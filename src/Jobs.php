@@ -9,6 +9,7 @@ namespace BeltoftServices;
 
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Install;
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 
@@ -391,6 +392,10 @@ final class Jobs {
 				continue;
 			}
 
+			if ( self::license_disagrees( $resource ) ) {
+				continue;
+			}
+
 			// A failed operation waiting for an admin has no operation (see Reconciler::operation()).
 			if ( null === Reconciler::operation( $resource ) ) {
 				// A failure whose alert was never sent (no valid address then) is sent now.
@@ -402,6 +407,35 @@ final class Jobs {
 
 			self::enqueue( $id, Reconciler::wait( $resource ) );
 		}
+	}
+
+	/**
+	 * Checks the resource against its license (beltoft-licenses state only), for a change the
+	 * listeners missed. A service meant to be ready on a license that is missing or not
+	 * active is paused. A service meant to be paused on an active license is only reported to
+	 * the admin: it may be paused by hand, so it is never resumed or deleted from here.
+	 *
+	 * @param Resource $resource Live resource.
+	 * @return bool True when a desired state was set and the resource is queued.
+	 */
+	private static function license_disagrees( Resource $resource ): bool {
+		$desired = $resource->get( 'desired' );
+		$license = $resource->license();
+		$active  = ! empty( $license ) && Licenses::STATUS_ACTIVE === Licenses::effective_status( $license );
+
+		if ( 'ready' === $desired && ! $active ) {
+			if ( $resource->desire( 'paused', 'License not active (found by the sweep)' ) ) {
+				self::enqueue( $resource->id() );
+			}
+
+			return true;
+		}
+
+		if ( 'paused' === $desired && $active && 'paused' === $resource->get( 'state' ) ) {
+			Alerts::admin( $resource, 'The service is paused but its license is active (found by the sweep). Resume it, or leave it paused on purpose.' );
+		}
+
+		return false;
 	}
 
 	/**

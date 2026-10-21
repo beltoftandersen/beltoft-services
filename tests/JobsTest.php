@@ -246,6 +246,74 @@ final class JobsTest extends TestCase {
 		$this->assertCount( 1, $this->pending( $pausing->id() ) );
 	}
 
+	/**
+	 * A resource on a license with the given status, created without the listeners.
+	 *
+	 * @param string               $status License status.
+	 * @param array<string, mixed> $meta   Resource meta.
+	 */
+	private function resource_on_license( string $status, array $meta ): Resource {
+		$driver   = $this->fake_driver();
+		$product  = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::create( $license, $driver, array(), $meta );
+
+		$this->assertInstanceOf( Resource::class, $resource );
+
+		// The status changes without the listeners: a change the service never heard of.
+		global $wpdb;
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'status' => $status ), array( 'id' => (int) $license['id'] ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		return $resource;
+	}
+
+	public function test_sweep_pauses_a_ready_service_whose_license_is_not_active(): void {
+		$revoked = $this->resource_on_license( \BeltoftLicenses\Licenses::STATUS_REVOKED, array( 'state' => 'ready' ) );
+		$active  = $this->resource_on_license( \BeltoftLicenses\Licenses::STATUS_ACTIVE, array( 'state' => 'ready' ) );
+
+		// A license that is gone is not active either.
+		$gone = $this->resource_on_license( \BeltoftLicenses\Licenses::STATUS_ACTIVE, array( 'state' => 'ready' ) );
+		global $wpdb;
+		$wpdb->delete( \BeltoftLicenses\Install::tables()['licenses'], array( 'id' => (int) $gone->license()['id'] ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$this->assertSame( array(), $gone->license() );
+
+		Jobs::sweep();
+
+		$this->assertSame( 'paused', Resource::find( $revoked->id() )->get( 'desired' ) );
+		$this->assertSame( 'paused', Resource::find( $gone->id() )->get( 'desired' ) );
+		$this->assertSame( 'ready', Resource::find( $active->id() )->get( 'desired' ) );
+		$this->assertCount( 1, $this->pending( $revoked->id() ) );
+		$this->assertSame( array(), $this->pending( $active->id() ) );
+
+		$events = wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $revoked->license()['id'] ), 'message' );
+		$this->assertContains( 'License not active (found by the sweep)', $events );
+	}
+
+	public function test_sweep_only_alerts_for_a_paused_service_on_an_active_license(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			20,
+			2
+		);
+
+		$resource = $this->resource_on_license( \BeltoftLicenses\Licenses::STATUS_ACTIVE, array( 'state' => 'paused', 'desired' => 'paused' ) );
+
+		Jobs::sweep();
+		Jobs::sweep();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ), 'Never resumed automatically.' );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertCount( 1, $mails, 'One alert, not one per sweep.' );
+		$this->assertStringContainsString( 'license is active', $mails[0]['message'] );
+	}
+
 	public function test_sweep_is_scheduled_every_fifteen_minutes(): void {
 		Jobs::schedule();
 		Jobs::schedule();
