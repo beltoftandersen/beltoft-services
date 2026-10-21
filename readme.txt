@@ -124,3 +124,4 @@ The settings, connections and email settings are deleted only if "Delete the set
 * WooCommerce → Services, a Service panel on each license, and customer emails.
 * Kill switch, and deletion after a retention period (off, report only or on).
 * WP-CLI: `link-http` and `status`.
+* Known limit: the Services list in the admin loads every live service for each view, which is fine for 0.1.0 and will be paged later.
