@@ -445,6 +445,15 @@ final class HttpDriver implements Driver, Opens {
 		$response             = $sent['response'];
 		$scrub                = array( (string) $connection['secret'], $sent['signature'], $body );
 
+		// The license key and the customer's email are in the body and the path, and a service
+		// may echo them back in an error.
+		foreach ( array( (string) $values['license_key'], (string) $values['email'] ) as $private ) {
+			$scrub[] = $private;
+			$scrub[] = rawurlencode( $private );
+			$scrub[] = urlencode( $private );
+		}
+
+
 		if ( is_wp_error( $response ) ) {
 			$meta['last_status'] = 0;
 
@@ -831,7 +840,7 @@ final class HttpDriver implements Driver, Opens {
 
 	/**
 	 * At most the first 200 characters of a response body, as one line of text, with the
-	 * secret, the signature and the request body removed first.
+	 * secret, the signature, the request body, the license key and the customer email removed first.
 	 *
 	 * @param string   $text  Response body.
 	 * @param string[] $scrub Values to remove.

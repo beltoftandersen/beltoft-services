@@ -438,6 +438,43 @@ class HttpDriverTest extends TestCase {
 		$this->assertCount( 2, $this->mails, 'The admin is alerted.' );
 	}
 
+	public function test_error_snippets_hide_the_license_key_and_the_customer_email(): void {
+		$this->connection();
+		$resource = $this->resource();
+		$license  = $resource->license();
+		$key      = (string) $license['license_key'];
+		$email    = (string) $license['email'];
+
+		$this->assertNotSame( '', $key );
+		$this->respond_with(
+			static function () use ( $key, $email ) {
+				return self::answer( 422, 'Rejected ' . $key . ' for ' . $email . ' (' . rawurlencode( $email ) . ')' );
+			}
+		);
+
+		$fresh = $this->step( $resource );
+		$error = (string) $fresh->get( 'last_error' );
+
+		$this->assertSame( 'failed', $fresh->get( 'state' ) );
+		$this->assertStringContainsString( 'Rejected', $error );
+		$this->assertStringNotContainsString( $key, $error );
+		$this->assertStringNotContainsString( $email, $error );
+		$this->assertStringNotContainsString( rawurlencode( $email ), $error );
+
+		foreach ( $this->mails as $mail ) {
+			$this->assertStringNotContainsString( $email, (string) $mail['message'] );
+		}
+
+		$events = (string) wp_json_encode( \BeltoftLicenses\Events::for_license( (int) $license['id'] ) );
+		$this->assertStringNotContainsString( $email, $events );
+
+		// A transport error that names the URL (a path with the key) is scrubbed too.
+		$other = $this->resource();
+		$okey  = (string) $other->license()['license_key'];
+		$this->answers( array( new \WP_Error( 'http_request_failed', 'cURL error 6: could not resolve https://api.example.com/x/' . rawurlencode( $okey ) ) ) );
+		$this->assertStringNotContainsString( $okey, (string) $this->step( $other )->get( 'last_error' ) );
+	}
+
 	public function test_medusa_tls_verification_is_on(): void {
 		$this->connection();
 		$resource = $this->resource();
