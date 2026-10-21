@@ -38,6 +38,9 @@ final class Product {
 		add_action( 'woocommerce_product_after_variable_attributes', array( __CLASS__, 'variation_fields' ), 10, 3 );
 		add_action( 'woocommerce_admin_process_variation_object', array( __CLASS__, 'save_variation' ), 10, 2 );
 
+		add_action( 'added_post_meta', array( __CLASS__, 'driver_meta_changed' ), 10, 4 );
+		add_action( 'updated_post_meta', array( __CLASS__, 'driver_meta_changed' ), 10, 4 );
+
 		add_filter( 'beltoft_licenses_api_license', array( __CLASS__, 'hide_from_api' ) );
 		add_filter( 'beltoft_licenses_resource_label', array( __CLASS__, 'resource_label' ), 10, 4 );
 		add_filter( 'beltoft_licenses_account_show_key', array( __CLASS__, 'show_key' ), 10, 2 );
@@ -100,6 +103,27 @@ final class Product {
 		if ( '' !== $slug && ! in_array( $slug, $slugs, true ) ) {
 			$slugs[] = $slug;
 			update_option( self::OPTION_SLUGS, $slugs, false );
+		}
+	}
+
+	/**
+	 * Remembers the software slug whenever a product's driver meta is added or updated with
+	 * a value, by any route (editor, CLI, import, code), not only the editor.
+	 *
+	 * @param int    $meta_id    Meta id.
+	 * @param int    $object_id  Post id.
+	 * @param string $meta_key   Meta key.
+	 * @param mixed  $meta_value Meta value.
+	 */
+	public static function driver_meta_changed( $meta_id, $object_id, $meta_key, $meta_value ): void {
+		if ( self::META_DRIVER !== $meta_key || ! is_scalar( $meta_value ) || '' === (string) $meta_value ) {
+			return;
+		}
+
+		$slug = (string) get_post_meta( (int) $object_id, \BeltoftLicenses\Software::META_SLUG, true );
+
+		if ( '' !== $slug ) {
+			self::remember_slug( $slug );
 		}
 	}
 
