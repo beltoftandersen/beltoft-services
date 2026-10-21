@@ -488,7 +488,9 @@ final class Resource {
 			}
 
 			if ( 'deleted' === $state ) {
-				$meta['replace_after_delete'] = $replace;
+				// Once a deletion is desired, "no replacement" wins: a later request (retention)
+				// cannot turn replacement back on after a deliberate deletion.
+				$meta['replace_after_delete'] = 'deleted' === $this->get( 'desired' ) ? ( $replace && $this->get( 'replace_after_delete' ) ) : $replace;
 			} elseif ( 'paused' === $state ) {
 				if ( null === $this->get( 'paused_at' ) ) {
 					$meta['paused_at'] = time();
@@ -496,6 +498,7 @@ final class Resource {
 			} else {
 				$meta['paused_at'] = null;
 				$meta['warned_at'] = null;
+				$meta['reported']  = '';
 			}
 
 			if ( ! $this->set( $meta ) ) {
@@ -533,7 +536,9 @@ final class Resource {
 
 	/**
 	 * Writes a pending desire, unless one requested later is already waiting, and queues the
-	 * resource.
+	 * resource. A waiting deletion is terminal here too: a later other desire leaves it in
+	 * place, and a later deletion keeps "no replacement" if the waiting one had it. A write
+	 * that fails alerts the admin (at most once an hour), so no desire is lost silently.
 	 *
 	 * @param string $state   Desired state.
 	 * @param string $reason  Reason.
@@ -544,6 +549,15 @@ final class Resource {
 		global $wpdb;
 
 		$waiting = $this->pending_desire();
+
+		if ( $waiting && 'deleted' === $waiting['state'] && $waiting['at'] <= $at ) {
+			if ( 'deleted' !== $state ) {
+				Jobs::enqueue( $this->id() );
+				return;
+			}
+
+			$replace = $replace && $waiting['replace'];
+		}
 
 		if ( ! $waiting || $waiting['at'] <= $at ) {
 			$name  = self::pending_desire_option( $this->id() );
@@ -560,8 +574,12 @@ final class Resource {
 			// One statement, whether or not the option exists: no cached view of it can turn
 			// the write into an update of nothing.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- caches are cleared below.
-			$wpdb->query( $wpdb->prepare( 'INSERT INTO %i ( option_name, option_value, autoload ) VALUES ( %s, %s, %s ) ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )', $wpdb->options, $name, $value, 'off' ) );
+			$written = $wpdb->query( $wpdb->prepare( 'INSERT INTO %i ( option_name, option_value, autoload ) VALUES ( %s, %s, %s ) ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )', $wpdb->options, $name, $value, 'off' ) );
 			self::forget_cached_option( $name );
+
+			if ( false === $written ) {
+				Alerts::write_failed( $this, sprintf( self::DESIRE_ERROR, $state ) );
+			}
 		}
 
 		Jobs::enqueue( $this->id() );
@@ -643,6 +661,109 @@ final class Resource {
 		if ( is_array( $missing ) && isset( $missing[ $name ] ) ) {
 			unset( $missing[ $name ] );
 			wp_cache_set( 'notoptions', $missing, 'options' );
+		}
+	}
+
+	/**
+	 * Error alerted when a new plan cannot be stored.
+	 */
+	public const PLAN_ERROR = 'The new plan could not be stored';
+
+	/**
+	 * Stores a new plan snapshot and marks it dirty, so the reconciler applies it
+	 * (update_plan), and writes a history event. Runs under the resource lock like desire(),
+	 * so a running job never overwrites it or marks it applied by mistake. A resource whose
+	 * deletion is desired keeps its plan: a replacement takes the product's plan anyway.
+	 *
+	 * @param array<string, mixed> $plan   Plan snapshot.
+	 * @param string               $reason What happened, for the history.
+	 * @return bool|null True when stored (or nothing to do), false when it could not be stored
+	 *                   (the admin is alerted), null when the lock stayed busy (try again later).
+	 */
+	public function change_plan( array $plan, string $reason ): ?bool {
+		return $this->locked(
+			function () use ( $plan, $reason ): bool {
+				// A resource on its way out keeps its plan.
+				if ( 'deleted' === $this->get( 'desired' ) ) {
+					return true;
+				}
+
+				if ( ! $this->set(
+					array(
+						'plan'       => $plan,
+						'plan_dirty' => true,
+					)
+				) ) {
+					Alerts::write_failed( $this, self::PLAN_ERROR );
+					return false;
+				}
+
+				Events::add( (int) $this->row['license_id'], 'service', $reason );
+				return true;
+			}
+		);
+	}
+
+	/**
+	 * Error alerted when retention bookkeeping cannot be stored.
+	 */
+	public const RETENTION_ERROR = 'The retention state could not be stored';
+
+	/**
+	 * Stores retention bookkeeping (warned_at, reported) under the resource lock, only while
+	 * the resource is still paused since $paused_at: a desire that changed it in the meantime
+	 * (a renewal) wins, and the caller must then not warn.
+	 *
+	 * @param array<string, mixed> $meta      Values (warned_at, reported).
+	 * @param int                  $paused_at The paused_at the caller decided on.
+	 * @return bool Whether it was stored.
+	 */
+	public function record_retention( array $meta, int $paused_at ): bool {
+		$meta = array_intersect_key( $meta, array_flip( array( 'warned_at', 'reported' ) ) );
+
+		return true === $this->locked(
+			function () use ( $meta, $paused_at ): bool {
+				if ( 'paused' !== $this->get( 'desired' ) || $this->get( 'paused_at' ) !== $paused_at ) {
+					return false;
+				}
+
+				if ( ! $this->set( $meta ) ) {
+					Alerts::write_failed( $this, self::RETENTION_ERROR );
+					return false;
+				}
+
+				return true;
+			}
+		);
+	}
+
+	/**
+	 * Runs a callback under the resource lock (waiting as desire() does), on a fresh read of
+	 * the row.
+	 *
+	 * @param callable $callback Returns whether it stored something.
+	 * @return bool|null The callback's result, or null when the lock stayed busy.
+	 */
+	private function locked( callable $callback ): ?bool {
+		$lock = Locks::name( 'resource', $this->id() );
+
+		/** This filter is documented in src/Resource.php (store_desire()). */
+		$wait = max( 0, (int) apply_filters( 'beltoft_services_desire_lock_wait', self::DESIRE_LOCK_WAIT ) );
+
+		if ( ! self::acquire( $lock, $wait ) ) {
+			return null;
+		}
+
+		try {
+			$fresh = Licenses::activation( $this->id() );
+
+			if ( $fresh ) {
+				$this->row = $fresh;
+			}
+
+			return (bool) $callback();
+		} finally {
+			self::release( $lock );
 		}
 	}
 

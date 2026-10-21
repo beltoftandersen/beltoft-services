@@ -44,6 +44,9 @@ final class Plugin {
 		Http\ConnectionsScreen::register();
 		Checkout::register();
 
+		Lifecycle::register();
+		Retention::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}
@@ -108,7 +111,7 @@ final class Plugin {
 
 	/**
 	 * Why the database server cannot run the plugin, or null when it can. The resource lock
-	 * is taken again inside a job that holds it, which needs re-entrant GET_LOCK: MySQL 5.7
+	 * is taken again inside a job that holds it, which needs re-entrant GET_LOCK: MySQL 5.7.5
 	 * or MariaDB 10.0.2 and newer. An unreadable version string is not refused.
 	 *
 	 * @param string $info Server version string (wpdb::db_server_info()).
@@ -126,13 +129,13 @@ final class Plugin {
 		}
 
 		$version = $match[1];
-		$minimum = $mariadb ? '10.0.2' : '5.7';
+		$minimum = $mariadb ? '10.0.2' : '5.7.5';
 
 		if ( version_compare( $version, $minimum, '>=' ) ) {
 			return null;
 		}
 
-		return sprintf( 'MySQL 5.7 or MariaDB 10.0.2 or newer, for re-entrant named locks (this server runs %s %s)', $mariadb ? 'MariaDB' : 'MySQL', $version );
+		return sprintf( 'MySQL 5.7.5 or MariaDB 10.0.2 or newer, for re-entrant named locks (this server runs %s %s)', $mariadb ? 'MariaDB' : 'MySQL', $version );
 	}
 
 	/**

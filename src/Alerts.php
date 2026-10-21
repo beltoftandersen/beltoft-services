@@ -77,6 +77,34 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a license's service could not be created (there is no resource to
+	 * hang the alert on). Sent once per call: a creation happens once per license event.
+	 *
+	 * @param array<string, mixed> $license License row.
+	 * @param string               $error   Error text.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function license( array $license, string $error ): bool {
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) ) {
+			return false;
+		}
+
+		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key  = (string) ( $license['license_key'] ?? '' );
+
+		$subject = sprintf( '[%s] Service not created: %s', $site, $key );
+		$lines   = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Product: %d', (int) ( $license['product_id'] ?? 0 ) ),
+			sprintf( 'Error: %s', $error ),
+		);
+
+		return (bool) wp_mail( $to, $subject, implode( "\n", $lines ) . "\n" );
+	}
+
+	/**
 	 * Alerts the admin that a write for the resource failed, at most once an hour per
 	 * resource (transient `beltoft_services_not_stored_<id>`, and once per request), so a
 	 * broken database does not flood the inbox.

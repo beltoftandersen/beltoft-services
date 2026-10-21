@@ -1205,4 +1205,55 @@ final class ReconcilerTest extends TestCase {
 		$this->assertEqualsWithDelta( $before + 900, $this->pending_at( $resource->id() ), 2 );
 		$this->assertCount( 1, $this->mails );
 	}
+
+	public function test_queued_desire_that_cannot_be_written_alerts_the_admin(): void {
+		list( $resource ) = $this->resource( array( 'state' => 'ready' ) );
+
+		global $wpdb;
+		$name  = Resource::pending_desire_option( $resource->id() );
+		$table = $wpdb->options;
+		$break = static function ( $query ) use ( $table, $name ) {
+			return 0 === strpos( ltrim( $query ), 'INSERT INTO `' . $table . '`' ) && false !== strpos( $query, $name ) ? '' : $query;
+		};
+
+		add_filter( 'query', $break );
+		$this->desire_while_locked( $resource, 'paused', 'License revoked' );
+		remove_filter( 'query', $break );
+
+		$this->assertNull( Resource::find( $resource->id() )->pending_desire() );
+		$this->assertCount( 1, $this->mails, 'The lost desire is not silent.' );
+		$this->assertStringContainsString( 'Desired state "paused" could not be stored', $this->mails[0]['message'] );
+	}
+
+	public function test_deliberate_deletion_without_replacement_is_not_turned_back_on(): void {
+		list( $resource ) = $this->resource( array( 'state' => 'paused' ) );
+
+		$this->assertTrue( $resource->desire( 'deleted', 'Deleted by an admin' ) );
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'deleted', 'Retention period ended', true ) );
+		$this->assertFalse( Resource::find( $resource->id() )->get( 'replace_after_delete' ), 'False wins over a later true.' );
+
+		list( $other ) = $this->resource( array( 'state' => 'paused' ) );
+
+		$this->assertTrue( $other->desire( 'deleted', 'Retention period ended', true ) );
+		$this->assertTrue( Resource::find( $other->id() )->desire( 'deleted', 'Deleted by an admin' ) );
+		$this->assertFalse( Resource::find( $other->id() )->get( 'replace_after_delete' ) );
+	}
+
+	public function test_queued_deletion_keeps_its_place_and_no_replacement(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+
+		Resource::find( $resource->id() )->queue_desire( 'deleted', 'Deleted by an admin' );
+		Resource::find( $resource->id() )->queue_desire( 'deleted', 'Retention period ended', true );
+		$this->assertFalse( Resource::find( $resource->id() )->pending_desire()['replace'], 'False wins in the queue too.' );
+
+		Resource::find( $resource->id() )->queue_desire( 'ready', 'License active' );
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->pending_desire()['state'], 'A queued deletion is terminal too.' );
+
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'deleted', $fresh->get( 'state' ) );
+		$this->assertFalse( $fresh->get( 'replace_after_delete' ) );
+		$this->assertCount( 1, $driver->calls( 'delete' ) );
+	}
 }

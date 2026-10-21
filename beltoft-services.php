@@ -51,8 +51,9 @@ add_action(
 	}
 );
 
-// The sweep stops with the plugin; pending reconcile jobs keep their place.
+// The sweep and the retention run stop with the plugin; pending reconcile jobs keep their place.
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'unschedule' ) );
+register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 'unschedule' ) );
 
 // After beltoft-licenses (priority 10), so its classes and hooks exist.
 add_action( 'plugins_loaded', array( \BeltoftServices\Plugin::class, 'boot' ), 20 );

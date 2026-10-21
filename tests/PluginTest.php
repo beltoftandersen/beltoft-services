@@ -56,7 +56,10 @@ class PluginTest extends TestCase {
 	public static function database_versions(): array {
 		return array(
 			'MySQL 5.6'                   => array( '5.6.51-log', false ),
-			'MySQL 5.7.0'                 => array( '5.7.0', true ),
+			'MySQL 5.7.0'                 => array( '5.7.0', false ),
+			'MySQL 5.7.4'                 => array( '5.7.4-log', false ),
+			'MySQL 5.7.5'                 => array( '5.7.5', true ),
+			'MySQL 5.7 without a patch'   => array( '5.7', false ),
 			'MySQL 8'                     => array( '8.0.36-0ubuntu0.22.04.1', true ),
 			'MariaDB 10.0.1 with prefix'  => array( '5.5.5-10.0.1-MariaDB', false ),
 			'MariaDB 10.0.2 with prefix'  => array( '5.5.5-10.0.2-MariaDB-log', true ),
@@ -88,7 +91,7 @@ class PluginTest extends TestCase {
 		Plugin::boot();
 
 		$this->assertFalse( Plugin::booted() );
-		$this->assertSame( array( 'MySQL 5.7 or MariaDB 10.0.2 or newer, for re-entrant named locks (this server runs MySQL 5.6.51)' ), Plugin::missing() );
+		$this->assertSame( array( 'MySQL 5.7.5 or MariaDB 10.0.2 or newer, for re-entrant named locks (this server runs MySQL 5.6.51)' ), Plugin::missing() );
 	}
 
 	public function test_this_database_is_supported(): void {
