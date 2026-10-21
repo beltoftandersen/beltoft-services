@@ -22,7 +22,11 @@ final class RateLimit {
 	/**
 	 * Counts this call. True when it is over the limit. A limit of 0 or less turns the check
 	 * off. Counters live in the persistent object cache when there is one, otherwise in
-	 * transients; if counting fails the call is let through.
+	 * transients; if counting fails the call is let through. Best-effort without a persistent
+	 * object cache (the transient path reads then writes, so concurrent calls can be missed). The
+	 * window is fixed, not sliding: it resets at each multiple of the window length. Callers must
+	 * namespace $key with their plugin slug, for example 'odoowoo-portal:verify', so plugins do
+	 * not share counters.
 	 *
 	 * @param int    $user_id User id.
 	 * @param string $key     What is being limited (a route, an action): counted apart per user.

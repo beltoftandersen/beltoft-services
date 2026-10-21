@@ -253,6 +253,18 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( 200, $this->request( 'GET', '/resources/' . $second->id(), $other )->get_status() );
 	}
 
+	public function test_routes_share_their_counter_with_the_public_limiter(): void {
+		list( $resource, , $user ) = $this->resource();
+		$route                     = '/beltoft-services/v1/resources/' . $resource->id();
+
+		// The status route allows 20 a minute; use them up through the public API.
+		for ( $i = 0; $i < Routes::STATUS_RATE_LIMIT; $i++ ) {
+			$this->assertFalse( \BeltoftServices\RateLimit::exceeded( $user, $route, Routes::STATUS_RATE_LIMIT, Routes::WINDOW ) );
+		}
+
+		$this->assertSame( 429, $this->request( 'GET', '/resources/' . $resource->id(), $user )->get_status() );
+	}
+
 	public function test_rate_limit_is_filterable(): void {
 		list( $resource, , $user ) = $this->resource();
 

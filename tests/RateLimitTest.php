@@ -50,8 +50,8 @@ final class RateLimitTest extends TestCase {
 		RateLimit::exceeded( 7, 'window', 5, 3600 );
 		RateLimit::exceeded( 7, 'window-default', 5 );
 
-		$long    = $this->timeout_for( 3600 );
-		$default = $this->timeout_for( MINUTE_IN_SECONDS );
+		$long    = $this->timeout_for( 'window', 3600 );
+		$default = $this->timeout_for( 'window-default', MINUTE_IN_SECONDS );
 
 		$this->assertEqualsWithDelta( time() + 3600, $long, 5 );
 		$this->assertEqualsWithDelta( time() + MINUTE_IN_SECONDS, $default, 5 );
@@ -64,20 +64,14 @@ final class RateLimitTest extends TestCase {
 	}
 
 	/**
-	 * Expiry of a counter transient whose lifetime matches the window.
+	 * Expiry of the counter transient for one key and window.
 	 *
+	 * @param string $key    Limiter key.
 	 * @param int    $window Window in seconds.
 	 */
-	private function timeout_for( int $window ): int {
-		global $wpdb;
+	private function timeout_for( string $key, int $window ): int {
+		$name = 'rl_' . md5( '7|' . $key . '|' . (int) floor( time() / $window ) );
 
-		$rows = $wpdb->get_col( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_timeout\\_beltoft\\_services\\_rl\\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		foreach ( $rows as $value ) {
-			if ( abs( (int) $value - ( time() + $window ) ) <= 5 ) {
-				return (int) $value;
-			}
-		}
-
-		return 0;
+		return (int) get_option( '_transient_timeout_beltoft_services_' . $name, 0 );
 	}
 }
