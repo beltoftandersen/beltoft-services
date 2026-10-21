@@ -198,9 +198,15 @@ final class Emails {
 	 * The daily usage check: asks every ready HTTP service for its usage (HttpDriver::status(),
 	 * which makes no request without a usage endpoint) and emails the customer once per new
 	 * count over the limit. A count back within the limit is forgotten, so a later overage is
-	 * sent again. Runs only as an Action Scheduler job, never during a page render.
+	 * sent again. Runs only as an Action Scheduler job, never during a page render, and does
+	 * nothing while "Pause all driver activity" is on.
 	 */
 	public static function usage(): void {
+		// The kill switch stops every request to services; the schedule stays.
+		if ( \BeltoftServices\Settings::get( 'pause_all' ) ) {
+			return;
+		}
+
 		$driver = Registry::get( 'http' );
 
 		if ( ! $driver ) {

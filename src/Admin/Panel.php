@@ -30,7 +30,8 @@ final class Panel {
 	public const CAPABILITY = 'manage_woocommerce';
 	public const ACTION     = 'beltoft_services_resource';
 	public const ACTIONS    = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect' );
-	public const CONFIRM    = 'DELETE';
+	public const CONFIRM      = 'DELETE';
+	public const CONFIRM_MARK = 'MARK DELETED';
 
 	/**
 	 * Hooks.
@@ -69,7 +70,7 @@ final class Panel {
 	 * - delete: the desired state deleted, without a replacement; needs $confirm = "DELETE"
 	 *   and an unprotected resource;
 	 * - mark_deleted: closes the resource as deleted without calling the service (for one
-	 *   that is gone already, such as a stranded delete);
+	 *   that is gone already, such as a stranded delete); needs $confirm = "MARK DELETED";
 	 * - protect, unprotect: retention and driver switches never delete a protected service.
 	 *
 	 * @param Resource $r       Resource.
@@ -79,11 +80,11 @@ final class Panel {
 	 */
 	public static function act( Resource $r, string $action, string $confirm = '' ) {
 		if ( ! in_array( $action, self::ACTIONS, true ) ) {
-			return new \WP_Error( 'invalid', __( 'Unknown action.', 'beltoft-services' ) );
+			return self::error( 'invalid' );
 		}
 
 		if ( ! $r->is_live() ) {
-			return new \WP_Error( 'closed', __( 'This service is closed already.', 'beltoft-services' ) );
+			return self::error( 'closed' );
 		}
 
 		$who        = self::who();
@@ -113,7 +114,7 @@ final class Panel {
 			case 'pause':
 			case 'resume':
 				if ( 'deleted' === $r->get( 'desired' ) ) {
-					return new \WP_Error( 'deleting', __( 'The service is being deleted.', 'beltoft-services' ) );
+					return self::error( 'deleting' );
 				}
 
 				// Stored now, or queued for the next step when the lock is busy.
@@ -123,8 +124,7 @@ final class Panel {
 
 			case 'delete':
 				if ( self::CONFIRM !== $confirm ) {
-					/* translators: %s: the word to type. */
-					return new \WP_Error( 'confirm', sprintf( __( 'Type %s to confirm the deletion.', 'beltoft-services' ), self::CONFIRM ) );
+					return self::error( 'confirm' );
 				}
 
 				$refused = false;
@@ -141,11 +141,15 @@ final class Panel {
 				);
 
 				if ( $refused ) {
-					return new \WP_Error( 'protected', __( 'This service is protected. Unprotect it first.', 'beltoft-services' ) );
+					return self::error( 'protected' );
 				}
 				break;
 
 			case 'mark_deleted':
+				if ( self::CONFIRM_MARK !== $confirm ) {
+					return self::error( 'confirm_mark' );
+				}
+
 				return self::mark_deleted( $r, $who );
 
 			default:
@@ -163,11 +167,11 @@ final class Panel {
 		}
 
 		if ( null === $stored ) {
-			return self::busy();
+			return self::error( 'busy' );
 		}
 
 		if ( false === $stored ) {
-			return new \WP_Error( 'error', __( 'The change could not be stored.', 'beltoft-services' ) );
+			return self::error( 'error' );
 		}
 
 		if ( in_array( $action, array( 'retry', 'pause', 'resume', 'delete' ), true ) ) {
@@ -215,11 +219,11 @@ final class Panel {
 		);
 
 		if ( null === $stored ) {
-			return self::busy();
+			return self::error( 'busy' );
 		}
 
 		if ( ! $stored ) {
-			return new \WP_Error( 'error', __( 'The change could not be stored.', 'beltoft-services' ) );
+			return self::error( 'error' );
 		}
 
 		delete_option( Resource::pending_desire_option( $r->id() ) );
@@ -233,10 +237,36 @@ final class Panel {
 	}
 
 	/**
-	 * The error when a job holds the resource.
+	 * Error messages by code. The redirect carries only the code, so a notice never shows
+	 * text taken from the URL.
+	 *
+	 * @return array<string, string>
 	 */
-	private static function busy(): \WP_Error {
-		return new \WP_Error( 'busy', __( 'The service is busy right now. Try again in a moment.', 'beltoft-services' ) );
+	public static function errors(): array {
+		return array(
+			'invalid'      => __( 'Unknown action.', 'beltoft-services' ),
+			'missing'      => __( 'That service does not exist.', 'beltoft-services' ),
+			'closed'       => __( 'This service is closed already.', 'beltoft-services' ),
+			'deleting'     => __( 'The service is being deleted.', 'beltoft-services' ),
+			/* translators: %s: the word to type. */
+			'confirm'      => sprintf( __( 'Type %s to confirm the deletion.', 'beltoft-services' ), self::CONFIRM ),
+			/* translators: %s: the words to type. */
+			'confirm_mark' => sprintf( __( 'Type %s to confirm.', 'beltoft-services' ), self::CONFIRM_MARK ),
+			'protected'    => __( 'This service is protected. Unprotect it first.', 'beltoft-services' ),
+			'busy'         => __( 'The service is busy right now. Try again in a moment.', 'beltoft-services' ),
+			'error'        => __( 'The change could not be stored.', 'beltoft-services' ),
+		);
+	}
+
+	/**
+	 * An error by code (see errors()).
+	 *
+	 * @param string $code Code.
+	 */
+	private static function error( string $code ): \WP_Error {
+		$errors = self::errors();
+
+		return new \WP_Error( $code, $errors[ $code ] ?? $errors['error'] );
 	}
 
 	/**
@@ -256,7 +286,7 @@ final class Panel {
 		$resource = Resource::find( $id );
 
 		if ( ! $resource ) {
-			wp_safe_redirect( \BeltoftLicenses\Admin\Screen::url( array( 'beltoft_services_error' => __( 'That service does not exist.', 'beltoft-services' ) ) ) );
+			wp_safe_redirect( \BeltoftLicenses\Admin\Screen::url( array( 'beltoft_services_error' => 'missing' ) ) );
 			exit;
 		}
 
@@ -264,7 +294,7 @@ final class Panel {
 		$args   = array( 'license' => (int) ( $resource->license()['id'] ?? 0 ) );
 
 		if ( is_wp_error( $result ) ) {
-			$args['beltoft_services_error'] = $result->get_error_message();
+			$args['beltoft_services_error'] = $result->get_error_code();
 		} else {
 			$args['beltoft_services_notice'] = $action;
 		}
@@ -284,7 +314,7 @@ final class Panel {
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only view parameters.
 		$notice = isset( $_GET['beltoft_services_notice'] ) ? sanitize_key( wp_unslash( $_GET['beltoft_services_notice'] ) ) : '';
-		$error  = isset( $_GET['beltoft_services_error'] ) ? sanitize_text_field( wp_unslash( $_GET['beltoft_services_error'] ) ) : '';
+		$error  = isset( $_GET['beltoft_services_error'] ) ? sanitize_key( wp_unslash( $_GET['beltoft_services_error'] ) ) : '';
 		// phpcs:enable
 
 		$messages = array(
@@ -301,8 +331,10 @@ final class Panel {
 			printf( '<div class="notice notice-success is-dismissible"><p>%s</p></div>', esc_html( $messages[ $notice ] ) );
 		}
 
-		if ( '' !== $error ) {
-			printf( '<div class="notice notice-error"><p>%s</p></div>', esc_html( $error ) );
+		$errors = self::errors();
+
+		if ( isset( $errors[ $error ] ) ) {
+			printf( '<div class="notice notice-error"><p>%s</p></div>', esc_html( $errors[ $error ] ) );
 		}
 
 		$count = count( self::problems() );
@@ -433,13 +465,30 @@ final class Panel {
 					)
 				)
 			);
-			echo '<button type="submit" class="button button-link-delete">' . esc_html__( 'Delete', 'beltoft-services' ) . '</button></p></form>';
+			echo '<button type="submit" class="button button-link-delete">' . esc_html__( 'Delete', 'beltoft-services' ) . '</button></p>';
+
+			if ( \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $license ) ) {
+				echo '<p class="description">' . esc_html__( 'A renewal of an active license creates a new service.', 'beltoft-services' ) . '</p>';
+			}
+
+			echo '</form>';
 		}
 
 		echo '<h3>' . esc_html__( 'Mark deleted', 'beltoft-services' ) . '</h3>';
 		echo '<p class="description">' . esc_html__( 'For a service that is already gone (removed by hand, or a deletion the service cannot complete): closes it here without calling the service.', 'beltoft-services' ) . '</p>';
+		echo '<p class="description"><strong>' . esc_html__( 'If the service still exists it keeps running and is no longer managed here. A renewal of an active license creates a new service.', 'beltoft-services' ) . '</strong></p>';
 		self::form_open( $r, 'mark_deleted' );
-		echo '<p><button type="submit" class="button">' . esc_html__( 'Mark deleted', 'beltoft-services' ) . '</button></p></form>';
+		printf(
+			'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
+			esc_html(
+				sprintf(
+					/* translators: %s: the words to type. */
+					__( 'Type %s to confirm:', 'beltoft-services' ),
+					self::CONFIRM_MARK
+				)
+			)
+		);
+		echo '<button type="submit" class="button">' . esc_html__( 'Mark deleted', 'beltoft-services' ) . '</button></p></form>';
 	}
 
 	/**

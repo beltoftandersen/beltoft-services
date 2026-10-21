@@ -46,6 +46,7 @@ final class EmailsTest extends TestCase {
 
 	public function tear_down(): void {
 		delete_option( Connections::OPTION );
+		$this->set_import_running( false );
 
 		parent::tear_down();
 	}
@@ -377,5 +378,84 @@ final class EmailsTest extends TestCase {
 		Registry::get( 'http' )->render_account( $resource );
 		ob_end_clean();
 		$this->assertSame( array(), $this->http_calls() );
+	}
+
+	/**
+	 * Sets beltoft-licenses' import flag.
+	 *
+	 * @param bool $running Running.
+	 */
+	private function set_import_running( bool $running ): void {
+		$flag = new \ReflectionProperty( \BeltoftLicenses\Import::class, 'running' );
+		$flag->setAccessible( true );
+		$flag->setValue( null, $running );
+	}
+
+	public function test_usage_does_nothing_while_driver_activity_is_paused(): void {
+		$this->connection();
+		$this->http_resource();
+		$this->usage_is( 9 );
+		Emails::schedule();
+		$this->settings( array( 'pause_all' => true ) );
+
+		Emails::usage();
+
+		$this->assertSame( array(), $this->http_calls(), 'No request while the kill switch is on.' );
+		$this->assertSame( array(), $this->customer_mails() );
+		$this->assertNotEmpty( as_get_scheduled_actions( array( 'hook' => Emails::USAGE_HOOK, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ), 'The schedule stays.' );
+
+		$this->settings( array( 'pause_all' => false ) );
+		Emails::usage();
+		$this->assertCount( 1, $this->customer_mails( 'limit' ) );
+	}
+
+	public function test_no_email_while_licenses_import(): void {
+		$this->fake_driver();
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) );
+
+		$this->set_import_running( true );
+		Emails::on_state_changed( Resource::find( $resource->id() ), 'provisioning', 'ready' );
+		Emails::on_state_changed( Resource::find( $resource->id() ), 'ready', 'paused' );
+		do_action( Retention::WARNING_HOOK, Resource::find( $resource->id() ), time() + DAY_IN_SECONDS );
+
+		$this->assertSame( array(), $this->customer_mails() );
+		$this->assertSame( null, Resource::find( $resource->id() )->get( 'notified' ), 'Nothing is recorded as told.' );
+
+		$this->set_import_running( false );
+		Emails::on_state_changed( Resource::find( $resource->id() ), 'provisioning', 'ready' );
+		$this->assertCount( 1, $this->customer_mails( 'ready' ) );
+	}
+
+	public function test_trigger_restores_the_locale_when_sending_throws(): void {
+		$this->fake_driver();
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) );
+
+		$restored = 0;
+		add_filter(
+			'woocommerce_email_restore_locale',
+			static function ( $restore ) use ( &$restored ) {
+				++$restored;
+				return $restore;
+			}
+		);
+		add_filter(
+			'woocommerce_email_recipient_beltoft_services_ready',
+			static function () {
+				throw new \RuntimeException( 'Recipient lookup failed' );
+			}
+		);
+
+		try {
+			Emails::get( 'beltoft_services_ready' )->trigger( $resource );
+			$this->fail( 'The exception reaches the caller.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 'Recipient lookup failed', $e->getMessage() );
+		}
+
+		$this->assertSame( 1, $restored, 'The locale is restored.' );
 	}
 }

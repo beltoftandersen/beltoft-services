@@ -53,36 +53,38 @@ abstract class ServiceEmail extends \WC_Email {
 	 */
 	public function trigger( Resource $r, array $data = array() ): bool {
 		$this->setup_locale();
-
-		$license = $r->license();
-		$user    = ! empty( $license['user_id'] ) ? get_userdata( (int) $license['user_id'] ) : false;
-		$driver  = Registry::get( $r->get( 'driver' ) );
-		$used    = (int) ( $data['used'] ?? 0 );
-		$limit   = (int) ( $data['limit'] ?? 0 );
-		$date    = isset( $data['deletes_at'] ) ? wp_date( (string) get_option( 'date_format' ), (int) $data['deletes_at'] ) : '';
-
-		$this->object    = $r;
-		$this->recipient = (string) ( $license['email'] ?? '' );
-		$this->values    = array(
-			'product_name'  => $license ? View::product_name( $license ) : '',
-			'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
-			'account_url'   => wc_get_account_endpoint_url( Endpoint::slug() ),
-			'deletion_date' => (string) $date,
-			'used'          => $used,
-			'limit'         => $limit,
-			'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
-		);
-
-		$this->placeholders['{product_name}']  = $this->values['product_name'];
-		$this->placeholders['{deletion_date}'] = $this->values['deletion_date'];
-
 		$sent = false;
 
-		if ( $this->is_enabled() && $this->get_recipient() ) {
-			$sent = (bool) $this->send( $this->get_recipient(), $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );
-		}
+		try {
+			$license = $r->license();
+			$user    = ! empty( $license['user_id'] ) ? get_userdata( (int) $license['user_id'] ) : false;
+			$driver  = Registry::get( $r->get( 'driver' ) );
+			$used    = (int) ( $data['used'] ?? 0 );
+			$limit   = (int) ( $data['limit'] ?? 0 );
+			$date    = isset( $data['deletes_at'] ) ? wp_date( (string) get_option( 'date_format' ), (int) $data['deletes_at'] ) : '';
 
-		$this->restore_locale();
+			$this->object    = $r;
+			$this->recipient = (string) ( $license['email'] ?? '' );
+			$this->values    = array(
+				'product_name'  => $license ? View::product_name( $license ) : '',
+				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
+				'account_url'   => wc_get_account_endpoint_url( Endpoint::slug() ),
+				'deletion_date' => (string) $date,
+				'used'          => $used,
+				'limit'         => $limit,
+				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
+			);
+
+			$this->placeholders['{product_name}']  = $this->values['product_name'];
+			$this->placeholders['{deletion_date}'] = $this->values['deletion_date'];
+
+			if ( $this->is_enabled() && $this->get_recipient() ) {
+				$sent = (bool) $this->send( $this->get_recipient(), $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );
+			}
+		} finally {
+			// Also when a filter or the mailer throws.
+			$this->restore_locale();
+		}
 
 		return $sent;
 	}

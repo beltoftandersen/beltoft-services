@@ -239,7 +239,7 @@ final class AdminPanelTest extends TestCase {
 				'confirm'  => 'nope',
 			)
 		);
-		$this->assertStringContainsString( 'beltoft_services_error=', $target );
+		$this->assertStringContainsString( 'beltoft_services_error=confirm', $target );
 		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'desired' ) );
 
 		// A protected service is not deleted, even when confirmed.
@@ -283,10 +283,19 @@ final class AdminPanelTest extends TestCase {
 			3
 		);
 
+		// Without or with the wrong confirmation: nothing happens.
+		foreach ( array( '', 'mark deleted', 'DELETE' ) as $typed ) {
+			$this->assertWPError( Panel::act( Resource::find( $resource->id() ), 'mark_deleted', $typed ), 'Typed: "' . $typed . '"' );
+			$this->assertTrue( Resource::find( $resource->id() )->is_live() );
+			$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
+		}
+		$this->assertSame( array(), $changes );
+
 		$target = $this->post(
 			array(
 				'resource' => $resource->id(),
 				'do'       => 'mark_deleted',
+				'confirm'  => 'MARK DELETED',
 			)
 		);
 		$this->assertStringContainsString( 'beltoft_services_notice=mark_deleted', $target );
@@ -321,7 +330,7 @@ final class AdminPanelTest extends TestCase {
 			$result = Panel::act( $resource, 'protect' );
 			$this->assertWPError( $result );
 			$this->assertFalse( Resource::find( $resource->id() )->get( 'protected' ) );
-			$this->assertWPError( Panel::act( $resource, 'mark_deleted' ) );
+			$this->assertWPError( Panel::act( $resource, 'mark_deleted', 'MARK DELETED' ) );
 			$this->assertTrue( Resource::find( $resource->id() )->is_live() );
 		} finally {
 			$other->close();
@@ -360,11 +369,32 @@ final class AdminPanelTest extends TestCase {
 			$this->assertStringContainsString( 'value="' . $do . '"', $html );
 		}
 		$this->assertStringContainsString( 'name="confirm"', $html );
+		$this->assertStringContainsString( 'MARK DELETED', $html );
+		$this->assertStringContainsString( 'If the service still exists it keeps running and is no longer managed here.', $html );
+		$this->assertStringContainsString( 'A renewal of an active license creates a new service.', $html );
 
 		// Nothing for a license that is not a service.
 		ob_start();
 		do_action( 'beltoft_licenses_admin_license', array( 'id' => 999999, 'product_id' => 0, 'product_slug' => 'plain-plugin' ) );
 		$this->assertSame( '', trim( (string) ob_get_clean() ) );
+	}
+
+	public function test_error_notices_show_only_known_messages(): void {
+		$this->admin();
+
+		$_GET = array( 'beltoft_services_error' => 'Your account is suspended, call 555-0100' );
+		ob_start();
+		Panel::notices();
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'suspended', $html );
+		$this->assertStringNotContainsString( '555-0100', $html );
+
+		$_GET = array( 'beltoft_services_error' => 'confirm' );
+		ob_start();
+		Panel::notices();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'notice-error', $html );
+		$this->assertStringContainsString( 'Type DELETE to confirm', $html );
 	}
 
 	public function test_site_wide_notice_when_an_alert_could_not_be_sent(): void {
