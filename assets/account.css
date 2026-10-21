@@ -1,0 +1,52 @@
+/*
+ * My Account → Licenses: the service panel. Layout only: fonts and colours come from the theme
+ * except for the state badge. Turn it off with
+ * add_filter( 'beltoft_services_account_css', '__return_false' ).
+ */
+.beltoft-services-panel {
+	margin-top: 1em;
+	padding-top: 1em;
+	border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.beltoft-services-panel__head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5em 1em;
+}
+
+.beltoft-services-badge {
+	display: inline-block;
+	font-size: 0.875em;
+	padding: 0.1em 0.6em;
+	border: 1px solid currentColor;
+	border-radius: 1em;
+	white-space: nowrap;
+}
+
+.beltoft-services-badge--ready {
+	color: #1a7f37;
+}
+
+.beltoft-services-badge--getting-ready {
+	color: #8a6d00;
+}
+
+.beltoft-services-badge--paused {
+	color: #57606a;
+}
+
+.beltoft-services-badge--failed {
+	color: #b42318;
+}
+
+.beltoft-services-panel__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5em;
+}
+
+.beltoft-services-panel__notice:empty {
+	display: none;
+}

@@ -818,8 +818,13 @@ class HttpDriverTest extends TestCase {
 		$this->assertStringContainsString( 'Open app', $html );
 		$this->assertStringNotContainsString( self::SECRET, $html );
 
-		$this->assertSame( 1, preg_match( '#href="https://app\.example\.com/open\?t=([^"]+)"#', $html, $m ) );
-		$payload = Signer::verify_open_token( Connections::get( 'svc' ), html_entity_decode( $m[1] ) );
+		// The page links to the open route; the token is made when the route is followed.
+		$this->assertStringNotContainsString( 'app.example.com', $html );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Api\Routes::open_url( $fresh->id() ) ), $html );
+
+		$this->assertSame( 1, preg_match( '#^https://app\.example\.com/open\?t=(.+)$#', (string) $this->driver()->open_url( $fresh ), $m ) );
+		$this->assertCount( $count, $this->http_calls(), 'Making the open URL makes no request.' );
+		$payload = Signer::verify_open_token( Connections::get( 'svc' ), rawurldecode( $m[1] ) );
 		$this->assertIsArray( $payload );
 		$this->assertSame( $fresh->get( 'uuid' ), $payload['tenant'] );
 		$this->assertSame( 'customer@example.com', $payload['email'] );
@@ -839,7 +844,8 @@ class HttpDriverTest extends TestCase {
 		$fresh->set( array( 'state' => 'ready' ) );
 		ob_start();
 		$this->driver()->render_account( $fresh );
-		$this->assertStringNotContainsString( 'open?t=', (string) ob_get_clean() );
+		$this->assertStringNotContainsString( 'Open app', (string) ob_get_clean() );
+		$this->assertNull( $this->driver()->open_url( $fresh ) );
 	}
 
 	public function test_admin_panel_shows_remote_id_and_last_request(): void {

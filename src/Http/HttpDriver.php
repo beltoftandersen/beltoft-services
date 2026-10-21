@@ -7,7 +7,9 @@
 
 namespace BeltoftServices\Http;
 
+use BeltoftServices\Api\Routes;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\Opens;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -30,7 +32,7 @@ defined( 'ABSPATH' ) || exit;
  * gone); 408, 429, 5xx and transport
  * errors are retried (honouring Retry-After); anything else fails. Redirects are not followed.
  */
-final class HttpDriver implements Driver {
+final class HttpDriver implements Driver, Opens {
 
 	/**
 	 * Error when a provision answer carries no remote id.
@@ -234,8 +236,8 @@ final class HttpDriver implements Driver {
 
 	/**
 	 * The state, the limit, the last known usage and, when the connection has an open URL and
-	 * the resource is ready, an "Open" button with a five-minute sign-in token. No request is
-	 * made while rendering.
+	 * the resource is ready, an "Open" button. The button links to the open route, which makes
+	 * the five-minute sign-in token when it is clicked. No request is made while rendering.
 	 *
 	 * @param Resource $r Resource.
 	 */
@@ -256,15 +258,43 @@ final class HttpDriver implements Driver {
 
 		$connection = $this->connection( $r );
 
-		if ( 'ready' === $state && $connection && '' !== (string) $connection['open_url'] && '' !== (string) $connection['secret'] ) {
-			$token = Signer::open_token( $connection, $r->get( 'uuid' ), (string) ( $license['email'] ?? '' ), (string) ( $license['license_key'] ?? '' ) );
-			$url   = str_replace( '{token}', rawurlencode( $token ), (string) $connection['open_url'] );
+		if ( 'ready' === $state && self::can_open( $connection ) ) {
+			// The token is made when the button is clicked (Routes::open), never in the page.
+			$url   = Routes::open_url( $r->id() );
 			$label = '' !== (string) $connection['open_label'] ? (string) $connection['open_label'] : __( 'Open', 'beltoft-services' );
 
 			echo '<p><a class="button woocommerce-button beltoft-services-http-open" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $label ) . '</a></p>';
 		}
 
 		echo '</div>';
+	}
+
+	/**
+	 * The connection's open URL with a five-minute sign-in token made now, or null when the
+	 * connection has no open URL or secret. No request is made.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function open_url( Resource $r ): ?string {
+		$connection = $this->connection( $r );
+
+		if ( ! self::can_open( $connection ) ) {
+			return null;
+		}
+
+		$license = $r->license();
+		$token   = Signer::open_token( $connection, $r->get( 'uuid' ), (string) ( $license['email'] ?? '' ), (string) ( $license['license_key'] ?? '' ) );
+
+		return str_replace( '{token}', rawurlencode( $token ), (string) $connection['open_url'] );
+	}
+
+	/**
+	 * Whether a connection can sign customers in: it has an open URL and a secret.
+	 *
+	 * @param array<string, mixed>|null $connection Connection, secret decrypted.
+	 */
+	private static function can_open( ?array $connection ): bool {
+		return $connection && '' !== (string) $connection['open_url'] && '' !== (string) $connection['secret'];
 	}
 
 	/**

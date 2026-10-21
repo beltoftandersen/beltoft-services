@@ -250,6 +250,32 @@ final class Resource {
 	}
 
 	/**
+	 * May its customer see its state? While it is live, its license is active and it is
+	 * meant to run: not when it is paused or on its way out. A failed resource shows (as
+	 * failed), so the customer knows to get in touch.
+	 */
+	public function shows_status(): bool {
+		if ( ! $this->is_live() || 'ready' !== $this->get( 'desired' ) || in_array( $this->get( 'state' ), array( 'paused', 'deleting', 'deleted' ), true ) ) {
+			return false;
+		}
+
+		$license = $this->license();
+
+		return $license && Licenses::STATUS_ACTIVE === Licenses::effective_status( $license );
+	}
+
+	/**
+	 * May its customer run actions on it now? Only when it shows its status, is ready, is valid
+	 * and no other desired state is waiting to be applied.
+	 */
+	public function accepts_actions(): bool {
+		return $this->is_valid()
+			&& 'ready' === $this->get( 'state' )
+			&& null === $this->pending_desire()
+			&& $this->shows_status();
+	}
+
+	/**
 	 * One property, typed, with its default when unset.
 	 *
 	 * @param string $key Property.
