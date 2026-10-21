@@ -14,3 +14,4 @@ if ( empty( $beltoft_services_settings['delete_data'] ) ) {
 }
 
 delete_option( 'beltoft_services_settings' );
+delete_option( 'beltoft_services_alert_problem' );

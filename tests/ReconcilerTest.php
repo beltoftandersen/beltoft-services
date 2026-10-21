@@ -520,7 +520,8 @@ final class ReconcilerTest extends TestCase {
 			array( 'failed', 'ready', false, 'provision', 3, false, null ),
 			array( 'failed', 'ready', false, 'resume', 0, false, 'resume' ),
 			array( 'failed', 'ready', false, 'update_plan', 0, false, 'update_plan' ),
-			array( 'failed', 'ready', false, 'pause', 0, false, null ),
+			array( 'failed', 'ready', false, 'pause', 2, false, 'resume' ),
+			array( 'failed', 'ready', false, 'delete', 1, false, 'resume' ),
 			array( 'failed', 'ready', false, '', 0, false, null ),
 			array( 'paused', 'ready', false, '', 0, false, 'resume' ),
 			array( 'paused', 'ready', true, '', 0, false, 'resume' ),
@@ -551,18 +552,188 @@ final class ReconcilerTest extends TestCase {
 			list( $state, $desired, $dirty, $failed_op, $attempts, $steps, $operation ) = $case;
 			$resource->set(
 				array(
-					'state'      => $state,
-					'desired'    => $desired,
-					'plan_dirty' => $dirty,
-					'failed_op'  => $failed_op,
-					'op'         => $failed_op,
-					'attempts'   => $attempts,
-					'steps'      => $steps ? array( 'created' ) : array(),
+					'state'          => $state,
+					'desired'        => $desired,
+					'plan_dirty'     => $dirty,
+					'failed_op'      => $failed_op,
+					'failed_desired' => $desired,
+					'op'             => $failed_op,
+					'attempts'       => $attempts,
+					'steps'          => $steps ? array( 'created' ) : array(),
 				)
 			);
 
 			$this->assertSame( $operation, Reconciler::operation( $resource ), "$state → $desired" . ( $dirty ? ' (plan dirty)' : '' ) . ( $failed_op ? " (failed $failed_op, $attempts attempts)" : '' ) . ( $steps ? ' (with steps)' : '' ) );
 		}
+
+		// The admin wait holds only under the desired state the resource failed under.
+		$resource->set(
+			array(
+				'state'          => 'failed',
+				'desired'        => 'ready',
+				'failed_op'      => 'provision',
+				'failed_desired' => 'paused',
+				'op'             => 'provision',
+				'attempts'       => 3,
+			)
+		);
+		$this->assertSame( 'provision', Reconciler::operation( $resource ) );
+	}
+
+	public function test_alerts_once_per_operation_and_error(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::fail( 'Host unreachable' ) );
+		$driver->will( 'pause', StepResult::retry( 0, 'Host unreachable' ) );
+
+		Jobs::run( $resource->id() );
+		$this->assertCount( 1, $this->mails );
+
+		Resource::find( $resource->id() )->desire( 'paused', 'License revoked' );
+
+		for ( $i = 0; $i < 6; $i++ ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+		}
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $fresh->get( 'state' ) );
+		$this->assertSame( 'pause', $fresh->get( 'failed_op' ) );
+		$this->assertCount( 6, $driver->calls( 'pause' ) );
+		$this->assertCount( 2, $this->mails, 'The failed pause is alerted although the error text is the same.' );
+		$this->assertStringContainsString( 'Operation: pause', $this->mails[1]['message'] );
+	}
+
+	public function test_invalid_admin_email_keeps_the_alert_for_later(): void {
+		$this->settings( array( 'admin_email' => 'not-an-address' ) );
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::fail( 'Host unreachable' ) );
+
+		Jobs::run( $resource->id() );
+
+		$this->assertSame( array(), $this->mails );
+		$this->assertSame( '', (string) Resource::find( $resource->id() )->get( 'alerted' ) );
+		$problem = get_option( \BeltoftServices\Alerts::PROBLEM_OPTION );
+		$this->assertIsArray( $problem );
+		$this->assertSame( $resource->id(), $problem['resource'] );
+
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$this->admin_retry( $resource );
+		$this->run_jobs();
+
+		$this->assertCount( 1, $this->mails );
+		$this->assertSame( 'ops@example.com', $this->mails[0]['to'] );
+		$this->assertFalse( get_option( \BeltoftServices\Alerts::PROBLEM_OPTION ) );
+	}
+
+	public function test_failed_pause_reinstated_then_revoked_again(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		for ( $i = 0; $i < 6; $i++ ) {
+			$driver->will( 'pause', StepResult::retry( 0, 'Host unreachable' ) );
+		}
+		$driver->will( 'pause', StepResult::fail( 'Host unreachable' ) );
+
+		$resource->desire( 'paused', 'License revoked' );
+		for ( $i = 0; $i < 6; $i++ ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+		}
+
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertCount( 1, $this->mails );
+
+		// Waiting for the admin: nothing runs by itself.
+		Jobs::run( $resource->id() );
+		$this->assertCount( 6, $driver->calls( 'pause' ) );
+
+		// Reinstated: the failed pause leaves the service running, so it resumes.
+		Resource::find( $resource->id() )->desire( 'ready', 'License reinstated' );
+		Jobs::enqueue( $resource->id() );
+		$this->run_jobs();
+		$this->assertCount( 1, $driver->calls( 'resume' ) );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+
+		// Revoked again: pause runs with a fresh count and its failure is alerted.
+		Resource::find( $resource->id() )->desire( 'paused', 'License revoked' );
+		Jobs::enqueue( $resource->id() );
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertCount( 7, $driver->calls( 'pause' ) );
+		$this->assertSame( 'failed', $fresh->get( 'state' ) );
+		$this->assertSame( 1, $fresh->get( 'attempts' ) );
+		$this->assertCount( 2, $this->mails );
+	}
+
+	public function test_failed_bookkeeping_write_is_logged_and_not_requeued(): void {
+		list( $resource ) = $this->resource();
+		$table            = \BeltoftLicenses\Install::tables()['activations'];
+		$break            = static function ( $query ) use ( $table ) {
+			return 0 === strpos( ltrim( $query ), 'UPDATE `' . $table . '`' ) ? '' : $query;
+		};
+
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) use ( $break ) {
+				$drivers['fake'] = new class( $break ) extends FakeDriver {
+					/**
+					 * Query filter.
+					 *
+					 * @var callable
+					 */
+					private $break;
+
+					public function __construct( callable $brk ) {
+						$this->break = $brk;
+					}
+
+					public function provision( Resource $r ): StepResult {
+						add_filter( 'query', $this->break );
+						return StepResult::retry( 0, 'Booting' );
+					}
+				};
+				return $drivers;
+			},
+			20
+		);
+
+		$log  = wp_tempnam( 'bs-log' );
+		$prev = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky
+
+		Jobs::run( $resource->id() );
+		Jobs::run( $resource->id() );
+
+		ini_set( 'error_log', $prev ); // phpcs:ignore WordPress.PHP.IniSet.Risky
+		remove_filter( 'query', $break );
+		$logged = (string) file_get_contents( $log ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		wp_delete_file( $log );
+
+		$this->assertNull( $this->pending_at( $resource->id() ), 'Nothing loops on a broken write.' );
+		$this->assertSame( 1, substr_count( $logged, 'resource ' . $resource->id() . ' could not be updated' ) );
+	}
+
+	public function test_pause_without_steps_stops_when_it_cannot_be_stored(): void {
+		list( $resource, $driver ) = $this->resource();
+		$resource->desire( 'paused', 'License revoked' );
+		$table = \BeltoftLicenses\Install::tables()['activations'];
+		$break = static function ( $query ) use ( $table ) {
+			return 0 === strpos( ltrim( $query ), 'UPDATE `' . $table . '`' ) ? '' : $query;
+		};
+
+		$log  = wp_tempnam( 'bs-log' );
+		$prev = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky
+		add_filter( 'query', $break );
+
+		Jobs::run( $resource->id() );
+
+		remove_filter( 'query', $break );
+		ini_set( 'error_log', $prev ); // phpcs:ignore WordPress.PHP.IniSet.Risky
+		$logged = (string) file_get_contents( $log ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		wp_delete_file( $log );
+
+		$this->assertStringContainsString( 'resource ' . $resource->id() . ' could not be updated', $logged );
+		$this->assertNull( $this->pending_at( $resource->id() ) );
+		$this->assertSame( 'requested', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertSame( array(), $driver->calls() );
 	}
 
 	public function test_pause_resume_and_update_plan(): void {

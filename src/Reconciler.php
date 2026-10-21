@@ -25,11 +25,14 @@ defined( 'ABSPATH' ) || exit;
  * | ready   | paused, failed after resume                        | resume                 |
  * | ready   | ready with plan_dirty, failed after update_plan    | update_plan            |
  *
- * `attempts` counts per operation (meta `op`): it starts again when the operation changes and
- * is never reset by failures of the same operation. A failed resource does not retry the
- * operation that failed (meta `failed_op`) by itself once it has counted attempts: an admin
- * retry resets `attempts` and queues it. Another operation (the license was revoked, say)
- * starts with a fresh count.
+ * A failed pause or delete whose desired state is ready again resumes.
+ *
+ * `attempts` counts per operation (meta `op`): it starts again when the operation or the
+ * desired state changes and is never reset by failures of the same operation. A failed
+ * resource does not retry the operation that failed (meta `failed_op`) by itself while the
+ * desired state is still the one it failed under (meta `failed_desired`) and it has counted
+ * attempts: an admin retry resets `attempts` and queues it. Another operation or a new
+ * desired state (the license was revoked, say) starts with a fresh count.
  */
 final class Reconciler {
 
@@ -48,7 +51,7 @@ final class Reconciler {
 	 * Meta only the reconciler and the resource itself write. A driver's step meta cannot
 	 * change these.
 	 */
-	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'alerted', 'protected', 'paused_at', 'warned_at' );
+	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at' );
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -74,7 +77,13 @@ final class Reconciler {
 
 		$operation = self::wanted( $r );
 
-		if ( null !== $operation && 'failed' === $r->get( 'state' ) && $r->get( 'failed_op' ) === $operation && $r->get( 'attempts' ) > 0 ) {
+		if (
+			null !== $operation
+			&& 'failed' === $r->get( 'state' )
+			&& $r->get( 'failed_op' ) === $operation
+			&& $r->get( 'failed_desired' ) === $r->get( 'desired' )
+			&& $r->get( 'attempts' ) > 0
+		) {
 			return null;
 		}
 
@@ -103,7 +112,7 @@ final class Reconciler {
 			return 'provision';
 		}
 
-		if ( 'paused' === $state || 'resume' === $failed_op ) {
+		if ( 'paused' === $state || in_array( $failed_op, array( 'resume', 'pause', 'delete' ), true ) ) {
 			return 'resume';
 		}
 
@@ -157,7 +166,10 @@ final class Reconciler {
 
 		// Nothing exists yet, so there is nothing to pause.
 		if ( 'pause' === $operation && 'requested' === $r->get( 'state' ) && ! $r->get( 'steps' ) ) {
-			$r->set( self::cleared() );
+			if ( ! $r->set( self::cleared() ) ) {
+				self::not_stored( $r );
+				return;
+			}
 			self::move( $r, 'paused', 'Service paused before it was provisioned' );
 			self::follow_up( $r );
 			return;
@@ -174,13 +186,19 @@ final class Reconciler {
 		}
 
 		if ( $r->get( 'op' ) !== $operation ) {
-			$r->set(
+			$started = $r->set(
 				array(
 					'op'              => $operation,
 					'attempts'        => 0,
 					'next_attempt_at' => null,
+					'alerted'         => '',
 				)
 			);
+
+			if ( ! $started ) {
+				self::not_stored( $r );
+				return;
+			}
 		}
 
 		if ( 'provision' === $operation && 'provisioning' !== $r->get( 'state' ) ) {
@@ -231,6 +249,7 @@ final class Reconciler {
 			'next_attempt_at' => null,
 			'last_error'      => '',
 			'failed_op'       => '',
+			'failed_desired'  => '',
 			'alerted'         => '',
 		);
 	}
@@ -309,9 +328,8 @@ final class Reconciler {
 			'last_error'      => $error,
 		);
 
-		if ( ! $r->set( array_merge( $meta, $bookkeeping ) ) && $meta ) {
-			$bookkeeping['last_error'] = self::META_ERROR;
-			$r->set( $bookkeeping );
+		if ( ! self::record( $r, $meta, $bookkeeping ) ) {
+			return;
 		}
 
 		// Another operation (the desired state changed meanwhile) runs now; this one waits.
@@ -340,17 +358,63 @@ final class Reconciler {
 			'next_attempt_at' => null,
 			'last_error'      => $error,
 			'failed_op'       => $operation,
+			'failed_desired'  => $r->get( 'desired' ),
 		);
 
-		if ( ! $r->set( array_merge( $meta, $bookkeeping ) ) && $meta ) {
-			$error                     = self::META_ERROR;
-			$bookkeeping['last_error'] = $error;
-			$r->set( $bookkeeping );
+		if ( ! self::record( $r, $meta, $bookkeeping ) ) {
+			return;
 		}
+
+		$error = $r->get( 'last_error' );
 
 		self::move( $r, 'failed', 'Service failed: ' . $error );
 		Alerts::admin( $r, $error );
 		self::follow_up( $r );
+	}
+
+	/**
+	 * Stores the outcome of an attempt with the driver's meta, or, if that cannot be stored,
+	 * without it and with META_ERROR. When even that fails, nothing is queued: the error is
+	 * logged and the sweep tries again later, so a broken write never loops.
+	 *
+	 * @param Resource             $r           Resource.
+	 * @param array<string, mixed> $meta        Driver meta.
+	 * @param array<string, mixed> $bookkeeping Reconciler meta.
+	 * @return bool Whether the bookkeeping was stored.
+	 */
+	private static function record( Resource $r, array $meta, array $bookkeeping ): bool {
+		if ( $r->set( array_merge( $meta, $bookkeeping ) ) ) {
+			return true;
+		}
+
+		if ( $meta ) {
+			$bookkeeping['last_error'] = self::META_ERROR;
+
+			if ( $r->set( $bookkeeping ) ) {
+				return true;
+			}
+		}
+
+		self::not_stored( $r );
+
+		return false;
+	}
+
+	/**
+	 * Logs, once per request and resource, that the resource could not be updated.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function not_stored( Resource $r ): void {
+		static $logged = array();
+
+		if ( isset( $logged[ $r->id() ] ) ) {
+			return;
+		}
+
+		$logged[ $r->id() ] = true;
+
+		error_log( sprintf( 'Beltoft Services: resource %d could not be updated; the sweep will try again.', $r->id() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a failed database write cannot be recorded anywhere else.
 	}
 
 	/**

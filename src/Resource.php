@@ -319,8 +319,9 @@ final class Resource {
 
 	/**
 	 * Sets the desired state and writes a history event. Pausing records when; wanting it
-	 * ready again clears that. Never deletes anything by itself. The event is written only
-	 * when the change was stored.
+	 * ready again clears that. A change of the desired state resets the reconciler's attempt
+	 * count (meta op, attempts) and its alert memory. Never deletes anything by itself. The
+	 * event is written only when the change was stored.
 	 *
 	 * @param string $state  ready, paused or deleted.
 	 * @param string $reason What happened, for the history.
@@ -333,6 +334,14 @@ final class Resource {
 		}
 
 		$meta = array( 'desired' => $state );
+
+		// A new desired state is a new start for the reconciler: a fresh attempt count, and a
+		// failure under it is alerted again.
+		if ( $this->get( 'desired' ) !== $state ) {
+			$meta['op']       = '';
+			$meta['attempts'] = 0;
+			$meta['alerted']  = '';
+		}
 
 		if ( 'paused' === $state ) {
 			if ( null === $this->get( 'paused_at' ) ) {
