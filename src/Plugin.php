@@ -46,6 +46,7 @@ final class Plugin {
 
 		Lifecycle::register();
 		Retention::register();
+		Cli\Commands::register();
 
 		Account\Panel::register();
 		Api\Routes::register();
