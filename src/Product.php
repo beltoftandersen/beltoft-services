@@ -25,6 +25,8 @@ final class Product {
 	public const META_TRIAL_PAID = '_beltoft_services_trial_requires_payment';
 	public const META_PLAN       = '_beltoft_services_plan_';
 	public const FIELD_MARKER    = '_beltoft_services_plan_driver';
+	public const FIELD_RELEASE   = '_beltoft_services_no_longer_service';
+	public const OPTION_SLUGS    = 'beltoft_services_service_slugs';
 
 	/**
 	 * Hooks for the product editor and the beltoft-licenses filters.
@@ -72,6 +74,60 @@ final class Product {
 	 */
 	public static function is_service( int $product_id ): bool {
 		return $product_id > 0 && '' !== self::meta( self::parent_id( $product_id ), self::META_DRIVER );
+	}
+
+	/**
+	 * Software slugs that were ever saved as services. Licenses with these slugs stay out of
+	 * the public license API even if their product is deleted.
+	 *
+	 * @return string[]
+	 */
+	public static function service_slugs(): array {
+		$slugs = get_option( self::OPTION_SLUGS, array() );
+
+		return is_array( $slugs ) ? array_values( array_filter( array_map( 'strval', $slugs ) ) ) : array();
+	}
+
+	/**
+	 * Remembers a software slug as a service slug.
+	 *
+	 * @param string $slug Software slug.
+	 */
+	public static function remember_slug( string $slug ): void {
+		$slug  = sanitize_title( $slug );
+		$slugs = self::service_slugs();
+
+		if ( '' !== $slug && ! in_array( $slug, $slugs, true ) ) {
+			$slugs[] = $slug;
+			update_option( self::OPTION_SLUGS, $slugs, false );
+		}
+	}
+
+	/**
+	 * Forgets a service slug. Only an explicit admin action does this.
+	 *
+	 * @param string $slug Software slug.
+	 */
+	public static function forget_slug( string $slug ): void {
+		$slug = sanitize_title( $slug );
+
+		update_option( self::OPTION_SLUGS, array_values( array_diff( self::service_slugs(), array( $slug ) ) ), false );
+	}
+
+	/**
+	 * Is this license a service license: its product is a service, or its software slug was
+	 * saved as a service (which survives the product being deleted)?
+	 *
+	 * @param array<string, mixed> $license License row.
+	 */
+	public static function is_service_license( array $license ): bool {
+		if ( self::is_service( (int) ( $license['product_id'] ?? 0 ) ) ) {
+			return true;
+		}
+
+		$slug = sanitize_title( (string) ( $license['product_slug'] ?? '' ) );
+
+		return '' !== $slug && in_array( $slug, self::service_slugs(), true );
 	}
 
 	/**
@@ -188,7 +244,7 @@ final class Product {
 	 * @return array<string, mixed>|null
 	 */
 	public static function hide_from_api( $license ) {
-		if ( is_array( $license ) && self::is_service( (int) ( $license['product_id'] ?? 0 ) ) ) {
+		if ( is_array( $license ) && self::is_service_license( $license ) ) {
 			return null;
 		}
 
@@ -204,7 +260,7 @@ final class Product {
 	 * @param int                  $max     Allowed.
 	 */
 	public static function resource_label( $label, $license, $used, $max ): string {
-		$driver = is_array( $license ) ? self::driver_for( (int) ( $license['product_id'] ?? 0 ) ) : null;
+		$driver = is_array( $license ) && self::is_service_license( $license ) ? self::driver_for( (int) ( $license['product_id'] ?? 0 ) ) : null;
 
 		return $driver ? $driver->unit_label( (int) $used, (int) $max ) : (string) $label;
 	}
@@ -216,7 +272,7 @@ final class Product {
 	 * @param array<string, mixed> $license License row.
 	 */
 	public static function show_key( $show, $license ): bool {
-		if ( is_array( $license ) && self::is_service( (int) ( $license['product_id'] ?? 0 ) ) ) {
+		if ( is_array( $license ) && self::is_service_license( $license ) ) {
 			return false;
 		}
 
@@ -252,6 +308,11 @@ final class Product {
 
 		foreach ( Registry::all() as $id => $driver ) {
 			$options[ $id ] = $driver->label();
+		}
+
+		if ( '' !== $driver_id && ! isset( $options[ $driver_id ] ) ) {
+			/* translators: %s: driver id. */
+			$options[ $driver_id ] = sprintf( __( '%s (unavailable)', 'beltoft-services' ), $driver_id );
 		}
 
 		echo '<div id="beltoft_services_product_data" class="panel woocommerce_options_panel hidden"><div class="options_group">';
@@ -309,6 +370,17 @@ final class Product {
 			}
 		}
 
+		if ( '' !== $driver_id ) {
+			woocommerce_wp_checkbox(
+				array(
+					'id'          => self::FIELD_RELEASE,
+					'label'       => __( 'No longer a service', 'beltoft-services' ),
+					'description' => __( 'Warning: its licenses will start working in the public license API.', 'beltoft-services' ),
+					'value'       => 'no',
+				)
+			);
+		}
+
 		echo '</div></div>';
 	}
 
@@ -358,11 +430,30 @@ final class Product {
 	 */
 	public static function save( \WC_Product $product ): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified by WooCommerce (woocommerce_meta_nonce) before woocommerce_admin_process_product_object.
-		$driver_id = isset( $_POST[ self::META_DRIVER ] ) ? sanitize_key( wp_unslash( $_POST[ self::META_DRIVER ] ) ) : '';
+		// A save path that does not post the Service panel changes nothing.
+		if ( ! isset( $_POST[ self::META_DRIVER ] ) ) {
+			return;
+		}
+
+		$saved  = (string) $product->get_meta( self::META_DRIVER );
+		$posted = sanitize_key( wp_unslash( $_POST[ self::META_DRIVER ] ) );
+		$slug   = isset( $_POST[ \BeltoftLicenses\Software::META_SLUG ] ) ? sanitize_title( wp_unslash( $_POST[ \BeltoftLicenses\Software::META_SLUG ] ) ) : sanitize_title( (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ) );
+
+		if ( '' !== $saved && isset( $_POST[ self::FIELD_RELEASE ] ) ) {
+			// The one explicit way out: the licenses become ordinary software licenses.
+			$product->update_meta_data( self::META_DRIVER, '' );
+			self::forget_slug( $slug );
+			return;
+		}
+
+		// A registered driver can be chosen; anything else (empty, unknown) keeps the saved one.
+		$driver_id = Registry::get( $posted ) ? $posted : $saved;
 		$driver    = '' === $driver_id ? null : Registry::get( $driver_id );
-		$driver_id = $driver ? $driver_id : '';
 
 		$product->update_meta_data( self::META_DRIVER, $driver_id );
+		if ( '' !== $driver_id ) {
+			self::remember_slug( $slug );
+		}
 		$product->update_meta_data( self::META_CONNECTION, isset( $_POST[ self::META_CONNECTION ] ) ? sanitize_key( wp_unslash( $_POST[ self::META_CONNECTION ] ) ) : '' );
 
 		$retention = isset( $_POST[ self::META_RETENTION ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::META_RETENTION ] ) ) ) : '';

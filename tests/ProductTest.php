@@ -157,7 +157,9 @@ class ProductTest extends TestCase {
 		$fake              = $this->fake_driver();
 		$fake->plan_fields = $this->fields();
 
-		$product = $this->service_product( '', array(), array( 'variations' => array( array() ) ) );
+		$product = $this->service_product( 'fake', array(), array( 'variations' => array( array() ) ) );
+		delete_post_meta( $product->get_id(), Product::META_DRIVER );
+		Product::forget_slug( 'test-service' );
 		$product = wc_get_product( $product->get_id() );
 
 		$_POST = array(
@@ -180,7 +182,7 @@ class ProductTest extends TestCase {
 			Product::META_DRIVER => 'unregistered',
 		);
 		Product::save( $product );
-		$this->assertSame( '', $product->get_meta( Product::META_DRIVER ), 'An unknown driver is not stored.' );
+		$this->assertSame( 'fake', $product->get_meta( Product::META_DRIVER ), 'An unknown driver does not replace the saved one.' );
 
 		$_POST     = array( Product::META_PLAN . 'ram' => array( 3 => '8192' ) );
 		$variation = wc_get_product( $product->get_children()[0] );
@@ -191,6 +193,101 @@ class ProductTest extends TestCase {
 		$this->assertSame( 8192, Product::plan( $product->get_id(), $variation->get_id() )['ram'] );
 
 		$_POST = array();
+	}
+
+	public function test_license_stays_hidden_after_its_product_is_deleted(): void {
+		$this->fake_driver();
+		$product = $this->service_product();
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		$unknown = $this->validate( 'BLTFT-NOPE-NOPE-NOPE' );
+
+		wp_delete_post( $product->get_id(), true );
+
+		$this->assertSame( $unknown->get_data(), $this->validate( $license['license_key'] )->get_data() );
+		$this->assertFalse( apply_filters( 'beltoft_licenses_account_show_key', true, $license ) );
+	}
+
+	public function test_releasing_the_slug_through_the_admin_action_makes_the_license_validate_again(): void {
+		$this->fake_driver();
+		$product = $this->service_product();
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+
+		$_POST = array(
+			Product::META_DRIVER   => 'fake',
+			Product::FIELD_RELEASE => 'yes',
+		);
+		Product::save( $product );
+		$product->save();
+		$_POST = array();
+
+		$this->assertFalse( Product::is_service( $product->get_id() ) );
+		$this->assertNotContains( 'test-service', Product::service_slugs() );
+		$this->assertTrue( $this->validate( $license['license_key'] )->get_data()['valid'] );
+	}
+
+	public function test_saving_a_product_remembers_its_slug(): void {
+		$this->fake_driver();
+		$product = new \WC_Product_Simple();
+		$product->save();
+
+		$_POST = array(
+			Product::META_DRIVER             => 'fake',
+			\BeltoftLicenses\Software::META_SLUG => 'saved-slug',
+		);
+		Product::save( $product );
+		$_POST = array();
+
+		$this->assertContains( 'saved-slug', Product::service_slugs() );
+	}
+
+	public function test_software_license_with_a_missing_product_is_unaffected(): void {
+		$this->fake_driver();
+		$license = \BeltoftLicenses\Licenses::create(
+			array(
+				'product_id'   => 999999,
+				'product_slug' => 'ordinary-plugin',
+				'email'        => 'a@example.com',
+			)
+		);
+
+		$this->assertSame( $license, apply_filters( 'beltoft_licenses_api_license', $license, $license['license_key'] ) );
+		$this->assertTrue( $this->validate( $license['license_key'] )->get_data()['valid'] );
+	}
+
+	public function test_unavailable_driver_is_kept_and_listed(): void {
+		$product = $this->service_product( 'gone' );
+		$product = wc_get_product( $product->get_id() );
+
+		$_POST = array( Product::META_DRIVER => '' );
+		Product::save( $product );
+		$this->assertSame( 'gone', $product->get_meta( Product::META_DRIVER ), 'Empty does not wipe the saved driver.' );
+
+		include_once WC_ABSPATH . 'includes/admin/wc-meta-box-functions.php';
+		$GLOBALS['product_object'] = $product;
+		ob_start();
+		Product::panel();
+		$html = ob_get_clean();
+		unset( $GLOBALS['product_object'] );
+		$_POST = array();
+
+		$this->assertStringContainsString( 'gone (unavailable)', $html );
+	}
+
+	public function test_save_without_the_service_panel_changes_nothing(): void {
+		$this->fake_driver();
+		$product = $this->service_product( 'fake', array(), array( 'retention' => 30, 'connection' => 'main', 'trial_requires_payment' => 'no' ) );
+		$product = wc_get_product( $product->get_id() );
+
+		$_POST = array( 'something_else' => '1' );
+		Product::save( $product );
+		$product->save();
+		$_POST = array();
+
+		$product = wc_get_product( $product->get_id() );
+		$this->assertSame( 'fake', $product->get_meta( Product::META_DRIVER ) );
+		$this->assertSame( 30, Product::retention_days( $product->get_id() ) );
+		$this->assertSame( 'main', Product::connection( $product->get_id() ) );
+		$this->assertFalse( Product::trial_requires_payment( $product->get_id() ) );
 	}
 
 	/**

@@ -161,6 +161,10 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 		$product->save();
 
+		if ( '' !== $driver ) {
+			Product::remember_slug( (string) ( $extra['slug'] ?? 'test-service' ) );
+		}
+
 		foreach ( array_values( $variations ) as $index => $overrides ) {
 			$variation = new \WC_Product_Variation();
 			$variation->set_parent_id( $product->get_id() );
