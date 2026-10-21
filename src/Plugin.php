@@ -40,6 +40,8 @@ final class Plugin {
 
 		Jobs::register();
 
+		Checkout::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}
