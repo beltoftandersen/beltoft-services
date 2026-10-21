@@ -47,6 +47,9 @@ final class Plugin {
 		Lifecycle::register();
 		Retention::register();
 
+		Account\Panel::register();
+		Api\Routes::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}
