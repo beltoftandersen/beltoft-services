@@ -10,7 +10,9 @@ namespace BeltoftServices\Emails;
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -70,6 +72,8 @@ abstract class ServiceEmail extends \WC_Email {
 				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
 				'account_url'   => wc_get_account_endpoint_url( Endpoint::slug() ),
 				'deletion_date' => (string) $date,
+				'reason'        => self::customer_reason( (string) $r->get( 'paused_reason' ) ),
+				'retention_days' => self::retention_days( $r, $license ),
 				'used'          => $used,
 				'limit'         => $limit,
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
@@ -87,6 +91,33 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		return $sent;
+	}
+
+	/**
+	 * Why the service was paused, as the customer may read it: the history text, but never the
+	 * login of an admin.
+	 *
+	 * @param string $reason History text of the pause.
+	 */
+	public static function customer_reason( string $reason ): string {
+		$reason = trim( wp_strip_all_tags( $reason ) );
+
+		return 0 === strpos( $reason, 'Paused by ' ) ? 'Paused by an administrator' : $reason;
+	}
+
+	/**
+	 * Days a paused service is kept before it is deleted, when deleting is on ("on") and the
+	 * product has a retention period; otherwise 0 (no period is promised).
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $license License row.
+	 */
+	private static function retention_days( Resource $r, array $license ): int {
+		if ( 'on' !== (string) Settings::get( 'deletion_mode' ) || $r->get( 'protected' ) ) {
+			return 0;
+		}
+
+		return Product::retention_days( (int) ( $license['product_id'] ?? 0 ) );
 	}
 
 	/**

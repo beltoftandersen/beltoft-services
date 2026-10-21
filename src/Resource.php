@@ -519,11 +519,13 @@ final class Resource {
 				$meta['replace_after_delete'] = 'deleted' === $this->get( 'desired' ) ? ( $replace && $this->get( 'replace_after_delete' ) ) : $replace;
 			} elseif ( 'paused' === $state ) {
 				if ( null === $this->get( 'paused_at' ) ) {
-					$meta['paused_at'] = time();
+					$meta['paused_at']     = time();
+					$meta['paused_reason'] = $reason;
 				}
 			} else {
-				$meta['paused_at'] = null;
-				$meta['warned_at'] = null;
+				$meta['paused_at']     = null;
+				$meta['paused_reason'] = '';
+				$meta['warned_at']     = null;
 				$meta['reported']  = '';
 			}
 

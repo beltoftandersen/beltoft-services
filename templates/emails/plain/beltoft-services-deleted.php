@@ -18,25 +18,29 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// A plain text email: tags are stripped, and HTML-escaping would show entities such as &amp; in the text.
+// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-echo esc_html( wp_strip_all_tags( $email_heading ) );
+echo wp_strip_all_tags( $email_heading );
 echo "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
 
 if ( '' !== $customer_name ) {
 	/* translators: %s: customer's first name. */
-	echo esc_html( sprintf( __( 'Hi %s,', 'beltoft-services' ), $customer_name ) ) . "\n\n";
+	echo wp_strip_all_tags( sprintf( __( 'Hi %s,', 'beltoft-services' ), $customer_name ) ) . "\n\n";
 } else {
-	echo esc_html__( 'Hi,', 'beltoft-services' ) . "\n\n";
+	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
 }
 
 /* translators: %s: product name. */
-echo esc_html( sprintf( __( 'Your %s and its data have been deleted.', 'beltoft-services' ), $product_name ) ) . "\n\n";
+echo wp_strip_all_tags( sprintf( __( 'Your %s and its data have been deleted.', 'beltoft-services' ), $product_name ) ) . "\n\n";
 
-echo esc_html__( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
+echo __( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 
 if ( $additional_content ) {
-	echo esc_html( wp_strip_all_tags( wptexturize( $additional_content ) ) );
+	echo wp_strip_all_tags( wptexturize( $additional_content ) );
 	echo "\n\n----------------------------------------\n\n";
 }
 
 echo wp_kses_post( apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
+// phpcs:enable

@@ -126,6 +126,63 @@ final class EmailsTest extends TestCase {
 		$this->assertCount( 3, $this->customer_mails() );
 	}
 
+	public function test_paused_email_gives_the_reason_and_the_retention_period(): void {
+		$this->fake_driver();
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$product = $this->service_product( 'fake', array(), array( 'retention' => 30 ) );
+		$license = $this->service_license( $product );
+		$this->run_jobs();
+
+		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_SUSPENDED ) );
+		$this->run_jobs();
+
+		$mail = $this->customer_mails( 'paused' );
+		$this->assertCount( 1, $mail );
+		$this->assertStringContainsString( 'License suspended', (string) $mail[0]['message'], 'The reason is in the email.' );
+		$this->assertStringContainsString( '30 days', (string) $mail[0]['message'], 'The data is kept for the retention period.' );
+
+		// Retention off: the reason is there, no period is promised.
+		$this->mails = array();
+		$this->settings( array( 'deletion_mode' => 'off' ) );
+		$other = $this->service_license( $this->service_product( 'fake', array(), array( 'retention' => 30, 'slug' => 'svc-two' ) ) );
+		$this->run_jobs();
+		$this->mails = array();
+		Licenses::update( (int) $other['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
+		$this->run_jobs();
+
+		$mail = $this->customer_mails( 'paused' );
+		$this->assertCount( 1, $mail );
+		$this->assertStringContainsString( 'License revoked', (string) $mail[0]['message'] );
+		$this->assertStringNotContainsString( '30 days', (string) $mail[0]['message'] );
+		$this->assertStringContainsString( 'data is kept', (string) $mail[0]['message'] );
+	}
+
+	public function test_plain_text_emails_show_names_as_text_not_as_html_entities(): void {
+		$this->fake_driver();
+		$email = Emails::get( 'beltoft_services_ready' );
+		$email->email_type = 'plain';
+
+		$product = $this->service_product( 'fake' );
+		$product->set_name( 'Tom & Jerry <b>Pro</b>' );
+		$product->save();
+		$this->service_license( $product );
+		$this->run_jobs();
+
+		$mail = $this->customer_mails( 'ready' );
+		$this->assertCount( 1, $mail );
+		$this->assertStringContainsString( 'Tom & Jerry Pro', (string) $mail[0]['message'] );
+		$this->assertStringNotContainsString( '&amp;', (string) $mail[0]['message'] );
+		$this->assertStringNotContainsString( '<b>', (string) $mail[0]['message'] );
+
+		$email->email_type = 'html';
+	}
+
+	public function test_customer_reason_never_names_an_admin(): void {
+		$this->assertSame( 'Paused by an administrator', ServiceEmail::customer_reason( 'Paused by boss' ) );
+		$this->assertSame( 'License suspended', ServiceEmail::customer_reason( 'License suspended' ) );
+		$this->assertSame( '', ServiceEmail::customer_reason( '' ) );
+	}
+
 	public function test_no_paused_email_for_a_service_that_never_existed(): void {
 		$this->fake_driver();
 		$product  = $this->service_product( 'fake' );
