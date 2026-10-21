@@ -107,6 +107,8 @@ final class Commands {
 				'protected'  => true,
 				'plan_dirty' => true,
 				'steps'      => array( 'provision' ),
+				// The customer already has this service: later paused/deleted emails apply.
+				'notified'   => 'ready',
 			)
 		);
 

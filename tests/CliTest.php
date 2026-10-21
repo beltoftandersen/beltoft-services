@@ -276,4 +276,31 @@ class CliTest extends TestCase {
 		$this->assertSame( 'other', Resource::for_license( (int) $license['id'] )->get( 'remote_id' ) );
 		$this->assertNotContains( 'resource_linked', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $license['id'] ), 'type' ) );
 	}
+
+	public function test_linked_tenant_sends_no_ready_mail_but_a_paused_mail_later(): void {
+		$this->connection();
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$product = $this->service_product( 'http', array(), array( 'connection' => 'svc', 'slug' => 'cli-mail' ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+
+		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-m' ) );
+		$this->run_jobs();
+		$this->assertSame( 'ready', Resource::for_license( (int) $license['id'] )->get( 'notified' ) );
+		$this->assertSame( array(), $mails, 'Linking sends no ready email.' );
+
+		\BeltoftLicenses\Licenses::update( (int) $license['id'], array( 'status' => 'suspended' ) );
+		$this->run_jobs();
+
+		$paused = array_filter( $mails, static fn( $m ) => false !== stripos( (string) $m['subject'], 'paused' ) && false !== strpos( implode( ',', (array) $m['to'] ), 'customer@example.com' ) );
+		$this->assertCount( 1, $paused );
+	}
 }
