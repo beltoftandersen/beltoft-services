@@ -57,7 +57,11 @@ final class LifecycleTest extends TestCase {
 	 * @return bool
 	 */
 	public function catch_mail( $pre, $atts ) {
-		$this->mails[] = $atts;
+		// Only the admin alerts: the customer's service emails are tested in EmailsTest.
+		$to = is_array( $atts['to'] ) ? implode( ',', $atts['to'] ) : (string) $atts['to'];
+		if ( false === strpos( $to, 'customer@example.com' ) ) {
+			$this->mails[] = $atts;
+		}
 		return true;
 	}
 

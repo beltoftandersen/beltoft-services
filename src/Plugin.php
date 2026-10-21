@@ -47,6 +47,10 @@ final class Plugin {
 		Lifecycle::register();
 		Retention::register();
 
+		Admin\Panel::register();
+		Admin\Screen::register();
+		Emails\Emails::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}

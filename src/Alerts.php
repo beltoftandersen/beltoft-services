@@ -57,7 +57,7 @@ final class Alerts {
 		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 		$key     = (string) ( $license['license_key'] ?? '' );
 
-		$subject = sprintf( '[%s] Service failed: %s', $site, $key );
+		$subject = sprintf( '[%s] Service failed: %s', $site, self::mask( $key ) );
 		$lines   = array(
 			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
 			sprintf( 'Resource: %d', $r->id() ),
@@ -94,7 +94,7 @@ final class Alerts {
 		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 		$key  = (string) ( $license['license_key'] ?? '' );
 
-		$subject = sprintf( '[%s] Service not created: %s', $site, $key );
+		$subject = sprintf( '[%s] Service not created: %s', $site, self::mask( $key ) );
 		$lines   = array(
 			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
 			sprintf( 'Product: %d', (int) ( $license['product_id'] ?? 0 ) ),
@@ -131,6 +131,16 @@ final class Alerts {
 	}
 
 	/**
+	 * A license key for a mail subject: only its last four characters ("…ABCD"). Subjects show
+	 * in inbox lists and notifications; the body carries the full key for the admin.
+	 *
+	 * @param string $key License key.
+	 */
+	public static function mask( string $key ): string {
+		return '' === $key ? '' : '…' . substr( $key, -4 );
+	}
+
+	/**
 	 * Alerts that could not be sent, keyed by resource id.
 	 *
 	 * @return array<int, array{time: int, resource: int, message: string}>
@@ -142,11 +152,11 @@ final class Alerts {
 	}
 
 	/**
-	 * Forgets the unsent alert of one resource.
+	 * Forgets the unsent alert of one resource (sent since, or the resource was closed).
 	 *
 	 * @param int $resource_id Activation id.
 	 */
-	private static function clear_problem( int $resource_id ): void {
+	public static function clear_problem( int $resource_id ): void {
 		$problems = self::problems();
 
 		if ( ! isset( $problems[ $resource_id ] ) ) {

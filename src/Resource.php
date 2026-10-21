@@ -773,12 +773,13 @@ final class Resource {
 
 	/**
 	 * Runs a callback under the resource lock (waiting as desire() does), on a fresh read of
-	 * the row.
+	 * the row. Every meta write from outside a job (admin actions, the usage check) goes
+	 * through here, so it never overwrites a running step's meta or is overwritten by it.
 	 *
 	 * @param callable $callback Returns whether it stored something.
 	 * @return bool|null The callback's result, or null when the lock stayed busy.
 	 */
-	private function locked( callable $callback ): ?bool {
+	public function locked( callable $callback ): ?bool {
 		$lock = Locks::name( 'resource', $this->id() );
 
 		/** This filter is documented in src/Resource.php (store_desire()). */
