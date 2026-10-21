@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\Settings;
+use BeltoftServices\Tests\Support\FakeDriver;
 
 /**
  * Base test case: settings, Action Scheduler runner and an HTTP recorder.
@@ -90,6 +91,26 @@ abstract class TestCase extends \WP_UnitTestCase {
 	 */
 	protected function respond_with( callable $responder ): void {
 		$this->http_responder = $responder;
+	}
+
+	/**
+	 * Creates a FakeDriver and registers it through the beltoft_services_drivers filter for
+	 * the current test (WP_UnitTestCase restores the hooks afterwards).
+	 *
+	 * @return FakeDriver
+	 */
+	protected function fake_driver(): FakeDriver {
+		$fake = new FakeDriver();
+
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) use ( $fake ) {
+				$drivers[ $fake->id() ] = $fake;
+				return $drivers;
+			}
+		);
+
+		return $fake;
 	}
 
 	/**
