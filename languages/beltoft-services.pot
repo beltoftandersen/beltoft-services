@@ -1,0 +1,971 @@
+# Copyright (C) 2026 beltoft.net
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Beltoft Services for WooCommerce 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-10-21T16:56:24+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: beltoft-services\n"
+
+#. Plugin Name of the plugin
+#: beltoft-services.php
+msgid "Beltoft Services for WooCommerce"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+#: beltoft-services.php
+msgid "https://beltoft.net/"
+msgstr ""
+
+#. Description of the plugin
+#: beltoft-services.php
+msgid "Sell services with WooCommerce Subscriptions: a license is the entitlement, and a driver provisions, pauses, resumes and removes the service, driven by Beltoft Licenses."
+msgstr ""
+
+#. Author of the plugin
+#: beltoft-services.php
+msgid "beltoft.net"
+msgstr ""
+
+#: src/Account/Panel.php:66
+msgid "Getting ready"
+msgstr ""
+
+#: src/Account/Panel.php:67
+#: src/Http/HttpDriver.php:871
+msgid "Ready"
+msgstr ""
+
+#: src/Account/Panel.php:68
+#: src/Http/HttpDriver.php:872
+msgid "Paused"
+msgstr ""
+
+#: src/Account/Panel.php:69
+msgid "Failed: contact us"
+msgstr ""
+
+#: src/Account/Panel.php:83
+msgid "Your service is being set up. This page updates by itself."
+msgstr ""
+
+#: src/Account/Panel.php:84
+msgid "Your service is ready."
+msgstr ""
+
+#: src/Account/Panel.php:85
+msgid "Your service is paused."
+msgstr ""
+
+#: src/Account/Panel.php:86
+msgid "Something went wrong with your service. Please contact us and we will sort it out."
+msgstr ""
+
+#: src/Account/Panel.php:204
+#: src/Api/Routes.php:182
+msgid "Your request is on its way. This can take a minute."
+msgstr ""
+
+#: src/Account/Panel.php:205
+msgid "This is not available right now."
+msgstr ""
+
+#: src/Account/Panel.php:206
+#: src/Api/Routes.php:264
+msgid "Too many requests. Please wait a minute and try again."
+msgstr ""
+
+#: src/Account/Panel.php:207
+msgid "Something went wrong. Please try again."
+msgstr ""
+
+#: src/Account/Panel.php:208
+msgid "Your session has expired. Please reload the page."
+msgstr ""
+
+#: src/Admin/ListTable.php:53
+msgid "License"
+msgstr ""
+
+#: src/Admin/ListTable.php:54
+msgid "Customer"
+msgstr ""
+
+#: src/Admin/ListTable.php:55
+#: src/Admin/ListTable.php:95
+#: src/Admin/Panel.php:412
+msgid "Driver"
+msgstr ""
+
+#: src/Admin/ListTable.php:56
+#: src/Admin/ListTable.php:101
+#: src/Admin/Panel.php:414
+msgid "State"
+msgstr ""
+
+#: src/Admin/ListTable.php:57
+#: src/Admin/Panel.php:415
+msgid "Desired"
+msgstr ""
+
+#. translators: %s: operation.
+#: src/Admin/ListTable.php:58
+#: src/Admin/Panel.php:417
+msgid "Attempts"
+msgstr ""
+
+#: src/Admin/ListTable.php:59
+#: src/Admin/Panel.php:419
+msgid "Last error"
+msgstr ""
+
+#: src/Admin/ListTable.php:95
+msgid "All drivers"
+msgstr ""
+
+#: src/Admin/ListTable.php:101
+msgid "All states"
+msgstr ""
+
+#: src/Admin/ListTable.php:107
+msgid "Failed only"
+msgstr ""
+
+#: src/Admin/ListTable.php:108
+msgid "Filter"
+msgstr ""
+
+#: src/Admin/ListTable.php:116
+msgid "No services found."
+msgstr ""
+
+#: src/Admin/ListTable.php:154
+msgid "The failure alert could not be sent."
+msgstr ""
+
+#: src/Admin/Panel.php:247
+msgid "Unknown action."
+msgstr ""
+
+#: src/Admin/Panel.php:248
+msgid "That service does not exist."
+msgstr ""
+
+#: src/Admin/Panel.php:249
+msgid "This service is closed already."
+msgstr ""
+
+#: src/Admin/Panel.php:250
+msgid "The service is being deleted."
+msgstr ""
+
+#. translators: %s: the word to type.
+#: src/Admin/Panel.php:252
+#, php-format
+msgid "Type %s to confirm the deletion."
+msgstr ""
+
+#. translators: %s: the words to type.
+#: src/Admin/Panel.php:254
+#, php-format
+msgid "Type %s to confirm."
+msgstr ""
+
+#: src/Admin/Panel.php:255
+msgid "This service is protected. Unprotect it first."
+msgstr ""
+
+#: src/Admin/Panel.php:256
+msgid "The service is busy right now. Try again in a moment."
+msgstr ""
+
+#: src/Admin/Panel.php:257
+msgid "The change could not be stored."
+msgstr ""
+
+#: src/Admin/Panel.php:277
+#: src/Http/ConnectionsScreen.php:61
+msgid "You do not have permission to do this."
+msgstr ""
+
+#: src/Admin/Panel.php:321
+msgid "The service will be tried again."
+msgstr ""
+
+#: src/Admin/Panel.php:322
+msgid "The service will be paused."
+msgstr ""
+
+#: src/Admin/Panel.php:323
+msgid "The service will be resumed."
+msgstr ""
+
+#: src/Admin/Panel.php:324
+msgid "The service will be deleted."
+msgstr ""
+
+#: src/Admin/Panel.php:325
+msgid "The service was marked deleted. The service itself was not called."
+msgstr ""
+
+#: src/Admin/Panel.php:326
+msgid "The service is protected."
+msgstr ""
+
+#: src/Admin/Panel.php:327
+msgid "The service is no longer protected."
+msgstr ""
+
+#. translators: %d: number of services.
+#: src/Admin/Panel.php:348
+#, php-format
+msgid "A failure alert for %d service could not be sent: the alert address is not a valid email address."
+msgid_plural "Failure alerts for %d services could not be sent: the alert address is not a valid email address."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/Panel.php:353
+msgid "Fix the alert address"
+msgstr ""
+
+#: src/Admin/Panel.php:355
+msgid "Failed services"
+msgstr ""
+
+#: src/Admin/Panel.php:393
+#: src/Admin/Panel.php:405
+#: src/Product.php:323
+msgid "Service"
+msgstr ""
+
+#: src/Admin/Panel.php:393
+msgid "This license has no live service."
+msgstr ""
+
+#: src/Admin/Panel.php:412
+msgid "(not available)"
+msgstr ""
+
+#: src/Admin/Panel.php:413
+msgid "Identifier"
+msgstr ""
+
+#: src/Admin/Panel.php:416
+msgid "Operation"
+msgstr ""
+
+#. translators: %s: operation.
+#: src/Admin/Panel.php:416
+#, php-format
+msgid "failed: %s"
+msgstr ""
+
+#: src/Admin/Panel.php:418
+msgid "Next attempt"
+msgstr ""
+
+#: src/Admin/Panel.php:420
+msgid "Protected"
+msgstr ""
+
+#: src/Admin/Panel.php:420
+#: src/Product.php:563
+msgid "Yes"
+msgstr ""
+
+#: src/Admin/Panel.php:420
+#: src/Product.php:564
+msgid "No"
+msgstr ""
+
+#: src/Admin/Panel.php:421
+msgid "Paused since"
+msgstr ""
+
+#: src/Admin/Panel.php:422
+msgid "Deletion warned"
+msgstr ""
+
+#: src/Admin/Panel.php:437
+msgid "Retry now"
+msgstr ""
+
+#: src/Admin/Panel.php:441
+msgid "Resume"
+msgstr ""
+
+#: src/Admin/Panel.php:443
+msgid "Pause"
+msgstr ""
+
+#: src/Admin/Panel.php:448
+msgid "Unprotect"
+msgstr ""
+
+#: src/Admin/Panel.php:450
+msgid "Protect"
+msgstr ""
+
+#: src/Admin/Panel.php:456
+msgid "Delete the service"
+msgstr ""
+
+#. translators: %s: the word to type.
+#: src/Admin/Panel.php:463
+#, php-format
+msgid "Deletes the service and its data. Type %s to confirm:"
+msgstr ""
+
+#: src/Admin/Panel.php:468
+#: src/Http/ConnectionsScreen.php:206
+msgid "Delete"
+msgstr ""
+
+#: src/Admin/Panel.php:471
+msgid "A renewal of an active license creates a new service."
+msgstr ""
+
+#: src/Admin/Panel.php:477
+#: src/Admin/Panel.php:491
+msgid "Mark deleted"
+msgstr ""
+
+#: src/Admin/Panel.php:478
+msgid "For a service that is already gone (removed by hand, or a deletion the service cannot complete): closes it here without calling the service."
+msgstr ""
+
+#: src/Admin/Panel.php:479
+msgid "If the service still exists it keeps running and is no longer managed here. A renewal of an active license creates a new service."
+msgstr ""
+
+#. translators: %s: the words to type.
+#: src/Admin/Panel.php:486
+#, php-format
+msgid "Type %s to confirm:"
+msgstr ""
+
+#: src/Admin/Screen.php:40
+#: src/Admin/Screen.php:41
+#: src/Admin/Screen.php:176
+#: src/Settings.php:210
+#: src/Settings.php:211
+#: src/Settings.php:251
+msgid "Services"
+msgstr ""
+
+#: src/Api/Routes.php:174
+msgid "This action is not available."
+msgstr ""
+
+#: src/Api/Routes.php:205
+msgid "This service cannot be opened from here."
+msgstr ""
+
+#: src/Api/Routes.php:211
+#: src/Api/Routes.php:277
+msgid "This service is not available."
+msgstr ""
+
+#. translators: %s: product name.
+#: src/Checkout.php:158
+#, php-format
+msgid "You have already used the trial for %s."
+msgstr ""
+
+#: src/Emails/Deleted.php:22
+msgid "Service deleted"
+msgstr ""
+
+#: src/Emails/Deleted.php:23
+msgid "Sent to the customer when their service has been deleted."
+msgstr ""
+
+#: src/Emails/Deleted.php:34
+msgid "Your {product_name} has been deleted"
+msgstr ""
+
+#: src/Emails/Deleted.php:41
+msgid "Your service has been deleted"
+msgstr ""
+
+#: src/Emails/DeletionWarning.php:22
+msgid "Service deletion warning"
+msgstr ""
+
+#: src/Emails/DeletionWarning.php:23
+msgid "Sent to the customer before a paused service is deleted after its retention period."
+msgstr ""
+
+#: src/Emails/DeletionWarning.php:34
+msgid "Your {product_name} will be deleted on {deletion_date}"
+msgstr ""
+
+#: src/Emails/DeletionWarning.php:41
+msgid "Your service will be deleted"
+msgstr ""
+
+#: src/Emails/LimitExceeded.php:22
+msgid "Service limit exceeded"
+msgstr ""
+
+#: src/Emails/LimitExceeded.php:23
+msgid "Sent to the customer when the daily usage check finds their service over its limit."
+msgstr ""
+
+#: src/Emails/LimitExceeded.php:34
+msgid "Your {product_name} is over its limit"
+msgstr ""
+
+#: src/Emails/LimitExceeded.php:41
+msgid "Your service is over its limit"
+msgstr ""
+
+#: src/Emails/Paused.php:22
+msgid "Service paused"
+msgstr ""
+
+#: src/Emails/Paused.php:23
+msgid "Sent to the customer when their service is paused."
+msgstr ""
+
+#: src/Emails/Paused.php:34
+msgid "Your {product_name} is paused"
+msgstr ""
+
+#: src/Emails/Paused.php:41
+msgid "Your service is paused"
+msgstr ""
+
+#: src/Emails/Ready.php:22
+msgid "Service ready"
+msgstr ""
+
+#: src/Emails/Ready.php:23
+msgid "Sent to the customer when their service is ready to use."
+msgstr ""
+
+#: src/Emails/Ready.php:34
+msgid "Your {product_name} is ready"
+msgstr ""
+
+#: src/Emails/Ready.php:41
+msgid "Your service is ready"
+msgstr ""
+
+#: src/Http/Connections.php:168
+msgid "A connection needs an id."
+msgstr ""
+
+#: src/Http/Connections.php:178
+msgid "A connection needs a label."
+msgstr ""
+
+#: src/Http/Connections.php:192
+msgid "Authentication must be HMAC or a static header."
+msgstr ""
+
+#: src/Http/Connections.php:204
+msgid "Header names may contain letters, numbers and dashes only."
+msgstr ""
+
+#: src/Http/Connections.php:213
+msgid "The header name may contain letters, numbers and dashes only."
+msgstr ""
+
+#: src/Http/Connections.php:217
+msgid "Header authentication needs a header name."
+msgstr ""
+
+#: src/Http/Connections.php:225
+msgid "The timeout must be between 1 and 120 seconds."
+msgstr ""
+
+#. translators: %s: placeholder
+#: src/Http/Connections.php:245
+#, php-format
+msgid "Unknown placeholder {%s} in the body template."
+msgstr ""
+
+#: src/Http/Connections.php:251
+msgid "The body template is not valid JSON."
+msgstr ""
+
+#: src/Http/Connections.php:265
+msgid "Response fields are dot paths such as data.id."
+msgstr ""
+
+#: src/Http/Connections.php:275
+msgid "The open URL must be a valid https address, with {token} where the token goes."
+msgstr ""
+
+#: src/Http/Connections.php:289
+msgid "A connection needs a secret: the HMAC key, or the value sent in the header."
+msgstr ""
+
+#: src/Http/Connections.php:413
+msgid "Enter a valid base URL."
+msgstr ""
+
+#: src/Http/Connections.php:417
+msgid "The base URL must use https, unless the host is a private or loopback IP address."
+msgstr ""
+
+#. translators: %s: endpoint name
+#: src/Http/Connections.php:440
+#, php-format
+msgid "The %s endpoint needs a method: GET, POST, PUT, PATCH or DELETE."
+msgstr ""
+
+#. translators: %s: endpoint name
+#: src/Http/Connections.php:445
+#, php-format
+msgid "The %s path must start with a slash and hold no spaces or \"..\"."
+msgstr ""
+
+#. translators: 1: endpoint name, 2: placeholder
+#: src/Http/Connections.php:452
+#, php-format
+msgid "Unknown placeholder {%2$s} in the %1$s path."
+msgstr ""
+
+#: src/Http/Connections.php:497
+#: src/Settings.php:406
+msgid "Add BELTOFT_SERVICES_KEY to wp-config.php before saving secrets."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:41
+msgid "Connections"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:78
+msgid "That connection no longer exists. It may have been deleted in another tab."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:95
+msgid "A connection with that id already exists."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:109
+msgid "Connection saved."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:123
+msgid "Connection deleted."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:184
+msgid "Add connection"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:187
+msgid "No connections yet."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:191
+#: src/Http/ConnectionsScreen.php:254
+msgid "Label"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:191
+#: src/Http/ConnectionsScreen.php:251
+msgid "Id"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:191
+#: src/Http/ConnectionsScreen.php:255
+msgid "Base URL"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:191
+#: src/Http/ConnectionsScreen.php:257
+msgid "Authentication"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:200
+#: src/Http/ConnectionsScreen.php:258
+msgid "Static header"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:202
+msgid "Edit"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:203
+msgid "Delete this connection?"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:239
+msgid "That connection does not exist."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:251
+msgid "Letters, numbers, dashes and underscores. Left empty, it is made from the label. It cannot be changed later."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:255
+msgid "https, unless the host is a private or loopback IP address (such as 10.0.0.2)."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:263
+msgid "Secret"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:264
+#: src/Settings.php:335
+msgid "Saved"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:265
+msgid "Leave empty to keep the saved secret."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:269
+msgid "Remove the saved secret"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:274
+msgid "Timestamp header"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:275
+msgid "Tenant header"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:276
+msgid "Signature header"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:277
+msgid "Header name"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:277
+msgid "Static header authentication: the name of the header. The secret is sent as its value."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:278
+msgid "Timeout in seconds"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:290
+msgid "Body template"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:295
+msgid "Remote id field"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:295
+msgid "Dot path in the provision reply."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:296
+msgid "Usage: used field"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:297
+msgid "Usage: limit field"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:298
+msgid "Open URL"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:298
+msgid "For services with their own front end. Use {token} where the token goes."
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:299
+msgid "Open button label"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:302
+msgid "Save connection"
+msgstr ""
+
+#: src/Http/ConnectionsScreen.php:303
+msgid "Back to the list"
+msgstr ""
+
+#. translators: 1: units used, 2: units allowed
+#: src/Http/HttpDriver.php:86
+#, php-format
+msgid "%1$d of %2$d"
+msgstr ""
+
+#: src/Http/HttpDriver.php:108
+msgid "Limit"
+msgstr ""
+
+#: src/Http/HttpDriver.php:109
+msgid "How many units the service allows, sent as {limit}. Empty: the license site limit."
+msgstr ""
+
+#: src/Http/HttpDriver.php:115
+msgid "Plan attributes"
+msgstr ""
+
+#: src/Http/HttpDriver.php:116
+msgid "One key=value per line, sent in {plan} together with the limit."
+msgstr ""
+
+#: src/Http/HttpDriver.php:251
+msgid "Status:"
+msgstr ""
+
+#: src/Http/HttpDriver.php:253
+msgid "Limit:"
+msgstr ""
+
+#: src/Http/HttpDriver.php:256
+msgid "Usage:"
+msgstr ""
+
+#: src/Http/HttpDriver.php:264
+msgid "Open"
+msgstr ""
+
+#: src/Http/HttpDriver.php:321
+#: src/Product.php:366
+msgid "Connection"
+msgstr ""
+
+#: src/Http/HttpDriver.php:322
+msgid "Remote id"
+msgstr ""
+
+#: src/Http/HttpDriver.php:323
+msgid "Last request"
+msgstr ""
+
+#: src/Http/HttpDriver.php:324
+msgid "Last answer"
+msgstr ""
+
+#: src/Http/HttpDriver.php:324
+msgid "No answer"
+msgstr ""
+
+#: src/Http/HttpDriver.php:869
+msgid "Requested"
+msgstr ""
+
+#: src/Http/HttpDriver.php:870
+msgid "Being set up"
+msgstr ""
+
+#: src/Http/HttpDriver.php:873
+msgid "Being removed"
+msgstr ""
+
+#: src/Http/HttpDriver.php:874
+msgid "Removed"
+msgstr ""
+
+#: src/Http/HttpDriver.php:875
+msgid "Needs attention"
+msgstr ""
+
+#. translators: %s: comma separated plugin names.
+#: src/Plugin.php:161
+#, php-format
+msgid "Beltoft Services is inactive until these are active: %s."
+msgstr ""
+
+#: src/Product.php:340
+msgid "Not a service"
+msgstr ""
+
+#. translators: %s: driver id.
+#: src/Product.php:348
+#, php-format
+msgid "%s (unavailable)"
+msgstr ""
+
+#: src/Product.php:356
+msgid "Service driver"
+msgstr ""
+
+#: src/Product.php:357
+msgid "The product must also be a licensed product. Save to show the driver's plan fields."
+msgstr ""
+
+#: src/Product.php:367
+msgid "The connection id (HTTP driver only)."
+msgstr ""
+
+#: src/Product.php:375
+msgid "Retention (days)"
+msgstr ""
+
+#: src/Product.php:376
+msgid "Days to keep the service after its license ends. 0 never deletes."
+msgstr ""
+
+#: src/Product.php:390
+msgid "Trial needs payment"
+msgstr ""
+
+#: src/Product.php:391
+msgid "Ask for a payment method at checkout when the order is a free trial."
+msgstr ""
+
+#: src/Product.php:410
+msgid "No longer a service"
+msgstr ""
+
+#: src/Product.php:411
+msgid "Warning: its licenses will start working in the public license API."
+msgstr ""
+
+#: src/Product.php:554
+msgid "Empty uses the product's setting."
+msgstr ""
+
+#: src/Product.php:562
+msgid "Product setting"
+msgstr ""
+
+#: src/Settings.php:39
+msgid "Pause all driver activity"
+msgstr ""
+
+#: src/Settings.php:40
+msgid "Jobs keep their place and run when this is turned off."
+msgstr ""
+
+#: src/Settings.php:48
+msgid "Off: never delete"
+msgstr ""
+
+#: src/Settings.php:49
+msgid "Report only: log what would be deleted"
+msgstr ""
+
+#: src/Settings.php:50
+msgid "On: delete"
+msgstr ""
+
+#: src/Settings.php:52
+msgid "Delete paused services after their retention period"
+msgstr ""
+
+#: src/Settings.php:60
+msgid "Warn customers this many days before deletion"
+msgstr ""
+
+#: src/Settings.php:67
+msgid "Send failure alerts to"
+msgstr ""
+
+#: src/Settings.php:74
+msgid "Delete the settings when the plugin is deleted"
+msgstr ""
+
+#: src/Settings.php:94
+#: src/Settings.php:112
+msgid "General"
+msgstr ""
+
+#: src/Settings.php:227
+msgid "Settings"
+msgstr ""
+
+#: src/Settings.php:256
+msgid "Secrets cannot be saved until an encryption key is set. Add this line to wp-config.php:"
+msgstr ""
+
+#: src/Settings.php:264
+msgid "Services stop up to a day late after a subscription ends. Turn on 'Check expiry every hour' under Settings → Licenses."
+msgstr ""
+
+#: src/Settings.php:266
+msgid "Open Settings → Licenses"
+msgstr ""
+
+#. translators: %s: customer's first name.
+#: templates/emails/beltoft-services-deleted.php:28
+#: templates/emails/beltoft-services-deletion-warning.php:28
+#: templates/emails/beltoft-services-limit-exceeded.php:28
+#: templates/emails/beltoft-services-paused.php:28
+#: templates/emails/beltoft-services-ready.php:28
+#: templates/emails/plain/beltoft-services-deleted.php:27
+#: templates/emails/plain/beltoft-services-deletion-warning.php:27
+#: templates/emails/plain/beltoft-services-limit-exceeded.php:27
+#: templates/emails/plain/beltoft-services-paused.php:27
+#: templates/emails/plain/beltoft-services-ready.php:27
+#, php-format
+msgid "Hi %s,"
+msgstr ""
+
+#: templates/emails/beltoft-services-deleted.php:30
+#: templates/emails/beltoft-services-deletion-warning.php:30
+#: templates/emails/beltoft-services-limit-exceeded.php:30
+#: templates/emails/beltoft-services-paused.php:30
+#: templates/emails/beltoft-services-ready.php:30
+#: templates/emails/plain/beltoft-services-deleted.php:29
+#: templates/emails/plain/beltoft-services-deletion-warning.php:29
+#: templates/emails/plain/beltoft-services-limit-exceeded.php:29
+#: templates/emails/plain/beltoft-services-paused.php:29
+#: templates/emails/plain/beltoft-services-ready.php:29
+msgid "Hi,"
+msgstr ""
+
+#. translators: %s: product name.
+#: templates/emails/beltoft-services-deleted.php:37
+#: templates/emails/plain/beltoft-services-deleted.php:33
+#, php-format
+msgid "Your %s and its data have been deleted."
+msgstr ""
+
+#: templates/emails/beltoft-services-deleted.php:40
+#: templates/emails/beltoft-services-deletion-warning.php:40
+#: templates/emails/beltoft-services-limit-exceeded.php:40
+#: templates/emails/beltoft-services-paused.php:40
+#: templates/emails/beltoft-services-ready.php:40
+msgid "View your services in your account"
+msgstr ""
+
+#. translators: 1: product name, 2: date.
+#: templates/emails/beltoft-services-deletion-warning.php:37
+#: templates/emails/plain/beltoft-services-deletion-warning.php:33
+#, php-format
+msgid "Your %1$s has been paused for a while and will be deleted with its data on %2$s. Renew your subscription before then to keep it."
+msgstr ""
+
+#. translators: 1: product name, 2: usage, such as "6 of 5".
+#: templates/emails/beltoft-services-limit-exceeded.php:37
+#: templates/emails/plain/beltoft-services-limit-exceeded.php:33
+#, php-format
+msgid "Your %1$s is over its limit: %2$s. Please upgrade your plan or reduce your usage."
+msgstr ""
+
+#. translators: %s: product name.
+#: templates/emails/beltoft-services-paused.php:37
+#: templates/emails/plain/beltoft-services-paused.php:33
+#, php-format
+msgid "Your %s has been paused. Its data is kept, and it starts again once your subscription is active."
+msgstr ""
+
+#. translators: %s: product name.
+#: templates/emails/beltoft-services-ready.php:37
+#: templates/emails/plain/beltoft-services-ready.php:33
+#, php-format
+msgid "Your %s is ready to use."
+msgstr ""
+
+#: templates/emails/plain/beltoft-services-deleted.php:35
+#: templates/emails/plain/beltoft-services-deletion-warning.php:35
+#: templates/emails/plain/beltoft-services-limit-exceeded.php:35
+#: templates/emails/plain/beltoft-services-paused.php:35
+#: templates/emails/plain/beltoft-services-ready.php:35
+msgid "View your services in your account:"
+msgstr ""
