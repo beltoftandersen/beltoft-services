@@ -245,10 +245,13 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 	/**
 	 * Runs the pending Action Scheduler actions of group beltoft-services that are due,
-	 * repeatedly, until none is due.
+	 * repeatedly, until none is due. Fails the test when an action ends as failed (Action
+	 * Scheduler swallows exceptions) or when actions are still due after $max_rounds.
+	 *
+	 * @param int $max_rounds Rounds before giving up.
 	 */
-	protected function run_jobs(): void {
-		for ( $round = 0; $round < 100; $round++ ) {
+	protected function run_jobs( int $max_rounds = 100 ): void {
+		for ( $round = 0; $round < $max_rounds; $round++ ) {
 			$ids = as_get_scheduled_actions(
 				array(
 					'group'        => 'beltoft-services',
@@ -268,7 +271,18 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 			foreach ( $ids as $id ) {
 				\ActionScheduler::runner()->process_action( $id, 'Tests' );
+
+				if ( \ActionScheduler_Store::STATUS_FAILED === \ActionScheduler::store()->get_status( $id ) ) {
+					$messages = array();
+					foreach ( \ActionScheduler::logger()->get_logs( $id ) as $entry ) {
+						$messages[] = $entry->get_message();
+					}
+
+					$this->fail( sprintf( 'Action %d (%s) failed: %s', $id, \ActionScheduler::store()->fetch_action( $id )->get_hook(), implode( ' | ', $messages ) ) );
+				}
 			}
 		}
+
+		$this->fail( sprintf( 'Jobs were still due after %d rounds.', $max_rounds ) );
 	}
 }

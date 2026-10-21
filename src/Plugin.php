@@ -38,6 +38,8 @@ final class Plugin {
 
 		Product::register();
 
+		Jobs::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}
