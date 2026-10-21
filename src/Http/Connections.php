@@ -367,7 +367,7 @@ final class Connections {
 		}
 
 		/** This filter is documented in wp-includes/http.php */
-		$safe = (array) apply_filters( 'http_allowed_safe_ports', array( 80, 443, 8080 ), $host, $base_url );
+		$safe = (array) apply_filters( 'http_allowed_safe_ports', array( 80, 443, 8080 ), $host, $base_url ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core's own filter.
 
 		if ( null !== $port && ! in_array( (int) $port, array_map( 'intval', $safe ), true ) ) {
 			/* translators: %d: port number. */
