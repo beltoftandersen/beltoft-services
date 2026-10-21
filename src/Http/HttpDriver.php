@@ -31,7 +31,8 @@ defined( 'ABSPATH' ) || exit;
  * `remote_id_field`); 409 on provision with a remote id is done (without one it fails and the
  * provision stays open); 404 on delete is done (already
  * gone); 408, 429, 5xx and transport
- * errors are retried (honouring Retry-After); anything else fails. Redirects are not followed.
+ * errors are retried (a Retry-After of up to a day is accepted; the Reconciler never waits less
+ * than its backoff step nor more than 14400 seconds); anything else fails. Redirects are not followed.
  */
 final class HttpDriver implements Driver, Opens {
 

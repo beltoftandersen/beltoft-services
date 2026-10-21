@@ -30,7 +30,7 @@ METHOD\npath?query\ntimestamp\ntenant\nsha256_hex(body)
 
 Every request also carries `Idempotency-Key: <tenant>:<operation>:<sequence>`, the same on retries.
 
-Answers: 2xx is done (provision needs the id in the remote id field); 409 on provision with an id is done; 404 on delete is done; 408, 429 and 5xx are retried, honouring `Retry-After`; any other 4xx is final. See `readme.txt` for the details.
+Answers: 2xx is done (provision needs the id in the remote id field); 409 on provision with an id is done; 404 on delete is done; 408, 429 and 5xx are retried, honouring `Retry-After` (never longer than 4 hours); any other 4xx is final. See `readme.txt` for the details.
 
 ## Development
 
