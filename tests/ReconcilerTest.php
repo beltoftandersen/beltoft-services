@@ -791,6 +791,53 @@ final class ReconcilerTest extends TestCase {
 		$this->assertCount( 1, $driver->calls( 'provision' ) );
 	}
 
+	public function test_failed_replacement_after_deletion_alerts_the_admin(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
+		$resource->desire( 'deleted', 'Retention over' );
+		$license_id = (int) $resource->license()['id'];
+
+		global $wpdb;
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the license lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'license', $license_id ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+		add_filter( 'beltoft_services_lock_timeout', '__return_zero' );
+
+		Jobs::run( $resource->id() );
+		$other->close();
+
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertNull( Resource::for_license( $license_id ) );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'A new service could not be created after the deletion: Another request is creating this resource', $this->mails[0]['message'] );
+	}
+
+	public function test_replacement_without_a_driver_alerts_the_admin(): void {
+		list( $resource ) = $this->resource( array( 'state' => 'paused' ) );
+		$resource->desire( 'deleted', 'Retention over' );
+		$license_id = (int) $resource->license()['id'];
+
+		// The driver's plugin goes away while the deletion runs.
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) {
+				$drivers['fake'] = new class() extends FakeDriver {
+					public function delete( Resource $r ): StepResult {
+						remove_all_filters( 'beltoft_services_drivers' );
+						return StepResult::done();
+					}
+				};
+				return $drivers;
+			},
+			20
+		);
+
+		Jobs::run( $resource->id() );
+
+		$this->assertNull( Resource::for_license( $license_id ) );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'no driver is available for the product', $this->mails[0]['message'] );
+	}
+
 	public function test_dunning_during_a_retrying_delete_still_deletes(): void {
 		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
 		$driver->will( 'delete', StepResult::retry( 0, 'Host busy' ) )->will( 'delete', StepResult::done() );
@@ -823,14 +870,20 @@ final class ReconcilerTest extends TestCase {
 
 		$fresh = Resource::find( $resource->id() );
 		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
-		$this->assertSame( 'paused', $fresh->get( 'desired_pending' )['state'] );
+		$this->assertSame( 'paused', $fresh->pending_desire()['state'] );
+		$this->assertFalse( wp_load_alloptions()[ Resource::pending_desire_option( $resource->id() ) ] ?? false, 'Not autoloaded.' );
+
+		// A reconciler meta write cannot drop it.
+		$fresh->set( array( 'steps' => array( 'x' ) ) );
+		$this->assertNotNull( Resource::find( $resource->id() )->pending_desire() );
 		$this->assertNotNull( $this->pending_at( $resource->id() ) );
 
 		$this->run_jobs();
 
 		$fresh = Resource::find( $resource->id() );
 		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
-		$this->assertNull( $fresh->get( 'desired_pending' ) );
+		$this->assertNull( $fresh->pending_desire() );
+		$this->assertFalse( get_option( Resource::pending_desire_option( $resource->id() ) ) );
 		$this->assertSame( 'paused', $fresh->get( 'state' ) );
 		$this->assertCount( 1, $driver->calls( 'pause' ) );
 		$this->assertContains( 'License revoked', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $resource->license()['id'] ), 'message' ) );

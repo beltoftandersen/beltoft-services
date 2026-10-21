@@ -173,7 +173,7 @@ final class Jobs {
 			}
 
 			// A desired state that could not take the lock is applied by the next step.
-			if ( is_array( $resource->get( 'desired_pending' ) ) ) {
+			if ( null !== $resource->pending_desire() ) {
 				self::enqueue( $id );
 				continue;
 			}

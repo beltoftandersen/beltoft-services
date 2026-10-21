@@ -52,7 +52,7 @@ final class Reconciler {
 	 * Meta only the reconciler and the resource itself write. A driver's step meta cannot
 	 * change these.
 	 */
-	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'desired_pending', 'alerted', 'protected', 'paused_at', 'warned_at' );
+	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at' );
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -152,11 +152,11 @@ final class Reconciler {
 		}
 
 		// A desired state that could not take the lock earlier is applied first.
-		$pending = $r->get( 'desired_pending' );
+		$pending = $r->pending_desire();
 
-		if ( is_array( $pending ) && isset( $pending['state'] ) ) {
-			$r->desire( (string) $pending['state'], (string) ( $pending['reason'] ?? '' ) );
-			$r->set( array( 'desired_pending' => null ) );
+		if ( $pending ) {
+			$r->desire( $pending['state'], $pending['reason'] );
+			delete_option( Resource::pending_desire_option( $r->id() ) );
 		}
 
 		$operation = self::operation( $r );
@@ -317,15 +317,19 @@ final class Reconciler {
 		$driver       = $driver ? $driver : Registry::get( $r->get( 'driver' ) );
 
 		if ( ! $driver ) {
+			Alerts::admin( $r, 'A new service could not be created after the deletion: no driver is available for the product' );
 			return;
 		}
 
 		$plan     = $product_id > 0 ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $r->get( 'plan' );
 		$resource = Resource::create( $license, $driver, $plan );
 
-		if ( $resource instanceof Resource ) {
-			Jobs::enqueue( $resource->id() );
+		if ( ! $resource instanceof Resource ) {
+			Alerts::admin( $r, 'A new service could not be created after the deletion: ' . $resource->get_error_message() );
+			return;
 		}
+
+		Jobs::enqueue( $resource->id() );
 	}
 
 	/**

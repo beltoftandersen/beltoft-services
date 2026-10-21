@@ -319,6 +319,38 @@ final class Resource {
 	}
 
 	/**
+	 * Option prefix for a desired state that is waiting for the resource lock.
+	 */
+	public const PENDING_DESIRE_PREFIX = 'beltoft_services_pending_desire_';
+
+	/**
+	 * The option that holds a resource's desired state waiting for its lock.
+	 *
+	 * @param int $activation_id Activation id.
+	 */
+	public static function pending_desire_option( int $activation_id ): string {
+		return self::PENDING_DESIRE_PREFIX . $activation_id;
+	}
+
+	/**
+	 * The desired state waiting for the lock, or null.
+	 *
+	 * @return array{state: string, reason: string}|null
+	 */
+	public function pending_desire(): ?array {
+		$pending = get_option( self::pending_desire_option( $this->id() ), null );
+
+		if ( ! is_array( $pending ) || ! isset( $pending['state'] ) ) {
+			return null;
+		}
+
+		return array(
+			'state'  => (string) $pending['state'],
+			'reason' => (string) ( $pending['reason'] ?? '' ),
+		);
+	}
+
+	/**
 	 * Seconds desire() waits for the resource lock.
 	 */
 	public const DESIRE_LOCK_WAIT = 2;
@@ -336,7 +368,8 @@ final class Resource {
 	 *
 	 * Runs under the resource lock (the reconciler's, re-entrant within one connection), so
 	 * a running job never overwrites it. When the lock stays busy, the change is kept in meta
-	 * `desired_pending`, the resource is queued, and the next step applies it.
+	 * its own option (pending_desire_option(), so no meta write can drop it), the resource is
+	 * queued, and the next step applies it.
 	 *
 	 * Deleted is terminal: once desired, it is never left. The history then says a new service
 	 * follows, which the reconciler creates when the deletion completes on an active license.
@@ -354,13 +387,13 @@ final class Resource {
 		$lock = Locks::name( 'resource', $this->id() );
 
 		if ( ! self::acquire( $lock, self::DESIRE_LOCK_WAIT ) ) {
-			$this->set(
+			update_option(
+				self::pending_desire_option( $this->id() ),
 				array(
-					'desired_pending' => array(
-						'state'  => $state,
-						'reason' => $reason,
-					),
-				)
+					'state'  => $state,
+					'reason' => $reason,
+				),
+				false
 			);
 			Jobs::enqueue( $this->id() );
 
@@ -379,10 +412,10 @@ final class Resource {
 				return false;
 			}
 
-			$meta = array(
-				'desired'         => $state,
-				'desired_pending' => null,
-			);
+			// A newer desire wins over one still waiting for the lock.
+			delete_option( self::pending_desire_option( $this->id() ) );
+
+			$meta = array( 'desired' => $state );
 
 			// A new desired state is a new start for the reconciler: a fresh attempt count, and a
 			// failure under it is alerted again.
