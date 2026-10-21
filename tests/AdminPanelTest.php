@@ -371,12 +371,111 @@ final class AdminPanelTest extends TestCase {
 		$this->assertStringContainsString( 'name="confirm"', $html );
 		$this->assertStringContainsString( 'MARK DELETED', $html );
 		$this->assertStringContainsString( 'If the service still exists it keeps running and is no longer managed here.', $html );
-		$this->assertStringContainsString( 'A renewal of an active license creates a new service.', $html );
+		$this->assertStringNotContainsString( 'A renewal of an active license creates a new service', $html );
 
 		// Nothing for a license that is not a service.
 		ob_start();
 		do_action( 'beltoft_licenses_admin_license', array( 'id' => 999999, 'product_id' => 0, 'product_slug' => 'plain-plugin' ) );
 		$this->assertSame( '', trim( (string) ob_get_clean() ) );
+	}
+
+	/**
+	 * Posts the create action for a license; returns the redirect target.
+	 *
+	 * @param int  $license_id License id.
+	 * @param bool $nonce      Add a valid nonce.
+	 */
+	private function post_create( int $license_id, bool $nonce = true ): string {
+		$post = array(
+			'license' => $license_id,
+			'do'      => 'create',
+			'action'  => Panel::ACTION,
+		);
+
+		if ( $nonce ) {
+			$post['_wpnonce'] = wp_create_nonce( Panel::nonce_action( $license_id, 'create' ) );
+		}
+
+		$_POST    = wp_slash( $post );
+		$_REQUEST = $_POST;
+		$target   = '';
+
+		add_filter(
+			'wp_redirect',
+			static function ( $location ) {
+				throw new \RuntimeException( $location ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+
+		try {
+			Panel::handle();
+		} catch ( \RuntimeException $e ) {
+			$target = $e->getMessage();
+		} finally {
+			remove_all_filters( 'wp_redirect' );
+		}
+
+		return $target;
+	}
+
+	public function test_create_the_service_for_an_active_license_without_one(): void {
+		$this->fake_driver();
+		$product = $this->service_product( 'fake', array(), array( 'slug' => 'svc-create' ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		$this->admin();
+
+		ob_start();
+		do_action( 'beltoft_licenses_admin_license', $license );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'value="create"', $html );
+		$this->assertStringContainsString( 'Create the service', $html );
+
+		// No nonce: stopped, nothing created.
+		try {
+			$this->post_create( (int) $license['id'], false );
+			$this->fail( 'A request without a nonce must die.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+		}
+
+		// No capability: stopped.
+		$admin = get_current_user_id();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+		try {
+			$this->post_create( (int) $license['id'] );
+			$this->fail( 'A user without manage_woocommerce must be stopped.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+		}
+		wp_set_current_user( $admin );
+
+		$target   = $this->post_create( (int) $license['id'] );
+		$resource = Resource::for_license( (int) $license['id'] );
+
+		$this->assertStringContainsString( 'beltoft_services_notice=create', $target );
+		$this->assertNotNull( $resource );
+		$this->assertSame( 'ready', $resource->get( 'desired' ) );
+		$this->assertNotEmpty( Jobs::pending( $resource->id() ) );
+
+		// It exists now: no button, and a second request makes no second service.
+		ob_start();
+		do_action( 'beltoft_licenses_admin_license', $license );
+		$this->assertStringNotContainsString( 'value="create"', (string) ob_get_clean() );
+		$this->assertStringContainsString( 'beltoft_services_error=has_service', $this->post_create( (int) $license['id'] ) );
+	}
+
+	public function test_create_the_service_refuses_an_inactive_license(): void {
+		$this->fake_driver();
+		$product = $this->service_product( 'fake', array(), array( 'slug' => 'svc-create-off' ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'status' => \BeltoftLicenses\Licenses::STATUS_SUSPENDED ) );
+		$this->admin();
+
+		ob_start();
+		do_action( 'beltoft_licenses_admin_license', $license );
+		$this->assertStringNotContainsString( 'value="create"', (string) ob_get_clean() );
+
+		$this->assertStringContainsString( 'beltoft_services_error=not_active', $this->post_create( (int) $license['id'] ) );
+		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
 	}
 
 	public function test_error_notices_show_only_known_messages(): void {

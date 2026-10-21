@@ -314,7 +314,7 @@ final class Lifecycle {
 	 *
 	 * @param array<string, mixed> $license License row.
 	 */
-	private static function provide( array $license ): void {
+	public static function provide( array $license ): void {
 		$product_id   = (int) ( $license['product_id'] ?? 0 );
 		$variation_id = (int) ( $license['variation_id'] ?? 0 );
 		$driver       = Product::driver_for( $product_id );

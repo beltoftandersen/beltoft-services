@@ -11,6 +11,7 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
+use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
@@ -182,6 +183,34 @@ final class Panel {
 	}
 
 	/**
+	 * Creates the service of an active service license that has no live one, the same way
+	 * a new license gets it (Lifecycle::provide: the resource, then its provisioning job).
+	 *
+	 * @param int $license_id License id.
+	 * @return true|\WP_Error
+	 */
+	public static function create_service( int $license_id ) {
+		$license = \BeltoftLicenses\Licenses::find( $license_id );
+
+		if ( ! is_array( $license ) || ! Product::is_service_license( $license ) ) {
+			return self::error( 'no_license' );
+		}
+
+		if ( \BeltoftLicenses\Licenses::STATUS_ACTIVE !== \BeltoftLicenses\Licenses::effective_status( $license ) ) {
+			return self::error( 'not_active' );
+		}
+
+		if ( Resource::for_license( $license_id ) ) {
+			return self::error( 'has_service' );
+		}
+
+		Events::add( $license_id, 'service', sprintf( 'Service creation requested by %s', self::who() ) );
+		Lifecycle::provide( $license );
+
+		return Resource::for_license( $license_id ) ? true : self::error( 'not_created' );
+	}
+
+	/**
 	 * Closes a resource as deleted without any driver call, under its lock, and tells
 	 * listeners (the resource is closed first).
 	 *
@@ -255,6 +284,10 @@ final class Panel {
 			'protected'    => __( 'This service is protected. Unprotect it first.', 'beltoft-services' ),
 			'busy'         => __( 'The service is busy right now. Try again in a moment.', 'beltoft-services' ),
 			'error'        => __( 'The change could not be stored.', 'beltoft-services' ),
+			'no_license'   => __( 'That license does not exist or is not a service license.', 'beltoft-services' ),
+			'not_active'   => __( 'The license is not active, so it gets no service.', 'beltoft-services' ),
+			'has_service'  => __( 'This license has a service already.', 'beltoft-services' ),
+			'not_created'  => __( 'The service could not be created. See the license history.', 'beltoft-services' ),
 		);
 	}
 
@@ -279,6 +312,24 @@ final class Panel {
 
 		$id     = isset( $_POST['resource'] ) ? absint( $_POST['resource'] ) : 0;
 		$action = isset( $_POST['do'] ) ? sanitize_key( wp_unslash( $_POST['do'] ) ) : '';
+
+		if ( 'create' === $action ) {
+			$license_id = isset( $_POST['license'] ) ? absint( $_POST['license'] ) : 0;
+
+			check_admin_referer( self::nonce_action( $license_id, 'create' ) );
+
+			$result = self::create_service( $license_id );
+			$args   = array( 'license' => $license_id );
+
+			if ( is_wp_error( $result ) ) {
+				$args['beltoft_services_error'] = $result->get_error_code();
+			} else {
+				$args['beltoft_services_notice'] = 'create';
+			}
+
+			wp_safe_redirect( \BeltoftLicenses\Admin\Screen::url( $args ) );
+			exit;
+		}
 
 		check_admin_referer( self::nonce_action( $id, $action ) );
 
@@ -318,6 +369,7 @@ final class Panel {
 		// phpcs:enable
 
 		$messages = array(
+			'create'       => __( 'The service is being created.', 'beltoft-services' ),
 			'retry'        => __( 'The service will be tried again.', 'beltoft-services' ),
 			'pause'        => __( 'The service will be paused.', 'beltoft-services' ),
 			'resume'       => __( 'The service will be resumed.', 'beltoft-services' ),
@@ -391,6 +443,19 @@ final class Panel {
 		if ( ! $r ) {
 			if ( Product::is_service_license( $license ) ) {
 				echo '<h2>' . esc_html__( 'Service', 'beltoft-services' ) . '</h2><p>' . esc_html__( 'This license has no live service.', 'beltoft-services' ) . '</p>';
+
+				if ( \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $license ) ) {
+					$license_id = (int) $license['id'];
+
+					echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+					wp_nonce_field( self::nonce_action( $license_id, 'create' ) );
+					printf(
+						'<input type="hidden" name="action" value="%1$s"><input type="hidden" name="license" value="%2$d"><input type="hidden" name="do" value="create"><button type="submit" class="button">%3$s</button></form>',
+						esc_attr( self::ACTION ),
+						(int) $license_id,
+						esc_html__( 'Create the service', 'beltoft-services' )
+					);
+				}
 			}
 			return;
 		}
@@ -468,7 +533,7 @@ final class Panel {
 			echo '<button type="submit" class="button button-link-delete">' . esc_html__( 'Delete', 'beltoft-services' ) . '</button></p>';
 
 			if ( \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $license ) ) {
-				echo '<p class="description">' . esc_html__( 'A renewal of an active license creates a new service.', 'beltoft-services' ) . '</p>';
+				echo '<p class="description">' . esc_html__( 'The license is active: afterwards use "Create the service" on this screen to give it a new service.', 'beltoft-services' ) . '</p>';
 			}
 
 			echo '</form>';
@@ -476,7 +541,7 @@ final class Panel {
 
 		echo '<h3>' . esc_html__( 'Mark deleted', 'beltoft-services' ) . '</h3>';
 		echo '<p class="description">' . esc_html__( 'For a service that is already gone (removed by hand, or a deletion the service cannot complete): closes it here without calling the service.', 'beltoft-services' ) . '</p>';
-		echo '<p class="description"><strong>' . esc_html__( 'If the service still exists it keeps running and is no longer managed here. A renewal of an active license creates a new service.', 'beltoft-services' ) . '</strong></p>';
+		echo '<p class="description"><strong>' . esc_html__( 'If the service still exists it keeps running and is no longer managed here. If the license is active, use "Create the service" afterwards to give it a new one.', 'beltoft-services' ) . '</strong></p>';
 		self::form_open( $r, 'mark_deleted' );
 		printf(
 			'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
