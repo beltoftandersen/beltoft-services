@@ -23,6 +23,7 @@ final class Checkout {
 		// After WooCommerce Subscriptions, whose $0 checkout setting may unhook its own rule.
 		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'cart_needs_payment' ), 20, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
+		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
 	}
 
 	/**
@@ -39,18 +40,25 @@ final class Checkout {
 	}
 
 	/**
-	 * Service trials in the cart.
+	 * Service trials being bought in the cart. Renewals, switches and resubscribes are not a
+	 * new trial, so they are skipped (WooCommerce Subscriptions marks those cart items).
 	 *
+	 * @param \WC_Cart|null $cart Cart; the current cart when null.
 	 * @return \WC_Product[]
 	 */
-	private static function trials_in_cart(): array {
+	private static function trials_in_cart( ?\WC_Cart $cart = null ): array {
 		$trials = array();
+		$cart   = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
 
-		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+		if ( ! $cart ) {
 			return $trials;
 		}
 
-		foreach ( WC()->cart->get_cart() as $item ) {
+		foreach ( $cart->get_cart() as $item ) {
+			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) || isset( $item['subscription_resubscribe'] ) ) {
+				continue;
+			}
+
 			$product = $item['data'] ?? false;
 
 			if ( self::is_service_trial( $product ) ) {
@@ -75,52 +83,75 @@ final class Checkout {
 
 		$cart = $cart instanceof \WC_Cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
 		if ( ! $cart || (float) $cart->get_total( 'edit' ) > 0 ) {
-			return (bool) $needs_payment;
+			return false;
 		}
 
-		foreach ( self::trials_in_cart() as $product ) {
+		foreach ( self::trials_in_cart( $cart ) as $product ) {
 			if ( Product::trial_requires_payment( $product->get_id() ) ) {
 				return true;
 			}
 		}
 
-		return (bool) $needs_payment;
+		return false;
 	}
 
 	/**
-	 * Refuses a trial of a service the customer already holds a license for, by user id or,
-	 * for guests, by billing email. WooCommerce has verified the checkout nonce.
+	 * Classic checkout: refuses a second trial. WooCommerce has verified the checkout nonce.
 	 *
 	 * @param array<string, mixed> $data   Posted checkout data.
 	 * @param \WP_Error            $errors Validation errors.
 	 */
 	public static function validate( $data, $errors ): void {
-		$trials = self::trials_in_cart();
+		self::check( is_array( $data ) ? (string) ( $data['billing_email'] ?? '' ) : '', $errors, null );
+	}
+
+	/**
+	 * Block checkout (Store API): the same rule, with the customer's billing email.
+	 *
+	 * @param \WP_Error $errors Cart errors.
+	 * @param \WC_Cart  $cart   Cart.
+	 */
+	public static function store_api_errors( $errors, $cart = null ): void {
+		$email = function_exists( 'WC' ) && WC()->customer ? (string) WC()->customer->get_billing_email() : '';
+
+		self::check( $email, $errors, $cart instanceof \WC_Cart ? $cart : null );
+	}
+
+	/**
+	 * Refuses a trial of a service the customer already holds a license for, matched by user
+	 * id and by billing email (so a guest trial with the same email counts).
+	 *
+	 * @param string        $email  Billing email.
+	 * @param \WP_Error     $errors Errors.
+	 * @param \WC_Cart|null $cart   Cart.
+	 */
+	private static function check( string $email, $errors, ?\WC_Cart $cart ): void {
+		$trials = self::trials_in_cart( $cart );
 		if ( ! $trials || ! $errors instanceof \WP_Error ) {
 			return;
 		}
 
 		$user_id = get_current_user_id();
-		$email   = sanitize_email( (string) ( is_array( $data ) ? ( $data['billing_email'] ?? '' ) : '' ) );
+		$email   = sanitize_email( $email );
 
-		$licenses = array();
-		if ( $user_id > 0 ) {
-			$licenses = \BeltoftLicenses\Licenses::where( 'user_id', $user_id );
-		} elseif ( '' !== $email ) {
-			$licenses = \BeltoftLicenses\Licenses::where( 'email', $email );
+		$licenses = $user_id > 0 ? \BeltoftLicenses\Licenses::where( 'user_id', $user_id ) : array();
+		if ( '' !== $email ) {
+			$licenses = array_merge( $licenses, \BeltoftLicenses\Licenses::where( 'email', $email ) );
 		}
 
 		if ( ! $licenses ) {
 			return;
 		}
 
-		$held = array_column( $licenses, 'product_slug' );
+		$held     = array_column( $licenses, 'product_slug' );
+		$reported = array();
 
 		foreach ( $trials as $product ) {
 			$parent = $product->is_type( 'variation' ) ? wc_get_product( $product->get_parent_id() ) : $product;
 			$slug   = $parent ? sanitize_title( (string) $parent->get_meta( \BeltoftLicenses\Software::META_SLUG ) ) : '';
 
-			if ( '' !== $slug && in_array( $slug, $held, true ) ) {
+			if ( '' !== $slug && ! isset( $reported[ $slug ] ) && in_array( $slug, $held, true ) ) {
+				$reported[ $slug ] = true;
 				$errors->add(
 					'beltoft_services_trial_used',
 					/* translators: %s: product name. */
