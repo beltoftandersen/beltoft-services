@@ -42,6 +42,7 @@ final class Plugin {
 
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
+		Checkout::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
