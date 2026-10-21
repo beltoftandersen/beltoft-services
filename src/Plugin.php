@@ -46,6 +46,7 @@ final class Plugin {
 
 		Lifecycle::register();
 		Retention::register();
+		Cli\Commands::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
