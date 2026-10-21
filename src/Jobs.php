@@ -155,8 +155,9 @@ final class Jobs {
 
 	/**
 	 * The recurring sweep: queues every live resource that has something to do, at its retry
-	 * time if it has one. Failed resources wait for an admin while they should be ready;
-	 * resources with missing meta are alerted and left alone.
+	 * time if it has one. Failed resources whose operation waits for an admin are left alone
+	 * (but alerted if that never happened); resources with missing meta are alerted and left
+	 * alone.
 	 */
 	public static function sweep(): void {
 		foreach ( self::live_ids() as $id ) {
@@ -171,8 +172,18 @@ final class Jobs {
 				continue;
 			}
 
-			// A failed resource that should run waits for an admin; one to pause or delete does not.
-			if ( ( 'failed' === $resource->get( 'state' ) && 'ready' === $resource->get( 'desired' ) ) || null === Reconciler::operation( $resource ) ) {
+			// A desired state that could not take the lock is applied by the next step.
+			if ( is_array( $resource->get( 'desired_pending' ) ) ) {
+				self::enqueue( $id );
+				continue;
+			}
+
+			// A failed operation waiting for an admin has no operation (see Reconciler::operation()).
+			if ( null === Reconciler::operation( $resource ) ) {
+				// A failure whose alert was never sent (no valid address then) is sent now.
+				if ( 'failed' === $resource->get( 'state' ) && '' === (string) $resource->get( 'alerted' ) ) {
+					Alerts::admin( $resource, $resource->get( 'last_error' ) );
+				}
 				continue;
 			}
 

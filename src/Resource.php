@@ -88,7 +88,14 @@ final class Resource {
 
 		$lock = self::lock_name( $license_id );
 
-		if ( ! self::acquire( $lock ) ) {
+		/**
+		 * Seconds to wait for the license lock when creating a resource.
+		 *
+		 * @param int $seconds Seconds.
+		 */
+		$timeout = max( 0, (int) apply_filters( 'beltoft_services_lock_timeout', 5 ) );
+
+		if ( ! self::acquire( $lock, $timeout ) ) {
 			return new \WP_Error( 'locked', 'Another request is creating this resource' );
 		}
 
@@ -159,17 +166,11 @@ final class Resource {
 	/**
 	 * Takes a named database lock.
 	 *
-	 * @param string $name Lock name.
+	 * @param string $name    Lock name.
+	 * @param int    $timeout Seconds to wait.
 	 */
-	private static function acquire( string $name ): bool {
+	private static function acquire( string $name, int $timeout ): bool {
 		global $wpdb;
-
-		/**
-		 * Seconds to wait for the license lock when creating a resource.
-		 *
-		 * @param int $seconds Seconds.
-		 */
-		$timeout = max( 0, (int) apply_filters( 'beltoft_services_lock_timeout', 5 ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
 		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, %d )', $name, $timeout ) );
@@ -318,14 +319,31 @@ final class Resource {
 	}
 
 	/**
+	 * Seconds desire() waits for the resource lock.
+	 */
+	public const DESIRE_LOCK_WAIT = 2;
+
+	/**
+	 * History text when a desired state other than deleted arrives during a deletion.
+	 */
+	public const DELETION_IN_PROGRESS = 'Deletion in progress; a new service will follow when it completes';
+
+	/**
 	 * Sets the desired state and writes a history event. Pausing records when; wanting it
 	 * ready again clears that. A change of the desired state resets the reconciler's attempt
 	 * count (meta op, attempts) and its alert memory. Never deletes anything by itself. The
 	 * event is written only when the change was stored.
 	 *
+	 * Runs under the resource lock (the reconciler's, re-entrant within one connection), so
+	 * a running job never overwrites it. When the lock stays busy, the change is kept in meta
+	 * `desired_pending`, the resource is queued, and the next step applies it.
+	 *
+	 * Deleted is terminal: once desired, it is never left. The history then says a new service
+	 * follows, which the reconciler creates when the deletion completes on an active license.
+	 *
 	 * @param string $state  ready, paused or deleted.
 	 * @param string $reason What happened, for the history.
-	 * @return bool Whether it was stored.
+	 * @return bool Whether it was stored now.
 	 */
 	public function desire( string $state, string $reason ): bool {
 		if ( ! in_array( $state, self::DESIRED, true ) ) {
@@ -333,27 +351,61 @@ final class Resource {
 			return false;
 		}
 
-		$meta = array( 'desired' => $state );
+		$lock = Locks::name( 'resource', $this->id() );
 
-		// A new desired state is a new start for the reconciler: a fresh attempt count, and a
-		// failure under it is alerted again.
-		if ( $this->get( 'desired' ) !== $state ) {
-			$meta['op']       = '';
-			$meta['attempts'] = 0;
-			$meta['alerted']  = '';
-		}
+		if ( ! self::acquire( $lock, self::DESIRE_LOCK_WAIT ) ) {
+			$this->set(
+				array(
+					'desired_pending' => array(
+						'state'  => $state,
+						'reason' => $reason,
+					),
+				)
+			);
+			Jobs::enqueue( $this->id() );
 
-		if ( 'paused' === $state ) {
-			if ( null === $this->get( 'paused_at' ) ) {
-				$meta['paused_at'] = time();
-			}
-		} elseif ( 'ready' === $state ) {
-			$meta['paused_at'] = null;
-			$meta['warned_at'] = null;
-		}
-
-		if ( ! $this->set( $meta ) ) {
 			return false;
+		}
+
+		try {
+			$fresh = Licenses::activation( $this->id() );
+
+			if ( $fresh ) {
+				$this->row = $fresh;
+			}
+
+			if ( 'deleted' === $this->get( 'desired' ) && 'deleted' !== $state ) {
+				Events::add( (int) $this->row['license_id'], 'service', self::DELETION_IN_PROGRESS );
+				return false;
+			}
+
+			$meta = array(
+				'desired'         => $state,
+				'desired_pending' => null,
+			);
+
+			// A new desired state is a new start for the reconciler: a fresh attempt count, and a
+			// failure under it is alerted again.
+			if ( $this->get( 'desired' ) !== $state ) {
+				$meta['op']       = '';
+				$meta['attempts'] = 0;
+				$meta['alerted']  = '';
+			}
+
+			if ( 'paused' === $state ) {
+				if ( null === $this->get( 'paused_at' ) ) {
+					$meta['paused_at'] = time();
+				}
+			} elseif ( 'ready' === $state ) {
+				$meta['paused_at'] = null;
+				$meta['warned_at'] = null;
+			}
+
+			if ( ! $this->set( $meta ) ) {
+				return false;
+			}
+		} finally {
+			self::release( $lock );
 		}
 
 		Events::add( (int) $this->row['license_id'], 'service', $reason );

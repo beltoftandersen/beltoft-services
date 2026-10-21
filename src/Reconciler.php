@@ -7,6 +7,7 @@
 
 namespace BeltoftServices;
 
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 
@@ -51,7 +52,7 @@ final class Reconciler {
 	 * Meta only the reconciler and the resource itself write. A driver's step meta cannot
 	 * change these.
 	 */
-	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at' );
+	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'desired_pending', 'alerted', 'protected', 'paused_at', 'warned_at' );
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -148,6 +149,14 @@ final class Reconciler {
 		if ( ! $r->is_valid() ) {
 			Alerts::admin( $r, $r->get( 'last_error' ) );
 			return;
+		}
+
+		// A desired state that could not take the lock earlier is applied first.
+		$pending = $r->get( 'desired_pending' );
+
+		if ( is_array( $pending ) && isset( $pending['state'] ) ) {
+			$r->desire( (string) $pending['state'], (string) ( $pending['reason'] ?? '' ) );
+			$r->set( array( 'desired_pending' => null ) );
 		}
 
 		$operation = self::operation( $r );
@@ -282,10 +291,41 @@ final class Reconciler {
 
 		if ( 'delete' === $operation ) {
 			$r->close();
+			self::replace_deleted( $r );
 			return;
 		}
 
 		self::follow_up( $r );
+	}
+
+	/**
+	 * After a deletion on a license that is active (renewed while the deletion ran), a new
+	 * resource is made with the product's current plan and queued.
+	 *
+	 * @param Resource $r The deleted, closed resource.
+	 */
+	private static function replace_deleted( Resource $r ): void {
+		$license = $r->license();
+
+		if ( ! $license || Licenses::STATUS_ACTIVE !== Licenses::effective_status( $license ) ) {
+			return;
+		}
+
+		$product_id   = (int) ( $license['product_id'] ?? 0 );
+		$variation_id = (int) ( $license['variation_id'] ?? 0 );
+		$driver       = Product::driver_for( $product_id );
+		$driver       = $driver ? $driver : Registry::get( $r->get( 'driver' ) );
+
+		if ( ! $driver ) {
+			return;
+		}
+
+		$plan     = $product_id > 0 ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $r->get( 'plan' );
+		$resource = Resource::create( $license, $driver, $plan );
+
+		if ( $resource instanceof Resource ) {
+			Jobs::enqueue( $resource->id() );
+		}
 	}
 
 	/**
@@ -320,7 +360,8 @@ final class Reconciler {
 			return;
 		}
 
-		$delay       = max( $delay, self::BACKOFF[ $attempts - 1 ] );
+		// A driver cannot push its retry beyond the longest backoff.
+		$delay       = max( min( $delay, self::BACKOFF[ count( self::BACKOFF ) - 1 ] ), self::BACKOFF[ $attempts - 1 ] );
 		$bookkeeping = array(
 			'op'              => $operation,
 			'attempts'        => $attempts,
@@ -401,18 +442,24 @@ final class Reconciler {
 	}
 
 	/**
-	 * Logs, once per request and resource, that the resource could not be updated.
+	 * Logs and alerts the admin that the resource could not be updated: at most once an hour
+	 * per resource.
 	 *
 	 * @param Resource $r Resource.
 	 */
 	private static function not_stored( Resource $r ): void {
 		static $logged = array();
 
-		if ( isset( $logged[ $r->id() ] ) ) {
+		$transient = 'beltoft_services_not_stored_' . $r->id();
+
+		if ( isset( $logged[ $r->id() ] ) || false !== get_transient( $transient ) ) {
 			return;
 		}
 
 		$logged[ $r->id() ] = true;
+		set_transient( $transient, 1, HOUR_IN_SECONDS );
+
+		Alerts::admin( $r, 'Resource could not be updated' );
 
 		error_log( sprintf( 'Beltoft Services: resource %d could not be updated; the sweep will try again.', $r->id() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a failed database write cannot be recorded anywhere else.
 	}

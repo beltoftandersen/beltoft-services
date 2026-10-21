@@ -16,8 +16,8 @@ defined( 'ABSPATH' ) || exit;
 final class Alerts {
 
 	/**
-	 * Option holding the last alert that could not be sent (no valid alert address), for the
-	 * admin screen to show.
+	 * Option holding the alerts that could not be sent (no valid alert address), keyed by
+	 * resource id, for the admin screen to show.
 	 */
 	public const PROBLEM_OPTION = 'beltoft_services_alert_problem';
 
@@ -40,15 +40,15 @@ final class Alerts {
 		$to = (string) Settings::get( 'admin_email' );
 
 		if ( ! is_email( $to ) ) {
-			update_option(
-				self::PROBLEM_OPTION,
-				array(
-					'time'     => time(),
-					'resource' => $r->id(),
-					'message'  => 'A service failure alert could not be sent: the alert address is not a valid email address.',
-				),
-				false
+			$problems = self::problems();
+
+			$problems[ $r->id() ] = array(
+				'time'     => time(),
+				'resource' => $r->id(),
+				'message'  => 'A service failure alert could not be sent: the alert address is not a valid email address.',
 			);
+
+			update_option( self::PROBLEM_OPTION, $problems, false );
 
 			return false;
 		}
@@ -71,8 +71,40 @@ final class Alerts {
 		$sent = (bool) wp_mail( $to, $subject, implode( "\n", $lines ) . "\n" );
 
 		$r->set( array( 'alerted' => $hash ) );
-		delete_option( self::PROBLEM_OPTION );
+		self::clear_problem( $r->id() );
 
 		return $sent;
+	}
+
+	/**
+	 * Alerts that could not be sent, keyed by resource id.
+	 *
+	 * @return array<int, array{time: int, resource: int, message: string}>
+	 */
+	public static function problems(): array {
+		$problems = get_option( self::PROBLEM_OPTION, array() );
+
+		return is_array( $problems ) ? $problems : array();
+	}
+
+	/**
+	 * Forgets the unsent alert of one resource.
+	 *
+	 * @param int $resource_id Activation id.
+	 */
+	private static function clear_problem( int $resource_id ): void {
+		$problems = self::problems();
+
+		if ( ! isset( $problems[ $resource_id ] ) ) {
+			return;
+		}
+
+		unset( $problems[ $resource_id ] );
+
+		if ( $problems ) {
+			update_option( self::PROBLEM_OPTION, $problems, false );
+		} else {
+			delete_option( self::PROBLEM_OPTION );
+		}
 	}
 }

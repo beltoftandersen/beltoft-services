@@ -33,4 +33,27 @@ final class LocksTest extends TestCase {
 	public function test_names_fit_mysql_limit(): void {
 		$this->assertLessThanOrEqual( 64, strlen( Locks::name( 'license', PHP_INT_MAX ) ) );
 	}
+
+	public function test_get_lock_is_reentrant_on_this_server(): void {
+		global $wpdb;
+
+		$name  = Locks::name( 'resource', 987654 );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection watches the lock.
+		$free  = static function () use ( $other, $name ) {
+			return $other->query( "SELECT IS_FREE_LOCK( '" . $other->real_escape_string( $name ) . "' )" )->fetch_row()[0];
+		};
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$this->assertSame( '1', $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, 0 )', $name ) ) );
+		$this->assertSame( '1', $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, 0 )', $name ) ), 'The same connection takes it again.' );
+
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $name ) );
+		$this->assertSame( '0', $free(), 'One release keeps the outer hold.' );
+
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $name ) );
+		$this->assertSame( '1', $free() );
+		// phpcs:enable
+
+		$other->close();
+	}
 }

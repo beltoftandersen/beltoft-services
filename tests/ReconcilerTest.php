@@ -612,9 +612,9 @@ final class ReconcilerTest extends TestCase {
 
 		$this->assertSame( array(), $this->mails );
 		$this->assertSame( '', (string) Resource::find( $resource->id() )->get( 'alerted' ) );
-		$problem = get_option( \BeltoftServices\Alerts::PROBLEM_OPTION );
-		$this->assertIsArray( $problem );
-		$this->assertSame( $resource->id(), $problem['resource'] );
+		$problems = \BeltoftServices\Alerts::problems();
+		$this->assertArrayHasKey( $resource->id(), $problems );
+		$this->assertSame( $resource->id(), $problems[ $resource->id() ]['resource'] );
 
 		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
 		$this->admin_retry( $resource );
@@ -709,6 +709,131 @@ final class ReconcilerTest extends TestCase {
 
 		$this->assertNull( $this->pending_at( $resource->id() ), 'Nothing loops on a broken write.' );
 		$this->assertSame( 1, substr_count( $logged, 'resource ' . $resource->id() . ' could not be updated' ) );
+		$this->assertCount( 1, $this->mails, 'The admin is told, at most once an hour.' );
+		$this->assertStringContainsString( 'Resource could not be updated', $this->mails[0]['message'] );
+		$this->assertNotFalse( get_transient( 'beltoft_services_not_stored_' . $resource->id() ) );
+	}
+
+	public function test_sweep_sends_an_alert_once_the_address_is_fixed(): void {
+		$this->settings( array( 'admin_email' => '' ) );
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::fail( 'Host unreachable' ) );
+
+		Jobs::run( $resource->id() );
+		$this->assertSame( array(), $this->mails );
+
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		Jobs::sweep();
+
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'Host unreachable', $this->mails[0]['message'] );
+		$this->assertSame( array(), \BeltoftServices\Alerts::problems() );
+
+		Jobs::sweep();
+		$this->assertCount( 1, $this->mails, 'Sent once.' );
+		$this->assertCount( 1, $driver->calls( 'provision' ), 'The sweep does not retry the failed operation.' );
+	}
+
+	public function test_problem_record_is_kept_per_resource(): void {
+		$this->settings( array( 'admin_email' => '' ) );
+		list( $first, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::fail( 'Host unreachable' ) );
+		Jobs::run( $first->id() );
+
+		list( $second, $driver2 ) = $this->resource();
+		$driver2->will( 'provision', StepResult::fail( 'Host unreachable' ) );
+		Jobs::run( $second->id() );
+		$this->assertCount( 2, \BeltoftServices\Alerts::problems() );
+
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		\BeltoftServices\Alerts::admin( Resource::find( $second->id() ), 'Host unreachable' );
+
+		$this->assertSame( array( $first->id() ), array_keys( \BeltoftServices\Alerts::problems() ) );
+	}
+
+	public function test_driver_retry_delay_is_capped_at_the_longest_backoff(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 999999, 'Come back next month' ) );
+
+		Jobs::run( $resource->id() );
+
+		$this->assertLessThanOrEqual( time() + 14400, Resource::find( $resource->id() )->get( 'next_attempt_at' ) );
+		$this->assertLessThanOrEqual( time() + 14400, $this->pending_at( $resource->id() ) );
+	}
+
+	public function test_renewal_during_a_retrying_delete_makes_a_new_service(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
+		$driver->will( 'delete', StepResult::retry( 0, 'Host busy' ) )->will( 'delete', StepResult::done() );
+		$license_id = (int) $resource->license()['id'];
+
+		$this->assertTrue( $resource->desire( 'deleted', 'Retention over' ) );
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'deleting', Resource::find( $resource->id() )->get( 'state' ) );
+
+		// The customer renews: deleted is terminal, the history says what happens.
+		$this->assertFalse( Resource::find( $resource->id() )->desire( 'ready', 'Subscription renewed' ) );
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'desired' ) );
+		$this->assertContains( Resource::DELETION_IN_PROGRESS, wp_list_pluck( \BeltoftLicenses\Events::for_license( $license_id ), 'message' ) );
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+
+		$this->assertFalse( Resource::find( $resource->id() )->is_live() );
+		$replacement = Resource::for_license( $license_id );
+		$this->assertNotNull( $replacement );
+		$this->assertNotSame( $resource->id(), $replacement->id() );
+
+		$this->run_jobs();
+
+		$fresh = Resource::find( $replacement->id() );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertCount( 1, $driver->calls( 'provision' ) );
+	}
+
+	public function test_dunning_during_a_retrying_delete_still_deletes(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
+		$driver->will( 'delete', StepResult::retry( 0, 'Host busy' ) )->will( 'delete', StepResult::done() );
+		$license_id = (int) $resource->license()['id'];
+
+		$resource->desire( 'deleted', 'Retention over' );
+		Jobs::run( $resource->id() );
+
+		\BeltoftLicenses\Licenses::update( $license_id, array( 'status' => \BeltoftLicenses\Licenses::STATUS_SUSPENDED ) );
+		$this->assertFalse( Resource::find( $resource->id() )->desire( 'paused', 'Payment failed' ) );
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertNull( Resource::for_license( $license_id ), 'No new service on a suspended license.' );
+		$this->assertSame( array(), $driver->calls( 'provision' ) );
+	}
+
+	public function test_desire_while_a_job_holds_the_lock_is_applied_by_the_next_step(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+
+		global $wpdb;
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $resource->id() ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		$this->assertFalse( $resource->desire( 'paused', 'License revoked' ) );
+		$other->close();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'desired_pending' )['state'] );
+		$this->assertNotNull( $this->pending_at( $resource->id() ) );
+
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertNull( $fresh->get( 'desired_pending' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertCount( 1, $driver->calls( 'pause' ) );
+		$this->assertContains( 'License revoked', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $resource->license()['id'] ), 'message' ) );
 	}
 
 	public function test_pause_without_steps_stops_when_it_cannot_be_stored(): void {

@@ -207,9 +207,10 @@ final class JobsTest extends TestCase {
 		$settled  = $make( array( 'state' => 'ready' ) );
 		$failed   = $make(
 			array(
-				'state'     => 'failed',
-				'failed_op' => 'provision',
-				'attempts'  => 6,
+				'state'          => 'failed',
+				'failed_op'      => 'provision',
+				'failed_desired' => 'ready',
+				'attempts'       => 6,
 			)
 		);
 		$dirty    = $make(
@@ -225,8 +226,19 @@ final class JobsTest extends TestCase {
 			)
 		);
 
+		$resuming = $make(
+			array(
+				'state'          => 'failed',
+				'failed_op'      => 'pause',
+				'failed_desired' => 'paused',
+				'op'             => 'pause',
+				'attempts'       => 6,
+			)
+		);
+
 		Jobs::sweep();
 
+		$this->assertCount( 1, $this->pending( $resuming->id() ), 'A failed pause that should be ready again resumes.' );
 		$this->assertEqualsWithDelta( time() + 600, $this->pending( $later->id() )[0] ?? 0, 2 );
 		$this->assertSame( array(), $this->pending( $settled->id() ) );
 		$this->assertSame( array(), $this->pending( $failed->id() ), 'A failed resource waits for the admin.' );
