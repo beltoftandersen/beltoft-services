@@ -265,10 +265,6 @@ final class ConnectionsScreen {
 			esc_html__( 'Leave empty to keep the saved secret.', 'beltoft-services' )
 		);
 
-		if ( '' !== $id && Connections::has_secret( $id ) ) {
-			echo '<label><input type="checkbox" name="remove_secret" value="1"> ' . esc_html__( 'Remove the saved secret', 'beltoft-services' ) . '</label>';
-		}
-
 		echo '</td></tr>';
 
 		self::row( 'header_timestamp', __( 'Timestamp header', 'beltoft-services' ), $c['header_timestamp'] );

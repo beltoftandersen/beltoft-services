@@ -154,8 +154,7 @@ final class Connections {
 	}
 
 	/**
-	 * Validates and saves a connection. An empty `secret` keeps the saved one; `remove_secret`
-	 * clears it.
+	 * Validates and saves a connection. An empty `secret` keeps the saved one.
 	 *
 	 * @param string               $id    Connection id (letters, numbers, dashes and underscores).
 	 * @param array<string, mixed> $input Raw values, as posted.
@@ -483,7 +482,7 @@ final class Connections {
 	}
 
 	/**
-	 * The secret to store: a new one encrypted, the saved one, or none.
+	 * The secret to store: a new one encrypted, or the saved one.
 	 *
 	 * @param array<string, mixed> $input Posted values.
 	 * @param string               $saved Saved (encrypted) value.
@@ -500,6 +499,6 @@ final class Connections {
 			return Crypto::encrypt( $new );
 		}
 
-		return empty( $input['remove_secret'] ) ? $saved : '';
+		return $saved;
 	}
 }

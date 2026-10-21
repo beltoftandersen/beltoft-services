@@ -146,17 +146,20 @@ class ConnectionsTest extends TestCase {
 		$this->assertSame( 'new-secret', Connections::get( 's' )['secret'] );
 	}
 
-	public function test_secret_is_required_and_cannot_be_removed_alone(): void {
+	public function test_secret_is_required_and_an_empty_field_keeps_the_saved_one(): void {
 		$this->assertTrue( Connections::save( 's', $this->input() ) );
 
 		foreach ( array( 'hmac', 'header' ) as $auth ) {
-			$over = array( 'secret' => '', 'remove_secret' => '1', 'auth' => $auth, 'header_static' => 'X-Api-Key' );
-			$this->assertInstanceOf( \WP_Error::class, Connections::save( 's', $over + $this->input() ), $auth );
-			$this->assertSame( 'hunter2', Connections::get( 's' )['secret'] );
+			$over = array( 'secret' => '', 'auth' => $auth, 'header_static' => 'X-Api-Key' );
+			$this->assertTrue( Connections::save( 's', $over + $this->input() ), $auth );
+			$this->assertSame( 'hunter2', Connections::get( 's' )['secret'], 'An empty field keeps the saved secret.' );
 		}
 
-		// A new secret wins over the checkbox.
-		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => 'fresh', 'remove_secret' => '1' ) ) ) );
+		// There is no way to clear a secret: a stray remove_secret field changes nothing.
+		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => '', 'remove_secret' => '1' ) ) ) );
+		$this->assertSame( 'hunter2', Connections::get( 's' )['secret'] );
+
+		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => 'fresh' ) ) ) );
 		$this->assertSame( 'fresh', Connections::get( 's' )['secret'] );
 
 		$this->assertInstanceOf( \WP_Error::class, Connections::save( 'new', $this->input( array( 'secret' => '' ) ) ), 'no secret at all' );
