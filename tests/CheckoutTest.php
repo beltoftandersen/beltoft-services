@@ -87,7 +87,7 @@ class CheckoutTest extends TestCase {
 		$this->assertFalse( WC()->cart->needs_payment(), 'Not a service: the store setting decides.' );
 	}
 
-	public function test_paid_purchase_is_not_affected(): void {
+	public function test_medusa_paid_purchases_do_not_get_a_trial_on_top(): void {
 		$this->fake_driver();
 
 		$no_trial = $this->as_subscription( $this->service_product( 'fake' ), 0 );

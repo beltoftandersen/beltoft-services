@@ -253,7 +253,7 @@ final class RetentionTest extends TestCase {
 		$this->assertSame( array(), $this->warnings );
 	}
 
-	public function test_warning_from_an_earlier_pause_does_not_count(): void {
+	public function test_medusa_lifting_a_suspension_cannot_trigger_immediate_deletion(): void {
 		$this->settings( array( 'deletion_mode' => 'on' ) );
 
 		// Warned during an earlier pause (before this paused_at), then paused again.

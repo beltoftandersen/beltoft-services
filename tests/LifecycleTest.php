@@ -216,6 +216,31 @@ final class LifecycleTest extends TestCase {
 		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
 	}
 
+	public function test_medusa_one_cancel_does_not_disable_the_other_plan(): void {
+		$user = self::factory()->user->create();
+		$one  = $this->service_product( 'fake', array(), array( 'max' => 3, 'slug' => 'plan-one' ) );
+		$two  = $this->service_product( 'fake', array(), array( 'max' => 3, 'slug' => 'plan-two' ) );
+
+		$license_one = $this->service_license( $one, array( 'user_id' => $user ) );
+		$license_two = $this->service_license( $two, array( 'user_id' => $user ) );
+		$this->run_jobs();
+
+		$resource_one = Resource::for_license( (int) $license_one['id'] );
+		$resource_two = Resource::for_license( (int) $license_two['id'] );
+		$this->assertNotSame( $resource_one->id(), $resource_two->id() );
+		$this->assertSame( 'ready', $resource_one->get( 'state' ) );
+		$this->assertSame( 'ready', $resource_two->get( 'state' ) );
+
+		Licenses::update( (int) $license_one['id'], array( 'expires_at' => time() - 60 ) );
+		\BeltoftLicenses\Lifecycle\Expiry::run();
+		$this->run_jobs();
+
+		$this->assertSame( 'paused', $this->fresh( $resource_one )->get( 'state' ) );
+		$this->assertSame( 'ready', $this->fresh( $resource_two )->get( 'state' ), 'The customer\'s other service keeps running.' );
+		$this->assertSame( 'ready', $this->fresh( $resource_two )->get( 'desired' ) );
+		$this->assertCount( 1, $this->driver->calls( 'pause' ) );
+	}
+
 	public function test_medusa_resume_reenables(): void {
 		list( $license, $resource ) = $this->provisioned();
 

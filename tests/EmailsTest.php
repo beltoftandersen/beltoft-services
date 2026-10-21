@@ -140,7 +140,7 @@ final class EmailsTest extends TestCase {
 		$this->assertSame( array(), $this->customer_mails() );
 	}
 
-	public function test_deletion_warning_and_deleted_emails(): void {
+	public function test_medusa_deleted_email_is_sent_not_lost_to_a_payload_mismatch(): void {
 		$this->fake_driver();
 		$product  = $this->service_product( 'fake' );
 		$license  = $this->service_license( $product, array( 'fire' => false ) );
