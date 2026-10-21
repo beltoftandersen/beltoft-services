@@ -263,6 +263,16 @@ final class Settings {
 		}
 		echo '</nav>';
 
+		/**
+		 * Renders a tab that draws its own content instead of the generic fields. When something
+		 * is hooked to `beltoft_services_settings_tab_{slug}`, the Settings API form is skipped.
+		 */
+		if ( has_action( 'beltoft_services_settings_tab_' . $current ) ) {
+			do_action( 'beltoft_services_settings_tab_' . $current );
+			echo '</div>';
+			return;
+		}
+
 		echo '<form action="options.php" method="post">';
 		settings_fields( self::PAGE );
 		do_settings_sections( self::PAGE . '-' . $current );

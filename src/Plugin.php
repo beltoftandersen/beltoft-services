@@ -40,6 +40,9 @@ final class Plugin {
 
 		Jobs::register();
 
+		Http\Connections::register();
+		Http\ConnectionsScreen::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}
