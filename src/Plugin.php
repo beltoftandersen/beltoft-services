@@ -34,6 +34,8 @@ final class Plugin {
 
 		remove_action( 'admin_notices', array( __CLASS__, 'notice_missing' ) );
 
+		Settings::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}
