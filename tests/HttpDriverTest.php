@@ -670,10 +670,14 @@ class HttpDriverTest extends TestCase {
 		$resource = $this->resource();
 		$resource->set( array( 'remote_id' => 'r' ) );
 
-		// Nothing to tell the service: pausing, resuming and plan changes are done.
-		$this->assertTrue( $this->driver()->pause( $resource )->is_done() );
+		// Only resuming has nothing to tell the service; a pause or a plan change cannot be assumed.
 		$this->assertTrue( $this->driver()->resume( $resource )->is_done() );
-		$this->assertTrue( $this->driver()->update_plan( $resource )->is_done() );
+		$result = $this->driver()->pause( $resource );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( 'No pause endpoint is configured', $result->error() );
+		$result = $this->driver()->update_plan( $resource );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( 'No update_plan endpoint is configured', $result->error() );
 		// Deleting cannot be assumed.
 		$result = $this->driver()->delete( $resource );
 		$this->assertTrue( $result->is_failed() );
@@ -696,6 +700,71 @@ class HttpDriverTest extends TestCase {
 		$this->assertStringContainsString( 'remote id', $result->error() );
 		$this->assertTrue( $this->driver()->update_plan( Resource::find( $resource->id() ) )->is_failed() );
 		$this->assertCount( 1, $this->http_calls() );
+
+		// A provision the service refused for good created nothing: nothing to delete.
+		$refused = $this->resource();
+		$this->answers( array( self::answer( 422, 'no' ) ) );
+		$this->assertSame( 'failed', $this->step( $refused )->get( 'state' ) );
+		$this->assertTrue( $this->driver()->delete( Resource::find( $refused->id() ) )->is_done() );
+		$this->assertCount( 2, $this->http_calls() );
+	}
+
+	public function test_large_remote_ids_are_kept_exactly(): void {
+		$this->connection();
+		$resource = $this->resource();
+		$this->answers( array( self::answer( 201, '{"data":{"id":123456789012345678901234567890}}' ) ) );
+
+		$this->assertSame( '123456789012345678901234567890', $this->step( $resource )->get( 'remote_id' ) );
+	}
+
+	public function test_delete_answered_404_is_already_gone(): void {
+		$this->connection();
+		$resource = $this->resource();
+		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'r' ) ) ), self::answer( 404, 'Not found' ) ) );
+		$fresh = $this->step( $resource );
+
+		$fresh->desire( 'deleted', 'Test' );
+		$this->assertSame( 'deleted', $this->step( $fresh )->get( 'state' ) );
+
+		// A 404 to anything else is still a failure.
+		$other = $this->resource();
+		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'r2' ) ) ), self::answer( 404, 'Not found' ) ) );
+		$other = $this->step( $other );
+		$other->desire( 'paused', 'Test' );
+		$this->assertSame( 'failed', $this->step( $other )->get( 'state' ) );
+	}
+
+	public function test_a_changed_body_gets_a_new_key(): void {
+		$this->connection();
+		$resource = $this->resource();
+		$uuid     = $resource->get( 'uuid' );
+		$timeout  = new \WP_Error( 'http_request_failed', 'cURL error 28: Operation timed out' );
+		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'r' ) ) ) ) );
+		$fresh = $this->step( $resource );
+
+		$this->answers( array( $timeout ) );
+		$fresh->set( array( 'plan' => array( 'limit' => 7, 'attributes' => '' ), 'plan_dirty' => true ) );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_retry() );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_retry() );
+
+		// Plan B while plan A's request is still open: a new key, so B is never answered with A's reply.
+		$fresh->set( array( 'plan' => array( 'limit' => 9, 'attributes' => '' ) ) );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_retry() );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_retry() );
+
+		$keys = array_map( static fn( $call ) => $call['args']['headers']['Idempotency-Key'], array_slice( $this->http_calls(), 1 ) );
+		$this->assertSame( array( $uuid . ':update_plan:1', $uuid . ':update_plan:1', $uuid . ':update_plan:2', $uuid . ':update_plan:2' ), $keys );
+		$this->assertSame( 9, json_decode( end( $this->http_calls )['args']['body'], true )['limit'] );
+
+		// Provision keeps its key even when the body changed: the tenant must not be made twice.
+		$other = $this->resource();
+		$this->answers( array( $timeout ) );
+		$this->driver()->provision( $other );
+		$other->set( array( 'plan' => array( 'limit' => 4, 'attributes' => 'x=y' ) ) );
+		$this->driver()->provision( Resource::find( $other->id() ) );
+
+		$keys = array_map( static fn( $call ) => $call['args']['headers']['Idempotency-Key'], array_slice( $this->http_calls(), -2 ) );
+		$this->assertSame( array( $other->get( 'uuid' ) . ':provision:1', $other->get( 'uuid' ) . ':provision:1' ), $keys );
 	}
 
 	public function test_status_reads_usage(): void {

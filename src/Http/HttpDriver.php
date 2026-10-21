@@ -26,7 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * number.
  *
  * Answers: 2xx is done (provision also needs the remote id, read from the connection's
- * `remote_id_field`); 409 on provision with a remote id is done; 408, 429, 5xx and transport
+ * `remote_id_field`); 409 on provision with a remote id is done; 404 on delete is done (already
+ * gone); 408, 429, 5xx and transport
  * errors are retried (honouring Retry-After); anything else fails. Redirects are not followed.
  */
 final class HttpDriver implements Driver {
@@ -331,10 +332,12 @@ final class HttpDriver implements Driver {
 		$path     = (string) $endpoint['path'];
 
 		if ( '' === $path ) {
-			// Nothing to tell the service, except that creating or deleting cannot be assumed.
-			return in_array( $operation, array( 'provision', 'delete' ), true )
-				? StepResult::fail( sprintf( 'No %s endpoint is configured', $operation ) )
-				: StepResult::done( array( 'connection' => $connection_id ) );
+			// Only resuming can be assumed: a service with nothing to resume is running.
+			// Creating, pausing, deleting or a plan change that is never sent would leave the
+			// service out of step without anyone knowing.
+			return 'resume' === $operation
+				? StepResult::done( array( 'connection' => $connection_id ) )
+				: StepResult::fail( sprintf( 'No %s endpoint is configured', $operation ) );
 		}
 
 		$idempotency = is_array( $r->get( 'idempotency' ) ) ? $r->get( 'idempotency' ) : array();
@@ -353,15 +356,21 @@ final class HttpDriver implements Driver {
 			return StepResult::fail( 'The body template does not give valid JSON' );
 		}
 
-		// Store the sequence before the request goes out, so a crash cannot change the key.
+		// Store the sequence before the request goes out, so a crash cannot change the key. A
+		// retry whose body changed (a newer plan) is another request and gets a new key, or the
+		// service would replay its answer to the old body; provision keeps its key whatever
+		// changed, so the tenant is never created twice.
 		$entry = is_array( $idempotency[ $operation ] ?? null ) ? $idempotency[ $operation ] : array();
 		$seq   = (int) ( $entry['seq'] ?? 0 );
+		$hash  = hash( 'sha256', $body );
+		$fresh = empty( $entry['open'] ) || ( 'provision' !== $operation && ( $entry['body'] ?? '' ) !== $hash );
 
-		if ( empty( $entry['open'] ) ) {
+		if ( $fresh ) {
 			++$seq;
 			$idempotency[ $operation ] = array(
 				'seq'  => $seq,
 				'open' => true,
+				'body' => $hash,
 			);
 
 			if ( ! $r->set(
@@ -382,6 +391,7 @@ final class HttpDriver implements Driver {
 		$closed[ $operation ] = array(
 			'seq'  => $seq,
 			'open' => false,
+			'body' => $hash,
 		);
 		$meta                 = array(
 			'last_request'    => $line,
@@ -402,12 +412,13 @@ final class HttpDriver implements Driver {
 		$meta['last_status'] = $code;
 		$prefix              = $line . ': HTTP ' . $code . ': ';
 
-		if ( ( $code >= 200 && $code <= 299 ) || ( 409 === $code && 'provision' === $operation ) ) {
+		// Deleting what the service no longer has is done.
+		if ( ( $code >= 200 && $code <= 299 ) || ( 409 === $code && 'provision' === $operation ) || ( 404 === $code && 'delete' === $operation ) ) {
 			if ( 'provision' !== $operation ) {
 				return StepResult::done( array_merge( $meta, array( 'idempotency' => $closed ) ) );
 			}
 
-			$data      = json_decode( $text, true );
+			$data      = json_decode( $text, true, 512, JSON_BIGINT_AS_STRING );
 			$remote_id = is_array( $data ) ? self::field( $data, (string) $connection['remote_id_field'] ) : null;
 
 			if ( is_scalar( $remote_id ) && ! is_bool( $remote_id ) && '' !== (string) $remote_id ) {
@@ -446,14 +457,17 @@ final class HttpDriver implements Driver {
 
 	/**
 	 * The answer for an operation whose path needs a remote id the resource does not have.
-	 * Never provisioned: there is nothing to pause or delete. A provision was sent but its id
-	 * never came back: the service may hold something, so an admin decides.
+	 * Never provisioned, or the provision got a final refusal: there is nothing to pause or
+	 * delete. A provision was sent but its answer never came: the service may hold something,
+	 * so an admin decides.
 	 *
 	 * @param string               $operation   Operation.
 	 * @param array<string, mixed> $idempotency Stored sequences.
 	 */
 	private function without_remote_id( string $operation, array $idempotency ): StepResult {
-		if ( in_array( $operation, array( 'pause', 'delete' ), true ) && ! isset( $idempotency['provision'] ) ) {
+		$provision = is_array( $idempotency['provision'] ?? null ) ? $idempotency['provision'] : array();
+
+		if ( in_array( $operation, array( 'pause', 'delete' ), true ) && empty( $provision['open'] ) ) {
 			return StepResult::done();
 		}
 

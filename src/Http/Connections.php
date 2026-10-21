@@ -316,7 +316,7 @@ final class Connections {
 	}
 
 	/**
-	 * Whether a URL (which may hold {token}) uses https, or http to a private or loopback host.
+	 * Whether a URL (which may hold {token}) uses https, or http to a private or loopback IP literal.
 	 *
 	 * @param string $url URL.
 	 */
@@ -324,7 +324,10 @@ final class Connections {
 		$scheme = strtolower( (string) wp_parse_url( str_replace( array( '{', '}' ), '', $url ), PHP_URL_SCHEME ) );
 		$host   = (string) wp_parse_url( str_replace( array( '{', '}' ), '', $url ), PHP_URL_HOST );
 
-		return 'https' === $scheme || ( 'http' === $scheme && self::is_private_host( $host ) );
+		// Plain http only to an IP literal: a name such as localhost could resolve anywhere.
+		$bare = trim( $host, '[]' );
+
+		return 'https' === $scheme || ( 'http' === $scheme && false !== filter_var( $bare, FILTER_VALIDATE_IP ) && self::is_private_host( $bare ) );
 	}
 
 	/**
@@ -411,7 +414,7 @@ final class Connections {
 		}
 
 		if ( ! self::scheme_allowed( $url ) ) {
-			return new \WP_Error( 'beltoft_services_connection_https', __( 'The base URL must use https, unless the host is a private or loopback address.', 'beltoft-services' ) );
+			return new \WP_Error( 'beltoft_services_connection_https', __( 'The base URL must use https, unless the host is a private or loopback IP address.', 'beltoft-services' ) );
 		}
 
 		return esc_url_raw( $url );

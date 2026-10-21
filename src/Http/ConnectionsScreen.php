@@ -252,7 +252,7 @@ final class ConnectionsScreen {
 		}
 
 		self::row( 'label', __( 'Label', 'beltoft-services' ), $c['label'] );
-		self::row( 'base_url', __( 'Base URL', 'beltoft-services' ), $c['base_url'], __( 'https, unless the host is a private or loopback address.', 'beltoft-services' ) );
+		self::row( 'base_url', __( 'Base URL', 'beltoft-services' ), $c['base_url'], __( 'https, unless the host is a private or loopback IP address (such as 10.0.0.2).', 'beltoft-services' ) );
 
 		echo '<tr><th scope="row"><label for="bs_auth">' . esc_html__( 'Authentication', 'beltoft-services' ) . '</label></th><td><select id="bs_auth" name="auth">';
 		printf( '<option value="hmac" %1$s>HMAC</option><option value="header" %2$s>%3$s</option>', selected( $c['auth'], 'hmac', false ), selected( $c['auth'], 'header', false ), esc_html__( 'Static header', 'beltoft-services' ) );

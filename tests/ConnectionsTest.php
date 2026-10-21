@@ -99,10 +99,10 @@ class ConnectionsTest extends TestCase {
 	}
 
 	public function test_http_is_allowed_for_private_and_loopback_hosts_only(): void {
-		foreach ( array( 'http://localhost:8080', 'http://127.0.0.1', 'http://10.1.2.3', 'http://172.16.0.9', 'http://172.31.255.1', 'http://192.168.1.5/api', 'http://[::1]:9000', 'http://[fd12:3456::1]', 'HTTP://LOCALHOST', 'http://[::ffff:127.0.0.1]' ) as $url ) {
+		foreach ( array( 'http://127.0.0.1', 'http://10.1.2.3', 'http://172.16.0.9', 'http://172.31.255.1', 'http://192.168.1.5/api', 'http://[::1]:9000', 'http://[fd12:3456::1]', 'http://[::ffff:127.0.0.1]', 'https://localhost', 'https://localhost:8443' ) as $url ) {
 			$this->assertTrue( Connections::save( 'p', $this->input( array( 'base_url' => $url ) ) ), $url );
 		}
-		foreach ( array( 'http://172.32.0.1', 'http://172.15.0.1', 'http://192.169.1.1', 'http://11.0.0.1', 'http://8.8.8.8', 'http://[2001:db8::1]', 'http://[::ffff:8.8.8.8]', 'http://localhost.example.com' ) as $url ) {
+		foreach ( array( 'http://172.32.0.1', 'http://172.15.0.1', 'http://192.169.1.1', 'http://11.0.0.1', 'http://8.8.8.8', 'http://[2001:db8::1]', 'http://[::ffff:8.8.8.8]', 'http://localhost.example.com', 'http://localhost:8080', 'HTTP://LOCALHOST' ) as $url ) {
 			$this->assertInstanceOf( \WP_Error::class, Connections::save( 'p', $this->input( array( 'base_url' => $url ) ) ), $url );
 		}
 	}
