@@ -39,6 +39,13 @@ class FakeDriver implements Driver {
 	public $status = null;
 
 	/**
+	 * What plan_fields() answers.
+	 *
+	 * @var array<string, array<int, mixed>>
+	 */
+	public $plan_fields = array();
+
+	/**
 	 * Customer actions answer.
 	 *
 	 * @var array<string, string>
@@ -119,7 +126,7 @@ class FakeDriver implements Driver {
 	}
 
 	public function plan_fields(): array {
-		return array();
+		return $this->plan_fields;
 	}
 
 	public function provision( Resource $r ): StepResult {

@@ -36,6 +36,8 @@ final class Plugin {
 
 		Settings::register();
 
+		Product::register();
+
 		// Later tasks register their parts here.
 		self::$booted = true;
 	}

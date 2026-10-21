@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Tests;
 
+use BeltoftServices\Product;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\Support\FakeDriver;
 
@@ -111,6 +112,121 @@ abstract class TestCase extends \WP_UnitTestCase {
 		);
 
 		return $fake;
+	}
+
+	/**
+	 * Creates a saved, licensed service product.
+	 *
+	 * $extra keys: slug, retention, trial_requires_payment ('yes'|'no'), connection, max
+	 * (sites per license), variations (a list of plan overrides, each optionally with 'max';
+	 * makes a variable product).
+	 *
+	 * @param string               $driver Driver id.
+	 * @param array<string, mixed> $plan   Plan values by field key.
+	 * @param array<string, mixed> $extra  Other settings.
+	 * @return \WC_Product
+	 */
+	protected function service_product( string $driver = 'fake', array $plan = array(), array $extra = array() ): \WC_Product {
+		$variations = isset( $extra['variations'] ) ? (array) $extra['variations'] : array();
+		$product    = $variations ? new \WC_Product_Variable() : new \WC_Product_Simple();
+
+		$product->set_name( 'Service ' . wp_generate_password( 6, false ) );
+		$product->set_status( 'publish' );
+
+		if ( $variations ) {
+			$attribute = new \WC_Product_Attribute();
+			$attribute->set_name( 'Tier' );
+			$attribute->set_options( array_map( 'strval', array_keys( array_values( $variations ) ) ) );
+			$attribute->set_visible( true );
+			$attribute->set_variation( true );
+			$product->set_attributes( array( $attribute ) );
+		} else {
+			$product->set_regular_price( '10' );
+		}
+
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, (string) ( $extra['slug'] ?? 'test-service' ) );
+		$product->update_meta_data( Product::META_DRIVER, $driver );
+		$product->update_meta_data( Product::META_CONNECTION, (string) ( $extra['connection'] ?? '' ) );
+		$product->update_meta_data( Product::META_RETENTION, isset( $extra['retention'] ) ? (string) $extra['retention'] : '' );
+		$product->update_meta_data( Product::META_TRIAL_PAID, (string) ( $extra['trial_requires_payment'] ?? 'yes' ) );
+
+		if ( isset( $extra['max'] ) ) {
+			$product->update_meta_data( \BeltoftLicenses\Product::META_MAX, (string) $extra['max'] );
+		}
+
+		foreach ( $plan as $key => $value ) {
+			$product->update_meta_data( Product::META_PLAN . $key, is_bool( $value ) ? ( $value ? 'yes' : 'no' ) : (string) $value );
+		}
+
+		$product->save();
+
+		foreach ( array_values( $variations ) as $index => $overrides ) {
+			$variation = new \WC_Product_Variation();
+			$variation->set_parent_id( $product->get_id() );
+			$variation->set_attributes( array( 'tier' => (string) $index ) );
+			$variation->set_regular_price( '10' );
+			$variation->set_status( 'publish' );
+
+			foreach ( (array) $overrides as $key => $value ) {
+				if ( 'max' === $key ) {
+					$variation->update_meta_data( \BeltoftLicenses\Product::META_MAX, (string) $value );
+				} else {
+					$variation->update_meta_data( Product::META_PLAN . $key, is_bool( $value ) ? ( $value ? 'yes' : 'no' ) : (string) $value );
+				}
+			}
+
+			$variation->save();
+		}
+
+		if ( $variations ) {
+			\WC_Product_Variable::sync( $product->get_id() );
+		}
+
+		return wc_get_product( $product->get_id() );
+	}
+
+	/**
+	 * Creates a license for a product. With $data['fire'] = false the creation listeners
+	 * (beltoft_licenses_license_created) are detached while it is created; the license is the
+	 * same normal license.
+	 *
+	 * @param \WC_Product          $product Product (simple or variable parent).
+	 * @param array<string, mixed> $data    Columns for Licenses::create(), plus 'fire'.
+	 * @return array<string, mixed>
+	 */
+	protected function service_license( \WC_Product $product, array $data = array() ): array {
+		$fire = ! array_key_exists( 'fire', $data ) || $data['fire'];
+		unset( $data['fire'] );
+
+		$data = array_merge(
+			array(
+				'product_id'      => $product->get_id(),
+				'product_slug'    => (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ),
+				'email'           => 'customer@example.com',
+				'user_id'         => self::factory()->user->create(),
+				'max_activations' => \BeltoftLicenses\Product::max_activations( $product ),
+				'source'          => 'order',
+			),
+			$data
+		);
+
+		global $wp_filter;
+		$saved = $wp_filter['beltoft_licenses_license_created'] ?? null;
+
+		if ( ! $fire ) {
+			unset( $wp_filter['beltoft_licenses_license_created'] );
+		}
+
+		$license = \BeltoftLicenses\Licenses::create( $data );
+
+		if ( ! $fire && null !== $saved ) {
+			$wp_filter['beltoft_licenses_license_created'] = $saved;
+		}
+
+		$this->assertIsArray( $license, 'The license was created.' );
+
+		return $license;
 	}
 
 	/**
