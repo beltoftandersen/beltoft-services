@@ -64,14 +64,26 @@ final class Jobs {
 	}
 
 	/**
-	 * Queues a reconcile job for a resource, unless one is already waiting for it.
+	 * Queues a reconcile job for a resource. A job already waiting for it at the same time or
+	 * earlier is enough; a later one is replaced, so a change never waits out a long backoff.
 	 *
 	 * @param int $activation_id Activation id of the resource.
 	 * @param int $delay         Seconds from now.
 	 */
 	public static function enqueue( int $activation_id, int $delay = 0 ): void {
-		if ( ! function_exists( 'as_enqueue_async_action' ) || self::is_pending( $activation_id ) ) {
+		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
 			return;
+		}
+
+		$delay   = max( 0, $delay );
+		$pending = self::pending( $activation_id );
+
+		if ( $pending && min( $pending ) <= time() + $delay ) {
+			return;
+		}
+
+		foreach ( array_keys( $pending ) as $action_id ) {
+			\ActionScheduler::store()->cancel_action( $action_id );
 		}
 
 		if ( $delay > 0 ) {
@@ -82,25 +94,33 @@ final class Jobs {
 	}
 
 	/**
-	 * Is a job waiting for this resource? Only pending jobs count: the job that is running now
-	 * must be able to queue its own follow-up (as_has_scheduled_action also counts running ones).
+	 * The jobs waiting for a resource, as action id => scheduled time. Only pending jobs count:
+	 * the job that is running now must be able to queue its own follow-up
+	 * (as_has_scheduled_action also counts running ones).
 	 *
 	 * @param int $activation_id Activation id.
+	 * @return array<int, int>
 	 */
-	public static function is_pending( int $activation_id ): bool {
-		$ids = as_get_scheduled_actions(
+	public static function pending( int $activation_id ): array {
+		$actions = as_get_scheduled_actions(
 			array(
 				'hook'     => self::HOOK,
 				'args'     => array( $activation_id ),
 				'group'    => self::GROUP,
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
-				'per_page' => 1,
+				'per_page' => -1,
 				'orderby'  => 'none',
-			),
-			'ids'
+			)
 		);
 
-		return ! empty( $ids );
+		$times = array();
+		foreach ( $actions as $action_id => $action ) {
+			$date = $action->get_schedule()->get_date();
+
+			$times[ (int) $action_id ] = $date ? $date->getTimestamp() : time();
+		}
+
+		return $times;
 	}
 
 	/**
@@ -135,8 +155,8 @@ final class Jobs {
 
 	/**
 	 * The recurring sweep: queues every live resource that has something to do, at its retry
-	 * time if it has one. Failed resources wait for an admin; resources with missing meta are
-	 * alerted and left alone.
+	 * time if it has one. Failed resources wait for an admin while they should be ready;
+	 * resources with missing meta are alerted and left alone.
 	 */
 	public static function sweep(): void {
 		foreach ( self::live_ids() as $id ) {
@@ -151,13 +171,12 @@ final class Jobs {
 				continue;
 			}
 
-			if ( 'failed' === $resource->get( 'state' ) || null === Reconciler::operation( $resource ) ) {
+			// A failed resource that should run waits for an admin; one to pause or delete does not.
+			if ( ( 'failed' === $resource->get( 'state' ) && 'ready' === $resource->get( 'desired' ) ) || null === Reconciler::operation( $resource ) ) {
 				continue;
 			}
 
-			$next = (int) $resource->get( 'next_attempt_at' );
-
-			self::enqueue( $id, max( 0, $next - time() ) );
+			self::enqueue( $id, Reconciler::wait( $resource ) );
 		}
 	}
 
@@ -230,7 +249,7 @@ final class Jobs {
 			$id       = (int) ( $args[0] ?? 0 );
 			$resource = $id ? Resource::find( $id ) : null;
 
-			if ( $resource && (int) $resource->get( 'next_attempt_at' ) > time() ) {
+			if ( $resource && Reconciler::wait( $resource ) > 0 ) {
 				continue;
 			}
 

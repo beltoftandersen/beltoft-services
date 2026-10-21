@@ -89,6 +89,25 @@ final class ReconcilerTest extends TestCase {
 		return $date ? $date->getTimestamp() : time();
 	}
 
+	/**
+	 * Makes the resource's retry time due now (as if the backoff had passed).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function make_due( Resource $r ): void {
+		Resource::find( $r->id() )->set( array( 'next_attempt_at' => time() - 1 ) );
+	}
+
+	/**
+	 * What an admin "Retry now" does: reset the count and queue the resource.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function admin_retry( Resource $r ): void {
+		Resource::find( $r->id() )->set( array( 'attempts' => 0 ) );
+		Jobs::enqueue( $r->id() );
+	}
+
 	public function test_provision_done_makes_ready(): void {
 		list( $resource, $driver ) = $this->resource();
 		$driver->will( 'provision', StepResult::done( array( 'remote_id' => 'vm-1' ), 'Server created' ) );
@@ -132,6 +151,7 @@ final class ReconcilerTest extends TestCase {
 		$expected = array( 60, 300, 900, 3600, 14400 );
 
 		foreach ( $expected as $index => $backoff ) {
+			$this->make_due( $resource );
 			$before = time();
 			Jobs::run( $resource->id() );
 			$fresh = Resource::find( $resource->id() );
@@ -148,12 +168,14 @@ final class ReconcilerTest extends TestCase {
 		}
 
 		// The sixth try fails for good.
+		$this->make_due( $resource );
 		Jobs::run( $resource->id() );
 		$fresh = Resource::find( $resource->id() );
 
 		$this->assertSame( 'failed', $fresh->get( 'state' ) );
 		$this->assertSame( 6, $fresh->get( 'attempts' ) );
 		$this->assertSame( 'Not yet', $fresh->get( 'last_error' ) );
+		$this->assertSame( 'provision', $fresh->get( 'failed_op' ) );
 		$this->assertNull( $this->pending_at( $resource->id() ) );
 		$this->assertCount( 6, $driver->calls( 'provision' ) );
 		$this->assertCount( 1, $this->mails );
@@ -177,19 +199,220 @@ final class ReconcilerTest extends TestCase {
 			->will( 'provision', StepResult::retry( 0, 'Timeout' ) );
 
 		Jobs::run( $resource->id() );
+		$this->make_due( $resource );
 		Jobs::run( $resource->id() );
 		$this->assertSame( 2, Resource::find( $resource->id() )->get( 'attempts' ) );
 
+		$this->make_due( $resource );
 		Jobs::run( $resource->id() );
 		$failed = Resource::find( $resource->id() );
 		$this->assertSame( 'failed', $failed->get( 'state' ) );
 		$this->assertSame( 'Quota exceeded', $failed->get( 'last_error' ) );
 		$this->assertSame( 3, $failed->get( 'attempts' ), 'A failure never resets the count.' );
 
-		// An admin retry of a resource that never became ready provisions again; the count goes on.
+		// A failed operation is not retried by itself: more runs make no driver call.
 		Jobs::run( $resource->id() );
-		$this->assertSame( 4, Resource::find( $resource->id() )->get( 'attempts' ) );
+		$this->run_jobs();
+		$this->assertCount( 3, $driver->calls( 'provision' ) );
+		$this->assertSame( 3, Resource::find( $resource->id() )->get( 'attempts' ) );
+
+		// The admin "Retry now" resets the count, and the failed operation runs again.
+		$this->admin_retry( $resource );
+		$this->run_jobs();
 		$this->assertCount( 4, $driver->calls( 'provision' ) );
+		$this->assertSame( 1, Resource::find( $resource->id() )->get( 'attempts' ) );
+	}
+
+	public function test_attempts_count_per_operation(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Timeout' ) );
+		$driver->will( 'pause', StepResult::retry( 0, 'Busy' ) );
+
+		Jobs::run( $resource->id() );
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$this->assertSame( 2, Resource::find( $resource->id() )->get( 'attempts' ) );
+
+		Resource::find( $resource->id() )->desire( 'paused', 'License revoked' );
+		Jobs::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'pause', $fresh->get( 'op' ) );
+		$this->assertSame( 1, $fresh->get( 'attempts' ), 'A new operation starts its own count.' );
+		$this->assertSame( 'Busy', $fresh->get( 'last_error' ) );
+	}
+
+	public function test_revoked_during_provision_retry_pauses(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Booting' ) );
+
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'provisioning', Resource::find( $resource->id() )->get( 'state' ) );
+
+		Resource::find( $resource->id() )->desire( 'paused', 'License revoked' );
+		Jobs::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertCount( 1, $driver->calls( 'pause' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertCount( 1, $driver->calls( 'provision' ) );
+	}
+
+	public function test_failed_plan_update_then_revoked_pauses(): void {
+		list( $resource, $driver ) = $this->resource(
+			array(
+				'state'      => 'ready',
+				'plan_dirty' => true,
+			)
+		);
+		$driver->will( 'update_plan', StepResult::fail( 'Resize refused' ) );
+
+		Jobs::run( $resource->id() );
+		$failed = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $failed->get( 'state' ) );
+		$this->assertSame( 'update_plan', $failed->get( 'failed_op' ) );
+
+		$failed->desire( 'paused', 'License revoked' );
+		Jobs::enqueue( $resource->id() );
+		$this->run_jobs();
+
+		$this->assertCount( 1, $driver->calls( 'pause' ) );
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_failed_resource_to_delete_gets_its_own_attempts_and_is_swept(): void {
+		list( $resource, $driver ) = $this->resource(
+			array(
+				'state'     => 'failed',
+				'failed_op' => 'provision',
+				'op'        => 'provision',
+				'attempts'  => 6,
+			)
+		);
+		$driver->will( 'delete', StepResult::retry( 0, 'Locked by host' ) );
+		$resource->desire( 'deleted', 'Retention over' );
+
+		Jobs::sweep();
+		$before = time();
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertCount( 1, $driver->calls( 'delete' ) );
+		$this->assertSame( 'delete', $fresh->get( 'op' ) );
+		$this->assertSame( 1, $fresh->get( 'attempts' ) );
+		$this->assertEqualsWithDelta( $before + 60, $fresh->get( 'next_attempt_at' ), 2 );
+		$this->assertEqualsWithDelta( $before + 60, $this->pending_at( $resource->id() ), 2 );
+	}
+
+	public function test_failed_resume_is_rerun_by_an_admin_retry(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
+		$driver->will( 'resume', StepResult::fail( 'Host down' ) )->will( 'resume', StepResult::done() );
+
+		Jobs::run( $resource->id() );
+		$failed = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $failed->get( 'state' ) );
+		$this->assertSame( 'resume', $failed->get( 'failed_op' ) );
+
+		$this->admin_retry( $resource );
+		$this->run_jobs();
+
+		$this->assertCount( 2, $driver->calls( 'resume' ) );
+		$this->assertSame( array(), $driver->calls( 'provision' ) );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_pause_before_anything_exists_needs_no_driver_call(): void {
+		list( $resource, $driver ) = $this->resource();
+		$resource->desire( 'paused', 'License revoked' );
+
+		Jobs::run( $resource->id() );
+
+		$this->assertSame( array(), $driver->calls() );
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
+
+		// With steps recorded something may exist: the driver pauses it.
+		list( $partial, $driver2 ) = $this->resource( array( 'steps' => array( 'vm_created' ) ) );
+		$partial->desire( 'paused', 'License revoked' );
+		Jobs::run( $partial->id() );
+		$this->assertCount( 1, $driver2->calls( 'pause' ) );
+	}
+
+	public function test_early_run_waits_for_the_retry_time(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Booting' ) );
+
+		$before = time();
+		Jobs::run( $resource->id() );
+
+		// A sweep and a stray job inside the backoff window make no driver call.
+		Jobs::sweep();
+		Jobs::run( $resource->id() );
+		$this->run_jobs();
+
+		$this->assertCount( 1, $driver->calls( 'provision' ) );
+		$this->assertEqualsWithDelta( $before + 60, $this->pending_at( $resource->id() ), 2 );
+		$this->assertCount(
+			1,
+			as_get_scheduled_actions(
+				array(
+					'hook'   => Jobs::HOOK,
+					'args'   => array( $resource->id() ),
+					'status' => \ActionScheduler_Store::STATUS_PENDING,
+				),
+				'ids'
+			)
+		);
+
+		// Once due, the next window allows exactly one more call.
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		Jobs::run( $resource->id() );
+		$this->assertCount( 2, $driver->calls( 'provision' ) );
+	}
+
+	public function test_desire_change_does_not_wait_out_a_long_backoff(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 14400, 'Host busy' ) );
+
+		Jobs::run( $resource->id() );
+		$this->assertGreaterThan( time() + 14000, $this->pending_at( $resource->id() ) );
+
+		// What a lifecycle listener does on revocation.
+		Resource::find( $resource->id() )->desire( 'paused', 'License revoked' );
+		Jobs::enqueue( $resource->id() );
+		$this->assertLessThanOrEqual( time(), $this->pending_at( $resource->id() ) );
+
+		$this->run_jobs();
+
+		$this->assertCount( 1, $driver->calls( 'pause' ) );
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_unstorable_driver_meta_is_a_retry_not_ready(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::done( array( 'remote_id' => "bad \xB1\x31" ) ) )
+			->will( 'provision', StepResult::done( array( 'remote_id' => 'vm-9' ) ) );
+
+		Jobs::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'provisioning', $fresh->get( 'state' ) );
+		$this->assertSame( 1, $fresh->get( 'attempts' ) );
+		$this->assertSame( Reconciler::META_ERROR, $fresh->get( 'last_error' ) );
+		$this->assertSame( '', $fresh->get( 'remote_id' ) );
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 'vm-9', $fresh->get( 'remote_id' ) );
+
+		// The same on retry and fail: the attempt is recorded without the meta.
+		list( $other, $driver2 ) = $this->resource();
+		$driver2->will( 'provision', StepResult::retry( 0, 'Waiting', array( 'x' => "bad \xB1\x31" ) ) );
+		Jobs::run( $other->id() );
+		$this->assertSame( 1, Resource::find( $other->id() )->get( 'attempts' ) );
+		$this->assertSame( Reconciler::META_ERROR, Resource::find( $other->id() )->get( 'last_error' ) );
 	}
 
 	public function test_desired_change_mid_flight_is_applied_after_the_step(): void {
@@ -261,10 +484,13 @@ final class ReconcilerTest extends TestCase {
 		$this->assertStringContainsString( (string) $license['id'], $this->mails[0]['message'] );
 		$this->assertStringContainsString( 'failed', $this->mails[0]['message'] );
 
-		Jobs::run( $resource->id() );
+		$this->admin_retry( $resource );
+		$this->run_jobs();
 		$this->assertCount( 1, $this->mails, 'The same error is not sent twice.' );
 
-		Jobs::run( $resource->id() );
+		$this->admin_retry( $resource );
+		$this->run_jobs();
+		$this->assertCount( 3, $driver->calls( 'provision' ) );
 		$this->assertCount( 2, $this->mails, 'A new error is sent.' );
 		$this->assertStringContainsString( 'Disk full', $this->mails[1]['message'] );
 	}
@@ -275,7 +501,8 @@ final class ReconcilerTest extends TestCase {
 		$driver->will( 'pause', StepResult::fail( 'Boom' ) );
 
 		Jobs::run( $resource->id() );
-		Jobs::run( $resource->id() );
+		$this->admin_retry( $resource );
+		$this->run_jobs();
 		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
 
 		Resource::find( $resource->id() )->desire( 'paused', 'Suspended' );
@@ -285,41 +512,56 @@ final class ReconcilerTest extends TestCase {
 	}
 
 	public function test_operation_table(): void {
+		// state, desired, plan_dirty, failed_op, attempts, steps, expected operation.
 		$cases = array(
-			array( 'requested', 'ready', false, '', 'provision' ),
-			array( 'provisioning', 'ready', false, '', 'provision' ),
-			array( 'failed', 'ready', false, 'provisioning', 'provision' ),
-			array( 'failed', 'ready', false, 'requested', 'provision' ),
-			array( 'failed', 'ready', false, 'ready', null ),
-			array( 'failed', 'ready', false, '', null ),
-			array( 'paused', 'ready', false, '', 'resume' ),
-			array( 'ready', 'paused', false, '', 'pause' ),
-			array( 'ready', 'deleted', false, '', 'delete' ),
-			array( 'paused', 'deleted', false, '', 'delete' ),
-			array( 'requested', 'deleted', false, '', 'delete' ),
-			array( 'failed', 'deleted', false, 'ready', 'delete' ),
-			array( 'deleting', 'deleted', false, '', 'delete' ),
-			array( 'deleted', 'deleted', false, '', null ),
-			array( 'ready', 'ready', true, '', 'update_plan' ),
-			array( 'ready', 'ready', false, '', null ),
-			array( 'paused', 'paused', true, '', null ),
-			array( 'provisioning', 'paused', false, '', null ),
+			array( 'requested', 'ready', false, '', 0, false, 'provision' ),
+			array( 'provisioning', 'ready', false, '', 2, false, 'provision' ),
+			array( 'failed', 'ready', false, 'provision', 0, false, 'provision' ),
+			array( 'failed', 'ready', false, 'provision', 3, false, null ),
+			array( 'failed', 'ready', false, 'resume', 0, false, 'resume' ),
+			array( 'failed', 'ready', false, 'update_plan', 0, false, 'update_plan' ),
+			array( 'failed', 'ready', false, 'pause', 0, false, null ),
+			array( 'failed', 'ready', false, '', 0, false, null ),
+			array( 'paused', 'ready', false, '', 0, false, 'resume' ),
+			array( 'paused', 'ready', true, '', 0, false, 'resume' ),
+			array( 'ready', 'ready', true, '', 0, false, 'update_plan' ),
+			array( 'ready', 'ready', false, '', 0, false, null ),
+			array( 'deleting', 'ready', false, '', 0, false, null ),
+			array( 'ready', 'paused', false, '', 0, false, 'pause' ),
+			array( 'provisioning', 'paused', false, '', 0, false, 'pause' ),
+			array( 'failed', 'paused', false, 'provision', 6, false, 'pause' ),
+			array( 'failed', 'paused', false, 'pause', 2, false, null ),
+			array( 'requested', 'paused', false, '', 0, false, 'pause' ),
+			array( 'requested', 'paused', false, '', 0, true, 'pause' ),
+			array( 'paused', 'paused', true, '', 0, false, null ),
+			array( 'deleting', 'paused', false, '', 0, false, null ),
+			array( 'ready', 'deleted', false, '', 0, false, 'delete' ),
+			array( 'paused', 'deleted', false, '', 0, false, 'delete' ),
+			array( 'requested', 'deleted', false, '', 0, false, 'delete' ),
+			array( 'provisioning', 'deleted', false, '', 0, false, 'delete' ),
+			array( 'deleting', 'deleted', false, '', 0, false, 'delete' ),
+			array( 'failed', 'deleted', false, 'provision', 6, false, 'delete' ),
+			array( 'failed', 'deleted', false, 'delete', 1, false, null ),
+			array( 'deleted', 'deleted', false, '', 0, false, null ),
 		);
 
 		list( $resource ) = $this->resource();
 
 		foreach ( $cases as $case ) {
-			list( $state, $desired, $dirty, $from, $operation ) = $case;
+			list( $state, $desired, $dirty, $failed_op, $attempts, $steps, $operation ) = $case;
 			$resource->set(
 				array(
-					'state'       => $state,
-					'desired'     => $desired,
-					'plan_dirty'  => $dirty,
-					'failed_from' => $from,
+					'state'      => $state,
+					'desired'    => $desired,
+					'plan_dirty' => $dirty,
+					'failed_op'  => $failed_op,
+					'op'         => $failed_op,
+					'attempts'   => $attempts,
+					'steps'      => $steps ? array( 'created' ) : array(),
 				)
 			);
 
-			$this->assertSame( $operation, Reconciler::operation( $resource ), "$state → $desired" . ( $dirty ? ' (plan dirty)' : '' ) . ( $from ? " (failed from $from)" : '' ) );
+			$this->assertSame( $operation, Reconciler::operation( $resource ), "$state → $desired" . ( $dirty ? ' (plan dirty)' : '' ) . ( $failed_op ? " (failed $failed_op, $attempts attempts)" : '' ) . ( $steps ? ' (with steps)' : '' ) );
 		}
 	}
 
@@ -445,6 +687,7 @@ final class ReconcilerTest extends TestCase {
 		Jobs::run( $resource->id() );
 		$this->assertSame( array( 'a' ), Resource::find( $resource->id() )->get( 'steps' ) );
 
+		$this->make_due( $resource );
 		Jobs::run( $resource->id() );
 		$this->assertSame( array( 'a', 'b' ), Resource::find( $resource->id() )->get( 'steps' ) );
 	}

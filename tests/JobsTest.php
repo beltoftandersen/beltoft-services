@@ -197,14 +197,17 @@ final class JobsTest extends TestCase {
 		$later    = $make(
 			array(
 				'state'           => 'provisioning',
+				'op'              => 'provision',
+				'attempts'        => 1,
 				'next_attempt_at' => time() + 600,
 			)
 		);
 		$settled  = $make( array( 'state' => 'ready' ) );
 		$failed   = $make(
 			array(
-				'state'       => 'failed',
-				'failed_from' => 'provisioning',
+				'state'     => 'failed',
+				'failed_op' => 'provision',
+				'attempts'  => 6,
 			)
 		);
 		$dirty    = $make(

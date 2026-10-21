@@ -16,13 +16,20 @@ defined( 'ABSPATH' ) || exit;
  * Picks one driver operation from the resource's state and desired state, runs it and
  * records the outcome. Only Jobs::run() calls step(), under the resource lock.
  *
- * | state                                       | desired | operation   |
- * |---------------------------------------------|---------|-------------|
- * | requested, provisioning, failed (never ready) | ready | provision   |
- * | paused                                      | ready   | resume      |
- * | ready                                       | paused  | pause       |
- * | any but deleted                             | deleted | delete      |
- * | ready, plan_dirty                           | ready   | update_plan |
+ * | desired | state                                              | operation              |
+ * |---------|----------------------------------------------------|------------------------|
+ * | deleted | any but deleted                                    | delete                 |
+ * | paused  | ready, provisioning, failed, requested with steps  | pause                  |
+ * | paused  | requested with no steps (nothing exists yet)       | paused, no driver call |
+ * | ready   | requested, provisioning, failed after provision    | provision              |
+ * | ready   | paused, failed after resume                        | resume                 |
+ * | ready   | ready with plan_dirty, failed after update_plan    | update_plan            |
+ *
+ * `attempts` counts per operation (meta `op`): it starts again when the operation changes and
+ * is never reset by failures of the same operation. A failed resource does not retry the
+ * operation that failed (meta `failed_op`) by itself once it has counted attempts: an admin
+ * retry resets `attempts` and queues it. Another operation (the license was revoked, say)
+ * starts with a fresh count.
  */
 final class Reconciler {
 
@@ -33,10 +40,15 @@ final class Reconciler {
 	public const BACKOFF = array( 60, 300, 900, 3600, 14400 );
 
 	/**
+	 * Error recorded when the driver's step meta cannot be stored.
+	 */
+	public const META_ERROR = 'Driver meta could not be stored';
+
+	/**
 	 * Meta only the reconciler and the resource itself write. A driver's step meta cannot
 	 * change these.
 	 */
-	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'attempts', 'next_attempt_at', 'last_error', 'failed_from', 'alerted', 'protected', 'paused_at', 'warned_at' );
+	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'alerted', 'protected', 'paused_at', 'warned_at' );
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -50,7 +62,8 @@ final class Reconciler {
 	);
 
 	/**
-	 * The operation a resource needs now, or null when there is nothing to do.
+	 * The operation a resource needs now, or null when there is nothing to do (or it waits
+	 * for an admin retry).
 	 *
 	 * @param Resource $r Resource.
 	 */
@@ -59,33 +72,62 @@ final class Reconciler {
 			return null;
 		}
 
-		$state   = $r->get( 'state' );
-		$desired = $r->get( 'desired' );
+		$operation = self::wanted( $r );
+
+		if ( null !== $operation && 'failed' === $r->get( 'state' ) && $r->get( 'failed_op' ) === $operation && $r->get( 'attempts' ) > 0 ) {
+			return null;
+		}
+
+		return $operation;
+	}
+
+	/**
+	 * The operation the table gives for the state and desired state.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function wanted( Resource $r ): ?string {
+		$state     = $r->get( 'state' );
+		$desired   = $r->get( 'desired' );
+		$failed_op = 'failed' === $state ? $r->get( 'failed_op' ) : '';
 
 		if ( 'deleted' === $desired ) {
 			return 'deleted' === $state ? null : 'delete';
 		}
 
 		if ( 'paused' === $desired ) {
-			return 'ready' === $state ? 'pause' : null;
+			return in_array( $state, array( 'ready', 'provisioning', 'failed', 'requested' ), true ) ? 'pause' : null;
 		}
 
-		// Desired ready.
-		$never_ready = 'failed' === $state && in_array( $r->get( 'failed_from' ), array( 'requested', 'provisioning' ), true );
-
-		if ( in_array( $state, array( 'requested', 'provisioning' ), true ) || $never_ready ) {
+		if ( in_array( $state, array( 'requested', 'provisioning' ), true ) || 'provision' === $failed_op ) {
 			return 'provision';
 		}
 
-		if ( 'paused' === $state ) {
+		if ( 'paused' === $state || 'resume' === $failed_op ) {
 			return 'resume';
 		}
 
-		if ( 'ready' === $state && $r->get( 'plan_dirty' ) ) {
+		if ( ( 'ready' === $state && $r->get( 'plan_dirty' ) ) || 'update_plan' === $failed_op ) {
 			return 'update_plan';
 		}
 
 		return null;
+	}
+
+	/**
+	 * Seconds until the resource's operation may run: its retry time, while the operation is
+	 * still the one that set it; 0 otherwise.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function wait( Resource $r ): int {
+		$operation = self::operation( $r );
+
+		if ( null === $operation || $r->get( 'op' ) !== $operation ) {
+			return 0;
+		}
+
+		return max( 0, (int) $r->get( 'next_attempt_at' ) - time() );
 	}
 
 	/**
@@ -105,6 +147,22 @@ final class Reconciler {
 			return;
 		}
 
+		// Early for this operation's retry (a sweep or another queueing): wait for it.
+		$wait = self::wait( $r );
+
+		if ( $wait > 0 ) {
+			Jobs::enqueue( $r->id(), $wait );
+			return;
+		}
+
+		// Nothing exists yet, so there is nothing to pause.
+		if ( 'pause' === $operation && 'requested' === $r->get( 'state' ) && ! $r->get( 'steps' ) ) {
+			$r->set( self::cleared() );
+			self::move( $r, 'paused', 'Service paused before it was provisioned' );
+			self::follow_up( $r );
+			return;
+		}
+
 		$driver_id = $r->get( 'driver' );
 		$driver    = Registry::get( $driver_id );
 
@@ -113,6 +171,16 @@ final class Reconciler {
 			Alerts::admin( $r, sprintf( 'Driver "%s" is not available', $driver_id ) );
 			Jobs::enqueue( $r->id(), Jobs::PAUSED_DELAY );
 			return;
+		}
+
+		if ( $r->get( 'op' ) !== $operation ) {
+			$r->set(
+				array(
+					'op'              => $operation,
+					'attempts'        => 0,
+					'next_attempt_at' => null,
+				)
+			);
 		}
 
 		if ( 'provision' === $operation && 'provisioning' !== $r->get( 'state' ) ) {
@@ -145,14 +213,31 @@ final class Reconciler {
 		if ( $result->is_done() ) {
 			self::done( $fresh, $operation, $result, $meta, $plan );
 		} elseif ( $result->is_retry() ) {
-			self::retry( $fresh, $result, $meta );
+			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta );
 		} else {
-			self::fail( $fresh, $result->error(), $meta );
+			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
 	}
 
 	/**
-	 * Records a completed operation and queues the next step if one is needed.
+	 * Bookkeeping cleared when an operation completes.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function cleared(): array {
+		return array(
+			'op'              => '',
+			'attempts'        => 0,
+			'next_attempt_at' => null,
+			'last_error'      => '',
+			'failed_op'       => '',
+			'alerted'         => '',
+		);
+	}
+
+	/**
+	 * Records a completed operation and queues the next step if one is needed. Without the
+	 * driver's meta stored it is not complete: it counts as a retry.
 	 *
 	 * @param Resource             $r         Fresh resource.
 	 * @param string               $operation Operation.
@@ -161,18 +246,17 @@ final class Reconciler {
 	 * @param array<string, mixed> $plan      The plan the operation was given.
 	 */
 	private static function done( Resource $r, string $operation, StepResult $result, array $meta, array $plan ): void {
-		$meta['attempts']        = 0;
-		$meta['next_attempt_at'] = null;
-		$meta['last_error']      = '';
-		$meta['failed_from']     = '';
-		$meta['alerted']         = '';
+		$bookkeeping = self::cleared();
 
 		// A plan changed while the update ran stays dirty, so it is applied next.
 		if ( 'update_plan' === $operation && $r->get( 'plan' ) === $plan ) {
-			$meta['plan_dirty'] = false;
+			$bookkeeping['plan_dirty'] = false;
 		}
 
-		$r->set( $meta );
+		if ( ! $r->set( array_merge( $meta, $bookkeeping ) ) ) {
+			self::retry( $r, $operation, 0, self::META_ERROR, array() );
+			return;
+		}
 
 		$event = '' !== $result->event() ? $result->event() : self::event( $operation );
 		self::move( $r, self::REACHES[ $operation ], $event );
@@ -182,57 +266,91 @@ final class Reconciler {
 			return;
 		}
 
+		self::follow_up( $r );
+	}
+
+	/**
+	 * Queues the next step when the stored resource still needs one (the desired state may
+	 * have changed while the step ran), at its retry time if it has one.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function follow_up( Resource $r ): void {
 		$fresh = Resource::find( $r->id() );
 
 		if ( $fresh && null !== self::operation( $fresh ) ) {
-			Jobs::enqueue( $fresh->id() );
+			Jobs::enqueue( $fresh->id(), self::wait( $fresh ) );
 		}
 	}
 
 	/**
-	 * Counts an attempt and waits, or fails after the last retry.
+	 * Counts an attempt and waits, or fails after the last retry. Driver meta that cannot be
+	 * stored is dropped and the attempt is recorded with META_ERROR.
 	 *
-	 * @param Resource             $r      Fresh resource.
-	 * @param StepResult           $result Result.
-	 * @param array<string, mixed> $meta   Driver meta.
+	 * @param Resource             $r         Fresh resource.
+	 * @param string               $operation Operation.
+	 * @param int                  $delay     Delay the driver asked for.
+	 * @param string               $error     Error.
+	 * @param array<string, mixed> $meta      Driver meta.
 	 */
-	private static function retry( Resource $r, StepResult $result, array $meta ): void {
+	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta ): void {
 		$attempts = $r->get( 'attempts' ) + 1;
 
 		if ( $attempts > count( self::BACKOFF ) ) {
-			self::fail( $r, $result->error(), $meta );
+			self::fail( $r, $operation, $error, $meta );
 			return;
 		}
 
-		$delay = max( $result->delay(), self::BACKOFF[ $attempts - 1 ] );
+		$delay       = max( $delay, self::BACKOFF[ $attempts - 1 ] );
+		$bookkeeping = array(
+			'op'              => $operation,
+			'attempts'        => $attempts,
+			'next_attempt_at' => time() + $delay,
+			'last_error'      => $error,
+		);
 
-		$meta['attempts']        = $attempts;
-		$meta['next_attempt_at'] = time() + $delay;
-		$meta['last_error']      = $result->error();
+		if ( ! $r->set( array_merge( $meta, $bookkeeping ) ) && $meta ) {
+			$bookkeeping['last_error'] = self::META_ERROR;
+			$r->set( $bookkeeping );
+		}
 
-		$r->set( $meta );
-		Jobs::enqueue( $r->id(), $delay );
+		// Another operation (the desired state changed meanwhile) runs now; this one waits.
+		$fresh = Resource::find( $r->id() );
+		$next  = $fresh ? self::operation( $fresh ) : null;
+
+		if ( null !== $next ) {
+			Jobs::enqueue( $r->id(), $next === $operation ? $delay : 0 );
+		}
 	}
 
 	/**
-	 * Fails for good: counts the attempt, keeps the error and tells the admin.
+	 * Fails for good: counts the attempt, keeps the error and the operation, and tells the
+	 * admin. A desired state that changed meanwhile is followed up.
 	 *
-	 * @param Resource             $r     Fresh resource.
-	 * @param string               $error Error.
-	 * @param array<string, mixed> $meta  Driver meta.
+	 * @param Resource             $r         Fresh resource.
+	 * @param string               $operation Operation.
+	 * @param string               $error     Error.
+	 * @param array<string, mixed> $meta      Driver meta.
 	 */
-	private static function fail( Resource $r, string $error, array $meta ): void {
-		$error = '' !== $error ? $error : 'Unknown error';
-		$from  = $r->get( 'state' );
+	private static function fail( Resource $r, string $operation, string $error, array $meta ): void {
+		$error       = '' !== $error ? $error : 'Unknown error';
+		$bookkeeping = array(
+			'op'              => $operation,
+			'attempts'        => $r->get( 'attempts' ) + 1,
+			'next_attempt_at' => null,
+			'last_error'      => $error,
+			'failed_op'       => $operation,
+		);
 
-		$meta['attempts']        = $r->get( 'attempts' ) + 1;
-		$meta['next_attempt_at'] = null;
-		$meta['last_error']      = $error;
-		$meta['failed_from']     = 'failed' === $from ? $r->get( 'failed_from' ) : $from;
+		if ( ! $r->set( array_merge( $meta, $bookkeeping ) ) && $meta ) {
+			$error                     = self::META_ERROR;
+			$bookkeeping['last_error'] = $error;
+			$r->set( $bookkeeping );
+		}
 
-		$r->set( $meta );
 		self::move( $r, 'failed', 'Service failed: ' . $error );
 		Alerts::admin( $r, $error );
+		self::follow_up( $r );
 	}
 
 	/**
