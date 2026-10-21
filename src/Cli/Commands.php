@@ -81,15 +81,25 @@ final class Commands {
 			\WP_CLI::error( 'The license already has a live resource.' );
 		}
 
+		$status = Licenses::effective_status( $license );
+
+		// beltoft-licenses refuses to add a resource to a license that is not active, so linking
+		// one is not possible; refuse early with the reason instead of a half-made link.
+		if ( Licenses::STATUS_ACTIVE !== $status ) {
+			\WP_CLI::error( sprintf( 'The license is %s; a resource can only be linked to an active license.', $status ) );
+		}
+
 		if ( ! empty( $assoc_args['dry-run'] ) ) {
 			\WP_CLI::log( sprintf( 'Would record license %d as ready and protected with remote id %s, call the service for nothing, then one update_plan.', (int) $license['id'], $remote_id ) );
 			return;
 		}
 
+		$variation_id = (int) ( $license['variation_id'] ?? 0 );
+
 		$resource = Resource::create(
 			$license,
 			$driver,
-			Product::plan( $product_id ),
+			Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ),
 			array(
 				'state'      => 'ready',
 				'desired'    => 'ready',
@@ -102,6 +112,11 @@ final class Commands {
 
 		if ( is_wp_error( $resource ) ) {
 			\WP_CLI::error( $resource->get_error_message() );
+		}
+
+		// A resource made by another request between the check and create() is returned as it is.
+		if ( $resource->get( 'remote_id' ) !== $remote_id ) {
+			\WP_CLI::error( 'The license got a resource in the meantime; nothing was linked.' );
 		}
 
 		Events::add( (int) $license['id'], 'resource_linked', sprintf( 'Linked to existing tenant %s by WP-CLI; the plan will be pushed once.', $remote_id ) );

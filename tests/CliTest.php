@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\Cli\Commands;
+use BeltoftServices\Http\Connections;
 use BeltoftServices\Jobs;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
@@ -164,5 +165,115 @@ class CliTest extends TestCase {
 		$license = $this->license();
 
 		$this->assertNotSame( '', $this->failure( fn() => ( new Commands() )->status( array( (string) $license['id'] ), array() ) ) );
+	}
+
+	/**
+	 * Saves an HTTP connection 'svc' with a pause and update_plan endpoint.
+	 */
+	private function connection(): void {
+		$key = base64_encode( random_bytes( 32 ) );
+		add_filter( 'beltoft_services_key', fn() => $key );
+		delete_option( Connections::OPTION );
+
+		$this->assertTrue(
+			Connections::save(
+				'svc',
+				array(
+					'label'         => 'Service',
+					'base_url'      => 'https://api.example.com/v1',
+					'auth'          => 'hmac',
+					'secret'        => 'S3cret-Value-Never-Shown',
+					'endpoints'     => array(
+						'provision'   => array( 'method' => 'POST', 'path' => '/tenants' ),
+						'pause'       => array( 'method' => 'POST', 'path' => '/tenants/{remote_id}/pause' ),
+						'update_plan' => array( 'method' => 'PUT', 'path' => '/tenants/{remote_id}/plan' ),
+						'delete'      => array( 'method' => 'DELETE', 'path' => '/tenants/{remote_id}' ),
+					),
+					'body_template' => '{"limit":{limit}}',
+				)
+			)
+		);
+	}
+
+	public function test_inactive_license_is_refused_and_nothing_is_written(): void {
+		$cli = new Commands();
+
+		foreach ( array( 'revoked', 'suspended' ) as $status ) {
+			$license = $this->license();
+			\BeltoftLicenses\Licenses::update( (int) $license['id'], array( 'status' => $status ) );
+
+			$message = $this->failure( fn() => $cli->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-9' ) ) );
+
+			$this->assertStringContainsString( $status, $message );
+			$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+		}
+
+		$expired = $this->license();
+		\BeltoftLicenses\Licenses::update( (int) $expired['id'], array( 'expires_at' => gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS ) ) );
+		$this->assertStringContainsString( 'expired', $this->failure( fn() => $cli->link_http( array( (string) $expired['id'] ), array( 'remote-id' => 'tenant-9' ) ) ) );
+		$this->assertNull( Resource::for_license( (int) $expired['id'] ) );
+	}
+
+	public function test_pause_of_a_linked_resource_uses_the_remote_id(): void {
+		$this->connection();
+		$product = $this->service_product( 'http', array(), array( 'connection' => 'svc', 'slug' => 'cli-pause' ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-9' ) );
+		$this->run_jobs();
+
+		$resource = Resource::for_license( (int) $license['id'] );
+		$this->assertTrue( $resource->desire( 'paused', 'Test' ) );
+		Jobs::enqueue( $resource->id() );
+		$this->run_jobs();
+
+		$this->assertContains( 'https://api.example.com/v1/tenants/tenant-9/pause', array_column( $this->http_calls(), 'url' ) );
+		$this->assertSame( 'paused', Resource::for_license( (int) $license['id'] )->get( 'state' ) );
+	}
+
+	public function test_plan_uses_the_licenses_variation(): void {
+		$this->connection();
+		$product = $this->service_product(
+			'http',
+			array( 'limit' => 2 ),
+			array(
+				'connection' => 'svc',
+				'slug'       => 'cli-var',
+				'variations' => array( array( 'limit' => 7 ), array( 'limit' => 11 ) ),
+			)
+		);
+		$variation = $product->get_children()[1];
+		$license   = $this->service_license( $product, array( 'fire' => false, 'variation_id' => $variation ) );
+
+		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-v' ) );
+		$this->assertSame( 11, Resource::for_license( (int) $license['id'] )->get( 'plan' )['limit'] );
+
+		$this->run_jobs();
+
+		$call = $this->http_calls()[0];
+		$this->assertSame( 'https://api.example.com/v1/tenants/tenant-v/plan', $call['url'] );
+		$this->assertSame( 11, json_decode( $call['args']['body'], true )['limit'] );
+	}
+
+	public function test_a_resource_made_in_between_is_not_reported_as_linked(): void {
+		$license = $this->license();
+		$driver  = \BeltoftServices\Product::driver_for( (int) $license['product_id'] );
+		$done    = false;
+
+		add_action(
+			'beltoft_services_resource_locked',
+			function () use ( $license, $driver, &$done ) {
+				if ( $done ) {
+					return;
+				}
+				$done = true;
+				$this->assertInstanceOf( Resource::class, Resource::create( $license, $driver, array(), array( 'remote_id' => 'other' ) ) );
+			}
+		);
+
+		$message = $this->failure( fn() => ( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'mine' ) ) );
+
+		$this->assertStringContainsString( 'meantime', $message );
+		$this->assertSame( 'other', Resource::for_license( (int) $license['id'] )->get( 'remote_id' ) );
+		$this->assertNotContains( 'resource_linked', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $license['id'] ), 'type' ) );
 	}
 }
