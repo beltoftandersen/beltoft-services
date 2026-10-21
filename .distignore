@@ -1,0 +1,12 @@
+.git
+.gitignore
+.distignore
+.internal
+CLAUDE.md
+.claude
+tests
+phpunit.xml.dist
+.phpunit.result.cache
+README.md
+.playwright-mcp
+.superpowers
