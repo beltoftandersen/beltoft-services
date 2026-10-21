@@ -37,7 +37,7 @@ final class Panel {
 	}
 
 	/**
-	 * The badge group of a state: getting-ready, ready, paused or failed.
+	 * The badge group of a state: getting-ready, ready, paused, removed or failed.
 	 *
 	 * @param string $state Resource state.
 	 */
@@ -48,11 +48,16 @@ final class Panel {
 			case 'failed':
 				return 'failed';
 			case 'paused':
+				return 'paused';
 			case 'deleting':
 			case 'deleted':
-				return 'paused';
-			default:
+				return 'removed';
+			case 'requested':
+			case 'provisioning':
 				return 'getting-ready';
+			default:
+				// An unknown state, or none (metadata missing): something is wrong.
+				return 'failed';
 		}
 	}
 
@@ -66,6 +71,7 @@ final class Panel {
 			'getting-ready' => __( 'Getting ready', 'beltoft-services' ),
 			'ready'         => __( 'Ready', 'beltoft-services' ),
 			'paused'        => __( 'Paused', 'beltoft-services' ),
+			'removed'       => __( 'Removed', 'beltoft-services' ),
 			'failed'        => __( 'Failed: contact us', 'beltoft-services' ),
 		);
 
@@ -83,6 +89,7 @@ final class Panel {
 			'getting-ready' => __( 'Your service is being set up. This page updates by itself.', 'beltoft-services' ),
 			'ready'         => __( 'Your service is ready.', 'beltoft-services' ),
 			'paused'        => __( 'Your service is paused.', 'beltoft-services' ),
+			'removed'       => __( 'This service has been removed.', 'beltoft-services' ),
 			'failed'        => __( 'Something went wrong with your service. Please contact us and we will sort it out.', 'beltoft-services' ),
 		);
 

@@ -5,7 +5,7 @@
  * background), then every 10 seconds while the state differs from the desired one; once it
  * settles the page reloads to show the service's controls. Action buttons queue the action.
  * Uses the WordPress REST API with the wp_rest nonce, kept fresh from each response's
- * X-WP-Nonce header; an Open link gets a fresh nonce from WordPress's rest-nonce action when it
+ * X-WP-Nonce header; after a queued action the button stays off for about ten seconds, then the page reloads; an Open link gets a fresh nonce from WordPress's rest-nonce action when it
  * is clicked, so a page left open for a day still works. No dependencies.
  */
 ( function () {
@@ -121,6 +121,37 @@
 		} ).catch( function () {} );
 	}
 
+	// After a queued action: look a few times (the job usually finishes within seconds), then
+	// reload, which shows the new state and gives the button back.
+	function settle( panel, rounds ) {
+		var id = panel.getAttribute( 'data-resource' );
+		var first = panel.getAttribute( 'data-state' );
+
+		function again() {
+			if ( rounds < 1 ) {
+				window.location.reload();
+				return;
+			}
+
+			rounds -= 1;
+
+			request( 'GET', id ).then( function ( response ) {
+				return response.ok ? response.json() : null;
+			} ).then( function ( data ) {
+				if ( data && data.state !== first ) {
+					window.location.reload();
+					return;
+				}
+
+				window.setTimeout( again, 2000 );
+			} ).catch( function () {
+				window.setTimeout( again, 2000 );
+			} );
+		}
+
+		window.setTimeout( again, 2000 );
+	}
+
 	function act( panel, button ) {
 		var id = panel.getAttribute( 'data-resource' );
 
@@ -129,6 +160,7 @@
 		request( 'POST', id + '/actions/' + encodeURIComponent( button.getAttribute( 'data-action' ) ) ).then( function ( response ) {
 			if ( 202 === response.status ) {
 				notice( panel, config.strings.queued );
+				settle( panel, 5 );
 				return;
 			}
 

@@ -84,7 +84,60 @@ final class AccountPanelTest extends TestCase {
 		$this->assertStringContainsString( 'Failed: contact us', $this->render( $resource->license() ) );
 
 		$this->assertSame( 'Getting ready', Panel::label( 'requested' ) );
-		$this->assertSame( 'Paused', Panel::label( 'deleting' ) );
+		$this->assertSame( 'Getting ready', Panel::label( 'provisioning' ) );
+	}
+
+	public function test_a_removed_service_says_so_and_unknown_states_read_as_failed(): void {
+		foreach ( array( 'deleting', 'deleted' ) as $state ) {
+			$this->assertSame( 'Removed', Panel::label( $state ), $state );
+			$this->assertSame( 'This service has been removed.', Panel::message( $state ), $state );
+			$this->assertStringNotContainsStringIgnoringCase( 'paused', Panel::message( $state ) );
+		}
+
+		foreach ( array( '', 'something-new', 'invalid' ) as $state ) {
+			$this->assertSame( 'failed', Panel::group( $state ), 'State "' . $state . '" is not "Getting ready".' );
+			$this->assertSame( 'Failed: contact us', Panel::label( $state ) );
+		}
+
+		// A row without its metadata reads as failed too.
+		list( $resource ) = $this->resource();
+		global $wpdb;
+		$wpdb->update( \BeltoftLicenses\Install::tables()['activations'], array( 'meta' => '{}' ), array( 'id' => $resource->id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- corrupt the row on purpose.
+		$html = $this->render( $resource->license() );
+		$this->assertStringContainsString( 'Failed: contact us', $html );
+		$this->assertStringNotContainsString( 'Getting ready', $html );
+	}
+
+	public function test_the_script_does_not_leave_a_queued_action_disabled_forever(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' );
+
+		$this->assertStringContainsString( 'settle( panel, 5 )', $js, 'After a 202 it looks a few times.' );
+		$this->assertMatchesRegularExpression( '/rounds < 1 \) \{\s+window\.location\.reload\(\)/', $js, 'Then it reloads, which gives the button back.' );
+	}
+
+	public function test_a_failed_state_never_shows_the_last_error(): void {
+		list( $resource ) = $this->resource( array( 'state' => 'failed', 'last_error' => 'POST /v1/tenants: HTTP 500: internal stack trace secret-host.internal' ) );
+
+		$html = $this->render( $resource->license() );
+
+		$this->assertStringContainsString( 'Failed: contact us', $html );
+		$this->assertStringNotContainsString( 'secret-host', $html );
+		$this->assertStringNotContainsString( 'HTTP 500', $html );
+		$this->assertStringNotContainsString( 'stack trace', $html );
+	}
+
+	public function test_a_license_owned_by_another_logged_in_user_shows_no_controls(): void {
+		list( $resource ) = $this->resource();
+		wp_set_current_user( self::factory()->user->create( array( 'user_email' => 'someone-else@example.com' ) ) );
+
+		$html = $this->render( $resource->license() );
+
+		$this->assertStringContainsString( 'Ready', $html );
+		$this->assertStringNotContainsString( 'data-resource=', $html );
+		$this->assertStringNotContainsString( 'data-action=', $html );
+		$this->assertStringNotContainsString( 'Restart now', $html );
+		$this->assertStringNotContainsString( 'fake-account', $html );
+		$this->assertStringNotContainsString( 'data-notice', $html );
 	}
 
 	public function test_nothing_for_licenses_that_are_not_services(): void {

@@ -8,7 +8,6 @@
 namespace BeltoftServices;
 
 use BeltoftLicenses\Events;
-use BeltoftLicenses\Install;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
