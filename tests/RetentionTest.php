@@ -297,8 +297,13 @@ final class RetentionTest extends TestCase {
 
 		$table   = \BeltoftLicenses\Install::tables()['activations'];
 		$batches = 0;
-		$count   = static function ( $query ) use ( $table, &$batches ) {
-			if ( 0 === strpos( ltrim( $query ), 'SELECT id FROM `' . $table . '`' ) && false !== strpos( $query, 'LIMIT' ) ) {
+		$kinds   = array();
+		$count   = static function ( $query ) use ( $table, &$batches, &$kinds ) {
+			if ( 0 === strpos( ltrim( $query ), 'SELECT id FROM `' . $table . '`' ) && false !== strpos( $query, 'LIMIT' ) && preg_match( "/kind = '([^']+)'/", $query, $kind ) ) {
+				$kinds[ $kind[1] ] = ( $kinds[ $kind[1] ] ?? 0 ) + 1;
+			}
+			// Batches of this test's kind; every other registered kind (e.g. http) is read once.
+			if ( 0 === strpos( ltrim( $query ), 'SELECT id FROM `' . $table . '`' ) && false !== strpos( $query, 'LIMIT' ) && false !== strpos( $query, "kind = 'fake'" ) ) {
 				++$batches;
 				if ( $batches > 10 ) {
 					throw new \RuntimeException( 'The retention job loops.' );
@@ -312,6 +317,9 @@ final class RetentionTest extends TestCase {
 		remove_filter( 'query', $count );
 
 		$this->assertSame( 2, $batches, 'Two batches: 50, then 10.' );
+		foreach ( $kinds as $kind => $queries ) {
+			$this->assertSame( 'fake' === $kind ? 2 : 1, $queries, sprintf( 'Batches of kind %s.', $kind ) );
+		}
 		$this->assertSame( array(), $this->warnings, 'Already warned: no warning again.' );
 		foreach ( $ids as $id ) {
 			$this->assertSame( 'paused', Resource::find( $id )->get( 'desired' ) );
