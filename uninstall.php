@@ -16,6 +16,11 @@ if ( empty( $beltoft_services_settings['delete_data'] ) ) {
 delete_option( 'beltoft_services_settings' );
 delete_option( 'beltoft_services_alert_problem' );
 
+// Left on purpose: the option 'beltoft_services_service_slugs' (it keeps service license keys hidden
+// from the public license API while the plugin is gone, and is harmless), and the Action Scheduler
+// actions in the group 'beltoft-services' (pending ones are not run without the plugin, and
+// Action Scheduler removes finished ones itself).
+
 // Desired states that were waiting for a resource lock.
 global $wpdb;
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time cleanup of the plugin's own options.

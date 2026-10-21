@@ -25,6 +25,14 @@ class CliTest extends TestCase {
 
 		\WP_CLI::reset();
 		as_unschedule_all_actions( Jobs::SWEEP, array(), Jobs::GROUP );
+		$this->connection();
+	}
+
+	public function tear_down(): void {
+		remove_all_filters( 'beltoft_services_key' );
+		delete_option( Connections::OPTION );
+
+		parent::tear_down();
 	}
 
 	/**
@@ -34,7 +42,7 @@ class CliTest extends TestCase {
 	 * @return array<string, mixed>
 	 */
 	private function license( string $driver = 'http' ): array {
-		return $this->service_license( $this->service_product( $driver, array(), array( 'slug' => 'cli-' . wp_generate_password( 5, false, false ) ) ), array( 'fire' => false ) );
+		return $this->service_license( $this->service_product( $driver, array(), array( 'slug' => 'cli-' . wp_generate_password( 5, false, false ), 'connection' => 'svc' ) ), array( 'fire' => false ) );
 	}
 
 	/**
@@ -193,6 +201,38 @@ class CliTest extends TestCase {
 				)
 			)
 		);
+	}
+
+	public function test_link_http_refuses_a_product_whose_connection_does_not_exist(): void {
+		$cli = new Commands();
+
+		foreach ( array( '', 'nowhere' ) as $connection ) {
+			$product = $this->service_product( 'http', array(), array( 'connection' => $connection, 'slug' => 'cli-noconn-' . $connection ) );
+			$license = $this->service_license( $product, array( 'fire' => false ) );
+
+			$message = $this->failure( fn() => $cli->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-1' ) ) );
+
+			$this->assertStringContainsString( 'connection', $message );
+			$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+		}
+	}
+
+	public function test_link_http_refuses_a_remote_id_already_linked_to_another_license(): void {
+		$cli   = new Commands();
+		$first = $this->license();
+		$cli->link_http( array( (string) $first['id'] ), array( 'remote-id' => 'tenant-dup' ) );
+
+		$second  = $this->license();
+		$message = $this->failure( fn() => $cli->link_http( array( (string) $second['id'] ), array( 'remote-id' => 'tenant-dup' ) ) );
+
+		$this->assertStringContainsString( 'already linked', $message );
+		$this->assertStringContainsString( (string) $first['id'], $message );
+		$this->assertNull( Resource::for_license( (int) $second['id'] ) );
+
+		// A dry run refuses too, and another id is fine.
+		$this->assertStringContainsString( 'already linked', $this->failure( fn() => $cli->link_http( array( (string) $second['id'] ), array( 'remote-id' => 'tenant-dup', 'dry-run' => true ) ) ) );
+		$cli->link_http( array( (string) $second['id'] ), array( 'remote-id' => 'tenant-other' ) );
+		$this->assertNotNull( Resource::for_license( (int) $second['id'] ) );
 	}
 
 	public function test_inactive_license_is_refused_and_nothing_is_written(): void {

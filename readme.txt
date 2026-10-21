@@ -12,7 +12,7 @@ Sell services with WooCommerce Subscriptions. A license is the entitlement, and 
 
 == Description ==
 
-Built on Beltoft Licenses. It needs WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or newer; if one is missing it shows a notice and does nothing else.
+Built on Beltoft Licenses. The `Requires Plugins` header depends on the plugin folder names `woocommerce`, `woocommerce-subscriptions` and `beltoft-licenses`; a copy installed under another folder name is not recognised by WordPress as the dependency. It needs WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or newer; if one is missing it shows a notice and does nothing else.
 
 A service product is a licensed product with a service driver. When its license becomes active, the driver creates the service. When the license is suspended, revoked or expires, the service is paused, and when the license is active again, it is resumed. A plan change (a subscription switch or a new site limit) updates the service's plan. Billing, renewals, retries and their emails stay with WooCommerce Subscriptions: this plugin only follows the license.
 
@@ -107,9 +107,13 @@ An admin can also delete a service from the license screen.
 
 Services follow the license status, and Beltoft Licenses checks for expired licenses once a day by default, so a service can keep running for up to a day after its license ends. Turn on "Check expiry every hour" in Beltoft Licenses' settings. Settings → Services shows a notice while it is off.
 
+= What happens while the plugin is deactivated? =
+
+Nothing is provisioned, paused, resumed or deleted: licenses change without the services following. While it is deactivated, the license keys of service licenses are no longer hidden from the public license API, so a service license key validates like any software license key. Activate the plugin again and run "Check expiry every hour" or the 15-minute sweep to bring services back in line with their licenses.
+
 = Does deleting the plugin delete data? =
 
-The settings, connections and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service on the remote side.
+The settings, connections and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service on the remote side. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
 

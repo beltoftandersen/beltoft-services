@@ -444,14 +444,10 @@ final class Jobs {
 	 * @return int[]
 	 */
 	private static function live_ids(): array {
-		global $wpdb;
-
 		$ids = array();
 
 		foreach ( Registry::kinds() as $kind ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-			$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL ORDER BY id ASC', Install::tables()['activations'], $kind ) );
-			$ids  = array_merge( $ids, array_map( 'intval', (array) $rows ) );
+			$ids = array_merge( $ids, Resource::live_ids( $kind ) );
 		}
 
 		return array_values( array_unique( $ids ) );

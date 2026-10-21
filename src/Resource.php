@@ -215,6 +215,21 @@ final class Resource {
 	}
 
 	/**
+	 * Ids of the live resources of a kind.
+	 *
+	 * @param string $kind Activation kind.
+	 * @return int[]
+	 */
+	public static function live_ids( string $kind ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
+		$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL ORDER BY id ASC', \BeltoftLicenses\Install::tables()['activations'], $kind ) );
+
+		return array_map( 'intval', (array) $rows );
+	}
+
+	/**
 	 * The activation id.
 	 */
 	public function id(): int {

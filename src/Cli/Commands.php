@@ -9,6 +9,7 @@ namespace BeltoftServices\Cli;
 
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Http\Connections;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -77,8 +78,20 @@ final class Commands {
 			\WP_CLI::error( "The license's product is not an HTTP service." );
 		}
 
+		$connection = Product::connection( $product_id );
+
+		if ( '' === $connection || ! isset( Connections::all()[ $connection ] ) ) {
+			\WP_CLI::error( '' === $connection ? "The license's product has no connection." : sprintf( 'The connection "%s" of the license\'s product does not exist.', $connection ) );
+		}
+
 		if ( Resource::for_license( (int) $license['id'] ) ) {
 			\WP_CLI::error( 'The license already has a live resource.' );
+		}
+
+		$other = $this->linked_license( $driver->kind(), $connection, $remote_id );
+
+		if ( $other > 0 ) {
+			\WP_CLI::error( sprintf( 'Remote id %1$s is already linked to license %2$d.', $remote_id, $other ) );
 		}
 
 		$status = Licenses::effective_status( $license );
@@ -125,6 +138,33 @@ final class Commands {
 		Jobs::enqueue( $resource->id() );
 
 		\WP_CLI::success( sprintf( 'Linked license %d to remote id %s. The plan will be pushed once.', (int) $license['id'], $remote_id ) );
+	}
+
+	/**
+	 * The license whose live resource already has this remote id on this connection, or 0.
+	 *
+	 * @param string $kind       Activation kind.
+	 * @param string $connection Connection id.
+	 * @param string $remote_id  Remote id.
+	 */
+	private function linked_license( string $kind, string $connection, string $remote_id ): int {
+		foreach ( Resource::live_ids( $kind ) as $id ) {
+			$resource = Resource::find( $id );
+
+			if ( ! $resource || $resource->get( 'remote_id' ) !== $remote_id ) {
+				continue;
+			}
+
+			$license = $resource->license();
+			$used    = (string) $resource->get( 'connection' );
+			$used    = '' !== $used ? $used : Product::connection( (int) ( $license['product_id'] ?? 0 ) );
+
+			if ( $used === $connection ) {
+				return (int) ( $license['id'] ?? 0 );
+			}
+		}
+
+		return 0;
 	}
 
 	/**
