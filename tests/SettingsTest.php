@@ -111,6 +111,10 @@ class SettingsTest extends TestCase {
 		$this->assertStringContainsString( 'type="password"', $html );
 	}
 
+	public function test_no_plaintext_password_field_type(): void {
+		$this->assertStringNotContainsString( "case 'password'", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Settings.php' ) );
+	}
+
 	public function test_tabs_can_be_added_by_filter(): void {
 		$this->assertArrayHasKey( 'general', Settings::tabs() );
 		add_filter(
@@ -122,5 +126,56 @@ class SettingsTest extends TestCase {
 		);
 		$this->assertArrayHasKey( 'connections', Settings::tabs() );
 		remove_all_filters( 'beltoft_services_settings_tabs' );
+	}
+
+	public function test_first_save_of_the_option_encrypts_a_secret_once(): void {
+		$this->add_secret_field();
+		$key = base64_encode( random_bytes( 32 ) );
+		add_filter( 'beltoft_services_key', fn() => $key );
+		delete_option( Settings::OPTION );
+		register_setting( Settings::PAGE, Settings::OPTION, array( 'sanitize_callback' => array( Settings::class, 'sanitize' ), 'default' => array() ) );
+
+		update_option( Settings::OPTION, array( 'demo_secret' => 'hunter2' ) );
+
+		$this->assertSame( 'hunter2', \BeltoftServices\Crypto::decrypt( Settings::get( 'demo_secret' ) ) );
+	}
+
+	public function test_no_key_error_is_added_once_on_first_save(): void {
+		$this->add_secret_field();
+		delete_option( Settings::OPTION );
+		register_setting( Settings::PAGE, Settings::OPTION, array( 'sanitize_callback' => array( Settings::class, 'sanitize' ), 'default' => array() ) );
+
+		update_option( Settings::OPTION, array( 'demo_secret' => 'hunter2' ) );
+
+		$errors = wp_list_pluck( get_settings_errors( Settings::OPTION ), 'message' );
+		$this->assertCount( 1, $errors );
+		$this->assertSame( '', (string) Settings::get( 'demo_secret' ) );
+	}
+
+	public function test_sections_without_fields_on_a_tab_are_not_registered(): void {
+		global $wp_settings_sections;
+		add_filter(
+			'beltoft_services_settings_tabs',
+			static function ( $tabs ) {
+				$tabs['other'] = 'Other';
+				return $tabs;
+			}
+		);
+		add_filter(
+			'beltoft_services_settings_sections',
+			static function ( $sections ) {
+				$sections['extra'] = 'Extra';
+				return $sections;
+			}
+		);
+		$wp_settings_sections = array();
+
+		Settings::register_setting();
+
+		$this->assertArrayHasKey( 'beltoft-services-general', $wp_settings_sections );
+		$this->assertArrayNotHasKey( 'beltoft-services-other', $wp_settings_sections );
+		$this->assertArrayNotHasKey( 'beltoft_services_general_extra', $wp_settings_sections['beltoft-services-general'] );
+		remove_all_filters( 'beltoft_services_settings_tabs' );
+		remove_all_filters( 'beltoft_services_settings_sections' );
 	}
 }

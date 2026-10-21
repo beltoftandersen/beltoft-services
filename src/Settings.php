@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * - `beltoft_services_settings_tabs` adds a tab (slug => label);
  * - `beltoft_services_settings_fields` adds fields. A field sets `tab` (a tab slug), `section`
  *   (a section slug, titled by `beltoft_services_settings_sections`), `type` (text, textarea,
- *   checkbox, number, select, email, password or secret), `default` and `label`.
+ *   checkbox, number, select, email or secret), `default` and `label`.
  * A `secret` field is a password field whose value is encrypted with Crypto before it is saved.
  */
 final class Settings {
@@ -169,13 +169,23 @@ final class Settings {
 			)
 		);
 
-		foreach ( array_keys( self::tabs() ) as $tab ) {
-			foreach ( self::sections() as $id => $title ) {
-				add_settings_section( 'beltoft_services_' . $tab . '_' . $id, $title, '__return_false', self::PAGE . '-' . $tab );
+		$fields   = self::fields();
+		$sections = self::sections();
+		$added    = array();
+
+		foreach ( $fields as $field ) {
+			$tab = $field['tab'] ?? 'general';
+			$id  = $field['section'] ?? 'general';
+
+			if ( isset( $added[ $tab . '_' . $id ] ) ) {
+				continue;
 			}
+
+			$added[ $tab . '_' . $id ] = true;
+			add_settings_section( 'beltoft_services_' . $tab . '_' . $id, $sections[ $id ] ?? '', '__return_false', self::PAGE . '-' . $tab );
 		}
 
-		foreach ( self::fields() as $key => $field ) {
+		foreach ( $fields as $key => $field ) {
 			$tab = $field['tab'] ?? 'general';
 
 			add_settings_field(
@@ -289,7 +299,6 @@ final class Settings {
 				}
 				echo '</select>';
 				break;
-			case 'password':
 			case 'secret':
 				// A saved secret is never printed back into the page.
 				printf(
@@ -349,16 +358,17 @@ final class Settings {
 					$email         = sanitize_email( (string) $raw );
 					$clean[ $key ] = is_email( $email ) ? $email : $field['default'];
 					break;
-				case 'password':
-					// Empty means "keep the saved one": the field is never pre-filled.
-					$raw           = trim( (string) $raw );
-					$clean[ $key ] = '' === $raw ? (string) self::get( $key ) : sanitize_text_field( $raw );
-					break;
 				case 'secret':
 					$raw           = trim( (string) $raw );
 					$clean[ $key ] = (string) self::get( $key );
 
 					if ( '' === $raw ) {
+						break;
+					}
+
+					// update_option() may sanitise twice (add_option on a new option): keep a value that is already ours.
+					if ( 0 === strpos( $raw, 'bs1:' ) && null !== Crypto::decrypt( $raw ) ) {
+						$clean[ $key ] = $raw;
 						break;
 					}
 
