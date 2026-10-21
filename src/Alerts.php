@@ -77,6 +77,32 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a write for the resource failed, at most once an hour per
+	 * resource (transient `beltoft_services_not_stored_<id>`, and once per request), so a
+	 * broken database does not flood the inbox.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $error Error text.
+	 * @return bool Whether an alert was attempted now (false while throttled).
+	 */
+	public static function write_failed( Resource $r, string $error ): bool {
+		static $alerted = array();
+
+		$transient = 'beltoft_services_not_stored_' . $r->id();
+
+		if ( isset( $alerted[ $r->id() ] ) || false !== get_transient( $transient ) ) {
+			return false;
+		}
+
+		$alerted[ $r->id() ] = true;
+		set_transient( $transient, 1, HOUR_IN_SECONDS );
+
+		self::admin( $r, $error );
+
+		return true;
+	}
+
+	/**
 	 * Alerts that could not be sent, keyed by resource id.
 	 *
 	 * @return array<int, array{time: int, resource: int, message: string}>

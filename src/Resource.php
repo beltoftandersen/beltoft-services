@@ -276,7 +276,10 @@ final class Resource {
 				return (int) $value;
 			case 'plan_dirty':
 			case 'protected':
+			case 'replace_after_delete':
 				return (bool) $value;
+			case 'desired_at':
+				return is_numeric( $value ) ? (float) $value : 0.0;
 			case 'next_attempt_at':
 			case 'paused_at':
 			case 'warned_at':
@@ -333,21 +336,44 @@ final class Resource {
 	}
 
 	/**
-	 * The desired state waiting for the lock, or null.
+	 * The desired state waiting for the lock, or null. Read from the database, not the
+	 * option cache: another request may have written or applied it.
 	 *
-	 * @return array{state: string, reason: string}|null
+	 * @return array{state: string, reason: string, replace: bool, at: float}|null
 	 */
 	public function pending_desire(): ?array {
-		$pending = get_option( self::pending_desire_option( $this->id() ), null );
+		$raw = self::pending_raw( $this->id() );
 
-		if ( ! is_array( $pending ) || ! isset( $pending['state'] ) ) {
-			return null;
+		return null === $raw ? null : self::decode_pending( $raw );
+	}
+
+	/**
+	 * Queues a desired state for the next step instead of storing it now: what desire() does
+	 * when the resource lock stays busy. A pending desire that was requested later is kept.
+	 *
+	 * @param string $state   ready, paused or deleted.
+	 * @param string $reason  What happened, for the history.
+	 * @param bool   $replace For deleted: make a new service once the deletion completes.
+	 */
+	public function queue_desire( string $state, string $reason, bool $replace = false ): void {
+		$this->queue( $state, $reason, $replace, microtime( true ) );
+	}
+
+	/**
+	 * Applies the desired state waiting for the lock, through desire(). Called by the
+	 * reconciler under the resource lock. The option is removed by desire() once the desire
+	 * is stored (or refused), never before, so a failed write keeps it for the next step.
+	 *
+	 * @return bool Whether a desire was stored.
+	 */
+	public function apply_pending_desire(): bool {
+		$pending = $this->pending_desire();
+
+		if ( ! $pending ) {
+			return false;
 		}
 
-		return array(
-			'state'  => (string) $pending['state'],
-			'reason' => (string) ( $pending['reason'] ?? '' ),
-		);
+		return $this->store_desire( $pending['state'], $pending['reason'], $pending['replace'], $pending['at'] );
 	}
 
 	/**
@@ -358,7 +384,17 @@ final class Resource {
 	/**
 	 * History text when a desired state other than deleted arrives during a deletion.
 	 */
-	public const DELETION_IN_PROGRESS = 'Deletion in progress; a new service will follow when it completes';
+	public const DELETION_IN_PROGRESS = 'Deletion in progress.';
+
+	/**
+	 * Added to DELETION_IN_PROGRESS when a new service follows the deletion.
+	 */
+	public const DELETION_REPLACED = ' A new service will follow when it completes.';
+
+	/**
+	 * Error alerted when a desired state cannot be stored.
+	 */
+	public const DESIRE_ERROR = 'Desired state "%s" could not be stored';
 
 	/**
 	 * Sets the desired state and writes a history event. Pausing records when; wanting it
@@ -367,38 +403,57 @@ final class Resource {
 	 * event is written only when the change was stored.
 	 *
 	 * Runs under the resource lock (the reconciler's, re-entrant within one connection), so
-	 * a running job never overwrites it. When the lock stays busy, the change is kept in meta
-	 * its own option (pending_desire_option(), so no meta write can drop it), the resource is
-	 * queued, and the next step applies it.
+	 * a running job never overwrites it. When the lock stays busy, the change is kept in its
+	 * own option (queue_desire(), so no meta write can drop it), the resource is queued, and
+	 * the next step applies it. Desires are ordered by when they were requested (meta
+	 * `desired_at`): an older pending desire never overrides a newer stored one.
 	 *
-	 * Deleted is terminal: once desired, it is never left. The history then says a new service
-	 * follows, which the reconciler creates when the deletion completes on an active license.
+	 * Deleted is terminal: once desired, it is never left. With $replace, the reconciler
+	 * makes a new service when the deletion completes on an active license (meta
+	 * `replace_after_delete`); the history of a refused desire says so.
 	 *
-	 * @param string $state  ready, paused or deleted.
-	 * @param string $reason What happened, for the history.
+	 * A desired state that cannot be stored alerts the admin (at most once an hour) and keeps
+	 * a pending desire in place for the next step.
+	 *
+	 * @param string $state   ready, paused or deleted.
+	 * @param string $reason  What happened, for the history.
+	 * @param bool   $replace For deleted: make a new service once the deletion completes.
 	 * @return bool Whether it was stored now.
 	 */
-	public function desire( string $state, string $reason ): bool {
+	public function desire( string $state, string $reason, bool $replace = false ): bool {
+		return $this->store_desire( $state, $reason, $replace, microtime( true ) );
+	}
+
+	/**
+	 * Stores a desired state requested at a given time (see desire()).
+	 *
+	 * @param string $state   ready, paused or deleted.
+	 * @param string $reason  What happened, for the history.
+	 * @param bool   $replace For deleted: make a new service once the deletion completes.
+	 * @param float  $at      When it was requested (microtime).
+	 * @return bool Whether it was stored now.
+	 */
+	private function store_desire( string $state, string $reason, bool $replace, float $at ): bool {
 		if ( ! in_array( $state, self::DESIRED, true ) ) {
-			_doing_it_wrong( __METHOD__, esc_html( sprintf( 'Unknown desired state "%s".', $state ) ), '0.1.0' );
+			_doing_it_wrong( __CLASS__ . '::desire', esc_html( sprintf( 'Unknown desired state "%s".', $state ) ), '0.1.0' );
 			return false;
 		}
 
 		$lock = Locks::name( 'resource', $this->id() );
 
-		if ( ! self::acquire( $lock, self::DESIRE_LOCK_WAIT ) ) {
-			update_option(
-				self::pending_desire_option( $this->id() ),
-				array(
-					'state'  => $state,
-					'reason' => $reason,
-				),
-				false
-			);
-			Jobs::enqueue( $this->id() );
+		/**
+		 * Seconds desire() waits for the resource lock before it queues the desired state.
+		 *
+		 * @param int $seconds Seconds (default Resource::DESIRE_LOCK_WAIT).
+		 */
+		$wait = max( 0, (int) apply_filters( 'beltoft_services_desire_lock_wait', self::DESIRE_LOCK_WAIT ) );
 
+		if ( ! self::acquire( $lock, $wait ) ) {
+			$this->queue( $state, $reason, $replace, $at );
 			return false;
 		}
+
+		$event = $reason;
 
 		try {
 			$fresh = Licenses::activation( $this->id() );
@@ -407,15 +462,22 @@ final class Resource {
 				$this->row = $fresh;
 			}
 
-			if ( 'deleted' === $this->get( 'desired' ) && 'deleted' !== $state ) {
-				Events::add( (int) $this->row['license_id'], 'service', self::DELETION_IN_PROGRESS );
+			// A desire requested after this one was stored already: this one is superseded.
+			if ( $at < $this->get( 'desired_at' ) ) {
+				$this->forget_pending( $at );
 				return false;
 			}
 
-			// A newer desire wins over one still waiting for the lock.
-			delete_option( self::pending_desire_option( $this->id() ) );
+			if ( 'deleted' === $this->get( 'desired' ) && 'deleted' !== $state ) {
+				$this->forget_pending( $at );
+				Events::add( (int) $this->row['license_id'], 'service', $this->deletion_in_progress() );
+				return false;
+			}
 
-			$meta = array( 'desired' => $state );
+			$meta = array(
+				'desired'    => $state,
+				'desired_at' => $at,
+			);
 
 			// A new desired state is a new start for the reconciler: a fresh attempt count, and a
 			// failure under it is alerted again.
@@ -425,25 +487,163 @@ final class Resource {
 				$meta['alerted']  = '';
 			}
 
-			if ( 'paused' === $state ) {
+			if ( 'deleted' === $state ) {
+				$meta['replace_after_delete'] = $replace;
+			} elseif ( 'paused' === $state ) {
 				if ( null === $this->get( 'paused_at' ) ) {
 					$meta['paused_at'] = time();
 				}
-			} elseif ( 'ready' === $state ) {
+			} else {
 				$meta['paused_at'] = null;
 				$meta['warned_at'] = null;
 			}
 
 			if ( ! $this->set( $meta ) ) {
+				Alerts::write_failed( $this, sprintf( self::DESIRE_ERROR, $state ) );
 				return false;
 			}
+
+			// Stored: a pending desire requested up to now is done (a newer one stays).
+			$this->forget_pending( $at );
 		} finally {
 			self::release( $lock );
 		}
 
-		Events::add( (int) $this->row['license_id'], 'service', $reason );
+		Events::add( (int) $this->row['license_id'], 'service', $event );
 
 		return true;
+	}
+
+	/**
+	 * History text of a desire refused during a deletion.
+	 */
+	private function deletion_in_progress(): string {
+		$text = self::DELETION_IN_PROGRESS;
+
+		if ( $this->get( 'replace_after_delete' ) ) {
+			$license = $this->license();
+
+			if ( $license && Licenses::STATUS_ACTIVE === Licenses::effective_status( $license ) ) {
+				$text .= self::DELETION_REPLACED;
+			}
+		}
+
+		return $text;
+	}
+
+	/**
+	 * Writes a pending desire, unless one requested later is already waiting, and queues the
+	 * resource.
+	 *
+	 * @param string $state   Desired state.
+	 * @param string $reason  Reason.
+	 * @param bool   $replace Replace after deletion.
+	 * @param float  $at      When it was requested.
+	 */
+	private function queue( string $state, string $reason, bool $replace, float $at ): void {
+		global $wpdb;
+
+		$waiting = $this->pending_desire();
+
+		if ( ! $waiting || $waiting['at'] <= $at ) {
+			$name  = self::pending_desire_option( $this->id() );
+			$value = maybe_serialize(
+				array(
+					'state'   => $state,
+					'reason'  => $reason,
+					'replace' => $replace,
+					'at'      => $at,
+					'token'   => wp_generate_uuid4(),
+				)
+			);
+
+			// One statement, whether or not the option exists: no cached view of it can turn
+			// the write into an update of nothing.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- caches are cleared below.
+			$wpdb->query( $wpdb->prepare( 'INSERT INTO %i ( option_name, option_value, autoload ) VALUES ( %s, %s, %s ) ON DUPLICATE KEY UPDATE option_value = VALUES( option_value )', $wpdb->options, $name, $value, 'off' ) );
+			self::forget_cached_option( $name );
+		}
+
+		Jobs::enqueue( $this->id() );
+	}
+
+	/**
+	 * Removes the pending desire if it was requested at or before $at. A newer one, or one
+	 * written after it was read, stays.
+	 *
+	 * @param float $at Request time of the desire just handled.
+	 */
+	private function forget_pending( float $at ): void {
+		global $wpdb;
+
+		$name = self::pending_desire_option( $this->id() );
+		$raw  = self::pending_raw( $this->id() );
+
+		if ( null === $raw ) {
+			return;
+		}
+
+		$pending = self::decode_pending( $raw );
+
+		if ( $pending && $pending['at'] > $at ) {
+			return;
+		}
+
+		// Only the value that was read: a pending desire written since then stays.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- caches are cleared below.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE option_name = %s AND option_value = %s', $wpdb->options, $name, $raw ) );
+		self::forget_cached_option( $name );
+	}
+
+	/**
+	 * The stored value of a resource's pending desire option, or null.
+	 *
+	 * @param int $activation_id Activation id.
+	 */
+	private static function pending_raw( int $activation_id ): ?string {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- always fresh: other requests write it.
+		$raw = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $wpdb->options, self::pending_desire_option( $activation_id ) ) );
+
+		return null === $raw ? null : (string) $raw;
+	}
+
+	/**
+	 * A pending desire from its stored value, or null when it is unreadable.
+	 *
+	 * @param string $raw Stored value.
+	 * @return array{state: string, reason: string, replace: bool, at: float}|null
+	 */
+	private static function decode_pending( string $raw ): ?array {
+		$pending = maybe_unserialize( $raw );
+
+		if ( ! is_array( $pending ) || ! isset( $pending['state'] ) ) {
+			return null;
+		}
+
+		return array(
+			'state'   => (string) $pending['state'],
+			'reason'  => (string) ( $pending['reason'] ?? '' ),
+			'replace' => ! empty( $pending['replace'] ),
+			'at'      => (float) ( $pending['at'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Drops WordPress's cached copy of an option written with SQL.
+	 *
+	 * @param string $name Option name.
+	 */
+	private static function forget_cached_option( string $name ): void {
+		wp_cache_delete( $name, 'options' );
+
+		$missing = wp_cache_get( 'notoptions', 'options' );
+
+		if ( is_array( $missing ) && isset( $missing[ $name ] ) ) {
+			unset( $missing[ $name ] );
+			wp_cache_set( 'notoptions', $missing, 'options' );
+		}
 	}
 
 	/**

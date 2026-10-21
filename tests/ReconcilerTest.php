@@ -766,14 +766,15 @@ final class ReconcilerTest extends TestCase {
 		$driver->will( 'delete', StepResult::retry( 0, 'Host busy' ) )->will( 'delete', StepResult::done() );
 		$license_id = (int) $resource->license()['id'];
 
-		$this->assertTrue( $resource->desire( 'deleted', 'Retention over' ) );
+		$this->assertTrue( $resource->desire( 'deleted', 'Retention over', true ) );
+		$this->assertTrue( Resource::find( $resource->id() )->get( 'replace_after_delete' ) );
 		Jobs::run( $resource->id() );
 		$this->assertSame( 'deleting', Resource::find( $resource->id() )->get( 'state' ) );
 
 		// The customer renews: deleted is terminal, the history says what happens.
 		$this->assertFalse( Resource::find( $resource->id() )->desire( 'ready', 'Subscription renewed' ) );
 		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'desired' ) );
-		$this->assertContains( Resource::DELETION_IN_PROGRESS, wp_list_pluck( \BeltoftLicenses\Events::for_license( $license_id ), 'message' ) );
+		$this->assertContains( 'Deletion in progress. A new service will follow when it completes.', wp_list_pluck( \BeltoftLicenses\Events::for_license( $license_id ), 'message' ) );
 
 		$this->make_due( $resource );
 		Jobs::run( $resource->id() );
@@ -791,9 +792,44 @@ final class ReconcilerTest extends TestCase {
 		$this->assertCount( 1, $driver->calls( 'provision' ) );
 	}
 
+	public function test_deletion_without_replace_on_an_active_license_creates_nothing(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
+		$driver->will( 'delete', StepResult::retry( 0, 'Host busy' ) )->will( 'delete', StepResult::done() );
+		$license_id = (int) $resource->license()['id'];
+
+		$this->assertTrue( $resource->desire( 'deleted', 'Deleted by the admin' ) );
+		$this->assertFalse( Resource::find( $resource->id() )->get( 'replace_after_delete' ) );
+		Jobs::run( $resource->id() );
+
+		$this->assertFalse( Resource::find( $resource->id() )->desire( 'ready', 'Subscription renewed' ) );
+		$messages = wp_list_pluck( \BeltoftLicenses\Events::for_license( $license_id ), 'message' );
+		$this->assertContains( 'Deletion in progress.', $messages );
+		$this->assertNotContains( 'Deletion in progress. A new service will follow when it completes.', $messages );
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$this->run_jobs();
+
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertNull( Resource::for_license( $license_id ), 'The license is active, but the deletion was not a replacement.' );
+		$this->assertSame( array(), $driver->calls( 'provision' ) );
+		$this->assertSame( array(), $this->mails );
+	}
+
+	public function test_deleted_terminal_text_names_no_replacement_on_an_inactive_license(): void {
+		list( $resource ) = $this->resource( array( 'state' => 'paused' ) );
+		$license_id       = (int) $resource->license()['id'];
+
+		$resource->desire( 'deleted', 'Retention over', true );
+		\BeltoftLicenses\Licenses::update( $license_id, array( 'status' => \BeltoftLicenses\Licenses::STATUS_SUSPENDED ) );
+		$this->assertFalse( Resource::find( $resource->id() )->desire( 'paused', 'Payment failed' ) );
+
+		$this->assertContains( 'Deletion in progress.', wp_list_pluck( \BeltoftLicenses\Events::for_license( $license_id ), 'message' ) );
+	}
+
 	public function test_failed_replacement_after_deletion_alerts_the_admin(): void {
 		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
-		$resource->desire( 'deleted', 'Retention over' );
+		$resource->desire( 'deleted', 'Retention over', true );
 		$license_id = (int) $resource->license()['id'];
 
 		global $wpdb;
@@ -813,7 +849,7 @@ final class ReconcilerTest extends TestCase {
 
 	public function test_replacement_without_a_driver_alerts_the_admin(): void {
 		list( $resource ) = $this->resource( array( 'state' => 'paused' ) );
-		$resource->desire( 'deleted', 'Retention over' );
+		$resource->desire( 'deleted', 'Retention over', true );
 		$license_id = (int) $resource->license()['id'];
 
 		// The driver's plugin goes away while the deletion runs.
@@ -887,6 +923,105 @@ final class ReconcilerTest extends TestCase {
 		$this->assertSame( 'paused', $fresh->get( 'state' ) );
 		$this->assertCount( 1, $driver->calls( 'pause' ) );
 		$this->assertContains( 'License revoked', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $resource->license()['id'] ), 'message' ) );
+	}
+
+	/**
+	 * Queues a desired state as a desire() that found the resource lock busy does.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $state  Desired state.
+	 * @param string   $reason Reason.
+	 */
+	private function desire_while_locked( Resource $r, string $state, string $reason ): void {
+		global $wpdb;
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $r->id() ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		$this->assertFalse( Resource::find( $r->id() )->desire( $state, $reason ) );
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		$other->close();
+	}
+
+	public function test_pending_desire_that_cannot_be_stored_is_kept_and_alerted(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$this->desire_while_locked( $resource, 'paused', 'License revoked' );
+
+		$table = \BeltoftLicenses\Install::tables()['activations'];
+		$break = static function ( $query ) use ( $table ) {
+			return 0 === strpos( ltrim( $query ), 'UPDATE `' . $table . '`' ) ? '' : $query;
+		};
+
+		add_filter( 'query', $break );
+		Jobs::run( $resource->id() );
+		Jobs::run( $resource->id() );
+		remove_filter( 'query', $break );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->pending_desire()['state'], 'The revocation is kept for the next step.' );
+		$this->assertCount( 1, $this->mails, 'The admin is told, at most once an hour.' );
+		$this->assertStringContainsString( 'Desired state "paused" could not be stored', $this->mails[0]['message'] );
+		$this->assertNotFalse( get_transient( 'beltoft_services_not_stored_' . $resource->id() ) );
+
+		// The sweep picks it up once the database works again.
+		Jobs::sweep();
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertNull( $fresh->pending_desire() );
+		$this->assertCount( 1, $driver->calls( 'pause' ) );
+	}
+
+	public function test_newer_pending_desire_written_during_apply_survives(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$this->desire_while_locked( $resource, 'paused', 'License revoked' );
+
+		// While the step applies the pause, another request's desire finds the lock busy (the
+		// job holds it on this connection, so that request is played by queue_desire()).
+		$table   = \BeltoftLicenses\Install::tables()['activations'];
+		$id      = $resource->id();
+		$written = false;
+		$newer   = static function ( $query ) use ( $table, $id, &$written ) {
+			if ( ! $written && 0 === strpos( ltrim( $query ), 'UPDATE `' . $table . '`' ) ) {
+				$written = true;
+				Resource::find( $id )->queue_desire( 'deleted', 'Retention over' );
+			}
+			return $query;
+		};
+
+		add_filter( 'query', $newer );
+		Jobs::run( $resource->id() );
+		remove_filter( 'query', $newer );
+
+		$this->assertTrue( $written );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'deleted', $fresh->pending_desire()['state'], 'The newer desire survives.' );
+
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'deleted', $fresh->get( 'state' ) );
+		$this->assertNull( $fresh->pending_desire() );
+		$this->assertCount( 1, $driver->calls( 'delete' ) );
+	}
+
+	public function test_older_pending_desire_never_overrides_a_newer_stored_one(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$this->desire_while_locked( $resource, 'paused', 'License revoked' );
+
+		// A later request gets the lock first and stores its own desire.
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'ready', 'License reinstated' ) );
+		$this->assertNull( Resource::find( $resource->id() )->pending_desire(), 'The older pending desire is dropped.' );
+
+		$this->run_jobs();
+
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'desired' ) );
+		$this->assertSame( array(), $driver->calls( 'pause' ) );
 	}
 
 	public function test_pause_without_steps_stops_when_it_cannot_be_stored(): void {

@@ -26,7 +26,9 @@ defined( 'ABSPATH' ) || exit;
  * | ready   | paused, failed after resume                        | resume                 |
  * | ready   | ready with plan_dirty, failed after update_plan    | update_plan            |
  *
- * A failed pause or delete whose desired state is ready again resumes.
+ * A failed pause or delete whose desired state is ready again resumes. A completed delete
+ * makes a new resource only when the deletion asked for it (desire( 'deleted', ..., true ))
+ * and the license is active.
  *
  * `attempts` counts per operation (meta `op`): it starts again when the operation or the
  * desired state changes and is never reset by failures of the same operation. A failed
@@ -52,7 +54,7 @@ final class Reconciler {
 	 * Meta only the reconciler and the resource itself write. A driver's step meta cannot
 	 * change these.
 	 */
-	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at' );
+	private const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete' );
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -151,13 +153,9 @@ final class Reconciler {
 			return;
 		}
 
-		// A desired state that could not take the lock earlier is applied first.
-		$pending = $r->pending_desire();
-
-		if ( $pending ) {
-			$r->desire( $pending['state'], $pending['reason'] );
-			delete_option( Resource::pending_desire_option( $r->id() ) );
-		}
+		// A desired state that could not take the lock earlier is applied first. desire()
+		// removes it once stored; a failed write keeps it for the next step.
+		$r->apply_pending_desire();
 
 		$operation = self::operation( $r );
 
@@ -299,12 +297,17 @@ final class Reconciler {
 	}
 
 	/**
-	 * After a deletion on a license that is active (renewed while the deletion ran), a new
-	 * resource is made with the product's current plan and queued.
+	 * After a deletion that was asked to be replaced (meta `replace_after_delete`), on a
+	 * license that is active (renewed while the deletion ran), a new resource is made with
+	 * the product's current plan and queued. Any other deletion stays a deletion.
 	 *
 	 * @param Resource $r The deleted, closed resource.
 	 */
 	private static function replace_deleted( Resource $r ): void {
+		if ( ! $r->get( 'replace_after_delete' ) ) {
+			return;
+		}
+
 		$license = $r->license();
 
 		if ( ! $license || Licenses::STATUS_ACTIVE !== Licenses::effective_status( $license ) ) {
@@ -452,18 +455,9 @@ final class Reconciler {
 	 * @param Resource $r Resource.
 	 */
 	private static function not_stored( Resource $r ): void {
-		static $logged = array();
-
-		$transient = 'beltoft_services_not_stored_' . $r->id();
-
-		if ( isset( $logged[ $r->id() ] ) || false !== get_transient( $transient ) ) {
+		if ( ! Alerts::write_failed( $r, 'Resource could not be updated' ) ) {
 			return;
 		}
-
-		$logged[ $r->id() ] = true;
-		set_transient( $transient, 1, HOUR_IN_SECONDS );
-
-		Alerts::admin( $r, 'Resource could not be updated' );
 
 		error_log( sprintf( 'Beltoft Services: resource %d could not be updated; the sweep will try again.', $r->id() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a failed database write cannot be recorded anywhere else.
 	}

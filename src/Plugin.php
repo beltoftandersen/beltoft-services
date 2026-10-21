@@ -59,7 +59,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Human names of the missing dependencies.
+	 * Human names of the missing dependencies, including a database server that is too old.
 	 *
 	 * @return string[]
 	 */
@@ -78,6 +78,20 @@ final class Plugin {
 			$missing[] = 'Beltoft Licenses 0.7.0 or newer';
 		}
 
+		global $wpdb;
+
+		/**
+		 * Filters the database server version string the requirement check reads
+		 * (wpdb::db_server_info(), e.g. "8.0.36" or "5.5.5-10.11.14-MariaDB").
+		 *
+		 * @param string $info Server version string.
+		 */
+		$database = self::unsupported_database( (string) apply_filters( 'beltoft_services_database_server_info', (string) $wpdb->db_server_info() ) );
+
+		if ( null !== $database ) {
+			$missing[] = $database;
+		}
+
 		/**
 		 * Filters the list of missing dependencies.
 		 *
@@ -86,6 +100,35 @@ final class Plugin {
 		$missing = apply_filters( 'beltoft_services_dependencies', $missing );
 
 		return array_values( is_array( $missing ) ? $missing : array() );
+	}
+
+	/**
+	 * Why the database server cannot run the plugin, or null when it can. The resource lock
+	 * is taken again inside a job that holds it, which needs re-entrant GET_LOCK: MySQL 5.7
+	 * or MariaDB 10.0.2 and newer. An unreadable version string is not refused.
+	 *
+	 * @param string $info Server version string (wpdb::db_server_info()).
+	 */
+	public static function unsupported_database( string $info ): ?string {
+		$mariadb = false !== stripos( $info, 'mariadb' );
+
+		// MariaDB may report itself behind a "5.5.5-" prefix for old MySQL clients.
+		if ( $mariadb ) {
+			$info = (string) preg_replace( '/^5\.5\.5-/', '', $info );
+		}
+
+		if ( ! preg_match( '/^(\d+\.\d+(?:\.\d+)?)/', $info, $match ) ) {
+			return null;
+		}
+
+		$version = $match[1];
+		$minimum = $mariadb ? '10.0.2' : '5.7';
+
+		if ( version_compare( $version, $minimum, '>=' ) ) {
+			return null;
+		}
+
+		return sprintf( 'MySQL 5.7 or MariaDB 10.0.2 or newer, for re-entrant named locks (this server runs %s %s)', $mariadb ? 'MariaDB' : 'MySQL', $version );
 	}
 
 	/**
