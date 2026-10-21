@@ -43,7 +43,9 @@ final class Resource {
 	}
 
 	/**
-	 * Creates the license's resource, or returns the live one it already holds.
+	 * Creates the license's resource, or returns the live one it already holds (one resource
+	 * per license). A live resource that is already 'deleted' counts as gone: it is closed
+	 * and a new one is made. A 'uuid' in $meta becomes the identifier, otherwise one is made.
 	 *
 	 * @param array<string, mixed> $license License row.
 	 * @param Driver               $driver  Driver.
@@ -52,16 +54,21 @@ final class Resource {
 	 * @return Resource|\WP_Error
 	 */
 	public static function create( array $license, Driver $driver, array $plan, array $meta = array() ) {
-		$existing = self::for_license( (int) $license['id'] );
+		$license_id = (int) $license['id'];
+		$existing   = self::reusable( $license_id );
 
 		if ( $existing ) {
 			return $existing;
 		}
 
-		$uuid = wp_generate_uuid4();
+		$uuid = isset( $meta['uuid'] ) ? (string) $meta['uuid'] : wp_generate_uuid4();
+
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{1,180}$/', $uuid ) ) {
+			return new \WP_Error( 'invalid', 'Invalid resource identifier' );
+		}
+
 		$meta = array_merge(
 			array(
-				'uuid'       => $uuid,
 				'driver'     => $driver->id(),
 				'state'      => 'requested',
 				'desired'    => 'ready',
@@ -71,10 +78,38 @@ final class Resource {
 				'attempts'   => 0,
 				'protected'  => false,
 			),
-			$meta
+			$meta,
+			array( 'uuid' => $uuid )
 		);
 
-		$result = Licenses::add_resource( $license, $driver->kind(), $uuid, $meta );
+		if ( false === json_encode( $meta ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- strict check: wp_json_encode would repair invalid UTF-8 silently.
+			return new \WP_Error( 'invalid', 'Resource data cannot be stored' );
+		}
+
+		$lock = self::lock_name( $license_id );
+
+		if ( ! self::acquire( $lock ) ) {
+			return new \WP_Error( 'locked', 'Another request is creating this resource' );
+		}
+
+		try {
+			/**
+			 * Fires under the license lock, before the one-resource-per-license check is made again.
+			 *
+			 * @param int $license_id License id.
+			 */
+			do_action( 'beltoft_services_resource_locked', $license_id );
+
+			$existing = self::reusable( $license_id );
+
+			if ( $existing ) {
+				return $existing;
+			}
+
+			$result = Licenses::add_resource( $license, $driver->kind(), $uuid, $meta );
+		} finally {
+			self::release( $lock );
+		}
 
 		if ( empty( $result['success'] ) || empty( $result['activation_id'] ) ) {
 			return new \WP_Error( (string) ( $result['code'] ?? 'error' ), (string) ( $result['message'] ?? 'Resource could not be stored' ) );
@@ -82,7 +117,74 @@ final class Resource {
 
 		$resource = self::find( (int) $result['activation_id'] );
 
-		return $resource ? $resource : new \WP_Error( 'error', 'Resource could not be stored' );
+		if ( ! $resource ) {
+			return new \WP_Error( 'error', 'Resource could not be stored' );
+		}
+
+		// Another request's resource (already_active) is returned as it is.
+		if ( 'activated' === $result['code'] && ( ! $resource->is_valid() || $resource->get( 'uuid' ) !== $uuid || $resource->get( 'plan' ) !== $plan ) ) {
+			$resource->close();
+
+			return new \WP_Error( 'error', 'Resource data was not stored completely' );
+		}
+
+		return $resource;
+	}
+
+	/**
+	 * The license's live resource, closing it first when it is already deleted (then null).
+	 *
+	 * @param int $license_id License id.
+	 */
+	private static function reusable( int $license_id ): ?Resource {
+		$existing = self::for_license( $license_id );
+
+		if ( $existing && $existing->is_valid() && 'deleted' === $existing->get( 'state' ) ) {
+			$existing->close();
+			return null;
+		}
+
+		return $existing;
+	}
+
+	/**
+	 * Lock name for a license.
+	 *
+	 * @param int $license_id License id.
+	 */
+	private static function lock_name( int $license_id ): string {
+		return 'beltoft_services_license_' . $license_id;
+	}
+
+	/**
+	 * Takes a named database lock.
+	 *
+	 * @param string $name Lock name.
+	 */
+	private static function acquire( string $name ): bool {
+		global $wpdb;
+
+		/**
+		 * Seconds to wait for the license lock when creating a resource.
+		 *
+		 * @param int $seconds Seconds.
+		 */
+		$timeout = max( 0, (int) apply_filters( 'beltoft_services_lock_timeout', 5 ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
+		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, %d )', $name, $timeout ) );
+	}
+
+	/**
+	 * Releases a named database lock.
+	 *
+	 * @param string $name Lock name.
+	 */
+	private static function release( string $name ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $name ) );
 	}
 
 	/**
@@ -130,6 +232,16 @@ final class Resource {
 	}
 
 	/**
+	 * Does the row carry its metadata? A row without a uuid is corrupt: it reads as failed
+	 * and must never be provisioned again.
+	 */
+	public function is_valid(): bool {
+		$meta = is_array( $this->row['meta'] ?? null ) ? $this->row['meta'] : array();
+
+		return isset( $meta['uuid'] ) && is_scalar( $meta['uuid'] ) && '' !== (string) $meta['uuid'];
+	}
+
+	/**
 	 * Is the resource still live (not closed)?
 	 */
 	public function is_live(): bool {
@@ -145,6 +257,15 @@ final class Resource {
 	public function get( string $key ) {
 		$meta  = is_array( $this->row['meta'] ?? null ) ? $this->row['meta'] : array();
 		$value = $meta[ $key ] ?? null;
+
+		if ( ! $this->is_valid() ) {
+			if ( 'state' === $key ) {
+				return 'failed';
+			}
+			if ( 'last_error' === $key ) {
+				return 'Resource metadata missing';
+			}
+		}
 
 		switch ( $key ) {
 			case 'plan':
@@ -179,6 +300,10 @@ final class Resource {
 	 * @param array<string, mixed> $meta Values.
 	 */
 	public function set( array $meta ): bool {
+		if ( false === json_encode( $meta ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- strict check: wp_json_encode would repair invalid UTF-8 silently.
+			return false;
+		}
+
 		if ( ! Licenses::update_resource_meta( $this->id(), $meta ) ) {
 			return false;
 		}
@@ -194,14 +319,17 @@ final class Resource {
 
 	/**
 	 * Sets the desired state and writes a history event. Pausing records when; wanting it
-	 * ready again clears that. Never deletes anything by itself.
+	 * ready again clears that. Never deletes anything by itself. The event is written only
+	 * when the change was stored.
 	 *
 	 * @param string $state  ready, paused or deleted.
 	 * @param string $reason What happened, for the history.
+	 * @return bool Whether it was stored.
 	 */
-	public function desire( string $state, string $reason ): void {
+	public function desire( string $state, string $reason ): bool {
 		if ( ! in_array( $state, self::DESIRED, true ) ) {
-			return;
+			_doing_it_wrong( __METHOD__, esc_html( sprintf( 'Unknown desired state "%s".', $state ) ), '0.1.0' );
+			return false;
 		}
 
 		$meta = array( 'desired' => $state );
@@ -215,23 +343,35 @@ final class Resource {
 			$meta['warned_at'] = null;
 		}
 
-		$this->set( $meta );
+		if ( ! $this->set( $meta ) ) {
+			return false;
+		}
+
 		Events::add( (int) $this->row['license_id'], 'service', $reason );
+
+		return true;
 	}
 
 	/**
-	 * Moves to a state and writes a history event.
+	 * Moves to a state and writes a history event, only when the change was stored.
 	 *
 	 * @param string $state ready, paused, etc. (see STATES).
 	 * @param string $event What happened, for the history.
+	 * @return bool Whether it was stored.
 	 */
-	public function transition( string $state, string $event ): void {
+	public function transition( string $state, string $event ): bool {
 		if ( ! in_array( $state, self::STATES, true ) ) {
-			return;
+			_doing_it_wrong( __METHOD__, esc_html( sprintf( 'Unknown state "%s".', $state ) ), '0.1.0' );
+			return false;
 		}
 
-		$this->set( array( 'state' => $state ) );
+		if ( ! $this->set( array( 'state' => $state ) ) ) {
+			return false;
+		}
+
 		Events::add( (int) $this->row['license_id'], 'service', $event );
+
+		return true;
 	}
 
 	/**

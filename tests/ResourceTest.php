@@ -188,4 +188,159 @@ final class ResourceTest extends TestCase {
 
 		$this->assertNotContains( 'empty-driver-slug', Product::service_slugs() );
 	}
+
+	public function test_uuid_in_meta_is_the_identifier(): void {
+		list( $license, $driver ) = $this->setup_license();
+
+		$resource = Resource::create( $license, $driver, array(), array( 'uuid' => 'import-0001' ) );
+		$row      = \BeltoftLicenses\Licenses::activation( $resource->id() );
+
+		$this->assertSame( 'import-0001', $resource->get( 'uuid' ) );
+		$this->assertSame( 'import-0001', $row['domain'] );
+		$this->assertSame( 'import-0001', $row['live_domain'] );
+	}
+
+	public function test_invalid_uuid_in_meta_is_refused(): void {
+		list( $license, $driver ) = $this->setup_license();
+
+		$result = Resource::create( $license, $driver, array(), array( 'uuid' => 'bad uuid!' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'invalid', $result->get_error_code() );
+		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+	}
+
+	public function test_race_under_the_lock_leaves_one_resource(): void {
+		list( $license, $driver ) = $this->setup_license();
+
+		// Another request gets its resource in between the first check and the insert.
+		add_action(
+			'beltoft_services_resource_locked',
+			function () use ( $license ) {
+				\BeltoftLicenses\Licenses::add_resource( $license, 'fake', 'other-request-uuid', array( 'uuid' => 'other-request-uuid' ) );
+			}
+		);
+
+		$result = Resource::create( $license, $driver, array() );
+
+		$this->assertInstanceOf( Resource::class, $result );
+		$this->assertSame( 'other-request-uuid', $result->get( 'uuid' ) );
+		$this->assertCount( 1, \BeltoftLicenses\Licenses::resources( (int) $license['id'] ) );
+	}
+
+	public function test_create_returns_locked_when_another_connection_holds_the_lock(): void {
+		list( $license, $driver ) = $this->setup_license();
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$other->query( 'SELECT GET_LOCK( \'beltoft_services_license_' . (int) $license['id'] . '\', 1 )' );
+
+		add_filter( 'beltoft_services_lock_timeout', '__return_zero' );
+		$result = Resource::create( $license, $driver, array() );
+		$other->close();
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'locked', $result->get_error_code() );
+		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+	}
+
+	public function test_failed_write_returns_false_and_writes_no_event(): void {
+		list( $license, $driver ) = $this->setup_license();
+		$resource                 = Resource::create( $license, $driver, array() );
+
+		$this->assertFalse( $resource->set( array( 'last_error' => "bad \xB1\x31 utf8" ) ) );
+
+		global $wpdb;
+		$wpdb->delete( \BeltoftLicenses\Install::tables()['activations'], array( 'id' => $resource->id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		$before = count( \BeltoftLicenses\Events::for_license( (int) $license['id'] ) );
+		$this->assertFalse( $resource->transition( 'ready', 'Should not be written' ) );
+		$this->assertFalse( $resource->desire( 'paused', 'Should not be written either' ) );
+		$this->assertCount( $before, \BeltoftLicenses\Events::for_license( (int) $license['id'] ) );
+	}
+
+	public function test_unknown_states_are_refused(): void {
+		list( $license, $driver ) = $this->setup_license();
+		$resource                 = Resource::create( $license, $driver, array() );
+
+		$this->setExpectedIncorrectUsage( 'BeltoftServices\Resource::transition' );
+		$this->setExpectedIncorrectUsage( 'BeltoftServices\Resource::desire' );
+
+		$this->assertFalse( $resource->transition( 'bogus', 'x' ) );
+		$this->assertFalse( $resource->desire( 'bogus', 'x' ) );
+		$this->assertSame( 'requested', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_unstorable_plan_closes_nothing_and_errors(): void {
+		list( $license, $driver ) = $this->setup_license();
+
+		$result = Resource::create( $license, $driver, array( 'name' => "bad \xB1\x31 utf8" ) );
+
+		$this->assertWPError( $result );
+		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+	}
+
+	public function test_row_without_meta_reads_as_failed_and_invalid(): void {
+		list( $license, $driver ) = $this->setup_license();
+		$added                    = \BeltoftLicenses\Licenses::add_resource( $license, 'fake', 'bare-row' );
+
+		$resource = Resource::find( (int) $added['activation_id'] );
+
+		$this->assertFalse( $resource->is_valid() );
+		$this->assertSame( 'failed', $resource->get( 'state' ) );
+		$this->assertSame( 'Resource metadata missing', $resource->get( 'last_error' ) );
+		$this->assertSame( $resource->id(), Resource::for_license( (int) $license['id'] )->id() );
+
+		// Never replaced by a new one.
+		$this->assertSame( $resource->id(), Resource::create( $license, $driver, array() )->id() );
+	}
+
+	public function test_deleted_resource_is_replaced_by_create(): void {
+		list( $license, $driver ) = $this->setup_license();
+		$old                      = Resource::create( $license, $driver, array() );
+		$old->transition( 'deleted', 'Deleted' );
+
+		$new = Resource::create( $license, $driver, array() );
+
+		$this->assertNotSame( $old->id(), $new->id() );
+		$this->assertNotSame( $old->get( 'uuid' ), $new->get( 'uuid' ) );
+		$this->assertCount( 1, \BeltoftLicenses\Licenses::resources( (int) $license['id'] ) );
+		$this->assertFalse( Resource::find( $old->id() )->is_live() );
+	}
+
+	public function test_other_live_states_are_returned_as_they_are(): void {
+		list( $license, $driver ) = $this->setup_license();
+		$old                      = Resource::create( $license, $driver, array() );
+		$old->transition( 'deleting', 'Deleting' );
+
+		$this->assertSame( $old->id(), Resource::create( $license, $driver, array() )->id() );
+	}
+
+	public function test_create_after_close_makes_a_new_resource(): void {
+		list( $license, $driver ) = $this->setup_license();
+		$old                      = Resource::create( $license, $driver, array() );
+		$old->close();
+
+		$new = Resource::create( $license, $driver, array() );
+
+		$this->assertNotSame( $old->id(), $new->id() );
+		$this->assertNotSame( $old->get( 'uuid' ), $new->get( 'uuid' ) );
+	}
+
+	public function test_slug_is_remembered_in_either_write_order(): void {
+		$a = new \WC_Product_Simple();
+		$a->set_name( 'A' );
+		$a->save();
+		update_post_meta( $a->get_id(), Product::META_DRIVER, 'fake' );
+		$this->assertNotContains( 'order-a', Product::service_slugs() );
+		update_post_meta( $a->get_id(), \BeltoftLicenses\Software::META_SLUG, 'order-a' );
+		$this->assertContains( 'order-a', Product::service_slugs() );
+
+		$b = new \WC_Product_Simple();
+		$b->set_name( 'B' );
+		$b->save();
+		update_post_meta( $b->get_id(), \BeltoftLicenses\Software::META_SLUG, 'order-b' );
+		$this->assertNotContains( 'order-b', Product::service_slugs() );
+		update_post_meta( $b->get_id(), Product::META_DRIVER, 'fake' );
+		$this->assertContains( 'order-b', Product::service_slugs() );
+	}
 }

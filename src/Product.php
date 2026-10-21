@@ -107,8 +107,9 @@ final class Product {
 	}
 
 	/**
-	 * Remembers the software slug whenever a product's driver meta is added or updated with
-	 * a value, by any route (editor, CLI, import, code), not only the editor.
+	 * Remembers the software slug whenever a product's driver meta or slug meta is added or
+	 * updated with a value and the other is already set, by any route (editor, CLI, import,
+	 * code), in either write order.
 	 *
 	 * @param int    $meta_id    Meta id.
 	 * @param int    $object_id  Post id.
@@ -116,15 +117,23 @@ final class Product {
 	 * @param mixed  $meta_value Meta value.
 	 */
 	public static function driver_meta_changed( $meta_id, $object_id, $meta_key, $meta_value ): void {
-		if ( self::META_DRIVER !== $meta_key || ! is_scalar( $meta_value ) || '' === (string) $meta_value ) {
+		if ( self::META_DRIVER !== $meta_key && \BeltoftLicenses\Software::META_SLUG !== $meta_key ) {
 			return;
 		}
 
-		$slug = (string) get_post_meta( (int) $object_id, \BeltoftLicenses\Software::META_SLUG, true );
-
-		if ( '' !== $slug ) {
-			self::remember_slug( $slug );
+		if ( ! is_scalar( $meta_value ) || '' === (string) $meta_value ) {
+			return;
 		}
+
+		// Either order: the slug counts once the product has both a driver and a slug.
+		$other = self::META_DRIVER === $meta_key ? \BeltoftLicenses\Software::META_SLUG : self::META_DRIVER;
+		$other = get_post_meta( (int) $object_id, $other, true );
+
+		if ( ! is_scalar( $other ) || '' === (string) $other ) {
+			return;
+		}
+
+		self::remember_slug( self::META_DRIVER === $meta_key ? (string) $other : (string) $meta_value );
 	}
 
 	/**
