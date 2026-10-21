@@ -1,0 +1,5 @@
+.internal/
+CLAUDE.md
+.superpowers/
+.phpunit.result.cache
+.playwright-mcp/
