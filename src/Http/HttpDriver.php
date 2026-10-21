@@ -28,7 +28,8 @@ defined( 'ABSPATH' ) || exit;
  * number.
  *
  * Answers: 2xx is done (provision also needs the remote id, read from the connection's
- * `remote_id_field`); 409 on provision with a remote id is done; 404 on delete is done (already
+ * `remote_id_field`); 409 on provision with a remote id is done (without one it fails and the
+ * provision stays open); 404 on delete is done (already
  * gone); 408, 429, 5xx and transport
  * errors are retried (honouring Retry-After); anything else fails. Redirects are not followed.
  */
@@ -483,7 +484,9 @@ final class HttpDriver implements Driver, Opens {
 			}
 
 			if ( 409 === $code ) {
-				return StepResult::fail( $prefix . self::snippet( $text, $scrub ), array_merge( $meta, array( 'idempotency' => $closed ) ) );
+				// The service holds the tenant but did not say its id: the provision stays open, so a
+				// later pause or delete needs an admin instead of counting as done.
+				return StepResult::fail( $prefix . self::snippet( $text, $scrub ), $meta );
 			}
 
 			// The service may have created it: retry with the same key to get the id.
@@ -545,6 +548,7 @@ final class HttpDriver implements Driver, Opens {
 			'method'      => $method,
 			'timeout'     => (int) $connection['timeout'],
 			'redirection' => 0,
+			'sslverify'   => true,
 			'headers'     => $headers,
 		);
 

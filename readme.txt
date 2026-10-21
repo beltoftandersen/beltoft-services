@@ -78,7 +78,7 @@ Requests send and accept JSON (`Content-Type: application/json`, `Accept: applic
 = What answers does the service have to give? =
 
 * **2xx:** done. A provision answer must be a JSON object with the service's id in the connection's "remote id field" (`id` by default; a dotted path such as `data.id` works). Without the id, the call is retried and then fails: a service never counts as ready without its id.
-* **409 on provision**, with the id in the body: done (the service exists already). Without an id, it fails.
+* **409 on provision**, with the id in the body: done (the service exists already). Without an id, it fails, and the provision stays open: the service may hold the tenant, so pausing or deleting that resource later needs an admin (it fails and the admin is alerted) and never counts as done.
 * **404 on delete:** done (the service is gone already).
 * **408, 429 and 5xx**, and network errors: retried later. A `Retry-After` header (seconds or an HTTP date) is honoured, but the wait is never shorter than the current backoff step (1, 5 and 15 minutes, 1 hour, 4 hours) and never longer than 4 hours.
 * **Any other 4xx:** final. The service is marked failed and the admin gets an email.

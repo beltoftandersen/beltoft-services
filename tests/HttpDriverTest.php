@@ -409,6 +409,50 @@ class HttpDriverTest extends TestCase {
 		$this->assertSame( 'failed', $this->step( $other )->get( 'state' ) );
 	}
 
+	public function test_409_without_an_id_keeps_the_provision_open_so_a_pause_alerts(): void {
+		$this->connection(
+			array(
+				'endpoints' => array(
+					'provision' => array( 'method' => 'POST', 'path' => '/tenants' ),
+					'pause'     => array( 'method' => 'POST', 'path' => '/tenants/{remote_id}/pause' ),
+				),
+			)
+		);
+		$resource = $this->resource();
+		$this->answers( array( self::answer( 409, array( 'error' => 'conflict' ) ) ) );
+
+		$fresh = $this->step( $resource );
+		$this->assertSame( 'failed', $fresh->get( 'state' ) );
+		$this->assertTrue( $fresh->get( 'idempotency' )['provision']['open'], 'The service may hold the tenant: the provision stays open.' );
+		$this->assertCount( 1, $this->mails );
+
+		// The license is revoked: there is no remote id to pause, and the service may exist.
+		$fresh->desire( 'paused', 'License revoked' );
+		$fresh->set( array( 'attempts' => 0 ) );
+		$calls = count( $this->http_calls() );
+		$fresh = $this->step( $fresh );
+
+		$this->assertSame( 'failed', $fresh->get( 'state' ) );
+		$this->assertSame( 'Cannot pause: the resource has no remote id', $fresh->get( 'last_error' ) );
+		$this->assertCount( $calls, $this->http_calls(), 'No call without a remote id.' );
+		$this->assertCount( 2, $this->mails, 'The admin is alerted.' );
+	}
+
+	public function test_medusa_tls_verification_is_on(): void {
+		$this->connection();
+		$resource = $this->resource();
+		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'rem-1' ) ) ) ) );
+
+		$this->step( $resource );
+
+		$calls = $this->http_calls();
+		$this->assertNotEmpty( $calls );
+
+		foreach ( $calls as $call ) {
+			$this->assertTrue( $call['args']['sslverify'], 'Certificates are always checked.' );
+		}
+	}
+
 	public function test_medusa_requests_are_signed_not_a_global_header_plus_customer_id(): void {
 		$this->connection();
 		$resource = $this->resource();
