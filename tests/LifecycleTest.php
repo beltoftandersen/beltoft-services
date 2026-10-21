@@ -437,4 +437,76 @@ final class LifecycleTest extends TestCase {
 		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
 		$this->assertCount( 1, $this->driver->calls( 'provision' ) );
 	}
+
+	public function test_switch_to_another_driver_leaves_a_protected_service_and_alerts_once(): void {
+		$other                      = $this->fake_driver( 'fake2' );
+		list( $license, $resource ) = $this->provisioned();
+		$resource->set( array( 'protected' => true ) );
+		$product = $this->service_product( 'fake2', array(), array( 'slug' => 'other-service' ) );
+
+		Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+		Licenses::update( (int) $license['id'], array( 'max_activations' => 9 ) );
+		$this->run_jobs();
+
+		$fresh = $this->fresh( $resource );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertTrue( $fresh->is_live() );
+		$this->assertSame( 'fake', $fresh->get( 'driver' ) );
+		$this->assertFalse( $fresh->get( 'plan_dirty' ), 'The old plan stays.' );
+		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
+		$this->assertSame( array(), $other->calls() );
+		$this->assertCount( 1, $this->mails, 'Alerted once per resource and product.' );
+		$this->assertStringContainsString( 'Product changed to a product with another driver; decide on the license screen.', $this->mails[0]['message'] );
+	}
+
+	public function test_switch_to_another_driver_on_a_suspended_license_deletes_nothing(): void {
+		$other                      = $this->fake_driver( 'fake2' );
+		list( $license, $resource ) = $this->provisioned();
+		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_SUSPENDED ) );
+		$this->run_jobs();
+
+		$product = $this->service_product( 'fake2', array(), array( 'slug' => 'other-service' ) );
+		Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+		$this->run_jobs();
+
+		$fresh = $this->fresh( $resource );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertTrue( $fresh->is_live() );
+		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
+		$this->assertSame( array(), $other->calls() );
+		$this->assertCount( 1, $this->mails );
+	}
+
+	public function test_renewal_that_only_clears_the_expiry_resumes(): void {
+		list( $license, $resource ) = $this->provisioned();
+
+		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_SUSPENDED ) );
+		Licenses::update( (int) $license['id'], array( 'expires_at' => time() - 60 ) );
+		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_ACTIVE ) );
+		$this->run_jobs();
+		$this->assertSame( 'paused', $this->fresh( $resource )->get( 'state' ) );
+
+		// A renewal as beltoft-licenses' Subscriptions::activated() does it on an active status.
+		Licenses::update( (int) $license['id'], array( 'expires_at' => null ) );
+		$this->run_jobs();
+
+		$fresh = $this->fresh( $resource );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertCount( 1, $this->driver->calls( 'resume' ) );
+	}
+
+	public function test_expiry_moved_into_the_past_pauses(): void {
+		list( $license, $resource ) = $this->provisioned();
+
+		Licenses::update( (int) $license['id'], array( 'expires_at' => time() + DAY_IN_SECONDS ) );
+		$this->assertSame( 'ready', $this->fresh( $resource )->get( 'desired' ), 'A future expiry changes nothing.' );
+
+		Licenses::update( (int) $license['id'], array( 'expires_at' => time() - 60 ) );
+		$this->run_jobs();
+
+		$this->assertSame( 'paused', $this->fresh( $resource )->get( 'state' ) );
+		$this->assertCount( 1, $this->driver->calls( 'pause' ) );
+		$this->assertContains( 'License expired', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $license['id'] ), 'message' ) );
+	}
 }

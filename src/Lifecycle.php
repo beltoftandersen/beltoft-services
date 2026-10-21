@@ -21,10 +21,13 @@ defined( 'ABSPATH' ) || exit;
  * in the reconcile job.
  *
  * - created and active: the service is created and queued for provisioning;
- * - active again: ready (a license with no live service gets a new one);
- * - suspended, expired, revoked (or active but past its expiry): paused;
+ * - active again, by its status or its expiry: ready (a license with no live service gets a
+ *   new one);
+ * - suspended, expired, revoked, or active but past its expiry (by its status or its
+ *   expiry): paused;
  * - sites, variation or product changed: a new plan snapshot, applied by update_plan; a
- *   product with another driver replaces the service (deleted, then made anew).
+ *   product with another driver replaces the service (deleted, then made anew) when it is
+ *   not protected and the license is active; otherwise the admin is alerted once.
  *
  * Every listener does nothing while beltoft-licenses imports.
  */
@@ -52,6 +55,7 @@ final class Lifecycle {
 		add_action( 'beltoft_licenses_license_created', array( __CLASS__, 'on_created' ) );
 		add_action( 'beltoft_licenses_status_changed', array( __CLASS__, 'on_status' ), 10, 2 );
 		add_action( 'beltoft_licenses_license_updated', array( __CLASS__, 'on_updated' ), 10, 3 );
+		add_action( 'beltoft_licenses_expiry_changed', array( __CLASS__, 'on_expiry' ), 10, 2 );
 		add_action( self::PLAN_HOOK, array( __CLASS__, 'apply_plan' ) );
 	}
 
@@ -119,6 +123,40 @@ final class Lifecycle {
 	}
 
 	/**
+	 * A license's expiry changed without a status change (a renewal clears it, on-hold and
+	 * pending-cancel set it, an admin moves it). The same decision as on_status(), taken only
+	 * when it changes what the service should be.
+	 *
+	 * @param array<string, mixed> $license License after the change.
+	 * @param string|null          $old     Previous expiry (unused: the new one decides).
+	 */
+	public static function on_expiry( $license, $old ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- action signature.
+		if ( ! is_array( $license ) || self::skip( $license ) ) {
+			return;
+		}
+
+		$resource = Resource::for_license( (int) $license['id'] );
+		$active   = self::is_active( $license );
+
+		if ( ! $resource ) {
+			if ( $active ) {
+				self::provide( $license );
+			}
+			return;
+		}
+
+		$want    = $active ? 'ready' : 'paused';
+		$desired = $resource->get( 'desired' );
+
+		// A deletion is terminal; the same desired state needs nothing.
+		if ( 'deleted' === $desired || $want === $desired ) {
+			return;
+		}
+
+		self::desire( $resource, $want, $active ? 'License active' : sprintf( 'License %s', Licenses::effective_status( $license ) ) );
+	}
+
+	/**
 	 * A license was updated. A change of sites, variation or product takes a new plan.
 	 *
 	 * @param array<string, mixed> $after   License after the update.
@@ -168,7 +206,13 @@ final class Lifecycle {
 		// creates a new one with the product's driver and plan (replace = true). The old
 		// driver never gets the new product's plan.
 		if ( $driver && $driver->id() !== $resource->get( 'driver' ) ) {
-			self::desire( $resource, 'deleted', sprintf( 'Product changed to another service driver (%s); the service is replaced', $driver->id() ), true );
+			// Only an unprotected service of an active license is replaced; anything else (a
+			// migrated tenant, a suspended license) is left for an admin to decide.
+			if ( ! $resource->get( 'protected' ) && self::is_active( $license ) ) {
+				self::desire( $resource, 'deleted', sprintf( 'Product changed to another service driver (%s); the service is replaced', $driver->id() ), true );
+			} else {
+				self::driver_conflict( $license, $resource, $product_id );
+			}
 			return;
 		}
 
@@ -183,6 +227,35 @@ final class Lifecycle {
 			self::retry_plan( $license_id );
 		}
 		// False: it could not be stored, and the admin was alerted.
+	}
+
+	/**
+	 * Option prefix remembering which product a driver conflict was alerted for, per resource.
+	 */
+	public const CONFLICT_PREFIX = 'beltoft_services_driver_conflict_';
+
+	/**
+	 * Alert text when a service is not replaced after a switch to another driver.
+	 */
+	public const CONFLICT_ERROR = 'Product changed to a product with another driver; decide on the license screen.';
+
+	/**
+	 * The service keeps its driver and plan; the admin is told once per resource and product.
+	 *
+	 * @param array<string, mixed> $license    License row.
+	 * @param Resource             $r          Resource.
+	 * @param int                  $product_id The new product.
+	 */
+	private static function driver_conflict( array $license, Resource $r, int $product_id ): void {
+		$option = self::CONFLICT_PREFIX . $r->id();
+
+		if ( (int) get_option( $option, 0 ) === $product_id ) {
+			return;
+		}
+
+		update_option( $option, $product_id, false );
+		Events::add( (int) $license['id'], 'service', self::CONFLICT_ERROR );
+		Alerts::license( $license, self::CONFLICT_ERROR );
 	}
 
 	/**

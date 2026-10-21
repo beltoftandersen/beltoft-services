@@ -231,6 +231,14 @@ final class Settings {
 	}
 
 	/**
+	 * Does beltoft-licenses check license expiry only once a day? Services are paused when
+	 * a license's status turns expired, so they then stop up to a day late.
+	 */
+	public static function expiry_is_daily(): bool {
+		return class_exists( \BeltoftLicenses\Settings::class ) && ! \BeltoftLicenses\Settings::get( 'expiry_hourly' );
+	}
+
+	/**
 	 * The page.
 	 */
 	public static function render_page(): void {
@@ -247,6 +255,15 @@ final class Settings {
 				'<div class="notice notice-warning"><p>%1$s</p><p><code>%2$s</code></p></div>',
 				esc_html__( 'Secrets cannot be saved until an encryption key is set. Add this line to wp-config.php:', 'beltoft-services' ),
 				esc_html( "define( 'BELTOFT_SERVICES_KEY', '" . Crypto::suggested_key() . "' );" )
+			);
+		}
+
+		if ( self::expiry_is_daily() ) {
+			printf(
+				'<div class="notice notice-warning"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+				esc_html__( "Services stop up to a day late after a subscription ends. Turn on 'Check expiry every hour' under Settings → Licenses.", 'beltoft-services' ),
+				esc_url( admin_url( 'options-general.php?page=' . \BeltoftLicenses\Settings::PAGE ) ),
+				esc_html__( 'Open Settings → Licenses', 'beltoft-services' )
 			);
 		}
 

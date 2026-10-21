@@ -169,11 +169,13 @@ final class Retention {
 			return;
 		}
 
-		// Replace: a renewal while the deletion runs gets a fresh service.
-		if ( $r->desire( 'deleted', 'Retention period over', true ) ) {
+		// Decided again under the resource lock, so a renewal stored since wins. A new service
+		// follows if the license is renewed while the deletion runs.
+		if ( $r->delete_if_still_paused( $paused_at, 'Retention period over' ) ) {
 			Jobs::enqueue( $r->id() );
 		}
-		// False: queued for the lock, or not stored (the admin was alerted). The next run retries.
+		// False: no longer due, the lock was busy, or not stored (the admin was alerted). The
+		// next run decides again; nothing is queued.
 	}
 
 	/**

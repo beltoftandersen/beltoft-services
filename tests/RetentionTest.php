@@ -341,4 +341,61 @@ final class RetentionTest extends TestCase {
 		Retention::unschedule();
 		$this->assertFalse( as_has_scheduled_action( Retention::HOOK, array(), Jobs::GROUP ) );
 	}
+
+	public function test_renewal_between_check_and_deletion_wins(): void {
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$due = $this->paused( 31, array( 'warned_at' => time() - 2 * DAY_IN_SECONDS ) );
+		$this->run_jobs();
+
+		// The renewal lands after retention read the resource and the license (it reads the
+		// settings a second time for warning_days), before it asks for the deletion.
+		$reads   = 0;
+		$renewed = false;
+		$renew   = function ( $value ) use ( $due, &$reads, &$renewed ) {
+			if ( ! $renewed && 2 === ++$reads ) {
+				$renewed = true;
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the renewal of another request.
+				$GLOBALS['wpdb']->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'status' => 'active' ), array( 'id' => (int) $due->license()['id'] ) );
+				Resource::find( $due->id() )->desire( 'ready', 'License active' );
+			}
+			return $value;
+		};
+
+		add_filter( 'option_' . \BeltoftServices\Settings::OPTION, $renew );
+		Retention::run();
+		remove_filter( 'option_' . \BeltoftServices\Settings::OPTION, $renew );
+
+		$this->assertTrue( $renewed );
+		$fresh = $this->fresh( $due );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ), 'The renewal wins.' );
+		$this->assertNull( $fresh->pending_desire() );
+
+		$this->run_jobs();
+		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
+	}
+
+	public function test_busy_lock_skips_the_deletion_until_the_next_run(): void {
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$due = $this->paused( 31, array( 'warned_at' => time() - 2 * DAY_IN_SECONDS ) );
+		$this->run_jobs();
+
+		global $wpdb;
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $due->id() ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		Retention::run();
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		$other->close();
+
+		$fresh = $this->fresh( $due );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertNull( $fresh->pending_desire(), 'Never queued.' );
+		$this->assertSame( array(), Jobs::pending( $due->id() ) );
+
+		// The next run deletes it.
+		Retention::run();
+		$this->assertSame( 'deleted', $this->fresh( $due )->get( 'desired' ) );
+	}
 }

@@ -738,6 +738,40 @@ final class Resource {
 	}
 
 	/**
+	 * Requests the deletion of a paused service after its retention period (with a new
+	 * service to follow on a renewal), only if, under the resource lock, it is still meant to
+	 * be paused since $paused_at, is not protected, has no desired state waiting, and its
+	 * license is not active. A renewal stored in the meantime wins. When the lock stays busy
+	 * nothing is stored or queued: the next retention run decides again.
+	 *
+	 * @param int    $paused_at The paused_at the caller decided on.
+	 * @param string $reason    History text.
+	 * @return bool Whether the deletion was stored.
+	 */
+	public function delete_if_still_paused( int $paused_at, string $reason ): bool {
+		return true === $this->locked(
+			function () use ( $paused_at, $reason ): bool {
+				if ( 'paused' !== $this->get( 'desired' ) || $this->get( 'paused_at' ) !== $paused_at || $this->get( 'protected' ) ) {
+					return false;
+				}
+
+				if ( null !== $this->pending_desire() ) {
+					return false;
+				}
+
+				$license = $this->license();
+
+				if ( ! $license || Licenses::STATUS_ACTIVE === Licenses::effective_status( $license ) ) {
+					return false;
+				}
+
+				// The lock is re-entrant within this connection: desire() takes it again at once.
+				return $this->desire( 'deleted', $reason, true );
+			}
+		);
+	}
+
+	/**
 	 * Runs a callback under the resource lock (waiting as desire() does), on a fresh read of
 	 * the row.
 	 *

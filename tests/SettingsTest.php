@@ -178,4 +178,25 @@ class SettingsTest extends TestCase {
 		remove_all_filters( 'beltoft_services_settings_tabs' );
 		remove_all_filters( 'beltoft_services_settings_sections' );
 	}
+
+	public function test_notice_when_license_expiry_is_only_checked_daily(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		update_option( \BeltoftLicenses\Settings::OPTION, array( 'expiry_hourly' => 0 ) );
+		$this->assertTrue( Settings::expiry_is_daily() );
+
+		ob_start();
+		Settings::render_page();
+		$html = ob_get_clean();
+		$this->assertStringContainsString( 'Services stop up to a day late after a subscription ends.', $html );
+		$this->assertStringContainsString( 'options-general.php?page=beltoft-licenses', $html );
+
+		update_option( \BeltoftLicenses\Settings::OPTION, array( 'expiry_hourly' => 1 ) );
+		$this->assertFalse( Settings::expiry_is_daily() );
+
+		ob_start();
+		Settings::render_page();
+		$html = ob_get_clean();
+		$this->assertStringNotContainsString( 'Services stop up to a day late', $html );
+	}
 }
