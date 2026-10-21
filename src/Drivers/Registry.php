@@ -21,11 +21,11 @@ final class Registry {
 	 */
 	public static function all(): array {
 		/**
-		 * Filters the registered drivers.
+		 * Filters the registered drivers. The HTTP driver is built in.
 		 *
 		 * @param array<string, Driver> $drivers Drivers keyed by id.
 		 */
-		$drivers = apply_filters( 'beltoft_services_drivers', array() );
+		$drivers = apply_filters( 'beltoft_services_drivers', array( 'http' => new \BeltoftServices\Http\HttpDriver() ) );
 
 		$valid = array();
 		foreach ( (array) $drivers as $id => $driver ) {
