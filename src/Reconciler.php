@@ -54,7 +54,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified' );
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -285,13 +285,15 @@ final class Reconciler {
 		}
 
 		$event = '' !== $result->event() ? $result->event() : self::event( $operation );
-		self::move( $r, self::REACHES[ $operation ], $event );
 
 		if ( 'delete' === $operation ) {
-			$r->close();
+			// Closed before listeners hear of it: they see the resource as it now is.
+			self::move( $r, 'deleted', $event, true );
 			self::replace_deleted( $r );
 			return;
 		}
+
+		self::move( $r, self::REACHES[ $operation ], $event );
 
 		self::follow_up( $r );
 	}
@@ -463,27 +465,51 @@ final class Reconciler {
 	}
 
 	/**
-	 * Moves to a state, then tells listeners when it changed.
+	 * Moves to a state, then tells listeners when it changed. With $close the resource is
+	 * closed once the state is stored, before listeners are told.
 	 *
 	 * @param Resource $r     Resource.
 	 * @param string   $state New state.
 	 * @param string   $event History text.
+	 * @param bool     $close Close the resource (a completed deletion).
 	 */
-	private static function move( Resource $r, string $state, string $event ): void {
-		$old = $r->get( 'state' );
+	private static function move( Resource $r, string $state, string $event, bool $close = false ): void {
+		$old    = $r->get( 'state' );
+		$stored = $r->transition( $state, $event );
 
-		if ( ! $r->transition( $state, $event ) || $old === $state ) {
+		if ( $close ) {
+			$r->close();
+		}
+
+		if ( ! $stored || $old === $state ) {
 			return;
 		}
 
-		/**
-		 * Fires after a resource moved to another state.
-		 *
-		 * @param Resource $r   Resource.
-		 * @param string   $old Previous state.
-		 * @param string   $new New state.
-		 */
-		do_action( 'beltoft_services_state_changed', $r, $old, $state );
+		self::notify( $r, $old, $state );
+	}
+
+	/**
+	 * Fires beltoft_services_state_changed. A listener that throws is logged and never breaks
+	 * the job that moved the resource (the rest of that hook's listeners are skipped).
+	 *
+	 * @param Resource $r   Resource.
+	 * @param string   $old Previous state.
+	 * @param string   $new New state.
+	 */
+	public static function notify( Resource $r, string $old, string $new ): void {
+		try {
+			/**
+			 * Fires after a resource moved to another state. A resource that reached `deleted`
+			 * is already closed. Listeners must not throw; one that does is logged and skipped.
+			 *
+			 * @param Resource $r   Resource.
+			 * @param string   $old Previous state.
+			 * @param string   $new New state.
+			 */
+			do_action( 'beltoft_services_state_changed', $r, $old, $new );
+		} catch ( \Throwable $e ) {
+			error_log( sprintf( 'Beltoft Services: a beltoft_services_state_changed listener failed for resource %d: %s', $r->id(), $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a listener's failure must not stop the job; this is its only record.
+		}
 	}
 
 	/**

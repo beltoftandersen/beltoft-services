@@ -43,7 +43,11 @@ final class ReconcilerTest extends TestCase {
 	 * @return bool
 	 */
 	public function catch_mail( $pre, $atts ) {
-		$this->mails[] = $atts;
+		// Only the admin alerts: the customer's service emails are tested in EmailsTest.
+		$to = is_array( $atts['to'] ) ? implode( ',', $atts['to'] ) : (string) $atts['to'];
+		if ( false === strpos( $to, 'customer@example.com' ) ) {
+			$this->mails[] = $atts;
+		}
 		return true;
 	}
 
@@ -478,7 +482,8 @@ final class ReconcilerTest extends TestCase {
 		$this->assertCount( 1, $this->mails );
 		$license = $resource->license();
 		$this->assertSame( 'ops@example.com', $this->mails[0]['to'] );
-		$this->assertSame( '[' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) . '] Service failed: ' . $license['license_key'], $this->mails[0]['subject'] );
+		$this->assertSame( '[' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) . '] Service failed: …' . substr( $license['license_key'], -4 ), $this->mails[0]['subject'] );
+		$this->assertStringNotContainsString( $license['license_key'], $this->mails[0]['subject'], 'The key is masked in the subject.' );
 		$this->assertStringContainsString( 'Host unreachable', $this->mails[0]['message'] );
 		$this->assertStringContainsString( 'fake', $this->mails[0]['message'] );
 		$this->assertStringContainsString( (string) $license['id'], $this->mails[0]['message'] );
@@ -1255,5 +1260,68 @@ final class ReconcilerTest extends TestCase {
 		$this->assertSame( 'deleted', $fresh->get( 'state' ) );
 		$this->assertFalse( $fresh->get( 'replace_after_delete' ) );
 		$this->assertCount( 1, $driver->calls( 'delete' ) );
+	}
+
+	public function test_deleted_listeners_see_the_closed_resource(): void {
+		list( $resource ) = $this->resource( array( 'state' => 'paused' ) );
+		$resource->desire( 'deleted', 'Retention over' );
+
+		$seen = array();
+		add_action(
+			'beltoft_services_state_changed',
+			static function ( $r, $old, $new ) use ( &$seen ) {
+				$stored = Resource::find( $r->id() );
+				$seen[] = array( $new, $r->is_live(), $stored->is_live() );
+			},
+			10,
+			3
+		);
+
+		Jobs::run( $resource->id() );
+
+		$this->assertSame( array( 'deleted', false, false ), end( $seen ), 'The resource is closed before listeners hear of the deletion.' );
+	}
+
+	public function test_a_failing_state_listener_never_breaks_the_reconciler(): void {
+		list( $resource, $driver ) = $this->resource();
+		$log      = wp_tempnam( 'beltoft-services-log' );
+		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- keeps the logged failure out of the test output.
+
+		add_action(
+			'beltoft_services_state_changed',
+			static function () {
+				throw new \RuntimeException( 'Listener exploded' );
+			}
+		);
+
+		Jobs::enqueue( $resource->id() );
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertCount( 1, $driver->calls( 'provision' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 0, $fresh->get( 'attempts' ) );
+		$this->assertSame( '', $fresh->get( 'last_error' ) );
+
+		// A deletion still closes the resource.
+		$fresh->desire( 'deleted', 'Gone' );
+		Jobs::run( $resource->id() );
+		ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet.Risky
+
+		$this->assertFalse( Resource::find( $resource->id() )->is_live() );
+		$this->assertStringContainsString( 'Listener exploded', (string) file_get_contents( $log ), 'The failure is logged.' );
+		wp_delete_file( $log );
+	}
+
+	public function test_license_alert_masks_the_key_in_the_subject(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$product = $this->service_product( 'fake' );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+
+		\BeltoftServices\Alerts::license( $license, 'No driver' );
+
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringEndsWith( 'Service not created: …' . substr( $license['license_key'], -4 ), $this->mails[0]['subject'] );
+		$this->assertStringNotContainsString( $license['license_key'], $this->mails[0]['subject'] );
 	}
 }

@@ -49,6 +49,9 @@ final class Plugin {
 
 		Account\Panel::register();
 		Api\Routes::register();
+		Admin\Panel::register();
+		Admin\Screen::register();
+		Emails\Emails::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
