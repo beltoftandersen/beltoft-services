@@ -11,6 +11,7 @@ use BeltoftServices\Account\Panel;
 use BeltoftServices\Drivers\Opens;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
+use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -49,11 +50,6 @@ final class Routes {
 	 * Rate limit window in seconds.
 	 */
 	public const WINDOW = 60;
-
-	/**
-	 * Object cache group of the rate limit counters.
-	 */
-	private const GROUP = 'beltoft_services_rl';
 
 	/**
 	 * Hooks.
@@ -282,9 +278,7 @@ final class Routes {
 
 	/**
 	 * Counts this request. True when it is over the limit (filter
-	 * beltoft_services_rest_rate_limit; 0 turns it off). Counters live in the persistent object
-	 * cache when there is one, otherwise in transients; if counting fails the request is let
-	 * through.
+	 * beltoft_services_rest_rate_limit; 0 turns it off). The counting is RateLimit::exceeded().
 	 *
 	 * @param int    $user_id User id.
 	 * @param string $route   Request route (with the resource id).
@@ -299,21 +293,7 @@ final class Routes {
 		 */
 		$max = (int) apply_filters( 'beltoft_services_rest_rate_limit', $limit, $route );
 
-		if ( $max <= 0 ) {
-			return false;
-		}
-
-		$key = 'rl_' . md5( $user_id . '|' . $route . '|' . (int) floor( time() / self::WINDOW ) );
-
-		if ( wp_using_ext_object_cache() ) {
-			wp_cache_add( $key, 0, self::GROUP, self::WINDOW );
-			$count = wp_cache_incr( $key, 1, self::GROUP );
-		} else {
-			$count = (int) get_transient( 'beltoft_services_' . $key ) + 1;
-			set_transient( 'beltoft_services_' . $key, $count, self::WINDOW );
-		}
-
-		return false !== $count && (int) $count > $max;
+		return RateLimit::exceeded( $user_id, $route, $max, self::WINDOW );
 	}
 
 	/**

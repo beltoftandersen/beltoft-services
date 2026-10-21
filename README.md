@@ -32,6 +32,10 @@ Every request also carries `Idempotency-Key: <tenant>:<operation>:<sequence>`, t
 
 Answers: 2xx is done (provision needs the id in the remote id field); 409 on provision with an id is done; 404 on delete is done; 408, 429 and 5xx are retried, honouring `Retry-After` (never longer than 4 hours); any other 4xx is final. See `readme.txt` for the details.
 
+## Developer API
+
+- `BeltoftServices\RateLimit::exceeded( int $user_id, string $key, int $limit, int $window = MINUTE_IN_SECONDS ): bool`: counts one call for a user and key in a fixed window; true when over the limit (0 or less turns it off). Persistent object cache when there is one, otherwise transients.
+
 ## Development
 
 Tests: `/root/plugin-tests/run.sh /path/to/beltoft-services`
