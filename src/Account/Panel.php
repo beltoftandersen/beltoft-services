@@ -197,12 +197,15 @@ final class Panel {
 			array(
 				'root'     => esc_url_raw( rest_url( Routes::NAMESPACE . '/resources/' ) ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),
+				// WordPress's own rest-nonce action hands out a fresh nonce to a logged-in user.
+				'nonceUrl' => esc_url_raw( add_query_arg( 'action', 'rest-nonce', admin_url( 'admin-ajax.php' ) ) ),
 				'interval' => 10000,
 				'strings'  => array(
 					'queued'  => __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
 					'refused' => __( 'This is not available right now.', 'beltoft-services' ),
 					'tooMany' => __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ),
 					'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
+					'expired' => __( 'Your session has expired. Please reload the page.', 'beltoft-services' ),
 				),
 			)
 		);

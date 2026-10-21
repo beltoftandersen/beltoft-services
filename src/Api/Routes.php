@@ -205,11 +205,48 @@ final class Routes {
 			return self::error( 'beltoft_services_no_open', __( 'This service cannot be opened from here.', 'beltoft-services' ), 404 );
 		}
 
+		$location = self::safe_redirect( $url, (string) $driver->open_host( $resource ) );
+
+		if ( '' === $location ) {
+			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
+		}
+
 		$response = new \WP_REST_Response( null, 302 );
-		$response->header( 'Location', esc_url_raw( $url ) );
+		$response->header( 'Location', $location );
 		$response->header( 'Cache-Control', 'no-store' );
 
 		return $response;
+	}
+
+	/**
+	 * The URL when wp_validate_redirect() accepts it with only the driver's configured host
+	 * added to the allowed redirect hosts (for this check only), otherwise ''.
+	 *
+	 * @param string $url  URL from the driver.
+	 * @param string $host The driver's configured host.
+	 */
+	private static function safe_redirect( string $url, string $host ): string {
+		$host = strtolower( trim( $host ) );
+
+		if ( '' === $host || ! in_array( wp_parse_url( $url, PHP_URL_SCHEME ), array( 'https', 'http' ), true ) ) {
+			return '';
+		}
+
+		$allow = static function ( $hosts ) use ( $host ) {
+			$hosts   = is_array( $hosts ) ? $hosts : array();
+			$hosts[] = $host;
+			return $hosts;
+		};
+
+		add_filter( 'allowed_redirect_hosts', $allow );
+
+		try {
+			$location = wp_validate_redirect( wp_sanitize_redirect( $url ), '' );
+		} finally {
+			remove_filter( 'allowed_redirect_hosts', $allow );
+		}
+
+		return is_string( $location ) && '' !== $location && strtolower( (string) wp_parse_url( $location, PHP_URL_HOST ) ) === $host ? $location : '';
 	}
 
 	/**

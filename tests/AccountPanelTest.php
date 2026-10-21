@@ -121,6 +121,8 @@ final class AccountPanelTest extends TestCase {
 		$data = (string) wp_scripts()->get_data( 'beltoft-services-account', 'data' );
 		$this->assertStringContainsString( wp_create_nonce( 'wp_rest' ), $data );
 		$this->assertStringContainsString( 'beltoft-services/v1/resources/', $data );
+		$this->assertStringContainsString( 'admin-ajax.php', $data, 'Where a fresh REST nonce comes from (core action rest-nonce).' );
+		$this->assertStringContainsString( 'Your session has expired. Please reload the page.', $data );
 
 		unset( $wp->query_vars[ \BeltoftLicenses\Account\Endpoint::slug() ] );
 		wp_dequeue_script( 'beltoft-services-account' );

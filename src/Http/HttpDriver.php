@@ -263,7 +263,7 @@ final class HttpDriver implements Driver, Opens {
 			$url   = Routes::open_url( $r->id() );
 			$label = '' !== (string) $connection['open_label'] ? (string) $connection['open_label'] : __( 'Open', 'beltoft-services' );
 
-			echo '<p><a class="button woocommerce-button beltoft-services-http-open" href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $label ) . '</a></p>';
+			echo '<p><a class="button woocommerce-button beltoft-services-http-open" href="' . esc_url( $url ) . '" data-beltoft-services-open target="_blank" rel="noopener noreferrer">' . esc_html( $label ) . '</a></p>';
 		}
 
 		echo '</div>';
@@ -286,6 +286,18 @@ final class HttpDriver implements Driver, Opens {
 		$token   = Signer::open_token( $connection, $r->get( 'uuid' ), (string) ( $license['email'] ?? '' ), (string) ( $license['license_key'] ?? '' ) );
 
 		return str_replace( '{token}', rawurlencode( $token ), (string) $connection['open_url'] );
+	}
+
+	/**
+	 * The host of the connection's configured open URL, or null.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function open_host( Resource $r ): ?string {
+		$connection = $this->connection( $r );
+		$host       = $connection ? wp_parse_url( (string) $connection['open_url'], PHP_URL_HOST ) : null;
+
+		return is_string( $host ) && '' !== $host ? strtolower( $host ) : null;
 	}
 
 	/**

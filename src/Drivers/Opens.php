@@ -26,4 +26,13 @@ interface Opens {
 	 * @return string|null
 	 */
 	public function open_url( Resource $r ): ?string;
+
+	/**
+	 * The host open_url() may send customers to, as the admin configured it, or null when
+	 * none is configured. The open route redirects only to this host.
+	 *
+	 * @param Resource $r Resource.
+	 * @return string|null
+	 */
+	public function open_host( Resource $r ): ?string;
 }

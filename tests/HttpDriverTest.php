@@ -821,6 +821,8 @@ class HttpDriverTest extends TestCase {
 		// The page links to the open route; the token is made when the route is followed.
 		$this->assertStringNotContainsString( 'app.example.com', $html );
 		$this->assertStringContainsString( esc_url( \BeltoftServices\Api\Routes::open_url( $fresh->id() ) ), $html );
+		$this->assertStringContainsString( 'data-beltoft-services-open', $html, 'The script swaps in a fresh nonce on click.' );
+		$this->assertSame( 'app.example.com', $this->driver()->open_host( $fresh ) );
 
 		$this->assertSame( 1, preg_match( '#^https://app\.example\.com/open\?t=(.+)$#', (string) $this->driver()->open_url( $fresh ), $m ) );
 		$this->assertCount( $count, $this->http_calls(), 'Making the open URL makes no request.' );

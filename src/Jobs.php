@@ -267,7 +267,11 @@ final class Jobs {
 		$backoff  = Reconciler::BACKOFF;
 
 		if ( $result->is_retry() && $attempts <= count( $backoff ) ) {
-			$r->set( array_merge( $meta, array( 'act_attempts' => $attempts ) ) );
+			// Without the attempt stored the backoff would never run out: alert, never loop.
+			if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => $attempts ) ) ) ) {
+				Alerts::write_failed( $r, 'Resource could not be updated' );
+				return;
+			}
 
 			$delay = max( min( $result->delay(), $backoff[ count( $backoff ) - 1 ] ), $backoff[ $attempts - 1 ] );
 			self::queue_act( $r->id(), $action, $args, $delay );

@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Drivers\Opens;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Http\HttpDriver;
@@ -498,5 +499,106 @@ final class RoutesTest extends TestCase {
 		list( $resource, , $user ) = $this->resource();
 
 		$this->assertSame( 404, $this->request( 'GET', '/resources/' . $resource->id() . '/open', $user )->get_status() );
+	}
+
+	public function test_act_retry_alerts_when_its_bookkeeping_cannot_be_stored(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'act', StepResult::retry( 10, 'Busy' ) );
+
+		$table = \BeltoftLicenses\Install::tables()['activations'];
+		$break = static function ( $query ) use ( $table ) {
+			return 0 === strpos( ltrim( $query ), 'UPDATE `' . $table . '`' ) ? '' : $query;
+		};
+
+		add_filter( 'query', $break );
+		Jobs::act( $resource->id(), 'restart', array() );
+		remove_filter( 'query', $break );
+
+		$this->assertCount( 1, $driver->calls( 'act' ) );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'Resource could not be updated', $this->mails[0]['message'] );
+		$this->assertNotFalse( get_transient( 'beltoft_services_not_stored_' . $resource->id() ) );
+		$this->assertSame( array(), $this->queued( Jobs::ACT ), 'A write that fails never loops.' );
+	}
+
+	/**
+	 * Registers a fake driver that can be opened, answering the given URL and host.
+	 *
+	 * @param string      $url  What open_url() answers.
+	 * @param string|null $host What open_host() answers.
+	 * @return FakeDriver
+	 */
+	private function opener( string $url, ?string $host ): FakeDriver {
+		$driver = new class( 'fake' ) extends FakeDriver implements Opens {
+			/**
+			 * Answer of open_url().
+			 *
+			 * @var string
+			 */
+			public $url = '';
+
+			/**
+			 * Answer of open_host().
+			 *
+			 * @var string|null
+			 */
+			public $host = null;
+
+			public function open_url( Resource $r ): ?string {
+				return $this->url;
+			}
+
+			public function open_host( Resource $r ): ?string {
+				return $this->host;
+			}
+		};
+
+		$driver->url  = $url;
+		$driver->host = $host;
+
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) use ( $driver ) {
+				$drivers['fake'] = $driver;
+				return $drivers;
+			},
+			20
+		);
+
+		return $driver;
+	}
+
+	public function test_open_route_only_redirects_to_the_drivers_configured_host(): void {
+		list( $resource, , $user ) = $this->resource();
+
+		// Another host than the configured one.
+		$this->opener( 'https://evil.example.net/steal?t=abc', 'app.example.com' );
+		$this->assertSame( 403, $this->request( 'GET', '/resources/' . $resource->id() . '/open', $user )->get_status() );
+	}
+
+	public function test_open_route_refuses_unsafe_urls(): void {
+		list( $resource, , $user ) = $this->resource();
+
+		$this->opener( 'javascript:alert(1)', 'app.example.com' );
+		$this->assertSame( 403, $this->request( 'GET', '/resources/' . $resource->id() . '/open', $user )->get_status() );
+	}
+
+	public function test_open_route_refuses_when_the_driver_names_no_host(): void {
+		list( $resource, , $user ) = $this->resource();
+
+		$this->opener( 'https://app.example.com/open?t=abc', null );
+		$this->assertSame( 403, $this->request( 'GET', '/resources/' . $resource->id() . '/open', $user )->get_status() );
+	}
+
+	public function test_open_route_allows_the_configured_host_for_that_request_only(): void {
+		list( $resource, , $user ) = $this->resource();
+
+		$this->opener( 'https://app.example.com/open?t=abc', 'app.example.com' );
+		$response = $this->request( 'GET', '/resources/' . $resource->id() . '/open', $user );
+
+		$this->assertSame( 302, $response->get_status() );
+		$this->assertSame( 'https://app.example.com/open?t=abc', $response->get_headers()['Location'] );
+		$this->assertSame( '', wp_validate_redirect( 'https://app.example.com/x', '' ), 'The host is not allowed outside the request.' );
 	}
 }
