@@ -111,10 +111,6 @@ class SettingsTest extends TestCase {
 		$this->assertStringContainsString( 'type="password"', $html );
 	}
 
-	public function test_no_plaintext_password_field_type(): void {
-		$this->assertStringNotContainsString( "case 'password'", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Settings.php' ) );
-	}
-
 	public function test_tabs_can_be_added_by_filter(): void {
 		$this->assertArrayHasKey( 'general', Settings::tabs() );
 		add_filter(

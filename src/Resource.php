@@ -215,6 +215,25 @@ final class Resource {
 	}
 
 	/**
+	 * A state in words, translated.
+	 *
+	 * @param string $state State (see STATES).
+	 */
+	public static function state_label( string $state ): string {
+		$labels = array(
+			'requested'    => __( 'Requested', 'beltoft-services' ),
+			'provisioning' => __( 'Being set up', 'beltoft-services' ),
+			'ready'        => __( 'Ready', 'beltoft-services' ),
+			'paused'       => __( 'Paused', 'beltoft-services' ),
+			'deleting'     => __( 'Being removed', 'beltoft-services' ),
+			'deleted'      => __( 'Removed', 'beltoft-services' ),
+			'failed'       => __( 'Needs attention', 'beltoft-services' ),
+		);
+
+		return $labels[ $state ] ?? $state;
+	}
+
+	/**
 	 * Ids of the live resources of a kind.
 	 *
 	 * @param string $kind Activation kind.

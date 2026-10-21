@@ -580,4 +580,35 @@ final class AdminPanelTest extends TestCase {
 		$this->assertStringContainsString( esc_url( \BeltoftLicenses\Admin\Screen::url( array( 'license' => (int) $failed->license()['id'] ) ) ), $html );
 		$this->assertStringContainsString( 'Boom', $html );
 	}
+
+	public function test_state_names_are_translatable_in_the_list_and_the_panel(): void {
+		add_filter(
+			'gettext',
+			static function ( $translation, $text ) {
+				return 'Needs attention' === $text ? 'Kraever opmaerksomhed' : $translation;
+			},
+			10,
+			2
+		);
+
+		list( $failed ) = $this->resource( array( 'state' => 'failed', 'failed_op' => 'provision', 'last_error' => 'Boom' ) );
+		$this->admin();
+		set_current_screen( 'woocommerce_page_' . Screen::PAGE );
+		$_GET  = array();
+		$table = new ListTable();
+		$table->prepare_items();
+		ob_start();
+		$table->display();
+		$table->extra_tablenav( 'top' );
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '>Kraever opmaerksomhed<', $html, 'The state column and the filter option are translated.' );
+		$this->assertStringContainsString( 'value="failed"', $html, 'The filter value stays the state.' );
+
+		ob_start();
+		do_action( 'beltoft_licenses_admin_license', $failed->license() );
+		$this->assertStringContainsString( 'Kraever opmaerksomhed', (string) ob_get_clean() );
+
+		remove_all_filters( 'gettext' );
+	}
 }

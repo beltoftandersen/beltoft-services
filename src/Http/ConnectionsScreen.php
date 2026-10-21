@@ -148,6 +148,25 @@ final class ConnectionsScreen {
 	}
 
 	/**
+	 * An endpoint's name in words, translated.
+	 *
+	 * @param string $name Endpoint name (see Connections::ENDPOINTS).
+	 */
+	private static function endpoint_label( string $name ): string {
+		$labels = array(
+			'provision'   => __( 'Provision', 'beltoft-services' ),
+			'pause'       => __( 'Pause', 'beltoft-services' ),
+			'resume'      => __( 'Resume', 'beltoft-services' ),
+			'update_plan' => __( 'Update plan', 'beltoft-services' ),
+			'delete'      => __( 'Delete', 'beltoft-services' ),
+			'status'      => __( 'Status', 'beltoft-services' ),
+			'usage'       => __( 'Usage', 'beltoft-services' ),
+		);
+
+		return $labels[ $name ] ?? $name;
+	}
+
+	/**
 	 * Keeps a message for the next page load of this user.
 	 *
 	 * @param string $type    success, warning or error.
@@ -296,7 +315,7 @@ final class ConnectionsScreen {
 		self::row( 'timeout', __( 'Timeout in seconds', 'beltoft-services' ), (string) $c['timeout'] );
 
 		foreach ( Connections::ENDPOINTS as $name ) {
-			printf( '<tr><th scope="row">%s</th><td><select name="endpoints[%s][method]">', esc_html( $name ), esc_attr( $name ) );
+			printf( '<tr><th scope="row">%s</th><td><select name="endpoints[%s][method]">', esc_html( self::endpoint_label( $name ) ), esc_attr( $name ) );
 			foreach ( array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ) as $method ) {
 				printf( '<option value="%1$s" %2$s>%1$s</option>', esc_attr( $method ), selected( $c['endpoints'][ $name ]['method'], $method, false ) );
 			}

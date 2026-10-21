@@ -100,7 +100,7 @@ final class ListTable extends \WP_List_Table {
 
 		echo '<label class="screen-reader-text" for="bs-state">' . esc_html__( 'State', 'beltoft-services' ) . '</label><select id="bs-state" name="state"><option value="">' . esc_html__( 'All states', 'beltoft-services' ) . '</option>';
 		foreach ( Resource::STATES as $state ) {
-			printf( '<option value="%1$s" %2$s>%1$s</option>', esc_attr( $state ), selected( $filters['state'], $state, false ) );
+			printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $state ), selected( $filters['state'], $state, false ), esc_html( Resource::state_label( $state ) ) );
 		}
 		echo '</select>';
 
@@ -142,7 +142,7 @@ final class ListTable extends \WP_List_Table {
 				$driver = Registry::get( $item->get( 'driver' ) );
 				return esc_html( $driver ? $driver->label() : $item->get( 'driver' ) );
 			case 'state':
-				return esc_html( $item->get( 'state' ) );
+				return esc_html( Resource::state_label( (string) $item->get( 'state' ) ) );
 			case 'desired':
 				return esc_html( $item->get( 'desired' ) );
 			case 'attempts':

@@ -476,8 +476,8 @@ final class Panel {
 		$rows = array(
 			__( 'Driver', 'beltoft-services' )         => $driver ? $driver->label() : $r->get( 'driver' ) . ' ' . __( '(not available)', 'beltoft-services' ),
 			__( 'Identifier', 'beltoft-services' )     => $r->get( 'uuid' ),
-			__( 'State', 'beltoft-services' )          => $r->get( 'state' ),
-			__( 'Desired', 'beltoft-services' )        => $r->get( 'desired' ),
+			__( 'State', 'beltoft-services' )          => Resource::state_label( (string) $r->get( 'state' ) ),
+			__( 'Desired', 'beltoft-services' )        => Resource::state_label( (string) $r->get( 'desired' ) ),
 			__( 'Operation', 'beltoft-services' )      => (string) $r->get( 'op' ) . ( '' !== (string) $r->get( 'failed_op' ) ? ' (' . sprintf( /* translators: %s: operation. */ __( 'failed: %s', 'beltoft-services' ), (string) $r->get( 'failed_op' ) ) . ')' : '' ),
 			__( 'Attempts', 'beltoft-services' )       => (string) $r->get( 'attempts' ),
 			__( 'Next attempt', 'beltoft-services' )   => $next ? wp_date( $format, $next ) : '',

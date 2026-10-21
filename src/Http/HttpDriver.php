@@ -250,7 +250,7 @@ final class HttpDriver implements Driver, Opens {
 		$usage   = get_transient( self::usage_key( $r ) );
 
 		echo '<div class="beltoft-services-http">';
-		echo '<p class="beltoft-services-http-state"><strong>' . esc_html__( 'Status:', 'beltoft-services' ) . '</strong> ' . esc_html( self::state_label( $state ) ) . '</p>';
+		echo '<p class="beltoft-services-http-state"><strong>' . esc_html__( 'Status:', 'beltoft-services' ) . '</strong> ' . esc_html( Resource::state_label( $state ) ) . '</p>';
 
 		echo '<p class="beltoft-services-http-limit"><strong>' . esc_html__( 'Limit:', 'beltoft-services' ) . '</strong> ' . esc_html( (string) $limit ) . '</p>';
 
@@ -871,24 +871,5 @@ final class HttpDriver implements Driver, Opens {
 	 */
 	private static function usage_key( Resource $r ): string {
 		return 'beltoft_services_http_usage_' . $r->id();
-	}
-
-	/**
-	 * A state for customers.
-	 *
-	 * @param string $state State.
-	 */
-	private static function state_label( string $state ): string {
-		$labels = array(
-			'requested'    => __( 'Requested', 'beltoft-services' ),
-			'provisioning' => __( 'Being set up', 'beltoft-services' ),
-			'ready'        => __( 'Ready', 'beltoft-services' ),
-			'paused'       => __( 'Paused', 'beltoft-services' ),
-			'deleting'     => __( 'Being removed', 'beltoft-services' ),
-			'deleted'      => __( 'Removed', 'beltoft-services' ),
-			'failed'       => __( 'Needs attention', 'beltoft-services' ),
-		);
-
-		return $labels[ $state ] ?? $state;
 	}
 }
