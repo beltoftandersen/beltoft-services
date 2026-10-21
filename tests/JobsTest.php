@@ -122,7 +122,9 @@ final class JobsTest extends TestCase {
 		list( $resource, $driver ) = $this->resource();
 
 		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
-		$other->query( 'SELECT GET_LOCK( \'beltoft_services_' . $resource->id() . '\', 1 )' );
+		global $wpdb;
+		$held = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $resource->id() ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0], 'The second connection holds the lock.' );
 
 		$before = time();
 		Jobs::run( $resource->id() );
@@ -164,7 +166,7 @@ final class JobsTest extends TestCase {
 		$this->assertCount( 1, $this->pending( $resource->id() ) );
 
 		global $wpdb;
-		$this->assertSame( '1', $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK( %s )', 'beltoft_services_' . $resource->id() ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$this->assertSame( '1', $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK( %s )', \BeltoftServices\Locks::name( 'resource', $resource->id() ) ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	}
 
 	public function test_sweep_picks_up_due_retries(): void {

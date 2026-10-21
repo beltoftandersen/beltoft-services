@@ -232,7 +232,9 @@ final class ResourceTest extends TestCase {
 		list( $license, $driver ) = $this->setup_license();
 
 		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
-		$other->query( 'SELECT GET_LOCK( \'beltoft_services_license_' . (int) $license['id'] . '\', 1 )' );
+		global $wpdb;
+		$held = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'license', (int) $license['id'] ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0], 'The second connection holds the lock.' );
 
 		add_filter( 'beltoft_services_lock_timeout', '__return_zero' );
 		$result = Resource::create( $license, $driver, array() );

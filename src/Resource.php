@@ -153,7 +153,7 @@ final class Resource {
 	 * @param int $license_id License id.
 	 */
 	private static function lock_name( int $license_id ): string {
-		return 'beltoft_services_license_' . $license_id;
+		return Locks::name( 'license', $license_id );
 	}
 
 	/**

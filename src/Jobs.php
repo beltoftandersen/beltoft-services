@@ -134,7 +134,7 @@ final class Jobs {
 			return;
 		}
 
-		$lock = 'beltoft_services_' . $activation_id;
+		$lock = Locks::name( 'resource', $activation_id );
 
 		if ( ! self::acquire( $lock ) ) {
 			self::enqueue( $activation_id, self::LOCKED_DELAY );
