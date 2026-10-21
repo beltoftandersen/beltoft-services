@@ -23,7 +23,8 @@ defined( 'ABSPATH' ) || exit;
  * - created and active: the service is created and queued for provisioning;
  * - active again: ready (a license with no live service gets a new one);
  * - suspended, expired, revoked (or active but past its expiry): paused;
- * - sites, variation or product changed: a new plan snapshot, applied by update_plan.
+ * - sites, variation or product changed: a new plan snapshot, applied by update_plan; a
+ *   product with another driver replaces the service (deleted, then made anew).
  *
  * Every listener does nothing while beltoft-licenses imports.
  */
@@ -137,7 +138,8 @@ final class Lifecycle {
 	}
 
 	/**
-	 * Stores the license's current plan on its service and queues the update. The plan is
+	 * Stores the license's current plan on its service and queues the update. When the
+	 * product's driver is not the service's, the service is replaced instead. The plan is
 	 * read when this runs, so a retry always takes the latest one. When the resource lock
 	 * stays busy (a job is running), it is tried again a moment later in a job of its own.
 	 *
@@ -160,8 +162,18 @@ final class Lifecycle {
 		$product_id   = (int) ( $license['product_id'] ?? 0 );
 		$variation_id = (int) ( $license['variation_id'] ?? 0 );
 
+		$driver = Product::driver_for( $product_id );
+
+		// Another driver: the old service is deleted, and once that completes the reconciler
+		// creates a new one with the product's driver and plan (replace = true). The old
+		// driver never gets the new product's plan.
+		if ( $driver && $driver->id() !== $resource->get( 'driver' ) ) {
+			self::desire( $resource, 'deleted', sprintf( 'Product changed to another service driver (%s); the service is replaced', $driver->id() ), true );
+			return;
+		}
+
 		// A product that is no longer a service keeps the last plan; the sites may still change.
-		$plan = Product::driver_for( $product_id ) ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $resource->get( 'plan' );
+		$plan = $driver ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $resource->get( 'plan' );
 
 		$stored = $resource->change_plan( $plan, 'Plan changed' );
 
@@ -205,12 +217,13 @@ final class Lifecycle {
 	 * already done what is needed: queued the change for the lock (and the job), refused it
 	 * (a deletion is terminal, written to the history) or alerted that it could not be stored.
 	 *
-	 * @param Resource $r      Resource.
-	 * @param string   $state  ready or paused.
-	 * @param string   $reason History text.
+	 * @param Resource $r       Resource.
+	 * @param string   $state   ready, paused or deleted.
+	 * @param string   $reason  History text.
+	 * @param bool     $replace For deleted: a new service follows on an active license.
 	 */
-	private static function desire( Resource $r, string $state, string $reason ): void {
-		if ( $r->desire( $state, $reason ) ) {
+	private static function desire( Resource $r, string $state, string $reason, bool $replace = false ): void {
+		if ( $r->desire( $state, $reason, $replace ) ) {
 			Jobs::enqueue( $r->id() );
 		}
 	}

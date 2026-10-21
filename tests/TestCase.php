@@ -98,10 +98,11 @@ abstract class TestCase extends \WP_UnitTestCase {
 	 * Creates a FakeDriver and registers it through the beltoft_services_drivers filter for
 	 * the current test (WP_UnitTestCase restores the hooks afterwards).
 	 *
+	 * @param string $id Driver id (and kind); 'fake' by default.
 	 * @return FakeDriver
 	 */
-	protected function fake_driver(): FakeDriver {
-		$fake = new FakeDriver();
+	protected function fake_driver( string $id = 'fake' ): FakeDriver {
+		$fake = new FakeDriver( $id );
 
 		add_filter(
 			'beltoft_services_drivers',

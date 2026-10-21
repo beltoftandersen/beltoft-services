@@ -391,4 +391,50 @@ final class LifecycleTest extends TestCase {
 		$this->assertFalse( $fresh->get( 'plan_dirty' ) );
 		$this->assertCount( $calls, $this->driver->calls() );
 	}
+
+	public function test_switch_to_another_driver_replaces_the_service(): void {
+		$other = $this->fake_driver( 'fake2' );
+
+		list( $license, $resource ) = $this->provisioned();
+		$product                    = $this->service_product( 'fake2', array(), array( 'slug' => 'other-service' ) );
+
+		Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+
+		$this->assertSame( 'deleted', $this->fresh( $resource )->get( 'desired' ) );
+		$this->assertTrue( $this->fresh( $resource )->get( 'replace_after_delete' ) );
+		$this->assertFalse( $this->fresh( $resource )->get( 'plan_dirty' ), 'The old service never gets the new plan.' );
+
+		$this->run_jobs();
+
+		$old = $this->fresh( $resource );
+		$this->assertSame( 'deleted', $old->get( 'state' ) );
+		$this->assertFalse( $old->is_live() );
+		$this->assertCount( 1, $this->driver->calls( 'delete' ) );
+		$this->assertSame( array(), $this->driver->calls( 'update_plan' ) );
+
+		$new = Resource::for_license( (int) $license['id'] );
+		$this->assertNotNull( $new );
+		$this->assertNotSame( $resource->id(), $new->id() );
+		$this->assertSame( 'fake2', $new->get( 'driver' ) );
+		$this->assertSame( Product::plan( $product->get_id() ), $new->get( 'plan' ) );
+		$this->assertSame( 'ready', $new->get( 'state' ) );
+		$this->assertCount( 1, $other->calls( 'provision' ) );
+		$this->assertSame( array(), $other->calls( 'delete' ) );
+	}
+
+	public function test_switch_to_a_product_with_the_same_driver_updates_the_plan(): void {
+		list( $license, $resource ) = $this->provisioned();
+		$product                    = $this->service_product( 'fake', array(), array( 'slug' => 'bigger-service' ) );
+
+		Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+		$this->run_jobs();
+
+		$fresh = $this->fresh( $resource );
+		$this->assertTrue( $fresh->is_live() );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertCount( 1, $this->driver->calls( 'update_plan' ) );
+		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
+		$this->assertCount( 1, $this->driver->calls( 'provision' ) );
+	}
 }

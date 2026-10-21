@@ -53,6 +53,22 @@ class FakeDriver implements Driver {
 	public $customer_actions = array();
 
 	/**
+	 * Driver id (also its kind).
+	 *
+	 * @var string
+	 */
+	private $id;
+
+	/**
+	 * A fake driver with its own id, so a test can register two.
+	 *
+	 * @param string $id Driver id and kind.
+	 */
+	public function __construct( string $id = 'fake' ) {
+		$this->id = $id;
+	}
+
+	/**
 	 * Scripts the result of an operation. Several calls queue results in order; the last one
 	 * repeats.
 	 *
@@ -110,7 +126,7 @@ class FakeDriver implements Driver {
 	}
 
 	public function id(): string {
-		return 'fake';
+		return $this->id;
 	}
 
 	public function label(): string {
@@ -118,7 +134,7 @@ class FakeDriver implements Driver {
 	}
 
 	public function kind(): string {
-		return 'fake';
+		return $this->id;
 	}
 
 	public function unit_label( int $used, int $max ): string {
