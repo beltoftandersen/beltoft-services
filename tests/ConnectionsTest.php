@@ -44,7 +44,7 @@ class ConnectionsTest extends TestCase {
 				'label'     => 'Service',
 				'base_url'  => 'https://api.example.com/',
 				'auth'      => 'hmac',
-				'secret'    => 'hunter2',
+				'secret'    => 'hunter2-long-secret',
 				'timeout'   => '15',
 				'endpoints' => array(
 					'provision' => array( 'method' => 'post', 'path' => '/tenants' ),
@@ -111,9 +111,9 @@ class ConnectionsTest extends TestCase {
 		$this->assertTrue( Connections::save( 's', $this->input() ) );
 
 		$raw = (string) wp_json_encode( get_option( Connections::OPTION ) );
-		$this->assertStringNotContainsString( 'hunter2', $raw );
+		$this->assertStringNotContainsString( 'hunter2-long-secret', $raw );
 		$this->assertStringStartsWith( 'bs1:', Connections::all()['s']['secret'] );
-		$this->assertSame( 'hunter2', Crypto::decrypt( Connections::all()['s']['secret'] ) );
+		$this->assertSame( 'hunter2-long-secret', Crypto::decrypt( Connections::all()['s']['secret'] ) );
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$_GET = array( 'edit' => 's' );
@@ -123,7 +123,7 @@ class ConnectionsTest extends TestCase {
 		$_GET = array();
 		$this->assertStringContainsString( 'name="secret"', $form );
 		$this->assertStringContainsString( 'type="password"', $form );
-		$this->assertStringNotContainsString( 'hunter2', $form );
+		$this->assertStringNotContainsString( 'hunter2-long-secret', $form );
 		$this->assertStringNotContainsString( 'bs1:', $form );
 
 		ob_start();
@@ -139,11 +139,11 @@ class ConnectionsTest extends TestCase {
 
 		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => '', 'label' => 'Renamed' ) ) ) );
 		$this->assertSame( $before, Connections::all()['s']['secret'] );
-		$this->assertSame( 'hunter2', Connections::get( 's' )['secret'] );
+		$this->assertSame( 'hunter2-long-secret', Connections::get( 's' )['secret'] );
 		$this->assertSame( 'Renamed', Connections::get( 's' )['label'] );
 
-		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => 'new-secret' ) ) ) );
-		$this->assertSame( 'new-secret', Connections::get( 's' )['secret'] );
+		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => 'new-secret-123456' ) ) ) );
+		$this->assertSame( 'new-secret-123456', Connections::get( 's' )['secret'] );
 	}
 
 	public function test_secret_is_required_and_an_empty_field_keeps_the_saved_one(): void {
@@ -152,17 +152,83 @@ class ConnectionsTest extends TestCase {
 		foreach ( array( 'hmac', 'header' ) as $auth ) {
 			$over = array( 'secret' => '', 'auth' => $auth, 'header_static' => 'X-Api-Key' );
 			$this->assertTrue( Connections::save( 's', $over + $this->input() ), $auth );
-			$this->assertSame( 'hunter2', Connections::get( 's' )['secret'], 'An empty field keeps the saved secret.' );
+			$this->assertSame( 'hunter2-long-secret', Connections::get( 's' )['secret'], 'An empty field keeps the saved secret.' );
 		}
 
 		// There is no way to clear a secret: a stray remove_secret field changes nothing.
 		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => '', 'remove_secret' => '1' ) ) ) );
-		$this->assertSame( 'hunter2', Connections::get( 's' )['secret'] );
+		$this->assertSame( 'hunter2-long-secret', Connections::get( 's' )['secret'] );
 
-		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => 'fresh' ) ) ) );
-		$this->assertSame( 'fresh', Connections::get( 's' )['secret'] );
+		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => 'fresh-secret-12345' ) ) ) );
+		$this->assertSame( 'fresh-secret-12345', Connections::get( 's' )['secret'] );
 
 		$this->assertInstanceOf( \WP_Error::class, Connections::save( 'new', $this->input( array( 'secret' => '' ) ) ), 'no secret at all' );
+	}
+
+	public function test_a_new_secret_needs_at_least_16_characters(): void {
+		$short = Connections::save( 's', $this->input( array( 'secret' => '123456789012345' ) ) );
+		$this->assertInstanceOf( \WP_Error::class, $short );
+		$this->assertSame( 'beltoft_services_connection_secret_short', $short->get_error_code() );
+		$this->assertArrayNotHasKey( 's', Connections::all() );
+
+		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => '1234567890123456' ) ) ) );
+
+		// An empty field keeps a saved (older, shorter) secret.
+		$this->assertTrue( Connections::save( 's', $this->input( array( 'secret' => '' ) ) ) );
+		$this->assertSame( '1234567890123456', Connections::get( 's' )['secret'] );
+	}
+
+	public function test_warnings_for_urls_the_safe_request_refuses(): void {
+		foreach ( array( 'https://api.example.com', 'https://api.example.com:443/v1', 'https://api.example.com:8080', 'http://10.0.0.2:3000' ) as $url ) {
+			$this->assertSame( array(), Connections::warnings( $url ), $url );
+		}
+
+		foreach ( array( 'https://api.example.com:8443', 'https://api.example.com:9000/x', 'https://localhost', 'https://localhost:443', 'https://LOCALHOST/v1' ) as $url ) {
+			$this->assertCount( 1, Connections::warnings( $url ), $url );
+		}
+
+		// The warning shows after a save that still succeeds.
+		$target = $this->post_save( $this->input( array( 'base_url' => 'https://api.example.com:8443' ) ) );
+		$this->assertNotSame( '', $target );
+		$this->assertCount( 1, Connections::all(), 'Saved all the same.' );
+		$notice = get_transient( 'beltoft_services_conn_notice_' . get_current_user_id() );
+		$this->assertSame( 'warning', $notice[0] );
+		$this->assertStringContainsString( 'Connection saved', $notice[1] );
+		$this->assertStringContainsString( '8443', $notice[1] );
+	}
+
+	public function test_a_connection_in_use_by_a_product_is_not_deleted(): void {
+		Connections::save( 's', $this->input() );
+		$this->service_product( 'http', array(), array( 'connection' => 's' ) );
+		$this->service_product( 'http', array(), array( 'connection' => 's', 'slug' => 'other' ) );
+
+		$this->assertSame( 2, Connections::in_use( 's' ) );
+		$this->assertFalse( Connections::delete( 's' ) );
+		$this->assertNotNull( Connections::get( 's' ) );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$_POST    = array(
+			'connection_id' => 's',
+			'_wpnonce'      => wp_create_nonce( 'beltoft_services_delete_connection' ),
+		);
+		$_REQUEST = $_POST;
+		add_filter(
+			'wp_redirect',
+			static function ( $location ) {
+				throw new \RuntimeException( $location ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			}
+		);
+		try {
+			ConnectionsScreen::handle_delete();
+		} catch ( \RuntimeException $e ) {
+			$this->assertNotSame( '', $e->getMessage() );
+		}
+		remove_all_filters( 'wp_redirect' );
+
+		$notice = get_transient( 'beltoft_services_conn_notice_' . get_current_user_id() );
+		$this->assertSame( 'error', $notice[0] );
+		$this->assertStringContainsString( '2', $notice[1] );
+		$this->assertNotNull( Connections::get( 's' ) );
 	}
 
 	public function test_header_auth_needs_a_header_name_and_a_secret(): void {
@@ -170,7 +236,7 @@ class ConnectionsTest extends TestCase {
 
 		$this->assertTrue( Connections::save( 'h', $this->input( $header ) ) );
 		$this->assertSame( 'X-Api-Key', Connections::get( 'h' )['header_static'] );
-		$this->assertSame( 'hunter2', Connections::get( 'h' )['secret'] );
+		$this->assertSame( 'hunter2-long-secret', Connections::get( 'h' )['secret'] );
 
 		$this->assertInstanceOf( \WP_Error::class, Connections::save( 'h2', $this->input( array( 'auth' => 'header' ) ) ), 'no header name' );
 		$this->assertInstanceOf( \WP_Error::class, Connections::save( 'h2', $this->input( array( 'auth' => 'header', 'header_static' => 'X Key: v' ) ) ), 'bad name' );
@@ -192,7 +258,7 @@ class ConnectionsTest extends TestCase {
 		$this->assertTrue( Connections::save( 's', $this->input() ) );
 
 		$found = apply_filters( 'beltoft_services_connection', null, 's' );
-		$this->assertSame( 'hunter2', $found['secret'] );
+		$this->assertSame( 'hunter2-long-secret', $found['secret'] );
 		$this->assertSame( 'https://api.example.com', $found['base_url'] );
 		$this->assertNull( apply_filters( 'beltoft_services_connection', null, 'missing' ) );
 	}
@@ -206,24 +272,60 @@ class ConnectionsTest extends TestCase {
 
 	public function test_tab_is_listed_and_handlers_refuse_non_admins(): void {
 		$this->assertArrayHasKey( 'connections', Settings::tabs() );
+		Connections::save( 's', $this->input() );
 
+		// A valid nonce, so only the capability check can refuse.
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
-		$_POST = array( 'label' => 'X' );
 
-		$this->expectException( \WPDieException::class );
-		ConnectionsScreen::handle_save();
+		$_POST = array(
+			'label'    => 'X',
+			'_wpnonce' => wp_create_nonce( 'beltoft_services_save_connection' ),
+		);
+		try {
+			ConnectionsScreen::handle_save();
+			$this->fail( 'A subscriber must not save.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertCount( 1, Connections::all() );
+		}
+
+		$_POST = array(
+			'connection_id' => 's',
+			'_wpnonce'      => wp_create_nonce( 'beltoft_services_delete_connection' ),
+		);
+		try {
+			ConnectionsScreen::handle_delete();
+			$this->fail( 'A subscriber must not delete.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertNotNull( Connections::get( 's' ) );
+		}
 	}
 
 	public function test_handlers_need_a_valid_nonce(): void {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
-		$_POST = array( 'connection_id' => 's' );
 		Connections::save( 's', $this->input() );
 
+		$_POST = array( 'connection_id' => 's' );
 		try {
 			ConnectionsScreen::handle_delete();
 			$this->fail( 'A request without a nonce must die.' );
 		} catch ( \WPDieException $e ) {
 			$this->assertNotNull( Connections::get( 's' ) );
+		}
+
+		$_POST = $this->input( array( 'connection_id' => 's', 'label' => 'Changed' ) );
+		try {
+			ConnectionsScreen::handle_save();
+			$this->fail( 'A save without a nonce must die.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertSame( 'Service', Connections::get( 's' )['label'] );
+		}
+
+		$_POST = $this->input( array( 'connection_id' => 's', 'label' => 'Changed', '_wpnonce' => wp_create_nonce( 'beltoft_services_delete_connection' ) ) );
+		try {
+			ConnectionsScreen::handle_save();
+			$this->fail( 'A nonce for another action must not pass.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertSame( 'Service', Connections::get( 's' )['label'] );
 		}
 	}
 

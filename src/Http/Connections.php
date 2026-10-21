@@ -8,6 +8,7 @@
 namespace BeltoftServices\Http;
 
 use BeltoftServices\Crypto;
+use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -19,6 +20,11 @@ defined( 'ABSPATH' ) || exit;
 final class Connections {
 
 	public const OPTION = 'beltoft_services_connections';
+
+	/**
+	 * Shortest new secret, in characters.
+	 */
+	public const MIN_SECRET = 16;
 
 	/**
 	 * Operations that can have an endpoint.
@@ -297,14 +303,39 @@ final class Connections {
 	}
 
 	/**
-	 * Deletes a connection.
+	 * How many products use a connection.
+	 *
+	 * @param string $id Connection id.
+	 */
+	public static function in_use( string $id ): int {
+		if ( '' === $id ) {
+			return 0;
+		}
+
+		$ids = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_key'       => Product::META_CONNECTION, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- a rare admin action.
+				'meta_value'     => $id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		);
+
+		return count( $ids );
+	}
+
+	/**
+	 * Deletes a connection. A connection a product uses is kept.
 	 *
 	 * @param string $id Connection id.
 	 */
 	public static function delete( string $id ): bool {
 		$all = self::all();
 
-		if ( ! isset( $all[ $id ] ) ) {
+		if ( ! isset( $all[ $id ] ) || self::in_use( $id ) > 0 ) {
 			return false;
 		}
 
@@ -312,6 +343,38 @@ final class Connections {
 		update_option( self::OPTION, $all, false );
 
 		return true;
+	}
+
+	/**
+	 * Warnings about a base URL that is accepted but that wp_safe_remote_request() will
+	 * refuse: localhost, or a port other than the safe ones (80, 443, 8080, filterable with
+	 * core's `http_allowed_safe_ports`). A private or loopback IP literal is not refused: the
+	 * driver sends that host's requests unsafe on purpose.
+	 *
+	 * @param string $base_url Base URL.
+	 * @return string[]
+	 */
+	public static function warnings( string $base_url ): array {
+		$host = strtolower( trim( (string) wp_parse_url( $base_url, PHP_URL_HOST ), '[]' ) );
+		$port = wp_parse_url( $base_url, PHP_URL_PORT );
+
+		if ( '' === $host || ( false !== filter_var( $host, FILTER_VALIDATE_IP ) && self::is_private_host( $host ) ) ) {
+			return array();
+		}
+
+		if ( 'localhost' === $host ) {
+			return array( __( 'localhost is refused by WordPress\'s safe HTTP requests, so calls to this connection will fail. Use a public host name, or a private IP address.', 'beltoft-services' ) );
+		}
+
+		/** This filter is documented in wp-includes/http.php */
+		$safe = (array) apply_filters( 'http_allowed_safe_ports', array( 80, 443, 8080 ), $host, $base_url );
+
+		if ( null !== $port && ! in_array( (int) $port, array_map( 'intval', $safe ), true ) ) {
+			/* translators: %d: port number. */
+			return array( sprintf( __( 'Port %d is refused by WordPress\'s safe HTTP requests (only 80, 443 and 8080 are allowed), so calls to this connection will fail. Use one of those ports, or allow it with the http_allowed_safe_ports filter.', 'beltoft-services' ), (int) $port ) );
+		}
+
+		return array();
 	}
 
 	/**
@@ -492,6 +555,11 @@ final class Connections {
 		$new = trim( (string) ( $input['secret'] ?? '' ) );
 
 		if ( '' !== $new ) {
+			if ( strlen( $new ) < self::MIN_SECRET ) {
+				/* translators: %d: minimum length. */
+				return new \WP_Error( 'beltoft_services_connection_secret_short', sprintf( __( 'A new secret needs at least %d characters.', 'beltoft-services' ), self::MIN_SECRET ) );
+			}
+
 			if ( ! Crypto::available() ) {
 				return new \WP_Error( 'beltoft_services_no_key', __( 'Add BELTOFT_SERVICES_KEY to wp-config.php before saving secrets.', 'beltoft-services' ) );
 			}

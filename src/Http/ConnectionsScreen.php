@@ -106,7 +106,14 @@ final class ConnectionsScreen {
 			exit;
 		}
 
-		self::flash( 'success', __( 'Connection saved.', 'beltoft-services' ) );
+		$warnings = Connections::warnings( (string) Connections::all()[ $id ]['base_url'] );
+
+		if ( array() === $warnings ) {
+			self::flash( 'success', __( 'Connection saved.', 'beltoft-services' ) );
+		} else {
+			self::flash( 'warning', __( 'Connection saved.', 'beltoft-services' ) . ' ' . implode( ' ', $warnings ) );
+		}
+
 		wp_safe_redirect( self::url() );
 		exit;
 	}
@@ -119,8 +126,21 @@ final class ConnectionsScreen {
 
 		$id = isset( $_POST['connection_id'] ) ? sanitize_key( wp_unslash( $_POST['connection_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified in authorise().
 
-		if ( Connections::delete( $id ) ) {
+		$products = Connections::in_use( $id );
+
+		if ( $products > 0 ) {
+			self::flash(
+				'error',
+				sprintf(
+					/* translators: %d: number of products. */
+					_n( 'This connection is used by %d product. Choose another connection on that product first.', 'This connection is used by %d products. Choose another connection on those products first.', $products, 'beltoft-services' ),
+					$products
+				)
+			);
+		} elseif ( Connections::delete( $id ) ) {
 			self::flash( 'success', __( 'Connection deleted.', 'beltoft-services' ) );
+		} else {
+			self::flash( 'error', __( 'The connection could not be deleted. It may be gone already.', 'beltoft-services' ) );
 		}
 
 		wp_safe_redirect( self::url() );
@@ -130,7 +150,7 @@ final class ConnectionsScreen {
 	/**
 	 * Keeps a message for the next page load of this user.
 	 *
-	 * @param string $type    success or error.
+	 * @param string $type    success, warning or error.
 	 * @param string $message Message.
 	 */
 	private static function flash( string $type, string $message ): void {
@@ -149,7 +169,9 @@ final class ConnectionsScreen {
 		}
 
 		delete_transient( $key );
-		printf( '<div class="notice notice-%1$s"><p>%2$s</p></div>', 'error' === $flash[0] ? 'error' : 'success', esc_html( (string) $flash[1] ) );
+		$type = in_array( $flash[0], array( 'error', 'warning' ), true ) ? $flash[0] : 'success';
+
+		printf( '<div class="notice notice-%1$s"><p>%2$s</p></div>', esc_attr( $type ), esc_html( (string) $flash[1] ) );
 	}
 
 	/**
