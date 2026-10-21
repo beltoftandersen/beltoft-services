@@ -509,4 +509,48 @@ final class LifecycleTest extends TestCase {
 		$this->assertCount( 1, $this->driver->calls( 'pause' ) );
 		$this->assertContains( 'License expired', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $license['id'] ), 'message' ) );
 	}
+
+	public function test_expiry_changes_while_the_lock_is_held_end_with_the_newest(): void {
+		list( $license, $resource ) = $this->provisioned();
+
+		global $wpdb;
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $resource->id() ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		Licenses::update( (int) $license['id'], array( 'expires_at' => time() - 60 ) );
+		$this->assertSame( 'paused', $this->fresh( $resource )->pending_desire()['state'] );
+
+		Licenses::update( (int) $license['id'], array( 'expires_at' => null ) );
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		$other->close();
+
+		$this->assertSame( 'ready', $this->fresh( $resource )->pending_desire()['state'], 'The newer desire is queued.' );
+
+		$this->run_jobs();
+
+		$fresh = $this->fresh( $resource );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( array(), $this->driver->calls( 'pause' ) );
+	}
+
+	public function test_driver_conflict_alerts_again_after_the_driver_matched_again(): void {
+		$this->fake_driver( 'fake2' );
+		list( $license, $resource ) = $this->provisioned();
+		$resource->set( array( 'protected' => true ) );
+		$original = (int) $license['product_id'];
+		$product  = $this->service_product( 'fake2', array(), array( 'slug' => 'other-service' ) );
+
+		Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+		$this->assertCount( 1, $this->mails );
+		$this->assertNotFalse( get_option( \BeltoftServices\Lifecycle::CONFLICT_PREFIX . $resource->id() ) );
+
+		Licenses::update( (int) $license['id'], array( 'product_id' => $original ) );
+		$this->assertFalse( get_option( \BeltoftServices\Lifecycle::CONFLICT_PREFIX . $resource->id() ), 'Cleared once the driver matches.' );
+
+		Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+		$this->assertCount( 2, $this->mails, 'A later conflict alerts again.' );
+	}
 }

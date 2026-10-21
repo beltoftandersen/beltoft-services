@@ -145,10 +145,13 @@ final class Lifecycle {
 			return;
 		}
 
-		$want    = $active ? 'ready' : 'paused';
-		$desired = $resource->get( 'desired' );
+		$want = $active ? 'ready' : 'paused';
 
-		// A deletion is terminal; the same desired state needs nothing.
+		// Compared with what will apply: a desired state waiting for the lock is newer than the
+		// stored one. A deletion is terminal; the same desired state needs nothing.
+		$pending = $resource->pending_desire();
+		$desired = $pending ? $pending['state'] : $resource->get( 'desired' );
+
 		if ( 'deleted' === $desired || $want === $desired ) {
 			return;
 		}
@@ -214,6 +217,11 @@ final class Lifecycle {
 				self::driver_conflict( $license, $resource, $product_id );
 			}
 			return;
+		}
+
+		// The driver matches (again): a later conflict is alerted again.
+		if ( $driver ) {
+			delete_option( self::CONFLICT_PREFIX . $resource->id() );
 		}
 
 		// A product that is no longer a service keeps the last plan; the sites may still change.
