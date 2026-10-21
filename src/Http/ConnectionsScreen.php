@@ -74,11 +74,21 @@ final class ConnectionsScreen {
 		$id   = sanitize_key( (string) ( $post['connection_id'] ?? '' ) );
 		$new  = '' === $id;
 
+		if ( ! $new && ! isset( Connections::all()[ $id ] ) ) {
+			self::flash( 'error', __( 'That connection no longer exists. It may have been deleted in another tab.', 'beltoft-services' ) );
+			wp_safe_redirect( self::url() );
+			exit;
+		}
+
 		if ( $new ) {
 			$id = sanitize_key( (string) ( $post['new_id'] ?? '' ) );
 
 			if ( '' === $id ) {
-				$id = sanitize_key( sanitize_title( (string) ( $post['label'] ?? '' ) ) );
+				$label = (string) ( $post['label'] ?? '' );
+				$slug  = sanitize_title( $label );
+
+				// A label with no plain letters or numbers gives an encoded slug: use a short hash instead.
+				$id = ( '' === $slug || false !== strpos( $slug, '%' ) ) ? 'connection-' . substr( md5( $label ), 0, 8 ) : sanitize_key( $slug );
 			}
 
 			if ( isset( Connections::all()[ $id ] ) ) {
@@ -264,7 +274,7 @@ final class ConnectionsScreen {
 		self::row( 'header_timestamp', __( 'Timestamp header', 'beltoft-services' ), $c['header_timestamp'] );
 		self::row( 'header_tenant', __( 'Tenant header', 'beltoft-services' ), $c['header_tenant'] );
 		self::row( 'header_signature', __( 'Signature header', 'beltoft-services' ), $c['header_signature'] );
-		self::row( 'header_static', __( 'Static header value', 'beltoft-services' ), $c['header_static'], __( 'Used with static header authentication.', 'beltoft-services' ) );
+		self::row( 'header_static', __( 'Header name', 'beltoft-services' ), $c['header_static'], __( 'Static header authentication: the name of the header. The secret is sent as its value.', 'beltoft-services' ) );
 		self::row( 'timeout', __( 'Timeout in seconds', 'beltoft-services' ), (string) $c['timeout'] );
 
 		foreach ( Connections::ENDPOINTS as $name ) {

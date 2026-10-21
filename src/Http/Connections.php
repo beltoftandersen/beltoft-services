@@ -207,7 +207,17 @@ final class Connections {
 			$clean[ $key ] = $name;
 		}
 
-		$clean['header_static'] = sanitize_text_field( (string) ( $input['header_static'] ?? '' ) );
+		$static = trim( (string) ( $input['header_static'] ?? '' ) );
+
+		if ( '' !== $static && ! preg_match( '/^[A-Za-z0-9-]{1,64}$/', $static ) ) {
+			return new \WP_Error( 'beltoft_services_connection_header', __( 'The header name may contain letters, numbers and dashes only.', 'beltoft-services' ) );
+		}
+
+		if ( 'header' === $clean['auth'] && '' === $static ) {
+			return new \WP_Error( 'beltoft_services_connection_header', __( 'Header authentication needs a header name.', 'beltoft-services' ) );
+		}
+
+		$clean['header_static'] = $static;
 
 		$timeout = isset( $input['timeout'] ) && '' !== $input['timeout'] ? (int) $input['timeout'] : 10;
 
@@ -275,8 +285,8 @@ final class Connections {
 			return $secret;
 		}
 
-		if ( 'hmac' === $clean['auth'] && '' === $secret ) {
-			return new \WP_Error( 'beltoft_services_connection_secret', __( 'HMAC needs a secret.', 'beltoft-services' ) );
+		if ( '' === $secret ) {
+			return new \WP_Error( 'beltoft_services_connection_secret', __( 'A connection needs a secret: the HMAC key, or the value sent in the header.', 'beltoft-services' ) );
 		}
 
 		$clean['secret'] = $secret;
@@ -330,7 +340,7 @@ final class Connections {
 			&& in_array( strtolower( $parts['scheme'] ), array( 'http', 'https' ), true )
 			&& ! isset( $parts['user'] )
 			&& 1 === preg_match( '/^[A-Za-z0-9.:\[\]-]+$/', $parts['host'] )
-			&& 1 !== preg_match( '/\s/', $url );
+			&& 1 !== preg_match( '/[\s\\\\]/', $url );
 	}
 
 	/**
@@ -357,6 +367,11 @@ final class Connections {
 			$b = ord( $packed[1] );
 
 			return 10 === $a || 127 === $a || ( 172 === $a && $b >= 16 && $b <= 31 ) || ( 192 === $a && 168 === $b );
+		}
+
+		// IPv4-mapped (::ffff:a.b.c.d): judge the embedded address.
+		if ( str_repeat( "\0", 10 ) . "\xff\xff" === substr( $packed, 0, 12 ) ) {
+			return self::is_private_host( (string) inet_ntop( substr( $packed, 12 ) ) );
 		}
 
 		return $packed === str_repeat( "\0", 15 ) . "\1" || 0xfc === ( ord( $packed[0] ) & 0xfe );
@@ -391,7 +406,7 @@ final class Connections {
 	private static function clean_base_url( string $url ) {
 		$url = untrailingslashit( trim( $url ) );
 
-		if ( ! self::looks_like_url( $url ) ) {
+		if ( ! self::looks_like_url( $url ) || false !== strpbrk( $url, '#?' ) ) {
 			return new \WP_Error( 'beltoft_services_connection_url', __( 'Enter a valid base URL.', 'beltoft-services' ) );
 		}
 
