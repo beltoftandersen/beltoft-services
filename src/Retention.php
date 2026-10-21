@@ -211,7 +211,7 @@ final class Retention {
 			 * @param Resource $r          The resource.
 			 * @param int      $deletes_at Unix time of the deletion.
 			 */
-			do_action( self::WARNING_HOOK, $r, $deletes_at );
+			do_action( 'beltoft_services_deletion_warning', $r, $deletes_at );
 		} catch ( \Throwable $e ) {
 			// One broken listener must not stop the run for every other service.
 			Events::add( (int) $r->license()['id'], 'service', 'A deletion warning listener failed.' );

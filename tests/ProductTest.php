@@ -273,6 +273,61 @@ class ProductTest extends TestCase {
 		$this->assertStringContainsString( 'gone (unavailable)', $html );
 	}
 
+	/**
+	 * Renders the Service tab of a product.
+	 *
+	 * @param \WC_Product $product Product.
+	 */
+	private function panel_html( \WC_Product $product ): string {
+		include_once WC_ABSPATH . 'includes/admin/wc-meta-box-functions.php';
+		$GLOBALS['product_object'] = $product;
+		ob_start();
+		Product::panel();
+		$html = (string) ob_get_clean();
+		unset( $GLOBALS['product_object'] );
+
+		return $html;
+	}
+
+	public function test_a_saved_service_product_has_no_not_a_service_option(): void {
+		$this->fake_driver();
+
+		$new = $this->panel_html( new \WC_Product_Simple() );
+		$this->assertStringContainsString( 'Not a service', $new );
+
+		$product = wc_get_product( $this->service_product()->get_id() );
+		$html    = $this->panel_html( $product );
+		$this->assertStringNotContainsString( 'Not a service', $html, 'The way out is the "No longer a service" checkbox.' );
+		$this->assertStringContainsString( Product::FIELD_RELEASE, $html );
+	}
+
+	public function test_the_connection_is_a_select_of_the_saved_connections(): void {
+		$this->fake_driver();
+		$key = base64_encode( random_bytes( 32 ) );
+		add_filter( 'beltoft_services_key', fn() => $key );
+		\BeltoftServices\Http\Connections::save(
+			'main-api',
+			array(
+				'label'     => 'Main API',
+				'base_url'  => 'https://api.example.com',
+				'auth'      => 'hmac',
+				'secret'    => 'a-long-enough-secret',
+				'endpoints' => array( 'provision' => array( 'method' => 'POST', 'path' => '/t' ) ),
+			)
+		);
+
+		$product = wc_get_product( $this->service_product( 'fake', array(), array( 'connection' => 'old-gone' ) )->get_id() );
+		$html    = $this->panel_html( $product );
+
+		$this->assertMatchesRegularExpression( '/<select[^>]+name="' . preg_quote( Product::META_CONNECTION, '/' ) . '"/', $html );
+		$this->assertStringContainsString( 'value="main-api"', $html );
+		$this->assertStringContainsString( 'Main API', $html );
+		$this->assertMatchesRegularExpression( '/<option value="old-gone"[^>]*selected[^>]*>[^<]*old-gone[^<]*missing/', $html, 'A saved id that no longer exists stays selectable, marked missing.' );
+
+		remove_all_filters( 'beltoft_services_key' );
+		delete_option( \BeltoftServices\Http\Connections::OPTION );
+	}
+
 	public function test_save_without_the_service_panel_changes_nothing(): void {
 		$this->fake_driver();
 		$product = $this->service_product( 'fake', array(), array( 'retention' => 30, 'connection' => 'main', 'trial_requires_payment' => 'no' ) );

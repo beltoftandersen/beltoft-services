@@ -9,6 +9,7 @@ namespace BeltoftServices;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Http\Connections;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -337,7 +338,13 @@ final class Product {
 
 		$product   = $product_object instanceof \WC_Product ? $product_object : null;
 		$driver_id = $product ? (string) $product->get_meta( self::META_DRIVER ) : '';
-		$options   = array( '' => __( 'Not a service', 'beltoft-services' ) );
+		$options   = array();
+
+		// Once saved as a service, the only way out is the "No longer a service" checkbox: an
+		// empty choice would be ignored on save.
+		if ( '' === $driver_id ) {
+			$options[''] = __( 'Not a service', 'beltoft-services' );
+		}
 
 		foreach ( Registry::all() as $id => $driver ) {
 			$options[ $id ] = $driver->label();
@@ -360,13 +367,26 @@ final class Product {
 				'value'       => $driver_id,
 			)
 		);
-		woocommerce_wp_text_input(
+		$connection  = $product ? (string) $product->get_meta( self::META_CONNECTION ) : '';
+		$connections = array( '' => __( '— None —', 'beltoft-services' ) );
+
+		foreach ( Connections::all() as $id => $saved_connection ) {
+			$connections[ $id ] = '' === (string) $saved_connection['label'] ? $id : sprintf( '%1$s (%2$s)', $saved_connection['label'], $id );
+		}
+
+		if ( '' !== $connection && ! isset( $connections[ $connection ] ) ) {
+			/* translators: %s: connection id. */
+			$connections[ $connection ] = sprintf( __( '%s (missing)', 'beltoft-services' ), $connection );
+		}
+
+		woocommerce_wp_select(
 			array(
 				'id'          => self::META_CONNECTION,
 				'label'       => __( 'Connection', 'beltoft-services' ),
-				'description' => __( 'The connection id (HTTP driver only).', 'beltoft-services' ),
+				'description' => __( 'The connection to use (HTTP driver only). Add connections under Settings → Services → Connections.', 'beltoft-services' ),
 				'desc_tip'    => true,
-				'value'       => $product ? $product->get_meta( self::META_CONNECTION ) : '',
+				'options'     => $connections,
+				'value'       => $connection,
 			)
 		);
 		woocommerce_wp_text_input(
@@ -502,7 +522,8 @@ final class Product {
 				if ( 'checkbox' === $type ) {
 					$product->update_meta_data( $name, isset( $_POST[ $name ] ) ? 'yes' : 'no' );
 				} elseif ( isset( $_POST[ $name ] ) ) {
-					$product->update_meta_data( $name, self::clean( $type, wp_unslash( $_POST[ $name ] ) ) );
+					$value = 'textarea' === $type ? sanitize_textarea_field( wp_unslash( $_POST[ $name ] ) ) : sanitize_text_field( wp_unslash( $_POST[ $name ] ) );
+					$product->update_meta_data( $name, self::finish( $type, $value ) );
 				}
 			}
 		}
@@ -510,19 +531,18 @@ final class Product {
 	}
 
 	/**
-	 * Sanitises a submitted plan value.
+	 * Finishes a plan value that was sanitised at the point of reading it: text is trimmed,
+	 * and a number field that is not numeric is empty.
 	 *
 	 * @param string $type  Field type.
-	 * @param mixed  $value Raw (unslashed) value.
+	 * @param string $value Sanitised value.
 	 */
-	private static function clean( string $type, $value ): string {
-		$value = is_scalar( $value ) ? (string) $value : '';
-
+	private static function finish( string $type, string $value ): string {
 		if ( 'textarea' === $type ) {
-			return sanitize_textarea_field( $value );
+			return $value;
 		}
 
-		$value = trim( sanitize_text_field( $value ) );
+		$value = trim( $value );
 
 		return 'number' === $type && '' !== $value && ! is_numeric( $value ) ? '' : $value;
 	}
@@ -596,14 +616,20 @@ final class Product {
 
 			$name = self::META_PLAN . $key;
 			$type = (string) ( $field[0] ?? 'text' );
-			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by WooCommerce (save-variations).
-			$raw = isset( $_POST[ $name ][ $i ] ) ? wp_unslash( $_POST[ $name ][ $i ] ) : '';
+			$raw  = '';
 
-			if ( 'checkbox' === $type ) {
-				$raw = in_array( $raw, array( 'yes', 'no' ), true ) ? $raw : '';
-			} else {
-				$raw = self::clean( $type, $raw );
+			// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified by WooCommerce (save-variations).
+			if ( isset( $_POST[ $name ][ $i ] ) ) {
+				if ( 'checkbox' === $type ) {
+					$raw = sanitize_key( wp_unslash( $_POST[ $name ][ $i ] ) );
+					$raw = in_array( $raw, array( 'yes', 'no' ), true ) ? $raw : '';
+				} elseif ( 'textarea' === $type ) {
+					$raw = self::finish( $type, sanitize_textarea_field( wp_unslash( $_POST[ $name ][ $i ] ) ) );
+				} else {
+					$raw = self::finish( $type, sanitize_text_field( wp_unslash( $_POST[ $name ][ $i ] ) ) );
+				}
 			}
+			// phpcs:enable
 
 			$variation->update_meta_data( $name, $raw );
 		}
