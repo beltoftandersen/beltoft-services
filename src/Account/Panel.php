@@ -197,7 +197,7 @@ final class Panel {
 			array(
 				'root'     => esc_url_raw( rest_url( Routes::NAMESPACE . '/resources/' ) ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),
-				'interval' => 5000,
+				'interval' => 10000,
 				'strings'  => array(
 					'queued'  => __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
 					'refused' => __( 'This is not available right now.', 'beltoft-services' ),

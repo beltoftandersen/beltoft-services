@@ -232,7 +232,8 @@ final class RoutesTest extends TestCase {
 		list( $resource, , $user ) = $this->resource();
 		$route                     = '/resources/' . $resource->id();
 
-		for ( $i = 0; $i < 10; $i++ ) {
+		// The status route allows 20 a minute: polling every 10 s never reaches it.
+		for ( $i = 0; $i < 20; $i++ ) {
 			$this->assertSame( 200, $this->request( 'GET', $route, $user )->get_status(), 'Request ' . ( $i + 1 ) );
 		}
 
@@ -240,9 +241,13 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( 429, $over->get_status() );
 		$this->assertArrayHasKey( 'Retry-After', $over->get_headers() );
 
-		// Another route of the same user, and the same route for another user, have their own count.
-		$this->assertSame( 202, $this->request( 'POST', $route . '/actions/restart', $user )->get_status() );
+		// Another route of the same user has its own count; the action route allows 10.
+		for ( $i = 0; $i < 10; $i++ ) {
+			$this->assertSame( 202, $this->request( 'POST', $route . '/actions/restart', $user )->get_status(), 'Action ' . ( $i + 1 ) );
+		}
+		$this->assertSame( 429, $this->request( 'POST', $route . '/actions/restart', $user )->get_status() );
 
+		// The same route for another user has its own count.
 		list( $second, , $other ) = $this->resource();
 		$this->assertSame( 200, $this->request( 'GET', '/resources/' . $second->id(), $other )->get_status() );
 	}

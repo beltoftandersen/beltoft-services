@@ -23,7 +23,8 @@ defined( 'ABSPATH' ) || exit;
  * - POST resources/<id>/actions/<action> → 202, queues the job beltoft_services_act
  * - GET  resources/<id>/open             → 302 to the service, signed at click time
  *
- * Logged-in users only (401 otherwise), each route rate limited per user (429). A user who
+ * Logged-in users only (401 otherwise), each route rate limited per user (429): 20 requests a
+ * minute for the status route, 10 for actions and Open. A user who
  * does not own the license (its user_id; a guest license matched by email is not enough),
  * a license that is not active, or a resource that is paused or on its way out gets 403
  * and nothing is queued. Actions and Open need a ready resource. No route calls the service:
@@ -34,9 +35,15 @@ final class Routes {
 	public const NAMESPACE = 'beltoft-services/v1';
 
 	/**
-	 * Requests per user, route and window, unless filtered.
+	 * Requests per user, route and window for actions and Open, unless filtered.
 	 */
 	public const RATE_LIMIT = 10;
+
+	/**
+	 * Requests per user, route and window for the status route, unless filtered: room for
+	 * the panel's polling (every 10 s) plus a reload or a second tab.
+	 */
+	public const STATUS_RATE_LIMIT = 20;
 
 	/**
 	 * Rate limit window in seconds.
@@ -123,7 +130,7 @@ final class Routes {
 	 * @return \WP_REST_Response
 	 */
 	public static function status( \WP_REST_Request $request ): \WP_REST_Response {
-		$resource = self::guard( $request, false );
+		$resource = self::guard( $request, false, self::STATUS_RATE_LIMIT );
 
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
@@ -153,7 +160,7 @@ final class Routes {
 	 * @return \WP_REST_Response
 	 */
 	public static function action( \WP_REST_Request $request ): \WP_REST_Response {
-		$resource = self::guard( $request, true );
+		$resource = self::guard( $request, true, self::RATE_LIMIT );
 
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
@@ -185,7 +192,7 @@ final class Routes {
 	 * @return \WP_REST_Response
 	 */
 	public static function open( \WP_REST_Request $request ): \WP_REST_Response {
-		$resource = self::guard( $request, true );
+		$resource = self::guard( $request, true, self::RATE_LIMIT );
 
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
@@ -210,12 +217,13 @@ final class Routes {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @param bool             $ready   Whether the resource must accept actions.
+	 * @param int              $limit   Default requests per minute for this route.
 	 * @return Resource|\WP_REST_Response The resource, or the refusal.
 	 */
-	private static function guard( \WP_REST_Request $request, bool $ready ) {
+	private static function guard( \WP_REST_Request $request, bool $ready, int $limit ) {
 		$user_id = get_current_user_id();
 
-		if ( self::exceeded( $user_id, (string) $request->get_route() ) ) {
+		if ( self::exceeded( $user_id, (string) $request->get_route(), $limit ) ) {
 			$response = self::error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ), 429 );
 			$response->header( 'Retry-After', (string) ( self::WINDOW - ( time() % self::WINDOW ) ) );
 
@@ -243,15 +251,16 @@ final class Routes {
 	 *
 	 * @param int    $user_id User id.
 	 * @param string $route   Request route (with the resource id).
+	 * @param int    $limit   Default limit of this route.
 	 */
-	private static function exceeded( int $user_id, string $route ): bool {
+	private static function exceeded( int $user_id, string $route, int $limit ): bool {
 		/**
 		 * Requests per minute a user may make to one customer route of one resource.
 		 *
-		 * @param int    $max   Requests, default 10.
+		 * @param int    $max   Requests: default 20 for the status route, 10 for actions and Open.
 		 * @param string $route Request route.
 		 */
-		$max = (int) apply_filters( 'beltoft_services_rest_rate_limit', self::RATE_LIMIT, $route );
+		$max = (int) apply_filters( 'beltoft_services_rest_rate_limit', $limit, $route );
 
 		if ( $max <= 0 ) {
 			return false;

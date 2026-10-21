@@ -2,7 +2,7 @@
  * My Account → Licenses: the service panels.
  *
  * Asks for each panel's state once (which also lets the server refresh usage in the
- * background), then every few seconds while the state differs from the desired one; once it
+ * background), then every 10 seconds while the state differs from the desired one; once it
  * settles the page reloads to show the service's controls. Action buttons queue the action.
  * Uses the WordPress REST API with the wp_rest nonce. No dependencies.
  */
@@ -79,7 +79,7 @@
 			if ( data.state !== data.desired && 'failed' !== data.state ) {
 				window.setTimeout( function () {
 					poll( panel );
-				}, parseInt( config.interval, 10 ) || 5000 );
+				}, parseInt( config.interval, 10 ) || 10000 );
 			} else if ( data.state !== first ) {
 				// Settled in a new state: the driver's part and the buttons change with it.
 				window.location.reload();
