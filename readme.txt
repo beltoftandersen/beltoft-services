@@ -80,7 +80,7 @@ Requests send and accept JSON (`Content-Type: application/json`, `Accept: applic
 * **2xx:** done. A provision answer must be a JSON object with the service's id in the connection's "remote id field" (`id` by default; a dotted path such as `data.id` works). Without the id, the call is retried and then fails: a service never counts as ready without its id.
 * **409 on provision**, with the id in the body: done (the service exists already). Without an id, it fails.
 * **404 on delete:** done (the service is gone already).
-* **408, 429 and 5xx**, and network errors: retried later. A `Retry-After` header (seconds or an HTTP date, at most one day) is honoured.
+* **408, 429 and 5xx**, and network errors: retried later. A `Retry-After` header (seconds or an HTTP date) is honoured, but the wait is never shorter than the current backoff step (1, 5 and 15 minutes, 1 hour, 4 hours) and never longer than 4 hours.
 * **Any other 4xx:** final. The service is marked failed and the admin gets an email.
 
 Provision, pause, update plan and delete need an endpoint. A missing resume endpoint counts as done.
@@ -99,7 +99,7 @@ Choose under Settings → Services, "Delete paused services after their retentio
 
 * **Off** (the default): paused services are never deleted.
 * **Report only:** the daily job writes in the license history what it would delete, and deletes nothing.
-* **On:** a service that has been paused for its product's retention period (Service tab, in days; 0 never deletes) is deleted. The customer is warned the set number of days before, and a deletion never comes before that warning has been given. A protected service, or one whose license is active again, is never deleted.
+* **On:** a service that has been paused for its product's retention period (Service tab, in days; 0 never deletes) is deleted. The customer is warned the set number of days before, and a deletion never comes before that warning has been given. With "Warn customers this many days before deletion" set to 0, no warning is sent. A protected service, or one whose license is active again, is never deleted.
 
 An admin can also delete a service from the license screen.
 

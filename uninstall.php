@@ -1,6 +1,6 @@
 <?php
 /**
- * Removes the plugin's options, but only when "Delete all data on uninstall" is on.
+ * Removes the plugin's options, but only when "Delete the settings when the plugin is deleted" is on.
  *
  * @package BeltoftServices
  */
