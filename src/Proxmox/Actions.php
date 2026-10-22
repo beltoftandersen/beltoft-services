@@ -124,6 +124,11 @@ final class Actions {
 			$out['reset_password'] = __( 'Reset password', 'beltoft-services' );
 		}
 
+		// An adopted machine keeps what it has: no key swap, no wipe.
+		if ( true === $r->get( 'linked' ) ) {
+			return $out;
+		}
+
 		$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
 		$out['reinstall']      = __( 'Reinstall', 'beltoft-services' );
 
@@ -176,6 +181,10 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
+		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall' ), true ) ) {
+			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
+		}
+
 		if ( 'replace_ssh_key' === $action && null === SshKeyField::normalise( $args['key'] ?? null ) ) {
 			return SshKeyField::invalid_message();
 		}

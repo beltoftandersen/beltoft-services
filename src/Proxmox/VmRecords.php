@@ -114,6 +114,53 @@ final class VmRecords {
 	}
 
 	/**
+	 * Records a machine that already exists (adopting it), under the allocation lock.
+	 *
+	 * @param int    $resource_id Activation id.
+	 * @param string $cluster     Cluster id.
+	 * @param string $node        Node it runs on.
+	 * @param int    $vmid        VMID.
+	 * @return bool False when the VMID is recorded for another resource or the insert failed.
+	 * @throws \RuntimeException When the allocation lock cannot be taken in time.
+	 */
+	public static function adopt( int $resource_id, string $cluster, string $node, int $vmid ): bool {
+		global $wpdb;
+
+		list( $locked, $done ) = Locks::with(
+			Locks::name( 'vmid', 0 ),
+			Locks::allocation_wait(),
+			static function () use ( $wpdb, $resource_id, $cluster, $node, $vmid ) {
+				if ( null !== self::for_resource( $resource_id ) || isset( self::for_cluster( $cluster )[ $vmid ] ) ) {
+					return false;
+				}
+
+				$suppress = $wpdb->suppress_errors( true );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the unique key is the backstop.
+				$inserted = $wpdb->insert(
+					Schema::tables()['vms'],
+					array(
+						'resource_id' => $resource_id,
+						'cluster'     => $cluster,
+						'node'        => $node,
+						'vmid'        => $vmid,
+						'created_at'  => gmdate( 'Y-m-d H:i:s' ),
+					),
+					array( '%d', '%s', '%s', '%d', '%s' )
+				);
+				$wpdb->suppress_errors( $suppress );
+
+				return (bool) $inserted;
+			}
+		);
+
+		if ( ! $locked ) {
+			throw new \RuntimeException( 'The VMID allocation is busy.' );
+		}
+
+		return (bool) $done;
+	}
+
+	/**
 	 * The record of a resource.
 	 *
 	 * @param int $resource_id Activation id.

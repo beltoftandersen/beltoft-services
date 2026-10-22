@@ -53,6 +53,7 @@ final class ProxmoxSettings {
 		if ( is_array( $tabs ) ) {
 			$tabs[ self::TAB ]             = __( 'Proxmox', 'beltoft-services' );
 			$tabs[ ClustersScreen::TAB ] = __( 'Proxmox clusters', 'beltoft-services' );
+			$tabs[ IpPoolScreen::TAB ]   = __( 'IP pool', 'beltoft-services' );
 		}
 
 		return $tabs;

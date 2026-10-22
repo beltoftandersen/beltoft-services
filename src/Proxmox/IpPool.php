@@ -205,6 +205,111 @@ final class IpPool {
 	}
 
 	/**
+	 * Gives one specific free address to a resource, as in use (adopting a machine that already
+	 * uses it). False when the address is not free.
+	 *
+	 * @throws \RuntimeException When the pool is busy (not "no": try again).
+	 *
+	 * @param string $address     Address.
+	 * @param int    $resource_id Activation id.
+	 */
+	public static function take( string $address, int $resource_id ): bool {
+		global $wpdb;
+
+		list( $locked, $taken ) = Locks::with(
+			Locks::name( 'ippool', 0 ),
+			Locks::allocation_wait(),
+			static function () use ( $wpdb, $address, $resource_id ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one statement.
+				return (int) $wpdb->query( $wpdb->prepare( "UPDATE %i SET state = 'assigned', resource_id = %d, updated_at = %s WHERE address = %s AND state = 'free' AND resource_id IS NULL", Schema::tables()['ips'], $resource_id, gmdate( 'Y-m-d H:i:s' ), $address ) );
+			}
+		);
+
+		if ( ! $locked ) {
+			throw new \RuntimeException( 'The IP pool is busy.' );
+		}
+
+		self::changed();
+
+		return 1 === $taken;
+	}
+
+	/**
+	 * The pool row of an address, or null.
+	 *
+	 * @param string $address Address.
+	 * @return ?array{id: int, address: string, prefix: int, gateway: ?string, state: string, resource_id: ?int}
+	 */
+	public static function find( string $address ): ?array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- must be fresh.
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE address = %s', Schema::tables()['ips'], $address ), ARRAY_A );
+
+		return is_array( $row ) ? self::shape( $row ) : null;
+	}
+
+	/**
+	 * Every address with the state of the resource that holds it, lowest first.
+	 *
+	 * @return array<int, array{id: int, address: string, prefix: int, gateway: ?string, state: string, resource_id: ?int, leftover: string}>
+	 */
+	public static function rows(): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- an admin list must be fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY INET_ATON(address) ASC LIMIT 5000', Schema::tables()['ips'] ), ARRAY_A );
+		$out  = array();
+
+		foreach ( (array) $rows as $row ) {
+			$shaped             = self::shape( $row );
+			$shaped['leftover'] = self::leftover( $shaped );
+			$out[]              = $shaped;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Why an address in use may be released by an admin: 'failed' (held by a resource that failed:
+	 * nothing was built) or 'closed' (the resource was closed, for instance by "Mark deleted", and
+	 * the machine may still exist). Empty for everything else.
+	 *
+	 * @param array<string, mixed> $row Shaped row.
+	 */
+	public static function leftover( array $row ): string {
+		if ( ! in_array( $row['state'], array( 'held', 'assigned' ), true ) || empty( $row['resource_id'] ) ) {
+			return '';
+		}
+
+		$activation = \BeltoftLicenses\Licenses::activation( (int) $row['resource_id'] );
+
+		if ( null === $activation || ! empty( $activation['deactivated_at'] ) ) {
+			return 'closed';
+		}
+
+		$resource = \BeltoftServices\Resource::find( (int) $row['resource_id'] );
+
+		return 'held' === $row['state'] && $resource && 'failed' === $resource->get( 'state' ) ? 'failed' : '';
+	}
+
+	/**
+	 * Releases the address of a failed or closed resource.
+	 *
+	 * @param string $address Address.
+	 * @return string The kind that was released ('failed' or 'closed'), or '' when this address is not a leftover.
+	 */
+	public static function release_leftover( string $address ): string {
+		foreach ( self::rows() as $row ) {
+			if ( $row['address'] === $address && '' !== $row['leftover'] ) {
+				return self::release( (int) $row['resource_id'] ) ? $row['leftover'] : '';
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Takes a free address out of circulation. False when there is no such free address (unknown,
 	 * or in use: an address in use cannot be blocked).
 	 *

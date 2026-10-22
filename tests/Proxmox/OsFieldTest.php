@@ -24,6 +24,10 @@ class OsFieldTest extends TestCase {
 	public function set_up(): void {
 		parent::set_up();
 
+		// These tests are about checkout fields, not stock (StockTest covers that).
+		add_filter( 'woocommerce_product_is_in_stock', '__return_true', 99 );
+		add_filter( 'woocommerce_is_purchasable', '__return_true', 99 );
+
 		$key = base64_encode( random_bytes( 32 ) );
 		add_filter( 'beltoft_services_key', fn() => $key );
 		delete_option( Clusters::OPTION );
@@ -38,6 +42,8 @@ class OsFieldTest extends TestCase {
 	}
 
 	public function tear_down(): void {
+		remove_filter( 'woocommerce_product_is_in_stock', '__return_true', 99 );
+		remove_filter( 'woocommerce_is_purchasable', '__return_true', 99 );
 		unset( $_POST[ OsField::POST_KEY ] );
 		remove_all_filters( 'beltoft_services_key' );
 		delete_option( Clusters::OPTION );

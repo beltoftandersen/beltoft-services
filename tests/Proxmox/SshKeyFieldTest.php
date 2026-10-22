@@ -21,7 +21,17 @@ use BeltoftServices\Tests\TestCase;
  */
 class SshKeyFieldTest extends TestCase {
 
+	public function set_up(): void {
+		parent::set_up();
+
+		// These tests are about checkout fields, not stock (StockTest covers that).
+		add_filter( 'woocommerce_product_is_in_stock', '__return_true', 99 );
+		add_filter( 'woocommerce_is_purchasable', '__return_true', 99 );
+	}
+
 	public function tear_down(): void {
+		remove_filter( 'woocommerce_product_is_in_stock', '__return_true', 99 );
+		remove_filter( 'woocommerce_is_purchasable', '__return_true', 99 );
 		unset( $_POST[ SshKeyField::POST_KEY ] );
 		remove_all_filters( 'beltoft_services_initial_meta' );
 		parent::tear_down();

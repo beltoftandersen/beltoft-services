@@ -11,6 +11,8 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\LinkVm;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -138,6 +140,180 @@ final class Commands {
 		Jobs::enqueue( $resource->id() );
 
 		\WP_CLI::success( sprintf( 'Linked license %d to remote id %s. The plan will be pushed once.', (int) $license['id'], $remote_id ) );
+	}
+
+	/**
+	 * Adds an address or a network to the IP pool as free (IPv4 only).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <ip|cidr>
+	 * : An address, or a network of /20 or smaller such as 192.0.2.8/29.
+	 *
+	 * [--gateway=<ip>]
+	 * : Gateway stored with each address (it must lie inside the network).
+	 *
+	 * @subcommand ip-pool-add
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function ip_pool_add( array $args, array $assoc_args ): void {
+		$added = IpPool::add( (string) ( $args[0] ?? '' ), isset( $assoc_args['gateway'] ) ? (string) $assoc_args['gateway'] : null );
+
+		if ( 0 === $added ) {
+			\WP_CLI::error( 'Nothing was added: give an IPv4 address or a network of /20 or smaller; addresses already in the pool are skipped.' );
+		}
+
+		\WP_CLI::success( sprintf( '%d address(es) added.', $added ) );
+	}
+
+	/**
+	 * Blocks a free address, so it is never handed out.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <ip>
+	 * : The address.
+	 *
+	 * [--unblock]
+	 * : Put a blocked address back into the pool instead.
+	 *
+	 * @subcommand ip-pool-block
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function ip_pool_block( array $args, array $assoc_args ): void {
+		$ip = (string) ( $args[0] ?? '' );
+
+		try {
+			$ok = ! empty( $assoc_args['unblock'] ) ? IpPool::unblock( $ip ) : IpPool::block( $ip );
+		} catch ( \RuntimeException $e ) {
+			\WP_CLI::error( 'The pool is busy; try again.' );
+		}
+
+		if ( ! $ok ) {
+			\WP_CLI::error( ! empty( $assoc_args['unblock'] ) ? sprintf( '%s is not a blocked address.', $ip ) : sprintf( '%s is not a free address of the pool.', $ip ) );
+		}
+
+		\WP_CLI::success( sprintf( '%1$s %2$s.', $ip, ! empty( $assoc_args['unblock'] ) ? 'unblocked' : 'blocked' ) );
+	}
+
+	/**
+	 * Lists the IP pool.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : table or json.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * @subcommand ip-pool-list
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function ip_pool_list( array $args, array $assoc_args ): void {
+		unset( $args );
+
+		$items = array();
+
+		foreach ( IpPool::rows() as $row ) {
+			$items[] = array(
+				'address'  => $row['address'],
+				'prefix'   => (string) $row['prefix'],
+				'gateway'  => (string) $row['gateway'],
+				'state'    => $row['state'],
+				'resource' => null === $row['resource_id'] ? '' : (string) $row['resource_id'],
+				'leftover' => $row['leftover'],
+			);
+		}
+
+		\WP_CLI\Utils\format_items( 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table', $items, array( 'address', 'prefix', 'gateway', 'state', 'resource', 'leftover' ) );
+	}
+
+	/**
+	 * Links a license to a virtual machine that already exists on a Proxmox cluster.
+	 *
+	 * Bookkeeping and the ownership tag only: it records the license as ready and protected, adds a
+	 * tag line to the machine's description and, when the cluster has a pool and the machine is in
+	 * none, adds it to that pool. It starts, stops, resizes and reconfigures nothing, and the plan is
+	 * not pushed. Calls: two reads, one or two writes. A dry run makes no call at all.
+	 *
+	 * A machine on another network (another bridge, an internal address) that is not in the pool
+	 * is adopted with --outside-pool: nothing about its network is touched. IPv4 only.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <license-id>
+	 * : The license id.
+	 *
+	 * --cluster=<id>
+	 * : Cluster id (Settings, Proxmox clusters).
+	 *
+	 * --node=<node>
+	 * : The node the machine runs on.
+	 *
+	 * --vmid=<id>
+	 * : The machine's VMID (inside the cluster's customer range).
+	 *
+	 * --ip=<ip>
+	 * : The machine's IPv4 address: a free address of the pool, or with --outside-pool one that is not in it.
+	 *
+	 * [--outside-pool]
+	 * : The address is not in the pool (another network).
+	 *
+	 * [--dry-run]
+	 * : Print the calls that would be made. Nothing is read, written or recorded.
+	 *
+	 * [--confirm=<text>]
+	 * : LINK:<vmid>. Required to change a machine on a live cluster.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp beltoft-services link-vm 12 --cluster=main --node=pve1 --vmid=200 --ip=192.0.2.10 --dry-run
+	 *     wp beltoft-services link-vm 12 --cluster=main --node=pve1 --vmid=200 --ip=192.0.2.10 --confirm=LINK:200
+	 *
+	 * @subcommand link-vm
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function link_vm( array $args, array $assoc_args ): void {
+		$result = LinkVm::run(
+			(int) ( $args[0] ?? 0 ),
+			array(
+				'cluster'      => (string) ( $assoc_args['cluster'] ?? '' ),
+				'node'         => (string) ( $assoc_args['node'] ?? '' ),
+				'vmid'         => (int) ( $assoc_args['vmid'] ?? 0 ),
+				'ip'           => (string) ( $assoc_args['ip'] ?? '' ),
+				'outside_pool' => ! empty( $assoc_args['outside-pool'] ),
+				'dry_run'      => ! empty( $assoc_args['dry-run'] ),
+				'confirm'      => (string) ( $assoc_args['confirm'] ?? '' ),
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+		}
+
+		foreach ( $result['lines'] as $line ) {
+			\WP_CLI::log( $line );
+		}
+
+		foreach ( $result['warnings'] as $warning ) {
+			\WP_CLI::warning( $warning );
+		}
+
+		if ( $result['linked'] ) {
+			\WP_CLI::success( 'Done.' );
+		}
 	}
 
 	/**
