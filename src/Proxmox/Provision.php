@@ -258,7 +258,16 @@ final class Provision {
 					: array( $base . '/status/stop', array() );
 				$done  = $this->run_task( 'wipe', 'POST', $call[0], $call[1], $phase );
 			} else {
-				$done = $this->run_task( 'wipe', 'DELETE', $base, array( 'purge' => 1 ), 'delete' );
+				$done = $this->run_task(
+					'wipe',
+					'DELETE',
+					$base,
+					array(
+						'purge'                      => 1,
+						'destroy-unreferenced-disks' => 1,
+					),
+					'delete'
+				);
 			}
 
 			if ( $done instanceof StepResult ) {
@@ -877,6 +886,8 @@ final class Provision {
 			}
 		}
 
+		Operations::remember_power( $this->r->id(), 'running' );
+
 		return array( 'agent' => $agent );
 	}
 
@@ -971,7 +982,7 @@ final class Provision {
 	 *
 	 * @param string $agent Property string.
 	 */
-	private static function agent_enabled( string $agent ): bool {
+	public static function agent_enabled( string $agent ): bool {
 		foreach ( '' === $agent ? array() : explode( ',', $agent ) as $token ) {
 			if ( '1' === $token || 'enabled=1' === $token ) {
 				return true;

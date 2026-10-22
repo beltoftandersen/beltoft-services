@@ -249,7 +249,7 @@ final class SshKeyField {
 	/**
 	 * The message for a refused key (the entry itself is never repeated).
 	 */
-	private static function invalid_message(): string {
+	public static function invalid_message(): string {
 		return __( 'The SSH public key is not valid. Paste the single line from your .pub file: ssh-ed25519, ecdsa-sha2-nistp256/384/521, or ssh-rsa with at least 3072 bits.', 'beltoft-services' );
 	}
 

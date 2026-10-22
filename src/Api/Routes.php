@@ -170,7 +170,27 @@ final class Routes {
 			return self::error( 'beltoft_services_unknown_action', __( 'This action is not available.', 'beltoft-services' ), 403 );
 		}
 
-		Jobs::queue_act( $resource->id(), $action, self::clean_args( $request['args'] ) );
+		$args = self::clean_args( $request['args'] );
+
+		/**
+		 * A driver's refusal of an action that is offered but whose arguments are not acceptable
+		 * (a missing confirmation, an invalid key), answered at once instead of by a background job.
+		 *
+		 * @param \WP_Error|null       $refusal  Null to accept; an error whose message is for the customer.
+		 * @param Resource             $resource Resource.
+		 * @param string               $action   Action name.
+		 * @param array<string, string> $args     Cleaned arguments.
+		 */
+		$refusal = apply_filters( 'beltoft_services_action_refusal', null, $resource, $action, $args );
+
+		if ( $refusal instanceof \WP_Error ) {
+			$data   = $refusal->get_error_data();
+			$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422;
+
+			return self::error( $refusal->get_error_code(), $refusal->get_error_message(), $status );
+		}
+
+		Jobs::queue_act( $resource->id(), $action, $args );
 
 		return new \WP_REST_Response(
 			array(

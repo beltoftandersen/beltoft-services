@@ -26,6 +26,11 @@ final class Access {
 	public const META_UNTIL  = 'reveal_until';
 
 	/**
+	 * Set while a reset password is stored but not yet applied to the VM: it cannot be revealed then.
+	 */
+	public const META_RESET = 'password_reset';
+
+	/**
 	 * Days the customer has to read the password.
 	 */
 	public const REVEAL_DAYS = 7;
@@ -88,6 +93,64 @@ final class Access {
 	}
 
 	/**
+	 * The password of a customer's "reset password": a new one, stored encrypted (and marked as
+	 * not yet applied) BEFORE it is sent anywhere. A retry of the same reset reuses the stored
+	 * one; a reset that was already finished always gets a new one. Call it from a driver step,
+	 * which runs under the resource lock. The plain password is returned for the requests that
+	 * send it, never stored, logged or put in an event.
+	 *
+	 * @param Resource $r Resource.
+	 * @return string The plain password.
+	 * @throws \RuntimeException When it cannot be stored (nothing is sent then).
+	 */
+	public static function reset_password( Resource $r ): string {
+		if ( $r->get( self::META_RESET ) ) {
+			$stored = $r->get( self::META_REVEAL );
+			$plain  = is_string( $stored ) && '' !== $stored ? Crypto::decrypt( $stored ) : null;
+
+			if ( null !== $plain && '' !== $plain ) {
+				return $plain;
+			}
+		}
+
+		$password  = self::generate_password();
+		$encrypted = Crypto::encrypt( $password );
+
+		if ( ! $r->set(
+			array(
+				self::META_REVEAL => $encrypted,
+				self::META_UNTIL  => time() + self::REVEAL_DAYS * DAY_IN_SECONDS,
+				self::META_RESET  => true,
+			)
+		) ) {
+			throw new \RuntimeException( 'The password could not be stored.' );
+		}
+
+		return $password;
+	}
+
+	/**
+	 * The reset password is on the VM: from now on the customer can reveal it.
+	 *
+	 * @param Resource $r Resource.
+	 * @return bool Whether it was stored.
+	 */
+	public static function finish_reset( Resource $r ): bool {
+		return $r->set( array( self::META_RESET => null ) );
+	}
+
+	/**
+	 * Is a password stored that the customer may still reveal?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function revealable( Resource $r ): bool {
+		$stored = $r->get( self::META_REVEAL );
+
+		return is_string( $stored ) && '' !== $stored && (int) $r->get( self::META_UNTIL ) >= time() && ! $r->get( self::META_RESET );
+	}
+
+	/**
 	 * Takes the password for its owner and wipes it, inside the resource lock so two requests
 	 * at once cannot both get it. It is wiped before it is returned: if the wipe cannot be
 	 * stored, nothing is revealed.
@@ -110,7 +173,8 @@ final class Access {
 
 				$stored = $r->get( self::META_REVEAL );
 
-				if ( ! is_string( $stored ) || '' === $stored ) {
+				// A reset password that is not on the VM yet would only lock the customer out.
+				if ( ! is_string( $stored ) || '' === $stored || $r->get( self::META_RESET ) ) {
 					return false;
 				}
 
@@ -155,6 +219,7 @@ final class Access {
 			array(
 				self::META_REVEAL => '',
 				self::META_UNTIL  => 0,
+				self::META_RESET  => null,
 			)
 		);
 	}

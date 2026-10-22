@@ -52,6 +52,36 @@ final class Operations {
 		$this->r = $r;
 	}
 
+	/**
+	 * The last status kept for a resource (set by status(), by the customer's power actions and
+	 * when a build ends), or null. Reading it makes no Proxmox call.
+	 *
+	 * @param int $resource_id Resource id.
+	 * @return array{power: string, cpu: float, mem: int}|null
+	 */
+	public static function cached_status( int $resource_id ): ?array {
+		$status = get_transient( self::STATUS_PREFIX . $resource_id );
+
+		return is_array( $status ) && isset( $status['power'] ) ? $status : null;
+	}
+
+	/**
+	 * Remembers the power state (keeps the other values of an earlier status).
+	 *
+	 * @param int    $resource_id Resource id.
+	 * @param string $power       running or stopped.
+	 */
+	public static function remember_power( int $resource_id, string $power ): void {
+		$status = self::cached_status( $resource_id ) ?? array(
+			'cpu' => 0.0,
+			'mem' => 0,
+		);
+
+		$status['power'] = $power;
+
+		set_transient( self::STATUS_PREFIX . $resource_id, $status, HOUR_IN_SECONDS );
+	}
+
 	// -- Pause -----------------------------------------------------------------------------------
 
 	/**

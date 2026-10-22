@@ -216,9 +216,7 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function customer_actions( Resource $r ): array {
-		unset( $r );
-
-		return array();
+		return Actions::offered( $r );
 	}
 
 	/**
@@ -229,9 +227,7 @@ class ProxmoxDriver implements Driver {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public function act( Resource $r, string $action, array $args ): StepResult {
-		unset( $r, $action, $args );
-
-		return StepResult::fail( 'This action is not available' );
+		return ( new Actions( $r ) )->run( $action, $args );
 	}
 
 	/**
@@ -240,7 +236,7 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function render_account( Resource $r ): void {
-		unset( $r );
+		Panels::account( $r );
 	}
 
 	/**
@@ -249,6 +245,6 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function render_admin( Resource $r ): void {
-		unset( $r );
+		Panels::admin( $r );
 	}
 }

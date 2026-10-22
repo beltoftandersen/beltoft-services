@@ -164,6 +164,17 @@ final class Panel {
 
 		$actions = $resource->accepts_actions() ? $driver->customer_actions( $resource ) : array();
 
+		/**
+		 * The actions that get a generic button. The generic script posts no arguments, so a driver
+		 * removes the actions that need some (a typed confirmation, a key) and draws their forms in
+		 * render_account() itself.
+		 *
+		 * @param array<string, string> $actions  Action name => label.
+		 * @param Resource              $resource Resource.
+		 */
+		$buttons = apply_filters( 'beltoft_services_account_buttons', $actions, $resource );
+		$actions = is_array( $buttons ) ? array_intersect_key( $buttons, $actions ) : $actions;
+
 		if ( $actions ) {
 			echo '<p class="beltoft-services-panel__actions">';
 			foreach ( $actions as $name => $label ) {
@@ -196,6 +207,13 @@ final class Panel {
 		if ( apply_filters( 'beltoft_services_account_css', true ) ) {
 			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/account.css', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION );
 		}
+
+		/**
+		 * Lets a driver add its own script or style to the panel page.
+		 *
+		 * @param string $handle Handle of the generic panel script, which a driver script depends on.
+		 */
+		do_action( 'beltoft_services_account_assets', self::HANDLE );
 
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION, true );
 		wp_localize_script(
