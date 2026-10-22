@@ -11,7 +11,8 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 - An HTTP API driver: signed requests, idempotency keys, a JSON body template, usage, and an "Open" sign-in link. More drivers through the `beltoft_services_drivers` filter.
 - A Service tab on products, one free trial per customer, a My Account panel, WooCommerce → Services, a Service panel on each license, customer emails.
 - A kill switch, and deletion after a retention period (off by default, report only, or on).
-- WP-CLI: `wp beltoft-services link-http` and `wp beltoft-services status`.
+- A Proxmox VE driver (0.2.0): virtual machines cloned from templates, with an IP pool, SSH key or one-time password, an operating system choice, capacity limits, customer actions and abuse, breach and deletion modes. A built-in fake cluster is used until you switch a cluster live.
+- WP-CLI: `wp beltoft-services link-http`, `link-vm`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
 
 ## Setup
 
@@ -19,6 +20,58 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 2. Settings → Services: the alert address and a connection.
 3. On a licensed product, the Service tab: driver, connection and plan.
 4. In Beltoft Licenses' settings, turn on "Check expiry every hour".
+
+## Proxmox VE
+
+**Proxmox is production: nothing talks to a real one until you enable it.** Clusters are "fake" (a built-in model of the API) until `define( 'BELTOFT_SERVICES_PROXMOX_LIVE', true );` is in `wp-config.php`, the site tag is set, and the cluster's client is set to "live". No filter or setting replaces the constant. A stored live cluster with no site tag is left alone (jobs wait, one alert a day), never faked.
+
+### Setup
+
+1. A dedicated pool and a privilege-separated token. Grant the same role to the user and the token (a privsep token gets the intersection), on the pool, the templates, the storages, the bridge's SDN zone and the nodes. Privilege names are from the PVE 9.2 docs; check them against your version.
+
+   ```
+   pveum pool add beltoft-customers
+   pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit"
+   pveum user add svc@pve
+   pveum user token add svc@pve beltoft --privsep 1
+   pveum acl modify /pool/beltoft-customers --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices
+   pveum acl modify /vms/<template id> --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices
+   pveum acl modify /storage/<storage id> --users svc@pve --tokens 'svc@pve!beltoft' --roles PVEDatastoreUser
+   pveum acl modify /sdn/zones/localnetwork --users svc@pve --tokens 'svc@pve!beltoft' --roles PVESDNUser
+   pveum acl modify /nodes/<node> --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices
+   ```
+
+2. Settings → Services → Proxmox: the site tag (written into every VM's description as `beltoft-services:<tag>:<service id>`; only tagged VMs in the customer VMID range that are recorded for the service are ever changed or deleted).
+3. Settings → Services → Proxmox clusters: API URL, token, nodes, storages, bridge, pool, boot disk, templates (`VMID = label`, one default), VMID range, nameservers, prefix, gateway.
+4. Settings → Services → IP pool, or `wp beltoft-services ip-pool-add 192.0.2.160/29`. IPv4 only in 0.2.0.
+5. A licensed product, Service tab: driver Proxmox, cluster, template, cores, memory, disk.
+
+### TLS
+
+Verified by default. For a self-signed or private-CA certificate give the **CA file** (absolute path) or a **SHA-256 public key pin** (`openssl x509 -in pve-ssl.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64`; needs PHP curl pinning, and a request is refused if it cannot be applied). The certificate must name the host used in the API URL.
+
+### Operating system
+
+Each cluster lists its templates and a default (for example Ubuntu 26.04). A required "Operating system" select at checkout (classic and block) and again on reinstall chooses one; a cart with several clusters accepts only templates all of them list. The product's template is the fallback.
+
+### Network
+
+`ip=<address>/<cluster prefix>,gw=<cluster gateway>`. Routed set-up: prefix 32 and the host's address as the gateway, which need not be inside the pool (pool `192.0.2.160/29`, gateway `198.51.100.1`). A gateway on a pool row must be inside that row's network.
+
+### Capacity
+
+A node is full when the configured memory of this site's VMs on it (including recorded VMs not yet listed) plus the host reserve ("Memory kept free on each node", default 4 GB) reaches the node's memory. Other machines on the node are covered only by the reserve. Counted hourly, on cluster save and on activation; products show as out of stock when nothing fits. An order that slips through retries, then fails with an admin alert and a "delay" email and notice to the customer.
+
+### Deletion, abuse and breach
+
+- Deletion: off (default), report only, or on; a VM product defaults to 3 days retention, cancelled subscriptions follow it.
+- Abuse (sustained high CPU): off, report only (default) or pause. Linked VMs are never paused.
+- Suspend for breach: holds the VM paused (no customer start, renewal resume or reinstall), deleted after 14 days by default when deletion is on; the license keeps a breach mark, cleared only by "Create the service" with `CLEAR BREACH`.
+- Disputes and chargebacks are manual (see below).
+
+### link-vm
+
+`wp beltoft-services link-vm <license-id> --cluster=<id> --node=<node> --vmid=<vmid> --ip=<ip> [--outside-pool] [--dry-run] [--confirm=LINK:<vmid>]` records an existing VM as the license's ready, protected service and adds the ownership tag. It starts, stops, resizes and reconfigures nothing. `--outside-pool` adopts a machine on another network whose address is not in the pool. `--dry-run` prints the calls and makes none; a live cluster needs `--confirm=LINK:<vmid>`.
 
 ## HTTP signature
 
