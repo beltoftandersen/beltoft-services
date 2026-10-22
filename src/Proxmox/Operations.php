@@ -63,13 +63,13 @@ final class Operations {
 		$steps  = (array) $this->r->get( 'steps' );
 
 		if ( null === $record ) {
-			return $this->record_gone() ?? StepResult::done( array( 'task' => null ) );
+			return $this->record_gone() ?? StepResult::done( array( 'task' => null, 'was_running' => null ) );
 		}
 
 		$pending = is_array( $task ) && ! empty( $task['upid'] );
 
 		if ( ! in_array( 'clone', $steps, true ) && ! $pending ) {
-			return StepResult::done(); // Nothing was built: nothing to switch off.
+			return StepResult::done( array( 'was_running' => null ) ); // Nothing was built: nothing to switch off.
 		}
 
 		$early = $this->prepare( $record );
@@ -86,12 +86,13 @@ final class Operations {
 		}
 
 		if ( ! in_array( 'clone', $steps, true ) ) {
-			return StepResult::done( array( 'task' => null ) );
+			return StepResult::done( array( 'task' => null, 'was_running' => null ) );
 		}
 
 		$out = $this->power_or_delete( $record, 'pause', false );
 
-		return $out instanceof StepResult ? $out : StepResult::done( array( 'task' => null ) );
+		// A pause that supersedes an interrupted plan change ends that change: the VM stays off.
+		return $out instanceof StepResult ? $out : StepResult::done( array( 'task' => null, 'was_running' => null ) );
 	}
 
 	/**
@@ -357,7 +358,18 @@ final class Operations {
 				return $this->classify( $answer, 'update' );
 			}
 
-			$this->progressed = true; // The new cores and memory are written.
+			// Progress only when the VM now reports the new values (a write that changed nothing is no progress).
+			$check = $this->verified( $record, 'update' );
+
+			if ( $check instanceof StepResult ) {
+				return $check;
+			}
+
+			if ( (int) ( $check['config']['cores'] ?? 0 ) !== (int) ( $v['config']['cores'] ?? 0 ) || (int) ( $check['config']['memory'] ?? 0 ) !== (int) ( $v['config']['memory'] ?? 0 ) ) {
+				$this->progressed = true;
+			}
+
+			$v = $check;
 		}
 
 		if ( $grow ) {
@@ -406,6 +418,11 @@ final class Operations {
 	 * @param array<string, mixed> $record VM record.
 	 */
 	private function restore( array $record ): void {
+		// A pause or a delete asked for since: the VM must stay off (or go), whatever it did before.
+		if ( in_array( (string) $this->r->get( 'desired' ), array( 'paused', 'deleted' ), true ) ) {
+			return;
+		}
+
 		$v = Ownership::verify( $this->client, $record, $this->r );
 
 		if ( ! is_wp_error( $v ) && 'running' !== $v['status'] ) {

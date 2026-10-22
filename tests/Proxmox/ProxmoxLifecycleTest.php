@@ -43,6 +43,27 @@ class QuickLifecycleDriver extends ProxmoxDriver {
 }
 
 /**
+ * A fake cluster that can be told to swallow config writes.
+ */
+class ScriptableLifecycleClient extends FakeClient {
+
+	/**
+	 * Accept PUT config without applying it.
+	 *
+	 * @var bool
+	 */
+	public $deaf_config = false;
+
+	public function request( string $method, string $path, array $params = array() ) {
+		if ( $this->deaf_config && 'PUT' === strtoupper( $method ) && 1 === preg_match( '#/config$#', $path ) ) {
+			return null;
+		}
+
+		return parent::request( $method, $path, $params );
+	}
+}
+
+/**
  * The operations after provisioning, against the fake cluster.
  */
 class ProxmoxLifecycleTest extends TestCase {
@@ -52,7 +73,7 @@ class ProxmoxLifecycleTest extends TestCase {
 	/**
 	 * The fake cluster.
 	 *
-	 * @var FakeClient
+	 * @var ScriptableLifecycleClient
 	 */
 	private $fake;
 
@@ -91,7 +112,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		delete_option( Clusters::OPTION );
 		$this->settings( array( 'task_wait' => 5 ) );
 
-		$this->fake = new FakeClient();
+		$this->fake = new ScriptableLifecycleClient();
 		add_filter( 'beltoft_services_proxmox_client', fn() => $this->fake );
 
 		$this->driver = new QuickLifecycleDriver();
@@ -811,6 +832,64 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertEmpty( Resource::find( $id )->get( 'was_running' ) );
 	}
 
+	public function test_a_failed_update_does_not_restart_a_vm_when_a_pause_or_delete_is_wanted(): void {
+		IpPool::add( '192.0.2.12' );
+
+		foreach ( array( 'paused', 'deleted' ) as $desired ) {
+			$r = $this->built();
+			$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $r->get( 'vmid' ) . '/status/stop' );
+			$this->assertSame( 'stopped', $this->fake->vm( (int) $r->get( 'vmid' ) )['status'] );
+			$r->set( array( 'was_running' => true, 'failed_op' => 'update_plan', 'desired' => $desired ) );
+			$starts = count( $this->calls( 'POST', '/status/start' ) );
+
+			Operations::on_state_changed( Resource::find( $r->id() ), 'ready', 'failed' );
+
+			$this->assertSame( $starts, count( $this->calls( 'POST', '/status/start' ) ), 'No start while ' . $desired . ' is wanted.' );
+			$this->assertSame( 'stopped', $this->fake->vm( (int) $r->get( 'vmid' ) )['status'] );
+		}
+
+		// Control: with nothing wanted, it is started again.
+		$r = $this->built();
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $r->get( 'vmid' ) . '/status/stop' );
+		$r->set( array( 'was_running' => true, 'failed_op' => 'update_plan' ) );
+
+		Operations::on_state_changed( Resource::find( $r->id() ), 'ready', 'failed' );
+
+		$this->assertSame( 'running', $this->fake->vm( (int) $r->get( 'vmid' ) )['status'] );
+	}
+
+	public function test_a_pause_that_supersedes_an_interrupted_update_clears_was_running(): void {
+		$r = $this->built();
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $r->get( 'vmid' ) . '/status/stop' );
+		$r->set( array( 'was_running' => true ) );
+
+		$result = $this->op( 'pause', $r );
+
+		$this->assertTrue( $result->is_done() );
+		$this->assertArrayHasKey( 'was_running', $result->meta() );
+		$this->assertNull( $result->meta()['was_running'], 'The result clears the marker.' );
+	}
+
+	public function test_a_config_write_that_changed_nothing_is_not_progress(): void {
+		$r = $this->built();
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $r->get( 'vmid' ) . '/status/stop' );
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 4 ) ) ) );
+
+		// A cluster that accepts the write but keeps its values: the re-read shows no change.
+		$this->fake->deaf_config = true;
+		$first                   = $this->driver->update_plan( Resource::find( $r->id() ) );
+
+		$this->assertTrue( $first->is_retry() );
+		$this->assertFalse( $first->has_progress(), 'A write that changed nothing is no progress.' );
+
+		// The same write that does take effect counts.
+		$this->fake->deaf_config = false;
+		$second                  = $this->driver->update_plan( Resource::find( $r->id() ) );
+
+		$this->assertTrue( $second->is_done() || $second->has_progress() );
+		$this->assertSame( 4, (int) $this->fake->vm( (int) $r->get( 'vmid' ) )['config']['cores'] );
+	}
+
 	public function test_a_switch_between_variations_is_checked_by_the_variation_disk(): void {
 		Switches::register();
 		$product = $this->service_product(
@@ -868,7 +947,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $resource->id() );
 
 		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
-		$this->assertLessThanOrEqual( 7, count( $this->calls( 'POST', '/clone' ) ), 'A failing task is not progress: the budget ends it.' );
+		$this->assertSame( 6, count( $this->calls( 'POST', '/clone' ) ), 'A failing task is not progress: the budget ends it.' );
 	}
 
 	public function test_a_shutdown_that_fails_every_time_in_pause_and_update_ends_in_fail(): void {
@@ -885,7 +964,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $resource->id() );
 
 		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
-		$this->assertLessThanOrEqual( 40, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
+		$this->assertSame( 18, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 
 		// The same for a plan change.
@@ -896,7 +975,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $other->id() );
 
 		$this->assertSame( 'failed', Resource::find( $other->id() )->get( 'state' ) );
-		$this->assertLessThanOrEqual( 40, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
+		$this->assertSame( 18, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
 		$this->assertSame( 'running', $this->fake->vm( 5001 )['status'] );
 	}
 }
