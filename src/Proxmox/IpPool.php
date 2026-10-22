@@ -312,7 +312,18 @@ final class IpPool {
 	public static function release_leftover( string $address ): string {
 		foreach ( self::rows() as $row ) {
 			if ( $row['address'] === $address && '' !== $row['leftover'] ) {
-				return self::release( (int) $row['resource_id'] ) ? $row['leftover'] : '';
+				if ( ! self::release( (int) $row['resource_id'] ) ) {
+					return '';
+				}
+
+				// A closed resource's VM row goes with its address (the admin typed the release):
+				// otherwise its VMID would stay taken for ever. A failed resource keeps its row, as
+				// a clone may have left a machine behind for the admin to look at.
+				if ( 'closed' === $row['leftover'] ) {
+					VmRecords::remove( (int) $row['resource_id'] );
+				}
+
+				return $row['leftover'];
 			}
 		}
 

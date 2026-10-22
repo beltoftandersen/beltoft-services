@@ -177,6 +177,59 @@ class OsFieldTest extends TestCase {
 		$this->assertSame( '9000', $item->get_meta( OsField::ITEM_META ) );
 	}
 
+	public function test_a_cluster_without_a_template_list_does_not_empty_the_choice_and_keeps_its_own_template(): void {
+		$this->save_cluster( 'bare', '' );
+		$this->assertSame( array(), Clusters::templates( 'bare' ) );
+
+		$with = $this->vm( 'lab', 'vm-a' );
+		$bare = $this->vm( 'bare', 'vm-b' );
+		WC()->cart->add_to_cart( $with->get_id() );
+		WC()->cart->add_to_cart( $bare->get_id() );
+
+		$choice = OsField::cart_choice();
+		$this->assertNotNull( $choice );
+		$this->assertSame( array( 9000 => 'Ubuntu 26.04', 9001 => 'Ubuntu 24.04' ), $choice['options'], 'The cluster with a list decides; the bare one is skipped.' );
+		$this->assertSame( 'lab', $choice['cluster'] );
+		$this->assertSame( array(), $this->check( '9001' ) );
+		$this->assertCount( 1, $this->check( '9005' ), 'Still only listed templates.' );
+
+		// The bare cluster's line keeps no choice (it would fail at provision): its product template applies.
+		$_POST[ OsField::POST_KEY ] = '9001';
+		do_action( 'woocommerce_checkout_process' );
+		$line_with = new \WC_Order_Item_Product();
+		$line_with->set_product( $with );
+		OsField::save_on_item( $line_with );
+		$line_bare = new \WC_Order_Item_Product();
+		$line_bare->set_product( $bare );
+		OsField::save_on_item( $line_bare );
+		$this->assertSame( '9001', $line_with->get_meta( OsField::ITEM_META ) );
+		$this->assertSame( '', $line_bare->get_meta( OsField::ITEM_META ) );
+
+		// Even an order-wide block choice does not reach the bare cluster's service.
+		$order = wc_create_order();
+		$item  = new \WC_Order_Item_Product();
+		$item->set_product( $bare );
+		$item->set_quantity( 1 );
+		$order->add_item( $item );
+		$order->update_meta_data( '_wc_other/' . OsField::BLOCK_FIELD_ID, '9000' );
+		$order->save();
+		$license = $this->service_license( $bare, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		Lifecycle::provide( $license );
+		$this->assertNull( Resource::for_license( (int) $license['id'] )->get( 'os_template' ) );
+
+		// And the same order choice still reaches a cluster that has a list.
+		$order2 = wc_create_order();
+		$item2  = new \WC_Order_Item_Product();
+		$item2->set_product( $with );
+		$item2->set_quantity( 1 );
+		$order2->add_item( $item2 );
+		$order2->update_meta_data( '_wc_other/' . OsField::BLOCK_FIELD_ID, '9000' );
+		$order2->save();
+		$license2 = $this->service_license( $with, array( 'fire' => false, 'order_id' => $order2->get_id() ) );
+		Lifecycle::provide( $license2 );
+		$this->assertSame( 9000, Resource::for_license( (int) $license2['id'] )->get( 'os_template' ) );
+	}
+
 	public function test_a_cart_without_a_shared_template_is_refused_for_any_choice(): void {
 		$this->save_cluster( 'lab2', '9002 = Debian 12', '9002' );
 		WC()->cart->add_to_cart( $this->vm( 'lab', 'vm-a' )->get_id() );

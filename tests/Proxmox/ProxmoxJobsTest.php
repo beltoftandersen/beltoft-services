@@ -550,6 +550,39 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( '', (string) Resource::find( $fresh->id() )->get( Access::META_REVEAL ) );
 	}
 
+	public function test_the_password_purge_and_a_breach_hold_do_not_interfere(): void {
+		$held = $this->vm( 5000 );
+		$this->assertTrue(
+			$held->set(
+				array(
+					'state'               => 'paused',
+					'desired'             => 'paused',
+					'paused_at'           => time() - 100,
+					'breach_at'           => time() - 100,
+					'breach_reason'       => 'Spam',
+					Access::META_REVEAL   => 'ciphertext-held',
+					Access::META_UNTIL    => time() - 60,
+				)
+			)
+		);
+
+		ProxmoxJobs::purge_passwords();
+
+		$after = Resource::find( $held->id() );
+		$this->assertSame( '', (string) $after->get( Access::META_REVEAL ), 'The expired password is purged under a hold too.' );
+		$this->assertTrue( $after->on_hold() );
+		$this->assertSame( 'paused', $after->get( 'desired' ) );
+		$this->assertSame( 'paused', $after->get( 'state' ) );
+		$this->assertSame( 'Spam', $after->get( 'breach_reason' ) );
+
+		// A held service whose days are over is deleted, with no replacement (the deletion itself is tested elsewhere).
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->assertTrue( Resource::find( $held->id() )->set( array( 'breach_at' => time() - 20 * DAY_IN_SECONDS, Access::META_REVEAL => 'ciphertext-again', Access::META_UNTIL => time() + DAY_IN_SECONDS ) ) );
+		\BeltoftServices\Retention::run();
+		$this->assertSame( 'deleted', Resource::find( $held->id() )->get( 'desired' ) );
+		$this->assertFalse( Resource::find( $held->id() )->get( 'replace_after_delete' ) );
+	}
+
 	public function test_the_sweep_runs_the_purge(): void {
 		$r = $this->vm( 5000 );
 		$this->assertTrue( $r->set( array( Access::META_REVEAL => 'ciphertext', Access::META_UNTIL => time() - 5 ) ) );
@@ -607,6 +640,24 @@ class ProxmoxJobsTest extends TestCase {
 
 		$this->run_jobs();
 
+		$this->assertIsArray( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
+	}
+
+	public function test_activating_the_plugin_queues_a_capacity_run_for_each_saved_cluster(): void {
+		$this->assertNotFalse( has_action( 'activate_' . plugin_basename( BELTOFT_SERVICES_FILE ), array( ProxmoxJobs::class, 'activate' ) ) );
+
+		$this->fake->add_vm( array( 'vmid' => 9000, 'node' => 'node-a', 'template' => 1 ) );
+		$this->cluster();
+		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array(), Jobs::GROUP );
+		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
+
+		ProxmoxJobs::activate();
+		ProxmoxJobs::activate();
+
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => ProxmoxJobs::CAPACITY_NOW, 'args' => array( 'lab' ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ), 'One run, queued once.' );
+		$this->assertCount( 0, $this->fake->calls(), 'Queued, not run inline.' );
+
+		$this->run_jobs();
 		$this->assertIsArray( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
 	}
 

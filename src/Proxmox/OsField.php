@@ -126,7 +126,14 @@ final class OsField {
 				continue;
 			}
 
-			$list   = Clusters::templates( $cluster );
+			$list = Clusters::templates( $cluster );
+
+			// A cluster with no template list offers no choice: its product's template applies, and
+			// it must not empty what the other servers' clusters share.
+			if ( array() === $list ) {
+				continue;
+			}
+
 			$first  = '' === $first ? $cluster : $first;
 			$any   += $list;
 			$shared = null === $shared ? $list : array_intersect_key( $shared, $list );
@@ -293,7 +300,14 @@ final class OsField {
 	 * @param \WC_Order              $order  Order (unused).
 	 */
 	public static function save_on_item( $item, $key = '', $values = array(), $order = null ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( ! $item instanceof \WC_Order_Item_Product || '' === self::cluster_of( (int) $item->get_product_id(), (int) $item->get_variation_id() ) ) {
+		if ( ! $item instanceof \WC_Order_Item_Product ) {
+			return;
+		}
+
+		$cluster = self::cluster_of( (int) $item->get_product_id(), (int) $item->get_variation_id() );
+
+		// No cluster, or one with no template list (its product template applies).
+		if ( '' === $cluster || array() === Clusters::templates( $cluster ) ) {
 			return;
 		}
 
@@ -411,6 +425,12 @@ final class OsField {
 		$candidates = array();
 		$product_id = (int) ( $license['product_id'] ?? 0 );
 		$variation  = (int) ( $license['variation_id'] ?? 0 );
+		$cluster    = self::cluster_of( $product_id, $variation );
+
+		// A cluster with no template list takes no choice: its product's template applies.
+		if ( '' === $cluster || array() === Clusters::templates( $cluster ) ) {
+			return $meta;
+		}
 
 		foreach ( $order->get_items() as $item ) {
 			if ( $item instanceof \WC_Order_Item_Product && (int) $item->get_product_id() === $product_id && ( 0 === $variation || (int) $item->get_variation_id() === $variation ) ) {

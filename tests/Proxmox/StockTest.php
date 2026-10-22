@@ -11,6 +11,7 @@ use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\Placement;
 use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Stock;
 use BeltoftServices\Tests\TestCase;
 
 /**
@@ -242,6 +243,33 @@ class StockTest extends TestCase {
 		WC()->cart->add_to_cart( $other->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => 1 ) ) );
 		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id() ), 'Sold out product refused after another product\'s renewal add.' );
 		wc_clear_notices();
+	}
+
+	public function test_an_add_that_aborts_after_the_item_data_filter_closes_the_flag(): void {
+		$product = $this->sold_out_product();
+		$sub     = $this->subscription( self::factory()->user->create() );
+
+		// WooCommerce throws after the item-data filter (here: something else makes the item not purchasable).
+		$abort = static fn() => false;
+		add_filter( 'woocommerce_is_purchasable', $abort, 999 );
+		WC()->cart->empty_cart();
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $sub->get_id() ) ) ) );
+		remove_filter( 'woocommerce_is_purchasable', $abort, 999 );
+		wc_clear_notices();
+
+		// Between the abort and the next add the exemption must not stay open: a validation of the
+		// next add (WooCommerce's form handler and REST/store routes run it first) closes it.
+		apply_filters( 'woocommerce_add_to_cart_validation', true, $product->get_id(), 1 );
+		$this->assertFalse( $this->in_stock( $product ), 'Closed by the next add\'s validation.' );
+
+		// And so does the end of the request, for an abort nothing else followed.
+		add_filter( 'woocommerce_is_purchasable', $abort, 999 );
+		WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $sub->get_id() ) ) );
+		remove_filter( 'woocommerce_is_purchasable', $abort, 999 );
+		wc_clear_notices();
+		$this->assertTrue( has_action( 'shutdown', array( Stock::class, 'clear_flow' ) ) !== false );
+		Stock::clear_flow();
+		$this->assertFalse( $this->in_stock( $product ), 'Closed at the end of the request.' );
 	}
 
 	public function test_a_session_reload_keeps_a_renewal_item(): void {

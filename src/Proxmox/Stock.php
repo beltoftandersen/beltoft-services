@@ -51,6 +51,11 @@ final class Stock {
 		// After WCS's own item-data filters (priority 10, e.g. the switcher's), so the keys are in place.
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'note_flow' ), 999, 3 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'clear_flow' ) );
+		// An add can abort after the item-data filter (WooCommerce throws, class-wc-cart.php:1487) and no
+		// action follows it: the next add's validation (class-wc-form-handler.php, the Store API) or the
+		// end of the request closes the flag instead.
+		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validation' ), 1 );
+		add_action( 'shutdown', array( __CLASS__, 'clear_flow' ) );
 		// A cart loaded from the session checks is_purchasable() before the item data is applied (class-wc-cart-session.php:198).
 		add_filter( 'woocommerce_cart_item_is_purchasable', array( __CLASS__, 'session_item' ), 20, 4 );
 		// Paying an existing renewal, switch or resubscribe order (woocommerce/includes/shortcodes/class-wc-shortcode-checkout.php:154).
@@ -72,7 +77,20 @@ final class Stock {
 	}
 
 	/**
-	 * Action woocommerce_add_to_cart: the item is in the cart, close the flag.
+	 * Filter woocommerce_add_to_cart_validation, first in line: a new add starts, so a flag left by
+	 * an add that aborted is closed. The value passes through untouched.
+	 *
+	 * @param mixed $valid Whether the add is valid so far.
+	 * @return mixed
+	 */
+	public static function validation( $valid ) {
+		self::$adding = null;
+
+		return $valid;
+	}
+
+	/**
+	 * Action woocommerce_add_to_cart: the item is in the cart, close the flag. Also at the end of the request.
 	 */
 	public static function clear_flow(): void {
 		self::$adding = null;

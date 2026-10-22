@@ -662,6 +662,9 @@ class ActionsTest extends TestCase {
 		$this->act( $r, 'reset_password' );
 		$this->assertCount( $seen, $this->fake->calls() );
 		$this->assertArrayNotHasKey( $r->id(), Alerts::problems() );
+
+		// Dropped, but not silently: the history says so.
+		$this->assertContains( 'Customer action "reset_password" was not run: it is not available any more', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ), 'message' ) );
 	}
 
 	/**

@@ -452,6 +452,8 @@ class ProxmoxCliTest extends TestCase {
 		$this->assertSame( 'assigned', IpPool::find( '192.0.2.10' )['state'] );
 
 		$resource->close(); // "Mark deleted" leaves the address behind.
+		$record = VmRecords::for_resource( $resource->id() );
+		$this->assertNotNull( $record, 'The closed resource still holds its VM row, so its VMID is taken.' );
 		$row = IpPool::find( '192.0.2.10' );
 		$this->assertSame( 'assigned', $row['state'] );
 		$this->assertSame( 'closed', IpPool::leftover( $row ) );
@@ -465,6 +467,8 @@ class ProxmoxCliTest extends TestCase {
 		$this->assertSame( 'success', $done[0] );
 		$this->assertSame( 'free', IpPool::find( '192.0.2.10' )['state'] );
 		$this->assertNull( IpPool::find( '192.0.2.10' )['resource_id'] );
+		$this->assertNull( VmRecords::for_resource( $resource->id() ), 'The VM row goes with the address: the VMID is free again.' );
+		$this->assertTrue( VmRecords::owned( $record['cluster'], $record['vmid'], $resource->id() ) === false );
 	}
 
 	public function test_ip_pool_screen_releases_a_held_address_of_a_failed_resource_and_blocks_and_adds(): void {

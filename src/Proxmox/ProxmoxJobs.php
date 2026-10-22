@@ -188,6 +188,29 @@ final class ProxmoxJobs {
 	}
 
 	/**
+	 * Activation hook: queues a capacity run for every cluster, so the stock is not closed until
+	 * the first hourly run (a plugin that is activated again finds its clusters already saved).
+	 * Action Scheduler may not be ready yet; the run is then queued when it is.
+	 */
+	public static function activate(): void {
+		if ( class_exists( 'ActionScheduler' ) && \ActionScheduler::is_initialized() ) {
+			self::queue_all_capacity();
+			return;
+		}
+
+		add_action( 'action_scheduler_init', array( __CLASS__, 'queue_all_capacity' ) );
+	}
+
+	/**
+	 * Queues the capacity run of each saved cluster (a run already waiting is enough).
+	 */
+	public static function queue_all_capacity(): void {
+		foreach ( array_keys( Clusters::all() ) as $id ) {
+			self::queue_capacity( (string) $id );
+		}
+	}
+
+	/**
 	 * Queues a capacity run for one cluster (after it was saved), so its stock is not closed
 	 * until the next hourly run. A run already waiting is enough.
 	 *
