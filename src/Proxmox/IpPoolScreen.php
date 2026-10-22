@@ -91,9 +91,9 @@ final class IpPoolScreen {
 				return array( 'error', __( 'That address is not a leftover of a failed or closed service.', 'beltoft-services' ) );
 			}
 
-			if ( 'closed' === $row['leftover'] && trim( $confirm ) !== 'RELEASE ' . $address ) {
+			if ( IpPool::needs_typed_release( $row ) && trim( $confirm ) !== 'RELEASE ' . $address ) {
 				/* translators: %s: the words to type, such as RELEASE 192.0.2.5. */
-				return array( 'error', sprintf( __( 'Type %s to confirm. The server of a closed service may still be running on this address.', 'beltoft-services' ), 'RELEASE ' . $address ) );
+				return array( 'error', sprintf( __( 'Type %s to confirm. A server of this service may still be running on this address.', 'beltoft-services' ), 'RELEASE ' . $address ) );
 			}
 
 			return '' !== IpPool::release_leftover( $address ) ? array( 'success', __( 'Address released.', 'beltoft-services' ) ) : array( 'error', __( 'The address could not be released.', 'beltoft-services' ) );
@@ -212,9 +212,9 @@ final class IpPoolScreen {
 				self::mini_form( 'block', __( 'Block', 'beltoft-services' ), array( 'address' => $row['address'] ) );
 			} elseif ( 'blocked' === $row['state'] ) {
 				self::mini_form( 'unblock', __( 'Unblock', 'beltoft-services' ), array( 'address' => $row['address'] ) );
-			} elseif ( 'failed' === $row['leftover'] ) {
+			} elseif ( 'failed' === $row['leftover'] && ! IpPool::needs_typed_release( $row ) ) {
 				self::mini_form( 'release', __( 'Release', 'beltoft-services' ), array( 'address' => $row['address'] ) );
-			} elseif ( 'closed' === $row['leftover'] ) {
+			} elseif ( '' !== $row['leftover'] ) {
 				/* translators: %s: the words to type. */
 				self::mini_form( 'release', __( 'Release', 'beltoft-services' ), array( 'address' => $row['address'] ), 'confirm', sprintf( __( 'Type %s', 'beltoft-services' ), 'RELEASE ' . $row['address'] ) );
 			}

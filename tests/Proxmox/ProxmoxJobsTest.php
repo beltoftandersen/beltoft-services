@@ -333,6 +333,30 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertNotEmpty( Jobs::pending( $r->id() ), 'A reconcile job was queued.' );
 	}
 
+	public function test_abuse_pause_mode_only_reports_protected_and_linked_resources(): void {
+		$this->settings( array( 'abuse_mode' => 'pause' ) );
+		$protected = $this->vm( 5000 );
+		$linked    = $this->vm( 5001 );
+		$normal    = $this->vm( 5002 );
+		$this->assertTrue( $protected->set( array( 'protected' => true ) ) );
+		$this->assertTrue( $linked->set( array( 'linked' => true ) ) );
+
+		foreach ( array( 5000, 5001, 5002 ) as $vmid ) {
+			$this->fake->set_rrd( $vmid, $this->samples( fn() => 0.97 ) );
+		}
+
+		$this->abuse_run();
+
+		$this->assertSame( 'ready', Resource::find( $protected->id() )->get( 'desired' ), 'Protected: reported only.' );
+		$this->assertSame( 'ready', Resource::find( $linked->id() )->get( 'desired' ), 'Linked: reported only.' );
+		$this->assertSame( 'paused', Resource::find( $normal->id() )->get( 'desired' ) );
+		$this->assertCount( 3, $this->mails, 'All three are reported.' );
+
+		$bodies = array_column( $this->mails, 'message' );
+		$this->assertSame( 1, count( array_filter( $bodies, static fn( $m ) => false !== strpos( $m, 'Mode: pause' ) ) ) );
+		$this->assertSame( 2, count( array_filter( $bodies, static fn( $m ) => false !== strpos( $m, 'report only' ) ) ) );
+	}
+
 	public function test_abuse_off_does_nothing(): void {
 		$this->settings( array( 'abuse_mode' => 'off' ) );
 		$this->vm( 5000 );

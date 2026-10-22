@@ -159,7 +159,11 @@ final class Commands {
 	 * @param array<string, string> $assoc_args Flags.
 	 */
 	public function ip_pool_add( array $args, array $assoc_args ): void {
-		$added = IpPool::add( (string) ( $args[0] ?? '' ), isset( $assoc_args['gateway'] ) ? (string) $assoc_args['gateway'] : null );
+		try {
+			$added = IpPool::add( (string) ( $args[0] ?? '' ), isset( $assoc_args['gateway'] ) ? (string) $assoc_args['gateway'] : null );
+		} catch ( \RuntimeException $e ) {
+			\WP_CLI::error( 'The pool is busy; nothing more was added. Try again.' );
+		}
 
 		if ( 0 === $added ) {
 			\WP_CLI::error( 'Nothing was added: give an IPv4 address or a network of /20 or smaller; addresses already in the pool are skipped.' );
@@ -198,6 +202,42 @@ final class Commands {
 		}
 
 		\WP_CLI::success( sprintf( '%1$s %2$s.', $ip, ! empty( $assoc_args['unblock'] ) ? 'unblocked' : 'blocked' ) );
+	}
+
+	/**
+	 * Releases the address of a failed or closed service back to the pool.
+	 *
+	 * Only a leftover can be released: held by a failed service, or assigned to a closed one (for
+	 * instance after "Mark deleted"). When a machine may still exist (a closed service, or a failed
+	 * one with a VM record) type the confirmation: --confirm="RELEASE <ip>".
+	 *
+	 * ## OPTIONS
+	 *
+	 * <ip>
+	 * : The address.
+	 *
+	 * [--confirm=<text>]
+	 * : RELEASE <ip>.
+	 *
+	 * @subcommand ip-pool-release
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function ip_pool_release( array $args, array $assoc_args ): void {
+		$result = \BeltoftServices\Proxmox\IpPoolScreen::apply(
+			'release',
+			array(
+				'address' => (string) ( $args[0] ?? '' ),
+				'confirm' => (string) ( $assoc_args['confirm'] ?? '' ),
+			)
+		);
+
+		if ( 'success' !== $result[0] ) {
+			\WP_CLI::error( $result[1] );
+		}
+
+		\WP_CLI::success( $result[1] );
 	}
 
 	/**

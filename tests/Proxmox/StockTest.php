@@ -178,50 +178,183 @@ class StockTest extends TestCase {
 		$this->assertFalse( \BeltoftServices\Proxmox\Stock::filter( false, $this->product() ) );
 	}
 
-	public function test_stock_does_not_block_renewal_switch_or_resubscribe(): void {
+	/**
+	 * A subscription of a user (WooCommerce Subscriptions' own factory).
+	 *
+	 * @param int $user_id Owner.
+	 */
+	private function subscription( int $user_id ): \WC_Subscription {
+		$subscription = wcs_create_subscription(
+			array(
+				'customer_id'      => $user_id,
+				'billing_period'   => 'month',
+				'billing_interval' => 1,
+			)
+		);
+		$this->assertInstanceOf( \WC_Subscription::class, $subscription );
+
+		return $subscription;
+	}
+
+	private function sold_out_product(): \WC_Product {
 		$product = $this->product();
 		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertFalse( $this->in_stock( $product ), 'Sold out for a new customer.' );
 
-		// Cart items carry WooCommerce Subscriptions' own keys (Checkout reads the same ones).
-		foreach ( array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe' ) as $key ) {
+		return $product;
+	}
+
+	public function test_stock_does_not_block_renewal_switch_or_resubscribe(): void {
+		$product = $this->sold_out_product();
+
+		// A new VM added while sold out is refused by WooCommerce itself.
+		WC()->cart->empty_cart();
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id() ), 'A new server is refused.' );
+		$this->assertSame( array(), WC()->cart->get_cart() );
+		wc_clear_notices();
+
+		// WCS adds each of its flows through WC()->cart->add_to_cart() with its key in the item data
+		// (class-wcs-cart-renewal.php:364-370); is_purchasable() runs before the item is in the cart.
+		$subscription = $this->subscription( self::factory()->user->create() );
+
+		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
 			WC()->cart->empty_cart();
-			WC()->cart->cart_contents['k'] = array(
-				'key'          => 'k',
-				'product_id'   => $product->get_id(),
-				'variation_id' => 0,
-				'quantity'     => 1,
-				$key           => array( 'subscription_id' => 1 ),
-			);
+			$added = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( $key => array( 'subscription_id' => $subscription->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
+			$this->assertNotFalse( $added, $key . ' is added while sold out: ' . wp_json_encode( wc_get_notices() ) );
+			// WCS's own cart checks may drop an item whose data is not a full switch; the add itself is what matters here.
+			$this->assertArrayHasKey( $added, WC()->cart->cart_contents, $key . ' in cart' );
 
-			$this->assertTrue( $this->in_stock( $product ), $key . ' is not blocked.' );
-
-			WC()->cart->cart_contents['k'] = array(
-				'key'          => 'k',
-				'product_id'   => $product->get_id() + 1000,
-				'variation_id' => 0,
-				'quantity'     => 1,
-				$key           => array(),
-			);
-			$this->assertFalse( $this->in_stock( $product ), 'A renewal of another product lets this one through no more.' );
+			// The flag is closed again: a plain add to an empty cart is refused.
+			WC()->cart->empty_cart();
+			$this->assertFalse( WC()->cart->add_to_cart( $product->get_id() ), 'A plain add after a ' . $key . ' add is refused.' );
+			wc_clear_notices();
 		}
+	}
+
+	public function test_a_failed_flow_add_does_not_leave_the_exemption_open(): void {
+		$product = $this->sold_out_product();
+		$other   = $this->product();
+		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 
 		WC()->cart->empty_cart();
+		// Item data with a flow key for ANOTHER product does not open this one.
+		WC()->cart->add_to_cart( $other->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => 1 ) ) );
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id() ), 'Sold out product refused after another product\'s renewal add.' );
+		wc_clear_notices();
+	}
 
-		// The switch link (request argument the switcher reads before the item is in the cart) and the resubscribe link.
-		$_REQUEST['switch-subscription'] = '5';
-		$this->assertTrue( $this->in_stock( $product ), 'The switch landing page is not blocked.' );
-		unset( $_REQUEST['switch-subscription'] );
-		$this->assertFalse( $this->in_stock( $product ) );
+	public function test_a_session_reload_keeps_a_renewal_item(): void {
+		$product = $this->sold_out_product();
 
-		$_GET['resubscribe'] = '5';
-		$this->assertTrue( $this->in_stock( $product ) );
-		unset( $_GET['resubscribe'] );
-		$this->assertFalse( $this->in_stock( $product ) );
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $this->subscription( self::factory()->user->create() )->get_id() ) ) ) );
 
-		// A plain item of the same product is still blocked.
-		WC()->cart->cart_contents['p'] = array( 'key' => 'p', 'product_id' => $product->get_id(), 'variation_id' => 0, 'quantity' => 1 );
-		$this->assertFalse( $this->in_stock( $product ) );
+		// What the session holds for the cart (class-wc-cart-session.php:277 reads it back).
+		$session = array();
+		foreach ( WC()->cart->get_cart() as $key => $item ) {
+			$session[ $key ] = array_diff_key( $item, array( 'data' => 1, 'data_hash' => 1 ) );
+		}
+
+		WC()->cart->cart_contents = array();
+		WC()->session->set( 'cart', $session );
+		WC()->cart->get_cart_from_session();
+
+		$this->assertCount( 1, WC()->cart->get_cart(), 'The renewal item survives a reload while sold out.' );
+
+		// A plain item in the session is dropped.
+		$plain   = $this->product();
+		$session = array(
+			'plainitem' => array(
+				'key'               => 'plainitem',
+				'product_id'        => $plain->get_id(),
+				'variation_id'      => 0,
+				'variation'         => array(),
+				'quantity'          => 1,
+				'data_hash'         => wc_get_cart_item_data_hash( $plain ),
+				'line_tax_data'     => array( 'subtotal' => array(), 'total' => array() ),
+				'line_subtotal'     => 10,
+				'line_subtotal_tax' => 0,
+				'line_total'        => 10,
+				'line_tax'          => 0,
+			),
+		);
+		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
+		WC()->cart->cart_contents = array();
+		WC()->session->set( 'cart', $session );
+		WC()->cart->get_cart_from_session();
+		$this->assertCount( 0, WC()->cart->get_cart(), 'A new server is dropped from the reloaded cart.' );
+		wc_clear_notices();
+	}
+
+	public function test_paying_a_renewal_order_is_not_blocked(): void {
+		$product = $this->sold_out_product();
+		$user    = self::factory()->user->create();
+
+		$subscription = $this->subscription( $user );
+		$subscription->add_product( $product );
+		$subscription->save();
+
+		$renewal = wcs_create_renewal_order( $subscription );
+		$this->assertInstanceOf( \WC_Order::class, $renewal );
+
+		// The call of WooCommerce's order-pay check (class-wc-shortcode-checkout.php:154).
+		$p = wc_get_product( $product->get_id() );
+		$this->assertTrue( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $p->is_in_stock(), $p, $renewal ), 'A renewal order can be paid.' );
+
+		$plain = wc_create_order( array( 'customer_id' => $user ) );
+		$plain->add_product( $product );
+		$plain->save();
+		$this->assertFalse( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $p->is_in_stock(), $p, $plain ), 'An ordinary order for a new server cannot.' );
+	}
+
+	public function test_request_args_only_count_for_a_subscription_the_user_owns(): void {
+		$product = $this->sold_out_product();
+		$mine    = self::factory()->user->create();
+		$theirs  = self::factory()->user->create();
+		$own     = $this->subscription( $mine );
+		$foreign = $this->subscription( $theirs );
+
+		$set = static function ( string $arg, ?string $value ): void {
+			if ( 'switch-subscription' === $arg ) {
+				if ( null === $value ) {
+					unset( $_REQUEST[ $arg ] );
+					return;
+				}
+
+				$_REQUEST[ $arg ] = $value;
+				return;
+			}
+
+			if ( null === $value ) {
+				unset( $_GET[ $arg ] );
+				return;
+			}
+
+			$_GET[ $arg ] = $value;
+		};
+
+		foreach ( array( 'switch-subscription', 'resubscribe' ) as $arg ) {
+			wp_set_current_user( $mine );
+			$set( $arg, (string) $own->get_id() );
+			$this->assertTrue( $this->in_stock( $product ), $arg . ' with an own subscription.' );
+
+			$set( $arg, (string) $foreign->get_id() );
+			$this->assertFalse( $this->in_stock( $product ), $arg . ' with somebody else\'s subscription.' );
+
+			$set( $arg, '1' );
+			$this->assertFalse( $this->in_stock( $product ), 'A forged ' . $arg . '=1 stays refused.' );
+
+			$set( $arg, '999999' );
+			$this->assertFalse( $this->in_stock( $product ), $arg . ' naming nothing.' );
+
+			wp_set_current_user( 0 );
+			$set( $arg, (string) $own->get_id() );
+			$this->assertFalse( $this->in_stock( $product ), $arg . ' without a login.' );
+
+			$set( $arg, null );
+		}
 	}
 
 	public function test_medusa_availability_is_real(): void {

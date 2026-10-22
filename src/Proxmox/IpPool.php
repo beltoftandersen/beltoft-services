@@ -294,6 +294,16 @@ final class IpPool {
 	}
 
 	/**
+	 * Must an admin type RELEASE <ip> to release this leftover? Yes when a machine may still exist:
+	 * a closed resource, or a failed one that has a VM record (the clone may have left a VM behind).
+	 *
+	 * @param array<string, mixed> $row Row from rows().
+	 */
+	public static function needs_typed_release( array $row ): bool {
+		return 'closed' === $row['leftover'] || ( 'failed' === $row['leftover'] && null !== VmRecords::for_resource( (int) $row['resource_id'] ) );
+	}
+
+	/**
 	 * Releases the address of a failed or closed resource.
 	 *
 	 * @param string $address Address.

@@ -633,6 +633,12 @@ final class ProxmoxJobs {
 	 */
 	private static function report( Resource $resource, int $threshold, int $duration, int $since ): void {
 		$mode = (string) Settings::get( 'abuse_mode' );
+
+		// A protected or adopted machine is reported, never paused.
+		if ( 'pause' === $mode && ( $resource->get( 'protected' ) || true === $resource->get( 'linked' ) ) ) {
+			$mode = 'report';
+		}
+
 		$text = sprintf(
 			'CPU at or above %d%% for %s (since %s UTC) %s',
 			$threshold,

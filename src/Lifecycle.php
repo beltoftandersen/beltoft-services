@@ -228,6 +228,19 @@ final class Lifecycle {
 		// A product that is no longer a service keeps the last plan; the sites may still change.
 		$plan = $driver ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $resource->get( 'plan' );
 
+		// An adopted machine is never resized by itself: update_plan shuts a VM down. The admin decides.
+		if ( true === $resource->get( 'linked' ) ) {
+			$resource->locked(
+				static function () use ( $resource ): bool {
+					Alerts::admin( $resource, self::LINKED_PLAN_ERROR );
+
+					return true;
+				}
+			);
+			Events::add( $license_id, 'service', 'Plan changed on a linked VM; it was not applied. ' . self::LINKED_PLAN_ERROR );
+			return;
+		}
+
 		$stored = $resource->change_plan( $plan, 'Plan changed' );
 
 		if ( true === $stored ) {
@@ -237,6 +250,11 @@ final class Lifecycle {
 		}
 		// False: it could not be stored, and the admin was alerted.
 	}
+
+	/**
+	 * Alert text when the plan of an adopted (linked) machine changes.
+	 */
+	public const LINKED_PLAN_ERROR = 'Plan changed on a linked VM; resize it manually.';
 
 	/**
 	 * Option prefix remembering which product a driver conflict was alerted for, per resource.

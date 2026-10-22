@@ -493,6 +493,87 @@ class ProxmoxCliTest extends TestCase {
 		$this->assertSame( 'error', IpPoolScreen::apply( 'drop', array() )[0] );
 	}
 
+	public function test_a_plan_change_on_a_linked_vm_is_alerted_not_applied(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+
+		$license = $this->license();
+		$this->vm();
+		$this->assertIsArray( $this->link( $license ) );
+		$resource = Resource::for_license( (int) $license['id'] );
+		$plan     = $resource->get( 'plan' );
+
+		update_post_meta( (int) $license['product_id'], \BeltoftServices\Product::META_PLAN . 'memory_mb', '8192' );
+		\BeltoftServices\Lifecycle::apply_plan( (int) $license['id'] );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertFalse( $fresh->get( 'plan_dirty' ), 'No update_plan is asked for.' );
+		$this->assertSame( $plan, $fresh->get( 'plan' ), 'The plan snapshot is kept.' );
+		$this->assertSame( array(), Jobs::pending( $resource->id() ) );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'resize it manually', $mails[0]['message'] );
+
+		// An ordinary resource still gets its plan applied.
+		$other = $this->license();
+		$this->vm( 210, array( 'ipconfig0' => 'ip=192.0.2.11/24' ) );
+		$this->assertIsArray( $this->link( $other, array( 'vmid' => 210, 'ip' => '192.0.2.11' ) ) );
+		$r2 = Resource::for_license( (int) $other['id'] );
+		$r2->set( array( 'linked' => false ) );
+		update_post_meta( (int) $other['product_id'], \BeltoftServices\Product::META_PLAN . 'memory_mb', '4096' );
+		\BeltoftServices\Lifecycle::apply_plan( (int) $other['id'] );
+		$this->assertTrue( Resource::find( $r2->id() )->get( 'plan_dirty' ) );
+
+		remove_all_filters( 'pre_wp_mail' );
+	}
+
+	public function test_ip_pool_release_cli_and_typed_confirmation_for_a_failed_leftover_with_a_vm_record(): void {
+		$cli     = new Commands();
+		$license = $this->license();
+		$r       = Resource::create( $license, \BeltoftServices\Drivers\Registry::get( 'proxmox' ), \BeltoftServices\Product::plan( (int) $license['product_id'] ) );
+		$held    = IpPool::hold( $r->id() );
+		$this->assertTrue( $r->set( array( 'state' => 'failed' ) ) );
+
+		// Failed, no VM record: no typing.
+		$this->assertFalse( IpPool::needs_typed_release( IpPool::rows()[0] ) );
+
+		// Failed, with a VM record (a clone may have left a machine): typing needed, in the screen and the CLI.
+		$this->assertTrue( VmRecords::adopt( $r->id(), 'lab', 'node-a', 300 ) );
+		$row = IpPool::find( $held['address'] );
+		$this->assertTrue( IpPool::needs_typed_release( $row + array( 'leftover' => IpPool::leftover( $row ) ) ) );
+		$this->assertSame( 'error', IpPoolScreen::apply( 'release', array( 'address' => $held['address'] ) )[0] );
+		$this->assertNotSame( '', $this->failure( fn() => $cli->ip_pool_release( array( $held['address'] ), array() ) ) );
+		$this->assertNotSame( '', $this->failure( fn() => $cli->ip_pool_release( array( $held['address'] ), array( 'confirm' => 'RELEASE' ) ) ) );
+		$this->assertSame( 'held', IpPool::find( $held['address'] )['state'] );
+
+		$cli->ip_pool_release( array( $held['address'] ), array( 'confirm' => 'RELEASE ' . $held['address'] ) );
+		$this->assertSame( 'free', IpPool::find( $held['address'] )['state'] );
+
+		// Not a leftover: refused.
+		$this->assertNotSame( '', $this->failure( fn() => $cli->ip_pool_release( array( '192.0.2.11' ), array( 'confirm' => 'RELEASE 192.0.2.11' ) ) ) );
+	}
+
+	public function test_ip_pool_block_cli_reports_a_busy_pool(): void {
+		$mysqli = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$name   = \BeltoftServices\Locks::name( 'ippool', 0 );
+		$mysqli->query( "SELECT GET_LOCK('" . $mysqli->real_escape_string( $name ) . "', 0)" );
+
+		add_filter( 'beltoft_services_alloc_lock_wait', fn() => 0 );
+		$message = $this->failure( fn() => ( new Commands() )->ip_pool_block( array( '192.0.2.10' ), array() ) );
+		remove_all_filters( 'beltoft_services_alloc_lock_wait' );
+		$mysqli->close();
+
+		$this->assertStringContainsString( 'busy', $message );
+	}
+
 	public function test_ip_pool_screen_needs_capability_and_nonce(): void {
 		$_POST = array( 'op' => 'block', 'address' => '192.0.2.11' );
 
