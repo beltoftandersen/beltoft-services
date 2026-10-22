@@ -11,6 +11,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Retention;
 use BeltoftServices\Tests\Support\FakeDriver;
 
 /**
@@ -214,6 +215,80 @@ final class LifecycleTest extends TestCase {
 		$this->assertSame( 'paused', $fresh->get( 'state' ) );
 		$this->assertCount( 1, $this->driver->calls( 'pause' ) );
 		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
+	}
+
+	/**
+	 * WCS cancels at once (an admin's cancel, a trial cancelled): the license expires now.
+	 * The service is paused and goes through the ordinary retention, with its warning first;
+	 * no path deletes it sooner.
+	 *
+	 * @param array<string, mixed> $license_data License columns (a trial has an expiry already).
+	 */
+	private function assert_cancel_goes_through_retention( array $license_data ): void {
+		$this->settings(
+			array(
+				'deletion_mode' => 'on',
+				'warning_days'  => 1,
+				'admin_email'   => 'ops@example.com',
+			)
+		);
+		$product = $this->service_product( 'fake', array(), array( 'retention' => 30 ) );
+		$license = $this->service_license( $product, array_merge( array( 'subscription_id' => 5151 ), $license_data ) );
+		$this->run_jobs();
+		$resource = Resource::for_license( (int) $license['id'] );
+		$this->assertSame( 'ready', $resource->get( 'state' ) );
+
+		// The cancellation.
+		\BeltoftLicenses\Lifecycle\Subscriptions::ended( $this->subscription( 5151 ) );
+		$this->assertNotNull( Licenses::find( (int) $license['id'] )['expires_at'], 'The cancellation set the expiry to now.' );
+
+		// A moment later beltoft-licenses' expiry job expires the license, which pauses the service.
+		Licenses::update( (int) $license['id'], array( 'expires_at' => gmdate( 'Y-m-d H:i:s', time() - 60 ) ) );
+		\BeltoftLicenses\Lifecycle\Expiry::run();
+		$this->run_jobs();
+
+		$fresh = $this->fresh( $resource );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertCount( 1, $this->driver->calls( 'pause' ) );
+		$this->assertSame( array(), $this->driver->calls( 'delete' ), 'Never deleted at once.' );
+
+		$paused_at = (int) $fresh->get( 'paused_at' );
+
+		// Every later run, with deletion on: nothing is deleted before the retention days.
+		foreach ( array( 0, 10, 28 ) as $days ) {
+			$this->assertTrue( $this->fresh( $resource )->set( array( 'paused_at' => $paused_at - $days * DAY_IN_SECONDS ) ) );
+			Retention::run();
+			Jobs::sweep();
+			$this->run_jobs();
+
+			$this->assertSame( 'paused', $this->fresh( $resource )->get( 'desired' ), "Day $days" );
+			$this->assertSame( array(), $this->driver->calls( 'delete' ), "Day $days" );
+		}
+
+		// Past the retention days: warned first, not deleted the same day.
+		$this->assertTrue( $this->fresh( $resource )->set( array( 'paused_at' => $paused_at - 31 * DAY_IN_SECONDS ) ) );
+		Retention::run();
+		$this->run_jobs();
+		$this->assertSame( 'paused', $this->fresh( $resource )->get( 'desired' ) );
+		$this->assertNotNull( $this->fresh( $resource )->get( 'warned_at' ) );
+		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
+
+		// A day after the warning it is deleted.
+		$this->fresh( $resource )->set( array( 'warned_at' => time() - DAY_IN_SECONDS - 1 ) );
+		Retention::run();
+		$this->run_jobs();
+		$this->assertCount( 1, $this->driver->calls( 'delete' ) );
+		$this->assertFalse( $this->fresh( $resource )->is_live() );
+	}
+
+	public function test_an_admin_cancel_pauses_and_deletes_only_after_the_retention(): void {
+		$this->assert_cancel_goes_through_retention( array() );
+	}
+
+	public function test_a_cancelled_trial_pauses_and_deletes_only_after_the_retention(): void {
+		// A trial: its license carries the trial end as its expiry before it is cancelled.
+		$this->assert_cancel_goes_through_retention( array( 'expires_at' => gmdate( 'Y-m-d H:i:s', time() + 5 * DAY_IN_SECONDS ) ) );
 	}
 
 	public function test_medusa_one_cancel_does_not_disable_the_other_plan(): void {
