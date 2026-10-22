@@ -32,6 +32,36 @@ class QuickLiveClient extends LiveClient {
 }
 
 /**
+ * LiveClient that records the curl options instead of setting them, and can refuse one.
+ */
+class RecordingLiveClient extends QuickLiveClient {
+
+	/**
+	 * Options set, in order: constant => value.
+	 *
+	 * @var array<int, array{0: int, 1: mixed}>
+	 */
+	public $options = array();
+
+	/**
+	 * Option constants curl "refuses".
+	 *
+	 * @var int[]
+	 */
+	public $refuse = array();
+
+	protected function set_curl_option( $handle, int $option, $value ): bool {
+		if ( in_array( $option, $this->refuse, true ) ) {
+			return false;
+		}
+
+		$this->options[] = array( $option, $value );
+
+		return true;
+	}
+}
+
+/**
  * A Client that is neither fake nor live.
  */
 class StubClient implements Client {
@@ -715,6 +745,87 @@ class ClientTest extends TestCase {
 		$this->expectException( \RuntimeException::class );
 		$this->expectExceptionMessage( 'CURLOPT_PINNEDPUBLICKEY' );
 		$this->live( array( 'pin_sha256' => $pin ), NoPinLiveClient::class );
+	}
+
+	public function test_a_pin_without_a_ca_file_replaces_the_chain_check_for_that_request_only(): void {
+		$pin    = base64_encode( hash( 'sha256', 'key', true ) );
+		$client = $this->live( array( 'pin_sha256' => $pin ), RecordingLiveClient::class );
+		$url    = self::BASE . '/api2/json/nodes';
+
+		$this->assertTrue( $client->pin_key( new \stdClass(), array(), $url ) );
+		$this->assertSame(
+			array(
+				array( CURLOPT_PINNEDPUBLICKEY, 'sha256//' . $pin ),
+				array( CURLOPT_SSL_VERIFYPEER, false ),
+				array( CURLOPT_SSL_VERIFYHOST, 0 ),
+			),
+			$client->options,
+			'The pin first, then the chain and host checks off.'
+		);
+
+		// Another host: nothing is touched.
+		$client->options = array();
+		$this->assertFalse( $client->pin_key( new \stdClass(), array(), 'https://other.example.test/' ) );
+		$this->assertSame( array(), $client->options );
+
+		// The request itself: the request arguments keep sslverify on (the disabling happens on the handle, per request).
+		$this->respond_with(
+			function ( $url, $args ) use ( $client ) {
+				do_action( 'http_api_curl', new \stdClass(), $args, $url );
+				$this->assertTrue( $args['sslverify'] );
+				return $this->json_reply( array( 'ok' => 1 ) );
+			}
+		);
+		$client->options = array();
+		$this->assertSame( array( 'ok' => 1 ), $client->request( 'GET', '/nodes' ) );
+		$this->assertCount( 3, $client->options );
+
+		// A later request of a client without a pin never touches the verify options.
+		$plain = $this->live( array(), RecordingLiveClient::class );
+		$this->respond_with(
+			function ( $url, $args ) use ( $plain ) {
+				do_action( 'http_api_curl', new \stdClass(), $args, $url );
+				return $this->json_reply( array( 'ok' => 1 ) );
+			}
+		);
+		$this->assertSame( array( 'ok' => 1 ), $plain->request( 'GET', '/nodes' ) );
+		$this->assertSame( array(), $plain->options );
+	}
+
+	public function test_a_pin_with_a_ca_file_keeps_full_verification(): void {
+		$ca = tempnam( get_temp_dir(), 'ca' );
+		file_put_contents( $ca, "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n" );
+		$pin    = base64_encode( hash( 'sha256', 'key', true ) );
+		$client = $this->live( array( 'pin_sha256' => $pin, 'ca_file' => $ca ), RecordingLiveClient::class );
+
+		$this->assertTrue( $client->pin_key( new \stdClass(), array(), self::BASE . '/api2/json/nodes' ) );
+		$this->assertSame( array( array( CURLOPT_PINNEDPUBLICKEY, 'sha256//' . $pin ) ), $client->options, 'Only the pin is added.' );
+		unlink( $ca );
+	}
+
+	public function test_the_pin_still_fails_closed_when_curl_refuses_the_pin_or_a_verify_option(): void {
+		$pin = base64_encode( hash( 'sha256', 'key', true ) );
+
+		foreach ( array( CURLOPT_PINNEDPUBLICKEY, CURLOPT_SSL_VERIFYPEER, CURLOPT_SSL_VERIFYHOST ) as $refused ) {
+			$client         = $this->live( array( 'pin_sha256' => $pin ), RecordingLiveClient::class );
+			$client->refuse = array( $refused );
+			$this->respond_with(
+				function ( $url, $args ) {
+					do_action( 'http_api_curl', new \stdClass(), $args, $url );
+					return $this->json_reply( array( 'secret' => 'data' ) );
+				}
+			);
+
+			$result = $client->request( 'GET', '/nodes' );
+
+			$this->assertWPError( $result );
+			$this->assertSame( 'pin_unverified', $result->get_error_code(), 'Refused option ' . $refused );
+			$this->assertStringNotContainsString( 'data', $result->get_error_message() );
+
+			if ( CURLOPT_PINNEDPUBLICKEY === $refused ) {
+				$this->assertSame( array(), $client->options, 'Verification is never switched off without the pin.' );
+			}
+		}
 	}
 
 	public function test_short_secrets_are_scrubbed_too(): void {

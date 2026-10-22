@@ -267,6 +267,20 @@ class LiveClient implements Client {
 	 * Sets the public key pin on the curl handle (action http_api_curl, fired by
 	 * WP_Http_Curl and Requests; present only while this client's request runs).
 	 *
+	 * With a CA file the pin comes on top of the full chain and host name verification. With a
+	 * pin and no CA file the pin replaces the chain check, for this request only: a Proxmox
+	 * certificate is usually self-signed and would never pass it. The pin is set first; the
+	 * checks are switched off only after curl accepted it, and the request counts as pinned only
+	 * when every option was accepted (otherwise the answer is discarded, see request()).
+	 *
+	 * Sources: the hook runs from Requests' curl.before_send (wp-includes/class-wp-http-requests-hooks.php:58,
+	 * dispatched at wp-includes/Requests/src/Transport/Curl.php:174), before the transport applies its own
+	 * verify options (Curl.php:192-203), which only change anything for sslverify=false and the CA path;
+	 * we pass sslverify=true and, here, no CA file, so they leave these two options alone. PHP curl_setopt():
+	 * CURLOPT_SSL_VERIFYPEER (bool), CURLOPT_SSL_VERIFYHOST (0 or 2) and CURLOPT_PINNEDPUBLICKEY
+	 * (https://www.php.net/manual/en/function.curl-setopt.php). libcurl checks the pin after the TLS
+	 * handshake whatever the verify options say (a wrong pin ends with CURLE_SSL_PINNEDPUBKEYNOTMATCH, 90).
+	 *
 	 * @param resource|\CurlHandle $handle Curl handle.
 	 * @param mixed                $args   Request arguments.
 	 * @param mixed                $url    Request URL.
@@ -276,9 +290,25 @@ class LiveClient implements Client {
 			return false;
 		}
 
-		$this->pin_applied = (bool) curl_setopt( $handle, CURLOPT_PINNEDPUBLICKEY, 'sha256//' . $this->pin ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress has no request argument for a public key pin.
+		$this->pin_applied = $this->set_curl_option( $handle, CURLOPT_PINNEDPUBLICKEY, 'sha256//' . $this->pin );
+
+		if ( $this->pin_applied && '' === $this->ca_file ) {
+			$this->pin_applied = $this->set_curl_option( $handle, CURLOPT_SSL_VERIFYPEER, false )
+				&& $this->set_curl_option( $handle, CURLOPT_SSL_VERIFYHOST, 0 );
+		}
 
 		return $this->pin_applied;
+	}
+
+	/**
+	 * One curl option on a handle. A seam for tests.
+	 *
+	 * @param resource|\CurlHandle $handle Curl handle.
+	 * @param int                  $option CURLOPT_* constant.
+	 * @param mixed                $value  Value.
+	 */
+	protected function set_curl_option( $handle, int $option, $value ): bool {
+		return (bool) curl_setopt( $handle, $option, $value ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress has no request argument for a public key pin.
 	}
 
 	/**
