@@ -278,7 +278,7 @@ final class Reconciler {
 	public static function guard( Resource $r ): bool {
 		$license = $r->license();
 
-		if ( ! $license || Licenses::STATUS_ACTIVE === Licenses::effective_status( $license ) ) {
+		if ( ! $license || Lifecycle::is_active( $license ) ) {
 			return false;
 		}
 

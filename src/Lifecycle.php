@@ -75,7 +75,7 @@ final class Lifecycle {
 	 *
 	 * @param array<string, mixed> $license License row.
 	 */
-	private static function is_active( array $license ): bool {
+	public static function is_active( array $license ): bool {
 		return Licenses::STATUS_ACTIVE === Licenses::effective_status( $license );
 	}
 
