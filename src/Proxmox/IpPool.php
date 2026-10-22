@@ -21,11 +21,6 @@ final class IpPool {
 	public const FREE_TRANSIENT = 'beltoft_services_proxmox_ip_free';
 
 	/**
-	 * Seconds hold() waits for the pool lock.
-	 */
-	private const LOCK_WAIT = 10;
-
-	/**
 	 * Largest network add() expands: /20 is 4094 hosts.
 	 */
 	private const MIN_PREFIX = 20;
@@ -134,7 +129,7 @@ final class IpPool {
 
 		list( $locked, $row ) = Locks::with(
 			Locks::name( 'ippool', 0 ),
-			self::LOCK_WAIT,
+			Locks::allocation_wait(),
 			static function () use ( $wpdb, $resource_id ) {
 				$existing = self::for_resource( $resource_id );
 
@@ -210,7 +205,10 @@ final class IpPool {
 	}
 
 	/**
-	 * Takes a free address out of circulation. An address in use cannot be blocked.
+	 * Takes a free address out of circulation. False when there is no such free address (unknown,
+	 * or in use: an address in use cannot be blocked).
+	 *
+	 * @throws \RuntimeException When the pool is busy (not "no": try again).
 	 *
 	 * @param string $address Address.
 	 */
@@ -219,7 +217,9 @@ final class IpPool {
 	}
 
 	/**
-	 * Puts a blocked address back into circulation.
+	 * Puts a blocked address back into circulation. False when there is no such blocked address.
+	 *
+	 * @throws \RuntimeException When the pool is busy (not "no": try again).
 	 *
 	 * @param string $address Address.
 	 */
@@ -239,16 +239,20 @@ final class IpPool {
 
 		list( $locked, $changed ) = Locks::with(
 			Locks::name( 'ippool', 0 ),
-			self::LOCK_WAIT,
+			Locks::allocation_wait(),
 			static function () use ( $wpdb, $address, $from, $to ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one statement.
 				return (int) $wpdb->query( $wpdb->prepare( 'UPDATE %i SET state = %s, updated_at = %s WHERE address = %s AND state = %s AND resource_id IS NULL', Schema::tables()['ips'], $to, gmdate( 'Y-m-d H:i:s' ), $address, $from ) );
 			}
 		);
 
+		if ( ! $locked ) {
+			throw new \RuntimeException( 'The IP pool is busy.' );
+		}
+
 		self::changed();
 
-		return $locked && $changed > 0;
+		return $changed > 0;
 	}
 
 	/**

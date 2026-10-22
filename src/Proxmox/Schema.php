@@ -19,6 +19,7 @@ final class Schema {
 
 	public const DB_VERSION        = '1';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
+	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
 	/**
 	 * Unique keys that allocation relies on, per table: key name => columns in order.
@@ -60,8 +61,15 @@ final class Schema {
 	 * runs the activation hook, so Plugin::boot() calls this.
 	 */
 	public static function maybe_upgrade(): void {
+		if ( self::DB_VERSION === get_option( self::OPTION_DB_VERSION ) || false !== get_transient( self::RETRY_TRANSIENT ) ) {
+			return;
+		}
+
+		self::create_tables();
+
+		// A persistent failure is tried again in an hour, not on every request.
 		if ( self::DB_VERSION !== get_option( self::OPTION_DB_VERSION ) ) {
-			self::create_tables();
+			set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
 		}
 	}
 
@@ -150,6 +158,7 @@ final class Schema {
 
 		if ( array() === self::missing_keys() ) {
 			update_option( self::OPTION_DB_VERSION, self::DB_VERSION );
+			delete_transient( self::RETRY_TRANSIENT );
 		}
 	}
 }

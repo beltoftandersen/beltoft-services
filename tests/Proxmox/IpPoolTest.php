@@ -207,4 +207,46 @@ class IpPoolTest extends TestCase {
 		$row = IpPool::hold( 3 );
 		$this->assertSame( $row, IpPool::for_resource( 3 ) );
 	}
+
+	/**
+	 * Holds a named lock on a second database connection, so it blocks this one.
+	 *
+	 * @param string $name Lock name.
+	 */
+	private function lock_elsewhere( string $name ): \mysqli {
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$res   = $other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		$this->assertSame( '1', (string) $res->fetch_row()[0], 'the other connection holds the lock' );
+
+		return $other;
+	}
+
+	public function test_a_busy_pool_throws_and_changes_nothing_until_the_lock_is_released(): void {
+		IpPool::add( '192.0.2.120/30' );
+		add_filter( 'beltoft_services_alloc_lock_wait', fn() => 1 );
+		$other = $this->lock_elsewhere( Locks::name( 'ippool', 0 ) );
+
+		try {
+			IpPool::hold( 1 );
+			$this->fail( 'hold must not guess when the pool is busy' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 2, IpPool::free_count() );
+		}
+		$this->assertNull( IpPool::for_resource( 1 ) );
+
+		foreach ( array( 'block', 'unblock' ) as $method ) {
+			try {
+				IpPool::$method( '192.0.2.121' );
+				$this->fail( $method . ' must throw when the pool is busy' );
+			} catch ( \RuntimeException $e ) {
+				$this->assertSame( array(), $this->addresses( 'blocked' ) );
+			}
+		}
+
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( Locks::name( 'ippool', 0 ) ) . "')" );
+		$other->close();
+
+		$this->assertSame( '192.0.2.121', IpPool::hold( 1 )['address'] );
+		$this->assertFalse( IpPool::block( '192.0.2.250' ), 'no such address is false, not an exception' );
+	}
 }

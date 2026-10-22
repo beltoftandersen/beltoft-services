@@ -233,4 +233,82 @@ class VmRecordsTest extends TestCase {
 		VmRecords::remove( 1 );
 		$this->assertTrue( Clusters::delete( 'lab' ) );
 	}
+
+	public function test_a_busy_allocation_lock_throws_and_changes_nothing_until_released(): void {
+		add_filter( 'beltoft_services_alloc_lock_wait', fn() => 1 );
+		$name  = Locks::name( 'vmid', 0 );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$this->assertSame( '1', (string) $other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" )->fetch_row()[0] );
+
+		try {
+			VmRecords::allocate( 1, 'lab', 5000, 5099, array(), $this->free() );
+			$this->fail( 'allocate must throw when the lock is busy' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 0, $this->rows() );
+		}
+
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
+		$other->close();
+
+		$this->assertSame( 5000, VmRecords::allocate( 1, 'lab', 5000, 5099, array(), $this->free() ) );
+	}
+
+	public function test_failed_inserts_are_bounded(): void {
+		global $wpdb;
+
+		$inserts = 0;
+		$filling = false;
+		$filled  = false;
+		add_filter(
+			'query',
+			function ( $q ) use ( &$inserts, &$filling, &$filled, $wpdb ) {
+				if ( $filling ) {
+					return $q;
+				}
+				if ( ! $filled && 0 === stripos( ltrim( $q ), 'INSERT' ) ) {
+					// Another process fills the whole range after our read of the table, before our first insert.
+					$filled  = true;
+					$filling = true;
+					for ( $id = 5000; $id < 5200; $id++ ) {
+						$wpdb->insert( Schema::tables()['vms'], array( 'resource_id' => 2000 + $id, 'cluster' => 'lab', 'vmid' => $id, 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+					}
+					$filling = false;
+				}
+				if ( 0 === stripos( ltrim( $q ), 'INSERT' ) ) {
+					++$inserts;
+				}
+				return $q;
+			}
+		);
+		$asked = 0;
+
+		$this->assertNull( VmRecords::allocate( 1, 'lab', 5000, 5199, array(), function () use ( &$asked ) {
+			++$asked;
+			return true;
+		} ) );
+		$this->assertSame( 0, $asked );
+		$this->assertSame( 50, $inserts, 'attempts are bounded, not one per id in the range' );
+	}
+
+	public function test_a_resource_recorded_behind_the_lock_ends_the_loop(): void {
+		global $wpdb;
+
+		$done = false;
+		add_filter( 'query', function ( $q ) use ( &$done, $wpdb ) {
+			if ( ! $done && 0 === stripos( ltrim( $q ), 'INSERT' ) ) {
+				$done = true;
+				// Another process records this very resource at 5003, after our read and before our first insert.
+				$wpdb->insert( Schema::tables()['vms'], array( 'resource_id' => 1, 'cluster' => 'lab', 'vmid' => 5003, 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+			}
+			return $q;
+		} );
+		$asked = 0;
+
+		$this->assertSame( 5003, VmRecords::allocate( 1, 'lab', 5000, 5099, array(), function () use ( &$asked ) {
+			++$asked;
+			return true;
+		} ) );
+		$this->assertSame( 0, $asked, 'no further candidates for a resource that is recorded' );
+		$this->assertSame( 1, $this->rows() );
+	}
 }

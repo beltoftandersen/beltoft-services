@@ -40,6 +40,18 @@ final class Locks {
 	}
 
 	/**
+	 * Seconds that IP pool and VMID allocation wait for their lock (default 10).
+	 */
+	public static function allocation_wait(): int {
+		/**
+		 * Filters how long IP pool and VMID allocation wait for their lock.
+		 *
+		 * @param int $seconds Seconds (default 10).
+		 */
+		return max( 0, (int) apply_filters( 'beltoft_services_alloc_lock_wait', 10 ) );
+	}
+
+	/**
 	 * Runs a callback while holding a named lock. Used by code that must read and write one
 	 * thing atomically without a transaction (a START TRANSACTION would also commit the test
 	 * suite's own). The lock is released even when the callback throws.

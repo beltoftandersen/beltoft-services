@@ -19,12 +19,7 @@ defined( 'ABSPATH' ) || exit;
 final class VmRecords {
 
 	/**
-	 * Seconds allocate() waits for the lock.
-	 */
-	private const LOCK_WAIT = 10;
-
-	/**
-	 * Most ids offered to the "is it free" assertion in one call.
+	 * Most insert attempts (failed ones included) in one call.
 	 */
 	private const MAX_ASSERTIONS = 50;
 
@@ -53,7 +48,7 @@ final class VmRecords {
 
 		list( $locked, $vmid ) = Locks::with(
 			Locks::name( 'vmid', 0 ),
-			self::LOCK_WAIT,
+			Locks::allocation_wait(),
 			static function () use ( $wpdb, $resource_id, $cluster, $min, $max, $taken_on_cluster, $is_free ) {
 				$existing = self::for_resource( $resource_id );
 
@@ -86,11 +81,18 @@ final class VmRecords {
 					);
 					$wpdb->suppress_errors( $suppress );
 
-					if ( ! $inserted ) {
-						continue; // Somebody holds it (or the resource got a record meanwhile): not an assertion.
-					}
-
 					++$asked;
+
+					if ( ! $inserted ) {
+						// Somebody holds the id, or this very resource was recorded meanwhile.
+						$now = self::for_resource( $resource_id );
+
+						if ( $now ) {
+							return $now['vmid'];
+						}
+
+						continue;
+					}
 
 					if ( $is_free( $id ) ) {
 						return $id;

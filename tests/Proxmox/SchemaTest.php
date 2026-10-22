@@ -124,10 +124,44 @@ class SchemaTest extends TestCase {
 	}
 
 	public function test_the_activation_hook_is_registered(): void {
-		$this->assertStringContainsString(
-			"register_activation_hook( __FILE__, array( \\BeltoftServices\\Proxmox\\Schema::class, 'activate' ) )",
-			(string) file_get_contents( BELTOFT_SERVICES_PATH . 'beltoft-services.php' )
-		);
+		$this->assertNotFalse( has_action( 'activate_' . plugin_basename( BELTOFT_SERVICES_FILE ), array( Schema::class, 'activate' ) ) );
+	}
+
+	public function test_a_failing_upgrade_is_not_retried_on_every_request(): void {
+		delete_option( Schema::OPTION_DB_VERSION );
+		$runs  = 0;
+		$count = static function ( $query ) use ( &$runs ) {
+			if ( false !== stripos( $query, 'SHOW INDEX' ) ) {
+				++$runs;
+			}
+			return $query;
+		};
+		// Simulate a persistent failure: the keys are never verified.
+		$break = static function ( $query ) {
+			return false !== stripos( $query, 'SHOW INDEX' ) ? 'SELECT * FROM zz_no_such_table' : $query;
+		};
+		add_filter( 'query', $count, 1 );
+		add_filter( 'query', $break, 2 );
+
+		ob_start();
+		Schema::maybe_upgrade();
+		$first = $runs;
+		Schema::maybe_upgrade();
+		Schema::maybe_upgrade();
+		ob_end_clean();
+
+		remove_filter( 'query', $count, 1 );
+		remove_filter( 'query', $break, 2 );
+
+		$this->assertFalse( get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertGreaterThan( 0, $first );
+		$this->assertSame( $first, $runs, 'one attempt, then it waits' );
+		$this->assertNotFalse( get_transient( Schema::RETRY_TRANSIENT ) );
+
+		delete_transient( Schema::RETRY_TRANSIENT );
+		Schema::maybe_upgrade();
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertFalse( get_transient( Schema::RETRY_TRANSIENT ), 'success clears the throttle' );
 	}
 
 	/**
