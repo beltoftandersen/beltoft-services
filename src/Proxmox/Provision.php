@@ -439,10 +439,26 @@ final class Provision {
 		}
 
 		$source = (string) ( $template['node'] ?? '' );
-		$node   = Placement::node( $this->cluster_id, $this->cluster, $this->client, $source );
+		$node   = Placement::node( $this->cluster_id, $this->cluster, $source );
 
 		if ( null === $node ) {
-			return StepResult::retry( 0, 'clone: no allowed node is online' );
+			return StepResult::retry( 0, 'clone: no allowed node is online, or the capacity is not known yet' );
+		}
+
+		// The placement is recorded and its memory committed before the clone, so a second provision
+		// and the capacity job both see it. Once per node: a retry on the same node adds nothing.
+		if ( $node !== $record['node'] ) {
+			try {
+				$reserved = Capacity::reserve( $this->cluster_id, $node, (int) $this->plan['memory_mb'] * 1048576 );
+			} catch ( \RuntimeException $e ) {
+				unset( $e );
+
+				return StepResult::retry( 0, 'clone: the capacity is busy' );
+			}
+
+			if ( ! $reserved || ! VmRecords::move( $this->r->id(), $node ) ) {
+				return StepResult::retry( 0, 'clone: the placement could not be recorded' );
+			}
 		}
 
 		$params = array(

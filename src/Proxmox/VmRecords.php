@@ -209,6 +209,30 @@ final class VmRecords {
 	}
 
 	/**
+	 * The records of a cluster with their node ('' until a node was chosen).
+	 *
+	 * @param string $cluster Cluster id.
+	 * @return array<int, array{vmid: int, resource_id: int, node: string}>
+	 */
+	public static function rows_for_cluster( string $cluster ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- must be fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT vmid, resource_id, node FROM %i WHERE cluster = %s', Schema::tables()['vms'], $cluster ), ARRAY_A );
+		$out  = array();
+
+		foreach ( (array) $rows as $row ) {
+			$out[] = array(
+				'vmid'        => (int) $row['vmid'],
+				'resource_id' => (int) $row['resource_id'],
+				'node'        => (string) $row['node'],
+			);
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Whether this VMID on this cluster is recorded for this resource.
 	 *
 	 * @param string $cluster     Cluster id.

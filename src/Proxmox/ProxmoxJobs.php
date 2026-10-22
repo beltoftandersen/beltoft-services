@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * kill switch is on, and only look at clusters that are live or hold persisted fake state.
  *
  * Calls (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html):
- * - capacity, per cluster and hour: GET /nodes and GET /cluster/resources?type=vm (two calls);
+ * - capacity, per cluster and hour (and once after a cluster is saved): GET /nodes and GET /cluster/resources?type=vm (two calls);
  * - power, per cluster and 15 minutes: GET /cluster/resources?type=vm (one call for every VM);
  * - abuse, per running VM and hour: GET /nodes/{node}/qemu/{vmid}/rrddata.
  *
@@ -35,7 +35,9 @@ defined( 'ABSPATH' ) || exit;
  *          on the node, running or not) + host reserve (setting `host_reserve_gb`)
  * and `maxmem` is the node's memory. Placement and the stock check read free = maxmem - mem. The
  * node's real figure is kept as `mem_used`. "This site's VMs" are those recorded in the
- * beltoft_services_vms table for the cluster; templates are never counted.
+ * beltoft_services_vms table for the cluster, plus recorded VMs not listed yet (just placed) at
+ * their plan's memory; templates are never counted. A provision commits its VM's memory in the
+ * cache when it picks the node (Capacity::reserve()), so a burst does not overcommit.
  */
 final class ProxmoxJobs {
 
@@ -43,6 +45,7 @@ final class ProxmoxJobs {
 	public const POWER       = 'beltoft_services_proxmox_power';
 	public const ABUSE       = 'beltoft_services_proxmox_abuse';
 	public const ABUSE_BATCH = 'beltoft_services_proxmox_abuse_batch';
+	public const CAPACITY_NOW = 'beltoft_services_proxmox_capacity_now';
 
 	public const RUNNING_PREFIX = 'beltoft_services_proxmox_running_';
 	public const QUEUE          = 'beltoft_services_proxmox_abuse_queue';
@@ -82,6 +85,7 @@ final class ProxmoxJobs {
 	 */
 	public static function register(): void {
 		add_action( self::CAPACITY, array( __CLASS__, 'capacity' ) );
+		add_action( self::CAPACITY_NOW, array( __CLASS__, 'capacity_now' ) );
 		add_action( self::POWER, array( __CLASS__, 'power' ) );
 		add_action( self::ABUSE, array( __CLASS__, 'abuse' ) );
 		add_action( self::ABUSE_BATCH, array( __CLASS__, 'abuse_batch' ) );
@@ -118,6 +122,7 @@ final class ProxmoxJobs {
 		}
 
 		as_unschedule_all_actions( self::ABUSE_BATCH, array(), Jobs::GROUP );
+		as_unschedule_all_actions( self::CAPACITY_NOW, array(), Jobs::GROUP );
 	}
 
 	/**
@@ -177,49 +182,113 @@ final class ProxmoxJobs {
 	 * the stock check. A cluster that cannot be read keeps its last cache.
 	 */
 	public static function capacity(): void {
-		$reserve = max( 0, (int) Settings::get( 'host_reserve_gb' ) ) * 1073741824;
-
 		foreach ( self::clusters() as $id => $one ) {
-			$nodes = $one['client']->request( 'GET', '/nodes' );
-			$vms   = self::vm_rows( $one['client'] );
-
-			if ( ! is_array( $nodes ) || null === $vms ) {
-				continue; // Never cache a guess: Placement asks Proxmox itself when there is no cache.
-			}
-
-			$ours      = VmRecords::for_cluster( $id );
-			$committed = array();
-
-			foreach ( $vms as $vm ) {
-				if ( ! empty( $vm['template'] ) || ! isset( $ours[ (int) ( $vm['vmid'] ?? 0 ) ] ) ) {
-					continue;
-				}
-
-				$node               = (string) ( $vm['node'] ?? '' );
-				$committed[ $node ] = ( $committed[ $node ] ?? 0 ) + (int) ( $vm['maxmem'] ?? 0 );
-			}
-
-			$rows = array();
-
-			foreach ( $nodes as $node ) {
-				if ( ! is_array( $node ) || '' === (string) ( $node['node'] ?? '' ) ) {
-					continue;
-				}
-
-				$name   = (string) $node['node'];
-				$rows[] = array(
-					'node'     => $name,
-					'status'   => (string) ( $node['status'] ?? '' ),
-					'maxmem'   => (int) ( $node['maxmem'] ?? 0 ),
-					'mem'      => ( $committed[ $name ] ?? 0 ) + $reserve,
-					'mem_used' => (int) ( $node['mem'] ?? 0 ),
-					'maxcpu'   => (int) ( $node['maxcpu'] ?? 0 ),
-					'cpu'      => (float) ( $node['cpu'] ?? 0 ),
-				);
-			}
-
-			set_transient( Placement::CAPACITY_PREFIX . $id, $rows, 2 * HOUR_IN_SECONDS );
+			self::cache_capacity( $id, $one['client'] );
 		}
+	}
+
+	/**
+	 * Queues a capacity run for one cluster (after it was saved), so its stock is not closed
+	 * until the next hourly run. A run already waiting is enough.
+	 *
+	 * @param string $id Cluster id.
+	 */
+	public static function queue_capacity( string $id ): void {
+		if ( ! function_exists( 'as_enqueue_async_action' ) || as_has_scheduled_action( self::CAPACITY_NOW, array( $id ), Jobs::GROUP ) ) {
+			return;
+		}
+
+		as_enqueue_async_action( self::CAPACITY_NOW, array( $id ), Jobs::GROUP );
+	}
+
+	/**
+	 * The queued run for one cluster.
+	 *
+	 * @param string $id Cluster id.
+	 */
+	public static function capacity_now( $id ): void {
+		$all = self::clusters();
+
+		if ( isset( $all[ (string) $id ] ) ) {
+			self::cache_capacity( (string) $id, $all[ (string) $id ]['client'] );
+		}
+	}
+
+	/**
+	 * Reads one cluster and writes its cache. Committed memory also counts the VMs recorded for
+	 * this site that the listing does not show yet (a clone just placed), at the memory of their
+	 * plan, on the node they were placed on. The write takes the lock Capacity::reserve() uses.
+	 *
+	 * @param string $id     Cluster id.
+	 * @param Client $client Client.
+	 */
+	private static function cache_capacity( string $id, Client $client ): void {
+		$reserve = max( 0, (int) Settings::get( 'host_reserve_gb' ) ) * 1073741824;
+		$nodes   = $client->request( 'GET', '/nodes' );
+		$vms     = self::vm_rows( $client );
+
+		if ( ! is_array( $nodes ) || null === $vms ) {
+			return; // Never cache a guess: stock stays closed (or on the old cache) until it can be read.
+		}
+
+		list( $locked ) = Locks::with(
+			Locks::name( 'capacity', 0 ),
+			Locks::allocation_wait(),
+			static function () use ( $id, $nodes, $vms, $reserve ): bool {
+				$records   = VmRecords::rows_for_cluster( $id );
+				$ours      = array_column( $records, 'resource_id', 'vmid' );
+				$listed    = array();
+				$committed = array();
+
+				foreach ( $vms as $vm ) {
+					$listed[ (int) ( $vm['vmid'] ?? 0 ) ] = true;
+
+					if ( ! empty( $vm['template'] ) || ! isset( $ours[ (int) ( $vm['vmid'] ?? 0 ) ] ) ) {
+						continue;
+					}
+
+					$node               = (string) ( $vm['node'] ?? '' );
+					$committed[ $node ] = ( $committed[ $node ] ?? 0 ) + (int) ( $vm['maxmem'] ?? 0 );
+				}
+
+				foreach ( $records as $record ) {
+					if ( isset( $listed[ $record['vmid'] ] ) || '' === $record['node'] ) {
+						continue; // Listed (counted above), or not placed yet.
+					}
+
+					$resource = Resource::find( $record['resource_id'] );
+					$plan     = $resource ? $resource->get( 'plan' ) : null;
+					$mb       = is_array( $plan ) ? (int) ( $plan['memory_mb'] ?? 0 ) : 0;
+
+					$committed[ $record['node'] ] = ( $committed[ $record['node'] ] ?? 0 ) + $mb * 1048576;
+				}
+
+				$rows = array();
+
+				foreach ( $nodes as $node ) {
+					if ( ! is_array( $node ) || '' === (string) ( $node['node'] ?? '' ) ) {
+						continue;
+					}
+
+					$name   = (string) $node['node'];
+					$rows[] = array(
+						'node'     => $name,
+						'status'   => (string) ( $node['status'] ?? '' ),
+						'maxmem'   => (int) ( $node['maxmem'] ?? 0 ),
+						'mem'      => ( $committed[ $name ] ?? 0 ) + $reserve,
+						'mem_used' => (int) ( $node['mem'] ?? 0 ),
+						'maxcpu'   => (int) ( $node['maxcpu'] ?? 0 ),
+						'cpu'      => (float) ( $node['cpu'] ?? 0 ),
+					);
+				}
+
+				set_transient( Placement::CAPACITY_PREFIX . $id, $rows, 2 * HOUR_IN_SECONDS );
+
+				return true;
+			}
+		);
+
+		unset( $locked ); // Busy: the cache stays as it is and the next run writes it.
 	}
 
 	// -- Power -----------------------------------------------------------------------------------
@@ -289,16 +358,33 @@ final class ProxmoxJobs {
 			return;
 		}
 
-		$queue = array();
+		$lists = array();
 
 		foreach ( array_keys( self::clusters() ) as $id ) {
 			$list = get_transient( self::RUNNING_PREFIX . $id );
 
-			foreach ( is_array( $list ) ? $list : array() as $item ) {
-				if ( count( $queue ) < self::MAX_VMS && is_array( $item ) ) {
-					$queue[] = $item;
+			$lists[] = array_values( array_filter( is_array( $list ) ? $list : array(), 'is_array' ) );
+		}
+
+		// Round robin over the clusters, so one big cluster cannot use the whole cap.
+		$queue = array();
+		$round = 0;
+
+		while ( count( $queue ) < self::MAX_VMS ) {
+			$took = false;
+
+			foreach ( $lists as $list ) {
+				if ( isset( $list[ $round ] ) && count( $queue ) < self::MAX_VMS ) {
+					$queue[] = $list[ $round ];
+					$took    = true;
 				}
 			}
+
+			if ( ! $took ) {
+				break;
+			}
+
+			++$round;
 		}
 
 		as_unschedule_all_actions( self::ABUSE_BATCH, array(), Jobs::GROUP );
@@ -386,6 +472,12 @@ final class ProxmoxJobs {
 
 		if ( null === $record || (string) $item['cluster'] !== $record['cluster'] || (int) $item['vmid'] !== $record['vmid'] ) {
 			return;
+		}
+
+		$cached = Operations::cached_status( $resource->id() );
+
+		if ( null !== $cached && 'running' !== $cached['power'] ) {
+			return; // Stopped since the power job looked: nothing is running to measure.
 		}
 
 		$samples = $client->request(
@@ -542,7 +634,7 @@ final class ProxmoxJobs {
 	private static function report( Resource $resource, int $threshold, int $duration, int $since ): void {
 		$mode = (string) Settings::get( 'abuse_mode' );
 		$text = sprintf(
-			'Abuse suspected: CPU at or above %d%% for %s (since %s UTC) %s',
+			'CPU at or above %d%% for %s (since %s UTC) %s',
 			$threshold,
 			human_time_diff( 0, $duration ),
 			gmdate( 'Y-m-d H:i', $since ),
@@ -552,10 +644,10 @@ final class ProxmoxJobs {
 		$license_id = (int) ( $resource->license()['id'] ?? 0 );
 		$noted      = self::NOTE_PREFIX . $resource->id() . '_' . gmdate( 'Ymd' );
 
-		// Alerts::admin() stores its dedupe hash in the resource meta: only under the lock.
+		// Alerts::abuse() stores its dedupe hash in the resource meta: only under the lock.
 		$resource->locked(
-			static function () use ( $resource, $text ): bool {
-				Alerts::admin( $resource, $text );
+			static function () use ( $resource, $text, $mode ): bool {
+				Alerts::abuse( $resource, $text, $mode );
 
 				return true;
 			}
@@ -563,13 +655,13 @@ final class ProxmoxJobs {
 
 		if ( false === get_transient( $noted ) ) {
 			set_transient( $noted, 1, DAY_IN_SECONDS );
-			Events::add( $license_id, 'service', $text );
+			Events::add( $license_id, 'service', 'Abuse suspected: ' . $text );
 		}
 
 		if ( 'pause' === $mode ) {
 			$fresh = Resource::find( $resource->id() );
 
-			if ( $fresh && 'ready' === $fresh->get( 'desired' ) && $fresh->desire( 'paused', 'Abuse: ' . $text ) ) {
+			if ( $fresh && 'ready' === $fresh->get( 'desired' ) && $fresh->desire( 'paused', 'Abuse suspected: ' . $text ) ) {
 				Jobs::enqueue( $fresh->id() );
 			}
 		}

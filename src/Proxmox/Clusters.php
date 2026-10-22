@@ -441,6 +441,7 @@ final class Clusters {
 
 		$all[ $id ] = $clean;
 		update_option( self::OPTION, $all, false );
+		ProxmoxJobs::queue_capacity( $id );
 
 		return true;
 	}

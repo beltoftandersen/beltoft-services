@@ -77,6 +77,49 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a service looks abused (sustained high load): its own subject and
+	 * body, not the failed-service format. Deduped like admin(): the text carries the date, so
+	 * it repeats at most daily. Call it under the resource lock (it stores the dedupe hash in meta).
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $measured What was measured (threshold, duration, since, date).
+	 * @param string   $mode     The abuse mode (report or pause).
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function abuse( Resource $r, string $measured, string $mode ): bool {
+		$hash = md5( 'abuse|' . $measured );
+
+		if ( $hash === $r->get( 'alerted' ) ) {
+			return false;
+		}
+
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) ) {
+			return false;
+		}
+
+		$license = $r->license();
+		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key     = (string) ( $license['license_key'] ?? '' );
+
+		$lines = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Resource: %d', $r->id() ),
+			sprintf( 'Driver: %s', $r->get( 'driver' ) ),
+			sprintf( 'State: %s', $r->get( 'state' ) ),
+			sprintf( 'Measured: %s', $measured ),
+			'pause' === $mode ? 'Mode: pause. The service was asked to pause; a renewal asks for it again.' : 'Mode: report only. Nothing was changed.',
+		);
+
+		$sent = (bool) wp_mail( $to, sprintf( '[%s] Abuse suspected: %s', $site, self::mask( $key ) ), implode( "\n", $lines ) . "\n" );
+
+		$r->set( array( 'alerted' => $hash ) );
+
+		return $sent;
+	}
+
+	/**
 	 * Alerts the admin that a license's service could not be created (there is no resource to
 	 * hang the alert on). Sent once per call: a creation happens once per license event.
 	 *

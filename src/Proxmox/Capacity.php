@@ -71,4 +71,45 @@ final class Capacity {
 
 		return false;
 	}
+
+	/**
+	 * Commits memory on a node in the cache (a VM was placed there and is not in the cluster
+	 * listing yet), under the same lock the capacity job writes with. With no cache nothing is
+	 * written: the job's next run counts the recorded VM itself.
+	 *
+	 * @param string $cluster_id Cluster id.
+	 * @param string $node       Node.
+	 * @param int    $bytes      Memory.
+	 * @return bool False when the cache could not be written.
+	 * @throws \RuntimeException When the lock stays busy.
+	 */
+	public static function reserve( string $cluster_id, string $node, int $bytes ): bool {
+		list( $locked, $ok ) = \BeltoftServices\Locks::with(
+			\BeltoftServices\Locks::name( 'capacity', 0 ),
+			\BeltoftServices\Locks::allocation_wait(),
+			static function () use ( $cluster_id, $node, $bytes ): bool {
+				$rows = self::rows( $cluster_id );
+
+				if ( null === $rows ) {
+					return true;
+				}
+
+				foreach ( $rows as $i => $row ) {
+					if ( (string) ( $row['node'] ?? '' ) === $node ) {
+						$rows[ $i ]['mem'] = (int) ( $row['mem'] ?? 0 ) + max( 0, $bytes );
+					}
+				}
+
+				set_transient( Placement::CAPACITY_PREFIX . $cluster_id, $rows, 2 * HOUR_IN_SECONDS );
+
+				return true;
+			}
+		);
+
+		if ( ! $locked ) {
+			throw new \RuntimeException( 'The capacity cache is busy.' );
+		}
+
+		return (bool) $ok;
+	}
 }

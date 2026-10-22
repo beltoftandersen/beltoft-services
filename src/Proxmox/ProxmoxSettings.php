@@ -165,6 +165,7 @@ final class ProxmoxSettings {
 			'default' => 2,
 			'min'     => self::RANGES['abuse_hours'][0],
 			'label'   => __( 'for at least this many hours', 'beltoft-services' ),
+			'desc'    => __( 'One reading covers about an hour, so the hours are counted over several hourly readings: with 1 hour the first alert comes with the second reading, with 3 hours after about three.', 'beltoft-services' ),
 		);
 
 		return $fields;

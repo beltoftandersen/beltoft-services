@@ -224,7 +224,7 @@ class ProxmoxJobsTest extends TestCase {
 		$calls = count( $this->fake->calls() );
 		$this->assertSame( 2, $calls, 'GET /nodes and one /cluster/resources, no per-VM call.' );
 
-		$node = Placement::node( 'lab', Clusters::get( 'lab' ), $this->fake );
+		$node = Placement::node( 'lab', Clusters::get( 'lab' ) );
 
 		$this->assertSame( 'node-b', $node, 'node-b has the most uncommitted memory.' );
 		$this->assertCount( $calls, $this->fake->calls(), 'A page request reads the cache and calls nothing.' );
@@ -309,7 +309,11 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
 		$this->assertSame( 'ready', $fresh->get( 'state' ) );
 		$this->assertCount( 1, $this->mails );
-		$this->assertStringContainsString( 'Abuse suspected', $this->mails[0]['message'] );
+		$this->assertStringStartsWith( '[', $this->mails[0]['subject'] );
+		$this->assertStringContainsString( '] Abuse suspected: ', $this->mails[0]['subject'], 'Its own subject, not the service-failed one.' );
+		$this->assertStringNotContainsString( 'Service failed', $this->mails[0]['subject'] );
+		$this->assertStringContainsString( 'Measured: CPU at or above 90%', $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'Mode: report only', $this->mails[0]['message'] );
 		$this->assertStringContainsString( gmdate( 'Y-m-d' ), $this->mails[0]['message'], 'The text carries the date.' );
 
 		$this->abuse_run();
@@ -537,5 +541,103 @@ class ProxmoxJobsTest extends TestCase {
 
 		$out = apply_filters( 'sanitize_option_' . \BeltoftServices\Settings::OPTION, array( 'host_reserve_gb' => -5 ) );
 		$this->assertSame( 0, $out['host_reserve_gb'] );
+	}
+
+	public function test_placement_never_calls_proxmox_and_waits_without_a_cache(): void {
+		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
+
+		$this->assertNull( Placement::node( 'lab', Clusters::get( 'lab' ) ), 'Two nodes and no cache: no answer.' );
+		$this->assertCount( 0, $this->fake->calls() );
+	}
+
+	public function test_capacity_counts_recorded_vms_that_are_not_listed_yet(): void {
+		$placed   = $this->vm( 5000, 'node-a', 'running', 8192 );
+		$unplaced = $this->vm( 5001, 'node-a', 'running', 4096 );
+
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		$this->fake->request( 'DELETE', '/nodes/node-a/qemu/5000' ); // Not in the listing (a clone not visible yet).
+		$this->assertNull( $this->fake->vm( 5000 ) );
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/5001/status/stop' );
+		$this->fake->request( 'DELETE', '/nodes/node-a/qemu/5001' );
+		$this->assertNull( $this->fake->vm( 5001 ) );
+		$this->assertTrue( VmRecords::move( $placed->id(), 'node-a' ) );
+
+		ProxmoxJobs::capacity();
+
+		$by = array_column( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), null, 'node' );
+		$this->assertSame( 8192 * 1048576 + 4 * self::GB, $by['node-a']['mem'], 'The placed record counts at its plan memory; the unplaced one is not on a node yet.' );
+		$this->assertSame( 'ready', $unplaced->get( 'state' ) );
+	}
+
+	public function test_saving_a_cluster_queues_a_capacity_run(): void {
+		$this->fake->add_vm( array( 'vmid' => 9000, 'node' => 'node-a', 'template' => 1 ) );
+		$this->cluster();
+
+		$this->assertTrue( as_has_scheduled_action( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ), 'Queued, not run inline.' );
+		$this->assertFalse( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
+		$this->assertCount( 0, $this->fake->calls() );
+
+		$this->cluster();
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => ProxmoxJobs::CAPACITY_NOW, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ), 'One waiting run is enough.' );
+
+		$this->run_jobs();
+
+		$this->assertIsArray( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
+	}
+
+	public function test_capacity_cache_is_not_rewritten_when_resources_cannot_be_read(): void {
+		set_transient( Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'old', 'status' => 'online', 'maxmem' => 1, 'mem' => 0 ) ), HOUR_IN_SECONDS );
+		$this->fake->fail_next( 'GET', '#/cluster/resources$#', array( 'status' => 500 ) );
+
+		ProxmoxJobs::capacity();
+
+		$this->assertSame( 'old', get_transient( Placement::CAPACITY_PREFIX . 'lab' )[0]['node'] );
+	}
+
+	public function test_abuse_skips_vms_whose_cached_power_is_stopped(): void {
+		$r = $this->vm( 5000 );
+		$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97 ) );
+		set_transient( ProxmoxJobs::RUNNING_PREFIX . 'lab', array( array( 'resource' => $r->id(), 'cluster' => 'lab', 'vmid' => 5000, 'node' => 'node-a' ) ), HOUR_IN_SECONDS );
+		Operations::remember_power( $r->id(), 'stopped' );
+
+		ProxmoxJobs::abuse();
+
+		$this->assertSame( 0, $this->paths( 'GET', '#rrddata$#' ) );
+	}
+
+	public function test_pause_mode_skips_a_resource_whose_desired_is_not_ready(): void {
+		$this->settings( array( 'abuse_mode' => 'pause' ) );
+		$r = $this->vm( 5000 );
+		$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97 ) );
+		$this->assertTrue( $r->set( array( 'desired' => 'paused' ) ) );
+
+		$this->abuse_run();
+
+		$this->assertSame( 'paused', Resource::find( $r->id() )->get( 'desired' ) );
+		$this->assertCount( 0, $this->mails );
+		$this->assertSame( 0, $this->paths( 'GET', '#rrddata$#' ) );
+	}
+
+	public function test_the_cap_is_shared_round_robin_between_clusters(): void {
+		$stored         = get_option( Clusters::OPTION );
+		$stored['lab2'] = $stored['lab'];
+		update_option( Clusters::OPTION, $stored, false );
+
+		foreach ( array( 'lab', 'lab2' ) as $id ) {
+			$list = array();
+
+			for ( $i = 0; $i < 400; $i++ ) {
+				$list[] = array( 'resource' => 999999, 'cluster' => $id, 'vmid' => $i, 'node' => 'node-a' );
+			}
+
+			set_transient( ProxmoxJobs::RUNNING_PREFIX . $id, $list, HOUR_IN_SECONDS );
+		}
+
+		ProxmoxJobs::abuse();
+
+		$queue    = get_transient( ProxmoxJobs::QUEUE );
+		$clusters = array_count_values( array_column( $queue['items'], 'cluster' ) );
+		$this->assertSame( 250, $clusters['lab'] );
+		$this->assertSame( 250, $clusters['lab2'] );
 	}
 }

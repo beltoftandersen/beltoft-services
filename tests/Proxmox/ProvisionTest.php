@@ -471,8 +471,8 @@ class ProvisionTest extends TestCase {
 	}
 
 	public function test_clone_asks_for_another_node_only_when_placement_picks_one(): void {
-		$this->fake->add_node( 'node-b', array( 'mem' => 0 ) );
-		$this->fake->add_node( 'node-a', array( 'mem' => 60000000000 ) );
+		$this->fake->add_node( 'node-b' );
+		$this->cache( array( 'node-a' => 60000000000, 'node-b' => 0 ) );
 		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
 		$resource = $this->resource();
 
@@ -482,6 +482,68 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'node-b', $clone[0]['params']['target'] );
 		$this->assertSame( 'node-b', VmRecords::for_resource( $resource->id() )['node'] );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+	}
+
+	/**
+	 * Seeds the capacity cache: node => committed bytes, each node 64 GiB.
+	 *
+	 * @param array<string, int> $committed Committed memory per node.
+	 */
+	private function cache( array $committed ): void {
+		$rows = array();
+
+		foreach ( $committed as $node => $mem ) {
+			$rows[] = array(
+				'node'   => $node,
+				'status' => 'online',
+				'maxmem' => 68719476736,
+				'mem'    => $mem,
+			);
+		}
+
+		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
+	}
+
+	public function test_clone_waits_for_the_capacity_cache_and_never_asks_proxmox_for_nodes(): void {
+		$this->fake->add_node( 'node-b' );
+		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
+		delete_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab' );
+		$resource = $this->resource();
+
+		$result = $this->run_provision( $resource );
+
+		$this->assertTrue( $result->is_retry() );
+		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+		$this->assertCount( 0, $this->calls( 'GET', '/nodes' ), 'No live GET /nodes fallback.' );
+		$this->assertSame( '', VmRecords::for_resource( $resource->id() )['node'], 'Nothing was placed.' );
+	}
+
+	public function test_a_burst_of_provisions_commits_memory_and_does_not_overcommit(): void {
+		$gb = 1073741824;
+		$this->fake->add_node( 'node-b' );
+		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
+		// Free: node-a 60 GiB - ... the plan is 4096 MB (4 GiB); node-a has 12 free, node-b 6.
+		$rows = array(
+			array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 4 * $gb ),
+			array( 'node' => 'node-b', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 10 * $gb ),
+		);
+		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
+
+		IpPool::add( '192.0.2.12' );
+		$nodes = array();
+
+		foreach ( array( 1, 2, 3 ) as $unused ) {
+			$resource = $this->resource();
+			$this->assert_done( $this->run_provision( $resource ) );
+			$nodes[] = VmRecords::for_resource( $resource->id() )['node'];
+		}
+
+		$this->assertSame( array( 'node-a', 'node-a', 'node-b' ), $nodes, 'Each placement counts: 12/6 free, then 8/6, then 4/6.' );
+
+		$free = \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' );
+		$this->assertSame( 4 * $gb, $free['node-a'] );
+		$this->assertSame( 2 * $gb, $free['node-b'] );
+		$this->assertFalse( \BeltoftServices\Proxmox\Capacity::fits( 'lab', 5 * $gb ), 'Stock closes for a plan that no longer fits anywhere.' );
 	}
 
 	public function test_template_must_be_a_template_and_in_the_list(): void {
