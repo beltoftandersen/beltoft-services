@@ -28,6 +28,7 @@ $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LI
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time cleanup of the plugin's own options.
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'beltoft_services_driver_conflict_' ) . '%' ) );
 delete_option( 'beltoft_services_connections' );
+delete_option( 'beltoft_services_proxmox_clusters' );
 
 // The customer emails' WooCommerce settings.
 foreach ( array( 'ready', 'paused', 'deletion_warning', 'deleted', 'limit_exceeded' ) as $beltoft_services_email ) {
