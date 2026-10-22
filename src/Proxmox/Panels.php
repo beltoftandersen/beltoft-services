@@ -67,6 +67,8 @@ final class Panels {
 		$list   = null === $record ? array() : OsField::options_for( $record['cluster'] );
 		$chosen = (int) $r->get( OsField::META );
 		$chosen = $chosen > 0 ? $chosen : (int) ( $plan['template'] ?? 0 );
+		// A template that is no longer listed cannot be preselected: the cluster's default is.
+		$select = isset( $list[ $chosen ] ) || null === $record ? $chosen : Clusters::default_template( $record['cluster'] );
 		$state  = array(
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'plan'       => array(
@@ -77,7 +79,7 @@ final class Panels {
 			'power'      => null === $status ? '' : (string) $status['power'],
 			'os_label'   => (string) ( $list[ $chosen ] ?? '' ),
 			'os_options' => $list,
-			'os_current' => $chosen,
+			'os_current' => $select,
 			'has_key'    => Actions::has_key( $r ),
 			'can_reveal' => Access::revealable( $r ),
 			'forms'      => $r->accepts_actions(),

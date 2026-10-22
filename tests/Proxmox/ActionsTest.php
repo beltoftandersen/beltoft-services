@@ -146,8 +146,8 @@ class ActionsTest extends TestCase {
 			)
 		);
 
-		foreach ( array( '192.0.2.10', '192.0.2.11', '192.0.2.12', '192.0.2.13', '192.0.2.14' ) as $address ) {
-			IpPool::add( $address );
+		foreach ( range( 10, 24 ) as $last_octet ) {
+			IpPool::add( '192.0.2.' . $last_octet );
 		}
 
 		as_unschedule_all_actions( Jobs::SWEEP, array(), Jobs::GROUP );
@@ -639,6 +639,147 @@ class ActionsTest extends TestCase {
 
 		$this->run_jobs();
 		$this->assertStringNotContainsString( 'internal pve', (string) wp_json_encode( Panel::message( 'ready' ) ) );
+	}
+
+	// -- Fix round 1 ---------------------------------------------------------------------------------
+
+	public function test_reset_password_is_offered_only_when_the_guest_agent_is_known_to_work(): void {
+		list( $r, $owner ) = $this->ready();
+		$this->assertSame( 'ok', $r->get( 'agent' ) );
+		$this->assertArrayHasKey( 'reset_password', Actions::offered( $r ) );
+		$this->assertStringContainsString( 'data-action="reset_password"', $this->panel( $r, $owner ) );
+
+		$r->set( array( 'agent' => 'unknown' ) );
+		$r = Resource::find( $r->id() );
+		$seen = count( $this->fake->calls() );
+
+		$this->assertArrayNotHasKey( 'reset_password', Actions::offered( $r ) );
+		$this->assertStringNotContainsString( 'data-action="reset_password"', $this->panel( $r, $owner ) );
+		$this->assertSame( 403, $this->route( $r->id(), $owner, 'reset_password' )->get_status(), 'The route refuses it.' );
+
+		// A job that was queued before the agent state changed is refused too, without an alert.
+		$this->act( $r, 'reset_password' );
+		$this->assertCount( $seen, $this->fake->calls() );
+		$this->assertArrayNotHasKey( $r->id(), Alerts::problems() );
+	}
+
+	/**
+	 * Makes the VM look like somebody else's, or out of range, and returns the state to compare.
+	 *
+	 * @param string $how tag or range.
+	 */
+	private function break_ownership( Resource $r, string $how ): void {
+		if ( 'tag' === $how ) {
+			$this->fake->request( 'PUT', '/nodes/node-a/qemu/' . $r->get( 'vmid' ) . '/config', array( 'description' => 'somebody else' ) );
+			return;
+		}
+
+		$this->save_range( 6000, 6099 );
+	}
+
+	private function save_range( int $min, int $max ): void {
+		$this->assertTrue( Clusters::save( 'lab', array_merge( Clusters::get( 'lab' ), array( 'token_secret' => '', 'nodes' => 'node-a', 'nameservers' => '192.0.2.53', 'vlan' => '', 'templates' => "9000 = Ubuntu 26.04\n9001 = Ubuntu 24.04", 'default_template' => '9000', 'vmid_min' => (string) $min, 'vmid_max' => (string) $max ) ) ) );
+	}
+
+	public function test_ownership_refusals_fail_without_a_write_for_reinstall_reset_password_and_shutdown(): void {
+		foreach ( array( 'tag', 'range' ) as $how ) {
+			foreach ( array( 'reinstall', 'reset_password', 'shutdown' ) as $action ) {
+				list( $r ) = $this->ready();
+				$this->break_ownership( $r, $how );
+				$before = Resource::find( $r->id() );
+				$steps  = $before->get( 'steps' );
+				$seen   = count( $this->fake->calls() );
+
+				$result = ( new Actions( $before ) )->run( $action, array( 'confirm' => 'REINSTALL' ) );
+
+				$this->assertTrue( $result->is_failed(), $how . ' ' . $action );
+				$this->assertStringContainsString( 'Ownership check failed', $result->error() );
+
+				foreach ( array_slice( $this->fake->calls(), $seen ) as $call ) {
+					$this->assertSame( 'GET', $call['method'], $how . ' ' . $action . ': ' . $call['method'] . ' ' . $call['path'] );
+				}
+
+				$after = Resource::find( $r->id() );
+				$this->assertSame( 'ready', $after->get( 'state' ), 'State untouched.' );
+				$this->assertSame( $steps, $after->get( 'steps' ), 'Steps untouched.' );
+				$this->assertEmpty( $after->get( 'wipe' ) );
+				$this->assertEmpty( $after->get( 'password_reset' ) );
+				$this->assertSame( $before->get( 'reveal' ), $after->get( 'reveal' ), 'The password is untouched.' );
+				$this->assertSame( 'running', $this->fake->vm( (int) $r->get( 'vmid' ) )['status'] );
+
+				// Restore the cluster range for the next round.
+				if ( 'range' === $how ) {
+					$this->save_range( 5000, 5099 );
+				}
+			}
+		}
+	}
+
+	public function test_a_job_dropped_because_the_power_state_changed_leaves_an_event(): void {
+		list( $r ) = $this->ready();
+		$seen      = count( $this->fake->calls() );
+
+		// The panel offered Shut down while the VM ran; by the time the job runs it is known to be off.
+		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'stopped' );
+		$this->act( $r, 'shutdown' );
+
+		$this->assertCount( $seen, $this->fake->calls() );
+		$events = (string) wp_json_encode( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ) );
+		$this->assertStringContainsString( 'shutdown', $events );
+		$this->assertStringContainsString( 'not available any more', $events );
+	}
+
+	public function test_the_reinstall_form_falls_back_to_the_cluster_default_when_the_current_os_is_gone(): void {
+		list( $r, $owner ) = $this->ready();
+		$r->set( array( 'os_template' => 9777 ) );
+
+		$html = $this->panel( $r, $owner );
+
+		$this->assertMatchesRegularExpression( '#<option value="9000"[^>]*selected#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<option value="9001"[^>]*selected#', $html );
+	}
+
+	public function test_a_permanent_cipassword_failure_restores_the_unread_first_password(): void {
+		list( $r, $owner ) = $this->ready();
+		$original          = Crypto::decrypt( (string) $r->get( 'reveal' ) );
+		$this->assertNotEmpty( $original );
+
+		$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 400, 'message' => 'invalid parameter' ) );
+		$result = ( new Actions( Resource::find( $r->id() ) ) )->run( 'reset_password', array() );
+
+		$this->assertTrue( $result->is_failed() );
+		$after = Resource::find( $r->id() );
+		$this->assertEmpty( $after->get( 'password_reset' ), 'No half-applied reset is left.' );
+		$this->assertSame( $original, Crypto::decrypt( (string) $after->get( 'reveal' ) ), 'The unread password is still there.' );
+		$this->assertTrue( Access::revealable( $after ) );
+		$this->assertSame( $original, Access::take_reveal( $after, $owner ) );
+	}
+
+	public function test_reset_password_has_a_limit_kept_in_the_resource(): void {
+		list( $r, $owner ) = $this->ready();
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$this->act( $r, 'reset_password' );
+			$this->assertFalse( (bool) Resource::find( $r->id() )->get( 'password_reset' ) );
+		}
+
+		wp_cache_flush();
+		global $wpdb;
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '%transient%beltoft_services%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$seen = count( $this->calls( 'PUT', '/config' ) );
+
+		$answer = $this->route( $r->id(), $owner, 'reset_password' );
+		$this->assertSame( 422, $answer->get_status() );
+		$this->assertStringContainsString( 'three times an hour', $answer->get_data()['message'] );
+
+		$this->act( $r, 'reset_password' );
+		$this->assertCount( $seen, $this->calls( 'PUT', '/config' ), 'The job refuses it as well.' );
+
+		// A retry of a reset in progress is not a new reset.
+		$stamps = (array) Resource::find( $r->id() )->get( 'reset_times' );
+		$this->assertCount( 3, $stamps );
+		Resource::find( $r->id() )->set( array( 'reset_times' => array( time() - HOUR_IN_SECONDS - 5, time() - 10, time() - 5 ) ) );
+		$this->assertSame( 202, $this->route( $r->id(), $owner, 'reset_password' )->get_status() );
 	}
 
 	// -- Panels --------------------------------------------------------------------------------------

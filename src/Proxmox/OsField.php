@@ -25,8 +25,8 @@ defined( 'ABSPATH' ) || exit;
  * provisioning with an admin alert). The product's own Template VMID is the fallback when no
  * choice exists: an order from before this field, or a license issued by an admin.
  *
- * One choice per order: every VM product on it gets the same template, and its options come from
- * the cluster of the first VM product in the cart. WooCommerce's block checkout has no default
+ * One choice per order: every VM product on it gets the same template, so only a template that
+ * every VM product's cluster lists is accepted (never a silent change after payment). WooCommerce's block checkout has no default
  * value for additional select fields (the registration takes none), so there the default is
  * listed first and the customer picks explicitly.
  */
@@ -101,9 +101,12 @@ final class OsField {
 	}
 
 	/**
-	 * What the current cart offers: the cluster of its first VM product that has templates.
+	 * What the current cart offers: the templates valid for EVERY VM product in it (the
+	 * intersection of their clusters' lists, by VMID), the first cluster's default first when it
+	 * is among them. The system is never changed after payment, so a template one of the servers'
+	 * clusters lacks is not offered.
 	 *
-	 * @return array{cluster: string, options: array<int, string>, default: int}|null Null: no VM in the cart or no templates configured.
+	 * @return array{cluster: string, options: array<int, string>, default: int, any: array<int, string>}|null Null: no VM in the cart, or no cluster of it has templates. `options` is empty when the clusters share none; `any` is every template of any of them.
 	 */
 	public static function cart_choice(): ?array {
 		$cart = function_exists( 'WC' ) ? WC()->cart : null;
@@ -112,20 +115,61 @@ final class OsField {
 			return null;
 		}
 
+		$first  = '';
+		$shared = null;
+		$any    = array();
+
 		foreach ( $cart->get_cart() as $item ) {
 			$cluster = self::cluster_of( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) );
-			$options = '' === $cluster ? array() : self::options_for( $cluster );
 
-			if ( array() !== $options ) {
-				return array(
-					'cluster' => $cluster,
-					'options' => $options,
-					'default' => Clusters::default_template( $cluster ),
-				);
+			if ( '' === $cluster ) {
+				continue;
 			}
+
+			$list   = Clusters::templates( $cluster );
+			$first  = '' === $first ? $cluster : $first;
+			$any   += $list;
+			$shared = null === $shared ? $list : array_intersect_key( $shared, $list );
 		}
 
-		return null;
+		if ( null === $shared || array() === $any ) {
+			return null;
+		}
+
+		$default = Clusters::default_template( $first );
+
+		if ( isset( $shared[ $default ] ) ) {
+			$shared = array( $default => $shared[ $default ] ) + $shared;
+		}
+
+		return array(
+			'cluster' => $first,
+			'options' => $shared,
+			'default' => isset( $shared[ $default ] ) ? $default : (int) array_key_first( $shared ),
+			'any'     => $any,
+		);
+	}
+
+	/**
+	 * The refusal for a choice: the all-servers message when it is a template of some server's
+	 * cluster, otherwise the plain "choose" message. Null when it is acceptable.
+	 *
+	 * @param mixed                                                                                 $raw    Input.
+	 * @param array{options: array<int, string>, any: array<int, string>} $choice The cart's choice.
+	 */
+	private static function refusal( $raw, array $choice ): ?string {
+		if ( self::pick( $raw, $choice['options'] ) > 0 ) {
+			return null;
+		}
+
+		return array() === $choice['options'] || self::pick( $raw, $choice['any'] ) > 0 ? self::not_all_message() : self::invalid_message();
+	}
+
+	/**
+	 * The message when a template is not valid for all servers of the cart.
+	 */
+	private static function not_all_message(): string {
+		return __( "The chosen operating system isn't available for all servers in your cart.", 'beltoft-services' );
 	}
 
 	/**
@@ -187,6 +231,11 @@ final class OsField {
 			return;
 		}
 
+		if ( array() === $choice['options'] ) {
+			echo '<p class="beltoft-services-os woocommerce-error">' . esc_html( self::not_all_message() ) . '</p>';
+			return;
+		}
+
 		echo '<div class="beltoft-services-os">';
 
 		woocommerce_form_field(
@@ -228,8 +277,10 @@ final class OsField {
 	public static function validate_classic( $data, $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
 		$choice = self::cart_choice();
 
-		if ( null !== $choice && $errors instanceof \WP_Error && 0 === self::pick( self::posted(), $choice['options'] ) ) {
-			$errors->add( 'beltoft_services_os', self::invalid_message() );
+		$why = null === $choice ? null : self::refusal( self::posted(), $choice );
+
+		if ( null !== $why && $errors instanceof \WP_Error ) {
+			$errors->add( 'beltoft_services_os', $why );
 		}
 	}
 
@@ -322,6 +373,15 @@ final class OsField {
 	 * @return true|\WP_Error
 	 */
 	public static function block_validate( $value ) {
+		// The select lists every configured template (registered once, before any cart); the cart decides here.
+		$choice = self::cart_choice();
+
+		if ( null !== $choice ) {
+			$why = self::refusal( $value, $choice );
+
+			return null === $why ? true : new \WP_Error( 'beltoft_services_os', $why );
+		}
+
 		return self::pick( $value, self::all_options() ) > 0 ? true : new \WP_Error( 'beltoft_services_os', self::invalid_message() );
 	}
 

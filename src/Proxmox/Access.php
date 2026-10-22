@@ -31,6 +31,12 @@ final class Access {
 	public const META_RESET = 'password_reset';
 
 	/**
+	 * The reveal state before a reset began, put back when the reset cannot be applied.
+	 */
+	public const META_PREV       = 'reveal_prev';
+	public const META_PREV_UNTIL = 'reveal_prev_until';
+
+	/**
 	 * Days the customer has to read the password.
 	 */
 	public const REVEAL_DAYS = 7;
@@ -115,12 +121,16 @@ final class Access {
 
 		$password  = self::generate_password();
 		$encrypted = Crypto::encrypt( $password );
+		$previous  = $r->get( self::META_REVEAL );
 
 		if ( ! $r->set(
 			array(
-				self::META_REVEAL => $encrypted,
-				self::META_UNTIL  => time() + self::REVEAL_DAYS * DAY_IN_SECONDS,
-				self::META_RESET  => true,
+				self::META_REVEAL     => $encrypted,
+				self::META_UNTIL      => time() + self::REVEAL_DAYS * DAY_IN_SECONDS,
+				self::META_RESET      => true,
+				// An unread password is kept aside until the new one is on the VM.
+				self::META_PREV       => is_string( $previous ) && '' !== $previous ? $previous : null,
+				self::META_PREV_UNTIL => is_string( $previous ) && '' !== $previous ? (int) $r->get( self::META_UNTIL ) : null,
 			)
 		) ) {
 			throw new \RuntimeException( 'The password could not be stored.' );
@@ -136,7 +146,35 @@ final class Access {
 	 * @return bool Whether it was stored.
 	 */
 	public static function finish_reset( Resource $r ): bool {
-		return $r->set( array( self::META_RESET => null ) );
+		return $r->set(
+			array(
+				self::META_RESET      => null,
+				self::META_PREV       => null,
+				self::META_PREV_UNTIL => null,
+			)
+		);
+	}
+
+	/**
+	 * The reset cannot be applied (the cluster refused it for good): the unread password that was
+	 * there before comes back, the half-done reset is cleared.
+	 *
+	 * @param Resource $r Resource.
+	 * @return bool Whether it was stored.
+	 */
+	public static function abort_reset( Resource $r ): bool {
+		$previous = $r->get( self::META_PREV );
+		$had      = is_string( $previous ) && '' !== $previous;
+
+		return $r->set(
+			array(
+				self::META_REVEAL     => $had ? $previous : '',
+				self::META_UNTIL      => $had ? (int) $r->get( self::META_PREV_UNTIL ) : 0,
+				self::META_RESET      => null,
+				self::META_PREV       => null,
+				self::META_PREV_UNTIL => null,
+			)
+		);
 	}
 
 	/**
@@ -220,6 +258,7 @@ final class Access {
 				self::META_REVEAL => '',
 				self::META_UNTIL  => 0,
 				self::META_RESET  => null,
+				self::META_PREV   => null,
 			)
 		);
 	}

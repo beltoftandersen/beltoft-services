@@ -71,8 +71,8 @@ class OsFieldTest extends TestCase {
 		);
 	}
 
-	private function vm( string $cluster = 'lab' ): \WC_Product {
-		return $this->service_product( 'proxmox', array( 'cluster' => $cluster, 'template' => 9001 ) );
+	private function vm( string $cluster = 'lab', string $slug = 'test-service' ): \WC_Product {
+		return $this->service_product( 'proxmox', array( 'cluster' => $cluster, 'template' => 9001 ), array( 'slug' => $slug ) );
 	}
 
 	private function html(): string {
@@ -116,6 +116,92 @@ class OsFieldTest extends TestCase {
 		// No templates configured: no field.
 		delete_option( Clusters::OPTION );
 		$this->assertSame( '', $this->html() );
+	}
+
+	private const NOT_ALL = "The chosen operating system isn't available for all servers in your cart.";
+
+	/**
+	 * Posts a value through the classic validation.
+	 *
+	 * @param mixed $value Value, null for none.
+	 * @return string[] Error messages.
+	 */
+	private function check( $value ): array {
+		do_action( 'woocommerce_checkout_process' );
+
+		if ( null === $value ) {
+			unset( $_POST[ OsField::POST_KEY ] );
+		} else {
+			$_POST[ OsField::POST_KEY ] = $value;
+		}
+
+		$errors = new \WP_Error();
+		OsField::validate_classic( array(), $errors );
+
+		return $errors->get_error_messages();
+	}
+
+	public function test_a_mixed_cluster_cart_offers_and_accepts_only_the_shared_templates(): void {
+		$this->save_cluster( 'lab2', "9000 = Ubuntu 26.04\n9002 = Debian 12", '9000' );
+		WC()->cart->add_to_cart( $this->vm( 'lab', 'vm-a' )->get_id() );
+		WC()->cart->add_to_cart( $this->vm( 'lab2', 'vm-b' )->get_id() );
+
+		$this->assertSame( array( 9000 => 'Ubuntu 26.04' ), OsField::cart_choice()['options'], 'The intersection.' );
+
+		$html = $this->html();
+		$this->assertStringContainsString( 'value="9000"', $html );
+		$this->assertStringNotContainsString( 'value="9001"', $html );
+		$this->assertStringNotContainsString( 'value="9002"', $html );
+
+		$this->assertSame( array(), $this->check( '9000' ), 'Valid for both clusters.' );
+		$this->assertSame( array( self::NOT_ALL ), $this->check( '9001' ), 'Only the first cluster has it.' );
+		$this->assertSame( array( self::NOT_ALL ), $this->check( '9002' ), 'Only the second cluster has it.' );
+		$this->assertCount( 1, $this->check( '9005' ), 'Unknown everywhere.' );
+		$this->assertNotSame( array( self::NOT_ALL ), $this->check( '9005' ) );
+		$this->assertCount( 1, $this->check( null ) );
+
+		// Saved on the lines only when valid for all.
+		$item = new \WC_Order_Item_Product();
+		$item->set_product( $this->vm( 'lab', 'vm-a' ) );
+		$_POST[ OsField::POST_KEY ] = '9001';
+		OsField::save_on_item( $item );
+		$this->assertSame( '', $item->get_meta( OsField::ITEM_META ) );
+		$_POST[ OsField::POST_KEY ] = '9000';
+		OsField::save_on_item( $item );
+		$this->assertSame( '9000', $item->get_meta( OsField::ITEM_META ) );
+	}
+
+	public function test_a_cart_without_a_shared_template_is_refused_for_any_choice(): void {
+		$this->save_cluster( 'lab2', '9002 = Debian 12', '9002' );
+		WC()->cart->add_to_cart( $this->vm( 'lab', 'vm-a' )->get_id() );
+		WC()->cart->add_to_cart( $this->vm( 'lab2', 'vm-b' )->get_id() );
+
+		$this->assertSame( array(), OsField::cart_choice()['options'] );
+		$this->assertStringNotContainsString( '<select', $this->html() );
+		$this->assertStringContainsString( 'isn&#039;t available for all servers', $this->html() );
+
+		foreach ( array( '9000', '9001', '9002' ) as $value ) {
+			$this->assertSame( array( self::NOT_ALL ), $this->check( $value ), $value );
+		}
+	}
+
+	public function test_block_validation_uses_the_templates_shared_by_the_cart(): void {
+		$this->save_cluster( 'lab2', "9000 = Ubuntu 26.04\n9002 = Debian 12", '9000' );
+		$args = OsField::block_field_args();
+
+		// Without a cart: every configured template.
+		$this->assertTrue( call_user_func( $args['validate_callback'], '9002', $args ) );
+
+		WC()->cart->add_to_cart( $this->vm( 'lab', 'vm-a' )->get_id() );
+		WC()->cart->add_to_cart( $this->vm( 'lab2', 'vm-b' )->get_id() );
+
+		$this->assertTrue( call_user_func( $args['validate_callback'], '9000', $args ) );
+
+		foreach ( array( '9001', '9002' ) as $value ) {
+			$result = call_user_func( $args['validate_callback'], $value, $args );
+			$this->assertInstanceOf( \WP_Error::class, $result );
+			$this->assertSame( self::NOT_ALL, $result->get_error_message() );
+		}
 	}
 
 	public function test_classic_validation_needs_a_listed_template(): void {

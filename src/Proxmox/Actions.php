@@ -59,6 +59,22 @@ final class Actions {
 	);
 
 	/**
+	 * Password resets per hour, counted in the resource.
+	 */
+	public const RESET_LIMIT = 3;
+
+	/**
+	 * The timestamps within a window.
+	 *
+	 * @param array<int, mixed> $stamps Timestamps.
+	 * @param int               $window Seconds.
+	 * @return int[]
+	 */
+	private static function recent( array $stamps, int $window ): array {
+		return array_values( array_filter( array_map( 'intval', $stamps ), static fn( $t ) => $t > 0 && time() - $t < $window ) );
+	}
+
+	/**
 	 * Cluster settings (token secret decrypted).
 	 *
 	 * @var array<string, mixed>
@@ -104,11 +120,25 @@ final class Actions {
 			$out['reboot']   = __( 'Reboot', 'beltoft-services' );
 		}
 
-		$out['reset_password'] = __( 'Reset password', 'beltoft-services' );
+		if ( self::agent_ok( $r ) ) {
+			$out['reset_password'] = __( 'Reset password', 'beltoft-services' );
+		}
+
 		$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
 		$out['reinstall']      = __( 'Reinstall', 'beltoft-services' );
 
 		return $out;
+	}
+
+	/**
+	 * Is the guest agent known to work? The build records the outcome of its last ping (it only
+	 * pings when the template enables the agent), so "ok" means enabled and answering. Without it a
+	 * new password could only be set for a later cloud-init run, which nobody can promise.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function agent_ok( Resource $r ): bool {
+		return 'ok' === $r->get( 'agent' );
 	}
 
 	/**
@@ -148,6 +178,14 @@ final class Actions {
 	public static function check( Resource $r, string $action, array $args ): ?string {
 		if ( 'replace_ssh_key' === $action && null === SshKeyField::normalise( $args['key'] ?? null ) ) {
 			return SshKeyField::invalid_message();
+		}
+
+		if ( 'reset_password' === $action ) {
+			if ( ! self::agent_ok( $r ) ) {
+				return __( 'Resetting the password is not available for this server.', 'beltoft-services' );
+			}
+
+			return count( self::recent( (array) $r->get( 'reset_times' ), HOUR_IN_SECONDS ) ) >= self::RESET_LIMIT ? __( 'The password can be reset three times an hour. Please try again later.', 'beltoft-services' ) : null;
 		}
 
 		if ( 'reinstall' !== $action ) {
@@ -406,6 +444,11 @@ final class Actions {
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
 	private function reset_password( array $record, array $v ): StepResult {
+		// A retry of a reset in progress is not a new reset; a new one is counted before anything is generated.
+		if ( ! $this->r->get( Access::META_RESET ) && ! $this->r->set( array( 'reset_times' => array_merge( self::recent( (array) $this->r->get( 'reset_times' ), HOUR_IN_SECONDS ), array( time() ) ) ) ) ) {
+			return StepResult::retry( 0, 'reset_password: the request could not be stored' );
+		}
+
 		try {
 			$password = Access::reset_password( $this->r );
 		} catch ( \RuntimeException $e ) {
@@ -420,7 +463,14 @@ final class Actions {
 		$answer = $this->client->request( 'PUT', $base . '/config', array( 'cipassword' => $password ) );
 
 		if ( is_wp_error( $answer ) ) {
-			return $this->classify( $answer, 'reset_password' );
+			$result = $this->classify( $answer, 'reset_password' );
+
+			// Refused for good: the customer keeps the password they had not read yet.
+			if ( $result->is_failed() ) {
+				Access::abort_reset( $this->r );
+			}
+
+			return $result;
 		}
 
 		$agent = 'running' === $v['status'] && Provision::agent_enabled( (string) ( $v['config']['agent'] ?? '' ) );
@@ -493,6 +543,7 @@ final class Actions {
 			Access::META_REVEAL => '',
 			Access::META_UNTIL  => 0,
 			Access::META_RESET  => null,
+			Access::META_PREV   => null,
 			'last_reinstall_at' => time(),
 		);
 
