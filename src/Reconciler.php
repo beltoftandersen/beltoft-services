@@ -54,7 +54,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified' );
 
 	/**
 	 * The state each operation reaches when it is done.

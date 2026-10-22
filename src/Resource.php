@@ -289,7 +289,7 @@ final class Resource {
 	 * failed), so the customer knows to get in touch.
 	 */
 	public function shows_status(): bool {
-		if ( ! $this->is_live() || 'ready' !== $this->get( 'desired' ) || in_array( $this->get( 'state' ), array( 'paused', 'deleting', 'deleted' ), true ) ) {
+		if ( ! $this->is_live() || $this->on_hold() || 'ready' !== $this->get( 'desired' ) || in_array( $this->get( 'state' ), array( 'paused', 'deleting', 'deleted' ), true ) ) {
 			return false;
 		}
 
@@ -299,11 +299,21 @@ final class Resource {
 	}
 
 	/**
+	 * Is the service held for a breach of the terms (meta breach_at)? A held service stays
+	 * paused: no license event, renewal, admin resume or customer action lifts the hold, only
+	 * "Lift hold" does (Admin\Panel).
+	 */
+	public function on_hold(): bool {
+		return null !== $this->get( 'breach_at' );
+	}
+
+	/**
 	 * May its customer run actions on it now? Only when it shows its status, is ready, is valid
 	 * and no other desired state is waiting to be applied.
 	 */
 	public function accepts_actions(): bool {
 		return $this->is_valid()
+			&& ! $this->on_hold()
 			&& 'ready' === $this->get( 'state' )
 			&& null === $this->pending_desire()
 			&& $this->shows_status();
@@ -343,6 +353,7 @@ final class Resource {
 			case 'next_attempt_at':
 			case 'paused_at':
 			case 'warned_at':
+			case 'breach_at':
 				return null === $value || '' === $value ? null : (int) $value;
 			case 'state':
 				return is_string( $value ) ? $value : 'requested';
@@ -352,6 +363,7 @@ final class Resource {
 			case 'driver':
 			case 'last_error':
 			case 'remote_id':
+			case 'breach_reason':
 				return is_scalar( $value ) ? (string) $value : '';
 			default:
 				return $value;
@@ -534,6 +546,13 @@ final class Resource {
 				return false;
 			}
 
+			// A breach hold is lifted by an admin only: nothing else may make the service ready.
+			if ( 'ready' === $state && $this->on_hold() ) {
+				$this->forget_pending( $at );
+				Events::add( (int) $this->row['license_id'], 'service', self::HOLD_REFUSED );
+				return false;
+			}
+
 			$meta = array(
 				'desired'    => $state,
 				'desired_at' => $at,
@@ -578,6 +597,11 @@ final class Resource {
 
 		return true;
 	}
+
+	/**
+	 * History text when a ready desire is refused during a breach hold.
+	 */
+	public const HOLD_REFUSED = 'Resume refused: the service is on breach hold. Lift the hold first.';
 
 	/**
 	 * History text of a desire refused during a deletion.
@@ -829,6 +853,28 @@ final class Resource {
 
 				// The lock is re-entrant within this connection: desire() takes it again at once.
 				return $this->desire( 'deleted', $reason, true );
+			}
+		);
+	}
+
+	/**
+	 * Requests the deletion of a service whose breach hold began at $breach_at, under the
+	 * resource lock and only while that hold is still the same one, the service is still meant
+	 * to be paused and is not protected. No replacement follows, whatever the license says:
+	 * billing is the admin's. A lifted hold, a protected service or a busy lock stores nothing.
+	 *
+	 * @param int    $breach_at The breach_at the caller decided on.
+	 * @param string $reason    History text.
+	 * @return bool Whether the deletion was stored.
+	 */
+	public function delete_if_still_held( int $breach_at, string $reason ): bool {
+		return true === $this->locked(
+			function () use ( $breach_at, $reason ): bool {
+				if ( $this->get( 'breach_at' ) !== $breach_at || 'paused' !== $this->get( 'desired' ) || $this->get( 'protected' ) ) {
+					return false;
+				}
+
+				return $this->desire( 'deleted', $reason, false );
 			}
 		);
 	}

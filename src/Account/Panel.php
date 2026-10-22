@@ -64,9 +64,14 @@ final class Panel {
 	/**
 	 * The badge text of a state.
 	 *
-	 * @param string $state Resource state.
+	 * @param string        $state Resource state.
+	 * @param Resource|null $r     The resource, when its hold decides the text.
 	 */
-	public static function label( string $state ): string {
+	public static function label( string $state, ?Resource $r = null ): string {
+		if ( $r && $r->on_hold() && 'removed' !== self::group( $state ) ) {
+			return __( 'Suspended', 'beltoft-services' );
+		}
+
 		$labels = array(
 			'getting-ready' => __( 'Getting ready', 'beltoft-services' ),
 			'ready'         => __( 'Ready', 'beltoft-services' ),
@@ -82,9 +87,14 @@ final class Panel {
 	 * A sentence for the customer about a state. Fixed texts only: never the resource's
 	 * last_error or anything else a driver reported.
 	 *
-	 * @param string $state Resource state.
+	 * @param string        $state Resource state.
+	 * @param Resource|null $r     The resource, when its hold or a delayed setup decides the text.
 	 */
-	public static function message( string $state ): string {
+	public static function message( string $state, ?Resource $r = null ): string {
+		if ( $r && $r->on_hold() && 'removed' !== self::group( $state ) ) {
+			return __( 'This server is suspended. Contact support.', 'beltoft-services' );
+		}
+
 		$messages = array(
 			'getting-ready' => __( 'Your service is being set up. This page updates by itself.', 'beltoft-services' ),
 			'ready'         => __( 'Your service is ready.', 'beltoft-services' ),
@@ -135,8 +145,8 @@ final class Panel {
 		printf(
 			'<p class="beltoft-services-panel__head"><span class="beltoft-services-badge beltoft-services-badge--%1$s" data-badge>%2$s</span> <span class="beltoft-services-panel__message" data-message>%3$s</span></p>',
 			esc_attr( $group ),
-			esc_html( self::label( $state ) ),
-			esc_html( self::message( $state ) )
+			esc_html( self::label( $state, $resource ) ),
+			esc_html( self::message( $state, $resource ) )
 		);
 
 		if ( $owner ) {

@@ -435,7 +435,7 @@ final class Jobs {
 			return true;
 		}
 
-		if ( 'paused' === $desired && $active && 'paused' === $resource->get( 'state' ) ) {
+		if ( 'paused' === $desired && $active && ! $resource->on_hold() && 'paused' === $resource->get( 'state' ) ) {
 			Alerts::admin( $resource, 'The service is paused but its license is active (found by the sweep). Resume it, or leave it paused on purpose.' );
 		}
 

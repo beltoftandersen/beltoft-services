@@ -120,6 +120,46 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin once per hold that a service on breach hold has passed its days and was
+	 * not deleted (deletion is off or report only). The hold's date is stored in meta
+	 * `breach_alerted` under the resource lock, after the mail is attempted.
+	 *
+	 * @param Resource $r    Resource.
+	 * @param int      $days Breach days.
+	 * @param string   $mode Deletion mode (off or report).
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function breach_due( Resource $r, int $days, string $mode ): bool {
+		$breach_at = $r->get( 'breach_at' );
+		$to        = (string) Settings::get( 'admin_email' );
+
+		if ( null === $breach_at || (int) $r->get( 'breach_alerted' ) === $breach_at || ! is_email( $to ) ) {
+			return false;
+		}
+
+		$license = $r->license();
+		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key     = (string) ( $license['license_key'] ?? '' );
+		$lines   = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Resource: %d', $r->id() ),
+			sprintf( 'Driver: %s', $r->get( 'driver' ) ),
+			sprintf( 'On breach hold since: %s UTC (%d days)', gmdate( 'Y-m-d H:i', $breach_at ), $days ),
+			sprintf( 'Deletion mode: %s, so nothing was deleted. Delete the service by hand, or turn deletion on.', $mode ),
+		);
+
+		$sent = (bool) wp_mail( $to, sprintf( '[%s] Breach hold period over: %s', $site, self::mask( $key ) ), implode( "\n", $lines ) . "\n" );
+
+		$r->locked(
+			static function () use ( $r, $breach_at ): bool {
+				return $breach_at === $r->get( 'breach_at' ) && $r->set( array( 'breach_alerted' => $breach_at ) );
+			}
+		);
+
+		return $sent;
+	}
+
+	/**
 	 * Alerts the admin that a license's service could not be created (there is no resource to
 	 * hang the alert on). Sent once per call: a creation happens once per license event.
 	 *

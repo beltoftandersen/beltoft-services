@@ -30,9 +30,12 @@ final class Panel {
 
 	public const CAPABILITY = 'manage_woocommerce';
 	public const ACTION     = 'beltoft_services_resource';
-	public const ACTIONS    = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect' );
+	public const ACTIONS    = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect', 'suspend', 'lift_hold' );
 	public const CONFIRM      = 'DELETE';
 	public const CONFIRM_MARK = 'MARK DELETED';
+	public const CONFIRM_SUSPEND = 'SUSPEND';
+	public const CONFIRM_LIFT    = 'LIFT HOLD';
+	public const REASON_MAX      = 500;
 
 	/**
 	 * Hooks.
@@ -72,14 +75,20 @@ final class Panel {
 	 *   and an unprotected resource;
 	 * - mark_deleted: closes the resource as deleted without calling the service (for one
 	 *   that is gone already, such as a stranded delete); needs $confirm = "MARK DELETED";
-	 * - protect, unprotect: retention and driver switches never delete a protected service.
+	 * - protect, unprotect: retention and driver switches never delete a protected service;
+	 * - suspend: the breach hold. Needs $confirm = "SUSPEND" and a $reason; the service is
+	 *   paused and nothing but lift_hold resumes it (license events, renewals, the admin's
+	 *   Resume, the customer); retention deletes it after the breach days;
+	 * - lift_hold: needs $confirm = "LIFT HOLD"; the normal state applies again (ready on an
+	 *   active license, otherwise paused with the retention counted from now).
 	 *
 	 * @param Resource $r       Resource.
 	 * @param string   $action  Action.
-	 * @param string   $confirm Typed confirmation (delete).
+	 * @param string   $confirm Typed confirmation (delete, suspend, lift_hold).
+	 * @param string   $reason  Why (suspend).
 	 * @return true|\WP_Error
 	 */
-	public static function act( Resource $r, string $action, string $confirm = '' ) {
+	public static function act( Resource $r, string $action, string $confirm = '', string $reason = '' ) {
 		if ( ! in_array( $action, self::ACTIONS, true ) ) {
 			return self::error( 'invalid' );
 		}
@@ -118,6 +127,10 @@ final class Panel {
 					return self::error( 'deleting' );
 				}
 
+				if ( 'resume' === $action && $r->on_hold() ) {
+					return self::error( 'hold' );
+				}
+
 				// Stored now, or queued for the next step when the lock is busy.
 				$r->desire( 'pause' === $action ? 'paused' : 'ready', sprintf( 'pause' === $action ? 'Paused by %s' : 'Resumed by %s', $who ) );
 				$stored = true;
@@ -143,6 +156,100 @@ final class Panel {
 
 				if ( $refused ) {
 					return self::error( 'protected' );
+				}
+				break;
+
+			case 'suspend':
+				if ( self::CONFIRM_SUSPEND !== $confirm ) {
+					return self::error( 'confirm_suspend' );
+				}
+
+				$reason = trim( wp_strip_all_tags( $reason ) );
+
+				if ( '' === $reason ) {
+					return self::error( 'reason' );
+				}
+
+				$reason  = function_exists( 'mb_substr' ) ? mb_substr( $reason, 0, self::REASON_MAX ) : substr( $reason, 0, self::REASON_MAX );
+				$refused = '';
+				$stored  = $r->locked(
+					static function () use ( $r, $who, $reason, &$refused ): bool {
+						if ( 'deleted' === $r->get( 'desired' ) ) {
+							$refused = 'deleting';
+							return false;
+						}
+
+						if ( $r->on_hold() ) {
+							$refused = 'held';
+							return false;
+						}
+
+						if ( ! $r->set(
+							array(
+								'breach_at'     => time(),
+								'breach_reason' => $reason,
+							)
+						) ) {
+							return false;
+						}
+
+						// The lock is re-entrant within this connection. Stored or queued: the hold is
+						// in place either way, so a resume is refused from here on.
+						$r->desire( 'paused', sprintf( 'Suspended for breach by %1$s: %2$s', $who, $reason ) );
+						return true;
+					}
+				);
+
+				if ( '' !== $refused ) {
+					return self::error( $refused );
+				}
+				break;
+
+			case 'lift_hold':
+				if ( self::CONFIRM_LIFT !== $confirm ) {
+					return self::error( 'confirm_lift' );
+				}
+
+				$refused = '';
+				$stored  = $r->locked(
+					static function () use ( $r, $who, $license_id, &$refused ): bool {
+						if ( ! $r->on_hold() ) {
+							$refused = 'no_hold';
+							return false;
+						}
+
+						$active = \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $r->license() );
+						$meta   = array(
+							'breach_at'      => null,
+							'breach_reason'  => '',
+							'breach_alerted' => null,
+						);
+
+						// Still paused: the retention period starts now, never from the pause the hold began.
+						if ( ! $active ) {
+							$meta['paused_at'] = time();
+							$meta['warned_at'] = null;
+							$meta['reported']  = '';
+						}
+
+						if ( ! $r->set( $meta ) ) {
+							return false;
+						}
+
+						$text = sprintf( 'Breach hold lifted by %s', $who );
+
+						if ( $active ) {
+							$r->desire( 'ready', $text );
+						} else {
+							Events::add( $license_id, 'service', $text );
+						}
+
+						return true;
+					}
+				);
+
+				if ( '' !== $refused ) {
+					return self::error( $refused );
 				}
 				break;
 
@@ -175,7 +282,7 @@ final class Panel {
 			return self::error( 'error' );
 		}
 
-		if ( in_array( $action, array( 'retry', 'pause', 'resume', 'delete' ), true ) ) {
+		if ( in_array( $action, array( 'retry', 'pause', 'resume', 'delete', 'suspend', 'lift_hold' ), true ) ) {
 			Jobs::enqueue( $r->id() );
 		}
 
@@ -281,6 +388,14 @@ final class Panel {
 			'confirm'      => sprintf( __( 'Type %s to confirm the deletion.', 'beltoft-services' ), self::CONFIRM ),
 			/* translators: %s: the words to type. */
 			'confirm_mark' => sprintf( __( 'Type %s to confirm.', 'beltoft-services' ), self::CONFIRM_MARK ),
+			/* translators: %s: the words to type. */
+			'confirm_suspend' => sprintf( __( 'Type %s to confirm the suspension.', 'beltoft-services' ), self::CONFIRM_SUSPEND ),
+			/* translators: %s: the words to type. */
+			'confirm_lift' => sprintf( __( 'Type %s to confirm.', 'beltoft-services' ), self::CONFIRM_LIFT ),
+			'reason'       => __( 'Give the reason for the suspension.', 'beltoft-services' ),
+			'hold'         => __( 'This service is on breach hold. Lift the hold first.', 'beltoft-services' ),
+			'held'         => __( 'This service is on breach hold already.', 'beltoft-services' ),
+			'no_hold'      => __( 'This service is not on breach hold.', 'beltoft-services' ),
 			'protected'    => __( 'This service is protected. Unprotect it first.', 'beltoft-services' ),
 			'busy'         => __( 'The service is busy right now. Try again in a moment.', 'beltoft-services' ),
 			'error'        => __( 'The change could not be stored.', 'beltoft-services' ),
@@ -334,6 +449,7 @@ final class Panel {
 		check_admin_referer( self::nonce_action( $id, $action ) );
 
 		$confirm  = isset( $_POST['confirm'] ) ? sanitize_text_field( wp_unslash( $_POST['confirm'] ) ) : '';
+		$reason   = isset( $_POST['reason'] ) ? sanitize_text_field( wp_unslash( $_POST['reason'] ) ) : '';
 		$resource = Resource::find( $id );
 
 		if ( ! $resource ) {
@@ -341,7 +457,7 @@ final class Panel {
 			exit;
 		}
 
-		$result = self::act( $resource, $action, $confirm );
+		$result = self::act( $resource, $action, $confirm, $reason );
 		$args   = array( 'license' => (int) ( $resource->license()['id'] ?? 0 ) );
 
 		if ( is_wp_error( $result ) ) {
@@ -377,6 +493,8 @@ final class Panel {
 			'mark_deleted' => __( 'The service was marked deleted. The service itself was not called.', 'beltoft-services' ),
 			'protect'      => __( 'The service is protected.', 'beltoft-services' ),
 			'unprotect'    => __( 'The service is no longer protected.', 'beltoft-services' ),
+			'suspend'      => __( 'The service is suspended for breach.', 'beltoft-services' ),
+			'lift_hold'    => __( 'The breach hold was lifted.', 'beltoft-services' ),
 		);
 
 		if ( isset( $messages[ $notice ] ) ) {
@@ -487,6 +605,11 @@ final class Panel {
 			__( 'Deletion warned', 'beltoft-services' ) => $warned ? wp_date( $format, $warned ) : '',
 		);
 
+		if ( $r->on_hold() ) {
+			$rows[ __( 'Breach hold since', 'beltoft-services' ) ] = wp_date( $format, (int) $r->get( 'breach_at' ) );
+			$rows[ __( 'Breach reason', 'beltoft-services' ) ]     = (string) $r->get( 'breach_reason' );
+		}
+
 		echo '<table class="widefat striped beltoft-services-panel"><tbody>';
 		foreach ( $rows as $label => $value ) {
 			echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td>' . esc_html( '' === (string) $value ? '—' : (string) $value ) . '</td></tr>';
@@ -502,8 +625,11 @@ final class Panel {
 		self::button( $r, 'retry', __( 'Retry now', 'beltoft-services' ) );
 
 		if ( 'deleted' !== $r->get( 'desired' ) ) {
+			// A held service has no Resume: only "Lift hold" (below) resumes it.
 			if ( 'paused' === $r->get( 'desired' ) ) {
-				self::button( $r, 'resume', __( 'Resume', 'beltoft-services' ) );
+				if ( ! $r->on_hold() ) {
+					self::button( $r, 'resume', __( 'Resume', 'beltoft-services' ) );
+				}
 			} else {
 				self::button( $r, 'pause', __( 'Pause', 'beltoft-services' ) );
 			}
@@ -516,6 +642,8 @@ final class Panel {
 		}
 
 		echo '</div>';
+
+		self::hold_forms( $r );
 
 		if ( 'deleted' !== $r->get( 'desired' ) ) {
 			echo '<h3>' . esc_html__( 'Delete the service', 'beltoft-services' ) . '</h3>';
@@ -554,6 +682,55 @@ final class Panel {
 			)
 		);
 		echo '<button type="submit" class="button">' . esc_html__( 'Mark deleted', 'beltoft-services' ) . '</button></p></form>';
+	}
+
+	/**
+	 * The breach hold forms: suspend (with a reason), or lift the hold.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function hold_forms( Resource $r ): void {
+		if ( 'deleted' === $r->get( 'desired' ) ) {
+			return;
+		}
+
+		echo '<h3>' . esc_html__( 'Breach of terms', 'beltoft-services' ) . '</h3>';
+
+		if ( $r->on_hold() ) {
+			echo '<p class="description">' . esc_html__( 'The service is suspended for breach. Nothing resumes it except lifting the hold: not a renewal, not Resume, not the customer.', 'beltoft-services' ) . '</p>';
+			self::form_open( $r, 'lift_hold' );
+			printf(
+				'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
+				esc_html(
+					sprintf(
+						/* translators: %s: the words to type. */
+						__( 'Type %s to confirm:', 'beltoft-services' ),
+						self::CONFIRM_LIFT
+					)
+				)
+			);
+			echo '<button type="submit" class="button">' . esc_html__( 'Lift hold', 'beltoft-services' ) . '</button></p></form>';
+			return;
+		}
+
+		echo '<p class="description">' . esc_html__( 'Pauses the service and keeps it paused whatever billing does, until you lift the hold. Billing is not touched: cancel the subscription in WooCommerce Subscriptions yourself. The customer sees only that the server is suspended.', 'beltoft-services' ) . '</p>';
+		self::form_open( $r, 'suspend' );
+		printf(
+			'<p><label>%1$s <input type="text" name="reason" autocomplete="off" maxlength="%2$d" class="regular-text" required></label></p>',
+			esc_html__( 'Reason (kept in the history, never shown to the customer):', 'beltoft-services' ),
+			(int) self::REASON_MAX
+		);
+		printf(
+			'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
+			esc_html(
+				sprintf(
+					/* translators: %s: the word to type. */
+					__( 'Type %s to confirm:', 'beltoft-services' ),
+					self::CONFIRM_SUSPEND
+				)
+			)
+		);
+		echo '<button type="submit" class="button button-link-delete">' . esc_html__( 'Suspend for breach', 'beltoft-services' ) . '</button></p></form>';
 	}
 
 	/**

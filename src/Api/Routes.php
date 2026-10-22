@@ -142,8 +142,8 @@ final class Routes {
 			array(
 				'state'   => $state,
 				'desired' => (string) $resource->get( 'desired' ),
-				'label'   => Panel::label( $state ),
-				'message' => Panel::message( $state ),
+				'label'   => Panel::label( $state, $resource ),
+				'message' => Panel::message( $state, $resource ),
 			),
 			200
 		);

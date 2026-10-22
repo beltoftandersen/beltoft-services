@@ -72,7 +72,9 @@ final class Retention {
 	public static function run(): void {
 		$mode = (string) Settings::get( 'deletion_mode' );
 
-		if ( 'report' !== $mode && 'on' !== $mode ) {
+		// Off still looks at services on breach hold (the admin is told when their days are over),
+		// but only when one exists: the ordinary retention does nothing then.
+		if ( 'report' !== $mode && 'on' !== $mode && ! self::any_held() ) {
 			return;
 		}
 
@@ -96,6 +98,17 @@ final class Retention {
 	}
 
 	/**
+	 * Is any live resource on breach hold? A cheap look at the stored meta, so the daily run
+	 * costs nothing while deletion is off and nothing is held.
+	 */
+	private static function any_held(): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE deactivated_at IS NULL AND meta LIKE %s AND meta NOT LIKE %s', Install::tables()['activations'], '%"breach_at":%', '%"breach_at":null%' ) ) > 0;
+	}
+
+	/**
 	 * The next live resources of a kind after an id.
 	 *
 	 * @param string $kind  Activation kind.
@@ -112,6 +125,49 @@ final class Retention {
 	}
 
 	/**
+	 * Breach hold days, kept within 1 and 365 whatever is stored.
+	 */
+	public static function breach_days(): int {
+		return min( 365, max( 1, (int) Settings::get( 'breach_retention_days' ) ) );
+	}
+
+	/**
+	 * A service on breach hold, once its days (counted from the hold) are over: deleted when
+	 * deletion is on, with no warning email and no replacement; otherwise the admin is alerted
+	 * once (and in report mode the history says what would happen).
+	 *
+	 * @param Resource $r    Resource.
+	 * @param string   $mode off, report or on.
+	 */
+	private static function check_breach( Resource $r, string $mode ): void {
+		$breach_at = $r->get( 'breach_at' );
+		$paused_at = $r->get( 'paused_at' );
+
+		if ( null === $breach_at || null === $paused_at || null !== $r->pending_desire() ) {
+			return;
+		}
+
+		$days = self::breach_days();
+
+		if ( time() < $breach_at + $days * DAY_IN_SECONDS ) {
+			return;
+		}
+
+		if ( 'on' === $mode ) {
+			if ( $r->delete_if_still_held( $breach_at, 'Retention period over: breach hold' ) ) {
+				Jobs::enqueue( $r->id() );
+			}
+			return;
+		}
+
+		if ( 'report' === $mode ) {
+			self::report( $r, $paused_at, 'breach:' . $breach_at, sprintf( 'Would delete the service: the breach hold is %d days old (deletion mode is report only).', $days ) );
+		}
+
+		Alerts::breach_due( $r, $days, $mode );
+	}
+
+	/**
 	 * Warns, reports or requests the deletion of one resource, if it is due.
 	 *
 	 * @param Resource $r    Resource.
@@ -119,6 +175,16 @@ final class Retention {
 	 */
 	private static function check( Resource $r, string $mode ): void {
 		if ( ! $r->is_valid() || ! $r->is_live() || $r->get( 'protected' ) || 'paused' !== $r->get( 'desired' ) ) {
+			return;
+		}
+
+		// A held service follows the breach days only: never the product's retention or warning.
+		if ( $r->on_hold() ) {
+			self::check_breach( $r, $mode );
+			return;
+		}
+
+		if ( 'report' !== $mode && 'on' !== $mode ) {
 			return;
 		}
 
@@ -228,6 +294,11 @@ final class Retention {
 	 */
 	private static function report( Resource $r, int $paused_at, string $stage, string $message ): void {
 		$key = $stage . ':' . $paused_at;
+
+		// A breach stage names its own hold (it already carries the date).
+		if ( 0 === strpos( $stage, 'breach:' ) ) {
+			$key = $stage;
+		}
 
 		if ( (string) $r->get( 'reported' ) === $key ) {
 			return;
