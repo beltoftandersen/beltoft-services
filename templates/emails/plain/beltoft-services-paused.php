@@ -12,7 +12,8 @@
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
  * @var string            $reason             Why it was paused, or ''.
- * @var int               $retention_days     Days the data is kept before deletion, or 0.
+ * @var string            $deletes_on         Date the service will be deleted, or '' when none is promised.
+ * @var bool              $held               The service is suspended (breach hold).
  * @var string            $usage              Usage line (limit exceeded), or ''.
  * @var string            $additional_content Additional content from the email's settings.
  * @var \WC_Email         $email              The email.
@@ -42,10 +43,15 @@ if ( '' !== $reason ) {
 	echo wp_strip_all_tags( sprintf( __( 'Reason: %s', 'beltoft-services' ), $reason ) ) . "\n\n";
 }
 
-if ( $retention_days > 0 ) {
-	/* translators: %d: number of days. */
-	echo wp_strip_all_tags( sprintf( _n( 'Its data is kept for %d day. It starts again once your subscription is active.', 'Its data is kept for %d days. It starts again once your subscription is active.', $retention_days, 'beltoft-services' ), $retention_days ) ) . "\n\n";
-} else {
+if ( '' !== $deletes_on ) {
+	if ( $held ) {
+		/* translators: %s: date. */
+		echo wp_strip_all_tags( sprintf( __( 'It will be deleted on %s.', 'beltoft-services' ), $deletes_on ) ) . "\n\n";
+	} else {
+		/* translators: %s: date. */
+		echo wp_strip_all_tags( sprintf( __( 'It will be deleted on %s unless your subscription is active again before then.', 'beltoft-services' ), $deletes_on ) ) . "\n\n";
+	}
+} elseif ( ! $held ) {
 	echo __( 'Its data is kept, and it starts again once your subscription is active.', 'beltoft-services' ) . "\n\n";
 }
 

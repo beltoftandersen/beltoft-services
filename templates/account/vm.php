@@ -4,7 +4,7 @@
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
  * disk_gb), $power (running, stopped or empty when not known), $os_label, $os_options
- * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now).
+ * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user.
  * The password is never part of this template: the reveal button asks the server for it once.
  *
  * @package BeltoftServices
@@ -23,7 +23,7 @@ $beltoft_services_power_labels = array(
 			<dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt>
 			<dd><code><?php echo esc_html( $ip ); ?></code></dd>
 			<dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt>
-			<dd><code>ssh root@<?php echo esc_html( $ip ); ?></code></dd>
+			<dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<?php echo esc_html( $ip ); ?></code></dd>
 		<?php endif; ?>
 		<dt><?php esc_html_e( 'Plan', 'beltoft-services' ); ?></dt>
 		<dd>

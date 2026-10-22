@@ -83,6 +83,7 @@ final class Panels {
 			'has_key'    => Actions::has_key( $r ),
 			'can_reveal' => Access::revealable( $r ),
 			'forms'      => $r->accepts_actions(),
+			'ssh_user'   => Provision::LOGIN_USER,
 		);
 
 		( static function ( array $vars ): void {

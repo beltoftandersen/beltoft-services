@@ -34,6 +34,11 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Provision {
 
+	/**
+	 * The login the cloud-init sets up (and the guest agent sets the password for).
+	 */
+	public const LOGIN_USER = 'root';
+
 	use Steps;
 
 	/**
@@ -718,7 +723,7 @@ final class Provision {
 				'cores'     => $this->plan['cores'],
 				'memory'    => $this->plan['memory_mb'],
 				'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $this->cluster['prefix'] . ',gw=' . $gw,
-				'ciuser'    => 'root',
+				'ciuser'    => self::LOGIN_USER,
 				'net0'      => $this->net0( (string) ( $v['config']['net0'] ?? '' ) ),
 				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
 			);

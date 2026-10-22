@@ -63,6 +63,7 @@ final class Plugin {
 		Proxmox\OsField::register();
 		Proxmox\Actions::register();
 		Proxmox\Panels::register();
+		Proxmox\EmailDetails::register();
 		Proxmox\ProxmoxJobs::register();
 		Proxmox\Stock::register();
 		Proxmox\IpPoolScreen::register();

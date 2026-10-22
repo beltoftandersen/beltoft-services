@@ -10,6 +10,7 @@ namespace BeltoftServices\Account;
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Emails\Emails;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -72,6 +73,10 @@ final class Panel {
 			return __( 'Suspended', 'beltoft-services' );
 		}
 
+		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
+			return __( 'Delayed', 'beltoft-services' );
+		}
+
 		$labels = array(
 			'getting-ready' => __( 'Getting ready', 'beltoft-services' ),
 			'ready'         => __( 'Ready', 'beltoft-services' ),
@@ -93,6 +98,11 @@ final class Panel {
 	public static function message( string $state, ?Resource $r = null ): string {
 		if ( $r && $r->on_hold() && 'removed' !== self::group( $state ) ) {
 			return __( 'This server is suspended. Contact support.', 'beltoft-services' );
+		}
+
+		// A server that could not be set up: a delay, never what went wrong.
+		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
+			return __( "There's a delay setting up your server. We're on it.", 'beltoft-services' );
 		}
 
 		$messages = array(

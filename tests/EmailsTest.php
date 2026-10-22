@@ -82,7 +82,7 @@ final class EmailsTest extends TestCase {
 	}
 
 	public function test_emails_are_woocommerce_emails(): void {
-		$ids = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded' );
+		$ids = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay' );
 
 		foreach ( $ids as $id ) {
 			$email = Emails::get( $id );
@@ -138,8 +138,9 @@ final class EmailsTest extends TestCase {
 
 		$mail = $this->customer_mails( 'paused' );
 		$this->assertCount( 1, $mail );
-		$this->assertStringContainsString( 'License suspended', (string) $mail[0]['message'], 'The reason is in the email.' );
-		$this->assertStringContainsString( '30 days', (string) $mail[0]['message'], 'The data is kept for the retention period.' );
+		$this->assertStringContainsString( 'Your subscription is on hold', (string) $mail[0]['message'], 'A fixed text for the cause is in the email.' );
+		$this->assertStringNotContainsString( 'License suspended', (string) $mail[0]['message'], 'Never the history text.' );
+		$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), (int) Resource::for_license( (int) $license['id'] )->get( 'paused_at' ) + 30 * DAY_IN_SECONDS ), (string) $mail[0]['message'], 'The deletion date is given.' );
 
 		// Retention off: the reason is there, no period is promised.
 		$this->mails = array();
@@ -152,8 +153,8 @@ final class EmailsTest extends TestCase {
 
 		$mail = $this->customer_mails( 'paused' );
 		$this->assertCount( 1, $mail );
-		$this->assertStringContainsString( 'License revoked', (string) $mail[0]['message'] );
-		$this->assertStringNotContainsString( '30 days', (string) $mail[0]['message'] );
+		$this->assertStringContainsString( 'cancelled or refunded', (string) $mail[0]['message'] );
+		$this->assertStringNotContainsString( 'deleted on', (string) $mail[0]['message'] );
 		$this->assertStringContainsString( 'data is kept', (string) $mail[0]['message'] );
 	}
 
@@ -178,8 +179,8 @@ final class EmailsTest extends TestCase {
 	}
 
 	public function test_customer_reason_never_names_an_admin(): void {
-		$this->assertSame( 'Paused by an administrator', ServiceEmail::customer_reason( 'Paused by boss' ) );
-		$this->assertSame( 'License suspended', ServiceEmail::customer_reason( 'License suspended' ) );
+		$this->assertSame( 'Paused by an administrator.', ServiceEmail::customer_reason( 'Paused by boss' ) );
+		$this->assertSame( 'Your subscription is on hold, for example because a payment is missing.', ServiceEmail::customer_reason( 'License suspended' ) );
 		$this->assertSame( '', ServiceEmail::customer_reason( '' ) );
 	}
 

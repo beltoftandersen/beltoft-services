@@ -26,6 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * - deleted: the resource was deleted after the customer was told about it (an email, or
  *   the deletion warning), unless a new service follows (a replacement on an active license);
  * - deletion warning: Retention's beltoft_services_deletion_warning;
+ * - provision delay: a provision ended failed, once per resource (meta `delay_notified`), with
+ *   no technical detail; the admin alert and the held IP are not touched;
  * - limit exceeded: the daily usage check (Action Scheduler, beltoft_services_usage) finds an
  *   HTTP service over its limit, once per new count.
  *
@@ -34,7 +36,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Emails {
 
-	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded' );
+	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay' );
 
 	public const USAGE_HOOK = 'beltoft_services_usage';
 	public const USAGE_CRON = '0 6 * * *';
@@ -49,6 +51,7 @@ final class Emails {
 		'BeltoftServices_DeletionWarning' => DeletionWarning::class,
 		'BeltoftServices_Deleted'         => Deleted::class,
 		'BeltoftServices_LimitExceeded'   => LimitExceeded::class,
+		'BeltoftServices_ProvisionDelay'  => ProvisionDelay::class,
 	);
 
 	/**
@@ -131,6 +134,11 @@ final class Emails {
 				return;
 			}
 
+			if ( 'failed' === $new && self::delay_applies( $r ) ) {
+				self::delay( $r );
+				return;
+			}
+
 			$told = (string) $r->get( 'notified' );
 
 			if ( 'ready' === $new && 'ready' !== $told ) {
@@ -146,6 +154,45 @@ final class Emails {
 			}
 		} catch ( \Throwable $e ) {
 			error_log( sprintf( 'Beltoft Services: service email failed: %s', $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a failed email must not stop the job; this is its only record.
+		}
+	}
+
+	/**
+	 * Did setting the service up fail so that the customer is told of a delay? Only a server
+	 * (a driver of kind vm) whose provision ended failed; a failed pause or deletion is not the
+	 * customer's business.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function delay_applies( Resource $r ): bool {
+		if ( ! $r->is_valid() || 'failed' !== $r->get( 'state' ) || 'provision' !== $r->get( 'failed_op' ) ) {
+			return false;
+		}
+
+		$driver = Registry::get( $r->get( 'driver' ) );
+
+		return $driver && 'vm' === $driver->kind();
+	}
+
+	/**
+	 * Tells the customer of the delay once. The record is stored first, so a send that fails or
+	 * is repeated by a retry never mails twice; an admin's retry and a later failure stay quiet.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function delay( Resource $r ): void {
+		if ( $r->get( 'delay_notified' ) ) {
+			return;
+		}
+
+		$stored = $r->locked(
+			static function () use ( $r ): bool {
+				return ! $r->get( 'delay_notified' ) && $r->set( array( 'delay_notified' => time() ) );
+			}
+		);
+
+		if ( true === $stored ) {
+			self::send( 'beltoft_services_provision_delay', $r );
 		}
 	}
 

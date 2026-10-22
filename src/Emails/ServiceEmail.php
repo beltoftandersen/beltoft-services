@@ -12,6 +12,7 @@ use BeltoftLicenses\Account\View;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Retention;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -72,8 +73,11 @@ abstract class ServiceEmail extends \WC_Email {
 				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
 				'account_url'   => wc_get_account_endpoint_url( Endpoint::slug() ),
 				'deletion_date' => (string) $date,
-				'reason'        => self::customer_reason( (string) $r->get( 'paused_reason' ) ),
+				'reason'        => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
+				'held'          => $r->on_hold(),
 				'retention_days' => self::retention_days( $r, $license ),
+				'deletes_on'    => self::deletes_on( $r, $license ),
+				'details'       => $this->details( $r ),
 				'used'          => $used,
 				'limit'         => $limit,
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
@@ -94,15 +98,95 @@ abstract class ServiceEmail extends \WC_Email {
 	}
 
 	/**
-	 * Why the service was paused, as the customer may read it: the history text, but never the
-	 * login of an admin.
+	 * Why the service was paused, in words the customer may read: a fixed text per cause, never
+	 * the history text (it can name an admin, a license key or what Proxmox answered).
 	 *
-	 * @param string $reason History text of the pause.
+	 * @param string $reason History text of the pause (paused_reason).
+	 * @param bool   $held   The service is on breach hold.
 	 */
-	public static function customer_reason( string $reason ): string {
+	public static function customer_reason( string $reason, bool $held = false ): string {
+		if ( $held ) {
+			return __( 'This server is suspended. Contact support.', 'beltoft-services' );
+		}
+
 		$reason = trim( wp_strip_all_tags( $reason ) );
 
-		return 0 === strpos( $reason, 'Paused by ' ) ? 'Paused by an administrator' : $reason;
+		if ( '' === $reason ) {
+			return '';
+		}
+
+		if ( 0 === strpos( $reason, 'Paused by ' ) ) {
+			return __( 'Paused by an administrator.', 'beltoft-services' );
+		}
+
+		if ( 0 === strpos( $reason, 'Abuse suspected' ) ) {
+			return __( 'Your server was using the processor heavily for a long time.', 'beltoft-services' );
+		}
+
+		$causes = array(
+			'License expired'   => __( 'Your subscription period has ended.', 'beltoft-services' ),
+			'License suspended' => __( 'Your subscription is on hold, for example because a payment is missing.', 'beltoft-services' ),
+			'License revoked'   => __( 'Your subscription was cancelled or refunded.', 'beltoft-services' ),
+		);
+
+		return $causes[ $reason ] ?? __( 'Your subscription is not active.', 'beltoft-services' );
+	}
+
+	/**
+	 * Details lines for the email (label => value), from the driver's plugin through the filter
+	 * beltoft_services_email_details. Only plain strings are kept; whatever a listener returns is
+	 * escaped by the template.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, string>
+	 */
+	private function details( Resource $r ): array {
+		/**
+		 * Lines for a service email, for example the address and the login command in the ready
+		 * email. Never add a secret: emails are not private.
+		 *
+		 * @param array<string, string> $details  Label => value, empty by default.
+		 * @param string                $email_id The email's id.
+		 * @param Resource              $r        The resource.
+		 */
+		$details = apply_filters( 'beltoft_services_email_details', array(), $this->id, $r );
+		$clean   = array();
+
+		foreach ( is_array( $details ) ? $details : array() as $label => $value ) {
+			if ( is_string( $label ) && is_scalar( $value ) && '' !== (string) $value ) {
+				$clean[ $label ] = (string) $value;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * The date a paused service will be deleted, formatted, when deletion is on and a period
+	 * applies; otherwise ''. A service on breach hold counts the breach days from the hold.
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $license License row.
+	 */
+	private static function deletes_on( Resource $r, array $license ): string {
+		if ( 'on' !== (string) Settings::get( 'deletion_mode' ) || $r->get( 'protected' ) ) {
+			return '';
+		}
+
+		if ( $r->on_hold() ) {
+			$at = (int) $r->get( 'breach_at' ) + Retention::breach_days() * DAY_IN_SECONDS;
+		} else {
+			$days      = Product::retention_days( (int) ( $license['product_id'] ?? 0 ) );
+			$paused_at = $r->get( 'paused_at' );
+
+			if ( $days <= 0 || null === $paused_at ) {
+				return '';
+			}
+
+			$at = $paused_at + $days * DAY_IN_SECONDS;
+		}
+
+		return wp_date( (string) get_option( 'date_format' ), $at );
 	}
 
 	/**

@@ -489,7 +489,7 @@ final class Actions {
 				'POST',
 				$base . '/agent/set-user-password',
 				array(
-					'username' => 'root',
+					'username' => Provision::LOGIN_USER,
 					'password' => $password,
 				)
 			);
