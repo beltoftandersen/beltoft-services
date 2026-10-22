@@ -154,6 +154,10 @@ final class ClustersScreen {
 			echo '<div class="notice notice-info inline"><p>' . esc_html__( 'Live Proxmox calls are switched off in wp-config.php. Clusters use the fake client.', 'beltoft-services' ) . '</p></div>';
 		}
 
+		if ( Clients::live_allowed() && '' === ProxmoxSettings::explicit_site_tag() ) {
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'The site tag is not set, so every cluster uses the fake client. Set it in Settings, Proxmox before going live.', 'beltoft-services' ) . '</p></div>';
+		}
+
 		if ( $adding || '' !== $edit ) {
 			self::render_form( $edit );
 			return;

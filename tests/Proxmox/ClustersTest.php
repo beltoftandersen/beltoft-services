@@ -8,7 +8,10 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Crypto;
+use BeltoftServices\Proxmox\Clients;
 use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
 
 /**
@@ -28,6 +31,7 @@ class ClustersTest extends TestCase {
 		remove_all_filters( 'beltoft_services_key' );
 		remove_all_filters( 'beltoft_services_proxmox_cluster_in_use' );
 		delete_option( Clusters::OPTION );
+		delete_option( Settings::OPTION );
 
 		parent::tear_down();
 	}
@@ -170,6 +174,55 @@ class ClustersTest extends TestCase {
 		// Deleting one cluster must not rewrite the other one as fake in the database.
 		$this->assertTrue( Clusters::delete( 'other' ) );
 		$this->assertSame( 'live', get_option( Clusters::OPTION )['lab']['client'] );
+	}
+
+	public function test_a_live_cluster_needs_an_explicit_site_tag_to_be_saved(): void {
+		delete_option( Settings::OPTION );
+
+		// The constant is on (given as the allowance), the tag was never set: refused, even though
+		// the host name would make a valid default.
+		$refusal = Clusters::live_refusal( true );
+		$this->assertWPError( $refusal );
+		$this->assertSame( 'beltoft_services_cluster_site_tag', $refusal->get_error_code() );
+		$this->assertStringContainsString( 'site tag', $refusal->get_error_message() );
+
+		// A tag that is not usable is not a tag.
+		foreach ( array( '', 'a:b', 'a b' ) as $bad ) {
+			update_option( Settings::OPTION, array( 'site_tag' => $bad ) );
+			$this->assertWPError( Clusters::live_refusal( true ), $bad );
+		}
+
+		// Without the constant the constant's refusal comes first, with or without a tag.
+		$this->assertSame( 'beltoft_services_cluster_live', Clusters::live_refusal( false )->get_error_code() );
+
+		update_option( Settings::OPTION, array( 'site_tag' => 'shop-main' ) );
+		$this->assertNull( Clusters::live_refusal( true ) );
+
+		// Save goes through the same check (the test run has no constant, so the constant refuses first).
+		delete_option( Settings::OPTION );
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'client' => 'live' ) ) ) );
+		$this->assertNull( Clusters::get( 'lab' ) );
+
+		// A fake cluster keeps working with no tag: the host name is its default.
+		$this->assertTrue( Clusters::save( 'lab', $this->input() ) );
+		$this->assertSame( wp_parse_url( home_url(), PHP_URL_HOST ), ProxmoxSettings::site_tag() );
+		$this->assertSame( '', ProxmoxSettings::explicit_site_tag() );
+	}
+
+	public function test_a_stored_live_cluster_is_not_used_live_without_the_site_tag(): void {
+		$live = array_merge( Clusters::defaults(), array( 'label' => 'x', 'client' => 'live' ) );
+		update_option( Clusters::OPTION, array( 'lab' => $live ), false );
+
+		delete_option( Settings::OPTION );
+		$this->assertSame( 'fake', Clusters::view( true )['lab']['client'], 'Allowed, but no tag: fake.' );
+		$this->assertSame( 'fake', Clusters::view( false )['lab']['client'] );
+		$this->assertFalse( Clients::live_ready( true ) );
+
+		update_option( Settings::OPTION, array( 'site_tag' => 'shop-main' ) );
+		$this->assertSame( 'live', Clusters::view( true )['lab']['client'], 'Allowed and tagged: live.' );
+		$this->assertSame( 'fake', Clusters::view( false )['lab']['client'], 'Not allowed: fake whatever the tag.' );
+		$this->assertTrue( Clients::live_ready( true ) );
+		$this->assertFalse( Clients::live_ready( false ) );
 	}
 
 	public function test_default_template_is_marked_validated_and_falls_back_to_the_first(): void {

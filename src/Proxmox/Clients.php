@@ -23,6 +23,16 @@ final class Clients {
 	}
 
 	/**
+	 * May a cluster go live? The allowance (wp-config.php) AND an explicitly set site tag: the
+	 * ownership tag of every VM must be the admin's own choice, never the host name.
+	 *
+	 * @param bool $allowed Whether wp-config.php allows live calls.
+	 */
+	public static function live_ready( bool $allowed ): bool {
+		return $allowed && '' !== ProxmoxSettings::explicit_site_tag();
+	}
+
+	/**
 	 * Which client a cluster gets: live only when it says so AND the allowance is true.
 	 *
 	 * @param array<string, mixed> $cluster Cluster settings.
@@ -40,7 +50,7 @@ final class Clients {
 	 * @param array<string, mixed> $cluster Cluster settings.
 	 */
 	public static function for( array $cluster ): Client {
-		$live = 'live' === self::kind( $cluster, self::live_allowed() );
+		$live = 'live' === self::kind( $cluster, self::live_ready( self::live_allowed() ) );
 
 		$client = $live
 			? new LiveClient( $cluster, true )

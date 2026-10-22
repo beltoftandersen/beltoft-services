@@ -65,9 +65,20 @@ final class Clusters {
 	 * @return array<string, array<string, mixed>>
 	 */
 	public static function all(): array {
+		return self::view( Clients::live_allowed() );
+	}
+
+	/**
+	 * Every cluster as all() gives it, for a given allowance: a cluster stored as live reads as
+	 * fake unless live calls are allowed AND the site tag was set explicitly.
+	 *
+	 * @param bool $allowed Whether wp-config.php allows live calls.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function view( bool $allowed ): array {
 		$list = self::stored();
 
-		if ( ! Clients::live_allowed() ) {
+		if ( ! Clients::live_ready( $allowed ) ) {
 			foreach ( $list as $id => $cluster ) {
 				if ( 'live' === $cluster['client'] ) {
 					$list[ $id ]['client'] = 'fake';
@@ -76,6 +87,23 @@ final class Clusters {
 		}
 
 		return $list;
+	}
+
+	/**
+	 * Why a cluster cannot be saved as live, or null when it can.
+	 *
+	 * @param bool $allowed Whether wp-config.php allows live calls.
+	 */
+	public static function live_refusal( bool $allowed ): ?\WP_Error {
+		if ( ! $allowed ) {
+			return self::error( 'live', __( 'Live Proxmox calls are switched off. Define BELTOFT_SERVICES_PROXMOX_LIVE as true in wp-config.php first.', 'beltoft-services' ) );
+		}
+
+		if ( '' === ProxmoxSettings::explicit_site_tag() ) {
+			return self::error( 'site_tag', __( 'Set the site tag in Settings, Proxmox first. A live cluster needs one you chose: the host name is not used for live clusters.', 'beltoft-services' ) );
+		}
+
+		return null;
 	}
 
 	/**
@@ -117,10 +145,6 @@ final class Clusters {
 
 		$cluster                 = $all[ $id ];
 		$cluster['token_secret'] = '' === (string) $cluster['token_secret'] ? '' : (string) Crypto::decrypt( (string) $cluster['token_secret'] );
-
-		if ( 'live' === $cluster['client'] && ! Clients::live_allowed() ) {
-			$cluster['client'] = 'fake';
-		}
 
 		return $cluster;
 	}
@@ -276,8 +300,10 @@ final class Clusters {
 			return self::error( 'client', __( 'The client must be fake or live.', 'beltoft-services' ) );
 		}
 
-		if ( 'live' === $client && ! Clients::live_allowed() ) {
-			return self::error( 'live', __( 'Live Proxmox calls are switched off. Define BELTOFT_SERVICES_PROXMOX_LIVE as true in wp-config.php first.', 'beltoft-services' ) );
+		$refusal = 'live' === $client ? self::live_refusal( Clients::live_allowed() ) : null;
+
+		if ( $refusal ) {
+			return $refusal;
 		}
 
 		$clean['client'] = $client;

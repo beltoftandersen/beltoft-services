@@ -30,8 +30,12 @@ class ProxmoxSettingsTest extends TestCase {
 	}
 
 	public function test_site_tag_default(): void {
-		$this->assertSame( wp_parse_url( home_url(), PHP_URL_HOST ), Settings::get( 'site_tag' ) );
-		$this->assertSame( wp_parse_url( home_url(), PHP_URL_HOST ), ProxmoxSettings::site_tag() );
+		// Nothing is stored as "set": a form that saves the field empty stays unset.
+		$this->assertSame( '', Settings::get( 'site_tag' ) );
+		$this->assertSame( '', ProxmoxSettings::explicit_site_tag() );
+		$this->assertSame( wp_parse_url( home_url(), PHP_URL_HOST ), ProxmoxSettings::site_tag(), 'The host name serves fake clusters.' );
+		$this->assertSame( '', ProxmoxSettings::sanitize( array( 'site_tag' => 'a:b' ) )['site_tag'], 'An unusable tag is unset, never replaced by the host.' );
+		$this->assertSame( 'shop-main', ProxmoxSettings::sanitize( array( 'site_tag' => 'shop-main' ) )['site_tag'] );
 	}
 
 	public function test_other_defaults(): void {

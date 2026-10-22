@@ -92,13 +92,23 @@ final class ProxmoxSettings {
 	}
 
 	/**
-	 * The site tag used in VM descriptions. Never empty and never holds a colon or whitespace,
-	 * whatever is stored.
+	 * The site tag the admin set, or '' when none was set (or the stored one is not usable).
+	 * A cluster can only go live with one: the host name is a default for fake clusters.
 	 */
-	public static function site_tag(): string {
+	public static function explicit_site_tag(): string {
 		$tag = (string) Settings::get( 'site_tag' );
 
-		return self::valid_tag( $tag ) ? $tag : self::default_site_tag();
+		return self::valid_tag( $tag ) ? $tag : '';
+	}
+
+	/**
+	 * The site tag used in VM descriptions: the one that was set, otherwise the host name (fake
+	 * clusters only). Never empty and never holds a colon or whitespace, whatever is stored.
+	 */
+	public static function site_tag(): string {
+		$tag = self::explicit_site_tag();
+
+		return '' !== $tag ? $tag : self::default_site_tag();
 	}
 
 	/**
@@ -119,9 +129,9 @@ final class ProxmoxSettings {
 
 		$fields['site_tag']         = $base + array(
 			'type'    => 'text',
-			'default' => self::default_site_tag(),
+			'default' => '',
 			'label'   => __( 'Site tag', 'beltoft-services' ),
-			'desc'    => __( 'Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. Do not change it once machines exist.', 'beltoft-services' ),
+			'desc'    => __( 'Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. Do not change it once machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only.', 'beltoft-services' ),
 		);
 		$fields['shutdown_timeout'] = $base + array(
 			'type'    => 'number',
@@ -192,8 +202,9 @@ final class ProxmoxSettings {
 			$value['abuse_mode'] = 'report';
 		}
 
+		// Not usable means not set: it is never replaced by a guess.
 		if ( array_key_exists( 'site_tag', $value ) && ! self::valid_tag( (string) $value['site_tag'] ) ) {
-			$value['site_tag'] = self::default_site_tag();
+			$value['site_tag'] = '';
 		}
 
 		return $value;
