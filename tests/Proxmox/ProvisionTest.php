@@ -1041,6 +1041,26 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.254', $this->fake->vm( 5001 )['config']['ipconfig0'] );
 	}
 
+	public function test_the_routed_setup_sends_a_host_route_with_a_gateway_outside_the_pool_network(): void {
+		// Production: addresses of a routed /29 are configured as /32 with the host as the gateway,
+		// which is not in the pool's network. Documentation values stand in for the real ones.
+		$this->wipe_tables();
+		$this->cluster( array( 'prefix' => '32', 'gateway' => '198.51.100.1' ) );
+		$this->assertSame( 6, IpPool::add( '192.0.2.160/29' ) );
+
+		$first  = $this->resource();
+		$result = $this->run_provision( $first );
+
+		$this->assert_done( $result );
+		$this->assertSame( 'ip=192.0.2.161/32,gw=198.51.100.1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$this->assertSame( '192.0.2.161', Resource::find( $first->id() )->get( 'ip' ) );
+
+		// The next address gets its own host route; no refusal for the gateway being off the pool's network.
+		$second = $this->resource();
+		$this->assert_done( $this->run_provision( $second ) );
+		$this->assertSame( 'ip=192.0.2.162/32,gw=198.51.100.1', $this->fake->vm( 5001 )['config']['ipconfig0'] );
+	}
+
 	public function test_a_retry_that_advanced_carries_progress_and_polling_does_not(): void {
 		$resource = $this->resource();
 		$this->fake->fail_next( 'POST', '#/status/start$#', array( 'status' => 503, 'message' => 'busy' ) );
