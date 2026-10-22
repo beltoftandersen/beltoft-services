@@ -239,9 +239,9 @@ class ProxmoxCliTest extends TestCase {
 		// A machine in another pool is not moved.
 		$this->fake->add_pool( 'other' );
 		$license2 = $this->license();
-		$this->vm( 201, array( 'ipconfig0' => 'ip=192.0.2.11/24,gw=192.0.2.1' ), array( 'pool' => 'other' ) );
+		$this->vm( 250, array( 'ipconfig0' => 'ip=192.0.2.11/24,gw=192.0.2.1' ), array( 'pool' => 'other' ) );
 		$before = count( $this->fake->calls() );
-		$result = $this->link( $license2, array( 'vmid' => 201, 'ip' => '192.0.2.11' ) );
+		$result = $this->link( $license2, array( 'vmid' => 250, 'ip' => '192.0.2.11' ) );
 		$this->assertIsArray( $result, $this->error_text( $result ) );
 		$new = array_slice( $this->fake->calls(), $before );
 		$this->assertSame( array( 'GET', 'GET', 'PUT' ), array_column( $new, 'method' ), 'No pool call.' );
@@ -250,21 +250,21 @@ class ProxmoxCliTest extends TestCase {
 
 	public function test_link_vm_adopts_a_machine_on_another_network_outside_the_pool(): void {
 		$license = $this->license();
-		$this->vm( 201, array( 'ipconfig0' => 'ip=10.10.10.6/24', 'net0' => 'virtio=11:22:33:44:55:66,bridge=vmbr1' ) );
+		$this->vm( 250, array( 'ipconfig0' => 'ip=198.51.100.6/24', 'net0' => 'virtio=11:22:33:44:55:66,bridge=vmbr7' ) );
 
-		$refused = $this->link( $license, array( 'vmid' => 201, 'ip' => '10.10.10.6' ) );
+		$refused = $this->link( $license, array( 'vmid' => 250, 'ip' => '198.51.100.6' ) );
 		$this->assertStringContainsString( '--outside-pool', $this->error_text( $refused ) );
 		$this->assertSame( array(), $this->fake->calls(), 'Refused before any call.' );
 
-		$result = $this->link( $license, array( 'vmid' => 201, 'ip' => '10.10.10.6', 'outside_pool' => true ) );
+		$result = $this->link( $license, array( 'vmid' => 250, 'ip' => '198.51.100.6', 'outside_pool' => true ) );
 		$this->assertIsArray( $result, $this->error_text( $result ) );
 
 		$resource = Resource::for_license( (int) $license['id'] );
-		$this->assertSame( '10.10.10.6', $resource->get( 'ip' ) );
+		$this->assertSame( '198.51.100.6', $resource->get( 'ip' ) );
 		$this->assertNull( VmRecords::for_resource( $resource->id() )['ip_id'] );
 		$this->assertSame( 'free', IpPool::find( '192.0.2.10' )['state'], 'The pool is untouched.' );
-		$this->assertSame( 'virtio=11:22:33:44:55:66,bridge=vmbr1', $this->fake->vm( 201 )['config']['net0'], 'Bridge and MAC untouched.' );
-		$this->assertSame( 'ip=10.10.10.6/24', $this->fake->vm( 201 )['config']['ipconfig0'] );
+		$this->assertSame( 'virtio=11:22:33:44:55:66,bridge=vmbr7', $this->fake->vm( 250 )['config']['net0'], 'Bridge and MAC untouched.' );
+		$this->assertSame( 'ip=198.51.100.6/24', $this->fake->vm( 250 )['config']['ipconfig0'] );
 
 		// An address that IS in the pool is not "outside".
 		$license2 = $this->license();
@@ -341,7 +341,7 @@ class ProxmoxCliTest extends TestCase {
 		$this->assertTrue( LinkVm::needs_confirmation( array( 'client' => 'live' ) ) );
 		$this->assertFalse( LinkVm::needs_confirmation( array( 'client' => 'fake' ) ) );
 
-		foreach ( array( '', 'LINK:201', 'link:200', 'LINK:200 ' ) as $wrong ) {
+		foreach ( array( '', 'LINK:250', 'link:200', 'LINK:200 ' ) as $wrong ) {
 			$error = $this->error_text( $this->link( $license, array( 'live' => true, 'confirm' => $wrong ) ) );
 			$this->assertStringContainsString( '--confirm=LINK:200', $error, "'$wrong' is not the confirmation." );
 		}
@@ -535,6 +535,64 @@ class ProxmoxCliTest extends TestCase {
 		update_post_meta( (int) $other['product_id'], \BeltoftServices\Product::META_PLAN . 'memory_mb', '4096' );
 		\BeltoftServices\Lifecycle::apply_plan( (int) $other['id'] );
 		$this->assertTrue( Resource::find( $r2->id() )->get( 'plan_dirty' ) );
+
+		remove_all_filters( 'pre_wp_mail' );
+	}
+
+	/**
+	 * A linked resource that is ready, with its VM running and tagged by link-vm.
+	 *
+	 * @return Resource
+	 */
+	private function linked_resource(): Resource {
+		$license = $this->license();
+		$this->vm();
+		$this->assertIsArray( $this->link( $license ) );
+
+		$resource = Resource::for_license( (int) $license['id'] );
+		$this->assertTrue( $resource->get( 'linked' ) );
+		$this->assertSame( 'running', $this->fake->vm( 200 )['status'] );
+
+		return $resource;
+	}
+
+	public function test_a_linked_vm_is_paused_like_any_other_when_its_license_lapses(): void {
+		$resource = $this->linked_resource();
+
+		$this->assertTrue( $resource->desire( 'paused', 'License expired' ) );
+		Jobs::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertSame( 'stopped', $this->fake->vm( 200 )['status'], 'Ruling 2026-10-22: an adopted VM is shut down when the license lapses.' );
+		$this->assertCount( 1, array_filter( $this->fake->calls(), static fn( $c ) => 'POST' === $c['method'] && false !== strpos( $c['path'], '/status/shutdown' ) ) );
+	}
+
+	public function test_update_plan_refuses_a_linked_vm_itself_with_no_call_and_an_admin_alert(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$resource = $this->linked_resource();
+
+		// Forced past the first guard (Lifecycle): a plan change that reaches the driver anyway.
+		$this->assertTrue( $resource->set( array( 'plan' => array_merge( (array) $resource->get( 'plan' ), array( 'cores' => 8, 'memory_mb' => 16384 ) ), 'plan_dirty' => true ) ) );
+		$before = count( $this->fake->calls() );
+
+		$result = \BeltoftServices\Drivers\Registry::get( 'proxmox' )->update_plan( Resource::find( $resource->id() ) );
+
+		$this->assertTrue( $result->is_done() );
+		$this->assertSame( $before, count( $this->fake->calls() ), 'No Proxmox call of any kind.' );
+		$this->assertSame( 'running', $this->fake->vm( 200 )['status'] );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'resize it manually', $mails[0]['message'] );
 
 		remove_all_filters( 'pre_wp_mail' );
 	}

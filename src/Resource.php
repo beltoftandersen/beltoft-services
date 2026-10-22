@@ -343,6 +343,7 @@ final class Resource {
 			case 'steps':
 				return is_array( $value ) ? $value : array();
 			case 'attempts':
+			case 'progress_resets':
 				return (int) $value;
 			case 'plan_dirty':
 			case 'protected':
@@ -561,9 +562,10 @@ final class Resource {
 			// A new desired state is a new start for the reconciler: a fresh attempt count, and a
 			// failure under it is alerted again.
 			if ( $this->get( 'desired' ) !== $state ) {
-				$meta['op']       = '';
-				$meta['attempts'] = 0;
-				$meta['alerted']  = '';
+				$meta['op']              = '';
+				$meta['attempts']        = 0;
+				$meta['progress_resets'] = 0;
+				$meta['alerted']         = '';
 			}
 
 			if ( 'deleted' === $state ) {

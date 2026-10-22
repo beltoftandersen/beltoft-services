@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Lifecycle;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -118,6 +119,9 @@ final class Operations {
 		if ( ! in_array( 'clone', $steps, true ) ) {
 			return StepResult::done( array( 'task' => null, 'was_running' => null ) );
 		}
+
+		// A finished task of an earlier run is no progress for a pause: only the VM changing state is.
+		$this->progressed = false;
 
 		$out = $this->power_or_delete( $record, 'pause', false );
 
@@ -269,6 +273,13 @@ final class Operations {
 	 * Applies cores and memory, grows the disk; never shrinks it. A VM that ran is started again.
 	 */
 	public function update_plan(): StepResult {
+		// Second guard (Lifecycle::on_plan_change is the first): an adopted VM is never resized, and no call is made.
+		if ( true === $this->r->get( 'linked' ) ) {
+			Alerts::admin( $this->r, Lifecycle::LINKED_PLAN_ERROR );
+
+			return StepResult::done( array(), 'Plan change on a linked VM was not applied' );
+		}
+
 		$record = VmRecords::for_resource( $this->r->id() );
 
 		if ( null === $record ) {
@@ -582,19 +593,28 @@ final class Operations {
 			return true;
 		}
 
+		// A task that ended OK is no progress by itself: only the re-read below can show that the VM is up.
+		$was  = $this->progressed;
 		$done = $this->run_task( $step, 'POST', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/status/start' );
 
 		if ( $done instanceof StepResult ) {
 			return $done;
 		}
 
-		$again = $this->verified( $record, $step );
+		$this->progressed = $was;
+		$again            = $this->verified( $record, $step );
 
 		if ( $again instanceof StepResult ) {
 			return $again;
 		}
 
-		return 'running' === $again['status'] ? true : StepResult::retry( 0, $step . ': the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')' );
+		if ( 'running' === $again['status'] ) {
+			$this->progressed = true;
+
+			return true;
+		}
+
+		return StepResult::retry( 0, $step . ': the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')' );
 	}
 
 	/**
@@ -607,12 +627,20 @@ final class Operations {
 	 * @return StepResult|array{v?: array<string, mixed>, gone?: bool} retry/fail, or the stopped VM, or gone (the id is confirmed free).
 	 */
 	private function power_or_delete( array $record, string $step, bool $delete ) {
+		// A task that ended OK is no progress by itself: progress is the VM being found in a different
+		// state by the next verified read. A VM that something keeps restarting never progresses, so
+		// the retries run into the budget instead of looping.
+		$was  = $this->progressed;
+		$prev = null;
+
 		for ( $round = 0; $round < 5; $round++ ) {
 			$fresh = VmRecords::for_resource( $this->r->id() );
 			$v     = Ownership::verify( $this->client, $fresh ? $fresh : $record, $this->r );
 
 			if ( is_wp_error( $v ) && 'absent' === $v->get_error_code() && $delete ) {
 				if ( true === Ownership::is_free( $this->client, $record['vmid'] ) ) {
+					$this->progressed = $this->progressed || null !== $prev;
+
 					return array( 'gone' => true );
 				}
 
@@ -627,6 +655,12 @@ final class Operations {
 				return 'absent' === $v->get_error_code() ? StepResult::retry( 0, $step . ': ' . $v->get_error_message() ) : $this->classify( $v, $step );
 			}
 
+			if ( null !== $prev && $v['status'] !== $prev ) {
+				$this->progressed = true;
+				$was              = true;
+			}
+
+			$prev = $v['status'];
 			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
 
 			if ( 'running' === $v['status'] ) {
@@ -649,6 +683,8 @@ final class Operations {
 			} else {
 				return array( 'v' => $v );
 			}
+
+			$this->progressed = $was;
 
 			if ( $done instanceof StepResult ) {
 				return $done;

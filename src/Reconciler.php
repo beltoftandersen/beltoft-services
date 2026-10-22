@@ -54,7 +54,14 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets' );
+
+	/**
+	 * How often one operation may restart its retry count because a run made progress. After
+	 * this many, retries count normally, so a step that "progresses" without ever finishing
+	 * (a VM that something keeps restarting) still ends in a failure and an alert.
+	 */
+	public const MAX_PROGRESS_RESETS = 10;
 
 	/**
 	 * The state each operation reaches when it is done.
@@ -197,6 +204,7 @@ final class Reconciler {
 				array(
 					'op'              => $operation,
 					'attempts'        => 0,
+					'progress_resets' => 0,
 					'next_attempt_at' => null,
 					'alerted'         => '',
 				)
@@ -253,6 +261,7 @@ final class Reconciler {
 		return array(
 			'op'              => '',
 			'attempts'        => 0,
+			'progress_resets' => 0,
 			'next_attempt_at' => null,
 			'last_error'      => '',
 			'failed_op'       => '',
@@ -364,10 +373,17 @@ final class Reconciler {
 	 * @param int                  $delay     Delay the driver asked for.
 	 * @param string               $error     Error.
 	 * @param array<string, mixed> $meta      Driver meta.
-	 * @param bool                 $progress  The driver got further in this run: the count starts again at this retry.
+	 * @param bool                 $progress  The driver got further in this run: the count starts again at this retry (at most MAX_PROGRESS_RESETS times per operation).
 	 */
 	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta, bool $progress = false ): void {
-		$attempts = $progress ? 1 : $r->get( 'attempts' ) + 1;
+		$resets = $r->get( 'op' ) === $operation ? $r->get( 'progress_resets' ) : 0;
+
+		if ( $progress && $resets < self::MAX_PROGRESS_RESETS ) {
+			$attempts = 1;
+			++$resets;
+		} else {
+			$attempts = $r->get( 'attempts' ) + 1;
+		}
 
 		if ( $attempts > count( self::BACKOFF ) ) {
 			self::fail( $r, $operation, $error, $meta );
@@ -379,6 +395,7 @@ final class Reconciler {
 		$bookkeeping = array(
 			'op'              => $operation,
 			'attempts'        => $attempts,
+			'progress_resets' => $resets,
 			'next_attempt_at' => time() + $delay,
 			'last_error'      => $error,
 		);

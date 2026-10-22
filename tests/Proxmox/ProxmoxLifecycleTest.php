@@ -54,6 +54,30 @@ class ScriptableLifecycleClient extends FakeClient {
 	 */
 	public $deaf_config = false;
 
+	/**
+	 * Undo the power change right after a task: 'stop' puts a stopped VM back to running (an HA
+	 * group or a watchdog), 'start' puts a started VM back to stopped (a guest that crashes on boot).
+	 *
+	 * @var string
+	 */
+	public $bounce = '';
+
+	public function task( string $method, string $path, array $params = array() ) {
+		$upid = parent::task( $method, $path, $params );
+
+		if ( ! is_wp_error( $upid ) && 1 === preg_match( '#/qemu/(\d+)/status/(shutdown|stop|start)$#', $path, $m ) ) {
+			$vm = $this->vm( (int) $m[1] );
+
+			if ( $vm && 'stop' === $this->bounce && 'start' !== $m[2] ) {
+				$this->add_vm( array_merge( $vm, array( 'status' => 'running' ) ) );
+			} elseif ( $vm && 'start' === $this->bounce && 'start' === $m[2] ) {
+				$this->add_vm( array_merge( $vm, array( 'status' => 'stopped' ) ) );
+			}
+		}
+
+		return $upid;
+	}
+
 	public function request( string $method, string $path, array $params = array() ) {
 		if ( $this->deaf_config && 'PUT' === strtoupper( $method ) && 1 === preg_match( '#/config$#', $path ) ) {
 			return null;
@@ -978,5 +1002,42 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( 'failed', Resource::find( $other->id() )->get( 'state' ) );
 		$this->assertSame( 18, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
 		$this->assertSame( 'running', $this->fake->vm( 5001 )['status'] );
+	}
+
+	public function test_a_vm_that_restarts_after_every_stop_ends_in_fail_with_the_alert_and_bounded_calls(): void {
+		$resource = $this->resource();
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->fake->bounce = 'stop';
+		$this->mails        = array();
+		$before             = count( $this->fake->calls() );
+
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'paused', 'test' ) );
+		$this->run_to_failure( $resource->id() );
+
+		$r = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $r->get( 'state' ), 'A power change that never sticks must end in a failure.' );
+		$this->assertLessThanOrEqual( 6, $r->get( 'attempts' ) );
+		$this->assertNotEmpty( $this->mails, 'The admin is alerted.' );
+		$this->assertLessThanOrEqual( 150, count( $this->fake->calls() ) - $before, 'The number of Proxmox calls is bounded.' );
+	}
+
+	public function test_a_vm_that_stops_after_every_start_ends_in_fail_with_the_alert_and_bounded_calls(): void {
+		$resource = $this->resource();
+		Jobs::run( $resource->id() );
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'paused', 'test' ) );
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->fake->bounce = 'start';
+		$this->mails        = array();
+		$before             = count( $this->fake->calls() );
+
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'ready', 'test' ) );
+		$this->run_to_failure( $resource->id() );
+
+		$r = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $r->get( 'state' ) );
+		$this->assertNotEmpty( $this->mails );
+		$this->assertLessThanOrEqual( 150, count( $this->fake->calls() ) - $before );
 	}
 }

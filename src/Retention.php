@@ -31,7 +31,7 @@ defined( 'ABSPATH' ) || exit;
  * during an earlier pause does not count.
  *
  * Resources are read in batches of 50 in id order, continuing after the last id seen, so
- * the run always ends (Medusa's warning job could select the same batch forever).
+ * the run always ends, however many services there are.
  */
 final class Retention {
 
