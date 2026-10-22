@@ -184,7 +184,7 @@ final class ProxmoxSettings {
 			'type'    => 'text',
 			'default' => '',
 			'label'   => __( 'Site tag', 'beltoft-services' ),
-			'desc'    => __( 'Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. Do not change it once machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only.', 'beltoft-services' ),
+			'desc'    => __( 'Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. It cannot be changed while machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only.', 'beltoft-services' ),
 		);
 		$fields['shutdown_timeout'] = $base + array(
 			'type'    => 'number',
@@ -258,6 +258,17 @@ final class ProxmoxSettings {
 		// Not usable means not set: it is never replaced by a guess.
 		if ( array_key_exists( 'site_tag', $value ) && ! self::valid_tag( (string) $value['site_tag'] ) ) {
 			$value['site_tag'] = '';
+		}
+
+		// The tag is written into every VM description: changing it would make every existing VM "not ours".
+		if ( array_key_exists( 'site_tag', $value ) && (string) $value['site_tag'] !== (string) Settings::get( 'site_tag' ) && (string) $value['site_tag'] !== self::site_tag() && VmRecords::any() ) {
+			$value['site_tag'] = (string) Settings::get( 'site_tag' );
+
+			add_settings_error(
+				Settings::OPTION,
+				'beltoft_services_site_tag_locked',
+				__( 'The site tag was not changed: virtual machines already carry it in their description, and a different tag would make this site refuse to manage every one of them. Change it only after every service has been deleted.', 'beltoft-services' )
+			);
 		}
 
 		return $value;

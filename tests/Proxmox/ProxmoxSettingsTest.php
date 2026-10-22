@@ -8,6 +8,8 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
 
@@ -17,7 +19,13 @@ use BeltoftServices\Tests\TestCase;
 class ProxmoxSettingsTest extends TestCase {
 
 	public function tear_down(): void {
+		global $wpdb;
+
 		delete_option( Settings::OPTION );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$wpdb->query( 'DELETE FROM ' . Schema::tables()['vms'] );
+		global $wp_settings_errors;
+		$wp_settings_errors = array();
 
 		parent::tear_down();
 	}
@@ -80,5 +88,32 @@ class ProxmoxSettingsTest extends TestCase {
 		update_option( Settings::OPTION, array( 'abuse_mode' => 'pause', 'shutdown_timeout' => 300 ) );
 		$this->assertSame( 'pause', Settings::get( 'abuse_mode' ) );
 		$this->assertSame( 300, Settings::get( 'shutdown_timeout' ) );
+	}
+
+	public function test_the_site_tag_cannot_change_while_vm_records_exist(): void {
+		global $wp_settings_errors;
+
+		update_option( Settings::OPTION, array( 'site_tag' => 'shop-main' ) );
+
+		// No VM yet: it can change.
+		$this->assertSame( 'shop-two', ProxmoxSettings::sanitize( array( 'site_tag' => 'shop-two' ) )['site_tag'] );
+
+		$this->assertTrue( VmRecords::adopt( 77, 'lab', 'node-a', 5000 ) );
+		$wp_settings_errors = array();
+
+		$out = ProxmoxSettings::sanitize( array( 'site_tag' => 'shop-two' ) );
+		$this->assertSame( 'shop-main', $out['site_tag'], 'The saved tag is kept.' );
+		$this->assertSame( 'beltoft_services_site_tag_locked', $wp_settings_errors[0]['code'] );
+		$this->assertStringContainsString( 'every one of them', $wp_settings_errors[0]['message'] );
+
+		// Clearing it is a change too; an unusable value as well.
+		$this->assertSame( 'shop-main', ProxmoxSettings::sanitize( array( 'site_tag' => '' ) )['site_tag'] );
+		$this->assertSame( 'shop-main', ProxmoxSettings::sanitize( array( 'site_tag' => 'a:b' ) )['site_tag'] );
+
+		// Saving the same tag again, and a form that leaves it alone, work.
+		$wp_settings_errors = array();
+		$this->assertSame( 'shop-main', ProxmoxSettings::sanitize( array( 'site_tag' => 'shop-main' ) )['site_tag'] );
+		$this->assertSame( array(), $wp_settings_errors );
+		$this->assertSame( 20, ProxmoxSettings::sanitize( array( 'abuse_hours' => 20 ) )['abuse_hours'] );
 	}
 }

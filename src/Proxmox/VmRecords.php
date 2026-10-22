@@ -209,6 +209,16 @@ final class VmRecords {
 	}
 
 	/**
+	 * Whether any VM record exists (on any cluster).
+	 */
+	public static function any(): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- must be fresh.
+		return null !== $wpdb->get_var( $wpdb->prepare( 'SELECT vmid FROM %i LIMIT 1', Schema::tables()['vms'] ) );
+	}
+
+	/**
 	 * The records of a cluster with their node ('' until a node was chosen).
 	 *
 	 * @param string $cluster Cluster id.

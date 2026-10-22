@@ -120,7 +120,7 @@ A privilege-separated token only gets what is granted to the token itself, and n
 
 Setting the pool in the cluster form is what puts the new VMs into it. Never use the root account or a token that can reach other virtual machines: the plugin only ever changes machines that carry its own ownership tag, but a narrow token is the second safeguard.
 
-2. **The site tag.** Settings → Services → Proxmox: a short name for this site. It is written into the description of every VM the site creates (`beltoft-services:<site tag>:<service id>`). A VM is only ever stopped, resized, changed or deleted when its description has this exact line, its VMID is in the customer range and the VMID is recorded for that service. A cluster cannot go live until the tag is set explicitly, and it must not change once VMs exist.
+2. **The site tag.** Settings → Services → Proxmox: a short name for this site. It is written into the description of every VM the site creates (`beltoft-services:<site tag>:<service id>`). A VM is only ever stopped, resized, changed or deleted when its description has this exact line, its VMID is in the customer range and the VMID is recorded for that service. A cluster cannot go live until the tag is set explicitly, and it cannot be changed while VM records exist (the settings screen refuses, with an explanation): every existing VM would stop matching it.
 
 3. **The cluster.** Settings → Services → Proxmox clusters: API URL (`https://pve.example.com:8006`), token id (`USER@REALM!TOKENID`) and secret, node names, disk storage and cloud-init storage, bridge and optional VLAN, the pool, the boot disk key of the templates (`scsi0` by default), the templates (one `VMID = label` per line, and a default), the customer VMID range, the nameservers, the network prefix and the gateway. A template must not sit inside the customer VMID range. The pool form (`pools` or the older `pools_id`) depends on your PVE version.
 
@@ -137,14 +137,18 @@ A cluster is created as "fake". To let the plugin talk to a real Proxmox, two th
 
 There is no filter, option or setting that can switch it on without the constant. Without the constant, a cluster stored as live behaves as a fake one. With the constant but without a site tag, a live cluster is left alone: provisioning and every action wait, the admin gets one alert a day and a notice, and nothing is faked. Do not put the constant on a staging site that shares a database or credentials with production.
 
+= Which database versions are supported? =
+
+MySQL 5.7.5 or newer, or MariaDB 10.0.2 or newer. WordPress itself still runs on MySQL 5.5.5, but the plugin takes one named lock while it holds another (to give out VM ids and addresses without two orders getting the same one), and older servers release the first lock as soon as the second is taken.
+
 = How is the Proxmox TLS certificate checked? =
 
 Certificates are verified. A cluster with a self-signed or private-CA certificate needs one of:
 
 * **The CA file:** an absolute path to the PEM file of the CA (or the certificate itself), readable by the web server.
-* **A SHA-256 pin of the public key:** the base64 hash, made with `openssl x509 -in pve-ssl.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64`. A pin needs PHP curl with pinned public key support; a request is refused when the pin cannot be applied.
+* **A SHA-256 pin of the public key:** the base64 hash, made with `openssl x509 -in pve-ssl.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64`. A pin needs PHP curl with pinned public key support; a request is refused, and its answer discarded, when the pin cannot be applied. With a pin and no CA file, the pin replaces the certificate chain and host name check: the connection is accepted only if the server's public key matches the pin (this is what lets a self-signed certificate work). With a CA file as well, the full chain and host name verification stays on and the pin is added to it.
 
-Either way, the certificate must name the host used in the API URL (as its common name or a subject alternative name): connect with the host name the certificate carries, not an IP address it does not list.
+With a CA file, the certificate must name the host used in the API URL (as its common name or a subject alternative name): connect with the host name the certificate carries, not an IP address it does not list. With a pin alone, the host name is not checked, only the key.
 
 = How is the operating system chosen? =
 
@@ -161,7 +165,7 @@ A node counts as full when the memory of the VMs of this site on it (the configu
 = What about deletion, abuse, breach and disputes? =
 
 * **Deletion** (Settings → Services, General) is off by default. "Report only" writes what would be deleted to the license history. "On" deletes a paused VM after its product's retention (default 3 days for a VM product; 0 never) and warns the customer first. A cancelled subscription follows the same retention as an expired one. A deletion needs the VM to carry our tag, a VMID in the customer range and a record for that service, and then removes the VM with its disks. A VM that is gone already counts as deleted only when its VMID is free.
-* **Abuse** (Settings → Services → Proxmox): "Sustained high CPU" is off, report only (default) or pause. A VM above the CPU percentage for the set number of hours is reported to the admin; in pause mode the service is also asked to pause, and a renewal asks for it again. A VM linked with `link-vm` is never paused or shut down by the plugin.
+* **Abuse** (Settings → Services → Proxmox): "Sustained high CPU" is off, report only (default) or pause. A VM above the CPU percentage for the set number of hours is reported to the admin; in pause mode the service is also asked to pause, and a renewal asks for it again. A VM linked with `link-vm` is never reinstalled, never resized by a plan change (the admin is alerted to do it by hand) and never paused by the abuse check (it is only reported). It is paused like any other VM when its license lapses (shut down, then stopped if it does not stop), and its customer can start, shut down and reboot it.
 * **Breach:** "Suspend for breach" on the license screen pauses the VM and holds it: the customer cannot start it, renew it back to life or reinstall it. It is deleted after the breach days (default 14, setting "Delete a service suspended for breach after this many days") when deletion is On, otherwise you get an alert. The license stays marked after the VM is gone, so no renewal creates a new one; use "Create the service" on the license screen and type CLEAR BREACH to override. Billing is cancelled by you.
 * **Disputes and chargebacks are manual.** WooCommerce, WooCommerce Subscriptions and their bundled gateways fire no dispute action. Put the subscription on hold or cancel it, or suspend the license for breach.
 
@@ -215,6 +219,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks and email
 * Customer actions (start, shut down, reboot, reset password, replace SSH key, reinstall), the usage and abuse jobs (off, report or pause), and emails with the address and size.
 * Suspend for breach with a per-license breach mark, retention for cancelled subscriptions, and a delay notice when a provision fails.
 * WP-CLI: `link-vm`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release` and `ip-pool-list`.
+* Changes for every driver, not only Proxmox: the paused reason shown to customers (screen and email) is now a fixed, translated sentence per cause, also for HTTP services (it was the raw history text such as "License expired"); a customer action that is dropped because it is no longer available now leaves a line in the license history; a driver can report progress with a retry (`StepResult::retry()` has a fourth argument, `$progress`) so long operations made of many short steps are not cut off by the five-retry budget, at most 10 times per operation (reserved meta `progress_resets`); drivers can add initial meta (filter `beltoft_services_initial_meta`), email details (`beltoft_services_email_details`), account panel buttons, assets and action refusals (`beltoft_services_account_buttons`, `beltoft_services_account_assets`, `beltoft_services_action_refusal`), and a default retention per service type (`beltoft_services_default_retention`; empty product retention now means 3 days for virtual machines and never for others); `Routes::guard()` is public; `Locks::with()` nests named locks; the customer panel shows "Suspended" and "Delayed" states; the "Service setup delayed" customer email and the breach mark (Suspend for breach, with its retention days setting) apply to every driver; and uninstall removes every transient of the plugin.
 * Known limits: IPv4 only; disputes are manual; the Proxmox privilege names are taken from the PVE 9.2 documentation.
 
 = 0.1.1 =

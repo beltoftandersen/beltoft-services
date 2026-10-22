@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-22T06:26:20+00:00\n"
+"POT-Creation-Date: 2026-10-22T08:51:06+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -438,7 +438,7 @@ msgstr ""
 msgid "Delete the service"
 msgstr ""
 
-#. translators: %s: the word to type.
+#. translators: %s: the word or words to type.
 #: src/Admin/Panel.php:694
 #, php-format
 msgid "Deletes the service and its data. Type %s to confirm:"
@@ -468,8 +468,7 @@ msgstr ""
 msgid "If the service still exists it keeps running and is no longer managed here. If the license is active, use \"Create the service\" afterwards to give it a new one."
 msgstr ""
 
-#. translators: %s: the words to type.
-#. translators: %s: the word to type.
+#. translators: %s: the word or words to type.
 #: src/Admin/Panel.php:717
 #: src/Admin/Panel.php:745
 #: src/Admin/Panel.php:766
@@ -1664,7 +1663,7 @@ msgid "Reinstalling erases everything on the server. Continue?"
 msgstr ""
 
 #: src/Proxmox/Panels.php:106
-#: src/Proxmox/ProxmoxDriver.php:82
+#: src/Proxmox/ProxmoxDriver.php:84
 msgid "Cluster"
 msgstr ""
 
@@ -1705,42 +1704,39 @@ msgid_plural "%1$d of %2$d servers"
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/Proxmox/ProxmoxDriver.php:79
+msgid "none yet"
+msgstr ""
+
 #. translators: %s: cluster ids, comma separated.
-#: src/Proxmox/ProxmoxDriver.php:84
+#: src/Proxmox/ProxmoxDriver.php:86
 #, php-format
 msgid "The id of the Proxmox cluster to build on. Configured: %s"
 msgstr ""
 
-#. translators: %s: cluster ids, comma separated.
-#. translators: %s: templates per cluster.
-#: src/Proxmox/ProxmoxDriver.php:84
 #: src/Proxmox/ProxmoxDriver.php:92
-msgid "none yet"
-msgstr ""
-
-#: src/Proxmox/ProxmoxDriver.php:90
 msgid "Template VMID"
 msgstr ""
 
 #. translators: %s: templates per cluster.
-#: src/Proxmox/ProxmoxDriver.php:92
+#: src/Proxmox/ProxmoxDriver.php:94
 #, php-format
 msgid "The fallback template VMID, used when the customer made no operating system choice (older orders, licenses issued by an admin). It must be in the cluster's template list. Configured: %s"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:98
+#: src/Proxmox/ProxmoxDriver.php:100
 msgid "CPU cores"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:105
+#: src/Proxmox/ProxmoxDriver.php:107
 msgid "Memory (MB)"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:112
+#: src/Proxmox/ProxmoxDriver.php:114
 msgid "Disk (GB)"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:113
+#: src/Proxmox/ProxmoxDriver.php:115
 msgid "The boot disk grows to this size. It is never shrunk."
 msgstr ""
 
@@ -1775,7 +1771,7 @@ msgid "Site tag"
 msgstr ""
 
 #: src/Proxmox/ProxmoxSettings.php:187
-msgid "Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. Do not change it once machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only."
+msgid "Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. It cannot be changed while machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only."
 msgstr ""
 
 #: src/Proxmox/ProxmoxSettings.php:193
@@ -1828,6 +1824,10 @@ msgstr ""
 
 #: src/Proxmox/ProxmoxSettings.php:231
 msgid "One reading covers about an hour, so the hours are counted over several hourly readings: with 1 hour the first alert comes with the second reading, with 3 hours after about three."
+msgstr ""
+
+#: src/Proxmox/ProxmoxSettings.php:270
+msgid "The site tag was not changed: virtual machines already carry it in their description, and a different tag would make this site refuse to manage every one of them. Change it only after every service has been deleted."
 msgstr ""
 
 #: src/Proxmox/SshKeyField.php:253

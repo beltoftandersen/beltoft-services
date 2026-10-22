@@ -2,7 +2,7 @@
 
 Sell services with WooCommerce Subscriptions. A license (from Beltoft Licenses) is the entitlement; drivers provision, pause, resume, update and remove the service in Action Scheduler jobs.
 
-Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or newer, PHP 8.1 and MySQL 5.7.5 or MariaDB 10.0.2 or newer.
+Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or newer, PHP 8.1 and MySQL 5.7.5 or MariaDB 10.0.2 or newer (more than WordPress itself needs: the plugin nests named locks, which older servers release early).
 
 ## Features
 
@@ -48,7 +48,7 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 
 ### TLS
 
-Verified by default. For a self-signed or private-CA certificate give the **CA file** (absolute path) or a **SHA-256 public key pin** (`openssl x509 -in pve-ssl.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64`; needs PHP curl pinning, and a request is refused if it cannot be applied). The certificate must name the host used in the API URL.
+Verified by default. For a self-signed or private-CA certificate give the **CA file** (absolute path) or a **SHA-256 public key pin** (`openssl x509 -in pve-ssl.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64`; needs PHP curl pinning, and a request is refused, and its answer discarded, if it cannot be applied). With a CA file the full chain and host name verification stays on (and the pin is added if set); the certificate must name the host used in the API URL. With a pin and no CA file the pin replaces the chain and host name check for that connection, so a self-signed certificate works and only the key is checked.
 
 ### Operating system
 
@@ -65,13 +65,13 @@ A node is full when the configured memory of this site's VMs on it (including re
 ### Deletion, abuse and breach
 
 - Deletion: off (default), report only, or on; a VM product defaults to 3 days retention, cancelled subscriptions follow it.
-- Abuse (sustained high CPU): off, report only (default) or pause. Linked VMs are never paused.
+- Abuse (sustained high CPU): off, report only (default) or pause. A linked VM is never paused by the abuse check (it is only reported).
 - Suspend for breach: holds the VM paused (no customer start, renewal resume or reinstall), deleted after 14 days by default when deletion is on; the license keeps a breach mark, cleared only by "Create the service" with `CLEAR BREACH`.
 - Disputes and chargebacks are manual (see below).
 
 ### link-vm
 
-`wp beltoft-services link-vm <license-id> --cluster=<id> --node=<node> --vmid=<vmid> --ip=<ip> [--outside-pool] [--dry-run] [--confirm=LINK:<vmid>]` records an existing VM as the license's ready, protected service and adds the ownership tag. It starts, stops, resizes and reconfigures nothing. `--outside-pool` adopts a machine on another network whose address is not in the pool. `--dry-run` prints the calls and makes none; a live cluster needs `--confirm=LINK:<vmid>`.
+`wp beltoft-services link-vm <license-id> --cluster=<id> --node=<node> --vmid=<vmid> --ip=<ip> [--outside-pool] [--dry-run] [--confirm=LINK:<vmid>]` records an existing VM as the license's ready, protected service and adds the ownership tag. It starts, stops, resizes and reconfigures nothing. Afterwards a linked VM is never reinstalled and never resized by a plan change (the admin is alerted to do it by hand), but it IS paused like any other VM when its license lapses (shut down, then stopped), and its customer can start, shut down and reboot it. `--outside-pool` adopts a machine on another network whose address is not in the pool. `--dry-run` prints the calls and makes none; a live cluster needs `--confirm=LINK:<vmid>`.
 
 ## HTTP signature
 
