@@ -3,7 +3,7 @@
  * Plugin Name:          Beltoft Services for WooCommerce
  * Plugin URI:           https://beltoft.net/
  * Description:          Sell services with WooCommerce Subscriptions: a license is the entitlement, and a driver provisions, pauses, resumes and removes the service, driven by Beltoft Licenses.
- * Version:              0.2.1
+ * Version:              0.2.2
  * Requires at least:    6.5
  * Requires PHP:         8.1
  * Requires Plugins:     woocommerce, woocommerce-subscriptions, beltoft-licenses
@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'BELTOFT_SERVICES_FILE', __FILE__ );
 define( 'BELTOFT_SERVICES_PATH', plugin_dir_path( __FILE__ ) );
-define( 'BELTOFT_SERVICES_VERSION', '0.2.1' );
+define( 'BELTOFT_SERVICES_VERSION', '0.2.2' );
 
 spl_autoload_register(
 	static function ( $class_name ) {

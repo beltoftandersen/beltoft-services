@@ -62,6 +62,13 @@ class ScriptableLifecycleClient extends FakeClient {
 	 */
 	public $bounce = '';
 
+	/**
+	 * Called after every task is created (a hook for the test to change the world mid-run).
+	 *
+	 * @var callable|null
+	 */
+	public $after_task = null;
+
 	public function task( string $method, string $path, array $params = array() ) {
 		$upid = parent::task( $method, $path, $params );
 
@@ -73,6 +80,10 @@ class ScriptableLifecycleClient extends FakeClient {
 			} elseif ( $vm && 'start' === $this->bounce && 'start' === $m[2] ) {
 				$this->add_vm( array_merge( $vm, array( 'status' => 'stopped' ) ) );
 			}
+		}
+
+		if ( $this->after_task ) {
+			( $this->after_task )( $method, $path );
 		}
 
 		return $upid;
@@ -1039,5 +1050,97 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( 'failed', $r->get( 'state' ) );
 		$this->assertNotEmpty( $this->mails );
 		$this->assertLessThanOrEqual( 150, count( $this->fake->calls() ) - $before );
+	}
+
+	/**
+	 * Ends the resource's license without any beltoft-licenses action (the clock passing the expiry).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function end_license_silently( Resource $r ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'expires_at' => gmdate( 'Y-m-d H:i:s', time() - 1 ) ), array( 'id' => (int) $r->license()['id'] ) );
+	}
+
+	public function test_a_license_ended_before_the_job_runs_makes_no_clone_call(): void {
+		$resource = $this->resource();
+		$this->end_license_silently( $resource );
+
+		\BeltoftServices\Reconciler::step( Resource::find( $resource->id() ) );
+
+		\BeltoftServices\Reconciler::step( Resource::find( $resource->id() ) ); // The queued follow-up: the pause.
+
+		$this->assertSame( array(), $this->fake->calls(), 'Proxmox was not called at all.' );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
+	}
+
+	public function test_a_license_with_a_future_expiry_still_provisions(): void {
+		$resource = $this->resource();
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ) ), array( 'id' => (int) $resource->license()['id'] ) );
+
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+	}
+
+	public function test_a_license_revoked_after_the_clone_leaves_a_stopped_vm_and_a_paused_service(): void {
+		$resource = $this->resource();
+
+		$this->fake->after_task = function ( string $method, string $path ) use ( $resource ) {
+			if ( str_ends_with( $path, '/clone' ) ) {
+				$this->end_license_silently( $resource );
+			}
+		};
+
+		$result = $this->run_provision( $resource );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertSame( array(), $this->calls_matching( 'POST', '/status/start' ), 'The VM was never started.' );
+
+		$this->fake->after_task = null;
+		$id                     = $resource->id();
+
+		// The reconciler's next steps: the pause that the guard asked for, with the VM off.
+		\BeltoftServices\Reconciler::step( Resource::find( $id ) );
+
+		$fresh = Resource::find( $id );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
+		$this->assertSame( array(), $this->calls_matching( 'POST', '/status/start' ) );
+	}
+
+	public function test_resume_of_a_paused_service_with_an_ended_license_stays_paused(): void {
+		$r = $this->built();
+		$this->assert_done( $this->op( 'pause', $r ) );
+		$this->assertTrue( Resource::find( $r->id() )->desire( 'paused', 'license expired' ) );
+		\BeltoftServices\Reconciler::step( Resource::find( $r->id() ) );
+
+		$this->end_license_silently( $r );
+		$this->assertTrue( Resource::find( $r->id() )->desire( 'ready', 'stale' ) );
+		$seen = count( $this->fake->calls() );
+
+		\BeltoftServices\Reconciler::step( Resource::find( $r->id() ) );
+
+		$this->assertSame( array(), array_filter( $this->since( $seen ), static fn( $p ) => 0 === strpos( $p, 'POST' ) ), 'Nothing was started.' );
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
+		$this->assertSame( 'paused', Resource::find( $r->id() )->get( 'desired' ) );
+		$this->assertSame( 'paused', Resource::find( $r->id() )->get( 'state' ) );
+	}
+
+	/**
+	 * Recorded fake calls by method and path ending.
+	 *
+	 * @param string $method Method.
+	 * @param string $suffix Path ending.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function calls_matching( string $method, string $suffix ): array {
+		return array_values( array_filter( $this->fake->calls(), static fn( $c ) => $c['method'] === $method && str_ends_with( $c['path'], $suffix ) ) );
 	}
 }

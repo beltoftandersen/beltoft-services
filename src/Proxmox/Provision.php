@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Alerts;
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -116,6 +117,11 @@ final class Provision {
 		foreach ( self::STEPS as $name ) {
 			if ( 'wipe' === $name ? ! $this->r->get( 'wipe' ) : in_array( $name, $steps, true ) ) {
 				continue;
+			}
+
+			// A license that ended since this job was queued builds nothing and starts nothing; a VM already cloned is paused (it stays off).
+			if ( in_array( $name, array( 'clone', 'start' ), true ) && Reconciler::guard( $this->r ) ) {
+				return StepResult::retry( 0, 'The license is no longer active; provisioning stopped' );
 			}
 
 			$meta = $this->{'step_' . $name}();

@@ -26,6 +26,11 @@ defined( 'ABSPATH' ) || exit;
  * | ready   | paused, failed after resume                        | resume                 |
  * | ready   | ready with plan_dirty, failed after update_plan    | update_plan            |
  *
+ * Provision and resume create or start something, so the license is read again right before
+ * (guard()): a license that ended after the job was queued (a chargeback right after payment,
+ * an expiry that passed by a second) pauses the service instead. A license with a future
+ * expiry is active and provisions normally.
+ *
  * A failed pause or delete whose desired state is ready again resumes. A completed delete
  * makes a new resource only when the deletion asked for it (desire( 'deleted', ..., true ))
  * and the license is active.
@@ -189,6 +194,12 @@ final class Reconciler {
 			return;
 		}
 
+		// Nothing is created or started for a license that is no longer active.
+		if ( in_array( $operation, array( 'provision', 'resume' ), true ) && self::guard( $r ) ) {
+			self::follow_up( $r );
+			return;
+		}
+
 		$driver_id = $r->get( 'driver' );
 		$driver    = Registry::get( $driver_id );
 
@@ -250,6 +261,32 @@ final class Reconciler {
 		} else {
 			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
+	}
+
+	/**
+	 * Re-reads the license before something is created or started. When it is not active (by
+	 * its status or its expiry), the desired state becomes paused, with a history event, and
+	 * the caller must not create or start anything. A resource with no readable license is
+	 * left alone.
+	 *
+	 * Drivers call this too, between the steps of one run, before a step that creates or
+	 * starts something (the Proxmox clone and start).
+	 *
+	 * @param Resource $r Resource, read under its lock.
+	 * @return bool True when the license is not active: the caller stops.
+	 */
+	public static function guard( Resource $r ): bool {
+		$license = $r->license();
+
+		if ( ! $license || Licenses::STATUS_ACTIVE === Licenses::effective_status( $license ) ) {
+			return false;
+		}
+
+		if ( 'paused' !== $r->get( 'desired' ) ) {
+			$r->desire( 'paused', sprintf( 'License %s: nothing was created or started', Licenses::effective_status( $license ) ) );
+		}
+
+		return true;
 	}
 
 	/**

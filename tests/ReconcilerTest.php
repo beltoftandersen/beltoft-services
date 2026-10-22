@@ -1423,4 +1423,63 @@ final class ReconcilerTest extends TestCase {
 		$this->assertStringEndsWith( 'Service not created: …' . substr( $license['license_key'], -4 ), $this->mails[0]['subject'] );
 		$this->assertStringNotContainsString( $license['license_key'], $this->mails[0]['subject'] );
 	}
+
+	/**
+	 * Sets a license's expiry straight in the table: no beltoft-licenses action fires, as
+	 * when the clock passes an expiry between two events.
+	 *
+	 * @param int      $license_id License id.
+	 * @param int|null $time       Unix time, or null for none.
+	 */
+	private function set_expiry_silently( int $license_id, ?int $time ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'expires_at' => null === $time ? null : gmdate( 'Y-m-d H:i:s', $time ) ), array( 'id' => $license_id ) );
+	}
+
+	public function test_a_license_that_ended_after_the_job_was_queued_is_never_provisioned(): void {
+		list( $resource, $driver ) = $this->resource();
+
+		$this->set_expiry_silently( (int) $resource->license()['id'], time() - 1 );
+		Reconciler::step( Resource::find( $resource->id() ) );
+		Reconciler::step( Resource::find( $resource->id() ) ); // The queued follow-up: the pause.
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( array(), $driver->calls( 'provision' ) );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ), 'Nothing was built, so it is simply paused.' );
+		$this->assertStringContainsString( 'nothing was created or started', implode( "\n", wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $resource->license()['id'] ), 'message' ) ) );
+	}
+
+	public function test_a_license_with_a_future_expiry_provisions_normally(): void {
+		list( $resource, $driver ) = $this->resource();
+
+		$this->set_expiry_silently( (int) $resource->license()['id'], time() + DAY_IN_SECONDS );
+		Reconciler::step( Resource::find( $resource->id() ) );
+
+		$this->assertCount( 1, $driver->calls( 'provision' ) );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_a_revoked_license_never_resumes(): void {
+		list( $resource, $driver ) = $this->resource();
+		Reconciler::step( Resource::find( $resource->id() ) );
+		$resource = Resource::find( $resource->id() );
+		$this->assertTrue( $resource->desire( 'paused', 'test' ) );
+		Reconciler::step( Resource::find( $resource->id() ) );
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
+
+		// Revoked silently, then something wants it ready again (a stale renewal, an admin click).
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'status' => 'revoked' ), array( 'id' => (int) $resource->license()['id'] ) );
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'ready', 'stale' ) );
+		Reconciler::step( Resource::find( $resource->id() ) );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( array(), $driver->calls( 'resume' ) );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ) );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+	}
 }
