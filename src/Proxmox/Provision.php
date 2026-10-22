@@ -183,6 +183,17 @@ final class Provision {
 			'disk_gb'   => (int) ( $plan['disk_gb'] ?? 0 ),
 		);
 
+		// The customer's choice (checkout or reinstall) beats the plan's template, which is the fallback.
+		$chosen = $this->r->get( OsField::META );
+
+		if ( null !== $chosen && '' !== $chosen && 0 !== $chosen ) {
+			$this->plan['template'] = is_int( $chosen ) || ( is_string( $chosen ) && ctype_digit( $chosen ) ) ? (int) $chosen : 0;
+
+			if ( ! array_key_exists( $this->plan['template'], Clusters::templates( $this->cluster_id ) ) ) {
+				return StepResult::fail( 'The operating system template chosen for this service (' . mb_substr( sanitize_text_field( (string) ( is_scalar( $chosen ) ? $chosen : '' ) ), 0, 20 ) . ') is not in the template list of this cluster' );
+			}
+		}
+
 		if ( ! array_key_exists( $this->plan['template'], Clusters::templates( $this->cluster_id ) ) ) {
 			return StepResult::fail( 'Template ' . $this->plan['template'] . ' is not in the template list of this cluster' );
 		}

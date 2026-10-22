@@ -172,6 +172,25 @@ class ClustersTest extends TestCase {
 		$this->assertSame( 'live', get_option( Clusters::OPTION )['lab']['client'] );
 	}
 
+	public function test_default_template_is_marked_validated_and_falls_back_to_the_first(): void {
+		$list = "9000 = Ubuntu 26.04\n9001 = Ubuntu 24.04";
+
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'templates' => $list ) ) ) );
+		$this->assertSame( 9000, Clusters::default_template( 'lab' ), 'Unmarked: the first.' );
+
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'templates' => $list, 'default_template' => '9001' ) ) ) );
+		$this->assertSame( 9001, Clusters::default_template( 'lab' ), 'The marker beats the order.' );
+		$this->assertSame( 9001, Clusters::get( 'lab' )['default_template'] );
+
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'templates' => $list, 'default_template' => '9005' ) ) ), 'Not in the list.' );
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'templates' => $list, 'default_template' => 'abc' ) ) ) );
+		$this->assertSame( 9001, Clusters::default_template( 'lab' ), 'A refused save changes nothing.' );
+
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'templates' => "9000 = Ubuntu 26.04\n9002 = Debian", 'default_template' => '' ) ) ) );
+		$this->assertSame( 9000, Clusters::default_template( 'lab' ), 'Emptied: back to the first.' );
+		$this->assertSame( 0, Clusters::default_template( 'nope' ) );
+	}
+
 	public function test_templates_parse(): void {
 		Clusters::save( 'lab', $this->input( array( 'templates' => "9000 = Debian 12\n\n  9001=Ubuntu = LTS \n" ) ) );
 

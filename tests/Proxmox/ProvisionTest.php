@@ -433,6 +433,43 @@ class ProvisionTest extends TestCase {
 		);
 	}
 
+	public function test_the_chosen_operating_system_template_is_cloned(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-24-template' ) );
+		$resource = $this->resource( array(), array( 'os_template' => 9001 ) );
+
+		$this->assert_done( $this->run_provision( $resource ) );
+
+		$clone = $this->calls( 'POST', '/clone' );
+		$this->assertCount( 1, $clone );
+		$this->assertSame( '/nodes/node-a/qemu/9001/clone', $clone[0]['path'], 'The choice, not the plan template 9000.' );
+		$this->assertSame( 9001, Resource::find( $resource->id() )->get( 'os_template' ), 'It stays on the resource: it is the current system.' );
+	}
+
+	public function test_the_plan_template_is_the_fallback_without_a_choice(): void {
+		$resource = $this->resource();
+
+		$this->assert_done( $this->run_provision( $resource ) );
+
+		$this->assertSame( '/nodes/node-a/qemu/9000/clone', $this->calls( 'POST', '/clone' )[0]['path'] );
+	}
+
+	public function test_a_chosen_template_the_cluster_does_not_list_fails_with_no_clone(): void {
+		$this->template( array( 'vmid' => 9002, 'name' => 'unlisted-template' ) );
+		$resource = $this->resource( array(), array( 'os_template' => 9002 ) );
+
+		$result = $this->run_provision( $resource );
+
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'operating system template', $result->error() );
+		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+		$this->assertCount( 0, $this->calls( 'POST', '/status/start' ) );
+
+		// Junk is refused the same way, never cast into a template id.
+		$junk = $this->resource( array(), array( 'os_template' => '9000; DROP' ) );
+		$this->assertTrue( $this->run_provision( $junk )->is_failed() );
+		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+	}
+
 	public function test_clone_asks_for_another_node_only_when_placement_picks_one(): void {
 		$this->fake->add_node( 'node-b', array( 'mem' => 0 ) );
 		$this->fake->add_node( 'node-a', array( 'mem' => 60000000000 ) );

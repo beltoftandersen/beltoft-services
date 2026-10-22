@@ -286,7 +286,8 @@ final class ClustersScreen {
 		self::row( 'prefix', __( 'Network prefix', 'beltoft-services' ), (string) $c['prefix'], __( 'Bits in the netmask, 1 to 32.', 'beltoft-services' ) );
 		self::row( 'vmid_min', __( 'First customer VMID', 'beltoft-services' ), (string) $c['vmid_min'], __( 'At least 100. Machines in this range are the only ones this site will change.', 'beltoft-services' ) );
 		self::row( 'vmid_max', __( 'Last customer VMID', 'beltoft-services' ), (string) $c['vmid_max'] );
-		self::row( 'templates', __( 'Templates', 'beltoft-services' ), $templates, __( 'One per line: VMID = label. A template must be outside the customer VMID range.', 'beltoft-services' ), 'textarea' );
+		self::row( 'templates', __( 'Templates', 'beltoft-services' ), $templates, __( 'One per line: VMID = label. The label is what customers see as the operating system. A template must be outside the customer VMID range.', 'beltoft-services' ), 'textarea' );
+		self::row( 'default_template', __( 'Default template', 'beltoft-services' ), $c['default_template'] ? (string) $c['default_template'] : '', __( 'The VMID from the list above that customers get preselected at checkout and on reinstall. Empty: the first template of the list.', 'beltoft-services' ) );
 		self::row( 'vendor_snippet', __( 'Vendor snippet', 'beltoft-services' ), (string) $c['vendor_snippet'], __( 'Optional cloud-init snippet volume, such as local:snippets/vendor.yaml.', 'beltoft-services' ) );
 
 		printf(

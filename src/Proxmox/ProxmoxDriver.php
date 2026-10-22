@@ -89,7 +89,7 @@ class ProxmoxDriver implements Driver {
 				'number',
 				__( 'Template VMID', 'beltoft-services' ),
 				/* translators: %s: templates per cluster. */
-				sprintf( __( 'The VMID of the template to clone. It must be in the cluster\'s template list. Configured: %s', 'beltoft-services' ), $templates ? implode( '; ', $templates ) : __( 'none yet', 'beltoft-services' ) ),
+				sprintf( __( 'The fallback template VMID, used when the customer made no operating system choice (older orders, licenses issued by an admin). It must be in the cluster\'s template list. Configured: %s', 'beltoft-services' ), $templates ? implode( '; ', $templates ) : __( 'none yet', 'beltoft-services' ) ),
 				'',
 				true,
 			),

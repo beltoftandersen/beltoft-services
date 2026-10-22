@@ -52,6 +52,7 @@ final class Clusters {
 			'vmid_min'          => 200,
 			'vmid_max'          => 999,
 			'templates'         => array(),
+			'default_template'  => 0,
 			'vendor_snippet'    => '',
 			'block_smtp'        => 1,
 		);
@@ -145,6 +146,25 @@ final class Clusters {
 		$all = self::all();
 
 		return isset( $all[ $cluster ] ) && is_array( $all[ $cluster ]['templates'] ) ? $all[ $cluster ]['templates'] : array();
+	}
+
+	/**
+	 * The template preselected for customers: the one marked as default in the cluster's settings
+	 * when it is still in the list, otherwise the first template of the list, 0 when there is none.
+	 *
+	 * @param string $cluster Cluster id.
+	 */
+	public static function default_template( string $cluster ): int {
+		$all       = self::all();
+		$templates = self::templates( $cluster );
+
+		if ( array() === $templates ) {
+			return 0;
+		}
+
+		$marked = isset( $all[ $cluster ] ) ? (int) $all[ $cluster ]['default_template'] : 0;
+
+		return isset( $templates[ $marked ] ) ? $marked : (int) array_key_first( $templates );
 	}
 
 	/**
@@ -386,6 +406,14 @@ final class Clusters {
 		}
 
 		$clean['templates'] = $templates;
+
+		$default = trim( (string) ( $input['default_template'] ?? '' ) );
+
+		if ( '' !== $default && ( ! ctype_digit( $default ) || ! isset( $templates[ (int) $default ] ) ) ) {
+			return self::error( 'default_template', __( 'The default template must be one of the VMIDs in the template list, or empty to use the first.', 'beltoft-services' ) );
+		}
+
+		$clean['default_template'] = '' === $default ? 0 : (int) $default;
 
 		$snippet = trim( (string) ( $input['vendor_snippet'] ?? '' ) );
 
