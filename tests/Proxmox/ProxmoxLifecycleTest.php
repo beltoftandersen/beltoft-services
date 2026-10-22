@@ -1,0 +1,723 @@
+<?php
+/**
+ * Pause, resume, delete, plan changes and status of a Proxmox VM. Only the fake client is used: nothing here reaches a Proxmox host.
+ *
+ * @package BeltoftServices
+ */
+
+namespace BeltoftServices\Tests\Proxmox;
+
+use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
+use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Access;
+use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Switches;
+use BeltoftServices\Retention;
+use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Resource;
+use BeltoftServices\Tests\TestCase;
+
+/**
+ * A ProxmoxDriver that records its sleeps instead of sleeping.
+ */
+class QuickLifecycleDriver extends ProxmoxDriver {
+
+	/**
+	 * Sleeps asked for.
+	 *
+	 * @var int[]
+	 */
+	public $naps = array();
+
+	public function nap( int $seconds ): void {
+		$this->naps[] = $seconds;
+	}
+}
+
+/**
+ * The operations after provisioning, against the fake cluster.
+ */
+class ProxmoxLifecycleTest extends TestCase {
+
+	private const SECRET = 'secret-secret-secret-1';
+
+	/**
+	 * The fake cluster.
+	 *
+	 * @var FakeClient
+	 */
+	private $fake;
+
+	/**
+	 * The driver under test.
+	 *
+	 * @var QuickLifecycleDriver
+	 */
+	private $driver;
+
+	/**
+	 * Mails sent.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private $mails = array();
+
+	public function set_up(): void {
+		parent::set_up();
+
+		$this->mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) {
+				$this->mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+
+		$key = base64_encode( random_bytes( 32 ) );
+		add_filter( 'beltoft_services_key', fn() => $key );
+
+		$this->wipe_tables();
+		delete_option( Clusters::OPTION );
+		$this->settings( array( 'task_wait' => 5 ) );
+
+		$this->fake = new FakeClient();
+		add_filter( 'beltoft_services_proxmox_client', fn() => $this->fake );
+
+		$this->driver = new QuickLifecycleDriver();
+		add_filter(
+			'beltoft_services_drivers',
+			function ( $drivers ) {
+				$drivers['proxmox'] = $this->driver;
+				return $drivers;
+			}
+		);
+
+		$this->fake->add_node( 'node-a' );
+		$this->template();
+		$this->cluster();
+		IpPool::add( '192.0.2.10' );
+		IpPool::add( '192.0.2.11' );
+
+		as_unschedule_all_actions( Jobs::SWEEP, array(), Jobs::GROUP );
+	}
+
+	public function tear_down(): void {
+		remove_all_filters( 'beltoft_services_key' );
+		remove_all_filters( 'beltoft_services_proxmox_client' );
+		delete_option( Clusters::OPTION );
+		$this->wipe_tables();
+
+		parent::tear_down();
+	}
+
+	private function wipe_tables(): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$wpdb->query( 'DELETE FROM ' . Schema::tables()['vms'] );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$wpdb->query( 'DELETE FROM ' . Schema::tables()['ips'] );
+		delete_transient( IpPool::FREE_TRANSIENT );
+	}
+
+	/**
+	 * The template: VMID 9000 on node-a with one 10G disk, a NIC with a MAC and a tag, and the agent.
+	 *
+	 * @param array<string, mixed> $over Overrides of the VM.
+	 */
+	private function template( array $over = array() ): void {
+		$this->fake->add_vm(
+			array_merge(
+				array(
+					'vmid'     => 9000,
+					'node'     => 'node-a',
+					'name'     => 'debian-template',
+					'template' => 1,
+					'config'   => array(
+						'scsi0'  => 'disk-store:vm-9000-disk-0,size=10G',
+						'net0'   => 'virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0,tag=5',
+						'agent'  => '1',
+						'memory' => 512,
+						'cores'  => 1,
+					),
+				),
+				$over
+			)
+		);
+	}
+
+	/**
+	 * Saves the cluster "lab".
+	 *
+	 * @param array<string, mixed> $over Form overrides.
+	 */
+	private function cluster( array $over = array() ): void {
+		$saved = Clusters::save(
+			'lab',
+			array_merge(
+				array(
+					'label'             => 'Lab cluster',
+					'api_url'           => 'https://pve.example.invalid:8006',
+					'token_id'          => 'svc@pve!beltoft',
+					'token_secret'      => self::SECRET,
+					'client'            => 'fake',
+					'pool_api'          => 'pools',
+					'nodes'             => 'node-a',
+					'storage'           => 'disk-store',
+					'cloudinit_storage' => 'ci-store',
+					'bridge'            => 'vmbr9',
+					'vlan'              => '',
+					'pool'              => '',
+					'boot_disk'         => 'scsi0',
+					'gateway'           => '192.0.2.1',
+					'nameservers'       => '192.0.2.53, 192.0.2.54',
+					'prefix'            => '24',
+					'vmid_min'          => '5000',
+					'vmid_max'          => '5099',
+					'templates'         => "9000 = Debian 12\n9001 = Ubuntu 24.04",
+					'vendor_snippet'    => '',
+					'block_smtp'        => '1',
+				),
+				$over
+			)
+		);
+
+		$this->assertTrue( $saved );
+	}
+
+	/**
+	 * A resource of a new license, ready to be provisioned.
+	 *
+	 * @param array<string, mixed> $plan Plan overrides.
+	 * @param array<string, mixed> $meta Initial meta.
+	 * @param int|null             $user Owner.
+	 */
+	private function resource( array $plan = array(), array $meta = array(), ?int $user = null ): Resource {
+		$product = $this->service_product(
+			'proxmox',
+			array_merge(
+				array(
+					'cluster'   => 'lab',
+					'template'  => 9000,
+					'cores'     => 2,
+					'memory_mb' => 4096,
+					'disk_gb'   => 30,
+				),
+				$plan
+			),
+			array( 'max' => 3 )
+		);
+
+		$data = array( 'fire' => false );
+
+		if ( null !== $user ) {
+			$data['user_id'] = $user;
+		}
+
+		$license  = $this->service_license( $product, $data );
+		$resource = Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $product->get_id() ), $meta );
+
+		$this->assertInstanceOf( Resource::class, $resource );
+
+		return $resource;
+	}
+
+	/**
+	 * One run of the driver, as the reconciler would make it (a fresh read each time).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function run_provision( Resource $r ): StepResult {
+		return $this->driver->provision( Resource::find( $r->id() ) );
+	}
+
+	/**
+	 * Calls matching a method and a path ending.
+	 *
+	 * @param string $method Method.
+	 * @param string $suffix Path ending.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function calls( string $method, string $suffix ): array {
+		return array_values(
+			array_filter(
+				$this->fake->calls(),
+				static fn( $call ) => $call['method'] === $method && substr( $call['path'], -strlen( $suffix ) ) === $suffix
+			)
+		);
+	}
+
+	private function assert_done( StepResult $result ): void {
+		$this->assertTrue( $result->is_done(), 'Expected done, got: ' . $result->error() );
+	}
+
+	private function ed25519(): string {
+		$blob = pack( 'N', 11 ) . 'ssh-ed25519' . pack( 'N', 32 ) . random_bytes( 32 );
+
+		return 'ssh-ed25519 ' . base64_encode( $blob ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test key.
+	}
+
+	/**
+	 * A provisioned, running VM, the resource read fresh.
+	 */
+	private function built( array $plan = array() ): Resource {
+		$resource = $this->resource( $plan );
+		$this->assert_done( $this->run_provision( $resource ) );
+
+		return Resource::find( $resource->id() );
+	}
+
+	private function op( string $operation, Resource $r ): StepResult {
+		return $this->driver->$operation( Resource::find( $r->id() ) );
+	}
+
+	/**
+	 * Calls made after a mark, as "METHOD path".
+	 *
+	 * @param int $seen Calls to skip.
+	 * @return string[]
+	 */
+	private function since( int $seen ): array {
+		return array_map( static fn( $c ) => $c['method'] . ' ' . $c['path'], array_slice( $this->fake->calls(), $seen ) );
+	}
+
+	private function assert_only_reads( int $seen ): void {
+		foreach ( array_slice( $this->fake->calls(), $seen ) as $call ) {
+			$this->assertSame( 'GET', $call['method'], 'Read-only: ' . $call['method'] . ' ' . $call['path'] );
+		}
+	}
+
+	/**
+	 * Powers the fake VM off the way a customer would from inside the guest.
+	 */
+	private function power_off( int $vmid ): void {
+		$upid = $this->fake->task( 'POST', '/nodes/node-a/qemu/' . $vmid . '/status/shutdown' );
+		$this->assertTrue( true === $this->fake->wait_task( $upid, 10 ) );
+	}
+
+	public function test_medusa_pause_shuts_down_before_stopping(): void {
+		$r    = $this->built();
+		$seen = count( $this->fake->calls() );
+
+		$this->assert_done( $this->op( 'pause', $r ) );
+
+		$paths = $this->since( $seen );
+		$this->assertContains( 'POST /nodes/node-a/qemu/5000/status/shutdown', $paths );
+		$this->assertNotContains( 'POST /nodes/node-a/qemu/5000/status/stop', $paths, 'A clean shutdown needs no plug pull.' );
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
+
+		$shutdown = $this->calls( 'POST', '/status/shutdown' );
+		$this->assertSame( 120, (int) $shutdown[0]['params']['timeout'] );
+	}
+
+	public function test_pause_stops_only_if_shutdown_task_leaves_it_running(): void {
+		$r = $this->built();
+		$this->fake->next_task( array( 'exitstatus' => 'command timed out - aborting', 'effect' => false ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->assert_done( $this->op( 'pause', $r ) );
+
+		$paths    = $this->since( $seen );
+		$shutdown = array_search( 'POST /nodes/node-a/qemu/5000/status/shutdown', $paths, true );
+		$stop     = array_search( 'POST /nodes/node-a/qemu/5000/status/stop', $paths, true );
+		$this->assertNotFalse( $shutdown );
+		$this->assertNotFalse( $stop );
+		$this->assertLessThan( $stop, $shutdown );
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
+	}
+
+	public function test_pause_refuses_untagged_vm(): void {
+		$r = $this->built();
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
+		$seen = count( $this->fake->calls() );
+
+		$result = $this->op( 'pause', $r );
+
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'Ownership check failed', $result->error() );
+		$this->assert_only_reads( $seen );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+	}
+
+	public function test_pause_of_a_half_built_resource_makes_no_vm_call(): void {
+		$resource = $this->resource();
+
+		// Nothing recorded at all.
+		$this->assert_done( $this->op( 'pause', $resource ) );
+
+		// A VMID recorded, the clone never finished.
+		$this->fake->fail_next( 'POST', '#/clone$#', array( 'status' => 500, 'message' => 'storage is busy' ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->assertNotNull( VmRecords::for_resource( $resource->id() ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->assert_done( $this->op( 'pause', $resource ) );
+		$this->assertCount( $seen, $this->fake->calls() );
+	}
+
+	public function test_pause_waits_for_a_pending_clone(): void {
+		$resource = $this->resource();
+		$this->fake->next_task( array( 'polls' => 400 ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$task = Resource::find( $resource->id() )->get( 'task' );
+		$this->assertNotEmpty( $task['upid'] );
+		$seen = count( $this->fake->calls() );
+
+		$result = $this->op( 'pause', $resource );
+
+		$this->assertTrue( $result->is_retry() );
+		$this->assert_only_reads( $seen );
+		$this->assertSame( $task['upid'], Resource::find( $resource->id() )->get( 'task' )['upid'], 'The task id is kept.' );
+	}
+
+	public function test_resume_starts(): void {
+		$r = $this->built();
+		$this->assert_done( $this->op( 'pause', $r ) );
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
+
+		$this->assert_done( $this->op( 'resume', $r ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+
+		// Already running: no start call.
+		$seen = count( $this->fake->calls() );
+		$this->assert_done( $this->op( 'resume', $r ) );
+		$this->assertSame( array(), array_filter( $this->since( $seen ), static fn( $p ) => 0 === strpos( $p, 'POST' ) ) );
+	}
+
+	public function test_resume_after_a_pause_mid_provision_finishes_provisioning(): void {
+		$resource = $this->resource();
+		$this->fake->fail_next( 'POST', '#/clone$#', array( 'status' => 500, 'message' => 'storage is busy' ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->assert_done( $this->op( 'pause', $resource ) );
+		$this->assertNull( $this->fake->vm( 5000 ) );
+
+		$this->assert_done( $this->op( 'resume', $resource ) );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( array( 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' ), $fresh->get( 'steps' ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+	}
+
+	public function test_delete_releases_ip_and_record(): void {
+		$r     = $this->built();
+		$owner = (int) $r->license()['user_id'];
+		$this->assertNotNull( IpPool::for_resource( $r->id() ) );
+		$this->assertNotEmpty( $r->get( Access::META_REVEAL ) );
+		$free = IpPool::free_count();
+		$seen = count( $this->fake->calls() );
+
+		$this->assert_done( $this->op( 'delete', $r ) );
+
+		$paths    = $this->since( $seen );
+		$shutdown = array_search( 'POST /nodes/node-a/qemu/5000/status/shutdown', $paths, true );
+		$delete   = array_search( 'DELETE /nodes/node-a/qemu/5000', $paths, true );
+		$this->assertNotFalse( $shutdown );
+		$this->assertNotFalse( $delete );
+		$this->assertLessThan( $delete, $shutdown );
+
+		$call = $this->calls( 'DELETE', '/qemu/5000' )[0];
+		$this->assertSame( 1, (int) $call['params']['purge'] );
+		$this->assertSame( 1, (int) $call['params']['destroy-unreferenced-disks'] );
+
+		$this->assertNull( $this->fake->vm( 5000 ) );
+		$this->assertNull( VmRecords::for_resource( $r->id() ) );
+		$this->assertNull( IpPool::for_resource( $r->id() ) );
+		$this->assertSame( $free + 1, IpPool::free_count() );
+		$this->assertNull( Access::take_reveal( Resource::find( $r->id() ), $owner ), 'No unread password survives the VM.' );
+		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ) );
+	}
+
+	public function test_delete_refuses_a_vm_that_is_not_ours(): void {
+		$r = $this->built();
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
+		$seen = count( $this->fake->calls() );
+
+		$result = $this->op( 'delete', $r );
+
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'Ownership check failed', $result->error() );
+		$this->assert_only_reads( $seen );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ), 'The record stays.' );
+		$this->assertNotNull( IpPool::for_resource( $r->id() ) );
+		$this->assertNotNull( $this->fake->vm( 5000 ) );
+	}
+
+	public function test_delete_refuses_an_id_outside_the_customer_range(): void {
+		$r = $this->built();
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( Schema::tables()['vms'], array( 'vmid' => 4000 ), array( 'resource_id' => $r->id() ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->assertTrue( $this->op( 'delete', $r )->is_failed() );
+		$this->assert_only_reads( $seen );
+	}
+
+	public function test_delete_of_a_vm_already_gone_is_done_only_when_the_id_is_free(): void {
+		$r = $this->built();
+		$this->power_off( 5000 );
+		$upid = $this->fake->task( 'DELETE', '/nodes/node-a/qemu/5000', array( 'purge' => 1 ) );
+		$this->assertTrue( true === $this->fake->wait_task( $upid, 10 ) );
+		$this->assertNull( $this->fake->vm( 5000 ) );
+
+		// The id cannot be confirmed free: not done.
+		$this->fake->fail_next( 'GET', '#/cluster/nextid$#', array( 'status' => 500, 'message' => 'busy' ) );
+		$result = $this->op( 'delete', $r );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
+		$this->assertNotNull( IpPool::for_resource( $r->id() ) );
+
+		// The id is taken (not visible to us): not done either.
+		$this->fake->fail_next( 'GET', '#/cluster/nextid$#', array( 'status' => 400, 'message' => 'VM 5000 already exists' ) );
+		$this->assertTrue( $this->op( 'delete', $r )->is_retry() );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
+
+		// Free: done, and no DELETE call of ours.
+		$seen = count( $this->fake->calls() );
+		$this->assert_done( $this->op( 'delete', $r ) );
+		$this->assertSame( array(), array_filter( $this->since( $seen ), static fn( $p ) => 0 === strpos( $p, 'DELETE' ) ) );
+		$this->assertNull( VmRecords::for_resource( $r->id() ) );
+		$this->assertNull( IpPool::for_resource( $r->id() ) );
+	}
+
+	public function test_delete_of_a_half_built_resource_deletes_no_vm(): void {
+		// A foreign VM appears on the id the allocation chose: the clone step refuses it.
+		$resource = $this->resource();
+		$this->fake->fail_next( 'POST', '#/clone$#', array( 'status' => 500, 'message' => 'storage is busy' ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->fake->add_vm( array( 'vmid' => 5000, 'node' => 'node-a', 'status' => 'running', 'config' => array( 'description' => 'not ours' ) ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_failed() );
+		$this->assertNotNull( VmRecords::for_resource( $resource->id() ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->assert_done( $this->op( 'delete', $resource ) );
+
+		$this->assert_only_reads( $seen );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
+		$this->assertNull( IpPool::for_resource( $resource->id() ) );
+
+		// A clone that never started: nothing at the id, the id is confirmed free.
+		$other = $this->resource();
+		$this->fake->fail_next( 'POST', '#/clone$#', array( 'status' => 500, 'message' => 'storage is busy' ) );
+		$this->assertTrue( $this->run_provision( $other )->is_retry() );
+		$seen = count( $this->fake->calls() );
+		$this->assert_done( $this->op( 'delete', $other ) );
+		$this->assert_only_reads( $seen );
+		$this->assertNull( IpPool::for_resource( $other->id() ) );
+	}
+
+	public function test_delete_of_a_pending_clone_waits(): void {
+		$resource = $this->resource();
+		$this->fake->next_task( array( 'polls' => 400 ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$seen = count( $this->fake->calls() );
+
+		$this->assertTrue( $this->op( 'delete', $resource )->is_retry() );
+		$this->assert_only_reads( $seen );
+		$this->assertNotNull( IpPool::for_resource( $resource->id() ) );
+	}
+
+	public function test_mark_deleted_keeps_the_ip_held(): void {
+		$r    = $this->built();
+		$user = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user );
+		get_user_by( 'id', $user )->add_cap( 'manage_woocommerce' );
+		$seen = count( $this->fake->calls() );
+
+		$result = \BeltoftServices\Admin\Panel::act( Resource::find( $r->id() ), 'mark_deleted', 'MARK DELETED' );
+
+		$this->assertNotWPError( $result );
+		$this->assertFalse( Resource::find( $r->id() )->is_live() );
+		$this->assertCount( $seen, $this->fake->calls(), 'No driver call.' );
+		$this->assertSame( 'assigned', IpPool::for_resource( $r->id() )['state'], 'The VM may still run on it.' );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
+		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ), 'The unread password is wiped.' );
+	}
+
+	public function test_medusa_upgrade_is_applied_not_just_charged(): void {
+		$resource = $this->resource();
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+		$seen = count( $this->fake->calls() );
+
+		$plan = array_merge( (array) Resource::find( $resource->id() )->get( 'plan' ), array( 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 50 ) );
+		$this->assertTrue( Resource::find( $resource->id() )->change_plan( $plan, 'Plan changed' ) );
+		Jobs::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertEmpty( $fresh->get( 'plan_dirty' ) );
+
+		$vm = $this->fake->vm( 5000 );
+		$this->assertSame( 4, (int) $vm['config']['cores'] );
+		$this->assertSame( 8192, (int) $vm['config']['memory'] );
+		$this->assertSame( 'disk-store:vm-9000-disk-0,size=50G', $vm['config']['scsi0'] );
+		$this->assertSame( 'running', $vm['status'], 'It ran before, it runs after.' );
+		$this->assertSame( 50, $fresh->get( 'disk_gb' ) );
+		$this->assertEmpty( $fresh->get( 'was_running' ) );
+
+		$paths = $this->since( $seen );
+		$this->assertLessThan( array_search( 'PUT /nodes/node-a/qemu/5000/config', $paths, true ), array_search( 'POST /nodes/node-a/qemu/5000/status/shutdown', $paths, true ) );
+	}
+
+	public function test_update_plan_noop_when_already_matching_makes_no_shutdown(): void {
+		$r    = $this->built();
+		$seen = count( $this->fake->calls() );
+
+		$result = $this->op( 'update_plan', $r );
+
+		$this->assert_done( $result );
+		$this->assert_only_reads( $seen );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+		$this->assertSame( 30, $result->meta()['disk_gb'] );
+	}
+
+	public function test_vm_not_restarted_after_update_when_it_was_stopped(): void {
+		$r = $this->built();
+		$this->power_off( 5000 );
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 40 ) ) ) );
+
+		$this->assert_done( $this->op( 'update_plan', $r ) );
+
+		$vm = $this->fake->vm( 5000 );
+		$this->assertSame( 'stopped', $vm['status'] );
+		$this->assertSame( 4, (int) $vm['config']['cores'] );
+		$this->assertSame( 'disk-store:vm-9000-disk-0,size=40G', $vm['config']['scsi0'] );
+		$this->assertSame( array(), $this->calls( 'POST', '/status/start' ) === array() ? array() : array_slice( $this->calls( 'POST', '/status/start' ), 1 ), 'No start after the provision one.' );
+	}
+
+	public function test_update_refuses_an_untagged_vm(): void {
+		$r = $this->built();
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 8 ) ) ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->assertTrue( $this->op( 'update_plan', $r )->is_failed() );
+		$this->assert_only_reads( $seen );
+	}
+
+	public function test_medusa_disk_downgrade_is_refused_before_payment(): void {
+		Switches::register();
+		$big     = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 60 ), array( 'max' => 1, 'slug' => 'vm-big' ) );
+		$small   = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 20 ), array( 'max' => 1, 'slug' => 'vm-small' ) );
+		$larger  = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 80 ), array( 'max' => 1, 'slug' => 'vm-larger' ) );
+		$license = $this->service_license( $big, array( 'fire' => false, 'subscription_id' => 4242 ) );
+		$this->assertInstanceOf( Resource::class, Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $big->get_id() ) ) );
+
+		$subscription = new class() {
+			public function get_id() {
+				return 4242;
+			}
+		};
+
+		$refused = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $small->get_id(), 1, 0, $subscription, null );
+		$this->assertSame( 'This plan has a smaller disk than your server. Choose a plan with at least 60 GB.', $refused );
+
+		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $larger->get_id(), 1, 0, $subscription, null ) );
+		$this->assertSame( 'Another error.', apply_filters( 'woocommerce_subscriptions_switch_error_message', 'Another error.', $small->get_id(), 1, 0, $subscription, null ), 'WCS\'s own message is kept.' );
+
+		$other = new class() {
+			public function get_id() {
+				return 9999;
+			}
+		};
+		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $small->get_id(), 1, 0, $other, null ), 'A subscription with no VM.' );
+	}
+
+	public function test_cpu_ram_downgrade_applies_and_disk_is_kept_with_one_alert(): void {
+		$r = $this->built();
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 20 ) ) ) );
+
+		$seen  = count( $this->fake->calls() );
+		$first = $this->op( 'update_plan', $r );
+		$this->assert_done( $first );
+
+		$vm = $this->fake->vm( 5000 );
+		$this->assertSame( 1, (int) $vm['config']['cores'] );
+		$this->assertSame( 2048, (int) $vm['config']['memory'] );
+		$this->assertSame( 'disk-store:vm-9000-disk-0,size=30G', $vm['config']['scsi0'], 'The disk is never shrunk.' );
+		$this->assertSame( 'running', $vm['status'] );
+		$this->assertSame( 30, $first->meta()['disk_gb'] );
+		$this->assertSame( array(), array_filter( $this->since( $seen ), static fn( $p ) => false !== strpos( $p, '/resize' ) ) );
+
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'Plan disk (20 GB) is smaller than the VM disk (30 GB); the disk was not shrunk', $this->mails[0]['message'] . $this->mails[0]['subject'] );
+
+		// Asked again (the same dirty plan): still one alert.
+		$this->assert_done( $this->op( 'update_plan', $r ) );
+		$this->assertCount( 1, $this->mails );
+	}
+
+	public function test_a_failed_config_write_after_shutdown_starts_the_vm_again(): void {
+		$r = $this->built();
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 4 ) ) ) );
+		$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 400, 'message' => 'invalid' ) );
+
+		$this->assertTrue( $this->op( 'update_plan', $r )->is_failed() );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'], 'A customer VM is not left switched off.' );
+	}
+
+	public function test_status_is_cached_in_a_transient_not_meta(): void {
+		$r      = $this->built();
+		$before = (array) $r->get( 'steps' );
+
+		$status = $this->driver->status( Resource::find( $r->id() ) );
+
+		$this->assertSame( 'running', $status['power'] );
+		$this->assertArrayHasKey( 'cpu', $status );
+		$this->assertArrayHasKey( 'mem', $status );
+		$this->assertSame( $status, get_transient( Operations::STATUS_PREFIX . $r->id() ) );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( 'power' ) );
+		$this->assertNull( $fresh->get( 'status' ) );
+		$this->assertSame( $before, $fresh->get( 'steps' ) );
+
+		// Not ours: nothing.
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
+		$this->assertNull( $this->driver->status( Resource::find( $r->id() ) ) );
+		$this->assertNull( $this->driver->status( Resource::find( $this->resource()->id() ) ) );
+	}
+
+	public function test_medusa_customer_shutdown_vm_still_follows_retention(): void {
+		$resource = $this->resource();
+		$id       = $resource->id();
+		Jobs::run( $id );
+		$this->assertSame( 'ready', Resource::find( $id )->get( 'state' ) );
+
+		// The customer powers it off from inside the guest, then the license lapses.
+		$this->power_off( 5000 );
+		\BeltoftLicenses\Licenses::update( (int) $resource->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		$this->run_jobs();
+
+		$paused = Resource::find( $id );
+		$this->assertSame( 'paused', $paused->get( 'state' ) );
+		$this->assertEmpty( $this->calls( 'POST', '/status/stop' ) );
+
+		// Retention off (the default): never deleted.
+		$paused->set( array( 'paused_at' => time() - 10 * DAY_IN_SECONDS, 'warned_at' => time() - 2 * DAY_IN_SECONDS ) );
+		Retention::run();
+		$this->assertSame( 'paused', Resource::find( $id )->get( 'desired' ) );
+		$this->assertNotNull( $this->fake->vm( 5000 ) );
+
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		Retention::run();
+		$this->run_jobs();
+
+		$this->assertSame( 'deleted', Resource::find( $id )->get( 'state' ) );
+		$this->assertNull( $this->fake->vm( 5000 ) );
+		$this->assertNull( IpPool::for_resource( $id ) );
+	}
+}

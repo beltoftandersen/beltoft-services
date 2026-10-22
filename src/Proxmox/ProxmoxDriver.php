@@ -154,16 +154,23 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function pause( Resource $r ): StepResult {
-		return $this->not_yet( $r );
+		return ( new Operations( $r ) )->pause();
 	}
 
 	/**
 	 * {@inheritDoc}
 	 *
+	 * A service paused before its provisioning ended continues provisioning (the reconciler sends
+	 * `resume` for it too).
+	 *
 	 * @param Resource $r Resource.
 	 */
 	public function resume( Resource $r ): StepResult {
-		return $this->not_yet( $r );
+		if ( ! in_array( 'ready', (array) $r->get( 'steps' ), true ) ) {
+			return $this->provision( $r );
+		}
+
+		return ( new Operations( $r ) )->resume();
 	}
 
 	/**
@@ -172,7 +179,7 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function update_plan( Resource $r ): StepResult {
-		return $this->not_yet( $r );
+		return ( new Operations( $r ) )->update_plan();
 	}
 
 	/**
@@ -181,18 +188,7 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function delete( Resource $r ): StepResult {
-		return $this->not_yet( $r );
-	}
-
-	/**
-	 * Operations that come with the next task: they refuse and make no Proxmox call.
-	 *
-	 * @param Resource $r Resource.
-	 */
-	private function not_yet( Resource $r ): StepResult {
-		unset( $r );
-
-		return StepResult::fail( 'This Proxmox operation is not available yet' );
+		return ( new Operations( $r ) )->delete();
 	}
 
 	/**
@@ -201,9 +197,7 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function status( Resource $r ): ?array {
-		unset( $r );
-
-		return null;
+		return ( new Operations( $r ) )->status();
 	}
 
 	/**

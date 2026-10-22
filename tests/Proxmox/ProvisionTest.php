@@ -855,17 +855,7 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 	}
 
-	public function test_the_unfinished_operations_make_no_proxmox_call(): void {
-		$resource = $this->resource();
-		$this->assert_done( $this->run_provision( $resource ) );
-		$seen = count( $this->fake->calls() );
-		$r    = Resource::find( $resource->id() );
-
-		foreach ( array( 'pause', 'resume', 'update_plan', 'delete' ) as $operation ) {
-			$this->assertTrue( $this->driver->$operation( $r )->is_failed() );
-		}
-
-		$this->assertCount( $seen, $this->fake->calls() );
+	public function test_driver_identity(): void {
 		$this->assertSame( 'vm', $this->driver->kind() );
 		$this->assertSame( 'proxmox', $this->driver->id() );
 		$this->assertNotContains( 'Drivers\\Opens', class_implements( $this->driver ) );

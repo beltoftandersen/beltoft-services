@@ -137,4 +137,41 @@ final class Access {
 
 		return $taken;
 	}
+
+	/**
+	 * Wipes the stored password, read or not (a deleted or closed VM has nothing left to reveal).
+	 *
+	 * @param Resource $r Resource.
+	 * @return bool Whether nothing is stored afterwards.
+	 */
+	public static function purge( Resource $r ): bool {
+		$stored = $r->get( self::META_REVEAL );
+
+		if ( ( ! is_string( $stored ) || '' === $stored ) && 0 === (int) $r->get( self::META_UNTIL ) ) {
+			return true;
+		}
+
+		return $r->set(
+			array(
+				self::META_REVEAL => '',
+				self::META_UNTIL  => 0,
+			)
+		);
+	}
+
+	/**
+	 * Listener of beltoft_services_state_changed: a deleted VM service keeps no password. This
+	 * also covers "Mark deleted", which closes the resource without calling the driver.
+	 *
+	 * @param mixed  $r   Resource.
+	 * @param string $old Old state.
+	 * @param string $new New state.
+	 */
+	public static function on_state_changed( $r, $old, $new ): void {
+		unset( $old );
+
+		if ( 'deleted' === $new && $r instanceof Resource && SshKeyField::DRIVER === $r->get( 'driver' ) ) {
+			self::purge( $r );
+		}
+	}
 }
