@@ -475,6 +475,10 @@ class StockTest extends TestCase {
 		$ids    = $parent->get_children();
 		$seen   = array();
 
+		$this->capacity( 32 );
+		Stock::sync( 'lab' );
+		$this->assertSame( 'instock', $this->stored( $ids[1] ) );
+
 		add_action(
 			'woocommerce_product_set_stock_status',
 			static function ( $id, $status ) use ( &$seen ) {
@@ -660,7 +664,7 @@ class StockTest extends TestCase {
 
 		// WC_Cart::check_cart_item_stock() (class-wc-cart.php:897) reads is_in_stock() of the item's product.
 		$result = WC()->cart->check_cart_item_stock();
-		$this->assertTrue( true === $result || ! is_wp_error( $result ), 'The renewal item passes the cart stock check while stored out of stock.' );
+		$this->assertTrue( $result, 'The renewal item passes the cart stock check while stored out of stock.' );
 
 		// The same item without a flow key does not.
 		WC()->cart->empty_cart();
@@ -720,6 +724,278 @@ class StockTest extends TestCase {
 
 			$this->assertTrue( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $p->is_in_stock(), $p, $order ), 'A ' . $type . ' order can be paid while stored out of stock.' );
 		}
+	}
+
+	/**
+	 * The cluster "lab" as in set_up(), with these overrides.
+	 *
+	 * @param array<string, string> $over Overrides.
+	 * @return true|\WP_Error
+	 */
+	private function save_cluster( array $over = array() ) {
+		return Clusters::save(
+			'lab',
+			array_merge(
+				array(
+					'label'             => 'Lab',
+					'api_url'           => 'https://pve.example.invalid:8006',
+					'token_id'          => 'svc@pve!beltoft',
+					'token_secret'      => 'secret-secret-secret-1',
+					'client'            => 'fake',
+					'pool_api'          => 'pools',
+					'nodes'             => 'node-a, node-b',
+					'storage'           => 'disk-store',
+					'cloudinit_storage' => 'ci-store',
+					'bridge'            => 'vmbr9',
+					'gateway'           => '192.0.2.1',
+					'nameservers'       => '192.0.2.53',
+					'prefix'            => '24',
+					'vmid_min'          => '5000',
+					'vmid_max'          => '5099',
+					'templates'         => '9000 = Debian 12',
+				),
+				$over
+			)
+		);
+	}
+
+	public function test_the_owner_changing_the_status_ends_the_plugins_claim_on_it(): void {
+		$product = $this->product( 4096 );
+		$id      = $product->get_id();
+
+		$this->capacity( 1 );
+		Stock::sync( 'lab' );
+		$this->assertSame( 'outofstock', $this->stored( $id ) );
+		$this->assertSame( 'yes', get_post_meta( $id, Stock::META_CLOSED, true ), 'Closed by the plugin.' );
+
+		// Room comes back (no sync yet), and the owner reopens by hand, then closes on purpose.
+		$this->capacity( 8 );
+		$owner = wc_get_product( $id );
+		$owner->set_stock_status( 'instock' );
+		$owner->save();
+		$this->assertSame( '', (string) get_post_meta( $id, Stock::META_CLOSED, true ), 'The owner\'s change ends the claim.' );
+
+		$owner = wc_get_product( $id );
+		$owner->set_stock_status( 'outofstock' );
+		$owner->save();
+
+		Stock::sync( 'lab' );
+		$this->assertSame( 'outofstock', $this->stored( $id ), 'Closed on purpose: the next sync does not reopen it.' );
+		IpPool::add( '192.0.2.77' );
+		$this->assertSame( 'outofstock', $this->stored( $id ) );
+	}
+
+	public function test_the_owner_flipping_twice_between_syncs_leaves_no_claim(): void {
+		$product = $this->product( 4096 );
+		$id      = $product->get_id();
+
+		$this->capacity( 1 );
+		Stock::sync( 'lab' );
+		$this->capacity( 8 );
+
+		foreach ( array( 'instock', 'outofstock', 'instock', 'outofstock' ) as $status ) {
+			$owner = wc_get_product( $id );
+			$owner->set_stock_status( $status );
+			$owner->save();
+		}
+
+		$this->assertSame( '', (string) get_post_meta( $id, Stock::META_CLOSED, true ) );
+		Stock::sync( 'lab' );
+		$this->assertSame( 'outofstock', $this->stored( $id ), 'The owner\'s last word stands.' );
+	}
+
+	public function test_the_plugins_own_writes_keep_their_claim(): void {
+		$product = $this->product( 4096 );
+		$this->capacity( 1 );
+		Stock::sync( 'lab' );
+
+		$this->assertSame( 'yes', get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
+		$this->capacity( 8 );
+		Stock::sync( 'lab' );
+		$this->assertSame( 'instock', $this->stored( $product ), 'Its own closing is undone by it.' );
+	}
+
+	public function test_a_new_product_with_no_room_is_stored_out_of_stock_when_saved(): void {
+		$this->capacity( 1 );
+		$product = $this->product( 4096 );
+
+		$this->assertSame( 'outofstock', $this->stored( $product ), 'No sync, no capacity run: the save itself wrote it.' );
+		$this->assertSame( 'yes', get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
+	}
+
+	public function test_editing_the_plan_memory_refreshes_the_status(): void {
+		$product = $this->product( 4096 );
+		$this->capacity( 3 );
+		$product = wc_get_product( $product->get_id() );
+		$product->save(); // Any save of the product.
+		$this->assertSame( 'outofstock', $this->stored( $product ), '4 GB does not fit in 3 GB.' );
+
+		$product = wc_get_product( $product->get_id() );
+		$product->update_meta_data( \BeltoftServices\Product::META_PLAN . 'memory_mb', '2048' );
+		$product->save();
+		$this->assertSame( 'instock', $this->stored( $product ), 'Now it fits, and the save says so.' );
+
+		$product = wc_get_product( $product->get_id() );
+		$product->update_meta_data( \BeltoftServices\Product::META_PLAN . 'memory_mb', '8192' );
+		$product->save();
+		$this->assertSame( 'outofstock', $this->stored( $product ) );
+	}
+
+	public function test_editing_a_variation_refreshes_it_and_its_parent(): void {
+		$parent = $this->product( 1024, array( 'variations' => array( array( 'memory_mb' => 16384 ) ) ) );
+		$ids    = $parent->get_children();
+		$this->assertSame( 'outofstock', $this->stored( $ids[0] ), 'Too big for 8 GB.' );
+		$this->assertSame( 'outofstock', $this->stored( $parent ), 'The parent follows its only variation.' );
+
+		$variation = wc_get_product( $ids[0] );
+		$variation->update_meta_data( \BeltoftServices\Product::META_PLAN . 'memory_mb', '2048' );
+		$variation->save();
+
+		$this->assertSame( 'instock', $this->stored( $ids[0] ) );
+		$this->assertSame( 'instock', $this->stored( $parent ) );
+	}
+
+	public function test_a_product_of_another_driver_is_not_synced_by_its_save(): void {
+		$this->capacity( 1 );
+		$other = $this->service_product( 'fake' );
+		$this->assertSame( 'instock', $this->stored( $other ) );
+	}
+
+	public function test_saving_or_deleting_a_cluster_refreshes_the_status(): void {
+		$product = $this->product( 4096 );
+		$this->assertSame( 'instock', $this->stored( $product ) );
+
+		$this->assertTrue( $this->save_cluster( array( 'nodes' => 'node-c' ) ) );
+		$this->assertSame( 'outofstock', $this->stored( $product ), 'The cached nodes are no longer allowed ones.' );
+
+		$this->assertTrue( $this->save_cluster() );
+		$this->assertSame( 'instock', $this->stored( $product ) );
+
+		$this->assertTrue( Clusters::delete( 'lab' ) );
+		$this->assertSame( 'outofstock', $this->stored( $product ), 'A plan on a cluster that is gone cannot be built.' );
+	}
+
+	public function test_one_failing_product_does_not_stop_the_others_and_is_logged(): void {
+		$a = $this->product( 4096 );
+		$b = $this->product( 4096 );
+		$this->capacity( 1 );
+
+		$fail = static function ( $object ) use ( $a ) {
+			if ( $object instanceof \WC_Product && $object->get_id() === $a->get_id() ) {
+				throw new \RuntimeException( 'boom' );
+			}
+		};
+		add_action( 'woocommerce_before_product_object_save', $fail );
+
+		$log = tempnam( sys_get_temp_dir(), 'bsl' );
+		$old = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- capture the log line.
+
+		Stock::sync( 'lab' );
+
+		ini_set( 'error_log', (string) $old ); // phpcs:ignore WordPress.PHP.IniSet.Risky
+		remove_action( 'woocommerce_before_product_object_save', $fail );
+
+		$this->assertSame( 'instock', $this->stored( $a ), 'The failing one is left as it was.' );
+		$this->assertSame( 'outofstock', $this->stored( $b ), 'The other one is still synced.' );
+		$this->assertStringContainsString( 'product ' . $a->get_id() . ' could not be synced: boom', (string) file_get_contents( $log ) );
+		unlink( $log );
+	}
+
+	public function test_pool_writes_that_change_nothing_do_not_sync(): void {
+		$resource = 4343;
+		$this->assertNotNull( IpPool::hold( $resource ) );
+		IpPool::add( '192.0.2.20' );
+
+		$probe = static function (): void {
+			set_transient( IpPool::FREE_TRANSIENT, 99, MINUTE_IN_SECONDS ); // Every real change clears it (changed()).
+		};
+		$still = function ( string $what ) {
+			$this->assertSame( 99, get_transient( IpPool::FREE_TRANSIENT ), $what . ' changed nothing, so nothing was synced.' );
+		};
+
+		$probe();
+		$this->assertNotNull( IpPool::hold( $resource ) );
+		$still( 'hold() of a resource that already holds an address' );
+
+		IpPool::assign( $resource );
+		$still( 'assign()' );
+
+		$this->assertFalse( IpPool::release( 9999 ) );
+		$still( 'release() of a resource without an address' );
+
+		$this->assertFalse( IpPool::take( '192.0.2.10', 7777 ), 'The address is in use.' );
+		$still( 'take() of an address that is not free' );
+
+		$this->assertSame( 0, IpPool::add( 'not an address' ) );
+		$still( 'add() of nothing' );
+		$this->assertSame( 0, IpPool::add( '192.0.2.20' ) );
+		$still( 'add() of an address already in the pool' );
+
+		$this->assertFalse( IpPool::block( '192.0.2.99' ) );
+		$still( 'block() of an unknown address' );
+		$this->assertFalse( IpPool::unblock( '192.0.2.20' ) );
+		$still( 'unblock() of an address that is not blocked' );
+
+		$this->assertTrue( IpPool::release( $resource ) );
+		$this->assertFalse( get_transient( IpPool::FREE_TRANSIENT ), 'A real change clears it.' );
+	}
+
+	public function test_a_plain_renewal_order_and_a_failed_renewal_order_can_be_paid_while_stored_out_of_stock(): void {
+		$product = $this->sold_out_product();
+		$user    = self::factory()->user->create();
+		$sub     = $this->subscription( $user );
+		$sub->add_product( $product );
+		$sub->save();
+		$p = wc_get_product( $product->get_id() );
+		$this->assertFalse( $p->is_in_stock() );
+
+		foreach ( array( 'pending', 'failed' ) as $status ) {
+			$renewal = wcs_create_renewal_order( $sub );
+			$renewal->set_status( $status );
+			$renewal->save();
+
+			$this->assertTrue( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $p->is_in_stock(), $p, $renewal ), 'A ' . $status . ' renewal order can be paid.' );
+		}
+	}
+
+	public function test_an_early_renewal_cart_and_its_session_reload_survive_a_stored_out_of_stock(): void {
+		$product = $this->sold_out_product();
+		$sub     = $this->subscription( self::factory()->user->create() );
+
+		WC()->cart->empty_cart();
+		$key = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal_early' => array( 'subscription_id' => $sub->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
+		$this->assertNotFalse( $key, 'An early renewal is added: ' . wp_json_encode( wc_get_notices() ) );
+		$this->assertTrue( WC()->cart->check_cart_item_stock() );
+
+		$session = array();
+		foreach ( WC()->cart->get_cart() as $k => $item ) {
+			$session[ $k ] = array_diff_key( $item, array( 'data' => 1, 'data_hash' => 1 ) );
+		}
+
+		WC()->cart->cart_contents = array();
+		WC()->session->set( 'cart', $session );
+		WC()->cart->get_cart_from_session();
+		$this->assertCount( 1, WC()->cart->get_cart(), 'Kept after the reload.' );
+		$this->assertTrue( WC()->cart->check_cart_item_stock() );
+		WC()->cart->empty_cart();
+	}
+
+	public function test_a_cart_reloaded_from_the_session_with_a_stored_out_of_stock_keeps_renewal_and_drops_new(): void {
+		$product = $this->sold_out_product();
+		$this->assertSame( 'outofstock', $this->stored( $product ) );
+
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $this->subscription( self::factory()->user->create() )->get_id() ) ) ) );
+		$session = array();
+		foreach ( WC()->cart->get_cart() as $k => $item ) {
+			$session[ $k ] = array_diff_key( $item, array( 'data' => 1, 'data_hash' => 1 ) );
+		}
+
+		WC()->cart->cart_contents = array();
+		WC()->session->set( 'cart', $session );
+		WC()->cart->get_cart_from_session();
+		$this->assertCount( 1, WC()->cart->get_cart() );
+		WC()->cart->empty_cart();
 	}
 
 	public function test_medusa_availability_is_real(): void {

@@ -256,7 +256,7 @@ final class ProxmoxJobs {
 		$vms     = self::vm_rows( $client );
 
 		if ( ! is_array( $nodes ) || null === $vms ) {
-			return; // Never cache a guess: stock stays closed (or on the old cache) until it can be read.
+			return; // Never cache a guess: the old cache and the stored stock status stay as they are until it can be read.
 		}
 
 		list( $locked ) = Locks::with(

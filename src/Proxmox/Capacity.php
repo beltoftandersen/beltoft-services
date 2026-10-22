@@ -40,7 +40,7 @@ final class Capacity {
 	 * @return array<string, int>|null Node => free bytes; null when there is no cache or the cluster is unknown.
 	 */
 	public static function free_by_node( string $cluster_id ): ?array {
-		$cluster = Clusters::get( $cluster_id );
+		$cluster = Clusters::all()[ $cluster_id ] ?? null; // Only the node list is needed: no secret is decrypted.
 		$rows    = self::rows( $cluster_id );
 
 		if ( null === $cluster || null === $rows ) {

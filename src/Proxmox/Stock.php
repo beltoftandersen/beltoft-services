@@ -63,11 +63,22 @@ final class Stock {
 	private static $adding = null;
 
 	/**
+	 * True while sync() writes: its own saves must not run product_saved() or forget_marker().
+	 *
+	 * @var bool
+	 */
+	private static $writing = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_filter( 'woocommerce_product_is_in_stock', array( __CLASS__, 'in_stock' ), 20, 2 );
 		add_filter( 'woocommerce_is_purchasable', array( __CLASS__, 'filter' ), 20, 2 );
+		// The status follows a saved plan or driver, and an owner's own change to it is respected (see forget_marker()).
+		add_action( 'woocommerce_after_product_object_save', array( __CLASS__, 'product_saved' ) );
+		add_action( 'woocommerce_after_product_variation_object_save', array( __CLASS__, 'product_saved' ) );
+		add_action( 'woocommerce_product_object_updated_props', array( __CLASS__, 'forget_marker' ), 10, 2 );
 		// After WCS's own item-data filters (priority 10, e.g. the switcher's), so the keys are in place.
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'note_flow' ), 999, 3 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'clear_flow' ) );
@@ -245,12 +256,21 @@ final class Stock {
 
 		$plan    = Product::plan( $product->get_id() );
 		$cluster = (string) ( $plan['cluster'] ?? '' );
+		$free    = Capacity::free_by_node( $cluster ); // One read of the cluster list and one of the cache; no secret is decrypted.
 
-		if ( null !== Clusters::get( $cluster ) && null === Capacity::rows( $cluster ) ) {
-			return null;
+		if ( null === $free ) {
+			return isset( Clusters::all()[ $cluster ] ) ? null : false; // A saved cluster without a cache waits; an unknown one is closed.
 		}
 
-		return Capacity::fits( $cluster, max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576 );
+		$bytes = max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576;
+
+		foreach ( $free as $bytes_free ) {
+			if ( $bytes_free >= $bytes ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -283,43 +303,108 @@ final class Stock {
 	 * @param string|null $cluster_id Only the plans of this cluster (a capacity write); null for all (the pool changed).
 	 */
 	public static function sync( ?string $cluster_id = null ): void {
-		static $running = false;
+		self::sync_ids( self::product_ids(), $cluster_id );
+	}
 
-		if ( $running || ! function_exists( 'wc_get_product' ) ) {
+	/**
+	 * Action woocommerce_after_product_object_save / _product_variation_object_save: a saved Proxmox
+	 * product (new, or a changed plan, memory or driver) is synced at once, so its stored status is
+	 * right without waiting for the next capacity run.
+	 *
+	 * @param mixed $product Saved product or variation.
+	 */
+	public static function product_saved( $product ): void {
+		if ( self::$writing || ! $product instanceof \WC_Product ) {
 			return;
 		}
 
-		$running = true;
+		$parent = $product->get_parent_id();
+		$id     = $parent > 0 ? $parent : $product->get_id();
+		$driver = Product::driver_for( $id );
+
+		if ( $driver && 'proxmox' === $driver->id() ) {
+			self::sync_ids( array( $id ), null );
+		}
+	}
+
+	/**
+	 * Action woocommerce_product_object_updated_props: a stock status that somebody else changed (the
+	 * owner, an import, WooCommerce) ends our claim on it. Otherwise a product we closed, that the owner
+	 * reopened and later closed on purpose, would be reopened by the next sync.
+	 *
+	 * @param mixed $product Saved product or variation.
+	 * @param mixed $props   Props that were written.
+	 */
+	public static function forget_marker( $product, $props = array() ): void {
+		if ( self::$writing || ! $product instanceof \WC_Product || ! in_array( 'stock_status', (array) $props, true ) ) {
+			return;
+		}
+
+		if ( '' !== (string) get_post_meta( $product->get_id(), self::META_CLOSED, true ) ) {
+			delete_post_meta( $product->get_id(), self::META_CLOSED );
+			$product->delete_meta_data( self::META_CLOSED ); // The object may be saved again.
+		}
+	}
+
+	/**
+	 * The sync of these parent products. A product that fails is logged and skipped: the others go on.
+	 *
+	 * @param int[]       $ids        Parent product ids.
+	 * @param string|null $cluster_id Only the plans of this cluster, or null.
+	 */
+	private static function sync_ids( array $ids, ?string $cluster_id ): void {
+		if ( self::$writing || ! function_exists( 'wc_get_product' ) ) {
+			return;
+		}
+
+		self::$writing = true;
 
 		try {
-			foreach ( self::product_ids() as $id ) {
-				$product = wc_get_product( $id );
-
-				if ( ! $product ) {
-					continue;
-				}
-
-				if ( ! $product instanceof \WC_Product_Variable ) {
-					self::apply( $product, $cluster_id );
-					continue;
-				}
-
-				$changed = false;
-
-				foreach ( $product->get_children() as $child_id ) {
-					$variation = wc_get_product( $child_id );
-					$changed   = ( $variation && self::apply( $variation, $cluster_id ) ) || $changed;
-				}
-
-				if ( $changed ) {
-					// A variation's save does not touch its parent (only the admin screens sync it).
-					\WC_Product_Variable::sync( $id );
+			foreach ( $ids as $id ) {
+				try {
+					self::sync_product( (int) $id, $cluster_id );
+				} catch ( \Throwable $e ) {
+					// A failed write cannot be recorded anywhere else; the next sync tries again.
+					error_log( sprintf( 'Beltoft Services: the stock status of product %d could not be synced: %s', (int) $id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 				}
 			}
-		} catch ( \Throwable $e ) {
-			unset( $e );
 		} finally {
-			$running = false;
+			self::$writing = false;
+		}
+	}
+
+	/**
+	 * One product, or a variable product's variations, then the variable product itself.
+	 *
+	 * @param int         $id         Parent product id.
+	 * @param string|null $cluster_id Cluster filter.
+	 */
+	private static function sync_product( int $id, ?string $cluster_id ): void {
+		$product = wc_get_product( $id );
+
+		if ( ! $product ) {
+			return;
+		}
+
+		if ( ! $product instanceof \WC_Product_Variable ) {
+			self::apply( $product, $cluster_id );
+			return;
+		}
+
+		$changed = false;
+
+		foreach ( $product->get_children() as $child_id ) {
+			try {
+				$variation = wc_get_product( $child_id );
+				$changed   = ( $variation && self::apply( $variation, $cluster_id ) ) || $changed;
+			} catch ( \Throwable $e ) {
+				error_log( sprintf( 'Beltoft Services: the stock status of variation %d could not be synced: %s', (int) $child_id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- see sync_ids().
+			}
+		}
+
+		if ( $changed ) {
+			// A variation's save does not touch its parent (only the admin screens sync it).
+			\WC_Product_Variable::sync( $id );
 		}
 	}
 

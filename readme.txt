@@ -212,7 +212,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks and email
 == Changelog ==
 
 = 0.2.1 =
-* A virtual machine product's availability is now its WooCommerce stock status. It is written (`instock` or `outofstock`, only when it changes) after each capacity run, each placement and each change of the IP pool, so WooCommerce's own out-of-stock display and `woocommerce_product_set_stock_status` / `woocommerce_variation_set_stock_status` hooks (page cache purges) work as usual. A product you set to out of stock by hand is never reopened, and products that manage stock are left alone.
+* A virtual machine product's availability is now its WooCommerce stock status. It is written (`instock` or `outofstock`, only when it changes) after each capacity run, each placement and each change of the IP pool, so WooCommerce's own out-of-stock display and `woocommerce_product_set_stock_status` / `woocommerce_variation_set_stock_status` hooks (page cache purges) work as usual. The status is also refreshed when a product or variation is saved and when a cluster is saved or deleted. A status you change by hand is never overridden: a product you set to out of stock is not reopened, and products that manage stock are left alone.
 * When the capacity cache is gone (for example after an object cache flush) products are no longer closed: the stored status stands and a capacity run is queued.
 * Renewals, switches and resubscribes still go through when the stored status is out of stock.
 

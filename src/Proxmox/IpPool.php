@@ -62,7 +62,9 @@ final class IpPool {
 			$added += (int) $wpdb->query( $wpdb->prepare( 'INSERT IGNORE INTO %i (address, prefix, gateway, state, updated_at) VALUES (%s, %d, %s, %s, %s)', $table, $host, $prefix, $gateway, 'free', $now ) );
 		}
 
-		self::changed();
+		if ( $added > 0 ) {
+			self::changed();
+		}
 
 		return $added;
 	}
@@ -127,10 +129,12 @@ final class IpPool {
 	public static function hold( int $resource_id ): ?array {
 		global $wpdb;
 
+		$took = false;
+
 		list( $locked, $row ) = Locks::with(
 			Locks::name( 'ippool', 0 ),
 			Locks::allocation_wait(),
-			static function () use ( $wpdb, $resource_id ) {
+			static function () use ( $wpdb, $resource_id, &$took ) {
 				$existing = self::for_resource( $resource_id );
 
 				if ( $existing ) {
@@ -140,7 +144,9 @@ final class IpPool {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one statement picks and takes the address.
 				$taken = $wpdb->query( $wpdb->prepare( "UPDATE %i SET state = 'held', resource_id = %d, updated_at = %s WHERE state = 'free' ORDER BY id ASC LIMIT 1", Schema::tables()['ips'], $resource_id, gmdate( 'Y-m-d H:i:s' ) ) );
 
-				return 1 === $taken ? self::for_resource( $resource_id ) : null;
+				$took = 1 === $taken;
+
+				return $took ? self::for_resource( $resource_id ) : null;
 			}
 		);
 
@@ -149,7 +155,9 @@ final class IpPool {
 			throw new \RuntimeException( 'The IP pool is busy.' );
 		}
 
-		self::changed();
+		if ( $took ) { // A resource that already held an address takes nothing from the pool.
+			self::changed();
+		}
 
 		return $row;
 	}
@@ -182,8 +190,7 @@ final class IpPool {
 
 		$row = self::for_resource( $resource_id );
 
-		self::changed();
-
+		// held to assigned: neither is free, so the free count (and the stock) does not move.
 		return null !== $row && 'assigned' === $row['state'];
 	}
 
@@ -199,7 +206,9 @@ final class IpPool {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one statement.
 		$freed = (int) $wpdb->query( $wpdb->prepare( "UPDATE %i SET state = 'free', resource_id = NULL, updated_at = %s WHERE resource_id = %d AND state IN ('held', 'assigned')", Schema::tables()['ips'], gmdate( 'Y-m-d H:i:s' ), $resource_id ) );
 
-		self::changed();
+		if ( $freed > 0 ) {
+			self::changed();
+		}
 
 		return $freed > 0;
 	}
@@ -229,7 +238,9 @@ final class IpPool {
 			throw new \RuntimeException( 'The IP pool is busy.' );
 		}
 
-		self::changed();
+		if ( 1 === $taken ) {
+			self::changed();
+		}
 
 		return 1 === $taken;
 	}
@@ -376,7 +387,9 @@ final class IpPool {
 			throw new \RuntimeException( 'The IP pool is busy.' );
 		}
 
-		self::changed();
+		if ( $changed > 0 ) {
+			self::changed();
+		}
 
 		return $changed > 0;
 	}

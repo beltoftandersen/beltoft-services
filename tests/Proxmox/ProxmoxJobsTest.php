@@ -285,10 +285,9 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ) );
 
 		// The cache is flushed (an object cache flush) while the product is closed by this plugin.
-		$closed = wc_get_product( $product->get_id() );
-		$closed->set_stock_status( 'outofstock' );
-		$closed->update_meta_data( Stock::META_CLOSED, 'yes' );
-		$closed->save();
+		set_transient( Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 8 * self::GB, 'mem' => 8 * self::GB ) ), HOUR_IN_SECONDS );
+		Stock::sync( 'lab' );
+		$this->assertSame( 'outofstock', $this->stock_of( $product->get_id() ), 'Closed by the plugin (marker set).' );
 		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
 
 		do_action( ProxmoxJobs::CAPACITY_NOW, 'lab' );

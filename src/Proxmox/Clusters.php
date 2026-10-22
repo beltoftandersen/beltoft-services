@@ -235,6 +235,7 @@ final class Clusters {
 
 		unset( $all[ $id ] );
 		update_option( self::OPTION, $all, false );
+		Stock::sync(); // Its plans have no known cluster now: they close.
 
 		return true;
 	}
@@ -471,6 +472,7 @@ final class Clusters {
 		$all[ $id ] = $clean;
 		update_option( self::OPTION, $all, false );
 		ProxmoxJobs::queue_capacity( $id );
+		Stock::sync( $id ); // A new node list or a new cluster changes what fits (the old cache stays until the run).
 
 		return true;
 	}
