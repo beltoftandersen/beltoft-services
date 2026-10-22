@@ -548,6 +548,11 @@ final class Provision {
 			return StepResult::fail( 'configure: the VM record or the address is missing' );
 		}
 
+		// A gateway the pool row brings must be on the address's own network; the cluster's is the routed default.
+		if ( null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
+			return StepResult::fail( sprintf( 'configure: the gateway %1$s of address %2$s is outside %2$s/%3$d; nothing was written to the VM', $ip['gateway'], $ip['address'], (int) $this->cluster['prefix'] ) );
+		}
+
 		$done = (array) $this->r->get( 'configured' );
 		$disk = null;
 
@@ -633,11 +638,6 @@ final class Provision {
 	private function configure_config( array $record, array $v, array $ip ) {
 		$key = $this->r->get( 'ssh_key' );
 		$gw  = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $this->cluster['gateway'];
-
-		// A gateway the pool row brings must be on the address's own network; the cluster's is the routed default.
-		if ( null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
-			return StepResult::fail( sprintf( 'configure: the gateway %1$s of address %2$s is outside %2$s/%3$d; nothing was written to the VM', $ip['gateway'], $ip['address'], (int) $this->cluster['prefix'] ) );
-		}
 
 		$login = array();
 

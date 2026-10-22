@@ -69,6 +69,24 @@ trait Steps {
 	}
 
 	/**
+	 * Does a finished task count as progress? Only one that ended OK or with warnings (the steps
+	 * still re-read the state before believing it). A task that failed never does: a step that
+	 * keeps failing must run into the retry budget instead of looping.
+	 *
+	 * @param \WP_Error|true $result Result of wait_task().
+	 */
+	protected static function accepted( $result ): bool {
+		if ( true === $result ) {
+			return true;
+		}
+
+		$data = is_wp_error( $result ) ? $result->get_error_data() : null;
+		$exit = is_array( $data ) && isset( $data['exitstatus'] ) && is_scalar( $data['exitstatus'] ) ? (string) $data['exitstatus'] : '';
+
+		return 0 === strpos( $exit, 'WARNINGS' );
+	}
+
+	/**
 	 * A task stored by an earlier run is polled first. Still running: that is this run's answer.
 	 * Finished (well or not): the steps go on and read the remote state, which is what counts.
 	 */
@@ -97,7 +115,7 @@ trait Steps {
 			'exit'  => is_wp_error( $result ) ? $this->exit_status( $result ) : 'OK',
 		);
 
-		$this->progressed = true;
+		$this->progressed = $this->progressed || self::accepted( $result );
 
 		if ( ! $this->r->set( array( 'task' => null ) ) ) {
 			return StepResult::retry( 0, $step . ': the finished task could not be cleared' );
@@ -128,7 +146,7 @@ trait Steps {
 	 */
 	protected function refuse_or_retry( \WP_Error $e, string $step ): StepResult {
 		if ( in_array( $e->get_error_code(), array( 'no_cluster', 'out_of_range', 'not_recorded', 'not_ours', 'is_template' ), true ) ) {
-			return StepResult::fail( $step . ': refused, ' . $e->get_error_message() );
+			return StepResult::fail( 'Ownership check failed: ' . $e->get_error_message() . ' (' . $step . ')' );
 		}
 
 		if ( 'absent' === $e->get_error_code() ) {
@@ -178,7 +196,7 @@ trait Steps {
 			return StepResult::retry( 0, $step . ': ' . $this->text( $result ) );
 		}
 
-		$this->progressed = true;
+		$this->progressed = $this->progressed || self::accepted( $result );
 
 		if ( ! $this->r->set( array( 'task' => null ) ) ) {
 			return StepResult::retry( 0, $step . ': the finished task could not be cleared' );

@@ -595,7 +595,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( 'stopped', $vm['status'] );
 		$this->assertSame( 4, (int) $vm['config']['cores'] );
 		$this->assertSame( 'disk-store:vm-9000-disk-0,size=40G', $vm['config']['scsi0'] );
-		$this->assertSame( array(), $this->calls( 'POST', '/status/start' ) === array() ? array() : array_slice( $this->calls( 'POST', '/status/start' ), 1 ), 'No start after the provision one.' );
+		$this->assertCount( 1, $this->calls( 'POST', '/status/start' ), 'Only the provision start: none after the plan change.' );
 	}
 
 	public function test_update_refuses_an_untagged_vm(): void {
@@ -719,5 +719,184 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( 'deleted', Resource::find( $id )->get( 'state' ) );
 		$this->assertNull( $this->fake->vm( 5000 ) );
 		$this->assertNull( IpPool::for_resource( $id ) );
+	}
+
+	public function test_a_missing_vm_record_after_the_clone_fails_for_an_admin_and_releases_nothing(): void {
+		IpPool::add( '192.0.2.12' );
+		IpPool::add( '192.0.2.13' );
+
+		foreach ( array( 'delete', 'pause' ) as $operation ) {
+			$r = $this->built();
+			VmRecords::remove( $r->id() );
+			$seen = count( $this->fake->calls() );
+
+			$result = $this->op( $operation, $r );
+
+			$this->assertTrue( $result->is_failed(), $operation );
+			$this->assertStringContainsString( 'VM record missing; check Proxmox manually', $result->error() );
+			$this->assertCount( $seen, $this->fake->calls() );
+			$this->assertNotNull( IpPool::for_resource( $r->id() ), 'The address is not released.' );
+			$this->assertNotNull( $this->fake->vm( 5000 ) );
+		}
+
+		// Through the reconciler the admin is alerted.
+		$r = $this->built();
+		VmRecords::remove( $r->id() );
+		$this->mails = array();
+		$r->set( array( 'state' => 'ready' ) );
+		$this->assertTrue( $r->desire( 'deleted', 'test' ) );
+		Jobs::run( $r->id() );
+		$this->assertSame( 'failed', Resource::find( $r->id() )->get( 'state' ) );
+		$this->assertNotEmpty( $this->mails );
+	}
+
+	public function test_the_vm_changing_hands_between_shutdown_and_delete_stops_the_delete(): void {
+		$r = $this->built();
+		$this->fake->next_task( array( 'polls' => 3 ) );
+
+		$first = $this->op( 'delete', $r );
+		$this->assertTrue( $first->is_retry(), 'The shutdown task is still running.' );
+
+		// Somebody takes the VM over while the task runs.
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
+		$seen = count( $this->fake->calls() );
+
+		$result = $this->op( 'delete', $r );
+
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'Ownership check failed', $result->error() );
+		$this->assertSame( array(), array_filter( $this->since( $seen ), static fn( $p ) => 0 === strpos( $p, 'DELETE' ) ) );
+		$this->assertNotNull( $this->fake->vm( 5000 ) );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
+	}
+
+	public function test_each_finished_step_of_a_plan_change_counts_as_progress(): void {
+		$r = $this->built();
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 4 ) ) ) );
+		$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 500, 'message' => 'busy' ) );
+
+		$first = $this->driver->update_plan( Resource::find( $r->id() ) );
+		$this->assertTrue( $first->is_retry() );
+		$this->assertTrue( $first->has_progress(), 'The shutdown finished.' );
+
+		// Only waiting for a task that still runs is not progress.
+		$r2 = $this->built();
+		$this->fake->next_task( array( 'polls' => 400 ) );
+		$r2->set( array( 'plan' => array_merge( (array) $r2->get( 'plan' ), array( 'cores' => 8 ) ) ) );
+		$waiting = $this->driver->update_plan( Resource::find( $r2->id() ) );
+		$this->assertTrue( $waiting->is_retry() );
+		$this->assertFalse( $waiting->has_progress() );
+	}
+
+	public function test_a_plan_change_that_runs_out_of_attempts_leaves_a_running_vm_running(): void {
+		$resource = $this->resource();
+		$id       = $resource->id();
+		Jobs::run( $id );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+
+		$plan = array_merge( (array) Resource::find( $id )->get( 'plan' ), array( 'cores' => 4 ) );
+		$this->assertTrue( Resource::find( $id )->change_plan( $plan, 'Plan changed' ) );
+
+		for ( $i = 0; $i < 12; $i++ ) {
+			$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 500, 'message' => 'busy' ) );
+		}
+
+		for ( $run = 0; $run < 12 && 'failed' !== Resource::find( $id )->get( 'state' ); $run++ ) {
+			Resource::find( $id )->set( array( 'next_attempt_at' => time() - 1 ) );
+			Jobs::run( $id );
+		}
+
+		$this->assertSame( 'failed', Resource::find( $id )->get( 'state' ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'], 'The customer VM is switched on again.' );
+		$this->assertEmpty( Resource::find( $id )->get( 'was_running' ) );
+	}
+
+	public function test_a_switch_between_variations_is_checked_by_the_variation_disk(): void {
+		Switches::register();
+		$product = $this->service_product(
+			'proxmox',
+			array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 1, 'memory_mb' => 1024, 'disk_gb' => 10 ),
+			array(
+				'slug'       => 'vm-tiers',
+				'variations' => array(
+					array( 'disk_gb' => 20 ),
+					array( 'disk_gb' => 40 ),
+					array( 'disk_gb' => 80 ),
+				),
+			)
+		);
+
+		$variations = $product->get_children();
+		$this->assertCount( 3, $variations );
+		$this->assertSame( 40, Product::plan( $product->get_id(), (int) $variations[1] )['disk_gb'], 'Variation fields override the product.' );
+
+		$license = $this->service_license( $product, array( 'fire' => false, 'subscription_id' => 5151, 'variation_id' => (int) $variations[1] ) );
+		$this->assertInstanceOf( Resource::class, Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $product->get_id(), (int) $variations[1] ) ) );
+
+		$subscription = new class() {
+			public function get_id() {
+				return 5151;
+			}
+		};
+
+		$down = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $product->get_id(), 1, (int) $variations[0], $subscription, null );
+		$this->assertSame( 'This plan has a smaller disk than your server. Choose a plan with at least 40 GB.', $down );
+		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $product->get_id(), 1, (int) $variations[2], $subscription, null ) );
+		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $product->get_id(), 1, (int) $variations[1], $subscription, null ) );
+	}
+
+	/**
+	 * Runs the reconciler until the resource fails or the rounds are used.
+	 */
+	private function run_to_failure( int $id ): void {
+		for ( $run = 0; $run < 15 && 'failed' !== Resource::find( $id )->get( 'state' ); $run++ ) {
+			Resource::find( $id )->set( array( 'next_attempt_at' => time() - 1 ) );
+			Jobs::run( $id );
+		}
+	}
+
+	private function fail_tasks( int $count ): void {
+		for ( $i = 0; $i < $count; $i++ ) {
+			$this->fake->next_task( array( 'exitstatus' => 'storage full', 'effect' => false ) );
+		}
+	}
+
+	public function test_a_clone_task_that_fails_every_time_ends_in_fail_with_a_capped_number_of_posts(): void {
+		$resource = $this->resource();
+		$this->fail_tasks( 60 );
+
+		$this->run_to_failure( $resource->id() );
+
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertLessThanOrEqual( 7, count( $this->calls( 'POST', '/clone' ) ), 'A failing task is not progress: the budget ends it.' );
+	}
+
+	public function test_a_shutdown_that_fails_every_time_in_pause_and_update_ends_in_fail(): void {
+		$resource = $this->resource();
+		$other    = $this->resource();
+		Jobs::run( $resource->id() );
+		Jobs::run( $other->id() );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertSame( 'ready', Resource::find( $other->id() )->get( 'state' ) );
+		$this->fail_tasks( 80 );
+		$before = count( $this->calls( 'POST', '/status/shutdown' ) );
+
+		$this->assertTrue( Resource::find( $resource->id() )->desire( 'paused', 'test' ) );
+		$this->run_to_failure( $resource->id() );
+
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertLessThanOrEqual( 40, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+
+		// The same for a plan change.
+		$plan = array_merge( (array) Resource::find( $other->id() )->get( 'plan' ), array( 'cores' => 4 ) );
+		$this->assertTrue( Resource::find( $other->id() )->change_plan( $plan, 'Plan changed' ) );
+		$before = count( $this->calls( 'POST', '/status/shutdown' ) );
+
+		$this->run_to_failure( $other->id() );
+
+		$this->assertSame( 'failed', Resource::find( $other->id() )->get( 'state' ) );
+		$this->assertLessThanOrEqual( 40, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
+		$this->assertSame( 'running', $this->fake->vm( 5001 )['status'] );
 	}
 }

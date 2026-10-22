@@ -63,7 +63,7 @@ final class Operations {
 		$steps  = (array) $this->r->get( 'steps' );
 
 		if ( null === $record ) {
-			return StepResult::done( array( 'task' => null ) );
+			return $this->record_gone() ?? StepResult::done( array( 'task' => null ) );
 		}
 
 		$pending = is_array( $task ) && ! empty( $task['upid'] );
@@ -92,6 +92,18 @@ final class Operations {
 		$out = $this->power_or_delete( $record, 'pause', false );
 
 		return $out instanceof StepResult ? $out : StepResult::done( array( 'task' => null ) );
+	}
+
+	/**
+	 * No VM record although the clone (or more) was recorded as done: a record was lost, and a VM
+	 * may still run on an address nothing holds. Never "done", never a release.
+	 */
+	private function record_gone(): ?StepResult {
+		if ( array() === array_intersect( array( 'clone', 'ready' ), (array) $this->r->get( 'steps' ) ) ) {
+			return null;
+		}
+
+		return StepResult::fail( 'VM record missing; check Proxmox manually' );
 	}
 
 	// -- Resume ----------------------------------------------------------------------------------
@@ -138,7 +150,7 @@ final class Operations {
 		$record = VmRecords::for_resource( $this->r->id() );
 
 		if ( null === $record ) {
-			return $this->cleanup( 'No virtual machine was ever recorded' );
+			return $this->record_gone() ?? $this->cleanup( 'No virtual machine was ever recorded' );
 		}
 
 		$early = $this->prepare( $record );
@@ -344,6 +356,8 @@ final class Operations {
 			if ( is_wp_error( $answer ) ) {
 				return $this->classify( $answer, 'update' );
 			}
+
+			$this->progressed = true; // The new cores and memory are written.
 		}
 
 		if ( $grow ) {
@@ -401,12 +415,42 @@ final class Operations {
 				$this->client->wait_task( $upid, $this->wait );
 			}
 		}
+
+		$after = Ownership::verify( $this->client, $record, $this->r );
+
+		if ( ! is_wp_error( $after ) && 'running' === $after['status'] ) {
+			$this->r->set( array( 'was_running' => null ) );
+		}
+	}
+
+	/**
+	 * Listener of beltoft_services_state_changed: an update that ran out of attempts must not leave
+	 * the VM it switched off switched off. Runs under the resource lock of the failing job.
+	 *
+	 * @param mixed  $r   Resource.
+	 * @param string $old Old state.
+	 * @param string $new New state.
+	 */
+	public static function on_state_changed( $r, $old, $new ): void {
+		unset( $old );
+
+		if ( 'failed' !== $new || ! $r instanceof Resource || SshKeyField::DRIVER !== $r->get( 'driver' ) || 'update_plan' !== $r->get( 'failed_op' ) || ! $r->get( 'was_running' ) ) {
+			return;
+		}
+
+		$record = VmRecords::for_resource( $r->id() );
+		$self   = new self( $r );
+
+		if ( null !== $record && null === $self->prepare( $record ) ) {
+			$self->restore( $record );
+		}
 	}
 
 	// -- Status ----------------------------------------------------------------------------------
 
 	/**
-	 * Power, CPU load and memory from status/current, kept for an hour in a transient (not in meta:
+	 * Power, CPU load and memory from status/current. `cpu` is PVE's own number: a fraction of the
+	 * VM's CPUs in use (0 to 1 over all of them, so 0.5 is half), not a percent. Kept for an hour in a transient (not in meta:
 	 * a write outside the resource lock could race the reconciler).
 	 *
 	 * @return array{power: string, cpu: float, mem: int}|null
@@ -524,7 +568,7 @@ final class Operations {
 
 			if ( is_wp_error( $v ) ) {
 				if ( in_array( $v->get_error_code(), array( 'no_cluster', 'out_of_range', 'not_recorded', 'not_ours', 'is_template' ), true ) ) {
-					return StepResult::fail( 'Ownership check failed: ' . $this->scrub( $v->get_error_message(), 200 ) );
+					return StepResult::fail( 'Ownership check failed: ' . $this->scrub( $v->get_error_message(), 200 ) . ' (' . $step . ')' );
 				}
 
 				return 'absent' === $v->get_error_code() ? StepResult::retry( 0, $step . ': ' . $v->get_error_message() ) : $this->classify( $v, $step );

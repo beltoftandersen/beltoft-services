@@ -864,6 +864,7 @@ class ProvisionTest extends TestCase {
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'gateway', $result->error() );
 		$this->assertSame( array(), $this->calls( 'PUT', '/config' ) );
+		$this->assertSame( array(), $this->calls( 'POST', '/config' ), 'Not even the cloud-init drive.' );
 
 		// A gateway inside address/prefix is used.
 		$this->wipe_tables();
@@ -1002,7 +1003,7 @@ class ProvisionTest extends TestCase {
 		$result = $this->run_provision( $resource );
 
 		$this->assertTrue( $result->is_failed() );
-		$this->assertStringContainsString( 'refused', $result->error() );
+		$this->assertStringContainsString( 'Ownership check failed', $result->error() );
 
 		foreach ( array_slice( $this->fake->calls(), $seen ) as $call ) {
 			$this->assertSame( 'GET', $call['method'], 'Read-only: ' . $call['method'] . ' ' . $call['path'] );

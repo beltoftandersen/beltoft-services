@@ -32,6 +32,12 @@ Every request also carries `Idempotency-Key: <tenant>:<operation>:<sequence>`, t
 
 Answers: 2xx is done (provision needs the id in the remote id field); 409 on provision with an id is done; 404 on delete is done; 408, 429 and 5xx are retried, honouring `Retry-After` (never longer than 4 hours); any other 4xx is final. See `readme.txt` for the details.
 
+## Proxmox deletion notes
+
+- A delete never removes a VM that is not provably ours (customer-range VMID, recorded for this service, tag line in the description).
+- A half-built service (the clone never finished) whose recorded VMID now holds a foreign VM releases only our IP address and our record; the foreign VM is not touched.
+- A service whose VM record is missing although its clone was recorded fails for an admin ("VM record missing; check Proxmox manually") and releases nothing.
+
 ## Developer API
 
 - `BeltoftServices\RateLimit::exceeded( int $user_id, string $key, int $limit, int $window = MINUTE_IN_SECONDS ): bool`: counts one call for a user and key in a fixed window; true when over the limit (0 or less turns it off). Persistent object cache when there is one, otherwise transients. Best-effort without a persistent object cache (transient path is read-then-write); the window is fixed, not sliding; namespace `$key` with your plugin slug, e.g. `odoowoo-portal:verify`.
