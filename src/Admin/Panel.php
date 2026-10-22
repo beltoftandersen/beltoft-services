@@ -690,7 +690,7 @@ final class Panel {
 				'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
 				esc_html(
 					sprintf(
-						/* translators: %s: the word to type. */
+						/* translators: %s: the word or words to type. */
 						__( 'Deletes the service and its data. Type %s to confirm:', 'beltoft-services' ),
 						self::CONFIRM
 					)
@@ -713,7 +713,7 @@ final class Panel {
 			'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
 			esc_html(
 				sprintf(
-					/* translators: %s: the words to type. */
+					/* translators: %s: the word or words to type. */
 					__( 'Type %s to confirm:', 'beltoft-services' ),
 					self::CONFIRM_MARK
 				)
@@ -741,7 +741,7 @@ final class Panel {
 				'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
 				esc_html(
 					sprintf(
-						/* translators: %s: the words to type. */
+						/* translators: %s: the word or words to type. */
 						__( 'Type %s to confirm:', 'beltoft-services' ),
 						self::CONFIRM_LIFT
 					)
@@ -762,7 +762,7 @@ final class Panel {
 			'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label> ',
 			esc_html(
 				sprintf(
-					/* translators: %s: the word to type. */
+					/* translators: %s: the word or words to type. */
 					__( 'Type %s to confirm:', 'beltoft-services' ),
 					self::CONFIRM_SUSPEND
 				)

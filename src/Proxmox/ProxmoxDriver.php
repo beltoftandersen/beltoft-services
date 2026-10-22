@@ -76,12 +76,14 @@ class ProxmoxDriver implements Driver {
 			$templates[] = $id . ': ' . ( $list ? implode( ', ', $list ) : '-' );
 		}
 
+		$none = __( 'none yet', 'beltoft-services' );
+
 		return array(
 			'cluster'   => array(
 				'text',
 				__( 'Cluster', 'beltoft-services' ),
 				/* translators: %s: cluster ids, comma separated. */
-				sprintf( __( 'The id of the Proxmox cluster to build on. Configured: %s', 'beltoft-services' ), $clusters ? implode( ', ', $clusters ) : __( 'none yet', 'beltoft-services' ) ),
+				sprintf( __( 'The id of the Proxmox cluster to build on. Configured: %s', 'beltoft-services' ), $clusters ? implode( ', ', $clusters ) : $none ),
 				'',
 				true,
 			),
@@ -89,7 +91,7 @@ class ProxmoxDriver implements Driver {
 				'number',
 				__( 'Template VMID', 'beltoft-services' ),
 				/* translators: %s: templates per cluster. */
-				sprintf( __( 'The fallback template VMID, used when the customer made no operating system choice (older orders, licenses issued by an admin). It must be in the cluster\'s template list. Configured: %s', 'beltoft-services' ), $templates ? implode( '; ', $templates ) : __( 'none yet', 'beltoft-services' ) ),
+				sprintf( __( 'The fallback template VMID, used when the customer made no operating system choice (older orders, licenses issued by an admin). It must be in the cluster\'s template list. Configured: %s', 'beltoft-services' ), $templates ? implode( '; ', $templates ) : $none ),
 				'',
 				true,
 			),

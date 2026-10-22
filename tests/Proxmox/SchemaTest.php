@@ -165,6 +165,28 @@ class SchemaTest extends TestCase {
 	}
 
 	/**
+	 * Every transient family the plugin sets in src/ (one example each; checked against the code in review).
+	 */
+	private const TRANSIENTS = array(
+		'beltoft_services_site_tag_alert_0123abcd',
+		'beltoft_services_not_stored_5',
+		'beltoft_services_usage_queued_5',
+		'beltoft_services_http_usage_5',
+		'beltoft_services_rl_0123abcd',
+		'beltoft_services_conn_notice_1',
+		'beltoft_services_ip_notice_1',
+		'beltoft_services_cluster_notice_1',
+		'beltoft_services_proxmox_abuse_queue',
+		'beltoft_services_proxmox_abuse_since_5',
+		'beltoft_services_proxmox_abuse_note_5_20261022',
+		'beltoft_services_proxmox_status_5',
+		'beltoft_services_proxmox_running_lab',
+		'beltoft_services_proxmox_capacity_lab',
+		'beltoft_services_proxmox_purge_ran',
+		'beltoft_services_proxmox_schema_retry',
+	);
+
+	/**
 	 * Runs uninstall.php and returns the queries it issued, as written (before the suite
 	 * rewrites DROP TABLE into DROP TEMPORARY TABLE).
 	 *
@@ -184,6 +206,12 @@ class SchemaTest extends TestCase {
 		update_option( 'beltoft_services_fake_proxmox', array( 'x' => 1 ) );
 		set_transient( 'beltoft_services_proxmox_power_5', 'running', 60 );
 		update_option( 'beltoft_services_breach_7', array( 'at' => 1, 'reason' => 'x', 'alerted' => 0 ), false );
+
+		foreach ( self::TRANSIENTS as $name ) {
+			set_transient( $name, 1, 600 );
+		}
+
+		set_transient( 'someone_elses_transient', 1, 600 );
 
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', 'beltoft-services/beltoft-services.php' );
@@ -206,6 +234,10 @@ class SchemaTest extends TestCase {
 		$this->assertSame( 4, get_transient( 'beltoft_services_proxmox_ip_free' ) );
 		$this->assertNotFalse( get_option( 'beltoft_services_breach_7' ), 'The breach marks stay without the setting.' );
 
+		foreach ( self::TRANSIENTS as $name ) {
+			$this->assertNotFalse( get_transient( $name ), $name . ' stays without the setting.' );
+		}
+
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
 		$this->assertCount( 2, $drops );
@@ -218,5 +250,11 @@ class SchemaTest extends TestCase {
 		$this->assertFalse( get_transient( 'beltoft_services_proxmox_ip_free' ) );
 		$this->assertFalse( get_transient( 'beltoft_services_proxmox_power_5' ) );
 		$this->assertFalse( get_option( 'beltoft_services_breach_7' ), 'The breach marks go with the rest.' );
+
+		foreach ( self::TRANSIENTS as $name ) {
+			$this->assertFalse( get_transient( $name ), $name . ' is removed.' );
+		}
+
+		$this->assertEquals( 1, get_transient( 'someone_elses_transient' ), 'Other plugins\' transients are left alone.' );
 	}
 }
