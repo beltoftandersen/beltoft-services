@@ -183,6 +183,7 @@ class SchemaTest extends TestCase {
 		update_option( 'beltoft_services_proxmox_clusters', array( 'lab' => array() ) );
 		update_option( 'beltoft_services_fake_proxmox', array( 'x' => 1 ) );
 		set_transient( 'beltoft_services_proxmox_power_5', 'running', 60 );
+		update_option( 'beltoft_services_breach_7', array( 'at' => 1, 'reason' => 'x', 'alerted' => 0 ), false );
 
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', 'beltoft-services/beltoft-services.php' );
@@ -203,6 +204,7 @@ class SchemaTest extends TestCase {
 		$this->assertSame( '1', get_option( 'beltoft_services_db_version' ) );
 		$this->assertNotFalse( get_option( 'beltoft_services_proxmox_clusters' ) );
 		$this->assertSame( 4, get_transient( 'beltoft_services_proxmox_ip_free' ) );
+		$this->assertNotFalse( get_option( 'beltoft_services_breach_7' ), 'The breach marks stay without the setting.' );
 
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
@@ -215,5 +217,6 @@ class SchemaTest extends TestCase {
 		$this->assertFalse( get_option( 'beltoft_services_fake_proxmox' ) );
 		$this->assertFalse( get_transient( 'beltoft_services_proxmox_ip_free' ) );
 		$this->assertFalse( get_transient( 'beltoft_services_proxmox_power_5' ) );
+		$this->assertFalse( get_option( 'beltoft_services_breach_7' ), 'The breach marks go with the rest.' );
 	}
 }
