@@ -41,11 +41,11 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ProxmoxJobs {
 
-	public const CAPACITY    = 'beltoft_services_proxmox_capacity';
-	public const POWER       = 'beltoft_services_proxmox_power';
-	public const ABUSE       = 'beltoft_services_proxmox_abuse';
-	public const ABUSE_BATCH = 'beltoft_services_proxmox_abuse_batch';
+	public const CAPACITY     = 'beltoft_services_proxmox_capacity';
 	public const CAPACITY_NOW = 'beltoft_services_proxmox_capacity_now';
+	public const POWER        = 'beltoft_services_proxmox_power';
+	public const ABUSE        = 'beltoft_services_proxmox_abuse';
+	public const ABUSE_BATCH  = 'beltoft_services_proxmox_abuse_batch';
 
 	public const RUNNING_PREFIX = 'beltoft_services_proxmox_running_';
 	public const QUEUE          = 'beltoft_services_proxmox_abuse_queue';
@@ -257,7 +257,12 @@ final class ProxmoxJobs {
 					}
 
 					$resource = Resource::find( $record['resource_id'] );
-					$plan     = $resource ? $resource->get( 'plan' ) : null;
+
+					if ( ! $resource || ! $resource->is_live() ) {
+						continue; // Deleted (or closed): nothing is coming.
+					}
+
+					$plan = $resource->get( 'plan' );
 					$mb       = is_array( $plan ) ? (int) ( $plan['memory_mb'] ?? 0 ) : 0;
 
 					$committed[ $record['node'] ] = ( $committed[ $record['node'] ] ?? 0 ) + $mb * 1048576;

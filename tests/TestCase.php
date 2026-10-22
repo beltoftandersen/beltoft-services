@@ -235,6 +235,27 @@ abstract class TestCase extends \WP_UnitTestCase {
 	}
 
 	/**
+	 * Seeds a cluster's capacity cache: every node online, 64 GiB, nothing committed.
+	 *
+	 * @param string   $cluster Cluster id.
+	 * @param string[] $nodes   Node names.
+	 */
+	protected function seed_capacity( string $cluster = 'lab', array $nodes = array( 'node-a' ) ): void {
+		$rows = array();
+
+		foreach ( $nodes as $node ) {
+			$rows[] = array(
+				'node'   => $node,
+				'status' => 'online',
+				'maxmem' => 68719476736,
+				'mem'    => 0,
+			);
+		}
+
+		set_transient( 'beltoft_services_proxmox_capacity_' . $cluster, $rows, HOUR_IN_SECONDS );
+	}
+
+	/**
 	 * Merges settings over the saved ones.
 	 *
 	 * @param array<string, mixed> $values Settings.

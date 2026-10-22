@@ -98,6 +98,7 @@ class ActionsTest extends TestCase {
 		);
 
 		$this->fake->add_node( 'node-a' );
+		$this->seed_capacity();
 
 		foreach ( array(
 			9000 => 'ubuntu-26-template',

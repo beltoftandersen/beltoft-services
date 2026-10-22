@@ -312,6 +312,7 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertStringStartsWith( '[', $this->mails[0]['subject'] );
 		$this->assertStringContainsString( '] Abuse suspected: ', $this->mails[0]['subject'], 'Its own subject, not the service-failed one.' );
 		$this->assertStringNotContainsString( 'Service failed', $this->mails[0]['subject'] );
+		$this->assertStringNotContainsString( (string) $r->license()['license_key'], $this->mails[0]['subject'], 'The key is masked.' );
 		$this->assertStringContainsString( 'Measured: CPU at or above 90%', $this->mails[0]['message'] );
 		$this->assertStringContainsString( 'Mode: report only', $this->mails[0]['message'] );
 		$this->assertStringContainsString( gmdate( 'Y-m-d' ), $this->mails[0]['message'], 'The text carries the date.' );
@@ -663,5 +664,29 @@ class ProxmoxJobsTest extends TestCase {
 		$clusters = array_count_values( array_column( $queue['items'], 'cluster' ) );
 		$this->assertSame( 250, $clusters['lab'] );
 		$this->assertSame( 250, $clusters['lab2'] );
+	}
+
+	public function test_a_failed_clone_and_a_deleted_resource_stop_counting_at_the_next_run(): void {
+		$failed  = $this->vm( 5000, 'node-a', 'running', 8192 );
+		$deleted = $this->vm( 5001, 'node-a', 'running', 4096 );
+
+		foreach ( array( 5000, 5001 ) as $vmid ) {
+			$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $vmid . '/status/stop' );
+			$this->fake->request( 'DELETE', '/nodes/node-a/qemu/' . $vmid );
+		}
+
+		VmRecords::move( $failed->id(), 'node-a' );
+		VmRecords::move( $deleted->id(), 'node-a' );
+
+		ProxmoxJobs::capacity();
+		$by = array_column( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), null, 'node' );
+		$this->assertSame( ( 8192 + 4096 ) * 1048576 + 4 * self::GB, $by['node-a']['mem'] );
+
+		VmRecords::remove( $failed->id() ); // The failed clone's record is removed.
+		$deleted->close(); // The resource is deleted (its row stays).
+
+		ProxmoxJobs::capacity();
+		$by = array_column( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), null, 'node' );
+		$this->assertSame( 4 * self::GB, $by['node-a']['mem'], 'Back to the reserve alone.' );
 	}
 }

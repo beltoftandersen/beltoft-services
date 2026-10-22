@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Crypto;
+use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -439,24 +440,34 @@ final class Provision {
 		}
 
 		$source = (string) ( $template['node'] ?? '' );
-		$node   = Placement::node( $this->cluster_id, $this->cluster, $source );
+		$bytes  = max( 0, (int) $this->plan['memory_mb'] ) * 1048576;
+		$node   = $record['node'];
 
-		if ( null === $node ) {
-			return StepResult::retry( 0, 'clone: no allowed node is online, or the capacity is not known yet' );
-		}
+		// A node already chosen for this VM (and committed) is kept on a retry.
+		if ( '' === $node || ! in_array( $node, array_map( 'strval', (array) $this->cluster['nodes'] ), true ) ) {
+			$node = Placement::node( $this->cluster_id, $this->cluster, $source, $bytes );
 
-		// The placement is recorded and its memory committed before the clone, so a second provision
-		// and the capacity job both see it. Once per node: a retry on the same node adds nothing.
-		if ( $node !== $record['node'] ) {
+			if ( null === $node ) {
+				if ( null === Capacity::rows( $this->cluster_id ) ) {
+					return StepResult::retry( 0, 'clone: the capacity of the cluster is not known yet' );
+				}
+
+				// Retried along the backoff; when it runs out the service fails and the admin is told.
+				Alerts::admin( $this->r, sprintf( 'No capacity on cluster %s', $this->cluster_id ) );
+
+				return StepResult::retry( 0, sprintf( 'clone: No capacity on cluster %s', $this->cluster_id ) );
+			}
+
+			// The record and the committed memory change together, under the capacity lock.
 			try {
-				$reserved = Capacity::reserve( $this->cluster_id, $node, (int) $this->plan['memory_mb'] * 1048576 );
+				$placed = Capacity::place( $this->cluster_id, $node, $bytes, fn(): bool => VmRecords::move( $this->r->id(), $node ) );
 			} catch ( \RuntimeException $e ) {
 				unset( $e );
 
 				return StepResult::retry( 0, 'clone: the capacity is busy' );
 			}
 
-			if ( ! $reserved || ! VmRecords::move( $this->r->id(), $node ) ) {
+			if ( ! $placed ) {
 				return StepResult::retry( 0, 'clone: the placement could not be recorded' );
 			}
 		}

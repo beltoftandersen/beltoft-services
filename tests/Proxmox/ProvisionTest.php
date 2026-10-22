@@ -109,6 +109,7 @@ class ProvisionTest extends TestCase {
 		$this->fake->add_node( 'node-a' );
 		$this->template();
 		$this->cluster();
+		$this->cache( array( 'node-a' => 0 ) );
 		IpPool::add( '192.0.2.10' );
 		IpPool::add( '192.0.2.11' );
 
@@ -518,11 +519,78 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( '', VmRecords::for_resource( $resource->id() )['node'], 'Nothing was placed.' );
 	}
 
+	public function test_a_single_node_without_a_cache_waits_too(): void {
+		delete_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab' );
+		$resource = $this->resource();
+
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+	}
+
+	public function test_a_full_node_gets_no_clone_and_one_alert(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->cache( array( 'node-a' => 68719476736 - 1048576 * 1024 ) ); // 1 GiB free, the plan needs 4.
+		$resource = $this->resource();
+
+		foreach ( array( 1, 2, 3 ) as $unused ) {
+			$result = $this->run_provision( $resource );
+			$this->assertTrue( $result->is_retry() );
+			$this->assertStringContainsString( 'No capacity on cluster lab', $result->error() );
+		}
+
+		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+		$this->assertCount( 1, $mails, 'Alerted once.' );
+		$this->assertStringContainsString( 'No capacity on cluster lab', $mails[0]['message'] );
+	}
+
+	public function test_all_nodes_full_gets_no_clone(): void {
+		$this->fake->add_node( 'node-b' );
+		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
+		$this->cache( array( 'node-a' => 68719476736, 'node-b' => 68719476736 - 1048576 ) );
+		$resource = $this->resource();
+
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+	}
+
+	public function test_a_failed_record_move_reserves_nothing_and_the_retry_reserves_once(): void {
+		$resource = $this->resource();
+		$before   = \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' )['node-a'];
+
+		// A move that fails: the record row is made unwritable for one attempt.
+		$fail = function ( $query ) {
+			return 0 === strpos( ltrim( $query ), 'UPDATE' ) && false !== strpos( $query, 'beltoft_services_vms' ) ? 'SELECT 1 FROM nonexistent_table_for_test' : $query;
+		};
+		add_filter( 'query', $fail );
+		$suppress = $GLOBALS['wpdb']->suppress_errors( true );
+		$first    = $this->run_provision( $resource );
+		$GLOBALS['wpdb']->suppress_errors( $suppress );
+		remove_filter( 'query', $fail );
+
+		$this->assertTrue( $first->is_retry() );
+		$this->assertSame( $before, \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' )['node-a'], 'Nothing reserved by the failed move.' );
+
+		$this->run_provision( $resource );
+		$this->run_provision( $resource );
+
+		$this->assertSame( $before - 4096 * 1048576, \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' )['node-a'], 'Reserved once.' );
+	}
+
 	public function test_a_burst_of_provisions_commits_memory_and_does_not_overcommit(): void {
 		$gb = 1073741824;
 		$this->fake->add_node( 'node-b' );
 		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
-		// Free: node-a 60 GiB - ... the plan is 4096 MB (4 GiB); node-a has 12 free, node-b 6.
+		// The plan is 4096 MB (4 GiB); node-a has 12 GiB free, node-b 6.
 		$rows = array(
 			array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 4 * $gb ),
 			array( 'node' => 'node-b', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 10 * $gb ),

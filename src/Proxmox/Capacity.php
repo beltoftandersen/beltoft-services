@@ -13,6 +13,11 @@ defined( 'ABSPATH' ) || exit;
  * The one place that reads the capacity transient written by ProxmoxJobs::capacity() (rows with
  * node, status, maxmem and `mem`, the committed memory plus the host reserve). It never calls
  * Proxmox: with no cache there is no answer, and callers treat that as "no room".
+ *
+ * Self-healing: the job recounts committed memory from scratch every hour (listed VMs of this
+ * site, plus recorded VMs that are placed but not listed yet and whose resource is still live).
+ * A reservation made by place() for a clone that then failed (its record removed) or for a resource
+ * that was deleted is therefore gone at the next run, and the cache never drifts for long.
  */
 final class Capacity {
 
@@ -73,21 +78,27 @@ final class Capacity {
 	}
 
 	/**
-	 * Commits memory on a node in the cache (a VM was placed there and is not in the cluster
-	 * listing yet), under the same lock the capacity job writes with. With no cache nothing is
-	 * written: the job's next run counts the recorded VM itself.
+	 * Records a placement and commits its memory in the cache, in one go under the lock the
+	 * capacity job writes with: the memory is added only when `$record` succeeded, so a failed
+	 * record is not counted and its retry counts once. With no cache nothing is added (the job's
+	 * next run counts the recorded VM itself).
 	 *
-	 * @param string $cluster_id Cluster id.
-	 * @param string $node       Node.
-	 * @param int    $bytes      Memory.
-	 * @return bool False when the cache could not be written.
+	 * @param string   $cluster_id Cluster id.
+	 * @param string   $node       Node.
+	 * @param int      $bytes      Memory.
+	 * @param callable $record     fn(): bool, stores the node in the VM record.
+	 * @return bool Whether the placement was recorded.
 	 * @throws \RuntimeException When the lock stays busy.
 	 */
-	public static function reserve( string $cluster_id, string $node, int $bytes ): bool {
+	public static function place( string $cluster_id, string $node, int $bytes, callable $record ): bool {
 		list( $locked, $ok ) = \BeltoftServices\Locks::with(
 			\BeltoftServices\Locks::name( 'capacity', 0 ),
 			\BeltoftServices\Locks::allocation_wait(),
-			static function () use ( $cluster_id, $node, $bytes ): bool {
+			static function () use ( $cluster_id, $node, $bytes, $record ): bool {
+				if ( ! $record() ) {
+					return false;
+				}
+
 				$rows = self::rows( $cluster_id );
 
 				if ( null === $rows ) {

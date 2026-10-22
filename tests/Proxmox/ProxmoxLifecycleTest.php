@@ -127,6 +127,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->fake->add_node( 'node-a' );
 		$this->template();
 		$this->cluster();
+		$this->seed_capacity();
 		IpPool::add( '192.0.2.10' );
 		IpPool::add( '192.0.2.11' );
 
