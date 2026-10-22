@@ -34,6 +34,8 @@ final class Plugin {
 
 		remove_action( 'admin_notices', array( __CLASS__, 'notice_missing' ) );
 
+		Proxmox\Schema::maybe_upgrade();
+
 		Settings::register();
 
 		Product::register();

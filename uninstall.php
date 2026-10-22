@@ -29,6 +29,18 @@ $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LI
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'beltoft_services_driver_conflict_' ) . '%' ) );
 delete_option( 'beltoft_services_connections' );
 delete_option( 'beltoft_services_proxmox_clusters' );
+delete_option( 'beltoft_services_fake_proxmox' );
+delete_option( 'beltoft_services_db_version' );
+
+// The capacity and power transients (and their timeouts).
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time cleanup of the plugin's own transients.
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_beltoft_services_proxmox_' ) . '%', $wpdb->esc_like( '_transient_timeout_beltoft_services_proxmox_' ) . '%' ) );
+
+// The IP pool and the VM records. The warning is on the setting's description.
+foreach ( array( 'beltoft_services_ips', 'beltoft_services_vms' ) as $beltoft_services_table ) {
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables.
+	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . $beltoft_services_table ) );
+}
 
 // The customer emails' WooCommerce settings.
 foreach ( array( 'ready', 'paused', 'deletion_warning', 'deleted', 'limit_exceeded' ) as $beltoft_services_email ) {
