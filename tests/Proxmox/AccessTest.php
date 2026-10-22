@@ -111,6 +111,39 @@ class AccessTest extends TestCase {
 		$this->assertStringNotContainsString( $password, $meta );
 	}
 
+	public function test_no_exception_text_or_client_call_record_contains_the_password(): void {
+		list( $resource ) = $this->resource();
+
+		// An exception from the storing step.
+		global $wpdb;
+		$wpdb->delete( \BeltoftLicenses\Install::tables()['activations'], array( 'id' => $resource->id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test.
+		$texts = array();
+
+		try {
+			Access::pending_password( $resource );
+			$this->fail( 'Expected an exception.' );
+		} catch ( \RuntimeException $e ) {
+			$texts[] = $e->getMessage() . $e->getTraceAsString();
+		}
+
+		// A client that is sent the password records it scrubbed.
+		list( $other ) = $this->resource();
+		$password      = Access::pending_password( $other );
+		$client        = new \BeltoftServices\Proxmox\FakeClient();
+		$client->add_node( 'n1' );
+		$client->add_vm( array( 'vmid' => 100, 'node' => 'n1', 'name' => 'x' ) );
+		$client->request( 'PUT', '/nodes/n1/qemu/100/config', array( 'cipassword' => $password, 'sshkeys' => rawurlencode( 'ssh-ed25519 AAAA' ) ) );
+
+		$texts[] = wp_json_encode( $client->calls() );
+		$texts[] = wp_json_encode( $client->state() );
+
+		foreach ( $texts as $text ) {
+			$this->assertStringNotContainsString( $password, $text );
+		}
+
+		$this->assertStringContainsString( '***', $texts[1], 'The record exists, scrubbed.' );
+	}
+
 	public function test_without_a_key_nothing_is_generated_or_stored(): void {
 		list( $resource ) = $this->resource();
 		remove_all_filters( 'beltoft_services_key' );
@@ -184,16 +217,32 @@ class AccessTest extends TestCase {
 		$this->assertStringContainsString( 'no-store', (string) ( $first->get_headers()['Cache-Control'] ?? '' ) );
 
 		$second = $this->post( $resource->id(), $owner );
-		$this->assertSame( 410, $second->get_status() );
+		$this->assertSame( 409, $second->get_status() );
 		$this->assertStringNotContainsString( $password, wp_json_encode( $second->get_data() ) );
 
 		for ( $i = 3; $i <= 5; $i++ ) {
-			$this->assertSame( 410, $this->post( $resource->id(), $owner )->get_status() );
+			$this->assertSame( 409, $this->post( $resource->id(), $owner )->get_status() );
 		}
 
 		$sixth = $this->post( $resource->id(), $owner );
 		$this->assertSame( 429, $sixth->get_status(), 'Five a minute.' );
 		$this->assertNotEmpty( $sixth->get_headers()['Retry-After'] ?? '' );
+	}
+
+	public function test_reveal_route_has_a_rate_limit_floor_even_when_the_filter_turns_limits_off(): void {
+		list( $resource, $owner ) = $this->resource();
+		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+
+		$statuses = array();
+
+		for ( $i = 1; $i <= \BeltoftServices\Proxmox\RevealRoute::FLOOR_LIMIT + 1; $i++ ) {
+			$statuses[] = $this->post( $resource->id(), $owner )->get_status();
+		}
+
+		remove_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+
+		$this->assertNotContains( 429, array_slice( $statuses, 0, \BeltoftServices\Proxmox\RevealRoute::FLOOR_LIMIT ) );
+		$this->assertSame( 429, end( $statuses ) );
 	}
 
 	public function test_reveal_route_refuses_strangers_visitors_and_unready_resources(): void {

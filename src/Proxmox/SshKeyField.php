@@ -111,16 +111,51 @@ final class SshKeyField {
 			return null;
 		}
 
-		return self::blob_is_valid( $type, $blob ) ? $type . ' ' . $encoded : null;
+		$canonical = self::canonical_blob( $type, $blob );
+
+		// Stored re-encoded from the parsed fields, never the customer's bytes.
+		return null === $canonical ? null : $type . ' ' . base64_encode( $canonical ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding a public key blob.
+	}
+
+	/**
+	 * The blob re-encoded from its parsed fields, or null when it is not a well-formed key of
+	 * this type.
+	 *
+	 * @param string $type Key type from the line.
+	 * @param string $blob Decoded blob.
+	 */
+	private static function canonical_blob( string $type, string $blob ): ?string {
+		if ( ! self::blob_is_valid( $type, $blob, $fields ) ) {
+			return null;
+		}
+
+		$out = self::pack_string( $type );
+
+		foreach ( $fields as $field ) {
+			$out .= self::pack_string( $field );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * One SSH string.
+	 *
+	 * @param string $value Bytes.
+	 */
+	private static function pack_string( string $value ): string {
+		return pack( 'N', strlen( $value ) ) . $value;
 	}
 
 	/**
 	 * Is the decoded blob a well-formed key of this type?
 	 *
-	 * @param string $type Key type from the line.
-	 * @param string $blob Decoded blob.
+	 * @param string             $type   Key type from the line.
+	 * @param string             $blob   Decoded blob.
+	 * @param array<int, string> $fields Out: the strings after the type, in order.
 	 */
-	private static function blob_is_valid( string $type, string $blob ): bool {
+	private static function blob_is_valid( string $type, string $blob, ?array &$fields = null ): bool {
+		$fields = array();
 		$offset = 0;
 		$inner  = self::read_string( $blob, $offset );
 
@@ -131,6 +166,8 @@ final class SshKeyField {
 		if ( 'ssh-ed25519' === $type ) {
 			$key = self::read_string( $blob, $offset );
 
+			$fields = array( (string) $key );
+
 			return null !== $key && 32 === strlen( $key ) && strlen( $blob ) === $offset;
 		}
 
@@ -138,11 +175,15 @@ final class SshKeyField {
 			$e = self::read_string( $blob, $offset );
 			$n = self::read_string( $blob, $offset );
 
+			$fields = array( (string) $e, (string) $n );
+
 			return null !== $e && null !== $n && strlen( $blob ) === $offset && self::rsa_is_valid( $e, $n );
 		}
 
 		$curve = self::read_string( $blob, $offset );
 		$point = self::read_string( $blob, $offset );
+
+		$fields = array( (string) $curve, (string) $point );
 
 		return 'ecdsa-sha2-' . $curve === $type
 			&& isset( self::ECDSA[ $curve ] )
@@ -161,6 +202,11 @@ final class SshKeyField {
 	private static function rsa_is_valid( string $e, string $n ): bool {
 		if ( '' === $e || '' === $n || ord( $e[0] ) >= 0x80 || ord( $n[0] ) >= 0x80 ) {
 			return false; // Empty or negative.
+		}
+
+		// RFC 4251 section 5: no unnecessary leading zero bytes (one only when the next byte has its top bit set).
+		if ( "\0" === $e[0] && ( strlen( $e ) < 2 || ord( $e[1] ) < 0x80 ) || "\0" === $n[0] && ( strlen( $n ) < 2 || ord( $n[1] ) < 0x80 ) ) {
+			return false;
 		}
 
 		$e = ltrim( $e, "\0" );
@@ -293,7 +339,7 @@ final class SshKeyField {
 			array(
 				'type'              => 'textarea',
 				'label'             => __( 'SSH public key', 'beltoft-services' ),
-				'description'       => __( 'Optional. Paste the single line from your .pub file to log in to your server without a password.', 'beltoft-services' ),
+				'description'       => __( 'Optional. Paste the single line from your .pub file to log in to your server without a password. The key is used for every server of this product on the order.', 'beltoft-services' ),
 				'required'          => false,
 				'custom_attributes' => array(
 					'rows'         => 3,

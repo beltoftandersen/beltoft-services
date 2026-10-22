@@ -97,6 +97,38 @@ class SshKeyFieldTest extends TestCase {
 		$this->assertNull( SshKeyField::normalise( $parts[0] . ' ' . rtrim( $parts[1], '=' ) . 'A' ) );
 	}
 
+	public function test_rsa_refuses_a_non_minimal_mpint_and_stores_the_re_encoded_key(): void {
+		$n = "\x80" . random_bytes( 383 );
+
+		$good = self::line( 'ssh-rsa', self::str( "\x01\x00\x01" ) . self::str( "\x00" . $n ) );
+		$this->assertNotNull( SshKeyField::normalise( $good ) );
+
+		// RFC 4251 section 5: extra leading zero bytes are not the minimal form.
+		$this->assertNull( SshKeyField::normalise( self::line( 'ssh-rsa', self::str( "\x01\x00\x01" ) . self::str( "\x00\x00" . $n ) ) ), 'modulus with two zero bytes' );
+		$this->assertNull( SshKeyField::normalise( self::line( 'ssh-rsa', self::str( "\x00\x01\x00\x01" ) . self::str( "\x00" . $n ) ) ), 'exponent with a needless zero' );
+		$this->assertNull( SshKeyField::normalise( self::line( 'ssh-rsa', self::str( "\x01\x00\x01" ) . self::str( "\x00\x7f" . random_bytes( 383 ) ) ) ), 'zero before a byte without the top bit' );
+
+		// What is stored is rebuilt from the parsed fields: exactly the blob the key consists of.
+		$normal = (string) SshKeyField::normalise( $good );
+		$this->assertSame( explode( ' ', $good )[1], explode( ' ', $normal )[1] );
+		$this->assertSame( self::str( 'ssh-rsa' ) . self::str( "\x01\x00\x01" ) . self::str( "\x00" . $n ), base64_decode( explode( ' ', $normal )[1] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+	}
+
+	public function test_checkout_field_says_the_key_applies_to_every_vm_of_the_product(): void {
+		$this->fake_driver( 'proxmox' );
+		$vm = $this->vm_product();
+
+		WC()->cart->empty_cart();
+		WC()->cart->add_to_cart( $vm->get_id() );
+
+		ob_start();
+		SshKeyField::render_classic();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'every server of this product on the order', $html );
+		WC()->cart->empty_cart();
+	}
+
 	private function vm_product(): \WC_Product {
 		return $this->service_product( 'proxmox' );
 	}
