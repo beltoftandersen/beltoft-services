@@ -560,6 +560,31 @@ final class BreachHoldTest extends TestCase {
 		$this->assertSame( 'has_service', Panel::create_service( $id )->get_error_code() );
 	}
 
+	public function test_the_override_keeps_the_mark_when_no_service_was_created(): void {
+		list( $license ) = $this->held_then_deleted();
+		$id              = (int) $license['id'];
+
+		// The driver is gone: the creation fails.
+		$hide = static function ( $drivers ) {
+			unset( $drivers['fake'] );
+			return $drivers;
+		};
+		add_filter( 'beltoft_services_drivers', $hide, 99 );
+
+		$result = Panel::create_service( $id, 'CLEAR BREACH' );
+		$this->assertWPError( $result );
+		$this->assertSame( 'not_created', $result->get_error_code() );
+		$this->assertNull( Resource::for_license( $id ) );
+		$this->assertTrue( \BeltoftServices\Breach::marked( $id ), 'The mark stays: no service exists.' );
+		$this->assertStringNotContainsString( 'Breach mark cleared', implode( "\n", wp_list_pluck( Events::for_license( $id ), 'message' ) ) );
+
+		// With the driver back, the same override creates the service and clears the mark.
+		remove_filter( 'beltoft_services_drivers', $hide, 99 );
+		$this->assertTrue( Panel::create_service( $id, 'CLEAR BREACH' ) );
+		$this->assertFalse( \BeltoftServices\Breach::marked( $id ) );
+		$this->assertStringContainsString( 'Breach mark cleared', implode( "\n", wp_list_pluck( Events::for_license( $id ), 'message' ) ) );
+	}
+
 	public function test_lifting_a_live_hold_clears_the_mark(): void {
 		$r = $this->ready();
 		$this->suspend( $r );

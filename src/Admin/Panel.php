@@ -324,15 +324,20 @@ final class Panel {
 			return self::error( 'confirm_breach' );
 		}
 
+		Events::add( $license_id, 'service', sprintf( 'Service creation requested by %s', self::who() ) );
+		Lifecycle::provide( $license, true );
+
+		if ( ! Resource::for_license( $license_id ) ) {
+			// The mark stays: a license with no service must not be left open to the automatic creation.
+			return self::error( 'not_created' );
+		}
+
 		if ( $marked ) {
 			\BeltoftServices\Breach::clear( $license_id );
 			Events::add( $license_id, 'service', sprintf( 'Breach mark cleared by %s', self::who() ) );
 		}
 
-		Events::add( $license_id, 'service', sprintf( 'Service creation requested by %s', self::who() ) );
-		Lifecycle::provide( $license, true );
-
-		return Resource::for_license( $license_id ) ? true : self::error( 'not_created' );
+		return true;
 	}
 
 	/**
