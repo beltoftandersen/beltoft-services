@@ -23,13 +23,24 @@ final class Clients {
 	}
 
 	/**
+	 * Which client a cluster gets: live only when it says so AND the allowance is true.
+	 *
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param bool                 $allowed Whether wp-config.php allows live calls.
+	 * @return string 'live' or 'fake'.
+	 */
+	public static function kind( array $cluster, bool $allowed ): string {
+		return $allowed && 'live' === ( $cluster['client'] ?? 'fake' ) ? 'live' : 'fake';
+	}
+
+	/**
 	 * The client for a cluster: a FakeClient unless the cluster's client is live and the
 	 * constant is true. Cluster keys used here: client (fake|live), persist (fake only).
 	 *
 	 * @param array<string, mixed> $cluster Cluster settings.
 	 */
 	public static function for( array $cluster ): Client {
-		$live = 'live' === ( $cluster['client'] ?? 'fake' ) && self::live_allowed();
+		$live = 'live' === self::kind( $cluster, self::live_allowed() );
 
 		$client = $live
 			? new LiveClient( $cluster, true )
@@ -42,9 +53,12 @@ final class Clients {
 		 * @param Client               $client  The client.
 		 * @param array<string, mixed> $cluster Cluster settings.
 		 */
-		$filtered = apply_filters( 'beltoft_services_proxmox_client', $client, $cluster );
+		$public = $cluster;
+		unset( $public['token_secret'] );
 
-		if ( $filtered instanceof Client && ( $live || ! $filtered instanceof LiveClient ) ) {
+		$filtered = apply_filters( 'beltoft_services_proxmox_client', $client, $public );
+
+		if ( $filtered instanceof FakeClient || ( $live && $filtered instanceof LiveClient ) ) {
 			return $filtered;
 		}
 

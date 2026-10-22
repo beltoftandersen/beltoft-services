@@ -69,6 +69,13 @@ class LiveClient implements Client {
 	private $host;
 
 	/**
+	 * Whether the pin was applied to the handle of the current request.
+	 *
+	 * @var bool
+	 */
+	private $pin_applied = false;
+
+	/**
 	 * Parameters whose values never appear in errors.
 	 */
 	const SENSITIVE = array( 'cipassword', 'password', 'sshkeys' );
@@ -99,8 +106,8 @@ class LiveClient implements Client {
 
 		$secret = isset( $cluster['token_secret'] ) ? (string) $cluster['token_secret'] : '';
 
-		if ( '' === $secret ) {
-			throw new \InvalidArgumentException( 'The Proxmox token secret is empty.' );
+		if ( '' === trim( $secret ) ) {
+			throw new \InvalidArgumentException( 'The Proxmox token secret is empty (was the secrets key changed?).' );
 		}
 
 		$ca = isset( $cluster['ca_file'] ) ? (string) $cluster['ca_file'] : '';
@@ -206,6 +213,8 @@ class LiveClient implements Client {
 
 		$pinned = '' !== $this->pin;
 
+		$this->pin_applied = false;
+
 		if ( $pinned ) {
 			add_action( 'http_api_curl', array( $this, 'pin_key' ), 10, 3 );
 		}
@@ -220,6 +229,11 @@ class LiveClient implements Client {
 
 		if ( is_wp_error( $response ) ) {
 			return new \WP_Error( 'transport', 'Proxmox could not be reached: ' . $this->clean( $response->get_error_message(), $scrub ) );
+		}
+
+		// Fail closed: a transport that never applied the pin (not curl) is not trusted.
+		if ( $pinned && ! $this->pin_applied ) {
+			return new \WP_Error( 'pin_unverified', 'The Proxmox public key pin could not be applied to this connection, so the answer was discarded.' );
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
@@ -262,7 +276,9 @@ class LiveClient implements Client {
 			return false;
 		}
 
-		return curl_setopt( $handle, CURLOPT_PINNEDPUBLICKEY, 'sha256//' . $this->pin ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress has no request argument for a public key pin.
+		$this->pin_applied = (bool) curl_setopt( $handle, CURLOPT_PINNEDPUBLICKEY, 'sha256//' . $this->pin ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress has no request argument for a public key pin.
+
+		return $this->pin_applied;
 	}
 
 	/**
@@ -288,7 +304,7 @@ class LiveClient implements Client {
 	 * @param string[] $scrub  Values to hide.
 	 */
 	private function clean( string $text, array $scrub ): string {
-		$scrub = array_filter( $scrub, static fn( $value ) => strlen( (string) $value ) >= 4 );
+		$scrub = array_filter( $scrub, static fn( $value ) => '' !== (string) $value );
 		usort( $scrub, static fn( $a, $b ) => strlen( $b ) <=> strlen( $a ) );
 
 		$text = str_replace( $scrub, '***', wp_check_invalid_utf8( $text, true ) );

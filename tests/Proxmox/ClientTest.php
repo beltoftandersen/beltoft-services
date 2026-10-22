@@ -32,6 +32,24 @@ class QuickLiveClient extends LiveClient {
 }
 
 /**
+ * A Client that is neither fake nor live.
+ */
+class StubClient implements Client {
+
+	public function request( string $method, string $path, array $params = array() ) {
+		return null;
+	}
+
+	public function task( string $method, string $path, array $params = array() ) {
+		return new \WP_Error( 'stub', 'stub' );
+	}
+
+	public function wait_task( string $upid, int $timeout ) {
+		return true;
+	}
+}
+
+/**
  * LiveClient on a PHP without the curl pin constant.
  */
 class NoPinLiveClient extends QuickLiveClient {
@@ -147,16 +165,54 @@ class ClientTest extends TestCase {
 		// A filter cannot bring a live client in either, and may inject a fake.
 		add_filter(
 			'beltoft_services_proxmox_client',
-			static fn( $client, $c ) => new LiveClient( $c, true ),
+			static fn( $client ) => new LiveClient( $cluster + array( 'client' => 'live' ), true )
+		);
+		$this->assertInstanceOf( FakeClient::class, Clients::for( $cluster + array( 'client' => 'live' ) ) );
+
+		// Any other Client implementation is ignored too.
+		remove_all_filters( 'beltoft_services_proxmox_client' );
+		add_filter( 'beltoft_services_proxmox_client', static fn() => new StubClient() );
+		$this->assertInstanceOf( FakeClient::class, Clients::for( $cluster ) );
+
+		// The filter never sees the token secret.
+		remove_all_filters( 'beltoft_services_proxmox_client' );
+		$given = null;
+		add_filter(
+			'beltoft_services_proxmox_client',
+			static function ( $client, $c ) use ( &$given ) {
+				$given = $c;
+				return $client;
+			},
 			10,
 			2
 		);
-		$this->assertInstanceOf( FakeClient::class, Clients::for( $cluster + array( 'client' => 'live' ) ) );
+		Clients::for( $cluster );
+		$this->assertArrayNotHasKey( 'token_secret', $given );
+		$this->assertSame( self::TOKEN, $given['token_id'] );
 
 		remove_all_filters( 'beltoft_services_proxmox_client' );
 		$injected = new FakeClient();
 		add_filter( 'beltoft_services_proxmox_client', static fn() => $injected );
 		$this->assertSame( $injected, Clients::for( $cluster ) );
+	}
+
+	public function test_an_empty_token_secret_refuses_to_construct(): void {
+		foreach ( array( '', '   ' ) as $empty ) {
+			try {
+				$this->live( array( 'token_secret' => $empty ) );
+				$this->fail( 'Expected an exception for an empty secret.' );
+			} catch ( \InvalidArgumentException $e ) {
+				$this->assertStringContainsString( 'secret', $e->getMessage() );
+			}
+		}
+		$this->assertSame( array(), $this->http_calls() );
+	}
+
+	public function test_kind_is_live_only_with_the_setting_and_the_allowance(): void {
+		$this->assertSame( 'live', Clients::kind( array( 'client' => 'live' ), true ) );
+		$this->assertSame( 'fake', Clients::kind( array( 'client' => 'live' ), false ) );
+		$this->assertSame( 'fake', Clients::kind( array( 'client' => 'fake' ), true ) );
+		$this->assertSame( 'fake', Clients::kind( array(), true ) );
 	}
 
 	public function test_settings_cannot_select_live_without_the_constant(): void {
@@ -604,44 +660,48 @@ class ClientTest extends TestCase {
 	}
 
 	public function test_pin_is_set_on_curl_only_around_the_request_and_refuses_without_curl_support(): void {
-		$pin      = base64_encode( hash( 'sha256', 'key', true ) );
-		$seen     = array();
-		$this->respond_with(
-			function ( $url ) use ( &$seen ) {
-				$seen['during'] = has_action( 'http_api_curl' );
-				return $this->json_reply( array() );
-			}
-		);
-
+		$pin    = base64_encode( hash( 'sha256', 'key', true ) );
+		$seen   = array();
 		$client = $this->live( array( 'pin_sha256' => $pin ) );
+
+		// Simulates curl: the transport fires http_api_curl with a real handle.
 		$this->respond_with(
-			function () use ( &$seen, $client ) {
+			function ( $url, $args ) use ( &$seen, $client ) {
 				$seen['during'] = has_action( 'http_api_curl', array( $client, 'pin_key' ) );
-				return $this->json_reply( array() );
+				if ( function_exists( 'curl_init' ) ) {
+					$handle = curl_init();
+					do_action( 'http_api_curl', $handle, $args, $url );
+					curl_close( $handle );
+				}
+				return $this->json_reply( array( 'ok' => 1 ) );
 			}
 		);
-		$client->request( 'GET', '/nodes' );
-		$this->assertNotFalse( $seen['during'], 'The pin hook is on while the request runs.' );
-		$this->assertFalse( has_action( 'http_api_curl', array( $client, 'pin_key' ) ), 'And off right after.' );
 
-		// The hook sets CURLOPT_PINNEDPUBLICKEY on the handle for this host only.
-		if ( defined( 'CURLOPT_PINNEDPUBLICKEY' ) && function_exists( 'curl_init' ) ) {
-			$added = null;
-			$this->respond_with(
-				function () use ( &$added ) {
-					return $this->json_reply( array() );
-				}
-			);
+		if ( function_exists( 'curl_init' ) && defined( 'CURLOPT_PINNEDPUBLICKEY' ) ) {
+			$this->assertSame( array( 'ok' => 1 ), $client->request( 'GET', '/nodes' ) );
+			$this->assertNotFalse( $seen['during'], 'The pin hook is on while the request runs.' );
+			$this->assertFalse( has_action( 'http_api_curl', array( $client, 'pin_key' ) ), 'And off right after.' );
+
+			// The hook pins this host only.
 			$handle = curl_init();
 			$this->assertTrue( $client->pin_key( $handle, array(), self::BASE . '/api2/json/nodes' ) );
 			$this->assertFalse( $client->pin_key( $handle, array(), 'https://other.example.test/' ), 'Only this host is pinned.' );
 			curl_close( $handle );
 		}
 
-		// The hook is removed even when the request fails.
+		// Fails closed: a transport that never runs the hook (not curl) cannot be trusted.
+		$this->respond_with( fn() => $this->json_reply( array( 'secret' => 'data' ) ) );
+		$silent = $this->live( array( 'pin_sha256' => $pin ) );
+		$result = $silent->request( 'GET', '/nodes' );
+		$this->assertWPError( $result );
+		$this->assertSame( 'pin_unverified', $result->get_error_code() );
+		$this->assertStringNotContainsString( 'data', $result->get_error_message() );
+		$this->assertFalse( has_action( 'http_api_curl', array( $silent, 'pin_key' ) ) );
+
+		// The hook is removed even when the request fails, and the transport error stays.
 		$this->respond_with( static fn() => new \WP_Error( 'http_request_failed', 'down' ) );
 		$failing = $this->live( array( 'pin_sha256' => $pin ) );
-		$failing->request( 'GET', '/nodes' );
+		$this->assertSame( 'transport', $failing->request( 'GET', '/nodes' )->get_error_code() );
 		$this->assertFalse( has_action( 'http_api_curl', array( $failing, 'pin_key' ) ) );
 
 		// A malformed pin, and a pin on a site without the curl constant, refuse to construct.
@@ -655,6 +715,12 @@ class ClientTest extends TestCase {
 		$this->expectException( \RuntimeException::class );
 		$this->expectExceptionMessage( 'CURLOPT_PINNEDPUBLICKEY' );
 		$this->live( array( 'pin_sha256' => $pin ), NoPinLiveClient::class );
+	}
+
+	public function test_short_secrets_are_scrubbed_too(): void {
+		$this->respond_with( fn() => new \WP_Error( 'http_request_failed', 'bad pw=xy7 done' ) );
+		$error = $this->live()->request( 'POST', '/nodes/pve1/qemu/1/agent/set-user-password', array( 'username' => 'root', 'password' => 'xy7' ) );
+		$this->assertStringNotContainsString( 'xy7', $error->get_error_message() );
 	}
 
 	public function test_error_text_never_contains_the_secret_or_password(): void {
