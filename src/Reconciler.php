@@ -327,7 +327,7 @@ final class Reconciler {
 		}
 
 		$plan     = $product_id > 0 ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $r->get( 'plan' );
-		$resource = Resource::create( $license, $driver, $plan );
+		$resource = Resource::create( $license, $driver, $plan, Lifecycle::initial_meta( $license, $driver ) );
 
 		if ( ! $resource instanceof Resource ) {
 			Alerts::admin( $r, 'A new service could not be created after the deletion: ' . $resource->get_error_message() );

@@ -246,14 +246,15 @@ final class Routes {
 	}
 
 	/**
-	 * The checks every route makes, in order: rate limit, then ownership and state.
+	 * The checks every route makes, in order: rate limit, then ownership and state. Public for
+	 * routes of drivers built on this plugin, so they get the identical checks.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @param bool             $ready   Whether the resource must accept actions.
 	 * @param int              $limit   Default requests per minute for this route.
 	 * @return Resource|\WP_REST_Response The resource, or the refusal.
 	 */
-	private static function guard( \WP_REST_Request $request, bool $ready, int $limit ) {
+	public static function guard( \WP_REST_Request $request, bool $ready, int $limit ) {
 		$user_id = get_current_user_id();
 
 		if ( self::exceeded( $user_id, (string) $request->get_route(), $limit ) ) {

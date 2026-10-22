@@ -10,6 +10,7 @@ namespace BeltoftServices;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Import;
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Drivers\Driver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -310,6 +311,28 @@ final class Lifecycle {
 	}
 
 	/**
+	 * Meta a new resource starts with, from the filter beltoft_services_initial_meta (a driver's
+	 * plugin hands over what the customer chose at checkout, e.g. an SSH key). Reserved keys
+	 * are dropped: a listener cannot set the state, identity or retry bookkeeping.
+	 *
+	 * @param array<string, mixed> $license License row.
+	 * @param Driver               $driver  The service's driver.
+	 * @return array<string, mixed>
+	 */
+	public static function initial_meta( array $license, Driver $driver ): array {
+		/**
+		 * Initial meta for a new resource (provisioning and the replacement after a deletion).
+		 *
+		 * @param array<string, mixed> $meta    Meta; empty by default.
+		 * @param array<string, mixed> $license License row.
+		 * @param Driver               $driver  The service's driver.
+		 */
+		$meta = apply_filters( 'beltoft_services_initial_meta', array(), $license, $driver );
+
+		return is_array( $meta ) ? array_diff_key( $meta, array_flip( Reconciler::RESERVED ) ) : array();
+	}
+
+	/**
 	 * Creates the license's service with the product's plan and queues its provisioning.
 	 *
 	 * @param array<string, mixed> $license License row.
@@ -327,7 +350,7 @@ final class Lifecycle {
 			return;
 		}
 
-		$resource = Resource::create( $license, $driver, Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) );
+		$resource = Resource::create( $license, $driver, Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ), self::initial_meta( $license, $driver ) );
 
 		if ( is_wp_error( $resource ) ) {
 			// Another request holds the license lock: it is creating this service now.

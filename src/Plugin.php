@@ -54,6 +54,8 @@ final class Plugin {
 
 		Account\Panel::register();
 		Api\Routes::register();
+		Proxmox\RevealRoute::register();
+		Proxmox\SshKeyField::register();
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Emails\Emails::register();
