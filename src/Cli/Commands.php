@@ -11,9 +11,9 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Jobs;
+use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\LinkVm;
-use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -9,11 +9,11 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFieldsSchema\DocumentObject;
 use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFieldsSchema\Validation;
+use BeltoftServices\Jobs;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
-use BeltoftServices\Jobs;
 use BeltoftServices\Tests\TestCase;
 
 /**

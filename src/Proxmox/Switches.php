@@ -7,9 +7,9 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
-use BeltoftLicenses\Licenses;
 
 defined( 'ABSPATH' ) || exit;
 

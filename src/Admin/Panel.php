@@ -28,11 +28,11 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Panel {
 
-	public const CAPABILITY = 'manage_woocommerce';
-	public const ACTION     = 'beltoft_services_resource';
-	public const ACTIONS    = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect', 'suspend', 'lift_hold' );
-	public const CONFIRM      = 'DELETE';
-	public const CONFIRM_MARK = 'MARK DELETED';
+	public const CAPABILITY      = 'manage_woocommerce';
+	public const ACTION          = 'beltoft_services_resource';
+	public const ACTIONS         = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect', 'suspend', 'lift_hold' );
+	public const CONFIRM         = 'DELETE';
+	public const CONFIRM_MARK    = 'MARK DELETED';
 	public const CONFIRM_SUSPEND = 'SUSPEND';
 	public const CONFIRM_LIFT    = 'LIFT HOLD';
 	public const REASON_MAX      = 500;
