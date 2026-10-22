@@ -54,6 +54,7 @@ final class Plugin {
 
 		Account\Panel::register();
 		Api\Routes::register();
+		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
 		Proxmox\SshKeyField::register();
 		Admin\Panel::register();

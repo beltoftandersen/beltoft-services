@@ -21,11 +21,17 @@ final class Registry {
 	 */
 	public static function all(): array {
 		/**
-		 * Filters the registered drivers. The HTTP driver is built in.
+		 * Filters the registered drivers. The HTTP and Proxmox drivers are built in.
 		 *
 		 * @param array<string, Driver> $drivers Drivers keyed by id.
 		 */
-		$drivers = apply_filters( 'beltoft_services_drivers', array( 'http' => new \BeltoftServices\Http\HttpDriver() ) );
+		$drivers = apply_filters(
+			'beltoft_services_drivers',
+			array(
+				'http'    => new \BeltoftServices\Http\HttpDriver(),
+				'proxmox' => new \BeltoftServices\Proxmox\ProxmoxDriver(),
+			)
+		);
 
 		$valid = array();
 		foreach ( (array) $drivers as $id => $driver ) {
