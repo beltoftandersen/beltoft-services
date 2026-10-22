@@ -160,6 +160,18 @@ class ClustersTest extends TestCase {
 		$this->assertSame( 'fake', Clusters::get( 'lab' )['client'] );
 	}
 
+	public function test_all_downgrades_live_too_and_other_writes_keep_the_stored_value(): void {
+		$live = array_merge( Clusters::defaults(), array( 'label' => 'x', 'client' => 'live' ) );
+		update_option( Clusters::OPTION, array( 'lab' => $live, 'other' => array_merge( $live, array( 'label' => 'y' ) ) ), false );
+
+		$this->assertSame( 'fake', Clusters::all()['lab']['client'] );
+		$this->assertSame( 'fake', Clusters::all()['other']['client'] );
+
+		// Deleting one cluster must not rewrite the other one as fake in the database.
+		$this->assertTrue( Clusters::delete( 'other' ) );
+		$this->assertSame( 'live', get_option( Clusters::OPTION )['lab']['client'] );
+	}
+
 	public function test_templates_parse(): void {
 		Clusters::save( 'lab', $this->input( array( 'templates' => "9000 = Debian 12\n\n  9001=Ubuntu = LTS \n" ) ) );
 

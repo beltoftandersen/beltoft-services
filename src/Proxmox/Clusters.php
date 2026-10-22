@@ -58,11 +58,31 @@ final class Clusters {
 	}
 
 	/**
-	 * Every cluster by id, the token secret still encrypted.
+	 * Every cluster by id, the token secret still encrypted. A cluster stored as live reads as
+	 * fake unless wp-config.php allows live calls, so no caller can read `live` raw.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
 	public static function all(): array {
+		$list = self::stored();
+
+		if ( ! Clients::live_allowed() ) {
+			foreach ( $list as $id => $cluster ) {
+				if ( 'live' === $cluster['client'] ) {
+					$list[ $id ]['client'] = 'fake';
+				}
+			}
+		}
+
+		return $list;
+	}
+
+	/**
+	 * The clusters exactly as stored (only for writing them back).
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function stored(): array {
 		$stored = get_option( self::OPTION, array() );
 		$list   = array();
 
@@ -160,7 +180,7 @@ final class Clusters {
 	 * @param string $id Cluster id.
 	 */
 	public static function delete( string $id ): bool {
-		$all = self::all();
+		$all = self::stored();
 
 		if ( ! isset( $all[ $id ] ) || self::in_use( $id ) > 0 ) {
 			return false;
@@ -184,7 +204,7 @@ final class Clusters {
 			return self::error( 'id', __( 'A cluster id is 1 to 40 characters: lowercase letters, numbers, dashes and underscores.', 'beltoft-services' ) );
 		}
 
-		$all      = self::all();
+		$all      = self::stored();
 		$existing = $all[ $id ] ?? array();
 		$clean    = array_merge( self::defaults(), $existing );
 
