@@ -160,6 +160,31 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a live cluster has no site tag, at most once a day per cluster.
+	 *
+	 * @param string $cluster_id Cluster id.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function site_tag( string $cluster_id ): bool {
+		$transient = 'beltoft_services_site_tag_alert_' . md5( $cluster_id );
+		$to        = (string) Settings::get( 'admin_email' );
+
+		if ( false !== get_transient( $transient ) || ! is_email( $to ) ) {
+			return false;
+		}
+
+		set_transient( $transient, 1, DAY_IN_SECONDS );
+
+		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+		return (bool) wp_mail(
+			$to,
+			sprintf( '[%s] Set the site tag for cluster %s', $site, $cluster_id ),
+			sprintf( "The cluster %s is live but the site tag is not set, so nothing is done to it (provisioning and the other jobs wait).\nSet the site tag in Settings, Services, Proxmox.\n", $cluster_id )
+		);
+	}
+
+	/**
 	 * Alerts the admin that a license's service could not be created (there is no resource to
 	 * hang the alert on). Sent once per call: a creation happens once per license event.
 	 *

@@ -353,9 +353,15 @@ final class Lifecycle {
 	/**
 	 * Creates the license's service with the product's plan and queues its provisioning.
 	 *
-	 * @param array<string, mixed> $license License row.
+	 * @param array<string, mixed> $license  License row.
+	 * @param bool                 $override The admin cleared the breach mark: create anyway.
 	 */
-	public static function provide( array $license ): void {
+	public static function provide( array $license, bool $override = false ): void {
+		// A license marked for a breach gets no new service from any event.
+		if ( ! $override && Breach::refuse( $license ) ) {
+			return;
+		}
+
 		$product_id   = (int) ( $license['product_id'] ?? 0 );
 		$variation_id = (int) ( $license['variation_id'] ?? 0 );
 		$driver       = Product::driver_for( $product_id );

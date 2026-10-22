@@ -102,6 +102,10 @@ final class LinkVm {
 			return self::error( 'The license already has a live resource.' );
 		}
 
+		if ( \BeltoftServices\Breach::marked( (int) $license['id'] ) ) {
+			return self::error( 'The license is marked for a breach of the terms; clear it on the license screen first.' );
+		}
+
 		$status = Licenses::effective_status( $license );
 
 		if ( Licenses::STATUS_ACTIVE !== $status ) {
@@ -154,6 +158,12 @@ final class LinkVm {
 		}
 
 		// 2. Reads. Nothing is recorded before they agree.
+		$gate = Clients::gate( $cluster_id, $cluster, Clients::live_allowed() );
+
+		if ( null !== $gate ) {
+			return self::error( $gate );
+		}
+
 		$client = Clients::for( $cluster );
 		$list   = Ownership::listing( $client );
 

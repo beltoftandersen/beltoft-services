@@ -183,7 +183,12 @@ abstract class ServiceEmail extends \WC_Email {
 				return '';
 			}
 
-			$at = $paused_at + $days * DAY_IN_SECONDS;
+			// As Retention decides: not before the period is over, and never with less notice than
+			// the warning days (a warning already sent counts from when it was sent).
+			$notice = max( 0, (int) Settings::get( 'warning_days' ) ) * DAY_IN_SECONDS;
+			$warned = $r->get( 'warned_at' );
+			$warned = null !== $warned && $warned >= $paused_at ? $warned : time();
+			$at     = $notice > 0 ? max( $paused_at + $days * DAY_IN_SECONDS, $warned + $notice ) : $paused_at + $days * DAY_IN_SECONDS;
 		}
 
 		return wp_date( (string) get_option( 'date_format' ), $at );

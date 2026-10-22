@@ -143,7 +143,8 @@ final class Retention {
 		$breach_at = $r->get( 'breach_at' );
 		$paused_at = $r->get( 'paused_at' );
 
-		if ( null === $breach_at || null === $paused_at || null !== $r->pending_desire() ) {
+		// No paused_at is no reason to wait: the hold has its own clock (breach_at).
+		if ( null === $breach_at || null !== $r->pending_desire() ) {
 			return;
 		}
 
@@ -160,7 +161,7 @@ final class Retention {
 			return;
 		}
 
-		if ( 'report' === $mode ) {
+		if ( 'report' === $mode && null !== $paused_at ) {
 			self::report( $r, $paused_at, 'breach:' . $breach_at, sprintf( 'Would delete the service: the breach hold is %d days old (deletion mode is report only).', $days ) );
 		}
 

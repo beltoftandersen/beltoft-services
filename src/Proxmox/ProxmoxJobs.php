@@ -150,6 +150,11 @@ final class ProxmoxJobs {
 				continue;
 			}
 
+			// A live cluster without a site tag is left alone (and the admin told).
+			if ( null !== Clients::gate( (string) $id, $cluster, Clients::live_allowed() ) ) {
+				continue;
+			}
+
 			try {
 				$out[ (string) $id ] = array(
 					'cluster' => $cluster,

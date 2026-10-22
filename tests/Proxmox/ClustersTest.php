@@ -209,20 +209,70 @@ class ClustersTest extends TestCase {
 		$this->assertSame( '', ProxmoxSettings::explicit_site_tag() );
 	}
 
-	public function test_a_stored_live_cluster_is_not_used_live_without_the_site_tag(): void {
+	public function test_a_stored_live_cluster_without_the_site_tag_is_refused_not_faked(): void {
 		$live = array_merge( Clusters::defaults(), array( 'label' => 'x', 'client' => 'live' ) );
 		update_option( Clusters::OPTION, array( 'lab' => $live ), false );
-
 		delete_option( Settings::OPTION );
-		$this->assertSame( 'fake', Clusters::view( true )['lab']['client'], 'Allowed, but no tag: fake.' );
-		$this->assertSame( 'fake', Clusters::view( false )['lab']['client'] );
-		$this->assertFalse( Clients::live_ready( true ) );
 
+		// Allowed but untagged: it stays live (never silently fake), and no client is built for it.
+		$this->assertSame( 'live', Clusters::view( true )['lab']['client'] );
+		$this->assertSame( 'fake', Clusters::view( false )['lab']['client'], 'Not allowed: fake.' );
+		$this->assertTrue( Clients::untagged( $live, true ) );
+		$this->assertFalse( Clients::untagged( $live, false ) );
+
+		try {
+			Clients::build( $live, true );
+			$this->fail( 'A client was built for an untagged live cluster.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertStringContainsString( 'site tag', $e->getMessage() );
+		}
+
+		// The gate says what to retry on, and alerts once a day.
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$this->assertSame( 'Set the site tag for cluster lab', Clients::gate( 'lab', $live, true ) );
+		$this->assertSame( 'Set the site tag for cluster lab', Clients::gate( 'lab', $live, true ) );
+		$this->assertCount( 1, $mails, 'One alert.' );
+		$this->assertStringContainsString( 'Set the site tag for cluster lab', (string) $mails[0]['subject'] );
+		$this->assertNull( Clients::gate( 'lab', $live, false ) );
+		$this->assertNull( Clients::gate( 'lab', array_merge( $live, array( 'client' => 'fake' ) ), true ) );
+
+		// The notice names it, on any admin page, for an admin only.
+		$this->assertSame( array(), ProxmoxSettings::untagged_clusters(), 'The test run has no constant.' );
+
+		// Tagged: built (a live client constructor makes no request).
 		update_option( Settings::OPTION, array( 'site_tag' => 'shop-main' ) );
-		$this->assertSame( 'live', Clusters::view( true )['lab']['client'], 'Allowed and tagged: live.' );
-		$this->assertSame( 'fake', Clusters::view( false )['lab']['client'], 'Not allowed: fake whatever the tag.' );
-		$this->assertTrue( Clients::live_ready( true ) );
-		$this->assertFalse( Clients::live_ready( false ) );
+		$this->assertFalse( Clients::untagged( $live, true ) );
+		$this->assertNull( Clients::gate( 'lab', $live, true ) );
+		$this->assertInstanceOf( \BeltoftServices\Proxmox\LiveClient::class, Clients::build( array_merge( $live, array( 'api_url' => 'https://pve.example.invalid:8006', 'token_id' => 'a@pve!b', 'token_secret' => 'secret-secret-secret-1' ) ), true ) );
+	}
+
+	public function test_the_untagged_notice_shows_to_admins_on_any_page(): void {
+		// Without the constant nothing is live, so there is nothing to warn about.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		ob_start();
+		ProxmoxSettings::untagged_notice();
+		$this->assertSame( '', ob_get_clean() );
+		ob_start();
+		ProxmoxSettings::print_untagged( array( 'lab', 'two' ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'lab, two', $html );
+		$this->assertStringContainsString( 'Set the site tag', $html );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+		ob_start();
+		ProxmoxSettings::untagged_notice();
+		$this->assertSame( '', ob_get_clean() );
+		$this->assertNotFalse( has_action( 'admin_notices', array( ProxmoxSettings::class, 'untagged_notice' ) ) );
 	}
 
 	public function test_default_template_is_marked_validated_and_falls_back_to_the_first(): void {

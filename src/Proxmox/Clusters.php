@@ -70,7 +70,7 @@ final class Clusters {
 
 	/**
 	 * Every cluster as all() gives it, for a given allowance: a cluster stored as live reads as
-	 * fake unless live calls are allowed AND the site tag was set explicitly.
+	 * fake unless live calls are allowed.
 	 *
 	 * @param bool $allowed Whether wp-config.php allows live calls.
 	 * @return array<string, array<string, mixed>>
@@ -78,7 +78,10 @@ final class Clusters {
 	public static function view( bool $allowed ): array {
 		$list = self::stored();
 
-		if ( ! Clients::live_ready( $allowed ) ) {
+		// Only the missing allowance turns a live cluster into a fake one. A live cluster without a
+		// site tag stays live and is refused where a client is built (Clients::gate()), never
+		// served by a fake that would report success.
+		if ( ! $allowed ) {
 			foreach ( $list as $id => $cluster ) {
 				if ( 'live' === $cluster['client'] ) {
 					$list[ $id ]['client'] = 'fake';

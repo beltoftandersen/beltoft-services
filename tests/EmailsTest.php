@@ -154,7 +154,7 @@ final class EmailsTest extends TestCase {
 		$mail = $this->customer_mails( 'paused' );
 		$this->assertCount( 1, $mail );
 		$this->assertStringContainsString( 'cancelled or refunded', (string) $mail[0]['message'] );
-		$this->assertStringNotContainsString( 'deleted on', (string) $mail[0]['message'] );
+		$this->assertStringNotContainsString( 'deleted no earlier than', (string) $mail[0]['message'] );
 		$this->assertStringContainsString( 'data is kept', (string) $mail[0]['message'] );
 	}
 

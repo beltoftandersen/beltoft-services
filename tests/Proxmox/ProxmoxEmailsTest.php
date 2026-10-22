@@ -350,7 +350,7 @@ class ProxmoxEmailsTest extends TestCase {
 		$message = (string) $this->customer_mails( 'paused' )[0]['message'];
 		$this->assertStringContainsString( 'cancelled or refunded', $message );
 		$this->assertStringContainsString( 'data is kept', $message );
-		$this->assertStringNotContainsString( 'deleted on', $message );
+		$this->assertStringNotContainsString( 'deleted no earlier than', $message );
 	}
 
 	public function test_the_paused_reason_never_shows_raw_text_an_admin_or_an_abuse_figure(): void {

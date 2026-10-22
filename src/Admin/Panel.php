@@ -193,6 +193,9 @@ final class Panel {
 							return false;
 						}
 
+						// The license is marked too: the mark outlives the service.
+						\BeltoftServices\Breach::mark( (int) ( $r->license()['id'] ?? 0 ), $reason );
+
 						// The lock is re-entrant within this connection. Stored or queued: the hold is
 						// in place either way, so a resume is refused from here on.
 						$r->desire( 'paused', sprintf( 'Suspended for breach by %1$s: %2$s', $who, $reason ) );
@@ -235,6 +238,8 @@ final class Panel {
 						if ( ! $r->set( $meta ) ) {
 							return false;
 						}
+
+						\BeltoftServices\Breach::clear( $license_id );
 
 						$text = sprintf( 'Breach hold lifted by %s', $who );
 
@@ -293,10 +298,11 @@ final class Panel {
 	 * Creates the service of an active service license that has no live one, the same way
 	 * a new license gets it (Lifecycle::provide: the resource, then its provisioning job).
 	 *
-	 * @param int $license_id License id.
+	 * @param int    $license_id License id.
+	 * @param string $confirm    Typed confirmation (only for a license marked for a breach).
 	 * @return true|\WP_Error
 	 */
-	public static function create_service( int $license_id ) {
+	public static function create_service( int $license_id, string $confirm = '' ) {
 		$license = \BeltoftLicenses\Licenses::find( $license_id );
 
 		if ( ! is_array( $license ) || ! Product::is_service_license( $license ) ) {
@@ -311,8 +317,20 @@ final class Panel {
 			return self::error( 'has_service' );
 		}
 
+		// A license marked for a breach: only the typed confirmation overrides, and it clears the mark.
+		$marked = \BeltoftServices\Breach::marked( $license_id );
+
+		if ( $marked && \BeltoftServices\Breach::CONFIRM !== $confirm ) {
+			return self::error( 'confirm_breach' );
+		}
+
+		if ( $marked ) {
+			\BeltoftServices\Breach::clear( $license_id );
+			Events::add( $license_id, 'service', sprintf( 'Breach mark cleared by %s', self::who() ) );
+		}
+
 		Events::add( $license_id, 'service', sprintf( 'Service creation requested by %s', self::who() ) );
-		Lifecycle::provide( $license );
+		Lifecycle::provide( $license, true );
 
 		return Resource::for_license( $license_id ) ? true : self::error( 'not_created' );
 	}
@@ -393,6 +411,8 @@ final class Panel {
 			/* translators: %s: the words to type. */
 			'confirm_lift' => sprintf( __( 'Type %s to confirm.', 'beltoft-services' ), self::CONFIRM_LIFT ),
 			'reason'       => __( 'Give the reason for the suspension.', 'beltoft-services' ),
+			/* translators: %s: the words to type. */
+			'confirm_breach' => sprintf( __( 'This license is marked for a breach of the terms. Type %s to create a service anyway.', 'beltoft-services' ), \BeltoftServices\Breach::CONFIRM ),
 			'hold'         => __( 'This service is on breach hold. Lift the hold first.', 'beltoft-services' ),
 			'held'         => __( 'This service is on breach hold already.', 'beltoft-services' ),
 			'no_hold'      => __( 'This service is not on breach hold.', 'beltoft-services' ),
@@ -433,7 +453,7 @@ final class Panel {
 
 			check_admin_referer( self::nonce_action( $license_id, 'create' ) );
 
-			$result = self::create_service( $license_id );
+			$result = self::create_service( $license_id, isset( $_POST['confirm'] ) ? sanitize_text_field( wp_unslash( $_POST['confirm'] ) ) : '' );
 			$args   = array( 'license' => $license_id );
 
 			if ( is_wp_error( $result ) ) {
@@ -565,8 +585,21 @@ final class Panel {
 				if ( \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $license ) ) {
 					$license_id = (int) $license['id'];
 
+					$mark = \BeltoftServices\Breach::get( $license_id );
+
+					if ( $mark ) {
+						echo '<p class="description"><strong>' . esc_html__( 'This license is marked for a breach of the terms, so no service is created by itself.', 'beltoft-services' ) . '</strong></p>';
+					}
+
 					echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 					wp_nonce_field( self::nonce_action( $license_id, 'create' ) );
+
+					if ( $mark ) {
+						printf(
+							'<p><label>%1$s <input type="text" name="confirm" autocomplete="off" class="regular-text"></label></p>',
+							esc_html( sprintf( /* translators: %s: the words to type. */ __( 'Type %s to override:', 'beltoft-services' ), \BeltoftServices\Breach::CONFIRM ) )
+						);
+					}
 					printf(
 						'<input type="hidden" name="action" value="%1$s"><input type="hidden" name="license" value="%2$d"><input type="hidden" name="do" value="create"><button type="submit" class="button">%3$s</button></form>',
 						esc_attr( self::ACTION ),

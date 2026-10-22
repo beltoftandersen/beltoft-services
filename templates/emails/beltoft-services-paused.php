@@ -48,10 +48,10 @@ echo esc_html( sprintf( __( 'Your %s has been paused.', 'beltoft-services' ), $p
 if ( '' !== $deletes_on ) {
 	if ( $held ) {
 		/* translators: %s: date. */
-		echo esc_html( sprintf( __( 'It will be deleted on %s.', 'beltoft-services' ), $deletes_on ) );
+		echo esc_html( sprintf( __( 'It will be deleted no earlier than %s.', 'beltoft-services' ), $deletes_on ) );
 	} else {
 		/* translators: %s: date. */
-		echo esc_html( sprintf( __( 'It will be deleted on %s unless your subscription is active again before then.', 'beltoft-services' ), $deletes_on ) );
+		echo esc_html( sprintf( __( 'It will be deleted no earlier than %s unless your subscription is active again before then.', 'beltoft-services' ), $deletes_on ) );
 	}
 } elseif ( ! $held ) {
 	esc_html_e( 'Its data is kept, and it starts again once your subscription is active.', 'beltoft-services' );

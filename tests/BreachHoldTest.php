@@ -482,4 +482,115 @@ final class BreachHoldTest extends TestCase {
 
 		$this->assertTrue( $this->fresh( $r )->on_hold() );
 	}
+
+	/**
+	 * Hold, then delete through retention: the resource is gone, the license stays marked.
+	 *
+	 * @return array{0: array<string, mixed>, 1: Resource}
+	 */
+	private function held_then_deleted(): array {
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$r       = $this->held( 15 );
+		$license = $r->license();
+
+		Retention::run();
+		$this->run_jobs();
+
+		$this->assertFalse( $this->fresh( $r )->is_live(), 'The service is deleted and closed.' );
+		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+
+		return array( $license, $r );
+	}
+
+	public function test_the_breach_mark_outlives_the_deleted_service_and_blocks_every_creation(): void {
+		list( $license ) = $this->held_then_deleted();
+		$id              = (int) $license['id'];
+
+		$this->assertTrue( \BeltoftServices\Breach::marked( $id ) );
+		$this->mails = array();
+		$provisions  = count( $this->driver->calls( 'provision' ) );
+
+		// Billing: the license ends and is renewed (status and expiry events), or is re-created by the admin's tools.
+		Licenses::update( $id, array( 'status' => Licenses::STATUS_EXPIRED ) );
+		Licenses::update( $id, array( 'status' => Licenses::STATUS_ACTIVE, 'expires_at' => null ) );
+		do_action( 'beltoft_licenses_expiry_changed', Licenses::find( $id ), null );
+		\BeltoftServices\Lifecycle::on_created( Licenses::find( $id ) );
+		\BeltoftServices\Lifecycle::provide( Licenses::find( $id ) );
+		$this->run_jobs();
+
+		$this->assertNull( Resource::for_license( $id ), 'No new service.' );
+		$this->assertContains( 'No service was created: the license is marked for a breach of the terms. Use "Create the service" on the license screen and type CLEAR BREACH to override.', wp_list_pluck( Events::for_license( $id ), 'message' ) );
+		$this->assertCount( 1, array_filter( $this->mails, static fn( $m ) => 'ops@example.com' === ( is_array( $m['to'] ) ? implode( ',', $m['to'] ) : $m['to'] ) ), 'One admin alert per mark.' );
+		$this->assertCount( $provisions, $this->driver->calls( 'provision' ), 'No provision call after the mark.' );
+	}
+
+	public function test_a_replacement_after_a_deletion_also_respects_the_mark(): void {
+		$r = $this->ready();
+		\BeltoftServices\Breach::mark( (int) $r->license()['id'], 'x' );
+		$this->assertTrue( $r->desire( 'deleted', 'Gone', true ) );
+		Jobs::enqueue( $r->id() );
+		$this->run_jobs();
+
+		$this->assertNull( Resource::for_license( (int) $r->license()['id'] ), 'The replacement is refused.' );
+	}
+
+	public function test_the_admin_override_needs_clear_breach_and_clears_the_mark(): void {
+		list( $license ) = $this->held_then_deleted();
+		$id              = (int) $license['id'];
+
+		foreach ( array( '', 'CLEAR', 'SUSPEND', 'clear breach' ) as $word ) {
+			$result = Panel::create_service( $id, $word );
+			$this->assertWPError( $result );
+			$this->assertSame( 'confirm_breach', $result->get_error_code() );
+		}
+		$this->assertNull( Resource::for_license( $id ) );
+		$this->assertTrue( \BeltoftServices\Breach::marked( $id ) );
+
+		$this->assertTrue( Panel::create_service( $id, 'CLEAR BREACH' ) );
+		$this->assertFalse( \BeltoftServices\Breach::marked( $id ) );
+		$this->run_jobs();
+
+		$new = Resource::for_license( $id );
+		$this->assertNotNull( $new );
+		$this->assertSame( 'ready', $new->get( 'state' ) );
+		$this->assertFalse( $new->on_hold() );
+		$this->assertStringContainsString( 'Breach mark cleared by boss', implode( "\n", wp_list_pluck( Events::for_license( $id ), 'message' ) ) );
+
+		// An unmarked license is created as before, with no word needed.
+		$this->assertSame( 'has_service', Panel::create_service( $id )->get_error_code() );
+	}
+
+	public function test_lifting_a_live_hold_clears_the_mark(): void {
+		$r = $this->ready();
+		$this->suspend( $r );
+		$id = (int) $r->license()['id'];
+		$this->assertTrue( \BeltoftServices\Breach::marked( $id ) );
+
+		$this->assertTrue( Panel::act( $this->fresh( $r ), 'lift_hold', 'LIFT HOLD' ) );
+		$this->assertFalse( \BeltoftServices\Breach::marked( $id ) );
+	}
+
+	public function test_a_hold_without_a_pause_date_still_gets_its_deletion_clock(): void {
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$r = $this->held( 20 );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'paused_at' => null ) ) );
+
+		Retention::run();
+
+		$this->assertSame( 'deleted', $this->fresh( $r )->get( 'desired' ) );
+	}
+
+	public function test_the_cli_refuses_to_link_a_marked_license(): void {
+		$product = $this->service_product( 'fake', array(), array( 'slug' => 'svc-link' ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		\BeltoftServices\Breach::mark( (int) $license['id'], 'x' );
+
+		\WP_CLI::reset();
+		try {
+			( new \BeltoftServices\Cli\Commands() )->link_http( array( (string) $license['id'], 'remote-1' ), array() );
+			$this->fail( 'Expected an error.' );
+		} catch ( \Throwable $e ) {
+			$this->assertNull( Resource::for_license( (int) $license['id'] ) );
+		}
+	}
 }

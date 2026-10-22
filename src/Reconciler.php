@@ -316,6 +316,10 @@ final class Reconciler {
 			return;
 		}
 
+		if ( Breach::refuse( $license ) ) {
+			return;
+		}
+
 		$product_id   = (int) ( $license['product_id'] ?? 0 );
 		$variation_id = (int) ( $license['variation_id'] ?? 0 );
 		$driver       = Product::driver_for( $product_id );

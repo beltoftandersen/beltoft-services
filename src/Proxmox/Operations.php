@@ -549,6 +549,12 @@ final class Operations {
 		$this->cluster = $cluster;
 		$this->secrets = array( (string) $cluster['token_secret'] );
 
+		$gate = Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() );
+
+		if ( null !== $gate ) {
+			return StepResult::retry( 0, $gate );
+		}
+
 		try {
 			$this->client = Clients::for( $cluster );
 		} catch ( \Throwable $e ) {

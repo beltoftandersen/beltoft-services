@@ -33,6 +33,37 @@ final class Clients {
 	}
 
 	/**
+	 * Is this cluster live (and allowed to be) but without an explicit site tag? Its ownership tag
+	 * would be a guess, so nothing may be done to it.
+	 *
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param bool                 $allowed Whether wp-config.php allows live calls.
+	 */
+	public static function untagged( array $cluster, bool $allowed ): bool {
+		return $allowed && 'live' === ( $cluster['client'] ?? 'fake' ) && '' === ProxmoxSettings::explicit_site_tag();
+	}
+
+	/**
+	 * The gate before a client is built for a cluster: the retry text when the cluster is live
+	 * without a site tag (and the admin is alerted, once a day), otherwise null. A caller turns
+	 * it into a retry without progress, so the work waits for the tag and nothing is faked.
+	 *
+	 * @param string               $id      Cluster id.
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param bool                 $allowed Whether wp-config.php allows live calls.
+	 */
+	public static function gate( string $id, array $cluster, bool $allowed ): ?string {
+		if ( ! self::untagged( $cluster, $allowed ) ) {
+			return null;
+		}
+
+		\BeltoftServices\Alerts::site_tag( $id );
+
+		/* Admin text, not shown to customers. */
+		return sprintf( 'Set the site tag for cluster %s', $id );
+	}
+
+	/**
 	 * Which client a cluster gets: live only when it says so AND the allowance is true.
 	 *
 	 * @param array<string, mixed> $cluster Cluster settings.
@@ -50,7 +81,24 @@ final class Clients {
 	 * @param array<string, mixed> $cluster Cluster settings.
 	 */
 	public static function for( array $cluster ): Client {
-		$live = 'live' === self::kind( $cluster, self::live_ready( self::live_allowed() ) );
+		return self::build( $cluster, self::live_allowed() );
+	}
+
+	/**
+	 * for() with the allowance given. A live cluster without a site tag throws: a caller that
+	 * did not pass Clients::gate() gets no client rather than a fake.
+	 *
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param bool                 $allowed Whether wp-config.php allows live calls.
+	 *
+	 * @throws \RuntimeException When the cluster is live and has no site tag.
+	 */
+	public static function build( array $cluster, bool $allowed ): Client {
+		if ( self::untagged( $cluster, $allowed ) ) {
+			throw new \RuntimeException( 'The site tag is not set.' );
+		}
+
+		$live = 'live' === self::kind( $cluster, $allowed );
 
 		$client = $live
 			? new LiveClient( $cluster, true )

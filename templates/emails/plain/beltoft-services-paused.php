@@ -46,10 +46,10 @@ if ( '' !== $reason ) {
 if ( '' !== $deletes_on ) {
 	if ( $held ) {
 		/* translators: %s: date. */
-		echo wp_strip_all_tags( sprintf( __( 'It will be deleted on %s.', 'beltoft-services' ), $deletes_on ) ) . "\n\n";
+		echo wp_strip_all_tags( sprintf( __( 'It will be deleted no earlier than %s.', 'beltoft-services' ), $deletes_on ) ) . "\n\n";
 	} else {
 		/* translators: %s: date. */
-		echo wp_strip_all_tags( sprintf( __( 'It will be deleted on %s unless your subscription is active again before then.', 'beltoft-services' ), $deletes_on ) ) . "\n\n";
+		echo wp_strip_all_tags( sprintf( __( 'It will be deleted no earlier than %s unless your subscription is active again before then.', 'beltoft-services' ), $deletes_on ) ) . "\n\n";
 	}
 } elseif ( ! $held ) {
 	echo __( 'Its data is kept, and it starts again once your subscription is active.', 'beltoft-services' ) . "\n\n";

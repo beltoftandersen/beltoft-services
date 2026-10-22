@@ -210,6 +210,12 @@ final class Provision {
 			}
 		}
 
+		$gate = Clients::gate( $this->cluster_id, $cluster, Clients::live_allowed() );
+
+		if ( null !== $gate ) {
+			return StepResult::retry( 0, $gate );
+		}
+
 		try {
 			$this->client = Clients::for( $cluster );
 		} catch ( \Throwable $e ) {

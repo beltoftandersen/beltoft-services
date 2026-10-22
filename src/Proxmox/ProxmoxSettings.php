@@ -40,7 +40,60 @@ final class ProxmoxSettings {
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'add_section' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'add_fields' ) );
 		// After Settings::sanitize() (priority 10, added by register_setting): the bounds and the site tag format.
+		add_action( 'admin_notices', array( __CLASS__, 'untagged_notice' ) );
 		add_filter( 'sanitize_option_' . Settings::OPTION, array( __CLASS__, 'sanitize' ), 20 );
+	}
+
+	/**
+	 * Ids of the live clusters that have no site tag: nothing is done to them until it is set.
+	 *
+	 * @return string[]
+	 */
+	public static function untagged_clusters(): array {
+		$ids = array();
+
+		foreach ( Clusters::all() as $id => $cluster ) {
+			if ( Clients::untagged( $cluster, Clients::live_allowed() ) ) {
+				$ids[] = (string) $id;
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * A notice on every admin page while a live cluster has no site tag.
+	 */
+	public static function untagged_notice(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		self::print_untagged( self::untagged_clusters() );
+	}
+
+	/**
+	 * Prints the notice for these clusters (nothing for none).
+	 *
+	 * @param string[] $ids Cluster ids.
+	 */
+	public static function print_untagged( array $ids ): void {
+		if ( ! $ids ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-error"><p>%1$s <a href="%2$s">%3$s</a></p></div>',
+			esc_html(
+				sprintf(
+					/* translators: %s: cluster ids. */
+					__( 'No site tag is set, so nothing is done to the live Proxmox cluster(s) %s: new servers wait and no machine is changed.', 'beltoft-services' ),
+					implode( ', ', $ids )
+				)
+			),
+			esc_url( admin_url( 'options-general.php?page=' . Settings::PAGE . '&tab=' . self::TAB ) ),
+			esc_html__( 'Set the site tag', 'beltoft-services' )
+		);
 	}
 
 	/**

@@ -90,6 +90,10 @@ final class Commands {
 			\WP_CLI::error( 'The license already has a live resource.' );
 		}
 
+		if ( \BeltoftServices\Breach::marked( (int) $license['id'] ) ) {
+			\WP_CLI::error( 'The license is marked for a breach of the terms; clear it on the license screen first.' );
+		}
+
 		$other = $this->linked_license( $driver->kind(), $connection, $remote_id );
 
 		if ( $other > 0 ) {
