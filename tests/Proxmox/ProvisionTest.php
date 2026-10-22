@@ -454,6 +454,18 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( '/nodes/node-a/qemu/9000/clone', $this->calls( 'POST', '/clone' )[0]['path'] );
 	}
 
+	public function test_without_a_choice_or_a_plan_template_the_cluster_default_is_cloned(): void {
+		// An admin-issued license never went through the checkout field.
+		$resource = $this->resource( array( 'template' => 0 ) );
+
+		$this->assert_done( $this->run_provision( $resource ) );
+
+		$this->assertSame(
+			'/nodes/node-a/qemu/' . \BeltoftServices\Proxmox\Clusters::default_template( 'lab' ) . '/clone',
+			$this->calls( 'POST', '/clone' )[0]['path']
+		);
+	}
+
 	public function test_a_chosen_template_the_cluster_does_not_list_fails_with_no_clone(): void {
 		$this->template( array( 'vmid' => 9002, 'name' => 'unlisted-template' ) );
 		$resource = $this->resource( array(), array( 'os_template' => 9002 ) );

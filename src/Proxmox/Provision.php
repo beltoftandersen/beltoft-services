@@ -206,6 +206,12 @@ final class Provision {
 			}
 		}
 
+		// No choice (an admin-issued or imported license never saw the checkout field) and no plan
+		// template: the cluster's default, the same one the checkout field and reinstall preselect.
+		if ( 0 === $this->plan['template'] ) {
+			$this->plan['template'] = Clusters::default_template( $this->cluster_id );
+		}
+
 		if ( ! array_key_exists( $this->plan['template'], Clusters::templates( $this->cluster_id ) ) ) {
 			return StepResult::fail( 'Template ' . $this->plan['template'] . ' is not in the template list of this cluster' );
 		}
