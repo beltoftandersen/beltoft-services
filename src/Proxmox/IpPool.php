@@ -401,10 +401,12 @@ final class IpPool {
 	}
 
 	/**
-	 * Clears the cached count.
+	 * Clears the cached count, then lets the stock status follow the new count (Stock::sync() writes
+	 * only a status that differs). Every write of the pool ends here.
 	 */
 	private static function changed(): void {
 		delete_transient( self::FREE_TRANSIENT );
+		Stock::sync();
 	}
 
 	/**

@@ -13,9 +13,11 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Access;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\Placement;
 use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Stock;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
@@ -99,6 +101,8 @@ class ProxmoxJobsTest extends TestCase {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		$wpdb->query( 'DELETE FROM ' . Schema::tables()['vms'] );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$wpdb->query( 'DELETE FROM ' . Schema::tables()['ips'] );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_%beltoft\\_services\\_proxmox\\_%'" );
 		wp_cache_flush();
@@ -236,6 +240,71 @@ class ProxmoxJobsTest extends TestCase {
 		ProxmoxJobs::capacity();
 
 		$this->assertFalse( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
+	}
+
+	private function stock_of( int $product_id ): string {
+		wp_cache_flush();
+
+		return wc_get_product( $product_id )->get_stock_status( 'edit' );
+	}
+
+	public function test_the_hourly_capacity_run_writes_the_stock_status(): void {
+		IpPool::add( '192.0.2.10' );
+		$small = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
+		$big   = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 100 * 1024, 'disk_gb' => 30 ) );
+		$http  = $this->service_product( 'fake' );
+
+		$this->assertFalse( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), 'No cache yet.' );
+
+		$seen = array();
+		add_action(
+			'woocommerce_product_set_stock_status',
+			static function ( $id, $status ) use ( &$seen ) {
+				$seen[ $id ] = $status;
+			},
+			10,
+			2
+		);
+
+		ProxmoxJobs::capacity();
+
+		$this->assertSame( 'instock', $this->stock_of( $small->get_id() ) );
+		$this->assertSame( 'outofstock', $this->stock_of( $big->get_id() ), 'No node can hold 100 GB.' );
+		$this->assertSame( 'instock', $this->stock_of( $http->get_id() ), 'Another driver is not touched.' );
+		$this->assertSame( array( $big->get_id() => 'outofstock' ), $seen, 'One change, one hook.' );
+
+		$seen = array();
+		ProxmoxJobs::capacity();
+		$this->assertSame( array(), $seen, 'The next run changes nothing and fires nothing.' );
+	}
+
+	public function test_the_on_demand_capacity_run_writes_the_stock_status(): void {
+		IpPool::add( '192.0.2.10' );
+		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
+		ProxmoxJobs::capacity();
+		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ) );
+
+		// The cache is flushed (an object cache flush) while the product is closed by this plugin.
+		$closed = wc_get_product( $product->get_id() );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->update_meta_data( Stock::META_CLOSED, 'yes' );
+		$closed->save();
+		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
+
+		do_action( ProxmoxJobs::CAPACITY_NOW, 'lab' );
+
+		$this->assertIsArray( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
+		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ) );
+	}
+
+	public function test_a_capacity_run_that_cannot_read_the_cluster_leaves_the_status_alone(): void {
+		IpPool::add( '192.0.2.10' );
+		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
+		$this->fake->fail_next( 'GET', '#/nodes$#', array( 'status' => 500 ) );
+
+		ProxmoxJobs::capacity();
+
+		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ), 'No cache was written, so no status is.' );
 	}
 
 	public function test_a_plain_fake_cluster_is_skipped(): void {

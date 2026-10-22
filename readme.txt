@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -126,7 +126,7 @@ Setting the pool in the cluster form is what puts the new VMs into it. Never use
 
 4. **The IP pool.** Settings → Services → IP pool, or `wp beltoft-services ip-pool-add 192.0.2.160/29`. Only IPv4 is supported in 0.2.0: a cluster that needs IPv6 cannot be used yet.
 
-5. **A product.** On a licensed product, the Service tab: driver "Proxmox virtual machine", the cluster, the template (the fallback when no choice was made), cores, memory and disk. A product is out of stock when the pool has no free address or no node has room.
+5. **A product.** On a licensed product, the Service tab: driver "Proxmox virtual machine", the cluster, the template (the fallback when no choice was made), cores, memory and disk. A product is out of stock when the pool has no free address or no node has room; that is written as its WooCommerce stock status.
 
 = How does a cluster go live? =
 
@@ -160,7 +160,7 @@ The address is set with cloud-init as `ip=<address>/<prefix>,gw=<gateway>`, from
 
 = How is capacity decided? =
 
-A node counts as full when the memory of the VMs of this site on it (the configured memory of each, including a VM that was recorded but is not listed yet) plus the "memory kept free on each node" setting (default 4 GB) reaches the node's memory. Memory is counted as promised, not as used. VMs this site did not create are not counted, only the reserve covers them: raise the reserve if you run other machines on the same nodes. A product is out of stock when no node has room for its plan. The numbers are read hourly and when a cluster is saved, never during a page load. If an order slips through while the nodes are full, the service waits and is retried; if it still cannot be placed it fails, the admin gets an alert, and the customer gets a short "delay" email and a notice in My Account without details.
+A node counts as full when the memory of the VMs of this site on it (the configured memory of each, including a VM that was recorded but is not listed yet) plus the "memory kept free on each node" setting (default 4 GB) reaches the node's memory. Memory is counted as promised, not as used. VMs this site did not create are not counted, only the reserve covers them: raise the reserve if you run other machines on the same nodes. A product is out of stock when no node has room for its plan (its WooCommerce stock status is set after each run; one you mark out of stock yourself stays so). If the cache is lost, products stay as they are and a run is queued. The numbers are read hourly and when a cluster is saved, never during a page load. If an order slips through while the nodes are full, the service waits and is retried; if it still cannot be placed it fails, the admin gets an alert, and the customer gets a short "delay" email and a notice in My Account without details.
 
 = What about deletion, abuse, breach and disputes? =
 
@@ -210,6 +210,11 @@ Nothing is provisioned, paused, resumed or deleted: licenses change without the 
 The settings, connections, clusters, IP pool, VM records, breach marks and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.2.1 =
+* A virtual machine product's availability is now its WooCommerce stock status. It is written (`instock` or `outofstock`, only when it changes) after each capacity run, each placement and each change of the IP pool, so WooCommerce's own out-of-stock display and `woocommerce_product_set_stock_status` / `woocommerce_variation_set_stock_status` hooks (page cache purges) work as usual. A product you set to out of stock by hand is never reopened, and products that manage stock are left alone.
+* When the capacity cache is gone (for example after an object cache flush) products are no longer closed: the stored status stands and a capacity run is queued.
+* Renewals, switches and resubscribes still go through when the stored status is out of stock.
 
 = 0.2.0 =
 * New Proxmox VE driver: virtual machines cloned from templates, with an IP pool, a login (SSH key or one-time password), shutdown-before-stop pausing, plan changes, deletion and reinstall.

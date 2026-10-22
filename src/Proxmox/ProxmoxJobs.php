@@ -321,7 +321,10 @@ final class ProxmoxJobs {
 			}
 		);
 
-		unset( $locked ); // Busy: the cache stays as it is and the next run writes it.
+		// Busy: the cache stays as it is and the next run writes it. Written: the stock status follows it.
+		if ( $locked ) {
+			Stock::sync( $id );
+		}
 	}
 
 	// -- Power -----------------------------------------------------------------------------------

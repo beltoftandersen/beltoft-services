@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * The one place that reads the capacity transient written by ProxmoxJobs::capacity() (rows with
  * node, status, maxmem and `mem`, the committed memory plus the host reserve). It never calls
- * Proxmox: with no cache there is no answer, and callers treat that as "no room".
+ * Proxmox: with no cache there is no answer (Placement waits; Stock keeps the stored status and queues a run).
  *
  * Self-healing: the job recounts committed memory from scratch every hour (listed VMs of this
  * site, plus recorded VMs that are placed but not listed yet and whose resource is still live).
@@ -119,6 +119,10 @@ final class Capacity {
 
 		if ( ! $locked ) {
 			throw new \RuntimeException( 'The capacity cache is busy.' );
+		}
+
+		if ( $ok ) {
+			Stock::sync( $cluster_id ); // The committed memory moved: the plan that no longer fits closes.
 		}
 
 		return (bool) $ok;

@@ -60,7 +60,7 @@ Each cluster lists its templates and a default (for example Ubuntu 26.04). A req
 
 ### Capacity
 
-A node is full when the configured memory of this site's VMs on it (including recorded VMs not yet listed) plus the host reserve ("Memory kept free on each node", default 4 GB) reaches the node's memory. Other machines on the node are covered only by the reserve. Counted hourly, on cluster save and on activation; products show as out of stock when nothing fits. An order that slips through retries, then fails with an admin alert and a "delay" email and notice to the customer.
+A node is full when the configured memory of this site's VMs on it (including recorded VMs not yet listed) plus the host reserve ("Memory kept free on each node", default 4 GB) reaches the node's memory. Other machines on the node are covered only by the reserve. Counted hourly, on cluster save and on activation; products show as out of stock when nothing fits (the plugin writes the WooCommerce stock status, only when it changes, and never reopens a product you set out of stock by hand; with no cache the stored status stands and a run is queued). An order that slips through retries, then fails with an admin alert and a "delay" email and notice to the customer.
 
 ### Deletion, abuse and breach
 

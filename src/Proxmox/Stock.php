@@ -12,17 +12,37 @@ use BeltoftServices\Product;
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * Availability is the product's WooCommerce stock status: sync() writes it (`instock` or `outofstock`,
+ * only when it differs) after every capacity cache write and every change of the IP pool, so
+ * WooCommerce's own hooks fire (`woocommerce_product_set_stock_status`, which page caches purge on).
+ * A product the owner set to out of stock by hand is never reopened: only a status this class closed
+ * (marker META_CLOSED) is. Products that manage stock are left to WooCommerce.
+ *
  * Two WooCommerce filters (woocommerce/includes/abstracts/abstract-wc-product.php:1843 and :1785;
  * variations reach the second through parent::is_purchasable(), class-wc-product-variation.php:574)
- * make a Proxmox product unavailable when the IP pool has no free address, or when no allowed node
- * has the plan's memory free in the capacity cache (no cache counts as no room: fail closed).
+ * stay as a guard for the time between two runs: a Proxmox product is unavailable when the IP pool has
+ * no free address, or when no allowed node has the plan's memory free in the capacity cache. With NO
+ * cache (an object cache flush) the filters do not close anything: the stored status stands, and a
+ * capacity run is queued.
  *
- * A renewal, a switch and a resubscribe need no new address, so they are never blocked: a cart item
- * with WooCommerce Subscriptions' keys for this product, or the request arguments that start those
- * flows (`switch-subscription`, the switcher reads it before the item is in the cart; `resubscribe`),
- * lets the product through.
+ * A renewal, a switch and a resubscribe need no new address, so they are never blocked, also not by a
+ * stored `outofstock`: WooCommerce reads the stored status in is_in_stock() (add_to_cart(),
+ * check_cart_item_stock(), the order-pay check), so for those flows the in-stock filter answers true.
+ * A cart item with WooCommerce Subscriptions' keys for this product, or the request arguments that start
+ * those flows (`switch-subscription`, the switcher reads it before the item is in the cart;
+ * `resubscribe`), lets the product through.
  */
 final class Stock {
+
+	/**
+	 * Marker on a product whose `outofstock` this class wrote, so only that one is reopened.
+	 */
+	public const META_CLOSED = '_beltoft_services_stock_closed';
+
+	/**
+	 * Transient prefix: a capacity run was queued for the cluster lately (see queue()).
+	 */
+	private const QUEUED_PREFIX = 'beltoft_services_proxmox_stock_queued_';
 
 	/**
 	 * Cart item data keys of WooCommerce Subscriptions' flows: the `$cart_item_key` properties of
@@ -46,7 +66,7 @@ final class Stock {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		add_filter( 'woocommerce_product_is_in_stock', array( __CLASS__, 'filter' ), 20, 2 );
+		add_filter( 'woocommerce_product_is_in_stock', array( __CLASS__, 'in_stock' ), 20, 2 );
 		add_filter( 'woocommerce_is_purchasable', array( __CLASS__, 'filter' ), 20, 2 );
 		// After WCS's own item-data filters (priority 10, e.g. the switcher's), so the keys are in place.
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'note_flow' ), 999, 3 );
@@ -154,7 +174,27 @@ final class Stock {
 	}
 
 	/**
-	 * Both filters: ( $value, $product ).
+	 * Filter woocommerce_product_is_in_stock: the guard of `filter()`, and an existing customer's
+	 * renewal, switch or resubscribe is in stock even when the stored status is `outofstock`.
+	 *
+	 * @param mixed $value   Value so far.
+	 * @param mixed $product Product.
+	 * @return mixed
+	 */
+	public static function in_stock( $value, $product ) {
+		if ( ! $value && $product instanceof \WC_Product ) {
+			$driver = Product::driver_for( $product->get_id() );
+
+			if ( $driver && 'proxmox' === $driver->id() && self::existing_customer_flow( $product ) ) {
+				return true;
+			}
+		}
+
+		return self::filter( $value, $product );
+	}
+
+	/**
+	 * Both filters: ( $value, $product ). Only ever closes (a false value stays false).
 	 *
 	 * @param mixed $value   Value so far.
 	 * @param mixed $product Product.
@@ -171,22 +211,188 @@ final class Stock {
 			return $value;
 		}
 
-		return self::available( $product ) ? $value : false;
+		$available = self::availability( $product );
+
+		if ( null === $available ) {
+			// No capacity cache: not "no room". The stored status stands until the capacity run (queued) has written it.
+			self::queue( (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) );
+
+			return $value;
+		}
+
+		return $available ? $value : false;
 	}
 
 	/**
-	 * Can a new machine be built for this product now?
+	 * Can a new machine be built for this product now? False with no capacity cache.
 	 *
 	 * @param \WC_Product $product Product or variation.
 	 */
 	public static function available( \WC_Product $product ): bool {
+		return true === self::availability( $product );
+	}
+
+	/**
+	 * Can a new machine be built now: true or false, or null when it cannot be told because the
+	 * cluster is known but its capacity cache is gone (and the pool has addresses).
+	 *
+	 * @param \WC_Product $product Product or variation.
+	 */
+	private static function availability( \WC_Product $product ): ?bool {
 		if ( 0 === IpPool::free_count() ) {
 			return false;
 		}
 
-		$plan = Product::plan( $product->get_id() );
+		$plan    = Product::plan( $product->get_id() );
+		$cluster = (string) ( $plan['cluster'] ?? '' );
 
-		return Capacity::fits( (string) ( $plan['cluster'] ?? '' ), max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576 );
+		if ( null !== Clusters::get( $cluster ) && null === Capacity::rows( $cluster ) ) {
+			return null;
+		}
+
+		return Capacity::fits( $cluster, max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576 );
+	}
+
+	/**
+	 * Queues a capacity run for the cluster (ProxmoxJobs::queue_capacity(): async, one waiting run is
+	 * enough). At most once in five minutes, so a cluster that cannot be read is not asked on every page view.
+	 *
+	 * @param string $cluster_id Cluster id.
+	 */
+	private static function queue( string $cluster_id ): void {
+		if ( '' === $cluster_id || false !== get_transient( self::QUEUED_PREFIX . $cluster_id ) ) {
+			return;
+		}
+
+		if ( ! class_exists( 'ActionScheduler' ) || ! \ActionScheduler::is_initialized() ) {
+			return;
+		}
+
+		set_transient( self::QUEUED_PREFIX . $cluster_id, 1, 5 * MINUTE_IN_SECONDS );
+		ProxmoxJobs::queue_capacity( $cluster_id );
+	}
+
+	/**
+	 * Writes availability to the stock status of every Proxmox product and variation.
+	 *
+	 * Only a changed status is saved (WooCommerce CRUD, so its hooks fire once, and not at all when
+	 * nothing changed). Where it cannot be told (no capacity cache) nothing is written. A variable
+	 * product's own status is synced by WooCommerce afterwards. Never throws: callers are the capacity job
+	 * and the pool, which must not fail on a product.
+	 *
+	 * @param string|null $cluster_id Only the plans of this cluster (a capacity write); null for all (the pool changed).
+	 */
+	public static function sync( ?string $cluster_id = null ): void {
+		static $running = false;
+
+		if ( $running || ! function_exists( 'wc_get_product' ) ) {
+			return;
+		}
+
+		$running = true;
+
+		try {
+			foreach ( self::product_ids() as $id ) {
+				$product = wc_get_product( $id );
+
+				if ( ! $product ) {
+					continue;
+				}
+
+				if ( ! $product instanceof \WC_Product_Variable ) {
+					self::apply( $product, $cluster_id );
+					continue;
+				}
+
+				$changed = false;
+
+				foreach ( $product->get_children() as $child_id ) {
+					$variation = wc_get_product( $child_id );
+					$changed   = ( $variation && self::apply( $variation, $cluster_id ) ) || $changed;
+				}
+
+				if ( $changed ) {
+					// A variation's save does not touch its parent (only the admin screens sync it).
+					\WC_Product_Variable::sync( $id );
+				}
+			}
+		} catch ( \Throwable $e ) {
+			unset( $e );
+		} finally {
+			$running = false;
+		}
+	}
+
+	/**
+	 * Ids of the Proxmox products (parents; a variable product's variations are its children).
+	 *
+	 * @return int[]
+	 */
+	private static function product_ids(): array {
+		$ids = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_key'       => Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one small lookup of VM products.
+				'meta_value'     => 'proxmox', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		);
+
+		return array_map( 'intval', $ids );
+	}
+
+	/**
+	 * Brings one product's stored status in line with its availability.
+	 *
+	 * @param \WC_Product $product    Simple product or variation.
+	 * @param string|null $cluster_id Skip plans of other clusters.
+	 * @return bool Whether the status was saved.
+	 */
+	private static function apply( \WC_Product $product, ?string $cluster_id ): bool {
+		if ( $product->managing_stock() ) {
+			return false; // Quantities decide; WooCommerce would reset the status anyway.
+		}
+
+		if ( null !== $cluster_id && (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) !== $cluster_id ) {
+			return false;
+		}
+
+		$available = self::availability( $product );
+
+		if ( null === $available ) {
+			// No cache, so nothing can be said (a product closed for lack of an address cannot be reopened): ask for one.
+			self::queue( (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) );
+
+			return false;
+		}
+
+		$stored = $product->get_stock_status( 'edit' );
+
+		if ( $available ) {
+			// Reopens only what this class closed; 'onbackorder' is already purchasable.
+			if ( 'outofstock' !== $stored || 'yes' !== (string) $product->get_meta( self::META_CLOSED ) ) {
+				return false;
+			}
+
+			$product->set_stock_status( 'instock' );
+			$product->delete_meta_data( self::META_CLOSED );
+			$product->save();
+
+			return true;
+		}
+
+		if ( 'outofstock' === $stored ) {
+			return false;
+		}
+
+		$product->set_stock_status( 'outofstock' );
+		$product->update_meta_data( self::META_CLOSED, 'yes' );
+		$product->save();
+
+		return true;
 	}
 
 	/**
