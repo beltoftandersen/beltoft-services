@@ -141,6 +141,27 @@ final class VmRecords {
 	}
 
 	/**
+	 * The VMIDs recorded on a cluster, as vmid => resource id. Read-only: the jobs use it to tell
+	 * "our" VMs in a cluster listing.
+	 *
+	 * @param string $cluster Cluster id.
+	 * @return array<int, int>
+	 */
+	public static function for_cluster( string $cluster ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- must be fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT vmid, resource_id FROM %i WHERE cluster = %s', Schema::tables()['vms'], $cluster ), ARRAY_A );
+		$out  = array();
+
+		foreach ( (array) $rows as $row ) {
+			$out[ (int) $row['vmid'] ] = (int) $row['resource_id'];
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Whether this VMID on this cluster is recorded for this resource.
 	 *
 	 * @param string $cluster     Cluster id.

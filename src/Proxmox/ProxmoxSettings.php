@@ -29,6 +29,7 @@ final class ProxmoxSettings {
 		'task_wait'        => array( 1, 120 ),
 		'abuse_cpu'        => array( 1, 100 ),
 		'abuse_hours'      => array( 1, 168 ),
+		'host_reserve_gb'  => array( 0, 1024 ),
 	);
 
 	/**
@@ -134,6 +135,13 @@ final class ProxmoxSettings {
 			'min'     => self::RANGES['task_wait'][0],
 			'label'   => __( 'Seconds to wait for one Proxmox task', 'beltoft-services' ),
 			'desc'    => __( 'A step waits this long, then keeps the task and checks it again later. Keep it below the PHP time limit of this server.', 'beltoft-services' ),
+		);
+		$fields['host_reserve_gb']  = $base + array(
+			'type'    => 'number',
+			'default' => 4,
+			'min'     => self::RANGES['host_reserve_gb'][0],
+			'label'   => __( 'Memory kept free on each node, in GB', 'beltoft-services' ),
+			'desc'    => __( 'A node counts as full when the memory promised to the virtual machines of this site, plus this reserve, reaches the memory of the node. It leaves room for Proxmox itself and for machines this site did not create.', 'beltoft-services' ),
 		);
 		$fields['abuse_mode']       = $base + array(
 			'type'    => 'select',

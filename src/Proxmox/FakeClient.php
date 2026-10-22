@@ -156,6 +156,22 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * Sets what GET .../rrddata returns for a VM: a list of samples, each an array such as
+	 * time and cpu (the keys are not documented; tests state their own).
+	 *
+	 * @param int                              $vmid    VMID.
+	 * @param array<int, array<string, mixed>> $samples Samples.
+	 */
+	public function set_rrd( int $vmid, array $samples ): void {
+		$this->load();
+
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['rrd'] = $samples;
+			$this->save();
+		}
+	}
+
+	/**
 	 * A VM as stored, or null.
 	 *
 	 * @param int $vmid VMID.
@@ -519,7 +535,7 @@ class FakeClient implements Client {
 				'maxmem'   => (int) ( $vm['config']['memory'] ?? 512 ) * 1048576,
 				'mem'      => 'running' === $vm['status'] ? (int) ( $vm['config']['memory'] ?? 512 ) * 524288 : 0,
 				'maxcpu'   => (int) ( $vm['config']['cores'] ?? 1 ),
-				'cpu'      => 0,
+				'cpu'      => (float) ( $vm['cpu'] ?? 0 ),
 			);
 		}
 
@@ -928,7 +944,7 @@ class FakeClient implements Client {
 	}
 
 	/**
-	 * GET rrddata (an empty list: keys are not documented).
+	 * GET rrddata (the samples set with set_rrd(), else an empty list: keys are not documented).
 	 *
 	 * @param array<int, string>   $a Captures.
 	 * @param array<string, mixed> $p Parameters.
@@ -937,7 +953,7 @@ class FakeClient implements Client {
 		unset( $p );
 		$vm = $this->find( $a );
 
-		return is_wp_error( $vm ) ? $vm : array();
+		return is_wp_error( $vm ) ? $vm : (array) ( $vm['rrd'] ?? array() );
 	}
 
 	/**
