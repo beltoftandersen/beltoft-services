@@ -196,7 +196,17 @@ final class Product {
 	public static function retention_days( int $product_id ): int {
 		$value = self::meta( self::parent_id( $product_id ), self::META_RETENTION );
 
-		return '' === $value ? 0 : max( 0, (int) $value );
+		if ( '' === $value ) {
+			/**
+			 * The retention of products whose own field is empty (an explicit 0 still means never).
+			 *
+			 * @param int $days       Days: 0 by default.
+			 * @param int $product_id Product or variation id.
+			 */
+			return max( 0, (int) apply_filters( 'beltoft_services_default_retention', 0, $product_id ) );
+		}
+
+		return max( 0, (int) $value );
 	}
 
 	/**
@@ -393,7 +403,7 @@ final class Product {
 			array(
 				'id'                => self::META_RETENTION,
 				'label'             => __( 'Retention (days)', 'beltoft-services' ),
-				'description'       => __( 'Days to keep the service after its license ends. 0 never deletes.', 'beltoft-services' ),
+				'description'       => __( 'Days to keep the service after its license ends. 0 never deletes. Empty: the default of the service type (virtual machines: 3 days, others: never).', 'beltoft-services' ),
 				'desc_tip'          => true,
 				'type'              => 'number',
 				'custom_attributes' => array(

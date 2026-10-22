@@ -227,6 +227,105 @@ final class ReconcilerTest extends TestCase {
 		$this->assertSame( 1, Resource::find( $resource->id() )->get( 'attempts' ) );
 	}
 
+	public function test_a_retry_with_progress_starts_the_attempt_count_again(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Moved on', array(), true ) );
+
+		for ( $run = 1; $run <= 8; $run++ ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+			$fresh = Resource::find( $resource->id() );
+
+			$this->assertSame( 'provisioning', $fresh->get( 'state' ), "Run $run" );
+			$this->assertSame( 1, $fresh->get( 'attempts' ), 'Progress counts as a fresh first retry.' );
+			$this->assertGreaterThanOrEqual( time() + 59, $fresh->get( 'next_attempt_at' ), 'Still at least the first backoff.' );
+		}
+	}
+
+	public function test_a_plain_retry_does_not_reset_and_the_cap_still_fails_a_stuck_run(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Waiting' ) )
+			->will( 'provision', StepResult::retry( 0, 'Waiting' ) )
+			->will( 'provision', StepResult::retry( 0, 'Moved on', array(), true ) )
+			->will( 'provision', StepResult::retry( 0, 'Stuck' ) );
+
+		$seen = array();
+
+		for ( $run = 1; $run <= 3; $run++ ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+			$seen[] = Resource::find( $resource->id() )->get( 'attempts' );
+		}
+
+		$this->assertSame( array( 1, 2, 1 ), $seen );
+
+		// The last result repeats: after the progress, five more plain retries are the whole budget.
+		foreach ( array( 2, 3, 4, 5 ) as $expected ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+			$this->assertSame( $expected, Resource::find( $resource->id() )->get( 'attempts' ) );
+			$this->assertSame( 'provisioning', Resource::find( $resource->id() )->get( 'state' ) );
+		}
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_endless_progress_is_capped_and_ends_in_a_failure_with_an_alert(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Moved on', array(), true ) );
+
+		for ( $run = 1; $run <= Reconciler::MAX_PROGRESS_RESETS; $run++ ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+			$fresh = Resource::find( $resource->id() );
+			$this->assertSame( $run, $fresh->get( 'progress_resets' ) );
+			$this->assertSame( 1, $fresh->get( 'attempts' ) );
+		}
+
+		// Past the cap progress counts as a plain retry: five more, then the failure.
+		foreach ( array( 2, 3, 4, 5 ) as $expected ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+			$this->assertSame( $expected, Resource::find( $resource->id() )->get( 'attempts' ) );
+			$this->assertSame( 'provisioning', Resource::find( $resource->id() )->get( 'state' ) );
+		}
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertNotEmpty( $this->mails, 'The admin is told.' );
+		$this->assertCount( Reconciler::MAX_PROGRESS_RESETS + 4 + 1, $driver->calls( 'provision' ), 'A bounded number of driver runs.' );
+	}
+
+	public function test_the_progress_count_is_cleared_when_the_operation_completes(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::retry( 0, 'Moved on', array(), true ) )
+			->will( 'provision', StepResult::done() );
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$this->assertSame( 1, Resource::find( $resource->id() )->get( 'progress_resets' ) );
+
+		$this->make_due( $resource );
+		Jobs::run( $resource->id() );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 0, $fresh->get( 'progress_resets' ) );
+	}
+
+	public function test_a_driver_cannot_set_the_progress_count(): void {
+		$this->assertContains( 'progress_resets', Reconciler::RESERVED );
+	}
+
+	public function test_progress_is_only_a_flag_of_retry(): void {
+		$this->assertFalse( StepResult::retry( 5, 'x' )->has_progress() );
+		$this->assertTrue( StepResult::retry( 5, 'x', array(), true )->has_progress() );
+		$this->assertFalse( StepResult::fail( 'x' )->has_progress() );
+		$this->assertFalse( StepResult::done()->has_progress() );
+	}
+
 	public function test_attempts_count_per_operation(): void {
 		list( $resource, $driver ) = $this->resource();
 		$driver->will( 'provision', StepResult::retry( 0, 'Timeout' ) );

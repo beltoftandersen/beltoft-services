@@ -59,6 +59,16 @@ final class Settings {
 				'min'     => 0,
 				'label'   => __( 'Warn customers this many days before deletion', 'beltoft-services' ),
 			),
+			'breach_retention_days' => array(
+				'tab'     => 'general',
+				'section' => 'general',
+				'type'    => 'number',
+				'default' => 14,
+				'min'     => 1,
+				'max'     => 365,
+				'label'   => __( 'Delete a service suspended for breach after this many days', 'beltoft-services' ),
+				'desc'    => __( 'Counted from the day the hold was set, and only when deletion above is On. Otherwise you get an alert when the days are over.', 'beltoft-services' ),
+			),
 			'admin_email'   => array(
 				'tab'     => 'general',
 				'section' => 'general',
@@ -72,6 +82,7 @@ final class Settings {
 				'type'    => 'checkbox',
 				'default' => 0,
 				'label'   => __( 'Delete the settings when the plugin is deleted', 'beltoft-services' ),
+				'desc'    => __( 'This also deletes the IP pool and the virtual machine records. Machines that exist can then no longer be matched to their services.', 'beltoft-services' ),
 			),
 		);
 
@@ -317,7 +328,7 @@ final class Settings {
 				printf( '<input type="hidden" name="%1$s" value="0"><input type="checkbox" id="%2$s" name="%1$s" value="1" %3$s>', esc_attr( $name ), esc_attr( $id ), checked( (int) $value, 1, false ) );
 				break;
 			case 'number':
-				printf( '<input type="number" id="%1$s" name="%2$s" value="%3$s" min="%4$s" class="small-text">', esc_attr( $id ), esc_attr( $name ), esc_attr( (string) $value ), esc_attr( (string) ( $field['min'] ?? 0 ) ) );
+				printf( '<input type="number" id="%1$s" name="%2$s" value="%3$s" min="%4$s"%5$s class="small-text">', esc_attr( $id ), esc_attr( $name ), esc_attr( (string) $value ), esc_attr( (string) ( $field['min'] ?? 0 ) ), isset( $field['max'] ) ? ' max="' . esc_attr( (string) $field['max'] ) . '"' : '' );
 				break;
 			case 'select':
 				printf( '<select id="%1$s" name="%2$s">', esc_attr( $id ), esc_attr( $name ) );
@@ -374,6 +385,10 @@ final class Settings {
 					break;
 				case 'number':
 					$clean[ $key ] = max( (int) ( $field['min'] ?? 0 ), (int) $raw );
+
+					if ( isset( $field['max'] ) ) {
+						$clean[ $key ] = min( (int) $field['max'], $clean[ $key ] );
+					}
 					break;
 				case 'select':
 					$clean[ $key ] = array_key_exists( (string) $raw, $field['options'] ) ? (string) $raw : $field['default'];

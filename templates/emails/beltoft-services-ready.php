@@ -11,6 +11,7 @@
  * @var string            $customer_name      Customer's first name, or ''.
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
+ * @var array<string, string> $details        Lines about the service (label => value), may be empty. Never a password.
  * @var string            $usage              Usage line (limit exceeded), or ''.
  * @var string            $additional_content Additional content from the email's settings.
  * @var \WC_Email         $email              The email.
@@ -37,6 +38,16 @@ if ( '' !== $customer_name ) {
 echo esc_html( sprintf( __( 'Your %s is ready to use.', 'beltoft-services' ), $product_name ) );
 ?>
 </p>
+<?php if ( $details ) : ?>
+<table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
+	<?php foreach ( $details as $beltoft_services_label => $beltoft_services_value ) : ?>
+	<tr>
+		<th scope="row" style="text-align:left"><?php echo esc_html( (string) $beltoft_services_label ); ?></th>
+		<td><?php echo esc_html( (string) $beltoft_services_value ); ?></td>
+	</tr>
+	<?php endforeach; ?>
+</table>
+<?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'View your services in your account', 'beltoft-services' ); ?></a></p>
 <?php
 

@@ -10,6 +10,7 @@ namespace BeltoftServices;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Import;
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Drivers\Driver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -227,6 +228,19 @@ final class Lifecycle {
 		// A product that is no longer a service keeps the last plan; the sites may still change.
 		$plan = $driver ? Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) : $resource->get( 'plan' );
 
+		// An adopted machine is never resized by itself: update_plan shuts a VM down. The admin decides.
+		if ( true === $resource->get( 'linked' ) ) {
+			$resource->locked(
+				static function () use ( $resource ): bool {
+					Alerts::admin( $resource, self::LINKED_PLAN_ERROR );
+
+					return true;
+				}
+			);
+			Events::add( $license_id, 'service', 'Plan changed on a linked VM; it was not applied. ' . self::LINKED_PLAN_ERROR );
+			return;
+		}
+
 		$stored = $resource->change_plan( $plan, 'Plan changed' );
 
 		if ( true === $stored ) {
@@ -236,6 +250,11 @@ final class Lifecycle {
 		}
 		// False: it could not be stored, and the admin was alerted.
 	}
+
+	/**
+	 * Alert text when the plan of an adopted (linked) machine changes.
+	 */
+	public const LINKED_PLAN_ERROR = 'Plan changed on a linked VM; resize it manually.';
 
 	/**
 	 * Option prefix remembering which product a driver conflict was alerted for, per resource.
@@ -310,11 +329,39 @@ final class Lifecycle {
 	}
 
 	/**
-	 * Creates the license's service with the product's plan and queues its provisioning.
+	 * Meta a new resource starts with, from the filter beltoft_services_initial_meta (a driver's
+	 * plugin hands over what the customer chose at checkout, e.g. an SSH key). Reserved keys
+	 * are dropped: a listener cannot set the state, identity or retry bookkeeping.
 	 *
 	 * @param array<string, mixed> $license License row.
+	 * @param Driver               $driver  The service's driver.
+	 * @return array<string, mixed>
 	 */
-	public static function provide( array $license ): void {
+	public static function initial_meta( array $license, Driver $driver ): array {
+		/**
+		 * Initial meta for a new resource (provisioning and the replacement after a deletion).
+		 *
+		 * @param array<string, mixed> $meta    Meta; empty by default.
+		 * @param array<string, mixed> $license License row.
+		 * @param Driver               $driver  The service's driver.
+		 */
+		$meta = apply_filters( 'beltoft_services_initial_meta', array(), $license, $driver );
+
+		return is_array( $meta ) ? array_diff_key( $meta, array_flip( Reconciler::RESERVED ) ) : array();
+	}
+
+	/**
+	 * Creates the license's service with the product's plan and queues its provisioning.
+	 *
+	 * @param array<string, mixed> $license  License row.
+	 * @param bool                 $override The admin cleared the breach mark: create anyway.
+	 */
+	public static function provide( array $license, bool $override = false ): void {
+		// A license marked for a breach gets no new service from any event.
+		if ( ! $override && Breach::refuse( $license ) ) {
+			return;
+		}
+
 		$product_id   = (int) ( $license['product_id'] ?? 0 );
 		$variation_id = (int) ( $license['variation_id'] ?? 0 );
 		$driver       = Product::driver_for( $product_id );
@@ -327,7 +374,7 @@ final class Lifecycle {
 			return;
 		}
 
-		$resource = Resource::create( $license, $driver, Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) );
+		$resource = Resource::create( $license, $driver, Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ), self::initial_meta( $license, $driver ) );
 
 		if ( is_wp_error( $resource ) ) {
 			// Another request holds the license lock: it is creating this service now.

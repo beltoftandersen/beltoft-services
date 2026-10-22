@@ -11,6 +11,7 @@
  * @var string            $customer_name      Customer's first name, or ''.
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
+ * @var array<string, string> $details        Lines about the service (label => value), may be empty. Never a password.
  * @var string            $usage              Usage line (limit exceeded), or ''.
  * @var string            $additional_content Additional content from the email's settings.
  * @var \WC_Email         $email              The email.
@@ -34,6 +35,14 @@ if ( '' !== $customer_name ) {
 
 /* translators: %s: product name. */
 echo wp_strip_all_tags( sprintf( __( 'Your %s is ready to use.', 'beltoft-services' ), $product_name ) ) . "\n\n";
+
+foreach ( $details as $beltoft_services_label => $beltoft_services_value ) {
+	echo wp_strip_all_tags( $beltoft_services_label . ': ' . $beltoft_services_value ) . "\n";
+}
+
+if ( $details ) {
+	echo "\n";
+}
 
 echo __( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 

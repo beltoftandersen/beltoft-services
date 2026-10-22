@@ -234,6 +234,11 @@ final class Jobs {
 			$driver   = $resource ? Registry::get( $resource->get( 'driver' ) ) : null;
 
 			if ( ! $resource || ! $driver || ! $resource->accepts_actions() || ! array_key_exists( $action, $driver->customer_actions( $resource ) ) ) {
+				// Dropped, but not silently: the customer asked for something that did not happen.
+				if ( $resource ) {
+					Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', sprintf( 'Customer action "%s" was not run: it is not available any more', $action ) );
+				}
+
 				return;
 			}
 
@@ -430,7 +435,7 @@ final class Jobs {
 			return true;
 		}
 
-		if ( 'paused' === $desired && $active && 'paused' === $resource->get( 'state' ) ) {
+		if ( 'paused' === $desired && $active && ! $resource->on_hold() && 'paused' === $resource->get( 'state' ) ) {
 			Alerts::admin( $resource, 'The service is paused but its license is active (found by the sweep). Resume it, or leave it paused on purpose.' );
 		}
 

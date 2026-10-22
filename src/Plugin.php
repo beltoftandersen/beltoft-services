@@ -34,6 +34,8 @@ final class Plugin {
 
 		remove_action( 'admin_notices', array( __CLASS__, 'notice_missing' ) );
 
+		Proxmox\Schema::maybe_upgrade();
+
 		Settings::register();
 
 		Product::register();
@@ -42,6 +44,8 @@ final class Plugin {
 
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
+		Proxmox\ProxmoxSettings::register();
+		Proxmox\ClustersScreen::register();
 		Checkout::register();
 
 		Lifecycle::register();
@@ -50,6 +54,19 @@ final class Plugin {
 
 		Account\Panel::register();
 		Api\Routes::register();
+		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
+		Proxmox\RevealRoute::register();
+		Proxmox\Switches::register();
+		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );
+		add_action( 'beltoft_services_state_changed', array( Proxmox\Operations::class, 'on_state_changed' ), 10, 3 );
+		Proxmox\SshKeyField::register();
+		Proxmox\OsField::register();
+		Proxmox\Actions::register();
+		Proxmox\Panels::register();
+		Proxmox\EmailDetails::register();
+		Proxmox\ProxmoxJobs::register();
+		Proxmox\Stock::register();
+		Proxmox\IpPoolScreen::register();
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Emails\Emails::register();

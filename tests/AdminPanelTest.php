@@ -541,7 +541,10 @@ final class AdminPanelTest extends TestCase {
 		list( $closed ) = $this->resource( array( 'state' => 'deleted' ) );
 		$closed->close();
 
-		$ids = static fn( array $resources ) => array_map( static fn( Resource $r ) => $r->id(), $resources );
+		// The custom tables survive the test rollback, so rows of other runs may be there:
+		// only the ids this test created are looked at.
+		$mine = array( $ready->id(), $failed->id(), $other->id(), $closed->id() );
+		$ids  = static fn( array $resources ) => array_values( array_intersect( array_map( static fn( Resource $r ) => $r->id(), $resources ), $mine ) );
 
 		$all = $ids( Screen::resources( array() ) );
 		$this->assertEqualsCanonicalizing( array( $ready->id(), $failed->id(), $other->id() ), $all, 'Live resources of every registered kind.' );

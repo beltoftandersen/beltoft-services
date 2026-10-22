@@ -56,4 +56,38 @@ final class LocksTest extends TestCase {
 
 		$other->close();
 	}
+
+	public function test_with_returns_false_and_null_when_the_lock_is_busy(): void {
+		$name  = Locks::name( 'with', 1 );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		$ran = false;
+
+		$this->assertSame( array( false, null ), Locks::with( $name, 0, function () use ( &$ran ) {
+			$ran = true;
+			return 'x';
+		} ) );
+		$this->assertFalse( $ran, 'the callback does not run without the lock' );
+		$other->close();
+
+		$this->assertSame( array( true, 'x' ), Locks::with( $name, 0, fn() => 'x' ) );
+	}
+
+	public function test_with_releases_the_lock_when_the_callback_throws(): void {
+		global $wpdb;
+
+		$name = Locks::name( 'with', 2 );
+
+		try {
+			Locks::with( $name, 0, function () {
+				throw new \LogicException( 'boom' );
+			} );
+			$this->fail( 'the exception must reach the caller' );
+		} catch ( \LogicException $e ) {
+			$this->assertSame( 'boom', $e->getMessage() );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test read.
+		$this->assertSame( '1', (string) $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK( %s )', $name ) ) );
+	}
 }

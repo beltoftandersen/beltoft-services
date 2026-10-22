@@ -77,6 +77,114 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a service looks abused (sustained high load): its own subject and
+	 * body, not the failed-service format. Deduped like admin(): the text carries the date, so
+	 * it repeats at most daily. Call it under the resource lock (it stores the dedupe hash in meta).
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $measured What was measured (threshold, duration, since, date).
+	 * @param string   $mode     The abuse mode (report or pause).
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function abuse( Resource $r, string $measured, string $mode ): bool {
+		$hash = md5( 'abuse|' . $measured );
+
+		if ( $hash === $r->get( 'alerted' ) ) {
+			return false;
+		}
+
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) ) {
+			return false;
+		}
+
+		$license = $r->license();
+		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key     = (string) ( $license['license_key'] ?? '' );
+
+		$lines = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Resource: %d', $r->id() ),
+			sprintf( 'Driver: %s', $r->get( 'driver' ) ),
+			sprintf( 'State: %s', $r->get( 'state' ) ),
+			sprintf( 'Measured: %s', $measured ),
+			'pause' === $mode ? 'Mode: pause. The service was asked to pause; a renewal asks for it again.' : 'Mode: report only. Nothing was changed.',
+		);
+
+		$sent = (bool) wp_mail( $to, sprintf( '[%s] Abuse suspected: %s', $site, self::mask( $key ) ), implode( "\n", $lines ) . "\n" );
+
+		$r->set( array( 'alerted' => $hash ) );
+
+		return $sent;
+	}
+
+	/**
+	 * Alerts the admin once per hold that a service on breach hold has passed its days and was
+	 * not deleted (deletion is off or report only). The hold's date is stored in meta
+	 * `breach_alerted` under the resource lock, after the mail is attempted.
+	 *
+	 * @param Resource $r    Resource.
+	 * @param int      $days Breach days.
+	 * @param string   $mode Deletion mode (off or report).
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function breach_due( Resource $r, int $days, string $mode ): bool {
+		$breach_at = $r->get( 'breach_at' );
+		$to        = (string) Settings::get( 'admin_email' );
+
+		if ( null === $breach_at || (int) $r->get( 'breach_alerted' ) === $breach_at || ! is_email( $to ) ) {
+			return false;
+		}
+
+		$license = $r->license();
+		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key     = (string) ( $license['license_key'] ?? '' );
+		$lines   = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Resource: %d', $r->id() ),
+			sprintf( 'Driver: %s', $r->get( 'driver' ) ),
+			sprintf( 'On breach hold since: %s UTC (%d days)', gmdate( 'Y-m-d H:i', $breach_at ), $days ),
+			sprintf( 'Deletion mode: %s, so nothing was deleted. Delete the service by hand, or turn deletion on.', $mode ),
+		);
+
+		$sent = (bool) wp_mail( $to, sprintf( '[%s] Breach hold period over: %s', $site, self::mask( $key ) ), implode( "\n", $lines ) . "\n" );
+
+		$r->locked(
+			static function () use ( $r, $breach_at ): bool {
+				return $breach_at === $r->get( 'breach_at' ) && $r->set( array( 'breach_alerted' => $breach_at ) );
+			}
+		);
+
+		return $sent;
+	}
+
+	/**
+	 * Alerts the admin that a live cluster has no site tag, at most once a day per cluster.
+	 *
+	 * @param string $cluster_id Cluster id.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function site_tag( string $cluster_id ): bool {
+		$transient = 'beltoft_services_site_tag_alert_' . md5( $cluster_id );
+		$to        = (string) Settings::get( 'admin_email' );
+
+		if ( false !== get_transient( $transient ) || ! is_email( $to ) ) {
+			return false;
+		}
+
+		set_transient( $transient, 1, DAY_IN_SECONDS );
+
+		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+		return (bool) wp_mail(
+			$to,
+			sprintf( '[%s] Set the site tag for cluster %s', $site, $cluster_id ),
+			sprintf( "The cluster %s is live but the site tag is not set, so nothing is done to it (provisioning and the other jobs wait).\nSet the site tag in Settings, Services, Proxmox.\n", $cluster_id )
+		);
+	}
+
+	/**
 	 * Alerts the admin that a license's service could not be created (there is no resource to
 	 * hang the alert on). Sent once per call: a creation happens once per license event.
 	 *

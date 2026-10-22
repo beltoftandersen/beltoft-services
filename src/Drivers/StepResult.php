@@ -55,6 +55,13 @@ final class StepResult {
 	private $event;
 
 	/**
+	 * Whether a retry follows real progress (retry only).
+	 *
+	 * @var bool
+	 */
+	private $progress = false;
+
+	/**
 	 * Use the named constructors.
 	 *
 	 * @param string               $outcome Outcome.
@@ -88,10 +95,36 @@ final class StepResult {
 	 * @param int                  $delay Seconds until the next try.
 	 * @param string               $error What went wrong.
 	 * @param array<string, mixed> $meta  Meta to merge into the resource.
+	 * @param bool                 $progress True when this run got further (a step completed, a remote task ended): the Reconciler then counts the retry as a first one, so a long operation made of many short steps is not cut off by the 5-retry budget. Waiting for something that is still running is not progress.
 	 * @return self
 	 */
-	public static function retry( int $delay, string $error, array $meta = array() ): self {
-		return new self( self::RETRY, max( 0, $delay ), $error, $meta, '' );
+	public static function retry( int $delay, string $error, array $meta = array(), bool $progress = false ): self {
+		$result           = new self( self::RETRY, max( 0, $delay ), $error, $meta, '' );
+		$result->progress = $progress;
+
+		return $result;
+	}
+
+	/**
+	 * This result with the progress flag set (a retry only; other results are returned as they are).
+	 *
+	 * @return self
+	 */
+	public function with_progress(): self {
+		if ( ! $this->is_retry() ) {
+			return $this;
+		}
+
+		return self::retry( $this->delay, $this->error, $this->meta, true );
+	}
+
+	/**
+	 * Does a retry follow progress?
+	 *
+	 * @return bool
+	 */
+	public function has_progress(): bool {
+		return $this->progress;
 	}
 
 	/**
