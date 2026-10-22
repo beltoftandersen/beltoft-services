@@ -238,7 +238,7 @@ final class Reconciler {
 		if ( $result->is_done() ) {
 			self::done( $fresh, $operation, $result, $meta, $plan );
 		} elseif ( $result->is_retry() ) {
-			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta );
+			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta, $result->has_progress() );
 		} else {
 			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
@@ -360,9 +360,10 @@ final class Reconciler {
 	 * @param int                  $delay     Delay the driver asked for.
 	 * @param string               $error     Error.
 	 * @param array<string, mixed> $meta      Driver meta.
+	 * @param bool                 $progress  The driver got further in this run: the count starts again at this retry.
 	 */
-	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta ): void {
-		$attempts = $r->get( 'attempts' ) + 1;
+	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta, bool $progress = false ): void {
+		$attempts = $progress ? 1 : $r->get( 'attempts' ) + 1;
 
 		if ( $attempts > count( self::BACKOFF ) ) {
 			self::fail( $r, $operation, $error, $meta );

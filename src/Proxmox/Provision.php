@@ -129,6 +129,8 @@ final class Provision {
 				return StepResult::retry( 0, $name . ': the step result could not be stored' );
 			}
 
+			$this->progressed = true;
+
 			if ( 'wipe' === $name ) {
 				$steps = $this->r->get( 'steps' );
 			}
@@ -411,6 +413,11 @@ final class Provision {
 			return StepResult::fail( sprintf( 'VMID %d is not a template on this cluster', $this->plan['template'] ) );
 		}
 
+		// The VM is gone (an admin removed the leftover): a clone may be tried again.
+		if ( null !== $this->r->get( 'clone_failed' ) && ! $this->r->set( array( 'clone_failed' => null ) ) ) {
+			return StepResult::retry( 0, 'clone: the failed-clone marker could not be cleared' );
+		}
+
 		$source = (string) ( $template['node'] ?? '' );
 		$node   = Placement::node( $this->cluster_id, $this->cluster, $this->client, $source );
 
@@ -493,8 +500,13 @@ final class Provision {
 		}
 
 		// A task that ended in error and left a VM: an admin looks at it. "WARNINGS: n" means it finished.
-		if ( $this->finished && 'clone' === $this->finished['step'] && ! $this->finished['ok'] && 0 !== strpos( (string) $this->finished['exit'], 'WARNINGS' ) ) {
-			return StepResult::fail( sprintf( 'Clone task failed; VMID %d still exists, check it in Proxmox', $vmid ) );
+		// The marker outlives this run, so a crash or an admin retry does not adopt the leftover.
+		$failed = $this->finished && 'clone' === $this->finished['step'] && ! $this->finished['ok'] && 0 !== strpos( (string) $this->finished['exit'], 'WARNINGS' );
+
+		if ( $failed || (int) $this->r->get( 'clone_failed' ) === $vmid ) {
+			$this->r->set( array( 'clone_failed' => $vmid ) );
+
+			return StepResult::fail( sprintf( 'Clone task failed; VMID %d still exists, check it in Proxmox', $vmid ), array( 'clone_failed' => $vmid ) );
 		}
 
 		if ( $node !== $record['node'] ) {
@@ -622,22 +634,12 @@ final class Provision {
 		$key = $this->r->get( 'ssh_key' );
 		$gw  = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $this->cluster['gateway'];
 
-		$params = array(
-			'cores'     => $this->plan['cores'],
-			'memory'    => $this->plan['memory_mb'],
-			'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $this->cluster['prefix'] . ',gw=' . $gw,
-			'ciuser'    => 'root',
-			'net0'      => $this->net0( (string) ( $v['config']['net0'] ?? '' ) ),
-			'digest'    => (string) ( $v['config']['digest'] ?? '' ),
-		);
-
-		if ( array() !== (array) $this->cluster['nameservers'] ) {
-			$params['nameserver'] = implode( ' ', (array) $this->cluster['nameservers'] );
+		// A gateway the pool row brings must be on the address's own network; the cluster's is the routed default.
+		if ( null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
+			return StepResult::fail( sprintf( 'configure: the gateway %1$s of address %2$s is outside %2$s/%3$d; nothing was written to the VM', $ip['gateway'], $ip['address'], (int) $this->cluster['prefix'] ) );
 		}
 
-		if ( '' !== (string) $this->cluster['vendor_snippet'] ) {
-			$params['cicustom'] = 'vendor=' . $this->cluster['vendor_snippet'];
-		}
+		$login = array();
 
 		if ( is_string( $key ) && '' !== $key ) {
 			$clean = SshKeyField::normalise( $key );
@@ -646,8 +648,8 @@ final class Provision {
 				return StepResult::fail( 'configure: the stored SSH key is not valid' );
 			}
 
-			// The sshkeys parameter is URL-encoded (API viewer #/nodes/{node}/qemu/{vmid}/config).
-			$params['sshkeys'] = rawurlencode( $clean . "\n" );
+			// The raw key: the client URL-encodes the sshkeys value itself, once.
+			$login['sshkeys'] = $clean . "\n";
 		} else {
 			try {
 				// Stored encrypted BEFORE it is sent: a crash after the call loses nothing.
@@ -658,13 +660,51 @@ final class Provision {
 				return StepResult::retry( 0, 'configure: the VM password could not be stored' );
 			}
 
-			$params['cipassword'] = $password;
-			$this->secrets[]      = $password;
+			$login['cipassword'] = $password;
+			$this->secrets[]     = $password;
 		}
 
-		$answer = $this->client->request( 'PUT', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/config', $params );
+		$path = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/config';
 
-		return is_wp_error( $answer ) ? $this->classify( $answer, 'configure' ) : array();
+		for ( $try = 1; $try <= 2; $try++ ) {
+			$params = array(
+				'cores'     => $this->plan['cores'],
+				'memory'    => $this->plan['memory_mb'],
+				'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $this->cluster['prefix'] . ',gw=' . $gw,
+				'ciuser'    => 'root',
+				'net0'      => $this->net0( (string) ( $v['config']['net0'] ?? '' ) ),
+				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
+			);
+
+			if ( array() !== (array) $this->cluster['nameservers'] ) {
+				$params['nameserver'] = implode( ' ', (array) $this->cluster['nameservers'] );
+			}
+
+			if ( '' !== (string) $this->cluster['vendor_snippet'] ) {
+				$params['cicustom'] = 'vendor=' . $this->cluster['vendor_snippet'];
+			}
+
+			$answer = $this->client->request( 'PUT', $path, $params + $login );
+
+			if ( ! is_wp_error( $answer ) ) {
+				return array();
+			}
+
+			// Somebody changed the config between our read and our write (the digest guard): read it again, once.
+			if ( 1 === $try && 1 === preg_match( '/digest|modified configuration/i', $answer->get_error_message() ) ) {
+				$v = $this->verified( $record, 'configure' );
+
+				if ( $v instanceof StepResult ) {
+					return $v;
+				}
+
+				continue;
+			}
+
+			return $this->classify( $answer, 'configure' );
+		}
+
+		return StepResult::retry( 0, 'configure: the config kept changing under the write' );
 	}
 
 	/**
@@ -811,7 +851,7 @@ final class Provision {
 		$agent = 'unknown';
 
 		// Only a template that enables the agent has one to ask (API viewer: config `agent`).
-		if ( preg_match( '/^(enabled=)?1\b/', (string) ( $v['config']['agent'] ?? '' ) ) ) {
+		if ( self::agent_enabled( (string) ( $v['config']['agent'] ?? '' ) ) ) {
 			for ( $try = 1; $try <= 3; $try++ ) {
 				$ping = $this->client->request( 'POST', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/agent/ping' );
 
@@ -840,6 +880,24 @@ final class Provision {
 
 		if ( null === $record || null === $ip ) {
 			return StepResult::fail( 'ready: the VM record or the address is missing' );
+		}
+
+		// Where it runs now, from the listing, not from what was recorded earlier.
+		$list = Ownership::listing( $this->client );
+
+		if ( is_wp_error( $list ) ) {
+			return $this->classify( $list, 'ready' );
+		}
+
+		$entry = Ownership::entry( $list, $record['vmid'] );
+
+		if ( null === $entry || '' === (string) ( $entry['node'] ?? '' ) ) {
+			return StepResult::retry( 0, 'ready: the VM is not listed' );
+		}
+
+		if ( (string) $entry['node'] !== $record['node'] ) {
+			VmRecords::move( $this->r->id(), (string) $entry['node'] );
+			$record['node'] = (string) $entry['node'];
 		}
 
 		if ( ! VmRecords::set_ip( $this->r->id(), $ip['id'] ) || ! IpPool::assign( $this->r->id() ) ) {
@@ -895,6 +953,41 @@ final class Provision {
 		}
 
 		return implode( ',', $out );
+	}
+
+	/**
+	 * Does the `agent` property string enable the guest agent? `[enabled=]<bool>[,fstrim_cloned_disks=<bool>][,type=<t>]`: enabled may be a bare first value or a named one anywhere.
+	 *
+	 * @param string $agent Property string.
+	 */
+	private static function agent_enabled( string $agent ): bool {
+		foreach ( '' === $agent ? array() : explode( ',', $agent ) as $token ) {
+			if ( '1' === $token || 'enabled=1' === $token ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Is the address's gateway on the address's network (address/prefix)?
+	 *
+	 * @param string $address IPv4 address.
+	 * @param string $gateway IPv4 gateway.
+	 * @param int    $prefix  Prefix length.
+	 */
+	private static function gateway_on_network( string $address, string $gateway, int $prefix ): bool {
+		$a = ip2long( $address );
+		$g = ip2long( $gateway );
+
+		if ( false === $a || false === $g || $prefix < 1 || $prefix > 32 ) {
+			return false;
+		}
+
+		$mask = ( 0xFFFFFFFF << ( 32 - $prefix ) ) & 0xFFFFFFFF;
+
+		return ( $a & $mask ) === ( $g & $mask );
 	}
 
 	/**

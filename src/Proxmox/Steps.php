@@ -53,6 +53,22 @@ trait Steps {
 	protected $finished = null;
 
 	/**
+	 * Whether this run got further: a step completed or a Proxmox task ended.
+	 *
+	 * @var bool
+	 */
+	protected $progressed = false;
+
+	/**
+	 * Flags a retry as progress when this run advanced (never for merely polling a task that still runs).
+	 *
+	 * @param StepResult $result Result of the run.
+	 */
+	public function signal( StepResult $result ): StepResult {
+		return $this->progressed ? $result->with_progress() : $result;
+	}
+
+	/**
 	 * A task stored by an earlier run is polled first. Still running: that is this run's answer.
 	 * Finished (well or not): the steps go on and read the remote state, which is what counts.
 	 */
@@ -80,6 +96,8 @@ trait Steps {
 			'ok'    => true === $result,
 			'exit'  => is_wp_error( $result ) ? $this->exit_status( $result ) : 'OK',
 		);
+
+		$this->progressed = true;
 
 		if ( ! $this->r->set( array( 'task' => null ) ) ) {
 			return StepResult::retry( 0, $step . ': the finished task could not be cleared' );
@@ -159,6 +177,8 @@ trait Steps {
 		if ( is_wp_error( $result ) && 'task_failed' !== $result->get_error_code() ) {
 			return StepResult::retry( 0, $step . ': ' . $this->text( $result ) );
 		}
+
+		$this->progressed = true;
 
 		if ( ! $this->r->set( array( 'task' => null ) ) ) {
 			return StepResult::retry( 0, $step . ': the finished task could not be cleared' );

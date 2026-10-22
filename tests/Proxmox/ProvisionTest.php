@@ -41,6 +41,29 @@ class QuickProxmoxDriver extends ProxmoxDriver {
 }
 
 /**
+ * A fake cluster whose config writes go through a LiveClient on the recorded HTTP layer.
+ */
+class WireClient extends FakeClient {
+
+	public function request( string $method, string $path, array $params = array() ) {
+		if ( 'PUT' === $method && preg_match( '#/qemu/\d+/config$#', $path ) ) {
+			$live = new \BeltoftServices\Proxmox\LiveClient(
+				array(
+					'api_url'      => 'https://pve.example.test:8006',
+					'token_id'     => 'svc@pve!beltoft',
+					'token_secret' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+				),
+				true
+			);
+
+			return $live->request( $method, $path, $params );
+		}
+
+		return parent::request( $method, $path, $params );
+	}
+}
+
+/**
  * Every provision step against the fake cluster.
  */
 class ProvisionTest extends TestCase {
@@ -494,7 +517,7 @@ class ProvisionTest extends TestCase {
 		$put = $this->calls( 'PUT', '/qemu/5000/config' );
 		$this->assertArrayNotHasKey( 'cipassword', $put[0]['params'] );
 		$this->assertSame( '***', $put[0]['params']['sshkeys'] );
-		$this->assertSame( rawurlencode( $key . "\n" ), $this->fake->vm( 5000 )['config']['sshkeys'] );
+		$this->assertSame( $key . "\n", $this->fake->vm( 5000 )['config']['sshkeys'], 'The raw key: the client encodes it once.' );
 
 		$fresh = Resource::find( $resource->id() );
 		$this->assertEmpty( $fresh->get( 'reveal' ), 'No password was generated.' );
@@ -798,6 +821,139 @@ class ProvisionTest extends TestCase {
 
 		$this->assert_done( $this->run_provision( $resource ) );
 		$this->assertSame( 5000, VmRecords::for_resource( $resource->id() )['vmid'] );
+	}
+
+	public function test_the_ssh_key_is_encoded_exactly_once_on_the_wire(): void {
+		$wire = new WireClient();
+		$wire->add_node( 'node-a' );
+		$wire->add_vm( array( 'vmid' => 9000, 'node' => 'node-a', 'template' => 1, 'config' => array( 'scsi0' => 'disk-store:vm-9000-disk-0,size=10G', 'net0' => 'virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0' ) ) );
+		$this->fake = $wire;
+
+		$key      = (string) \BeltoftServices\Proxmox\SshKeyField::normalise( $this->ed25519() );
+		$resource = $this->resource( array(), array( 'ssh_key' => $key ) );
+
+		$this->respond_with(
+			function () {
+				return array(
+					'headers'  => array(),
+					'body'     => wp_json_encode( array( 'data' => null ) ),
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			}
+		);
+
+		$this->assert_done( $this->run_provision( $resource ) );
+
+		$sent = array_values( array_filter( $this->http_calls(), static fn( $c ) => false !== strpos( $c['url'], '/config' ) ) );
+		$this->assertCount( 1, $sent );
+		parse_str( (string) $sent[0]['args']['body'], $fields );
+		// One rawurlencode by the client: after the form decoding the value is still encoded text, and decoding that once gives the key.
+		$this->assertSame( rawurlencode( $key . "\n" ), $fields['sshkeys'] );
+		$this->assertSame( $key . "\n", rawurldecode( $fields['sshkeys'] ) );
+		$this->assertStringNotContainsString( '%2525', (string) $sent[0]['args']['body'], 'Not encoded twice.' );
+	}
+
+	public function test_a_pool_gateway_outside_the_network_fails_before_any_config_write(): void {
+		$this->wipe_tables();
+		IpPool::add( '192.0.2.10', '203.0.113.1' );
+
+		$result = $this->run_provision( $this->resource() );
+
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'gateway', $result->error() );
+		$this->assertSame( array(), $this->calls( 'PUT', '/config' ) );
+
+		// A gateway inside address/prefix is used.
+		$this->wipe_tables();
+		IpPool::add( '192.0.2.10', '192.0.2.254' );
+		$ok = $this->resource();
+		$this->assert_done( $this->run_provision( $ok ) );
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.254', $this->fake->vm( 5001 )['config']['ipconfig0'] );
+	}
+
+	public function test_a_retry_that_advanced_carries_progress_and_polling_does_not(): void {
+		$resource = $this->resource();
+		$this->fake->fail_next( 'POST', '#/status/start$#', array( 'status' => 503, 'message' => 'busy' ) );
+		$advanced = $this->run_provision( $resource );
+		$this->assertTrue( $advanced->is_retry() );
+		$this->assertTrue( $advanced->has_progress(), 'Four steps completed in that run.' );
+
+		$again = $this->run_provision( $resource );
+		$this->assert_done( $again );
+
+		// A pure poll of a running task is no progress.
+		$slow = $this->resource();
+		$this->fake->next_task( array( 'polls' => 99 ) );
+		$first = $this->run_provision( $slow );
+		$this->assertTrue( $first->is_retry() );
+		$poll = $this->run_provision( $slow );
+		$this->assertTrue( $poll->is_retry() );
+		$this->assertFalse( $poll->has_progress() );
+	}
+
+	public function test_a_failed_clone_marker_survives_a_crash(): void {
+		$resource = $this->resource();
+		$this->fake->next_task( array( 'exitstatus' => 'ERROR: clone failed', 'effect' => true ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_failed() );
+		$this->assertSame( 5000, Resource::find( $resource->id() )->get( 'clone_failed' ) );
+
+		// A later run (an admin retry, no task id left) must not adopt the leftover.
+		$resource->set( array( 'task' => null ) );
+		$again = $this->run_provision( $resource );
+		$this->assertTrue( $again->is_failed() );
+		$this->assertStringContainsString( 'still exists', $again->error() );
+		$this->assertCount( 1, $this->calls( 'POST', '/clone' ) );
+
+		// Once the admin removed the VM, the marker is cleared and the clone goes ahead.
+		$this->fake->request( 'DELETE', '/nodes/node-a/qemu/5000' );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertEmpty( Resource::find( $resource->id() )->get( 'clone_failed' ) );
+	}
+
+	public function test_a_digest_mismatch_is_retried_once_in_place(): void {
+		$resource = $this->resource();
+		$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 400, 'message' => 'Parameter verification failed: digest: detected modified configuration' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertCount( 2, $this->calls( 'PUT', '/qemu/5000/config' ) );
+
+		$stuck = $this->resource();
+		$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 400, 'message' => 'detected modified configuration' ) );
+		$this->fake->fail_next( 'PUT', '#/config$#', array( 'status' => 400, 'message' => 'detected modified configuration' ) );
+		$this->assertTrue( $this->run_provision( $stuck )->is_failed() );
+	}
+
+	public function test_the_agent_is_found_wherever_enabled_sits_in_the_string(): void {
+		$this->template( array( 'config' => array( 'scsi0' => 'disk-store:vm-9000-disk-0,size=10G', 'net0' => 'virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0', 'agent' => 'fstrim_cloned_disks=1,enabled=1' ) ) );
+		$resource = $this->resource();
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertSame( 'ok', Resource::find( $resource->id() )->get( 'agent' ) );
+		$this->assertNotEmpty( $this->calls( 'POST', '/agent/ping' ) );
+
+		$this->template( array( 'config' => array( 'scsi0' => 'disk-store:vm-9000-disk-0,size=10G', 'net0' => 'virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0', 'agent' => 'enabled=0,fstrim_cloned_disks=1' ) ) );
+		$off = $this->resource();
+		$seen = count( $this->calls( 'POST', '/agent/ping' ) );
+		$this->assert_done( $this->run_provision( $off ) );
+		$this->assertCount( $seen, $this->calls( 'POST', '/agent/ping' ) );
+		$this->assertSame( 'unknown', Resource::find( $off->id() )->get( 'agent' ) );
+	}
+
+	public function test_ready_records_the_node_the_vm_runs_on_now(): void {
+		$resource = $this->resource();
+		$this->fake->fail_next( 'POST', '#/status/start$#', array( 'status' => 503, 'message' => 'busy' ) );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+
+		// The VM moved to another node (HA) before the last step.
+		$this->fake->add_node( 'node-b' );
+		$vm         = $this->fake->vm( 5000 );
+		$vm['node'] = 'node-b';
+		$this->fake->add_vm( $vm );
+		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
+
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertSame( 'node-b', Resource::find( $resource->id() )->get( 'node' ) );
+		$this->assertSame( 'node-b', VmRecords::for_resource( $resource->id() )['node'] );
 	}
 
 	public function test_wipe_rebuilds_on_the_same_vmid_and_address(): void {

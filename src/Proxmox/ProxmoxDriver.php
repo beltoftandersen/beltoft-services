@@ -136,7 +136,9 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function provision( Resource $r ): StepResult {
-		return ( new Provision( $r, array( $this, 'nap' ) ) )->run();
+		$run = new Provision( $r, array( $this, 'nap' ) );
+
+		return $run->signal( $run->run() );
 	}
 
 	/**
@@ -154,7 +156,9 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function pause( Resource $r ): StepResult {
-		return ( new Operations( $r ) )->pause();
+		$op = new Operations( $r );
+
+		return $op->signal( $op->pause() );
 	}
 
 	/**
@@ -170,7 +174,9 @@ class ProxmoxDriver implements Driver {
 			return $this->provision( $r );
 		}
 
-		return ( new Operations( $r ) )->resume();
+		$op = new Operations( $r );
+
+		return $op->signal( $op->resume() );
 	}
 
 	/**
@@ -179,7 +185,9 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function update_plan( Resource $r ): StepResult {
-		return ( new Operations( $r ) )->update_plan();
+		$op = new Operations( $r );
+
+		return $op->signal( $op->update_plan() );
 	}
 
 	/**
@@ -188,7 +196,9 @@ class ProxmoxDriver implements Driver {
 	 * @param Resource $r Resource.
 	 */
 	public function delete( Resource $r ): StepResult {
-		return ( new Operations( $r ) )->delete();
+		$op = new Operations( $r );
+
+		return $op->signal( $op->delete() );
 	}
 
 	/**
