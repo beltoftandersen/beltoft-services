@@ -38,6 +38,10 @@ Answers: 2xx is done (provision needs the id in the remote id field); 409 on pro
 - A half-built service (the clone never finished) whose recorded VMID now holds a foreign VM releases only our IP address and our record; the foreign VM is not touched.
 - A service whose VM record is missing although its clone was recorded fails for an admin ("VM record missing; check Proxmox manually") and releases nothing.
 
+## Disputes and chargebacks (manual)
+
+WooCommerce, WooCommerce Subscriptions and the gateways bundled with them fire no dispute or chargeback action (checked against WooCommerce 11.2.1 and Subscriptions 9.3.0: the only mention is a render hook, `woocommerce_admin_order_data_after_payment_info`, that extensions may print a notice in). Beltoft Services therefore does not react to a dispute by itself. When a gateway tells you about one: cancel or put the subscription on hold in WooCommerce Subscriptions (the service pauses), or use "Suspend for breach" on the license screen to hold the service paused whatever billing does. A gateway plugin that does fire a dispute action can be wired up with a few lines on the `beltoft_services_*` API.
+
 ## Developer API
 
 - `BeltoftServices\RateLimit::exceeded( int $user_id, string $key, int $limit, int $window = MINUTE_IN_SECONDS ): bool`: counts one call for a user and key in a fixed window; true when over the limit (0 or less turns it off). Persistent object cache when there is one, otherwise transients. Best-effort without a persistent object cache (transient path is read-then-write); the window is fixed, not sliding; namespace `$key` with your plugin slug, e.g. `odoowoo-portal:verify`.
