@@ -288,7 +288,7 @@ final class Backups {
 	}
 
 	/**
-	 * A backup ended well: recorded, then pruned to the plan's days.
+	 * A backup ended well: recorded, then pruned to the plan's days. The night counts as good only when the prune worked too.
 	 *
 	 * @param array<string, mixed> $record VM record.
 	 */
@@ -297,8 +297,6 @@ final class Backups {
 			array(
 				'backup_task'  => null,
 				'backup_ok_at' => time(),
-				'backup_error' => '',
-				'backup_fails' => 0,
 			)
 		);
 
@@ -308,8 +306,16 @@ final class Backups {
 
 		$pruned = $this->prune( $record );
 
+		// A prune that fails (a backup server that refuses deletes) is a failed night like a failed backup: counted, and alerted by the same rule. Only a night where both worked ends a run of failures.
 		if ( null !== $pruned ) {
-			$this->store( array( 'backup_error' => $pruned ) );
+			$this->failed( $pruned );
+		} else {
+			$this->store(
+				array(
+					'backup_error' => '',
+					'backup_fails' => 0,
+				)
+			);
 		}
 
 		// The panels show this copy, so rendering a page never calls Proxmox.

@@ -155,6 +155,32 @@ class BackupsTest extends BackupTestCase {
 		$this->assertCount( 1, $this->mails, 'A new run of failures alerts again.' );
 	}
 
+	public function test_a_failed_prune_is_counted_and_alerted_once_per_run_of_failures(): void {
+		$r           = $this->ready_vm();
+		$this->mails = array();
+
+		for ( $night = 1; $night <= 4; $night++ ) {
+			Resource::find( $r->id() )->set( array( 'backup_last_at' => 0 ) );
+			$this->fake->fail_next( 'DELETE', '#/prunebackups$#', array( 'message' => 'permission check failed - missing Datastore.Prune' ) );
+			$this->assertTrue( $this->step( $r )->is_done() );
+
+			$fresh = Resource::find( $r->id() );
+			$this->assertSame( $night, (int) $fresh->get( 'backup_fails' ), 'A failed prune is counted.' );
+			$this->assertStringContainsString( 'Prune was refused', (string) $fresh->get( 'backup_error' ) );
+			$this->assertGreaterThan( 0, (int) $fresh->get( 'backup_ok_at' ), 'The backup itself worked.' );
+			$this->assertCount( $night >= 3 ? 2 : 1, $this->mails, 'An alert on the first night, a reminder on the third, none in between.' );
+		}
+
+		$this->assertStringContainsString( 'Prune was refused', $this->mails[0]['message'] );
+
+		// A night where backup and prune both work ends the run.
+		Resource::find( $r->id() )->set( array( 'backup_last_at' => 0 ) );
+		$this->step( $r );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 0, (int) $fresh->get( 'backup_fails' ) );
+		$this->assertSame( '', (string) $fresh->get( 'backup_error' ) );
+	}
+
 	public function test_a_failed_task_is_counted(): void {
 		$r = $this->ready_vm();
 		$this->fake->next_task( array( 'exitstatus' => 'ERROR: job failed with err -5' ) );
