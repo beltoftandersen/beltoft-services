@@ -115,11 +115,12 @@ class BackupReviewFixesTest extends BackupTestCase {
 		for ( $i = 0; $i < 8; $i++ ) {
 			$this->restore( $r, $volid );
 
-			if ( null === Resource::find( $r->id() )->get( 'restore' ) && 'running' === $this->fake->vm( $vmid )['status'] ) {
+			if ( false !== strpos( $this->events_of( $r ), 'Server restored' ) ) {
 				break;
 			}
 		}
 
+		Jobs::run( $r->id() ); // The queued plan change starts it.
 		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
 		$this->assertStringContainsString( 'Server restored from the backup of', $this->events_of( $r ) );
 		$this->assertStringNotContainsString( 'Restore failed', $this->events_of( $r ) );
@@ -250,6 +251,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 		$this->fake->drop_pool_on_restore( true );
 
 		$this->restore( $r, $volid );
+		Jobs::run( $r->id() );
 
 		$this->assertSame( 'customers', $this->fake->vm( $vmid )['pool'] );
 		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
@@ -333,6 +335,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 		);
 
 		$this->restore( $r, $volid );
+		Jobs::run( $r->id() );
 
 		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'], 'The server is started again.' );
 		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ) );
