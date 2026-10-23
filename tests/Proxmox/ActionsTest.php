@@ -1103,8 +1103,9 @@ class ActionsTest extends TestCase {
 			)
 		);
 		$this->assertSame(
-			array( 'POST /nodes/node-a/qemu/' . $vmid . '/status/shutdown', 'POST /nodes/node-a/qemu', 'POST /nodes/node-a/qemu/' . $vmid . '/status/start' ),
-			$order
+			array( 'POST /nodes/node-a/qemu/' . $vmid . '/status/shutdown', 'POST /nodes/node-a/qemu' ),
+			$order,
+			'The restore leaves the VM off: the queued plan change applies the plan and starts it.'
 		);
 
 		$restore = $this->calls( 'POST', '/nodes/node-a/qemu' );
@@ -1119,7 +1120,7 @@ class ActionsTest extends TestCase {
 		);
 
 		$this->assertSame( 2, (int) $this->fake->vm( $vmid )['config']['cores'], 'Back to the backup.' );
-		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+		$this->assertSame( 'stopped', $this->fake->vm( $vmid )['status'], 'Off until the queued plan change starts it.' );
 
 		$fresh = Resource::find( $r->id() );
 		$this->assertNull( $fresh->get( 'restore' ) );
@@ -1128,6 +1129,9 @@ class ActionsTest extends TestCase {
 		$this->assertSame( 30, (int) $fresh->get( 'disk_gb' ) );
 		$this->assertStringContainsString( 'Server restored from the backup of', $this->events_of( $r ) );
 		$this->assertStringContainsString( 'Plan re-applied after restore', $this->events_of( $r ) );
+
+		Jobs::run( $r->id() );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
 	}
 
 	public function test_a_backup_of_30g_restored_on_a_60g_plan_ends_at_60g_and_the_plan_sizing(): void {
@@ -1160,6 +1164,39 @@ class ActionsTest extends TestCase {
 		$this->assertSame( array( '60G' ), array_values( array_map( static fn( $c ) => $c['params']['size'], $resizes ) ), 'Grown to the plan; never asked for a smaller disk.' );
 	}
 
+	public function test_a_restore_on_a_bigger_plan_is_started_once_by_the_plan_change_with_no_second_shutdown(): void {
+		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$vmid      = (int) $r->get( 'vmid' );
+		$volid     = $this->backup_of( $r );
+		$plan      = array_merge( (array) Resource::find( $r->id() )->get( 'plan' ), array( 'disk_gb' => 60, 'cores' => 4, 'memory_mb' => 8192 ) );
+		$this->assertTrue( Resource::find( $r->id() )->change_plan( $plan, 'Plan changed' ) );
+		Jobs::run( $r->id() );
+
+		$seen = count( $this->fake->calls() );
+		$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+
+		$this->assertSame( 'stopped', $this->fake->vm( $vmid )['status'], 'The restore leaves the server off for the queued plan change.' );
+		$this->assertTrue( Resource::find( $r->id() )->get( 'was_running' ), 'The plan change owns the one start.' );
+
+		Jobs::run( $r->id() ); // The queued plan change: one job pickup, no backoff.
+
+		$lines = array_map( static fn( $c ) => $c['method'] . ' ' . $c['path'], array_slice( $this->fake->calls(), $seen ) );
+		$power = array_values( array_filter( $lines, static fn( $l ) => (bool) preg_match( '#/status/(shutdown|stop|start)$#', $l ) ) );
+		$base  = 'POST /nodes/node-a/qemu/' . $vmid . '/status/';
+		$this->assertSame( array( $base . 'shutdown', $base . 'start' ), $power, 'One shutdown (the restore\'s own), one start, and none in between.' );
+
+		$fresh  = Resource::find( $r->id() );
+		$config = $this->fake->vm( $vmid )['config'];
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+		$this->assertSame( 4, (int) $config['cores'] );
+		$this->assertSame( 8192, (int) $config['memory'] );
+		$this->assertStringContainsString( 'size=60G', $config['scsi0'] );
+		$this->assertFalse( $fresh->get( 'plan_dirty' ) );
+		$this->assertEmpty( $fresh->get( 'was_running' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 0, (int) $fresh->get( 'attempts' ) );
+	}
+
 	public function test_a_restore_task_that_is_still_running_is_waited_for_not_started_again(): void {
 		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
 		$vmid      = (int) $r->get( 'vmid' );
@@ -1173,10 +1210,11 @@ class ActionsTest extends TestCase {
 		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ), 'Not restored yet.' );
 		$this->assertSame( 'stopped', $this->fake->vm( $vmid )['status'] );
 
-		for ( $i = 0; $i < 4 && 'stopped' === $this->fake->vm( $vmid )['status']; $i++ ) {
+		for ( $i = 0; $i < 4 && ! str_contains( $this->events_of( $r ), 'Server restored' ); $i++ ) {
 			$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
 		}
 
+		Jobs::run( $r->id() );
 		$this->assertCount( 1, $this->calls( 'POST', '/nodes/node-a/qemu' ), 'One restore, however many rounds.' );
 		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
 		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ) );

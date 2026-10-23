@@ -106,7 +106,7 @@ final class BackupField {
 		}
 
 		$has     = (int) ( $plan['backup_days'] ?? 0 ) > 0;
-		$sibling = Backups::sibling( $variation, ! $has );
+		$sibling = Backups::sibling( $variation, ! $has, true );
 
 		if ( null === $sibling ) {
 			return null;

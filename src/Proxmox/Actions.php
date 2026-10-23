@@ -669,7 +669,8 @@ final class Actions {
 	/**
 	 * Restores the whole server to one backup: off, restored over the same VMID (`force`), the
 	 * tag checked in the restored config, the plan re-applied (the backup may predate an upgrade:
-	 * cores, memory and a larger disk come back, a disk is never shrunk), started. Every round
+	 * cores, memory and a larger disk come back, a disk is never shrunk), and the VM, still off, is
+	 * started by that plan change (meta was_running), once. Every round
 	 * starts from the remote state and the marker in meta `restore` ({volid, phase, ctime}), so
 	 * a retry never restores twice. The customer is told that the password and the SSH key are
 	 * the backup's. A failed restore may have destroyed the VM: it is left as it is and the
@@ -743,20 +744,6 @@ final class Actions {
 				return StepResult::retry( 0, 'restore: progress could not be stored' );
 			}
 		}
-
-		$v = $this->verified( $record, 'restore' );
-
-		if ( $v instanceof StepResult ) {
-			return $v;
-		}
-
-		$started = $this->start_after_restore( $record, $v );
-
-		if ( null !== $started ) {
-			return $started;
-		}
-
-		Operations::remember_power( $this->r->id(), 'running' );
 
 		return StepResult::done(
 			array( 'restore' => null ),
@@ -913,7 +900,8 @@ final class Actions {
 			return StepResult::fail( 'Restore: the boot disk was not found on the restored server', array( 'restore' => null ) );
 		}
 
-		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ) ) ) ) {
+		// The queued plan change owns the one start (was_running): it applies the plan to the stopped VM and starts it, so a VM that has only just booted is never shut down again.
+		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => true ) ) ) {
 			return StepResult::retry( 0, 'restore: progress could not be stored' );
 		}
 
@@ -983,31 +971,5 @@ final class Actions {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Starts the restored VM. Null: it runs.
-	 *
-	 * @param array<string, mixed> $record VM record.
-	 * @param array<string, mixed> $v      Verified VM.
-	 */
-	private function start_after_restore( array $record, array $v ): ?StepResult {
-		if ( 'running' === $v['status'] ) {
-			return null;
-		}
-
-		$done = $this->run_task( 'act', 'POST', self::base( $record, $v ) . '/status/start', array(), 'start' );
-
-		if ( $done instanceof StepResult ) {
-			return $done;
-		}
-
-		$again = $this->verified( $record, 'restore' );
-
-		if ( $again instanceof StepResult ) {
-			return $again;
-		}
-
-		return 'running' === $again['status'] ? null : StepResult::retry( 0, 'restore: the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')' );
 	}
 }

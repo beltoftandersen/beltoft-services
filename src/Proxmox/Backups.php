@@ -41,7 +41,7 @@ final class Backups {
 	public const MIN_GAP = 20 * HOUR_IN_SECONDS;
 
 	/**
-	 * Consecutive failures that alert the admin (once).
+	 * Consecutive failures after which the admin gets a reminder. The first failure always alerts.
 	 */
 	public const ALERT_AFTER = 3;
 
@@ -189,7 +189,7 @@ final class Backups {
 	 * One round for this server. A backup of an earlier round is collected first: still running is
 	 * a retry; finished well it is pruned, finished badly it is counted. Otherwise a new backup is
 	 * started and waited for (bounded). A failure never fails the resource and never mails the
-	 * customer: it is recorded, and the admin hears of it after ALERT_AFTER nights in a row.
+	 * customer: it is recorded, and the admin is mailed on the first failed night and again after ALERT_AFTER.
 	 */
 	public function step(): StepResult {
 		$record = VmRecords::for_resource( $this->r->id() );
@@ -288,7 +288,7 @@ final class Backups {
 	}
 
 	/**
-	 * A backup ended well: recorded, then pruned to the plan's days.
+	 * A backup ended well: recorded, then pruned to the plan's days. The night counts as good only when the prune worked too.
 	 *
 	 * @param array<string, mixed> $record VM record.
 	 */
@@ -297,8 +297,6 @@ final class Backups {
 			array(
 				'backup_task'  => null,
 				'backup_ok_at' => time(),
-				'backup_error' => '',
-				'backup_fails' => 0,
 			)
 		);
 
@@ -308,8 +306,16 @@ final class Backups {
 
 		$pruned = $this->prune( $record );
 
+		// A prune that fails (a backup server that refuses deletes) is a failed night like a failed backup: counted, and alerted by the same rule. Only a night where both worked ends a run of failures.
 		if ( null !== $pruned ) {
-			$this->store( array( 'backup_error' => $pruned ) );
+			$this->failed( $pruned );
+		} else {
+			$this->store(
+				array(
+					'backup_error' => '',
+					'backup_fails' => 0,
+				)
+			);
 		}
 
 		// The panels show this copy, so rendering a page never calls Proxmox.
@@ -362,7 +368,7 @@ final class Backups {
 
 	/**
 	 * A failed round: the error and the count are stored, the task cleared. The admin is mailed
-	 * when the count reaches ALERT_AFTER. The round is over (done), not retried: the next night tries again.
+	 * on the first failed night and again when the count reaches ALERT_AFTER. The round is over (done), not retried: the next night tries again.
 	 *
 	 * @param string $why Admin text.
 	 */
@@ -378,11 +384,21 @@ final class Backups {
 			)
 		);
 
-		if ( $stored && self::ALERT_AFTER === $fails ) {
+		if ( $stored && ( 1 === $fails || self::ALERT_AFTER === $fails ) ) {
 			$this->r->locked(
 				function () use ( $fails, $why ): bool {
+					if ( 1 === $fails ) {
+						// A new run of failures: an earlier run's alert must not hide this one.
+						$this->r->set( array( 'alerted' => null ) );
+					}
+
 					/* Admin text, not shown to customers. */
-					Alerts::admin( $this->r, sprintf( 'Backup failed %d nights in a row: %s', $fails, $why ) );
+					Alerts::admin(
+						$this->r,
+						1 === $fails
+							? sprintf( 'Backup failed on %s: %s', gmdate( 'Y-m-d' ), $why )
+							: sprintf( 'Backup failed %d nights in a row: %s', $fails, $why )
+					);
 
 					return true;
 				}
@@ -563,12 +579,13 @@ final class Backups {
 
 		$stored = $this->store(
 			array(
-				'backup_purge' => null,
-				'backup_list'  => null,
-				'backup_task'  => null,
-				'backup_ok_at' => null,
-				'backup_error' => '',
-				'backup_fails' => 0,
+				'backup_purge'   => null,
+				'backup_list'    => null,
+				'backup_task'    => null,
+				'backup_ok_at'   => null,
+				'backup_last_at' => null, // Backups bought again are due at once.
+				'backup_error'   => '',
+				'backup_fails'   => 0,
 			)
 		);
 
@@ -642,10 +659,15 @@ final class Backups {
 	 * (a variation with backups has no sibling "with backups"). Null when there is none, and then
 	 * no backup UI is shown.
 	 *
-	 * @param \WC_Product_Variation $v    Variation.
-	 * @param bool                  $with Whether the sibling has backups.
+	 * For an existing server (the account panel's links) stock does not matter: its machine exists,
+	 * and Stock lets a switch through at add-to-cart. Only a NEW purchase ($new_purchase: the
+	 * checkout box) needs a sibling that can be bought now.
+	 *
+	 * @param \WC_Product_Variation $v            Variation.
+	 * @param bool                  $with         Whether the sibling has backups.
+	 * @param bool                  $new_purchase Whether a new server is bought (stock and capacity count).
 	 */
-	public static function sibling( \WC_Product_Variation $v, bool $with ): ?\WC_Product_Variation {
+	public static function sibling( \WC_Product_Variation $v, bool $with, bool $new_purchase = false ): ?\WC_Product_Variation {
 		$parent = wc_get_product( $v->get_parent_id() );
 
 		if ( ! $parent instanceof \WC_Product_Variable ) {
@@ -685,7 +707,7 @@ final class Backups {
 			$plan = \BeltoftServices\Product::plan( $parent->get_id(), $other->get_id() );
 
 			// The same server, only the backups differ: never a silent plan change, never one that cannot be bought.
-			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( 'backup_days' => 1 ) ) === array_diff_key( $own, array( 'backup_days' => 1 ) ) && $other->is_purchasable() && $other->is_in_stock() ) {
+			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( 'backup_days' => 1 ) ) === array_diff_key( $own, array( 'backup_days' => 1 ) ) && ( $new_purchase ? $other->is_purchasable() && $other->is_in_stock() : '' !== (string) $other->get_price() ) ) {
 				return $other;
 			}
 		}
