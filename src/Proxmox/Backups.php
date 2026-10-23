@@ -41,7 +41,7 @@ final class Backups {
 	public const MIN_GAP = 20 * HOUR_IN_SECONDS;
 
 	/**
-	 * Consecutive failures that alert the admin (once).
+	 * Consecutive failures after which the admin gets a reminder. The first failure always alerts.
 	 */
 	public const ALERT_AFTER = 3;
 
@@ -189,7 +189,7 @@ final class Backups {
 	 * One round for this server. A backup of an earlier round is collected first: still running is
 	 * a retry; finished well it is pruned, finished badly it is counted. Otherwise a new backup is
 	 * started and waited for (bounded). A failure never fails the resource and never mails the
-	 * customer: it is recorded, and the admin hears of it after ALERT_AFTER nights in a row.
+	 * customer: it is recorded, and the admin is mailed on the first failed night and again after ALERT_AFTER.
 	 */
 	public function step(): StepResult {
 		$record = VmRecords::for_resource( $this->r->id() );
@@ -362,7 +362,7 @@ final class Backups {
 
 	/**
 	 * A failed round: the error and the count are stored, the task cleared. The admin is mailed
-	 * when the count reaches ALERT_AFTER. The round is over (done), not retried: the next night tries again.
+	 * on the first failed night and again when the count reaches ALERT_AFTER. The round is over (done), not retried: the next night tries again.
 	 *
 	 * @param string $why Admin text.
 	 */
@@ -378,11 +378,21 @@ final class Backups {
 			)
 		);
 
-		if ( $stored && self::ALERT_AFTER === $fails ) {
+		if ( $stored && ( 1 === $fails || self::ALERT_AFTER === $fails ) ) {
 			$this->r->locked(
 				function () use ( $fails, $why ): bool {
+					if ( 1 === $fails ) {
+						// A new run of failures: an earlier run's alert must not hide this one.
+						$this->r->set( array( 'alerted' => null ) );
+					}
+
 					/* Admin text, not shown to customers. */
-					Alerts::admin( $this->r, sprintf( 'Backup failed %d nights in a row: %s', $fails, $why ) );
+					Alerts::admin(
+						$this->r,
+						1 === $fails
+							? sprintf( 'Backup failed on %s: %s', gmdate( 'Y-m-d' ), $why )
+							: sprintf( 'Backup failed %d nights in a row: %s', $fails, $why )
+					);
 
 					return true;
 				}

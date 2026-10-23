@@ -119,7 +119,7 @@ class BackupsTest extends BackupTestCase {
 		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'backup_ok_at' ) );
 	}
 
-	public function test_three_failures_in_a_row_alert_the_admin_once_and_the_server_is_unaffected(): void {
+	public function test_the_admin_is_mailed_on_the_first_failure_and_again_after_three_nights_and_the_server_is_unaffected(): void {
 		$r          = $this->ready_vm();
 		$this->mails = array(); // The customer's "ready" mail is not under test.
 
@@ -133,17 +133,26 @@ class BackupsTest extends BackupTestCase {
 			$this->assertStringContainsString( 'storage is not online', (string) $fresh->get( 'backup_error' ) );
 			$this->assertSame( 'ready', $fresh->get( 'state' ), 'The server is unaffected.' );
 			$this->assertSame( 'running', $this->fake->vm( (int) $fresh->get( 'vmid' ) )['status'] );
-			$this->assertCount( $night >= 3 ? 1 : 0, $this->mails, 'One alert, on the third night.' );
+			$this->assertCount( $night >= 3 ? 2 : 1, $this->mails, 'An alert on the first night, a reminder on the third.' );
 		}
 
 		$this->assertSame( array( 'admin@example.com' ), (array) $this->mails[0]['to'] );
-		$this->assertStringContainsString( 'Backup failed 3 nights in a row', $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'Backup failed on ' . gmdate( 'Y-m-d' ), $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'storage is not online', $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'Backup failed 3 nights in a row', $this->mails[1]['message'] );
 
 		// A good night clears the count and the error.
 		$this->step( $r );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( 0, (int) $fresh->get( 'backup_fails' ) );
 		$this->assertSame( '', (string) $fresh->get( 'backup_error' ) );
+
+		// A later failure with the same error is mailed again: the alert names its date.
+		$this->mails = array();
+		Resource::find( $r->id() )->set( array( 'backup_last_at' => 0 ) );
+		$this->fake->fail_next( 'POST', '#/vzdump$#', array( 'message' => 'storage is not online' ) );
+		$this->step( $r );
+		$this->assertCount( 1, $this->mails, 'A new run of failures alerts again.' );
 	}
 
 	public function test_a_failed_task_is_counted(): void {
