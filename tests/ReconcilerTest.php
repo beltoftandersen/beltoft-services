@@ -383,6 +383,84 @@ final class ReconcilerTest extends TestCase {
 		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
 	}
 
+	public function test_delete_of_an_active_resource_pauses_first(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$resource->desire( 'deleted', 'Refunded' );
+
+		Jobs::sweep();
+		$this->run_jobs();
+
+		$ops = array_column( $driver->calls(), 'op' );
+		$this->assertSame( array( 'pause', 'delete' ), $ops );
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_delete_of_a_paused_resource_does_not_pause_again(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'paused' ) );
+		$resource->desire( 'deleted', 'Retention over' );
+
+		Jobs::sweep();
+		$this->run_jobs();
+
+		$this->assertSame( array( 'delete' ), array_column( $driver->calls(), 'op' ) );
+	}
+
+	public function test_failed_pause_before_delete_blocks_the_delete_and_retries(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$driver->will( 'pause', StepResult::retry( 0, 'Busy' ) )->will( 'pause', StepResult::done() );
+		$resource->desire( 'deleted', 'Refunded' );
+
+		Jobs::sweep();
+		$this->run_jobs();
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( array(), $driver->calls( 'delete' ) );
+		$this->assertSame( 'delete', $fresh->get( 'op' ) );
+		$this->assertSame( 1, $fresh->get( 'attempts' ) );
+		$this->assertStringContainsString( 'Busy', $fresh->get( 'last_error' ) );
+
+		// The retry pauses again (the first pause did not finish), then deletes.
+		$fresh->set( array( 'next_attempt_at' => null ) );
+		Reconciler::step( Resource::find( $resource->id() ) );
+		$this->assertSame( array( 'pause', 'pause', 'delete' ), array_column( $driver->calls(), 'op' ) );
+
+		$this->assertSame( 'deleted', Resource::find( $resource->id() )->get( 'state' ) );
+	}
+
+	public function test_pause_done_is_not_repeated_when_the_delete_itself_retries(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$driver->will( 'delete', StepResult::retry( 0, 'Host busy' ) )->will( 'delete', StepResult::done() );
+		$resource->desire( 'deleted', 'Refunded' );
+
+		Jobs::sweep();
+		$this->run_jobs();
+		Resource::find( $resource->id() )->set( array( 'next_attempt_at' => null ) );
+		Reconciler::step( Resource::find( $resource->id() ) );
+
+		$this->assertSame( array( 'pause', 'delete', 'delete' ), array_column( $driver->calls(), 'op' ) );
+	}
+
+	public function test_a_driver_that_stops_on_delete_is_not_paused_first(): void {
+		$stopper = new class( 'stopper' ) extends \BeltoftServices\Tests\Support\FakeDriver implements \BeltoftServices\Drivers\StopsOnDelete {
+		};
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) use ( $stopper ) {
+				$drivers['stopper'] = $stopper;
+				return $drivers;
+			}
+		);
+		$product  = $this->service_product( 'stopper', array(), array( 'max' => 3 ) );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::create( $license, $stopper, array(), array( 'state' => 'ready' ) );
+		$resource->desire( 'deleted', 'Refunded' );
+
+		Jobs::sweep();
+		$this->run_jobs();
+
+		$this->assertSame( array( 'delete' ), array_column( $stopper->calls(), 'op' ) );
+	}
+
 	public function test_failed_resource_to_delete_gets_its_own_attempts_and_is_swept(): void {
 		list( $resource, $driver ) = $this->resource(
 			array(

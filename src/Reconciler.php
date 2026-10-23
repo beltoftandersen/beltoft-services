@@ -8,7 +8,9 @@
 namespace BeltoftServices;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Drivers\StepResult;
 
 defined( 'ABSPATH' ) || exit;
@@ -30,6 +32,10 @@ defined( 'ABSPATH' ) || exit;
  * (guard()): a license that ended after the job was queued (a chargeback right after payment,
  * an expiry that passed by a second) pauses the service instead. A license with a future
  * expiry is active and provisions normally.
+ *
+ * A delete first runs the driver's pause unless the resource is paused already or the driver's
+ * delete stops the service itself (Drivers\StopsOnDelete, the Proxmox driver): a remote service may
+ * only delete what is paused. A pause that fails stops the delete and retries as a delete.
  *
  * A failed pause or delete whose desired state is ready again resumes. A completed delete
  * makes a new resource only when the deletion asked for it (desire( 'deleted', ..., true ))
@@ -59,7 +65,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused' );
 
 	/**
 	 * How often one operation may restart its retry count because a run made progress. After
@@ -227,6 +233,9 @@ final class Reconciler {
 			}
 		}
 
+		// Decided before the state moves to deleting.
+		$pause_first = 'delete' === $operation && self::needs_pause_before_delete( $r, $driver );
+
 		if ( 'provision' === $operation && 'provisioning' !== $r->get( 'state' ) ) {
 			self::move( $r, 'provisioning', 'Provisioning started' );
 		} elseif ( 'delete' === $operation && 'deleting' !== $r->get( 'state' ) ) {
@@ -234,6 +243,21 @@ final class Reconciler {
 		}
 
 		$plan = $r->get( 'plan' );
+
+		// A service is always paused before it is deleted.
+		if ( $pause_first ) {
+			$paused = self::pause_before_delete( $r, $driver );
+
+			if ( ! $paused ) {
+				return;
+			}
+
+			$r = Resource::find( $r->id() );
+
+			if ( ! $r ) {
+				return;
+			}
+		}
 
 		try {
 			$result = $driver->$operation( $r );
@@ -261,6 +285,71 @@ final class Reconciler {
 		} else {
 			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
+	}
+
+	/**
+	 * Whether the driver's pause must run before its delete: not when the resource is already
+	 * paused (or was paused for this deletion), when nothing exists yet, or when the driver's
+	 * delete stops the service itself (Drivers\StopsOnDelete).
+	 *
+	 * @param Resource $r      Resource.
+	 * @param Driver   $driver Driver.
+	 */
+	private static function needs_pause_before_delete( Resource $r, Driver $driver ): bool {
+		if ( $driver instanceof StopsOnDelete || 'paused' === $r->get( 'state' ) || $r->get( 'delete_paused' ) ) {
+			return false;
+		}
+
+		return ! ( 'requested' === $r->get( 'state' ) && ! $r->get( 'steps' ) );
+	}
+
+	/**
+	 * Runs the driver's pause for a resource about to be deleted. The resource keeps its state
+	 * (no paused notices); meta `delete_paused` records it, so a retry of the delete does not
+	 * pause again. A pause that is not done leaves the delete unattempted: it counts as an
+	 * attempt of the delete and retries or fails by the usual rules.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param Driver   $driver Driver.
+	 * @return bool True when the delete may go on.
+	 */
+	private static function pause_before_delete( Resource $r, Driver $driver ): bool {
+		try {
+			$result = $driver->pause( $r );
+		} catch ( \Throwable $e ) {
+			$result = StepResult::retry( 0, $e->getMessage() );
+		}
+
+		if ( ! $result instanceof StepResult ) {
+			$result = StepResult::retry( 0, 'The driver returned no result' );
+		}
+
+		$fresh = Resource::find( $r->id() );
+
+		if ( ! $fresh ) {
+			return false;
+		}
+
+		$meta = array_diff_key( $result->meta(), array_flip( self::RESERVED ) );
+
+		if ( $result->is_done() ) {
+			if ( $fresh->set( array_merge( $meta, array( 'delete_paused' => true ) ) ) ) {
+				return true;
+			}
+
+			self::retry( $fresh, 'delete', 0, self::META_ERROR, array() );
+			return false;
+		}
+
+		$error = 'Pause before delete: ' . ( '' !== $result->error() ? $result->error() : 'Unknown error' );
+
+		if ( $result->is_retry() ) {
+			self::retry( $fresh, 'delete', $result->delay(), $error, $meta, $result->has_progress() );
+		} else {
+			self::fail( $fresh, 'delete', $error, $meta );
+		}
+
+		return false;
 	}
 
 	/**
@@ -304,6 +393,7 @@ final class Reconciler {
 			'failed_op'       => '',
 			'failed_desired'  => '',
 			'alerted'         => '',
+			'delete_paused'   => false,
 		);
 	}
 

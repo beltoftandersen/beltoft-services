@@ -275,6 +275,7 @@ class HttpDriverTest extends TestCase {
 		$resource = $this->resource();
 		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'rem/1' ) ) ), self::answer( 204 ) ) );
 		$this->step( $resource );
+		$this->assertSame( 1, count( $this->http_calls() ) );
 
 		$resource->set(
 			array(
@@ -299,7 +300,9 @@ class HttpDriverTest extends TestCase {
 		$fresh = $this->step( $fresh );
 
 		$this->assertSame( 'deleted', $fresh->get( 'state' ) );
-		$call = $this->http_calls()[2];
+		// The service is paused first, then deleted.
+		$this->assertSame( 'https://api.example.com/v1/tenants/' . $resource->get( 'uuid' ) . '/pause', $this->http_calls()[2]['url'] );
+		$call = $this->http_calls()[3];
 		$this->assertSame( 'DELETE', $call['args']['method'] );
 		$this->assertSame( 'https://api.example.com/v1/tenants/rem%2F1', $call['url'] );
 		$this->assertSame( $resource->get( 'uuid' ) . ':delete:1', $call['args']['headers']['Idempotency-Key'] );
@@ -801,7 +804,7 @@ class HttpDriverTest extends TestCase {
 	public function test_delete_answered_404_is_already_gone(): void {
 		$this->connection();
 		$resource = $this->resource();
-		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'r' ) ) ), self::answer( 404, 'Not found' ) ) );
+		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'r' ) ) ), self::answer( 200 ), self::answer( 404, 'Not found' ) ) );
 		$fresh = $this->step( $resource );
 
 		$fresh->desire( 'deleted', 'Test' );
@@ -813,6 +816,99 @@ class HttpDriverTest extends TestCase {
 		$other = $this->step( $other );
 		$other->desire( 'paused', 'Test' );
 		$this->assertSame( 'failed', $this->step( $other )->get( 'state' ) );
+	}
+
+	/**
+	 * A fake remote service: it deletes a tenant only when it is paused (409 tenant_not_paused
+	 * otherwise), like the OdooWoo API.
+	 *
+	 * @param bool $pause_works Whether the pause call succeeds.
+	 * @return \stdClass Its state: ->paused, ->deleted.
+	 */
+	private function paused_only_remote( bool $pause_works = true ): \stdClass {
+		$remote          = new \stdClass();
+		$remote->paused  = false;
+		$remote->deleted = false;
+
+		$this->respond_with(
+			static function ( $url, $args ) use ( $remote, $pause_works ) {
+				$method = $args['method'];
+
+				if ( 'POST' === $method && str_ends_with( $url, '/tenants' ) ) {
+					return self::answer( 201, array( 'data' => array( 'id' => 'r1' ) ) );
+				}
+
+				if ( 'POST' === $method && str_ends_with( $url, '/pause' ) ) {
+					if ( ! $pause_works ) {
+						return self::answer( 500, 'boom' );
+					}
+					$remote->paused = true;
+					return self::answer( 200 );
+				}
+
+				if ( 'DELETE' === $method ) {
+					if ( ! $remote->paused ) {
+						return self::answer( 409, array( 'error' => 'tenant_not_paused' ) );
+					}
+					$remote->deleted = true;
+					return self::answer( 204 );
+				}
+
+				return self::answer( 200 );
+			}
+		);
+
+		return $remote;
+	}
+
+	public function test_deleting_an_active_service_pauses_it_first(): void {
+		$this->connection();
+		$remote   = $this->paused_only_remote();
+		$resource = $this->resource();
+		$fresh    = $this->step( $resource );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+
+		$fresh->desire( 'deleted', 'Refunded' );
+		$fresh = $this->step( $fresh );
+
+		$this->assertSame( 'deleted', $fresh->get( 'state' ) );
+		$this->assertTrue( $remote->deleted );
+		$methods = array_column( array_column( $this->http_calls(), 'args' ), 'method' );
+		$this->assertSame( array( 'POST', 'POST', 'DELETE' ), $methods );
+	}
+
+	public function test_a_failing_pause_blocks_the_delete_and_retries(): void {
+		$this->connection();
+		$remote   = $this->paused_only_remote( false );
+		$resource = $this->resource();
+		$fresh    = $this->step( $resource );
+
+		$fresh->desire( 'deleted', 'Refunded' );
+		$fresh = $this->step( $fresh );
+
+		$this->assertFalse( $remote->deleted );
+		$this->assertSame( 'deleting', $fresh->get( 'state' ) );
+		$this->assertSame( 'delete', $fresh->get( 'op' ) );
+		$this->assertSame( 1, $fresh->get( 'attempts' ) );
+		$methods = array_column( array_column( $this->http_calls(), 'args' ), 'method' );
+		$this->assertNotContains( 'DELETE', $methods );
+	}
+
+	public function test_a_paused_service_is_not_paused_again_before_its_delete(): void {
+		$this->connection();
+		$remote   = $this->paused_only_remote();
+		$resource = $this->resource();
+		$fresh    = $this->step( $resource );
+		$fresh->desire( 'paused', 'Expired' );
+		$fresh = $this->step( $fresh );
+		$this->assertSame( 'paused', $fresh->get( 'state' ) );
+
+		$fresh->desire( 'deleted', 'Retention over' );
+		$fresh = $this->step( $fresh );
+
+		$this->assertSame( 'deleted', $fresh->get( 'state' ) );
+		$methods = array_column( array_column( $this->http_calls(), 'args' ), 'method' );
+		$this->assertSame( array( 'POST', 'POST', 'DELETE' ), $methods );
 	}
 
 	public function test_a_changed_body_gets_a_new_key(): void {

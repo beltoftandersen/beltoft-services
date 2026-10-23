@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.2.4\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.2.5\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-23T10:07:05+00:00\n"
+"POT-Creation-Date: 2026-10-23T10:45:43+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -1663,7 +1663,7 @@ msgid "Reinstalling erases everything on the server. Continue?"
 msgstr ""
 
 #: src/Proxmox/Panels.php:106
-#: src/Proxmox/ProxmoxDriver.php:84
+#: src/Proxmox/ProxmoxDriver.php:85
 msgid "Cluster"
 msgstr ""
 
@@ -1692,51 +1692,51 @@ msgstr ""
 msgid "Virtual machine"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:40
+#: src/Proxmox/ProxmoxDriver.php:41
 msgid "Proxmox VM"
 msgstr ""
 
 #. translators: 1: servers used, 2: servers allowed
-#: src/Proxmox/ProxmoxDriver.php:58
+#: src/Proxmox/ProxmoxDriver.php:59
 #, php-format
 msgid "%1$d of %2$d server"
 msgid_plural "%1$d of %2$d servers"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Proxmox/ProxmoxDriver.php:79
+#: src/Proxmox/ProxmoxDriver.php:80
 msgid "none yet"
 msgstr ""
 
 #. translators: %s: cluster ids, comma separated.
-#: src/Proxmox/ProxmoxDriver.php:86
+#: src/Proxmox/ProxmoxDriver.php:87
 #, php-format
 msgid "The id of the Proxmox cluster to build on. Configured: %s"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:92
+#: src/Proxmox/ProxmoxDriver.php:93
 msgid "Template VMID"
 msgstr ""
 
 #. translators: %s: templates per cluster.
-#: src/Proxmox/ProxmoxDriver.php:94
+#: src/Proxmox/ProxmoxDriver.php:95
 #, php-format
 msgid "The fallback template VMID, used when the customer made no operating system choice (older orders, licenses issued by an admin). It must be in the cluster's template list. Configured: %s"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:100
+#: src/Proxmox/ProxmoxDriver.php:101
 msgid "CPU cores"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:107
+#: src/Proxmox/ProxmoxDriver.php:108
 msgid "Memory (MB)"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:114
+#: src/Proxmox/ProxmoxDriver.php:115
 msgid "Disk (GB)"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:115
+#: src/Proxmox/ProxmoxDriver.php:116
 msgid "The boot disk grows to this size. It is never shrunk."
 msgstr ""
 
