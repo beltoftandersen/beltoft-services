@@ -658,10 +658,15 @@ final class Backups {
 	 * (a variation with backups has no sibling "with backups"). Null when there is none, and then
 	 * no backup UI is shown.
 	 *
-	 * @param \WC_Product_Variation $v    Variation.
-	 * @param bool                  $with Whether the sibling has backups.
+	 * For an existing server (the account panel's links) stock does not matter: its machine exists,
+	 * and Stock lets a switch through at add-to-cart. Only a NEW purchase ($new_purchase: the
+	 * checkout box) needs a sibling that can be bought now.
+	 *
+	 * @param \WC_Product_Variation $v            Variation.
+	 * @param bool                  $with         Whether the sibling has backups.
+	 * @param bool                  $new_purchase Whether a new server is bought (stock and capacity count).
 	 */
-	public static function sibling( \WC_Product_Variation $v, bool $with ): ?\WC_Product_Variation {
+	public static function sibling( \WC_Product_Variation $v, bool $with, bool $new_purchase = false ): ?\WC_Product_Variation {
 		$parent = wc_get_product( $v->get_parent_id() );
 
 		if ( ! $parent instanceof \WC_Product_Variable ) {
@@ -701,7 +706,7 @@ final class Backups {
 			$plan = \BeltoftServices\Product::plan( $parent->get_id(), $other->get_id() );
 
 			// The same server, only the backups differ: never a silent plan change, never one that cannot be bought.
-			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( 'backup_days' => 1 ) ) === array_diff_key( $own, array( 'backup_days' => 1 ) ) && $other->is_purchasable() && $other->is_in_stock() ) {
+			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( 'backup_days' => 1 ) ) === array_diff_key( $own, array( 'backup_days' => 1 ) ) && ( $new_purchase ? $other->is_purchasable() && $other->is_in_stock() : '' !== (string) $other->get_price() ) ) {
 				return $other;
 			}
 		}

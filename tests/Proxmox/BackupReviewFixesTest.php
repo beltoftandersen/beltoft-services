@@ -298,7 +298,26 @@ class BackupReviewFixesTest extends BackupTestCase {
 		$v['a-Daily']->set_stock_status( 'outofstock' );
 		$v['a-Daily']->save();
 		wc_delete_product_transients( $v['a-Daily']->get_parent_id() );
-		$this->assertNull( Backups::sibling( wc_get_product( $v['a-None']->get_id() ), true ), 'Cannot be bought.' );
+		$this->assertNull( Backups::sibling( wc_get_product( $v['a-None']->get_id() ), true, true ), 'A new purchase needs stock.' );
+	}
+
+	public function test_a_sold_out_sibling_is_still_offered_to_an_existing_server_but_not_to_a_new_buyer(): void {
+		$v = $this->variable_product();
+		$v['a-Daily']->set_stock_status( 'outofstock' );
+		$v['a-Daily']->save();
+		wc_delete_product_transients( $v['a-Daily']->get_parent_id() );
+		$daily = $v['a-Daily']->get_id();
+		add_filter( 'woocommerce_is_purchasable', static fn( $p, $product ) => $product->get_id() === $daily ? false : $p, 99, 2 );
+
+		$existing = Backups::sibling( wc_get_product( $v['a-None']->get_id() ), true );
+		$this->assertNotNull( $existing, 'The server exists: no new IP or capacity is needed.' );
+		$this->assertSame( $daily, $existing->get_id() );
+		$this->assertNull( Backups::sibling( wc_get_product( $v['a-None']->get_id() ), true, true ), 'A new buyer cannot buy what is sold out.' );
+
+		$v['a-Daily']->set_status( 'draft' );
+		$v['a-Daily']->save();
+		$this->assertNull( Backups::sibling( wc_get_product( $v['a-None']->get_id() ), true ), 'An unpublished sibling is never offered.' );
+		remove_all_filters( 'woocommerce_is_purchasable', 99 );
 	}
 
 	// -- I7 ----------------------------------------------------------------------------------------
