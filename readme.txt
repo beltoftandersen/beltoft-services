@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -221,6 +221,11 @@ Nothing is provisioned, paused, resumed or deleted: licenses change without the 
 The settings, connections, clusters, IP pool, VM records, breach marks and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.3.1 =
+* The admin is mailed on the first failed backup night (and again after three), not only after three. A failed prune (for example a backup server that refuses deletes) now counts as a failed night and is alerted by the same rule, once per run of failures.
+* Fix: restoring a backup no longer shuts the restored server down again right after it was started. The restore leaves the server off, and the queued plan change applies the plan and starts it once.
+* Fix: the account panel's "Add backups" and "Remove backups" links no longer disappear for an existing server when the cluster is sold out. Only the checkout box for a new server still needs the sibling plan to be in stock.
 
 = 0.3.0 =
 * Daily server backups as a sellable add-on. A second attribute on the server product ("Backups": None or Daily) gives each plan a sibling variation with the new plan field "Backup days"; adding and removing backups are WooCommerce Subscriptions switches. Setting: "Backup storage" per cluster (a Proxmox Backup Server storage; empty turns backups off).
