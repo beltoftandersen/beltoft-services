@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-22T16:35:36+00:00\n"
+"POT-Creation-Date: 2026-10-23T10:07:05+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -955,40 +955,40 @@ msgstr ""
 msgid "One key=value per line, sent in {plan} together with the limit."
 msgstr ""
 
-#: src/Http/HttpDriver.php:253
+#: src/Http/HttpDriver.php:271
 msgid "Status:"
 msgstr ""
 
-#: src/Http/HttpDriver.php:255
+#: src/Http/HttpDriver.php:273
 msgid "Limit:"
 msgstr ""
 
-#: src/Http/HttpDriver.php:258
+#: src/Http/HttpDriver.php:276
 msgid "Usage:"
 msgstr ""
 
-#: src/Http/HttpDriver.php:266
+#: src/Http/HttpDriver.php:284
 msgid "Open"
 msgstr ""
 
-#: src/Http/HttpDriver.php:323
+#: src/Http/HttpDriver.php:341
 #: src/Product.php:395
 msgid "Connection"
 msgstr ""
 
-#: src/Http/HttpDriver.php:324
+#: src/Http/HttpDriver.php:342
 msgid "Remote id"
 msgstr ""
 
-#: src/Http/HttpDriver.php:325
+#: src/Http/HttpDriver.php:343
 msgid "Last request"
 msgstr ""
 
-#: src/Http/HttpDriver.php:326
+#: src/Http/HttpDriver.php:344
 msgid "Last answer"
 msgstr ""
 
-#: src/Http/HttpDriver.php:326
+#: src/Http/HttpDriver.php:344
 msgid "No answer"
 msgstr ""
 
@@ -1487,9 +1487,9 @@ msgid "Log in"
 msgstr ""
 
 #: src/Proxmox/EmailDetails.php:55
-#: src/Proxmox/OsField.php:252
-#: src/Proxmox/OsField.php:344
-#: src/Proxmox/OsField.php:345
+#: src/Proxmox/OsField.php:289
+#: src/Proxmox/OsField.php:381
+#: src/Proxmox/OsField.php:382
 #: templates/account/vm.php:43
 #: templates/account/vm.php:79
 msgid "Operating system"
@@ -1637,19 +1637,19 @@ msgstr ""
 msgid "Type %s"
 msgstr ""
 
-#: src/Proxmox/OsField.php:179
+#: src/Proxmox/OsField.php:216
 msgid "The chosen operating system isn't available for all servers in your cart."
 msgstr ""
 
-#: src/Proxmox/OsField.php:226
+#: src/Proxmox/OsField.php:263
 msgid "Choose an operating system for your server."
 msgstr ""
 
-#: src/Proxmox/OsField.php:253
+#: src/Proxmox/OsField.php:290
 msgid "The system your server is installed with. It is used for every server of this product on the order."
 msgstr ""
 
-#: src/Proxmox/OsField.php:346
+#: src/Proxmox/OsField.php:383
 msgid "Choose an operating system"
 msgstr ""
 
@@ -1830,28 +1830,26 @@ msgstr ""
 msgid "The site tag was not changed: virtual machines already carry it in their description, and a different tag would make this site refuse to manage every one of them. Change it only after every service has been deleted."
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:253
+#: src/Proxmox/SshKeyField.php:259
 msgid "The SSH public key is not valid. Paste the single line from your .pub file: ssh-ed25519, ecdsa-sha2-nistp256/384/521, or ssh-rsa with at least 3072 bits."
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:341
-#: src/Proxmox/SshKeyField.php:421
+#: src/Proxmox/SshKeyField.php:384
+#: src/Proxmox/SshKeyField.php:464
 #: templates/account/vm.php:65
 msgid "SSH public key"
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:342
+#: src/Proxmox/SshKeyField.php:385
 msgid "Optional. Paste the single line from your .pub file to log in to your server without a password. The key is used for every server of this product on the order."
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:422
+#: src/Proxmox/SshKeyField.php:465
 msgid "SSH public key (optional)"
 msgstr ""
 
-#. translators: %d: disk size in GB
-#: src/Proxmox/Switches.php:77
-#, php-format
-msgid "This plan has a smaller disk than your server. Choose a plan with at least %d GB."
+#: src/Proxmox/Switches.php:85
+msgid "Servers can't be downgraded. Choose a plan at least as large as your current one."
 msgstr ""
 
 #: src/Resource.php:224

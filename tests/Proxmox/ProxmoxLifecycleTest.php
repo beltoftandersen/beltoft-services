@@ -665,6 +665,37 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assert_only_reads( $seen );
 	}
 
+	private const NO_DOWNGRADE = "Servers can't be downgraded. Choose a plan at least as large as your current one.";
+
+	public function test_a_switch_to_a_smaller_plan_in_any_dimension_is_refused(): void {
+		Switches::register();
+		$plan = static fn( int $cores, int $memory, int $disk ): array => array( 'cluster' => 'lab', 'template' => 9000, 'cores' => $cores, 'memory_mb' => $memory, 'disk_gb' => $disk );
+		$now  = $this->service_product( 'proxmox', $plan( 2, 4096, 40 ), array( 'max' => 1, 'slug' => 'vm-now' ) );
+		$cases = array(
+			'less disk'    => array( $plan( 2, 4096, 20 ), true ),
+			'fewer cores'  => array( $plan( 1, 4096, 40 ), true ),
+			'less memory'  => array( $plan( 2, 2048, 40 ), true ),
+			'equal'        => array( $plan( 2, 4096, 40 ), false ),
+			'bigger'       => array( $plan( 4, 8192, 80 ), false ),
+			'bigger disk only' => array( $plan( 2, 4096, 50 ), false ),
+		);
+
+		$license = $this->service_license( $now, array( 'fire' => false, 'subscription_id' => 6161 ) );
+		$this->assertInstanceOf( Resource::class, Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $now->get_id() ) ) );
+		$subscription = new class() {
+			public function get_id() {
+				return 6161;
+			}
+		};
+
+		$n = 0;
+		foreach ( $cases as $name => $case ) {
+			$target = $this->service_product( 'proxmox', $case[0], array( 'max' => 1, 'slug' => 'vm-target-' . ( ++$n ) ) );
+			$result = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $subscription, null );
+			$this->assertSame( $case[1] ? self::NO_DOWNGRADE : '', $result, $name );
+		}
+	}
+
 	public function test_medusa_disk_downgrade_is_refused_before_payment(): void {
 		Switches::register();
 		$big     = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 60 ), array( 'max' => 1, 'slug' => 'vm-big' ) );
@@ -680,7 +711,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		};
 
 		$refused = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $small->get_id(), 1, 0, $subscription, null );
-		$this->assertSame( 'This plan has a smaller disk than your server. Choose a plan with at least 60 GB.', $refused );
+		$this->assertSame( self::NO_DOWNGRADE, $refused );
 
 		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $larger->get_id(), 1, 0, $subscription, null ) );
 		$this->assertSame( 'Another error.', apply_filters( 'woocommerce_subscriptions_switch_error_message', 'Another error.', $small->get_id(), 1, 0, $subscription, null ), 'WCS\'s own message is kept.' );
@@ -955,7 +986,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		};
 
 		$down = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $product->get_id(), 1, (int) $variations[0], $subscription, null );
-		$this->assertSame( 'This plan has a smaller disk than your server. Choose a plan with at least 40 GB.', $down );
+		$this->assertSame( self::NO_DOWNGRADE, $down );
 		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $product->get_id(), 1, (int) $variations[2], $subscription, null ) );
 		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $product->get_id(), 1, (int) $variations[1], $subscription, null ) );
 	}

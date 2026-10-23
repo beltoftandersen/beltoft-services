@@ -1,6 +1,6 @@
 <?php
 /**
- * Refuses a subscription switch to a plan with a smaller disk than the customer's server.
+ * Refuses a subscription switch to a plan smaller than the customer's server.
  *
  * @package BeltoftServices
  */
@@ -14,8 +14,9 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * WCS applies a switch by changing the license's variation. A disk is never shrunk, so a
- * downgrade of the disk would be paid for and then not applied: it is refused before payment, with
+ * WCS applies a switch by changing the license's variation. Servers are never downgraded (and a
+ * disk is never shrunk, so it would be paid for and then not applied): a plan with less disk, fewer
+ * cores or less memory than the server has now is refused before payment, with
  * WCS's own filter `woocommerce_subscriptions_switch_error_message` (WooCommerce Subscriptions
  * includes/switching/class-wc-subscriptions-switcher.php, applied in validate_switch_request()).
  * Plan A's Checkout skips switch carts, so this is its own class.
@@ -50,12 +51,16 @@ final class Switches {
 		try {
 			$target = Product::plan( (int) $product_id, (int) $variation_id > 0 ? (int) $variation_id : null );
 
-			if ( ! isset( $target['disk_gb'] ) || 'proxmox' !== ( Product::driver_for( (int) $product_id ) ? Product::driver_for( (int) $product_id )->id() : '' ) ) {
+			if ( 'proxmox' !== ( Product::driver_for( (int) $product_id ) ? Product::driver_for( (int) $product_id )->id() : '' ) ) {
 				return $message;
 			}
 
 			$item_product = ( is_object( $item ) && method_exists( $item, 'get_product_id' ) ) ? (int) $item->get_product_id() : 0;
-			$biggest      = 0;
+			$have         = array(
+				'disk_gb'   => 0,
+				'cores'     => 0,
+				'memory_mb' => 0,
+			);
 
 			foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
 				if ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) {
@@ -68,13 +73,17 @@ final class Switches {
 					continue;
 				}
 
-				$plan    = (array) $resource->get( 'plan' );
-				$biggest = max( $biggest, (int) ( $plan['disk_gb'] ?? 0 ), (int) $resource->get( 'disk_gb' ) );
+				$plan              = (array) $resource->get( 'plan' );
+				$have['disk_gb']   = max( $have['disk_gb'], (int) ( $plan['disk_gb'] ?? 0 ), (int) $resource->get( 'disk_gb' ) );
+				$have['cores']     = max( $have['cores'], (int) ( $plan['cores'] ?? 0 ) );
+				$have['memory_mb'] = max( $have['memory_mb'], (int) ( $plan['memory_mb'] ?? 0 ) );
 			}
 
-			if ( $biggest > (int) $target['disk_gb'] ) {
-				/* translators: %d: disk size in GB */
-				return sprintf( __( 'This plan has a smaller disk than your server. Choose a plan with at least %d GB.', 'beltoft-services' ), $biggest );
+			// A dimension the target plan does not state (or the server's record lacks) cannot be compared: let it through.
+			foreach ( $have as $key => $now ) {
+				if ( isset( $target[ $key ] ) && $now > 0 && (int) $target[ $key ] > 0 && $now > (int) $target[ $key ] ) {
+					return __( "Servers can't be downgraded. Choose a plan at least as large as your current one.", 'beltoft-services' );
+				}
 			}
 		} catch ( \Throwable $e ) {
 			unset( $e ); // Cannot tell: let the switch through; update_plan keeps the disk anyway.

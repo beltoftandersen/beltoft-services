@@ -213,6 +213,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks and email
 
 = 0.2.4 =
 * Fix: paying a renewal (also an early renewal) or a switch no longer asks for an operating system or an SSH key, in the classic and the block checkout; nothing is validated or saved for it. A resubscribe still asks, as it can build a new server. Themes can call `\BeltoftServices\Proxmox\OsField::cart_needs_choice()`.
+* A switch to a plan with less disk, fewer cores or less memory than the server has is refused before payment ("Servers can't be downgraded"); it used to be refused only for a smaller disk.
 * Fix: the usage shown in the account panel is refreshed after a plan change, so the old limit is not shown for up to an hour.
 
 = 0.2.3 =
