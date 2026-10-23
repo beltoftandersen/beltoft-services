@@ -52,6 +52,11 @@ final class SshKeyField {
 	 */
 	public const BLOCK_FIELD_ID = 'beltoft-services/ssh-public-key';
 
+	/**
+	 * Store API cart extension namespace of the renewal/switch flag.
+	 */
+	public const EXTENSION = 'beltoft-services';
+
 	private const MAX_BYTES = 8192;
 	private const MIN_RSA   = 3072;
 
@@ -69,6 +74,7 @@ final class SshKeyField {
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_classic' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 10, 4 );
 		add_action( 'woocommerce_init', array( __CLASS__, 'register_block_field' ) );
+		add_action( 'woocommerce_init', array( __CLASS__, 'register_cart_flag' ) );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
 	}
 
@@ -286,6 +292,43 @@ final class SshKeyField {
 	}
 
 	/**
+	 * Should the SSH key be asked for: the cart holds a VM and is not a renewal, early renewal or switch?
+	 */
+	public static function cart_needs_key(): bool {
+		return self::cart_has_vm() && ! OsField::cart_is_existing_server();
+	}
+
+	/**
+	 * Store API cart extension data `beltoft-services.existing_server`, which the block fields' hidden
+	 * rule reads (the cart document's `extensions`): true for a renewal or switch cart.
+	 */
+	public static function register_cart_flag(): void {
+		if ( ! function_exists( 'woocommerce_store_api_register_endpoint_data' ) ) {
+			return;
+		}
+
+		try {
+			woocommerce_store_api_register_endpoint_data(
+				array(
+					'endpoint'        => 'cart',
+					'namespace'       => self::EXTENSION,
+					'data_callback'   => static fn(): array => array( 'existing_server' => OsField::cart_is_existing_server() ),
+					'schema_callback' => static fn(): array => array(
+						'existing_server' => array(
+							'description' => 'The cart pays a renewal or switch of an existing server.',
+							'type'        => 'boolean',
+							'readonly'    => true,
+						),
+					),
+					'schema_type'     => ARRAY_A,
+				)
+			);
+		} catch ( \Exception $e ) {
+			unset( $e ); // Already registered or too late: the server side checks still hold.
+		}
+	}
+
+	/**
 	 * Ids of VM products and their variations: what the block field's rule compares the cart to.
 	 *
 	 * @return int[]
@@ -328,7 +371,7 @@ final class SshKeyField {
 	 * Shows the textarea when the cart holds a VM.
 	 */
 	public static function render_classic(): void {
-		if ( ! self::cart_has_vm() ) {
+		if ( ! self::cart_needs_key() ) {
 			return;
 		}
 
@@ -379,7 +422,7 @@ final class SshKeyField {
 	public static function validate_classic( $data, $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
 		$value = self::posted();
 
-		if ( '' !== $value && $errors instanceof \WP_Error && self::cart_has_vm() && null === self::normalise( $value ) ) {
+		if ( '' !== $value && $errors instanceof \WP_Error && self::cart_needs_key() && null === self::normalise( $value ) ) {
 			$errors->add( 'beltoft_services_ssh_key', self::invalid_message() );
 		}
 	}
@@ -393,7 +436,7 @@ final class SshKeyField {
 	 * @param \WC_Order              $order    Order (unused).
 	 */
 	public static function save_on_item( $item, $key = '', $values = array(), $order = null ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( ! $item instanceof \WC_Order_Item_Product || ! self::is_vm_product( (int) $item->get_product_id() ) ) {
+		if ( ! $item instanceof \WC_Order_Item_Product || ! self::is_vm_product( (int) $item->get_product_id() ) || OsField::cart_is_existing_server() ) {
 			return;
 		}
 
@@ -427,11 +470,30 @@ final class SshKeyField {
 			// Hidden when the cart's product ids contain none of the VM products. 0 never is a product id.
 			'hidden'                     => array(
 				'cart' => array(
-					'properties' => array(
-						'items' => array(
-							'not' => array(
-								'contains' => array( 'enum' => $ids ? $ids : array( 0 ) ),
+					'anyOf' => array(
+						array(
+							'properties' => array(
+								'items' => array(
+									'not' => array(
+										'contains' => array( 'enum' => $ids ? $ids : array( 0 ) ),
+									),
+								),
 							),
+						),
+						// A renewal or switch pays a server that already runs.
+						array(
+							'properties' => array(
+								'extensions' => array(
+									'properties' => array(
+										self::EXTENSION => array(
+											'properties' => array( 'existing_server' => array( 'const' => true ) ),
+											'required'   => array( 'existing_server' ),
+										),
+									),
+									'required'   => array( self::EXTENSION ),
+								),
+							),
+							'required'   => array( 'extensions' ),
 						),
 					),
 				),
@@ -474,7 +536,8 @@ final class SshKeyField {
 	 * @return true|\WP_Error
 	 */
 	public static function block_validate( $value ) {
-		if ( is_string( $value ) && '' === trim( $value ) ) {
+		// A renewal or switch never changes the system: nothing is asked, nothing refused.
+		if ( OsField::cart_is_existing_server() || ( is_string( $value ) && '' === trim( $value ) ) ) {
 			return true;
 		}
 

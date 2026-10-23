@@ -433,4 +433,163 @@ class OsFieldTest extends TestCase {
 		Lifecycle::provide( $no_order );
 		$this->assertNull( Resource::for_license( (int) $no_order['id'] )->get( 'os_template' ) );
 	}
+
+	// -- Renewal, early renewal, switch and resubscribe carts --------------------------------------
+
+	private function flow_cart( string $flow ): void {
+		WC()->cart->empty_cart();
+
+		if ( 'subscription_switch' === $flow ) {
+			// WooCommerce Subscriptions drops a switch item whose switch it cannot validate (no real
+			// subscription and variable plan here), so the flag is set on a plain item.
+			$key = WC()->cart->add_to_cart( $this->vm()->get_id() );
+			$this->assertNotFalse( $key );
+			WC()->cart->cart_contents[ $key ]['subscription_switch'] = array( 'subscription_id' => 1 );
+			return;
+		}
+
+		$data = 'new' === $flow ? array() : array( $flow => array( 'subscription_id' => 1, 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) );
+		$this->assertNotFalse( WC()->cart->add_to_cart( $this->vm()->get_id(), 1, 0, array(), $data ) );
+	}
+
+	private static function valid_ssh_key(): string {
+		return 'ssh-ed25519 ' . base64_encode( pack( 'N', 11 ) . 'ssh-ed25519' . pack( 'N', 32 ) . random_bytes( 32 ) ) . ' me@host';
+	}
+
+	/**
+	 * What both classic fields do for a cart.
+	 *
+	 * @return array{os: bool, key: bool, os_errors: string[], key_errors: string[], os_saved: string, key_saved: string}
+	 */
+	private function fields_for_cart(): array {
+		ob_start();
+		do_action( 'woocommerce_after_order_notes' );
+		$html = (string) ob_get_clean();
+
+		do_action( 'woocommerce_checkout_process' );
+		$_POST[ OsField::POST_KEY ]                = '9001';
+		$_POST[ \BeltoftServices\Proxmox\SshKeyField::POST_KEY ] = self::valid_ssh_key();
+		$errors = new \WP_Error();
+		OsField::validate_classic( array(), $errors );
+		$os_errors = $errors->get_error_messages();
+
+		// No OS posted at all, and a junk key.
+		unset( $_POST[ OsField::POST_KEY ] );
+		$_POST[ \BeltoftServices\Proxmox\SshKeyField::POST_KEY ] = 'junk';
+		$errors = new \WP_Error();
+		OsField::validate_classic( array(), $errors );
+		\BeltoftServices\Proxmox\SshKeyField::validate_classic( array(), $errors );
+		$missing = $errors->get_error_messages();
+
+		$_POST[ OsField::POST_KEY ]                = '9001';
+		$_POST[ \BeltoftServices\Proxmox\SshKeyField::POST_KEY ] = self::valid_ssh_key();
+		$item = new \WC_Order_Item_Product();
+		$item->set_product( $this->vm() );
+		OsField::save_on_item( $item );
+		\BeltoftServices\Proxmox\SshKeyField::save_on_item( $item );
+
+		unset( $_POST[ \BeltoftServices\Proxmox\SshKeyField::POST_KEY ] );
+
+		return array(
+			'os'         => str_contains( $html, OsField::POST_KEY ),
+			'key'        => str_contains( $html, \BeltoftServices\Proxmox\SshKeyField::POST_KEY ),
+			'os_errors'  => $missing,
+			'key_errors' => $os_errors,
+			'os_saved'   => (string) $item->get_meta( OsField::ITEM_META ),
+			'key_saved'  => (string) $item->get_meta( \BeltoftServices\Proxmox\SshKeyField::ITEM_META ),
+		);
+	}
+
+	public function test_a_new_purchase_shows_validates_and_saves_both_fields(): void {
+		$this->flow_cart( 'new' );
+
+		$this->assertTrue( OsField::cart_needs_choice() );
+		$r = $this->fields_for_cart();
+		$this->assertTrue( $r['os'] );
+		$this->assertTrue( $r['key'] );
+		$this->assertCount( 2, $r['os_errors'], 'Missing OS and junk key are refused.' );
+		$this->assertSame( array(), $r['key_errors'], 'A listed OS and a valid key pass.' );
+		$this->assertSame( '9001', $r['os_saved'] );
+		$this->assertNotSame( '', $r['key_saved'] );
+	}
+
+	/**
+	 * @dataProvider existing_server_flows
+	 */
+	public function test_renewal_early_renewal_and_switch_carts_ask_for_nothing( string $flow ): void {
+		$this->flow_cart( $flow );
+
+		$this->assertTrue( OsField::cart_is_existing_server() );
+		$this->assertFalse( OsField::cart_needs_choice() );
+		$r = $this->fields_for_cart();
+		$this->assertFalse( $r['os'], 'No OS select.' );
+		$this->assertFalse( $r['key'], 'No SSH key field.' );
+		$this->assertSame( array(), $r['os_errors'], 'Nothing is validated.' );
+		$this->assertSame( '', $r['os_saved'], 'Nothing is saved on the item.' );
+		$this->assertSame( '', $r['key_saved'] );
+
+		// The block checkout validators accept the empty entries too.
+		$this->assertTrue( OsField::block_validate( '' ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\SshKeyField::block_validate( 'junk' ) );
+	}
+
+	/**
+	 * @return array<string, array{0: string}>
+	 */
+	public static function existing_server_flows(): array {
+		return array(
+			'renewal'       => array( 'subscription_renewal' ),
+			'early renewal' => array( 'subscription_renewal_early' ),
+			'switch'        => array( 'subscription_switch' ),
+		);
+	}
+
+	public function test_a_resubscribe_cart_keeps_both_fields_because_it_can_build_a_new_server(): void {
+		$this->flow_cart( 'subscription_resubscribe' );
+
+		$this->assertFalse( OsField::cart_is_existing_server() );
+		$this->assertTrue( OsField::cart_needs_choice() );
+		$r = $this->fields_for_cart();
+		$this->assertTrue( $r['os'] );
+		$this->assertTrue( $r['key'] );
+		$this->assertSame( '9001', $r['os_saved'] );
+	}
+
+	public function test_cart_needs_choice_is_false_without_a_vm_or_templates(): void {
+		$this->assertFalse( OsField::cart_needs_choice(), 'Empty cart.' );
+
+		$this->flow_cart( 'new' );
+		delete_option( Clusters::OPTION );
+		$this->assertFalse( OsField::cart_needs_choice(), 'No templates.' );
+	}
+
+	public function test_the_block_fields_are_hidden_for_a_renewal_or_switch_cart(): void {
+		$vm   = $this->vm();
+		$args = OsField::block_field_args();
+
+		$hidden = function ( array $cart ) use ( $args ): bool {
+			$doc = new class( $cart ) extends DocumentObject {
+				private $data_cart;
+				public function __construct( array $cart ) {
+					$this->data_cart = $cart;
+				}
+				public function get_data() {
+					return array( 'cart' => $this->data_cart );
+				}
+			};
+
+			return true === Validation::validate_document_object( $doc, $args['hidden'] );
+		};
+
+		$ns = \BeltoftServices\Proxmox\SshKeyField::EXTENSION;
+		$this->assertFalse( $hidden( array( 'items' => array( $vm->get_id() ), 'extensions' => (object) array( $ns => array( 'existing_server' => false ) ) ) ) );
+		$this->assertTrue( $hidden( array( 'items' => array( $vm->get_id() ), 'extensions' => (object) array( $ns => array( 'existing_server' => true ) ) ) ) );
+		$this->assertTrue( $hidden( array( 'items' => array( 999999 ), 'extensions' => (object) array() ) ) );
+
+		// The flag the rule reads is served by the Store API cart extension data.
+		$this->flow_cart( 'subscription_renewal' );
+		$data = \Automattic\WooCommerce\StoreApi\StoreApi::container()->get( \Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema::class )->get_endpoint_data( 'cart' );
+		$flag = json_decode( (string) wp_json_encode( $data ), true );
+		$this->assertTrue( $flag[ $ns ]['existing_server'] );
+	}
 }

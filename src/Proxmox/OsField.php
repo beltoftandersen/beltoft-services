@@ -158,6 +158,43 @@ final class OsField {
 	}
 
 	/**
+	 * Cart item data keys of a renewal (also early) and a switch of WooCommerce Subscriptions
+	 * (WCS_Cart_Renewal, WCS_Cart_Switch; what wcs_cart_contains_renewal(), _early_renewal() and
+	 * _switches() look for). They pay for a server that already runs, whose system is never
+	 * changed after payment. A resubscribe is not listed: it can build a new server.
+	 */
+	private const EXISTING_SERVER_KEYS = array( 'subscription_renewal', 'subscription_renewal_early', 'subscription_switch' );
+
+	/**
+	 * Does the cart pay for a server that already exists: a renewal, an early renewal or a switch?
+	 */
+	public static function cart_is_existing_server(): bool {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		if ( ! $cart ) {
+			return false;
+		}
+
+		foreach ( $cart->get_cart() as $item ) {
+			foreach ( self::EXISTING_SERVER_KEYS as $key ) {
+				if ( ! empty( $item[ $key ] ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Should checkout ask for an operating system (and an SSH key)? True only when the cart holds a
+	 * VM product with templates and is not a renewal or switch. Safe for a theme to call.
+	 */
+	public static function cart_needs_choice(): bool {
+		return ! self::cart_is_existing_server() && null !== self::cart_choice();
+	}
+
+	/**
 	 * The refusal for a choice: the all-servers message when it is a template of some server's
 	 * cluster, otherwise the plain "choose" message. Null when it is acceptable.
 	 *
@@ -232,7 +269,7 @@ final class OsField {
 	 * Shows the select when the cart holds a VM with templates.
 	 */
 	public static function render_classic(): void {
-		$choice = self::cart_choice();
+		$choice = self::cart_needs_choice() ? self::cart_choice() : null;
 
 		if ( null === $choice ) {
 			return;
@@ -282,7 +319,7 @@ final class OsField {
 	 * @param \WP_Error $errors Errors.
 	 */
 	public static function validate_classic( $data, $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		$choice = self::cart_choice();
+		$choice = self::cart_needs_choice() ? self::cart_choice() : null;
 
 		$why = null === $choice ? null : self::refusal( self::posted(), $choice );
 
@@ -311,7 +348,7 @@ final class OsField {
 			return;
 		}
 
-		$choice = self::cart_choice();
+		$choice = self::cart_needs_choice() ? self::cart_choice() : null;
 		$vmid   = null === $choice ? 0 : self::pick( self::posted(), $choice['options'] );
 
 		if ( $vmid > 0 ) {
@@ -387,6 +424,11 @@ final class OsField {
 	 * @return true|\WP_Error
 	 */
 	public static function block_validate( $value ) {
+		// A renewal or switch never changes the system: nothing is asked, nothing refused.
+		if ( self::cart_is_existing_server() ) {
+			return true;
+		}
+
 		// The select lists every configured template (registered once, before any cart); the cart decides here.
 		$choice = self::cart_choice();
 
