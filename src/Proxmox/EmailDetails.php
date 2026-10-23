@@ -44,7 +44,6 @@ final class EmailDetails {
 		$list   = null === $record ? array() : OsField::options_for( $record['cluster'] );
 		$chosen = (int) $r->get( OsField::META );
 		$chosen = $chosen > 0 ? $chosen : (int) ( $plan['template'] ?? 0 );
-		$disk   = (int) $r->get( 'disk_gb' );
 
 		if ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			$details[ __( 'IP address', 'beltoft-services' ) ] = $ip;
@@ -60,7 +59,7 @@ final class EmailDetails {
 			__( '%1$d vCPU, %2$d MB RAM, %3$d GB disk', 'beltoft-services' ),
 			(int) ( $plan['cores'] ?? 0 ),
 			(int) ( $plan['memory_mb'] ?? 0 ),
-			$disk > 0 ? $disk : (int) ( $plan['disk_gb'] ?? 0 )
+			Panels::disk_gb( $r )
 		);
 
 		if ( Access::revealable( $r ) ) {

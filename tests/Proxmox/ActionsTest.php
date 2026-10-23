@@ -500,6 +500,85 @@ class ActionsTest extends TestCase {
 		$this->assertSame( 'Replace SSH key', Actions::offered( Resource::find( $r->id() ) )['replace_ssh_key'] );
 	}
 
+	public function test_replace_ssh_key_on_a_running_vm_replaces_authorized_keys_through_the_guest_agent(): void {
+		list( $r ) = $this->ready();
+		$vmid      = (int) $r->get( 'vmid' );
+		$old       = self::key();
+		$new       = self::key();
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $vmid . '/agent/file-write', array( 'file' => '/root/.ssh/authorized_keys', 'content' => $old . "\n" ) );
+
+		$this->act( $r, 'replace_ssh_key', array( 'key' => $new ) );
+
+		$clean = \BeltoftServices\Proxmox\SshKeyField::normalise( $new );
+		$this->assertSame( $clean . "\n", $this->fake->guest_file( $vmid, '/root/.ssh/authorized_keys' ), 'The file holds the new key only.' );
+		$this->assertStringNotContainsString( explode( ' ', $old )[1], (string) $this->fake->guest_file( $vmid, '/root/.ssh/authorized_keys' ) );
+		$this->assertNotEmpty( $this->calls( 'PUT', '/qemu/' . $vmid . '/config' ), 'The cloud-init key is updated too.' );
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );
+		$this->assertSame( $clean, Resource::find( $r->id() )->get( 'ssh_key' ) );
+		$this->assertContains( 'Customer changed the SSH key', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ), 'message' ) );
+	}
+
+	public function test_replace_ssh_key_on_a_stopped_vm_only_updates_the_cloud_init_key_and_says_so(): void {
+		list( $r ) = $this->ready();
+		$vmid      = (int) $r->get( 'vmid' );
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/' . $vmid . '/status/stop' );
+		$files = count( $this->calls( 'POST', '/agent/file-write' ) );
+
+		$this->act( $r, 'replace_ssh_key', array( 'key' => self::key() ) );
+
+		$this->assertCount( $files, $this->calls( 'POST', '/agent/file-write' ), 'A stopped VM has no agent.' );
+		$this->assertNotEmpty( $this->calls( 'PUT', '/qemu/' . $vmid . '/config' ) );
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );
+		$messages = implode( ' | ', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ), 'message' ) );
+		$this->assertStringContainsString( 'applies when the server next starts', $messages );
+	}
+
+	public function test_replace_ssh_key_denied_by_proxmox_names_the_privilege_and_keeps_the_config_key(): void {
+		list( $r ) = $this->ready();
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->mails = array();
+		$vmid        = (int) $r->get( 'vmid' );
+		$this->fake->fail_next( 'POST', '#/agent/file-write$#', array( 'status' => 403, 'message' => 'Permission check failed (/vms/' . $vmid . ', VM.GuestAgent.FileWrite|VM.GuestAgent.Unrestricted)' ) );
+
+		$this->act( $r, 'replace_ssh_key', array( 'key' => self::key() ) );
+
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ), 'The service stays ready.' );
+		$this->assertNotEmpty( $this->calls( 'PUT', '/qemu/' . $vmid . '/config' ) );
+		$this->assertNotEmpty( $this->mails, 'The admin is told.' );
+		$this->assertStringContainsString( 'VM.GuestAgent.FileWrite', (string) $this->mails[0]['message'] );
+		$messages = implode( ' | ', wp_list_pluck( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ), 'message' ) );
+		$this->assertStringContainsString( 'VM.GuestAgent.FileWrite', $messages );
+	}
+
+	public function test_replace_ssh_key_retries_when_the_agent_does_not_answer(): void {
+		list( $r ) = $this->ready();
+		$vmid      = (int) $r->get( 'vmid' );
+		$new       = self::key();
+		$this->fake->fail_next( 'POST', '#/agent/file-write$#', array( 'status' => 500, 'message' => 'QEMU guest agent is not running' ) );
+
+		$result = ( new Actions( Resource::find( $r->id() ) ) )->run( 'replace_ssh_key', array( 'key' => $new ) );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertNull( $this->fake->guest_file( $vmid, '/root/.ssh/authorized_keys' ) );
+
+		$result = ( new Actions( Resource::find( $r->id() ) ) )->run( 'replace_ssh_key', array( 'key' => $new ) );
+		$this->assertTrue( $result->is_done() );
+		$this->assertSame( \BeltoftServices\Proxmox\SshKeyField::normalise( $new ) . "\n", $this->fake->guest_file( $vmid, '/root/.ssh/authorized_keys' ) );
+	}
+
+	public function test_replace_ssh_key_on_a_vm_that_is_not_ours_writes_nothing(): void {
+		list( $r ) = $this->ready();
+		$this->break_ownership( $r, 'tag' );
+		$seen = count( $this->fake->calls() );
+
+		$result = ( new Actions( Resource::find( $r->id() ) ) )->run( 'replace_ssh_key', array( 'key' => self::key() ) );
+
+		$this->assertTrue( $result->is_failed() );
+
+		foreach ( array_slice( $this->fake->calls(), $seen ) as $call ) {
+			$this->assertSame( 'GET', $call['method'], $call['method'] . ' ' . $call['path'] );
+		}
+	}
+
 	public function test_a_resource_without_a_key_offers_add_ssh_key(): void {
 		list( $r ) = $this->ready();
 
@@ -866,6 +945,40 @@ class ActionsTest extends TestCase {
 		$this->assertStringContainsString( 'beltoft-services:', $admin );
 		$this->assertStringContainsString( (string) $r->get( 'vmid' ), $admin );
 		$this->assertStringNotContainsString( (string) Crypto::decrypt( (string) $r->get( 'reveal' ) ), $admin );
+	}
+
+	public function test_the_panels_show_the_disk_of_the_current_plan_after_an_upgrade(): void {
+		list( $r, $owner ) = $this->ready();
+		$this->assertStringContainsString( '30 GB disk', $this->panel( $r, $owner ) );
+
+		$plan = array_merge( (array) $r->get( 'plan' ), array( 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 60 ) );
+		$this->assertTrue( Resource::find( $r->id() )->change_plan( $plan, 'Plan changed' ) );
+		Jobs::run( $r->id() );
+
+		$fresh = Resource::find( $r->id() );
+		$html  = $this->panel( $fresh, $owner );
+		$this->assertStringContainsString( '60 GB disk', $html );
+		$this->assertStringNotContainsString( '30 GB disk', $html );
+		ob_start();
+		( new ProxmoxDriver() )->render_admin( $fresh );
+		$this->assertStringContainsString( '60 GB disk', (string) ob_get_clean() );
+	}
+
+	public function test_a_stale_stored_disk_never_hides_a_bigger_plan_disk(): void {
+		list( $r, $owner ) = $this->ready();
+		$plan              = array_merge( (array) $r->get( 'plan' ), array( 'disk_gb' => 60 ) );
+		$r->set( array( 'plan' => $plan, 'disk_gb' => 30 ) );
+
+		$html = $this->panel( Resource::find( $r->id() ), $owner );
+
+		$this->assertStringContainsString( '60 GB disk', $html );
+	}
+
+	public function test_a_disk_bigger_than_the_plan_is_shown_as_it_is(): void {
+		list( $r, $owner ) = $this->ready();
+		$r->set( array( 'disk_gb' => 80 ) );
+
+		$this->assertStringContainsString( '80 GB disk', $this->panel( Resource::find( $r->id() ), $owner ) );
 	}
 
 	public function test_the_panel_of_a_paused_service_has_no_forms_or_buttons(): void {

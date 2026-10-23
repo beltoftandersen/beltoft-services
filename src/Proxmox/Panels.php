@@ -55,6 +55,18 @@ final class Panels {
 	}
 
 	/**
+	 * The boot disk size to show, in GB: the larger of the size recorded after the last build or
+	 * resize and the plan's. A disk is never shrunk and a plan never asks for less than the VM
+	 * has (servers cannot be downgraded), so the larger one is the disk the VM has now, and a
+	 * stale record can never hide an upgrade.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function disk_gb( Resource $r ): int {
+		return max( (int) $r->get( 'disk_gb' ), (int) ( ( (array) $r->get( 'plan' ) )['disk_gb'] ?? 0 ) );
+	}
+
+	/**
 	 * The customer's part of the panel.
 	 *
 	 * @param Resource $r Resource.
@@ -74,7 +86,7 @@ final class Panels {
 			'plan'       => array(
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),
-				'disk_gb'   => (int) ( $r->get( 'disk_gb' ) ? $r->get( 'disk_gb' ) : ( $plan['disk_gb'] ?? 0 ) ),
+				'disk_gb'   => self::disk_gb( $r ),
 			),
 			'power'      => null === $status ? '' : (string) $status['power'],
 			'os_label'   => (string) ( $list[ $chosen ] ?? '' ),
@@ -109,6 +121,13 @@ final class Panels {
 			__( 'IP address', 'beltoft-services' )    => (string) $r->get( 'ip' ),
 			__( 'Ownership tag', 'beltoft-services' ) => Ownership::tag( $r ),
 			__( 'Power', 'beltoft-services' )         => null === $status ? '' : (string) $status['power'],
+			__( 'Size', 'beltoft-services' )          => sprintf(
+				/* translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB */
+				__( '%1$d vCPU, %2$d MB RAM, %3$d GB disk', 'beltoft-services' ),
+				(int) ( ( (array) $r->get( 'plan' ) )['cores'] ?? 0 ),
+				(int) ( ( (array) $r->get( 'plan' ) )['memory_mb'] ?? 0 ),
+				self::disk_gb( $r )
+			),
 			__( 'Template', 'beltoft-services' )      => (string) ( (int) $r->get( OsField::META ) > 0 ? $r->get( OsField::META ) : ( (array) $r->get( 'plan' ) )['template'] ?? '' ),
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),
 		);

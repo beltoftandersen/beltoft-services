@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
@@ -25,7 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * Proxmox endpoints (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html#<path>):
  * /nodes/{node}/qemu/{vmid}/status/start, .../status/shutdown (`timeout`), .../status/reboot
  * (`timeout`), PUT .../config (`cipassword`, `sshkeys`), POST .../agent/set-user-password
- * (`username`, `password`).
+ * (`username`, `password`), POST .../agent/file-write (`file`, `content`; needs the privilege
+ * VM.GuestAgent.FileWrite or VM.GuestAgent.Unrestricted, PVE 9 pveum documentation).
  *
  * A password reset sends only `cipassword` (and the guest agent while the VM runs): never
  * ipconfig0, cicustom or any other cloud-init value.
@@ -38,6 +40,11 @@ final class Actions {
 	 * The word a customer types to confirm a reinstall.
 	 */
 	public const CONFIRM = 'REINSTALL';
+
+	/**
+	 * The file the guest agent replaces on a key change (the login user is root).
+	 */
+	public const AUTHORIZED_KEYS = '/root/.ssh/authorized_keys';
 
 	/**
 	 * Seconds between two reinstalls of one VM.
@@ -530,11 +537,44 @@ final class Actions {
 			return StepResult::retry( 0, 'replace_ssh_key: the key could not be stored' );
 		}
 
-		// The raw key: the client URL-encodes the sshkeys value itself, once.
-		$answer = $this->client->request( 'PUT', self::base( $record, $v ) . '/config', array( 'sshkeys' => $clean . "\n" ) );
+		$base = self::base( $record, $v );
+
+		// The raw key: the client URL-encodes the sshkeys value itself, once. This is what a
+		// reinstall or a regenerated cloud-init drive uses from now on.
+		$answer = $this->client->request( 'PUT', $base . '/config', array( 'sshkeys' => $clean . "\n" ) );
 
 		if ( is_wp_error( $answer ) ) {
 			return $this->classify( $answer, 'replace_ssh_key' );
+		}
+
+		// Cloud-init only appends keys, and only at the next boot. A running VM with the guest
+		// agent gets the file replaced now, so the new key works at once and the old one stops.
+		if ( 'running' !== $v['status'] || ! Provision::agent_enabled( (string) ( $v['config']['agent'] ?? '' ) ) ) {
+			return StepResult::done( array(), 'Customer changed the SSH key; it applies when the server next starts, and the old key keeps working until the server is reinstalled' );
+		}
+
+		$written = $this->client->request(
+			'POST',
+			$base . '/agent/file-write',
+			array(
+				'file'    => self::AUTHORIZED_KEYS,
+				'content' => $clean . "\n",
+			)
+		);
+
+		if ( is_wp_error( $written ) ) {
+			$data   = $written->get_error_data();
+			$status = is_array( $data ) ? (int) ( $data['status'] ?? 0 ) : 0;
+
+			// No right to write through the agent: retrying cannot help, the owner must grant it.
+			if ( 403 === $status ) {
+				$text = 'Replace SSH key: the Proxmox token may not write files through the guest agent, so the new key is only in the cloud-init settings (it is added at the next boot and the old key keeps working). Grant the token the privilege VM.GuestAgent.FileWrite (or VM.GuestAgent.Unrestricted) on the pool of the customer VMs.';
+				Alerts::admin( $this->r, $text );
+
+				return StepResult::done( array(), 'Customer changed the SSH key; ' . $text );
+			}
+
+			return StepResult::retry( 0, 'replace_ssh_key: the guest agent did not take the key: ' . $this->text( $written ) );
 		}
 
 		return StepResult::done( array(), 'Customer changed the SSH key' );

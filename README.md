@@ -31,7 +31,7 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 
    ```
    pveum pool add beltoft-customers
-   pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit"
+   pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit"
    pveum user add svc@pve
    pveum user token add svc@pve beltoft --privsep 1
    pveum acl modify /pool/beltoft-customers --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices

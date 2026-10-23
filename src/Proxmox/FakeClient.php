@@ -183,6 +183,18 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * A file written into a VM through the guest agent, or null.
+	 *
+	 * @param int    $vmid VMID.
+	 * @param string $path Path in the guest.
+	 */
+	public function guest_file( int $vmid, string $path ): ?string {
+		$this->load();
+
+		return $this->state['vms'][ $vmid ]['guest_files'][ $path ] ?? null;
+	}
+
+	/**
 	 * The whole state (secrets are never in it).
 	 *
 	 * @return array<string, mixed>
@@ -390,6 +402,16 @@ class FakeClient implements Client {
 					'username' => array( 'string', true ),
 					'password' => array( 'string', true ),
 					'crypted'  => array( 'bool' ),
+				),
+			),
+			array(
+				'POST',
+				$node . '/agent/file-write$#',
+				'h_agent_file_write',
+				array(
+					'file'    => array( 'string', true ),
+					'content' => array( 'string', true ),
+					'encode'  => array( 'bool' ),
 				),
 			),
 			array(
@@ -941,6 +963,35 @@ class FakeClient implements Client {
 		unset( $p );
 
 		return $this->h_agent_ping( $a, array() );
+	}
+
+	/**
+	 * POST agent/file-write: replaces the file (a stopped VM has no agent: modelled). Content is
+	 * kept as the guest would hold it (decoded when `encode` is false, as sent otherwise).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_agent_file_write( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( 'running' !== $vm['status'] ) {
+			return $this->error( 500, 'VM ' . $a[1] . ' is not running' );
+		}
+
+		$content = (string) $p['content'];
+
+		if ( isset( $p['encode'] ) && 0 === (int) $p['encode'] ) {
+			$content = (string) base64_decode( $content ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		}
+
+		$this->state['vms'][ (int) $a[1] ]['guest_files'][ (string) $p['file'] ] = $content;
+
+		return null;
 	}
 
 	/**

@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.2.5\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.2.6\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-23T10:45:43+00:00\n"
+"POT-Creation-Date: 2026-10-23T13:03:58+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -157,7 +157,7 @@ msgstr ""
 
 #: src/Admin/ListTable.php:59
 #: src/Admin/Panel.php:640
-#: src/Proxmox/Panels.php:113
+#: src/Proxmox/Panels.php:132
 msgid "Last error"
 msgstr ""
 
@@ -1062,66 +1062,66 @@ msgstr ""
 msgid "Product setting"
 msgstr ""
 
-#: src/Proxmox/Actions.php:115
+#: src/Proxmox/Actions.php:122
 msgid "Start"
 msgstr ""
 
-#: src/Proxmox/Actions.php:119
+#: src/Proxmox/Actions.php:126
 msgid "Shut down"
 msgstr ""
 
-#: src/Proxmox/Actions.php:120
+#: src/Proxmox/Actions.php:127
 msgid "Reboot"
 msgstr ""
 
-#: src/Proxmox/Actions.php:124
+#: src/Proxmox/Actions.php:131
 msgid "Reset password"
 msgstr ""
 
-#: src/Proxmox/Actions.php:132
+#: src/Proxmox/Actions.php:139
 #: templates/account/vm.php:62
 #: templates/account/vm.php:69
 msgid "Replace SSH key"
 msgstr ""
 
-#: src/Proxmox/Actions.php:132
+#: src/Proxmox/Actions.php:139
 #: templates/account/vm.php:62
 #: templates/account/vm.php:69
 msgid "Add SSH key"
 msgstr ""
 
-#: src/Proxmox/Actions.php:133
+#: src/Proxmox/Actions.php:140
 #: templates/account/vm.php:74
 msgid "Reinstall"
 msgstr ""
 
-#: src/Proxmox/Actions.php:185
+#: src/Proxmox/Actions.php:192
 msgid "This is not available for this server. Please contact support."
 msgstr ""
 
-#: src/Proxmox/Actions.php:194
+#: src/Proxmox/Actions.php:201
 msgid "Resetting the password is not available for this server."
 msgstr ""
 
-#: src/Proxmox/Actions.php:197
+#: src/Proxmox/Actions.php:204
 msgid "The password can be reset three times an hour. Please try again later."
 msgstr ""
 
 #. translators: %s: the word to type, REINSTALL.
-#: src/Proxmox/Actions.php:206
+#: src/Proxmox/Actions.php:213
 #, php-format
 msgid "Type %s to confirm. Reinstalling erases everything on the server."
 msgstr ""
 
-#: src/Proxmox/Actions.php:214
+#: src/Proxmox/Actions.php:221
 msgid "Choose one of the listed operating systems."
 msgstr ""
 
-#: src/Proxmox/Actions.php:221
+#: src/Proxmox/Actions.php:228
 msgid "A server can be reinstalled once an hour. Please try again later."
 msgstr ""
 
-#: src/Proxmox/Actions.php:248
+#: src/Proxmox/Actions.php:255
 #: src/Proxmox/Panels.php:49
 msgid "Too many requests. Please wait a while and try again."
 msgstr ""
@@ -1475,18 +1475,18 @@ msgstr ""
 msgid "Save cluster"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:50
-#: src/Proxmox/Panels.php:109
+#: src/Proxmox/EmailDetails.php:49
+#: src/Proxmox/Panels.php:121
 #: templates/account/vm.php:23
 msgid "IP address"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:51
+#: src/Proxmox/EmailDetails.php:50
 #: templates/account/vm.php:25
 msgid "Log in"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:55
+#: src/Proxmox/EmailDetails.php:54
 #: src/Proxmox/OsField.php:289
 #: src/Proxmox/OsField.php:381
 #: src/Proxmox/OsField.php:382
@@ -1495,22 +1495,24 @@ msgstr ""
 msgid "Operating system"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:58
+#: src/Proxmox/EmailDetails.php:57
+#: src/Proxmox/Panels.php:124
 msgid "Size"
 msgstr ""
 
 #. translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB
-#: src/Proxmox/EmailDetails.php:60
+#: src/Proxmox/EmailDetails.php:59
+#: src/Proxmox/Panels.php:126
 #: templates/account/vm.php:34
 #, php-format
 msgid "%1$d vCPU, %2$d MB RAM, %3$d GB disk"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:67
+#: src/Proxmox/EmailDetails.php:66
 msgid "Password"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:67
+#: src/Proxmox/EmailDetails.php:66
 msgid "Shown once in your account"
 msgstr ""
 
@@ -1662,33 +1664,33 @@ msgstr ""
 msgid "Reinstalling erases everything on the server. Continue?"
 msgstr ""
 
-#: src/Proxmox/Panels.php:106
+#: src/Proxmox/Panels.php:118
 #: src/Proxmox/ProxmoxDriver.php:85
 msgid "Cluster"
 msgstr ""
 
-#: src/Proxmox/Panels.php:107
+#: src/Proxmox/Panels.php:119
 msgid "Node"
 msgstr ""
 
-#: src/Proxmox/Panels.php:108
+#: src/Proxmox/Panels.php:120
 msgid "VMID"
 msgstr ""
 
-#: src/Proxmox/Panels.php:110
+#: src/Proxmox/Panels.php:122
 msgid "Ownership tag"
 msgstr ""
 
-#: src/Proxmox/Panels.php:111
+#: src/Proxmox/Panels.php:123
 #: templates/account/vm.php:47
 msgid "Power"
 msgstr ""
 
-#: src/Proxmox/Panels.php:112
+#: src/Proxmox/Panels.php:131
 msgid "Template"
 msgstr ""
 
-#: src/Proxmox/Panels.php:116
+#: src/Proxmox/Panels.php:135
 msgid "Virtual machine"
 msgstr ""
 
