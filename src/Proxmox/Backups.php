@@ -17,7 +17,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * One backup of one VM at a time, to the cluster's backup storage (a Proxmox Backup Server storage).
  * Backup state lives in its own resource meta keys, never in `task` (the reconciler's): `backup_task`
- * {upid, node, started}, `backup_last_at`, `backup_ok_at`, `backup_error`, `backup_fails`. Every
+ * {upid, node, started}, `backup_last_at`, `backup_ok_at`, `backup_error`, `backup_fails`,
+ * `backup_list` (the listing as of the last good run, for the panels), `backup_purge`. Every
  * write goes through Resource::locked(), because the nightly run is not a reconciler job.
  *
  * Proxmox endpoints (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html#<path>):
@@ -282,6 +283,13 @@ final class Backups {
 			$this->store( array( 'backup_error' => $pruned ) );
 		}
 
+		// The panels show this copy, so rendering a page never calls Proxmox.
+		$list = $this->list();
+
+		if ( is_array( $list ) ) {
+			$this->store( array( 'backup_list' => $list ) );
+		}
+
 		return StepResult::done();
 	}
 
@@ -493,6 +501,7 @@ final class Backups {
 		$stored = $this->store(
 			array(
 				'backup_purge' => null,
+				'backup_list'  => null,
 				'backup_task'  => null,
 				'backup_ok_at' => null,
 				'backup_error' => '',
@@ -618,5 +627,159 @@ final class Backups {
 		}
 
 		return null;
+	}
+
+	// -- Panels and switch links -----------------------------------------------------------------
+
+	/**
+	 * What the customer's panel shows, from stored data only (no Proxmox call): null when there is
+	 * nothing to show or offer.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>|null
+	 */
+	public static function panel( Resource $r ): ?array {
+		if ( true === $r->get( 'linked' ) ) {
+			return null;
+		}
+
+		$enabled = self::enabled( $r );
+		$add     = $enabled ? '' : self::switch_url( $r, true );
+		$remove  = $enabled ? self::switch_url( $r, false ) : '';
+
+		if ( ! $enabled && '' === $add ) {
+			return null;
+		}
+
+		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		$list   = array();
+		$stored = $r->get( 'backup_list' );
+
+		foreach ( $enabled && is_array( $stored ) ? $stored : array() as $item ) {
+			if ( is_array( $item ) && isset( $item['volid'], $item['ctime'] ) ) {
+				$list[] = array(
+					'volid' => (string) $item['volid'],
+					'when'  => wp_date( $format, (int) $item['ctime'] ),
+					'size'  => (int) ( $item['size'] ?? 0 ) > 0 ? size_format( (int) $item['size'] ) : '',
+				);
+			}
+		}
+
+		$ok = (int) $r->get( 'backup_ok_at' );
+
+		return array(
+			'enabled'     => $enabled,
+			'days'        => self::days( $r ),
+			'list'        => $list,
+			'last_ok'     => $ok > 0 ? wp_date( $format, $ok ) : '',
+			'add_url'     => $add,
+			'add_price'   => '' === $add ? '' : self::price_label( $r, true ),
+			'remove_url'  => $remove,
+			'can_restore' => $enabled && array() !== $list,
+		);
+	}
+
+	/**
+	 * The price difference of the sibling, for a link: "+€12.00 / month" (excluding tax, as the
+	 * product page shows it). The period comes from WooCommerce Subscriptions when it is active.
+	 * Empty when there is no sibling.
+	 *
+	 * @param Resource $r    Resource.
+	 * @param bool     $with Whether the sibling has backups.
+	 */
+	public static function price_label( Resource $r, bool $with ): string {
+		$variation = wc_get_product( (int) ( $r->license()['variation_id'] ?? 0 ) );
+
+		if ( ! $variation instanceof \WC_Product_Variation ) {
+			return '';
+		}
+
+		$sibling = self::sibling( $variation, $with );
+
+		return null === $sibling ? '' : self::price_difference( $variation, $sibling );
+	}
+
+	/**
+	 * "+€12.00 / month" for a variation compared with another one.
+	 *
+	 * @param \WC_Product_Variation $from From.
+	 * @param \WC_Product_Variation $to   To.
+	 */
+	public static function price_difference( \WC_Product_Variation $from, \WC_Product_Variation $to ): string {
+		$diff = (float) wc_get_price_excluding_tax( $to ) - (float) wc_get_price_excluding_tax( $from );
+		$text = ( $diff < 0 ? '-' : '+' ) . html_entity_decode( wp_strip_all_tags( wc_price( abs( $diff ) ) ), ENT_QUOTES, 'UTF-8' );
+
+		if ( class_exists( '\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $to ) ) {
+			$period = (string) \WC_Subscriptions_Product::get_period( $to );
+			$every  = (int) \WC_Subscriptions_Product::get_interval( $to );
+
+			if ( '' !== $period && function_exists( 'wcs_get_subscription_period_strings' ) ) {
+				$text .= ' / ' . (string) wcs_get_subscription_period_strings( max( 1, $every ), $period );
+			}
+		}
+
+		return $text;
+	}
+
+	/**
+	 * The link that switches the server's subscription to the sibling with or without backups:
+	 * WooCommerce Subscriptions' own switch arguments (subscription, item, nonce, from
+	 * WC_Subscriptions_Switcher::get_switch_url()) on an add-to-cart URL of the sibling that lands
+	 * on the checkout. WCS accepts that add-to-cart with a valid nonce in the URL. Empty when WCS
+	 * is inactive, there is no sibling, or the item cannot be switched by this customer.
+	 *
+	 * @param Resource $r    Resource.
+	 * @param bool     $with Whether the target has backups.
+	 */
+	public static function switch_url( Resource $r, bool $with ): string {
+		if ( ! class_exists( '\WC_Subscriptions_Switcher' ) || ! function_exists( 'wcs_get_subscription' ) ) {
+			return '';
+		}
+
+		$license      = $r->license();
+		$variation_id = (int) ( $license['variation_id'] ?? 0 );
+		$sub_id       = (int) ( $license['subscription_id'] ?? 0 );
+		$variation    = $variation_id > 0 ? wc_get_product( $variation_id ) : null;
+
+		if ( $sub_id < 1 || ! $variation instanceof \WC_Product_Variation ) {
+			return '';
+		}
+
+		$sibling      = self::sibling( $variation, $with );
+		$subscription = wcs_get_subscription( $sub_id );
+
+		if ( null === $sibling || ! $subscription instanceof \WC_Subscription ) {
+			return '';
+		}
+
+		foreach ( $subscription->get_items() as $item_id => $item ) {
+			if ( (int) $item->get_variation_id() !== $variation_id ) {
+				continue;
+			}
+
+			if ( ! \WC_Subscriptions_Switcher::can_item_be_switched_by_user( $item, $subscription ) ) {
+				return '';
+			}
+
+			$query = array();
+			wp_parse_str( (string) wp_parse_url( \WC_Subscriptions_Switcher::get_switch_url( $item_id, $item, $subscription ), PHP_URL_QUERY ), $query );
+
+			$args = array_intersect_key( $query, array_flip( array( 'switch-subscription', 'item', '_wcsnonce' ) ) );
+
+			if ( 3 !== count( $args ) ) {
+				return '';
+			}
+
+			$args['add-to-cart'] = $sibling->get_parent_id();
+			$args['variation_id'] = $sibling->get_id();
+
+			foreach ( $sibling->get_attributes() as $name => $value ) {
+				$args[ 'attribute_' . $name ] = $value;
+			}
+
+			return add_query_arg( $args, wc_get_checkout_url() );
+		}
+
+		return '';
 	}
 }

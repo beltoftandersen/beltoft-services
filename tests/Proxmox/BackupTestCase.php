@@ -208,4 +208,63 @@ abstract class BackupTestCase extends TestCase {
 			)
 		);
 	}
+
+	/**
+	 * A variable product with attributes Tier (a, b) and Backups (None, Daily): four variations.
+	 *
+	 * @param array<string, string> $prices Price per backups value.
+	 * @return array<string, \WC_Product_Variation>
+	 */
+	protected function variable_product( array $prices = array( 'None' => '10', 'Daily' => '12' ) ): array {
+		$product = new \WC_Product_Variable();
+		$product->set_name( 'VPS ' . wp_generate_password( 5, false ) );
+		$product->set_status( 'publish' );
+
+		$tier = new \WC_Product_Attribute();
+		$tier->set_name( 'Tier' );
+		$tier->set_options( array( 'a', 'b' ) );
+		$tier->set_visible( true );
+		$tier->set_variation( true );
+
+		$backups = new \WC_Product_Attribute();
+		$backups->set_name( 'Backups' );
+		$backups->set_options( array( 'None', 'Daily' ) );
+		$backups->set_visible( true );
+		$backups->set_variation( true );
+
+		$product->set_attributes( array( $tier, $backups ) );
+		$product->update_meta_data( \BeltoftServices\Product::META_DRIVER, 'proxmox' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'vps-' . wp_generate_password( 5, false ) );
+
+		foreach ( array(
+			'cluster'   => 'lab',
+			'template'  => 9000,
+			'cores'     => 2,
+			'memory_mb' => 4096,
+			'disk_gb'   => 30,
+		) as $key => $value ) {
+			$product->update_meta_data( \BeltoftServices\Product::META_PLAN . $key, (string) $value );
+		}
+
+		$product->save();
+		\BeltoftServices\Product::remember_slug( (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ) );
+
+		$out = array();
+
+		foreach ( array( 'a', 'b' ) as $t ) {
+			foreach ( array( 'None', 'Daily' ) as $b ) {
+				$v = new \WC_Product_Variation();
+				$v->set_parent_id( $product->get_id() );
+				$v->set_attributes( array( 'tier' => $t, 'backups' => $b ) );
+				$v->set_regular_price( $prices[ $b ] );
+				$v->set_status( 'publish' );
+				$v->update_meta_data( \BeltoftServices\Product::META_PLAN . 'backup_days', 'Daily' === $b ? '7' : '0' );
+				$v->save();
+				$out[ $t . '-' . $b ] = $v;
+			}
+		}
+
+		return $out;
+	}
 }

@@ -246,52 +246,8 @@ class BackupsTest extends BackupTestCase {
 
 	// -- Variation sibling -------------------------------------------------------------------------
 
-	/**
-	 * A variable product with attributes Tier (a, b) and Backups (None, Daily): four variations.
-	 *
-	 * @return array<string, \WC_Product_Variation>
-	 */
-	private function two_attribute_product(): array {
-		$product = new \WC_Product_Variable();
-		$product->set_name( 'VPS ' . wp_generate_password( 5, false ) );
-		$product->set_status( 'publish' );
-
-		$tier = new \WC_Product_Attribute();
-		$tier->set_name( 'Tier' );
-		$tier->set_options( array( 'a', 'b' ) );
-		$tier->set_visible( true );
-		$tier->set_variation( true );
-
-		$backups = new \WC_Product_Attribute();
-		$backups->set_name( 'Backups' );
-		$backups->set_options( array( 'None', 'Daily' ) );
-		$backups->set_visible( true );
-		$backups->set_variation( true );
-
-		$product->set_attributes( array( $tier, $backups ) );
-		$product->update_meta_data( \BeltoftServices\Product::META_DRIVER, 'proxmox' );
-		$product->save();
-
-		$out = array();
-
-		foreach ( array( 'a', 'b' ) as $t ) {
-			foreach ( array( 'None', 'Daily' ) as $b ) {
-				$v = new \WC_Product_Variation();
-				$v->set_parent_id( $product->get_id() );
-				$v->set_attributes( array( 'tier' => $t, 'backups' => $b ) );
-				$v->set_regular_price( '10' );
-				$v->set_status( 'publish' );
-				$v->update_meta_data( \BeltoftServices\Product::META_PLAN . 'backup_days', 'Daily' === $b ? '7' : '0' );
-				$v->save();
-				$out[ $t . '-' . $b ] = $v;
-			}
-		}
-
-		return $out;
-	}
-
 	public function test_sibling_finds_the_variation_with_or_without_backups(): void {
-		$v = $this->two_attribute_product();
+		$v = $this->variable_product();
 
 		$with = Backups::sibling( $v['a-None'], true );
 		$this->assertNotNull( $with );
@@ -311,7 +267,7 @@ class BackupsTest extends BackupTestCase {
 		$this->assertNull( Backups::sibling( $first, true ), 'A single attribute and no backup variation.' );
 		$this->assertNull( Backups::sibling( $first, false ) );
 
-		$v = $this->two_attribute_product();
+		$v = $this->variable_product();
 		$v['a-Daily']->set_status( 'private' );
 		$v['a-Daily']->save();
 

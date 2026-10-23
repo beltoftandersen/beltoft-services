@@ -1,6 +1,6 @@
 /**
  * My Account → Licenses: the virtual machine panel. Draws nothing itself; it wires the forms
- * (add or replace the SSH key, reinstall) and the one-time password button that the server
+ * (add or replace the SSH key, reinstall, restore) and the one-time password button that the server
  * printed. Posts to the same action route as the generic buttons, with the arguments in
  * {args: {...}}; the REST nonce is shared with account.js (kept fresh from each reply). The
  * password is only ever held in the page for as long as the customer looks at it. No dependencies.
@@ -71,6 +71,10 @@
 		} );
 
 		if ( 'reinstall' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.reinstall ) ) {
+			return;
+		}
+
+		if ( 'restore' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.restore ) ) {
 			return;
 		}
 

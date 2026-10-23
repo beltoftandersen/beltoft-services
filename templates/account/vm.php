@@ -4,7 +4,8 @@
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
  * disk_gb), $power (running, stopped or empty when not known), $os_label, $os_options
- * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user.
+ * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
+ * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore).
  * The password is never part of this template: the reveal button asks the server for it once.
  *
  * @package BeltoftServices
@@ -48,6 +49,92 @@ $beltoft_services_power_labels = array(
 			<dd><?php echo esc_html( $beltoft_services_power_labels[ $power ] ); ?></dd>
 		<?php endif; ?>
 	</dl>
+
+	<?php if ( $forms && is_array( $backups ) ) : ?>
+		<div class="beltoft-services-vm__backups">
+			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
+			<?php if ( ! $backups['enabled'] ) : ?>
+				<p>
+					<a class="button woocommerce-button" href="<?php echo esc_url( $backups['add_url'] ); ?>">
+						<?php
+						echo esc_html(
+							'' === $backups['add_price']
+								? __( 'Add daily backups', 'beltoft-services' )
+								/* translators: %s: price difference such as +€12.00 / month */
+								: sprintf( __( 'Add daily backups (%s)', 'beltoft-services' ), $backups['add_price'] )
+						);
+						?>
+					</a>
+				</p>
+				<p class="description"><?php esc_html_e( 'A backup of the whole server is taken every night.', 'beltoft-services' ); ?></p>
+			<?php else : ?>
+				<p class="description">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %d: number of days */
+							_n( 'A backup is taken every night and kept for %d day.', 'A backup is taken every night and kept for %d days.', (int) $backups['days'], 'beltoft-services' ),
+							(int) $backups['days']
+						)
+					);
+					?>
+				</p>
+				<?php if ( array() === $backups['list'] ) : ?>
+					<p><?php esc_html_e( 'The first backup will appear here after tonight\'s run.', 'beltoft-services' ); ?></p>
+				<?php else : ?>
+					<table class="beltoft-services-vm__backup-list">
+						<thead>
+							<tr><th scope="col"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Size', 'beltoft-services' ); ?></th></tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $backups['list'] as $beltoft_services_backup ) : ?>
+								<tr><td><?php echo esc_html( $beltoft_services_backup['when'] ); ?></td><td><?php echo esc_html( $beltoft_services_backup['size'] ); ?></td></tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+
+				<?php if ( $backups['can_restore'] ) : ?>
+					<details class="beltoft-services-vm__more">
+						<summary><?php esc_html_e( 'Restore from a backup', 'beltoft-services' ); ?></summary>
+						<form class="beltoft-services-vm-form" data-action="restore">
+							<p class="description"><?php esc_html_e( 'Restoring replaces everything on the server with the backup. The server is switched off while it is restored. The password and the SSH key go back to the ones the backup had. The IP address stays.', 'beltoft-services' ); ?></p>
+							<p>
+								<label for="beltoft-vm-backup"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></label>
+								<select id="beltoft-vm-backup" name="volid">
+									<?php foreach ( $backups['list'] as $beltoft_services_backup ) : ?>
+										<option value="<?php echo esc_attr( $beltoft_services_backup['volid'] ); ?>"><?php echo esc_html( $beltoft_services_backup['when'] ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</p>
+							<p>
+								<label for="beltoft-vm-restore-confirm">
+									<?php
+									echo esc_html(
+										sprintf(
+											/* translators: %s: the word to type, RESTORE */
+											__( 'Type %s to confirm', 'beltoft-services' ),
+											'RESTORE'
+										)
+									);
+									?>
+								</label>
+								<input type="text" id="beltoft-vm-restore-confirm" name="confirm" autocomplete="off" required>
+							</p>
+							<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
+						</form>
+					</details>
+				<?php endif; ?>
+
+				<?php if ( '' !== $backups['remove_url'] ) : ?>
+					<p>
+						<a href="<?php echo esc_url( $backups['remove_url'] ); ?>"><?php esc_html_e( 'Remove backups', 'beltoft-services' ); ?></a>
+					</p>
+					<p class="description"><?php esc_html_e( 'If you remove backups, all backups of this server are deleted.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 
 	<?php if ( $forms ) : ?>
 		<?php if ( $can_reveal ) : ?>
