@@ -436,7 +436,7 @@ class OsFieldTest extends TestCase {
 
 	// -- Renewal, early renewal, switch and resubscribe carts --------------------------------------
 
-	private function flow_cart( string $flow ): void {
+	private function flow_cart( string $flow, array $extra = array() ): void {
 		WC()->cart->empty_cart();
 
 		if ( 'subscription_switch' === $flow ) {
@@ -448,7 +448,7 @@ class OsFieldTest extends TestCase {
 			return;
 		}
 
-		$data = 'new' === $flow ? array() : array( $flow => array( 'subscription_id' => 1, 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) );
+		$data = 'new' === $flow ? array() : array( $flow => $extra + array( 'subscription_id' => 1, 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) );
 		$this->assertNotFalse( WC()->cart->add_to_cart( $this->vm()->get_id(), 1, 0, array(), $data ) );
 	}
 
@@ -459,7 +459,7 @@ class OsFieldTest extends TestCase {
 	/**
 	 * What both classic fields do for a cart.
 	 *
-	 * @return array{os: bool, key: bool, os_errors: string[], key_errors: string[], os_saved: string, key_saved: string}
+	 * @return array{os: bool, key: bool, bad_input_errors: string[], good_input_errors: string[], os_saved: string, key_saved: string}
 	 */
 	private function fields_for_cart(): array {
 		ob_start();
@@ -471,7 +471,7 @@ class OsFieldTest extends TestCase {
 		$_POST[ \BeltoftServices\Proxmox\SshKeyField::POST_KEY ] = self::valid_ssh_key();
 		$errors = new \WP_Error();
 		OsField::validate_classic( array(), $errors );
-		$os_errors = $errors->get_error_messages();
+		$good = $errors->get_error_messages();
 
 		// No OS posted at all, and a junk key.
 		unset( $_POST[ OsField::POST_KEY ] );
@@ -493,8 +493,8 @@ class OsFieldTest extends TestCase {
 		return array(
 			'os'         => str_contains( $html, OsField::POST_KEY ),
 			'key'        => str_contains( $html, \BeltoftServices\Proxmox\SshKeyField::POST_KEY ),
-			'os_errors'  => $missing,
-			'key_errors' => $os_errors,
+			'bad_input_errors' => $missing,
+			'good_input_errors' => $good,
 			'os_saved'   => (string) $item->get_meta( OsField::ITEM_META ),
 			'key_saved'  => (string) $item->get_meta( \BeltoftServices\Proxmox\SshKeyField::ITEM_META ),
 		);
@@ -507,8 +507,8 @@ class OsFieldTest extends TestCase {
 		$r = $this->fields_for_cart();
 		$this->assertTrue( $r['os'] );
 		$this->assertTrue( $r['key'] );
-		$this->assertCount( 2, $r['os_errors'], 'Missing OS and junk key are refused.' );
-		$this->assertSame( array(), $r['key_errors'], 'A listed OS and a valid key pass.' );
+		$this->assertCount( 2, $r['bad_input_errors'], 'Missing OS and junk key are refused.' );
+		$this->assertSame( array(), $r['good_input_errors'], 'A listed OS and a valid key pass.' );
 		$this->assertSame( '9001', $r['os_saved'] );
 		$this->assertNotSame( '', $r['key_saved'] );
 	}
@@ -516,15 +516,15 @@ class OsFieldTest extends TestCase {
 	/**
 	 * @dataProvider existing_server_flows
 	 */
-	public function test_renewal_early_renewal_and_switch_carts_ask_for_nothing( string $flow ): void {
-		$this->flow_cart( $flow );
+	public function test_renewal_early_renewal_and_switch_carts_ask_for_nothing( string $flow, array $extra = array() ): void {
+		$this->flow_cart( $flow, $extra );
 
 		$this->assertTrue( OsField::cart_is_existing_server() );
 		$this->assertFalse( OsField::cart_needs_choice() );
 		$r = $this->fields_for_cart();
 		$this->assertFalse( $r['os'], 'No OS select.' );
 		$this->assertFalse( $r['key'], 'No SSH key field.' );
-		$this->assertSame( array(), $r['os_errors'], 'Nothing is validated.' );
+		$this->assertSame( array(), $r['bad_input_errors'], 'Nothing is validated.' );
 		$this->assertSame( '', $r['os_saved'], 'Nothing is saved on the item.' );
 		$this->assertSame( '', $r['key_saved'] );
 
@@ -534,12 +534,12 @@ class OsFieldTest extends TestCase {
 	}
 
 	/**
-	 * @return array<string, array{0: string}>
+	 * @return array<string, array{0: string, 1?: array<string, mixed>}>
 	 */
 	public static function existing_server_flows(): array {
 		return array(
 			'renewal'       => array( 'subscription_renewal' ),
-			'early renewal' => array( 'subscription_renewal_early' ),
+			'early renewal' => array( 'subscription_renewal', array( 'subscription_renewal_early' => true ) ),
 			'switch'        => array( 'subscription_switch' ),
 		);
 	}

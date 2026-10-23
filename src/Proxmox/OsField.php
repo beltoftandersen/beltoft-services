@@ -158,12 +158,12 @@ final class OsField {
 	}
 
 	/**
-	 * Cart item data keys of a renewal (also early) and a switch of WooCommerce Subscriptions
-	 * (WCS_Cart_Renewal, WCS_Cart_Switch; what wcs_cart_contains_renewal(), _early_renewal() and
-	 * _switches() look for). They pay for a server that already runs, whose system is never
-	 * changed after payment. A resubscribe is not listed: it can build a new server.
+	 * Cart item data keys of a renewal and a switch of WooCommerce Subscriptions
+	 * (WCS_Cart_Renewal, WCS_Cart_Switch; what wcs_cart_contains_renewal() and _switches() look for).
+	 * An early renewal item carries `subscription_renewal` too (its own flag is inside that array).
+	 * They pay for a server that already runs, whose system is never changed after payment. A resubscribe is not listed: it can build a new server.
 	 */
-	private const EXISTING_SERVER_KEYS = array( 'subscription_renewal', 'subscription_renewal_early', 'subscription_switch' );
+	private const EXISTING_SERVER_KEYS = array( 'subscription_renewal', 'subscription_switch' );
 
 	/**
 	 * Does the cart pay for a server that already exists: a renewal, an early renewal or a switch?
