@@ -144,7 +144,8 @@ final class Actions {
 			return $out;
 		}
 
-		if ( Backups::enabled( $r ) ) {
+		// A restore that has begun is finished even when the plan lost its backups meanwhile.
+		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
 			$out['restore'] = __( 'Restore from a backup', 'beltoft-services' );
 		}
 
@@ -255,7 +256,11 @@ final class Actions {
 	 * @param array<string, mixed> $args Arguments.
 	 */
 	private static function check_restore( Resource $r, array $args ): ?string {
-		if ( ! Backups::enabled( $r ) ) {
+		// A restore under way is finished whatever happened to the plan meanwhile: the server is off.
+		$state   = $r->get( 'restore' );
+		$running = is_array( $state ) && isset( $args['volid'] ) && ( $state['volid'] ?? '' ) === $args['volid'];
+
+		if ( ! $running && ! Backups::enabled( $r ) ) {
 			return __( 'Restoring is not available for this server.', 'beltoft-services' );
 		}
 
@@ -264,7 +269,7 @@ final class Actions {
 			return sprintf( __( 'Type %s to confirm. Restoring replaces everything on the server with the backup.', 'beltoft-services' ), self::CONFIRM_RESTORE );
 		}
 
-		if ( ! Backups::volid_fits( $r, $args['volid'] ?? null ) ) {
+		if ( ! $running && ! Backups::volid_fits( $r, $args['volid'] ?? null ) ) {
 			return __( 'Choose one of the listed backups.', 'beltoft-services' );
 		}
 
@@ -680,11 +685,24 @@ final class Actions {
 
 		// The restore task of an earlier round has ended: that decides, not another restore.
 		if ( '' === $phase && $this->finished && 'restore' === $this->finished['phase'] ) {
-			if ( ! $this->finished['ok'] ) {
+			if ( ! $this->finished['ok'] && ! self::accepted_exit( (string) $this->finished['exit'] ) ) {
 				return $this->restore_failed( (string) $this->finished['exit'] );
 			}
 
-			$state = array_merge( $state, array( 'volid' => $volid ) );
+			// The backup's time was not kept while the task ran: read it from the listing again.
+			$ctime = 0;
+			$list  = ( new Backups( $this->r ) )->list();
+
+			foreach ( is_array( $list ) ? $list : array() as $backup ) {
+				if ( $backup['volid'] === $volid ) {
+					$ctime = (int) $backup['ctime'];
+				}
+			}
+
+			$state = array(
+				'volid' => $volid,
+				'ctime' => $ctime,
+			);
 			$phase = 'task';
 		}
 
@@ -742,7 +760,7 @@ final class Actions {
 
 		return StepResult::done(
 			array( 'restore' => null ),
-			'Server restored from the backup of ' . gmdate( 'Y-m-d H:i', (int) ( $state['ctime'] ?? 0 ) ) . ' UTC'
+			(int) ( $state['ctime'] ?? 0 ) > 0 ? 'Server restored from the backup of ' . gmdate( 'Y-m-d H:i', (int) $state['ctime'] ) . ' UTC' : 'Server restored from a backup'
 		);
 	}
 
@@ -770,6 +788,23 @@ final class Actions {
 
 		if ( null === $ctime ) {
 			return StepResult::done( array( 'restore' => null ), 'Restore refused: that backup is not available for this server' );
+		}
+
+		// A backup in progress holds the VM (lock=backup): wait for it before anything is switched off.
+		$running = ( new Backups( $this->r ) )->collect_running();
+
+		if ( null !== $running ) {
+			return StepResult::retry( 0, 'restore: ' . $running->error() );
+		}
+
+		$locked = $this->verified( $record, 'restore' );
+
+		if ( $locked instanceof StepResult ) {
+			return $locked;
+		}
+
+		if ( '' !== (string) $locked['lock'] ) {
+			return StepResult::retry( 0, 'restore: the server is locked (' . sanitize_key( (string) $locked['lock'] ) . ')' );
 		}
 
 		$off = ( new Operations( $this->r ) )->pause();
@@ -823,7 +858,30 @@ final class Actions {
 	 * @param string $exit Exit status (admin text).
 	 */
 	private function restore_failed( string $exit ): StepResult {
+		$this->tell_customer();
+
 		return StepResult::fail( 'Restore failed (' . $this->scrub( $exit, 160 ) . '); the server was left switched off and may need a manual check', array( 'restore' => null ) );
+	}
+
+	/**
+	 * A restore ended badly: the customer gets one short, fixed note (no Proxmox text). The server may
+	 * be off and the admin has been alerted.
+	 */
+	private function tell_customer(): void {
+		$to = is_email( (string) ( $this->r->license()['email'] ?? '' ) ) ? (string) $this->r->license()['email'] : '';
+
+		if ( '' === $to ) {
+			return;
+		}
+
+		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+		wp_mail(
+			$to,
+			/* translators: %s: site name */
+			sprintf( __( '[%s] Your server restore did not finish', 'beltoft-services' ), $site ),
+			__( 'The restore of your server did not finish. We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support.', 'beltoft-services' )
+		);
 	}
 
 	/**
@@ -833,9 +891,19 @@ final class Actions {
 	 * @param array<string, mixed> $record VM record.
 	 */
 	private function restore_plan( array $record ): ?StepResult {
+		$pool = $this->restore_pool( $record );
+
+		if ( null !== $pool ) {
+			return $pool;
+		}
+
 		$v = $this->verified( $record, 'restore' );
 
 		if ( $v instanceof StepResult ) {
+			if ( $v->is_failed() ) {
+				$this->tell_customer();
+			}
+
 			return $v->is_failed() ? StepResult::fail( $v->error() . '; the restored server could not be proved ours', array( 'restore' => null ) ) : $v;
 		}
 
@@ -856,6 +924,63 @@ final class Actions {
 		}
 
 		Jobs::enqueue( $this->r->id() );
+
+		return null;
+	}
+
+	/**
+	 * A forced restore recreates the VM, and whether it stays in the cluster's pool is not known
+	 * for sure. The token sees only the pool, so a VM that left it would vanish for the plugin: the
+	 * membership is read and the VM put back when it is missing. Null: it is in the pool (or the
+	 * cluster has none).
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 */
+	private function restore_pool( array $record ): ?StepResult {
+		$pool = (string) $this->cluster['pool'];
+
+		if ( '' === $pool ) {
+			return null;
+		}
+
+		$by_id = 'pools_id' === $this->cluster['pool_api'];
+		$read  = $this->client->request( 'GET', $by_id ? '/pools/' . rawurlencode( $pool ) : '/pools', $by_id ? array() : array( 'poolid' => $pool ) );
+
+		if ( is_wp_error( $read ) ) {
+			return $this->classify( $read, 'restore' );
+		}
+
+		$members = array();
+
+		// PVE answers the pool itself (pools_id) or a list of pools (pools).
+		foreach ( is_array( $read ) ? ( isset( $read['members'] ) ? array( $read ) : $read ) : array() as $one ) {
+			if ( is_array( $one ) && ( $by_id || ( $one['poolid'] ?? $pool ) === $pool ) ) {
+				foreach ( (array) ( $one['members'] ?? array() ) as $member ) {
+					$members[] = is_array( $member ) ? (int) ( $member['vmid'] ?? 0 ) : (int) $member;
+				}
+			}
+		}
+
+		if ( in_array( (int) $record['vmid'], $members, true ) ) {
+			return null;
+		}
+
+		$put = $this->client->request(
+			'PUT',
+			$by_id ? '/pools/' . rawurlencode( $pool ) : '/pools',
+			$by_id ? array( 'vms' => (string) $record['vmid'] ) : array(
+				'poolid' => $pool,
+				'vms'    => (string) $record['vmid'],
+			)
+		);
+
+		if ( is_wp_error( $put ) ) {
+			$text = 'Restore: the server could not be put back into the pool "' . $pool . '": ' . $this->text( $put );
+			Alerts::admin( $this->r, $text );
+			$this->tell_customer();
+
+			return StepResult::fail( $text, array( 'restore' => null ) );
+		}
 
 		return null;
 	}

@@ -231,37 +231,85 @@ final class Operations {
 	 * @return StepResult|null Null: nothing to do, done, or given up; carry on with the delete.
 	 */
 	private function purge_backups(): ?StepResult {
-		if ( true === $this->r->get( 'linked' ) || ( ! Backups::enabled( $this->r ) && ! $this->r->get( 'backup_ok_at' ) ) ) {
+		if ( true === $this->r->get( 'linked' ) ) {
 			return null;
 		}
 
-		$tries = (int) $this->r->get( 'backup_purge_tries' );
+		$running = is_array( $this->r->get( 'backup_task' ) ) && ! empty( $this->r->get( 'backup_task' )['upid'] );
 
-		if ( $tries >= Backups::PURGE_TRIES ) {
+		if ( ! $running && ! Backups::enabled( $this->r ) && ! $this->r->get( 'backup_ok_at' ) ) {
 			return null;
 		}
 
-		$result = ( new Backups( $this->r ) )->purge();
+		if ( (int) $this->r->get( 'backup_purge_tries' ) >= Backups::PURGE_TRIES && $this->purge_given_up() ) {
+			return null;
+		}
+
+		$backups = new Backups( $this->r );
+		$early   = $backups->collect_running();
+
+		if ( null !== $early ) {
+			return StepResult::retry( 0, 'delete: ' . $early->error() );
+		}
+
+		$result = $backups->purge();
 
 		if ( $result->is_done() ) {
 			return null;
 		}
 
-		++$tries;
-		$text = 'Backups could not be deleted: ' . $this->scrub( $result->error(), 200 );
+		// A delete that is only slow is no failed try.
+		if ( Backups::PURGE_PENDING === $result->error() ) {
+			return StepResult::retry( 0, 'delete: ' . $result->error() );
+		}
 
-		if ( ! $this->r->set( array( 'backup_purge_tries' => $tries ) ) ) {
+		$tries   = (int) $this->r->get( 'backup_purge_tries' ) + 1;
+		$started = (int) $this->r->get( 'backup_purge_started' );
+		$started = $started > 0 ? $started : time();
+		$text    = 'Backups could not be deleted: ' . $this->scrub( $result->error(), 200 );
+
+		if ( ! $this->r->set( array( 'backup_purge_tries' => $tries, 'backup_purge_started' => $started ) ) ) {
 			return StepResult::retry( 0, 'delete: progress could not be stored' );
 		}
 
-		if ( $tries >= Backups::PURGE_TRIES ) {
-			Alerts::admin( $this->r, $text . '; the server is deleted anyway and its backups stay on the backup storage' );
-
+		if ( $this->purge_given_up() ) {
 			return null;
 		}
 
 		return StepResult::retry( 0, 'delete: ' . $text );
 	}
+
+	/**
+	 * Gives up on the backups once enough tries failed over enough time: the admin is told which
+	 * VMID and storage keep them, and the orphans are listed in an option.
+	 */
+	private function purge_given_up(): bool {
+		$tries   = (int) $this->r->get( 'backup_purge_tries' );
+		$started = (int) $this->r->get( 'backup_purge_started' );
+
+		if ( $tries < Backups::PURGE_TRIES || $started < 1 || time() - $started < Backups::PURGE_GIVE_UP_AFTER ) {
+			return false;
+		}
+
+		$record  = VmRecords::for_resource( $this->r->id() );
+		$vmid    = null === $record ? 0 : (int) $record['vmid'];
+		$storage = Backups::storage( $this->r );
+
+		$orphans   = get_option( Backups::ORPHANS, array() );
+		$orphans   = is_array( $orphans ) ? $orphans : array();
+		$orphans[] = array(
+			'cluster' => null === $record ? '' : (string) $record['cluster'],
+			'storage' => $storage,
+			'vmid'    => $vmid,
+			'at'      => time(),
+		);
+		update_option( Backups::ORPHANS, array_slice( $orphans, -200 ), false );
+
+		Alerts::admin( $this->r, sprintf( 'Backups of VMID %d could not be deleted on storage "%s"; the server is deleted anyway and its backups stay there until removed by hand', $vmid, $storage ) );
+
+		return true;
+	}
+
 
 	/**
 	 * A resource whose clone never completed: no VM of ours exists, or one does and the normal

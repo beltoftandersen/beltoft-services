@@ -518,6 +518,8 @@ class FakeClient implements Client {
 				),
 			),
 			array( 'GET', '#^/nodes/([A-Za-z0-9.\-]+)/tasks/([^/]+)/status$#', 'h_task_status', $none ),
+			array( 'GET', '#^/pools$#', 'h_pools_get', array( 'poolid' => array( 'string' ) ) ),
+			array( 'GET', '#^/pools/([A-Za-z0-9._\-]+)$#', 'h_pools_get_id', $none ),
 			array(
 				'PUT',
 				'#^/pools$#',
@@ -1272,8 +1274,10 @@ class FakeClient implements Client {
 
 	/**
 	 * POST qemu with archive: restores a backup over an existing VM (force) or creates the VM. A
-	 * running VM is refused, and so is force without a VM (as the plan states; modelled). The config
-	 * comes back from the snapshot taken at backup time; node, name, pool and the lock stay.
+	 * running VM is refused, and so is force without a VM (as the plan states; modelled: a real
+	 * qmrestore with force and no VM probably just restores). The config comes back from the snapshot
+	 * taken at backup time; node, name and the lock stay, and so does the pool unless
+	 * drop_pool_on_restore() is set (modelled assumptions: the real behaviour is unchecked).
 	 *
 	 * @param array<int, string>   $a Captures (node).
 	 * @param array<string, mixed> $p Parameters.
@@ -1320,6 +1324,17 @@ class FakeClient implements Client {
 
 				if ( $exists ) {
 					$this->state['vms'][ $id ]['config'] = $found['config'];
+
+					if ( ! empty( $this->state['restore_drops_pool'] ) ) {
+						$pool = (string) $this->state['vms'][ $id ]['pool'];
+
+						if ( '' !== $pool ) {
+							$this->state['pools'][ $pool ]['members'] = array_values( array_diff( $this->state['pools'][ $pool ]['members'], array( $id ) ) );
+						}
+
+						$this->state['vms'][ $id ]['pool'] = '';
+					}
+
 					return;
 				}
 
@@ -1369,6 +1384,74 @@ class FakeClient implements Client {
 			'status'     => 'stopped',
 			'exitstatus' => $task['exitstatus'],
 		);
+	}
+
+	/**
+	 * GET /pools?poolid=: a list holding the pool with its members (modelled on the PVE 8.1+ form).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_pools_get( array $a, array $p ) {
+		unset( $a );
+		$out = array();
+
+		foreach ( $this->state['pools'] as $poolid => $pool ) {
+			if ( ! isset( $p['poolid'] ) || $p['poolid'] === $poolid ) {
+				$out[] = array(
+					'poolid'  => $poolid,
+					'members' => $this->pool_members( $pool ),
+				);
+			}
+		}
+
+		return isset( $p['poolid'] ) && array() === $out ? $this->error( 500, "pool '" . $p['poolid'] . "' does not exist" ) : $out;
+	}
+
+	/**
+	 * GET /pools/{poolid}: the pool with its members.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_pools_get_id( array $a, array $p ) {
+		unset( $p );
+
+		if ( ! isset( $this->state['pools'][ $a[0] ] ) ) {
+			return $this->error( 500, "pool '" . $a[0] . "' does not exist" );
+		}
+
+		return array( 'members' => $this->pool_members( $this->state['pools'][ $a[0] ] ) );
+	}
+
+	/**
+	 * Pool members as the API lists them.
+	 *
+	 * @param array<string, mixed> $pool Pool.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function pool_members( array $pool ): array {
+		$out = array();
+
+		foreach ( $pool['members'] as $vmid ) {
+			$out[] = array(
+				'vmid' => (int) $vmid,
+				'type' => 'qemu',
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Makes restores drop the VM from its pool (an assumption the real behaviour is unknown for).
+	 *
+	 * @param bool $drop Whether a restore removes the VM from its pool.
+	 */
+	public function drop_pool_on_restore( bool $drop ): void {
+		$this->load();
+		$this->state['restore_drops_pool'] = $drop;
+		$this->save();
 	}
 
 	/**

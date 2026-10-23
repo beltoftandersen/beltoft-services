@@ -98,6 +98,7 @@ class BackupOperationsTest extends BackupTestCase {
 		$this->retry_now( $r->id() );
 		$this->assertSame( 2, (int) Resource::find( $r->id() )->get( 'backup_purge_tries' ) );
 		$this->assertNotNull( $this->fake->vm( $vmid ) );
+		Resource::find( $r->id() )->set( array( 'backup_purge_started' => time() - 2 * HOUR_IN_SECONDS ) ); // Three tries over more than the minimum time.
 
 		for ( $i = 0; $i < 6 && 'deleted' !== Resource::find( $r->id() )->get( 'state' ); $i++ ) {
 			$this->retry_now( $r->id() );
@@ -107,7 +108,9 @@ class BackupOperationsTest extends BackupTestCase {
 		$this->assertNull( $this->fake->vm( $vmid ) );
 		$alerts = array_values( array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ) );
 		$this->assertCount( 1, $alerts, 'One admin alert (the customer mails are not under test).' );
-		$this->assertStringContainsString( 'Backups could not be deleted', $alerts[0]['message'] );
+		$this->assertStringContainsString( 'Backups of VMID ' . $vmid . ' could not be deleted on storage "backup-store"', $alerts[0]['message'] );
+		$orphans = get_option( \BeltoftServices\Proxmox\Backups::ORPHANS );
+		$this->assertSame( $vmid, $orphans[0]['vmid'], 'The leftover is listed.' );
 	}
 
 	// -- Plan change -------------------------------------------------------------------------------

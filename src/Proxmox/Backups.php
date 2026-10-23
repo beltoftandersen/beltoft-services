@@ -52,6 +52,31 @@ final class Backups {
 	public const PURGE_TRIES = 3;
 
 	/**
+	 * A delete also waits this long, from the first failed try, before it gives up on the backups.
+	 */
+	public const PURGE_GIVE_UP_AFTER = HOUR_IN_SECONDS;
+
+	/**
+	 * A backup task that has not ended after this long counts as failed (it may be gone from Proxmox).
+	 */
+	public const MAX_TASK = 6 * HOUR_IN_SECONDS;
+
+	/**
+	 * Retry text of a backup that is simply still running (not a problem; the chain keeps polling it).
+	 */
+	public const WAITING = 'backup: waiting for the Proxmox task';
+
+	/**
+	 * Retry text of a backup delete that is still running (not a failed try).
+	 */
+	public const PURGE_PENDING = 'backup purge: waiting for a Proxmox task';
+
+	/**
+	 * Option listing the backups left behind by a server whose clean-up was given up.
+	 */
+	public const ORPHANS = 'beltoft_services_orphaned_backups';
+
+	/**
 	 * Cluster settings (token secret decrypted).
 	 *
 	 * @var array<string, mixed>
@@ -89,7 +114,8 @@ final class Backups {
 	 * @param int      $now Time.
 	 */
 	public static function due( Resource $r, int $now ): bool {
-		if ( 'ready' !== $r->get( 'state' ) || ! self::enabled( $r ) ) {
+		// A server on its way out (pause or delete asked, an operation running) is left alone.
+		if ( 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || '' !== (string) $r->get( 'op' ) || ! self::enabled( $r ) ) {
 			return false;
 		}
 
@@ -195,14 +221,17 @@ final class Backups {
 			$task = $this->r->get( 'backup_task' );
 		}
 
-		$result = $this->client->wait_task( (string) $task['upid'], $this->wait );
+		$result  = $this->client->wait_task( (string) $task['upid'], $this->wait );
+		$started = (int) ( $task['started'] ?? 0 );
+		$late    = $started > 0 && time() - $started > self::MAX_TASK;
 
+		// A task that never ends (gone from Proxmox, a node that stays away) is a failure after a while, so it cannot hold the chain.
 		if ( is_wp_error( $result ) && 'task_pending' === $result->get_error_code() ) {
-			return StepResult::retry( 60, 'backup: waiting for the Proxmox task' );
+			return $late ? $this->failed( 'The backup task did not finish in time' ) : StepResult::retry( 60, self::WAITING );
 		}
 
 		if ( is_wp_error( $result ) && 'task_failed' !== $result->get_error_code() ) {
-			return StepResult::retry( 60, 'backup: ' . $this->text( $result ) );
+			return $late ? $this->failed( 'The backup task could not be followed: ' . $this->text( $result ) ) : StepResult::retry( 60, 'backup: ' . $this->text( $result ) );
 		}
 
 		if ( true !== $result && ! self::accepted( $result ) ) {
@@ -407,8 +436,14 @@ final class Backups {
 			return new \WP_Error( 'beltoft_services_backups', $this->text( $answer ) );
 		}
 
-		$since = (int) strtotime( (string) $record['created_at'] . ' UTC' );
-		$out   = array();
+		// The record's time is WordPress's clock, ctime Proxmox's: no skew matters for backups taken after the VM exists. A time that cannot be read shows nothing.
+		$since = strtotime( (string) $record['created_at'] . ' UTC' );
+
+		if ( false === $since ) {
+			return array();
+		}
+
+		$out = array();
 
 		foreach ( is_array( $answer ) ? $answer : array() as $item ) {
 			if ( ! is_array( $item ) || ! isset( $item['volid'], $item['ctime'] ) || ! is_string( $item['volid'] ) ) {
@@ -460,6 +495,10 @@ final class Backups {
 
 			$done = $this->client->wait_task( $upid, $this->wait );
 
+			if ( is_wp_error( $done ) && 'task_pending' === $done->get_error_code() ) {
+				return StepResult::retry( 60, self::PURGE_PENDING );
+			}
+
 			if ( is_wp_error( $done ) ) {
 				return StepResult::retry( 60, 'backup purge: ' . $this->text( $done ) );
 			}
@@ -469,27 +508,51 @@ final class Backups {
 	}
 
 	/**
+	 * A backup that is still running is waited for (a delete or a restore must not race it). Null:
+	 * none runs, or it has ended (its task is cleared; the outcome is not counted here).
+	 */
+	public function collect_running(): ?StepResult {
+		$task = $this->r->get( 'backup_task' );
+
+		if ( ! is_array( $task ) || empty( $task['upid'] ) || ! is_string( $task['upid'] ) ) {
+			return null;
+		}
+
+		$record = VmRecords::for_resource( $this->r->id() );
+		$early  = null === $record ? null : $this->prepare( $record );
+
+		if ( null !== $early ) {
+			return $early;
+		}
+
+		if ( null === $record ) {
+			return null;
+		}
+
+		$waited = $this->client->wait_task( $task['upid'], $this->wait );
+
+		if ( is_wp_error( $waited ) && 'task_pending' === $waited->get_error_code() ) {
+			$started = (int) ( $task['started'] ?? 0 );
+
+			if ( $started > 0 && time() - $started > self::MAX_TASK ) {
+				return $this->store( array( 'backup_task' => null ) ) ? null : StepResult::retry( 60, 'backup: progress could not be stored' );
+			}
+
+			return StepResult::retry( 60, self::PURGE_PENDING );
+		}
+
+		return $this->store( array( 'backup_task' => null ) ) ? null : StepResult::retry( 60, 'backup: progress could not be stored' );
+	}
+
+	/**
 	 * The nightly removal of the backups of a server whose plan lost them. A backup that was still
 	 * running is collected first. Done clears the bookkeeping, so a later purchase starts afresh.
 	 */
 	public function run_purge(): StepResult {
-		$task = $this->r->get( 'backup_task' );
+		$early = $this->collect_running();
 
-		if ( is_array( $task ) && ! empty( $task['upid'] ) && is_string( $task['upid'] ) ) {
-			$record = VmRecords::for_resource( $this->r->id() );
-			$early  = null === $record ? null : $this->prepare( $record );
-
-			if ( null !== $early ) {
-				return $early;
-			}
-
-			if ( null !== $record ) {
-				$waited = $this->client->wait_task( $task['upid'], $this->wait );
-
-				if ( is_wp_error( $waited ) && 'task_pending' === $waited->get_error_code() ) {
-					return StepResult::retry( 60, 'backup purge: a backup is still running' );
-				}
-			}
+		if ( null !== $early ) {
+			return $early;
 		}
 
 		$result = $this->purge();
@@ -621,7 +684,8 @@ final class Backups {
 
 			$plan = \BeltoftServices\Product::plan( $parent->get_id(), $other->get_id() );
 
-			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with ) {
+			// The same server, only the backups differ: never a silent plan change, never one that cannot be bought.
+			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( 'backup_days' => 1 ) ) === array_diff_key( $own, array( 'backup_days' => 1 ) ) && $other->is_purchasable() && $other->is_in_stock() ) {
 				return $other;
 			}
 		}

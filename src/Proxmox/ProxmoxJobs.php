@@ -777,16 +777,15 @@ final class ProxmoxJobs {
 
 		$backups = new Backups( $picked );
 
-		if ( Backups::purge_due( $picked ) ) {
-			$backups->run_purge();
-		} else {
-			$backups->step();
-		}
+		$result = Backups::purge_due( $picked ) ? $backups->run_purge() : $backups->step();
 
 		$after = Resource::find( $picked->id() );
 		$task  = $after ? $after->get( 'backup_task' ) : null;
 
-		if ( ! $after || ( ! ( is_array( $task ) && ! empty( $task['upid'] ) ) && ( Backups::purge_due( $after ) || Backups::due( $after, time() ) ) ) ) {
+		// Still running is fine (it is polled again); any other retry (a poll error, an unreachable cluster) moves on.
+		$stuck = $result->is_retry() && ! in_array( $result->error(), array( Backups::WAITING, Backups::PURGE_PENDING ), true );
+
+		if ( ! $after || $stuck || ( ! ( is_array( $task ) && ! empty( $task['upid'] ) ) && ( Backups::purge_due( $after ) || Backups::due( $after, time() ) ) ) ) {
 			$skip[] = $picked->id();
 			set_transient( self::BACKUP_RUN, $skip, 6 * HOUR_IN_SECONDS );
 		}
