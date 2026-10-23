@@ -61,6 +61,7 @@ final class Plugin {
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Operations::class, 'on_state_changed' ), 10, 3 );
 		Proxmox\SshKeyField::register();
 		Proxmox\OsField::register();
+		Proxmox\BackupField::register();
 		Proxmox\Actions::register();
 		Proxmox\Panels::register();
 		Proxmox\EmailDetails::register();

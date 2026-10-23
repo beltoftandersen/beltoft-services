@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.2.6\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.3.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-23T13:03:58+00:00\n"
+"POT-Creation-Date: 2026-10-23T14:15:35+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -157,7 +157,7 @@ msgstr ""
 
 #: src/Admin/ListTable.php:59
 #: src/Admin/Panel.php:640
-#: src/Proxmox/Panels.php:132
+#: src/Proxmox/Panels.php:174
 msgid "Last error"
 msgstr ""
 
@@ -736,13 +736,13 @@ msgstr ""
 
 #. translators: %d: minimum length.
 #: src/Http/Connections.php:560
-#: src/Proxmox/Clusters.php:557
+#: src/Proxmox/Clusters.php:566
 #, php-format
 msgid "A new secret needs at least %d characters."
 msgstr ""
 
 #: src/Http/Connections.php:564
-#: src/Proxmox/Clusters.php:561
+#: src/Proxmox/Clusters.php:570
 #: src/Settings.php:421
 msgid "Add BELTOFT_SERVICES_KEY to wp-config.php before saving secrets."
 msgstr ""
@@ -929,7 +929,7 @@ msgid "Save connection"
 msgstr ""
 
 #: src/Http/ConnectionsScreen.php:340
-#: src/Proxmox/ClustersScreen.php:306
+#: src/Proxmox/ClustersScreen.php:307
 msgid "Back to the list"
 msgstr ""
 
@@ -993,7 +993,7 @@ msgid "No answer"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:178
+#: src/Plugin.php:179
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -1062,185 +1062,226 @@ msgstr ""
 msgid "Product setting"
 msgstr ""
 
-#: src/Proxmox/Actions.php:122
+#: src/Proxmox/Actions.php:130
 msgid "Start"
 msgstr ""
 
-#: src/Proxmox/Actions.php:126
+#: src/Proxmox/Actions.php:134
 msgid "Shut down"
 msgstr ""
 
-#: src/Proxmox/Actions.php:127
+#: src/Proxmox/Actions.php:135
 msgid "Reboot"
 msgstr ""
 
-#: src/Proxmox/Actions.php:131
+#: src/Proxmox/Actions.php:139
 msgid "Reset password"
 msgstr ""
 
-#: src/Proxmox/Actions.php:139
-#: templates/account/vm.php:62
-#: templates/account/vm.php:69
+#: src/Proxmox/Actions.php:148
+#: templates/account/vm.php:99
+msgid "Restore from a backup"
+msgstr ""
+
+#: src/Proxmox/Actions.php:151
+#: templates/account/vm.php:149
+#: templates/account/vm.php:156
 msgid "Replace SSH key"
 msgstr ""
 
-#: src/Proxmox/Actions.php:139
-#: templates/account/vm.php:62
-#: templates/account/vm.php:69
+#: src/Proxmox/Actions.php:151
+#: templates/account/vm.php:149
+#: templates/account/vm.php:156
 msgid "Add SSH key"
 msgstr ""
 
-#: src/Proxmox/Actions.php:140
-#: templates/account/vm.php:74
+#: src/Proxmox/Actions.php:152
+#: templates/account/vm.php:161
 msgid "Reinstall"
 msgstr ""
 
-#: src/Proxmox/Actions.php:192
+#: src/Proxmox/Actions.php:204
 msgid "This is not available for this server. Please contact support."
 msgstr ""
 
-#: src/Proxmox/Actions.php:201
+#: src/Proxmox/Actions.php:213
 msgid "Resetting the password is not available for this server."
 msgstr ""
 
-#: src/Proxmox/Actions.php:204
+#: src/Proxmox/Actions.php:216
 msgid "The password can be reset three times an hour. Please try again later."
 msgstr ""
 
 #. translators: %s: the word to type, REINSTALL.
-#: src/Proxmox/Actions.php:213
+#: src/Proxmox/Actions.php:229
 #, php-format
 msgid "Type %s to confirm. Reinstalling erases everything on the server."
 msgstr ""
 
-#: src/Proxmox/Actions.php:221
+#: src/Proxmox/Actions.php:237
 msgid "Choose one of the listed operating systems."
 msgstr ""
 
-#: src/Proxmox/Actions.php:228
+#: src/Proxmox/Actions.php:244
 msgid "A server can be reinstalled once an hour. Please try again later."
 msgstr ""
 
-#: src/Proxmox/Actions.php:255
+#: src/Proxmox/Actions.php:259
+msgid "Restoring is not available for this server."
+msgstr ""
+
+#. translators: %s: the word to type, RESTORE.
+#: src/Proxmox/Actions.php:264
+#, php-format
+msgid "Type %s to confirm. Restoring replaces everything on the server with the backup."
+msgstr ""
+
+#: src/Proxmox/Actions.php:268
+msgid "Choose one of the listed backups."
+msgstr ""
+
+#: src/Proxmox/Actions.php:295
 #: src/Proxmox/Panels.php:49
 msgid "Too many requests. Please wait a while and try again."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:102
+#. translators: %s: price difference such as +€12.00 / month
+#: src/Proxmox/BackupField.php:147
+#, php-format
+msgid "Daily backups (%s)"
+msgstr ""
+
+#. translators: %d: number of days
+#: src/Proxmox/BackupField.php:155
+#, php-format
+msgid "A backup of the whole server every night, kept for %d day. You can restore it from your account."
+msgid_plural "A backup of the whole server every night, kept for %d days. You can restore it from your account."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Proxmox/BackupField.php:178
+msgid "The backups option could not be changed. Please reload the page and try again."
+msgstr ""
+
+#: src/Proxmox/Clusters.php:103
 msgid "Live Proxmox calls are switched off. Define BELTOFT_SERVICES_PROXMOX_LIVE as true in wp-config.php first."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:106
+#: src/Proxmox/Clusters.php:107
 msgid "Set the site tag in Settings, Proxmox first. A live cluster needs one you chose: the host name is not used for live clusters."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:252
+#: src/Proxmox/Clusters.php:253
 msgid "A cluster id is 1 to 40 characters: lowercase letters, numbers, dashes and underscores."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:262
+#: src/Proxmox/Clusters.php:263
 msgid "A cluster needs a label."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:276
+#: src/Proxmox/Clusters.php:277
 msgid "The token id looks like user@realm!tokenname."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:284
+#: src/Proxmox/Clusters.php:285
 msgid "The CA file must be an absolute path to a file this site can read."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:295
+#: src/Proxmox/Clusters.php:296
 msgid "The pin must be the base64 of a SHA-256 hash (44 characters)."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:304
+#: src/Proxmox/Clusters.php:305
 msgid "The client must be fake or live."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:318
+#: src/Proxmox/Clusters.php:319
 msgid "The pool API must be pools or pools_id."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:327
+#: src/Proxmox/Clusters.php:328
 msgid "Node names contain letters, numbers and dashes only."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:334
+#: src/Proxmox/Clusters.php:335
 msgid "Name at least one node."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:340
+#: src/Proxmox/Clusters.php:341
 msgid "The disk storage"
 msgstr ""
 
-#: src/Proxmox/Clusters.php:341
+#: src/Proxmox/Clusters.php:342
 msgid "The cloud-init storage"
 msgstr ""
 
 #. translators: %s: field name, such as "The disk storage".
-#: src/Proxmox/Clusters.php:347
+#: src/Proxmox/Clusters.php:348
 #, php-format
 msgid "%s must be a storage id (letters, numbers, dots, dashes, underscores)."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:356
+#: src/Proxmox/Clusters.php:357
 msgid "The bridge is a network device name such as vmbr1."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:364
+#: src/Proxmox/Clusters.php:365
 msgid "The VLAN tag is a number from 1 to 4094, or empty."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:372
+#: src/Proxmox/Clusters.php:373
 msgid "The pool id contains letters, numbers, dots, dashes and underscores only."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:381
+#: src/Proxmox/Clusters.php:382
 msgid "The boot disk is a disk slot such as scsi0 or virtio0."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:389
+#: src/Proxmox/Clusters.php:390
 msgid "The gateway must be an IPv4 address."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:398
+#: src/Proxmox/Clusters.php:399
 msgid "Name servers are IPv4 addresses, separated by commas."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:410
+#: src/Proxmox/Clusters.php:411
 msgid "The network prefix is a number from 1 to 32."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:420
+#: src/Proxmox/Clusters.php:421
 msgid "The VMID range runs from at least 100 to at most 999999999, and the first must be lower than the last."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:434
+#: src/Proxmox/Clusters.php:435
 msgid "A template cannot sit inside the customer VMID range: it could then be changed or deleted like a customer machine."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:443
+#: src/Proxmox/Clusters.php:444
 msgid "The default template must be one of the VMIDs in the template list, or empty to use the first."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:451
+#: src/Proxmox/Clusters.php:452
 msgid "The vendor snippet is a volume such as local:snippets/vendor.yaml."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:467
+#: src/Proxmox/Clusters.php:460
+msgid "The backup storage must be a storage id (letters, numbers, dots, dashes, underscores), or empty to turn backups off."
+msgstr ""
+
+#: src/Proxmox/Clusters.php:476
 msgid "A cluster needs the API token secret."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:501
+#: src/Proxmox/Clusters.php:510
 msgid "Write each template as a line: VMID = label. The VMID is at least 100."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:505
+#: src/Proxmox/Clusters.php:514
 msgid "A template VMID is listed twice."
 msgstr ""
 
-#: src/Proxmox/Clusters.php:535
+#: src/Proxmox/Clusters.php:544
 msgid "The API address must be https, such as https://pve.example.invalid:8006, with no path."
 msgstr ""
 
@@ -1463,26 +1504,34 @@ msgstr ""
 msgid "Optional cloud-init snippet volume, such as local:snippets/vendor.yaml."
 msgstr ""
 
-#: src/Proxmox/ClustersScreen.php:299
+#: src/Proxmox/ClustersScreen.php:296
+msgid "Backup storage"
+msgstr ""
+
+#: src/Proxmox/ClustersScreen.php:296
+msgid "Optional storage id (a Proxmox Backup Server storage) for customer backups. Empty: no backups on this cluster."
+msgstr ""
+
+#: src/Proxmox/ClustersScreen.php:300
 msgid "Mail"
 msgstr ""
 
-#: src/Proxmox/ClustersScreen.php:301
+#: src/Proxmox/ClustersScreen.php:302
 msgid "Block outgoing mail from new machines"
 msgstr ""
 
-#: src/Proxmox/ClustersScreen.php:305
+#: src/Proxmox/ClustersScreen.php:306
 msgid "Save cluster"
 msgstr ""
 
 #: src/Proxmox/EmailDetails.php:49
-#: src/Proxmox/Panels.php:121
-#: templates/account/vm.php:23
+#: src/Proxmox/Panels.php:162
+#: templates/account/vm.php:24
 msgid "IP address"
 msgstr ""
 
 #: src/Proxmox/EmailDetails.php:50
-#: templates/account/vm.php:25
+#: templates/account/vm.php:26
 msgid "Log in"
 msgstr ""
 
@@ -1490,20 +1539,21 @@ msgstr ""
 #: src/Proxmox/OsField.php:289
 #: src/Proxmox/OsField.php:381
 #: src/Proxmox/OsField.php:382
-#: templates/account/vm.php:43
-#: templates/account/vm.php:79
+#: templates/account/vm.php:44
+#: templates/account/vm.php:166
 msgid "Operating system"
 msgstr ""
 
 #: src/Proxmox/EmailDetails.php:57
-#: src/Proxmox/Panels.php:124
+#: src/Proxmox/Panels.php:165
+#: templates/account/vm.php:87
 msgid "Size"
 msgstr ""
 
 #. translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB
 #: src/Proxmox/EmailDetails.php:59
-#: src/Proxmox/Panels.php:126
-#: templates/account/vm.php:34
+#: src/Proxmox/Panels.php:167
+#: templates/account/vm.php:35
 #, php-format
 msgid "%1$d vCPU, %2$d MB RAM, %3$d GB disk"
 msgstr ""
@@ -1664,33 +1714,76 @@ msgstr ""
 msgid "Reinstalling erases everything on the server. Continue?"
 msgstr ""
 
-#: src/Proxmox/Panels.php:118
+#: src/Proxmox/Panels.php:52
+msgid "Restoring replaces everything on the server with this backup, and the password and SSH key go back to the backup's. Continue?"
+msgstr ""
+
+#. translators: %d: days of backups kept
+#: src/Proxmox/Panels.php:128
+#, php-format
+msgid "daily, kept %d day"
+msgid_plural "daily, kept %d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Proxmox/Panels.php:129
+msgid "off"
+msgstr ""
+
+#. translators: %s: date and time
+#: src/Proxmox/Panels.php:132
+#, php-format
+msgid "last OK %s"
+msgstr ""
+
+#: src/Proxmox/Panels.php:133
+msgid "no backup yet"
+msgstr ""
+
+#. translators: %d: number of backups kept
+#: src/Proxmox/Panels.php:138
+#, php-format
+msgid "%d kept"
+msgstr ""
+
+#. translators: %s: error text
+#: src/Proxmox/Panels.php:143
+#, php-format
+msgid "last error: %s"
+msgstr ""
+
+#: src/Proxmox/Panels.php:159
 #: src/Proxmox/ProxmoxDriver.php:85
 msgid "Cluster"
 msgstr ""
 
-#: src/Proxmox/Panels.php:119
+#: src/Proxmox/Panels.php:160
 msgid "Node"
 msgstr ""
 
-#: src/Proxmox/Panels.php:120
+#: src/Proxmox/Panels.php:161
 msgid "VMID"
 msgstr ""
 
-#: src/Proxmox/Panels.php:122
+#: src/Proxmox/Panels.php:163
 msgid "Ownership tag"
 msgstr ""
 
-#: src/Proxmox/Panels.php:123
-#: templates/account/vm.php:47
+#: src/Proxmox/Panels.php:164
+#: templates/account/vm.php:48
 msgid "Power"
 msgstr ""
 
-#: src/Proxmox/Panels.php:131
+#: src/Proxmox/Panels.php:172
 msgid "Template"
 msgstr ""
 
-#: src/Proxmox/Panels.php:135
+#: src/Proxmox/Panels.php:173
+#: templates/account/vm.php:55
+msgid "Backups"
+msgstr ""
+
+#: src/Proxmox/Panels.php:177
 msgid "Virtual machine"
 msgstr ""
 
@@ -1740,6 +1833,14 @@ msgstr ""
 
 #: src/Proxmox/ProxmoxDriver.php:116
 msgid "The boot disk grows to this size. It is never shrunk."
+msgstr ""
+
+#: src/Proxmox/ProxmoxDriver.php:122
+msgid "Backup days"
+msgstr ""
+
+#: src/Proxmox/ProxmoxDriver.php:123
+msgid "Daily backups kept for this many days. 0 means no backups. Needs a backup storage on the cluster."
 msgstr ""
 
 #. translators: %s: cluster ids.
@@ -1838,7 +1939,7 @@ msgstr ""
 
 #: src/Proxmox/SshKeyField.php:384
 #: src/Proxmox/SshKeyField.php:464
-#: templates/account/vm.php:65
+#: templates/account/vm.php:152
 msgid "SSH public key"
 msgstr ""
 
@@ -1939,41 +2040,90 @@ msgstr ""
 msgid "Open Settings → Licenses"
 msgstr ""
 
-#: templates/account/vm.php:16
+#: templates/account/vm.php:17
 msgid "Running"
 msgstr ""
 
-#: templates/account/vm.php:17
+#: templates/account/vm.php:18
 msgid "Stopped"
 msgstr ""
 
-#: templates/account/vm.php:28
+#: templates/account/vm.php:29
 msgid "Plan"
 msgstr ""
 
-#: templates/account/vm.php:55
-msgid "Show password once"
+#: templates/account/vm.php:62
+msgid "Add daily backups"
 msgstr ""
 
-#: templates/account/vm.php:58
-msgid "The password is shown one time only. Copy it now and keep it safe."
+#. translators: %s: price difference such as +€12.00 / month
+#: templates/account/vm.php:64
+#, php-format
+msgid "Add daily backups (%s)"
 msgstr ""
 
-#: templates/account/vm.php:68
-msgid "Paste the single line from your .pub file. It replaces the key now on the server."
+#: templates/account/vm.php:69
+msgid "A backup of the whole server is taken every night."
 msgstr ""
 
+#. translators: %d: number of days
 #: templates/account/vm.php:76
-msgid "Reinstalling erases everything on the server and installs the system again. The IP address stays. You get a new password."
+#, php-format
+msgid "A backup is taken every night and kept for %d day."
+msgid_plural "A backup is taken every night and kept for %d days."
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/account/vm.php:83
+msgid "The first backup will appear here after tonight's run."
 msgstr ""
 
+#: templates/account/vm.php:87
+#: templates/account/vm.php:103
+msgid "Backup"
+msgstr ""
+
+#: templates/account/vm.php:101
+msgid "Restoring replaces everything on the server with the backup. The server is switched off while it is restored. The password and the SSH key go back to the ones the backup had. The IP address stays."
+msgstr ""
+
+#. translators: %s: the word to type, RESTORE
 #. translators: %s: the word to type, REINSTALL
-#: templates/account/vm.php:93
+#: templates/account/vm.php:116
+#: templates/account/vm.php:180
 #, php-format
 msgid "Type %s to confirm"
 msgstr ""
 
-#: templates/account/vm.php:101
+#: templates/account/vm.php:124
+msgid "Restore now"
+msgstr ""
+
+#: templates/account/vm.php:131
+msgid "Remove backups"
+msgstr ""
+
+#: templates/account/vm.php:133
+msgid "If you remove backups, all backups of this server are deleted."
+msgstr ""
+
+#: templates/account/vm.php:142
+msgid "Show password once"
+msgstr ""
+
+#: templates/account/vm.php:145
+msgid "The password is shown one time only. Copy it now and keep it safe."
+msgstr ""
+
+#: templates/account/vm.php:155
+msgid "Paste the single line from your .pub file. It replaces the key now on the server."
+msgstr ""
+
+#: templates/account/vm.php:163
+msgid "Reinstalling erases everything on the server and installs the system again. The IP address stays. You get a new password."
+msgstr ""
+
+#: templates/account/vm.php:188
 msgid "Reinstall now"
 msgstr ""
 
