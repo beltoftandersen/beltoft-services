@@ -357,6 +357,7 @@ class ClustersTest extends TestCase {
 			array( 'vendor_snippet' => 'local:snippets/../x.yaml' ),
 			array( 'vendor_snippet' => 'local:snippets/a,b.yaml' ),
 			array( 'vendor_snippet' => 'vendor.yaml' ),
+			array( 'backup_storage' => 'bad id!' ),
 			array( 'label' => '' ),
 		);
 
@@ -386,6 +387,31 @@ class ClustersTest extends TestCase {
 		$this->assertSame( 0, $c['block_smtp'] );
 	}
 
+	public function test_backup_storage_is_optional_and_validated(): void {
+		$this->assertTrue( Clusters::save( 'lab', $this->input() ) );
+		$this->assertSame( '', Clusters::get( 'lab' )['backup_storage'] );
+
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'backup_storage' => 'backup-store' ) ) ) );
+		$this->assertSame( 'backup-store', Clusters::get( 'lab' )['backup_storage'] );
+
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'backup_storage' => 'bad id!' ) ) ) );
+		$this->assertSame( 'backup-store', Clusters::get( 'lab' )['backup_storage'], 'A refused save keeps the stored value.' );
+
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'backup_storage' => '' ) ) ) );
+		$this->assertSame( '', Clusters::get( 'lab' )['backup_storage'] );
+	}
+
+	public function test_a_cluster_stored_before_backups_still_loads(): void {
+		$this->assertTrue( Clusters::save( 'lab', $this->input() ) );
+
+		$stored = get_option( Clusters::OPTION );
+		unset( $stored['lab']['backup_storage'] );
+		update_option( Clusters::OPTION, $stored );
+
+		$this->assertSame( '', Clusters::get( 'lab' )['backup_storage'] );
+		$this->assertArrayHasKey( 'lab', Clusters::all() );
+	}
+
 	public function test_id_is_validated(): void {
 		foreach ( array( '', 'Lab', 'a b', str_repeat( 'a', 41 ), 'a/b' ) as $id ) {
 			$this->assertWPError( Clusters::save( $id, $this->input() ), $id );
@@ -398,7 +424,7 @@ class ClustersTest extends TestCase {
 	public function test_no_built_in_default_names_an_infrastructure_value(): void {
 		$d = Clusters::defaults();
 
-		foreach ( array( 'api_url', 'token_id', 'token_secret', 'storage', 'cloudinit_storage', 'bridge', 'pool', 'gateway', 'nodes', 'templates', 'vendor_snippet' ) as $key ) {
+		foreach ( array( 'api_url', 'token_id', 'token_secret', 'storage', 'cloudinit_storage', 'bridge', 'pool', 'gateway', 'nodes', 'templates', 'vendor_snippet', 'backup_storage' ) as $key ) {
 			$this->assertContains( $d[ $key ], array( '', array() ), $key );
 		}
 

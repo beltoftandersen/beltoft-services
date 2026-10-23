@@ -54,6 +54,7 @@ final class Clusters {
 			'templates'         => array(),
 			'default_template'  => 0,
 			'vendor_snippet'    => '',
+			'backup_storage'    => '',
 			'block_smtp'        => 1,
 		);
 	}
@@ -452,6 +453,14 @@ final class Clusters {
 		}
 
 		$clean['vendor_snippet'] = $snippet;
+
+		$backup = trim( (string) ( $input['backup_storage'] ?? '' ) );
+
+		if ( '' !== $backup && ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/', $backup ) ) {
+			return self::error( 'backup_storage', __( 'The backup storage must be a storage id (letters, numbers, dots, dashes, underscores), or empty to turn backups off.', 'beltoft-services' ) );
+		}
+
+		$clean['backup_storage'] = $backup;
 
 		if ( array_key_exists( 'block_smtp', $input ) ) {
 			$clean['block_smtp'] = empty( $input['block_smtp'] ) ? 0 : 1;

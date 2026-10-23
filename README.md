@@ -31,12 +31,13 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 
    ```
    pveum pool add beltoft-customers
-   pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit"
+   pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit VM.Backup"
    pveum user add svc@pve
    pveum user token add svc@pve beltoft --privsep 1
    pveum acl modify /pool/beltoft-customers --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices
    pveum acl modify /vms/<template id> --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices
    pveum acl modify /storage/<storage id> --users svc@pve --tokens 'svc@pve!beltoft' --roles PVEDatastoreUser
+   pveum acl modify /storage/<backup storage> --users svc@pve --tokens 'svc@pve!beltoft' --roles PVEDatastoreUser   # only when you sell backups
    pveum acl modify /sdn/zones/localnetwork --users svc@pve --tokens 'svc@pve!beltoft' --roles PVESDNUser
    pveum acl modify /nodes/<node> --users svc@pve --tokens 'svc@pve!beltoft' --roles BeltoftServices
    ```

@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.6
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,7 +19,7 @@ A service product is a licensed product with a service driver. When its license 
 * **Driven by the license.** It listens only to Beltoft Licenses' actions (`beltoft_licenses_license_created`, `_status_changed`, `_license_updated` and `_expiry_changed`). While a Beltoft Licenses import is running, it does nothing.
 * **All work in background jobs.** Every driver call runs in an Action Scheduler job (group `beltoft-services`), never during checkout or a page load. A database lock per service makes sure two job runners never act on the same service at once. A failed call is retried after 1, 5 and 15 minutes, 1 hour and 4 hours; then the service is marked failed and the admin gets an email.
 * **An HTTP API driver** that calls your own service with signed requests. Each connection (Settings → Services → Connections) has a base URL, HMAC or static header authentication, an endpoint (method and path) for each operation, a JSON body template, the response field that holds the service's id, optional usage fields, and an optional "Open" link with a short-lived sign-in token. Other plugins can add drivers with the `beltoft_services_drivers` filter.
-* **A Proxmox VE driver (0.2.0)** that sells virtual machines: a VM is cloned from a template, given an address from your IP pool and a login, and started. See the FAQ, starting at "What does the Proxmox driver do?".
+* **A Proxmox VE driver (0.2.0)** that sells virtual machines: a VM is cloned from a template, given an address from your IP pool and a login, and started. See the FAQ, starting at "What does the Proxmox driver do?". Version 0.3.0 adds daily backups with a customer restore ("How do backups work?").
 * **A Service tab on licensed products:** the driver, the connection, the driver's plan fields (for HTTP, a limit and plan attributes; variations can set their own), a retention period, and whether a free trial needs a payment method. A free trial of a service is limited to one per customer (matched by account and billing email), in the classic and the block checkout. Renewals, switches and resubscribes are not affected.
 * **My Account:** each service license shows its service's state and usage, the actions the driver offers, and the Open button. Customers only see and act on their own services.
 * **Admin:** WooCommerce → Services lists every service with its state. Each license screen gets a Service panel with retry, pause, resume, delete (with a typed confirmation), protect, and "Mark deleted" for a service that was removed by hand.
@@ -106,7 +106,7 @@ The Proxmox driver clones a template into a new VM for each licensed unit, sets 
 1. **A dedicated pool and a privilege-separated token.** Give this plugin its own pool and an API token that can act only on that pool, the templates, the storage and the bridge. With `pveum` (names from the PVE 9.2 documentation; check the privilege names against your own version, and the "pveum" chapter of the Proxmox VE Administration Guide):
 
 `pveum pool add beltoft-customers`
-`pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit"`
+`pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit VM.Backup"`
 `pveum user add svc@pve`
 `pveum user token add svc@pve beltoft --privsep 1`
 
@@ -115,6 +115,7 @@ A privilege-separated token only gets what is granted to the token itself, and n
 * `/pool/beltoft-customers`: role `BeltoftServices`, propagated. New VMs are created inside this pool, so every call on them is covered here.
 * `/vms/<template id>` for each template: a role with `VM.Clone` and `VM.Audit` (the role above has both).
 * `/storage/<disk storage>` and `/storage/<cloud-init storage>`: `PVEDatastoreUser` (`Datastore.AllocateSpace`, `Datastore.Audit`).
+* `/storage/<backup storage>`: `PVEDatastoreUser`, only when you sell backups (the role above has `VM.Backup`, which vzdump needs on the VM).
 * `/sdn/zones/localnetwork` (or the zone of your bridge): `PVESDNUser` (`SDN.Use`) on PVE 8 and newer.
 * `/nodes/<node>`: `Sys.Audit`, to read the node list for capacity and the status of tasks.
 
@@ -173,6 +174,16 @@ A node counts as full when the memory of the VMs of this site on it (the configu
 
 A customer can add an SSH public key at checkout (RSA, ECDSA or ed25519), otherwise a password is generated and shown once, on the account page, to the license owner. It is encrypted at rest, never emailed, and a reveal is single-shot: if it is lost, the customer resets it (when the VM's guest agent works) or reinstalls. An order of several units shares the one key. Orders from a switch or an upgrade carry no key; the customer adds one later in My Account. Replacing a key writes it into the running server through the guest agent (privilege `VM.GuestAgent.FileWrite` or `VM.GuestAgent.Unrestricted`), so the old key stops working at once; on a server that is off the new key applies at its next start.
 
+= How do backups work? =
+
+Backups are sold as a second attribute on the server product ("Backups": None or Daily), so every plan has a sibling variation whose plan field "Backup days" is above zero. Buying, adding and removing backups are ordinary WooCommerce Subscriptions variation switches: nothing about billing is built here. At checkout a "Daily backups" box (classic checkout) swaps the cart's server for the sibling variation; in My Account → the server, the panel offers "Add daily backups" or "Remove backups" as a switch link to the checkout. A server on a cluster without a backup storage never offers them.
+
+The plugin runs the backups itself. Set a **backup storage** per cluster (Settings → Services → Proxmox clusters), the id of a Proxmox Backup Server storage; empty turns backups off for the cluster. A nightly job (03:30) backs up the servers that are due, one at a time, with `POST /nodes/{node}/vzdump`, then prunes to the plan's days with `DELETE /nodes/{node}/storage/{storage}/prunebackups` (`keep-daily`). It does not use a Proxmox backup job, because editing one needs `Sys.Modify` on `/`. A failed night is recorded and shown in the admin panel; after three nights in a row the admin gets an email. The customer is never emailed, and the server is not affected. Removing backups from a plan deletes the server's backups at the next nightly run, and deleting the server deletes them first.
+
+A customer can list the backups and restore the whole server to one of them (typing `RESTORE`): the server is shut down, restored over the same VMID, its plan is applied again (cores, memory and a larger disk come back if the backup predates an upgrade; a disk is never shrunk) and it is started. The password and the SSH key go back to the backup's. A restore is not offered for an adopted (linked) server. A deleted server's VMID can be reused, so the lists, restores and clean-ups never include backups taken before the server's record was created.
+
+The token needs `VM.Backup` (in the role above) and `PVEDatastoreUser` on `/storage/<backup storage>`; nothing else on the backup storage.
+
 = How do I adopt an existing VM? =
 
 `wp beltoft-services link-vm <license-id> --cluster=<id> --node=<node> --vmid=<vmid> --ip=<ip>` links a license to a VM that already exists. It only does bookkeeping: it records the VM as ready and protected, adds the ownership tag to its description, and adds it to the cluster's pool if it is in none. It starts, stops, resizes and reconfigures nothing, and makes two reads and one or two writes. `--dry-run` lists the calls and makes none. A machine on another network, such as an internal one, that is not in the IP pool is adopted with `--outside-pool` (nothing about its network is touched). On a live cluster the command needs `--confirm=LINK:<vmid>`. The VMID must be in the cluster's customer range, so a VM outside it cannot be adopted.
@@ -210,6 +221,13 @@ Nothing is provisioned, paused, resumed or deleted: licenses change without the 
 The settings, connections, clusters, IP pool, VM records, breach marks and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.3.0 =
+* Daily server backups as a sellable add-on. A second attribute on the server product ("Backups": None or Daily) gives each plan a sibling variation with the new plan field "Backup days"; adding and removing backups are WooCommerce Subscriptions switches. Setting: "Backup storage" per cluster (a Proxmox Backup Server storage; empty turns backups off).
+* A nightly job (03:30) backs up the due servers one at a time with vzdump, prunes to the plan's days, records failures and alerts the admin after three in a row. A deleted server's backups are deleted before the VM; removing backups from the plan deletes them at the next run.
+* Customers can list their backups and restore the whole server to one (typed confirmation `RESTORE`, rate limited); the plan is applied again afterwards and a disk is never shrunk. The account panel gets a Backups block (add, list, restore, remove) and the admin panel a Backups row. A "Daily backups" box at the classic checkout swaps the cart's server for the sibling variation.
+* The fake cluster models vzdump, storage content, prune, restore and locked VMs.
+* The Proxmox role needs `VM.Backup` and the token `PVEDatastoreUser` on the backup storage.
 
 = 0.2.6 =
 * Fix: replacing the SSH key now takes effect at once. On a running server with the guest agent, `/root/.ssh/authorized_keys` is replaced (not appended to), so the new key works immediately and the old one stops; the cloud-init key is updated as before, for a reinstall. A stopped server, or one without the agent, still gets the key only at its next start, and the old key stays until a reinstall; the admin history says so. This needs the token privilege `VM.GuestAgent.FileWrite` (or `VM.GuestAgent.Unrestricted`, which the documented role already has) on the pool; without it the admin is alerted with the privilege name.

@@ -49,6 +49,7 @@ final class Panels {
 					'tooMany'   => __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ),
 					'gone'      => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),
 					'reinstall' => __( 'Reinstalling erases everything on the server. Continue?', 'beltoft-services' ),
+					'restore'   => __( 'Restoring replaces everything on the server with this backup, and the password and SSH key go back to the backup\'s. Continue?', 'beltoft-services' ),
 				),
 			)
 		);
@@ -96,6 +97,7 @@ final class Panels {
 			'can_reveal' => Access::revealable( $r ),
 			'forms'      => $r->accepts_actions(),
 			'ssh_user'   => Provision::LOGIN_USER,
+			'backups'    => Backups::panel( $r ),
 		);
 
 		( static function ( array $vars ): void {
@@ -103,6 +105,45 @@ final class Panels {
 			extract( $vars, EXTR_SKIP );
 			include BELTOFT_SERVICES_PATH . 'templates/account/vm.php';
 		} )( $state );
+	}
+
+	/**
+	 * One line for the admin: whether backups are on, the last good one, how many are kept, the last error.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function backups_line( Resource $r ): string {
+		$enabled = Backups::enabled( $r );
+
+		if ( ! $enabled && ! $r->get( 'backup_ok_at' ) && ! $r->get( 'backup_error' ) ) {
+			return '';
+		}
+
+		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		$ok     = (int) $r->get( 'backup_ok_at' );
+		$kept   = $r->get( 'backup_list' );
+		$parts  = array(
+			$enabled
+				/* translators: %d: days of backups kept */
+				? sprintf( _n( 'daily, kept %d day', 'daily, kept %d days', Backups::days( $r ), 'beltoft-services' ), Backups::days( $r ) )
+				: __( 'off', 'beltoft-services' ),
+			$ok > 0
+				/* translators: %s: date and time */
+				? sprintf( __( 'last OK %s', 'beltoft-services' ), wp_date( $format, $ok ) )
+				: __( 'no backup yet', 'beltoft-services' ),
+		);
+
+		if ( is_array( $kept ) ) {
+			/* translators: %d: number of backups kept */
+			$parts[] = sprintf( __( '%d kept', 'beltoft-services' ), count( $kept ) );
+		}
+
+		if ( '' !== (string) $r->get( 'backup_error' ) ) {
+			/* translators: %s: error text */
+			$parts[] = sprintf( __( 'last error: %s', 'beltoft-services' ), (string) $r->get( 'backup_error' ) );
+		}
+
+		return implode( ', ', $parts );
 	}
 
 	/**
@@ -129,6 +170,7 @@ final class Panels {
 				self::disk_gb( $r )
 			),
 			__( 'Template', 'beltoft-services' )      => (string) ( (int) $r->get( OsField::META ) > 0 ? $r->get( OsField::META ) : ( (array) $r->get( 'plan' ) )['template'] ?? '' ),
+			__( 'Backups', 'beltoft-services' )       => self::backups_line( $r ),
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),
 		);
 

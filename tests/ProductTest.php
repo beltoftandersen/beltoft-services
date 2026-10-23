@@ -29,6 +29,35 @@ class ProductTest extends TestCase {
 		);
 	}
 
+	public function test_proxmox_backup_days_defaults_to_zero_and_a_variation_wins(): void {
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) {
+				$drivers['proxmox'] = new \BeltoftServices\Proxmox\ProxmoxDriver();
+				return $drivers;
+			}
+		);
+
+		$field = ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->plan_fields()['backup_days'];
+		$this->assertTrue( $field[4], 'It is set per variation.' );
+
+		$product = $this->service_product(
+			'proxmox',
+			array(),
+			array(
+				'variations' => array(
+					array(),
+					array( 'backup_days' => 7 ),
+				),
+			)
+		);
+		$ids     = $product->get_children();
+
+		$this->assertSame( 0, Product::plan( $product->get_id() )['backup_days'] );
+		$this->assertSame( 0, Product::plan( $product->get_id(), $ids[0] )['backup_days'] );
+		$this->assertSame( 7, Product::plan( $product->get_id(), $ids[1] )['backup_days'] );
+	}
+
 	public function test_plan_merges_driver_defaults_product_and_variation(): void {
 		$fake              = $this->fake_driver();
 		$fake->plan_fields = $this->fields();

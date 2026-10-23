@@ -134,6 +134,7 @@ class ActionsTest extends TestCase {
 					'nodes'             => 'node-a',
 					'storage'           => 'disk-store',
 					'cloudinit_storage' => 'ci-store',
+					'backup_storage'    => 'backup-store',
 					'bridge'            => 'vmbr9',
 					'gateway'           => '192.0.2.1',
 					'nameservers'       => '192.0.2.53',
@@ -178,10 +179,11 @@ class ActionsTest extends TestCase {
 	 * A ready, running VM and its owner.
 	 *
 	 * @param array<string, mixed> $meta Initial meta.
+	 * @param array<string, mixed> $plan Plan overrides (the product's plan fields).
 	 * @return array{0: Resource, 1: int}
 	 */
-	private function ready( array $meta = array() ): array {
-		$product  = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ), array( 'max' => 3, 'slug' => 'vm-' . wp_generate_password( 5, false ) ) );
+	private function ready( array $meta = array(), array $plan = array() ): array {
+		$product  = $this->service_product( 'proxmox', array_merge( array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ), $plan ), array( 'max' => 3, 'slug' => 'vm-' . wp_generate_password( 5, false ) ) );
 		$license  = $this->service_license( $product, array( 'fire' => false ) );
 		$resource = Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $product->get_id() ), $meta );
 
@@ -998,5 +1000,218 @@ class ActionsTest extends TestCase {
 		$this->assertNotFalse( has_filter( 'beltoft_services_action_refusal' ) );
 		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
 		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'templates/account/vm.php' );
+	}
+
+	// -- Restore -----------------------------------------------------------------------------------
+
+	/**
+	 * A backup of the VM now, through the fake's vzdump (it keeps the config it restores).
+	 *
+	 * @param Resource $r Resource.
+	 * @return string The volume id.
+	 */
+	private function backup_of( Resource $r ): string {
+		$upid = $this->fake->task( 'POST', '/nodes/node-a/vzdump', array( 'vmid' => (int) $r->get( 'vmid' ), 'storage' => 'backup-store' ) );
+		$this->assertIsString( $upid );
+
+		$list = ( new \BeltoftServices\Proxmox\Backups( Resource::find( $r->id() ) ) )->list();
+		$this->assertNotEmpty( $list );
+
+		return $list[0]['volid'];
+	}
+
+	private function events_of( Resource $r ): string {
+		return (string) wp_json_encode( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ) );
+	}
+
+	public function test_restore_is_offered_only_with_backups_and_never_for_a_linked_vm(): void {
+		list( $with )    = $this->ready( array(), array( 'backup_days' => 7 ) );
+		list( $without ) = $this->ready();
+
+		$this->assertArrayHasKey( 'restore', Actions::offered( $with ) );
+		$this->assertArrayNotHasKey( 'restore', Actions::offered( $without ) );
+
+		$with->set( array( 'linked' => true ) );
+		$linked = Resource::find( $with->id() );
+		$this->assertArrayNotHasKey( 'restore', Actions::offered( $linked ) );
+		$this->assertNotNull( Actions::check( $linked, 'restore', array( 'confirm' => 'RESTORE', 'volid' => 'backup-store:backup/vm/' . $linked->get( 'vmid' ) . '/x' ) ) );
+
+		$this->assertArrayNotHasKey( 'restore', Actions::buttons( array( 'restore' => 'Restore', 'start' => 'Start' ), Resource::find( $without->id() ) ) );
+	}
+
+	public function test_restore_needs_the_word_and_one_of_this_servers_backups(): void {
+		list( $r, $owner ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$volid             = $this->backup_of( $r );
+		$seen              = count( $this->fake->calls() );
+
+		$no_word = $this->route( $r->id(), $owner, 'restore', array( 'volid' => $volid ) );
+		$this->assertSame( 422, $no_word->get_status() );
+		$this->assertStringContainsString( 'RESTORE', $no_word->get_data()['message'] );
+
+		$this->assertSame( 422, $this->route( $r->id(), $owner, 'restore', array( 'volid' => $volid, 'confirm' => 'restore' ) )->get_status(), 'Case matters.' );
+		$this->assertSame( 422, $this->route( $r->id(), $owner, 'restore', array( 'confirm' => 'RESTORE' ) )->get_status(), 'No backup chosen.' );
+
+		$foreign = 'backup-store:backup/vm/' . ( (int) $r->get( 'vmid' ) + 1 ) . '/2026-01-01T00:00:00Z';
+		$bad     = $this->route( $r->id(), $owner, 'restore', array( 'volid' => $foreign, 'confirm' => 'RESTORE' ) );
+		$this->assertSame( 422, $bad->get_status() );
+		$this->assertStringContainsString( 'listed backups', $bad->get_data()['message'] );
+
+		$other_storage = str_replace( 'backup-store', 'disk-store', $volid );
+		$this->assertSame( 422, $this->route( $r->id(), $owner, 'restore', array( 'volid' => $other_storage, 'confirm' => 'RESTORE' ) )->get_status() );
+
+		$this->assertCount( $seen, $this->fake->calls(), 'The route made no Proxmox call.' );
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );
+	}
+
+	public function test_a_backup_from_before_the_vm_record_cannot_be_restored(): void {
+		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$vmid      = (int) $r->get( 'vmid' );
+		$born      = (int) strtotime( VmRecords::for_resource( $r->id() )['created_at'] . ' UTC' );
+		$old       = 'backup-store:backup/vm/' . $vmid . '/2020-01-01T00:00:00Z';
+		$config    = $this->fake->vm( $vmid )['config'];
+		$this->fake->add_backup( 'backup-store', array( 'vmid' => $vmid, 'ctime' => $born - 1000, 'volid' => $old, 'config' => $config ) );
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->mails = array();
+		$seen        = count( $this->fake->calls() );
+
+		$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $old ) );
+
+		$this->assertCount( 0, $this->calls( 'POST', '/qemu' ), 'Nothing was restored.' );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'], 'The server was not even switched off.' );
+		$this->assertStringContainsString( 'Restore refused', $this->events_of( $r ) );
+		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ) );
+		$this->assertSame( array(), array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ), 'A refusal is no alert.' );
+		unset( $seen );
+	}
+
+	public function test_restore_runs_off_restore_verify_plan_start(): void {
+		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$vmid      = (int) $r->get( 'vmid' );
+		$volid     = $this->backup_of( $r );
+
+		// Changed after the backup: the restore must undo it.
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/' . $vmid . '/config', array( 'cores' => 8 ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+
+		$lines = array_map( static fn( $c ) => $c['method'] . ' ' . $c['path'], array_slice( $this->fake->calls(), $seen ) );
+		$order = array_values(
+			array_filter(
+				$lines,
+				static fn( $l ) => (bool) preg_match( '#/status/(shutdown|stop|start)$|^POST /nodes/node-a/qemu$#', $l )
+			)
+		);
+		$this->assertSame(
+			array( 'POST /nodes/node-a/qemu/' . $vmid . '/status/shutdown', 'POST /nodes/node-a/qemu', 'POST /nodes/node-a/qemu/' . $vmid . '/status/start' ),
+			$order
+		);
+
+		$restore = $this->calls( 'POST', '/nodes/node-a/qemu' );
+		$this->assertSame(
+			array(
+				'vmid'    => $vmid,
+				'archive' => $volid,
+				'force'   => 1,
+				'storage' => 'disk-store',
+			),
+			$restore[0]['params']
+		);
+
+		$this->assertSame( 2, (int) $this->fake->vm( $vmid )['config']['cores'], 'Back to the backup.' );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( 'restore' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertTrue( $fresh->get( 'plan_dirty' ), 'The plan is queued again.' );
+		$this->assertSame( 30, (int) $fresh->get( 'disk_gb' ) );
+		$this->assertStringContainsString( 'Server restored from the backup of', $this->events_of( $r ) );
+		$this->assertStringContainsString( 'Plan re-applied after restore', $this->events_of( $r ) );
+	}
+
+	public function test_a_backup_of_30g_restored_on_a_60g_plan_ends_at_60g_and_the_plan_sizing(): void {
+		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$vmid      = (int) $r->get( 'vmid' );
+		$volid     = $this->backup_of( $r );
+		$this->assertStringContainsString( 'size=30G', $this->fake->vm( $vmid )['config']['scsi0'] );
+
+		// An upgrade after the backup: 60 GB, 4 cores.
+		$plan = array_merge( (array) Resource::find( $r->id() )->get( 'plan' ), array( 'disk_gb' => 60, 'cores' => 4, 'memory_mb' => 8192 ) );
+		$this->assertTrue( Resource::find( $r->id() )->change_plan( $plan, 'Plan changed' ) );
+		Jobs::run( $r->id() );
+		$this->assertStringContainsString( 'size=60G', $this->fake->vm( $vmid )['config']['scsi0'] );
+
+		$seen = count( $this->fake->calls() );
+		$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+
+		$this->assertStringContainsString( 'size=30G', $this->fake->vm( $vmid )['config']['scsi0'], 'The backup is what came back.' );
+		$this->assertSame( 30, (int) Resource::find( $r->id() )->get( 'disk_gb' ) );
+
+		Jobs::run( $r->id() ); // The queued plan change.
+
+		$config = $this->fake->vm( $vmid )['config'];
+		$this->assertStringContainsString( 'size=60G', $config['scsi0'], 'Grown again, never shrunk.' );
+		$this->assertSame( 4, (int) $config['cores'] );
+		$this->assertSame( 8192, (int) $config['memory'] );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+		$this->assertFalse( Resource::find( $r->id() )->get( 'plan_dirty' ) );
+		$resizes = array_filter( array_slice( $this->fake->calls(), $seen ), static fn( $c ) => 'PUT' === $c['method'] && '/nodes/node-a/qemu/' . $vmid . '/resize' === $c['path'] );
+		$this->assertSame( array( '60G' ), array_values( array_map( static fn( $c ) => $c['params']['size'], $resizes ) ), 'Grown to the plan; never asked for a smaller disk.' );
+	}
+
+	public function test_a_restore_task_that_is_still_running_is_waited_for_not_started_again(): void {
+		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$vmid      = (int) $r->get( 'vmid' );
+		$volid     = $this->backup_of( $r );
+
+		$this->fake->next_task( array() );             // The shutdown.
+		$this->fake->next_task( array( 'polls' => 10 ) ); // The restore.
+
+		$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+		$this->assertCount( 1, $this->calls( 'POST', '/nodes/node-a/qemu' ) );
+		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ), 'Not restored yet.' );
+		$this->assertSame( 'stopped', $this->fake->vm( $vmid )['status'] );
+
+		for ( $i = 0; $i < 4 && 'stopped' === $this->fake->vm( $vmid )['status']; $i++ ) {
+			$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+		}
+
+		$this->assertCount( 1, $this->calls( 'POST', '/nodes/node-a/qemu' ), 'One restore, however many rounds.' );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ) );
+		$this->assertStringContainsString( 'Server restored from the backup of', $this->events_of( $r ) );
+	}
+
+	public function test_a_failed_restore_is_left_alone_and_the_admin_is_alerted(): void {
+		list( $r ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$vmid      = (int) $r->get( 'vmid' );
+		$volid     = $this->backup_of( $r );
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->mails = array();
+
+		$this->fake->next_task( array() );
+		$this->fake->next_task( array( 'exitstatus' => 'ERROR: restore failed - storage unavailable' ) );
+		$seen = count( $this->fake->calls() );
+
+		$this->act( $r, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ), 'A failed action never changes the service state.' );
+		$this->assertNull( Resource::find( $r->id() )->get( 'restore' ) );
+		$this->assertCount( 0, array_filter( array_slice( $this->fake->calls(), $seen ), static fn( $c ) => '/nodes/node-a/qemu/' . $vmid . '/status/start' === $c['path'] ), 'No start after a failed restore.' );
+		$this->assertNotEmpty( array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ) );
+		$this->assertStringContainsString( 'Restore failed', $this->events_of( $r ) );
+	}
+
+	public function test_restore_is_rate_limited_per_hour(): void {
+		list( $r, $owner ) = $this->ready( array(), array( 'backup_days' => 7 ) );
+		$volid             = $this->backup_of( $r );
+		$args              = array( 'confirm' => 'RESTORE', 'volid' => $volid );
+
+		foreach ( range( 1, 3 ) as $n ) {
+			$this->assertSame( 202, $this->route( $r->id(), $owner, 'restore', $args )->get_status(), 'Request ' . $n );
+		}
+
+		$this->assertSame( 429, $this->route( $r->id(), $owner, 'restore', $args )->get_status() );
 	}
 }

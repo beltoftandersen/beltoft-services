@@ -1222,7 +1222,7 @@ class ProvisionTest extends TestCase {
 	public function test_plan_fields_are_per_variation_and_list_the_clusters(): void {
 		$fields = $this->driver->plan_fields();
 
-		$this->assertSame( array( 'cluster', 'template', 'cores', 'memory_mb', 'disk_gb' ), array_keys( $fields ) );
+		$this->assertSame( array( 'cluster', 'template', 'cores', 'memory_mb', 'disk_gb', 'backup_days' ), array_keys( $fields ) );
 
 		foreach ( $fields as $field ) {
 			$this->assertTrue( $field[4], 'Every field can differ per variation.' );
