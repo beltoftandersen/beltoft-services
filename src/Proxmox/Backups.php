@@ -102,6 +102,24 @@ final class Backups {
 	}
 
 	/**
+	 * Does a volume id have the shape of a backup of this server on its cluster's backup storage?
+	 * No Proxmox call: the route uses it. The listing (list()) is the real proof.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param mixed    $volid Volume id as sent.
+	 */
+	public static function volid_fits( Resource $r, $volid ): bool {
+		$record  = VmRecords::for_resource( $r->id() );
+		$storage = self::storage( $r );
+
+		if ( null === $record || '' === $storage || ! is_string( $volid ) ) {
+			return false;
+		}
+
+		return 1 === preg_match( '#^' . preg_quote( $storage, '#' ) . ':backup/vm/' . (int) $record['vmid'] . '/[A-Za-z0-9._:\-]{1,64}$#', $volid );
+	}
+
+	/**
 	 * Is the server's backups' removal waiting for the nightly run (the plan lost its backups)?
 	 *
 	 * @param Resource $r Resource.

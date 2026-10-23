@@ -17,7 +17,7 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * start, shutdown, reboot, reset_password, replace_ssh_key and reinstall. Every action runs from
+ * start, shutdown, reboot, reset_password, replace_ssh_key, reinstall and restore. Every action runs from
  * Jobs::act() (under the resource lock, only while the resource is ready and the license active),
  * verifies the VM as ours first (Ownership::verify through Steps::verified), re-reads the remote
  * state before it acts, and is idempotent on a repeat. Texts that reach the customer are fixed
@@ -27,7 +27,9 @@ defined( 'ABSPATH' ) || exit;
  * /nodes/{node}/qemu/{vmid}/status/start, .../status/shutdown (`timeout`), .../status/reboot
  * (`timeout`), PUT .../config (`cipassword`, `sshkeys`), POST .../agent/set-user-password
  * (`username`, `password`), POST .../agent/file-write (`file`, `content`; needs the privilege
- * VM.GuestAgent.FileWrite or VM.GuestAgent.Unrestricted, PVE 9 pveum documentation).
+ * VM.GuestAgent.FileWrite or VM.GuestAgent.Unrestricted, PVE 9 pveum documentation), and for a
+ * restore POST /nodes/{node}/qemu (`vmid`, `archive`, `force`, `storage`; with `archive` it is
+ * enough to hold VM.Backup on the existing VM, plus Datastore.AllocateSpace on the disk storage).
  *
  * A password reset sends only `cipassword` (and the guest agent while the VM runs): never
  * ipconfig0, cicustom or any other cloud-init value.
@@ -40,6 +42,11 @@ final class Actions {
 	 * The word a customer types to confirm a reinstall.
 	 */
 	public const CONFIRM = 'REINSTALL';
+
+	/**
+	 * The word a customer types to confirm a restore.
+	 */
+	public const CONFIRM_RESTORE = 'RESTORE';
 
 	/**
 	 * The file the guest agent replaces on a key change (the login user is root).
@@ -63,6 +70,7 @@ final class Actions {
 		'reset_password' => array( 5, HOUR_IN_SECONDS ),
 		'replace_ssh_key' => array( 10, HOUR_IN_SECONDS ),
 		'reinstall'      => array( 5, HOUR_IN_SECONDS ),
+		'restore'        => array( 3, HOUR_IN_SECONDS ),
 	);
 
 	/**
@@ -136,6 +144,10 @@ final class Actions {
 			return $out;
 		}
 
+		if ( Backups::enabled( $r ) ) {
+			$out['restore'] = __( 'Restore from a backup', 'beltoft-services' );
+		}
+
 		$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
 		$out['reinstall']      = __( 'Reinstall', 'beltoft-services' );
 
@@ -171,7 +183,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
-			unset( $actions['replace_ssh_key'], $actions['reinstall'] );
+			unset( $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'] );
 		}
 
 		return $actions;
@@ -188,7 +200,7 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
-		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall' ), true ) ) {
+		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore' ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
 		}
 
@@ -202,6 +214,10 @@ final class Actions {
 			}
 
 			return count( self::recent( (array) $r->get( 'reset_times' ), HOUR_IN_SECONDS ) ) >= self::RESET_LIMIT ? __( 'The password can be reset three times an hour. Please try again later.', 'beltoft-services' ) : null;
+		}
+
+		if ( 'restore' === $action ) {
+			return self::check_restore( $r, $args );
 		}
 
 		if ( 'reinstall' !== $action ) {
@@ -226,6 +242,30 @@ final class Actions {
 
 		if ( $last > 0 && time() - $last < self::REINSTALL_GAP ) {
 			return __( 'A server can be reinstalled once an hour. Please try again later.', 'beltoft-services' );
+		}
+
+		return null;
+	}
+
+	/**
+	 * The restore's checks that need no Proxmox call. That the backup is really listed for this
+	 * server (and newer than its record) is checked again when the action runs.
+	 *
+	 * @param Resource             $r    Resource.
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	private static function check_restore( Resource $r, array $args ): ?string {
+		if ( ! Backups::enabled( $r ) ) {
+			return __( 'Restoring is not available for this server.', 'beltoft-services' );
+		}
+
+		if ( self::CONFIRM_RESTORE !== ( $args['confirm'] ?? '' ) ) {
+			/* translators: %s: the word to type, RESTORE. */
+			return sprintf( __( 'Type %s to confirm. Restoring replaces everything on the server with the backup.', 'beltoft-services' ), self::CONFIRM_RESTORE );
+		}
+
+		if ( ! Backups::volid_fits( $r, $args['volid'] ?? null ) ) {
+			return __( 'Choose one of the listed backups.', 'beltoft-services' );
 		}
 
 		return null;
@@ -313,6 +353,8 @@ final class Actions {
 				return $this->reset_password( $record, $v );
 			case 'replace_ssh_key':
 				return $this->replace_ssh_key( $record, $v, (string) $args['key'] );
+			case 'restore':
+				return $this->restore( $record, (string) $args['volid'] );
 			default:
 				return $this->reinstall( $record, $args );
 		}
@@ -617,5 +659,230 @@ final class Actions {
 		Jobs::enqueue( $this->r->id() );
 
 		return StepResult::done();
+	}
+
+	/**
+	 * Restores the whole server to one backup: off, restored over the same VMID (`force`), the
+	 * tag checked in the restored config, the plan re-applied (the backup may predate an upgrade:
+	 * cores, memory and a larger disk come back, a disk is never shrunk), started. Every round
+	 * starts from the remote state and the marker in meta `restore` ({volid, phase, ctime}), so
+	 * a retry never restores twice. The customer is told that the password and the SSH key are
+	 * the backup's. A failed restore may have destroyed the VM: it is left as it is and the
+	 * admin is alerted.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param string               $volid  Backup volume id (shape already checked).
+	 */
+	private function restore( array $record, string $volid ): StepResult {
+		$state = $this->r->get( 'restore' );
+		$state = is_array( $state ) && ( $state['volid'] ?? '' ) === $volid ? $state : array();
+		$phase = (string) ( $state['phase'] ?? '' );
+
+		// The restore task of an earlier round has ended: that decides, not another restore.
+		if ( '' === $phase && $this->finished && 'restore' === $this->finished['phase'] ) {
+			if ( ! $this->finished['ok'] ) {
+				return $this->restore_failed( (string) $this->finished['exit'] );
+			}
+
+			$state = array_merge( $state, array( 'volid' => $volid ) );
+			$phase = 'task';
+		}
+
+		if ( '' === $phase ) {
+			$ran = $this->restore_run( $record, $volid );
+
+			if ( $ran instanceof StepResult ) {
+				return $ran;
+			}
+
+			$state = array(
+				'volid' => $volid,
+				'ctime' => $ran,
+			);
+			$phase = 'task';
+		}
+
+		if ( 'task' === $phase ) {
+			$state['phase'] = 'restored';
+
+			if ( ! $this->r->set( array( 'restore' => $state ) ) ) {
+				return StepResult::retry( 0, 'restore: progress could not be stored' );
+			}
+
+			$phase = 'restored';
+		}
+
+		if ( 'restored' === $phase ) {
+			$planned = $this->restore_plan( $record );
+
+			if ( null !== $planned ) {
+				return $planned;
+			}
+
+			$state['phase'] = 'planned';
+
+			if ( ! $this->r->set( array( 'restore' => $state ) ) ) {
+				return StepResult::retry( 0, 'restore: progress could not be stored' );
+			}
+		}
+
+		$v = $this->verified( $record, 'restore' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		$started = $this->start_after_restore( $record, $v );
+
+		if ( null !== $started ) {
+			return $started;
+		}
+
+		Operations::remember_power( $this->r->id(), 'running' );
+
+		return StepResult::done(
+			array( 'restore' => null ),
+			'Server restored from the backup of ' . gmdate( 'Y-m-d H:i', (int) ( $state['ctime'] ?? 0 ) ) . ' UTC'
+		);
+	}
+
+	/**
+	 * The first half: the backup is listed for this server, the VM is off, the restore task ran.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param string               $volid  Backup volume id.
+	 * @return int|StepResult The backup's time, or the round's answer.
+	 */
+	private function restore_run( array $record, string $volid ) {
+		$list = ( new Backups( $this->r ) )->list();
+
+		if ( is_wp_error( $list ) ) {
+			return StepResult::retry( 0, 'restore: ' . $this->scrub( $list->get_error_message(), 200 ) );
+		}
+
+		$ctime = null;
+
+		foreach ( $list as $backup ) {
+			if ( $backup['volid'] === $volid ) {
+				$ctime = (int) $backup['ctime'];
+			}
+		}
+
+		if ( null === $ctime ) {
+			return StepResult::done( array( 'restore' => null ), 'Restore refused: that backup is not available for this server' );
+		}
+
+		$off = ( new Operations( $this->r ) )->pause();
+
+		if ( ! $off->is_done() ) {
+			return $off;
+		}
+
+		$v = $this->verified( $record, 'restore' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		if ( 'running' === $v['status'] ) {
+			return StepResult::retry( 0, 'restore: the server did not switch off' );
+		}
+
+		$done = $this->run_task(
+			'act',
+			'POST',
+			'/nodes/' . rawurlencode( $v['node'] ) . '/qemu',
+			array(
+				'vmid'    => $record['vmid'],
+				'archive' => $volid,
+				'force'   => 1,
+				'storage' => (string) $this->cluster['storage'],
+			),
+			'restore'
+		);
+
+		if ( $done instanceof StepResult ) {
+			return $done;
+		}
+
+		return true === $done || self::accepted_exit( $done['failed'] ) ? $ctime : $this->restore_failed( $done['failed'] );
+	}
+
+	/**
+	 * Did the task end with warnings only?
+	 *
+	 * @param string $exit Exit status.
+	 */
+	private static function accepted_exit( string $exit ): bool {
+		return 0 === strpos( $exit, 'WARNINGS' );
+	}
+
+	/**
+	 * A restore that ended badly.
+	 *
+	 * @param string $exit Exit status (admin text).
+	 */
+	private function restore_failed( string $exit ): StepResult {
+		return StepResult::fail( 'Restore failed (' . $this->scrub( $exit, 160 ) . '); the server was left switched off and may need a manual check', array( 'restore' => null ) );
+	}
+
+	/**
+	 * The second half: the tag is in the restored config, the disk size is recorded, and the plan
+	 * is queued again. Null: done.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 */
+	private function restore_plan( array $record ): ?StepResult {
+		$v = $this->verified( $record, 'restore' );
+
+		if ( $v instanceof StepResult ) {
+			return $v->is_failed() ? StepResult::fail( $v->error() . '; the restored server could not be proved ours', array( 'restore' => null ) ) : $v;
+		}
+
+		$size = Provision::gigabytes( (string) ( $v['config'][ (string) $this->cluster['boot_disk'] ] ?? '' ) );
+
+		if ( null === $size ) {
+			return StepResult::fail( 'Restore: the boot disk was not found on the restored server', array( 'restore' => null ) );
+		}
+
+		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ) ) ) ) {
+			return StepResult::retry( 0, 'restore: progress could not be stored' );
+		}
+
+		$stored = $this->r->change_plan( (array) $this->r->get( 'plan' ), 'Plan re-applied after restore' );
+
+		if ( true !== $stored ) {
+			return StepResult::retry( 0, 'restore: the plan could not be queued again' );
+		}
+
+		Jobs::enqueue( $this->r->id() );
+
+		return null;
+	}
+
+	/**
+	 * Starts the restored VM. Null: it runs.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 */
+	private function start_after_restore( array $record, array $v ): ?StepResult {
+		if ( 'running' === $v['status'] ) {
+			return null;
+		}
+
+		$done = $this->run_task( 'act', 'POST', self::base( $record, $v ) . '/status/start', array(), 'start' );
+
+		if ( $done instanceof StepResult ) {
+			return $done;
+		}
+
+		$again = $this->verified( $record, 'restore' );
+
+		if ( $again instanceof StepResult ) {
+			return $again;
+		}
+
+		return 'running' === $again['status'] ? null : StepResult::retry( 0, 'restore: the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')' );
 	}
 }
