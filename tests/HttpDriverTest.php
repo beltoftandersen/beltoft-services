@@ -848,6 +848,39 @@ class HttpDriverTest extends TestCase {
 		$this->assertSame( array( $other->get( 'uuid' ) . ':provision:1', $other->get( 'uuid' ) . ':provision:1' ), $keys );
 	}
 
+	public function test_a_successful_plan_change_drops_the_cached_usage(): void {
+		$this->connection();
+		$resource = $this->resource();
+		$this->answers( array( self::answer( 201, array( 'data' => array( 'id' => 'rem-1' ) ) ), self::answer( 200, array( 'used' => 0, 'limit' => 1 ) ) ) );
+		$fresh = $this->step( $resource );
+		$this->driver()->status( $fresh );
+
+		$render = function () use ( $fresh ): string {
+			ob_start();
+			$this->driver()->render_account( Resource::find( $fresh->id() ) );
+
+			return (string) ob_get_clean();
+		};
+
+		$this->assertStringContainsString( 'Usage:', $render(), 'The old answer is cached.' );
+
+		// A failed change keeps it.
+		$fresh->set( array( 'plan' => array( 'limit' => 3, 'attributes' => '' ) ) );
+		$this->answers( array( self::answer( 400, 'no' ) ) );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_failed() );
+		$this->assertStringContainsString( 'Usage:', $render(), 'A refused change leaves it.' );
+
+		// A successful one drops it, and the next status() asks the service again.
+		$this->answers( array( self::answer( 204 ), self::answer( 200, array( 'used' => 0, 'limit' => 3 ) ) ) );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_done() );
+		$this->assertStringNotContainsString( 'Usage:', $render(), 'The old limit is gone.' );
+
+		$before = count( $this->http_calls() );
+		$this->assertSame( array( 'used' => 0, 'limit' => 3 ), $this->driver()->status( Resource::find( $fresh->id() ) ) );
+		$this->assertCount( $before + 1, $this->http_calls() );
+		$this->assertStringContainsString( '0 of 3', $render() );
+	}
+
 	public function test_status_reads_usage(): void {
 		$this->connection();
 		$resource = $this->resource();

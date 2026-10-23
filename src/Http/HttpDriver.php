@@ -128,7 +128,7 @@ final class HttpDriver implements Driver, Opens {
 	 * @param Resource $r Resource.
 	 */
 	public function provision( Resource $r ): StepResult {
-		return $this->operate( $r, 'provision' );
+		return $this->operate_and_forget_usage( $r, 'provision' );
 	}
 
 	/**
@@ -146,7 +146,7 @@ final class HttpDriver implements Driver, Opens {
 	 * @param Resource $r Resource.
 	 */
 	public function resume( Resource $r ): StepResult {
-		return $this->operate( $r, 'resume' );
+		return $this->operate_and_forget_usage( $r, 'resume' );
 	}
 
 	/**
@@ -155,7 +155,7 @@ final class HttpDriver implements Driver, Opens {
 	 * @param Resource $r Resource.
 	 */
 	public function update_plan( Resource $r ): StepResult {
-		return $this->operate( $r, 'update_plan' );
+		return $this->operate_and_forget_usage( $r, 'update_plan' );
 	}
 
 	/**
@@ -165,6 +165,24 @@ final class HttpDriver implements Driver, Opens {
 	 */
 	public function delete( Resource $r ): StepResult {
 		return $this->operate( $r, 'delete' );
+	}
+
+	/**
+	 * Runs an operation that can change the usage answer (a new plan changes the limit; a new or
+	 * resumed service starts from fresh numbers) and, when it succeeded, drops the cached usage,
+	 * so the account panel does not show the old limit for up to an hour.
+	 *
+	 * @param Resource $r         Resource.
+	 * @param string   $operation Operation.
+	 */
+	private function operate_and_forget_usage( Resource $r, string $operation ): StepResult {
+		$result = $this->operate( $r, $operation );
+
+		if ( $result->is_done() ) {
+			delete_transient( self::usage_key( $r ) );
+		}
+
+		return $result;
 	}
 
 	/**
