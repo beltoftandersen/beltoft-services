@@ -86,6 +86,7 @@ class FakeClient implements Client {
 			'pools' => array(),
 			'tasks' => array(),
 			'seq'   => 0,
+			'backups' => array(),
 		);
 	}
 
@@ -153,6 +154,42 @@ class FakeClient implements Client {
 		}
 
 		$this->save();
+	}
+
+	/**
+	 * Seeds a backup in a storage: vmid, ctime, size, notes, config (the VM config it restores), volid
+	 * (default storage:backup/vm/<vmid>/<iso8601 of ctime>).
+	 *
+	 * @param string               $storage Storage id.
+	 * @param array<string, mixed> $backup  Backup.
+	 */
+	public function add_backup( string $storage, array $backup ): void {
+		$this->load();
+		$this->state['backups'][ $storage ][] = $this->backup_entry( $storage, $backup );
+		$this->save();
+	}
+
+	/**
+	 * A backup record as the content listing shows it, with the modelled config snapshot.
+	 *
+	 * @param string               $storage Storage id.
+	 * @param array<string, mixed> $backup  vmid, ctime, size, notes, config, volid.
+	 * @return array<string, mixed>
+	 */
+	private function backup_entry( string $storage, array $backup ): array {
+		$vmid  = (int) $backup['vmid'];
+		$ctime = (int) ( $backup['ctime'] ?? time() );
+
+		return array(
+			'volid'   => (string) ( $backup['volid'] ?? $storage . ':backup/vm/' . $vmid . '/' . gmdate( 'Y-m-d\TH:i:s\Z', $ctime ) ),
+			'vmid'    => $vmid,
+			'ctime'   => $ctime,
+			'size'    => (int) ( $backup['size'] ?? 1073741824 ),
+			'notes'   => (string) ( $backup['notes'] ?? '' ),
+			'content' => 'backup',
+			'format'  => 'pbs-vm',
+			'config'  => (array) ( $backup['config'] ?? array() ),
+		);
 	}
 
 	/**
@@ -421,6 +458,48 @@ class FakeClient implements Client {
 				array(
 					'timeframe' => array( 'enum', true, array( 'values' => array( 'hour', 'day', 'week', 'month', 'year' ) ) ),
 					'cf'        => array( 'enum', false, array( 'values' => array( 'AVERAGE', 'MAX' ) ) ),
+				),
+			),
+			array(
+				'POST',
+				'#^/nodes/([A-Za-z0-9.\-]+)/vzdump$#',
+				'h_vzdump',
+				array(
+					'vmid'           => array( 'int', true, array( 'min' => 100 ) ),
+					'storage'        => array( 'string', true ),
+					'mode'           => array( 'enum', false, array( 'values' => array( 'snapshot', 'suspend', 'stop' ) ) ),
+					'notes-template' => array( 'string' ),
+				),
+			),
+			array(
+				'GET',
+				'#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content$#',
+				'h_content',
+				array(
+					'content' => array( 'enum', false, array( 'values' => array( 'backup' ) ) ),
+					'vmid'    => array( 'int', false, array( 'min' => 100 ) ),
+				),
+			),
+			array( 'DELETE', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content/(.+)$#', 'h_content_delete', $none ),
+			array(
+				'DELETE',
+				'#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/prunebackups$#',
+				'h_prune',
+				array(
+					'vmid'         => array( 'int', false, array( 'min' => 100 ) ),
+					'type'         => array( 'enum', false, array( 'values' => array( 'qemu', 'lxc' ) ) ),
+					'prune-backups' => array( 'string', true ),
+				),
+			),
+			array(
+				'POST',
+				'#^/nodes/([A-Za-z0-9.\-]+)/qemu$#',
+				'h_restore',
+				array(
+					'vmid'    => array( 'int', true, array( 'min' => 100 ) ),
+					'archive' => array( 'string', true ),
+					'force'   => array( 'bool' ),
+					'storage' => array( 'string' ),
 				),
 			),
 			array( 'GET', '#^/nodes/([A-Za-z0-9.\-]+)/tasks/([^/]+)/status$#', 'h_task_status', $none ),
@@ -1005,6 +1084,240 @@ class FakeClient implements Client {
 		$vm = $this->find( $a );
 
 		return is_wp_error( $vm ) ? $vm : (array) ( $vm['rrd'] ?? array() );
+	}
+
+	/**
+	 * POST vzdump: stores a backup (with a snapshot of the VM config, modelled) in the storage.
+	 *
+	 * @param array<int, string>   $a Captures (node).
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_vzdump( array $a, array $p ) {
+		$vm = $this->find( array( $a[0], $p['vmid'] ) );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		return $this->new_task(
+			$a[0],
+			'vzdump',
+			(string) $p['vmid'],
+			function () use ( $p, $vm ) {
+				$this->state['backups'][ $p['storage'] ][] = $this->backup_entry(
+					$p['storage'],
+					array(
+						'vmid'   => $p['vmid'],
+						'ctime'  => $this->free_ctime( $p['storage'], (int) $p['vmid'] ),
+						'notes'  => str_replace( '{{guestname}}', (string) $vm['name'], (string) ( $p['notes-template'] ?? '' ) ),
+						'config' => $vm['config'],
+					)
+				);
+			}
+		);
+	}
+
+	/**
+	 * A ctime now, moved on by seconds until no backup of the VM in the storage has it (volids hold the time).
+	 *
+	 * @param string $storage Storage.
+	 * @param int    $vmid    VMID.
+	 */
+	private function free_ctime( string $storage, int $vmid ): int {
+		$taken = array();
+
+		foreach ( $this->state['backups'][ $storage ] ?? array() as $backup ) {
+			if ( (int) $backup['vmid'] === $vmid ) {
+				$taken[ (int) $backup['ctime'] ] = true;
+			}
+		}
+
+		$ctime = time();
+
+		while ( isset( $taken[ $ctime ] ) ) {
+			++$ctime;
+		}
+
+		return $ctime;
+	}
+
+	/**
+	 * GET storage content (backups only; the config snapshot is not part of the listing).
+	 *
+	 * @param array<int, string>   $a Captures (node, storage).
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_content( array $a, array $p ) {
+		$out = array();
+
+		foreach ( $this->state['backups'][ $a[1] ] ?? array() as $backup ) {
+			if ( isset( $p['vmid'] ) && (int) $backup['vmid'] !== $p['vmid'] ) {
+				continue;
+			}
+
+			unset( $backup['config'] );
+			$out[] = $backup;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * DELETE storage content/{volume}: the volume id arrives URL-encoded.
+	 *
+	 * @param array<int, string>   $a Captures (node, storage, volume).
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_content_delete( array $a, array $p ) {
+		unset( $p );
+		$volid = rawurldecode( $a[2] );
+
+		if ( false === strpos( $volid, ':' ) ) {
+			$volid = $a[1] . ':' . $volid;
+		}
+
+		foreach ( $this->state['backups'][ $a[1] ] ?? array() as $backup ) {
+			if ( $backup['volid'] === $volid ) {
+				return $this->new_task(
+					$a[0],
+					'imgdel',
+					(string) $backup['vmid'],
+					function () use ( $a, $volid ) {
+						$this->drop_backups( $a[1], static fn( $b ) => $b['volid'] === $volid );
+					}
+				);
+			}
+		}
+
+		return $this->error( 500, "volume '" . $volid . "' does not exist" );
+	}
+
+	/**
+	 * DELETE prunebackups: keeps the newest backup of each of the last N days that have one (modelled
+	 * on keep-daily; no other keep option is understood).
+	 *
+	 * @param array<int, string>   $a Captures (node, storage).
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_prune( array $a, array $p ) {
+		if ( 1 !== preg_match( '/^keep-daily=(\d+)$/', $p['prune-backups'], $m ) || (int) $m[1] < 1 ) {
+			return $this->error( 400, 'Parameter verification failed: prune-backups: value does not match the format' );
+		}
+
+		$keep = (int) $m[1];
+		$list = array_values(
+			array_filter(
+				$this->state['backups'][ $a[1] ] ?? array(),
+				static fn( $b ) => ! isset( $p['vmid'] ) || (int) $b['vmid'] === $p['vmid']
+			)
+		);
+
+		usort( $list, static fn( $x, $y ) => $y['ctime'] <=> $x['ctime'] );
+
+		$kept_days = array();
+		$remove    = array();
+
+		foreach ( $list as $backup ) {
+			$day = $backup['vmid'] . ' ' . gmdate( 'Y-m-d', (int) $backup['ctime'] );
+
+			if ( isset( $kept_days[ $day ] ) ) {
+				$remove[] = $backup['volid'];
+				continue;
+			}
+
+			$days_of_vm = count( array_filter( array_keys( $kept_days ), static fn( $k ) => 0 === strpos( $k, $backup['vmid'] . ' ' ) ) );
+
+			if ( $days_of_vm >= $keep ) {
+				$remove[] = $backup['volid'];
+				continue;
+			}
+
+			$kept_days[ $day ] = true;
+		}
+
+		return $this->new_task(
+			$a[0],
+			'prunebackups',
+			isset( $p['vmid'] ) ? (string) $p['vmid'] : $a[1],
+			function () use ( $a, $remove ) {
+				$this->drop_backups( $a[1], static fn( $b ) => in_array( $b['volid'], $remove, true ) );
+			}
+		);
+	}
+
+	/**
+	 * Removes the backups of a storage that a callback selects.
+	 *
+	 * @param string   $storage Storage.
+	 * @param callable $match   Gets a backup record, true to remove it.
+	 */
+	private function drop_backups( string $storage, callable $match ): void {
+		$this->state['backups'][ $storage ] = array_values( array_filter( $this->state['backups'][ $storage ] ?? array(), static fn( $b ) => ! $match( $b ) ) );
+	}
+
+	/**
+	 * POST qemu with archive: restores a backup over an existing VM (force) or creates the VM. A
+	 * running VM is refused, and so is force without a VM (as the plan states; modelled). The config
+	 * comes back from the snapshot taken at backup time; node, name, pool and the lock stay.
+	 *
+	 * @param array<int, string>   $a Captures (node).
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_restore( array $a, array $p ) {
+		$exists = isset( $this->state['vms'][ $p['vmid'] ] );
+		$force  = ! empty( $p['force'] );
+		$found  = null;
+
+		foreach ( $this->state['backups'] as $backups ) {
+			foreach ( $backups as $backup ) {
+				if ( $backup['volid'] === $p['archive'] ) {
+					$found = $backup;
+				}
+			}
+		}
+
+		if ( null === $found ) {
+			return $this->error( 500, "volume '" . $p['archive'] . "' does not exist" );
+		}
+
+		if ( $exists && 'running' === $this->state['vms'][ $p['vmid'] ]['status'] ) {
+			return $this->error( 500, 'VM is running - destroy failed' );
+		}
+
+		if ( $exists && ! $force ) {
+			return $this->error( 500, 'unable to restore VM ' . $p['vmid'] . " - config file already exists (use 'force')" );
+		}
+
+		if ( ! $exists && $force ) {
+			return $this->error( 500, 'unable to restore VM ' . $p['vmid'] . ' - VM does not exist, force is not allowed' );
+		}
+
+		return $this->new_task(
+			$a[0],
+			'qmrestore',
+			(string) $p['vmid'],
+			function () use ( $a, $p, $found, $exists ) {
+				$id = (int) $p['vmid'];
+
+				if ( $exists ) {
+					$this->state['vms'][ $id ]['config'] = $found['config'];
+					return;
+				}
+
+				$this->state['vms'][ $id ] = array(
+					'vmid'             => $id,
+					'node'             => $a[0],
+					'name'             => 'vm' . $id,
+					'status'           => 'stopped',
+					'template'         => 0,
+					'pool'             => '',
+					'lock'             => '',
+					'config'           => $found['config'],
+					'firewall_rules'   => array(),
+					'firewall_options' => array(),
+				);
+			}
+		);
 	}
 
 	/**
