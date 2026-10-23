@@ -45,6 +45,12 @@ final class Backups {
 	public const ALERT_AFTER = 3;
 
 	/**
+	 * Tries to delete a server's backups before its VM is deleted. After this many the admin is
+	 * told and the deletion goes on.
+	 */
+	public const PURGE_TRIES = 3;
+
+	/**
 	 * Cluster settings (token secret decrypted).
 	 *
 	 * @var array<string, mixed>
@@ -93,6 +99,15 @@ final class Backups {
 		}
 
 		return $now - (int) $r->get( 'backup_last_at' ) > self::MIN_GAP;
+	}
+
+	/**
+	 * Is the server's backups' removal waiting for the nightly run (the plan lost its backups)?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function purge_due( Resource $r ): bool {
+		return true === $r->get( 'backup_purge' ) && in_array( $r->get( 'state' ), array( 'ready', 'paused' ), true );
 	}
 
 	/**
@@ -350,7 +365,7 @@ final class Backups {
 		$v = Ownership::verify( $this->client, $this->fresh( $record ), $this->r );
 
 		if ( is_wp_error( $v ) ) {
-			return new \WP_Error( 'beltoft_services_backups', $this->text( $v ) );
+			return new \WP_Error( 'absent' === $v->get_error_code() ? 'absent' : 'beltoft_services_backups', $this->text( $v ) );
 		}
 
 		$answer = $this->client->request(
@@ -397,6 +412,11 @@ final class Backups {
 	public function purge(): StepResult {
 		$list = $this->list();
 
+		// A VM that is not listed cannot be proved ours: nothing is deleted, and nothing can be reached.
+		if ( is_wp_error( $list ) && 'absent' === $list->get_error_code() ) {
+			return StepResult::done();
+		}
+
 		if ( is_wp_error( $list ) ) {
 			return StepResult::retry( 60, 'backup purge: ' . $list->get_error_message() );
 		}
@@ -420,6 +440,49 @@ final class Backups {
 		}
 
 		return StepResult::done();
+	}
+
+	/**
+	 * The nightly removal of the backups of a server whose plan lost them. A backup that was still
+	 * running is collected first. Done clears the bookkeeping, so a later purchase starts afresh.
+	 */
+	public function run_purge(): StepResult {
+		$task = $this->r->get( 'backup_task' );
+
+		if ( is_array( $task ) && ! empty( $task['upid'] ) && is_string( $task['upid'] ) ) {
+			$record = VmRecords::for_resource( $this->r->id() );
+			$early  = null === $record ? null : $this->prepare( $record );
+
+			if ( null !== $early ) {
+				return $early;
+			}
+
+			if ( null !== $record ) {
+				$waited = $this->client->wait_task( $task['upid'], $this->wait );
+
+				if ( is_wp_error( $waited ) && 'task_pending' === $waited->get_error_code() ) {
+					return StepResult::retry( 60, 'backup purge: a backup is still running' );
+				}
+			}
+		}
+
+		$result = $this->purge();
+
+		if ( ! $result->is_done() ) {
+			return $result;
+		}
+
+		$stored = $this->store(
+			array(
+				'backup_purge' => null,
+				'backup_task'  => null,
+				'backup_ok_at' => null,
+				'backup_error' => '',
+				'backup_fails' => 0,
+			)
+		);
+
+		return $stored ? $result : StepResult::retry( 60, 'backup purge: the result could not be stored' );
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------

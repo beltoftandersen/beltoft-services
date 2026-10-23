@@ -157,6 +157,21 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * Sets or clears the lock of a VM (a running backup holds `backup`).
+	 *
+	 * @param int    $vmid VMID.
+	 * @param string $lock Lock name, '' to clear.
+	 */
+	public function set_lock( int $vmid, string $lock ): void {
+		$this->load();
+
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['lock'] = $lock;
+			$this->save();
+		}
+	}
+
+	/**
 	 * Seeds a backup in a storage: vmid, ctime, size, notes, config (the VM config it restores), volid
 	 * (default storage:backup/vm/<vmid>/<iso8601 of ctime>).
 	 *
@@ -712,7 +727,7 @@ class FakeClient implements Client {
 	 * @param array<string, mixed> $p Parameters.
 	 */
 	private function h_config_post( array $a, array $p ) {
-		$vm = $this->find( $a );
+		$vm = $this->find_writable( $a );
 
 		if ( is_wp_error( $vm ) ) {
 			return $vm;
@@ -731,7 +746,7 @@ class FakeClient implements Client {
 	 * @return true|\WP_Error
 	 */
 	private function apply_config( array $a, array $p ) {
-		$vm = $this->find( $a );
+		$vm = $this->find_writable( $a );
 
 		if ( is_wp_error( $vm ) ) {
 			return $vm;
@@ -820,7 +835,7 @@ class FakeClient implements Client {
 	 * @param array<string, mixed> $p Parameters.
 	 */
 	private function h_resize( array $a, array $p ) {
-		$vm = $this->find( $a );
+		$vm = $this->find_writable( $a );
 
 		if ( is_wp_error( $vm ) ) {
 			return $vm;
@@ -870,7 +885,7 @@ class FakeClient implements Client {
 	 */
 	private function h_power( array $a, array $p ) {
 		unset( $p );
-		$vm = $this->find( $a );
+		$vm = $this->find_writable( $a );
 
 		if ( is_wp_error( $vm ) ) {
 			return $vm;
@@ -938,7 +953,7 @@ class FakeClient implements Client {
 	 */
 	private function h_delete( array $a, array $p ) {
 		unset( $p );
-		$vm = $this->find( $a );
+		$vm = $this->find_writable( $a );
 
 		if ( is_wp_error( $vm ) ) {
 			return $vm;
@@ -1280,6 +1295,10 @@ class FakeClient implements Client {
 			return $this->error( 500, "volume '" . $p['archive'] . "' does not exist" );
 		}
 
+		if ( $exists && '' !== (string) $this->state['vms'][ $p['vmid'] ]['lock'] ) {
+			return $this->error( 500, 'VM is locked (' . $this->state['vms'][ $p['vmid'] ]['lock'] . ')' );
+		}
+
 		if ( $exists && 'running' === $this->state['vms'][ $p['vmid'] ]['status'] ) {
 			return $this->error( 500, 'VM is running - destroy failed' );
 		}
@@ -1469,6 +1488,23 @@ class FakeClient implements Client {
 
 		if ( null === $vm || $vm['node'] !== $a[0] ) {
 			return $this->error( 500, "Configuration file 'nodes/" . $a[0] . '/qemu-server/' . (int) $a[1] . ".conf' does not exist" );
+		}
+
+		return $vm;
+	}
+
+	/**
+	 * Finds the VM of a path for a change: a VM with a lock (a running backup holds `lock: backup`)
+	 * refuses it with HTTP 500, as qm does ("VM is locked (backup)"; modelled).
+	 *
+	 * @param array<int, string> $a Captures.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function find_writable( array $a ) {
+		$vm = $this->find( $a );
+
+		if ( ! is_wp_error( $vm ) && '' !== (string) $vm['lock'] ) {
+			return $this->error( 500, 'VM is locked (' . $vm['lock'] . ')' );
 		}
 
 		return $vm;

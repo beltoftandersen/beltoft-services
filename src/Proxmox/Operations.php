@@ -208,6 +208,13 @@ final class Operations {
 			}
 		}
 
+		// While the VM is still in the pool and VM.Backup applies, and before its VMID can be reused.
+		$purged = $this->purge_backups();
+
+		if ( null !== $purged ) {
+			return $purged;
+		}
+
 		$out = $this->power_or_delete( $record, 'delete', true );
 
 		if ( $out instanceof StepResult ) {
@@ -215,6 +222,45 @@ final class Operations {
 		}
 
 		return $this->cleanup( 'The virtual machine was deleted' );
+	}
+
+	/**
+	 * Deletes the server's backups before its VM goes. After Backups::PURGE_TRIES failed tries the
+	 * admin is told and the deletion carries on (the backups then stay, unreachable for any customer).
+	 *
+	 * @return StepResult|null Null: nothing to do, done, or given up; carry on with the delete.
+	 */
+	private function purge_backups(): ?StepResult {
+		if ( true === $this->r->get( 'linked' ) || ( ! Backups::enabled( $this->r ) && ! $this->r->get( 'backup_ok_at' ) ) ) {
+			return null;
+		}
+
+		$tries = (int) $this->r->get( 'backup_purge_tries' );
+
+		if ( $tries >= Backups::PURGE_TRIES ) {
+			return null;
+		}
+
+		$result = ( new Backups( $this->r ) )->purge();
+
+		if ( $result->is_done() ) {
+			return null;
+		}
+
+		++$tries;
+		$text = 'Backups could not be deleted: ' . $this->scrub( $result->error(), 200 );
+
+		if ( ! $this->r->set( array( 'backup_purge_tries' => $tries ) ) ) {
+			return StepResult::retry( 0, 'delete: progress could not be stored' );
+		}
+
+		if ( $tries >= Backups::PURGE_TRIES ) {
+			Alerts::admin( $this->r, $text . '; the server is deleted anyway and its backups stay on the backup storage' );
+
+			return null;
+		}
+
+		return StepResult::retry( 0, 'delete: ' . $text );
 	}
 
 	/**
@@ -309,6 +355,10 @@ final class Operations {
 			return StepResult::fail( 'update: the plan needs positive cores, memory and disk' );
 		}
 
+		if ( ! $this->sync_backup_purge( (int) ( $plan['backup_days'] ?? 0 ) ) ) {
+			return StepResult::retry( 0, 'update: progress could not be stored' );
+		}
+
 		$v = $this->verified( $record, 'update' );
 
 		if ( $v instanceof StepResult ) {
@@ -324,6 +374,27 @@ final class Operations {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * A plan without backups after a plan with them queues the removal of the backups for the next
+	 * nightly run (meta `backup_purge`); a plan with backups again cancels it. No Proxmox call.
+	 *
+	 * @param int $days The plan's backup days.
+	 * @return bool False when the meta could not be stored.
+	 */
+	private function sync_backup_purge( int $days ): bool {
+		$queued = true === $this->r->get( 'backup_purge' );
+
+		if ( $days < 1 && ! $queued && $this->r->get( 'backup_ok_at' ) ) {
+			return $this->r->set( array( 'backup_purge' => true ) );
+		}
+
+		if ( $days >= 1 && $queued ) {
+			return $this->r->set( array( 'backup_purge' => null ) );
+		}
+
+		return true;
 	}
 
 	/**

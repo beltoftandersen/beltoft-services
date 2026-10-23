@@ -46,6 +46,9 @@ final class ProxmoxJobs {
 	public const POWER        = 'beltoft_services_proxmox_power';
 	public const ABUSE        = 'beltoft_services_proxmox_abuse';
 	public const ABUSE_BATCH  = 'beltoft_services_proxmox_abuse_batch';
+	public const BACKUP       = 'beltoft_services_proxmox_backup';
+	public const BACKUP_NEXT  = 'beltoft_services_proxmox_backup_next';
+	public const BACKUP_RUN   = 'beltoft_services_proxmox_backup_run';
 
 	public const RUNNING_PREFIX = 'beltoft_services_proxmox_running_';
 	public const QUEUE          = 'beltoft_services_proxmox_abuse_queue';
@@ -65,6 +68,11 @@ final class ProxmoxJobs {
 	public const BATCH_DELAY = 60;
 
 	/**
+	 * Seconds between two servers of the nightly backup run.
+	 */
+	public const BACKUP_DELAY = 60;
+
+	/**
 	 * Cron expressions.
 	 *
 	 * @var array<string, string>
@@ -73,6 +81,7 @@ final class ProxmoxJobs {
 		self::CAPACITY => '0 * * * *',
 		self::POWER    => '*/15 * * * *',
 		self::ABUSE    => '20 * * * *',
+		self::BACKUP   => '30 3 * * *',
 	);
 
 	/**
@@ -89,6 +98,8 @@ final class ProxmoxJobs {
 		add_action( self::POWER, array( __CLASS__, 'power' ) );
 		add_action( self::ABUSE, array( __CLASS__, 'abuse' ) );
 		add_action( self::ABUSE_BATCH, array( __CLASS__, 'abuse_batch' ) );
+		add_action( self::BACKUP, array( __CLASS__, 'backup' ) );
+		add_action( self::BACKUP_NEXT, array( __CLASS__, 'backup_next' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
 		// After the sweep itself (priority 10): one password purge a day.
 		add_action( Jobs::SWEEP, array( __CLASS__, 'purge_passwords' ), 20 );
@@ -122,6 +133,7 @@ final class ProxmoxJobs {
 		}
 
 		as_unschedule_all_actions( self::ABUSE_BATCH, array(), Jobs::GROUP );
+		as_unschedule_all_actions( self::BACKUP_NEXT, array(), Jobs::GROUP );
 		as_unschedule_all_actions( self::CAPACITY_NOW, array(), Jobs::GROUP );
 	}
 
@@ -706,6 +718,81 @@ final class ProxmoxJobs {
 			if ( $fresh && 'ready' === $fresh->get( 'desired' ) && $fresh->desire( 'paused', 'Abuse suspected: ' . $text ) ) {
 				Jobs::enqueue( $fresh->id() );
 			}
+		}
+	}
+
+	// -- Backups ---------------------------------------------------------------------------------
+
+	/**
+	 * Nightly: starts the run. One server is handled per action and the next action is queued
+	 * BACKUP_DELAY seconds later until no server is due, so only one vzdump runs at a time (the
+	 * uplink to the backup server is the limit).
+	 */
+	public static function backup(): void {
+		if ( Settings::get( 'pause_all' ) ) {
+			return;
+		}
+
+		as_unschedule_all_actions( self::BACKUP_NEXT, array(), Jobs::GROUP );
+		delete_transient( self::BACKUP_RUN );
+
+		self::backup_next();
+	}
+
+	/**
+	 * One server of the run: the first one with a backup due (or still running), or whose backups
+	 * are to be removed. A server that is still wanted after its turn without a running backup
+	 * (it could not be reached) is left out for the rest of the run, so a run always ends.
+	 */
+	public static function backup_next(): void {
+		if ( Settings::get( 'pause_all' ) ) {
+			delete_transient( self::BACKUP_RUN );
+			return;
+		}
+
+		$skip   = get_transient( self::BACKUP_RUN );
+		$skip   = is_array( $skip ) ? array_map( 'intval', $skip ) : array();
+		$driver = Registry::get( SshKeyField::DRIVER );
+		$picked = null;
+
+		if ( $driver ) {
+			foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
+				$resource = Resource::find( $id );
+
+				if ( ! $resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || in_array( $id, $skip, true ) ) {
+					continue;
+				}
+
+				if ( Backups::purge_due( $resource ) || Backups::due( $resource, time() ) ) {
+					$picked = $resource;
+					break;
+				}
+			}
+		}
+
+		if ( null === $picked ) {
+			delete_transient( self::BACKUP_RUN );
+			return;
+		}
+
+		$backups = new Backups( $picked );
+
+		if ( Backups::purge_due( $picked ) ) {
+			$backups->run_purge();
+		} else {
+			$backups->step();
+		}
+
+		$after = Resource::find( $picked->id() );
+		$task  = $after ? $after->get( 'backup_task' ) : null;
+
+		if ( ! $after || ( ! ( is_array( $task ) && ! empty( $task['upid'] ) ) && ( Backups::purge_due( $after ) || Backups::due( $after, time() ) ) ) ) {
+			$skip[] = $picked->id();
+			set_transient( self::BACKUP_RUN, $skip, 6 * HOUR_IN_SECONDS );
+		}
+
+		if ( ! as_has_scheduled_action( self::BACKUP_NEXT, array(), Jobs::GROUP ) ) {
+			as_schedule_single_action( time() + self::BACKUP_DELAY, self::BACKUP_NEXT, array(), Jobs::GROUP );
 		}
 	}
 

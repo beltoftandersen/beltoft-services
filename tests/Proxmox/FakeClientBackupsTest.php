@@ -179,4 +179,22 @@ class FakeClientBackupsTest extends TestCase {
 		$bad_archive = $this->fake->request( 'POST', '/nodes/node-a/qemu', array( 'vmid' => 201, 'archive' => 'backup-store:backup/vm/201/none', 'force' => 1 ) );
 		$this->assertWPError( $bad_archive );
 	}
+
+	public function test_a_locked_vm_refuses_changes_but_can_be_read(): void {
+		$this->fake->add_vm( array( 'vmid' => 203, 'node' => 'node-a', 'status' => 'running', 'lock' => 'backup', 'config' => array( 'scsi0' => 'disk-store:vm-203-disk-0,size=30G' ) ) );
+
+		foreach ( array(
+			array( 'PUT', '/nodes/node-a/qemu/203/config', array( 'cores' => 4 ) ),
+			array( 'POST', '/nodes/node-a/qemu/203/config', array( 'cores' => 4 ) ),
+			array( 'PUT', '/nodes/node-a/qemu/203/resize', array( 'disk' => 'scsi0', 'size' => '40G' ) ),
+			array( 'POST', '/nodes/node-a/qemu/203/status/shutdown', array() ),
+			array( 'DELETE', '/nodes/node-a/qemu/203', array() ),
+		) as $call ) {
+			$answer = $this->fake->request( $call[0], $call[1], $call[2] );
+			$this->assertWPError( $answer, $call[0] . ' ' . $call[1] );
+			$this->assertStringContainsString( 'locked (backup)', $answer->get_error_message() );
+		}
+
+		$this->assertIsArray( $this->fake->request( 'GET', '/nodes/node-a/qemu/203/config' ) );
+	}
 }
