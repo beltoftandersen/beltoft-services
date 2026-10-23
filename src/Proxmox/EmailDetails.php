@@ -63,7 +63,11 @@ final class EmailDetails {
 		);
 
 		if ( Access::revealable( $r ) ) {
-			$details[ __( 'Password', 'beltoft-services' ) ] = __( 'Shown once in your account', 'beltoft-services' );
+			$details[ __( 'Password', 'beltoft-services' ) ] = sprintf(
+				/* translators: %d: number of days the password can be revealed */
+				_n( 'Shown once in your account, within %d day: use the link below, open your server and click "Show password once".', 'Shown once in your account, within %d days: use the link below, open your server and click "Show password once".', Access::REVEAL_DAYS, 'beltoft-services' ),
+				Access::REVEAL_DAYS
+			);
 		}
 
 		return $details;

@@ -247,7 +247,7 @@ class ProxmoxEmailsTest extends TestCase {
 		$this->assertStringContainsString( 'ssh root@' . $ip, $message );
 		$this->assertStringContainsString( 'Debian 12', $message );
 		$this->assertStringContainsString( '2 vCPU, 4096 MB RAM, 30 GB disk', $message );
-		$this->assertStringContainsString( 'Shown once in your account', $message );
+		$this->assertStringContainsString( 'Shown once in your account, within 7 days', $message );
 
 		$this->assertSecretFree( $message, $r );
 	}
