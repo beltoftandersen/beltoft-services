@@ -579,12 +579,13 @@ final class Backups {
 
 		$stored = $this->store(
 			array(
-				'backup_purge' => null,
-				'backup_list'  => null,
-				'backup_task'  => null,
-				'backup_ok_at' => null,
-				'backup_error' => '',
-				'backup_fails' => 0,
+				'backup_purge'   => null,
+				'backup_list'    => null,
+				'backup_task'    => null,
+				'backup_ok_at'   => null,
+				'backup_last_at' => null, // Backups bought again are due at once.
+				'backup_error'   => '',
+				'backup_fails'   => 0,
 			)
 		);
 

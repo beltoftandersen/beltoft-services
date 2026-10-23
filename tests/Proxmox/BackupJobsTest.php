@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Resource;
 
@@ -153,5 +154,9 @@ class BackupJobsTest extends BackupTestCase {
 		$this->assertNull( $fresh->get( 'backup_ok_at' ) );
 		$this->assertCount( 1, $this->calls( 'POST', '/vzdump' ), 'No new backup was made.' );
 		$this->assertSame( $vmid, (int) $fresh->get( 'vmid' ) );
+
+		// Backups bought again after the removal: the server is due at once, not 20 hours later.
+		$fresh->set( array( 'plan' => array_merge( $fresh->get( 'plan' ), array( 'backup_days' => 7 ) ) ) );
+		$this->assertTrue( Backups::due( Resource::find( $r->id() ), time() ) );
 	}
 }
