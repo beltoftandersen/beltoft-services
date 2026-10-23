@@ -293,6 +293,7 @@ final class ClustersScreen {
 		self::row( 'templates', __( 'Templates', 'beltoft-services' ), $templates, __( 'One per line: VMID = label. The label is what customers see as the operating system. A template must be outside the customer VMID range.', 'beltoft-services' ), 'textarea' );
 		self::row( 'default_template', __( 'Default template', 'beltoft-services' ), $c['default_template'] ? (string) $c['default_template'] : '', __( 'The VMID from the list above that customers get preselected at checkout and on reinstall. Empty: the first template of the list.', 'beltoft-services' ) );
 		self::row( 'vendor_snippet', __( 'Vendor snippet', 'beltoft-services' ), (string) $c['vendor_snippet'], __( 'Optional cloud-init snippet volume, such as local:snippets/vendor.yaml.', 'beltoft-services' ) );
+		self::row( 'backup_storage', __( 'Backup storage', 'beltoft-services' ), (string) $c['backup_storage'], __( 'Optional storage id (a Proxmox Backup Server storage) for customer backups. Empty: no backups on this cluster.', 'beltoft-services' ) );
 
 		printf(
 			'<tr><th scope="row">%1$s</th><td><input type="hidden" name="block_smtp" value="0"><label><input type="checkbox" name="block_smtp" value="1" %2$s> %3$s</label></td></tr>',

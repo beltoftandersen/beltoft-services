@@ -106,7 +106,7 @@ The Proxmox driver clones a template into a new VM for each licensed unit, sets 
 1. **A dedicated pool and a privilege-separated token.** Give this plugin its own pool and an API token that can act only on that pool, the templates, the storage and the bridge. With `pveum` (names from the PVE 9.2 documentation; check the privilege names against your own version, and the "pveum" chapter of the Proxmox VE Administration Guide):
 
 `pveum pool add beltoft-customers`
-`pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit"`
+`pveum role add BeltoftServices --privs "VM.Allocate VM.Clone VM.Audit VM.PowerMgmt VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network VM.Config.Cloudinit VM.Config.Options VM.Config.HWType VM.Config.CDROM VM.GuestAgent.Audit VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted Pool.Allocate Sys.Audit VM.Backup"`
 `pveum user add svc@pve`
 `pveum user token add svc@pve beltoft --privsep 1`
 
@@ -115,6 +115,7 @@ A privilege-separated token only gets what is granted to the token itself, and n
 * `/pool/beltoft-customers`: role `BeltoftServices`, propagated. New VMs are created inside this pool, so every call on them is covered here.
 * `/vms/<template id>` for each template: a role with `VM.Clone` and `VM.Audit` (the role above has both).
 * `/storage/<disk storage>` and `/storage/<cloud-init storage>`: `PVEDatastoreUser` (`Datastore.AllocateSpace`, `Datastore.Audit`).
+* `/storage/<backup storage>`: `PVEDatastoreUser`, only when you sell backups (the role above has `VM.Backup`, which vzdump needs on the VM).
 * `/sdn/zones/localnetwork` (or the zone of your bridge): `PVESDNUser` (`SDN.Use`) on PVE 8 and newer.
 * `/nodes/<node>`: `Sys.Audit`, to read the node list for capacity and the status of tasks.
 

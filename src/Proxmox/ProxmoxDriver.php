@@ -117,6 +117,13 @@ class ProxmoxDriver implements Driver, StopsOnDelete {
 				30,
 				true,
 			),
+			'backup_days' => array(
+				'number',
+				__( 'Backup days', 'beltoft-services' ),
+				__( 'Daily backups kept for this many days. 0 means no backups. Needs a backup storage on the cluster.', 'beltoft-services' ),
+				0,
+				true,
+			),
 		);
 	}
 
