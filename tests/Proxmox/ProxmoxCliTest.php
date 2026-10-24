@@ -381,6 +381,7 @@ class ProxmoxCliTest extends TestCase {
 		$result = $this->link( $license );
 		$this->assertIsArray( $result );
 		$this->assertStringContainsString( 'could not be added to the pool', implode( ' ', $result['warnings'] ) );
+		$this->assertStringContainsString( 'Pool.Audit', implode( ' ', $result['warnings'] ) );
 		$this->assertNotNull( Resource::for_license( (int) $license['id'] ) );
 	}
 

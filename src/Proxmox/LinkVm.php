@@ -295,7 +295,8 @@ final class LinkVm {
 			$answer = $client->request( 'PUT', $pools, 'pools_id' === $cluster['pool_api'] ? array( 'vms' => (string) $vmid ) : array( 'poolid' => $pool, 'vms' => (string) $vmid ) );
 
 			if ( is_wp_error( $answer ) ) {
-				$warnings[] = 'The tag is written, but the VM could not be added to the pool: ' . $answer->get_error_message();
+				// Proxmox lists a VM's pool only to a token with Pool.Audit; without it every VM looks pool-less.
+				$warnings[] = 'The tag is written, but the VM could not be added to the pool: ' . $answer->get_error_message() . ' If it is already in the pool, give the token Pool.Audit so the VM list shows pools.';
 			}
 		} elseif ( '' !== $pool && $in_pool !== $pool ) {
 			$warnings[] = sprintf( 'The VM is in pool "%s"; it was not moved.', $in_pool );
