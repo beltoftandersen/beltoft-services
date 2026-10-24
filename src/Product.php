@@ -45,6 +45,7 @@ final class Product {
 		add_filter( 'beltoft_licenses_api_license', array( __CLASS__, 'hide_from_api' ) );
 		add_filter( 'beltoft_licenses_resource_label', array( __CLASS__, 'resource_label' ), 10, 4 );
 		add_filter( 'beltoft_licenses_account_show_key', array( __CLASS__, 'show_key' ), 10, 2 );
+		add_filter( 'beltoft_licenses_account_show_usage', array( __CLASS__, 'show_key' ), 10, 2 );
 	}
 
 	/**
@@ -310,7 +311,8 @@ final class Product {
 	}
 
 	/**
-	 * Service licenses have no key to show in My Account.
+	 * Service licenses have no key and no "Sites" line in My Account: the service panel
+	 * below shows the service itself.
 	 *
 	 * @param bool                 $show    Default.
 	 * @param array<string, mixed> $license License row.

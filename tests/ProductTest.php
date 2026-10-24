@@ -165,6 +165,7 @@ class ProductTest extends TestCase {
 
 		$this->assertSame( '2 of 3 units', apply_filters( 'beltoft_licenses_resource_label', '2 of 3 sites', $license, 2, 3 ) );
 		$this->assertFalse( apply_filters( 'beltoft_licenses_account_show_key', true, $license ) );
+		$this->assertFalse( apply_filters( 'beltoft_licenses_account_show_usage', true, $license ) );
 	}
 
 	public function test_non_service_licenses_are_untouched(): void {
@@ -178,6 +179,7 @@ class ProductTest extends TestCase {
 
 		$this->assertSame( '2 of 3 sites', apply_filters( 'beltoft_licenses_resource_label', '2 of 3 sites', $license, 2, 3 ) );
 		$this->assertTrue( apply_filters( 'beltoft_licenses_account_show_key', true, $license ) );
+		$this->assertTrue( apply_filters( 'beltoft_licenses_account_show_usage', true, $license ) );
 		$this->assertSame( $license, apply_filters( 'beltoft_licenses_api_license', $license, $license['license_key'] ) );
 		$this->assertSame( 200, $this->validate( $license['license_key'] )->get_status() );
 	}
@@ -234,6 +236,7 @@ class ProductTest extends TestCase {
 
 		$this->assertSame( $unknown->get_data(), $this->validate( $license['license_key'] )->get_data() );
 		$this->assertFalse( apply_filters( 'beltoft_licenses_account_show_key', true, $license ) );
+		$this->assertFalse( apply_filters( 'beltoft_licenses_account_show_usage', true, $license ) );
 	}
 
 	public function test_releasing_the_slug_through_the_admin_action_makes_the_license_validate_again(): void {
