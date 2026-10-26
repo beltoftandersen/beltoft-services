@@ -57,8 +57,19 @@ class LiveDns implements Dns {
 	}
 
 	public function secure( string $zone ): array|\WP_Error {
-		$result = $this->call( 'POST', $this->path( $zone ) . '/cryptokeys', array( 'keytype' => 'ksk', 'active' => true ) );
-		if ( is_wp_error( $result ) ) { return $result; }
+		$current = $this->call( 'GET', $this->path( $zone ) );
+		if ( is_wp_error( $current ) ) { return $current; }
+		if ( empty( $current['dnssec'] ) || empty( $current['api_rectify'] ) ) {
+			$enabled = $this->call( 'PUT', $this->path( $zone ), array( 'dnssec' => true, 'api_rectify' => true ) );
+			if ( is_wp_error( $enabled ) ) { return $enabled; }
+		}
+		$keys = $this->call( 'GET', $this->path( $zone ) . '/cryptokeys' );
+		if ( is_wp_error( $keys ) ) { return $keys; }
+		$result = null;
+		foreach ( $keys as $key ) {
+			if ( is_array( $key ) && ! empty( $key['active'] ) && 'ksk' === strtolower( (string) ( $key['keytype'] ?? '' ) ) && ! empty( $key['dnskey'] ) ) { $result = $key; break; }
+		}
+		if ( null === $result ) { return new \WP_Error( 'bad_response', 'DNS did not return an active signing key.' ); }
 		$parts = preg_split( '/\s+/', trim( (string) ( $result['dnskey'] ?? '' ) ), 4 );
 		if ( 4 !== count( $parts ) || (int) $parts[0] !== 257 || (int) $parts[1] !== 3 ) {
 			return new \WP_Error( 'bad_response', 'DNS did not return a valid DNSKEY.' );

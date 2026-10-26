@@ -26,7 +26,7 @@ final class Clients {
 	public static function registrar(): Client {
 		$mode = self::mode();
 		$account = Account::get();
-		$client = 'fake' === $mode ? new FakeClient() : new LiveClient( $mode, $account['username'], $account['password'] );
+		$client = 'fake' === $mode ? new FakeClient( true ) : new LiveClient( $mode, $account['username'], $account['password'] );
 		$filtered = apply_filters( 'beltoft_services_domains_client', $client );
 		if ( $filtered instanceof FakeClient || ( 'fake' !== $mode && $filtered instanceof LiveClient ) ) {
 			return $filtered;
@@ -38,7 +38,7 @@ final class Clients {
 		$account = Account::get();
 		$client = self::live_allowed()
 			? new LiveDns( (string) Settings::get( 'domain_dns_url', 'http://127.0.0.1:8081' ), $account['dns_key'], true )
-			: new FakeDns();
+			: new FakeDns( true );
 		$filtered = apply_filters( 'beltoft_services_domains_dns', $client );
 		if ( $filtered instanceof FakeDns || ( self::live_allowed() && $filtered instanceof LiveDns ) ) {
 			return $filtered;

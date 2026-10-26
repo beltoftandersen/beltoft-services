@@ -27,6 +27,18 @@ final class Prices {
 		return $overrides[ $tld ] ?? (int) $table[ $tld ]['price'];
 	}
 
+	/** The registrar's transfer cost for a full domain, or null if no price is stored. */
+	public static function transfer_cost( string $domain ): ?float {
+		$table = get_option( self::OPTION, array() );
+		if ( ! is_array( $table ) ) { return null; }
+		$tlds = array_keys( $table );
+		usort( $tlds, static fn( $a, $b ) => strlen( $b ) <=> strlen( $a ) );
+		foreach ( $tlds as $tld ) {
+			if ( str_ends_with( $domain, '.' . $tld ) ) { return isset( $table[ $tld ]['transfer'] ) ? (float) $table[ $tld ]['transfer'] : null; }
+		}
+		return null;
+	}
+
 	public static function sellable( string $tld ): bool {
 		$tld = strtolower( ltrim( $tld, '.' ) );
 		$table = get_option( self::OPTION, array() );

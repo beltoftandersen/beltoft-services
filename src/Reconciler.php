@@ -281,7 +281,7 @@ final class Reconciler {
 		if ( $result->is_done() ) {
 			self::done( $fresh, $operation, $result, $meta, $plan );
 		} elseif ( $result->is_retry() ) {
-			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta, $result->has_progress() );
+			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta, $result->has_progress(), $result->wait_until() );
 		} else {
 			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
@@ -502,10 +502,12 @@ final class Reconciler {
 	 * @param array<string, mixed> $meta      Driver meta.
 	 * @param bool                 $progress  The driver got further in this run: the count starts again at this retry (at most MAX_PROGRESS_RESETS times per operation).
 	 */
-	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta, bool $progress = false ): void {
+	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta, bool $progress = false, int $wait_until = 0 ): void {
 		$resets = $r->get( 'op' ) === $operation ? $r->get( 'progress_resets' ) : 0;
 
-		if ( $progress && $resets < self::MAX_PROGRESS_RESETS ) {
+		if ( $wait_until > time() ) {
+			$attempts = 1;
+		} elseif ( $progress && $resets < self::MAX_PROGRESS_RESETS ) {
 			$attempts = 1;
 			++$resets;
 		} else {

@@ -12,6 +12,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Domains\Clients as DomainClients;
 use BeltoftServices\Domains\Prices as DomainPrices;
+use BeltoftServices\Domains\Search as DomainSearch;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
@@ -46,6 +47,42 @@ final class Commands {
 		if ( is_wp_error( $result ) ) { \WP_CLI::error( $result->get_error_message() ); }
 		if ( ! is_numeric( $result['balance'] ?? null ) ) { \WP_CLI::error( 'Registrar did not return a balance.' ); }
 		\WP_CLI::log( sprintf( 'Balance: %s %s', (string) $result['balance'], (string) ( $result['currency'] ?? 'EUR' ) ) );
+	}
+
+	/**
+	 * Link an existing registration or DNS zone to an active license, without ordering anything.
+	 *
+	 * @subcommand link-domain
+	 */
+	public function link_domain( array $args, array $assoc_args ): void {
+		$license = Licenses::find( (int) ( $args[0] ?? 0 ) );
+		$domain = DomainSearch::normalise( (string) ( $args[1] ?? '' ) );
+		$dns_only = isset( $assoc_args['dns-only'] );
+		$remote_id = (string) ( $assoc_args['registrar-id'] ?? '' );
+		if ( ! $license || is_wp_error( $domain ) ) { \WP_CLI::error( 'Give an existing license id and a valid domain.' ); }
+		$driver = Product::driver_for( (int) $license['product_id'] );
+		if ( ! $driver || $driver->id() !== ( $dns_only ? 'dns' : 'domain' ) ) { \WP_CLI::error( 'The license product has the wrong domain driver.' ); }
+		if ( ! $dns_only && ! ctype_digit( $remote_id ) ) { \WP_CLI::error( '--registrar-id must be a numeric domain id.' ); }
+		if ( Resource::for_license( (int) $license['id'] ) ) { \WP_CLI::error( 'The license already has a resource.' ); }
+		if ( Licenses::STATUS_ACTIVE !== Licenses::effective_status( $license ) ) { \WP_CLI::error( 'The license must be active.' ); }
+		foreach ( array( 'domain', 'dns' ) as $kind ) {
+			foreach ( Resource::live_ids( $kind ) as $id ) {
+				$other = Resource::find( $id );
+				if ( $other && $other->get( 'domain' ) === $domain && (int) ( $other->license()['user_id'] ?? 0 ) !== (int) ( $license['user_id'] ?? 0 ) ) { \WP_CLI::error( 'This domain belongs to another customer resource.' ); }
+				if ( $other && $other->get( 'domain' ) === $domain && $kind === $driver->kind() ) { \WP_CLI::error( 'This domain already has a resource of this kind.' ); }
+			}
+		}
+		if ( $dns_only ) {
+			$zone = DomainClients::dns()->zone( $domain );
+			if ( is_wp_error( $zone ) || null === $zone ) { \WP_CLI::error( 'The DNS zone must exist before linking.' ); }
+		}
+		$meta = array( 'state' => 'ready', 'desired' => 'ready', 'domain' => $domain, 'mode' => $dns_only ? 'dns' : 'register', 'protected' => true, 'notified' => 'ready', 'steps' => array( 'claim', 'zone', 'delegation' ), 'zone_claimed' => true );
+		if ( ! $dns_only ) { $meta['remote_id'] = $remote_id; $meta['steps'] = array( 'contact', 'zone_prepared', 'order', 'active', 'zone', 'dates' ); }
+		$variation_id = (int) ( $license['variation_id'] ?? 0 );
+		$r = Resource::create( $license, $driver, Product::plan( (int) $license['product_id'], $variation_id > 0 ? $variation_id : null ), $meta );
+		if ( is_wp_error( $r ) ) { \WP_CLI::error( $r->get_error_message() ); }
+		Events::add( (int) $license['id'], 'resource_linked', sprintf( 'Linked existing domain %s by WP-CLI.', $domain ) );
+		\WP_CLI::success( sprintf( 'Linked %s to license %d.', $domain, (int) $license['id'] ) );
 	}
 
 	/**

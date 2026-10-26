@@ -185,6 +185,19 @@ final class ReconcilerTest extends TestCase {
 		$this->assertCount( 1, $this->mails );
 	}
 
+	public function test_bounded_registry_wait_keeps_provisioning_beyond_normal_retry_limit(): void {
+		list( $resource, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::wait( 3600, 'Registry pending', time() + 14 * DAY_IN_SECONDS ) );
+		for ( $attempt = 0; $attempt < 12; ++$attempt ) {
+			$this->make_due( $resource );
+			Jobs::run( $resource->id() );
+			$fresh = Resource::find( $resource->id() );
+			$this->assertSame( 'provisioning', $fresh->get( 'state' ) );
+			$this->assertSame( 1, $fresh->get( 'attempts' ) );
+			as_unschedule_all_actions( Jobs::HOOK, array( $resource->id() ), Jobs::GROUP );
+		}
+	}
+
 	public function test_retry_uses_the_longer_of_driver_delay_and_backoff(): void {
 		list( $resource, $driver ) = $this->resource();
 		$driver->will( 'provision', StepResult::retry( 7200, 'Slow' ) );

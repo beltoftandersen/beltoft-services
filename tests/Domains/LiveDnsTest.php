@@ -16,7 +16,15 @@ class LiveDnsTest extends TestCase {
 		$this->respond_with( function ( $url, $args ) {
 			$this->assertStringStartsWith( 'http://127.0.0.1:8081/', $url );
 			$this->assertSame( 'secret', $args['headers']['X-API-Key'] );
-			return array( 'headers' => array(), 'body' => wp_json_encode( array( 'dnskey' => '257 3 13 aaaa', 'active' => true ) ), 'response' => array( 'code' => 201, 'message' => 'Created' ), 'cookies' => array() );
+			if ( str_ends_with( $url, '/cryptokeys' ) ) {
+				$body = array( array( 'dnskey' => '257 3 13 aaaa', 'active' => true, 'keytype' => 'ksk' ) );
+			} elseif ( 'PUT' === $args['method'] ) {
+				$this->assertSame( array( 'dnssec' => true, 'api_rectify' => true ), json_decode( $args['body'], true ) );
+				$body = array( 'dnssec' => true );
+			} else {
+				$body = array( 'dnssec' => false );
+			}
+			return array( 'headers' => array(), 'body' => wp_json_encode( $body ), 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array() );
 		} );
 		$this->assertSame( array( array( 'flags' => 257, 'protocol' => 3, 'alg' => 13, 'pub_key' => 'aaaa' ) ), $dns->secure( 'example.com' ) );
 	}

@@ -1,0 +1,66 @@
+<?php
+/** DNS zone and DS order tests. @package BeltoftServices */
+namespace BeltoftServices\Tests\Domains;
+
+use BeltoftServices\Domains\DomainDriver;
+use BeltoftServices\Domains\FakeClient;
+use BeltoftServices\Domains\FakeDns;
+use BeltoftServices\Domains\Zone;
+use BeltoftServices\Resource;
+use BeltoftServices\Tests\TestCase;
+
+class ZoneTest extends TestCase {
+	private function resource( string $name = 'example.com' ): Resource {
+		$product = $this->service_product( 'domain' );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		$r = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => $name, 'remote_id' => '123' ) );
+		$this->assertInstanceOf( Resource::class, $r );
+		return $r;
+	}
+
+	public function test_zone_created_with_our_ns_and_ds_sent_to_registrar(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		$op = new FakeClient();
+		$op->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		$result = Zone::ensure( $this->resource() );
+		$this->assertTrue( $result->is_done() );
+		$this->assertTrue( $dns->zone( 'example.com' )['secured'] );
+		$this->assertSame( true, $op->calls()[0]['body']['is_dnssec_enabled'] );
+	}
+
+	public function test_no_zone_when_nameservers_unset(): void {
+		$this->settings( array( 'domain_nameservers' => '' ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->assertTrue( Zone::ensure( $this->resource() )->is_done() );
+		$this->assertSame( array(), $dns->calls() );
+	}
+
+	public function test_remove_clears_dnssec_before_zone_delete(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		$dns->create_zone( 'remove.example.com', Zone::nameservers() );
+		$op = new FakeClient();
+		$op->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		$r = $this->resource( 'remove.example.com' );
+		$r->set( array( 'dnssec_keys' => array( array( 'flags' => 257 ) ) ) );
+		$this->assertTrue( Zone::remove( $r )->is_done() );
+		$this->assertSame( false, $op->calls()[0]['body']['is_dnssec_enabled'] );
+		$this->assertNull( $dns->zone( 'remove.example.com' ) );
+	}
+
+	public function test_prepared_zone_can_be_reused_after_step_save_crash(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource( 'crash-example.com' );
+		$this->assertTrue( Zone::prepare( $r )->is_done() );
+		$this->assertTrue( Zone::prepare( Resource::find( $r->id() ) )->is_done() );
+		$this->assertCount( 1, array_filter( $dns->calls(), static fn( $call ) => 'create_zone' === $call[0] ) );
+	}
+}

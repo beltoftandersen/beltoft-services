@@ -30,6 +30,8 @@ final class Registry {
 			array(
 				'http'    => new \BeltoftServices\Http\HttpDriver(),
 				'proxmox' => new \BeltoftServices\Proxmox\ProxmoxDriver(),
+				'domain'  => new \BeltoftServices\Domains\DomainDriver(),
+				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
 			)
 		);
 

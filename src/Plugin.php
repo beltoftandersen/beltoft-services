@@ -48,6 +48,13 @@ final class Plugin {
 		Domains\DomainSettings::register();
 		Domains\Search::register();
 		Domains\Cart::register();
+		Domains\Meta::register();
+		Domains\Renewals::register();
+		Domains\Actions::register();
+		Domains\AuthCodeRoute::register();
+		Domains\Panels::register();
+		Domains\Sync::register();
+		Domains\EmailDetails::register();
 		Proxmox\ClustersScreen::register();
 		Checkout::register();
 

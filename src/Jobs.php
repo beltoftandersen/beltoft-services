@@ -10,6 +10,7 @@ namespace BeltoftServices;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\StepResult;
 
 defined( 'ABSPATH' ) || exit;
@@ -232,8 +233,10 @@ final class Jobs {
 		try {
 			$resource = Resource::find( $activation_id );
 			$driver   = $resource ? Registry::get( $resource->get( 'driver' ) ) : null;
+			$internal = $driver instanceof InternalActions && in_array( $action, $driver->internal_actions(), true );
+			$allowed = $resource && $driver && ( $internal ? $resource->is_live() && 'deleted' !== $resource->get( 'desired' ) : $resource->accepts_actions() && array_key_exists( $action, $driver->customer_actions( $resource ) ) );
 
-			if ( ! $resource || ! $driver || ! $resource->accepts_actions() || ! array_key_exists( $action, $driver->customer_actions( $resource ) ) ) {
+			if ( ! $allowed ) {
 				// Dropped, but not silently: the customer asked for something that did not happen.
 				if ( $resource ) {
 					Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', sprintf( 'Customer action "%s" was not run: it is not available any more', $action ) );

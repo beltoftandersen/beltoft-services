@@ -61,6 +61,9 @@ final class StepResult {
 	 */
 	private $progress = false;
 
+	/** Deadline for an explicitly bounded external wait; zero uses normal retry limits. */
+	private int $wait_until = 0;
+
 	/**
 	 * Use the named constructors.
 	 *
@@ -105,6 +108,17 @@ final class StepResult {
 		return $result;
 	}
 
+	/** Wait for an external authority until a fixed deadline without consuming the short retry budget. */
+	public static function wait( int $delay, string $error, int $until, array $meta = array() ): self {
+		$result = self::retry( $delay, $error, $meta, true );
+		$result->wait_until = $until;
+		return $result;
+	}
+
+	public function wait_until(): int {
+		return $this->wait_until;
+	}
+
 	/**
 	 * This result with the progress flag set (a retry only; other results are returned as they are).
 	 *
@@ -115,7 +129,9 @@ final class StepResult {
 			return $this;
 		}
 
-		return self::retry( $this->delay, $this->error, $this->meta, true );
+		$result = self::retry( $this->delay, $this->error, $this->meta, true );
+		$result->wait_until = $this->wait_until;
+		return $result;
 	}
 
 	/**
