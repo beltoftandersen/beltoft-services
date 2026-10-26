@@ -87,14 +87,15 @@ final class Search {
 			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
 			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
-			$results[] = array( 'domain' => $entry['domain'], 'status' => $status, 'price' => 'free' === $status ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status );
+			$results[] = array( 'domain' => $entry['domain'], 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status );
 		}
 		return array( 'results' => $results );
 	}
 
 	public static function shortcode(): string {
-		wp_enqueue_script( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.js', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION, true );
-		wp_enqueue_style( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.css', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION );
+		$asset_dir = plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'assets/';
+		wp_enqueue_script( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.js', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.js' ), true );
+		wp_enqueue_style( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.css' ) );
 		return '<div class="beltoft-domain-search" data-check="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/check' ) ) . '" data-cart="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/cart' ) ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'wc_store_api' ) ) . '"><label for="beltoft-domain-name">' . esc_html__( 'Find a domain', 'beltoft-services' ) . '</label><input id="beltoft-domain-name" type="search" autocomplete="off"><button type="button">' . esc_html__( 'Search', 'beltoft-services' ) . '</button><div class="beltoft-domain-results" aria-live="polite"></div></div>';
 	}
 }

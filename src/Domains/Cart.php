@@ -58,7 +58,7 @@ final class Cart {
 		$key = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
 		if ( ! $key ) { return new \WP_Error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		WC()->session->set_customer_session_cookie( true );
-		return new \WP_REST_Response( array( 'added' => true, 'cart_url' => wc_get_cart_url() ), 201 );
+		return new \WP_REST_Response( array( 'added' => true, 'checkout_url' => wc_get_checkout_url() ), 201 );
 	}
 
 	public static function line_data( string $domain, string $mode, string $auth_code = '' ): array|\WP_Error {
@@ -139,7 +139,10 @@ final class Cart {
 	}
 
 	public static function order_item( \WC_Order_Item_Product $item, string $cart_item_key, array $values, \WC_Order $order ): void {
-		if ( isset( $values['beltoft_services_domain'] ) ) { $item->add_meta_data( '_beltoft_services_domain', $values['beltoft_services_domain'], true ); }
+		if ( isset( $values['beltoft_services_domain'] ) ) {
+			$item->add_meta_data( '_beltoft_services_domain', $values['beltoft_services_domain'], true );
+			$item->add_meta_data( __( 'Domain', 'beltoft-services' ), (string) ( $values['beltoft_services_domain']['domain'] ?? '' ), true );
+		}
 		if ( isset( $values['beltoft_services_domain_auth'] ) ) { $item->add_meta_data( '_beltoft_services_domain_auth', $values['beltoft_services_domain_auth'], true ); }
 	}
 

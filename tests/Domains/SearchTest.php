@@ -34,4 +34,15 @@ class SearchTest extends TestCase {
 		$result = Search::find( 'example.dk' );
 		$this->assertSame( 'not_sold', $result['results'][0]['status'] );
 	}
+
+	public function test_registered_domain_shows_yearly_transfer_price(): void {
+		update_option( Prices::OPTION, array( 'org' => array( 'price' => 26, 'restricted' => false ) ) );
+		$this->settings( array( 'domain_featured_tlds' => 'org' ) );
+		$fake = new FakeClient();
+		$fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => 'owned.org', 'status' => 'taken' ) ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$result = Search::find( 'owned.org' );
+		$this->assertSame( 'taken', $result['results'][0]['status'] );
+		$this->assertSame( 26, $result['results'][0]['price'] );
+	}
 }

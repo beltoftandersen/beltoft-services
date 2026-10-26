@@ -46,6 +46,14 @@ class CartTest extends TestCase {
 		$this->assertSame( 'example.com', $data[0]['value'] );
 	}
 
+	public function test_order_line_preserves_domain_for_customer_and_provisioning(): void {
+		$item = new \WC_Order_Item_Product();
+		$order = new \WC_Order();
+		Cart::order_item( $item, 'domain-item', array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'register' ) ), $order );
+		$this->assertSame( 'example.com', $item->get_meta( 'Domain' ) );
+		$this->assertSame( 'example.com', $item->get_meta( '_beltoft_services_domain' )['domain'] );
+	}
+
 	public function test_domain_product_requires_selection_but_renewal_is_allowed(): void {
 		$product = $this->service_product( 'domain' );
 		$this->expectException( \Exception::class );
