@@ -46,6 +46,20 @@ class LiveClientTest extends TestCase {
 		$this->assertSame( 2, $logins );
 	}
 
+	public function test_availability_check_retries_one_transport_failure(): void {
+		$client = new LiveClient( 'sandbox', 'u', 'p' );
+		$checks = 0;
+		$this->respond_with( function ( $url ) use ( &$checks ) {
+			if ( str_ends_with( $url, '/auth/login' ) ) {
+				return $this->reply( array( 'data' => array( 'token' => 'token-one' ) ) );
+			}
+			++$checks;
+			return 1 === $checks ? new \WP_Error( 'http_request_failed', 'Temporary network failure.' ) : $this->reply( array( 'data' => array( 'results' => array() ) ) );
+		} );
+		$this->assertSame( array( 'results' => array() ), $client->request( 'POST', '/domains/check', array( 'domains' => array() ) ) );
+		$this->assertSame( 2, $checks );
+	}
+
 	public function test_error_code_becomes_op_code_and_password_never_leaks(): void {
 		$client = new LiveClient( 'sandbox', 'u', 'top-secret' );
 		$this->respond_with( function ( $url ) {

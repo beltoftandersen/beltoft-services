@@ -35,6 +35,10 @@ class LiveClient implements Client {
 		$token = $this->token();
 		if ( is_wp_error( $token ) ) { return $token; }
 		$result = $this->send( $method, $path, $body, $query, $token );
+		// An availability check does not place an order, so one transport retry is safe.
+		if ( 'POST' === $method && '/domains/check' === $path && is_wp_error( $result ) && 'transport' === $result->get_error_code() ) {
+			$result = $this->send( $method, $path, $body, $query, $token );
+		}
 		if ( is_wp_error( $result ) && 'http_401' === $result->get_error_code() ) {
 			delete_transient( self::token_key( $this->mode, $this->username ) );
 			$token = $this->token();
