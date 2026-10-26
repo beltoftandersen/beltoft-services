@@ -1,0 +1,58 @@
+{
+  "code": 0,
+  "data": {
+    "results": [
+      {
+        "name": "5g.in",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        }
+      },
+      {
+        "name": "6g.in",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "desc": ""
+}
