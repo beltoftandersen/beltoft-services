@@ -24,7 +24,7 @@ final class Search {
 	}
 
 	public static function rest_check( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
 		$id = (int) sprintf( '%u', crc32( $ip ) );
 		if ( RateLimit::exceeded( $id, 'domain-search', 30 ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );

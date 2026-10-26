@@ -14,7 +14,10 @@ final class DnsDriver implements Driver, StopsOnDelete {
 	public function id(): string { return 'dns'; }
 	public function label(): string { return __( 'DNS hosting', 'beltoft-services' ); }
 	public function kind(): string { return 'dns'; }
-	public function unit_label( int $used, int $max ): string { return sprintf( _n( '%d zone', '%d zones', $max, 'beltoft-services' ), $used ); }
+	public function unit_label( int $used, int $max ): string {
+		/* translators: %d: number of DNS zones. */
+		return sprintf( _n( '%d zone', '%d zones', $max, 'beltoft-services' ), $used );
+	}
 	public function plan_fields(): array { return array(); }
 
 	public function provision( Resource $r ): StepResult {

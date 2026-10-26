@@ -12,6 +12,7 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 - A Service tab on products, one free trial per customer, a My Account panel, WooCommerce → Services, a Service panel on each license, customer emails.
 - A kill switch, and deletion after a retention period (off by default, report only, or on).
 - A Proxmox VE driver (0.2.0): virtual machines cloned from templates, with an IP pool, SSH key or one-time password, an operating system choice, capacity limits, customer actions and abuse, breach and deletion modes. A built-in fake cluster is used until you switch a cluster live.
+- Domain registration, transfer and DNS hosting drivers (0.4.0), with a public search, one domain per subscription, customer DNS records and name servers, DNSSEC, paid renewals and daily health checks.
 - WP-CLI: `wp beltoft-services link-http`, `link-vm`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
 
 ## Setup
@@ -20,6 +21,17 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 2. Settings → Services: the alert address and a connection.
 3. On a licensed product, the Service tab: driver, connection and plan.
 4. In Beltoft Licenses' settings, turn on "Check expiry every hour".
+
+## Domains and DNS hosting
+
+1. In Settings → Services → Domains, enter at least two authoritative name servers, the registrar account, and the DNS API key. The DNS API accepts only a loopback HTTP URL. Start in `fake` mode; `sandbox` uses Openprovider's sandbox and keeps DNS fake. Live registrar and DNS access require `define( 'BELTOFT_SERVICES_DOMAINS_LIVE', true );` in `wp-config.php` and an appropriate API mode.
+   On this VM, set Primary DNS query address to `10.10.10.2`: the public address of `ns1.beltoft.net` does not hairpin from the VM. Other installations can leave it blank if the public address is reachable locally.
+2. Run `wp beltoft-services domain-prices` to load EUR costs and apply the markup, minimum margin, and any per-TLD price overrides. The table is also refreshed daily. A TLD without a usable price is not sold.
+3. Create a yearly WooCommerce Subscriptions product with the `domain` service driver. Create another yearly product with the `dns` driver for DNS hosting; its price is the product price and can be zero. Put `[beltoft_domain_search]` on the sales page. Each domain goes on its own cart line and subscription.
+4. Registration and transfer create a resource from the paid license. The registrar's automatic renewal stays off. A paid subscription renewal is checked against its renewal order before the registry is asked to renew. DNS hosting never changes the registrar and leaves the zone served during a payment hold.
+5. When a zone is removed, PowerDNS autosecondary keeps its copy on ns2. The resource waits for staff to remove that copy with `pdnsutil delete-zone <domain>` on ns2, then retries. The DNS runbook has the removal order and recovery steps.
+
+`wp beltoft-services link-domain <license-id> <domain> --registrar-id=<id>` adopts an existing registration without buying it. Add `--dns-only` instead for an existing DNS zone. `wp beltoft-services domain-balance` reads the registrar funds and `wp beltoft-services dns-check` checks the configured authoritative servers. The DNS check reports missing or orphan zones, SOA serial drift and near-expiry RRSIG records. Keep the live constant off during setup and use a fake license for checkout tests.
 
 ## Proxmox VE
 

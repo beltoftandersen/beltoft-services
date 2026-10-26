@@ -5,6 +5,8 @@ namespace BeltoftServices\Domains;
 defined( 'ABSPATH' ) || exit;
 
 interface Dns {
+	/** @return array|\WP_Error Zone summaries visible to this server. */
+	public function zones(): array|\WP_Error;
 	public function zone( string $name ): array|\WP_Error|null;
 	public function create_zone( string $name, array $nameservers ): true|\WP_Error;
 	public function delete_zone( string $name ): true|\WP_Error;

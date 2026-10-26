@@ -13,6 +13,7 @@ use BeltoftServices\Http\Connections;
 use BeltoftServices\Domains\Clients as DomainClients;
 use BeltoftServices\Domains\Prices as DomainPrices;
 use BeltoftServices\Domains\Search as DomainSearch;
+use BeltoftServices\Domains\Health as DomainHealth;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
@@ -83,6 +84,17 @@ final class Commands {
 		if ( is_wp_error( $r ) ) { \WP_CLI::error( $r->get_error_message() ); }
 		Events::add( (int) $license['id'], 'resource_linked', sprintf( 'Linked existing domain %s by WP-CLI.', $domain ) );
 		\WP_CLI::success( sprintf( 'Linked %s to license %d.', $domain, (int) $license['id'] ) );
+	}
+
+	/** Check configured authoritative servers and report zone problems.
+	 * @subcommand dns-check
+	 */
+	public function dns_check( array $args, array $assoc_args ): void {
+		$issues = DomainHealth::dns_check();
+		if ( is_wp_error( $issues ) ) { \WP_CLI::error( $issues->get_error_message() ); }
+		foreach ( $issues as $issue ) { \WP_CLI::warning( $issue ); }
+		if ( $issues ) { \WP_CLI::error( count( $issues ) . ' DNS issue(s) found.' ); }
+		\WP_CLI::success( 'DNS check passed.' );
 	}
 
 	/**

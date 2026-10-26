@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Alerts;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -29,7 +30,10 @@ final class Zone {
 		$nameservers = self::nameservers();
 		if ( count( $nameservers ) < 2 ) { return StepResult::retry( 3600, 'Configure at least two domain name servers.' ); }
 		$owner = self::owner( $r );
-		if ( 'other' === $owner ) { return StepResult::retry( 3600, 'A domain zone is assigned to another customer.' ); }
+		if ( 'other' === $owner ) {
+			if ( ! $r->get( 'zone_conflict_alerted' ) ) { Alerts::admin( $r, 'Domain zone belongs to a different customer.' ); $r->set( array( 'zone_conflict_alerted' => true ) ); }
+			return StepResult::retry( 3600, 'A domain zone is assigned to another customer.' );
+		}
 		if ( 'domain' === $owner ) { return StepResult::fail( 'This domain is already registered here.' ); }
 		$dns = Clients::dns();
 		$existing = $dns->zone( $name );
@@ -43,6 +47,13 @@ final class Zone {
 			}
 		} elseif ( 'dns' !== $owner && ! $r->get( 'zone_claimed' ) ) {
 			return StepResult::retry( 3600, 'An existing zone needs staff review.' );
+		}
+		$current = $dns->zone( $name );
+		$serial = is_array( $current ) ? DnsQuery::zone_serial( $current ) : null;
+		if ( null === $serial ) { return StepResult::retry( 300, 'The authoritative zone is not ready yet.' ); }
+		foreach ( $nameservers as $server ) {
+			$answer = DnsQuery::read( $server, $name, 6 );
+			if ( is_wp_error( $answer ) || $answer !== $serial ) { return StepResult::retry( 300, 'The name servers have not received the zone yet.' ); }
 		}
 		return StepResult::done( array( 'zone_prepared' => true ) );
 	}
@@ -65,6 +76,8 @@ final class Zone {
 			if ( is_wp_error( $created ) ) { return StepResult::retry( 3600, 'DNS zone could not be created.' ); }
 		}
 		if ( 'dns' === $r->get( 'driver' ) ) { return StepResult::done( array( 'zone_ready' => true ) ); }
+		// Sandbox registration has only a fake zone; its fake DNSKEY must never be sent to a registry.
+		if ( 'sandbox' === Clients::mode() && $dns instanceof FakeDns ) { return StepResult::done( array( 'zone_ready' => true, 'dnssec_keys' => array() ) ); }
 		$keys = $dns->secure( $name );
 		if ( is_wp_error( $keys ) ) { return StepResult::retry( 3600, 'DNSSEC signing could not be enabled.' ); }
 		if ( ! $publish_ds ) { return StepResult::done( array( 'zone_ready' => true, 'dnssec_keys' => $keys ) ); }
@@ -77,6 +90,7 @@ final class Zone {
 
 	public static function remove( Resource $r ): StepResult {
 		$name = (string) $r->get( 'domain' );
+		if ( ! $r->get( 'zone_claimed' ) && ! $r->get( 'zone_ready' ) ) { return StepResult::done(); }
 		$owner = self::owner( $r );
 		if ( 'other' === $owner ) { return StepResult::retry( 3600, 'DNS zone ownership needs staff review.' ); }
 		$remote_id = (string) $r->get( 'remote_id' );
@@ -87,6 +101,11 @@ final class Zone {
 		if ( 'domain' === $owner || 'dns' === $owner ) { return StepResult::done( array( 'zone_ready' => false, 'dnssec_keys' => array() ) ); }
 		$deleted = Clients::dns()->delete_zone( $name );
 		if ( is_wp_error( $deleted ) && 'http_404' !== $deleted->get_error_code() ) { return StepResult::retry( 3600, 'DNS zone could not be removed.' ); }
+		// Autosecondary does not replicate deletion. Keep the resource open until staff clears any secondary copy.
+		foreach ( array_slice( self::nameservers(), 1 ) as $secondary ) {
+			$answer = DnsQuery::read( $secondary, $name, 6 );
+			if ( ! is_wp_error( $answer ) || ! in_array( $answer->get_error_code(), array( 'dns_missing', 'dns_not_authoritative' ), true ) ) { return StepResult::retry( 3600, 'The DNS zone is still served by a secondary name server, or its status could not be checked.' ); }
+		}
 		return StepResult::done( array( 'zone_ready' => false, 'dnssec_keys' => array() ) );
 	}
 }

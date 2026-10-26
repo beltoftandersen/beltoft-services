@@ -41,6 +41,8 @@ class LiveDns implements Dns {
 		return is_wp_error( $result ) && 'http_404' === $result->get_error_code() ? null : $result;
 	}
 
+	public function zones(): array|\WP_Error { return $this->call( 'GET', '' ); }
+
 	public function create_zone( string $name, array $nameservers ): true|\WP_Error {
 		$result = $this->call( 'POST', '', array( 'name' => strtolower( rtrim( $name, '.' ) ) . '.', 'kind' => 'Master', 'nameservers' => array_map( static fn( $host ) => rtrim( strtolower( (string) $host ), '.' ) . '.', $nameservers ) ) );
 		return is_wp_error( $result ) ? $result : true;

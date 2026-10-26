@@ -96,6 +96,8 @@ final class Prices {
 		foreach ( array( 'create' => 'create_price', 'renew' => 'renew_price', 'transfer' => 'transfer_price' ) as $key => $field ) {
 			$price = $prices[ $field ]['reseller'] ?? null;
 			if ( null === $price && 'transfer' === $key ) { $values[ $key ] = 0.0; continue; }
+			// The sandbox lists active TLDs without a create or renewal price; they cannot be sold.
+			if ( null === $price ) { return null; }
 			if ( ! is_array( $price ) || ! is_numeric( $price['price'] ?? null ) || 'EUR' !== strtoupper( (string) ( $price['currency'] ?? '' ) ) ) {
 				return new \WP_Error( 'bad_currency', 'Registrar prices must be numeric and in EUR.' );
 			}

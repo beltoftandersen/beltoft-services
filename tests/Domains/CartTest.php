@@ -36,4 +36,9 @@ class CartTest extends TestCase {
 		$two = Cart::recurring_key( 'yearly', array( 'beltoft_services_domain' => array( 'domain' => 'two.dk' ) ) );
 		$this->assertNotSame( $one, $two );
 	}
+
+	public function test_cart_summary_shows_selected_domain(): void {
+		$data = Cart::item_data( array(), array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ) );
+		$this->assertSame( 'example.com', $data[0]['value'] );
+	}
 }

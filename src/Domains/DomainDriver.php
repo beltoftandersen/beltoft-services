@@ -17,7 +17,10 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions {
 	public function id(): string { return 'domain'; }
 	public function label(): string { return __( 'Domain name', 'beltoft-services' ); }
 	public function kind(): string { return 'domain'; }
-	public function unit_label( int $used, int $max ): string { return sprintf( _n( '%d domain', '%d domains', $max, 'beltoft-services' ), $used ); }
+	public function unit_label( int $used, int $max ): string {
+		/* translators: %d: number of domains. */
+		return sprintf( _n( '%d domain', '%d domains', $max, 'beltoft-services' ), $used );
+	}
 	public function plan_fields(): array { return array(); }
 	public function internal_actions(): array { return array( 'renew', 'transfer_renew' ); }
 

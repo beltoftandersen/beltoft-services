@@ -10,17 +10,20 @@ defined( 'ABSPATH' ) || exit;
 final class Sync {
 	public const HOOK = 'beltoft_services_domains_sync';
 	public const DELEGATION_HOOK = 'beltoft_services_dns_delegation';
+	public const HEALTH_HOOK = 'beltoft_services_dns_health';
 	public const CURSOR = 'beltoft_services_domains_sync_cursor';
 
 	public static function register(): void {
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( self::DELEGATION_HOOK, array( __CLASS__, 'delegation' ) );
+		add_action( self::HEALTH_HOOK, array( Health::class, 'dns_check' ) );
 	}
 	public static function schedule(): void {
 		if ( ! function_exists( 'as_next_scheduled_action' ) ) { return; }
 		if ( ! as_next_scheduled_action( self::HOOK, array(), 'beltoft-services' ) ) { as_schedule_cron_action( time() + HOUR_IN_SECONDS, '45 4 * * *', self::HOOK, array(), 'beltoft-services' ); }
 		if ( ! as_next_scheduled_action( self::DELEGATION_HOOK, array(), 'beltoft-services' ) ) { as_schedule_cron_action( time() + HOUR_IN_SECONDS, '15 5 * * *', self::DELEGATION_HOOK, array(), 'beltoft-services' ); }
+		if ( ! as_next_scheduled_action( self::HEALTH_HOOK, array(), 'beltoft-services' ) ) { as_schedule_cron_action( time() + 15 * MINUTE_IN_SECONDS, '*/15 * * * *', self::HEALTH_HOOK, array(), 'beltoft-services' ); }
 	}
 	public static function run(): void {
 		$ids = Resource::live_ids( 'domain' );

@@ -43,4 +43,17 @@ class PricesTest extends TestCase {
 		$this->assertWPError( Prices::sync() );
 		$this->assertSame( 14, Prices::price( 'com' ) );
 	}
+
+	public function test_active_tld_without_prices_is_skipped(): void {
+		$eur = array( 'reseller' => array( 'price' => 9, 'currency' => 'EUR' ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/tlds', array( 'results' => array(
+			array( 'name' => 'missing', 'status' => 'ACT', 'prices' => array( 'create_price' => null, 'renew_price' => $eur ) ),
+			array( 'name' => 'com', 'status' => 'ACT', 'prices' => array( 'create_price' => $eur, 'renew_price' => $eur ) ),
+		) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertSame( 1, Prices::sync() );
+		$this->assertNull( Prices::price( 'missing' ) );
+		$this->assertSame( 13, Prices::price( 'com' ) );
+	}
 }

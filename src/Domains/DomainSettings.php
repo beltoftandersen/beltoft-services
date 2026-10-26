@@ -48,6 +48,7 @@ final class DomainSettings {
 		$fields['domain_renew_days_before'] = $base + array( 'type' => 'number', 'default' => 30, 'min' => 1, 'max' => 60, 'label' => __( 'Charge renewals before expiry, in days', 'beltoft-services' ) );
 		$fields['domain_low_balance'] = $base + array( 'type' => 'number', 'default' => 50, 'min' => 0, 'label' => __( 'Low registrar balance in EUR', 'beltoft-services' ) );
 		$fields['domain_dns_url'] = $base + array( 'type' => 'text', 'default' => 'http://127.0.0.1:8081', 'label' => __( 'DNS API URL', 'beltoft-services' ) );
+		$fields['domain_dns_primary_query_address'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Primary DNS query address', 'beltoft-services' ), 'desc' => __( 'Local IP address used to check the first name server when its public address cannot be reached from this server.', 'beltoft-services' ) );
 		return $fields;
 	}
 
@@ -82,6 +83,7 @@ final class DomainSettings {
 		check_admin_referer( 'beltoft_services_save_domains_account' );
 		$input = array();
 		foreach ( array( 'username', 'password', 'handle', 'dns_key' ) as $key ) {
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Account::save sanitizes fields and must preserve exact secret bytes.
 			if ( isset( $_POST[ $key ] ) && is_string( $_POST[ $key ] ) ) { $input[ $key ] = wp_unslash( $_POST[ $key ] ); }
 		}
 		try { Account::save( $input ); } catch ( \RuntimeException $e ) { wp_die( esc_html__( 'Configure the encryption key before saving credentials.', 'beltoft-services' ) ); }

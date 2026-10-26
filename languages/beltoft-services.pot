@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.3.1\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.4.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-23T16:27:01+00:00\n"
+"POT-Creation-Date: 2026-10-26T11:53:34+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -67,7 +67,7 @@ msgid "Failed: contact us"
 msgstr ""
 
 #: src/Account/Panel.php:100
-#: src/Emails/ServiceEmail.php:109
+#: src/Emails/ServiceEmail.php:111
 msgid "This server is suspended. Contact support."
 msgstr ""
 
@@ -337,7 +337,7 @@ msgstr ""
 
 #: src/Admin/Panel.php:588
 #: src/Admin/Panel.php:626
-#: src/Product.php:334
+#: src/Product.php:336
 #: src/Proxmox/IpPoolScreen.php:191
 msgid "Service"
 msgstr ""
@@ -387,12 +387,12 @@ msgid "Protected"
 msgstr ""
 
 #: src/Admin/Panel.php:641
-#: src/Product.php:593
+#: src/Product.php:595
 msgid "Yes"
 msgstr ""
 
 #: src/Admin/Panel.php:641
-#: src/Product.php:594
+#: src/Product.php:596
 msgid "No"
 msgstr ""
 
@@ -528,6 +528,236 @@ msgstr ""
 msgid "You have already used the trial for %s."
 msgstr ""
 
+#: src/Domains/Actions.php:17
+#: templates/account/domain.php:37
+msgid "Save DNS records"
+msgstr ""
+
+#: src/Domains/Actions.php:18
+msgid "Check name servers"
+msgstr ""
+
+#: src/Domains/Actions.php:20
+msgid "Change name servers"
+msgstr ""
+
+#: src/Domains/Actions.php:21
+msgid "Lock transfer"
+msgstr ""
+
+#: src/Domains/Actions.php:22
+msgid "Unlock transfer"
+msgstr ""
+
+#: src/Domains/Cart.php:32
+msgid "Refresh the page and try again."
+msgstr ""
+
+#: src/Domains/Cart.php:39
+msgid "The cart is unavailable."
+msgstr ""
+
+#: src/Domains/Cart.php:42
+msgid "This domain is already in your cart."
+msgstr ""
+
+#: src/Domains/Cart.php:47
+msgid "This service is not available yet."
+msgstr ""
+
+#: src/Domains/Cart.php:53
+msgid "This domain cannot be ordered in that way."
+msgstr ""
+
+#: src/Domains/Cart.php:57
+msgid "The domain could not be added to your cart."
+msgstr ""
+
+#: src/Domains/Cart.php:117
+#: src/Domains/EmailDetails.php:13
+msgid "Domain"
+msgstr ""
+
+#: src/Domains/DnsDriver.php:15
+msgid "DNS hosting"
+msgstr ""
+
+#. translators: %d: number of DNS zones.
+#: src/Domains/DnsDriver.php:19
+#, php-format
+msgid "%d zone"
+msgid_plural "%d zones"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Domains/DomainDriver.php:18
+msgid "Domain name"
+msgstr ""
+
+#. translators: %d: number of domains.
+#: src/Domains/DomainDriver.php:22
+#, php-format
+msgid "%d domain"
+msgid_plural "%d domains"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Domains/DomainSettings.php:29
+msgid "Domains"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:34
+msgid "Domain registration and DNS"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:41
+#: src/Proxmox/ClustersScreen.php:192
+msgid "Fake"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:41
+msgid "Sandbox"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:41
+#: src/Proxmox/ClustersScreen.php:192
+#: src/Proxmox/ClustersScreen.php:274
+msgid "Live"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:41
+msgid "Registrar API mode"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:42
+#: src/Domains/EmailDetails.php:14
+#: src/Proxmox/ClustersScreen.php:289
+msgid "Name servers"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:42
+msgid "Comma separated host names. Leave empty to disable automatic zones."
+msgstr ""
+
+#: src/Domains/DomainSettings.php:43
+msgid "Markup percent"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:44
+msgid "Minimum margin in EUR"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:45
+msgid "Price overrides"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:45
+msgid "One TLD and whole euro price per line, for example com=15."
+msgstr ""
+
+#: src/Domains/DomainSettings.php:46
+msgid "Allowed restricted TLDs"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:47
+msgid "Featured TLDs"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:48
+msgid "Charge renewals before expiry, in days"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:49
+msgid "Low registrar balance in EUR"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:50
+msgid "DNS API URL"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:51
+msgid "Primary DNS query address"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:51
+msgid "Local IP address used to check the first name server when its public address cannot be reached from this server."
+msgstr ""
+
+#: src/Domains/DomainSettings.php:57
+msgid "Live mode is blocked until BELTOFT_SERVICES_DOMAINS_LIVE is enabled in wp-config.php."
+msgstr ""
+
+#: src/Domains/DomainSettings.php:65
+msgid "Registrar and DNS credentials"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:70
+msgid "Registrar username"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:70
+msgid "Reseller handle"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:70
+msgid "Registrar password"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:70
+msgid "DNS API key"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:73
+#: src/Http/ConnectionsScreen.php:305
+#: src/Proxmox/ClustersScreen.php:266
+#: src/Settings.php:346
+msgid "Saved"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:77
+msgid "Save credentials"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:82
+msgid "Not allowed."
+msgstr ""
+
+#: src/Domains/DomainSettings.php:89
+msgid "Configure the encryption key before saving credentials."
+msgstr ""
+
+#: src/Domains/EmailDetails.php:15
+msgid "Next step"
+msgstr ""
+
+#: src/Domains/EmailDetails.php:15
+msgid "Copy your DNS records, then change the name servers at your registrar."
+msgstr ""
+
+#: src/Domains/Health.php:23
+msgid "Domain registrar balance is low"
+msgstr ""
+
+#: src/Domains/Health.php:84
+msgid "Domain DNS health needs attention"
+msgstr ""
+
+#: src/Domains/Panels.php:42
+msgid "Subscription"
+msgstr ""
+
+#: src/Domains/Search.php:30
+msgid "Too many searches. Please wait a minute."
+msgstr ""
+
+#: src/Domains/Search.php:98
+msgid "Find a domain"
+msgstr ""
+
+#: src/Domains/Search.php:98
+msgid "Search"
+msgstr ""
+
 #: src/Emails/Deleted.php:22
 msgid "Service deleted"
 msgstr ""
@@ -558,6 +788,22 @@ msgstr ""
 
 #: src/Emails/DeletionWarning.php:41
 msgid "Your service will be deleted"
+msgstr ""
+
+#: src/Emails/DomainActionNeeded.php:10
+msgid "Domain action needed"
+msgstr ""
+
+#: src/Emails/DomainActionNeeded.php:11
+msgid "Sent when a registration or transfer needs a customer approval."
+msgstr ""
+
+#: src/Emails/DomainActionNeeded.php:16
+msgid "Action needed for your domain"
+msgstr ""
+
+#: src/Emails/DomainActionNeeded.php:17
+msgid "Your domain needs a confirmation"
 msgstr ""
 
 #: src/Emails/LimitExceeded.php:22
@@ -624,27 +870,27 @@ msgstr ""
 msgid "Your service is ready"
 msgstr ""
 
-#: src/Emails/ServiceEmail.php:119
+#: src/Emails/ServiceEmail.php:121
 msgid "Paused by an administrator."
 msgstr ""
 
-#: src/Emails/ServiceEmail.php:123
+#: src/Emails/ServiceEmail.php:125
 msgid "Your server was using the processor heavily for a long time."
 msgstr ""
 
-#: src/Emails/ServiceEmail.php:127
+#: src/Emails/ServiceEmail.php:129
 msgid "Your subscription period has ended."
 msgstr ""
 
-#: src/Emails/ServiceEmail.php:128
+#: src/Emails/ServiceEmail.php:130
 msgid "Your subscription is on hold, for example because a payment is missing."
 msgstr ""
 
-#: src/Emails/ServiceEmail.php:129
+#: src/Emails/ServiceEmail.php:131
 msgid "Your subscription was cancelled or refunded."
 msgstr ""
 
-#: src/Emails/ServiceEmail.php:132
+#: src/Emails/ServiceEmail.php:134
 msgid "Your subscription is not active."
 msgstr ""
 
@@ -858,12 +1104,6 @@ msgstr ""
 msgid "Secret"
 msgstr ""
 
-#: src/Http/ConnectionsScreen.php:305
-#: src/Proxmox/ClustersScreen.php:266
-#: src/Settings.php:346
-msgid "Saved"
-msgstr ""
-
 #: src/Http/ConnectionsScreen.php:306
 msgid "Leave empty to keep the saved secret."
 msgstr ""
@@ -972,7 +1212,7 @@ msgid "Open"
 msgstr ""
 
 #: src/Http/HttpDriver.php:341
-#: src/Product.php:395
+#: src/Product.php:397
 msgid "Connection"
 msgstr ""
 
@@ -993,72 +1233,72 @@ msgid "No answer"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:179
+#: src/Plugin.php:189
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
 
-#: src/Product.php:356
+#: src/Product.php:358
 msgid "Not a service"
 msgstr ""
 
 #. translators: %s: driver id.
-#: src/Product.php:365
+#: src/Product.php:367
 #, php-format
 msgid "%s (unavailable)"
 msgstr ""
 
-#: src/Product.php:373
+#: src/Product.php:375
 msgid "Service driver"
 msgstr ""
 
-#: src/Product.php:374
+#: src/Product.php:376
 msgid "The product must also be a licensed product. Save to show the driver's plan fields."
 msgstr ""
 
-#: src/Product.php:381
+#: src/Product.php:383
 msgid "— None —"
 msgstr ""
 
 #. translators: %s: connection id.
-#: src/Product.php:389
+#: src/Product.php:391
 #, php-format
 msgid "%s (missing)"
 msgstr ""
 
-#: src/Product.php:396
+#: src/Product.php:398
 msgid "The connection to use (HTTP driver only). Add connections under Settings → Services → Connections."
 msgstr ""
 
-#: src/Product.php:405
+#: src/Product.php:407
 msgid "Retention (days)"
 msgstr ""
 
-#: src/Product.php:406
+#: src/Product.php:408
 msgid "Days to keep the service after its license ends. 0 never deletes. Empty: the default of the service type (virtual machines: 3 days, others: never)."
 msgstr ""
 
-#: src/Product.php:420
+#: src/Product.php:422
 msgid "Trial needs payment"
 msgstr ""
 
-#: src/Product.php:421
+#: src/Product.php:423
 msgid "Ask for a payment method at checkout when the order is a free trial."
 msgstr ""
 
-#: src/Product.php:440
+#: src/Product.php:442
 msgid "No longer a service"
 msgstr ""
 
-#: src/Product.php:441
+#: src/Product.php:443
 msgid "Warning: its licenses will start working in the public license API."
 msgstr ""
 
-#: src/Product.php:584
+#: src/Product.php:586
 msgid "Empty uses the product's setting."
 msgstr ""
 
-#: src/Product.php:592
+#: src/Product.php:594
 msgid "Product setting"
 msgstr ""
 
@@ -1345,15 +1585,6 @@ msgstr ""
 msgid "Client"
 msgstr ""
 
-#: src/Proxmox/ClustersScreen.php:192
-#: src/Proxmox/ClustersScreen.php:274
-msgid "Live"
-msgstr ""
-
-#: src/Proxmox/ClustersScreen.php:192
-msgid "Fake"
-msgstr ""
-
 #: src/Proxmox/ClustersScreen.php:195
 msgid "Delete this cluster?"
 msgstr ""
@@ -1460,10 +1691,6 @@ msgstr ""
 
 #: src/Proxmox/ClustersScreen.php:288
 msgid "Gateway"
-msgstr ""
-
-#: src/Proxmox/ClustersScreen.php:289
-msgid "Name servers"
 msgstr ""
 
 #: src/Proxmox/ClustersScreen.php:289
@@ -1740,7 +1967,9 @@ msgid_plural "daily, kept %d days"
 msgstr[0] ""
 msgstr[1] ""
 
+#. translators: %s: transfer lock state.
 #: src/Proxmox/Panels.php:129
+#: templates/account/domain.php:17
 msgid "off"
 msgstr ""
 
@@ -2054,6 +2283,87 @@ msgstr ""
 msgid "Open Settings → Licenses"
 msgstr ""
 
+#: templates/account/domain.php:8
+msgid "Pointing at our name servers"
+msgstr ""
+
+#: templates/account/domain.php:8
+msgid "Not pointing at our name servers yet"
+msgstr ""
+
+#: templates/account/domain.php:9
+msgid "Copy your DNS records here before changing the name servers at your registrar."
+msgstr ""
+
+#. translators: %s: domain expiry date.
+#: templates/account/domain.php:13
+#, php-format
+msgid "Expires: %s"
+msgstr ""
+
+#. translators: %s: transfer lock state.
+#: templates/account/domain.php:17
+#, php-format
+msgid "Transfer lock: %s"
+msgstr ""
+
+#. translators: %s: transfer lock state.
+#: templates/account/domain.php:17
+msgid "on"
+msgstr ""
+
+#: templates/account/domain.php:20
+msgid "Name servers:"
+msgstr ""
+
+#: templates/account/domain.php:24
+msgid "Name server mode"
+msgstr ""
+
+#: templates/account/domain.php:24
+msgid "Our name servers"
+msgstr ""
+
+#: templates/account/domain.php:24
+msgid "Custom"
+msgstr ""
+
+#: templates/account/domain.php:25
+msgid "Custom name servers, separated by commas"
+msgstr ""
+
+#: templates/account/domain.php:26
+msgid "Save name servers"
+msgstr ""
+
+#: templates/account/domain.php:28
+msgid "Show transfer code"
+msgstr ""
+
+#: templates/account/domain.php:31
+msgid "DNS records"
+msgstr ""
+
+#: templates/account/domain.php:32
+msgid "Name"
+msgstr ""
+
+#: templates/account/domain.php:32
+msgid "Type"
+msgstr ""
+
+#: templates/account/domain.php:32
+msgid "TTL"
+msgstr ""
+
+#: templates/account/domain.php:32
+msgid "Value"
+msgstr ""
+
+#: templates/account/domain.php:37
+msgid "Records as JSON. Saving replaces all customer records."
+msgstr ""
+
 #: templates/account/vm.php:17
 msgid "Running"
 msgstr ""
@@ -2196,6 +2506,27 @@ msgstr ""
 msgid "Your %1$s has been paused for a while and will be deleted with its data on %2$s. Renew your subscription before then to keep it."
 msgstr ""
 
+#. translators: %s: the customer's domain name.
+#: templates/emails/beltoft-services-domain-action-needed.php:8
+#: templates/emails/plain/beltoft-services-domain-action-needed.php:6
+#, php-format
+msgid "Your domain %s is waiting for a confirmation."
+msgstr ""
+
+#: templates/emails/beltoft-services-domain-action-needed.php:10
+#: templates/emails/plain/beltoft-services-domain-action-needed.php:7
+msgid "Please complete the identity check sent by the registry."
+msgstr ""
+
+#: templates/emails/beltoft-services-domain-action-needed.php:10
+#: templates/emails/plain/beltoft-services-domain-action-needed.php:7
+msgid "Please approve the transfer request sent by the registry or current registrar."
+msgstr ""
+
+#: templates/emails/beltoft-services-domain-action-needed.php:11
+msgid "View your domain in your account"
+msgstr ""
+
 #. translators: 1: product name, 2: usage, such as "6 of 5".
 #: templates/emails/beltoft-services-limit-exceeded.php:37
 #: templates/emails/plain/beltoft-services-limit-exceeded.php:36
@@ -2250,4 +2581,8 @@ msgstr ""
 #: templates/emails/plain/beltoft-services-provision-delay.php:35
 #: templates/emails/plain/beltoft-services-ready.php:47
 msgid "View your services in your account:"
+msgstr ""
+
+#: templates/emails/plain/beltoft-services-domain-action-needed.php:8
+msgid "View your domain in your account:"
 msgstr ""

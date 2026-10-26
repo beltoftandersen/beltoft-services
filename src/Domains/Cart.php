@@ -14,6 +14,7 @@ final class Cart {
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'apply_prices' ) );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
+		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
 		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
 	}
 
@@ -32,6 +33,8 @@ final class Cart {
 		}
 		$data = self::line_data( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ) );
 		if ( is_wp_error( $data ) ) { return $data; }
+		// WooCommerce leaves its cart unloaded on custom REST routes.
+		if ( ! WC()->cart && function_exists( 'wc_load_cart' ) ) { wc_load_cart(); }
 		$cart = WC()->cart;
 		if ( ! $cart ) { return new \WP_Error( 'no_cart', __( 'The cart is unavailable.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		foreach ( $cart->get_cart() as $item ) {
@@ -52,6 +55,7 @@ final class Cart {
 		}
 		$key = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
 		if ( ! $key ) { return new \WP_Error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), array( 'status' => 400 ) ); }
+		WC()->session->set_customer_session_cookie( true );
 		return new \WP_REST_Response( array( 'added' => true, 'cart_url' => wc_get_cart_url() ), 201 );
 	}
 
@@ -106,6 +110,15 @@ final class Cart {
 		return isset( $cart_item['beltoft_services_domain'] ) ? '1' : $html;
 	}
 
+	/** Show the exact domain being ordered in cart and checkout summaries. */
+	public static function item_data( array $data, array $cart_item ): array {
+		$domain = $cart_item['beltoft_services_domain'] ?? null;
+		if ( is_array( $domain ) && ! empty( $domain['domain'] ) ) {
+			$data[] = array( 'key' => __( 'Domain', 'beltoft-services' ), 'value' => (string) $domain['domain'] );
+		}
+		return $data;
+	}
+
 	/** Keep each domain on its own subscription, so each gets its own license and renewal date. */
 	public static function recurring_key( string $key, array $cart_item ): string {
 		$domain = (string) ( $cart_item['beltoft_services_domain']['domain'] ?? '' );
@@ -113,7 +126,7 @@ final class Cart {
 	}
 
 	private static function product_for( string $driver ): ?\WC_Product {
-		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 20, 'meta_key' => Product::META_DRIVER, 'meta_value' => $driver ) );
+		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 20, 'meta_key' => Product::META_DRIVER, 'meta_value' => $driver ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Small published service-product catalogue, capped at 20.
 		foreach ( $ids as $id ) {
 			$product = wc_get_product( $id );
 			if ( $product && $product->is_purchasable() ) { return $product; }

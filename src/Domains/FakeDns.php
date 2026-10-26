@@ -26,12 +26,13 @@ class FakeDns implements Dns {
 
 	public function calls(): array { return $this->calls; }
 	public function zone( string $name ): array|\WP_Error|null { $this->load(); return $this->zones[ strtolower( rtrim( $name, '.' ) ) ] ?? null; }
+	public function zones(): array|\WP_Error { $this->load(); return array_values( $this->zones ); }
 	public function create_zone( string $name, array $nameservers ): true|\WP_Error {
 		$this->load();
 		$name = strtolower( rtrim( $name, '.' ) );
 		$this->calls[] = array( 'create_zone', $name, $nameservers );
 		if ( isset( $this->zones[ $name ] ) ) { return new \WP_Error( 'zone_exists', 'Zone already exists.' ); }
-		$this->zones[ $name ] = array( 'name' => $name . '.', 'nameservers' => $nameservers, 'rrsets' => array(), 'secured' => false );
+		$this->zones[ $name ] = array( 'name' => $name . '.', 'nameservers' => $nameservers, 'rrsets' => array(), 'secured' => false, 'serial' => 1 );
 		$this->save();
 		return true;
 	}
@@ -56,6 +57,7 @@ class FakeDns implements Dns {
 			else { $sets[ $key ] = $set; }
 		}
 		$this->zones[ $zone ]['rrsets'] = array_values( $sets );
+		$this->zones[ $zone ]['serial'] = (int) ( $this->zones[ $zone ]['serial'] ?? 1 ) + 1;
 		$this->save();
 		return true;
 	}
