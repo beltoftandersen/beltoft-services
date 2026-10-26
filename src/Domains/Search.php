@@ -71,7 +71,7 @@ final class Search {
 			$full = self::normalise( $label . '.' . $tld );
 			if ( is_wp_error( $full ) ) { continue; }
 			$domains[] = array( 'domain' => $full, 'tld' => $tld );
-			if ( Prices::sellable( $tld ) ) { $check[] = array( 'name' => $label, 'extension' => $tld ); }
+			if ( Prices::sellable( $tld ) && ( 'dk' !== $tld || DkAgreement::ready() ) ) { $check[] = array( 'name' => $label, 'extension' => $tld ); }
 		}
 		if ( ! $domains ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
 		$found = array();
@@ -84,7 +84,7 @@ final class Search {
 		}
 		$results = array();
 		foreach ( $domains as $entry ) {
-			$available = Prices::sellable( $entry['tld'] );
+			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
 			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
 			$results[] = array( 'domain' => $entry['domain'], 'status' => $status, 'price' => 'free' === $status ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status );

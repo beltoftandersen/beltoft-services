@@ -27,4 +27,11 @@ class SearchTest extends TestCase {
 		$this->assertSame( 'premium', $result['results'][0]['status'] );
 		$this->assertNull( $result['results'][0]['price'] );
 	}
+
+	public function test_dk_is_not_offered_until_agreement_approval(): void {
+		update_option( Prices::OPTION, array( 'dk' => array( 'price' => 13, 'restricted' => true ) ) );
+		$this->settings( array( 'domain_featured_tlds' => 'dk' ) );
+		$result = Search::find( 'example.dk' );
+		$this->assertSame( 'not_sold', $result['results'][0]['status'] );
+	}
 }

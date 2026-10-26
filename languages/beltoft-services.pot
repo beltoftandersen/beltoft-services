@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-26T11:53:34+00:00\n"
+"POT-Creation-Date: 2026-10-26T12:12:37+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -549,33 +549,81 @@ msgstr ""
 msgid "Unlock transfer"
 msgstr ""
 
-#: src/Domains/Cart.php:32
+#: src/Domains/Cart.php:34
 msgid "Refresh the page and try again."
 msgstr ""
 
-#: src/Domains/Cart.php:39
+#: src/Domains/Cart.php:41
 msgid "The cart is unavailable."
 msgstr ""
 
-#: src/Domains/Cart.php:42
+#: src/Domains/Cart.php:44
 msgid "This domain is already in your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:47
+#: src/Domains/Cart.php:49
 msgid "This service is not available yet."
 msgstr ""
 
-#: src/Domains/Cart.php:53
+#: src/Domains/Cart.php:55
 msgid "This domain cannot be ordered in that way."
 msgstr ""
 
-#: src/Domains/Cart.php:57
+#: src/Domains/Cart.php:59
 msgid "The domain could not be added to your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:117
+#: src/Domains/Cart.php:68
+#: src/Domains/DkAgreement.php:62
+msgid ".dk orders are not available yet."
+msgstr ""
+
+#: src/Domains/Cart.php:100
+#: src/Domains/Cart.php:110
+msgid "Choose a domain on the domain search page first."
+msgstr ""
+
+#: src/Domains/Cart.php:154
 #: src/Domains/EmailDetails.php:13
 msgid "Domain"
+msgstr ""
+
+#: src/Domains/DkAgreement.php:45
+msgid ".dk registration agreement"
+msgstr ""
+
+#: src/Domains/DkAgreement.php:46
+msgid "Requested domain names"
+msgstr ""
+
+#: src/Domains/DkAgreement.php:47
+msgid "Applicant"
+msgstr ""
+
+#: src/Domains/DkAgreement.php:49
+msgid "For each name above, I apply for a right to use that .dk domain under Punktum dk’s terms. I will keep the registrant details accurate and complete any requested identity check. I understand that the name may be suspended, transferred, blocked or deleted under those terms, and that the agreement has no ordinary withdrawal right. I will pay beltoft.net for the first registration period and for later periods under my chosen management arrangement. Punktum dk handles my personal data under its privacy policy; if I register for a legal entity, its published email address must not contain personal data unless permitted by Punktum dk."
+msgstr ""
+
+#: src/Domains/DkAgreement.php:50
+msgid "Punktum dk terms"
+msgstr ""
+
+#: src/Domains/DkAgreement.php:50
+msgid "Punktum dk privacy policy"
+msgstr ""
+
+#. translators: %s: .dk domain name.
+#: src/Domains/DkAgreement.php:54
+#, php-format
+msgid "I accept the agreement with Punktum dk A/S for %s."
+msgstr ""
+
+#: src/Domains/DkAgreement.php:65
+msgid "Accept the Punktum dk agreement for each .dk domain."
+msgstr ""
+
+#: src/Domains/DkAgreement.php:85
+msgid "Complete the .dk agreement in the website checkout."
 msgstr ""
 
 #: src/Domains/DnsDriver.php:15
@@ -1233,7 +1281,7 @@ msgid "No answer"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:189
+#: src/Plugin.php:190
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""

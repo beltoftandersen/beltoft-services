@@ -228,6 +228,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks and email
 * Public domain search, per-domain cart pricing, customer record and name-server controls, transfer lock and an owner-only transfer-code route.
 * DNSSEC with authoritative name-server readiness checks, paid subscription renewals, daily registrar and delegation sync, low-balance alerts and DNS health checks.
 * Fake registrar and DNS models for staging, a sandbox API mode, domain CLI commands and a pending-action customer email.
+* .dk ordering remains gated until its separate registrant agreement wording is approved and enabled; the prepared classic checkout records acceptance per domain.
 
 = 0.3.1 =
 * The admin is mailed on the first failed backup night (and again after three), not only after three. A failed prune (for example a backup server that refuses deletes) now counts as a failed night and is alerted by the same rule, once per run of failures.

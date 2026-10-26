@@ -33,6 +33,8 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 
 `wp beltoft-services link-domain <license-id> <domain> --registrar-id=<id>` adopts an existing registration without buying it. Add `--dns-only` instead for an existing DNS zone. `wp beltoft-services domain-balance` reads the registrar funds and `wp beltoft-services dns-check` checks the configured authoritative servers. The DNS check reports missing or orphan zones, SOA serial drift and near-expiry RRSIG records. Keep the live constant off during setup and use a fake license for checkout tests.
 
+.dk registration and transfers stay unavailable until the separate Punktum dk checkout agreement has been reviewed and `BELTOFT_SERVICES_DK_AGREEMENT_APPROVED` is explicitly set to `true`. The prepared classic checkout flow displays the applicant and requested names, requires a checkbox for each name, and records the acceptance time and terms version on the order. Store API checkout refuses .dk orders because it does not display that agreement. This constant is independent of the live registrar/DNS constant.
+
 ## Proxmox VE
 
 **Proxmox is production: nothing talks to a real one until you enable it.** Clusters are "fake" (a built-in model of the API) until `define( 'BELTOFT_SERVICES_PROXMOX_LIVE', true );` is in `wp-config.php`, the site tag is set, and the cluster's client is set to "live". No filter or setting replaces the constant. A stored live cluster with no site tag is left alone (jobs wait, one alert a day), never faked.

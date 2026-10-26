@@ -12,6 +12,8 @@ final class Cart {
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'apply_prices' ) );
+		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate_direct_add' ), 20, 6 );
+		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'require_domain_selection' ), 20, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
@@ -63,6 +65,7 @@ final class Cart {
 		$domain = Search::normalise( $domain );
 		if ( is_wp_error( $domain ) ) { return $domain; }
 		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', 'Choose registration, transfer or DNS hosting.' ); }
+		if ( 'dns' !== $mode && str_ends_with( $domain, '.dk' ) && ! DkAgreement::ready() ) { return new \WP_Error( 'dk_pending', __( '.dk orders are not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		$parts = explode( '.', $domain );
 		if ( 'dns' === $mode && count( $parts ) > 2 ) {
 			$table = get_option( Prices::OPTION, array() );
@@ -76,6 +79,40 @@ final class Cart {
 			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', 'Transfer cannot start until secure storage is configured.' ); }
 		}
 		return $data;
+	}
+
+	/** Prevent a direct product add from creating an unprovisionable license. */
+	public static function require_domain_selection( array $data, int $product_id ): array {
+		// Store API invokes this filter before its validation hook. Let that hook return a normal 400 response.
+		if ( method_exists( WC(), 'is_store_api_request' ) && WC()->is_store_api_request() ) { return $data; }
+		self::check_domain_selection( $data, $product_id );
+		return $data;
+	}
+
+	private static function check_domain_selection( array $data, int $product_id ): void {
+		$driver = Product::driver_for( $product_id );
+		if ( ! $driver || ! in_array( $driver->id(), array( 'domain', 'dns' ), true ) ) { return; }
+		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
+			if ( ! empty( $data[ $key ] ) ) { return; }
+		}
+		$chosen = $data['beltoft_services_domain'] ?? null;
+		if ( ! is_array( $chosen ) || empty( $chosen['domain'] ) || is_wp_error( Search::normalise( (string) $chosen['domain'] ) ) || ( ( 'dns' === $driver->id() ) !== ( 'dns' === ( $chosen['mode'] ?? '' ) ) ) ) {
+			throw new \Exception( esc_html__( 'Choose a domain on the domain search page first.', 'beltoft-services' ) );
+		}
+	}
+
+	/** Return a normal cart error for WooCommerce's direct product and Store API routes. */
+	public static function validate_direct_add( bool $valid, int $product_id, $quantity = null, $variation_id = 0, $variation = array(), $data = array() ): bool {
+		if ( ! $valid ) { return false; }
+		$data = is_array( $data ) ? $data : array();
+		$driver = Product::driver_for( $product_id );
+		if ( $driver && in_array( $driver->id(), array( 'domain', 'dns' ), true ) && method_exists( WC(), 'is_store_api_request' ) && WC()->is_store_api_request() && empty( $data['subscription_renewal'] ) && empty( $data['subscription_resubscribe'] ) && empty( $data['subscription_switch'] ) ) {
+			wc_add_notice( __( 'Choose a domain on the domain search page first.', 'beltoft-services' ), 'error' );
+			return false;
+		}
+		try { self::check_domain_selection( $data, $product_id ); }
+		catch ( \Exception $e ) { wc_add_notice( $e->getMessage(), 'error' ); return false; }
+		return true;
 	}
 
 	public static function price_for( array $item ): ?int {
