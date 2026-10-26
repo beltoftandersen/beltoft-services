@@ -10,6 +10,8 @@ namespace BeltoftServices\Cli;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Http\Connections;
+use BeltoftServices\Domains\Clients as DomainClients;
+use BeltoftServices\Domains\Prices as DomainPrices;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
@@ -22,6 +24,29 @@ defined( 'ABSPATH' ) || exit;
  * Manage Beltoft Services from the command line.
  */
 final class Commands {
+
+	/**
+	 * Fetches the registrar TLD table and prints the number saved.
+	 *
+	 * @subcommand domain-prices
+	 */
+	public function domain_prices( array $args, array $assoc_args ): void {
+		$count = DomainPrices::sync();
+		if ( is_wp_error( $count ) ) { \WP_CLI::error( $count->get_error_message() ); }
+		\WP_CLI::success( sprintf( '%d TLD prices saved.', $count ) );
+	}
+
+	/**
+	 * Prints the account balance in the registrar's currency.
+	 *
+	 * @subcommand domain-balance
+	 */
+	public function domain_balance( array $args, array $assoc_args ): void {
+		$result = DomainClients::registrar()->request( 'GET', '/resellers' );
+		if ( is_wp_error( $result ) ) { \WP_CLI::error( $result->get_error_message() ); }
+		if ( ! is_numeric( $result['balance'] ?? null ) ) { \WP_CLI::error( 'Registrar did not return a balance.' ); }
+		\WP_CLI::log( sprintf( 'Balance: %s %s', (string) $result['balance'], (string) ( $result['currency'] ?? 'EUR' ) ) );
+	}
 
 	/**
 	 * Registers the commands when WP-CLI is running.
