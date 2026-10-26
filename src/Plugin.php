@@ -46,6 +46,8 @@ final class Plugin {
 		Http\ConnectionsScreen::register();
 		Proxmox\ProxmoxSettings::register();
 		Domains\DomainSettings::register();
+		Domains\Search::register();
+		Domains\Cart::register();
 		Proxmox\ClustersScreen::register();
 		Checkout::register();
 

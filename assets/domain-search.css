@@ -1,0 +1,5 @@
+.beltoft-domain-search { display: grid; gap: .75rem; max-width: 42rem; }
+.beltoft-domain-search > input { width: 100%; }
+.beltoft-domain-results { display: grid; gap: .5rem; }
+.beltoft-domain-result { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .75rem; border: 1px solid currentColor; border-radius: .25rem; }
+.beltoft-domain-result span { flex: 1 1 12rem; }
