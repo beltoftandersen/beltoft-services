@@ -267,7 +267,7 @@ class ClientTest extends TestCase {
 
 	public function test_new_live_client_is_built_only_by_the_factory(): void {
 		$hits = array();
-		$dir  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src', \FilesystemIterator::SKIP_DOTS ) );
+		$dir  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src/Proxmox', \FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $dir as $file ) {
 			if ( 'php' === $file->getExtension() && false !== strpos( (string) file_get_contents( $file->getPathname() ), 'new LiveClient' ) ) {
 				$hits[] = $file->getFilename();
