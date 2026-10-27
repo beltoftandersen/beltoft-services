@@ -46,6 +46,13 @@
   gap: .5rem;
 }
 
+.beltoft-domain-result__renewal {
+  flex-basis: 100%;
+  font-size: .85em;
+  font-weight: 400;
+  color: #59615c;
+}
+
 .beltoft-domain-result__vat {
   font-size: .85em;
 }

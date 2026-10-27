@@ -97,7 +97,10 @@
       row.appendChild(information);
 
       if (item.price !== null && item.price !== undefined) {
-        row.appendChild(element('div', 'beltoft-domain-result__price', '€' + item.price + ' / year'));
+        const price = element('div', 'beltoft-domain-result__price', '€' + item.price + ' / year');
+        // The renewal price is the same as the first year's; saying so under the price answers the question before it is asked.
+        if (item.status === 'free') price.appendChild(element('span', 'beltoft-domain-result__renewal', 'Renews at €' + item.price + ' / year'));
+        row.appendChild(price);
       }
 
       const actions = document.createElement('div');
