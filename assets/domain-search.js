@@ -115,34 +115,69 @@
       return row;
     }
 
+    // A visible waiting state: a registrar answer can take a few seconds.
+    function loader() {
+      const box = element('div', 'beltoft-domain-loading', '');
+      box.setAttribute('role', 'status');
+      const bar = element('span', 'beltoft-domain-loading__bar', '');
+      bar.setAttribute('aria-hidden', 'true');
+      box.appendChild(bar);
+      box.appendChild(element('span', 'beltoft-domain-loading__text', 'Searching for domains…'));
+      box.appendChild(element('span', 'beltoft-domain-loading__note', 'This takes a few seconds.'));
+      return box;
+    }
+
+    // Draws a search answer; also used to bring back the last search when the page is opened again.
+    function render(data, typed) {
+      results.replaceChildren();
+      if (!data.results.length) {
+        results.textContent = 'No results found.';
+        return;
+      }
+      // An extension we do not sell is noise, unless the customer typed that exact extension.
+      const typedExtension = typed.indexOf('.') > 0;
+      const shown = data.results.filter(function (item, index) { return item.status !== 'not_sold' || (typedExtension && index === 0); });
+      if (shown.some(function (item) { return item.price !== null && item.price !== undefined; })) {
+        results.appendChild(element('p', 'beltoft-domain-note', 'Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.'));
+      }
+      // The first result is what the customer typed (or the first extension): it leads, the rest are alternatives.
+      shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
+    }
+
     async function search() {
-      results.textContent = 'Searching…';
+      results.replaceChildren(loader());
+      results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
       try {
         const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(input.value.trim()), { credentials: 'same-origin' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'The search could not be completed.');
-        results.replaceChildren();
-        if (!data.results.length) {
-          results.textContent = 'No results found.';
-          return;
-        }
-        // An extension we do not sell is noise, unless the customer typed that exact extension.
-        const typedExtension = input.value.trim().indexOf('.') > 0;
-        const shown = data.results.filter(function (item, index) { return item.status !== 'not_sold' || (typedExtension && index === 0); });
-        if (shown.some(function (item) { return item.price !== null && item.price !== undefined; })) {
-          results.appendChild(element('p', 'beltoft-domain-note', 'Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.'));
-        }
-        // The first result is what the customer typed (or the first extension): it leads, the rest are alternatives.
-        shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
+        render(data, input.value.trim());
+        remember(input.value.trim(), data);
       } catch (error) {
         results.textContent = error.message;
       } finally {
+        results.removeAttribute('aria-busy');
         searchButton.disabled = false;
       }
     }
 
+    // The last search is kept for this tab (30 minutes), so going back from checkout shows it again without a new lookup.
+    const STORE = 'beltoftDomainSearch';
+    function remember(typed, data) {
+      try { window.sessionStorage.setItem(STORE, JSON.stringify({ q: typed, data: data, t: Date.now() })); } catch (error) { /* storage can be blocked */ }
+    }
+    function restore() {
+      try {
+        const saved = JSON.parse(window.sessionStorage.getItem(STORE) || 'null');
+        if (!saved || !saved.q || !saved.data || Date.now() - saved.t > 30 * 60 * 1000) return;
+        input.value = saved.q;
+        render(saved.data, saved.q);
+      } catch (error) { /* nothing to restore */ }
+    }
+
     searchButton.addEventListener('click', search);
+    restore();
     input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); search(); } });
   });
 }());

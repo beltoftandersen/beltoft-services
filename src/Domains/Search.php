@@ -97,7 +97,7 @@ final class Search {
 			'dev' => __( 'Websites on this extension need HTTPS.', 'beltoft-services' ),
 			'app' => __( 'Websites on this extension need HTTPS.', 'beltoft-services' ),
 			'eu'  => __( 'The registrant must be in the EU.', 'beltoft-services' ),
-			'dk'  => __( 'A VAT number is needed to register this extension.', 'beltoft-services' ),
+			'dk'  => __( 'A business needs a VAT number to register this extension.', 'beltoft-services' ),
 		) );
 		return (string) ( $notes[ strtolower( ltrim( $tld, '.' ) ) ] ?? '' );
 	}
