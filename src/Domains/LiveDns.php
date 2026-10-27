@@ -68,8 +68,9 @@ class LiveDns implements Dns {
 		$keys = $this->call( 'GET', $this->path( $zone ) . '/cryptokeys' );
 		if ( is_wp_error( $keys ) ) { return $keys; }
 		$result = null;
+		// PowerDNS reports a single combined key as csk; it carries flags 257 like a ksk, which is checked below.
 		foreach ( $keys as $key ) {
-			if ( is_array( $key ) && ! empty( $key['active'] ) && 'ksk' === strtolower( (string) ( $key['keytype'] ?? '' ) ) && ! empty( $key['dnskey'] ) ) { $result = $key; break; }
+			if ( is_array( $key ) && ! empty( $key['active'] ) && in_array( strtolower( (string) ( $key['keytype'] ?? '' ) ), array( 'ksk', 'csk' ), true ) && ! empty( $key['dnskey'] ) ) { $result = $key; break; }
 		}
 		if ( null === $result ) { return new \WP_Error( 'bad_response', 'DNS did not return an active signing key.' ); }
 		$parts = preg_split( '/\s+/', trim( (string) ( $result['dnskey'] ?? '' ) ), 4 );

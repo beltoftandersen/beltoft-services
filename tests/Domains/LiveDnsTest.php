@@ -28,4 +28,28 @@ class LiveDnsTest extends TestCase {
 		} );
 		$this->assertSame( array( array( 'flags' => 257, 'protocol' => 3, 'alg' => 13, 'pub_key' => 'aaaa' ) ), $dns->secure( 'example.com' ) );
 	}
+
+	/** @return array<string, array{0: string, 1: string, 2: bool}> */
+	public static function key_types(): array {
+		return array(
+			'a combined signing key (what PowerDNS reports for one key)' => array( 'csk', '257 3 13 bbbb', true ),
+			'a key signing key' => array( 'ksk', '257 3 13 bbbb', true ),
+			'a zone signing key only' => array( 'zsk', '256 3 13 bbbb', false ),
+		);
+	}
+
+	/** @dataProvider key_types */
+	public function test_secure_accepts_a_combined_or_key_signing_key_but_not_a_zone_signing_key( string $type, string $dnskey, bool $accepted ): void {
+		$dns = new LiveDns( 'http://127.0.0.1:8081', 'secret', true );
+		$this->respond_with( function ( $url, $args ) use ( $type, $dnskey ) {
+			$body = str_ends_with( $url, '/cryptokeys' ) ? array( array( 'dnskey' => $dnskey, 'active' => true, 'keytype' => $type ) ) : array( 'dnssec' => true, 'api_rectify' => true );
+			return array( 'headers' => array(), 'body' => wp_json_encode( $body ), 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array() );
+		} );
+		$result = $dns->secure( 'example.com' );
+		if ( $accepted ) {
+			$this->assertSame( 'bbbb', $result[0]['pub_key'] );
+		} else {
+			$this->assertWPError( $result );
+		}
+	}
 }
