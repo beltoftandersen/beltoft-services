@@ -29,6 +29,7 @@ final class ProxmoxSettings {
 		'task_wait'        => array( 1, 120 ),
 		'abuse_cpu'        => array( 1, 100 ),
 		'abuse_hours'      => array( 1, 168 ),
+		'monitor_disk_percent' => array( 50, 99 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
 	);
 
@@ -230,6 +231,19 @@ final class ProxmoxSettings {
 			'label'   => __( 'for at least this many hours', 'beltoft-services' ),
 			'desc'    => __( 'One reading covers about an hour, so the hours are counted over several hourly readings: with 1 hour the first alert comes with the second reading, with 3 hours after about three.', 'beltoft-services' ),
 		);
+		$fields['monitor_alerts'] = $base + array(
+			'type' => 'select',
+			'default' => 'off',
+			'options' => array( 'off' => __( 'Off', 'beltoft-services' ), 'on' => __( 'On', 'beltoft-services' ) ),
+			'label' => __( 'Customer monitoring emails', 'beltoft-services' ),
+			'desc' => __( 'Email the customer when their server stays down unexpectedly or its disk is nearly full.', 'beltoft-services' ),
+		);
+		$fields['monitor_disk_percent'] = $base + array(
+			'type' => 'number',
+			'default' => 90,
+			'min' => self::RANGES['monitor_disk_percent'][0],
+			'label' => __( 'Disk alert threshold, percent', 'beltoft-services' ),
+		);
 
 		return $fields;
 	}
@@ -253,6 +267,9 @@ final class ProxmoxSettings {
 
 		if ( array_key_exists( 'abuse_mode', $value ) && ! in_array( $value['abuse_mode'], array( 'off', 'report', 'pause' ), true ) ) {
 			$value['abuse_mode'] = 'report';
+		}
+		if ( array_key_exists( 'monitor_alerts', $value ) && ! in_array( $value['monitor_alerts'], array( 'off', 'on' ), true ) ) {
+			$value['monitor_alerts'] = 'off';
 		}
 
 		// Not usable means not set: it is never replaced by a guess.

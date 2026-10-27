@@ -25,6 +25,15 @@ class LiveClient implements Client {
 	use Tasks;
 
 	const TIMEOUT = 30;
+	private int $request_timeout = self::TIMEOUT;
+
+	/** A bounded read for guest-agent calls that must not hold a job for 30 seconds. */
+	public function request_with_timeout( string $method, string $path, array $params, int $seconds ) {
+		$old = $this->request_timeout;
+		$this->request_timeout = max( 1, min( self::TIMEOUT, $seconds ) );
+		try { return $this->request( $method, $path, $params ); }
+		finally { $this->request_timeout = $old; }
+	}
 
 	/**
 	 * Base URL without a trailing slash.
@@ -191,7 +200,7 @@ class LiveClient implements Client {
 		$url     = $this->base . '/api2/json' . $path;
 		$args    = array(
 			'method'      => $method,
-			'timeout'     => self::TIMEOUT,
+			'timeout'     => $this->request_timeout,
 			'redirection' => 0,
 			'sslverify'   => true,
 			'headers'     => array(

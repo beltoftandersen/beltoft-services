@@ -67,6 +67,7 @@ final class Plugin {
 		Api\Routes::register();
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
+		Proxmox\MetricsRoute::register();
 		Proxmox\Switches::register();
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Operations::class, 'on_state_changed' ), 10, 3 );

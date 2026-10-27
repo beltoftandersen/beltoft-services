@@ -419,6 +419,7 @@ final class Actions {
 	private function start( array $record, array $v ): StepResult {
 		if ( 'running' === $v['status'] ) {
 			Operations::remember_power( $this->r->id(), 'running' );
+			$this->r->set( array( 'stopped_by_customer' => null ) );
 
 			return StepResult::done( array(), 'Start: the server was already running' );
 		}
@@ -440,6 +441,7 @@ final class Actions {
 		}
 
 		Operations::remember_power( $this->r->id(), 'running' );
+		$this->r->set( array( 'stopped_by_customer' => null ) );
 
 		return StepResult::done( array(), 'Customer started the server' );
 	}
@@ -454,6 +456,7 @@ final class Actions {
 	private function shutdown( array $record, array $v ): StepResult {
 		if ( 'running' !== $v['status'] ) {
 			Operations::remember_power( $this->r->id(), 'stopped' );
+			$this->r->set( array( 'stopped_by_customer' => time() ) );
 
 			return StepResult::done( array(), 'Shutdown: the server was already off' );
 		}
@@ -475,6 +478,7 @@ final class Actions {
 		}
 
 		Operations::remember_power( $this->r->id(), 'stopped' );
+		$this->r->set( array( 'stopped_by_customer' => time() ) );
 
 		return StepResult::done( array(), 'Customer shut the server down' );
 	}
@@ -491,6 +495,7 @@ final class Actions {
 
 			return StepResult::done( array(), 'Reboot refused: the server is not running' );
 		}
+		$this->r->set( array( 'stopped_by_customer' => time() ) );
 
 		$done = $this->run_task( 'act', 'POST', self::base( $record, $v ) . '/status/reboot', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ), 'reboot' );
 

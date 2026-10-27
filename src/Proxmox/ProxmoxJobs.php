@@ -1,6 +1,6 @@
 <?php
 /**
- * Recurring Proxmox jobs: capacity cache, power state, abuse report, password purge.
+ * Recurring Proxmox jobs: capacity cache, power state, abuse report, disk readings, password purge.
  *
  * @package BeltoftServices
  */
@@ -25,9 +25,10 @@ defined( 'ABSPATH' ) || exit;
  * - capacity, per cluster and hour (and once after a cluster is saved): GET /nodes and GET /cluster/resources?type=vm (two calls);
  * - power, per cluster and 15 minutes: GET /cluster/resources?type=vm (one call for every VM);
  * - abuse, per running VM and hour: GET /nodes/{node}/qemu/{vmid}/rrddata.
+ * - disk, per running VM and six hours: GET /nodes/{node}/qemu/{vmid}/agent/get-fsinfo.
  *
- * Nothing here writes resource meta except under the resource lock (Resource::locked() or
- * Resource::desire()); power state and "high since" live in transients.
+ * Resource meta writes use the resource lock (Resource::locked() or Resource::desire());
+ * power state and abuse "high since" live in transients, while monitoring alert state is meta.
  *
  * CAPACITY FORMULA (user decision D8): a node's cached `mem` is the COMMITTED memory, not the
  * memory in use:
@@ -46,12 +47,15 @@ final class ProxmoxJobs {
 	public const POWER        = 'beltoft_services_proxmox_power';
 	public const ABUSE        = 'beltoft_services_proxmox_abuse';
 	public const ABUSE_BATCH  = 'beltoft_services_proxmox_abuse_batch';
+	public const DISK         = 'beltoft_services_proxmox_disk';
+	public const DISK_BATCH   = 'beltoft_services_proxmox_disk_batch';
 	public const BACKUP       = 'beltoft_services_proxmox_backup';
 	public const BACKUP_NEXT  = 'beltoft_services_proxmox_backup_next';
 	public const BACKUP_RUN   = 'beltoft_services_proxmox_backup_run';
 
 	public const RUNNING_PREFIX = 'beltoft_services_proxmox_running_';
 	public const QUEUE          = 'beltoft_services_proxmox_abuse_queue';
+	public const DISK_QUEUE     = 'beltoft_services_proxmox_disk_queue';
 	public const SINCE_PREFIX   = 'beltoft_services_proxmox_abuse_since_';
 	public const NOTE_PREFIX    = 'beltoft_services_proxmox_abuse_note_';
 	public const PURGE_RAN      = 'beltoft_services_proxmox_purge_ran';
@@ -81,6 +85,7 @@ final class ProxmoxJobs {
 		self::CAPACITY => '0 * * * *',
 		self::POWER    => '*/15 * * * *',
 		self::ABUSE    => '20 * * * *',
+		self::DISK     => '10 */6 * * *',
 		self::BACKUP   => '30 3 * * *',
 	);
 
@@ -98,6 +103,8 @@ final class ProxmoxJobs {
 		add_action( self::POWER, array( __CLASS__, 'power' ) );
 		add_action( self::ABUSE, array( __CLASS__, 'abuse' ) );
 		add_action( self::ABUSE_BATCH, array( __CLASS__, 'abuse_batch' ) );
+		add_action( self::DISK, array( __CLASS__, 'disk' ) );
+		add_action( self::DISK_BATCH, array( __CLASS__, 'disk_batch' ) );
 		add_action( self::BACKUP, array( __CLASS__, 'backup' ) );
 		add_action( self::BACKUP_NEXT, array( __CLASS__, 'backup_next' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
@@ -133,6 +140,7 @@ final class ProxmoxJobs {
 		}
 
 		as_unschedule_all_actions( self::ABUSE_BATCH, array(), Jobs::GROUP );
+		as_unschedule_all_actions( self::DISK_BATCH, array(), Jobs::GROUP );
 		as_unschedule_all_actions( self::BACKUP_NEXT, array(), Jobs::GROUP );
 		as_unschedule_all_actions( self::CAPACITY_NOW, array(), Jobs::GROUP );
 	}
@@ -344,7 +352,7 @@ final class ProxmoxJobs {
 	/**
 	 * Every 15 minutes: one /cluster/resources call per cluster; each of our VMs' power, CPU
 	 * (PVE's fraction, not a percent) and memory go to the status transient, and the running ones
-	 * to a list for the abuse job. Resource meta is not touched, and a resource whose customer
+	 * to a list for the abuse job. Monitoring alert state may be stored under the resource lock; a resource whose customer
 	 * stopped the VM stays as it is. A VM with a lock (an operation is running) is left to that operation.
 	 */
 	public static function power(): void {
@@ -380,6 +388,8 @@ final class ProxmoxJobs {
 					),
 					HOUR_IN_SECONDS
 				);
+				$resource = Resource::find( (int) $ours[ $vmid ] );
+				if ( $resource ) { Monitor::power( $resource, $power ); }
 
 				if ( 'running' === $power ) {
 					$running[] = array(
@@ -392,6 +402,73 @@ final class ProxmoxJobs {
 			}
 
 			set_transient( self::RUNNING_PREFIX . $id, $running, 2 * HOUR_IN_SECONDS );
+		}
+	}
+
+	// -- Guest disk -------------------------------------------------------------------------------
+
+	/** Queue the running VMs from the power sweep for a six-hourly filesystem reading. */
+	public static function disk(): void {
+		if ( Settings::get( 'pause_all' ) ) {
+			return;
+		}
+		$queue = array();
+		foreach ( array_keys( self::clusters() ) as $id ) {
+			$list = get_transient( self::RUNNING_PREFIX . $id );
+			if ( ! is_array( $list ) ) {
+				continue;
+			}
+			foreach ( $list as $item ) {
+				if ( is_array( $item ) && count( $queue ) < self::MAX_VMS ) {
+					$queue[] = $item;
+				}
+			}
+		}
+		as_unschedule_all_actions( self::DISK_BATCH, array(), Jobs::GROUP );
+		if ( array() === $queue ) {
+			delete_transient( self::DISK_QUEUE );
+			return;
+		}
+		set_transient( self::DISK_QUEUE, array( 'items' => $queue, 'cursor' => 0 ), 8 * HOUR_IN_SECONDS );
+		self::disk_batch();
+	}
+
+	/** One batch of 25. Store progress before reads so a timeout cannot repeat a whole batch. */
+	public static function disk_batch(): void {
+		$queue = get_transient( self::DISK_QUEUE );
+		if ( Settings::get( 'pause_all' ) || ! is_array( $queue ) || ! isset( $queue['items'], $queue['cursor'] ) ) {
+			delete_transient( self::DISK_QUEUE );
+			return;
+		}
+		$items = (array) $queue['items'];
+		$cursor = (int) $queue['cursor'];
+		$end = min( count( $items ), $cursor + self::BATCH_SIZE );
+		if ( $end >= count( $items ) ) {
+			delete_transient( self::DISK_QUEUE );
+		} else {
+			$queue['cursor'] = $end;
+			set_transient( self::DISK_QUEUE, $queue, 8 * HOUR_IN_SECONDS );
+			if ( ! as_has_scheduled_action( self::DISK_BATCH, array(), Jobs::GROUP ) ) {
+				as_schedule_single_action( time() + self::BATCH_DELAY, self::DISK_BATCH, array(), Jobs::GROUP );
+			}
+		}
+		for ( $i = $cursor; $i < $end; ++$i ) {
+			$item = $items[ $i ];
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$r = Resource::find( (int) ( $item['resource'] ?? 0 ) );
+			$record = $r ? VmRecords::for_resource( $r->id() ) : null;
+			if ( ! $r || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || null === $record ) {
+				continue;
+			}
+			if ( (string) $record['cluster'] !== (string) ( $item['cluster'] ?? '' ) || (int) $record['vmid'] !== (int) ( $item['vmid'] ?? 0 ) ) {
+				continue;
+			}
+			$disk = GuestDisk::read( $r );
+			if ( null !== $disk ) {
+				Monitor::disk( $r, $disk );
+			}
 		}
 	}
 

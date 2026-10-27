@@ -265,6 +265,15 @@ class ClientTest extends TestCase {
 		$this->assertSame( array(), $this->http_calls(), 'The fake never sends an HTTP request.' );
 	}
 
+	public function test_short_guest_read_restores_the_default_timeout(): void {
+		$client = new LiveClient( array( 'api_url' => self::BASE, 'token_id' => self::TOKEN, 'token_secret' => self::SECRET ), true );
+		$this->respond_with( static fn() => array( 'headers' => array(), 'body' => '{"data":[]}', 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array(), 'filename' => null ) );
+		$client->request_with_timeout( 'GET', '/nodes/pve1/qemu/5000/agent/get-fsinfo', array(), 5 );
+		$client->request( 'GET', '/nodes' );
+		$this->assertSame( 5, $this->http_calls()[0]['args']['timeout'] );
+		$this->assertSame( LiveClient::TIMEOUT, $this->http_calls()[1]['args']['timeout'] );
+	}
+
 	public function test_new_live_client_is_built_only_by_the_factory(): void {
 		$hits = array();
 		$dir  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src/Proxmox', \FilesystemIterator::SKIP_DOTS ) );

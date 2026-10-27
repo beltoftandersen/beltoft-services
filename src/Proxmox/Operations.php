@@ -662,6 +662,23 @@ final class Operations {
 		return $status;
 	}
 
+	/** Read the VM's own usage history after the usual record and ownership checks. */
+	public function series( string $timeframe ): ?array {
+		if ( ! in_array( $timeframe, array( 'hour', 'day', 'month' ), true ) ) {
+			return null;
+		}
+		$record = VmRecords::for_resource( $this->r->id() );
+		if ( null === $record || null !== $this->prepare( $record ) ) {
+			return null;
+		}
+		$verified = Ownership::verify( $this->client, $record, $this->r );
+		if ( is_wp_error( $verified ) ) {
+			return null;
+		}
+		$rows = $this->client->request( 'GET', '/nodes/' . rawurlencode( $verified['node'] ) . '/qemu/' . $record['vmid'] . '/rrddata', array( 'timeframe' => $timeframe, 'cf' => 'AVERAGE' ) );
+		return is_array( $rows ) ? $rows : null;
+	}
+
 	// -- Helpers ---------------------------------------------------------------------------------
 
 	/**

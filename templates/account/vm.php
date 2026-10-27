@@ -50,6 +50,42 @@ $beltoft_services_power_labels = array(
 		<?php endif; ?>
 	</dl>
 
+	<?php if ( $metrics ) : ?>
+		<section class="beltoft-vm-usage" data-vm-metrics>
+			<div class="beltoft-vm-usage__head">
+				<h4><?php esc_html_e( 'Usage', 'beltoft-services' ); ?></h4>
+				<div class="beltoft-vm-usage__ranges" role="group" aria-label="<?php esc_attr_e( 'Time range', 'beltoft-services' ); ?>">
+					<button type="button" data-range="hour" aria-pressed="true"><?php esc_html_e( '1 hour', 'beltoft-services' ); ?></button>
+					<button type="button" data-range="day" aria-pressed="false"><?php esc_html_e( '1 day', 'beltoft-services' ); ?></button>
+					<button type="button" data-range="month" aria-pressed="false"><?php esc_html_e( '30 days', 'beltoft-services' ); ?></button>
+				</div>
+			</div>
+			<p class="beltoft-vm-usage__disk" data-disk-line>
+				<?php if ( is_numeric( $disk_used ) && is_numeric( $disk_total ) && (int) $disk_total > 0 ) : ?>
+					<?php
+					/* translators: 1: used disk space in GB, 2: total disk space in GB. */
+					echo esc_html( sprintf( __( 'Disk used: %1$s of %2$s GB', 'beltoft-services' ), number_format_i18n( (int) $disk_used / 1073741824, 1 ), number_format_i18n( (int) $disk_total / 1073741824, 1 ) ) );
+					?>
+				<?php else : ?>
+					<?php
+					/* translators: %d: the plan's disk size in GB. */
+					echo esc_html( sprintf( __( 'Disk: %d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ) );
+					?>
+				<?php endif; ?>
+			</p>
+			<p class="beltoft-vm-usage__notice" data-metrics-notice role="status" aria-live="polite"><?php esc_html_e( 'Loading usage…', 'beltoft-services' ); ?></p>
+			<div class="beltoft-vm-usage__grid">
+				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ), 'mem' => __( 'Memory', 'beltoft-services' ), 'net' => __( 'Network', 'beltoft-services' ), 'io' => __( 'Disk activity', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
+					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
+						<h5><?php echo esc_html( $beltoft_title ); ?></h5>
+						<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
+						<p class="beltoft-vm-usage__readout" data-readout></p>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		</section>
+	<?php endif; ?>
+
 	<?php if ( $forms && is_array( $backups ) ) : ?>
 		<div class="beltoft-services-vm__backups">
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>

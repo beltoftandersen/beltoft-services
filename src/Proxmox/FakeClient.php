@@ -223,6 +223,15 @@ class FakeClient implements Client {
 		}
 	}
 
+	/** Seed the observed get-fsinfo wrapper for a fake running VM. */
+	public function set_fsinfo( int $vmid, array $reply ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['fsinfo'] = $reply;
+			$this->save();
+		}
+	}
+
 	/**
 	 * A VM as stored, or null.
 	 *
@@ -420,6 +429,7 @@ class FakeClient implements Client {
 			),
 			array( 'POST', $node . '/status/(reboot)$#', 'h_power', array( 'timeout' => array( 'int', false, array( 'min' => 0 ) ) ) ),
 			array( 'GET', $node . '/status/current$#', 'h_status', $none ),
+			array( 'GET', $node . '/agent/get-fsinfo$#', 'h_fsinfo', $none ),
 			array(
 				'DELETE',
 				$node . '$#',
@@ -1101,6 +1111,19 @@ class FakeClient implements Client {
 		$vm = $this->find( $a );
 
 		return is_wp_error( $vm ) ? $vm : (array) ( $vm['rrd'] ?? array() );
+	}
+
+	/** The guest-agent reply is explicitly seeded; otherwise the model says unavailable. */
+	private function h_fsinfo( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+		if ( 'running' !== (string) ( $vm['status'] ?? '' ) || ! isset( $vm['fsinfo'] ) ) {
+			return $this->error( 500, 'QEMU guest agent is not running' );
+		}
+		return $vm['fsinfo'];
 	}
 
 	/**

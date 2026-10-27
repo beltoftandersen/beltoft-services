@@ -52,6 +52,14 @@ class ProxmoxSettingsTest extends TestCase {
 		$this->assertSame( 'report', Settings::get( 'abuse_mode' ) );
 		$this->assertSame( 90, Settings::get( 'abuse_cpu' ) );
 		$this->assertSame( 2, Settings::get( 'abuse_hours' ) );
+		$this->assertSame( 'off', Settings::get( 'monitor_alerts' ) );
+		$this->assertSame( 90, Settings::get( 'monitor_disk_percent' ) );
+	}
+
+	public function test_monitor_threshold_and_switch_are_sanitized(): void {
+		$this->assertSame( 50, ProxmoxSettings::sanitize( array( 'monitor_disk_percent' => 5 ) )['monitor_disk_percent'] );
+		$this->assertSame( 99, ProxmoxSettings::sanitize( array( 'monitor_disk_percent' => 200 ) )['monitor_disk_percent'] );
+		$this->assertSame( 'off', ProxmoxSettings::sanitize( array( 'monitor_alerts' => 'invalid' ) )['monitor_alerts'] );
 	}
 
 	public function test_site_tag_cannot_break_the_ownership_line(): void {

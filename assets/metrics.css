@@ -1,0 +1,20 @@
+.beltoft-vm-usage { margin: 1.5rem 0; padding: 1.25rem 0; border-top: 1px solid #d6d2c8; }
+.beltoft-vm-usage__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.beltoft-vm-usage__head h4 { margin: 0; }
+.beltoft-vm-usage__ranges { display: flex; flex-wrap: wrap; gap: .35rem; }
+.beltoft-vm-usage__ranges button { min-height: 38px; padding: .35rem .7rem; border: 1px solid #b9c2bc; border-radius: 0; background: #fff; color: #102042; cursor: pointer; }
+.beltoft-vm-usage__ranges button[aria-pressed="true"] { border-color: #245642; background: #245642; color: #fff; }
+.beltoft-vm-usage__ranges button:focus-visible { outline: 2px solid #245642; outline-offset: 2px; }
+.beltoft-vm-usage__disk { margin: .75rem 0; }
+.beltoft-vm-usage__notice:empty { display: none; }
+.beltoft-vm-usage__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.beltoft-vm-usage__chart { min-width: 0; padding: 1rem; border: 1px solid #d6d2c8; background: #fff; }
+body.woocommerce-account .beltoft-vm-usage .beltoft-vm-usage__chart h5 { margin: 0 0 .75rem; font-size: 16px; font-weight: 600; line-height: 1.35; }
+.beltoft-vm-usage__plot { width: 100%; height: 160px; }
+.beltoft-vm-usage__plot svg { display: block; width: 100%; height: 100%; }
+.beltoft-vm-usage__baseline { stroke: #d6d2c8; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.beltoft-vm-usage__series { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.beltoft-vm-usage__series--0 { stroke: #245642; }
+.beltoft-vm-usage__series--1 { stroke: #173e71; }
+.beltoft-vm-usage__readout { min-height: 2.5em; margin: .65rem 0 0; font-size: .85rem; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .beltoft-vm-usage__grid { grid-template-columns: 1fr; } .beltoft-vm-usage__plot { height: 120px; } }

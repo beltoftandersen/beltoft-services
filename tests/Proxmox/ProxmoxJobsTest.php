@@ -317,7 +317,7 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertCount( 0, $this->fake->calls() );
 	}
 
-	public function test_power_state_uses_one_call_per_cluster_and_no_meta_write(): void {
+	public function test_power_state_uses_one_call_per_cluster_and_tracks_unexpected_stop(): void {
 		$a = $this->vm( 5000, 'node-a', 'running', 4096, array( 'cpu' => 0.25 ) );
 		$b = $this->vm( 5001, 'node-b', 'stopped' );
 		$c = $this->vm( 5002, 'node-a', 'running', 4096, array( 'lock' => 'clone' ) );
@@ -339,9 +339,11 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( 'stopped', Operations::cached_status( $b->id() )['power'] );
 		$this->assertSame( 'stopped', Operations::cached_status( $c->id() )['power'], 'A VM with a lock is left to its operation.' );
 
-		foreach ( $before as $id => $meta ) {
-			$this->assertSame( $meta, $this->meta( Resource::find( $id ) ), 'No meta write.' );
-		}
+		$this->assertSame( $before[ $a->id() ], $this->meta( Resource::find( $a->id() ) ), 'A running VM needs no meta write.' );
+		$after_stop = $this->meta( Resource::find( $b->id() ) );
+		$this->assertGreaterThan( 0, $after_stop['monitor_down_since'] ?? 0 );
+		unset( $after_stop['monitor_down_since'] );
+		$this->assertSame( $before[ $b->id() ], $after_stop, 'Only the monitoring start time was stored.' );
 
 		$this->assertSame( 'ready', Resource::find( $b->id() )->get( 'state' ), 'A VM the customer stopped stays ready.' );
 		$this->assertSame( 'ready', Resource::find( $b->id() )->get( 'desired' ) );

@@ -1,0 +1,16 @@
+{
+  "result": [
+    {
+      "mountpoint": "/boot/efi",
+      "total-bytes": 129718272,
+      "used-bytes": 9322496,
+      "type": "vfat"
+    },
+    {
+      "mountpoint": "/",
+      "total-bytes": 2790285312,
+      "used-bytes": 884944896,
+      "type": "ext4"
+    }
+  ]
+}

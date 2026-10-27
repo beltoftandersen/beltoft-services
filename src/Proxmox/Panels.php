@@ -38,6 +38,22 @@ final class Panels {
 	 */
 	public static function assets( $parent ): void {
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), BELTOFT_SERVICES_VERSION, true );
+		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
+		wp_enqueue_style( 'beltoft-services-metrics', plugins_url( 'assets/metrics.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.css' ) );
+		wp_localize_script( 'beltoft-services-metrics', 'beltoftServicesMetrics', array( 'strings' => array(
+			'loading' => __( 'Loading usage…', 'beltoft-services' ),
+			'empty' => __( 'No data yet.', 'beltoft-services' ),
+			'unavailable' => __( 'Usage is unavailable. Please try again later.', 'beltoft-services' ),
+			'cpu' => __( 'CPU', 'beltoft-services' ),
+			'memory' => __( 'Used incl. cache', 'beltoft-services' ),
+			'allocated' => __( 'Allocated', 'beltoft-services' ),
+			'in' => __( 'In', 'beltoft-services' ),
+			'out' => __( 'Out', 'beltoft-services' ),
+			'read' => __( 'Read', 'beltoft-services' ),
+			'write' => __( 'Write', 'beltoft-services' ),
+			'graph' => __( 'usage graph', 'beltoft-services' ),
+			'noReading' => __( 'No reading', 'beltoft-services' ),
+		) ) );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesVm',
@@ -79,6 +95,7 @@ final class Panels {
 		$status = Operations::cached_status( $r->id() );
 		$list   = null === $record ? array() : OsField::options_for( $record['cluster'] );
 		$chosen = (int) $r->get( OsField::META );
+		$disk = GuestDisk::cached( $r );
 		$chosen = $chosen > 0 ? $chosen : (int) ( $plan['template'] ?? 0 );
 		// A template that is no longer listed cannot be preselected: the cluster's default is.
 		$select = isset( $list[ $chosen ] ) || null === $record ? $chosen : Clusters::default_template( $record['cluster'] );
@@ -98,6 +115,9 @@ final class Panels {
 			'forms'      => $r->accepts_actions(),
 			'ssh_user'   => Provision::LOGIN_USER,
 			'backups'    => Backups::panel( $r ),
+			'metrics'    => 'ready' === $r->get( 'state' ) && $r->shows_status(),
+			'disk_used'  => $disk['used'] ?? null,
+			'disk_total' => $disk['total'] ?? null,
 		);
 
 		( static function ( array $vars ): void {
@@ -171,6 +191,10 @@ final class Panels {
 			),
 			__( 'Template', 'beltoft-services' )      => (string) ( (int) $r->get( OsField::META ) > 0 ? $r->get( OsField::META ) : ( (array) $r->get( 'plan' ) )['template'] ?? '' ),
 			__( 'Backups', 'beltoft-services' )       => self::backups_line( $r ),
+			__( 'Disk reading', 'beltoft-services' ) => $r->get( 'disk_read_at' ) ? sprintf( '%s / %s bytes at %s', (string) $r->get( 'disk_used' ), (string) $r->get( 'disk_total' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'disk_read_at' ) ) ) : '',
+			__( 'Down since', 'beltoft-services' ) => $r->get( 'monitor_down_since' ) ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_down_since' ) ) : '',
+			__( 'Down alert sent', 'beltoft-services' ) => $r->get( 'monitor_down_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
+			__( 'Disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),
 		);
 

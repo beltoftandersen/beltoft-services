@@ -18,6 +18,9 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\LinkVm;
+use BeltoftServices\Proxmox\Metrics;
+use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -26,6 +29,26 @@ defined( 'ABSPATH' ) || exit;
  * Manage Beltoft Services from the command line.
  */
 final class Commands {
+	/**
+	 * Read shaped VPS metrics for one license; --disk explicitly asks its guest agent.
+	 *
+	 * @subcommand vm-metrics
+	 */
+	public function vm_metrics( array $args, array $assoc_args ): void {
+		$license_id = (int) ( $args[0] ?? 0 );
+		$resource = $license_id > 0 ? Resource::for_license( $license_id ) : null;
+		if ( ! $resource || 'proxmox' !== $resource->get( 'driver' ) ) { \WP_CLI::error( 'Give a VPS license with a live resource.' ); }
+		$range = (string) ( $assoc_args['range'] ?? 'hour' );
+		if ( ! isset( Metrics::RANGES[ $range ] ) ) { \WP_CLI::error( 'Use --range=hour, day or month.' ); }
+		$rows = ( new Operations( $resource ) )->series( $range );
+		if ( null === $rows ) { \WP_CLI::error( 'VM usage could not be read.' ); }
+		$series = Metrics::shape( $rows, $range );
+		\WP_CLI::log( sprintf( 'Range: %s; points: %d; latest: %s', $range, count( $series['points'] ), wp_json_encode( $series['points'] ? end( $series['points'] ) : null ) ) );
+		if ( isset( $assoc_args['disk'] ) ) {
+			$disk = GuestDisk::read( $resource );
+			\WP_CLI::log( 'Disk: ' . wp_json_encode( $disk ) );
+		}
+	}
 
 	/**
 	 * Fetches the registrar TLD table and prints the number saved.

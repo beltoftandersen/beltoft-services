@@ -13,7 +13,8 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.0 or ne
 - A kill switch, and deletion after a retention period (off by default, report only, or on).
 - A Proxmox VE driver (0.2.0): virtual machines cloned from templates, with an IP pool, SSH key or one-time password, an operating system choice, capacity limits, customer actions and abuse, breach and deletion modes. A built-in fake cluster is used until you switch a cluster live.
 - Domain registration, transfer and DNS hosting drivers (0.4.0), with a public search, one domain per subscription, customer DNS records and name servers, DNSSEC, paid renewals and daily health checks.
-- WP-CLI: `wp beltoft-services link-http`, `link-vm`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
+- VPS monitoring (0.5.0): owner-only usage graphs, cached root disk usage, and optional customer emails for unexpected downtime or a nearly full disk.
+- WP-CLI: `wp beltoft-services link-http`, `link-vm`, `vm-metrics`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
 
 ## Setup
 
@@ -76,6 +77,12 @@ Each cluster lists its templates and a default (for example Ubuntu 26.04). A req
 ### Capacity
 
 A node is full when the configured memory of this site's VMs on it (including recorded VMs not yet listed) plus the host reserve ("Memory kept free on each node", default 4 GB) reaches the node's memory. Other machines on the node are covered only by the reserve. Counted hourly, on cluster save and on activation; products show as out of stock when nothing fits (the plugin writes the WooCommerce stock status, only when it changes, and never reopens a product you set out of stock by hand; with no cache the stored status stands and a run is queued). An order that slips through retries, then fails with an admin alert and a "delay" email and notice to the customer.
+
+### Usage graphs and alerts
+
+The customer's VPS panel in My Account shows CPU, memory, network and disk activity for the last hour, day or 30 days. These are read-only VM usage samples, cached for one minute per server and range. When the guest agent reports its root filesystem, the panel also shows used and total disk space; without a reading it shows the plan's disk size. Graphs are included with the VPS product.
+
+Settings → Services → Proxmox has **Customer monitoring emails** (off by default) and a disk-used threshold (90% by default). When enabled, a server that stays stopped unexpectedly for about 30 minutes or whose root filesystem reaches the threshold sends one email per problem. A customer shutdown does not trigger a down email. The disk alert rearms after usage falls five percentage points below the threshold. The existing power sweep reads down state every 15 minutes; a separate disk sweep reads running VMs every six hours. `wp beltoft-services vm-metrics <license-id> [--range=hour|day|month] [--disk]` prints the shaped readings; `--disk` explicitly asks the guest agent.
 
 ### Deletion, abuse and breach
 

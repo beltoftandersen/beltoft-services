@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,10 +21,11 @@ A service product is a licensed product with a service driver. When its license 
 * **An HTTP API driver** that calls your own service with signed requests. Each connection (Settings → Services → Connections) has a base URL, HMAC or static header authentication, an endpoint (method and path) for each operation, a JSON body template, the response field that holds the service's id, optional usage fields, and an optional "Open" link with a short-lived sign-in token. Other plugins can add drivers with the `beltoft_services_drivers` filter.
 * **A Proxmox VE driver (0.2.0)** that sells virtual machines: a VM is cloned from a template, given an address from your IP pool and a login, and started. See the FAQ, starting at "What does the Proxmox driver do?". Version 0.3.0 adds daily backups with a customer restore ("How do backups work?").
 * **Domain and DNS hosting drivers (0.4.0):** domain search, registration and transfer, customer DNS records and name servers, DNSSEC, paid registry renewals, and DNS hosting for a domain registered elsewhere. Fake mode is the default. Live registrar and DNS access require `BELTOFT_SERVICES_DOMAINS_LIVE` in `wp-config.php`.
+* **VPS monitoring (0.5.0):** included usage graphs in My Account, cached root filesystem usage when the guest agent answers, and optional customer alerts for unexpected downtime and a nearly full disk. Customer emails are off by default.
 * **A Service tab on licensed products:** the driver, the connection, the driver's plan fields (for HTTP, a limit and plan attributes; variations can set their own), a retention period, and whether a free trial needs a payment method. A free trial of a service is limited to one per customer (matched by account and billing email), in the classic and the block checkout. Renewals, switches and resubscribes are not affected.
 * **My Account:** each service license shows its service's state and usage, the actions the driver offers, and the Open button. Customers only see and act on their own services.
 * **Admin:** WooCommerce → Services lists every service with its state. Each license screen gets a Service panel with retry, pause, resume, delete (with a typed confirmation), protect, and "Mark deleted" for a service that was removed by hand.
-* **Emails** (WooCommerce → Settings → Emails): service ready, paused, deletion warning, deleted and limit exceeded. Customers are not told about a service they never heard of.
+* **Emails** (WooCommerce → Settings → Emails): service ready, paused, deletion warning, deleted, limit exceeded, and optional server monitoring alerts. Customers are not told about a service they never heard of.
 * **Deletion after a retention period** is off by default. It can also report only, or delete.
 * **Kill switch:** "Pause all driver activity" stops every driver call at once.
 * **WP-CLI:** `wp beltoft-services link-http <license> --remote-id=<id> [--dry-run]` links a license to a service that already exists on the remote side (for a migration), `link-vm` adopts a Proxmox VM, and `link-domain` adopts a domain registration or existing DNS zone. `domain-prices`, `domain-balance` and `dns-check` manage domain pricing and health. `ip-pool-add`, `ip-pool-block`, `ip-pool-release` and `ip-pool-list` manage the address pool, and `status <license>` shows a service.
@@ -217,11 +218,22 @@ Services follow the license status, and Beltoft Licenses checks for expired lice
 
 Nothing is provisioned, paused, resumed or deleted: licenses change without the services following. While it is deactivated, the license keys of service licenses are no longer hidden from the public license API, so a service license key validates like any software license key. Activate the plugin again and run "Check expiry every hour" or the 15-minute sweep to bring services back in line with their licenses.
 
+= How does VPS monitoring work? =
+
+The My Account server panel shows CPU, memory, network and disk activity over the last hour, day or 30 days. Graphs are included with every VPS and use the VM's read-only usage history, cached for one minute. If the guest agent reports the root filesystem, the panel also shows used and total disk space; otherwise it shows the plan's disk size.
+
+In Settings → Services → Proxmox, Customer monitoring emails are off by default. An admin can enable them and choose the disk threshold (90% by default). A server that stays stopped unexpectedly for about 30 minutes, or a root filesystem at or above the threshold, sends one email per problem. A shutdown from My Account does not count as unexpected. The disk alert resets after usage drops five percentage points below the threshold. The existing power job checks every 15 minutes; disk readings run every six hours. The Proxmox role needs `VM.Audit` for usage graphs and `VM.GuestAgent.Audit` for filesystem readings. `wp beltoft-services vm-metrics <license-id> [--range=hour|day|month] [--disk]` prints the latest shaped data; `--disk` is the only option that asks the guest agent.
+
 = Does deleting the plugin delete data? =
 
 The settings, connections, clusters, IP pool, VM records, breach marks and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.5.0 =
+* Added owner-only CPU, memory, network and disk activity graphs for VPS customers, with hour, day and 30-day views.
+* Added cached root filesystem usage from the guest agent, read in six-hour batches without making a guest-agent call during a customer page load.
+* Added optional once-per-problem emails for unexpected downtime and high disk use, with admin settings and a read-only metrics CLI command.
 
 = 0.4.0 =
 * Domain registration and transfer through a guarded registrar client; DNS hosting for domains registered elsewhere, with a separate yearly subscription and license per domain.
