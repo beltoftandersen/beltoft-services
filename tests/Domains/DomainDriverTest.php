@@ -98,6 +98,16 @@ class DomainDriverTest extends TestCase {
 		$this->assertTrue( (bool) $r->get( 'is_locked' ) );
 	}
 
+	public function test_a_refused_order_records_the_registrars_reason_for_staff(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', new \WP_Error( 'op_399', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'Nameserver parent domain is not in your account' ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$result = ( new DomainDriver() )->provision( $this->resource() );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'op_399 (Nameserver parent domain is not in your account)', $result->error() );
+	}
+
 	public function test_incomplete_billing_waits_instead_of_failing(): void {
 		$r = $this->resource();
 		delete_user_meta( (int) $r->license()['user_id'], '_beltoft_services_domain_handle' );

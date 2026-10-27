@@ -72,6 +72,8 @@ class LiveClientTest extends TestCase {
 		$this->assertSame( 'op_920', $error->get_error_code() );
 		$this->assertStringNotContainsString( 'top-secret', $error->get_error_message() );
 		$this->assertStringNotContainsString( 'another-secret', $error->get_error_message() );
+		$this->assertStringNotContainsString( 'top-secret', (string) wp_json_encode( $error->get_error_data() ) );
+		$this->assertSame( 'Your account balance is insufficient [hidden]', $error->get_error_data()['desc'], 'Staff get the registrar\'s explanation; an echoed secret is hidden.' );
 	}
 
 	public function test_token_cache_is_per_mode(): void {

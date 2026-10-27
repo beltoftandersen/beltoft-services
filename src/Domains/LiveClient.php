@@ -87,7 +87,10 @@ class LiveClient implements Client {
 		$decoded = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 ) {
 			$code = is_array( $decoded ) ? (int) ( $decoded['code'] ?? 0 ) : 0;
-			return new \WP_Error( $code > 0 && 401 !== $status ? 'op_' . $code : 'http_' . $status, 'Registrar request failed.', array( 'status' => $status ) );
+			// The registrar's own explanation is kept for staff (it is what says why an order was refused); customers never see it.
+			$desc = is_array( $decoded ) ? mb_substr( sanitize_text_field( (string) ( $decoded['desc'] ?? '' ) ), 0, 200 ) : '';
+			foreach ( array_filter( array( $this->password, preg_replace( '/^Bearer\s+/', '', $authorization ), is_array( $body ) ? (string) ( $body['password'] ?? '' ) : '' ) ) as $secret ) { $desc = str_replace( $secret, '[hidden]', $desc ); }
+			return new \WP_Error( $code > 0 && 401 !== $status ? 'op_' . $code : 'http_' . $status, 'Registrar request failed.', array( 'status' => $status, 'desc' => $desc ) );
 		}
 		if ( ! is_array( $decoded ) || ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
 			return new \WP_Error( 'bad_response', 'Registrar returned an invalid response.' );

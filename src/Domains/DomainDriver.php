@@ -148,8 +148,11 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			return StepResult::retry( 3600, 'Waiting for complete billing details.', array( 'steps' => $steps, 'billing_alerted' => true ) );
 		}
 		if ( 'transport' === $code || 'bad_response' === $code || preg_match( '/^http_5/', $code ) ) { return StepResult::retry( 3600, 'The registrar is temporarily unavailable.', array( 'steps' => $steps ) ); }
-		Alerts::admin( $r, 'Registrar rejected the domain order: ' . $code );
-		return StepResult::fail( 'This domain order needs staff attention.', array( 'steps' => $steps ) );
+		$data = $error->get_error_data();
+		$desc = is_array( $data ) ? (string) ( $data['desc'] ?? '' ) : '';
+		$why  = $code . ( '' !== $desc ? ' (' . $desc . ')' : '' );
+		Alerts::admin( $r, 'Registrar rejected the domain order: ' . $why );
+		return StepResult::fail( 'This domain order needs staff attention. Registrar answer: ' . $why, array( 'steps' => $steps ) );
 	}
 
 	public function pause( Resource $r ): StepResult { return StepResult::done(); }
