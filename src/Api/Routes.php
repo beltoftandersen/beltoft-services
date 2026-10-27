@@ -41,6 +41,11 @@ final class Routes {
 	public const RATE_LIMIT = 10;
 
 	/**
+	 * Arguments kept exactly as sent, because the driver validates them itself.
+	 */
+	private const RAW_ARGS = array( 'records' );
+
+	/**
 	 * Requests per user, route and window for the status route, unless filtered: room for
 	 * the panel's polling (every 10 s) plus a reload or a second tab.
 	 */
@@ -333,9 +338,13 @@ final class Routes {
 		foreach ( is_array( $args ) ? array_slice( $args, 0, 20, true ) : array() as $key => $value ) {
 			$key = sanitize_key( (string) $key );
 
-			if ( '' !== $key && is_scalar( $value ) ) {
-				$clean[ $key ] = sanitize_text_field( (string) $value );
+			if ( '' === $key || ! is_scalar( $value ) ) {
+				continue;
 			}
+
+			// A DNS record list is JSON, checked record by record on the server; the text sanitizer
+			// would change real values (a "<", a "%41", repeated spaces). The size is capped.
+			$clean[ $key ] = in_array( $key, self::RAW_ARGS, true ) ? substr( (string) $value, 0, 200000 ) : sanitize_text_field( (string) $value );
 		}
 
 		return $clean;

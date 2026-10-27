@@ -26,11 +26,21 @@ final class Search {
 	public static function rest_check( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
 		$id = (int) sprintf( '%u', crc32( $ip ) );
-		if ( RateLimit::exceeded( $id, 'domain-search', 30 ) ) {
+		/** Searches allowed per visitor: per minute and per hour. */
+		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
+		$per_hour   = (int) apply_filters( 'beltoft_services_domain_search_hourly_limit', 200 );
+		if ( RateLimit::exceeded( $id, 'domain-search', $per_minute ) || RateLimit::exceeded( $id, 'domain-search-hour', $per_hour, HOUR_IN_SECONDS ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
+		if ( strlen( (string) $request['name'] ) > 253 ) {
+			return new \WP_Error( 'bad_domain', 'A valid domain name is required.', array( 'status' => 400 ) );
+		}
 		$result = self::find( (string) $request['name'] );
-		return is_wp_error( $result ) ? $result : new \WP_REST_Response( $result, 200 );
+		if ( is_wp_error( $result ) ) { return $result; }
+		$response = new \WP_REST_Response( $result, 200 );
+		// Only this browser may keep it, briefly: shared caches must not hold availability.
+		$response->header( 'Cache-Control', 'private, max-age=60' );
+		return $response;
 	}
 
 	/** IDNA and DNS label validation for a full name. */
@@ -47,8 +57,39 @@ final class Search {
 		return $ascii;
 	}
 
+	/**
+	 * The registrar's answer for these names. Availability is cached for a few minutes (prices are
+	 * not: they are read from the price table each time), a lookup that has to reach the registrar
+	 * counts against a site-wide hourly cap, and an order always asks again ($fresh) so a cached
+	 * answer is never what a domain is sold on. Failures are not cached.
+	 *
+	 * @param array<int, array<string, string>> $check Names and extensions.
+	 * @param bool                               $fresh Skip the cache and the cap.
+	 */
+	private static function availability( array $check, bool $fresh ): array|\WP_Error {
+		/** Seconds an availability answer is kept; 0 turns the cache off. */
+		$ttl = (int) apply_filters( 'beltoft_services_domain_search_cache_ttl', 5 * MINUTE_IN_SECONDS );
+		$key = 'beltoft_services_dsearch_' . md5( (string) wp_json_encode( $check ) );
+
+		if ( ! $fresh && $ttl > 0 ) {
+			$cached = get_transient( $key );
+			if ( is_array( $cached ) ) { return $cached; }
+		}
+
+		/** Registrar lookups allowed per hour for the whole site; 0 means no cap. */
+		$cap = (int) apply_filters( 'beltoft_services_domain_lookup_limit', 600 );
+		if ( ! $fresh && RateLimit::exceeded( 0, 'domain-registrar-lookups', $cap, HOUR_IN_SECONDS ) ) {
+			return new \WP_Error( 'search_busy', __( 'Domain search is busy. Please try again in a few minutes.', 'beltoft-services' ), array( 'status' => 429 ) );
+		}
+
+		$reply = Clients::registrar()->request( 'POST', '/domains/check', array( 'domains' => $check, 'with_price' => false ) );
+		if ( ! is_wp_error( $reply ) && $ttl > 0 ) { set_transient( $key, $reply, $ttl ); }
+
+		return $reply;
+	}
+
 	/** @return array|\WP_Error */
-	public static function find( string $input ): array|\WP_Error {
+	public static function find( string $input, bool $fresh = false ): array|\WP_Error {
 		$input = trim( $input );
 		$featured = Settings::get( 'domain_featured_tlds' );
 		$featured = is_string( $featured ) ? $featured : 'com,net,org,eu';
@@ -76,7 +117,7 @@ final class Search {
 		if ( ! $domains ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
 		$found = array();
 		if ( $check ) {
-			$reply = Clients::registrar()->request( 'POST', '/domains/check', array( 'domains' => $check, 'with_price' => false ) );
+			$reply = self::availability( $check, $fresh );
 			if ( is_wp_error( $reply ) ) { return $reply; }
 			foreach ( (array) ( $reply['results'] ?? array() ) as $item ) {
 				if ( is_array( $item ) && isset( $item['domain'] ) ) { $found[ strtolower( (string) $item['domain'] ) ] = $item; }

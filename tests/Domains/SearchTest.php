@@ -18,6 +18,94 @@ class SearchTest extends TestCase {
 		}
 	}
 
+	/** A fake registrar that answers one lookup for each name, in the order they will be asked. */
+	private function client( array $names ): FakeClient {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$fake = new FakeClient();
+		foreach ( $names as $name ) {
+			$fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => $name . '.com', 'status' => 'free', 'is_premium' => false ) ) ) );
+		}
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		return $fake;
+	}
+
+	private function unique( string $prefix ): string {
+		return $prefix . '-' . strtolower( wp_generate_password( 8, false, false ) );
+	}
+
+	private function lookups( FakeClient $fake ): int {
+		return count( array_filter( $fake->calls(), static fn( $c ) => '/domains/check' === $c['path'] ) );
+	}
+
+	public function test_availability_is_cached_but_the_price_is_always_current(): void {
+		$name = $this->unique( 'cache' );
+		$fake = $this->client( array( $name ) );
+
+		$first = Search::find( $name . '.com' );
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 19, 'restricted' => false ) ) );
+		$second = Search::find( $name . '.com' );
+
+		$this->assertSame( 1, $this->lookups( $fake ), 'The second search is answered from the cache.' );
+		$this->assertSame( 14, $first['results'][0]['price'] );
+		$this->assertSame( 19, $second['results'][0]['price'], 'A price change shows at once.' );
+	}
+
+	public function test_an_order_asks_the_registrar_again(): void {
+		$name = $this->unique( 'fresh' );
+		$fake = $this->client( array( $name, $name ) );
+
+		Search::find( $name . '.com' );
+		Search::find( $name . '.com', true );
+
+		$this->assertSame( 2, $this->lookups( $fake ), 'A cached answer is never what a domain is sold on.' );
+	}
+
+	public function test_a_failed_lookup_is_not_cached(): void {
+		$name = $this->unique( 'fail' );
+		$fake = new FakeClient();
+		$fake->reply( 'POST', '/domains/check', new \WP_Error( 'transport', 'down' ) );
+		$fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => $name . '.com', 'status' => 'free' ) ) ) );
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+
+		$this->assertWPError( Search::find( $name . '.com' ) );
+		$this->assertIsArray( Search::find( $name . '.com' ), 'The next try reaches the registrar again.' );
+	}
+
+	public function test_registrar_lookups_have_a_site_wide_hourly_cap_that_cached_answers_do_not_use(): void {
+		list( $a, $b, $c, $d ) = array( $this->unique( 'capa' ), $this->unique( 'capb' ), $this->unique( 'capc' ), $this->unique( 'capd' ) );
+		$fake = $this->client( array( $a, $b, $d ) );
+		add_filter( 'beltoft_services_domain_lookup_limit', static fn() => 2 );
+
+		$this->assertIsArray( Search::find( $a . '.com' ) );
+		$this->assertIsArray( Search::find( $b . '.com' ) );
+		$busy = Search::find( $c . '.com' );
+
+		$this->assertWPError( $busy );
+		$this->assertSame( 'search_busy', $busy->get_error_code() );
+		$this->assertIsArray( Search::find( $a . '.com' ), 'A cached search still works while the cap is reached.' );
+		$this->assertIsArray( Search::find( $d . '.com', true ), 'An order is never refused by the cap.' );
+		$this->assertSame( 3, $this->lookups( $fake ), 'The refused and the cached searches made no registrar call.' );
+	}
+
+	public function test_a_visitor_is_limited_per_minute_and_the_answer_is_kept_privately(): void {
+		$name = $this->unique( 'limit' );
+		$this->client( array( $name ) );
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.' . wp_rand( 1, 250 );
+		add_filter( 'beltoft_services_domain_search_limit', static fn() => 2 );
+		$request = static function ( string $name ): \WP_REST_Request { $r = new \WP_REST_Request( 'GET', '/beltoft-services/v1/domains/check' ); $r->set_param( 'name', $name ); return $r; };
+
+		$ok = Search::rest_check( $request( $name ) );
+		$this->assertInstanceOf( \WP_REST_Response::class, $ok );
+		$this->assertSame( 'private, max-age=60', $ok->get_headers()['Cache-Control'] );
+		Search::rest_check( $request( $name ) );
+		$third = Search::rest_check( $request( $name ) );
+
+		$this->assertWPError( $third );
+		$this->assertSame( 429, $third->get_error_data()['status'] );
+		$this->assertWPError( Search::rest_check( $request( str_repeat( 'a', 300 ) ) ) );
+	}
+
 	public function test_premium_shown_as_premium_not_sellable(): void {
 		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
 		$fake = new FakeClient();

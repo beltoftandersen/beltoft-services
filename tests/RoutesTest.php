@@ -170,6 +170,17 @@ final class RoutesTest extends TestCase {
 		$this->assertContains( 'act', array_column( $driver->calls(), 'op' ), 'The driver did the action.' );
 	}
 
+	public function test_a_dns_record_list_reaches_the_job_exactly_as_typed(): void {
+		list( $resource, , $user ) = $this->resource();
+		$json = '[{"name":"@","type":"TXT","value":"v=DKIM1; p=a<b %41  c"}]';
+
+		$this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user, array( 'args' => array( 'records' => $json, 'note' => 'x<b>y</b> ' ) ) );
+
+		$job = array_values( $this->queued( Jobs::ACT ) )[0]->get_args();
+		$this->assertSame( $json, $job[2]['records'], 'The text sanitizer would have changed the "<", the "%41" and the double space.' );
+		$this->assertSame( 'xy', $job[2]['note'], 'Everything else is still sanitized.' );
+	}
+
 	public function test_visitors_get_401(): void {
 		list( $resource ) = $this->resource();
 

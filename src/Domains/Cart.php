@@ -33,6 +33,10 @@ final class Cart {
 		if ( ! wp_verify_nonce( (string) $request->get_header( 'X-WC-Nonce' ), 'wc_store_api' ) ) {
 			return new \WP_Error( 'bad_nonce', __( 'Refresh the page and try again.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
+		if ( \BeltoftServices\RateLimit::exceeded( (int) sprintf( '%u', crc32( $ip ) ), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
+			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
+		}
 		$data = self::line_data( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ) );
 		if ( is_wp_error( $data ) ) { return $data; }
 		// WooCommerce leaves its cart unloaded on custom REST routes.
@@ -48,7 +52,7 @@ final class Cart {
 		$product = self::product_for( 'dns' === $mode ? 'dns' : 'domain' );
 		if ( ! $product ) { return new \WP_Error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		if ( 'register' === $mode || 'transfer' === $mode ) {
-			$search = Search::find( $data['beltoft_services_domain']['domain'] );
+			$search = Search::find( $data['beltoft_services_domain']['domain'], true );
 			if ( is_wp_error( $search ) ) { return $search; }
 			$status = $search['results'][0]['status'] ?? 'not_sold';
 			if ( ( 'register' === $mode && 'free' !== $status ) || ( 'transfer' === $mode && 'taken' !== $status ) ) {
