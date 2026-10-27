@@ -191,8 +191,23 @@
   });
 }());
 
-// Back from checkout or a login restores this page from the browser cache with stale nonces: load it fresh.
-window.addEventListener('pageshow', function (event) { if (event.persisted) { window.location.reload(); } });
+// Back from checkout or a login restores this page from the browser cache, with the nonces it had
+// then (the visitor may have logged in since): take fresh ones from the page, without a reload.
+window.addEventListener('pageshow', function (event) {
+  if (!event.persisted) return;
+  fetch(window.location.href, { credentials: 'same-origin', cache: 'reload' })
+    .then(function (response) { return response.text(); })
+    .then(function (html) {
+      const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.beltoft-domain-search');
+      if (!fresh) return;
+      document.querySelectorAll('.beltoft-domain-search').forEach(function (root) {
+        root.dataset.nonce = fresh.dataset.nonce;
+        root.dataset.restNonce = fresh.dataset.restNonce;
+      });
+    })
+    .catch(function () { /* the add reports its own error */ });
+});
+
 // The browser keeps a snapshot of the page when it is left: make it a clean one, not the waiting state.
 window.addEventListener('pagehide', function () {
   document.querySelectorAll('.beltoft-domain-action.is-working').forEach(function (button) {
