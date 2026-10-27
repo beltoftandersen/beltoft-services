@@ -181,3 +181,6 @@
     input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); search(); } });
   });
 }());
+
+// Back from checkout or a login restores this page from the browser cache with stale nonces: load it fresh.
+window.addEventListener('pageshow', function (event) { if (event.persisted) { window.location.reload(); } });
