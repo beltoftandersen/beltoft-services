@@ -34,6 +34,7 @@
 
     // The same moving bar as the search, on the button that was clicked: the page goes on to the checkout when the add is done.
     function working(button, on, text) {
+      if (on) button.dataset.label = button.textContent;
       button.disabled = on;
       button.classList.toggle('is-working', on);
       button.textContent = text;
@@ -192,3 +193,11 @@
 
 // Back from checkout or a login restores this page from the browser cache with stale nonces: load it fresh.
 window.addEventListener('pageshow', function (event) { if (event.persisted) { window.location.reload(); } });
+// The browser keeps a snapshot of the page when it is left: make it a clean one, not the waiting state.
+window.addEventListener('pagehide', function () {
+  document.querySelectorAll('.beltoft-domain-action.is-working').forEach(function (button) {
+    button.disabled = false;
+    button.classList.remove('is-working');
+    button.textContent = button.dataset.label || button.textContent;
+  });
+});
