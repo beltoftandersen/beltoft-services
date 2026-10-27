@@ -127,6 +127,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			$steps[] = 'dates';
 			if ( ! $r->set( array_merge( $dates->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'Billing dates could not be saved.' ); }
 		}
+		if ( 'register' === $mode && ! in_array( 'lock', $steps, true ) ) {
+			// A new domain starts locked against transfer, as at other registrars; a refusal must not fail a finished order.
+			$locked = Clients::registrar()->request( 'PUT', '/domains/' . $r->get( 'remote_id' ), array( 'is_locked' => true ) );
+			$steps[] = 'lock';
+			if ( ! $r->set( array( 'steps' => $steps, 'is_locked' => ! is_wp_error( $locked ) ) ) ) { return StepResult::retry( 3600, 'Transfer lock could not be saved.' ); }
+		}
 		return StepResult::done( array( 'steps' => $steps, 'remote_id' => $r->get( 'remote_id' ), 'expires_at' => $r->get( 'expires_at' ) ), 'Domain active' );
 	}
 

@@ -79,6 +79,25 @@ class DomainDriverTest extends TestCase {
 		$this->assertSame( 3600, $result->delay() );
 	}
 
+	public function test_new_registration_is_locked_against_transfer(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource();
+
+		$this->assertTrue( ( new DomainDriver() )->provision( $r )->is_done() );
+
+		$locks = array_filter( $fake->calls(), static fn( $c ) => 'PUT' === $c['method'] && ! empty( $c['body']['is_locked'] ) );
+		$this->assertCount( 1, $locks, 'The domain is locked once, after it is active.' );
+		$this->assertTrue( (bool) $r->get( 'is_locked' ) );
+	}
+
 	public function test_incomplete_billing_waits_instead_of_failing(): void {
 		$r = $this->resource();
 		delete_user_meta( (int) $r->license()['user_id'], '_beltoft_services_domain_handle' );

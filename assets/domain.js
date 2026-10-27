@@ -146,6 +146,9 @@
 		new FormData( form ).forEach( function ( value, key ) { args[ key ] = String( value ); } );
 		var button = form.querySelector( 'button[type=submit]' );
 		button.disabled = true;
+		if ( 'unlock' === form.dataset.domainAction ) {
+			try { window.sessionStorage.setItem( 'beltoftShowCode', panel.dataset.domainResource ); } catch ( e ) {}
+		}
 		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form ); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
 	} );
 	document.addEventListener( 'click', function ( event ) {
@@ -158,4 +161,12 @@
 			button.disabled = false;
 		} ).catch( function ( error ) { window.alert( error.message ); button.disabled = false; } );
 	} );
+	// After unlocking, the transfer code is what the customer came for: show it once the page is back.
+	( function () {
+		var id = null;
+		try { id = window.sessionStorage.getItem( 'beltoftShowCode' ); window.sessionStorage.removeItem( 'beltoftShowCode' ); } catch ( e ) {}
+		var panel = id ? document.querySelector( '[data-domain-resource="' + id + '"]' ) : null;
+		var show = panel ? panel.querySelector( '.beltoft-services-domain-auth' ) : null;
+		if ( show ) { show.click(); }
+	}() );
 }() );

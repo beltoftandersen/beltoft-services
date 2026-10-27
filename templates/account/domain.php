@@ -21,21 +21,11 @@ if ( $beltoft_time ) {
 		<p class="beltoft-services-domain__note"><?php echo esc_html( 'ours' === $r->get( 'delegation' ) ? __( 'Pointing at our name servers', 'beltoft-services' ) : __( 'Not pointing at our name servers yet', 'beltoft-services' ) ); ?></p>
 		<p class="beltoft-services-domain__note"><?php esc_html_e( 'Copy your DNS records here before changing the name servers at your registrar.', 'beltoft-services' ); ?></p>
 	<?php else : ?>
-		<dl class="beltoft-services-domain__facts">
-			<?php if ( '' !== $beltoft_expires ) : ?>
+		<?php if ( '' !== $beltoft_expires ) : ?>
+			<dl class="beltoft-services-domain__facts">
 				<div><dt><?php esc_html_e( 'Expires', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $beltoft_expires ); ?></dd></div>
-			<?php endif; ?>
-			<div>
-				<dt><?php esc_html_e( 'Transfer lock', 'beltoft-services' ); ?></dt>
-				<dd>
-					<span><?php echo esc_html( $beltoft_locked ? __( 'On', 'beltoft-services' ) : __( 'Off', 'beltoft-services' ) ); ?></span>
-					<?php if ( $beltoft_can ) : ?>
-						<form class="beltoft-services-domain-form" data-domain-action="<?php echo esc_attr( $beltoft_locked ? 'unlock' : 'lock' ); ?>"><button type="submit" class="beltoft-services-domain__link"><?php echo esc_html( $beltoft_locked ? __( 'Unlock transfer', 'beltoft-services' ) : __( 'Lock transfer', 'beltoft-services' ) ); ?></button></form>
-						<button type="button" class="beltoft-services-domain__link beltoft-services-domain-auth"><?php esc_html_e( 'Show transfer code', 'beltoft-services' ); ?></button><output class="beltoft-services-domain-code"></output>
-					<?php endif; ?>
-				</dd>
-			</div>
-		</dl>
+			</dl>
+		<?php endif; ?>
 	<?php endif; ?>
 
 	<section class="beltoft-services-domain__section">
@@ -78,6 +68,22 @@ if ( $beltoft_time ) {
 					<button type="submit" class="button"><?php esc_html_e( 'Save DNS records', 'beltoft-services' ); ?></button>
 				</div>
 			</form>
+		</section>
+	<?php endif; ?>
+
+	<?php if ( $beltoft_can && ! $dns_only ) : ?>
+		<section class="beltoft-services-domain__section">
+			<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'Transfer to another registrar', 'beltoft-services' ); ?></h4>
+			<p class="beltoft-services-domain__note"><?php echo esc_html( $beltoft_locked ? __( 'Your domain is locked, so it cannot be moved to another registrar.', 'beltoft-services' ) : __( 'Your domain is unlocked. Enter the transfer code at your new registrar.', 'beltoft-services' ) ); ?></p>
+			<div class="beltoft-services-domain__actions">
+				<?php if ( $beltoft_locked ) : ?>
+					<form class="beltoft-services-domain-form" data-domain-action="unlock"><button type="submit" class="button"><?php esc_html_e( 'Unlock and show transfer code', 'beltoft-services' ); ?></button></form>
+				<?php else : ?>
+					<button type="button" class="button beltoft-services-domain-auth"><?php esc_html_e( 'Show transfer code', 'beltoft-services' ); ?></button>
+					<form class="beltoft-services-domain-form" data-domain-action="lock"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Lock again', 'beltoft-services' ); ?></button></form>
+				<?php endif; ?>
+			</div>
+			<output class="beltoft-services-domain-code"></output>
 		</section>
 	<?php endif; ?>
 </div>
