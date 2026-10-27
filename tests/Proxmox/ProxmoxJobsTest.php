@@ -206,6 +206,7 @@ class ProxmoxJobsTest extends TestCase {
 	}
 
 	public function test_capacity_cached_and_no_call_on_page_requests(): void {
+		add_filter( 'beltoft_services_disk_capacity_enabled', '__return_true' );
 		$this->vm( 5000, 'node-a', 'running', 8192 );
 		$this->vm( 5001, 'node-a', 'stopped', 4096 ); // A stopped VM still holds its memory.
 		$this->fake->add_vm( array( 'vmid' => 700, 'node' => 'node-a', 'status' => 'running', 'config' => array( 'memory' => 16384 ) ) ); // Not ours.

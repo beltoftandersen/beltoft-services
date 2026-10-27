@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.5.0
+Stable tag: 0.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,7 +22,7 @@ A service product is a licensed product with a service driver. When its license 
 * **A Proxmox VE driver (0.2.0)** that sells virtual machines: a VM is cloned from a template, given an address from your IP pool and a login, and started. See the FAQ, starting at "What does the Proxmox driver do?". Version 0.3.0 adds daily backups with a customer restore ("How do backups work?").
 * **Domain and DNS hosting drivers (0.4.0):** domain search, registration and transfer, customer DNS records and name servers, DNSSEC, paid registry renewals, and DNS hosting for a domain registered elsewhere. Fake mode is the default. Live registrar and DNS access require `BELTOFT_SERVICES_DOMAINS_LIVE` in `wp-config.php`.
 * **VPS monitoring (0.5.0):** included usage graphs in My Account, cached root filesystem usage when the guest agent answers, and optional customer alerts for unexpected downtime and a nearly full disk. Customer emails are off by default.
-* **Extra disks (0.6.0, in preparation):** a separate variable subscription, license and resource per disk, offered with a new server at classic checkout or from My Account. A disk can grow but cannot shrink. Live Proxmox behavior requires a disposable VM check before sales are enabled.
+* **Extra disks (0.6.0):** a separate variable subscription, license and resource per disk, offered with a new server at classic checkout or from My Account. A disk can grow but cannot shrink. Live Proxmox behavior requires a disposable VM check before sales are enabled.
 * **A Service tab on licensed products:** the driver, the connection, the driver's plan fields (for HTTP, a limit and plan attributes; variations can set their own), a retention period, and whether a free trial needs a payment method. A free trial of a service is limited to one per customer (matched by account and billing email), in the classic and the block checkout. Renewals, switches and resubscribes are not affected.
 * **My Account:** each service license shows its service's state and usage, the actions the driver offers, and the Open button. Customers only see and act on their own services.
 * **Admin:** WooCommerce → Services lists every service with its state. Each license screen gets a Service panel with retry, pause, resume, delete (with a typed confirmation), protect, and "Mark deleted" for a service that was removed by hand.
@@ -231,6 +231,14 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.6.0 =
+* My Account has separate Domains and VPS tabs (Beltoft Licenses 0.8.0 or newer); the Licenses tab keeps the plugin keys, and empty tabs are hidden.
+* Domains: the card heading is the domain name; name servers, an always-open DNS records table editor, and one Transfer section (new domains start locked; unlock shows the transfer code in a read-only field with a Copy button). Actions show Updating and finish in seconds instead of waiting for the cron.
+* Domain and server carts require the full billing details at checkout; an incomplete domain order waits and alerts the admin instead of failing. The setup-delay email now also covers domains and DNS hosting.
+* Domain search caches availability for five minutes, caps registrar lookups per hour, and limits each visitor; an order always checks again.
+* Hardening: DNS records refuse control characters and over-long names, record lists are size capped, and assets are versioned by file time.
+* Extra disks are included but inactive: the storage reading on the cluster is only taken once a disk product exists (filter beltoft_services_disk_capacity_enabled).
 
 = 0.5.0 =
 * Added owner-only CPU, memory, network and disk activity graphs for VPS customers, with hour, day and 30-day views.

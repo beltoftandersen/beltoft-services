@@ -14,7 +14,7 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or ne
 - A Proxmox VE driver (0.2.0): virtual machines cloned from templates, with an IP pool, SSH key or one-time password, an operating system choice, capacity limits, customer actions and abuse, breach and deletion modes. A built-in fake cluster is used until you switch a cluster live.
 - Domain registration, transfer and DNS hosting drivers (0.4.0), with a public search, one domain per subscription, customer DNS records and name servers, DNSSEC, paid renewals and daily health checks.
 - VPS monitoring (0.5.0): owner-only usage graphs, cached root disk usage, and optional customer emails for unexpected downtime or a nearly full disk.
-- Extra disks (0.6.0, in preparation): one variable subscription variation per size, with one license and resource per disk. The live Proxmox allocation and removal sequence still requires the test-VM checks in the internal release plan.
+- Extra disks (0.6.0, inactive until a disk product exists): one variable subscription variation per size, with one license and resource per disk. The live Proxmox allocation and removal sequence still requires the test-VM checks in the internal release plan.
 - WP-CLI: `wp beltoft-services link-http`, `link-vm`, `vm-metrics`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
 
 ## Setup

@@ -46,4 +46,16 @@ class DiskCapacityTest extends BackupTestCase {
 		$this->settings( array( 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
 		$this->assertFalse( Stock::available( $product ) );
 	}
+
+	public function test_storage_is_only_read_when_a_disk_product_exists(): void {
+		delete_transient( 'beltoft_services_disk_products' );
+		$this->assertFalse( \BeltoftServices\Proxmox\DiskCapacity::wanted(), 'No disk product: no extra call to the cluster.' );
+
+		$this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ) );
+		delete_transient( 'beltoft_services_disk_products' );
+		$this->assertTrue( \BeltoftServices\Proxmox\DiskCapacity::wanted() );
+
+		add_filter( 'beltoft_services_disk_capacity_enabled', '__return_false' );
+		$this->assertFalse( \BeltoftServices\Proxmox\DiskCapacity::wanted(), 'The filter can switch it off.' );
+	}
 }

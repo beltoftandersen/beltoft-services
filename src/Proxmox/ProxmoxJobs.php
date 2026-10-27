@@ -342,7 +342,7 @@ final class ProxmoxJobs {
 		);
 
 		$cluster = Clusters::get( $id );
-		if ( $cluster && ! empty( $cluster['storage'] ) ) {
+		if ( $cluster && ! empty( $cluster['storage'] ) && DiskCapacity::wanted() ) {
 			foreach ( $nodes as $node ) {
 				if ( is_array( $node ) && 'online' === ( $node['status'] ?? '' ) && ! empty( $node['node'] ) ) {
 					DiskCapacity::refresh( $id, (string) $node['node'], (string) $cluster['storage'], $client );

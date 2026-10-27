@@ -17,6 +17,21 @@ final class DiskCapacity {
 		return self::PREFIX . md5( $cluster . '|' . $node . '|' . $storage );
 	}
 
+	/**
+	 * Is there a disk product? The storage reading is only taken for them, so a site that sells
+	 * no extra disks makes no extra call to its cluster. The filter forces it on or off.
+	 */
+	public static function wanted(): bool {
+		$found = get_transient( 'beltoft_services_disk_products' );
+		if ( false === $found ) {
+			$ids   = get_posts( array( 'post_type' => 'product', 'post_status' => array( 'publish', 'private' ), 'meta_key' => \BeltoftServices\Product::META_DRIVER, 'meta_value' => 'proxmox-disk', 'fields' => 'ids', 'numberposts' => 1 ) ); // phpcs:ignore WordPress.DB.SlowDBQuery -- one row, once every ten minutes.
+			$found = $ids ? 'yes' : 'no';
+			set_transient( 'beltoft_services_disk_products', $found, 10 * MINUTE_IN_SECONDS );
+		}
+
+		return (bool) apply_filters( 'beltoft_services_disk_capacity_enabled', 'yes' === $found );
+	}
+
 	/** Store only a real storage-status reply. */
 	public static function refresh( string $cluster, string $node, string $storage, Client $client ): bool {
 		$reply = $client->request( 'GET', '/nodes/' . rawurlencode( $node ) . '/storage/' . rawurlencode( $storage ) . '/status' );
