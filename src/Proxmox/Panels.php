@@ -37,7 +37,7 @@ final class Panels {
 	 * @param mixed $parent Handle of the generic panel script.
 	 */
 	public static function assets( $parent ): void {
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), BELTOFT_SERVICES_VERSION, true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
 		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
 		wp_enqueue_style( 'beltoft-services-metrics', plugins_url( 'assets/metrics.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.css' ) );
 		wp_localize_script( 'beltoft-services-metrics', 'beltoftServicesMetrics', array( 'strings' => array(

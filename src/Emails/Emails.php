@@ -160,9 +160,9 @@ final class Emails {
 	}
 
 	/**
-	 * Did setting the service up fail so that the customer is told of a delay? Only a server
-	 * (a driver of kind vm) whose provision ended failed; a failed pause or deletion is not the
-	 * customer's business.
+	 * Did setting the service up fail so that the customer is told of a delay? Only a server,
+	 * domain or DNS hosting (driver kind vm, domain or dns) whose provision ended failed; a
+	 * failed pause or deletion is not the customer's business.
 	 *
 	 * @param Resource $r Resource.
 	 */
@@ -173,7 +173,7 @@ final class Emails {
 
 		$driver = Registry::get( $r->get( 'driver' ) );
 
-		return $driver && 'vm' === $driver->kind();
+		return $driver && in_array( $driver->kind(), array( 'vm', 'domain', 'dns' ), true );
 	}
 
 	/**

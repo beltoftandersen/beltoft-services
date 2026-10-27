@@ -40,8 +40,8 @@ final class DkAgreement {
 	public static function render(): void {
 		$names = self::cart_domains();
 		if ( ! self::ready() || ! $names ) { return; }
-		wp_enqueue_script( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.js', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION, true );
-		wp_enqueue_style( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.css', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION );
+		wp_enqueue_script( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dk-agreement.js' ), true );
+		wp_enqueue_style( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dk-agreement.css' ) );
 		echo '<section class="beltoft-dk-agreement"><h3>' . esc_html__( '.dk registration agreement', 'beltoft-services' ) . '</h3>';
 		echo '<p><strong>' . esc_html__( 'Requested domain names', 'beltoft-services' ) . ':</strong> ' . esc_html( implode( ', ', $names ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Applicant', 'beltoft-services' ) . ':</strong> <span data-dk-applicant></span><br><span data-dk-address></span></p>';

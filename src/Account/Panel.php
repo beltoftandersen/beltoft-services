@@ -102,7 +102,7 @@ final class Panel {
 
 		// A server that could not be set up: a delay, never what went wrong.
 		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
-			return __( "There's a delay setting up your server. We're on it.", 'beltoft-services' );
+			return __( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
 		}
 
 		$messages = array(
@@ -225,7 +225,7 @@ final class Panel {
 		 * @param bool $load Load it, default true.
 		 */
 		if ( apply_filters( 'beltoft_services_account_css', true ) ) {
-			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/account.css', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION );
+			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/account.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/account.css' ) );
 		}
 
 		/**
@@ -235,7 +235,7 @@ final class Panel {
 		 */
 		do_action( 'beltoft_services_account_assets', self::HANDLE );
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array(), BELTOFT_SERVICES_VERSION, true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesAccount',

@@ -79,6 +79,25 @@ class DomainDriverTest extends TestCase {
 		$this->assertSame( 3600, $result->delay() );
 	}
 
+	public function test_incomplete_billing_waits_instead_of_failing(): void {
+		$r = $this->resource();
+		delete_user_meta( (int) $r->license()['user_id'], '_beltoft_services_domain_handle' );
+		$fake = new FakeClient();
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_retry(), 'An order with no billing address can be completed later.' );
+		$this->assertSame( 3600, $result->delay() );
+		$this->assertTrue( (bool) $result->meta()['billing_alerted'], 'The admin is told once; the reconciler stores the flag.' );
+	}
+
+	public function test_customer_is_told_when_a_domain_order_fails(): void {
+		$r = $this->resource();
+		$r->set( array( 'state' => 'failed', 'failed_op' => 'provision' ) );
+		$this->assertTrue( \BeltoftServices\Emails\Emails::delay_applies( $r ), 'A paid domain that could not be registered is not silent.' );
+		$r->set( array( 'failed_op' => 'delete' ) );
+		$this->assertFalse( \BeltoftServices\Emails\Emails::delay_applies( $r ), 'A failed deletion is not the customer\'s business.' );
+	}
+
 	public function test_pause_and_resume_make_no_registrar_call(): void {
 		$r = $this->resource();
 		$driver = new DomainDriver();

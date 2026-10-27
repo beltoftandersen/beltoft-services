@@ -6,6 +6,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\InternalActions;
+use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Emails\Emails;
@@ -13,7 +14,7 @@ use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DomainDriver implements Driver, StopsOnDelete, InternalActions {
+final class DomainDriver implements Driver, StopsOnDelete, InternalActions, NeedsBilling {
 	public function id(): string { return 'domain'; }
 	public function label(): string { return __( 'Domain name', 'beltoft-services' ); }
 	public function kind(): string { return 'domain'; }
@@ -134,6 +135,11 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions {
 		if ( 'op_920' === $code ) {
 			if ( ! $r->get( 'balance_alerted' ) ) { Alerts::admin( $r, 'Registrar balance is too low.' ); }
 			return StepResult::retry( 3600, 'Waiting for registrar account funds.', array( 'steps' => $steps, 'balance_alerted' => true ) );
+		}
+		if ( 'contact_incomplete' === $code ) {
+			// Fixable: the billing details on the order can be completed, and the next attempt reads them again.
+			if ( ! $r->get( 'billing_alerted' ) ) { Alerts::admin( $r, 'The order has incomplete billing details; add them to the order.' ); }
+			return StepResult::retry( 3600, 'Waiting for complete billing details.', array( 'steps' => $steps, 'billing_alerted' => true ) );
 		}
 		if ( 'transport' === $code || 'bad_response' === $code || preg_match( '/^http_5/', $code ) ) { return StepResult::retry( 3600, 'The registrar is temporarily unavailable.', array( 'steps' => $steps ) ); }
 		Alerts::admin( $r, 'Registrar rejected the domain order: ' . $code );

@@ -30,7 +30,7 @@ if ( '' !== $customer_name ) {
 	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
 }
 
-echo __( "There's a delay setting up your server. We're on it.", 'beltoft-services' ) . "\n\n";
+echo __( "There's a delay setting up your service. We're on it.", 'beltoft-services' ) . "\n\n";
 
 echo __( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 

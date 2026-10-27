@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Product;
@@ -20,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  * provisioning; pause, resume, delete and the plan change arrive with the next task, and until
  * then they refuse without touching Proxmox. No sign-in link: a VM has none (no Drivers\Opens).
  */
-class ProxmoxDriver implements Driver, StopsOnDelete {
+class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling {
 
 	/**
 	 * Days a VM product is kept after its license ends, unless the product says otherwise.

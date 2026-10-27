@@ -8,6 +8,45 @@ final class Records {
 	private const TYPES = array( 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' );
 
 	/** @return array|\WP_Error PowerDNS RRsets, without SOA or NS. */
+	/**
+	 * Customer records as editor rows (the shape validate() takes), from the zone's rrsets.
+	 * NS and SOA are ours and stay out of the editor.
+	 */
+	public static function to_rows( string $zone, array $rrsets ): array {
+		$rows = array();
+		foreach ( $rrsets as $set ) {
+			$type = strtoupper( (string) ( $set['type'] ?? '' ) );
+			if ( ! in_array( $type, self::TYPES, true ) ) { continue; }
+			$fqdn = strtolower( (string) ( $set['name'] ?? '' ) );
+			$relative = rtrim( substr( $fqdn, 0, max( 0, strlen( $fqdn ) - strlen( $zone ) - 1 ) ), '.' );
+			$name = rtrim( $fqdn, '.' ) === $zone ? '@' : ( substr_count( $relative, '.' ) > 1 ? $fqdn : $relative );
+			foreach ( (array) ( $set['records'] ?? array() ) as $entry ) {
+				$row = array( 'name' => $name, 'type' => $type, 'ttl' => (int) ( $set['ttl'] ?? 3600 ), 'value' => '' );
+				$content = trim( (string) ( $entry['content'] ?? '' ) );
+				if ( 'TXT' === $type ) {
+					preg_match_all( '/"((?:[^"\\\\]|\\\\.)*)"/', $content, $m );
+					$row['value'] = stripcslashes( implode( '', $m[1] ) );
+				} elseif ( 'MX' === $type && preg_match( '/^(\d+)\s+(\S+)$/', $content, $m ) ) {
+					$row['priority'] = (int) $m[1];
+					$row['value'] = rtrim( $m[2], '.' );
+				} elseif ( 'SRV' === $type && preg_match( '/^(\d+)\s+(\d+)\s+(\d+)\s+(\S+)$/', $content, $m ) ) {
+					$row['priority'] = (int) $m[1];
+					$row['weight'] = (int) $m[2];
+					$row['port'] = (int) $m[3];
+					$row['value'] = rtrim( $m[4], '.' );
+				} elseif ( 'CAA' === $type && preg_match( '/^(\d+)\s+(\S+)\s+"((?:[^"\\\\]|\\\\.)*)"$/', $content, $m ) ) {
+					$row['flag'] = (int) $m[1];
+					$row['tag'] = strtolower( $m[2] );
+					$row['value'] = stripcslashes( $m[3] );
+				} else {
+					$row['value'] = 'CNAME' === $type ? rtrim( $content, '.' ) : $content;
+				}
+				$rows[] = $row;
+			}
+		}
+		return $rows;
+	}
+
 	public static function validate( string $zone, array $records ): array|\WP_Error {
 		$zone = Search::normalise( $zone );
 		if ( is_wp_error( $zone ) ) { return $zone; }

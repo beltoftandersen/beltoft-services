@@ -23,6 +23,12 @@ class CartTest extends TestCase {
 		$this->assertSame( 'auth-secret', Crypto::decrypt( $data['beltoft_services_domain_auth'] ) );
 	}
 
+	public function test_search_markup_carries_a_rest_nonce_so_logged_in_users_keep_their_identity(): void {
+		$html = \BeltoftServices\Domains\Search::shortcode();
+		$this->assertStringContainsString( 'data-nonce="' . wp_create_nonce( 'wc_store_api' ) . '"', $html );
+		$this->assertStringContainsString( 'data-rest-nonce="' . wp_create_nonce( 'wp_rest' ) . '"', $html );
+	}
+
 	public function test_dns_mode_refuses_subdomain(): void {
 		$this->assertWPError( Cart::line_data( 'www.example.com', 'dns', '' ) );
 	}

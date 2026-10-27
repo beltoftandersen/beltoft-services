@@ -23,7 +23,7 @@
       const response = await fetch(root.dataset.cart, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce },
+        headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
         body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '' })
       });
       const data = await response.json();

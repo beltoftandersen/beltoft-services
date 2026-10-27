@@ -420,7 +420,7 @@ class ProxmoxEmailsTest extends TestCase {
 		$delay = $this->customer_mails( 'delay' );
 		$this->assertCount( 1, $delay );
 		$text = html_entity_decode( (string) $delay[0]['message'], ENT_QUOTES );
-		$this->assertStringContainsString( "There's a delay setting up your server. We're on it.", $text );
+		$this->assertStringContainsString( "There's a delay setting up your service. We're on it.", $text );
 		$this->assertStringNotContainsString( 'clone', strtolower( $text ) );
 		$this->assertStringNotContainsString( 'secret-path', $text );
 		$this->assertStringNotContainsString( '5000', $text, 'No VMID.' );
@@ -497,7 +497,7 @@ class ProxmoxEmailsTest extends TestCase {
 		$license = $this->failing_license();
 		$r       = Resource::for_license( (int) $license['id'] );
 
-		$this->assertSame( "There's a delay setting up your server. We're on it.", AccountPanel::message( 'failed', $r ) );
+		$this->assertSame( "There's a delay setting up your service. We're on it.", AccountPanel::message( 'failed', $r ) );
 		$this->assertSame( 'Delayed', AccountPanel::label( 'failed', $r ) );
 
 		wp_set_current_user( (int) $license['user_id'] );
@@ -505,7 +505,7 @@ class ProxmoxEmailsTest extends TestCase {
 		AccountPanel::render( $license );
 		$html = html_entity_decode( (string) ob_get_clean(), ENT_QUOTES );
 
-		$this->assertStringContainsString( "There's a delay setting up your server. We're on it.", $html );
+		$this->assertStringContainsString( "There's a delay setting up your service. We're on it.", $html );
 		$this->assertStringNotContainsString( 'secret-path', $html );
 		$this->assertStringNotContainsString( 'clone failed', $html );
 

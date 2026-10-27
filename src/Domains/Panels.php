@@ -12,7 +12,7 @@ final class Panels {
 		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'buttons' ), 10, 2 );
 	}
 	public static function assets( $parent ): void {
-		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), BELTOFT_SERVICES_VERSION, true );
+		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/domain.js' ), true );
 	}
 	public static function buttons( $buttons, $r ) {
 		if ( is_array( $buttons ) && $r instanceof Resource && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
@@ -25,6 +25,7 @@ final class Panels {
 		$dns_only = 'dns' === $r->get( 'driver' );
 		$zone = $dns_only || 'custom' !== $r->get( 'ns_mode' ) ? Clients::dns()->zone( $domain ) : null;
 		$rrsets = is_array( $zone ) ? (array) ( $zone['rrsets'] ?? array() ) : array();
+		$rows = Records::to_rows( $domain, $rrsets );
 		include BELTOFT_SERVICES_PATH . 'templates/account/domain.php';
 	}
 	public static function admin( Resource $r ): void {

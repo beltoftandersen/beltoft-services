@@ -31,7 +31,7 @@ if ( '' !== $customer_name ) {
 </p>
 <p>
 <?php
-esc_html_e( "There's a delay setting up your server. We're on it.", 'beltoft-services' );
+esc_html_e( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
 ?>
 </p>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'View your services in your account', 'beltoft-services' ); ?></a></p>

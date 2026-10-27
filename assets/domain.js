@@ -10,16 +10,96 @@
 			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
 		} );
 	}
+	var TYPES = [ 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' ];
+	var EXTRAS = { MX: [ 'priority' ], SRV: [ 'priority', 'weight', 'port' ], CAA: [ 'flag', 'tag' ] };
+	function field( name, value, label, type ) {
+		var input = document.createElement( 'input' );
+		input.type = type || 'text';
+		input.setAttribute( 'data-f', name );
+		input.setAttribute( 'aria-label', label );
+		input.placeholder = label;
+		input.autocomplete = 'off';
+		input.value = value === undefined || value === null ? '' : value;
+		if ( 'number' === input.type ) { input.min = '0'; }
+		return input;
+	}
+	function showExtras( tr ) {
+		var wanted = EXTRAS[ tr.querySelector( '[data-f=type]' ).value ] || [];
+		Array.prototype.forEach.call( tr.querySelectorAll( '.beltoft-dns-extra' ), function ( input ) {
+			input.hidden = wanted.indexOf( input.getAttribute( 'data-f' ) ) < 0;
+		} );
+	}
+	function addRow( form, row ) {
+		var t = JSON.parse( form.dataset.i18n );
+		var tr = document.createElement( 'tr' );
+		var cells = [ 0, 1, 2, 3, 4 ].map( function () { return tr.appendChild( document.createElement( 'td' ) ); } );
+		var name = field( 'name', row.name, t.name );
+		name.title = t.name_hint;
+		cells[ 0 ].appendChild( name );
+		var type = document.createElement( 'select' );
+		type.setAttribute( 'data-f', 'type' );
+		type.setAttribute( 'aria-label', 'Type' );
+		TYPES.forEach( function ( value ) { var o = document.createElement( 'option' ); o.value = o.textContent = value; type.appendChild( o ); } );
+		type.value = row.type || 'A';
+		type.addEventListener( 'change', function () { showExtras( tr ); } );
+		cells[ 1 ].appendChild( type );
+		var ttl = field( 'ttl', row.ttl || 3600, 'TTL', 'number' );
+		ttl.min = '60';
+		ttl.max = '86400';
+		cells[ 2 ].appendChild( ttl );
+		var box = cells[ 3 ].appendChild( document.createElement( 'div' ) );
+		box.className = 'beltoft-dns-value';
+		[ 'priority', 'weight', 'port', 'flag' ].forEach( function ( key ) {
+			var input = field( key, row[ key ], t[ key ], 'number' );
+			input.className = 'beltoft-dns-extra';
+			box.appendChild( input );
+		} );
+		var tag = field( 'tag', row.tag || 'issue', t.tag );
+		tag.className = 'beltoft-dns-extra';
+		box.appendChild( tag );
+		box.appendChild( field( 'value', row.value, t.value ) );
+		var remove = document.createElement( 'button' );
+		remove.type = 'button';
+		remove.className = 'button beltoft-dns-remove';
+		remove.textContent = t.remove;
+		cells[ 4 ].appendChild( remove );
+		form.querySelector( 'tbody' ).appendChild( tr );
+		showExtras( tr );
+		return tr;
+	}
+	function serialise( form ) {
+		var rows = [];
+		Array.prototype.forEach.call( form.querySelectorAll( 'tbody tr' ), function ( tr ) {
+			var get = function ( key ) { return tr.querySelector( '[data-f=' + key + ']' ).value.trim(); };
+			var type = get( 'type' );
+			var row = { name: get( 'name' ), type: type, ttl: parseInt( get( 'ttl' ), 10 ) || 3600, value: get( 'value' ) };
+			( EXTRAS[ type ] || [] ).forEach( function ( key ) { row[ key ] = 'tag' === key ? get( key ) : parseInt( get( key ), 10 ); } );
+			rows.push( row );
+		} );
+		form.querySelector( '[name=records]' ).value = JSON.stringify( rows );
+	}
+	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-dns-editor' ), function ( form ) {
+		JSON.parse( form.dataset.rows || '[]' ).forEach( function ( row ) { addRow( form, row ); } );
+	} );
+	document.addEventListener( 'click', function ( event ) {
+		var add = event.target.closest( '.beltoft-dns-add' );
+		if ( add ) { addRow( add.closest( 'form' ), {} ).querySelector( '[data-f=name]' ).focus(); return; }
+		var remove = event.target.closest( '.beltoft-dns-remove' );
+		if ( remove ) { remove.closest( 'tr' ).remove(); }
+	} );
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target.closest( '.beltoft-services-domain-form' );
 		if ( ! form ) { return; }
 		event.preventDefault();
 		var panel = form.closest( '[data-domain-resource]' );
+		var box = form.querySelector( '.beltoft-dns-error' );
+		if ( box ) { box.hidden = true; }
+		if ( form.classList.contains( 'beltoft-dns-editor' ) ) { serialise( form ); }
 		var args = {};
 		new FormData( form ).forEach( function ( value, key ) { args[ key ] = String( value ); } );
 		var button = form.querySelector( 'button[type=submit]' );
 		button.disabled = true;
-		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { window.location.reload(); } ).catch( function ( error ) { window.alert( error.message ); button.disabled = false; } );
+		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { window.location.reload(); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
 	} );
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest( '.beltoft-services-domain-auth' );

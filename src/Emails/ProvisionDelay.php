@@ -10,8 +10,8 @@ namespace BeltoftServices\Emails;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Sent once to the customer when setting up their server failed and an admin has to look at
- * it. It carries no technical detail.
+ * Sent once to the customer when setting up their server, domain or DNS hosting failed and an
+ * admin has to look at it. It carries no technical detail.
  */
 final class ProvisionDelay extends ServiceEmail {
 
@@ -21,7 +21,7 @@ final class ProvisionDelay extends ServiceEmail {
 	public function __construct() {
 		$this->id             = 'beltoft_services_provision_delay';
 		$this->title          = __( 'Service setup delayed', 'beltoft-services' );
-		$this->description    = __( 'Sent once to the customer when setting up their server failed and needs attention.', 'beltoft-services' );
+		$this->description    = __( 'Sent once to the customer when setting up their server, domain or DNS hosting failed and needs attention.', 'beltoft-services' );
 		$this->template_html  = 'emails/beltoft-services-provision-delay.php';
 		$this->template_plain = 'emails/plain/beltoft-services-provision-delay.php';
 
@@ -39,6 +39,6 @@ final class ProvisionDelay extends ServiceEmail {
 	 * Default heading.
 	 */
 	public function get_default_heading() {
-		return __( 'There is a delay setting up your server', 'beltoft-services' );
+		return __( 'There is a delay setting up your service', 'beltoft-services' );
 	}
 }

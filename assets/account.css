@@ -51,3 +51,25 @@
 .beltoft-services-panel__notice:empty {
 	display: none;
 }
+.beltoft-dns-editor table { width: 100%; border-collapse: collapse; }
+.beltoft-dns-editor td, .beltoft-dns-editor th { padding: 4px 6px 4px 0; text-align: left; vertical-align: top; }
+.beltoft-dns-editor input, .beltoft-dns-editor select { width: 100%; box-sizing: border-box; border-radius: 0; }
+.beltoft-dns-editor td:nth-child(3) { width: 6em; }
+.beltoft-dns-value { display: flex; flex-wrap: wrap; gap: 4px; }
+.beltoft-dns-value input { flex: 1 1 8em; width: auto; }
+.beltoft-dns-value input[hidden] { display: none; }
+.beltoft-dns-error { color: #b32d2e; }
+.beltoft-dns-note { opacity: .75; }
+@media (max-width: 640px) {
+	.beltoft-dns-editor thead { display: none; }
+	.beltoft-dns-editor tr { display: block; margin-bottom: 12px; }
+	.beltoft-dns-editor td { display: block; width: auto !important; padding: 2px 0; }
+}
+.beltoft-services-domain form, .beltoft-services-domain details { margin: 0 0 16px; }
+.beltoft-services-domain .button { margin: 0 8px 8px 0; }
+.beltoft-services-domain-code { display: inline-block; margin-left: 4px; }
+/* One size for every control in the domain panel; the theme gives selects extra padding. */
+div.beltoft-services-domain input:not([type="hidden"]), div.beltoft-services-domain select { box-sizing: border-box; width: 100%; height: 43px; min-height: 0; padding: 0 12px; font-size: 15px; line-height: 1.2; }
+div.beltoft-services-domain .button { height: 43px; padding: 0 20px; line-height: 1; }
+div.beltoft-services-domain label { display: block; margin-bottom: 12px; }
+.beltoft-dns-editor td:nth-child(2) { width: 8em; }

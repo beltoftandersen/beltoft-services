@@ -58,6 +58,7 @@ final class Plugin {
 		Domains\EmailDetails::register();
 		Proxmox\ClustersScreen::register();
 		Checkout::register();
+		BillingRequirements::register();
 
 		Lifecycle::register();
 		Retention::register();
@@ -118,8 +119,8 @@ final class Plugin {
 			$missing[] = 'WooCommerce Subscriptions';
 		}
 
-		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) ) {
-			$missing[] = 'Beltoft Licenses 0.7.0 or newer';
+		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, '0.7.3', '<' ) ) {
+			$missing[] = 'Beltoft Licenses 0.7.3 or newer';
 		}
 
 		global $wpdb;

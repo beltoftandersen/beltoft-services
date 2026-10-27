@@ -168,6 +168,21 @@ class ProductTest extends TestCase {
 		$this->assertFalse( apply_filters( 'beltoft_licenses_account_show_usage', true, $license ) );
 	}
 
+	public function test_service_keys_stay_off_order_pages_and_emails(): void {
+		$this->fake_driver();
+		$order = wc_create_order();
+		$order->set_billing_email( 'me@example.org' );
+		$order->set_status( 'processing' );
+		$order->save();
+		$product = $this->service_product();
+		$service = $this->service_license( $product, array( 'order_id' => $order->get_id(), 'fire' => false ) );
+
+		ob_start();
+		\BeltoftLicenses\Account\OrderLicenses::html( $order );
+		\BeltoftLicenses\Account\OrderLicenses::email( $order, false, true );
+		$this->assertStringNotContainsString( $service['license_key'], (string) ob_get_clean() );
+	}
+
 	public function test_non_service_licenses_are_untouched(): void {
 		$this->fake_driver();
 

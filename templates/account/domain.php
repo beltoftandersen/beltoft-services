@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 		echo esc_html( sprintf( __( 'Transfer lock: %s', 'beltoft-services' ), $r->get( 'is_locked' ) ? __( 'on', 'beltoft-services' ) : __( 'off', 'beltoft-services' ) ) );
 		?></p>
 	<?php endif; ?>
-	<p><?php esc_html_e( 'Name servers:', 'beltoft-services' ); ?> <?php echo esc_html( implode( ', ', $dns_only || 'custom' !== $r->get( 'ns_mode' ) ? Zone::nameservers() : (array) $r->get( 'nameservers' ) ) ); ?></p>
+	<p><?php esc_html_e( 'Name servers:', 'beltoft-services' ); ?> <?php echo esc_html( implode( ', ', $dns_only || 'custom' !== $r->get( 'ns_mode' ) ? \BeltoftServices\Domains\Zone::nameservers() : (array) $r->get( 'nameservers' ) ) ); ?></p>
 	<?php if ( $r->accepts_actions() ) : ?>
 		<?php if ( ! $dns_only ) : ?>
 			<form class="beltoft-services-domain-form" data-domain-action="set_nameservers">
@@ -28,13 +28,19 @@ defined( 'ABSPATH' ) || exit;
 			<button type="button" class="button beltoft-services-domain-auth"><?php esc_html_e( 'Show transfer code', 'beltoft-services' ); ?></button><output class="beltoft-services-domain-code"></output>
 		<?php endif; ?>
 		<?php if ( $dns_only || 'custom' !== $r->get( 'ns_mode' ) ) : ?>
-			<details><summary><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></summary>
-				<table><thead><tr><th><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'TTL', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th></tr></thead><tbody>
-				<?php foreach ( $rrsets as $beltoft_set ) : if ( in_array( $beltoft_set['type'] ?? '', array( 'NS', 'SOA' ), true ) ) { continue; } foreach ( (array) ( $beltoft_set['records'] ?? array() ) as $beltoft_entry ) : ?>
-				<tr><td><?php echo esc_html( (string) ( $beltoft_set['name'] ?? '' ) ); ?></td><td><?php echo esc_html( (string) ( $beltoft_set['type'] ?? '' ) ); ?></td><td><?php echo esc_html( (string) ( $beltoft_set['ttl'] ?? '' ) ); ?></td><td><?php echo esc_html( (string) ( $beltoft_entry['content'] ?? '' ) ); ?></td></tr>
-				<?php endforeach; endforeach; ?>
-				</tbody></table>
-				<form class="beltoft-services-domain-form" data-domain-action="set_records"><label><?php esc_html_e( 'Records as JSON. Saving replaces all customer records.', 'beltoft-services' ); ?> <textarea name="records" rows="8" cols="60">[]</textarea></label><button type="submit" class="button"><?php esc_html_e( 'Save DNS records', 'beltoft-services' ); ?></button></form>
+			<details class="beltoft-dns"><summary><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></summary>
+				<form class="beltoft-services-domain-form beltoft-dns-editor" data-domain-action="set_records" data-rows="<?php echo esc_attr( (string) wp_json_encode( $rows ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( array(
+					'name' => __( 'Name', 'beltoft-services' ), 'name_hint' => __( '@ for the domain itself, or a name like www', 'beltoft-services' ), 'value' => __( 'Value', 'beltoft-services' ),
+					'priority' => __( 'Priority', 'beltoft-services' ), 'weight' => __( 'Weight', 'beltoft-services' ), 'port' => __( 'Port', 'beltoft-services' ),
+					'flag' => __( 'Flag', 'beltoft-services' ), 'tag' => __( 'Tag', 'beltoft-services' ), 'remove' => __( 'Remove', 'beltoft-services' ),
+				) ) ); ?>">
+					<table><thead><tr><th><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'TTL', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th><th></th></tr></thead><tbody></tbody></table>
+					<input type="hidden" name="records" value="[]">
+					<p class="beltoft-dns-error" role="alert" hidden></p>
+					<p class="beltoft-dns-note"><?php esc_html_e( 'Changes are saved when you press Save DNS records.', 'beltoft-services' ); ?></p>
+					<button type="button" class="button beltoft-dns-add"><?php esc_html_e( 'Add record', 'beltoft-services' ); ?></button>
+					<button type="submit" class="button"><?php esc_html_e( 'Save DNS records', 'beltoft-services' ); ?></button>
+				</form>
 			</details>
 		<?php endif; ?>
 	<?php endif; ?>
