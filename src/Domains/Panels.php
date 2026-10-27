@@ -10,15 +10,23 @@ final class Panels {
 	public static function register(): void {
 		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ) );
 		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'buttons' ), 10, 2 );
+		add_filter( 'beltoft_licenses_account_title', array( __CLASS__, 'title' ), 10, 2 );
 	}
 	public static function assets( $parent ): void {
 		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/domain.js' ), true );
 	}
 	public static function buttons( $buttons, $r ) {
 		if ( is_array( $buttons ) && $r instanceof Resource && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
-			unset( $buttons['set_records'], $buttons['set_nameservers'] );
+			// The panel shows these itself, next to what they change.
+			unset( $buttons['set_records'], $buttons['set_nameservers'], $buttons['lock'], $buttons['unlock'], $buttons['check_delegation'] );
 		}
 		return $buttons;
+	}
+	/** The domain's own name as the heading of its card, instead of the product name. */
+	public static function title( $title, $license ) {
+		$r = is_array( $license ) ? Resource::for_license( (int) ( $license['id'] ?? 0 ) ) : null;
+		$domain = $r && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : '';
+		return '' !== $domain ? $domain : $title;
 	}
 	public static function account( Resource $r ): void {
 		$domain = (string) $r->get( 'domain' );

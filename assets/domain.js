@@ -33,6 +33,7 @@
 		var t = JSON.parse( form.dataset.i18n );
 		var tr = document.createElement( 'tr' );
 		var cells = [ 0, 1, 2, 3, 4 ].map( function () { return tr.appendChild( document.createElement( 'td' ) ); } );
+		[ t.name, t.type, t.ttl, t.value ].forEach( function ( label, i ) { cells[ i ].setAttribute( 'data-label', label ); } );
 		var name = field( 'name', row.name, t.name );
 		name.title = t.name_hint;
 		cells[ 0 ].appendChild( name );
@@ -60,12 +61,17 @@
 		box.appendChild( field( 'value', row.value, t.value ) );
 		var remove = document.createElement( 'button' );
 		remove.type = 'button';
-		remove.className = 'button beltoft-dns-remove';
+		remove.className = 'beltoft-services-domain__link beltoft-dns-remove';
 		remove.textContent = t.remove;
 		cells[ 4 ].appendChild( remove );
 		form.querySelector( 'tbody' ).appendChild( tr );
 		showExtras( tr );
 		return tr;
+	}
+	function syncEmpty( form ) {
+		var none = ! form.querySelector( 'tbody tr' );
+		form.querySelector( 'table' ).hidden = none;
+		form.querySelector( '.beltoft-services-domain__empty' ).hidden = ! none;
 	}
 	function serialise( form ) {
 		var rows = [];
@@ -80,12 +86,17 @@
 	}
 	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-dns-editor' ), function ( form ) {
 		JSON.parse( form.dataset.rows || '[]' ).forEach( function ( row ) { addRow( form, row ); } );
+		syncEmpty( form );
 	} );
 	document.addEventListener( 'click', function ( event ) {
 		var add = event.target.closest( '.beltoft-dns-add' );
-		if ( add ) { addRow( add.closest( 'form' ), {} ).querySelector( '[data-f=name]' ).focus(); return; }
+		if ( add ) { addRow( add.closest( 'form' ), {} ).querySelector( '[data-f=name]' ).focus(); syncEmpty( add.closest( 'form' ) ); return; }
 		var remove = event.target.closest( '.beltoft-dns-remove' );
-		if ( remove ) { remove.closest( 'tr' ).remove(); }
+		if ( remove ) { var form = remove.closest( 'form' ); remove.closest( 'tr' ).remove(); syncEmpty( form ); }
+	} );
+	document.addEventListener( 'change', function ( event ) {
+		var radio = event.target.closest ? event.target.closest( '.beltoft-services-domain__ns input[name=mode]' ) : null;
+		if ( radio ) { radio.form.querySelector( '.beltoft-services-domain__custom' ).hidden = 'custom' !== radio.value; }
 	} );
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target.closest( '.beltoft-services-domain-form' );
