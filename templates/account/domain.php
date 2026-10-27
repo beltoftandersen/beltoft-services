@@ -16,7 +16,7 @@ if ( $beltoft_time ) {
 	$beltoft_expires = wp_date( (string) get_option( 'date_format' ), $beltoft_time );
 }
 ?>
-<div class="beltoft-services-domain" data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>">
+<div class="beltoft-services-domain" data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-updating="<?php echo esc_attr__( 'Updating…', 'beltoft-services' ); ?>" data-updating-note="<?php echo esc_attr__( 'This can take up to a minute.', 'beltoft-services' ); ?>">
 	<?php if ( $dns_only ) : ?>
 		<p class="beltoft-services-domain__note"><?php echo esc_html( 'ours' === $r->get( 'delegation' ) ? __( 'Pointing at our name servers', 'beltoft-services' ) : __( 'Not pointing at our name servers yet', 'beltoft-services' ) ); ?></p>
 		<p class="beltoft-services-domain__note"><?php esc_html_e( 'Copy your DNS records here before changing the name servers at your registrar.', 'beltoft-services' ); ?></p>

@@ -138,7 +138,7 @@
 			request( 'GET', id ).then( function ( response ) {
 				return response.ok ? response.json() : null;
 			} ).then( function ( data ) {
-				if ( data && data.state !== first ) {
+				if ( data && ( data.state !== first || false === data.working ) ) {
 					window.location.reload();
 					return;
 				}

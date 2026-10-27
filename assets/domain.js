@@ -98,6 +98,42 @@
 		var radio = event.target.closest ? event.target.closest( '.beltoft-services-domain__ns input[name=mode]' ) : null;
 		if ( radio ) { radio.form.querySelector( '.beltoft-services-domain__custom' ).hidden = 'custom' !== radio.value; }
 	} );
+	// The change runs in the background: say so, and reload when it is done so the page shows the new state.
+	function settle( panel, form ) {
+		var note = form.querySelector( '.beltoft-services-domain__status' );
+		if ( ! note ) {
+			note = document.createElement( 'span' );
+			note.className = 'beltoft-services-domain__status';
+			note.setAttribute( 'role', 'status' );
+			form.appendChild( note );
+		}
+		note.textContent = '';
+		var bar = document.createElement( 'span' );
+		bar.className = 'beltoft-services-domain__bar';
+		bar.setAttribute( 'aria-hidden', 'true' );
+		var text = document.createElement( 'span' );
+		text.textContent = panel.dataset.updating || '';
+		var slow = document.createElement( 'span' );
+		slow.className = 'beltoft-services-domain__slow';
+		slow.textContent = panel.dataset.updatingNote || '';
+		note.appendChild( bar );
+		note.appendChild( text );
+		note.appendChild( slow );
+		Array.prototype.forEach.call( panel.querySelectorAll( 'button' ), function ( b ) { b.disabled = true; } );
+		var rounds = 30;
+		function next() {
+			rounds -= 1;
+			if ( rounds < 1 ) { window.location.reload(); return; }
+			window.setTimeout( again, 2000 );
+		}
+		function again() {
+			request( 'GET', panel.dataset.domainResource ).then( function ( body ) {
+				if ( ! body.working ) { window.location.reload(); return; }
+				next();
+			} ).catch( next );
+		}
+		again();
+	}
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target.closest( '.beltoft-services-domain-form' );
 		if ( ! form ) { return; }
@@ -110,7 +146,7 @@
 		new FormData( form ).forEach( function ( value, key ) { args[ key ] = String( value ); } );
 		var button = form.querySelector( 'button[type=submit]' );
 		button.disabled = true;
-		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { window.location.reload(); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
+		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form ); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
 	} );
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest( '.beltoft-services-domain-auth' );

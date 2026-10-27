@@ -138,10 +138,14 @@ final class Routes {
 			Jobs::queue_usage_refresh( $resource->id() );
 		}
 
+		// A customer waiting for a queued action should not wait for the next cron tick.
+		Jobs::run_waiting( $resource->id() );
+
 		return new \WP_REST_Response(
 			array(
 				'state'   => $state,
 				'desired' => (string) $resource->get( 'desired' ),
+				'working' => Jobs::acting( $resource->id() ),
 				'label'   => Panel::label( $state, $resource ),
 				'message' => Panel::message( $state, $resource ),
 			),

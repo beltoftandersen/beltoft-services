@@ -166,6 +166,66 @@ final class Jobs {
 	}
 
 	/**
+	 * The customer actions of a service in one Action Scheduler status, by action id.
+	 *
+	 * @param int    $activation_id Activation id.
+	 * @param string $status        Action Scheduler status.
+	 * @return array<int, \ActionScheduler_Action>
+	 */
+	private static function acts_of( int $activation_id, string $status ): array {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return array();
+		}
+
+		$mine = array();
+
+		foreach ( as_get_scheduled_actions( array( 'hook' => self::ACT, 'group' => self::GROUP, 'status' => $status, 'per_page' => -1 ) ) as $id => $action ) {
+			$args = $action->get_args();
+
+			if ( (int) ( $args[0] ?? 0 ) === $activation_id ) {
+				$mine[ (int) $id ] = $action;
+			}
+		}
+
+		return $mine;
+	}
+
+	/**
+	 * Is a customer action for this service waiting or running? The account page asks, so it can
+	 * show "Updating" and reload when the change is done instead of showing the old state.
+	 *
+	 * @param int $activation_id Activation id.
+	 */
+	public static function acting( int $activation_id ): bool {
+		return (bool) self::acts_of( $activation_id, \ActionScheduler_Store::STATUS_PENDING ) || (bool) self::acts_of( $activation_id, \ActionScheduler_Store::STATUS_RUNNING );
+	}
+
+	/**
+	 * Runs this service's customer actions that have waited a few seconds. The queue is normally
+	 * started by a cron tick (up to a minute away), so a customer watching the account page would
+	 * wait for nothing; the page's status check calls this instead. Safe next to the regular
+	 * runner: Action Scheduler only runs an action that is still pending, and the job itself takes
+	 * the service's lock.
+	 *
+	 * @param int $activation_id Activation id.
+	 * @param int $waited        Seconds an action must have been due before it is run here.
+	 */
+	public static function run_waiting( int $activation_id, int $waited = 3 ): void {
+		if ( ! class_exists( '\ActionScheduler' ) ) {
+			return;
+		}
+
+		foreach ( array_keys( self::acts_of( $activation_id, \ActionScheduler_Store::STATUS_PENDING ) ) as $id ) {
+			// The store has the date; an async action's own schedule has none.
+			$date = \ActionScheduler::store()->get_date( $id );
+
+			if ( $date && $date->getTimestamp() <= time() - $waited ) {
+				\ActionScheduler::runner()->process_action( $id, 'Beltoft Services' );
+			}
+		}
+	}
+
+	/**
 	 * Queues a customer action (job beltoft_services_act, args [id, action, args]). The same
 	 * action with the same arguments already waiting is enough.
 	 *

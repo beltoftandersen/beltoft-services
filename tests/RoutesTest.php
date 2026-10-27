@@ -141,8 +141,33 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( 'ready', $data['desired'] );
 		$this->assertSame( 'Getting ready', $data['label'] );
 		$this->assertNotSame( '', $data['message'] );
-		$this->assertSame( array( 'state', 'desired', 'label', 'message' ), array_keys( $data ) );
+		$this->assertSame( array( 'state', 'desired', 'working', 'label', 'message' ), array_keys( $data ) );
 		$this->assertSame( array(), $driver->calls(), 'A REST request never calls the driver.' );
+	}
+
+	public function test_status_says_while_a_queued_action_is_still_working(): void {
+		list( $resource, , $user ) = $this->resource();
+		$status = fn(): bool => $this->request( 'GET', '/resources/' . $resource->id(), $user )->get_data()['working'];
+
+		$this->assertFalse( $status(), 'Nothing queued.' );
+		$this->assertSame( 202, $this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user )->get_status() );
+		$this->assertTrue( $status(), 'The page can show Updating while the job waits.' );
+
+		$this->run_jobs();
+
+		$this->assertFalse( $status(), 'Done: the page can reload.' );
+	}
+
+	public function test_a_waiting_action_is_run_by_the_status_check_instead_of_waiting_for_cron(): void {
+		list( $resource, $driver, $user ) = $this->resource();
+		$this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user );
+
+		\BeltoftServices\Jobs::run_waiting( $resource->id() );
+		$this->assertTrue( \BeltoftServices\Jobs::acting( $resource->id() ), 'Just queued: the regular runner gets its few seconds first.' );
+
+		\BeltoftServices\Jobs::run_waiting( $resource->id(), 0 );
+		$this->assertFalse( \BeltoftServices\Jobs::acting( $resource->id() ) );
+		$this->assertContains( 'act', array_column( $driver->calls(), 'op' ), 'The driver did the action.' );
 	}
 
 	public function test_visitors_get_401(): void {
