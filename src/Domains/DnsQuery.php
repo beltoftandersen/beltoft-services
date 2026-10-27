@@ -35,9 +35,7 @@ final class DnsQuery {
 			return 6 === $type ? (int) ( $zone['serial'] ?? 1 ) : time() + 30 * DAY_IN_SECONDS;
 		}
 		$id = random_int( 1, 65535 );
-		$wire = pack( 'nnnnnn', $id, 0x0100, 1, 0, 0, 0 );
-		foreach ( explode( '.', rtrim( $domain, '.' ) ) as $label ) { $wire .= chr( strlen( $label ) ) . $label; }
-		$wire .= "\0" . pack( 'nn', $type, 1 );
+		$wire = self::packet( $id, $domain, $type );
 		$socket = @fsockopen( 'udp://' . self::address( $server ), 53, $errno, $message, 3 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- UDP DNS query, not file I/O; transport error returned below.
 		if ( ! $socket ) { return new \WP_Error( 'dns_transport', 'Name server did not answer.' ); }
 		stream_set_timeout( $socket, 3 );
@@ -66,6 +64,20 @@ final class DnsQuery {
 			$offset = $end;
 		}
 		return $values ? min( $values ) : new \WP_Error( 'dns_missing', 'Name server did not return the requested record.' );
+	}
+
+	/**
+	 * The question sent to a name server. A name server refuses a direct question for the record
+	 * type RRSIG, so the signature check (type 46) asks for the zone's SOA with signatures
+	 * requested (EDNS0, DO bit) and reads the RRSIG that comes back with it.
+	 */
+	public static function packet( int $id, string $domain, int $type ): string {
+		$signed = 46 === $type;
+		$wire   = pack( 'nnnnnn', $id, 0x0100, 1, 0, 0, $signed ? 1 : 0 );
+		foreach ( explode( '.', rtrim( $domain, '.' ) ) as $label ) { $wire .= chr( strlen( $label ) ) . $label; }
+		$wire .= "\0" . pack( 'nn', $signed ? 6 : $type, 1 );
+		if ( $signed ) { $wire .= "\0" . pack( 'nnNn', 41, 4096, 0x8000, 0 ); }
+		return $wire;
 	}
 
 	/** Advance over wire-format labels, including a compressed pointer. */
