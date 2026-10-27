@@ -32,6 +32,13 @@
       window.location.assign(data.checkout_url);
     }
 
+    // The same moving bar as the search, on the button that was clicked: the page goes on to the checkout when the add is done.
+    function working(button, on, text) {
+      button.disabled = on;
+      button.classList.toggle('is-working', on);
+      button.textContent = text;
+    }
+
     function transferForm(domain, actions) {
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
@@ -49,12 +56,12 @@
         event.preventDefault();
         const code = field.value.trim();
         if (!code) return;
-        submit.disabled = true;
+        working(submit, true, 'Adding to order…');
         try {
           await add(domain, 'transfer', code);
         } catch (error) {
           showError(error.message);
-          submit.disabled = false;
+          working(submit, false, 'Add transfer to order');
         }
       });
       actions.replaceChildren(form);
@@ -69,12 +76,13 @@
           transferForm(domain, button.closest('.beltoft-domain-result__actions'));
           return;
         }
-        button.disabled = true;
+        const label = button.textContent;
+        working(button, true, 'Adding to order…');
         try {
           await add(domain, mode, '');
         } catch (error) {
           showError(error.message);
-          button.disabled = false;
+          working(button, false, label);
         }
       });
       return button;
