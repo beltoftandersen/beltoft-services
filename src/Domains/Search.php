@@ -88,6 +88,20 @@ final class Search {
 		return $reply;
 	}
 
+	/**
+	 * A short plain note shown with an extension in the search results, where it matters to the buyer.
+	 * Sites can change or add notes with the beltoft_services_domain_tld_notes filter.
+	 */
+	public static function note( string $tld ): string {
+		$notes = (array) apply_filters( 'beltoft_services_domain_tld_notes', array(
+			'dev' => __( 'Websites on this extension need HTTPS.', 'beltoft-services' ),
+			'app' => __( 'Websites on this extension need HTTPS.', 'beltoft-services' ),
+			'eu'  => __( 'The registrant must be in the EU.', 'beltoft-services' ),
+			'dk'  => __( 'A VAT number is needed to register this extension.', 'beltoft-services' ),
+		) );
+		return (string) ( $notes[ strtolower( ltrim( $tld, '.' ) ) ] ?? '' );
+	}
+
 	/** @return array|\WP_Error */
 	public static function find( string $input, bool $fresh = false ): array|\WP_Error {
 		$input = trim( $input );
@@ -128,7 +142,7 @@ final class Search {
 			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
 			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
-			$results[] = array( 'domain' => $entry['domain'], 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status );
+			$results[] = array( 'domain' => $entry['domain'], 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
 		}
 		return array( 'results' => $results );
 	}

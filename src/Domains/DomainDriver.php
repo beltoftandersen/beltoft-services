@@ -77,6 +77,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					'autorenew' => 'off',
 					'is_dnssec_enabled' => false,
 				);
+				if ( str_ends_with( $name, '.dk' ) ) {
+					// The registry requires the registrant's acceptance of Punktum dk's terms with every .dk order, and the registrar fails an order without it.
+					$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
+					if ( ! $order || ! $order->get_meta( '_beltoft_services_dk_agreement' ) ) { return StepResult::fail( 'The .dk agreement was not accepted on this order.', array( 'steps' => $steps ) ); }
+					$body['additional_data'] = array( 'dk_acceptance' => 1 );
+				}
 				if ( 'transfer' === $mode ) {
 					$auth = Crypto::decrypt( (string) $r->get( 'auth' ) );
 					if ( null === $auth || '' === $auth ) { return StepResult::fail( 'The transfer code is unavailable. Contact support.' ); }

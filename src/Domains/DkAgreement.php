@@ -95,6 +95,10 @@ final class DkAgreement {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verifies its checkout nonce before processing the form.
 		$posted = isset( $_POST['beltoft_dk_agreement'] ) && is_array( $_POST['beltoft_dk_agreement'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['beltoft_dk_agreement'] ) ) : array();
 		if ( array_values( $posted ) !== $names ) { wc_add_notice( __( 'Accept the Punktum dk agreement for each .dk domain.', 'beltoft-services' ), 'error' ); }
+		// The registrar requires a tax number (a person) or a VAT number (a company) for .dk. Only the VAT number is collected so far, so private persons cannot order a .dk domain yet.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verifies its checkout nonce before processing the form.
+		$vat = isset( $_POST['billing_eu_vat_number'] ) ? trim( sanitize_text_field( wp_unslash( (string) $_POST['billing_eu_vat_number'] ) ) ) : '';
+		if ( '' === $vat ) { wc_add_notice( __( 'A .dk domain needs a VAT number. Private persons cannot register a .dk domain here yet.', 'beltoft-services' ), 'error' ); }
 	}
 
 	/** Save proof on the parent order before WooCommerce stores it. */

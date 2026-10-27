@@ -62,8 +62,12 @@ class DkAgreementTest extends TestCase {
 		wc_clear_notices();
 		$_POST['beltoft_dk_agreement'] = array( 'agree.dk' );
 		DkAgreement::validate();
+		$this->assertSame( 1, wc_notice_count( 'error' ), 'Agreed, but a .dk domain still needs a VAT number.' );
+		wc_clear_notices();
+		$_POST['billing_eu_vat_number'] = 'DK12345678';
+		DkAgreement::validate();
 		$this->assertSame( 0, wc_notice_count( 'error' ) );
-		unset( $_POST['beltoft_dk_agreement'] );
+		unset( $_POST['beltoft_dk_agreement'], $_POST['billing_eu_vat_number'] );
 		$order = wc_create_order();
 		$order->set_billing_first_name( 'Test' );
 		$order->set_billing_last_name( 'Registrant' );

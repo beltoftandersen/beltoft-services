@@ -33,7 +33,10 @@ final class Contacts {
 			'address' => array( 'street' => $street, 'number' => $number, 'zipcode' => (string) $order->get_billing_postcode(), 'city' => (string) $order->get_billing_city(), 'state' => (string) $order->get_billing_state(), 'country' => $country ),
 			'phone' => array( 'country_code' => $calling, 'area_code' => substr( $phone, 0, 2 ), 'subscriber_number' => substr( $phone, 2 ) ),
 		);
-		$vat = (string) $order->get_meta( '_billing_vat', true );
+		// The EU VAT plugin stores the number as _billing_eu_vat_number; _billing_vat is kept for sites that set it themselves.
+		$vat = (string) $order->get_meta( '_billing_eu_vat_number', true );
+		if ( '' === trim( $vat ) ) { $vat = (string) $order->get_meta( '_billing_vat', true ); }
+		$vat = preg_replace( '/\s+/', '', $vat );
 		if ( '' !== $vat ) { $body['vat'] = $vat; }
 		$result = Clients::registrar()->request( 'POST', '/customers', $body );
 		if ( is_wp_error( $result ) ) { return $result; }

@@ -63,6 +63,9 @@ class DomainDriverTest extends TestCase {
 		$fake->reply( 'GET', '/domains/456', array( 'id' => 456, 'status' => 'REQ' ) );
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		$r = $this->resource( 'register', 'pending-example.dk' );
+		$order = wc_get_order( (int) $r->license()['order_id'] );
+		$order->update_meta_data( '_beltoft_services_dk_agreement', array( 'version' => 1 ) );
+		$order->save();
 		$this->assertTrue( ( new DomainDriver() )->provision( $r )->is_retry() );
 		$this->assertSame( 'registrant_check', $r->get( 'action_needed_sent' ) );
 		$this->assertTrue( ( new DomainDriver() )->provision( $r )->is_retry() );
@@ -106,6 +109,32 @@ class DomainDriverTest extends TestCase {
 		$result = ( new DomainDriver() )->provision( $this->resource() );
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'op_399 (Nameserver parent domain is not in your account)', $result->error() );
+	}
+
+	public function test_a_dk_order_sends_the_registrys_acceptance_and_needs_the_recorded_agreement(): void {
+		$setup = function () {
+			$fake = new FakeClient();
+			$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+			$fake->reply( 'POST', '/domains', array( 'id' => 321, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+			add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+			return $fake;
+		};
+		$fake = $setup();
+		$r = $this->resource( 'register', 'agreed-' . wp_generate_password( 6, false, false ) . '.dk' );
+		$order = wc_get_order( (int) $r->license()['order_id'] );
+		$order->update_meta_data( '_beltoft_services_dk_agreement', array( 'version' => 1 ) );
+		$order->save();
+		( new DomainDriver() )->provision( $r );
+		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains' === $c['path'] ) );
+		$this->assertSame( array( 'dk_acceptance' => 1 ), $posts[0]['body']['additional_data'] );
+
+		remove_all_filters( 'beltoft_services_domains_client' );
+		$fake = $setup();
+		$r2 = $this->resource( 'register', 'unagreed-' . wp_generate_password( 6, false, false ) . '.dk' );
+		$result = ( new DomainDriver() )->provision( $r2 );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'agreement was not accepted', $result->error() );
+		$this->assertCount( 0, array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] ), 'Nothing is ordered without the agreement.' );
 	}
 
 	public function test_incomplete_billing_waits_instead_of_failing(): void {

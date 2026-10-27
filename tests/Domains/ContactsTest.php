@@ -26,4 +26,17 @@ class ContactsTest extends TestCase {
 		$this->assertSame( 'AL123-GB', Contacts::handle_for( $user, $order ) );
 		$this->assertCount( 1, $fake->calls() );
 	}
+
+	public function test_the_eu_vat_plugins_number_reaches_the_registrar_without_spaces(): void {
+		$user = self::factory()->user->create();
+		$order = wc_create_order( array( 'customer_id' => $user ) );
+		foreach ( array( 'first_name' => 'Ada', 'last_name' => 'Lovelace', 'email' => 'ada@example.test', 'address_1' => 'Main Street 2', 'city' => 'Aarhus', 'postcode' => '8000', 'country' => 'DK', 'phone' => '+4512345678' ) as $k => $v ) { $order->{"set_billing_$k"}( $v ); }
+		$order->update_meta_data( '_billing_eu_vat_number', 'DK 1234 5678' );
+		$order->save();
+		$fake = new FakeClient();
+		$fake->reply( 'POST', '/customers', array( 'handle' => 'AL1-DK' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		Contacts::handle_for( $user, $order );
+		$this->assertSame( 'DK12345678', $fake->calls()[0]['body']['vat'] );
+	}
 }

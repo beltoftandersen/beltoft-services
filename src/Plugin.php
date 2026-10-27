@@ -48,6 +48,7 @@ final class Plugin {
 		Domains\DomainSettings::register();
 		Domains\Search::register();
 		Domains\Cart::register();
+		Domains\TldRules::register();
 		Domains\DkAgreement::register();
 		Domains\Meta::register();
 		Domains\Renewals::register();

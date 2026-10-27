@@ -94,6 +94,7 @@
         not_sold: 'This domain extension is not available to order here.'
       };
       information.appendChild(element('span', 'beltoft-domain-result__status', descriptions[item.status] || 'Availability could not be confirmed.'));
+      if (item.note && item.status === 'free') information.appendChild(element('span', 'beltoft-domain-result__note', item.note));
       row.appendChild(information);
 
       if (item.price !== null && item.price !== undefined) {
