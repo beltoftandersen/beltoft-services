@@ -45,6 +45,10 @@ final class Cart {
 		if ( ! $cart ) { return new \WP_Error( 'no_cart', __( 'The cart is unavailable.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		foreach ( $cart->get_cart() as $item ) {
 			if ( ( $item['beltoft_services_domain']['domain'] ?? '' ) === $data['beltoft_services_domain']['domain'] ) {
+				// The same domain the same way, for example after going back from checkout: carry on to checkout.
+				if ( ( $item['beltoft_services_domain']['mode'] ?? '' ) === $data['beltoft_services_domain']['mode'] ) {
+					return new \WP_REST_Response( array( 'added' => false, 'already_in_cart' => true, 'checkout_url' => wc_get_checkout_url() ), 200 );
+				}
 				return new \WP_Error( 'duplicate_domain', __( 'This domain is already in your cart.', 'beltoft-services' ), array( 'status' => 409 ) );
 			}
 		}

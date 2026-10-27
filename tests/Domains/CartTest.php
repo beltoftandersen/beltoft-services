@@ -77,4 +77,38 @@ class CartTest extends TestCase {
 		$product = $this->service_product( 'dns' );
 		$this->assertFalse( Cart::validate_direct_add( true, $product->get_id(), 1, 0, array(), array() ) );
 	}
+
+	private function add_request( string $domain, string $mode ): \WP_REST_Request {
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/domains/cart' );
+		$request->set_header( 'X-WC-Nonce', wp_create_nonce( 'wc_store_api' ) );
+		$request->set_body_params( array( 'domain' => $domain, 'mode' => $mode ) );
+		return $request;
+	}
+
+	public function test_choosing_the_same_domain_again_goes_on_to_checkout(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 16, 'restricted' => false ) ) );
+		$name = 'again-' . strtolower( wp_generate_password( 8, false, false ) ) . '.com';
+		$fake = new \BeltoftServices\Domains\FakeClient();
+		$fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => $name, 'status' => 'free', 'is_premium' => false ) ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		add_filter( 'woocommerce_set_cookie_enabled', '__return_false' ); // no browser here to set a session cookie
+		$this->service_product( 'domain' );
+		wc_load_cart();
+		WC()->cart->empty_cart();
+
+		$first = Cart::rest_add( $this->add_request( $name, 'register' ) );
+		$this->assertInstanceOf( \WP_REST_Response::class, $first );
+		$this->assertSame( 201, $first->get_status() );
+
+		$again = Cart::rest_add( $this->add_request( $name, 'register' ) );
+		$this->assertInstanceOf( \WP_REST_Response::class, $again, 'Not an error: the customer came back from checkout.' );
+		$this->assertSame( 200, $again->get_status() );
+		$this->assertTrue( $again->get_data()['already_in_cart'] );
+		$this->assertSame( wc_get_checkout_url(), $again->get_data()['checkout_url'] );
+		$this->assertCount( 1, WC()->cart->get_cart(), 'Nothing is added twice.' );
+
+		$other_way = Cart::rest_add( $this->add_request( $name, 'dns' ) );
+		$this->assertWPError( $other_way, 'The same name chosen another way is still explained.' );
+		$this->assertSame( 'duplicate_domain', $other_way->get_error_code() );
+	}
 }
