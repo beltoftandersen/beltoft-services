@@ -47,6 +47,7 @@ final class DomainSettings {
 		$fields['domain_featured_tlds'] = $base + array( 'type' => 'text', 'default' => 'com,net,org,eu', 'label' => __( 'Featured TLDs', 'beltoft-services' ) );
 		$fields['domain_renew_days_before'] = $base + array( 'type' => 'number', 'default' => 30, 'min' => 1, 'max' => 60, 'label' => __( 'Charge renewals before expiry, in days', 'beltoft-services' ) );
 		$fields['domain_low_balance'] = $base + array( 'type' => 'number', 'default' => 50, 'min' => 0, 'label' => __( 'Low registrar balance in EUR', 'beltoft-services' ) );
+		$fields['domain_seller_name'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Seller name in the .dk agreement', 'beltoft-services' ), 'desc' => __( 'The company that is paid for the registration, as named in the .dk checkout agreement. Empty uses the site name.', 'beltoft-services' ) );
 		$fields['domain_dns_url'] = $base + array( 'type' => 'text', 'default' => 'http://127.0.0.1:8081', 'label' => __( 'DNS API URL', 'beltoft-services' ) );
 		$fields['domain_dns_primary_query_address'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Primary DNS query address', 'beltoft-services' ), 'desc' => __( 'Local IP address used to check the first name server when its public address cannot be reached from this server.', 'beltoft-services' ) );
 		return $fields;

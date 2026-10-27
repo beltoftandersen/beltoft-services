@@ -11,6 +11,21 @@ class DkAgreementTest extends TestCase {
 		$this->assertFalse( DkAgreement::ready() );
 	}
 
+	public function test_agreement_has_the_seven_prescribed_paragraphs_with_the_seller_named(): void {
+		$paragraphs = DkAgreement::agreement_paragraphs( 'Example Seller ApS' );
+		$this->assertCount( 7, $paragraphs );
+		$this->assertStringStartsWith( 'I hereby agree to enter into an agreement', $paragraphs[0] );
+		$this->assertStringContainsString( 'I agree that I will pay to Example Seller ApS the fee for the first registration period', $paragraphs[6] );
+		$this->assertStringContainsString( 'cf. section 2.1 of Punktum dk A/S', $paragraphs[6] );
+	}
+
+	public function test_seller_comes_from_the_setting_not_from_code(): void {
+		$this->settings( array( 'domain_seller_name' => 'Setting Seller' ) );
+		$this->assertSame( 'Setting Seller', DkAgreement::seller() );
+		$this->settings( array( 'domain_seller_name' => '' ) );
+		$this->assertSame( wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), DkAgreement::seller() );
+	}
+
 	public function test_only_new_or_transferred_dk_names_need_acceptance(): void {
 		$items = array(
 			array( 'beltoft_services_domain' => array( 'domain' => 'one.dk', 'mode' => 'register' ) ),
@@ -38,6 +53,10 @@ class DkAgreementTest extends TestCase {
 		$this->assertStringContainsString( 'agree.dk', $html );
 		$this->assertStringContainsString( DkAgreement::TERMS_URL, $html );
 		$this->assertStringContainsString( 'type="checkbox"', $html );
+		$this->assertStringContainsString( DkAgreement::CHECKBOX_LABEL, $html );
+		$this->assertStringContainsString( DkAgreement::TERMS_LABEL, $html );
+		$this->assertStringContainsString( 'Section 18 (2) (13) of the Danish Consumer Contract Act', $html );
+		$this->assertStringContainsString( 'I hereby agree to enter into an agreement on the right to use the specified .dk domain name', $html );
 		DkAgreement::validate();
 		$this->assertGreaterThan( 0, wc_notice_count( 'error' ) );
 		wc_clear_notices();

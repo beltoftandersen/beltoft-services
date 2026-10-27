@@ -60,3 +60,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+.beltoft-domain-note {
+  margin: 0;
+}
+
+.beltoft-domain-transfer {
+  display: grid;
+  gap: .5rem;
+}
+
+.beltoft-domain-transfer__help {
+  margin: 0;
+  max-width: 28rem;
+}
+
+.beltoft-domain-transfer input {
+  width: 100%;
+}
