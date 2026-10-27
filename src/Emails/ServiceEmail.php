@@ -71,7 +71,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$this->values    = array(
 				'product_name'  => $license ? View::product_name( $license ) : '',
 				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
-				'account_url'   => wc_get_account_endpoint_url( Endpoint::slug() ),
+				'account_url'   => $license ? Endpoint::url_for_license( $license ) : wc_get_account_endpoint_url( Endpoint::slug() ),
 				'deletion_date' => (string) $date,
 				'reason'        => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
 				'held'          => $r->on_hold(),

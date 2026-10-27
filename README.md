@@ -2,7 +2,7 @@
 
 Sell services with WooCommerce Subscriptions. A license (from Beltoft Licenses) is the entitlement; drivers provision, pause, resume, update and remove the service in Action Scheduler jobs.
 
-Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.3 or newer, PHP 8.1 and MySQL 5.7.5 or MariaDB 10.0.2 or newer (more than WordPress itself needs: the plugin nests named locks, which older servers release early).
+Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or newer, PHP 8.1 and MySQL 5.7.5 or MariaDB 10.0.2 or newer (more than WordPress itself needs: the plugin nests named locks, which older servers release early).
 
 ## Features
 

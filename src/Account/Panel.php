@@ -211,11 +211,11 @@ final class Panel {
 	}
 
 	/**
-	 * The script and stylesheet, only on the My Account licenses endpoint. Themes can turn the
+	 * The script and stylesheet, only on the My Account licenses endpoint and its extra tabs. Themes can turn the
 	 * stylesheet off with the beltoft_services_account_css filter.
 	 */
 	public static function assets(): void {
-		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( Endpoint::slug() ) ) {
+		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! array_filter( array_map( 'is_wc_endpoint_url', Endpoint::slugs() ) ) ) {
 			return;
 		}
 

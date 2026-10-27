@@ -12,7 +12,7 @@ Sell services with WooCommerce Subscriptions. A license is the entitlement, and 
 
 == Description ==
 
-Built on Beltoft Licenses. The `Requires Plugins` header depends on the plugin folder names `woocommerce`, `woocommerce-subscriptions` and `beltoft-licenses`; a copy installed under another folder name is not recognised by WordPress as the dependency. It needs WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.3 or newer; if one is missing it shows a notice and does nothing else.
+Built on Beltoft Licenses. The `Requires Plugins` header depends on the plugin folder names `woocommerce`, `woocommerce-subscriptions` and `beltoft-licenses`; a copy installed under another folder name is not recognised by WordPress as the dependency. It needs WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or newer; if one is missing it shows a notice and does nothing else.
 
 A service product is a licensed product with a service driver. When its license becomes active, the driver creates the service. When the license is suspended, revoked or expires, the service is paused, and when the license is active again, it is resumed. A plan change (a subscription switch or a new site limit) updates the service's plan. Billing, renewals, retries and their emails stay with WooCommerce Subscriptions: this plugin only follows the license.
 
@@ -43,7 +43,7 @@ Connection secrets are encrypted with a key from `wp-config.php`, and they are n
 
 == Installation ==
 
-1. Install and activate WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.7.3 or newer, then this plugin.
+1. Install and activate WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or newer, then this plugin.
 2. Add the secrets key to `wp-config.php` (see the FAQ).
 3. Go to Settings → Services, check the alert address, and add a connection under Connections.
 4. On a licensed product, open the Service tab, choose the driver and the connection, and fill in the plan.
