@@ -226,7 +226,7 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertArrayHasKey( 'cpu', $by['node-a'] );
 
 		$calls = count( $this->fake->calls() );
-		$this->assertSame( 2, $calls, 'GET /nodes and one /cluster/resources, no per-VM call.' );
+		$this->assertSame( 4, $calls, 'GET /nodes, one /cluster/resources and one storage-status call per node; no per-VM call.' );
 
 		$node = Placement::node( 'lab', Clusters::get( 'lab' ) );
 

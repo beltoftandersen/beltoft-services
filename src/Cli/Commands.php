@@ -21,6 +21,13 @@ use BeltoftServices\Proxmox\LinkVm;
 use BeltoftServices\Proxmox\Metrics;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\GuestDisk;
+use BeltoftServices\Proxmox\DiskDriver;
+use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Clients;
+use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Provision;
+use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -29,6 +36,73 @@ defined( 'ABSPATH' ) || exit;
  * Manage Beltoft Services from the command line.
  */
 final class Commands {
+	/**
+	 * Link an existing disk without changing its VM. Dry run makes no Proxmox call.
+	 *
+	 * ## OPTIONS
+	 * <license-id> : The disk license.
+	 * <server-license-id> : Its owner's server license.
+	 * <slot> : The existing scsi1 through scsi30 slot.
+	 * [--dry-run] : Print the intended read and bookkeeping change.
+	 * [--confirm=<text>] : LINK-DISK:<slot> on a live cluster.
+	 *
+	 * @subcommand link-disk
+	 */
+	public function link_disk( array $args, array $assoc_args ): void {
+		$disk_license = Licenses::find( (int) ( $args[0] ?? 0 ) );
+		$server_license = Licenses::find( (int) ( $args[1] ?? 0 ) );
+		$slot = (string) ( $args[2] ?? '' );
+		if ( ! $disk_license || ! $server_license || ! preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', $slot ) ) {
+			\WP_CLI::error( 'Give a disk license, a server license and scsi1 through scsi30.' );
+		}
+		$driver = Product::driver_for( (int) $disk_license['product_id'] );
+		$server = Resource::for_license( (int) $server_license['id'] );
+		if ( ! $driver || DiskDriver::ID !== $driver->id() || ! $server || 'proxmox' !== $server->get( 'driver' ) || $server->get( 'linked' ) || 'ready' !== $server->get( 'state' ) || Licenses::STATUS_ACTIVE !== Licenses::effective_status( $disk_license ) || (int) $disk_license['user_id'] !== (int) $server_license['user_id'] || Resource::for_license( (int) $disk_license['id'] ) ) {
+			\WP_CLI::error( 'The disk license must be active, both licenses must belong to one customer, the server must be ready and managed, and the disk must have no resource.' );
+		}
+		$record = VmRecords::for_resource( $server->id() );
+		$cluster = $record ? Clusters::get( $record['cluster'] ) : null;
+		if ( ! $record || ! $cluster ) {
+			\WP_CLI::error( 'The server VM record or cluster is unavailable.' );
+		}
+		foreach ( DiskMeta::for_server( $server ) as $other ) {
+			if ( $other->get( 'slot' ) === $slot ) {
+				\WP_CLI::error( 'Another disk resource already claims that slot.' );
+			}
+		}
+		if ( ! empty( $assoc_args['dry-run'] ) ) {
+			\WP_CLI::log( sprintf( 'Would read VM %d in cluster %s, verify ownership and slot %s, then create a protected disk resource. No remote write.', (int) $record['vmid'], $record['cluster'], $slot ) );
+			return;
+		}
+		if ( 'live' === ( $cluster['client'] ?? 'fake' ) && ( $assoc_args['confirm'] ?? '' ) !== 'LINK-DISK:' . $slot ) {
+			\WP_CLI::error( 'Live read requires --confirm=LINK-DISK:' . $slot . ' and per-step authorization.' );
+		}
+		$gate = Clients::gate( $record['cluster'], $cluster, Clients::live_allowed() );
+		if ( $gate ) {
+			\WP_CLI::error( $gate );
+		}
+		$client = Clients::for( $cluster );
+		$vm = Ownership::verify( $client, $record, $server );
+		if ( is_wp_error( $vm ) ) {
+			\WP_CLI::error( 'VM ownership could not be verified: ' . $vm->get_error_message() );
+		}
+		$value = (string) ( $vm['config'][ $slot ] ?? '' );
+		$volid = explode( ',', $value )[0];
+		$prefix = (string) $cluster['storage'] . ':' . (int) $record['vmid'] . '/';
+		$name = str_starts_with( $volid, $prefix ) ? substr( $volid, strlen( $prefix ) ) : '';
+		$size = Provision::gigabytes( $value );
+		$variation_id = (int) ( $disk_license['variation_id'] ?? 0 );
+		$plan = Product::plan( (int) $disk_license['product_id'], $variation_id > 0 ? $variation_id : null );
+		if ( ! preg_match( '/^vm-' . (int) $record['vmid'] . '-[A-Za-z0-9._-]+\.raw$/', $name ) || null === $size || (int) $size !== (int) ( $plan['disk_gb'] ?? 0 ) ) {
+			\WP_CLI::error( 'The slot must hold a raw volume on the server storage with exactly the licensed size.' );
+		}
+		$resource = Resource::create( $disk_license, $driver, $plan, array( 'server_license' => (int) $server_license['id'], 'slot' => $slot, 'volname' => $name, 'size_gb' => (int) $size, 'state' => 'ready', 'desired' => 'ready', 'linked' => true, 'protected' => true, 'steps' => array( 'server', 'slot', 'allocate', 'attach', 'verify' ), 'notified' => 'ready' ) );
+		if ( is_wp_error( $resource ) ) {
+			\WP_CLI::error( $resource->get_error_message() );
+		}
+		Events::add( (int) $disk_license['id'], 'resource_linked', sprintf( 'Linked existing disk in %s by WP-CLI without changing the server.', $slot ) );
+		\WP_CLI::success( sprintf( 'Linked disk license %d to server license %d in %s.', (int) $disk_license['id'], (int) $server_license['id'], $slot ) );
+	}
 	/**
 	 * Read shaped VPS metrics for one license; --disk explicitly asks its guest agent.
 	 *

@@ -68,6 +68,7 @@ final class Plugin {
 		Account\Panel::register();
 		Api\Routes::register();
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
+		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
 		Proxmox\MetricsRoute::register();
 		Proxmox\Switches::register();
@@ -76,6 +77,10 @@ final class Plugin {
 		Proxmox\SshKeyField::register();
 		Proxmox\OsField::register();
 		Proxmox\BackupField::register();
+		Proxmox\DiskMeta::register();
+		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );
+		Proxmox\DiskCart::register();
+		Proxmox\DiskField::register();
 		Proxmox\Actions::register();
 		Proxmox\Panels::register();
 		Proxmox\EmailDetails::register();

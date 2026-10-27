@@ -87,6 +87,7 @@ class FakeClient implements Client {
 			'tasks' => array(),
 			'seq'   => 0,
 			'backups' => array(),
+			'images' => array(),
 		);
 	}
 
@@ -377,6 +378,9 @@ class FakeClient implements Client {
 			'digest'     => array( 'string', false, array( 'max' => 40 ) ),
 			'delete'     => array( 'string' ),
 		);
+		foreach ( range( 0, 30 ) as $number ) {
+			$cfg[ 'scsi' . $number ] = array( 'string' );
+		}
 
 		return array(
 			array( 'GET', '#^/cluster/resources$#', 'h_resources', array( 'type' => array( 'enum', false, array( 'values' => array( 'vm', 'storage', 'node', 'sdn' ) ) ) ) ),
@@ -501,10 +505,22 @@ class FakeClient implements Client {
 				'#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content$#',
 				'h_content',
 				array(
-					'content' => array( 'enum', false, array( 'values' => array( 'backup' ) ) ),
+					'content' => array( 'enum', false, array( 'values' => array( 'backup', 'images' ) ) ),
 					'vmid'    => array( 'int', false, array( 'min' => 100 ) ),
 				),
 			),
+			array(
+				'POST',
+				'#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content$#',
+				'h_content_create',
+				array(
+					'filename' => array( 'string', true ),
+					'size'     => array( 'size', true ),
+					'vmid'     => array( 'int', true, array( 'min' => 100 ) ),
+					'format'   => array( 'enum', false, array( 'values' => array( 'raw' ) ) ),
+				),
+			),
+			array( 'GET', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/status$#', 'h_storage_status', $none ),
 			array( 'DELETE', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content/(.+)$#', 'h_content_delete', $none ),
 			array(
 				'DELETE',
@@ -771,12 +787,34 @@ class FakeClient implements Client {
 		$id = (int) $a[1];
 
 		foreach ( array_filter( array_map( 'trim', explode( ',', (string) ( $p['delete'] ?? '' ) ) ) ) as $key ) {
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+				$unused = 0;
+				while ( isset( $this->state['vms'][ $id ]['config'][ 'unused' . $unused ] ) ) {
+					++$unused;
+				}
+				$this->state['vms'][ $id ]['config'][ 'unused' . $unused ] = explode( ',', (string) $this->state['vms'][ $id ]['config'][ $key ] )[0];
+			}
+			if ( 1 === preg_match( '/^unused\d+$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+				$volid = (string) $this->state['vms'][ $id ]['config'][ $key ];
+				foreach ( $this->state['images'] as $storage => $images ) {
+					unset( $this->state['images'][ $storage ][ $volid ] );
+				}
+			}
 			unset( $this->state['vms'][ $id ]['config'][ $key ] );
 		}
 
 		foreach ( $p as $key => $value ) {
 			if ( in_array( $key, array( 'digest', 'delete' ), true ) || in_array( $key, self::SENSITIVE, true ) ) {
 				continue;
+			}
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) && false === strpos( $value, 'size=' ) ) {
+				$volid = explode( ',', $value )[0];
+				foreach ( $this->state['images'] as $images ) {
+					if ( isset( $images[ $volid ] ) ) {
+						$value .= ',size=' . (int) ( $images[ $volid ]['size'] / 1073741824 ) . 'G';
+						break;
+					}
+				}
 			}
 
 			$this->state['vms'][ $id ]['config'][ $key ] = $value;
@@ -885,6 +923,12 @@ class FakeClient implements Client {
 			$a[1],
 			function () use ( $a, $p, $disk ) {
 				$this->state['vms'][ (int) $a[1] ]['config'][ $p['disk'] ] = preg_replace( '/size=[0-9.]+[KMGT]?/', 'size=' . $p['size'], $disk );
+				$volid = explode( ',', $disk )[0];
+				foreach ( $this->state['images'] as $storage => $images ) {
+					if ( isset( $images[ $volid ] ) ) {
+						$this->state['images'][ $storage ][ $volid ]['size'] = (int) $p['size'] * 1073741824;
+					}
+				}
 			}
 		);
 	}
@@ -1182,7 +1226,7 @@ class FakeClient implements Client {
 	}
 
 	/**
-	 * GET storage content (backups only; the config snapshot is not part of the listing).
+	 * GET storage content. Backup config snapshots are not part of the listing.
 	 *
 	 * @param array<int, string>   $a Captures (node, storage).
 	 * @param array<string, mixed> $p Parameters.
@@ -1190,6 +1234,16 @@ class FakeClient implements Client {
 	private function h_content( array $a, array $p ) {
 		$out = array();
 
+		if ( ! isset( $p['content'] ) || 'images' === $p['content'] ) {
+			foreach ( $this->state['images'][ $a[1] ] ?? array() as $image ) {
+				if ( ! isset( $p['vmid'] ) || (int) $image['vmid'] === $p['vmid'] ) {
+					$out[] = $image;
+				}
+			}
+		}
+		if ( 'images' === ( $p['content'] ?? '' ) ) {
+			return $out;
+		}
 		foreach ( $this->state['backups'][ $a[1] ] ?? array() as $backup ) {
 			if ( isset( $p['vmid'] ) && (int) $backup['vmid'] !== $p['vmid'] ) {
 				continue;
@@ -1200,6 +1254,47 @@ class FakeClient implements Client {
 		}
 
 		return $out;
+	}
+
+	/** Allocate a named raw image on directory storage (modelled). */
+	private function h_content_create( array $a, array $p ) {
+		$vmid = (int) $p['vmid'];
+		$name = (string) $p['filename'];
+		if ( ! isset( $this->state['nodes'][ $a[0] ] ) || ! isset( $this->state['vms'][ $vmid ] ) ) {
+			return $this->error( 500, 'node or VM not found' );
+		}
+		if ( 1 !== preg_match( '/^vm-' . $vmid . '-[A-Za-z0-9._-]+\.raw$/', $name ) ) {
+			return $this->error( 400, 'illegal image name' );
+		}
+		$volid = $a[1] . ':' . $vmid . '/' . $name;
+		if ( isset( $this->state['images'][ $a[1] ][ $volid ] ) ) {
+			return $this->error( 500, 'volume already exists' );
+		}
+		if ( 1 !== preg_match( '/^(\d+)G$/', (string) $p['size'], $size ) ) {
+			return $this->error( 400, 'size must be in GB' );
+		}
+		$this->state['images'][ $a[1] ][ $volid ] = array(
+			'volid' => $volid,
+			'vmid' => $vmid,
+			'format' => 'raw',
+			'size' => (int) $size[1] * 1073741824,
+			'content' => 'images',
+		);
+		return $volid;
+	}
+
+	/** Storage status for capacity checks (modelled). */
+	private function h_storage_status( array $a, array $p ) {
+		unset( $p );
+		if ( ! isset( $this->state['nodes'][ $a[0] ] ) ) {
+			return $this->error( 500, 'node not found' );
+		}
+		$total = 4 * 1099511627776;
+		$used  = 0;
+		foreach ( $this->state['images'][ $a[1] ] ?? array() as $image ) {
+			$used += (int) $image['size'];
+		}
+		return array( 'total' => $total, 'used' => $used, 'avail' => $total - $used, 'active' => 1 );
 	}
 
 	/**

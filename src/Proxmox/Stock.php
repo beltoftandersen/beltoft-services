@@ -144,7 +144,7 @@ final class Stock {
 
 		$driver = Product::driver_for( $product->get_id() );
 
-		return $driver && 'proxmox' === $driver->id() ? true : $purchasable;
+		return $driver && in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) ? true : $purchasable;
 	}
 
 	/**
@@ -162,7 +162,7 @@ final class Stock {
 
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( ! $driver || 'proxmox' !== $driver->id() ) {
+		if ( ! $driver || ! in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) ) {
 			return $in_stock;
 		}
 
@@ -196,7 +196,7 @@ final class Stock {
 		if ( ! $value && $product instanceof \WC_Product ) {
 			$driver = Product::driver_for( $product->get_id() );
 
-			if ( $driver && 'proxmox' === $driver->id() && self::existing_customer_flow( $product ) ) {
+			if ( $driver && in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) && self::existing_customer_flow( $product ) ) {
 				return true;
 			}
 		}
@@ -218,7 +218,7 @@ final class Stock {
 
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( ! $driver || 'proxmox' !== $driver->id() || self::existing_customer_flow( $product ) ) {
+		if ( ! $driver || ! in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) || self::existing_customer_flow( $product ) ) {
 			return $value;
 		}
 
@@ -250,6 +250,21 @@ final class Stock {
 	 * @param \WC_Product $product Product or variation.
 	 */
 	private static function availability( \WC_Product $product ): ?bool {
+		$driver = Product::driver_for( $product->get_id() );
+		if ( $driver && DiskDriver::ID === $driver->id() ) {
+			$size = (int) ( Product::plan( $product->get_id() )['disk_gb'] ?? 0 );
+			if ( $size < 1 ) {
+				return false;
+			}
+			foreach ( Clusters::all() as $cluster_id => $cluster ) {
+				foreach ( (array) $cluster['nodes'] as $node ) {
+					if ( DiskCapacity::fits( (string) $cluster_id, (string) $node, (string) $cluster['storage'], $size ) ) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
 		if ( 0 === IpPool::free_count() ) {
 			return false;
 		}
@@ -322,7 +337,7 @@ final class Stock {
 		$id     = $parent > 0 ? $parent : $product->get_id();
 		$driver = Product::driver_for( $id );
 
-		if ( $driver && 'proxmox' === $driver->id() ) {
+		if ( $driver && in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) ) {
 			self::sync_ids( array( $id ), null );
 		}
 	}
@@ -421,8 +436,7 @@ final class Stock {
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
 				'no_found_rows'  => true,
-				'meta_key'       => Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one small lookup of VM products.
-				'meta_value'     => 'proxmox', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+				'meta_query'     => array( array( 'key' => Product::META_DRIVER, 'value' => array( 'proxmox', DiskDriver::ID ), 'compare' => 'IN' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Small service-product catalogue.
 			)
 		);
 
@@ -441,7 +455,8 @@ final class Stock {
 			return false; // Quantities decide; WooCommerce would reset the status anyway.
 		}
 
-		if ( null !== $cluster_id && (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) !== $cluster_id ) {
+		$driver = Product::driver_for( $product->get_id() );
+		if ( null !== $cluster_id && ( ! $driver || DiskDriver::ID !== $driver->id() ) && (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) !== $cluster_id ) {
 			return false;
 		}
 

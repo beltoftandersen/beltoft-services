@@ -34,7 +34,19 @@ final class EmailDetails {
 	 * @return mixed
 	 */
 	public static function details( $details, $email_id, $r ) {
-		if ( ! is_array( $details ) || 'beltoft_services_ready' !== $email_id || ! $r instanceof Resource || SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+		if ( ! is_array( $details ) || 'beltoft_services_ready' !== $email_id || ! $r instanceof Resource ) {
+			return $details;
+		}
+		if ( DiskDriver::ID === $r->get( 'driver' ) ) {
+			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+			$details[ __( 'Extra disk', 'beltoft-services' ) ] = (int) $r->get( 'size_gb' ) . ' GB';
+			if ( $server ) {
+				$details[ __( 'Server', 'beltoft-services' ) ] = (string) $server->get( 'ip' );
+			}
+			$details[ __( 'Backups', 'beltoft-services' ) ] = __( 'Extra disks are not included in nightly backups.', 'beltoft-services' );
+			return $details;
+		}
+		if ( SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
 			return $details;
 		}
 

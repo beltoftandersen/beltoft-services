@@ -50,6 +50,27 @@ final class Switches {
 
 		try {
 			$target = Product::plan( (int) $product_id, (int) $variation_id > 0 ? (int) $variation_id : null );
+			$target_driver = Product::driver_for( (int) $product_id );
+			if ( $target_driver && DiskDriver::ID === $target_driver->id() ) {
+				$item_product = ( is_object( $item ) && method_exists( $item, 'get_product_id' ) ) ? (int) $item->get_product_id() : 0;
+				$found = false;
+				foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
+					if ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) {
+						continue;
+					}
+					$disk = Resource::for_license( (int) $license['id'] );
+					if ( ! $disk || DiskDriver::ID !== $disk->get( 'driver' ) ) {
+						continue;
+					}
+					$found = true;
+					$plan = (array) $disk->get( 'plan' );
+					$have = max( (int) ( $plan['disk_gb'] ?? 0 ), (int) $disk->get( 'size_gb' ) );
+					if ( $have > (int) ( $target['disk_gb'] ?? 0 ) ) {
+						return __( "Disks can't be made smaller. Choose a size at least as large as your current disk.", 'beltoft-services' );
+					}
+				}
+				return $found ? $message : __( 'The disk for this subscription could not be found.', 'beltoft-services' );
+			}
 
 			if ( 'proxmox' !== ( Product::driver_for( (int) $product_id ) ? Product::driver_for( (int) $product_id )->id() : '' ) ) {
 				return $message;

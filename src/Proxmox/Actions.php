@@ -143,6 +143,10 @@ final class Actions {
 		if ( true === $r->get( 'linked' ) ) {
 			return $out;
 		}
+		if ( DiskMeta::for_server( $r ) ) {
+			$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
+			return $out;
+		}
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -201,6 +205,9 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
+		if ( in_array( $action, array( 'reinstall', 'restore' ), true ) && DiskMeta::for_server( $r ) ) {
+			return __( 'Remove the extra disks before reinstalling or restoring this server.', 'beltoft-services' );
+		}
 		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore' ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
 		}

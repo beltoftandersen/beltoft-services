@@ -50,6 +50,45 @@ $beltoft_services_power_labels = array(
 		<?php endif; ?>
 	</dl>
 
+	<section class="beltoft-services-vm__disks">
+		<h4><?php esc_html_e( 'Disks', 'beltoft-services' ); ?></h4>
+		<dl class="beltoft-services-vm__facts">
+			<dt><?php esc_html_e( 'Boot disk', 'beltoft-services' ); ?></dt>
+			<dd><?php echo esc_html( (int) $plan['disk_gb'] . ' GB' ); ?></dd>
+		</dl>
+		<?php foreach ( $extra_disks['items'] as $beltoft_extra_disk ) : ?>
+			<div class="beltoft-services-vm__disk">
+				<p><strong><?php echo esc_html( ( $beltoft_extra_disk['slot'] ?: __( 'Extra disk', 'beltoft-services' ) ) . ': ' . $beltoft_extra_disk['size'] . ' GB' ); ?></strong> <?php echo esc_html( $beltoft_extra_disk['state'] ); ?></p>
+				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
+				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a><?php endif; ?>
+			</div>
+		<?php endforeach; ?>
+		<?php if ( $extra_disks['items'] ) : ?>
+			<p class="description">
+				<?php if ( 'on' === $extra_disks['mode'] ) : ?>
+					<?php
+					$beltoft_disk_retention = (int) ( $extra_disks['items'][0]['retention_days'] ?? 0 );
+					if ( $beltoft_disk_retention > 0 ) {
+						/* translators: %d: days after the disk subscription's paid period ends. */
+						echo esc_html( sprintf( _n( 'When a disk subscription ends, the disk and its data are removed %d day after the paid period ends.', 'When a disk subscription ends, the disk and its data are removed %d days after the paid period ends.', $beltoft_disk_retention, 'beltoft-services' ), $beltoft_disk_retention ) );
+					} else {
+						esc_html_e( 'When a disk subscription ends, the disk and its data stay attached until we remove them.', 'beltoft-services' );
+					}
+					?>
+				<?php else : ?>
+					<?php esc_html_e( 'When a disk subscription ends, billing stops. The disk stays attached until we remove it.', 'beltoft-services' ); ?>
+				<?php endif; ?>
+			</p>
+			<p class="description"><?php esc_html_e( 'Reinstall and restore are unavailable until the extra disks are removed.', 'beltoft-services' ); ?></p>
+		<?php endif; ?>
+		<?php if ( $extra_disks['add'] ) : ?>
+			<p><?php esc_html_e( 'Add a disk:', 'beltoft-services' ); ?>
+			<?php foreach ( $extra_disks['add'] as $beltoft_disk_size ) : ?>
+				<a href="<?php echo esc_url( $beltoft_disk_size['url'] ); ?>"><?php echo esc_html( $beltoft_disk_size['size'] . ' GB (' . $beltoft_disk_size['price'] . ' excluding VAT)' ); ?></a>
+			<?php endforeach; ?></p>
+		<?php endif; ?>
+	</section>
+
 	<?php if ( $metrics ) : ?>
 		<section class="beltoft-vm-usage" data-vm-metrics>
 			<div class="beltoft-vm-usage__head">
@@ -130,7 +169,7 @@ $beltoft_services_power_labels = array(
 					</table>
 				<?php endif; ?>
 
-				<?php if ( $backups['can_restore'] ) : ?>
+				<?php if ( $backups['can_restore'] && ! $extra_disks['items'] ) : ?>
 					<details class="beltoft-services-vm__more">
 						<summary><?php esc_html_e( 'Restore from a backup', 'beltoft-services' ); ?></summary>
 						<form class="beltoft-services-vm-form" data-action="restore">
@@ -193,7 +232,7 @@ $beltoft_services_power_labels = array(
 			</form>
 		</details>
 
-		<details class="beltoft-services-vm__more">
+		<?php if ( ! $extra_disks['items'] ) : ?><details class="beltoft-services-vm__more">
 			<summary><?php esc_html_e( 'Reinstall', 'beltoft-services' ); ?></summary>
 			<form class="beltoft-services-vm-form" data-action="reinstall">
 				<p class="description"><?php esc_html_e( 'Reinstalling erases everything on the server and installs the system again. The IP address stays. You get a new password.', 'beltoft-services' ); ?></p>
@@ -223,6 +262,6 @@ $beltoft_services_power_labels = array(
 				</p>
 				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
 			</form>
-		</details>
+		</details><?php endif; ?>
 	<?php endif; ?>
 </div>

@@ -118,6 +118,7 @@ final class Panels {
 			'metrics'    => 'ready' === $r->get( 'state' ) && $r->shows_status(),
 			'disk_used'  => $disk['used'] ?? null,
 			'disk_total' => $disk['total'] ?? null,
+			'extra_disks' => DiskPanels::server( $r ),
 		);
 
 		( static function ( array $vars ): void {

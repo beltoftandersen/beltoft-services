@@ -31,6 +31,9 @@ final class ProxmoxSettings {
 		'abuse_hours'      => array( 1, 168 ),
 		'monitor_disk_percent' => array( 50, 99 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
+		'disk_reserve_gb' => array( 0, 10000 ),
+		'disk_promise_percent' => array( 1, 100 ),
+		'disk_max_extra' => array( 1, 30 ),
 	);
 
 	/**
@@ -208,6 +211,9 @@ final class ProxmoxSettings {
 			'label'   => __( 'Memory kept free on each node, in GB', 'beltoft-services' ),
 			'desc'    => __( 'A node counts as full when the memory promised to the virtual machines of this site, plus this reserve, reaches the memory of the node. It leaves room for Proxmox itself and for machines this site did not create.', 'beltoft-services' ),
 		);
+		$fields['disk_reserve_gb'] = $base + array( 'type' => 'number', 'default' => 200, 'min' => 0, 'label' => __( 'Storage kept free on each node (GB)', 'beltoft-services' ) );
+		$fields['disk_promise_percent'] = $base + array( 'type' => 'number', 'default' => 100, 'min' => 1, 'label' => __( 'Maximum promised storage (%)', 'beltoft-services' ) );
+		$fields['disk_max_extra'] = $base + array( 'type' => 'number', 'default' => 4, 'min' => 1, 'label' => __( 'Maximum extra disks per server', 'beltoft-services' ) );
 		$fields['abuse_mode']       = $base + array(
 			'type'    => 'select',
 			'default' => 'report',

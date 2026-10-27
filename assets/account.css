@@ -51,6 +51,25 @@
 .beltoft-services-panel__notice:empty {
 	display: none;
 }
+
+.beltoft-services-vm__disks {
+	margin: 1.5em 0;
+}
+
+.beltoft-services-vm__disk {
+	padding: 0.75em 0;
+	border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.beltoft-services-vm__disk p {
+	margin: 0 0 0.35em;
+}
+
+.beltoft-services-vm__disk a + a,
+.beltoft-services-vm__disks p a + a {
+	margin-left: 1em;
+}
+
 .beltoft-services-domain { --bsd-ink: var(--navy, #0c1535); --bsd-soft: var(--ink-soft, #5e7080); --bsd-rule: var(--rule, #d6d2c8); --bsd-warm: var(--bg-warm, #eeece6); --bsd-card: var(--bg-card, #fff); font-size: 15px; line-height: 1.5; }
 .beltoft-services-domain__facts { display: grid; gap: 10px; margin: 0; }
 .beltoft-services-domain__facts > div { display: grid; grid-template-columns: 9.5em 1fr; align-items: baseline; gap: 0 16px; }

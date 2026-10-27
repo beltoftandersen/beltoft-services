@@ -341,7 +341,15 @@ final class ProxmoxJobs {
 			}
 		);
 
-		// Busy: the cache stays as it is and the next run writes it. Written: the stock status follows it.
+		$cluster = Clusters::get( $id );
+		if ( $cluster && ! empty( $cluster['storage'] ) ) {
+			foreach ( $nodes as $node ) {
+				if ( is_array( $node ) && 'online' === ( $node['status'] ?? '' ) && ! empty( $node['node'] ) ) {
+					DiskCapacity::refresh( $id, (string) $node['node'], (string) $cluster['storage'], $client );
+				}
+			}
+		}
+		// A product's stock follows both the memory and storage readings.
 		if ( $locked ) {
 			Stock::sync( $id );
 		}

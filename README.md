@@ -14,6 +14,7 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or ne
 - A Proxmox VE driver (0.2.0): virtual machines cloned from templates, with an IP pool, SSH key or one-time password, an operating system choice, capacity limits, customer actions and abuse, breach and deletion modes. A built-in fake cluster is used until you switch a cluster live.
 - Domain registration, transfer and DNS hosting drivers (0.4.0), with a public search, one domain per subscription, customer DNS records and name servers, DNSSEC, paid renewals and daily health checks.
 - VPS monitoring (0.5.0): owner-only usage graphs, cached root disk usage, and optional customer emails for unexpected downtime or a nearly full disk.
+- Extra disks (0.6.0, in preparation): one variable subscription variation per size, with one license and resource per disk. The live Proxmox allocation and removal sequence still requires the test-VM checks in the internal release plan.
 - WP-CLI: `wp beltoft-services link-http`, `link-vm`, `vm-metrics`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
 
 ## Setup
@@ -83,6 +84,16 @@ A node is full when the configured memory of this site's VMs on it (including re
 The customer's VPS panel in My Account shows CPU, memory, network and disk activity for the last hour, day or 30 days. These are read-only VM usage samples, cached for one minute per server and range. When the guest agent reports its root filesystem, the panel also shows used and total disk space; without a reading it shows the plan's disk size. Graphs are included with the VPS product.
 
 Settings → Services → Proxmox has **Customer monitoring emails** (off by default) and a disk-used threshold (90% by default). When enabled, a server that stays stopped unexpectedly for about 30 minutes or whose root filesystem reaches the threshold sends one email per problem. A customer shutdown does not trigger a down email. The disk alert rearms after usage falls five percentage points below the threshold. The existing power sweep reads down state every 15 minutes; a separate disk sweep reads running VMs every six hours. `wp beltoft-services vm-metrics <license-id> [--range=hour|day|month] [--disk]` prints the shaped readings; `--disk` explicitly asks the guest agent.
+
+### Extra disks
+
+Create a licensed **variable subscription** product with the `proxmox-disk` driver. Set `disk_gb` and the recurring price on each variation. A customer can choose one disk alongside a new server at classic checkout, or add disks to a ready server in My Account. Each disk has its own subscription, license, and resource. The default limit is four extra disks per server; it can be changed under Settings → Services → Proxmox.
+
+The hourly capacity job reads each node's configured disk storage. Disk purchases require a recent storage reading, the configured free-space reserve (200 GB by default), and room for the full promised capacity (100% by default). A disk is attached as a separate SCSI device and excluded from the server's nightly backups. The customer must find the device in the guest, create a filesystem, mount it, and grow the filesystem after a disk-size upgrade. A disk can grow through a subscription switch; it cannot shrink. Reinstall and restore are unavailable while extra disks remain attached.
+
+Cancellation follows the product's retention period (three days by default). The disk stays attached while deletion mode is off or report-only. With deletion mode on, the retention job detaches and removes only the volume recorded for that disk. The live allocation, hot-plug, resize, and detach behavior must be verified on a disposable VM before selling the product on a live cluster. The token needs `VM.Config.Disk` on customer VMs and `Datastore.AllocateSpace` on the disk storage, in addition to the existing server rights.
+
+`wp beltoft-services link-disk <disk-license-id> <server-license-id> <scsiN> --dry-run` previews adoption of an existing disk. Without `--dry-run`, it reads and verifies the VM and creates a protected, linked resource; it never changes the VM. A live cluster also requires `--confirm=LINK-DISK:<scsiN>` and the per-step authorization in the internal runbook.
 
 ### Deletion, abuse and breach
 

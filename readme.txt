@@ -22,6 +22,7 @@ A service product is a licensed product with a service driver. When its license 
 * **A Proxmox VE driver (0.2.0)** that sells virtual machines: a VM is cloned from a template, given an address from your IP pool and a login, and started. See the FAQ, starting at "What does the Proxmox driver do?". Version 0.3.0 adds daily backups with a customer restore ("How do backups work?").
 * **Domain and DNS hosting drivers (0.4.0):** domain search, registration and transfer, customer DNS records and name servers, DNSSEC, paid registry renewals, and DNS hosting for a domain registered elsewhere. Fake mode is the default. Live registrar and DNS access require `BELTOFT_SERVICES_DOMAINS_LIVE` in `wp-config.php`.
 * **VPS monitoring (0.5.0):** included usage graphs in My Account, cached root filesystem usage when the guest agent answers, and optional customer alerts for unexpected downtime and a nearly full disk. Customer emails are off by default.
+* **Extra disks (0.6.0, in preparation):** a separate variable subscription, license and resource per disk, offered with a new server at classic checkout or from My Account. A disk can grow but cannot shrink. Live Proxmox behavior requires a disposable VM check before sales are enabled.
 * **A Service tab on licensed products:** the driver, the connection, the driver's plan fields (for HTTP, a limit and plan attributes; variations can set their own), a retention period, and whether a free trial needs a payment method. A free trial of a service is limited to one per customer (matched by account and billing email), in the classic and the block checkout. Renewals, switches and resubscribes are not affected.
 * **My Account:** each service license shows its service's state and usage, the actions the driver offers, and the Open button. Customers only see and act on their own services.
 * **Admin:** WooCommerce → Services lists every service with its state. Each license screen gets a Service panel with retry, pause, resume, delete (with a typed confirmation), protect, and "Mark deleted" for a service that was removed by hand.
@@ -29,6 +30,7 @@ A service product is a licensed product with a service driver. When its license 
 * **Deletion after a retention period** is off by default. It can also report only, or delete.
 * **Kill switch:** "Pause all driver activity" stops every driver call at once.
 * **WP-CLI:** `wp beltoft-services link-http <license> --remote-id=<id> [--dry-run]` links a license to a service that already exists on the remote side (for a migration), `link-vm` adopts a Proxmox VM, and `link-domain` adopts a domain registration or existing DNS zone. `domain-prices`, `domain-balance` and `dns-check` manage domain pricing and health. `ip-pool-add`, `ip-pool-block`, `ip-pool-release` and `ip-pool-list` manage the address pool, and `status <license>` shows a service.
+  `link-disk <disk-license> <server-license> <scsiN> --dry-run` previews adoption of a disk already attached to a managed VM; actual adoption records it as protected and makes no VM change.
 
 Connection secrets are encrypted with a key from `wp-config.php`, and they are never shown, logged or emailed.
 

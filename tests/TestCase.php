@@ -32,6 +32,11 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// The licenses activation table is outside WordPress' per-test rollback. A domain resource
+		// from an earlier test would be picked up by the daily sync during unrelated alert tests.
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Isolated PHPUnit fixture reset.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . $wpdb->prefix . 'beltoft_licenses_activations WHERE kind = %s', 'domain' ) );
 
 		$this->http_calls     = array();
 		$this->http_responder = null;

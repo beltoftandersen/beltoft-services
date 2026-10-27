@@ -67,6 +67,15 @@ final class Alerts {
 			sprintf( 'Attempts: %d', $r->get( 'attempts' ) ),
 			sprintf( 'Error: %s', $error ),
 		);
+		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $r->get( 'driver' ) && 'provision' === $r->get( 'failed_op' ) && (int) ( $license['order_id'] ?? 0 ) > 0 ) {
+			$lines[] = sprintf( 'Paid disk not delivered: review and refund order #%d.', (int) $license['order_id'] );
+			$order = wc_get_order( (int) $license['order_id'] );
+			$item_id = (int) $r->get( 'order_item_id' );
+			$item = $order && $item_id ? $order->get_item( $item_id ) : null;
+			if ( $item instanceof \WC_Order_Item_Product ) {
+				$lines[] = sprintf( 'Disk line charged: %s %s including tax.', (string) $order->get_currency(), (string) ( (float) $item->get_total() + (float) $item->get_total_tax() ) );
+			}
+		}
 
 		$sent = (bool) wp_mail( $to, $subject, implode( "\n", $lines ) . "\n" );
 
