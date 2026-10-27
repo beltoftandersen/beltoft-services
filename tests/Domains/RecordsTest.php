@@ -22,6 +22,14 @@ class RecordsTest extends TestCase {
 		}
 	}
 
+	public function test_free_text_cannot_carry_control_characters_and_names_have_a_length_limit(): void {
+		$this->assertWPError( Records::validate( 'example.com', array( array( 'name' => '@', 'type' => 'TXT', 'value' => "line\nbreak" ) ) ) );
+		$this->assertWPError( Records::validate( 'example.com', array( array( 'name' => '@', 'type' => 'CAA', 'flag' => 0, 'tag' => 'issue', 'value' => "c\x00a" ) ) ) );
+		$long = implode( '.', array_fill( 0, 40, 'abcdefg' ) ) . '.example.com.';
+		$this->assertWPError( Records::validate( 'example.com', array( array( 'name' => $long, 'type' => 'A', 'value' => '192.0.2.1' ) ) ) );
+		$this->assertIsArray( Records::validate( 'example.com', array( array( 'name' => '@', 'type' => 'TXT', 'value' => 'v=spf1 -all' ) ) ) );
+	}
+
 	public function test_more_than_200_records_are_refused(): void {
 		$records = array_fill( 0, 201, array( 'name' => 'www', 'type' => 'A', 'value' => '192.0.2.1' ) );
 		$this->assertWPError( Records::validate( 'example.com', $records ) );

@@ -120,11 +120,11 @@
 		note.appendChild( text );
 		note.appendChild( slow );
 		Array.prototype.forEach.call( panel.querySelectorAll( 'button' ), function ( b ) { b.disabled = true; } );
-		var rounds = 30;
+		var rounds = 15; // every 4 seconds: well inside the status route's rate limit
 		function next() {
 			rounds -= 1;
 			if ( rounds < 1 ) { window.location.reload(); return; }
-			window.setTimeout( again, 2000 );
+			window.setTimeout( again, 4000 );
 		}
 		function again() {
 			request( 'GET', panel.dataset.domainResource ).then( function ( body ) {
@@ -157,9 +157,33 @@
 		var panel = button.closest( '[data-domain-resource]' );
 		button.disabled = true;
 		request( 'GET', panel.dataset.domainResource + '/domain-authcode' ).then( function ( body ) {
-			panel.querySelector( '.beltoft-services-domain-code' ).textContent = body.auth_code;
+			var code = panel.querySelector( '.beltoft-services-domain-code' );
+			code.value = body.auth_code;
+			code.closest( '.beltoft-services-domain__code' ).hidden = false;
+			code.focus();
+			code.select();
 			button.disabled = false;
 		} ).catch( function ( error ) { window.alert( error.message ); button.disabled = false; } );
+	} );
+	document.addEventListener( 'click', function ( event ) {
+		var copy = event.target.closest( '.beltoft-services-domain__copy' );
+		if ( ! copy ) { return; }
+		var input = copy.parentNode.querySelector( 'input' );
+		var label = copy.getAttribute( 'data-label' ) || copy.textContent;
+		function done() {
+			copy.setAttribute( 'data-label', label );
+			copy.textContent = copy.getAttribute( 'data-copied' );
+			window.setTimeout( function () { copy.textContent = label; }, 2000 );
+		}
+		function fallback() {
+			input.select();
+			try { if ( document.execCommand( 'copy' ) ) { done(); } } catch ( e ) {}
+		}
+		if ( window.navigator.clipboard && window.isSecureContext ) {
+			window.navigator.clipboard.writeText( input.value ).then( done ).catch( fallback );
+		} else {
+			fallback();
+		}
 	} );
 	// After unlocking, the transfer code is what the customer came for: show it once the page is back.
 	( function () {

@@ -51,6 +51,8 @@ class PanelsTest extends TestCase {
 		$this->assertStringContainsString( 'data-domain-action="lock"', $r );
 		$this->assertStringNotContainsString( 'data-domain-action="unlock"', $r, 'Only the action that applies is offered.' );
 
+		$this->assertStringContainsString( 'beltoft-services-domain__copy', $r, 'The transfer code comes with a Copy button.' );
+		$this->assertMatchesRegularExpression( '/<input[^>]*readonly[^>]*beltoft-services-domain-code|<input[^>]*beltoft-services-domain-code[^>]*readonly/', $r );
 		$locked = $this->render( new DomainDriver(), array( 'domain' => 'lock-test-2.com', 'mode' => 'register', 'is_locked' => true ), true );
 		$this->assertStringContainsString( 'data-domain-action="unlock"', $locked );
 		$this->assertStringNotContainsString( 'data-domain-action="lock"', $locked );

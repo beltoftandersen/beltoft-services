@@ -129,4 +129,6 @@ div.beltoft-services-domain [hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .beltoft-services-domain__bar::before { width: 100%; opacity: .35; animation: none; } }
 .beltoft-services-domain__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 16px; }
 .beltoft-services-domain__actions form { margin: 0; }
-div.beltoft-services-domain output.beltoft-services-domain-code { display: block; margin-top: 12px; color: var(--bsd-ink); font-size: 17px; font-weight: 500; letter-spacing: .02em; overflow-wrap: anywhere; user-select: all; }
+.beltoft-services-domain__code { display: flex; gap: 8px; max-width: 520px; margin-top: 12px; }
+div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; background: var(--bsd-warm); font-size: 17px; font-weight: 500; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.beltoft-services-domain__code .button { flex: none; min-width: 5.5em; }

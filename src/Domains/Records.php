@@ -87,6 +87,7 @@ final class Records {
 			if ( substr_count( $raw, '.' ) > 1 ) { return new \WP_Error( 'outside_zone', 'A record name must stay inside the domain.' ); }
 			$name = $raw . '.' . $zone;
 		}
+		if ( strlen( $name ) > 253 ) { return new \WP_Error( 'bad_name', 'A record name is invalid.' ); }
 		foreach ( explode( '.', $name ) as $label ) {
 			if ( ! preg_match( '/^_?[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?$/', $label ) ) { return new \WP_Error( 'bad_name', 'A record name is invalid.' ); }
 		}
@@ -95,6 +96,7 @@ final class Records {
 
 	private static function content( string $type, array $record ): string|\WP_Error {
 		$value = trim( (string) ( $record['value'] ?? '' ) );
+		if ( in_array( $type, array( 'TXT', 'CAA' ), true ) && preg_match( '/[\x00-\x1F\x7F]/', $value ) ) { return new \WP_Error( 'bad_txt', 'A record value cannot contain control characters.' ); }
 		if ( 'A' === $type || 'AAAA' === $type ) {
 			$family = 'A' === $type ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6;
 			return filter_var( $value, FILTER_VALIDATE_IP, $family ) ? $value : new \WP_Error( 'bad_ip', 'Enter a valid IP address.' );
