@@ -7,7 +7,6 @@
 
 namespace BeltoftServices;
 
-use BeltoftServices\Account\Panel;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\SshKeyField;
 
@@ -281,7 +280,7 @@ final class Progress {
 			'current' => $current,
 			'minutes' => $minutes,
 			'eta'     => $eta,
-			'text'    => self::text( $r, $kind, $phase, $state, $marker, $eta, $driver ),
+			'text'    => self::text( $kind, $phase, $marker, $eta, $driver ),
 			'started' => self::started( $r, $kind, $marker ),
 		);
 	}
@@ -323,21 +322,20 @@ final class Progress {
 	/**
 	 * The sentence a screen reader hears and the card shows under the title.
 	 *
-	 * @param Resource                          $r      Resource.
 	 * @param string                            $kind   Kind.
 	 * @param string                            $phase  Phase.
-	 * @param string                            $state  Resource state.
 	 * @param array{action: string, at: int}|null $marker Marker.
 	 * @param string                            $eta    Typical duration sentence.
 	 * @param string                            $driver Driver id.
 	 */
-	private static function text( Resource $r, string $kind, string $phase, string $state, ?array $marker, string $eta, string $driver ): string {
+	private static function text( string $kind, string $phase, ?array $marker, string $eta, string $driver ): string {
 		if ( 'idle' === $phase ) {
 			return '';
 		}
 
 		if ( 'failed' === $phase ) {
-			return Panel::message( $state, $r );
+			// The card's own message above already says what to do; never the error itself.
+			return __( 'This stopped before it was finished.', 'beltoft-services' );
 		}
 
 		if ( 'queued' === $phase ) {

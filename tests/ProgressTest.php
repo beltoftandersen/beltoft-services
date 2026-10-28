@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Tests;
 
-use BeltoftServices\Account\Panel;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
@@ -182,7 +181,7 @@ final class ProgressTest extends TestCase {
 		$this->assertFalse( $p['active'] );
 		$this->assertSame( 'configure', $p['current'] );
 		$this->assertSame( 'failed', $this->statuses( $p )['configure'] );
-		$this->assertSame( Panel::message( 'failed', $r ), $p['text'] );
+		$this->assertSame( 'This stopped before it was finished.', $p['text'] );
 		$this->assertStringNotContainsString( 'hunter2', (string) wp_json_encode( $p ) );
 		$this->assertStringNotContainsString( '10.9.8.7', (string) wp_json_encode( $p ) );
 
