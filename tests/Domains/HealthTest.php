@@ -31,6 +31,17 @@ class HealthTest extends TestCase {
 		$this->assertContains( 'orphan-example.net: orphan zone', $issues );
 	}
 
+	public function test_dns_check_skips_the_sites_own_zones(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_infrastructure_zones' => 'Example.net., own-ns.example' ) );
+		$dns = new FakeDns();
+		$dns->create_zone( 'example.net', array( 'ns1.example.net', 'ns2.example.net' ) );
+		$dns->create_zone( 'own-ns.example', array( 'ns1.example.net', 'ns2.example.net' ) );
+		$dns->create_zone( 'stray-example.net', array( 'ns1.example.net', 'ns2.example.net' ) );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$issues = Health::dns_check();
+		$this->assertSame( array( 'stray-example.net: orphan zone' ), $issues );
+	}
+
 	public function test_dns_check_reports_old_serial_mismatch(): void {
 		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
 		$dns = new FakeDns();

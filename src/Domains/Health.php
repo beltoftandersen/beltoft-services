@@ -28,6 +28,14 @@ final class Health {
 		return $balance;
 	}
 
+	/** Zones that belong to the site itself (setting), which no customer service holds and which are no orphans. @return string[] */
+	public static function infrastructure_zones(): array {
+		$raw = Settings::get( 'domain_infrastructure_zones' );
+		$raw = is_string( $raw ) ? $raw : '';
+		$zones = array_map( static fn( $zone ) => strtolower( trim( $zone, " .\t\r\n" ) ), explode( ',', $raw ) );
+		return array_values( array_filter( apply_filters( 'beltoft_services_domain_infrastructure_zones', $zones ) ) );
+	}
+
 	/** @return string[]|\WP_Error DNS problems found in the primary and configured secondaries. */
 	public static function dns_check(): array|\WP_Error {
 		$nameservers = Zone::nameservers();
@@ -48,9 +56,10 @@ final class Health {
 			}
 		}
 		$issues = array();
+		$own    = self::infrastructure_zones();
 		foreach ( $listed as $zone ) {
 			$name = strtolower( rtrim( (string) ( $zone['name'] ?? '' ), '.' ) );
-			if ( '' !== $name && ! isset( $known[ $name ] ) ) { $issues[] = $name . ': orphan zone'; }
+			if ( '' !== $name && ! isset( $known[ $name ] ) && ! in_array( $name, $own, true ) ) { $issues[] = $name . ': orphan zone'; }
 		}
 		foreach ( $resources as $name => $r ) {
 			$zone = $dns->zone( $name );
