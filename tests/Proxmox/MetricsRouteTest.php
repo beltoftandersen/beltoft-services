@@ -54,6 +54,12 @@ class MetricsRouteTest extends MonitoringTestCase {
 		$failed = $this->call_route( $r->id() );
 		$this->assertSame( false, $failed->get_data()['available'] );
 		$this->fake->set_rrd( 5000, array( array( 'time' => 100, 'cpu' => 0.5 ) ) );
-		$this->assertSame( true, $this->call_route( $r->id() )->get_data()['available'], 'An error is not cached.' );
+		$rrd = static fn( $fake ) => count( array_filter( $fake->calls(), static fn( $call ) => str_ends_with( $call['path'], '/rrddata' ) ) );
+		$before = $rrd( $this->fake );
+		$this->assertSame( false, $this->call_route( $r->id() )->get_data()['available'], 'A failed read is kept briefly.' );
+		$this->assertSame( $before, $rrd( $this->fake ), 'No new cluster read while the failure is kept.' );
+		$this->assertLessThanOrEqual( 20, (int) get_option( '_transient_timeout_beltoft_services_proxmox_metrics_' . $r->id() . '_hour' ) - time(), 'Kept for 20 seconds, not a minute.' );
+		delete_transient( 'beltoft_services_proxmox_metrics_' . $r->id() . '_hour' );
+		$this->assertSame( true, $this->call_route( $r->id() )->get_data()['available'], 'After the short window the cluster is read again.' );
 	}
 }

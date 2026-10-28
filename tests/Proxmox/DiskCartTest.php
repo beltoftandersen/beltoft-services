@@ -141,4 +141,12 @@ class DiskCartTest extends BackupTestCase {
 		WC()->cart->remove_cart_item( $server_key );
 		$this->assertCount( 0, WC()->cart->get_cart(), 'A real server removal still cleans its disk.' );
 	}
+
+	public function test_a_disk_line_quantity_goes_back_to_one(): void {
+		WC()->cart->set_cart_contents( array( 'disk' => array( 'beltoft_services_disk_uid' => 'u1', 'quantity' => 5 ), 'other' => array( 'quantity' => 2 ) ) );
+		\BeltoftServices\Proxmox\DiskCart::one_each( WC()->cart );
+		$this->assertSame( 1, WC()->cart->cart_contents['disk']['quantity'] );
+		$this->assertSame( 2, WC()->cart->cart_contents['other']['quantity'] );
+		WC()->cart->empty_cart();
+	}
 }

@@ -41,9 +41,8 @@ final class MetricsRoute {
 		if ( ! is_array( $series ) ) {
 			$rows = ( new Operations( $resource ) )->series( $range );
 			$series = null === $rows ? array( 'range' => $range, 'step' => 0, 'points' => array() ) : Metrics::shape( $rows, $range );
-			if ( null !== $rows ) {
-				set_transient( $key, $series, MINUTE_IN_SECONDS );
-			}
+			// A failed read is kept for 20 seconds too, so polling does not reach the cluster on every request.
+			set_transient( $key, $series, null === $rows ? 20 : MINUTE_IN_SECONDS );
 		}
 		$series['disk'] = GuestDisk::cached( $resource );
 		$series['available'] = ! empty( $series['points'] );

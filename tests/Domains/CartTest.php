@@ -199,4 +199,12 @@ class CartTest extends TestCase {
 		$this->assertSame( array(), wc_get_notices( 'error' ) );
 		WC()->cart->empty_cart();
 	}
+
+	public function test_a_domain_line_quantity_goes_back_to_one(): void {
+		WC()->cart->set_cart_contents( array( 'dom' => array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'register' ), 'quantity' => 5 ), 'other' => array( 'quantity' => 3 ) ) );
+		Cart::apply_prices( WC()->cart );
+		$this->assertSame( 1, WC()->cart->cart_contents['dom']['quantity'] );
+		$this->assertSame( 3, WC()->cart->cart_contents['other']['quantity'] );
+		WC()->cart->empty_cart();
+	}
 }

@@ -19,6 +19,7 @@ final class DiskCart {
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
 		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
+		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'one_each' ), 5 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'checkout_validation' ), 10, 2 );
 	}
 
@@ -147,6 +148,15 @@ final class DiskCart {
 	public static function recurring_key( string $key, array $cart_item ): string {
 		$uid = (string) ( $cart_item['beltoft_services_disk_uid'] ?? '' );
 		return '' === $uid ? $key : $key . '_disk_' . md5( $uid );
+	}
+
+	/** One line is one disk: a quantity raised by a cart update or the Store API goes back to 1. */
+	public static function one_each( \WC_Cart $cart ): void {
+		foreach ( $cart->get_cart() as $key => $item ) {
+			if ( isset( $item['beltoft_services_disk_uid'] ) && 1 !== (int) ( $item['quantity'] ?? 1 ) ) {
+				$cart->cart_contents[ $key ]['quantity'] = 1;
+			}
+		}
 	}
 
 	public static function quantity( string $html, string $cart_item_key, array $cart_item ): string {

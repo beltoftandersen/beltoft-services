@@ -296,7 +296,9 @@ final class Cart {
 	}
 
 	public static function apply_prices( \WC_Cart $cart ): void {
-		foreach ( $cart->get_cart() as $item ) {
+		foreach ( $cart->get_cart() as $key => $item ) {
+			// One line is one domain: a quantity raised by a cart update or the Store API goes back to 1.
+			if ( isset( $item['beltoft_services_domain'] ) && 1 !== (int) ( $item['quantity'] ?? 1 ) ) { $cart->cart_contents[ $key ]['quantity'] = 1; }
 			$price = self::price_for( $item );
 			if ( null !== $price && isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) { $item['data']->set_price( $price ); }
 		}
