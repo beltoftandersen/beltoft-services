@@ -106,6 +106,7 @@ class PanelsTest extends TestCase {
 		$this->assertStringContainsString( 'data-domain-transfer', $html );
 		$this->assertStringContainsString( 'data-domain="move-here.com"', $html );
 		$this->assertStringContainsString( 'name="auth_code"', $html );
+		$this->assertStringContainsString( 'data-busy="Starting transfer…"', $html );
 		$this->assertStringContainsString( '22', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 

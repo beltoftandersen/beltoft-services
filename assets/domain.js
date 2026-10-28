@@ -260,7 +260,12 @@
 		var code = input ? input.value.trim() : '';
 		if ( ! code ) { if ( input ) { input.focus(); } return; }
 		var label = button ? button.textContent : '';
-		if ( button ) { button.disabled = true; button.textContent = form.getAttribute( 'data-busy' ) || label; }
+		if ( button ) {
+			button.disabled = true;
+			button.setAttribute( 'aria-busy', 'true' );
+			button.classList.add( 'is-busy' );
+			button.textContent = form.getAttribute( 'data-busy' ) || label;
+		}
 		if ( error ) { error.hidden = true; error.textContent = ''; }
 		window.fetch( form.getAttribute( 'data-cart' ), {
 			method: 'POST',
@@ -276,7 +281,12 @@
 			}
 			throw new Error( ( result.data && result.data.message ) || 'Error' );
 		} ).catch( function ( failure ) {
-			if ( button ) { button.disabled = false; button.textContent = label; }
+			if ( button ) {
+				button.disabled = false;
+				button.removeAttribute( 'aria-busy' );
+				button.classList.remove( 'is-busy' );
+				button.textContent = label;
+			}
 			if ( error ) { error.textContent = failure.message; error.hidden = false; }
 		} );
 	} );
