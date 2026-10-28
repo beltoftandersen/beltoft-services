@@ -86,6 +86,7 @@ final class Plugin {
 		Proxmox\OsField::register();
 		Proxmox\BackupField::register();
 		Proxmox\DiskMeta::register();
+		Proxmox\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );
 		Proxmox\DiskCart::register();
 		Proxmox\DiskField::register();

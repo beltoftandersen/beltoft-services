@@ -208,6 +208,16 @@ final class Operations {
 			}
 		}
 
+		// Fail-safe for an out-of-order end: the VM delete also destroys the disks that belong to it.
+		foreach ( DiskMeta::for_server( $this->r ) as $disk ) {
+			$disk_license = $disk->license();
+			if ( 'deleted' !== $disk->get( 'state' ) && \BeltoftServices\Lifecycle::is_active( $disk_license ) ) {
+				Alerts::admin( $this->r, 'A server with an active extra disk cannot be deleted; cancel the disk first.' );
+
+				return StepResult::retry( 3600, 'A server with an active extra disk cannot be deleted; cancel the disk first.' );
+			}
+		}
+
 		// While the VM is still in the pool and VM.Backup applies, and before its VMID can be reused.
 		$purged = $this->purge_backups();
 

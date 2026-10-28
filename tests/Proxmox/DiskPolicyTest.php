@@ -115,4 +115,108 @@ class DiskPolicyTest extends BackupTestCase {
 		$this->assertStringContainsString( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', $html );
 		$this->assertStringNotContainsString( 'sudo mkfs', $html, 'A detached disk shows no format instructions.' );
 	}
+
+	// -- A server's end ends its disks ---------------------------------------------------------
+
+	private function subscription( string $status = 'active', ?int $user = null ): \WC_Subscription {
+		$sub = wcs_create_subscription( array( 'customer_id' => $user ?? self::factory()->user->create(), 'billing_period' => 'month', 'billing_interval' => 1, 'status' => $status ) );
+		$this->assertInstanceOf( \WC_Subscription::class, $sub );
+		// The license table is not rolled back with the posts, which reuse their ids: forget rows left by earlier tests.
+		global $wpdb;
+		$wpdb->delete( \BeltoftLicenses\Install::tables()['licenses'], array( 'subscription_id' => $sub->get_id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture reset.
+		return $sub;
+	}
+
+	private function notes( \WC_Subscription $sub ): string {
+		return implode( "\n", array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) ) );
+	}
+
+	/** @return array{0: Resource, 1: \WC_Subscription, 2: Resource, 3: \WC_Subscription} server, its subscription, disk, the disk's subscription */
+	private function server_and_disk( ?Resource $server = null ): array {
+		$server = $server ?? $this->ready_vm();
+		$user = (int) $server->license()['user_id'];
+		$server_sub = $this->subscription( 'active', $user );
+		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $server->license()['id'], array( 'subscription_id' => $server_sub->get_id() ) ) );
+		$disk_product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
+		$disk_sub = $this->subscription( 'active', $user );
+		$disk_sub->add_product( $disk_product, 1, array( 'subtotal' => '5', 'total' => '5' ) );
+		$disk_sub->save();
+		$this->assertTrue( $this->fake_ready() );
+		$license = $this->service_license( $disk_product, array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $disk_sub->get_id() ) );
+		$disk = Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $disk_product->get_id() ), array( 'server_license' => (int) $server->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $disk );
+		return array( Resource::find( $server->id() ), $server_sub, $disk, $disk_sub );
+	}
+
+	private function fake_ready(): bool {
+		return DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake );
+	}
+
+	public function test_server_pending_cancel_puts_its_disk_subscription_in_pending_cancel_with_notes(): void {
+		list( , $server_sub, , $disk_sub ) = $this->server_and_disk();
+		$other = $this->subscription();
+		$server_sub->update_status( 'pending-cancel' );
+		$this->assertSame( 'pending-cancel', wcs_get_subscription( $disk_sub->get_id() )->get_status() );
+		$this->assertStringContainsString( 'Ended with its server', $this->notes( $disk_sub ) );
+		$this->assertStringContainsString( 'ends with this server', $this->notes( $server_sub ) );
+		$this->assertSame( 'active', wcs_get_subscription( $other->get_id() )->get_status(), 'An unrelated subscription is untouched.' );
+	}
+
+	public function test_server_cancel_cancels_its_disk_subscription_only(): void {
+		list( , $server_sub, , $disk_sub ) = $this->server_and_disk();
+		list( , , , $foreign_sub ) = $this->server_and_disk();
+		$server_sub->update_status( 'cancelled' );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $disk_sub->get_id() )->get_status() );
+		$this->assertStringContainsString( 'Cancelled with its server.', $this->notes( $disk_sub ) );
+		$this->assertSame( 'active', wcs_get_subscription( $foreign_sub->get_id() )->get_status(), 'The disk of another server stays.' );
+		$disk_sub->update_status( 'active' );
+	}
+
+	public function test_a_disk_subscription_with_other_lines_gets_a_note_and_an_alert_not_a_cancel(): void {
+		list( , $server_sub, , $disk_sub ) = $this->server_and_disk();
+		$disk_sub->add_product( $this->service_product( 'fake' ), 1, array( 'subtotal' => '3', 'total' => '3' ) );
+		$disk_sub->save();
+		$this->mails = array();
+		$server_sub->update_status( 'cancelled' );
+		$this->assertSame( 'active', wcs_get_subscription( $disk_sub->get_id() )->get_status() );
+		$this->assertStringContainsString( 'also holds other lines', $this->notes( $disk_sub ) );
+		$this->assertStringContainsString( 'also holds other lines', $this->notes( $server_sub ) );
+		$this->assertCount( 1, $this->mails );
+		$this->assertSame( 'admin@example.com', is_array( $this->mails[0]['to'] ) ? $this->mails[0]['to'][0] : $this->mails[0]['to'] );
+	}
+
+	public function test_an_already_ended_disk_subscription_is_skipped(): void {
+		list( , $server_sub, , $disk_sub ) = $this->server_and_disk();
+		$disk_sub->update_status( 'cancelled' );
+		$before = $this->notes( $disk_sub );
+		$server_sub->update_status( 'cancelled' );
+		$this->assertSame( $before, $this->notes( $disk_sub ) );
+	}
+
+	public function test_deletion_warning_lists_the_extra_disks_of_a_server_only(): void {
+		list( $server, , $disk ) = $this->server_and_disk();
+		$this->assertTrue( $disk->set( array( 'size_gb' => 50 ) ) );
+		$email = \BeltoftServices\Emails\Emails::get( 'beltoft_services_deletion_warning' );
+		$this->mails = array();
+		$this->assertTrue( $email->trigger( $server, array( 'deletes_at' => time() + DAY_IN_SECONDS ) ) );
+		$this->assertStringContainsString( 'Extra disks deleted with the server: 50 GB', wp_strip_all_tags( (string) $this->mails[0]['message'] ) );
+		$this->mails = array();
+		$this->assertTrue( $email->trigger( $disk, array( 'deletes_at' => time() + DAY_IN_SECONDS ) ) );
+		$this->assertStringNotContainsString( 'Extra disks deleted with the server', (string) $this->mails[0]['message'] );
+	}
+
+	public function test_server_delete_is_refused_while_a_disk_license_is_active(): void {
+		list( $server, , $disk ) = $this->server_and_disk();
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->mails = array();
+		$calls = count( $this->fake->calls() );
+		$result = Registry::get( 'proxmox' )->delete( $server );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertStringContainsString( 'active extra disk cannot be deleted', $result->error() );
+		$this->assertCount( 0, $this->calls( 'DELETE', '/qemu/5000' ), 'No VM delete.' );
+		$this->assertCount( 1, $this->mails, 'One admin alert.' );
+		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $disk->license()['id'], array( 'status' => 'revoked' ) ) );
+		$next = Registry::get( 'proxmox' )->delete( Resource::find( $server->id() ) );
+		$this->assertStringNotContainsString( 'active extra disk', (string) $next->error() );
+	}
 }

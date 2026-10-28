@@ -78,6 +78,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'retention_days' => self::retention_days( $r, $license ),
 				'deletes_on'    => self::deletes_on( $r, $license ),
 				'details'       => $this->details( $r ),
+				'extra_disks'   => self::extra_disks( $r ),
 				'used'          => $used,
 				'limit'         => $limit,
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
@@ -102,6 +103,30 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		return $sent;
+	}
+
+	/**
+	 * Sizes in GB of the extra disks that are deleted with a server, for its deletion warning.
+	 *
+	 * @param Resource $r Resource.
+	 * @return int[]
+	 */
+	private static function extra_disks( Resource $r ): array {
+		if ( \BeltoftServices\Proxmox\SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+			return array();
+		}
+
+		$sizes = array();
+
+		foreach ( \BeltoftServices\Proxmox\DiskMeta::for_server( $r ) as $disk ) {
+			$size = max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) );
+
+			if ( $size > 0 ) {
+				$sizes[] = $size;
+			}
+		}
+
+		return $sizes;
 	}
 
 	/**
