@@ -309,6 +309,14 @@ final class DiskSteps {
 
 	private const PENDING_DETACH = 'The disk detach is pending on the running server and applies when the server is restarted.';
 
+	/** A detach that waits for a restart: retried, and the admin is told once it has lasted. */
+	private function pending_detach(): StepResult {
+		if ( (int) $this->r->get( 'attempts' ) >= 2 ) {
+			\BeltoftServices\Alerts::admin( $this->r, self::PENDING_DETACH . ' Restart the server to apply it.' );
+		}
+		return StepResult::retry( 300, self::PENDING_DETACH );
+	}
+
 	private function has_image( array $images, string $volid ): bool {
 		foreach ( $images as $image ) {
 			if ( is_array( $image ) && ( $image['volid'] ?? '' ) === $volid ) {
@@ -319,14 +327,10 @@ final class DiskSteps {
 	}
 
 	/**
-	 * The volume is in no drive and in no unusedN entry of the server (a volume allocated but never
-	 * attached, or one a detach left behind): delete it by its own exact name, once it is certain
-	 * that the running server no longer uses it.
+	 * The volume was allocated but never attached (no attach step was ever recorded), and is in no drive and
+	 * no unusedN entry: delete it by its own exact name, once it is certain that the running server does not use it.
 	 */
-	private function remove_orphan( array $ctx, string $volid, bool $may_delete ): StepResult {
-		if ( ! $may_delete ) {
-			return StepResult::retry( 60, 'The disk volume still exists.' );
-		}
+	private function remove_orphan( array $ctx, string $volid ): StepResult {
 		$uuid = strtolower( preg_replace( '/[^a-f0-9]/i', '', (string) $this->r->get( 'uuid' ) ) );
 		$vmid = (int) $ctx['record']['vmid'];
 		if ( '' === $uuid || 1 !== preg_match( '/^vm-' . $vmid . '-bs(?:[1-9]|[12][0-9]|30)-' . $uuid . '\.raw$/', (string) $this->r->get( 'volname' ) ) ) {
@@ -341,11 +345,26 @@ final class DiskSteps {
 			return $this->classify( $running, 'disk running configuration' );
 		}
 		if ( ! is_array( $running ) || $this->attached( $running, $volid ) ) {
-			return StepResult::retry( 300, self::PENDING_DETACH );
+			return $this->pending_detach();
 		}
-		$task = $this->run_task( 'disk volume delete', 'DELETE', self::content_path( $ctx ) . '/' . rawurlencode( $volid ) );
-		if ( $task instanceof StepResult ) {
-			return $task;
+		$by_hand = 'The unattached disk volume ' . $volid . ' could not be removed; remove it by hand.';
+		$upid = $this->client->task( 'DELETE', self::content_path( $ctx ) . '/' . rawurlencode( $volid ) );
+		if ( is_wp_error( $upid ) ) {
+			// An error reply (a refusal, a permission) is final: nothing was touched. Without a status it is a transport problem and is retried.
+			$data = $upid->get_error_data();
+			return is_array( $data ) && (int) ( $data['status'] ?? 0 ) >= 400 && ! in_array( (int) $data['status'], array( 408, 429 ), true )
+				? StepResult::fail( $by_hand . ' (' . $this->text( $upid ) . ')' )
+				: $this->classify( $upid, 'disk volume delete' );
+		}
+		$result = $this->client->wait_task( (string) $upid, $this->wait );
+		if ( is_wp_error( $result ) && 'task_pending' === $result->get_error_code() ) {
+			return StepResult::retry( 0, 'disk volume delete: waiting for the Proxmox task' );
+		}
+		if ( is_wp_error( $result ) && 'task_failed' === $result->get_error_code() ) {
+			return StepResult::fail( $by_hand );
+		}
+		if ( is_wp_error( $result ) ) {
+			return StepResult::retry( 0, 'disk volume delete: ' . $this->text( $result ) );
 		}
 		$images = $this->images( $ctx );
 		if ( $images instanceof StepResult ) {
@@ -370,6 +389,11 @@ final class DiskSteps {
 		$server = $server_id > 0 ? Resource::for_license( $server_id ) : null;
 		if ( ! $server || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
 			return StepResult::fail( 'The server cannot be verified for disk removal.' );
+		}
+		$server_license = Licenses::find( $server_id );
+		$own_license    = $this->r->license();
+		if ( ! $server_license || (int) ( $server_license['user_id'] ?? 0 ) < 1 || (int) ( $server_license['user_id'] ?? 0 ) !== (int) ( $own_license['user_id'] ?? 0 ) ) {
+			return StepResult::fail( 'The server belongs to another customer, so the disk is not removed.' );
 		}
 		$ctx = $this->context( $server );
 		if ( $ctx instanceof StepResult ) {
@@ -398,7 +422,7 @@ final class DiskSteps {
 				return $this->classify( $config, 'disk detach verify' );
 			}
 			if ( $this->attached( $config, $volid ) ) {
-				return StepResult::retry( 300, self::PENDING_DETACH );
+				return $this->pending_detach();
 			}
 		}
 		$unused = null;
@@ -427,7 +451,14 @@ final class DiskSteps {
 			return $images;
 		}
 		if ( $this->has_image( $images, $volid ) ) {
-			return $this->remove_orphan( $ctx, $volid, ! $unused );
+			if ( $unused ) {
+				return StepResult::retry( 60, 'The disk volume still exists.' );
+			}
+			// A disk that was ever attached is removed only through the configuration (detach, unusedN, delete=unusedN), never by a direct storage delete.
+			if ( in_array( 'attach', (array) $this->r->get( 'steps' ), true ) ) {
+				return $this->pending_detach();
+			}
+			return $this->remove_orphan( $ctx, $volid );
 		}
 		return $this->finish_delete();
 	}

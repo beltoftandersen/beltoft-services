@@ -113,7 +113,9 @@ class DiskProvisionTest extends BackupTestCase {
 			$result = Registry::get( 'proxmox-disk' )->delete( $disk );
 			$this->assertTrue( $result->is_retry(), 'Hide ' . var_export( $hide, true ) . ': ' . $result->error() );
 			$this->assertStringContainsString( 'restarted', $result->error() );
-			$this->assertCount( 0, $this->calls( 'DELETE', rawurlencode( 'disk-store:5000/' . $volname ) ), 'The volume is never deleted while the running server holds it.' );
+			$this->assertContains( 'attach', (array) $disk->get( 'steps' ) );
+			$this->assertCount( 0, $this->calls( 'DELETE', rawurlencode( 'disk-store:5000/' . $volname ) ), 'The volume is never deleted by a direct storage delete (an attached disk goes through the configuration only).' );
+			$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
 			$this->assertCount( 1, $this->images() );
 		}
 	}
@@ -150,6 +152,50 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed() );
 		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
 		$this->assertCount( 2, $this->images() );
+	}
+
+	public function test_a_refused_orphan_delete_fails_with_the_by_hand_text_and_touches_nothing(): void {
+		list( , $disk ) = $this->removable_disk();
+		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
+		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->fake->fail_next( 'DELETE', '#/content/#', new \WP_Error( 'http_500', 'a guest with VMID 5000 exists', array( 'status' => 500 ) ) );
+		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'could not be removed; remove it by hand.', $result->error() );
+		$this->assertStringContainsString( 'disk-store:5000/' . $name, $result->error() );
+		$this->assertCount( 1, $this->images() );
+		// A failed task is final too.
+		$this->fake->next_task( array( 'exitstatus' => 'volume busy' ) );
+		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertCount( 1, $this->images() );
+	}
+
+	public function test_a_pending_detach_alerts_the_admin_once_after_retries_and_names_the_restart(): void {
+		list( , $disk ) = $this->removable_disk();
+		Jobs::run( $disk->id() );
+		$disk = Resource::find( $disk->id() );
+		$this->fake->hold_detach( 5000, true );
+		$this->mails = array();
+		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_retry() );
+		$this->assertCount( 0, $this->mails, 'No alert on the first try.' );
+		$this->assertTrue( $disk->set( array( 'attempts' => 3, 'op' => 'delete' ) ) );
+		$disk = Resource::find( $disk->id() );
+		Registry::get( 'proxmox-disk' )->delete( $disk );
+		Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) );
+		$this->assertCount( 1, $this->mails, 'One alert, not one per retry.' );
+		$this->assertStringContainsString( 'Restart the server', (string) $this->mails[0]['message'] );
+	}
+
+	public function test_disk_delete_fails_closed_when_the_server_belongs_to_another_customer(): void {
+		list( $server, $disk ) = $this->removable_disk();
+		Jobs::run( $disk->id() );
+		$disk = Resource::find( $disk->id() );
+		$other = $this->service_license( $this->service_product( 'proxmox', array( 'cluster' => 'lab' ), array( 'slug' => 'x-' . wp_generate_password( 5, false ) ) ), array( 'fire' => false, 'user_id' => (int) $server->license()['user_id'] + 1000 ) );
+		$this->assertTrue( $disk->set( array( 'server_license' => (int) $other['id'] ) ) );
+		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) )->is_failed() );
+		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
 	}
 
 	public function test_resume_between_claim_and_attach_provisions_instead_of_claiming_ready(): void {
