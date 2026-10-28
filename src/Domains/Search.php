@@ -12,6 +12,19 @@ final class Search {
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_shortcode( 'beltoft_domain_search', array( __CLASS__, 'shortcode' ) );
+		add_action( Sync::HOOK, array( __CLASS__, 'cleanup' ) );
+	}
+
+	/** Daily: delete the expired cached availability answers. Without an object cache they are transients in the options table, which only a read removes. */
+	public static function cleanup(): int {
+		global $wpdb;
+		if ( wp_using_ext_object_cache() ) { return 0; }
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- options table housekeeping, always fresh.
+		$names = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s AND option_value < %d LIMIT 500", $wpdb->esc_like( '_transient_timeout_beltoft_services_dsearch_' ) . '%', time() ) );
+		foreach ( (array) $names as $name ) {
+			delete_transient( substr( (string) $name, strlen( '_transient_timeout_' ) ) );
+		}
+		return count( (array) $names );
 	}
 
 	public static function routes(): void {
@@ -68,6 +81,8 @@ final class Search {
 	private static function availability( array $check, bool $fresh ): array|\WP_Error {
 		/** Seconds an availability answer is kept; 0 turns the cache off. */
 		$ttl = (int) apply_filters( 'beltoft_services_domain_search_cache_ttl', 5 * MINUTE_IN_SECONDS );
+		// Every cached answer expires (never more than an hour), so none stays behind.
+		$ttl = max( 0, min( $ttl, HOUR_IN_SECONDS ) );
 		$key = 'beltoft_services_dsearch_' . md5( (string) wp_json_encode( $check ) );
 
 		if ( ! $fresh && $ttl > 0 ) {

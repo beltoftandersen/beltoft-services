@@ -50,6 +50,24 @@ class SearchTest extends TestCase {
 		$this->assertSame( 19, $second['results'][0]['price'], 'A price change shows at once.' );
 	}
 
+	public function test_cached_answers_always_expire_and_the_expired_ones_are_cleaned_up(): void {
+		if ( wp_using_ext_object_cache() ) { $this->markTestSkipped( 'Transients live in the object cache.' ); }
+		add_filter( 'beltoft_services_domain_search_cache_ttl', static fn() => 10 * YEAR_IN_SECONDS );
+		$name = $this->unique( 'expire' );
+		$this->client( array( $name ) );
+		Search::find( $name . '.com' );
+		$key = 'beltoft_services_dsearch_' . md5( (string) wp_json_encode( array( array( 'name' => $name, 'extension' => 'com' ) ) ) );
+		$timeout = (int) get_option( '_transient_timeout_' . $key, 0 );
+		$this->assertGreaterThan( 0, $timeout );
+		$this->assertLessThanOrEqual( time() + HOUR_IN_SECONDS + 5, $timeout, 'No answer is kept for more than an hour.' );
+		set_transient( 'beltoft_services_dsearch_live', array( 'x' ), HOUR_IN_SECONDS );
+		update_option( '_transient_timeout_' . $key, time() - 10 );
+		$this->assertGreaterThanOrEqual( 1, Search::cleanup() );
+		$this->assertFalse( get_option( '_transient_' . $key, false ), 'The expired answer is gone from the table.' );
+		$this->assertFalse( get_option( '_transient_timeout_' . $key, false ) );
+		$this->assertSame( array( 'x' ), get_transient( 'beltoft_services_dsearch_live' ), 'A live one stays.' );
+	}
+
 	public function test_an_order_asks_the_registrar_again(): void {
 		$name = $this->unique( 'fresh' );
 		$fake = $this->client( array( $name, $name ) );
