@@ -131,6 +131,14 @@
 		return row;
 	}
 
+	// The record type is chosen from a list at the DNS provider, so it is shown as text, not copied.
+	function plainRow( label, value ) {
+		var row = el( 'div', 'beltoft-dns-claim__row' );
+		row.appendChild( el( 'span', 'beltoft-dns-claim__label', label ) );
+		row.appendChild( el( 'span', 'beltoft-dns-claim__value', value ) );
+		return row;
+	}
+
 	function cancelLink( claim ) {
 		var cancel = button( t.cancel, 'beltoft-dns-claim__link' );
 		cancel.addEventListener( 'click', function () {
@@ -185,7 +193,7 @@
 	function pending( claim, block ) {
 		var s = state( claim.id );
 		block.appendChild( message( claim.message ) );
-		block.appendChild( copyRow( t.type, 'TXT' ) );
+		block.appendChild( plainRow( t.type, 'TXT' ) );
 		block.appendChild( copyRow( t.name, claim.txt_name || '' ) );
 		block.appendChild( copyRow( t.value, claim.txt_value || '' ) );
 		if ( claim.expires_at ) {

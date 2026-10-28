@@ -89,6 +89,11 @@
 	overflow-wrap: anywhere;
 }
 
+.beltoft-dns-claim__value {
+	grid-column: 2 / -1;
+	justify-self: start;
+}
+
 .beltoft-dns-claim__label {
 	font-size: 0.875em;
 	opacity: 0.75;
@@ -204,8 +209,12 @@
 		grid-template-columns: minmax(0, 1fr) auto;
 	}
 
-	.beltoft-dns-claim__label {
+	.beltoft-dns-claim__label,
+	.beltoft-dns-claim__value {
 		grid-column: 1 / -1;
+	}
+
+	.beltoft-dns-claim__label {
 		margin-bottom: -0.25em;
 	}
 
