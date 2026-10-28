@@ -921,9 +921,11 @@ final class ProxmoxJobs {
 				continue;
 			}
 
-			SnapshotExpiry::clamp( $resource, $now );
+			if ( SnapshotExpiry::needs_clamp( $resource ) ) {
+				SnapshotExpiry::clamp( $resource, $now );
 
-			$resource = Resource::find( $id ) ?? $resource;
+				$resource = Resource::find( $id ) ?? $resource;
+			}
 			$action   = SnapshotExpiry::due( $resource, $now ) ? 'snapshot_expire' : ( $daily ? 'snapshot_sync' : '' );
 
 			if ( '' === $action ) {

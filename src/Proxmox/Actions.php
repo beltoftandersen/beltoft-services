@@ -715,6 +715,7 @@ final class Actions {
 			'wipe_power'        => null,
 			'wipe_snapshots'    => null,
 			'wipe_snapshot_tries' => null,
+			'wipe_snapshots_alerted' => null,
 			'disks_check'       => null,
 			'steps'             => array_values( array_intersect( (array) $this->r->get( 'steps' ), $boot ? array( 'ip', 'vmid', 'clone' ) : array( 'ip', 'vmid' ) ) ),
 			'task'              => null,

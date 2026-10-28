@@ -287,19 +287,31 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'rollback rolled', $this->admin_html( $r ) );
 	}
 
-	public function test_the_admin_shows_the_last_snapshot_error_and_clears_it_when_an_action_finishes(): void {
+	public function test_the_admin_shows_the_last_snapshot_refusal_keeps_it_through_a_retry_and_clears_it_on_a_success(): void {
 		$r = $this->server();
 		$this->take( $r, 'a' );
-		$this->fake->set_lock( 5000, 'backup' );
 		$entry = Snapshots::entries( $this->fresh( $r ) )[0];
+		$this->settings( array( 'snapshot_reserve_gb' => 100000 ) );
+		$this->act( $r, 'snapshot_take', array( 'label' => 'b' ) );
+		$this->assertStringContainsString( 'refused', (string) $this->fresh( $r )->get( Snapshots::ERROR ) );
+		$this->assertStringContainsString( 'refused', $this->admin_html( $r ) );
+
+		// A retry (the server is locked) does not hide it.
+		$this->fake->set_lock( 5000, 'backup' );
 		$this->act( $r, 'snapshot_delete', array( 'id' => $entry['id'] ) );
-		$this->assertStringContainsString( 'locked', (string) $this->fresh( $r )->get( Snapshots::ERROR ) );
-		$this->assertStringContainsString( 'locked', $this->admin_html( $r ) );
+		$this->assertStringContainsString( 'refused', (string) $this->fresh( $r )->get( Snapshots::ERROR ) );
 
 		$this->fake->set_lock( 5000, '' );
 		$this->run_jobs();
 		$this->act( $r, 'snapshot_sync' );
 		$this->assertNull( $this->fresh( $r )->get( Snapshots::ERROR ) );
+	}
+
+	public function test_a_refusal_returned_as_done_is_kept_not_cleared(): void {
+		$r = $this->server();
+		$this->settings( array( 'snapshot_reserve_gb' => 100000 ) );
+		$this->act( $r, 'snapshot_take', array( 'label' => 'x' ) );
+		$this->assertStringContainsString( 'less than', (string) $this->fresh( $r )->get( Snapshots::ERROR ) );
 	}
 
 	public function test_the_admin_has_no_snapshot_rows_when_there_are_none_and_the_switch_is_off(): void {
@@ -311,5 +323,72 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 	public function test_the_new_setting_is_off_by_default_and_a_checkbox(): void {
 		delete_option( \BeltoftServices\Settings::OPTION );
 		$this->assertSame( 0, \BeltoftServices\Settings::get( 'snapshot_expired_email' ) );
+	}
+
+	// -- Review fixes ----------------------------------------------------------------------------
+
+	public function test_the_expired_email_is_sent_when_the_delete_took_more_than_one_round(): void {
+		$this->settings( array( 'snapshot_expired_email' => 1 ) );
+		$r = $this->server();
+		$this->take( $r, 'old' );
+		$this->change( $r, 0, array( 'expires_at' => time() - 5 ) );
+		$this->mails = array();
+		$this->fake->next_task( array( 'polls' => 50 ) );
+
+		$this->act( $r, 'snapshot_expire' );
+		$this->assertSame( 'deleting', Snapshots::entries( $this->fresh( $r ) )[0]['state'] );
+
+		for ( $i = 0; $i < 60 && Snapshots::entries( $this->fresh( $r ) ); $i++ ) {
+			$this->act( $r, 'snapshot_expire' );
+		}
+
+		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 1, $this->mails_about( 'reached the end of its keeping time' ) );
+	}
+
+	public function test_several_snapshots_expiring_in_one_round_send_one_email(): void {
+		$this->settings( array( 'snapshot_expired_email' => 1 ) );
+		$r = $this->server();
+		$this->take( $r, 'a' );
+		$this->take( $r, 'b' );
+		$this->change( $r, 0, array( 'expires_at' => time() - 5 ) );
+		$this->change( $r, 1, array( 'expires_at' => time() - 5 ) );
+		$this->mails = array();
+
+		$this->act( $r, 'snapshot_expire' );
+
+		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 1, $this->mails_about( 'reached the end of its keeping time' ) );
+	}
+
+	public function test_a_lower_free_days_setting_does_not_send_slots_reduced(): void {
+		$this->on( array( 'snapshot_free_days' => 7 ) );
+		$r = $this->ready_vm();
+		$this->take( $r, 'a' );
+		$before = Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'];
+		$this->mails = array();
+		$this->settings( array( 'snapshot_free_days' => 1 ) );
+
+		$this->assertSame( 0, SnapshotExpiry::clamp( $this->fresh( $r ), time() ) );
+		$this->assertSame( $before, Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'] );
+		$this->assertSame( array(), $this->mails_about( 'allowance went down' ) );
+	}
+
+	public function test_the_hourly_job_does_not_lock_a_server_that_needs_no_clamp(): void {
+		$r = $this->server();
+		$this->take( $r, 'a' );
+		$this->assertFalse( SnapshotExpiry::needs_clamp( $this->fresh( $r ) ) );
+
+		$this->on( array( 'snapshot_free_slots' => 1 ) );
+		$this->paid( 1 );
+		$p = $this->ready_vm();
+		$this->take( $p, 'a' );
+		$this->paid( 0 );
+		$this->assertTrue( SnapshotExpiry::needs_clamp( $this->fresh( $p ) ), 'Taken on a paid slot, none paid now.' );
+
+		$this->on( array( 'snapshot_free_slots' => 3 ) );
+		$this->take( $r, 'b' );
+		$this->settings( array( 'snapshot_free_slots' => 1 ) );
+		$this->assertTrue( SnapshotExpiry::needs_clamp( $this->fresh( $r ) ), 'More snapshots than slots.' );
 	}
 }

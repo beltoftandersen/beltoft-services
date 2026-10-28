@@ -78,8 +78,32 @@ final class SnapshotExpiry {
 	}
 
 	/**
+	 * Is there anything for clamp() to do (or to end)? Meta only, no lock: more snapshots than slots, a snapshot
+	 * taken on a paid slot with none paid now, or an episode whose notice is still set.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function needs_clamp( Resource $r ): bool {
+		$entries = Snapshots::entries( $r );
+
+		if ( count( $entries ) > Snapshots::slots( $r ) || isset( ( (array) $r->get( self::NOTICE ) )['slots_reduced'] ) ) {
+			return true;
+		}
+
+		if ( 0 === Snapshots::paid_slots( $r ) ) {
+			foreach ( $entries as $entry ) {
+				if ( ! empty( $entry['paid'] ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * D7: when the paid slots are fewer than before, the snapshots over the count, and (with no paid slot at all)
-	 * those kept for the paid time, get `expires_at = max( taken_at + free days, now + 3 days )`. Never later than
+	 * those taken on a paid slot (the entry's `paid` flag, set at the take; a lower free-days setting changes nothing), get `expires_at = max( taken_at + free days, now + 3 days )`. Never later than
 	 * they were, and nothing is deleted here. The customer is told once per set of clamped snapshots; an empty
 	 * round ends the episode, so a later reduction is told again.
 	 *
@@ -107,7 +131,7 @@ final class SnapshotExpiry {
 
 					$taken     = (int) ( $entry['taken_at'] ?? 0 );
 					$expires   = (int) ( $entry['expires_at'] ?? 0 );
-					$too_long  = 0 === $paid && $expires > $taken + $free;
+					$too_long  = 0 === $paid && ! empty( $entry['paid'] ); // Taken on a paid slot, and none is paid any more.
 					$no_slot   = $i < $over; // The oldest ones lose their slot first.
 					$shortened = max( $taken + $free, $now + self::GRACE_DAYS * DAY_IN_SECONDS );
 

@@ -266,7 +266,7 @@ final class Provision {
 
 		for ( $round = 0; $round < 4; $round++ ) {
 			if ( null === $record ) {
-				return $this->wiped(); // Nothing was ever built.
+				return $this->wiped( true ); // Nothing was ever built.
 			}
 
 			$v = Ownership::verify( $this->client, $record, $this->r );
@@ -275,7 +275,7 @@ final class Provision {
 				$free = Ownership::is_free( $this->client, $record['vmid'] );
 
 				if ( true === $free ) {
-					return $this->wiped();
+					return $this->wiped( true );
 				}
 
 				return StepResult::retry( 0, 'wipe: the VM is not listed and its id is not confirmed free' );
@@ -350,7 +350,7 @@ final class Provision {
 
 				$this->r->set( array( 'wipe_snapshot_tries' => $tries ) );
 
-				if ( $tries >= 3 ) {
+				if ( $tries >= 3 && ! $this->r->get( 'wipe_snapshots_alerted' ) && $this->r->set( array( 'wipe_snapshots_alerted' => 1 ) ) ) {
 					Alerts::admin( $this->r, 'The reinstall waits: a snapshot of the server could not be deleted. Last answer: ' . $this->scrub( $purged->error(), 160 ) );
 				}
 
@@ -359,7 +359,7 @@ final class Provision {
 			}
 		}
 
-		return $this->r->set( array( 'wipe_snapshots' => 'done', 'wipe_snapshot_tries' => null ) ) ? null : StepResult::retry( 0, 'wipe: the snapshot clean-up could not be recorded' );
+		return $this->r->set( array( 'wipe_snapshots' => 'done', 'wipe_snapshot_tries' => null, 'wipe_snapshots_alerted' => null ) ) ? null : StepResult::retry( 0, 'wipe: the snapshot clean-up could not be recorded' );
 	}
 
 	/**
@@ -649,12 +649,16 @@ final class Provision {
 	/**
 	 * The old VM is gone: forget what a rebuilt one needs afresh.
 	 *
+	 * @param bool $gone The VM is absent (or was never recorded): the snapshots went with it, so the list is forgotten.
 	 * @return array<string, mixed>
 	 */
-	private function wiped(): array {
+	private function wiped( bool $gone = false ): array {
 		$keep = array_values( array_intersect( $this->r->get( 'steps' ), array( 'ip', 'vmid' ) ) );
+		$lost = $gone && Snapshots::tracked( $this->r )
+			? array( Snapshots::LIST => array(), Snapshots::OP => null, Snapshots::ROLLBACK => null )
+			: array();
 
-		return array(
+		return $lost + array(
 			'wipe'           => null,
 			'wipe_power'     => null,
 			'wipe_snapshots' => null,

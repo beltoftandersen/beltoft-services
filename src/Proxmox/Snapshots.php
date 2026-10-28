@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * the list is never touched. Every action runs from Jobs::act() under the resource lock, verifies the VM as ours
  * first and re-reads the remote state before it acts, so a retry never repeats a step.
  *
- * Meta on the server resource: `snapshots` (list of {id, snap, label, taken_at, expires_at, covers, consistent,
+ * Meta on the server resource: `snapshots` (list of {id, snap, label, taken_at, expires_at, covers, consistent, paid,
  * state: ok|creating|deleting}), `snapshot_op` ({op: take|delete, id, phase, at}, the crash-safe marker of the
  * operation in flight) and `snapshot_rollback` ({id, phase, was_running, at}, for the progress of a rollback).
  *
@@ -62,6 +62,12 @@ final class Snapshots {
 	public const ROLLBACK = 'snapshot_rollback';
 
 	/**
+	 * Rounds a disk delete waits for a task of another job, and the meta that counts them.
+	 */
+	public const DROP_WAITS       = 'snapshot_drop_waits';
+	public const DROP_WAIT_ROUNDS = 5;
+
+	/**
 	 * Meta: the last problem of a snapshot action, for the admin.
 	 */
 	public const ERROR = 'snapshot_error';
@@ -97,6 +103,13 @@ final class Snapshots {
 	 * @var array<string, mixed>
 	 */
 	private $cluster = array();
+
+	/**
+	 * Set while a disk delete drops the snapshots that cover its volume (see poll_task()).
+	 *
+	 * @var bool
+	 */
+	private bool $dropping = false;
 
 	/**
 	 * @param Resource $r Resource.
@@ -516,14 +529,20 @@ final class Snapshots {
 	}
 
 	/**
-	 * Keeps the last problem for the admin panel (meta `snapshot_error`): set by a failure or a retry, cleared
-	 * by an action that finished. Written only when it changes.
+	 * Keeps the last problem for the admin panel (meta `snapshot_error`): set by a failure or a refusal, cleared
+	 * by an action that succeeded; a retry leaves it as it is. Written only when it changes.
 	 *
 	 * @param StepResult $result Outcome of an action.
 	 */
 	private function note( StepResult $result ): void {
-		$now  = (string) $this->r->get( self::ERROR );
-		$next = $result->is_done() ? '' : $this->scrub( $result->error(), 200 );
+		$now = (string) $this->r->get( self::ERROR );
+
+		if ( $result->is_retry() ) {
+			return; // A retry or a wait is not a problem to show, and it must not hide one.
+		}
+
+		$text = $result->is_failed() ? $result->error() : ( 1 === preg_match( '/\brefused\b/i', $result->event() ) ? $result->event() : '' );
+		$next = $this->scrub( $text, 200 );
 
 		if ( $now !== $next ) {
 			$this->r->set( array( self::ERROR => '' === $next ? null : $next ) );
@@ -586,7 +605,9 @@ final class Snapshots {
 	 * @param string $volid Volume id.
 	 */
 	public function drop_covering( string $volid ): StepResult {
-		$began = $this->begin( 'snapshot_drop', true );
+		$this->dropping = true;
+		$began          = $this->begin( 'snapshot_drop', true );
+		$this->dropping = false;
 
 		if ( $began instanceof StepResult ) {
 			return $began;
@@ -604,7 +625,7 @@ final class Snapshots {
 			}
 		}
 
-		return StepResult::done();
+		return null === $this->r->get( self::DROP_WAITS ) || $this->r->set( array( self::DROP_WAITS => null ) ) ? StepResult::done() : StepResult::retry( 0, 'snapshot: the wait count could not be cleared' );
 	}
 
 	/**
@@ -670,6 +691,20 @@ final class Snapshots {
 		}
 
 		if ( 'snapshot' !== (string) ( $task['step'] ?? '' ) && ! is_array( $this->r->get( self::ROLLBACK ) ) ) {
+			if ( $this->dropping ) {
+				// A billing-driven disk delete never waits for good on a leftover task: a few rounds, then it goes on
+				// (Proxmox's own VM lock serialises, and a refusal is a retry).
+				$waits = (int) $this->r->get( self::DROP_WAITS ) + 1;
+
+				if ( $waits > self::DROP_WAIT_ROUNDS ) {
+					return null;
+				}
+
+				return $this->r->set( array( self::DROP_WAITS => $waits ) )
+					? StepResult::retry( 0, 'snapshot: waiting for another task on the server to end' )
+					: StepResult::retry( 0, 'snapshot: the wait could not be counted' );
+			}
+
 			return StepResult::retry( 0, 'snapshot: waiting for another task on the server to end' );
 		}
 
@@ -985,6 +1020,7 @@ final class Snapshots {
 			'expires_at' => $now + self::days_for( $this->r ) * DAY_IN_SECONDS,
 			'covers'     => array_values( $covers ),
 			'consistent' => 'running' === $v['status'] && Actions::agent_ok( $this->r ),
+			'paid'       => self::paid_slots( $this->r ) > 0,
 			'state'      => 'creating',
 		);
 		$op    = array(
@@ -1244,11 +1280,13 @@ final class Snapshots {
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
 	private function expire( array $record, array $v ): StepResult {
-		$now = time();
+		$now     = time();
+		$expired = array();
 
 		foreach ( self::entries( $this->r ) as $entry ) {
 			if ( SnapshotExpiry::is_due( $entry, $now ) ) {
-				$lapsed = 'ok' === ( $entry['state'] ?? 'ok' );
+				// Their time is up (not the state: a delete that took several rounds is "deleting" by then).
+				$lapsed = (int) ( $entry['expires_at'] ?? 0 ) <= $now;
 				$done   = $this->delete( $record, $v, (string) $entry['id'] );
 
 				if ( ! $done->is_done() ) {
@@ -1256,9 +1294,14 @@ final class Snapshots {
 				}
 
 				if ( $lapsed ) {
-					SnapshotExpiry::notify( $this->r, 'expired', (string) $entry['id'] );
+					$expired[] = (string) $entry['id'];
 				}
 			}
+		}
+
+		if ( $expired ) {
+			// One mail for the round.
+			SnapshotExpiry::notify( $this->r, 'expired', md5( implode( ',', $expired ) ), array( 'snapshot_count' => count( $expired ) ) );
 		}
 
 		return $this->sync( $record, $v );

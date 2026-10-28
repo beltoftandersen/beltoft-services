@@ -628,16 +628,18 @@ final class DiskSteps {
 	 * @return StepResult|null Null when none is left.
 	 */
 	private function drop_snapshots( Resource $server, string $volid ): ?StepResult {
-		if ( ! Snapshots::tracked( $server ) ) {
+		// Meta only, outside the lock: no snapshot covers this volume, so nothing to drop or to lock for.
+		if ( array() === Snapshots::covering( $server, $volid ) ) {
 			return null;
 		}
+		$disk   = $this->r->id();
 		$answer = null;
 		$ran    = $server->locked(
-			static function () use ( $server, $volid, &$answer ): bool {
-				$had    = array() !== Snapshots::covering( $server, $volid );
+			static function () use ( $server, $volid, $disk, &$answer ): bool {
 				$answer = ( new Snapshots( $server ) )->drop_covering( $volid );
-				if ( $had && $answer->is_done() ) {
-					SnapshotExpiry::notify( $server, 'disk_removed', $volid );
+				if ( $answer->is_done() ) {
+					// Keyed by the disk resource: a volume id comes back for a later disk, which is told again.
+					SnapshotExpiry::notify( $server, 'disk_removed', $disk . ':' . $volid );
 				}
 				return true;
 			}

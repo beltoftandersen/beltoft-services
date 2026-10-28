@@ -333,4 +333,95 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->assertArrayHasKey( $a['snap'], $this->fake->snapshots( 5000 ) );
 		$this->assertSame( array( $a['id'] ), array_column( Snapshots::entries( $this->fresh( $r ) ), 'id' ) );
 	}
+
+	// -- Review fixes ----------------------------------------------------------------------------
+
+	public function test_a_later_removal_of_a_disk_that_reuses_a_volume_id_mails_again(): void {
+		$r = $this->server();
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->mails = array();
+
+		foreach ( array( 'one', 'two' ) as $label ) {
+			$disk = $this->disk_for( $this->fresh( $r ) );
+			$this->take( $r, $label );
+			$done = Registry::get( 'proxmox-disk' )->delete( $this->fresh( $disk ) );
+			$this->assertTrue( $done->is_done(), $done->error() );
+		}
+
+		$this->assertCount( 2, $this->disk_mails() );
+	}
+
+	public function test_a_disk_nothing_covers_does_not_look_at_the_server_task_or_snapshots(): void {
+		$r    = $this->server();
+		$this->take( $r, 'before' );
+		$disk = $this->disk_for( $r );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'task' => array( 'step' => 'plan', 'phase' => '', 'upid' => 'UPID:node-a:0000:0000:0000:qmstart:5000:x:', 'node' => 'node-a' ) ) ) );
+		$seen = count( $this->fake->calls() );
+
+		$done = Registry::get( 'proxmox-disk' )->delete( $this->fresh( $disk ) );
+
+		$this->assertTrue( $done->is_done(), $done->error() );
+		$this->assertNull( $this->fresh( $r )->get( Snapshots::DROP_WAITS ) );
+		$this->assertSame( array(), array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => false !== strpos( $l, '/snapshot' ) ) );
+	}
+
+	public function test_a_disk_delete_does_not_wait_for_ever_on_a_task_of_another_job(): void {
+		$r    = $this->server();
+		$disk = $this->disk_for( $r );
+		$this->take( $r, 'covers' );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'task' => array( 'step' => 'plan', 'phase' => '', 'upid' => 'UPID:node-a:0000:0000:0000:qmstart:5000:x:', 'node' => 'node-a' ) ) ) );
+
+		$done = null;
+		for ( $i = 0; $i < 12 && ( null === $done || ! $done->is_done() ); $i++ ) {
+			$done = Registry::get( 'proxmox-disk' )->delete( $this->fresh( $disk ) );
+		}
+
+		$this->assertTrue( $done->is_done(), $done->error() );
+		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
+		$this->assertArrayNotHasKey( 'scsi1', $this->config() );
+	}
+
+	public function test_the_reinstall_alert_is_sent_once_by_a_flag_not_by_its_text(): void {
+		$r = $this->server();
+		$this->take( $r, 'stuck' );
+		$this->fake->set_lock( 5000, 'backup' );
+		$this->reinstall( $r );
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			Resource::find( $r->id() )->set( array( 'next_attempt_at' => time() - 1 ) );
+			Jobs::run( $r->id() );
+			if ( 2 === $i ) {
+				// The answer changes: a dedupe on the text would mail again.
+				$this->fake->set_lock( 5000, 'vzdump' );
+			}
+		}
+
+		$told = array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'reinstall waits' ) );
+		$this->assertCount( 1, $told );
+		$this->assertSame( 1, (int) $this->fresh( $r )->get( 'wipe_snapshots_alerted' ) );
+
+		$this->fake->set_lock( 5000, '' );
+		$this->rebuild( $r->id() );
+		$this->assertNull( $this->fresh( $r )->get( 'wipe_snapshots_alerted' ) );
+	}
+
+	public function test_a_reinstall_whose_vm_vanished_while_it_waited_forgets_the_snapshot_list(): void {
+		$r = $this->server();
+		$this->take( $r, 'a' );
+		$this->fake->set_lock( 5000, 'backup' );
+		$this->reinstall( $r );
+		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+
+		// The VM is destroyed outside the plugin (its snapshots with it).
+		$this->fake->set_lock( 5000, '' );
+		$this->fake->task( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		$this->fake->task( 'DELETE', '/nodes/node-a/qemu/5000', array( 'purge' => 1 ) );
+		$this->assertNull( $this->fake->vm( 5000 ) );
+
+		$this->rebuild( $r->id() );
+		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertNull( $this->fresh( $r )->get( Snapshots::OP ) );
+	}
 }
