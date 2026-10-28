@@ -347,13 +347,14 @@ final class Snapshots {
 	 */
 	public static function panel( Resource $r ): ?array {
 		$entries = self::entries( $r );
+		$enabled = self::enabled( $r );
 
-		if ( ! self::enabled( $r ) && ! $entries ) {
+		if ( ! $enabled && ! $entries ) {
 			return null;
 		}
 
 		return array(
-			'enabled'  => self::enabled( $r ),
+			'enabled'  => $enabled,
 			'slots'    => self::slots( $r ),
 			'used'     => count( $entries ),
 			'days'     => self::days_for( $r ),

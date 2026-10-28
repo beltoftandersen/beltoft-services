@@ -12,6 +12,15 @@ defined( 'ABSPATH' ) || exit;
 final class DiskPanels {
 	public static function server( Resource $server ): array {
 		$disks = array();
+		$volumes = array();
+		$located = VmRecords::for_resource( $server->id() );
+		$where = $located ? Clusters::get( $located['cluster'] ) : null;
+		$kept = Snapshots::entries( $server );
+		if ( $located && $where && $kept ) {
+			foreach ( DiskSteps::volumes( $server, (string) $where['storage'], (int) $located['vmid'], false ) as $volume ) {
+				$volumes[ $volume['id'] ] = $volume['volid'];
+			}
+		}
 		foreach ( DiskMeta::for_server( $server ) as $disk ) {
 			$license = $disk->license();
 			$grow_url = 'ready' === $disk->get( 'state' ) ? DiskCart::grow_url( $disk ) : '';
@@ -36,13 +45,14 @@ final class DiskPanels {
 				'grow_url' => $grow_url,
 				'grow_price' => $grow_price,
 				'paused' => 'paused' === $disk->get( 'state' ),
+				'snapshots_covering' => isset( $volumes[ $disk->id() ] ) ? count( array_filter( $kept, static fn( $e ) => in_array( $volumes[ $disk->id() ], (array) ( $e['covers'] ?? array() ), true ) ) ) : 0,
 				'remove_url' => 'ready' === $disk->get( 'state' ) ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
 			);
 		}
 		$add = array();
 		if ( count( $disks ) < max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
-			$record = VmRecords::for_resource( $server->id() );
-			$cluster = $record ? Clusters::get( $record['cluster'] ) : null;
+			$record = $located;
+			$cluster = $where;
 			foreach ( DiskField::sizes() as $variation ) {
 				$size = (int) ( Product::plan( $variation->get_parent_id(), $variation->get_id() )['disk_gb'] ?? 0 );
 				if ( ! $record || ! $cluster || ! DiskCapacity::fits( $record['cluster'], $record['node'], (string) $cluster['storage'], $size ) ) {

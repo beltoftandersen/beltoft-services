@@ -69,6 +69,7 @@ final class Panels {
 					'reinstallDisks' => __( 'Reinstalling erases the server\'s main disk. Extra disks are kept with their data and stay attached. Continue?', 'beltoft-services' ),
 					'restoreDisks' => __( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', 'beltoft-services' ),
 					'restore'   => __( 'Restoring replaces everything on the server with this backup, and the password and SSH key go back to the backup\'s. Continue?', 'beltoft-services' ),
+					'snapshotDelete' => __( 'Delete this snapshot? This cannot be undone.', 'beltoft-services' ),
 				),
 			)
 		);
@@ -123,6 +124,12 @@ final class Panels {
 			'disk_used'  => $disk['used'] ?? null,
 			'disk_total' => $disk['total'] ?? null,
 			'extra_disks' => DiskPanels::server( $r ),
+			'snapshots'  => self::snapshots( $r, $r->accepts_actions() ),
+			'resource_id' => $r->id(),
+			'snapshot_warnings' => array(
+				'reinstall' => Snapshots::reinstall_warning( $r ),
+				'restore'   => Snapshots::restore_warning( $r ),
+			),
 		);
 
 		( static function ( array $vars ): void {
@@ -130,6 +137,50 @@ final class Panels {
 			extract( $vars, EXTR_SKIP );
 			include BELTOFT_SERVICES_PATH . 'templates/account/vm.php';
 		} )( $state );
+	}
+
+	/**
+	 * What the card's Snapshots block shows, or null when the block is absent (no snapshots and none can be taken). Dates are formatted here; the template only prints.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param bool     $forms Whether the card accepts actions now.
+	 * @return array<string, mixed>|null
+	 */
+	public static function snapshots( Resource $r, bool $forms = true ): ?array {
+		$panel = Snapshots::panel( $r );
+
+		// Absent only when there are no snapshots and none can be taken.
+		if ( null === $panel ) {
+			return null;
+		}
+
+		// full: every action. working: the server is busy or not accepting actions, the list only.
+		// delete: not available any more, the customer may still remove what exists. readonly: an adopted machine, the list only.
+		$working = ! $forms || ! Snapshots::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
+
+		// Paused or on hold with no job running: nothing is in flight, the actions just are not offered.
+		$inactive = ! $panel['rolling'] && array() === (array) $r->get( Snapshots::OP ) && ! $r->get( 'plan_dirty' ) && ! is_array( $r->get( 'restore' ) ) && ! $r->get( 'wipe' )
+			&& ( $r->on_hold() || ( 'paused' === $r->get( 'state' ) && 'paused' === $r->get( 'desired' ) ) );
+
+		if ( true === $r->get( 'linked' ) ) {
+			$panel['mode'] = 'readonly';
+		} elseif ( $inactive ) {
+			$panel['mode'] = 'inactive';
+		} else {
+			$panel['mode'] = $working ? 'working' : ( $panel['enabled'] ? 'full' : 'delete' );
+		}
+
+		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+
+		foreach ( $panel['entries'] as $i => $entry ) {
+			$panel['entries'][ $i ]['taken']  = $entry['taken_at'] > 0 ? wp_date( $format, $entry['taken_at'] ) : '';
+			$panel['entries'][ $i ]['keeps']  = $entry['expires_at'] > 0 ? wp_date( $format, $entry['expires_at'] ) : '';
+		}
+
+		$panel['full']      = $panel['used'] >= $panel['slots'];
+		$panel['max_label'] = Snapshots::MAX_LABEL;
+
+		return $panel;
 	}
 
 	/**

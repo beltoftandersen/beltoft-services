@@ -36,7 +36,8 @@
 	}
 
 	function notice( panel, text ) {
-		var line = panel.querySelector( '[data-notice]' );
+		// An open dialog shows its own messages; otherwise the panel's line (the dialog has no data-notice).
+		var line = panel.querySelector( 'dialog[open] [data-dialog-notice]' ) || panel.querySelector( '[data-notice]' );
 
 		if ( line ) {
 			line.textContent = text;
@@ -83,6 +84,47 @@
 		}
 	}
 
+	// close() when the browser has dialogs, else the attribute the fallback opening set.
+	function closeDialog( dialog ) {
+		if ( dialog.close ) {
+			dialog.close();
+		} else {
+			dialog.removeAttribute( 'open' );
+		}
+	}
+
+	function send( panel, action, args, button, form ) {
+		if ( button ) {
+			busy( button );
+		}
+
+		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
+			if ( 202 === response.status ) {
+				var dialog = form ? form.closest( 'dialog' ) : null;
+
+				if ( dialog ) {
+					closeDialog( dialog );
+				}
+
+				notice( panel, vm.strings.queued );
+				// The panel's status poll (account.js) shows the progress and reloads when it is over.
+				panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
+				return null;
+			}
+
+			if ( button ) {
+				reset( button );
+			}
+
+			return reply( panel, response, vm.strings.failed );
+		} ).catch( function () {
+			if ( button ) {
+				reset( button );
+			}
+			notice( panel, vm.strings.failed );
+		} );
+	}
+
 	function submit( panel, form ) {
 		var args = {};
 		var button = form.querySelector( 'button[type="submit"]' );
@@ -101,29 +143,7 @@
 			return;
 		}
 
-		if ( button ) {
-			busy( button );
-		}
-
-		post( panel, 'actions/' + encodeURIComponent( form.getAttribute( 'data-action' ) ), { args: args } ).then( function ( response ) {
-			if ( 202 === response.status ) {
-				notice( panel, vm.strings.queued );
-				// The panel's status poll (account.js) shows the progress and reloads when it is over.
-				panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
-				return null;
-			}
-
-			if ( button ) {
-				reset( button );
-			}
-
-			return reply( panel, response, vm.strings.failed );
-		} ).catch( function () {
-			if ( button ) {
-				reset( button );
-			}
-			notice( panel, vm.strings.failed );
-		} );
+		send( panel, form.getAttribute( 'data-action' ), args, button, form );
 	}
 
 	function reveal( panel, button ) {
@@ -160,7 +180,41 @@
 		} );
 
 		panel.addEventListener( 'click', function ( event ) {
+			var roll = event.target.closest( '[data-snapshot-rollback]' );
+			var cancel = event.target.closest( '[data-snapshot-cancel]' );
+			var drop = event.target.closest( '[data-snapshot-delete]' );
+			var dialog = panel.querySelector( '[data-snapshot-dialog]' );
 			var button = event.target.closest( '[data-vm-reveal]' );
+
+			if ( roll && dialog ) {
+				dialog.querySelector( 'input[name="id"]' ).value = roll.getAttribute( 'data-snapshot-rollback' );
+				dialog.querySelector( '[data-snapshot-dialog-name]' ).textContent = roll.getAttribute( 'data-snapshot-name' );
+				dialog.querySelector( 'input[name="confirm"]' ).value = '';
+				notice( panel, '' );
+				dialog.querySelector( '[data-dialog-notice]' ).textContent = '';
+
+				if ( dialog.showModal ) {
+					dialog.showModal();
+				} else {
+					dialog.setAttribute( 'open', '' );
+				}
+
+				return;
+			}
+
+			if ( drop && ! drop.disabled ) {
+				if ( window.confirm( vm.strings.snapshotDelete ) ) {
+					send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, drop, null );
+				}
+
+				return;
+			}
+
+			if ( cancel && dialog ) {
+				closeDialog( dialog );
+
+				return;
+			}
 
 			if ( button && ! button.disabled ) {
 				reveal( panel, button );

@@ -305,3 +305,21 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-disk__guide ol { margin: 0.75em 0 0; padding-left: 1.5em; display: grid; gap: 0.75em; }
 .beltoft-services-disk__guide pre { margin: 0.35em 0 0; overflow-x: auto; }
 .beltoft-services-disk__guide :target, .beltoft-services-disk__guide[open] { scroll-margin-top: 1.5em; }
+
+.beltoft-services-vm__snapshot { padding: 12px 0; }
+
+.beltoft-services-vm__snapshot .beltoft-services-panel__actions { margin: 12px 0 0; }
+
+.beltoft-services-vm__snapshot .beltoft-services-panel__actions .button { margin: 0; }
+
+.beltoft-services-vm__dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
+
+.beltoft-services-vm__dialog::backdrop { background: rgba(12, 21, 53, 0.5); }
+
+.beltoft-services-vm__dialog .beltoft-services-vm-form { margin: 0; }
+
+.beltoft-services-vm__dialog h5 { margin: 0; font-size: 16px; font-weight: 600; }
+
+.beltoft-services-vm__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.beltoft-services-vm__buttons .button { margin: 0; }
