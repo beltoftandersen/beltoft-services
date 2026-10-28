@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-28T05:53:49+00:00\n"
+"POT-Creation-Date: 2026-10-28T06:03:39+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -1862,8 +1862,8 @@ msgstr ""
 #. translators: %d: number of days
 #: src/Proxmox/BackupField.php:178
 #, php-format
-msgid "A backup of the whole server every night, kept for %d day. You can restore it from your account."
-msgid_plural "A backup of the whole server every night, kept for %d days. You can restore it from your account."
+msgid "The server's boot disk is backed up every night and kept for %d day. Extra disks are not included. You can restore the server from your account."
+msgid_plural "The server's boot disk is backed up every night and kept for %d days. Extra disks are not included. You can restore the server from your account."
 msgstr[0] ""
 msgstr[1] ""
 
