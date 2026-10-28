@@ -10,6 +10,7 @@ namespace BeltoftServices\Domains;
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * A transfer order says what happens now (approval at the current registrar, how long, the email when it is done).
  * A DNS hosting order changes nothing for the domain until the customer moves its name servers, so
  * the thank-you page says what to do next: check the records, remove an old DS record, change the
  * name servers. It is printed inside the order details, or on the classic
@@ -59,6 +60,38 @@ final class ThankYou {
 	}
 
 	/**
+	 * The transfer-in domains of an order.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @return string[]
+	 */
+	public static function transfers( \WC_Order $order ): array {
+		$domains = array();
+
+		foreach ( $order->get_items() as $item ) {
+			$data = $item->get_meta( '_beltoft_services_domain', true );
+
+			if ( is_array( $data ) && 'transfer' === ( $data['mode'] ?? '' ) && ! empty( $data['domain'] ) ) {
+				$domains[] = (string) $data['domain'];
+			}
+		}
+
+		return array_values( array_unique( $domains ) );
+	}
+
+	/**
+	 * Days a transfer may take, as promised on the order received page.
+	 */
+	public static function transfer_days(): int {
+		/**
+		 * How many days the order received page says a domain transfer can take, at most.
+		 *
+		 * @param int $days Days, 5 by default (the usual time a losing registrar has to respond).
+		 */
+		return max( 1, (int) apply_filters( 'beltoft_services_transfer_days', 5 ) );
+	}
+
+	/**
 	 * The order details hook: only on the order received page, not when an order is viewed later.
 	 *
 	 * @param mixed $order Order.
@@ -82,20 +115,40 @@ final class ThankYou {
 			return;
 		}
 
-		$domains = self::domains( $order );
+		$domains   = self::domains( $order );
+		$transfers = self::transfers( $order );
 
-		if ( ! $domains ) {
+		if ( ! $domains && ! $transfers ) {
 			return;
 		}
 
 		self::$printed[ $order_id ] = true;
+
+		$account_url = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '';
+
+		if ( $transfers ) {
+			wc_get_template(
+				'order/transfer-next-steps.php',
+				array(
+					'domains'     => $transfers,
+					'days'        => self::transfer_days(),
+					'account_url' => $account_url,
+				),
+				'beltoft-services/',
+				BELTOFT_SERVICES_PATH . 'templates/'
+			);
+		}
+
+		if ( ! $domains ) {
+			return;
+		}
 
 		wc_get_template(
 			'order/dns-next-steps.php',
 			array(
 				'domains'     => $domains,
 				'nameservers' => Zone::nameservers(),
-				'account_url' => function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '',
+				'account_url' => $account_url,
 			),
 			'beltoft-services/',
 			BELTOFT_SERVICES_PATH . 'templates/'

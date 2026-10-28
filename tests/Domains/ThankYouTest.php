@@ -68,7 +68,33 @@ final class ThankYouTest extends TestCase {
 		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', (string) ob_get_clean() );
 	}
 
+	public function test_a_transfer_order_says_what_happens_now_once(): void {
+		$html = $this->page( $this->order( 'transfer' )->get_id() );
+		$this->assertSame( 1, substr_count( $html, 'What happens now with example.com' ) );
+		$this->assertStringContainsString( 'may ask you to approve the transfer', $html );
+		$this->assertStringContainsString( 'The transfer takes up to 5 days.', $html );
+		$this->assertStringContainsString( 'We email you when the domain is with us.', $html );
+		$this->assertStringContainsString( 'DNS settings do not change', $html );
+		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $html );
+		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', $html, 'No DNS block for a transfer.' );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+	}
+
+	public function test_the_transfer_days_have_a_filter(): void {
+		add_filter( 'beltoft_services_transfer_days', static fn() => 7 );
+		$this->assertStringContainsString( 'up to 7 days', $this->page( $this->order( 'transfer' )->get_id() ) );
+	}
+
+	public function test_a_failed_transfer_order_prints_nothing(): void {
+		$this->assertStringNotContainsString( 'beltoft-transfer-next-steps', $this->page( $this->order( 'transfer', null, 'failed' )->get_id() ) );
+	}
+
+	public function test_a_dns_order_has_no_transfer_block(): void {
+		$this->assertStringNotContainsString( 'beltoft-transfer-next-steps', $this->page( $this->order( 'dns' )->get_id() ) );
+	}
+
 	public function test_other_orders_and_failed_orders_get_nothing(): void {
+		$this->assertStringNotContainsString( 'beltoft-transfer-next-steps', $this->page( $this->order( 'register' )->get_id() ) );
 		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', $this->page( $this->order( 'register' )->get_id() ) );
 		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', $this->page( $this->order( 'dns', null, 'failed' )->get_id() ) );
 		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', $this->page( 0 ) );
