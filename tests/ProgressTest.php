@@ -147,6 +147,21 @@ final class ProgressTest extends TestCase {
 		$this->assertSame( array( 'Go back to the snapshot', 'Apply your plan', 'Start the server' ), $labels );
 	}
 
+	public function test_the_plan_change_after_a_rollback_keeps_the_rollback_steps(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready', 'plan_dirty' => true, 'snapshot_rolled_at' => time() - 30 ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertSame( 'rollback', $p['kind'] );
+		$this->assertSame( array( 'rollback' => 'done', 'plan' => 'current', 'start' => 'todo' ), $this->statuses( $p ) );
+
+		$r->set( array( 'snapshot_rolled_at' => time() - Progress::ROLLBACK_PLAN_WINDOW - 5 ) );
+		$this->assertSame( 'update', Progress::build( $r )['kind'], 'An old rollback does not claim a later plan change.' );
+
+		$r->set( array( 'snapshot_rolled_at' => time(), 'plan_dirty' => false ) );
+		$this->assertSame( '', Progress::build( $r )['kind'] );
+	}
+
 	public function test_a_requested_rollback_is_queued_with_its_steps_and_a_requested_take_is_a_generic_action(): void {
 		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready' ) );
 
@@ -380,7 +395,7 @@ final class ProgressTest extends TestCase {
 
 	public function test_power_says_busy_while_work_is_shown(): void {
 		$render = static function ( bool $busy ): string {
-			$vars = array( 'ip' => '', 'plan' => array( 'cores' => 1, 'memory_mb' => 1, 'disk_gb' => 1 ), 'power' => 'running', 'os_label' => '', 'os_options' => array(), 'os_current' => 0, 'has_key' => false, 'can_reveal' => false, 'forms' => false, 'ssh_user' => 'root', 'backups' => null, 'metrics' => false, 'disk_used' => null, 'disk_total' => null, 'extra_disks' => array( 'items' => array(), 'add' => array(), 'mode' => 'off' ), 'busy' => $busy );
+			$vars = array( 'ip' => '', 'plan' => array( 'cores' => 1, 'memory_mb' => 1, 'disk_gb' => 1 ), 'power' => 'running', 'os_label' => '', 'os_options' => array(), 'os_current' => 0, 'has_key' => false, 'can_reveal' => false, 'forms' => false, 'ssh_user' => 'root', 'backups' => null, 'metrics' => false, 'disk_used' => null, 'disk_total' => null, 'extra_disks' => array( 'items' => array(), 'add' => array(), 'mode' => 'off' ), 'busy' => $busy, 'snapshots' => null, 'snapshot_warnings' => array( 'reinstall' => '', 'restore' => '' ), 'resource_id' => 1 );
 			ob_start();
 			( static function ( array $vars ): void {
 				extract( $vars, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract

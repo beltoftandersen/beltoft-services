@@ -92,7 +92,7 @@ div.beltoft-services-domain.beltoft-services-domain fieldset.beltoft-services-do
 div.beltoft-services-domain input[type="radio"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--bsd-ink); }
 .beltoft-services-domain__custom { display: block; max-width: 560px; margin: 0 0 16px; color: var(--bsd-soft); font-size: 14px; }
 .beltoft-services-domain__custom[hidden] { display: none; }
-div.beltoft-services-domain input[type="text"], div.beltoft-services-domain input[type="number"] { box-sizing: border-box; width: 100%; height: 43px; margin: 4px 0 0; padding: 0 12px; border: 1px solid var(--bsd-rule); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; }
+div.beltoft-services-domain input[type="text"], div.beltoft-services-domain input[type="number"] { box-sizing: border-box; width: 100%; height: 43px; margin: 4px 0 0; padding: 0 12px; border: 1px solid var(--bsd-rule); border-radius: 0; background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; }
 div.beltoft-services-domain .button { height: 43px; margin: 0; padding: 0 20px; line-height: 1; }
 div.beltoft-services-domain :focus-visible { outline: 2px solid var(--bsd-ink); outline-offset: 2px; }
 div.beltoft-services-domain .beltoft-services-domain__empty { margin: 0 0 12px; color: var(--bsd-soft); }
@@ -103,7 +103,7 @@ div.beltoft-services-domain .beltoft-services-domain__empty { margin: 0 0 12px; 
 .beltoft-dns-editor td:nth-child(2) { width: 7.5em; }
 .beltoft-dns-editor td:nth-child(3) { width: 6.5em; }
 .beltoft-dns-editor td:last-child { width: 1%; padding-left: 8px; text-align: right; white-space: nowrap; }
-div.beltoft-services-domain .beltoft-dns-editor input[type="text"], div.beltoft-services-domain .beltoft-dns-editor input[type="number"], div.beltoft-services-domain .beltoft-dns-editor select { box-sizing: border-box; width: 100%; height: 44px; margin: 0; padding: 0 8px; border: 0; background: transparent; box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
+div.beltoft-services-domain .beltoft-dns-editor input[type="text"], div.beltoft-services-domain .beltoft-dns-editor input[type="number"], div.beltoft-services-domain .beltoft-dns-editor select { box-sizing: border-box; width: 100%; height: 44px; margin: 0; padding: 0 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
 div.beltoft-services-domain .beltoft-dns-editor select { appearance: none; padding-right: 22px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230c1535' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center; }
 div.beltoft-services-domain .beltoft-dns-editor input:hover, div.beltoft-services-domain .beltoft-dns-editor select:hover { background-color: var(--bsd-warm); }
 div.beltoft-services-domain .beltoft-dns-editor input:focus-visible, div.beltoft-services-domain .beltoft-dns-editor select:focus-visible { background-color: var(--bsd-card); outline: 2px solid var(--bsd-ink); outline-offset: -2px; }

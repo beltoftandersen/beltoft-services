@@ -7,6 +7,7 @@
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
  * $snapshots (null when the block is absent, or slots, used, full, days, max_label, entries of id/label/taken/keeps/consistent/state),
+ * $resource_id (the resource id, for ids that must be unique on a page),
  * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty).
  * The password is never part of this template: the reveal button asks the server for it once.
  *
@@ -67,7 +68,7 @@ $beltoft_services_power_labels = array(
 				<?php if ( ! empty( $beltoft_extra_disk['paused'] ) ) : ?><p class="description"><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a><?php endif; ?>
-				<?php if ( ! empty( $beltoft_extra_disk['snapshots_covering'] ) ) : ?>
+				<?php if ( $beltoft_extra_disk['remove_url'] && ! empty( $beltoft_extra_disk['snapshots_covering'] ) ) : ?>
 					<p class="description" data-snapshot-disk-warning>
 						<?php
 						echo esc_html(
@@ -231,7 +232,7 @@ $beltoft_services_power_labels = array(
 		</div>
 	<?php endif; ?>
 
-	<?php if ( $forms && is_array( $snapshots ) ) : ?>
+	<?php if ( is_array( $snapshots ) ) : ?>
 		<div class="beltoft-services-vm__backups beltoft-services-vm__snapshots" data-snapshots>
 			<h4><?php esc_html_e( 'Snapshots', 'beltoft-services' ); ?></h4>
 			<p class="description" data-snapshot-slots>
@@ -273,7 +274,7 @@ $beltoft_services_power_labels = array(
 							<dt><?php esc_html_e( 'Kept until', 'beltoft-services' ); ?></dt>
 							<dd><?php echo esc_html( $beltoft_services_snapshot['keeps'] ); ?></dd>
 						</dl>
-						<?php if ( 'ok' === $beltoft_services_snapshot['state'] && 'working' !== $snapshots['mode'] ) : ?>
+						<?php if ( 'ok' === $beltoft_services_snapshot['state'] && in_array( $snapshots['mode'], array( 'full', 'delete' ), true ) ) : ?>
 							<p class="beltoft-services-panel__actions">
 								<?php if ( 'full' === $snapshots['mode'] ) : ?>
 								<button type="button" class="button woocommerce-button" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( $beltoft_services_snapshot['label'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
@@ -287,15 +288,15 @@ $beltoft_services_power_labels = array(
 
 			<?php if ( 'working' === $snapshots['mode'] ) : ?>
 				<p data-snapshot-working><?php esc_html_e( 'Working on your server, snapshot actions are back when it is done.', 'beltoft-services' ); ?></p>
-			<?php elseif ( 'delete' === $snapshots['mode'] ) : ?>
-				<?php // Not available now: the list and Delete only. ?>
+			<?php elseif ( 'full' !== $snapshots['mode'] ) : ?>
+				<?php // Not available now (delete only) or read only: the list, no take form. ?>
 			<?php elseif ( $snapshots['full'] ) : ?>
 				<p data-snapshot-full><?php esc_html_e( 'All your snapshot slots are in use. Delete a snapshot first.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<form class="beltoft-services-vm-form" data-action="snapshot_take">
 					<p>
-						<label for="beltoft-vm-snapshot-label"><?php esc_html_e( 'Name (optional)', 'beltoft-services' ); ?></label>
-						<input type="text" id="beltoft-vm-snapshot-label" name="label" maxlength="<?php echo (int) $snapshots['max_label']; ?>" autocomplete="off">
+						<label for="beltoft-vm-snapshot-label-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Name (optional)', 'beltoft-services' ); ?></label>
+						<input type="text" id="beltoft-vm-snapshot-label-<?php echo (int) $resource_id; ?>" name="label" maxlength="<?php echo (int) $snapshots['max_label']; ?>" autocomplete="off">
 					</p>
 					<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Take a snapshot', 'beltoft-services' ); ?></button></p>
 				</form>
@@ -319,14 +320,14 @@ $beltoft_services_power_labels = array(
 				?>
 			</p>
 
-			<dialog class="beltoft-services-vm__dialog" data-snapshot-dialog aria-labelledby="beltoft-vm-rollback-title">
+			<dialog class="beltoft-services-vm__dialog" data-snapshot-dialog aria-labelledby="beltoft-vm-rollback-title-<?php echo (int) $resource_id; ?>">
 				<form class="beltoft-services-vm-form" data-action="snapshot_rollback">
-					<h5 id="beltoft-vm-rollback-title"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></h5>
+					<h5 id="beltoft-vm-rollback-title-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></h5>
 					<input type="hidden" name="id" value="">
 					<p class="description"><strong data-snapshot-dialog-name></strong></p>
 					<p class="description"><?php esc_html_e( 'Going back replaces everything on the server with the snapshot, extra disks included. The server is off for a moment while it goes back. The password and the SSH key go back to the ones saved. Anything changed since is lost.', 'beltoft-services' ); ?></p>
 					<p>
-						<label for="beltoft-vm-rollback-confirm">
+						<label for="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>">
 							<?php
 							echo esc_html(
 								sprintf(
@@ -337,9 +338,9 @@ $beltoft_services_power_labels = array(
 							);
 							?>
 						</label>
-						<input type="text" id="beltoft-vm-rollback-confirm" name="confirm" autocomplete="off" required>
+						<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required>
 					</p>
-					<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>
+					<p class="beltoft-services-panel__notice" data-dialog-notice role="status" aria-live="polite"></p>
 					<p class="beltoft-services-vm__buttons">
 						<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>
 						<button type="button" class="button woocommerce-button" data-snapshot-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>

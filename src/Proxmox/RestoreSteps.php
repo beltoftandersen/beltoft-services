@@ -130,7 +130,7 @@ trait RestoreSteps {
 			}
 		}
 
-		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => $was_running ? true : null ) ) ) {
+		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => $was_running ? true : null ) + ( 'rollback' === $what ? array( 'snapshot_rolled_at' => time() ) : array() ) ) ) {
 			return StepResult::retry( 0, $what . ': progress could not be stored' );
 		}
 

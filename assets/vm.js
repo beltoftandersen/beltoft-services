@@ -36,7 +36,8 @@
 	}
 
 	function notice( panel, text ) {
-		var line = panel.querySelector( 'dialog[open] [data-notice]' ) || panel.querySelector( '[data-notice]' );
+		// An open dialog shows its own messages; otherwise the panel's line (the dialog has no data-notice).
+		var line = panel.querySelector( 'dialog[open] [data-dialog-notice]' ) || panel.querySelector( '[data-notice]' );
 
 		if ( line ) {
 			line.textContent = text;
@@ -83,6 +84,15 @@
 		}
 	}
 
+	// close() when the browser has dialogs, else the attribute the fallback opening set.
+	function closeDialog( dialog ) {
+		if ( dialog.close ) {
+			dialog.close();
+		} else {
+			dialog.removeAttribute( 'open' );
+		}
+	}
+
 	function send( panel, action, args, button, form ) {
 		if ( button ) {
 			busy( button );
@@ -92,8 +102,8 @@
 			if ( 202 === response.status ) {
 				var dialog = form ? form.closest( 'dialog' ) : null;
 
-				if ( dialog && dialog.close ) {
-					dialog.close();
+				if ( dialog ) {
+					closeDialog( dialog );
 				}
 
 				notice( panel, vm.strings.queued );
@@ -181,6 +191,7 @@
 				dialog.querySelector( '[data-snapshot-dialog-name]' ).textContent = roll.getAttribute( 'data-snapshot-name' );
 				dialog.querySelector( 'input[name="confirm"]' ).value = '';
 				notice( panel, '' );
+				dialog.querySelector( '[data-dialog-notice]' ).textContent = '';
 
 				if ( dialog.showModal ) {
 					dialog.showModal();
@@ -200,11 +211,7 @@
 			}
 
 			if ( cancel && dialog ) {
-				if ( dialog.close ) {
-					dialog.close();
-				} else {
-					dialog.removeAttribute( 'open' );
-				}
+				closeDialog( dialog );
 
 				return;
 			}

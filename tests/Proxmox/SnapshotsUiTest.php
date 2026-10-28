@@ -187,8 +187,10 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$this->take( $r, 'with disk' );
 		$html = $this->card( $r );
 
-		$this->assertStringContainsString( 'data-snapshot-disk-warning', $html );
-		$this->assertStringContainsString( 'Removing this disk also deletes the 1 snapshot that includes it.', $html );
+		// The warning sits with the Remove link; the test disk has no subscription, so no link and no warning, but the data is there.
+		$this->assertSame( 1, \BeltoftServices\Proxmox\DiskPanels::server( $this->fresh( $r ) )['items'][0]['snapshots_covering'] );
+		$this->assertSame( '', \BeltoftServices\Proxmox\DiskPanels::server( $this->fresh( $r ) )['items'][0]['remove_url'] );
+		$this->assertStringNotContainsString( 'data-snapshot-disk-warning', $html );
 		$this->assertNotNull( $disk );
 	}
 
@@ -226,5 +228,72 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		Progress::mark( $this->fresh( $r ), 'snapshot_take', 'Take a snapshot' );
 
 		$this->assertStringContainsString( 'Busy', $this->card( $r ) );
+	}
+
+	public function test_the_dialog_notice_cannot_catch_the_panel_messages(): void {
+		$r = $this->server();
+		$this->take( $r, 'x' );
+
+		$html = $this->card( $r );
+
+		$this->assertStringNotContainsString( 'data-notice', $html, 'The panel notice is the only data-notice on the page.' );
+		$this->assertStringContainsString( 'data-dialog-notice', $html );
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
+		$this->assertStringContainsString( 'dialog[open] [data-dialog-notice]', $js );
+		$this->assertStringContainsString( "removeAttribute( 'open' )", $js );
+	}
+
+	public function test_the_form_ids_are_unique_per_server(): void {
+		$a = $this->server();
+		$b = $this->ready_vm();
+		$this->take( $a, 'a' );
+
+		$this->assertStringContainsString( 'beltoft-vm-snapshot-label-' . $a->id() . '"', $this->card( $a ) );
+		$this->assertStringContainsString( 'beltoft-vm-rollback-confirm-' . $a->id() . '"', $this->card( $a ) );
+		$this->assertStringContainsString( 'beltoft-vm-snapshot-label-' . $b->id() . '"', $this->card( $b ) );
+	}
+
+	public function test_a_server_that_does_not_accept_actions_shows_the_list_without_buttons(): void {
+		$r = $this->server();
+		$this->take( $r, 'kept' );
+
+		$panel = Panels::snapshots( $this->fresh( $r ), false );
+		$this->assertSame( 'working', $panel['mode'] );
+
+		$this->assertTrue( $this->fresh( $r )->set( array( 'desired' => 'paused' ) ) );
+		ob_start();
+		Panels::account( $this->fresh( $r ) );
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'data-snapshots', $html );
+		$this->assertStringContainsString( 'kept', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-rollback', $html );
+	}
+
+	public function test_an_adopted_server_shows_its_list_read_only(): void {
+		$r = $this->server();
+		$this->take( $r, 'adopted' );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'linked' => true ) ) );
+
+		$panel = Panels::snapshots( $this->fresh( $r ), true );
+
+		$this->assertSame( 'readonly', $panel['mode'] );
+		ob_start();
+		Panels::account( $this->fresh( $r ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-working', $html );
+	}
+
+	public function test_a_rollback_records_when_it_queued_the_plan(): void {
+		$r = $this->server();
+		$e = $this->take( $r, 'back' );
+
+		$this->act( $r, 'snapshot_rollback', array( 'id' => $e['id'], 'confirm' => 'ROLLBACK' ) );
+
+		$fresh = $this->fresh( $r );
+		$this->assertGreaterThan( time() - 60, (int) $fresh->get( 'snapshot_rolled_at' ) );
+		$this->assertNull( $fresh->get( Snapshots::ROLLBACK ) );
 	}
 }

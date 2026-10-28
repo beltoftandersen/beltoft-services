@@ -124,7 +124,8 @@ final class Panels {
 			'disk_used'  => $disk['used'] ?? null,
 			'disk_total' => $disk['total'] ?? null,
 			'extra_disks' => DiskPanels::server( $r ),
-			'snapshots'  => self::snapshots( $r ),
+			'snapshots'  => self::snapshots( $r, $r->accepts_actions() ),
+			'resource_id' => $r->id(),
 			'snapshot_warnings' => array(
 				'reinstall' => Snapshots::reinstall_warning( $r ),
 				'restore'   => Snapshots::restore_warning( $r ),
@@ -139,13 +140,13 @@ final class Panels {
 	}
 
 	/**
-	 * What the card's Snapshots block shows, or null when the block is absent (the switch is off, the server gets none
-	 * or it is busy). Dates are formatted here; the template only prints.
+	 * What the card's Snapshots block shows, or null when the block is absent (no snapshots and none can be taken). Dates are formatted here; the template only prints.
 	 *
-	 * @param Resource $r Resource.
+	 * @param Resource $r     Resource.
+	 * @param bool     $forms Whether the card accepts actions now.
 	 * @return array<string, mixed>|null
 	 */
-	public static function snapshots( Resource $r ): ?array {
+	public static function snapshots( Resource $r, bool $forms = true ): ?array {
 		$panel = Snapshots::panel( $r );
 
 		// Absent only when there are no snapshots and none can be taken.
@@ -153,9 +154,15 @@ final class Panels {
 			return null;
 		}
 
-		// full: every action. working: something else is running, the list only. delete: not available any more, the customer may still remove what exists.
-		$working       = ! Snapshots::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
-		$panel['mode'] = $working ? 'working' : ( $panel['enabled'] ? 'full' : 'delete' );
+		// full: every action. working: the server is busy or not accepting actions, the list only.
+		// delete: not available any more, the customer may still remove what exists. readonly: an adopted machine, the list only.
+		$working = ! $forms || ! Snapshots::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
+
+		if ( true === $r->get( 'linked' ) ) {
+			$panel['mode'] = 'readonly';
+		} else {
+			$panel['mode'] = $working ? 'working' : ( $panel['enabled'] ? 'full' : 'delete' );
+		}
 
 		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 

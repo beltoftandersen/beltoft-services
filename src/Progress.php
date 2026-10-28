@@ -34,6 +34,11 @@ final class Progress {
 	public const MARKER_TTL = 900;
 
 	/**
+	 * Seconds after a rollback during which a pending plan change still shows as part of it.
+	 */
+	public const ROLLBACK_PLAN_WINDOW = 6 * HOUR_IN_SECONDS;
+
+	/**
 	 * Notes that a customer asked for an action, before its job is queued.
 	 *
 	 * @param Resource $r      Resource.
@@ -248,12 +253,14 @@ final class Progress {
 			$kind = 'resume';
 		} elseif ( is_array( $r->get( 'restore' ) ) ) {
 			$kind = 'restore';
-		} elseif ( is_array( $r->get( 'snapshot_rollback' ) ) ) {
+		} elseif ( is_array( $r->get( 'snapshot_rollback' ) ) || ( $r->get( 'plan_dirty' ) && (int) $r->get( 'snapshot_rolled_at' ) > time() - self::ROLLBACK_PLAN_WINDOW ) ) {
+			// The marker is gone once the plan is queued; the plan change after a rollback is still the rollback's.
 			$kind = 'rollback';
 		} elseif ( $r->get( 'plan_dirty' ) ) {
 			$kind = 'update';
 		} elseif ( $marker ) {
-			$kind  = in_array( $marker['action'], array( 'reinstall', 'restore' ), true ) ? $marker['action'] : ( 'snapshot_rollback' === $marker['action'] ? 'rollback' : 'action' );
+			$kinds = array( 'reinstall' => 'reinstall', 'restore' => 'restore', 'snapshot_rollback' => 'rollback' );
+			$kind  = $kinds[ $marker['action'] ] ?? 'action';
 			$phase = 'queued';
 		}
 
@@ -428,7 +435,8 @@ final class Progress {
 		} elseif ( 'rollback' === $kind && SshKeyField::DRIVER === $driver ) {
 			$labels = self::server_steps( 'rollback' );
 			$state  = $r->get( 'snapshot_rollback' );
-			$mark   = is_array( $state ) ? (string) ( $state['phase'] ?? '' ) : '';
+			// No marker: the rollback itself is over and only its plan change is left.
+			$mark   = is_array( $state ) ? (string) ( $state['phase'] ?? '' ) : 'rolled';
 			$done   = array_slice( array_keys( $labels ), 0, 'rolled' === $mark ? 1 : 0 );
 		} elseif ( 'build' === $kind ) {
 			$labels = self::build_steps()[ $driver ] ?? array();
