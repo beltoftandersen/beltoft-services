@@ -274,7 +274,20 @@ final class DiskSteps {
 		return StepResult::done( array( 'slot' => $attached['slot'], 'volname' => $this->r->get( 'volname' ), 'size_gb' => $size, 'server_wait_until' => null, 'steps' => array( 'server', 'slot', 'allocate', 'attach', 'verify' ) ), 'Extra disk attached' );
 	}
 
-	public function grow(): StepResult {
+	/**
+	 * After a rollback to a snapshot a disk that was grown since has its old size again: grow it to the size it
+	 * was paid for. The space was ours before, so no new reservation is asked for. A disk that is not attached
+	 * and ready has nothing to grow.
+	 */
+	public function regrow_after_rollback(): StepResult {
+		$steps = (array) $this->r->get( 'steps' );
+		if ( $this->r->get( 'linked' ) || 'ready' !== $this->r->get( 'state' ) || ! $this->r->get( 'volname' ) || ! in_array( 'attach', $steps, true ) || ! in_array( 'verify', $steps, true ) || $this->r->get( 'detached' ) ) {
+			return StepResult::done( array(), 'Nothing to grow after the rollback' );
+		}
+		return $this->grow( true );
+	}
+
+	public function grow( bool $regrow = false ): StepResult {
 		if ( $this->r->get( 'linked' ) ) {
 			return StepResult::fail( 'An adopted disk is not resized automatically.' );
 		}
@@ -311,7 +324,7 @@ final class DiskSteps {
 		}
 		if ( $target > $actual ) {
 			$delta = (int) ceil( $target - $actual );
-			if ( ! DiskCapacity::reserve( $this->r, (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $delta ) ) {
+			if ( ! $regrow && ! DiskCapacity::reserve( $this->r, (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $delta ) ) {
 				return StepResult::retry( 3600, 'There is not enough verified storage capacity to grow the disk.' );
 			}
 			if ( '' !== $ctx['lock'] ) {

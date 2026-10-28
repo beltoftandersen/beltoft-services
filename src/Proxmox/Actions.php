@@ -37,6 +37,7 @@ defined( 'ABSPATH' ) || exit;
 final class Actions {
 
 	use Steps;
+	use RestoreSteps;
 
 	/**
 	 * The word a customer types to confirm a reinstall.
@@ -71,6 +72,9 @@ final class Actions {
 		'replace_ssh_key' => array( 10, HOUR_IN_SECONDS ),
 		'reinstall'      => array( 5, HOUR_IN_SECONDS ),
 		'restore'        => array( 3, HOUR_IN_SECONDS ),
+		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
+		'snapshot_delete'   => array( 10, HOUR_IN_SECONDS ),
+		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
 	);
 
 	/**
@@ -144,6 +148,8 @@ final class Actions {
 			return $out;
 		}
 
+		$out = array_merge( $out, Snapshots::offered( $r ) );
+
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
 			$out['restore'] = __( 'Restore from a backup', 'beltoft-services' );
@@ -184,7 +190,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
-			unset( $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'] );
+			unset( $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
 		}
 
 		return $actions;
@@ -217,6 +223,14 @@ final class Actions {
 			} elseif ( 'ready' !== $state ) {
 				$attention = true;
 			}
+		}
+
+		if ( 'rollback' === $action ) {
+			if ( $attention ) {
+				return __( 'An extra disk on this server needs attention from support before a rollback. Contact support.', 'beltoft-services' );
+			}
+
+			return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Rolling back is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
 		}
 
 		if ( 'reinstall' === $action ) {
@@ -258,6 +272,10 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
+		if ( in_array( $action, Snapshots::ACTIONS, true ) ) {
+			return Snapshots::check( $r, $action, $args );
+		}
+
 		if ( 'reinstall' === $action ) {
 			$block = self::disk_block( $r, 'reinstall' );
 
@@ -386,7 +404,9 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public function run( string $action, array $args ): StepResult {
-		if ( ! isset( self::FLOORS[ $action ] ) ) {
+		$internal = in_array( $action, Snapshots::INTERNAL, true );
+
+		if ( ! $internal && ! isset( self::FLOORS[ $action ] ) ) {
 			return StepResult::fail( 'This action is not available' );
 		}
 
@@ -396,11 +416,16 @@ final class Actions {
 			return StepResult::fail( 'VM record missing; check Proxmox manually' );
 		}
 
-		$why = self::check( $this->r, $action, $args );
+		$why = $internal ? null : self::check( $this->r, $action, $args );
 
 		// A refusal is an answer, not an error: no alert for a stray click.
 		if ( null !== $why ) {
 			return StepResult::done( array(), ucfirst( str_replace( '_', ' ', $action ) ) . ' refused: ' . $this->scrub( $why, 160 ) );
+		}
+
+		// Snapshots have their own steps (verification, task polling and all).
+		if ( $internal || in_array( $action, Snapshots::ACTIONS, true ) ) {
+			return ( new Snapshots( $this->r ) )->run( $action, $args );
 		}
 
 		$early = $this->prepare( $record );
@@ -941,29 +966,8 @@ final class Actions {
 	}
 
 	/**
-	 * A restore ended badly: the customer gets one short, fixed note (no Proxmox text). The server may
-	 * be off and the admin has been alerted.
-	 */
-	private function tell_customer(): void {
-		$to = is_email( (string) ( $this->r->license()['email'] ?? '' ) ) ? (string) $this->r->license()['email'] : '';
-
-		if ( '' === $to ) {
-			return;
-		}
-
-		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
-
-		wp_mail(
-			$to,
-			/* translators: %s: site name */
-			sprintf( __( '[%s] Your server restore did not finish', 'beltoft-services' ), $site ),
-			__( 'The restore of your server did not finish. We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support.', 'beltoft-services' )
-		);
-	}
-
-	/**
 	 * The second half: the tag is in the restored config, the disk size is recorded, and the plan
-	 * is queued again. Null: done.
+	 * is queued again (RestoreSteps::reapply_plan). Null: done.
 	 *
 	 * @param array<string, mixed> $record VM record.
 	 */
@@ -974,68 +978,7 @@ final class Actions {
 			return $pool;
 		}
 
-		$v = $this->verified( $record, 'restore' );
-
-		if ( $v instanceof StepResult ) {
-			if ( $v->is_failed() ) {
-				$this->tell_customer();
-			}
-
-			return $v->is_failed() ? StepResult::fail( $v->error() . '; the restored server could not be proved ours', array( 'restore' => null ) ) : $v;
-		}
-
-		$size = Provision::gigabytes( (string) ( $v['config'][ (string) $this->cluster['boot_disk'] ] ?? '' ) );
-
-		if ( null === $size ) {
-			return StepResult::fail( 'Restore: the boot disk was not found on the restored server', array( 'restore' => null ) );
-		}
-
-		// The queued plan change owns the one start (was_running): it applies the plan to the stopped VM and starts it, so a VM that has only just booted is never shut down again.
-		$disks = $this->restore_disks();
-
-		if ( null !== $disks ) {
-			return $disks;
-		}
-
-		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => true ) ) ) {
-			return StepResult::retry( 0, 'restore: progress could not be stored' );
-		}
-
-		$stored = $this->r->change_plan( (array) $this->r->get( 'plan' ), 'Plan re-applied after restore' );
-
-		if ( true !== $stored ) {
-			return StepResult::retry( 0, 'restore: the plan could not be queued again' );
-		}
-
-		Jobs::enqueue( $this->r->id() );
-
-		return null;
-	}
-
-	/**
-	 * The extra disks are not part of the backup: a forced restore keeps their volumes as unusedN entries.
-	 * Each one that was attached goes back to its own slot, while the server is still off. One that cannot
-	 * (volume missing, slot taken) is failed with one admin alert and left alone; the restore goes on.
-	 * Null: done.
-	 */
-	private function restore_disks(): ?StepResult {
-		foreach ( DiskMeta::for_server( $this->r ) as $disk ) {
-			$result = ( new DiskSteps( $disk ) )->reattach_after_restore( $this->r );
-
-			if ( $result->is_done() ) {
-				continue;
-			}
-
-			if ( ! $result->is_failed() ) {
-				return $result;
-			}
-
-			$disk->set( array( 'last_error' => $result->error() ) );
-			$disk->transition( 'failed', 'Extra disk could not be attached again after the restore: ' . $result->error() );
-			Alerts::admin( $disk, 'After the restore of the server the extra disk could not be attached again: ' . $result->error() . ' The volume was left alone.' );
-		}
-
-		return null;
+		return $this->reapply_plan( $record, 'restore', true );
 	}
 
 	/**
