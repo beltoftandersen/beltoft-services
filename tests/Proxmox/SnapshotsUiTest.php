@@ -269,6 +269,23 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'kept', $html );
 		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
 		$this->assertStringNotContainsString( 'data-snapshot-rollback', $html );
+		$this->assertStringContainsString( 'Working on your server, snapshot actions are back when it is done.', $html, 'A pending desire is a job in flight.' );
+	}
+
+	public function test_a_paused_server_says_actions_come_back_when_it_is_active(): void {
+		$r = $this->server();
+		$this->take( $r, 'asleep' );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'state' => 'paused', 'desired' => 'paused' ) ) );
+
+		$this->assertSame( 'inactive', Panels::snapshots( $this->fresh( $r ), false )['mode'] );
+		ob_start();
+		Panels::account( $this->fresh( $r ) );
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'asleep', $html );
+		$this->assertStringContainsString( 'Snapshot actions are available again when the server is active.', $html );
+		$this->assertStringNotContainsString( 'Working on your server', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
 	}
 
 	public function test_an_adopted_server_shows_its_list_read_only(): void {

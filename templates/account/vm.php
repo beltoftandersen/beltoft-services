@@ -288,6 +288,8 @@ $beltoft_services_power_labels = array(
 
 			<?php if ( 'working' === $snapshots['mode'] ) : ?>
 				<p data-snapshot-working><?php esc_html_e( 'Working on your server, snapshot actions are back when it is done.', 'beltoft-services' ); ?></p>
+			<?php elseif ( 'inactive' === $snapshots['mode'] ) : ?>
+				<p data-snapshot-inactive><?php esc_html_e( 'Snapshot actions are available again when the server is active.', 'beltoft-services' ); ?></p>
 			<?php elseif ( 'full' !== $snapshots['mode'] ) : ?>
 				<?php // Not available now (delete only) or read only: the list, no take form. ?>
 			<?php elseif ( $snapshots['full'] ) : ?>

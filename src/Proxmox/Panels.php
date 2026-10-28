@@ -158,8 +158,14 @@ final class Panels {
 		// delete: not available any more, the customer may still remove what exists. readonly: an adopted machine, the list only.
 		$working = ! $forms || ! Snapshots::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
 
+		// Paused or on hold with no job running: nothing is in flight, the actions just are not offered.
+		$inactive = ! $panel['rolling'] && array() === (array) $r->get( Snapshots::OP ) && ! $r->get( 'plan_dirty' ) && ! is_array( $r->get( 'restore' ) ) && ! $r->get( 'wipe' )
+			&& ( $r->on_hold() || ( 'paused' === $r->get( 'state' ) && 'paused' === $r->get( 'desired' ) ) );
+
 		if ( true === $r->get( 'linked' ) ) {
 			$panel['mode'] = 'readonly';
+		} elseif ( $inactive ) {
+			$panel['mode'] = 'inactive';
 		} else {
 			$panel['mode'] = $working ? 'working' : ( $panel['enabled'] ? 'full' : 'delete' );
 		}
