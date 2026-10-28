@@ -23,17 +23,60 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		return (string) ob_get_clean();
 	}
 
-	public function test_the_block_is_absent_when_the_switch_is_off(): void {
+	public function test_the_block_is_absent_when_the_switch_is_off_and_there_are_no_snapshots(): void {
 		$r = $this->server();
-		$this->take( $r, 'before' );
 		$this->settings( array( 'snapshots_enabled' => 0 ) );
 
 		$html = $this->card( $r );
 
 		$this->assertStringNotContainsString( 'data-snapshots', $html );
 		$this->assertStringNotContainsString( 'Take a snapshot', $html );
-		$this->assertStringNotContainsString( 'ROLLBACK', $html );
 		$this->assertNull( Panels::snapshots( $this->fresh( $r ) ) );
+	}
+
+	public function test_with_the_switch_off_the_list_stays_with_delete_only(): void {
+		$r = $this->server();
+		$e = $this->take( $r, 'before' );
+		$this->settings( array( 'snapshots_enabled' => 0 ) );
+
+		$html = $this->card( $r );
+
+		$this->assertStringContainsString( 'data-snapshots', $html );
+		$this->assertStringContainsString( 'before', $html );
+		$this->assertStringContainsString( 'data-snapshot-delete="' . $e['id'] . '"', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-rollback', $html );
+		$this->assertStringNotContainsString( 'data-action="snapshot_take"', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-dialog', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-working', $html );
+		$this->assertArrayHasKey( 'snapshot_delete', Snapshots::offered( $this->fresh( $r ) ) );
+		$this->assertArrayNotHasKey( 'snapshot_take', Snapshots::offered( $this->fresh( $r ) ) );
+		$this->assertArrayNotHasKey( 'snapshot_rollback', Snapshots::offered( $this->fresh( $r ) ) );
+		$this->assertNull( Snapshots::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $e['id'] ) ) );
+
+		$this->act( $r, 'snapshot_delete', array( 'id' => $e['id'] ) );
+		$this->assertSame( 0, Snapshots::used( $this->fresh( $r ) ) );
+		$this->assertStringNotContainsString( 'data-snapshots', $this->card( $r ) );
+	}
+
+	public function test_while_something_else_runs_the_list_stays_without_buttons(): void {
+		$r = $this->server();
+		$e = $this->take( $r, 'keep' );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'plan_dirty' => true ) ) );
+
+		$html = $this->card( $r );
+
+		$this->assertStringContainsString( 'data-snapshots', $html );
+		$this->assertStringContainsString( 'keep', $html );
+		$this->assertStringContainsString( 'Working on your server, snapshot actions are back when it is done.', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-rollback', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
+		$this->assertStringNotContainsString( 'data-action="snapshot_take"', $html );
+
+		$this->assertTrue( $this->fresh( $r )->set( array( 'plan_dirty' => false, Snapshots::ROLLBACK => array( 'id' => $e['id'], 'phase' => 'rolling' ) ) ) );
+		$html = $this->card( $r );
+		$this->assertStringContainsString( 'data-snapshot-working', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
+		$this->assertNotNull( Snapshots::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $e['id'] ) ), 'An open operation refuses a delete.' );
 	}
 
 	public function test_an_empty_list_shows_the_slot_line_and_the_take_form(): void {

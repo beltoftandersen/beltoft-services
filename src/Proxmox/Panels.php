@@ -148,9 +148,14 @@ final class Panels {
 	public static function snapshots( Resource $r ): ?array {
 		$panel = Snapshots::panel( $r );
 
-		if ( null === $panel || ! $panel['enabled'] ) {
+		// Absent only when there are no snapshots and none can be taken.
+		if ( null === $panel ) {
 			return null;
 		}
+
+		// full: every action. working: something else is running, the list only. delete: not available any more, the customer may still remove what exists.
+		$working       = ! Snapshots::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
+		$panel['mode'] = $working ? 'working' : ( $panel['enabled'] ? 'full' : 'delete' );
 
 		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 

@@ -273,9 +273,11 @@ $beltoft_services_power_labels = array(
 							<dt><?php esc_html_e( 'Kept until', 'beltoft-services' ); ?></dt>
 							<dd><?php echo esc_html( $beltoft_services_snapshot['keeps'] ); ?></dd>
 						</dl>
-						<?php if ( 'ok' === $beltoft_services_snapshot['state'] ) : ?>
+						<?php if ( 'ok' === $beltoft_services_snapshot['state'] && 'working' !== $snapshots['mode'] ) : ?>
 							<p class="beltoft-services-panel__actions">
+								<?php if ( 'full' === $snapshots['mode'] ) : ?>
 								<button type="button" class="button woocommerce-button" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( $beltoft_services_snapshot['label'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
+								<?php endif; ?>
 								<button type="button" class="button woocommerce-button" data-snapshot-delete="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
 							</p>
 						<?php endif; ?>
@@ -283,7 +285,11 @@ $beltoft_services_power_labels = array(
 				<?php endforeach; ?>
 			<?php endif; ?>
 
-			<?php if ( $snapshots['full'] ) : ?>
+			<?php if ( 'working' === $snapshots['mode'] ) : ?>
+				<p data-snapshot-working><?php esc_html_e( 'Working on your server, snapshot actions are back when it is done.', 'beltoft-services' ); ?></p>
+			<?php elseif ( 'delete' === $snapshots['mode'] ) : ?>
+				<?php // Not available now: the list and Delete only. ?>
+			<?php elseif ( $snapshots['full'] ) : ?>
 				<p data-snapshot-full><?php esc_html_e( 'All your snapshot slots are in use. Delete a snapshot first.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<form class="beltoft-services-vm-form" data-action="snapshot_take">
@@ -295,6 +301,7 @@ $beltoft_services_power_labels = array(
 				</form>
 			<?php endif; ?>
 
+			<?php if ( 'full' === $snapshots['mode'] ) : ?>
 			<p class="description">
 				<?php
 				echo esc_html(
@@ -339,6 +346,7 @@ $beltoft_services_power_labels = array(
 					</p>
 				</form>
 			</dialog>
+			<?php endif; ?>
 		</div>
 	<?php endif; ?>
 
