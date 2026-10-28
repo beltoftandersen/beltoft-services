@@ -29,9 +29,13 @@ final class AuthCodeRoute {
 			} else {
 				$reply = Clients::registrar()->request( 'GET', '/domains/' . $r->get( 'remote_id' ) . '/authcode' );
 				$code = is_wp_error( $reply ) ? '' : (string) ( $reply['auth_code'] ?? '' );
-				$response = '' === $code
-					? rest_convert_error_to_response( new \WP_Error( 'unavailable', 'The transfer code is not available yet.', array( 'status' => 503 ) ) )
-					: new \WP_REST_Response( array( 'auth_code' => $code ), 200 );
+				if ( '' === $code ) {
+					$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', 'The transfer code is not available yet.', array( 'status' => 503 ) ) );
+				} else {
+					// The customer is told it was shown, never the code.
+					Security::notify( $r, 'code_viewed' );
+					$response = new \WP_REST_Response( array( 'auth_code' => $code ), 200 );
+				}
 			}
 		}
 		$response->header( 'Cache-Control', 'no-store' );

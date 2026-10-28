@@ -63,6 +63,7 @@ final class Plugin {
 		Domains\DnsClaimPanel::register();
 		Domains\Panels::register();
 		Domains\Sync::register();
+		Domains\Security::register();
 		Domains\EmailDetails::register();
 		Proxmox\ClustersScreen::register();
 		Checkout::register();

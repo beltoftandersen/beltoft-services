@@ -93,10 +93,14 @@ final class Actions {
 				$ds = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'dnssec_keys' => $keys, 'is_dnssec_enabled' => true ) );
 				if ( is_wp_error( $ds ) ) { return StepResult::retry( 60, 'DNSSEC could not be published.' ); }
 			}
+			Security::notify( $r, 'ns_changed' );
 			return StepResult::done( array( 'ns_mode' => $mode, 'nameservers' => $hosts, 'dnssec_keys' => $keys ) );
 		}
 		$locked = 'lock' === $action;
 		$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'is_locked' => $locked ) );
-		return is_wp_error( $reply ) ? StepResult::retry( 60, 'Transfer lock could not be changed.' ) : StepResult::done( array( 'is_locked' => $locked ) );
+		if ( is_wp_error( $reply ) ) { return StepResult::retry( 60, 'Transfer lock could not be changed.' ); }
+		// The days an unlocked domain stays unlocked count from the unlock.
+		if ( ! $locked ) { Security::notify( $r, 'unlocked' ); }
+		return StepResult::done( array( 'is_locked' => $locked, 'unlocked_at' => $locked ? null : time() ) );
 	}
 }
