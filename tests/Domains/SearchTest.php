@@ -102,9 +102,6 @@ class SearchTest extends TestCase {
 		$this->assertWPError( $busy );
 		$this->assertSame( 'search_busy', $busy->get_error_code() );
 		$this->assertIsArray( Search::find( $a . '.com' ), 'A cached search still works while the cap is reached.' );
-		$fresh = Search::find( $d . '.com', true );
-		$this->assertWPError( $fresh, 'A fresh lookup reaches the registrar too, so the cap applies to it.' );
-		$this->assertSame( 'search_busy', $fresh->get_error_code() );
 		$this->assertSame( 2, $this->lookups( $fake ), 'The refused and the cached searches made no registrar call.' );
 	}
 
@@ -174,5 +171,33 @@ class SearchTest extends TestCase {
 
 	public function test_the_plugins_own_errors_stay_as_they_are(): void {
 		$this->assertSame( 'bad_domain', Search::find( '-bad-.com' )->get_error_code() );
+	}
+
+	public function test_public_searches_stop_at_80_percent_and_an_order_lookup_still_works(): void {
+		$names = array();
+		for ( $i = 0; $i < 6; $i++ ) { $names[] = $this->unique( 'share' . $i ); }
+		$order = $this->unique( 'order' );
+		$fake  = $this->client( array_merge( $names, array( $order ) ) );
+		add_filter( 'beltoft_services_domain_lookup_limit', static fn() => 5 );
+		$ok = 0;
+		foreach ( $names as $name ) {
+			if ( is_array( Search::find( $name . '.com' ) ) ) { ++$ok; }
+		}
+		$this->assertSame( 4, $ok, 'Public searches get 80% of the cap of five.' );
+		$result = Search::find( $order . '.com', true );
+		$this->assertIsArray( $result, 'A paying customer is not refused by the public share.' );
+		$this->assertSame( 5, $this->lookups( $fake ) );
+	}
+
+	public function test_order_lookups_have_their_own_global_and_per_visitor_limits(): void {
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.77';
+		$a = $this->unique( 'oa' );
+		$b = $this->unique( 'ob' );
+		$this->client( array( $a, $b ) );
+		add_filter( 'beltoft_services_domain_order_lookup_visitor_limit', static fn() => 1 );
+		$this->assertIsArray( Search::find( $a . '.com', true ) );
+		$busy = Search::find( $b . '.com', true );
+		$this->assertWPError( $busy );
+		$this->assertSame( 'search_busy', $busy->get_error_code() );
 	}
 }

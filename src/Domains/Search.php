@@ -92,8 +92,16 @@ final class Search {
 
 		/** Registrar lookups allowed per hour for the whole site; 0 means no cap. */
 		$cap = (int) apply_filters( 'beltoft_services_domain_lookup_limit', 600 );
-		// A fresh lookup (an order asks again) reaches the registrar too, so it counts against the same cap.
-		if ( RateLimit::exceeded( 0, 'domain-registrar-lookups', $cap, HOUR_IN_SECONDS ) ) {
+		// Public searches stop at 80% of the cap; an order's own lookup has a bucket of its own (and a per-visitor limit), so paying customers keep headroom.
+		if ( $fresh ) {
+			/** Order lookups allowed per hour for the whole site, and per visitor; 0 means no limit. */
+			$order_cap = (int) apply_filters( 'beltoft_services_domain_order_lookup_limit', 600 );
+			$per_visit = (int) apply_filters( 'beltoft_services_domain_order_lookup_visitor_limit', 60 );
+			$busy      = RateLimit::exceeded( 0, 'domain-order-lookups', $order_cap, HOUR_IN_SECONDS ) || RateLimit::exceeded( RateLimit::visitor(), 'domain-order-lookups', $per_visit, HOUR_IN_SECONDS );
+		} else {
+			$busy = $cap > 0 && RateLimit::exceeded( 0, 'domain-registrar-lookups', (int) ceil( $cap * 0.8 ), HOUR_IN_SECONDS );
+		}
+		if ( $busy ) {
 			return new \WP_Error( 'search_busy', __( 'Domain search is busy. Please try again in a few minutes.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 
