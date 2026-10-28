@@ -2,6 +2,9 @@
 /** Domain provisioning tests. @package BeltoftServices */
 namespace BeltoftServices\Tests\Domains;
 
+use BeltoftServices\Domains\DnsAssignments;
+use BeltoftServices\Domains\DnsClaims;
+use BeltoftServices\Domains\DnsDriver;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeClient;
 use BeltoftServices\Domains\FakeDns;
@@ -182,5 +185,49 @@ class DomainDriverTest extends TestCase {
 		$this->assertTrue( $result->is_done() );
 		$this->assertSame( '2028-10-26 00:00:00', $result->meta()['expires_at'] );
 		$this->assertCount( 1, array_filter( $fake->calls(), static fn( $call ) => '/domains/123/renew' === $call['path'] ) );
+	}
+
+	private function register_fakes(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+	}
+
+	public function test_registering_a_name_hosted_here_adopts_the_assignment_and_cancels_dns_only(): void {
+		$this->register_fakes();
+		$name = 'adopt-' . wp_generate_password( 6, false, false ) . '.com';
+		$r = $this->resource( 'register', $name );
+		$user = (int) $r->license()['user_id'];
+		$sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1, 'status' => 'active' ) );
+		$sub->save();
+		$dns_license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
+		$claim = DnsClaims::create( $user, $name );
+		$this->assertTrue( DnsAssignments::reserve( $user, $claim['id'], $name ) );
+		$old = Resource::create( $dns_license, new DnsDriver(), array(), array( 'domain' => $name, 'mode' => 'dns', 'claim_id' => $claim['id'] ) );
+		$this->assertTrue( DnsAssignments::bind_order( $name, $user, 1, 1 ) );
+		$this->assertTrue( DnsAssignments::activate( $name, $user, (int) $dns_license['id'], $old->id() ) );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$row = DnsAssignments::get( $name );
+		$this->assertSame( 'active', $row['status'] );
+		$this->assertSame( $r->id(), (int) $row['resource_id'] );
+		$this->assertSame( (int) $r->license()['id'], (int) $row['license_id'] );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status() );
+	}
+
+	public function test_another_customers_assignment_fails_closed(): void {
+		$this->register_fakes();
+		$name = 'other-' . wp_generate_password( 6, false, false ) . '.com';
+		$r = $this->resource( 'register', $name );
+		$this->assertTrue( DnsAssignments::reserve( (int) $r->license()['user_id'] + 1000, 9, $name ) );
+		$dns = new FakeDns();
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertFalse( $result->is_done() );
+		$this->assertNull( ( new FakeDns() )->zone( $name ) );
 	}
 }

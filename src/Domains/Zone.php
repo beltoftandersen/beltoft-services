@@ -13,6 +13,11 @@ final class Zone {
 	/** The other live license claiming this name, relative to this resource's customer. */
 	public static function owner( Resource $r ): string {
 		$name = (string) $r->get( 'domain' );
+		// The assignments table is the lock on a name: another customer's row (any status) is enough, even with no live resource.
+		if ( DnsSchema::ready() ) {
+			$row = DnsAssignments::get( $name );
+			if ( null !== $row && (int) $row['user_id'] !== (int) ( $r->license()['user_id'] ?? 0 ) ) { return 'other'; }
+		}
 		foreach ( array( 'domain', 'dns' ) as $kind ) {
 			foreach ( Resource::live_ids( $kind ) as $id ) {
 				$other = Resource::find( $id );

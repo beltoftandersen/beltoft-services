@@ -25,6 +25,16 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		if ( is_wp_error( Search::normalise( $name ) ) || 'dns' !== $r->get( 'mode' ) ) { return StepResult::fail( 'The order did not contain a valid domain.' ); }
 		if ( count( Zone::nameservers() ) < 2 ) { return StepResult::retry( 3600, 'Configure at least two domain name servers.' ); }
 		$steps = (array) $r->get( 'steps' );
+		if ( ! in_array( 'assignment', $steps, true ) ) {
+			$user = (int) ( $r->license()['user_id'] ?? 0 );
+			if ( ! $this->holds_name( $r, $name, $user ) ) {
+				if ( ! $r->get( 'assignment_alerted' ) ) { Alerts::admin( $r, 'DNS hosting was ordered without a verified domain assignment.' ); }
+				return StepResult::fail( 'DNS hosting needs a verified domain.', array( 'assignment_alerted' => true ) );
+			}
+			if ( ! DnsAssignments::activate( $name, $user, (int) ( $r->license()['id'] ?? 0 ), $r->id() ) ) { return StepResult::retry( 3600, 'The domain assignment could not be saved.' ); }
+			$steps[] = 'assignment';
+			if ( ! $r->set( array( 'steps' => $steps ) ) ) { return StepResult::retry( 3600, 'The domain assignment could not be saved.' ); }
+		}
 		if ( ! in_array( 'claim', $steps, true ) ) {
 			$owner = Zone::owner( $r );
 			if ( 'other' === $owner ) {
@@ -34,7 +44,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 			if ( 'domain' === $owner ) { return StepResult::fail( 'This domain is already registered here.' ); }
 			$zone = Clients::dns()->zone( $name );
 			if ( is_wp_error( $zone ) ) { return StepResult::retry( 3600, 'DNS zone could not be checked.' ); }
-			if ( null !== $zone && 'dns' !== $owner && ! $r->get( 'zone_claimed' ) ) { return StepResult::retry( 3600, 'An existing zone needs staff review.' ); }
+			// The assignment step proved this customer holds the name, so a zone that is already there is adopted.
 			$steps[] = 'claim';
 			if ( ! $r->set( array( 'steps' => $steps, 'zone_claimed' => true ) ) ) { return StepResult::retry( 3600, 'DNS claim could not be saved.' ); }
 		}
@@ -44,6 +54,22 @@ final class DnsDriver implements Driver, StopsOnDelete {
 			$steps[] = 'zone';
 			if ( ! $r->set( array_merge( $zone->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
 		}
+		if ( ! in_array( 'import', $steps, true ) ) {
+			$meta = array();
+			$claim = DnsClaims::get( (int) $r->get( 'claim_id' ) );
+			$draft = is_array( $claim ) && is_array( $claim['draft_records'] ?? null ) ? $claim['draft_records'] : array();
+			if ( $draft ) {
+				$checked = Records::validate( $name, $draft );
+				if ( is_wp_error( $checked ) ) {
+					$meta['import_error'] = $checked->get_error_message();
+				} else {
+					$imported = Records::replace( $name, $draft );
+					if ( is_wp_error( $imported ) ) { return StepResult::retry( 3600, 'The DNS records could not be imported.' ); }
+				}
+			}
+			$steps[] = 'import';
+			if ( ! $r->set( array_merge( $meta, array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'The import status could not be saved.' ); }
+		}
 		if ( ! in_array( 'delegation', $steps, true ) ) {
 			Delegation::refresh( $r );
 			$steps[] = 'delegation';
@@ -52,10 +78,42 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		return StepResult::done( array( 'steps' => $steps, 'domain' => $name ), 'DNS zone ready' );
 	}
 
-	public function pause( Resource $r ): StepResult { return StepResult::done(); }
-	public function resume( Resource $r ): StepResult { return StepResult::done(); }
+	/** The claim is the customer's, for this domain, and the assignment is theirs and bound to this order or already active for this service. */
+	private function holds_name( Resource $r, string $name, int $user ): bool {
+		$claim_id = (int) $r->get( 'claim_id' );
+		if ( $claim_id <= 0 || $user <= 0 || ! DnsSchema::ready() ) { return false; }
+		$claim = DnsClaims::get( $claim_id );
+		if ( ! $claim || (int) $claim['user_id'] !== $user || $claim['domain'] !== $name ) { return false; }
+		$row = DnsAssignments::get( $name );
+		if ( ! $row || (int) $row['user_id'] !== $user || (int) $row['claim_id'] !== $claim_id ) { return false; }
+		if ( 'active' === $row['status'] ) { return (int) $row['resource_id'] === $r->id(); }
+		return 'reserved' === $row['status'] && (int) $row['order_id'] > 0 && (int) $row['order_id'] === (int) ( $r->license()['order_id'] ?? 0 );
+	}
+
+	public function pause( Resource $r ): StepResult {
+		// The same customer's registered domain owns the zone now: its records are live and stay so.
+		if ( 'domain' === Zone::owner( $r ) ) { return StepResult::done(); }
+		$off = Records::set_disabled( (string) $r->get( 'domain' ), true );
+		if ( is_wp_error( $off ) ) {
+			if ( 'zone_missing' === $off->get_error_code() ) { return StepResult::done(); }
+			return StepResult::retry( 3600, 'The DNS records could not be switched off.' );
+		}
+		return StepResult::done( array( 'records_off' => true ) );
+	}
+	public function resume( Resource $r ): StepResult {
+		$on = Records::set_disabled( (string) $r->get( 'domain' ), false );
+		if ( is_wp_error( $on ) && 'zone_missing' !== $on->get_error_code() ) { return StepResult::retry( 3600, 'The DNS records could not be switched on.' ); }
+		return StepResult::done( array( 'records_off' => false ) );
+	}
 	public function update_plan( Resource $r ): StepResult { return StepResult::done(); }
-	public function delete( Resource $r ): StepResult { return Zone::remove( $r ); }
+	public function delete( Resource $r ): StepResult {
+		$owner = Zone::owner( $r );
+		$removed = Zone::remove( $r );
+		// The name stays locked to the customer until the release job sees that the parent no longer lists our name servers.
+		// When the same customer's domain resource keeps the zone, it holds the assignment and nothing is released.
+		if ( $removed->is_done() && ! in_array( $owner, array( 'domain', 'dns', 'other' ), true ) ) { DnsAssignments::release_pending_for( $r ); }
+		return $removed;
+	}
 	public function status( Resource $r ): ?array { return array( 'domain' => $r->get( 'domain' ), 'delegation' => $r->get( 'delegation' ) ); }
 	public function customer_actions( Resource $r ): array { return Actions::offered( $r ); }
 	public function act( Resource $r, string $action, array $args ): StepResult { return Actions::run( $r, $action, $args ); }

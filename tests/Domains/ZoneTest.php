@@ -105,4 +105,17 @@ class ZoneTest extends TestCase {
 		$this->assertFalse( $dns->zone( 'sandbox-example.com' )['secured'] );
 		$this->assertSame( array(), $result->meta()['dnssec_keys'] );
 	}
+
+	public function test_owner_is_other_when_another_customer_holds_the_assignment(): void {
+		$r = $this->resource( 'locked-example.com' );
+		$this->assertSame( 'none', Zone::owner( $r ) );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( (int) $r->license()['user_id'] + 1000, 5, 'locked-example.com' ) );
+		$this->assertSame( 'other', Zone::owner( $r ) );
+	}
+
+	public function test_owner_ignores_the_same_customers_assignment(): void {
+		$r = $this->resource( 'mine-example.com' );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( (int) $r->license()['user_id'], 5, 'mine-example.com' ) );
+		$this->assertSame( 'none', Zone::owner( $r ) );
+	}
 }

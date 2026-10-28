@@ -122,8 +122,19 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array_merge( $year->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'Transfer renewal status could not be saved.' ); }
 		}
 		if ( ! in_array( 'zone', $steps, true ) ) {
+			$user = (int) ( $r->license()['user_id'] ?? 0 );
+			$held = DnsSchema::ready() ? DnsAssignments::get( $name ) : null;
+			if ( null !== $held && (int) $held['user_id'] !== $user ) {
+				if ( ! $r->get( 'zone_conflict_alerted' ) ) { Alerts::admin( $r, 'Domain zone belongs to a different customer.' ); $r->set( array( 'zone_conflict_alerted' => true ) ); }
+				return StepResult::retry( 3600, 'A domain zone is assigned to another customer.' );
+			}
 			$zone = Zone::ensure( $r );
 			if ( ! $zone->is_done() ) { return $zone; }
+			// The same customer's DNS-only service held this name: this domain takes over the zone and the DNS-only subscription ends.
+			if ( null !== $held && 'active' === $held['status'] && (int) $held['resource_id'] !== $r->id() ) {
+				$adopted = $this->adopt( $r, $held, $user );
+				if ( ! $adopted ) { return StepResult::retry( 3600, 'The DNS hosting could not be handed over.' ); }
+			}
 			$steps[] = 'zone';
 			if ( ! $r->set( array_merge( $zone->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
 		}
@@ -140,6 +151,16 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array( 'steps' => $steps, 'is_locked' => ! is_wp_error( $locked ) ) ) ) { return StepResult::retry( 3600, 'Transfer lock could not be saved.' ); }
 		}
 		return StepResult::done( array( 'steps' => $steps, 'remote_id' => $r->get( 'remote_id' ), 'expires_at' => $r->get( 'expires_at' ) ), 'Domain active' );
+	}
+
+	/** Moves the assignment to this domain resource and cancels the DNS-only subscription. Safe to repeat: the cancel comes first, so a failed move is retried with the old row still in place. */
+	private function adopt( Resource $r, array $held, int $user ): bool {
+		$old = Resource::find( (int) $held['resource_id'] );
+		if ( $old && 'dns' === $old->get( 'driver' ) && function_exists( 'wcs_get_subscription' ) ) {
+			$subscription = wcs_get_subscription( (int) ( $old->license()['subscription_id'] ?? 0 ) );
+			if ( $subscription && ! $subscription->has_status( 'cancelled' ) ) { $subscription->update_status( 'cancelled', 'Replaced by the domain registration.' ); }
+		}
+		return DnsAssignments::move_to( (string) $held['domain'], $user, (int) ( $r->license()['id'] ?? 0 ), $r->id() );
 	}
 
 	private function error( Resource $r, \WP_Error $error, array $steps ): StepResult {
@@ -164,7 +185,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	public function pause( Resource $r ): StepResult { return StepResult::done(); }
 	public function resume( Resource $r ): StepResult { return StepResult::done(); }
 	public function update_plan( Resource $r ): StepResult { return StepResult::done(); }
-	public function delete( Resource $r ): StepResult { return Zone::remove( $r ); }
+	public function delete( Resource $r ): StepResult {
+		$owner = Zone::owner( $r );
+		$removed = Zone::remove( $r );
+		if ( $removed->is_done() && ! in_array( $owner, array( 'domain', 'dns', 'other' ), true ) ) { DnsAssignments::release_pending_for( $r ); }
+		return $removed;
+	}
 	public function status( Resource $r ): ?array { return array( 'domain' => $r->get( 'domain' ), 'status' => $r->get( 'registrar_status' ), 'expires_at' => $r->get( 'expires_at' ) ); }
 	public function customer_actions( Resource $r ): array { return Actions::offered( $r ); }
 	public function act( Resource $r, string $action, array $args ): StepResult {

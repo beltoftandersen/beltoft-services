@@ -62,6 +62,7 @@ register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Proxmox\ProxmoxJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Emails\Emails::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsClaimJobs::class, 'unschedule' ) );
+register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsReleaseJob::class, 'unschedule' ) );
 
 // After beltoft-licenses (priority 10), so its classes and hooks exist.
 add_action( 'plugins_loaded', array( \BeltoftServices\Plugin::class, 'boot' ), 20 );

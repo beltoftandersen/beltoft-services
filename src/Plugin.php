@@ -56,6 +56,8 @@ final class Plugin {
 		Domains\Actions::register();
 		Domains\AuthCodeRoute::register();
 		Domains\DnsClaimJobs::register();
+		Domains\DnsReleaseJob::register();
+		Domains\DnsCancel::register();
 		Domains\DnsClaimRoutes::register();
 		Domains\DnsClaimPanel::register();
 		Domains\Panels::register();

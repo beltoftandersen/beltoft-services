@@ -174,4 +174,23 @@ final class Records {
 		}
 		return $dns->replace_rrsets( $zone, $rrsets );
 	}
+
+	/**
+	 * Switches every customer record of a zone off or on, keeping the records. NS and SOA stay as they are.
+	 * A zone that does not exist gives the error zone_missing.
+	 */
+	public static function set_disabled( string $zone, bool $disabled ): true|\WP_Error {
+		$dns = Clients::dns();
+		$current = $dns->zone( $zone );
+		if ( is_wp_error( $current ) ) { return $current; }
+		if ( null === $current ) { return new \WP_Error( 'zone_missing', 'The DNS zone does not exist.' ); }
+		$sets = array();
+		foreach ( (array) ( $current['rrsets'] ?? array() ) as $set ) {
+			if ( ! in_array( strtoupper( (string) ( $set['type'] ?? '' ) ), self::TYPES, true ) ) { continue; }
+			$records = array();
+			foreach ( (array) ( $set['records'] ?? array() ) as $entry ) { $records[] = array( 'content' => (string) ( $entry['content'] ?? '' ), 'disabled' => $disabled ); }
+			$sets[] = array( 'name' => $set['name'], 'type' => $set['type'], 'ttl' => (int) ( $set['ttl'] ?? 3600 ), 'changetype' => 'REPLACE', 'records' => $records );
+		}
+		return $sets ? $dns->replace_rrsets( $zone, $sets ) : true;
+	}
 }

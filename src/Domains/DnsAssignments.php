@@ -264,6 +264,71 @@ final class DnsAssignments {
 	}
 
 	/**
+	 * Marks a resource's own row as being released: only when the row is active and belongs to this
+	 * resource, so a row handed to a registered domain is left alone.
+	 *
+	 * @param \BeltoftServices\Resource $r Resource.
+	 */
+	public static function release_pending_for( \BeltoftServices\Resource $r ): bool {
+		$row = self::get( (string) $r->get( 'domain' ) );
+
+		if ( null === $row || 'active' !== $row['status'] || (int) $row['resource_id'] !== $r->id() || (int) $row['user_id'] !== (int) ( $r->license()['user_id'] ?? 0 ) ) {
+			return false;
+		}
+
+		return self::release_pending( (string) $row['domain'] );
+	}
+
+	/**
+	 * Marks the first clear check of a release_pending row. For these rows reserved_until holds
+	 * the time of the first clear check (UTC), or NULL when the parent last listed our name
+	 * servers. updated_at is left alone: it says since when the row waits.
+	 *
+	 * @param string      $domain Domain.
+	 * @param string|null $when   UTC DATETIME, or null to clear the mark.
+	 */
+	public static function mark_clear( string $domain, ?string $when ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table; wpdb writes a null as NULL.
+		$wpdb->update( self::table(), array( 'reserved_until' => $when ), array( 'domain' => strtolower( $domain ), 'status' => 'release_pending' ) );
+
+		$row = self::get( $domain );
+
+		return null !== $row && 'release_pending' === $row['status'] && ( $row['reserved_until'] ?? null ) === $when;
+	}
+
+	/**
+	 * Hands an active row to another service of the same customer (a registered domain takes over
+	 * a DNS-only service). The row stays active. Safe to repeat.
+	 *
+	 * @param string $domain      Domain.
+	 * @param int    $user_id     Customer.
+	 * @param int    $license_id  New license.
+	 * @param int    $resource_id New resource.
+	 */
+	public static function move_to( string $domain, int $user_id, int $license_id, int $resource_id ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE %i SET license_id = %d, resource_id = %d, updated_at = %s WHERE domain = %s AND user_id = %d AND status = 'active'",
+				self::table(),
+				$license_id,
+				$resource_id,
+				self::now(),
+				strtolower( $domain ),
+				$user_id
+			)
+		);
+
+		$row = self::get( $domain );
+
+		return null !== $row && 'active' === $row['status'] && (int) $row['user_id'] === $user_id && (int) $row['resource_id'] === $resource_id;
+	}
+
+	/**
 	 * Frees a domain.
 	 *
 	 * @param string $domain Domain.

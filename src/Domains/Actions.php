@@ -30,6 +30,7 @@ final class Actions {
 	}
 
 	private static function validate( Resource $r, string $action, array $args ): true|\WP_Error {
+		if ( 'set_records' === $action && $r->get( 'records_off' ) ) { return new \WP_Error( 'paused', 'DNS hosting is paused.' ); }
 		if ( ! isset( self::offered( $r )[ $action ] ) ) { return new \WP_Error( 'unavailable', 'This action is unavailable.' ); }
 		if ( 'set_records' === $action ) {
 			if ( strlen( (string) ( $args['records'] ?? '' ) ) > 100000 ) { return new \WP_Error( 'bad_records', 'Enter a valid DNS record list.' ); }
