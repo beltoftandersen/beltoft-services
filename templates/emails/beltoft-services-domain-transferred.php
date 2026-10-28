@@ -9,6 +9,7 @@
  * @var string   $email_heading      Heading.
  * @var string   $customer_name      Customer's first name, or ''.
  * @var string   $domain_name        The domain.
+ * @var bool     $dns_stays          Our DNS already served the domain.
  * @var string   $domain_renews      Next renewal date, or ''.
  * @var string   $domains_url        My Account, Domains.
  * @var string[] $nameservers_shown  Name servers of the domain (registration only).
@@ -32,7 +33,11 @@ if ( '' !== $customer_name ) {
 ?>
 </p>
 <p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your domain %s is now with us. We are its registrar from now on.', 'beltoft-services' ), $domain_name ) ); ?></p>
-<p><?php esc_html_e( 'Nothing changes for your website or email: your DNS settings and name servers stay as they were.', 'beltoft-services' ); ?></p>
+<?php if ( $dns_stays ) : ?>
+<p><?php esc_html_e( 'Your DNS stays as it is.', 'beltoft-services' ); ?></p>
+<?php else : ?>
+<p><?php esc_html_e( 'The domain now uses our name servers. Check that your DNS records are in My account > Domains, so your website and email keep working.', 'beltoft-services' ); ?></p>
+<?php endif; ?>
 <?php if ( '' !== $domain_renews ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: %s: date. */ __( 'Next renewal: %s.', 'beltoft-services' ), $domain_renews ) ); ?></p>
 <?php endif; ?>

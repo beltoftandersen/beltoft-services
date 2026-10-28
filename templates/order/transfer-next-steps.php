@@ -5,14 +5,14 @@
  *
  * @package BeltoftServices
  *
- * @var string[] $domains     The domains being transferred.
+ * @var array<string, bool> $domains Domain => our DNS already serves it (the DNS stays as it is).
  * @var int      $days        The most days a transfer can take.
  * @var string   $account_url My Account Domains page.
  */
 
 defined( 'ABSPATH' ) || exit;
 
-foreach ( $domains as $beltoft_domain ) :
+foreach ( $domains as $beltoft_domain => $beltoft_served ) :
 	$beltoft_display = function_exists( 'idn_to_utf8' ) ? (string) ( idn_to_utf8( $beltoft_domain, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) ?: $beltoft_domain ) : $beltoft_domain;
 	?>
 <section class="beltoft-transfer-next-steps" style="margin: 0 0 2em;">
@@ -33,7 +33,11 @@ foreach ( $domains as $beltoft_domain ) :
 		</li>
 		<li><?php esc_html_e( 'We email you when the domain is with us.', 'beltoft-services' ); ?></li>
 	</ol>
-	<p><?php esc_html_e( 'Your DNS settings do not change, so your website and email keep working during the transfer.', 'beltoft-services' ); ?></p>
+	<?php if ( $beltoft_served ) : ?>
+		<p><?php esc_html_e( 'Your DNS stays as it is.', 'beltoft-services' ); ?></p>
+	<?php else : ?>
+		<p><?php esc_html_e( 'When the transfer is done, the domain uses our name servers. Add your DNS records in My account > Domains first, so your website and email keep working.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
 	<?php if ( '' !== $account_url ) : ?>
 		<p><a href="<?php echo esc_url( $account_url ); ?>" style="text-decoration: underline;"><?php esc_html_e( 'My Account, Domains', 'beltoft-services' ); ?></a></p>
 	<?php endif; ?>

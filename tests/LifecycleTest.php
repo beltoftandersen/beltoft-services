@@ -183,11 +183,12 @@ final class LifecycleTest extends TestCase {
 		list( $license ) = $this->provisioned();
 		$customer        = array();
 		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_EXPIRED, 'expires_at' => time() - 60 ) );
+		$this->run_jobs();
 
 		$this->assertGreaterThan( 0, $control, 'The control: a plugin license expiry mails the customer.' );
-		foreach ( $customer as $subject ) {
-			$this->assertStringNotContainsStringIgnoringCase( 'licen', $subject, 'No licence mail for a service.' );
-		}
+		// The service's own paused mail is the only customer mail; no licence mail comes with it.
+		$this->assertCount( 1, $customer, implode( ' | ', $customer ) );
+		$this->assertSame( array( 'Your ' . \BeltoftLicenses\Account\View::product_name( Licenses::find( (int) $license['id'] ) ) . ' is paused' ), $customer );
 	}
 
 	public function test_non_service_license_is_ignored(): void {

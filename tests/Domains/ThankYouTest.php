@@ -74,10 +74,22 @@ final class ThankYouTest extends TestCase {
 		$this->assertStringContainsString( 'may ask you to approve the transfer', $html );
 		$this->assertStringContainsString( 'The transfer takes up to 5 days.', $html );
 		$this->assertStringContainsString( 'We email you when the domain is with us.', $html );
-		$this->assertStringContainsString( 'DNS settings do not change', $html );
+		$this->assertStringContainsString( 'the domain uses our name servers. Add your DNS records in My account &gt; Domains first', $html );
+		$this->assertStringNotContainsString( 'Your DNS stays as it is.', $html );
 		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $html );
 		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', $html, 'No DNS block for a transfer.' );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
+	}
+
+	public function test_a_transfer_of_a_domain_our_dns_already_serves_says_the_dns_stays(): void {
+		$order = $this->order( 'transfer' );
+		$user  = (int) $order->get_customer_id();
+		$claim = DnsClaims::create( $user, 'example.com' );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( $user, (int) $claim['id'], 'example.com' ) );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::activate( 'example.com', $user, 1, 1 ) );
+		$html = $this->page( $order->get_id() );
+		$this->assertStringContainsString( 'Your DNS stays as it is.', $html );
+		$this->assertStringNotContainsString( 'uses our name servers', $html );
 	}
 
 	public function test_the_transfer_days_have_a_filter(): void {

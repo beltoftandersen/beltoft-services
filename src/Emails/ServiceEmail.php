@@ -85,6 +85,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
 				'domain_name'   => in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : '',
 				'domain_action_reason' => in_array( $data['domain_action_reason'] ?? '', array( 'registrant_check', 'transfer_approval' ), true ) ? $data['domain_action_reason'] : 'transfer_approval',
+				'dns_stays'     => 'domain' === $r->get( 'driver' ) && \BeltoftServices\Domains\Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $license['user_id'] ?? 0 ) ),
 				'domain_renews' => self::domain_renews( $r ),
 				'domains_url'   => function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '',
 				'nameservers_shown' => 'domain' === $r->get( 'driver' ) && 'custom' !== $r->get( 'ns_mode' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),

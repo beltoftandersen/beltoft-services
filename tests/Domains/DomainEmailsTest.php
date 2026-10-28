@@ -58,9 +58,21 @@ class DomainEmailsTest extends TestCase {
 		$this->assertStringContainsString( 'Dana', $mail['message'] );
 		$this->assertStringContainsString( date_i18n( get_option( 'date_format' ), strtotime( '2027-10-26 UTC' ) ), $mail['message'], 'The renewal date.' );
 		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $mail['message'], 'It links to My Account, Domains.' );
-		$this->assertStringContainsString( 'name servers stay as they were', $mail['message'] );
+		$this->assertStringContainsString( 'The domain now uses our name servers.', $mail['message'] );
+		$this->assertStringNotContainsString( 'Your DNS stays as it is.', $mail['message'] );
 		$this->assertStringNotContainsString( 'AUTH-CODE-NEVER-IN-MAIL', $mail['subject'] . $mail['message'] );
 		$this->assertStringNotContainsString( ' is ready', $mail['subject'], 'Not the generic ready mail.' );
+	}
+
+	public function test_a_transfer_of_a_domain_our_dns_already_served_says_the_dns_stays(): void {
+		$r    = $this->domain( 'transfer' );
+		$user = (int) $r->license()['user_id'];
+		$claim = \BeltoftServices\Domains\DnsClaims::create( $user, 'mail-example.net' );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( $user, (int) $claim['id'], 'mail-example.net' ) );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::activate( 'mail-example.net', $user, (int) $r->license()['id'], $r->id() ) );
+		$this->ready( $r );
+		$this->assertStringContainsString( 'Your DNS stays as it is.', $this->mails[0]['message'] );
+		$this->assertStringNotContainsString( 'uses our name servers', $this->mails[0]['message'] );
 	}
 
 	public function test_a_registration_sends_its_own_email(): void {

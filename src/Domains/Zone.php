@@ -29,6 +29,13 @@ final class Zone {
 		return 'none';
 	}
 
+	/** Does our DNS already serve this name for this customer (a verified DNS-only service holds it)? Then a transfer leaves the DNS as it is. */
+	public static function served_for( string $domain, int $user_id ): bool {
+		if ( $user_id <= 0 || ! DnsSchema::ready() ) { return false; }
+		$row = DnsAssignments::get( $domain );
+		return null !== $row && 'active' === $row['status'] && (int) $row['user_id'] === $user_id;
+	}
+
 	/** Make the configured servers authoritative before a registration request. Some registries require this. */
 	public static function prepare( Resource $r ): StepResult {
 		$name = (string) $r->get( 'domain' );

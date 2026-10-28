@@ -63,7 +63,7 @@ final class ThankYou {
 	 * The transfer-in domains of an order.
 	 *
 	 * @param \WC_Order $order Order.
-	 * @return string[]
+	 * @return array<string, bool> Domain => our DNS already serves it for this customer.
 	 */
 	public static function transfers( \WC_Order $order ): array {
 		$domains = array();
@@ -72,11 +72,11 @@ final class ThankYou {
 			$data = $item->get_meta( '_beltoft_services_domain', true );
 
 			if ( is_array( $data ) && 'transfer' === ( $data['mode'] ?? '' ) && ! empty( $data['domain'] ) ) {
-				$domains[] = (string) $data['domain'];
+				$domains[ (string) $data['domain'] ] = Zone::served_for( strtolower( (string) $data['domain'] ), (int) $order->get_customer_id() );
 			}
 		}
 
-		return array_values( array_unique( $domains ) );
+		return $domains;
 	}
 
 	/**
