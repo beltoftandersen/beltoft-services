@@ -251,7 +251,8 @@ div.beltoft-services-domain .beltoft-services-domain__inline .button {
 	outline-offset: 4px;
 }
 
-section.beltoft-services-domain--closed > :not(header) {
+/* Closed from the first paint: a domain card shows its body only once the script marks it open. */
+section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-services-domain--open) > :not(header) {
 	display: none !important;
 }
 
@@ -264,7 +265,7 @@ section.beltoft-services-domain--closed > :not(header) {
 	overflow-wrap: anywhere;
 }
 
-section.beltoft-services-domain--closed > header {
+section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-services-domain--open) > header {
 	margin-bottom: 0 !important;
 	padding-bottom: 0 !important;
 	border-bottom: 0 !important;

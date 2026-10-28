@@ -375,7 +375,11 @@ final class SshKeyField {
 			return;
 		}
 
-		echo '<div class="beltoft-services-ssh-key">';
+		// Folded away by default: most customers log in with the password, and the step stays short.
+		printf(
+			'<details class="beltoft-services-ssh-key"><summary style="cursor: pointer; text-decoration: underline; list-style: none; margin: 0 0 0.75em;">%s</summary>',
+			esc_html__( '+ Add an SSH public key (optional)', 'beltoft-services' )
+		);
 
 		woocommerce_form_field(
 			self::POST_KEY,
@@ -394,7 +398,7 @@ final class SshKeyField {
 			''
 		);
 
-		echo '</div>';
+		echo '</details>';
 	}
 
 	/**

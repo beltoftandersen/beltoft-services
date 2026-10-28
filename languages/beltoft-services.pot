@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-28T07:00:42+00:00\n"
+"POT-Creation-Date: 2026-10-28T07:12:10+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -2924,17 +2924,21 @@ msgstr ""
 msgid "The SSH public key is not valid. Paste the single line from your .pub file: ssh-ed25519, ecdsa-sha2-nistp256/384/521, or ssh-rsa with at least 3072 bits."
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:384
-#: src/Proxmox/SshKeyField.php:464
+#: src/Proxmox/SshKeyField.php:381
+msgid "+ Add an SSH public key (optional)"
+msgstr ""
+
+#: src/Proxmox/SshKeyField.php:388
+#: src/Proxmox/SshKeyField.php:468
 #: templates/account/vm.php:227
 msgid "SSH public key"
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:385
+#: src/Proxmox/SshKeyField.php:389
 msgid "Optional. Paste the single line from your .pub file to log in to your server without a password. The key is used for every server of this product on the order."
 msgstr ""
 
-#: src/Proxmox/SshKeyField.php:465
+#: src/Proxmox/SshKeyField.php:469
 msgid "SSH public key (optional)"
 msgstr ""
 

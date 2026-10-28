@@ -302,8 +302,9 @@
 		head.classList.add( 'beltoft-services-domain__toggle' );
 		head.setAttribute( 'role', 'button' );
 		head.setAttribute( 'tabindex', '0' );
+		// Closed comes from the stylesheet (no flash of open cards); the script only marks the open ones.
 		function set( open ) {
-			card.classList.toggle( 'beltoft-services-domain--closed', ! open );
+			card.classList.toggle( 'beltoft-services-domain--open', !! open );
 			head.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
 		}
 		set( -1 !== opened().indexOf( id ) || ( '' !== window.location.hash && card.querySelector( window.location.hash.replace( /[^#\w-]/g, '' ) ) ) );
