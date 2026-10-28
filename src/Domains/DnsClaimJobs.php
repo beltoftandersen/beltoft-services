@@ -73,6 +73,49 @@ final class DnsClaimJobs {
 	}
 
 	/**
+	 * Runs this claim's check or scan that has waited a few seconds. The queue is normally started
+	 * by a cron tick (up to a minute away), so the account page, which polls the claim while it
+	 * waits, calls this instead of leaving the customer watching a loader. Safe next to the regular
+	 * runner: Action Scheduler only runs an action that is still pending, and the jobs re-read the
+	 * claim before they write.
+	 *
+	 * @param int $claim_id Claim id.
+	 */
+	public static function run_waiting( int $claim_id ): void {
+		if ( ! class_exists( '\ActionScheduler' ) || ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return;
+		}
+
+		/**
+		 * Seconds a claim's check or scan must have been due before the polling page runs it.
+		 *
+		 * @param int $seconds Seconds (default 2).
+		 */
+		$waited = max( 0, (int) apply_filters( 'beltoft_services_dns_claim_run_after', 2 ) );
+
+		foreach ( array( self::CHECK, self::SCAN ) as $hook ) {
+			$ids = as_get_scheduled_actions(
+				array(
+					'hook'     => $hook,
+					'args'     => array( $claim_id ),
+					'group'    => Jobs::GROUP,
+					'status'   => \ActionScheduler_Store::STATUS_PENDING,
+					'per_page' => 1,
+				),
+				'ids'
+			);
+
+			foreach ( $ids as $id ) {
+				$date = \ActionScheduler::store()->get_date( $id );
+
+				if ( $date && $date->getTimestamp() <= time() - $waited ) {
+					\ActionScheduler::runner()->process_action( (int) $id, 'Beltoft Services' );
+				}
+			}
+		}
+	}
+
+	/**
 	 * Moves a claim to a new state, only when it is in one of the states it may move from, and
 	 * never to an active state once it is past its time.
 	 *

@@ -127,7 +127,15 @@ final class DnsClaimRoutes {
 	private static function show( \WP_REST_Request $request ): \WP_REST_Response {
 		$claim = self::load( $request );
 
-		return is_array( $claim ) ? new \WP_REST_Response( self::view( $claim ), 200 ) : $claim;
+		if ( ! is_array( $claim ) ) {
+			return $claim;
+		}
+
+		// The page polls while a check or scan waits: run it now instead of at the next cron tick.
+		DnsClaimJobs::run_waiting( (int) $claim['id'] );
+		$claim = DnsClaims::get( (int) $claim['id'] ) ?? $claim;
+
+		return new \WP_REST_Response( self::view( $claim ), 200 );
 	}
 
 	/**

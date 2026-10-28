@@ -225,6 +225,31 @@ class DnsClaimRoutesTest extends TestCase {
 		$this->assertSame( 429, $this->call( 'POST', '/' . $claim['id'] . '/check', $this->user )->get_status() );
 	}
 
+	public function test_polling_the_claim_runs_a_check_that_has_waited(): void {
+		$claim = $this->claim();
+		add_filter( 'beltoft_services_dns_proof_result', static function ( $pre, $call ) {
+			if ( 'delegation' === $call ) { return array( 'status' => 'ok', 'reason' => 'delegated', 'ns' => array( 'ns1.host.net' ), 'ips' => array(), 'ds' => false, 'ours' => false ); }
+			return array( 'status' => 'found', 'servers' => array( 'ns1.host.net' => 'found' ), 'reason' => 'found' );
+		}, 10, 2 );
+		$this->call( 'POST', '/' . $claim['id'] . '/check', $this->user );
+
+		// Just queued: the poll leaves it to the queue for a moment.
+		$this->assertSame( 'checking', $this->call( 'GET', '/' . $claim['id'], $this->user )->get_data()['status'] );
+
+		// Waited long enough: the poll runs it and answers with the result.
+		add_filter( 'beltoft_services_dns_claim_run_after', '__return_zero' );
+		$this->assertSame( 'verified', $this->call( 'GET', '/' . $claim['id'], $this->user )->get_data()['status'] );
+		$this->assertCount( 0, $this->queued( DnsClaimJobs::CHECK ) );
+	}
+
+	public function test_polling_another_users_claim_runs_nothing(): void {
+		$claim = $this->claim( 'pending', 'theirs.net', $this->other );
+		DnsClaimJobs::enqueue( DnsClaimJobs::CHECK, (int) $claim['id'] );
+		add_filter( 'beltoft_services_dns_claim_run_after', '__return_zero' );
+		$this->assertSame( 404, $this->call( 'GET', '/' . $claim['id'], $this->user )->get_status() );
+		$this->assertCount( 1, $this->queued( DnsClaimJobs::CHECK ) );
+	}
+
 	private function expiry( int $id ): string {
 		return (string) DnsClaims::get( $id )['expires_at'];
 	}
