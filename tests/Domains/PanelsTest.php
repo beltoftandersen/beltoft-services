@@ -70,4 +70,58 @@ class PanelsTest extends TestCase {
 		$this->assertStringContainsString( 'data-rows="[', $html );
 		$this->assertStringNotContainsString( '<textarea', $html );
 	}
+
+	public function test_dns_card_status_lines_and_notes(): void {
+		$ours = $this->render( new DnsDriver(), array( 'domain' => 'a.example.com', 'mode' => 'dns', 'delegation' => 'ours', 'parent_ds' => true ), true );
+		$this->assertStringContainsString( 'Pointing at our name servers', $ours );
+		$this->assertStringNotContainsString( 'DNSSEC', $ours, 'The DS note is only for a domain not pointing here.' );
+		$this->assertStringContainsString( 'data-domain-action="check_delegation"', $ours );
+		$this->assertStringContainsString( 'Save DNS records', $ours );
+
+		$other = $this->render( new DnsDriver(), array( 'domain' => 'b.example.com', 'mode' => 'dns', 'delegation' => 'other', 'parent_ds' => true ), true );
+		$this->assertStringContainsString( 'Not pointing here yet', $other );
+		$this->assertStringContainsString( 'This domain uses DNSSEC at your registrar. Remove the DS record there before you change the name servers, then wait a day.', $other );
+
+		$none = $this->render( new DnsDriver(), array( 'domain' => 'c.example.com', 'mode' => 'dns', 'parent_ds' => false ), true );
+		$this->assertStringContainsString( 'Unable to check right now', $none );
+		$this->assertStringNotContainsString( 'DNSSEC', $none );
+		$this->assertStringNotContainsString( 'paused', $none );
+
+		$error = $this->render( new DnsDriver(), array( 'domain' => 'd.example.com', 'mode' => 'dns', 'import_error' => 'MX was invalid <b>' ), true );
+		$this->assertStringContainsString( 'Some imported records could not be added: MX was invalid &lt;b&gt;. Add them below.', $error );
+	}
+
+	public function test_dns_card_is_read_only_while_records_are_off(): void {
+		$off = $this->render( new DnsDriver(), array( 'domain' => 'e.example.com', 'mode' => 'dns', 'records_off' => true, 'state' => 'paused' ) );
+		$this->assertStringContainsString( 'DNS hosting is paused. Your records are kept but not answered.', $off );
+		$this->assertStringContainsString( 'beltoft-dns-editor', $off );
+		$this->assertStringContainsString( 'data-readonly="1"', $off );
+		$this->assertStringNotContainsString( 'Save DNS records', $off );
+		$this->assertStringNotContainsString( 'beltoft-dns-add', $off );
+	}
+
+	public function test_dns_admin_rows(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$user = self::factory()->user->create();
+		$claim = \BeltoftServices\Domains\DnsClaims::create( $user, 'admin.example.com' );
+		\BeltoftServices\Domains\DnsClaims::set_status( $claim['id'], 'verified', array( 'verified_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+		\BeltoftServices\Domains\DnsAssignments::reserve( $user, $claim['id'], 'admin.example.com' );
+		\BeltoftServices\Domains\DnsAssignments::bind_order( 'admin.example.com', $user, 4321, 1 );
+		$license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user ) );
+		$r = Resource::create( $license, new DnsDriver(), array(), array( 'domain' => 'admin.example.com', 'mode' => 'dns', 'claim_id' => $claim['id'], 'parent_ds' => true, 'records_off' => true, 'import_error' => 'bad MX' ) );
+		ob_start();
+		Panels::admin( $r );
+		$html = (string) ob_get_clean();
+		foreach ( array( 'Claim:', 'verified', 'Assignment status:', 'reserved', 'Order:', '#4321', 'Parent DS:', 'Records off:', 'Import error:', 'bad MX' ) as $needle ) {
+			$this->assertStringContainsString( $needle, $html );
+		}
+		$this->assertStringNotContainsString( $claim['token'], $html );
+		\BeltoftServices\Domains\DnsAssignments::release_pending( 'admin.example.com' );
+		\BeltoftServices\Domains\DnsAssignments::activate( 'admin.example.com', $user, (int) $license['id'], $r->id() );
+		\BeltoftServices\Domains\DnsAssignments::release_pending( 'admin.example.com' );
+		\BeltoftServices\Domains\DnsAssignments::mark_clear( 'admin.example.com', '2026-11-01 10:00:00' );
+		ob_start();
+		Panels::admin( $r );
+		$this->assertStringContainsString( 'First clear check:', (string) ob_get_clean() );
+	}
 }

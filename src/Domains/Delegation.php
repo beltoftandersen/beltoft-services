@@ -31,8 +31,45 @@ final class Delegation {
 		if ( $rate_limit && $checked > time() - MINUTE_IN_SECONDS ) {
 			return new \WP_Error( 'rate_limited', 'Check again in a minute.' );
 		}
+		if ( 'dns' === $resource->get( 'driver' ) ) {
+			$result = self::parent_result( (string) $resource->get( 'domain' ) );
+			$resource->set( array( 'delegation' => $result['status'], 'parent_ds' => $result['ds'], 'delegation_checked' => time() ) );
+			return $result['status'];
+		}
 		$status = self::check( (string) $resource->get( 'domain' ) );
 		$resource->set( array( 'delegation' => $status, 'delegation_checked' => time() ) );
 		return $status;
+	}
+
+	/**
+	 * The parent zone's delegation of a domain, with the test hook the claim jobs use.
+	 *
+	 * @param string $domain Domain.
+	 * @return array<string, mixed>
+	 */
+	public static function lookup( string $domain ): array {
+		$found = apply_filters( 'beltoft_services_dns_proof_result', null, 'delegation', array( $domain ) );
+		return is_array( $found ) ? $found : ProofResolver::delegation( $domain );
+	}
+
+	/**
+	 * The delegation of a DNS-only domain as its parent zone publishes it.
+	 *
+	 * @param string $domain Domain.
+	 * @return array{status: string, ds: ?bool}
+	 */
+	private static function parent_result( string $domain ): array {
+		$found = self::lookup( $domain );
+		$state = (string) ( $found['status'] ?? '' );
+		$ours  = ! empty( $found['ours'] ) || ( 'support' === $state && 'delegated_to_us' === ( $found['reason'] ?? '' ) );
+		$ds    = $found['ds'] ?? null;
+		if ( $ours && in_array( $state, array( 'ok', 'support' ), true ) ) {
+			$status = 'ours';
+		} elseif ( 'ok' === $state ) {
+			$status = 'other';
+		} else {
+			$status = 'unknown';
+		}
+		return array( 'status' => $status, 'ds' => is_bool( $ds ) ? $ds : null );
 	}
 }

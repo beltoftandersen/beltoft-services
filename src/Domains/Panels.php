@@ -36,6 +36,40 @@ final class Panels {
 		$rows = Records::to_rows( $domain, $rrsets );
 		include BELTOFT_SERVICES_PATH . 'templates/account/domain.php';
 	}
+	/**
+	 * Read-only rows for a DNS-only resource: claim, assignment, order, parent DS, records off, import error.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, string>
+	 */
+	private static function dns_rows( Resource $r ): array {
+		$rows  = array();
+		$claim = (int) $r->get( 'claim_id' ) > 0 ? DnsClaims::get( (int) $r->get( 'claim_id' ) ) : null;
+		if ( $claim ) {
+			$rows['Claim'] = '#' . $claim['id'] . ( ! empty( $claim['verified_at'] ) ? ', verified ' . $claim['verified_at'] . ' UTC' : '' );
+		}
+		$row = DnsAssignments::get( (string) $r->get( 'domain' ) );
+		if ( $row ) {
+			$rows['Assignment status'] = (string) $row['status'];
+			if ( 'release_pending' === $row['status'] && ! empty( $row['reserved_until'] ) ) {
+				$rows['First clear check'] = $row['reserved_until'] . ' UTC';
+			}
+			if ( ! empty( $row['order_id'] ) ) {
+				$rows['Order'] = '#' . (int) $row['order_id'];
+			}
+		}
+		$ds = $r->get( 'parent_ds' );
+		if ( is_bool( $ds ) ) {
+			$rows['Parent DS'] = $ds ? 'yes' : 'no';
+		}
+		if ( $r->get( 'records_off' ) ) {
+			$rows['Records off'] = 'yes';
+		}
+		if ( '' !== (string) $r->get( 'import_error' ) ) {
+			$rows['Import error'] = (string) $r->get( 'import_error' );
+		}
+		return $rows;
+	}
 	public static function admin( Resource $r ): void {
 		$details = array_filter( array(
 			'Domain' => $r->get( 'domain' ),
@@ -46,6 +80,9 @@ final class Panels {
 			'Delegation checked' => $r->get( 'delegation_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'delegation_checked' ) ) : '',
 			'Last sync' => $r->get( 'last_sync' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'last_sync' ) ) : '',
 		) );
+		if ( 'dns' === $r->get( 'driver' ) ) {
+			$details = array_merge( $details, self::dns_rows( $r ) );
+		}
 		foreach ( $details as $label => $value ) { printf( '<p><strong>%s:</strong> %s</p>', esc_html( $label ), esc_html( (string) $value ) ); }
 		$subscription = (int) ( $r->license()['subscription_id'] ?? 0 );
 		if ( $subscription ) { printf( '<p><a href="%s">%s</a></p>', esc_url( get_edit_post_link( $subscription ) ), esc_html__( 'Subscription', 'beltoft-services' ) ); }

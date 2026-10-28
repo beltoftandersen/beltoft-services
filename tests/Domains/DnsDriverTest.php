@@ -54,7 +54,7 @@ class DnsDriverTest extends TestCase {
 		$op = new FakeClient();
 		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
 		add_filter( 'beltoft_services_domains_client', static fn() => $op );
-		add_filter( 'beltoft_services_domains_ns_answer', static fn() => array( 'elsewhere.example.net' ) );
+		add_filter( 'beltoft_services_dns_proof_result', static fn() => array( 'status' => 'ok', 'reason' => 'ok', 'ns' => array( 'elsewhere.example.net' ), 'ips' => array(), 'ds' => false, 'ours' => false ) );
 		$r = $this->resource( 'hosted-example.net', self::factory()->user->create() );
 		$this->assertTrue( ( new DnsDriver() )->provision( $r )->is_done() );
 		$this->assertFalse( $dns->zone( 'hosted-example.net' )['secured'] );

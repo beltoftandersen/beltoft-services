@@ -12,7 +12,6 @@ final class EmailDetails {
 		if ( ! is_array( $details ) || 'beltoft_services_ready' !== $email_id || ! $r instanceof Resource || ! in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) { return $details; }
 		$details[ __( 'Domain', 'beltoft-services' ) ] = (string) $r->get( 'domain' );
 		$details[ __( 'Name servers', 'beltoft-services' ) ] = implode( ', ', Zone::nameservers() );
-		if ( 'dns' === $r->get( 'driver' ) ) { $details[ __( 'Next step', 'beltoft-services' ) ] = __( 'Copy your DNS records, then change the name servers at your registrar.', 'beltoft-services' ); }
 		return $details;
 	}
 }

@@ -329,6 +329,37 @@ final class DnsAssignments {
 	}
 
 	/**
+	 * Staff override: the domain becomes a reservation for this customer, replacing any row.
+	 *
+	 * @param string $domain  Domain.
+	 * @param int    $user_id Customer.
+	 * @param int    $seconds How long the reservation lasts.
+	 */
+	public static function assign_reserved( string $domain, int $user_id, int $seconds = 7 * DAY_IN_SECONDS ): bool {
+		global $wpdb;
+
+		$now = self::now();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table; REPLACE swaps the one row by its primary key.
+		return false !== $wpdb->replace(
+			self::table(),
+			array(
+				'domain'         => strtolower( $domain ),
+				'user_id'        => $user_id,
+				'claim_id'       => null,
+				'status'         => 'reserved',
+				'reserved_until' => self::now( $seconds ),
+				'order_id'       => null,
+				'order_item_id'  => null,
+				'license_id'     => null,
+				'resource_id'    => null,
+				'created_at'     => $now,
+				'updated_at'     => $now,
+			)
+		);
+	}
+
+	/**
 	 * Frees a domain.
 	 *
 	 * @param string $domain Domain.

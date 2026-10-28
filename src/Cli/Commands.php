@@ -200,6 +200,7 @@ final class Commands {
 	public static function register(): void {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'beltoft-services', self::class );
+			\WP_CLI::add_command( 'beltoft-services dns-claims', DnsClaimsCommand::class );
 		}
 	}
 

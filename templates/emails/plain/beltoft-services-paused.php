@@ -14,6 +14,7 @@
  * @var string            $reason             Why it was paused, or ''.
  * @var string            $deletes_on         Date the service will be deleted, or '' when none is promised.
  * @var bool              $held               The service is suspended (breach hold).
+ * @var bool              $dns_only           DNS hosting only.
  * @var string            $usage              Usage line (limit exceeded), or ''.
  * @var string            $additional_content Additional content from the email's settings.
  * @var \WC_Email         $email              The email.
@@ -53,6 +54,10 @@ if ( '' !== $deletes_on ) {
 	}
 } elseif ( ! $held ) {
 	echo __( 'Its data is kept, and it starts again once your subscription is active.', 'beltoft-services' ) . "\n\n";
+}
+
+if ( ! empty( $dns_only ) ) {
+	echo __( 'Your DNS records are kept but no longer answered.', 'beltoft-services' ) . "\n\n";
 }
 
 echo __( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";

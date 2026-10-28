@@ -12,6 +12,8 @@
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
  * @var array<string, string> $details        Lines about the service (label => value), may be empty. Never a password.
+ * @var bool              $dns_only           DNS hosting only.
+ * @var string[]          $nameservers        Our name servers (DNS hosting only).
  * @var string            $usage              Usage line (limit exceeded), or ''.
  * @var string            $additional_content Additional content from the email's settings.
  * @var \WC_Email         $email              The email.
@@ -42,6 +44,11 @@ foreach ( $details as $beltoft_services_label => $beltoft_services_value ) {
 
 if ( $details ) {
 	echo "\n";
+}
+
+if ( ! empty( $dns_only ) && $nameservers ) {
+	echo __( 'Our name servers:', 'beltoft-services' ) . ' ' . wp_strip_all_tags( implode( ', ', array_map( 'strval', $nameservers ) ) ) . "\n";
+	echo __( 'Change the name servers at your registrar to these. If your registrar shows a DS record (DNSSEC), remove it first and wait a day.', 'beltoft-services' ) . "\n\n";
 }
 
 echo __( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";

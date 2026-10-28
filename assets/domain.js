@@ -87,6 +87,10 @@
 	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-dns-editor' ), function ( form ) {
 		JSON.parse( form.dataset.rows || '[]' ).forEach( function ( row ) { addRow( form, row ); } );
 		syncEmpty( form );
+		if ( form.dataset.readonly ) {
+			Array.prototype.forEach.call( form.querySelectorAll( 'input:not([type=hidden]), select' ), function ( control ) { control.disabled = true; } );
+			Array.prototype.forEach.call( form.querySelectorAll( '.beltoft-dns-remove' ), function ( button ) { button.hidden = true; } );
+		}
 	} );
 	document.addEventListener( 'click', function ( event ) {
 		var add = event.target.closest( '.beltoft-dns-add' );

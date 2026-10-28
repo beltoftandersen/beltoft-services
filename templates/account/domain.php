@@ -10,6 +10,7 @@ $beltoft_ours    = $dns_only || 'custom' !== $r->get( 'ns_mode' );
 $beltoft_hosts   = $beltoft_ours ? \BeltoftServices\Domains\Zone::nameservers() : (array) $r->get( 'nameservers' );
 $beltoft_locked  = (bool) $r->get( 'is_locked' );
 $beltoft_can     = $r->accepts_actions();
+$beltoft_off     = $dns_only && (bool) $r->get( 'records_off' );
 $beltoft_expires = (string) $r->get( 'expires_at' );
 $beltoft_time    = '' !== $beltoft_expires ? strtotime( $beltoft_expires . ' UTC' ) : false;
 if ( $beltoft_time ) {
@@ -18,7 +19,26 @@ if ( $beltoft_time ) {
 ?>
 <div class="beltoft-services-domain" data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-updating="<?php echo esc_attr__( 'Updating…', 'beltoft-services' ); ?>" data-updating-note="<?php echo esc_attr__( 'This can take up to a minute.', 'beltoft-services' ); ?>">
 	<?php if ( $dns_only ) : ?>
-		<p class="beltoft-services-domain__note"><?php echo esc_html( 'ours' === $r->get( 'delegation' ) ? __( 'Pointing at our name servers', 'beltoft-services' ) : __( 'Not pointing at our name servers yet', 'beltoft-services' ) ); ?></p>
+		<?php
+		$beltoft_state = (string) $r->get( 'delegation' );
+		if ( 'ours' === $beltoft_state ) {
+			$beltoft_line = __( 'Pointing at our name servers', 'beltoft-services' );
+		} elseif ( 'other' === $beltoft_state ) {
+			$beltoft_line = __( 'Not pointing here yet', 'beltoft-services' );
+		} else {
+			$beltoft_line = __( 'Unable to check right now', 'beltoft-services' );
+		}
+		?>
+		<p class="beltoft-services-domain__note"><?php echo esc_html( $beltoft_line ); ?></p>
+		<?php if ( true === $r->get( 'parent_ds' ) && 'ours' !== $beltoft_state ) : ?>
+			<p class="beltoft-services-domain__note"><?php esc_html_e( 'This domain uses DNSSEC at your registrar. Remove the DS record there before you change the name servers, then wait a day.', 'beltoft-services' ); ?></p>
+		<?php endif; ?>
+		<?php if ( $beltoft_off ) : ?>
+			<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNS hosting is paused. Your records are kept but not answered.', 'beltoft-services' ); ?></p>
+		<?php endif; ?>
+		<?php if ( '' !== (string) $r->get( 'import_error' ) ) : ?>
+			<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the reason some records were not imported. */ __( 'Some imported records could not be added: %s. Add them below.', 'beltoft-services' ), (string) $r->get( 'import_error' ) ) ); ?></p>
+		<?php endif; ?>
 		<p class="beltoft-services-domain__note"><?php esc_html_e( 'Copy your DNS records here before changing the name servers at your registrar.', 'beltoft-services' ); ?></p>
 	<?php else : ?>
 		<?php if ( '' !== $beltoft_expires ) : ?>
@@ -50,10 +70,10 @@ if ( $beltoft_time ) {
 		<?php endif; ?>
 	</section>
 
-	<?php if ( $beltoft_can && $beltoft_ours ) : ?>
+	<?php if ( ( $beltoft_can || $beltoft_off ) && $beltoft_ours ) : ?>
 		<section class="beltoft-services-domain__section">
 			<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></h4>
-			<form class="beltoft-services-domain-form beltoft-dns-editor" data-domain-action="set_records" data-rows="<?php echo esc_attr( (string) wp_json_encode( $rows ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( array(
+			<form class="beltoft-services-domain-form beltoft-dns-editor" data-domain-action="set_records"<?php echo $beltoft_off ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $rows ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( array(
 				'name' => __( 'Name', 'beltoft-services' ), 'name_hint' => __( '@ for the domain itself, or a name like www', 'beltoft-services' ), 'type' => __( 'Type', 'beltoft-services' ), 'ttl' => __( 'TTL', 'beltoft-services' ), 'value' => __( 'Value', 'beltoft-services' ),
 				'priority' => __( 'Priority', 'beltoft-services' ), 'weight' => __( 'Weight', 'beltoft-services' ), 'port' => __( 'Port', 'beltoft-services' ),
 				'flag' => __( 'Flag', 'beltoft-services' ), 'tag' => __( 'Tag', 'beltoft-services' ), 'remove' => __( 'Remove', 'beltoft-services' ),
@@ -62,11 +82,13 @@ if ( $beltoft_time ) {
 				<table><thead><tr><th><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'TTL', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th><th></th></tr></thead><tbody></tbody></table>
 				<input type="hidden" name="records" value="[]">
 				<p class="beltoft-dns-error" role="alert" hidden></p>
+				<?php if ( ! $beltoft_off ) : ?>
 				<p class="beltoft-dns-note"><?php esc_html_e( 'Changes are saved when you press Save DNS records.', 'beltoft-services' ); ?></p>
 				<div class="beltoft-dns-actions">
 					<button type="button" class="beltoft-services-domain__link beltoft-dns-add"><?php esc_html_e( 'Add record', 'beltoft-services' ); ?></button>
 					<button type="submit" class="button"><?php esc_html_e( 'Save DNS records', 'beltoft-services' ); ?></button>
 				</div>
+				<?php endif; ?>
 			</form>
 		</section>
 	<?php endif; ?>

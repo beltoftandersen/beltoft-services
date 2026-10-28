@@ -12,6 +12,8 @@
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
  * @var array<string, string> $details        Lines about the service (label => value), may be empty. Never a password.
+ * @var bool              $dns_only           DNS hosting only.
+ * @var string[]          $nameservers        Our name servers (DNS hosting only).
  * @var string            $usage              Usage line (limit exceeded), or ''.
  * @var string            $additional_content Additional content from the email's settings.
  * @var \WC_Email         $email              The email.
@@ -47,6 +49,10 @@ echo esc_html( sprintf( __( 'Your %s is ready to use.', 'beltoft-services' ), $p
 	</tr>
 	<?php endforeach; ?>
 </table>
+<?php endif; ?>
+<?php if ( ! empty( $dns_only ) && $nameservers ) : ?>
+<p><?php echo esc_html( sprintf( /* translators: %s: our name servers, comma separated. */ __( 'Our name servers: %s', 'beltoft-services' ), implode( ', ', array_map( 'strval', $nameservers ) ) ) ); ?></p>
+<p><?php esc_html_e( 'Change the name servers at your registrar to these. If your registrar shows a DS record (DNSSEC), remove it first and wait a day.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'View your services in your account', 'beltoft-services' ); ?></a></p>
 <?php
