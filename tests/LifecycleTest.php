@@ -160,6 +160,36 @@ final class LifecycleTest extends TestCase {
 		$this->assertCount( 1, $this->driver->calls( 'provision' ) );
 	}
 
+	public function test_an_expired_service_license_sends_no_licenses_ended_mail(): void {
+		$customer = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$customer ) {
+				$to = is_array( $atts['to'] ) ? implode( ',', $atts['to'] ) : (string) $atts['to'];
+				if ( false !== strpos( $to, 'customer@example.com' ) ) {
+					$customer[] = (string) $atts['subject'];
+				}
+				return $pre;
+			},
+			5,
+			2
+		);
+
+		// Control: a plain plugin license that expires still gets beltoft-licenses' mail.
+		$plain = $this->service_license( $this->service_product( '', array(), array( 'slug' => 'plain-plugin' ) ) );
+		Licenses::update( (int) $plain['id'], array( 'status' => Licenses::STATUS_EXPIRED, 'expires_at' => time() - 60 ) );
+		$control = count( $customer );
+
+		list( $license ) = $this->provisioned();
+		$customer        = array();
+		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_EXPIRED, 'expires_at' => time() - 60 ) );
+
+		$this->assertGreaterThan( 0, $control, 'The control: a plugin license expiry mails the customer.' );
+		foreach ( $customer as $subject ) {
+			$this->assertStringNotContainsStringIgnoringCase( 'licen', $subject, 'No licence mail for a service.' );
+		}
+	}
+
 	public function test_non_service_license_is_ignored(): void {
 		$product = $this->service_product( '', array(), array( 'slug' => 'plain-plugin' ) );
 		$license = $this->service_license( $product );

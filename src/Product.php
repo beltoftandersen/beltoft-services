@@ -46,6 +46,22 @@ final class Product {
 		add_filter( 'beltoft_licenses_resource_label', array( __CLASS__, 'resource_label' ), 10, 4 );
 		add_filter( 'beltoft_licenses_account_show_key', array( __CLASS__, 'show_key' ), 10, 2 );
 		add_filter( 'beltoft_licenses_account_show_usage', array( __CLASS__, 'show_key' ), 10, 2 );
+		add_filter( 'beltoft_licenses_send_status_email', array( __CLASS__, 'no_license_email' ), 10, 2 );
+		add_filter( 'beltoft_licenses_send_update_email', array( __CLASS__, 'no_license_email' ), 10, 2 );
+	}
+
+	/**
+	 * Services keep their own emails: no licence key mails (ended, update) for a service license.
+	 *
+	 * @param bool                 $send    Whether beltoft-licenses would send the mail.
+	 * @param array<string, mixed> $license License row.
+	 */
+	public static function no_license_email( $send, $license = array() ): bool {
+		if ( is_array( $license ) && self::is_service_license( $license ) ) {
+			return false;
+		}
+
+		return (bool) $send;
 	}
 
 	/**

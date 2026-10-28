@@ -159,6 +159,17 @@ class ProductTest extends TestCase {
 		$this->assertSame( $unknown->get_data(), $hidden->get_data() );
 	}
 
+	public function test_license_status_and_update_mails_are_off_for_services_only(): void {
+		$this->fake_driver();
+		$service = $this->service_license( $this->service_product(), array( 'fire' => false ) );
+		$plugin  = $this->service_license( $this->service_product( '', array(), array( 'slug' => 'plain-plugin' ) ), array( 'fire' => false ) );
+
+		$this->assertFalse( apply_filters( 'beltoft_licenses_send_status_email', true, $service, 'expired' ) );
+		$this->assertFalse( apply_filters( 'beltoft_licenses_send_update_email', true, $service, array() ) );
+		$this->assertTrue( apply_filters( 'beltoft_licenses_send_status_email', true, $plugin, 'expired' ) );
+		$this->assertTrue( apply_filters( 'beltoft_licenses_send_update_email', true, $plugin, array() ) );
+	}
+
 	public function test_resource_label_and_key_display_follow_the_driver(): void {
 		$this->fake_driver();
 		$license = $this->service_license( $this->service_product(), array( 'fire' => false ) );
