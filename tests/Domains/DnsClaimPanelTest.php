@@ -76,9 +76,14 @@ class DnsClaimPanelTest extends TestCase {
 	public function test_the_texts_for_the_script_have_no_em_dash_and_are_complete(): void {
 		$strings = \BeltoftServices\Domains\DnsClaimPanel::strings();
 
-		foreach ( $strings as $text ) {
-			$this->assertStringNotContainsString( "\u{2014}", $text );
-		}
+		array_walk_recursive(
+			$strings,
+			function ( $text ): void {
+				$this->assertIsString( $text );
+				$this->assertStringNotContainsString( "\u{2014}", $text );
+			}
+		);
+		$this->assertSame( 'Found, but with a different value. Check that the value matches exactly.', $strings['server_states']['wrong'] );
 		$this->assertSame( 'Continue to checkout', $strings['checkout'] );
 		$this->assertStringContainsString( 'Remove the DS record there', $strings['dnssec'] );
 	}
