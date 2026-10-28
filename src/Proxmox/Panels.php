@@ -172,6 +172,62 @@ final class Panels {
 	}
 
 	/**
+	 * The rows with the snapshot rows after the backups row: count and slots, the oldest, the next expiry, the last
+	 * problem and the operation in flight. None when the server has no snapshots and the customer switch is off.
+	 *
+	 * @param array<string, string|null> $rows Rows so far.
+	 * @param Resource                   $r    Resource.
+	 * @return array<string, string|null>
+	 */
+	private static function with_snapshots( array $rows, Resource $r ): array {
+		if ( ! Snapshots::tracked( $r ) && ! Snapshots::switched_on() ) {
+			return $rows;
+		}
+
+		$format  = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		$entries = Snapshots::entries( $r );
+		$taken   = array_filter( array_map( static fn( $e ) => (int) ( $e['taken_at'] ?? 0 ), $entries ) );
+		$next    = SnapshotExpiry::next( $r );
+		$op      = (array) $r->get( Snapshots::OP );
+		$roll    = $r->get( Snapshots::ROLLBACK );
+		$running = array();
+
+		if ( array() !== $op ) {
+			$running[] = (string) ( $op['op'] ?? '' ) . ' ' . (string) ( $op['phase'] ?? '' );
+		}
+
+		if ( is_array( $roll ) ) {
+			$running[] = 'rollback ' . (string) ( $roll['phase'] ?? '' );
+		}
+
+		$new = array(
+			__( 'Snapshots', 'beltoft-services' )        => sprintf(
+				/* translators: 1: snapshots in use, 2: slots, 3: on or off */
+				__( '%1$d of %2$d slots, %3$s', 'beltoft-services' ),
+				count( $entries ),
+				Snapshots::slots( $r ),
+				Snapshots::enabled( $r ) ? __( 'on', 'beltoft-services' ) : __( 'off', 'beltoft-services' )
+			),
+			__( 'Oldest snapshot', 'beltoft-services' )  => $taken ? wp_date( $format, min( $taken ) ) : '',
+			__( 'Next snapshot expiry', 'beltoft-services' ) => $next > 0 ? wp_date( $format, $next ) : '',
+			__( 'Snapshot error', 'beltoft-services' )   => (string) $r->get( Snapshots::ERROR ),
+			__( 'Snapshot running', 'beltoft-services' ) => trim( implode( ', ', $running ) ),
+		);
+
+		$out = array();
+
+		foreach ( $rows as $label => $value ) {
+			$out[ $label ] = $value;
+
+			if ( __( 'Backups', 'beltoft-services' ) === $label ) {
+				$out = array_merge( $out, $new );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * The admin's part: where the VM is and what it is doing. No password, no Proxmox call.
 	 *
 	 * @param Resource $r Resource.
@@ -202,6 +258,8 @@ final class Panels {
 			__( 'Disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),
 		);
+
+		$rows = self::with_snapshots( $rows, $r );
 
 		echo '<h3>' . esc_html__( 'Virtual machine', 'beltoft-services' ) . '</h3><table class="widefat striped"><tbody>';
 
