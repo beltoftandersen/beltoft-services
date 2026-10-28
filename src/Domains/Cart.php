@@ -109,9 +109,10 @@ final class Cart {
 	 *
 	 * @param array<string, mixed> $data    Cart item, or an array with the line's beltoft_services_domain.
 	 * @param int                  $user_id Customer.
+	 * @param int|null             $order_id The order being created or paid; null takes the checkout's awaiting-payment order.
 	 * @return true|\WP_Error
 	 */
-	private static function dns_claim_ok( array $data, int $user_id ) {
+	private static function dns_claim_ok( array $data, int $user_id, ?int $order_id = null ) {
 		$fail = new \WP_Error( 'dns_claim_expired', __( 'This DNS hosting check has expired. Start again from My Account, Domains.', 'beltoft-services' ) );
 		$line = $data['beltoft_services_domain'] ?? null;
 		if ( $user_id <= 0 || ! is_array( $line ) || 'dns' !== ( $line['mode'] ?? '' ) || ! isset( $line['claim_id'] ) || ! is_int( $line['claim_id'] ) || $line['claim_id'] <= 0 ) { return $fail; }
@@ -119,12 +120,16 @@ final class Cart {
 		if ( ! $claim || (int) $claim['user_id'] !== $user_id || '' === (string) ( $line['domain'] ?? '' ) || (string) $claim['domain'] !== (string) $line['domain'] ) { return $fail; }
 		$row = DnsAssignments::get( (string) $claim['domain'] );
 		if ( ! $row || (int) $row['user_id'] !== $user_id || (int) $row['claim_id'] !== (int) $claim['id'] ) { return $fail; }
-		if ( 'active' === $row['status'] ) { return true; }
+		// A new purchase only uses a reservation that is open: never an active or released domain.
 		if ( 'reserved' !== $row['status'] ) { return $fail; }
 		if ( ! empty( $row['reserved_until'] ) && strtotime( (string) $row['reserved_until'] . ' UTC' ) <= time() ) { return $fail; }
+		if ( null === $order_id ) { $order_id = ( function_exists( 'WC' ) && WC()->session ) ? (int) WC()->session->get( 'order_awaiting_payment' ) : 0; }
+		$bound = (int) $row['order_id'];
+		if ( $bound > 0 && $bound !== $order_id ) { return $fail; }
 		if ( DnsClaims::usable( $claim, $user_id ) ) { return true; }
-		if ( 'consumed' === $claim['status'] && (int) $row['order_id'] > 0 ) {
-			$order = wc_get_order( (int) $row['order_id'] );
+		// The claim went into the order that holds this reservation: only that order may be paid or retried.
+		if ( 'consumed' === $claim['status'] && $bound > 0 && $bound === $order_id ) {
+			$order = wc_get_order( $bound );
 			if ( $order && (int) $order->get_customer_id() === $user_id && $order->has_status( array( 'pending', 'on-hold' ) ) ) { return true; }
 		}
 		return $fail;
@@ -164,7 +169,7 @@ final class Cart {
 			$line = $item->get_meta( '_beltoft_services_domain', true );
 			if ( $claim_id <= 0 || ! is_array( $line ) ) { continue; }
 			$user_id = (int) $order->get_customer_id();
-			$ok = self::dns_claim_ok( array( 'beltoft_services_domain' => $line ), $user_id );
+			$ok = self::dns_claim_ok( array( 'beltoft_services_domain' => $line ), $user_id, (int) $order->get_id() );
 			if ( is_wp_error( $ok ) ) {
 				/* translators: %s: domain name */
 				$order->add_order_note( sprintf( __( 'DNS hosting for %s: the ownership check is no longer valid, so the domain was not reserved for this order.', 'beltoft-services' ), (string) ( $line['domain'] ?? '' ) ) );
@@ -172,13 +177,26 @@ final class Cart {
 			}
 			if ( DnsAssignments::bind_order( (string) $line['domain'], $user_id, (int) $order->get_id(), (int) $item->get_id() ) ) {
 				DnsClaims::set_status( $claim_id, 'consumed' );
+				continue;
 			}
+			/* translators: %s: domain name */
+			$order->add_order_note( sprintf( __( 'DNS hosting for %s: the domain could not be tied to this order.', 'beltoft-services' ), (string) $line['domain'] ) );
 		}
 	}
 
 	/** An order that will not be paid frees its reservation. Active rows are never touched. */
 	public static function release_dns_claims( $order_id ): void {
-		DnsAssignments::release_for_order( (int) $order_id );
+		$order_id = (int) $order_id;
+		$claims   = array();
+		foreach ( DnsAssignments::for_status( 'reserved' ) as $row ) {
+			if ( (int) $row['order_id'] === $order_id && $order_id > 0 ) { $claims[] = (int) $row['claim_id']; }
+		}
+		if ( ! DnsAssignments::release_for_order( $order_id ) ) { return; }
+		// The proof was used up by the order: it now reads as expired, so the customer can start again.
+		foreach ( $claims as $claim_id ) {
+			$claim = DnsClaims::get( $claim_id );
+			if ( $claim && 'consumed' === $claim['status'] ) { DnsClaims::set_status( $claim_id, 'expired' ); }
+		}
 	}
 
 	public static function release_trashed_post( $post_id ): void {

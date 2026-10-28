@@ -180,19 +180,19 @@ final class DnsAssignments {
 	public static function bind_order( string $domain, int $user_id, int $order_id, int $order_item_id, int $seconds = 7 * DAY_IN_SECONDS ): bool {
 		global $wpdb;
 
+		// A row already tied to another order is never moved: one proof, one order.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
-		$wpdb->update(
-			self::table(),
-			array(
-				'order_id'       => $order_id,
-				'order_item_id'  => $order_item_id,
-				'reserved_until' => self::now( $seconds ),
-				'updated_at'     => self::now(),
-			),
-			array(
-				'domain'  => strtolower( $domain ),
-				'user_id' => $user_id,
-				'status'  => 'reserved',
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE %i SET order_id = %d, order_item_id = %d, reserved_until = %s, updated_at = %s WHERE domain = %s AND user_id = %d AND status = 'reserved' AND ( order_id IS NULL OR order_id = 0 OR order_id = %d )",
+				self::table(),
+				$order_id,
+				$order_item_id,
+				self::now( $seconds ),
+				self::now(),
+				strtolower( $domain ),
+				$user_id,
+				$order_id
 			)
 		);
 

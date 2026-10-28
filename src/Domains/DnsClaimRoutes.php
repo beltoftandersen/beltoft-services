@@ -292,6 +292,14 @@ final class DnsClaimRoutes {
 			}
 		}
 
+		$product = Cart::dns_product();
+
+		if ( ! $product ) {
+			return self::error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), 503 );
+		}
+
+		$before  = DnsAssignments::get( $domain );
+		$created = ! $before || (int) $before['user_id'] !== $user_id;
 		$reserved = DnsAssignments::reserve( $user_id, (int) $claim['id'], $domain, 2 * HOUR_IN_SECONDS );
 
 		if ( is_wp_error( $reserved ) ) {
@@ -315,8 +323,14 @@ final class DnsClaimRoutes {
 		$cart = WC()->cart;
 
 		if ( ! $cart ) {
+			if ( $created ) {
+				DnsAssignments::release( $domain );
+			}
+
 			return self::error( 'no_cart', __( 'The cart is unavailable.', 'beltoft-services' ), 503 );
 		}
+
+		$stale = array();
 
 		foreach ( $cart->get_cart() as $key => $item ) {
 			$line = $item['beltoft_services_domain'] ?? array();
@@ -329,13 +343,7 @@ final class DnsClaimRoutes {
 				return new \WP_REST_Response( array( 'checkout_url' => wc_get_checkout_url() ), 200 );
 			}
 
-			$cart->remove_cart_item( $key ); // A line from an older check of this domain.
-		}
-
-		$product = Cart::dns_product();
-
-		if ( ! $product ) {
-			return self::error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), 503 );
+			$stale[] = $key; // A line from an older check of this domain.
 		}
 
 		$data = array(
@@ -346,8 +354,20 @@ final class DnsClaimRoutes {
 			),
 		);
 
-		if ( ! $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data ) ) {
+		$added = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
+
+		if ( ! $added ) {
+			if ( $created ) {
+				DnsAssignments::release( $domain );
+			}
+
 			return self::error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), 400 );
+		}
+
+		foreach ( $stale as $key ) {
+			if ( $key !== $added ) {
+				$cart->remove_cart_item( $key );
+			}
 		}
 
 		WC()->session->set_customer_session_cookie( true );

@@ -214,17 +214,27 @@ class DnsClaimCheckoutTest extends TestCase {
 		return $order;
 	}
 
+	/** The order's line that carries a claim (order ids are reused by the test database, so other lines may exist). */
+	private function claim_item( \WC_Order $order ): \WC_Order_Item_Product {
+		foreach ( $order->get_items() as $item ) {
+			if ( (int) $item->get_meta( '_beltoft_services_dns_claim', true ) > 0 ) { return $item; }
+		}
+		$this->fail( 'No claim line on the order.' );
+	}
+
 	public function test_order_creation_binds_the_assignment_and_consumes_the_claim(): void {
 		$claim = $this->in_cart();
 		$order = $this->order_for_cart();
-		$item  = array_values( $order->get_items() )[0];
+		$item  = $this->claim_item( $order );
 		$this->assertSame( $claim['id'], (int) $item->get_meta( '_beltoft_services_dns_claim', true ) );
 		do_action( 'woocommerce_checkout_order_created', $order );
 		$row = DnsAssignments::get( 'example.com' );
 		$this->assertSame( $order->get_id(), (int) $row['order_id'] );
 		$this->assertSame( $item->get_id(), (int) $row['order_item_id'] );
 		$this->assertSame( 'consumed', DnsClaims::get( $claim['id'] )['status'] );
+		WC()->session->set( 'order_awaiting_payment', $order->get_id() );
 		$this->assertSame( 0, $this->cart_error_count(), 'The cart still passes while the order waits for payment.' );
+		WC()->session->set( 'order_awaiting_payment', 0 );
 		do_action( 'woocommerce_checkout_order_created', $order ); // Store API style repeat.
 		$this->assertSame( 'consumed', DnsClaims::get( $claim['id'] )['status'] );
 	}
@@ -265,5 +275,67 @@ class DnsClaimCheckoutTest extends TestCase {
 		$meta = Meta::initial_meta( array(), array( 'id' => 77, 'order_id' => $order->get_id() ), $driver );
 		$this->assertSame( $claim['id'], $meta['claim_id'] );
 		$this->assertSame( 'dns', $meta['mode'] );
+	}
+
+	public function test_second_cart_with_the_same_claim_never_rebinds_the_row(): void {
+		$claim = $this->in_cart();
+		$a     = $this->order_for_cart();
+		do_action( 'woocommerce_checkout_order_created', $a );
+		WC()->session->set( 'order_awaiting_payment', $a->get_id() );
+		$this->assertSame( 0, $this->cart_error_count(), 'Order A awaiting payment: its own checkout retry passes.' );
+
+		// Another session: the same line, no awaiting order.
+		WC()->session->set( 'order_awaiting_payment', 0 );
+		$this->assertSame( 1, $this->cart_error_count() );
+		$errors = new \WP_Error();
+		Cart::validate_dns_checkout( array(), $errors );
+		$this->assertNotEmpty( $errors->get_error_codes() );
+
+		$b = $this->order_for_cart();
+		do_action( 'woocommerce_checkout_order_created', $b );
+		$this->assertSame( $a->get_id(), (int) DnsAssignments::get( 'example.com' )['order_id'] );
+		$this->assertNotEmpty( wc_get_order_notes( array( 'order_id' => $b->get_id() ) ) );
+		$this->assertFalse( DnsAssignments::bind_order( 'example.com', $this->user, $b->get_id(), 1 ) );
+		$this->assertSame( 'consumed', DnsClaims::get( $claim['id'] )['status'] );
+		WC()->session->set( 'order_awaiting_payment', 0 );
+	}
+
+	public function test_payment_retry_of_the_same_order_still_passes(): void {
+		$this->in_cart();
+		$a = $this->order_for_cart();
+		do_action( 'woocommerce_checkout_order_created', $a );
+		WC()->session->set( 'order_awaiting_payment', $a->get_id() );
+		$this->assertSame( 0, $this->cart_error_count() );
+		do_action( 'woocommerce_checkout_order_created', $a );
+		$this->assertSame( $a->get_id(), (int) DnsAssignments::get( 'example.com' )['order_id'] );
+		WC()->session->set( 'order_awaiting_payment', 0 );
+	}
+
+	public function test_leftover_line_after_the_order_is_active_is_refused(): void {
+		$this->in_cart();
+		$a = $this->order_for_cart();
+		do_action( 'woocommerce_checkout_order_created', $a );
+		DnsAssignments::activate( 'example.com', $this->user, 5, 5 );
+		WC()->session->set( 'order_awaiting_payment', $a->get_id() );
+		$this->assertSame( 1, $this->cart_error_count() );
+		$this->assertSame( 'This DNS hosting check has expired. Start again from My Account, Domains.', wc_get_notices( 'error' )[0]['notice'] );
+		WC()->session->set( 'order_awaiting_payment', 0 );
+	}
+
+	public function test_cancelling_the_order_expires_the_claim_so_the_customer_can_start_again(): void {
+		$claim = $this->in_cart();
+		$a     = $this->order_for_cart();
+		do_action( 'woocommerce_checkout_order_created', $a );
+		do_action( 'woocommerce_order_status_cancelled', $a->get_id() );
+		$this->assertSame( 'expired', DnsClaims::get( $claim['id'] )['status'] );
+		$this->assertSame( 'dns_claim_not_verified', $this->checkout( $claim['id'] )->get_data()['code'] );
+	}
+
+	public function test_missing_product_leaves_no_reservation(): void {
+		$claim = $this->claim( 'verified', 'noproduct.com' );
+		add_filter( 'pre_get_posts', static function ( $q ) { $q->set( 'post__in', array( 0 ) ); } );
+		$r = $this->checkout( $claim['id'] );
+		$this->assertSame( 503, $r->get_status() );
+		$this->assertNull( DnsAssignments::get( 'noproduct.com' ) );
 	}
 }
