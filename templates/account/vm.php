@@ -3,7 +3,7 @@
  * The virtual machine part of the service panel (My Account → Licenses).
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
- * disk_gb), $power (running, stopped or empty when not known), $os_label, $os_options
+ * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore).
  * The password is never part of this template: the reveal button asks the server for it once.
@@ -44,7 +44,10 @@ $beltoft_services_power_labels = array(
 			<dt><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></dt>
 			<dd><?php echo esc_html( $os_label ); ?></dd>
 		<?php endif; ?>
-		<?php if ( isset( $beltoft_services_power_labels[ $power ] ) ) : ?>
+		<?php if ( ! empty( $busy ) ) : ?>
+			<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
+			<dd><?php esc_html_e( 'Busy', 'beltoft-services' ); ?></dd>
+		<?php elseif ( isset( $beltoft_services_power_labels[ $power ] ) ) : ?>
 			<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
 			<dd><?php echo esc_html( $beltoft_services_power_labels[ $power ] ); ?></dd>
 		<?php endif; ?>

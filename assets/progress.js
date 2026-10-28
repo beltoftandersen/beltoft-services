@@ -92,13 +92,28 @@
 
 				if ( active ) {
 					wasActive = true;
-					window.setTimeout( again, interval );
+					wait();
 				} else if ( payload && options.onFinished ) {
 					options.onFinished( payload, wasActive );
 				}
-			} ).catch( function () {
-				window.setTimeout( again, interval );
-			} );
+			} ).catch( wait );
+		}
+
+		// No polling in a hidden tab; it looks again when the tab comes back.
+		function wait() {
+			window.setTimeout( function () {
+				if ( ! document.hidden ) {
+					again();
+					return;
+				}
+
+				document.addEventListener( 'visibilitychange', function back() {
+					if ( ! document.hidden ) {
+						document.removeEventListener( 'visibilitychange', back );
+						again();
+					}
+				} );
+			}, interval );
 		}
 
 		again();

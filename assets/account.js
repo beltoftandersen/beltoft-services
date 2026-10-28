@@ -66,6 +66,23 @@
 		}
 	}
 
+	// Waits for the tab to be visible before a poll runs, and polls again when it comes back.
+	function later( run, ms ) {
+		window.setTimeout( function () {
+			if ( ! document.hidden ) {
+				run();
+				return;
+			}
+
+			document.addEventListener( 'visibilitychange', function again() {
+				if ( ! document.hidden ) {
+					document.removeEventListener( 'visibilitychange', again );
+					run();
+				}
+			} );
+		}, ms );
+	}
+
 	function show( panel, data ) {
 		var badge = panel.querySelector( '[data-badge]' );
 		var message = panel.querySelector( '[data-message]' );
@@ -82,11 +99,11 @@
 		var block = panel.querySelector( '[data-progress]' );
 
 		if ( block && data.progress && window.BeltoftServicesProgress ) {
-			panel.beltoftActive = window.BeltoftServicesProgress.render( block, data.progress ) || panel.beltoftActive;
-			return data.progress.active;
+			window.BeltoftServicesProgress.render( block, data.progress );
 		}
 
-		return false;
+		// Active only while the server says work is going on: a queued form alone proves nothing.
+		return !! ( data.working || ( data.progress && data.progress.active ) );
 	}
 
 	// A button that has been clicked shows it is working; reset() gives it back after an error.
@@ -121,10 +138,11 @@
 		// Only the newest chain goes on: a queued action starts a fresh one at once.
 		panel.beltoftRun = run;
 		panel.beltoftActive = panel.beltoftActive || ( !! block && /^(queued|running)$/.test( block.getAttribute( 'data-phase' ) ) );
+		// Back on the page after a while: look at once.
 
 		request( 'GET', id ).then( function ( response ) {
 			if ( 429 === response.status ) {
-				window.setTimeout( function () {
+				later( function () {
 					if ( run === panel.beltoftRun ) {
 						poll( panel );
 					}
@@ -151,10 +169,11 @@
 			}
 
 			active = show( panel, data );
+			panel.beltoftActive = panel.beltoftActive || active;
 
 			// A failed service waits for the shop: no point in asking again.
 			if ( ( data.state !== data.desired || active ) && 'failed' !== data.state ) {
-				window.setTimeout( function () {
+				later( function () {
 					if ( run === panel.beltoftRun ) {
 						poll( panel );
 					}
@@ -267,7 +286,6 @@
 
 		// A form of another script (the server card) queued a slow action: show its progress now.
 		panel.addEventListener( 'beltoft-services:queued', function () {
-			panel.beltoftActive = true;
 			poll( panel );
 		} );
 

@@ -217,25 +217,40 @@ final class ProgressTest extends TestCase {
 		$this->assertSame( 'Restore requested. It starts in a moment.', Progress::build( $r )['text'] );
 	}
 
-	public function test_only_slow_actions_leave_a_marker_and_a_marker_expires(): void {
+	public function test_every_action_leaves_a_marker_and_a_vanished_job_lets_it_lapse(): void {
 		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready' ) );
 
-		Progress::mark( $r, 'restart' );
-		$this->assertNull( $r->get( Progress::MARKER ) );
+		Progress::mark( $r, 'replace_ssh_key', 'Replace SSH key' );
+		$p = Progress::build( $r );
 
-		Progress::mark( $r, 'reinstall' );
-		$this->assertNotNull( Progress::pending( $r ) );
+		$this->assertSame( 'action', $p['kind'] );
+		$this->assertSame( 'queued', $p['phase'] );
+		$this->assertSame( 'Replace SSH key', $p['title'] );
+		$this->assertSame( 'Replace SSH key requested. It starts in a moment.', $p['text'] );
+		$this->assertSame( array(), $p['steps'] );
+
+		Progress::mark( $r, 'x' );
+		$this->assertSame( 'Your request is on its way. This can take a minute.', Progress::build( $r )['text'] );
 
 		$r->set( array( Progress::MARKER => array( 'action' => 'reinstall', 'at' => time() - Progress::MARKER_TTL - 1 ) ) );
 		$this->assertNull( Progress::pending( $r ), 'A job that never ran must not leave the card waiting for ever.' );
 		$this->assertSame( 'idle', Progress::build( $r )['phase'] );
 
-		$r->set( array( Progress::MARKER => array( 'action' => 'restart', 'at' => time() ) ) );
-		$this->assertNull( Progress::pending( $r ), 'Not a slow action.' );
-
 		Progress::mark( $r, 'reinstall' );
 		Progress::clear( $r );
 		$this->assertNull( $r->get( Progress::MARKER ) );
+	}
+
+	public function test_a_waiting_or_retrying_job_keeps_an_old_marker_alive(): void {
+		list( $r ) = $this->resource( 'fake', array( 'state' => 'ready' ) );
+		$r->set( array( Progress::MARKER => array( 'action' => 'reinstall', 'at' => time() - Progress::MARKER_TTL - 600 ) ) );
+
+		$this->assertNull( Progress::pending( $r ) );
+
+		Jobs::queue_act( $r->id(), 'reinstall', array(), 3600 );
+
+		$this->assertNotNull( Progress::pending( $r ), 'The job still waits: the card keeps saying requested.' );
+		$this->assertSame( 'queued', Progress::build( $r )['phase'] );
 	}
 
 	public function test_real_work_wins_over_the_marker(): void {
@@ -248,7 +263,7 @@ final class ProgressTest extends TestCase {
 		$this->assertSame( 'wipe', $p['current'] );
 	}
 
-	public function test_filters_change_minutes_steps_and_the_marked_actions(): void {
+	public function test_filters_change_minutes_and_steps(): void {
 		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'provisioning', 'steps' => array() ) );
 
 		add_filter( 'beltoft_services_progress_minutes', static fn( $m, $kind, $driver ) => 'build' === $kind && 'proxmox' === $driver ? 7 : $m, 10, 3 );
@@ -260,10 +275,6 @@ final class ProgressTest extends TestCase {
 		$this->assertSame( 'Usually about 7 minutes.', $p['eta'] );
 		$this->assertSame( array( 'one' => 'current', 'two' => 'todo' ), $this->statuses( $p ) );
 
-		add_filter( 'beltoft_services_progress_actions', static fn( $a ) => array_merge( $a, array( 'restart' ) ) );
-		$r->set( array( 'state' => 'ready' ) );
-		Progress::mark( $r, 'restart' );
-		$this->assertNotNull( $r->get( Progress::MARKER ) );
 	}
 
 	public function test_the_action_route_marks_before_queueing_and_the_job_clears_it(): void {
@@ -279,8 +290,10 @@ final class ProgressTest extends TestCase {
 		};
 
 		$this->assertSame( 202, $post( 'restart' )->get_status() );
-		$this->assertNull( Resource::find( $r->id() )->get( Progress::MARKER ), 'A quick action leaves no marker.' );
+		$this->assertSame( 'restart', Resource::find( $r->id() )->get( Progress::MARKER )['action'], 'Every action leaves a marker, with the label the card shows.' );
+		$this->assertSame( 'Restart', Resource::find( $r->id() )->get( Progress::MARKER )['label'] );
 		$this->run_jobs();
+		$this->assertNull( Resource::find( $r->id() )->get( Progress::MARKER ) );
 
 		$this->assertSame( 202, $post( 'reinstall' )->get_status() );
 		$fresh = Resource::find( $r->id() );
@@ -324,6 +337,27 @@ final class ProgressTest extends TestCase {
 		Jobs::act( $r->id(), 'reinstall', array() );
 
 		$this->assertNotNull( Resource::find( $r->id() )->get( Progress::MARKER ), 'Still waiting for the retry: the card keeps saying requested.' );
+	}
+
+	public function test_power_says_busy_while_work_is_shown(): void {
+		$render = static function ( bool $busy ): string {
+			$vars = array( 'ip' => '', 'plan' => array( 'cores' => 1, 'memory_mb' => 1, 'disk_gb' => 1 ), 'power' => 'running', 'os_label' => '', 'os_options' => array(), 'os_current' => 0, 'has_key' => false, 'can_reveal' => false, 'forms' => false, 'ssh_user' => 'root', 'backups' => null, 'metrics' => false, 'disk_used' => null, 'disk_total' => null, 'extra_disks' => array( 'items' => array(), 'add' => array(), 'mode' => 'off' ), 'busy' => $busy );
+			ob_start();
+			( static function ( array $vars ): void {
+				extract( $vars, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract
+				include BELTOFT_SERVICES_PATH . 'templates/account/vm.php';
+			} )( $vars );
+			return (string) ob_get_clean();
+		};
+
+		$this->assertStringContainsString( 'Running', $render( false ) );
+		$busy = $render( true );
+		$this->assertStringContainsString( 'Busy', $busy );
+		$this->assertStringNotContainsString( 'Running', $busy );
+	}
+
+	public function test_the_server_panel_passes_busy_from_the_progress(): void {
+		$this->assertStringContainsString( "Progress::build( \$r )['active']", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/Panels.php' ) );
 	}
 
 	public function test_a_driver_cannot_write_the_marker(): void {

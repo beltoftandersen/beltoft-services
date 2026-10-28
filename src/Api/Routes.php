@@ -202,7 +202,7 @@ final class Routes {
 		}
 
 		// The card shows "requested" at once; the job clears the mark when it has run.
-		Progress::mark( $resource, $action );
+		Progress::mark( $resource, $action, (string) $offered[ $action ] );
 		Jobs::queue_act( $resource->id(), $action, $args );
 
 		return new \WP_REST_Response(

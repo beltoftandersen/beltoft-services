@@ -109,6 +109,7 @@ final class Panels {
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),
 				'disk_gb'   => self::disk_gb( $r ),
 			),
+			'busy'       => (bool) \BeltoftServices\Progress::build( $r )['active'],
 			'power'      => null === $status ? '' : (string) $status['power'],
 			'os_label'   => (string) ( $list[ $chosen ] ?? '' ),
 			'os_options' => $list,

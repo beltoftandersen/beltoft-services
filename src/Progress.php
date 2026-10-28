@@ -34,25 +34,15 @@ final class Progress {
 	public const MARKER_TTL = 900;
 
 	/**
-	 * The customer actions that leave a marker (the slow ones). Filter beltoft_services_progress_actions.
-	 *
-	 * @return array<int, string>
-	 */
-	public static function marked_actions(): array {
-		$actions = apply_filters( 'beltoft_services_progress_actions', array( 'reinstall', 'restore' ) );
-
-		return is_array( $actions ) ? array_values( array_map( 'strval', $actions ) ) : array( 'reinstall', 'restore' );
-	}
-
-	/**
 	 * Notes that a customer asked for an action, before its job is queued.
 	 *
 	 * @param Resource $r      Resource.
 	 * @param string   $action Action name.
+	 * @param string   $label  The action's label for the customer (what the card calls it).
 	 */
-	public static function mark( Resource $r, string $action ): void {
-		if ( in_array( $action, self::marked_actions(), true ) ) {
-			$r->set( array( self::MARKER => array( 'action' => $action, 'at' => time() ) ) );
+	public static function mark( Resource $r, string $action, string $label = '' ): void {
+		if ( '' !== $action ) {
+			$r->set( array( self::MARKER => array( 'action' => $action, 'at' => time(), 'label' => $label ) ) );
 		}
 	}
 
@@ -68,23 +58,24 @@ final class Progress {
 	}
 
 	/**
-	 * The marker, unless it is older than MARKER_TTL or is not a slow action.
+	 * The marker, unless it is older than MARKER_TTL and no job of the service is waiting or
+	 * running (a job that waits or retries keeps it alive; only a vanished job lets it lapse).
 	 *
 	 * @param Resource $r Resource.
-	 * @return array{action: string, at: int}|null
+	 * @return array{action: string, at: int, label: string}|null
 	 */
 	public static function pending( Resource $r ): ?array {
 		$marker = $r->get( self::MARKER );
 
-		if ( ! is_array( $marker ) || ! isset( $marker['action'], $marker['at'] ) || ! in_array( (string) $marker['action'], self::marked_actions(), true ) ) {
+		if ( ! is_array( $marker ) || ! isset( $marker['action'], $marker['at'] ) || '' === (string) $marker['action'] ) {
 			return null;
 		}
 
-		if ( (int) $marker['at'] < time() - self::MARKER_TTL ) {
+		if ( (int) $marker['at'] < time() - self::MARKER_TTL && ! Jobs::acting( $r->id() ) ) {
 			return null;
 		}
 
-		return array( 'action' => (string) $marker['action'], 'at' => (int) $marker['at'] );
+		return array( 'action' => (string) $marker['action'], 'at' => (int) $marker['at'], 'label' => (string) ( $marker['label'] ?? '' ) );
 	}
 
 	/**
@@ -155,7 +146,7 @@ final class Progress {
 	 * @param string $kind   Kind.
 	 * @param string $driver Driver id.
 	 */
-	private static function title( string $kind, string $driver ): string {
+	private static function title( string $kind, string $driver, ?array $marker = null ): string {
 		$disk   = DiskDriver::ID === $driver;
 		$server = SshKeyField::DRIVER === $driver;
 
@@ -172,6 +163,8 @@ final class Progress {
 				return $disk ? __( 'Detaching your disk', 'beltoft-services' ) : __( 'Pausing your service', 'beltoft-services' );
 			case 'resume':
 				return __( 'Starting your service again', 'beltoft-services' );
+			case 'action':
+				return $marker && '' !== $marker['label'] ? $marker['label'] : __( 'Working on your request', 'beltoft-services' );
 			default:
 				if ( $disk ) {
 					return __( 'Adding your disk', 'beltoft-services' );
@@ -196,6 +189,7 @@ final class Progress {
 			'update'    => 2,
 			'pause'     => 1,
 			'resume'    => 1,
+			'action'    => 1,
 		);
 		$minutes  = $defaults[ $kind ] ?? 2;
 
@@ -246,7 +240,7 @@ final class Progress {
 		} elseif ( $r->get( 'plan_dirty' ) ) {
 			$kind = 'update';
 		} elseif ( $marker ) {
-			$kind  = $marker['action'];
+			$kind  = in_array( $marker['action'], array( 'reinstall', 'restore' ), true ) ? $marker['action'] : 'action';
 			$phase = 'queued';
 		}
 
@@ -275,7 +269,7 @@ final class Progress {
 			'kind'    => $kind,
 			'phase'   => $phase,
 			'active'  => in_array( $phase, array( 'queued', 'running' ), true ),
-			'title'   => '' === $kind ? '' : self::title( $kind, $driver ),
+			'title'   => '' === $kind ? '' : self::title( $kind, $driver, $marker ),
 			'steps'   => $steps,
 			'current' => $current,
 			'minutes' => $minutes,
@@ -324,7 +318,7 @@ final class Progress {
 	 *
 	 * @param string                            $kind   Kind.
 	 * @param string                            $phase  Phase.
-	 * @param array{action: string, at: int}|null $marker Marker.
+	 * @param array{action: string, at: int, label: string}|null $marker Marker.
 	 * @param string                            $eta    Typical duration sentence.
 	 * @param string                            $driver Driver id.
 	 */
@@ -347,10 +341,19 @@ final class Progress {
 				return __( 'Restore requested. It starts in a moment.', 'beltoft-services' );
 			}
 
+			if ( 'action' === $kind && $marker && '' !== $marker['label'] ) {
+				/* translators: %s: what the customer asked for, such as "Replace SSH key". */
+				return sprintf( __( '%s requested. It starts in a moment.', 'beltoft-services' ), $marker['label'] );
+			}
+
+			if ( 'action' === $kind ) {
+				return __( 'Your request is on its way. This can take a minute.', 'beltoft-services' );
+			}
+
 			return __( 'Waiting to start. It begins in a moment.', 'beltoft-services' );
 		}
 
-		return trim( self::title( $kind, $driver ) . '. ' . $eta );
+		return trim( self::title( $kind, $driver, $marker ) . '. ' . $eta );
 	}
 
 	/**
@@ -358,7 +361,7 @@ final class Progress {
 	 *
 	 * @param Resource                          $r      Resource.
 	 * @param string                            $kind   Kind.
-	 * @param array{action: string, at: int}|null $marker Marker.
+	 * @param array{action: string, at: int, label: string}|null $marker Marker.
 	 */
 	private static function started( Resource $r, string $kind, ?array $marker ): int {
 		if ( '' === $kind ) {
@@ -369,7 +372,7 @@ final class Progress {
 			return (int) $r->get( 'last_reinstall_at' );
 		}
 
-		if ( $marker && $marker['action'] === $kind ) {
+		if ( $marker && ( $marker['action'] === $kind || 'action' === $kind ) ) {
 			return $marker['at'];
 		}
 
