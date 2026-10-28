@@ -19,7 +19,14 @@ final class DiskCascade {
 	/** Subscription statuses that end a server's subscription for good or at the end of its term. */
 	private const HOOKS = array( 'pending-cancel', 'cancelled', 'expired' );
 
+	/** Subscription meta: the server subscription a disk subscription was put in pending-cancel with. */
+	public const MARKER = '_beltoft_services_ended_with_server';
+
+	/** Subscription meta: the end date the disk subscription had before the cascade (empty: none). */
+	public const ORIGINAL_END = '_beltoft_services_original_end';
+
 	public static function register(): void {
+		add_action( 'woocommerce_subscription_status_active', array( __CLASS__, 'on_active' ), 20 );
 		foreach ( self::HOOKS as $status ) {
 			add_action( 'woocommerce_subscription_status_' . $status, array( __CLASS__, 'on_status' ), 20 );
 		}
@@ -38,6 +45,59 @@ final class DiskCascade {
 			$server = Resource::for_license( (int) $license['id'] );
 			if ( $server && SshKeyField::DRIVER === $server->get( 'driver' ) ) {
 				self::end_disks( $subscription, $server, $status );
+			}
+		}
+	}
+
+	/**
+	 * The server subscription is active again: the disk subscriptions the cascade put in pending-cancel
+	 * (marked with this server subscription's id) are reactivated. One the customer ended themselves has
+	 * no marker and stays; a cancelled one stays cancelled.
+	 *
+	 * @param mixed $subscription Subscription.
+	 */
+	public static function on_active( $subscription ): void {
+		if ( ! is_object( $subscription ) || ! method_exists( $subscription, 'get_id' ) || ! function_exists( 'wcs_get_subscription' ) ) {
+			return;
+		}
+		$server_sub_id = (int) $subscription->get_id();
+		foreach ( Licenses::where( 'subscription_id', $server_sub_id ) as $license ) {
+			$server = Resource::for_license( (int) $license['id'] );
+			if ( ! $server || SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+				continue;
+			}
+			$seen = array();
+			foreach ( DiskMeta::for_server( $server ) as $disk ) {
+				$id = (int) ( $disk->license()['subscription_id'] ?? 0 );
+				if ( $id < 1 || isset( $seen[ $id ] ) ) {
+					continue;
+				}
+				$seen[ $id ] = true;
+				$disk_subscription = wcs_get_subscription( $id );
+				if ( ! $disk_subscription instanceof \WC_Subscription || 'pending-cancel' !== $disk_subscription->get_status() || (int) $disk_subscription->get_meta( self::MARKER ) !== $server_sub_id ) {
+					continue;
+				}
+				$original = (string) $disk_subscription->get_meta( self::ORIGINAL_END );
+				$disk_subscription->delete_meta_data( self::MARKER );
+				$disk_subscription->delete_meta_data( self::ORIGINAL_END );
+				$disk_subscription->save();
+				try {
+					// WooCommerce Subscriptions restores the end date it kept before the pending cancellation.
+					$disk_subscription->update_status( 'active', __( 'Active again with its server.', 'beltoft-services' ) );
+					$wanted = '' === $original ? 0 : $original;
+					if ( ( 0 === $wanted ? '' : (string) $wanted ) !== (string) $disk_subscription->get_date( 'end' ) ) {
+						$disk_subscription->update_dates( array( 'end' => $wanted ) );
+					}
+				} catch ( \Exception $e ) {
+					// WooCommerce Subscriptions refuses some reactivations (for example with automatic renewal): the disk is left as it is.
+					$text = sprintf( 'Server subscription #%1$d is active again, but disk subscription #%2$d could not be reactivated: %3$s', $server_sub_id, $id, $e->getMessage() );
+					$disk_subscription->add_order_note( $text );
+					$subscription->add_order_note( $text );
+					Alerts::admin( $disk, $text );
+					continue;
+				}
+				/* translators: %d: disk subscription number. */
+				$subscription->add_order_note( sprintf( __( 'Extra disk subscription #%d is active again with this server.', 'beltoft-services' ), $id ) );
 			}
 		}
 	}
@@ -65,6 +125,9 @@ final class DiskCascade {
 			/* translators: %d: server subscription number. */
 			$note = sprintf( __( 'Ended with its server (subscription #%d).', 'beltoft-services' ), (int) $server_subscription->get_id() );
 			if ( 'pending-cancel' === $status ) {
+				$disk_subscription->update_meta_data( self::MARKER, (int) $server_subscription->get_id() );
+				$disk_subscription->update_meta_data( self::ORIGINAL_END, (string) $disk_subscription->get_date( 'end' ) );
+				$disk_subscription->save();
 				$disk_subscription->update_status( 'pending-cancel', $note );
 				self::align_end( $server_subscription, $disk_subscription );
 			} else {

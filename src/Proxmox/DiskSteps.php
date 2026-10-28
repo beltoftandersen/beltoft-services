@@ -336,10 +336,12 @@ final class DiskSteps {
 		if ( $this->r->get( 'linked' ) ) {
 			return StepResult::done( array(), 'An adopted disk stays attached' );
 		}
-		$steps = (array) $this->r->get( 'steps' );
-		if ( ! $this->r->get( 'volname' ) || ! in_array( 'attach', $steps, true ) ) {
+		if ( ! $this->r->get( 'volname' ) ) {
 			return StepResult::done( array(), 'The disk was never attached, so there is nothing to detach' );
 		}
+		// Whatever the steps say, a drive that holds the exact volume is detached; without an attach step the server is only looked at, never failed on.
+		$never = ! in_array( 'attach', (array) $this->r->get( 'steps' ), true );
+		$never_done = static fn() => StepResult::done( array(), 'The disk was never attached, so there is nothing to detach' );
 		$server_id = (int) $this->r->get( 'server_license' );
 		$server    = $server_id > 0 ? Resource::for_license( $server_id ) : null;
 		if ( $server && 'deleted' === $server->get( 'state' ) ) {
@@ -347,12 +349,15 @@ final class DiskSteps {
 		}
 		$server_license = $server_id > 0 ? Licenses::find( $server_id ) : null;
 		$own_license    = $this->r->license();
-		if ( ! $server || ! $server_license || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) || (int) ( $server_license['user_id'] ?? 0 ) < 1 || (int) $server_license['user_id'] !== (int) ( $own_license['user_id'] ?? 0 ) ) {
-			return StepResult::fail( 'The server cannot be verified for detaching the disk.' );
+		if ( $server && $server_license && (int) ( $server_license['user_id'] ?? 0 ) !== (int) ( $own_license['user_id'] ?? 0 ) ) {
+			return StepResult::fail( 'The server belongs to another customer, so the disk is not detached.' );
+		}
+		if ( ! $server || ! $server_license || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) || (int) ( $server_license['user_id'] ?? 0 ) < 1 ) {
+			return $never ? $never_done() : StepResult::fail( 'The server cannot be verified for detaching the disk.' );
 		}
 		$ctx = $this->context( $server );
 		if ( $ctx instanceof StepResult ) {
-			return $ctx;
+			return $never && $ctx->is_failed() ? $never_done() : $ctx;
 		}
 		$polled = $this->poll_task();
 		if ( $polled ) {
@@ -364,6 +369,9 @@ final class DiskSteps {
 		}
 		$volid    = $this->volume_id( $ctx );
 		$attached = $this->attached( $config, $volid );
+		if ( ! $attached && $never ) {
+			return $never_done();
+		}
 		if ( $attached ) {
 			if ( '' !== $ctx['lock'] ) {
 				return StepResult::retry( 60, 'The server is locked.' );
@@ -598,7 +606,11 @@ final class DiskSteps {
 			}
 			// A disk that was ever attached is removed only through the configuration (detach, unusedN, delete=unusedN), never by a direct storage delete.
 			if ( in_array( 'attach', (array) $this->r->get( 'steps' ), true ) ) {
-				return $this->pending_detach();
+				$holds = $this->running_holds( $ctx, $volid );
+				if ( $holds instanceof StepResult ) {
+					return $holds;
+				}
+				return $holds ? $this->pending_detach() : StepResult::fail( 'The disk volume ' . $volid . ' is on the storage but not linked to the server; remove it by hand.' );
 			}
 			return $this->remove_orphan( $ctx, $volid );
 		}

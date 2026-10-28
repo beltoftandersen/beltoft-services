@@ -12,6 +12,16 @@ use BeltoftServices\Resource;
 require_once __DIR__ . '/BackupTestCase.php';
 
 class DiskPolicyTest extends BackupTestCase {
+	public function set_up(): void {
+		parent::set_up();
+		global $wpdb;
+		// WordPress' test rollback reuses post IDs; WooCommerce's custom order-item tables persist between tests.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Isolated PHPUnit fixture reset.
+		$wpdb->query( 'DELETE FROM ' . $wpdb->prefix . 'woocommerce_order_itemmeta' );
+		$wpdb->query( 'DELETE FROM ' . $wpdb->prefix . 'woocommerce_order_items' );
+		// phpcs:enable
+	}
+
 	private function disk_for( Resource $server ): Resource {
 		$server_license = $server->license();
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
@@ -94,10 +104,14 @@ class DiskPolicyTest extends BackupTestCase {
 
 	public function test_pause_refuses_when_the_server_belongs_to_another_customer(): void {
 		$disk = $this->ready_disk();
-		$other = $this->service_license( $this->service_product( 'proxmox', array( 'cluster' => 'lab' ), array( 'slug' => 'x-' . wp_generate_password( 5, false ) ) ), array( 'fire' => false ) );
-		$this->assertTrue( $disk->set( array( 'server_license' => (int) $other['id'] ) ) );
+		$other = $this->ready_vm();
+		$this->assertNotSame( (int) $disk->license()['user_id'], (int) $other->license()['user_id'] );
+		$this->assertGreaterThan( 0, (int) $other->license()['user_id'] );
+		$this->assertTrue( $disk->set( array( 'server_license' => (int) $other->license()['id'] ) ) );
 		$before = count( $this->calls( 'PUT', '/qemu/5000/config' ) );
-		$this->assertTrue( Registry::get( 'proxmox-disk' )->pause( Resource::find( $disk->id() ) )->is_failed() );
+		$result = Registry::get( 'proxmox-disk' )->pause( Resource::find( $disk->id() ) );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'belongs to another customer', $result->error() );
 		$this->assertCount( $before, $this->calls( 'PUT', '/qemu/5000/config' ) );
 	}
 
@@ -121,6 +135,10 @@ class DiskPolicyTest extends BackupTestCase {
 	private function subscription( string $status = 'active', ?int $user = null ): \WC_Subscription {
 		$sub = wcs_create_subscription( array( 'customer_id' => $user ?? self::factory()->user->create(), 'billing_period' => 'month', 'billing_interval' => 1, 'status' => $status ) );
 		$this->assertInstanceOf( \WC_Subscription::class, $sub );
+		// WooCommerce Subscriptions only reactivates a pending-cancel subscription with manual renewal and an end date ahead.
+		$sub->set_requires_manual_renewal( true );
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + 30 * DAY_IN_SECONDS ) ) );
+		$sub->save();
 		// The license table is not rolled back with the posts, which reuse their ids: forget rows left by earlier tests.
 		global $wpdb;
 		$wpdb->delete( \BeltoftLicenses\Install::tables()['licenses'], array( 'subscription_id' => $sub->get_id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture reset.
@@ -218,5 +236,46 @@ class DiskPolicyTest extends BackupTestCase {
 		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $disk->license()['id'], array( 'status' => 'revoked' ) ) );
 		$next = Registry::get( 'proxmox' )->delete( Resource::find( $server->id() ) );
 		$this->assertStringNotContainsString( 'active extra disk', (string) $next->error() );
+	}
+
+	public function test_pause_detaches_a_drive_that_holds_the_volume_even_without_an_attach_step(): void {
+		$disk = $this->ready_disk();
+		$this->assertTrue( $disk->set( array( 'steps' => array( 'server', 'slot' ) ) ) );
+		$result = Registry::get( 'proxmox-disk' )->pause( Resource::find( $disk->id() ) );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertArrayNotHasKey( 'scsi1', $this->config() );
+		$this->assertCount( 1, $this->images() );
+		$this->assertArrayHasKey( 'detached', $result->meta() );
+	}
+
+	public function test_server_pending_cancel_then_reactivation_restores_the_disk_subscription(): void {
+		list( , $server_sub, , $disk_sub ) = $this->server_and_disk();
+		$server_sub->update_status( 'pending-cancel' );
+		$fresh = wcs_get_subscription( $disk_sub->get_id() );
+		$this->assertSame( 'pending-cancel', $fresh->get_status() );
+		$this->assertSame( $server_sub->get_id(), (int) $fresh->get_meta( \BeltoftServices\Proxmox\DiskCascade::MARKER ) );
+		wcs_get_subscription( $server_sub->get_id() )->update_status( 'active' );
+		$back = wcs_get_subscription( $disk_sub->get_id() );
+		$this->assertSame( 'active', $back->get_status() );
+		$this->assertSame( '', (string) $back->get_meta( \BeltoftServices\Proxmox\DiskCascade::MARKER ) );
+		$this->assertSame( 0, (int) $back->get_time( 'end' ) );
+		$this->assertStringContainsString( 'Active again with its server', $this->notes( $disk_sub ) );
+		$this->assertStringContainsString( 'is active again with this server', $this->notes( $server_sub ) );
+	}
+
+	public function test_reactivation_leaves_a_disk_without_the_marker_and_a_cancelled_one_alone(): void {
+		list( , $server_sub, , $own_sub ) = $this->server_and_disk();
+		$server_sub->update_status( 'pending-cancel' );
+		$own_sub = wcs_get_subscription( $own_sub->get_id() );
+		$own_sub->delete_meta_data( \BeltoftServices\Proxmox\DiskCascade::MARKER );
+		$own_sub->save();
+		wcs_get_subscription( $server_sub->get_id() )->update_status( 'active' );
+		$this->assertSame( 'pending-cancel', wcs_get_subscription( $own_sub->get_id() )->get_status(), 'No marker: the customer ended it themselves.' );
+
+		list( , $server_sub2, , $gone ) = $this->server_and_disk();
+		$server_sub2->update_status( 'cancelled' );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $gone->get_id() )->get_status() );
+		do_action( 'woocommerce_subscription_status_active', wcs_get_subscription( $server_sub2->get_id() ) );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $gone->get_id() )->get_status(), 'Cancelled stays cancelled.' );
 	}
 }

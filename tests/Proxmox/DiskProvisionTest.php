@@ -192,10 +192,31 @@ class DiskProvisionTest extends BackupTestCase {
 		list( $server, $disk ) = $this->removable_disk();
 		Jobs::run( $disk->id() );
 		$disk = Resource::find( $disk->id() );
-		$other = $this->service_license( $this->service_product( 'proxmox', array( 'cluster' => 'lab' ), array( 'slug' => 'x-' . wp_generate_password( 5, false ) ) ), array( 'fire' => false, 'user_id' => (int) $server->license()['user_id'] + 1000 ) );
-		$this->assertTrue( $disk->set( array( 'server_license' => (int) $other['id'] ) ) );
-		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) )->is_failed() );
+		$other = $this->ready_vm();
+		$this->assertNotSame( (int) $disk->license()['user_id'], (int) $other->license()['user_id'] );
+		$this->assertGreaterThan( 0, (int) $other->license()['user_id'] );
+		$this->assertTrue( $disk->set( array( 'server_license' => (int) $other->license()['id'] ) ) );
+		$result = Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'belongs to another customer', $result->error() );
 		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+	}
+
+	public function test_ever_attached_volume_in_no_drive_and_no_unused_entry_fails_with_a_by_hand_alert(): void {
+		list( , $disk ) = $this->removable_disk();
+		Jobs::run( $disk->id() );
+		$disk = Resource::find( $disk->id() );
+		$this->assertContains( 'attach', (array) $disk->get( 'steps' ) );
+		// A detach that applied but left the volume in neither a drive nor an unusedN entry: the config entry is lost.
+		$this->fake->hold_detach( 5000, true );
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => (string) $disk->get( 'slot' ) ) );
+		$this->fake->drop_running_drive( 5000, (string) $disk->get( 'slot' ) );
+		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
+		$this->assertTrue( $result->is_failed(), $result->error() );
+		$this->assertStringContainsString( 'is on the storage but not linked to the server; remove it by hand.', $result->error() );
+		$this->assertStringContainsString( 'disk-store:5000/' . $disk->get( 'volname' ), $result->error() );
+		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 1, $this->images() );
 	}
 
 	public function test_resume_between_claim_and_attach_provisions_instead_of_claiming_ready(): void {

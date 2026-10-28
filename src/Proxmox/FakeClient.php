@@ -186,6 +186,19 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * Applies a pending detach to the running configuration without an unusedN entry (modelled: the
+	 * drive is gone from the VM and the volume stays on the storage, linked to nothing).
+	 *
+	 * @param int    $vmid VM id.
+	 * @param string $key  Drive key.
+	 */
+	public function drop_running_drive( int $vmid, string $key ): void {
+		$this->load();
+		unset( $this->state['vms'][ $vmid ]['config'][ $key ], $this->state['pending'][ $vmid ][ $key ] );
+		$this->save();
+	}
+
+	/**
 	 * Seeds a backup in a storage: vmid, ctime, size, notes, config (the VM config it restores), volid
 	 * (default storage:backup/vm/<vmid>/<iso8601 of ctime>).
 	 *
