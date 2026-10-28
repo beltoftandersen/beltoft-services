@@ -111,4 +111,45 @@ class LiveClientTest extends TestCase {
 		$this->assertStringNotContainsString( 'Zq9-secret-code', $error->get_error_data()['desc'] );
 		$this->assertStringContainsString( '[hidden]', $error->get_error_data()['desc'] );
 	}
+
+	public function test_orders_wait_longer_than_other_calls_and_are_never_sent_twice(): void {
+		$client   = new LiveClient( 'sandbox', 'u', 'p' );
+		$timeouts = array();
+		$posts    = 0;
+		$this->respond_with( function ( $url, $args ) use ( &$timeouts, &$posts ) {
+			if ( str_ends_with( $url, '/auth/login' ) ) { return $this->reply( array( 'data' => array( 'token' => 'token-one' ) ) ); }
+			$path = (string) wp_parse_url( $url, PHP_URL_PATH );
+			$timeouts[ $args['method'] . ' ' . substr( $path, strpos( $path, '/domains' ) ) ] = $args['timeout'];
+			if ( 'POST' === $args['method'] && str_ends_with( $path, '/domains' ) ) { ++$posts; return new \WP_Error( 'http_request_failed', 'cURL error 28 for https://registrar.example/secret' ); }
+			return $this->reply( array( 'data' => array( 'ok' => true ) ) );
+		} );
+		$client->request( 'GET', '/domains' );
+		$client->request( 'POST', '/domains/transfer', array( 'auth_code' => 'x' ) );
+		$failed = $client->request( 'POST', '/domains', array( 'domain' => array() ) );
+		$client->request( 'POST', '/domains/check', array( 'domains' => array() ) );
+		$client->request( 'PUT', '/domains/123', array() );
+		$this->assertSame( 90, $timeouts['POST /domains'] );
+		$this->assertSame( 90, $timeouts['POST /domains/transfer'] );
+		$this->assertSame( 30, $timeouts['GET /domains'] );
+		$this->assertSame( 30, $timeouts['POST /domains/check'] );
+		$this->assertSame( 30, $timeouts['PUT /domains/123'] );
+		$this->assertSame( 1, $posts, 'A timed out order is not sent again by the client.' );
+		$this->assertSame( 'transport', $failed->get_error_code() );
+		$this->assertTrue( LiveClient::is_transient( $failed ) );
+		$this->assertSame( 'http_request_failed', $failed->get_error_data()['transport_code'] );
+		$this->assertStringNotContainsString( 'registrar.example', wp_json_encode( array( $failed->get_error_message(), $failed->get_error_data() ) ) );
+	}
+
+	public function test_secrets_stay_hidden_in_the_kept_explanation(): void {
+		$client = new LiveClient( 'sandbox', 'u', 'top-secret' );
+		$this->respond_with( function ( $url ) {
+			if ( str_ends_with( $url, '/auth/login' ) ) { return $this->reply( array( 'data' => array( 'token' => 'token-one' ) ) ); }
+			return $this->reply( array( 'code' => 102, 'desc' => 'Try later, token-one top-secret' ), 503 );
+		} );
+		$error = $client->request( 'POST', '/domains', array() );
+		$this->assertSame( 503, $error->get_error_data()['status'] );
+		$this->assertSame( 'op_102', $error->get_error_code() );
+		$this->assertStringNotContainsString( 'top-secret', $error->get_error_data()['desc'] );
+		$this->assertStringNotContainsString( 'token-one', $error->get_error_data()['desc'] );
+	}
 }

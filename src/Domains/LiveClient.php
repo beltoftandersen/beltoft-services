@@ -83,12 +83,17 @@ class LiveClient implements Client {
 		return $this->http( $method, $path, $body, $query, 'Bearer ' . $token );
 	}
 
+	/** Seconds to wait for one request: an order is placed with the registrar by a slow call that may still go through, so it gets longer; no order is ever sent twice by this client. */
+	public static function timeout_for( string $method, string $path ): int {
+		return 'POST' === strtoupper( $method ) && in_array( $path, array( '/domains', '/domains/transfer' ), true ) ? 90 : 30;
+	}
+
 	private function http( string $method, string $path, array $body, array $query, string $authorization ): array|\WP_Error {
 		$url = $this->base . $path;
 		if ( $query ) { $url = add_query_arg( $query, $url ); }
 		$args = array(
 			'method' => $method,
-			'timeout' => 30,
+			'timeout' => self::timeout_for( $method, $path ),
 			'redirection' => 0,
 			'sslverify' => true,
 			'headers' => array( 'Accept' => 'application/json', 'Content-Type' => 'application/json' ),
@@ -96,7 +101,10 @@ class LiveClient implements Client {
 		if ( '' !== $authorization ) { $args['headers']['Authorization'] = $authorization; }
 		if ( in_array( $method, array( 'POST', 'PUT', 'PATCH' ), true ) ) { $args['body'] = wp_json_encode( $body ); }
 		$response = wp_remote_request( $url, $args );
-		if ( is_wp_error( $response ) ) { return new \WP_Error( 'transport', 'Registrar request could not be completed.' ); }
+		if ( is_wp_error( $response ) ) {
+			// The reason's code (http_request_failed, say) is kept for staff; never its message, which can hold the URL.
+			return new \WP_Error( 'transport', 'Registrar request could not be completed.', array( 'transport_code' => substr( preg_replace( '/[^a-z0-9_]/', '', strtolower( (string) $response->get_error_code() ) ), 0, 60 ) ) );
+		}
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		$decoded = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 ) {

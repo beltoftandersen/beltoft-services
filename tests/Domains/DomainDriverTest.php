@@ -170,6 +170,24 @@ class DomainDriverTest extends TestCase {
 		$this->assertTrue( 'retry' === $expected ? $result->is_retry() : $result->is_failed() );
 	}
 
+	public function test_a_temporary_registrar_error_keeps_its_code_status_and_reason_for_staff(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', new \WP_Error( 'op_102', 'Registrar request failed.', array( 'status' => 503, 'desc' => 'Backend <b>busy</b>' ) ) );
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', new \WP_Error( 'transport', 'Registrar request could not be completed.', array( 'transport_code' => 'http_request_failed' ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource();
+		$first = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $first->is_retry() );
+		$this->assertSame( 'The registrar is temporarily unavailable (op_102, HTTP 503: Backend busy).', $first->error() );
+		$second = ( new DomainDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $second->is_retry() );
+		$this->assertSame( 'The registrar is temporarily unavailable (http_request_failed).', $second->error() );
+	}
+
 	public function test_register_happy_path(): void {
 		$fake = new FakeClient();
 		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );

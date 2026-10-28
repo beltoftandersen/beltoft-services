@@ -199,6 +199,17 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		return $license_id > 0 && (int) $item->get_meta( '_beltoft_services_domain_license', true ) === $license_id;
 	}
 
+	/** What staff read when the registrar could not be used for now: the code and HTTP status, and its short explanation. Never a URL, header or secret. */
+	private static function unavailable_message( \WP_Error $error ): string {
+		$data   = $error->get_error_data();
+		$data   = is_array( $data ) ? $data : array();
+		$code   = 'transport' === $error->get_error_code() && '' !== (string) ( $data['transport_code'] ?? '' ) ? (string) $data['transport_code'] : (string) $error->get_error_code();
+		$status = (int) ( $data['status'] ?? 0 );
+		$desc   = mb_substr( sanitize_text_field( (string) ( $data['desc'] ?? '' ) ), 0, 200 );
+		$detail = $code . ( $status > 0 ? ', HTTP ' . $status : '' ) . ( '' !== $desc ? ': ' . $desc : '' );
+		return 'The registrar is temporarily unavailable (' . $detail . ').';
+	}
+
 	private function error( Resource $r, \WP_Error $error, array $steps ): StepResult {
 		$code = $error->get_error_code();
 		if ( 'op_920' === $code ) {
@@ -210,9 +221,9 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->get( 'billing_alerted' ) ) { Alerts::admin( $r, 'The order has incomplete billing details; add them to the order.' ); }
 			return StepResult::retry( 3600, 'Waiting for complete billing details.', array( 'steps' => $steps, 'billing_alerted' => true ) );
 		}
-		if ( LiveClient::is_transient( $error ) ) { return StepResult::retry( 3600, 'The registrar is temporarily unavailable.', array( 'steps' => $steps ) ); }
 		$data = $error->get_error_data();
 		$desc = is_array( $data ) ? (string) ( $data['desc'] ?? '' ) : '';
+		if ( LiveClient::is_transient( $error ) ) { return StepResult::retry( 3600, self::unavailable_message( $error ), array( 'steps' => $steps ) ); }
 		$why  = $code . ( '' !== $desc ? ' (' . $desc . ')' : '' );
 		Alerts::admin( $r, 'Registrar rejected the domain order: ' . $why );
 		return StepResult::fail( 'This domain order needs staff attention. Registrar answer: ' . $why, array( 'steps' => $steps ) );
