@@ -56,7 +56,7 @@ ZONE;
 
 		$this->assertEquals(
 			array(
-				array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ),
+				array( 'name' => '@', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.10' ),
 				array( 'name' => 'www', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.11' ),
 				array( 'name' => '@', 'type' => 'AAAA', 'ttl' => 300, 'value' => '2001:db8::10' ),
 				array( 'name' => 'blog', 'type' => 'CNAME', 'ttl' => 300, 'value' => 'example.com' ),
@@ -178,9 +178,9 @@ ZONE;
 		$this->assertSame( 201, $result['skipped'][0]['line'] );
 	}
 
-	public function test_cloudflare_auto_ttl_becomes_300_seconds(): void {
+	public function test_cloudflare_auto_ttl_becomes_one_hour(): void {
 		$parsed = \BeltoftServices\Domains\ZoneFile::parse( "app.example.com.\t1\tIN\tA\t192.0.2.1\nb.example.com.\t30\tIN\tA\t192.0.2.2", 'example.com' );
-		$this->assertSame( 300, $parsed['records'][0]['ttl'] );
+		$this->assertSame( 3600, $parsed['records'][0]['ttl'] );
 		$this->assertSame( 60, $parsed['records'][1]['ttl'] );
 	}
 }

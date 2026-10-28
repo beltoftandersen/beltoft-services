@@ -131,8 +131,9 @@ final class ZoneFile {
 
 			// Providers export "automatic" as 1: keep the value inside what a zone accepts.
 			$row_ttl = null === $row_ttl ? $ttl : $row_ttl;
-			// Cloudflare exports its "Auto" TTL as 1, which means 300 seconds there.
-			$row['ttl'] = 1 === (int) $row_ttl ? 300 : max( 60, min( 86400, $row_ttl ) );
+			// Cloudflare exports its "Auto" TTL as 1 (300 seconds there, because it proxies). Here an hour is
+			// the better default: resolvers keep the answer longer, so fewer visitors wait for a fresh lookup.
+			$row['ttl'] = 1 === (int) $row_ttl ? 3600 : max( 60, min( 86400, $row_ttl ) );
 
 			if ( count( $records ) >= self::MAX_RECORDS ) {
 				$skip( __( 'too many records', 'beltoft-services' ) );
