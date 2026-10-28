@@ -46,14 +46,14 @@ class DiskRestoreTest extends BackupTestCase {
 		return array_map( static fn( $c ) => $c['method'] . ' ' . $c['path'], $this->fake->calls() );
 	}
 
-	public function test_restore_is_allowed_with_a_disk_and_reinstall_is_not(): void {
+	public function test_restore_and_reinstall_are_both_allowed_with_a_healthy_disk(): void {
 		$server = $this->ready_vm();
 		$this->disk_for( $server );
 		$volid = $this->backup_of( $server );
 		$this->assertContains( 'restore', array_keys( Actions::offered( $server ) ) );
 		$this->assertNull( Actions::check( $server, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) ) );
-		$this->assertNotContains( 'reinstall', array_keys( Actions::offered( $server ) ) );
-		$this->assertSame( 'Remove the extra disks before reinstalling this server.', Actions::check( $server, 'reinstall', array( 'confirm' => 'REINSTALL' ) ) );
+		$this->assertContains( 'reinstall', array_keys( Actions::offered( $server ) ) );
+		$this->assertNull( Actions::check( $server, 'reinstall', array( 'confirm' => 'REINSTALL' ) ) );
 	}
 
 	public function test_the_fake_restore_turns_backup_zero_disks_into_unused_entries_and_keeps_the_volumes(): void {
@@ -278,6 +278,7 @@ class DiskRestoreTest extends BackupTestCase {
 		$this->assertStringContainsString( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', $html );
 		$this->assertStringNotContainsString( "\xE2\x80\x94", $html );
 		$this->assertStringContainsString( 'data-disks="1"', $html );
-		$this->assertStringContainsString( 'Reinstall is unavailable until the extra disks are removed.', $html );
+		$this->assertStringNotContainsString( 'Reinstall is unavailable', $html );
+		$this->assertStringContainsString( 'Extra disks are kept with their data and stay attached.', $html );
 	}
 }

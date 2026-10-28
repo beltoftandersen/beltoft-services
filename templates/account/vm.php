@@ -80,7 +80,6 @@ $beltoft_services_power_labels = array(
 					<?php esc_html_e( 'When a disk subscription ends, billing stops. The disk is detached from your server and its data is kept until we remove the disk.', 'beltoft-services' ); ?>
 				<?php endif; ?>
 			</p>
-			<p class="description"><?php esc_html_e( 'Reinstall is unavailable until the extra disks are removed.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
 		<?php if ( $extra_disks['add'] ) : ?>
 			<p><?php esc_html_e( 'Add a disk:', 'beltoft-services' ); ?>
@@ -234,10 +233,14 @@ $beltoft_services_power_labels = array(
 			</form>
 		</details>
 
-		<?php if ( ! $extra_disks['items'] ) : ?><details class="beltoft-services-vm__more">
+		<details class="beltoft-services-vm__more">
 			<summary><?php esc_html_e( 'Reinstall', 'beltoft-services' ); ?></summary>
-			<form class="beltoft-services-vm-form" data-action="reinstall">
-				<p class="description"><?php esc_html_e( 'Reinstalling erases everything on the server and installs the system again. The IP address stays. You get a new password.', 'beltoft-services' ); ?></p>
+			<form class="beltoft-services-vm-form" data-action="reinstall"<?php echo $extra_disks['items'] ? ' data-disks="1"' : ''; ?>>
+				<?php if ( $extra_disks['items'] ) : ?>
+					<p class="description"><?php esc_html_e( 'Reinstalling erases the server\'s main disk and installs the system again. Extra disks are kept with their data and stay attached. The IP address stays. You get a new password.', 'beltoft-services' ); ?></p>
+				<?php else : ?>
+					<p class="description"><?php esc_html_e( 'Reinstalling erases everything on the server and installs the system again. The IP address stays. You get a new password.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
 				<?php if ( $os_options ) : ?>
 					<p>
 						<label for="beltoft-vm-os"><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></label>
@@ -264,6 +267,6 @@ $beltoft_services_power_labels = array(
 				</p>
 				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
 			</form>
-		</details><?php endif; ?>
+		</details>
 	<?php endif; ?>
 </div>

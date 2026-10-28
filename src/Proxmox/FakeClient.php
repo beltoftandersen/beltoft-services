@@ -403,6 +403,7 @@ class FakeClient implements Client {
 			'description' => array( 'string', false, array( 'max' => 8192 ) ),
 			'digest'     => array( 'string', false, array( 'max' => 40 ) ),
 			'delete'     => array( 'string' ),
+			'boot'       => array( 'string' ),
 		);
 		foreach ( range( 0, 30 ) as $number ) {
 			$cfg[ 'scsi' . $number ] = array( 'string' );
@@ -845,6 +846,14 @@ class FakeClient implements Client {
 			if ( in_array( $key, array( 'digest', 'delete' ), true ) || in_array( $key, self::SENSITIVE, true ) ) {
 				continue;
 			}
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) && false !== strpos( $value, 'import-from=' ) ) {
+				// Importing a template volume into a free slot allocates a new volume (modelled on PVE 9.1.6).
+				$value = $this->import_drive( $id, $key, $value );
+
+				if ( is_wp_error( $value ) ) {
+					return $value;
+				}
+			}
 			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) && false === strpos( $value, 'size=' ) ) {
 				$volid = explode( ',', $value )[0];
 				foreach ( $this->state['images'] as $images ) {
@@ -868,6 +877,82 @@ class FakeClient implements Client {
 		}
 
 		return true;
+	}
+
+	/**
+	 * `<storage>:0,import-from=<volid>` into a free slot: a new volume vm-<vmid>-disk-<n>.raw (the first free n)
+	 * in the storage, the size of the source; the config value is the new volume with the other options.
+	 * The slot must be empty (the old drive was detached and its unused volume deleted first).
+	 *
+	 * @param int    $id    VMID.
+	 * @param string $slot  Drive key.
+	 * @param string $value Drive string.
+	 * @return string|\WP_Error The config value.
+	 */
+	private function import_drive( int $id, string $slot, string $value ) {
+		$parts  = explode( ',', $value );
+		$target = array_shift( $parts );
+		$source = '';
+		$rest   = array();
+
+		foreach ( $parts as $part ) {
+			if ( 0 === strpos( $part, 'import-from=' ) ) {
+				$source = substr( $part, 12 );
+			} else {
+				$rest[] = $part;
+			}
+		}
+
+		if ( 1 !== preg_match( '/^([A-Za-z0-9._\-]+):0$/', $target, $m ) ) {
+			return $this->error( 400, 'Parameter verification failed: ' . $slot . ': invalid format' );
+		}
+
+		if ( isset( $this->state['vms'][ $id ]['config'][ $slot ] ) ) {
+			return $this->error( 500, "drive '" . $slot . "' already exists" );
+		}
+
+		$gb = null;
+
+		foreach ( $this->state['images'] as $images ) {
+			if ( isset( $images[ $source ] ) ) {
+				$gb = (int) ( $images[ $source ]['size'] / 1073741824 );
+			}
+		}
+
+		foreach ( $this->state['vms'] as $vm ) {
+			foreach ( $vm['config'] as $drive ) {
+				if ( is_string( $drive ) && explode( ',', $drive )[0] === $source && 1 === preg_match( '/(?:^|,)size=(\d+)G/', $drive, $size ) ) {
+					$gb = (int) $size[1];
+				}
+			}
+		}
+
+		if ( null === $gb ) {
+			return $this->error( 500, 'unable to find the volume ' . $source . ' to import' );
+		}
+
+		for ( $n = 0;; $n++ ) {
+			$volid = $m[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.raw';
+			$taken = isset( $this->state['images'][ $m[1] ][ $volid ] );
+
+			foreach ( $this->state['vms'][ $id ]['config'] as $drive ) {
+				$taken = $taken || ( is_string( $drive ) && explode( ',', $drive )[0] === $volid );
+			}
+
+			if ( ! $taken ) {
+				break;
+			}
+		}
+
+		$this->state['images'][ $m[1] ][ $volid ] = array(
+			'volid'   => $volid,
+			'vmid'    => $id,
+			'format'  => 'raw',
+			'size'    => $gb * 1073741824,
+			'content' => 'images',
+		);
+
+		return implode( ',', array_merge( array( $volid ), $rest, array( 'size=' . $gb . 'G' ) ) );
 	}
 
 	/**

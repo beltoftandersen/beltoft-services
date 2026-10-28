@@ -147,12 +147,42 @@ final class DiskSteps {
 
 	/** The config entry that refers to this resource's named volume, or null. */
 	private function attached( array $config, string $volid ): ?array {
+		return self::holds( $config, $volid );
+	}
+
+	/** The scsi1..30 entry of a VM configuration that refers to a volume, or null. */
+	public static function holds( array $config, string $volid ): ?array {
 		foreach ( $config as $slot => $value ) {
 			if ( preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', (string) $slot ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
 				return array( 'slot' => $slot, 'value' => $value );
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * The extra disks of a server and where their volumes belong: disk resource id, slot and volume id.
+	 * With $attached_only only the disks that must be attached to the running VM (ready, verified, not detached by the policy, not adopted).
+	 *
+	 * @param Resource $server        Server resource.
+	 * @param string   $storage       Storage of the cluster.
+	 * @param int      $vmid          VMID of the server.
+	 * @param bool     $attached_only Only the disks that should be attached now.
+	 * @return array<int, array{id: int, slot: string, volid: string}>
+	 */
+	public static function volumes( Resource $server, string $storage, int $vmid, bool $attached_only ): array {
+		$out = array();
+		foreach ( DiskMeta::for_server( $server ) as $disk ) {
+			$volname = (string) $disk->get( 'volname' );
+			if ( '' === $volname || 'deleted' === $disk->get( 'state' ) ) {
+				continue;
+			}
+			if ( $attached_only && ( $disk->get( 'linked' ) || 'ready' !== $disk->get( 'state' ) || $disk->get( 'detached' ) || ! in_array( 'attach', (array) $disk->get( 'steps' ), true ) || ! in_array( 'verify', (array) $disk->get( 'steps' ), true ) ) ) {
+				continue;
+			}
+			$out[] = array( 'id' => $disk->id(), 'slot' => (string) $disk->get( 'slot' ), 'volid' => $storage . ':' . $vmid . '/' . $volname );
+		}
+		return $out;
 	}
 
 	public function provision(): StepResult {

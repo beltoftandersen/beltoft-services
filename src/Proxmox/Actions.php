@@ -143,7 +143,6 @@ final class Actions {
 		if ( true === $r->get( 'linked' ) ) {
 			return $out;
 		}
-		$has_disks = (bool) DiskMeta::for_server( $r );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -151,9 +150,7 @@ final class Actions {
 		}
 
 		$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
-		if ( ! $has_disks ) {
-			$out['reinstall'] = __( 'Reinstall', 'beltoft-services' );
-		}
+		$out['reinstall']       = __( 'Reinstall', 'beltoft-services' );
 
 		return $out;
 	}
@@ -201,17 +198,19 @@ final class Actions {
 	 * disk that failed, is being deleted or is otherwise not a ready drive needs support. A forced restore may
 	 * not be started over either, because their volumes are not known to survive it.
 	 *
-	 * @param Resource $r Server resource.
+	 * @param Resource $r      Server resource.
+	 * @param string   $action restore or reinstall: names the action in the text.
 	 */
-	public static function disk_block( Resource $r ): ?string {
+	public static function disk_block( Resource $r, string $action = 'restore' ): ?string {
 		$attention = false;
 		$policy    = false;
 
 		foreach ( DiskMeta::for_server( $r ) as $disk ) {
-			if ( $disk->get( 'linked' ) || ! in_array( 'attach', (array) $disk->get( 'steps' ), true ) ) {
+			$state = $disk->get( 'state' );
+
+			if ( 'deleted' === $state || $disk->get( 'linked' ) || ! in_array( 'attach', (array) $disk->get( 'steps' ), true ) ) {
 				continue;
 			}
-			$state = $disk->get( 'state' );
 
 			if ( 'paused' === $state || ( 'ready' === $state && $disk->get( 'detached' ) ) ) {
 				$policy = true;
@@ -220,11 +219,34 @@ final class Actions {
 			}
 		}
 
+		if ( 'reinstall' === $action ) {
+			if ( $attention ) {
+				return __( 'An extra disk on this server needs attention from support before a reinstall. Contact support.', 'beltoft-services' );
+			}
+
+			return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Reinstall is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
+		}
+
 		if ( $attention ) {
 			return __( 'An extra disk on this server needs attention from support before a restore. Contact support.', 'beltoft-services' );
 		}
 
 		return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
+	}
+
+	/**
+	 * Does the server have an extra disk (one that is not deleted)? A reinstall then replaces only the boot disk.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function has_extra_disks( Resource $r ): bool {
+		foreach ( DiskMeta::for_server( $r ) as $disk ) {
+			if ( 'deleted' !== $disk->get( 'state' ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -236,8 +258,12 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
-		if ( 'reinstall' === $action && DiskMeta::for_server( $r ) ) {
-			return __( 'Remove the extra disks before reinstalling this server.', 'beltoft-services' );
+		if ( 'reinstall' === $action ) {
+			$block = self::disk_block( $r, 'reinstall' );
+
+			if ( null !== $block ) {
+				return $block;
+			}
 		}
 		if ( 'restore' === $action ) {
 			// A restore that has begun is finished whatever happens to a disk meanwhile: the server is off and must start.
@@ -688,9 +714,14 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	private function reinstall( array $record, array $args ): StepResult {
+		// A server with extra disks keeps its VM: only the boot disk is replaced (the VM and its address stay, clone is skipped).
+		$boot = self::has_extra_disks( $this->r );
 		$meta = array(
-			'wipe'              => true,
-			'steps'             => array_values( array_intersect( (array) $this->r->get( 'steps' ), array( 'ip', 'vmid' ) ) ),
+			'wipe'              => $boot ? 'boot' : true,
+			'wipe_old_boot'     => null,
+			'wipe_boot_phase'   => null,
+			'disks_check'       => null,
+			'steps'             => array_values( array_intersect( (array) $this->r->get( 'steps' ), $boot ? array( 'ip', 'vmid', 'clone' ) : array( 'ip', 'vmid' ) ) ),
 			'task'              => null,
 			'agent'             => null,
 			'configured'        => array(),

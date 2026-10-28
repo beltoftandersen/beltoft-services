@@ -40,6 +40,11 @@ final class Provision {
 	 */
 	public const LOGIN_USER = 'root';
 
+	/**
+	 * Recorded as the old boot volume when the VM had no boot drive.
+	 */
+	private const NO_BOOT = '-';
+
 	use Steps;
 
 	/**
@@ -252,6 +257,10 @@ final class Provision {
 	private function step_wipe() {
 		$record = VmRecords::for_resource( $this->r->id() );
 
+		if ( 'boot' === $this->r->get( 'wipe' ) ) {
+			return $this->step_wipe_boot( $record );
+		}
+
 		for ( $round = 0; $round < 4; $round++ ) {
 			if ( null === $record ) {
 				return $this->wiped(); // Nothing was ever built.
@@ -307,6 +316,227 @@ final class Provision {
 		}
 
 		return StepResult::retry( 0, 'wipe: the VM did not reach the wanted state' );
+	}
+
+	/**
+	 * Step 0 of a reinstall of a server that has extra disks: replace only the boot disk of the existing VM.
+	 * Stop; detach the boot drive (it becomes unusedN); delete exactly that old volume; import the template's boot
+	 * volume into the boot slot. Every round reads the VM and decides from what is there, so a crash or a retry
+	 * never imports twice and never deletes the new boot disk. Only the boot slot and the one unusedN entry that
+	 * holds the recorded old boot volume (meta `wipe_old_boot`, matched by volume id) are ever written; meta
+	 * `wipe_boot_phase` = import marks that the old volume is gone, because the new volume may get the old name. The extra
+	 * disks, their slots and every other unusedN entry are left alone.
+	 *
+	 * @param array<string, mixed>|null $record VM record.
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_wipe_boot( ?array $record ) {
+		if ( null === $record ) {
+			return StepResult::fail( 'wipe: no VM is recorded for this service; the extra disks were not touched' );
+		}
+
+		$boot = (string) $this->cluster['boot_disk'];
+
+		if ( 1 !== preg_match( '/^(?:scsi|virtio|sata|ide)\\d+$/', $boot ) ) {
+			return StepResult::fail( 'wipe: the cluster boot disk "' . mb_substr( sanitize_text_field( $boot ), 0, 20 ) . '" is not a drive name' );
+		}
+
+		$extra = DiskSteps::volumes( $this->r, (string) $this->cluster['storage'], (int) $record['vmid'], false );
+
+		foreach ( $extra as $disk ) {
+			if ( $disk['slot'] === $boot ) {
+				return StepResult::fail( 'wipe: an extra disk uses the boot slot ' . $boot . '; nothing was changed' );
+			}
+		}
+
+		$extra_ids = array_column( $extra, 'volid' );
+
+		for ( $round = 0; $round < 8; $round++ ) {
+			$v = Ownership::verify( $this->client, $record, $this->r );
+
+			if ( is_wp_error( $v ) ) {
+				return $this->refuse_or_retry( $v, 'wipe' );
+			}
+
+			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
+
+			if ( 'running' === $v['status'] ) {
+				$phase = ( $this->finished && 'wipe' === $this->finished['step'] && 'shutdown' === $this->finished['phase'] ) ? 'stop' : 'shutdown';
+				$call  = 'shutdown' === $phase
+					? array( $base . '/status/shutdown', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ) )
+					: array( $base . '/status/stop', array() );
+				$done  = $this->run_task( 'wipe', 'POST', $call[0], $call[1], $phase );
+
+				if ( $done instanceof StepResult ) {
+					return $done;
+				}
+
+				$this->finished = array(
+					'step'  => 'wipe',
+					'phase' => $phase,
+					'ok'    => true === $done,
+					'exit'  => true === $done ? 'OK' : (string) $done['failed'],
+				);
+				continue;
+			}
+
+			if ( '' !== $v['lock'] ) {
+				return StepResult::retry( 0, 'wipe: the VM is locked (' . sanitize_key( $v['lock'] ) . ')' );
+			}
+
+			$config = $v['config'];
+			$drive  = isset( $config[ $boot ] ) && is_string( $config[ $boot ] ) ? $config[ $boot ] : '';
+			$volid  = '' === $drive ? '' : explode( ',', $drive, 2 )[0];
+			$old    = (string) $this->r->get( 'wipe_old_boot' );
+
+			// The old boot volume is written down before anything is detached: it is the only volume this step may destroy.
+			if ( '' === $old ) {
+				if ( '' !== $volid && in_array( $volid, $extra_ids, true ) ) {
+					return StepResult::fail( 'wipe: the boot slot holds an extra disk volume; nothing was changed' );
+				}
+
+				$old = '' === $volid ? self::NO_BOOT : $volid;
+
+				if ( ! $this->r->set( array( 'wipe_old_boot' => $old ) ) ) {
+					return StepResult::retry( 0, 'wipe: the old boot volume could not be recorded' );
+				}
+			}
+
+			$path   = $base . '/config';
+			$digest = (string) ( $config['digest'] ?? '' );
+			$phase  = (string) $this->r->get( 'wipe_boot_phase' );
+
+			// Once the old volume is gone and the import is under way, whatever the boot slot holds is the new boot disk
+			// (it may even carry the old name): it is never detached again.
+			if ( 'import' === $phase ) {
+				if ( '' !== $volid ) {
+					return $this->wiped_boot();
+				}
+			} elseif ( '' !== $volid && $volid !== $old ) {
+				return StepResult::fail( 'wipe: the boot slot holds a volume that is not the recorded old boot volume; nothing was changed' );
+			} elseif ( '' !== $volid ) {
+				$answer = $this->client->request( 'PUT', $path, array( 'delete' => $boot, 'digest' => $digest ) );
+
+				if ( is_wp_error( $answer ) ) {
+					return $this->classify( $answer, 'wipe' );
+				}
+
+				continue;
+			} else {
+				$unused = '';
+
+				foreach ( self::NO_BOOT === $old ? array() : $config as $key => $value ) {
+					if ( 1 === preg_match( '/^unused\d+$/', (string) $key ) && is_string( $value ) && explode( ',', $value, 2 )[0] === $old ) {
+						$unused = (string) $key;
+						break;
+					}
+				}
+
+				if ( '' !== $unused ) {
+					$answer = $this->client->request( 'PUT', $path, array( 'delete' => $unused, 'digest' => $digest ) );
+
+					if ( is_wp_error( $answer ) ) {
+						return $this->classify( $answer, 'wipe' );
+					}
+
+					continue;
+				}
+
+				// The old volume is gone: written down before the import, so a retry never mistakes the new disk for the old one.
+				if ( ! $this->r->set( array( 'wipe_boot_phase' => 'import' ) ) ) {
+					return StepResult::retry( 0, 'wipe: the import phase could not be recorded' );
+				}
+			}
+
+			$source = $this->template_boot_volume( $boot );
+
+			if ( $source instanceof StepResult ) {
+				return $source;
+			}
+
+			$done = $this->run_task(
+				'wipe',
+				'POST',
+				$path,
+				array(
+					$boot    => $this->cluster['storage'] . ':0,import-from=' . $source,
+					'boot'   => 'order=' . $boot,
+					'digest' => $digest,
+				),
+				'import'
+			);
+
+			if ( $done instanceof StepResult ) {
+				return $done;
+			}
+
+			$this->finished = array(
+				'step'  => 'wipe',
+				'phase' => 'import',
+				'ok'    => true === $done,
+				'exit'  => true === $done ? 'OK' : (string) $done['failed'],
+			);
+
+			// Whatever the exit status said, the boot slot decides on the next round; a plain failure is tried again later.
+			if ( true !== $done && 0 !== strpos( (string) $done['failed'], 'WARNINGS' ) ) {
+				return StepResult::retry( 0, 'wipe: the boot disk import failed (' . $done['failed'] . ')' );
+			}
+		}
+
+		return StepResult::retry( 0, 'wipe: the boot disk did not reach the wanted state' );
+	}
+
+	/**
+	 * The volume the template boots from, for import-from.
+	 *
+	 * @param string $boot Boot drive key.
+	 * @return string|StepResult
+	 */
+	private function template_boot_volume( string $boot ) {
+		$list = Ownership::listing( $this->client );
+
+		if ( is_wp_error( $list ) ) {
+			return $this->classify( $list, 'wipe' );
+		}
+
+		$template = Ownership::entry( $list, $this->plan['template'] );
+
+		if ( null === $template || empty( $template['template'] ) || '' === (string) ( $template['node'] ?? '' ) ) {
+			return StepResult::fail( sprintf( 'wipe: VMID %d is not a template on this cluster; the boot disk was not replaced', $this->plan['template'] ) );
+		}
+
+		$config = $this->client->request( 'GET', '/nodes/' . rawurlencode( (string) $template['node'] ) . '/qemu/' . $this->plan['template'] . '/config' );
+
+		if ( is_wp_error( $config ) ) {
+			return $this->classify( $config, 'wipe' );
+		}
+
+		$drive = is_array( $config ) && isset( $config[ $boot ] ) && is_string( $config[ $boot ] ) ? explode( ',', $config[ $boot ], 2 )[0] : '';
+
+		if ( 1 !== preg_match( '#^[A-Za-z0-9._\\-]+:[A-Za-z0-9._\\-/]+$#', $drive ) ) {
+			return StepResult::fail( sprintf( 'wipe: template %1$d has no boot disk %2$s to import', $this->plan['template'], $boot ) );
+		}
+
+		return $drive;
+	}
+
+	/**
+	 * The boot disk was replaced: the VM exists, so clone is skipped; configure, start and ready run as usual
+	 * and ready checks that every extra disk is still in its slot.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function wiped_boot(): array {
+		return array(
+			'wipe'            => null,
+			'wipe_old_boot'   => null,
+			'wipe_boot_phase' => null,
+			'disks_check'     => true,
+			'task'            => null,
+			'agent'           => null,
+			'configured'      => array(),
+			'steps'           => array_values( array_intersect( (array) $this->r->get( 'steps' ), array( 'ip', 'vmid', 'clone' ) ) ),
+		);
 	}
 
 	/**
@@ -976,17 +1206,58 @@ final class Provision {
 			return StepResult::retry( 0, 'ready: the address could not be recorded as in use' );
 		}
 
+		$checked = $this->check_extra_disks( $record );
+
+		if ( $checked instanceof StepResult ) {
+			return $checked;
+		}
+
 		return array(
-			'ip'     => $ip['address'],
-			'node'   => $record['node'],
-			'vmid'   => $record['vmid'],
-			'vm'     => array(
+			'disks_check' => null,
+			'ip'          => $ip['address'],
+			'node'        => $record['node'],
+			'vmid'        => $record['vmid'],
+			'vm'          => array(
 				'cluster' => $record['cluster'],
 				'vmid'    => $record['vmid'],
 				'node'    => $record['node'],
 			),
-			'task'   => null,
+			'task'        => null,
 		);
+	}
+
+	/**
+	 * After a boot disk replacement: every extra disk that should be attached still is, in its own slot. One
+	 * admin alert when not; nothing is changed automatically.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 */
+	private function check_extra_disks( array $record ): ?StepResult {
+		if ( ! $this->r->get( 'disks_check' ) ) {
+			return null;
+		}
+
+		$v = $this->verified( $record, 'ready' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		$lost = array();
+
+		foreach ( DiskSteps::volumes( $this->r, (string) $this->cluster['storage'], (int) $record['vmid'], true ) as $disk ) {
+			$held = DiskSteps::holds( $v['config'], $disk['volid'] );
+
+			if ( null === $held || $held['slot'] !== $disk['slot'] ) {
+				$lost[] = '#' . $disk['id'] . ' (' . $disk['slot'] . ')';
+			}
+		}
+
+		if ( array() !== $lost ) {
+			Alerts::admin( $this->r, 'After the reinstall these extra disks are not attached in their slot: ' . implode( ', ', $lost ) . '. Nothing was changed automatically; check the server configuration.' );
+		}
+
+		return null;
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------

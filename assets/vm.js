@@ -70,7 +70,7 @@
 			}
 		} );
 
-		if ( 'reinstall' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.reinstall ) ) {
+		if ( 'reinstall' === form.getAttribute( 'data-action' ) && ! window.confirm( form.hasAttribute( 'data-disks' ) ? vm.strings.reinstallDisks : vm.strings.reinstall ) ) {
 			return;
 		}
 

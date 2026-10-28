@@ -65,6 +65,7 @@ final class Panels {
 					'tooMany'   => __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ),
 					'gone'      => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),
 					'reinstall' => __( 'Reinstalling erases everything on the server. Continue?', 'beltoft-services' ),
+					'reinstallDisks' => __( 'Reinstalling erases the server\'s main disk. Extra disks are kept with their data and stay attached. Continue?', 'beltoft-services' ),
 					'restoreDisks' => __( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', 'beltoft-services' ),
 					'restore'   => __( 'Restoring replaces everything on the server with this backup, and the password and SSH key go back to the backup\'s. Continue?', 'beltoft-services' ),
 				),

@@ -243,15 +243,13 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertCount( 1, $this->calls( 'POST', '/storage/disk-store/content' ), 'A verified disk is not provisioned again.' );
 	}
 
-	public function test_extra_disk_blocks_reinstall_but_not_restore_before_a_remote_call(): void {
+	public function test_extra_disk_blocks_neither_reinstall_nor_restore_while_it_is_healthy(): void {
 		$server = $this->ready_vm();
 		$disk = $this->disk_for( $server );
 		Jobs::run( $disk->id() );
-		$this->assertNotContains( 'reinstall', array_keys( Actions::offered( $server ) ) );
+		$this->assertContains( 'reinstall', array_keys( Actions::offered( $server ) ) );
 		$this->assertContains( 'restore', array_keys( Actions::offered( $server ) ) );
-		$this->assertSame( 'Remove the extra disks before reinstalling this server.', Actions::check( $server, 'reinstall', array( 'confirm' => 'REINSTALL' ) ) );
-		$volid = 'backup-store:backup/vm/5000/x';
-		$this->assertNotSame( 'Remove the extra disks before reinstalling this server.', (string) Actions::check( $server, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) ) );
+		$this->assertNull( Actions::check( $server, 'reinstall', array( 'confirm' => 'REINSTALL' ) ) );
 	}
 
 	public function test_account_panel_reports_disk_and_deletion_setting(): void {
@@ -265,7 +263,7 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertStringContainsString( 'Disks', $html );
 		$this->assertStringContainsString( 'scsi1: 50 GB', $html );
 		$this->assertStringContainsString( 'The disk is detached from your server and its data is kept until we remove the disk.', $html );
-		$this->assertStringNotContainsString( 'data-action="reinstall"', $html );
+		$this->assertStringContainsString( 'data-action="reinstall" data-disks="1"', $html );
 		$this->assertStringNotContainsString( 'data-action="restore"', $html );
 	}
 
