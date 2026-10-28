@@ -240,11 +240,46 @@ class DnsDriverTest extends TestCase {
 		$this->assertSame( 'active', DnsAssignments::get( 'keep-example.net' )['status'] );
 	}
 
-	public function test_an_existing_zone_of_the_verified_customer_is_adopted(): void {
+	public function test_an_existing_zone_goes_to_staff_review_and_its_records_are_untouched(): void {
 		$dns = $this->fakes();
-		$r = $this->resource( 'prezone-example.net', self::factory()->user->create() );
+		$draft = array( array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) );
+		$r = $this->resource( 'prezone-example.net', self::factory()->user->create(), 'dns', array( 'draft' => $draft ) );
 		$dns->create_zone( 'prezone-example.net', array( 'ns1.example.net', 'ns2.example.net' ) );
-		$this->assertTrue( ( new DnsDriver() )->provision( $r )->is_done() );
-		$this->assertCount( 1, array_filter( $dns->calls(), static fn( $call ) => 'create_zone' === $call[0] ) );
+		$dns->replace_rrsets( 'prezone-example.net', array( array( 'name' => 'old.prezone-example.net.', 'type' => 'A', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '192.0.2.99', 'disabled' => false ) ) ) ) );
+		$result = ( new DnsDriver() )->provision( $r );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertSame( 'An existing zone needs staff review.', $result->error() );
+		$this->assertCount( 1, $dns->zone( 'prezone-example.net' )['rrsets'] );
+		$this->assertSame( '192.0.2.99', $dns->zone( 'prezone-example.net' )['rrsets'][0]['records'][0]['content'] );
+	}
+
+	public function test_pause_and_resume_leave_a_zone_alone_that_another_service_holds(): void {
+		$dns = $this->fakes();
+		$user = self::factory()->user->create();
+		$first = $this->resource( 'shared-example.net', $user, 'dns', array( 'draft' => array( array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$driver = new DnsDriver();
+		$this->assertTrue( $driver->provision( $first )->is_done() );
+		// A second DNS service of the same customer (owner "dns"), without the row.
+		$second = $this->resource( 'shared-example.net', $user, 'dns', array( 'claim' => false ) );
+		$before = count( $dns->calls() );
+		$this->assertSame( array(), $driver->pause( $second )->meta() );
+		$this->assertSame( array(), $driver->resume( $second )->meta() );
+		$this->assertCount( $before, $dns->calls() );
+		// A row moved to a domain resource: the DNS resource no longer holds it.
+		$domain = $this->resource( 'shared-example.net', $user, 'domain' );
+		DnsAssignments::move_to( 'shared-example.net', $user, (int) $domain->license()['id'], $domain->id() );
+		$this->assertSame( array(), $driver->pause( $first )->meta() );
+		$this->assertCount( $before, $dns->calls() );
+	}
+
+	public function test_pause_does_nothing_for_another_customers_name(): void {
+		$dns = $this->fakes();
+		$holder = $this->resource( 'foreign-example.net', self::factory()->user->create(), 'dns', array( 'draft' => array( array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$driver = new DnsDriver();
+		$this->assertTrue( $driver->provision( $holder )->is_done() );
+		$intruder = $this->resource( 'foreign-example.net', self::factory()->user->create(), 'dns', array( 'claim' => false ) );
+		$before = count( $dns->calls() );
+		$this->assertSame( array(), $driver->pause( $intruder )->meta() );
+		$this->assertCount( $before, $dns->calls() );
 	}
 }

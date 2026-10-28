@@ -27,6 +27,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		$steps = (array) $r->get( 'steps' );
 		if ( ! in_array( 'assignment', $steps, true ) ) {
 			$user = (int) ( $r->license()['user_id'] ?? 0 );
+			if ( ! DnsSchema::ready() ) { return StepResult::retry( 3600, 'DNS hosting storage is not ready.' ); }
 			if ( ! $this->holds_name( $r, $name, $user ) ) {
 				if ( ! $r->get( 'assignment_alerted' ) ) { Alerts::admin( $r, 'DNS hosting was ordered without a verified domain assignment.' ); }
 				return StepResult::fail( 'DNS hosting needs a verified domain.', array( 'assignment_alerted' => true ) );
@@ -44,7 +45,8 @@ final class DnsDriver implements Driver, StopsOnDelete {
 			if ( 'domain' === $owner ) { return StepResult::fail( 'This domain is already registered here.' ); }
 			$zone = Clients::dns()->zone( $name );
 			if ( is_wp_error( $zone ) ) { return StepResult::retry( 3600, 'DNS zone could not be checked.' ); }
-			// The assignment step proved this customer holds the name, so a zone that is already there is adopted.
+			// The assignment proves the customer holds the name, not who made a zone that is already there: staff look at it first.
+			if ( null !== $zone && ! $r->get( 'zone_claimed' ) ) { return StepResult::retry( 3600, 'An existing zone needs staff review.' ); }
 			$steps[] = 'claim';
 			if ( ! $r->set( array( 'steps' => $steps, 'zone_claimed' => true ) ) ) { return StepResult::retry( 3600, 'DNS claim could not be saved.' ); }
 		}
@@ -81,7 +83,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 	/** The claim is the customer's, for this domain, and the assignment is theirs and bound to this order or already active for this service. */
 	private function holds_name( Resource $r, string $name, int $user ): bool {
 		$claim_id = (int) $r->get( 'claim_id' );
-		if ( $claim_id <= 0 || $user <= 0 || ! DnsSchema::ready() ) { return false; }
+		if ( $claim_id <= 0 || $user <= 0 ) { return false; }
 		$claim = DnsClaims::get( $claim_id );
 		if ( ! $claim || (int) $claim['user_id'] !== $user || $claim['domain'] !== $name ) { return false; }
 		$row = DnsAssignments::get( $name );
@@ -90,9 +92,15 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		return 'reserved' === $row['status'] && (int) $row['order_id'] > 0 && (int) $row['order_id'] === (int) ( $r->license()['order_id'] ?? 0 );
 	}
 
+	/** This resource is the active holder of its name. Otherwise the zone is not its to change (another service of the same customer, a registered domain, or another customer). */
+	private function holds_row( Resource $r ): bool {
+		if ( ! DnsSchema::ready() ) { return false; }
+		$row = DnsAssignments::get( (string) $r->get( 'domain' ) );
+		return null !== $row && 'active' === $row['status'] && (int) $row['resource_id'] === $r->id() && (int) $row['user_id'] === (int) ( $r->license()['user_id'] ?? 0 );
+	}
+
 	public function pause( Resource $r ): StepResult {
-		// The same customer's registered domain owns the zone now: its records are live and stay so.
-		if ( 'domain' === Zone::owner( $r ) ) { return StepResult::done(); }
+		if ( ! $this->holds_row( $r ) || 'domain' === Zone::owner( $r ) ) { return StepResult::done(); }
 		$off = Records::set_disabled( (string) $r->get( 'domain' ), true );
 		if ( is_wp_error( $off ) ) {
 			if ( 'zone_missing' === $off->get_error_code() ) { return StepResult::done(); }
@@ -101,6 +109,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		return StepResult::done( array( 'records_off' => true ) );
 	}
 	public function resume( Resource $r ): StepResult {
+		if ( ! $this->holds_row( $r ) ) { return StepResult::done(); }
 		$on = Records::set_disabled( (string) $r->get( 'domain' ), false );
 		if ( is_wp_error( $on ) && 'zone_missing' !== $on->get_error_code() ) { return StepResult::retry( 3600, 'The DNS records could not be switched on.' ); }
 		return StepResult::done( array( 'records_off' => false ) );

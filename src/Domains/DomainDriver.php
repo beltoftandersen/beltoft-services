@@ -135,6 +135,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 				$adopted = $this->adopt( $r, $held, $user );
 				if ( ! $adopted ) { return StepResult::retry( 3600, 'The DNS hosting could not be handed over.' ); }
 			}
+			// The cancelled DNS-only service switched the records off; they are the domain's now and must answer.
+			if ( $r->get( 'adopt_enable' ) ) {
+				$on = Records::set_disabled( $name, false );
+				if ( is_wp_error( $on ) && 'zone_missing' !== $on->get_error_code() ) { return StepResult::retry( 3600, 'The DNS records could not be switched on.' ); }
+				$r->set( array( 'adopt_enable' => false ) );
+			}
 			$steps[] = 'zone';
 			if ( ! $r->set( array_merge( $zone->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
 		}
@@ -153,14 +159,23 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		return StepResult::done( array( 'steps' => $steps, 'remote_id' => $r->get( 'remote_id' ), 'expires_at' => $r->get( 'expires_at' ) ), 'Domain active' );
 	}
 
-	/** Moves the assignment to this domain resource and cancels the DNS-only subscription. Safe to repeat: the cancel comes first, so a failed move is retried with the old row still in place. */
+	/** Moves the assignment to this domain resource and ends the DNS-only subscription when it holds nothing else. The cancel comes first, so a failed move is retried with the old row still in place. */
 	private function adopt( Resource $r, array $held, int $user ): bool {
 		$old = Resource::find( (int) $held['resource_id'] );
 		if ( $old && 'dns' === $old->get( 'driver' ) && function_exists( 'wcs_get_subscription' ) ) {
 			$subscription = wcs_get_subscription( (int) ( $old->license()['subscription_id'] ?? 0 ) );
-			if ( $subscription && ! $subscription->has_status( 'cancelled' ) ) { $subscription->update_status( 'cancelled', 'Replaced by the domain registration.' ); }
+			if ( $subscription && ! $subscription->has_status( 'cancelled' ) ) {
+				if ( count( $subscription->get_items() ) <= 1 ) {
+					$subscription->update_status( 'cancelled', 'Replaced by the domain registration.' );
+				} else {
+					// Other DNS lines of this subscription may still be in use: leave it for staff.
+					$subscription->add_order_note( 'The domain ' . $held['domain'] . ' is now registered here. This subscription has other lines, so it was not cancelled.' );
+					Alerts::admin( $r, 'A DNS-only subscription with several lines was not cancelled after its domain was registered here: subscription ' . $subscription->get_id() . '.' );
+				}
+			}
 		}
-		return DnsAssignments::move_to( (string) $held['domain'], $user, (int) ( $r->license()['id'] ?? 0 ), $r->id() );
+		if ( ! DnsAssignments::move_to( (string) $held['domain'], $user, (int) ( $r->license()['id'] ?? 0 ), $r->id() ) ) { return false; }
+		return $r->set( array( 'adopt_enable' => true ) );
 	}
 
 	private function error( Resource $r, \WP_Error $error, array $steps ): StepResult {

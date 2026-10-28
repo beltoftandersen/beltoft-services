@@ -230,4 +230,60 @@ class DomainDriverTest extends TestCase {
 		$this->assertFalse( $result->is_done() );
 		$this->assertNull( ( new FakeDns() )->zone( $name ) );
 	}
+
+	/** A DNS-only service for the domain's customer: subscription with $lines lines, resource, assignment (active). */
+	private function dns_only( Resource $r, string $name, int $lines = 1 ): array {
+		$user = (int) $r->license()['user_id'];
+		$sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1, 'status' => 'active' ) );
+		for ( $i = 0; $i < $lines; $i++ ) { $sub->add_product( $this->service_product( 'dns' ), 1 ); }
+		$sub->save();
+		$license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
+		$claim = DnsClaims::create( $user, $name );
+		$this->assertTrue( DnsAssignments::reserve( $user, $claim['id'], $name ) );
+		$old = Resource::create( $license, new DnsDriver(), array(), array( 'domain' => $name, 'mode' => 'dns', 'claim_id' => $claim['id'] ) );
+		DnsAssignments::bind_order( $name, $user, 1, 1 );
+		DnsAssignments::activate( $name, $user, (int) $license['id'], $old->id() );
+		return array( $sub, $old );
+	}
+
+	public function test_adoption_switches_records_back_on_after_the_dns_only_pause(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$name = 'reenable-' . wp_generate_password( 6, false, false ) . '.com';
+		$r = $this->resource( 'register', $name );
+		list( $sub, $old ) = $this->dns_only( $r, $name );
+		$dns->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) );
+		$dns->replace_rrsets( $name, array( array( 'name' => $name . '.', 'type' => 'A', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '192.0.2.10', 'disabled' => true ) ) ) ) );
+		$old->set( array( 'zone_claimed' => true, 'records_off' => true ) );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertFalse( $dns->zone( $name )['rrsets'][0]['records'][0]['disabled'] );
+		$this->assertFalse( (bool) Resource::find( $r->id() )->get( 'adopt_enable' ) );
+	}
+
+	public function test_a_subscription_with_two_lines_is_not_cancelled_but_the_row_moves(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$name = 'twolines-' . wp_generate_password( 6, false, false ) . '.com';
+		$r = $this->resource( 'register', $name );
+		list( $sub ) = $this->dns_only( $r, $name, 2 );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status() );
+		$this->assertSame( $r->id(), (int) DnsAssignments::get( $name )['resource_id'] );
+		$notes = array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) );
+		$this->assertNotEmpty( array_filter( $notes, static fn( $n ) => str_contains( $n, 'other lines' ) ) );
+	}
 }
