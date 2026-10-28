@@ -2,6 +2,8 @@
 /** Openprovider HTTP client. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Crypto;
+
 defined( 'ABSPATH' ) || exit;
 
 class LiveClient implements Client {
@@ -64,8 +66,10 @@ class LiveClient implements Client {
 
 	private function token(): string|\WP_Error {
 		$key = self::token_key( $this->mode, $this->username );
+		// The login token is a credential: it is kept encrypted, and not at all when there is no key to encrypt it with.
 		$cached = get_transient( $key );
-		if ( is_string( $cached ) && '' !== $cached ) { return $cached; }
+		$plain  = is_string( $cached ) && '' !== $cached ? Crypto::decrypt( $cached ) : null;
+		if ( is_string( $plain ) && '' !== $plain ) { return $plain; }
 		if ( '' === $this->username || '' === $this->password ) {
 			return new \WP_Error( 'credentials_missing', 'Registrar credentials are not configured.' );
 		}
@@ -75,7 +79,7 @@ class LiveClient implements Client {
 		if ( ! is_string( $token ) || '' === $token ) {
 			return new \WP_Error( 'bad_response', 'Registrar login returned no token.' );
 		}
-		set_transient( $key, $token, 47 * HOUR_IN_SECONDS );
+		if ( Crypto::available() ) { set_transient( $key, Crypto::encrypt( $token ), 47 * HOUR_IN_SECONDS ); }
 		return $token;
 	}
 

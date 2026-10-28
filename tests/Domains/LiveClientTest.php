@@ -6,6 +6,26 @@ use BeltoftServices\Domains\LiveClient;
 use BeltoftServices\Tests\TestCase;
 
 class LiveClientTest extends TestCase {
+	public function set_up(): void {
+		parent::set_up();
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 'k', 32 ) ) );
+		delete_transient( LiveClient::token_key( 'sandbox', 'u' ) );
+	}
+
+	public function test_the_login_token_is_kept_encrypted_and_not_at_all_without_a_key(): void {
+		$client = new LiveClient( 'sandbox', 'u', 'p' );
+		$this->respond_with( fn( $url ) => str_ends_with( $url, '/auth/login' ) ? $this->reply( array( 'data' => array( 'token' => 'token-secret-value' ) ) ) : $this->reply( array( 'data' => array( 'ok' => true ) ) ) );
+		$client->request( 'GET', '/domains' );
+		$stored = (string) get_transient( LiveClient::token_key( 'sandbox', 'u' ) );
+		$this->assertStringStartsWith( 'bs1:', $stored );
+		$this->assertStringNotContainsString( 'token-secret-value', $stored );
+		delete_transient( LiveClient::token_key( 'sandbox', 'u' ) );
+		remove_all_filters( 'beltoft_services_key' );
+		add_filter( 'beltoft_services_key', '__return_empty_string' );
+		$client->request( 'GET', '/domains' );
+		$this->assertFalse( get_transient( LiveClient::token_key( 'sandbox', 'u' ) ), 'Without a key the token is not cached.' );
+	}
+
 	private function reply( array $data, int $status = 200 ): array {
 		return array( 'headers' => array(), 'body' => wp_json_encode( $data ), 'response' => array( 'code' => $status, 'message' => '' ), 'cookies' => array(), 'filename' => null );
 	}
