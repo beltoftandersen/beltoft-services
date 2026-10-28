@@ -83,7 +83,9 @@ final class Search {
 		}
 
 		$reply = Clients::registrar()->request( 'POST', '/domains/check', array( 'domains' => $check, 'with_price' => false ) );
-		if ( ! is_wp_error( $reply ) && $ttl > 0 ) { set_transient( $key, $reply, $ttl ); }
+		// The registrar's own codes and explanations are for staff only: visitors get one generic answer.
+		if ( is_wp_error( $reply ) ) { return new \WP_Error( 'registrar_unavailable', __( 'Domain search is not available right now. Try again in a few minutes.', 'beltoft-services' ), array( 'status' => 503 ) ); }
+		if ( $ttl > 0 ) { set_transient( $key, $reply, $ttl ); }
 
 		return $reply;
 	}

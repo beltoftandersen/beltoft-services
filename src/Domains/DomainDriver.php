@@ -59,7 +59,9 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 				$full = $item['full_name'] ?? ( ( $item['domain']['name'] ?? '' ) . '.' . ( $item['domain']['extension'] ?? '' ) );
 				if ( strtolower( (string) $full ) === $name ) { $existing = $item; break; }
 			}
-			if ( $existing && isset( $existing['owner_handle'] ) && $existing['owner_handle'] !== $r->get( 'contact_handle' ) ) {
+			// Fail closed: a domain already in our account continues only when it names this order's registrant (a crash-resume).
+			if ( $existing && ( ! isset( $existing['owner_handle'] ) || ! is_string( $existing['owner_handle'] ) || '' === $existing['owner_handle'] || $existing['owner_handle'] !== $r->get( 'contact_handle' ) ) ) {
+				Alerts::admin( $r, 'This domain is held by a different registrant.' );
 				return StepResult::fail( 'This domain is held by a different registrant.' );
 			}
 			$ordered = $existing;
@@ -88,6 +90,9 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					if ( null === $auth || '' === $auth ) { return StepResult::fail( 'The transfer code is unavailable. Contact support.' ); }
 					$body['auth_code'] = $auth;
 				}
+				// Money is spent here: only when the paid line covers the registrar's cost. A resumed order (found above) never gets here.
+				$blocked = SpendGuard::guard( $r, $name, 'transfer' === $mode ? 'transfer' : 'create', SpendGuard::item_of_resource( $r ) );
+				if ( $blocked ) { return $blocked; }
 				$ordered = $client->request( 'POST', 'transfer' === $mode ? '/domains/transfer' : '/domains', $body );
 				if ( is_wp_error( $ordered ) ) { return $this->error( $r, $ordered, $steps ); }
 			}
@@ -201,7 +206,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->get( 'billing_alerted' ) ) { Alerts::admin( $r, 'The order has incomplete billing details; add them to the order.' ); }
 			return StepResult::retry( 3600, 'Waiting for complete billing details.', array( 'steps' => $steps, 'billing_alerted' => true ) );
 		}
-		if ( 'transport' === $code || 'bad_response' === $code || preg_match( '/^http_5/', $code ) ) { return StepResult::retry( 3600, 'The registrar is temporarily unavailable.', array( 'steps' => $steps ) ); }
+		if ( LiveClient::is_transient( $error ) ) { return StepResult::retry( 3600, 'The registrar is temporarily unavailable.', array( 'steps' => $steps ) ); }
 		$data = $error->get_error_data();
 		$desc = is_array( $data ) ? (string) ( $data['desc'] ?? '' ) : '';
 		$why  = $code . ( '' !== $desc ? ' (' . $desc . ')' : '' );

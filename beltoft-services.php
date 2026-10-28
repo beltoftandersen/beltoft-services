@@ -59,6 +59,7 @@ register_activation_hook( __FILE__, array( \BeltoftServices\Proxmox\ProxmoxJobs:
 // The sweep, the retention run and the usage check stop with the plugin; pending reconcile jobs keep their place.
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 'unschedule' ) );
+register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\Renewals::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Proxmox\ProxmoxJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Emails\Emails::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsClaimJobs::class, 'unschedule' ) );

@@ -14,20 +14,141 @@ use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
 class DomainDriverTest extends TestCase {
-	private function resource( string $mode = 'register', string $domain = 'example.com' ): Resource {
+	/** Registrar costs for the extensions these tests use; a row a test already stored keeps its own values. */
+	private function prices(): void {
+		$table = get_option( Prices::OPTION, array() );
+		$table = is_array( $table ) ? $table : array();
+		foreach ( array( 'com', 'dk', 'nl' ) as $tld ) {
+			$table[ $tld ] = ( $table[ $tld ] ?? array() ) + array( 'create' => 10.0, 'renew' => 10.0, 'transfer' => 9.0, 'restricted' => false, 'price' => 16 );
+		}
+		update_option( Prices::OPTION, $table );
+	}
+
+	private function resource( string $mode = 'register', string $domain = 'example.com', float $total = 50.0 ): Resource {
+		$this->prices();
 		if ( 'example.com' === $domain ) { $domain = 'example-' . wp_generate_password( 10, false, false ) . '.com'; }
 		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
 		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-test' ) );
 		$user = self::factory()->user->create();
 		update_user_meta( $user, '_beltoft_services_domain_handle', 'AA123-GB' );
 		$order = wc_create_order( array( 'customer_id' => $user ) );
+		$line = new \WC_Order_Item_Product();
+		$line->set_props( array( 'name' => 'Domain', 'quantity' => 1, 'subtotal' => $total, 'total' => $total ) );
+		$order->add_item( $line );
 		$order->save();
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
-		$meta = array( 'domain' => $domain, 'mode' => $mode );
+		$meta = array( 'domain' => $domain, 'mode' => $mode, 'order_item_id' => (int) $line->get_id() );
 		if ( 'transfer' === $mode ) { $meta['auth'] = Crypto::encrypt( 'transfer-secret' ); }
 		$r = Resource::create( $license, new DomainDriver(), array(), $meta );
 		$this->assertInstanceOf( Resource::class, $r );
 		return $r;
+	}
+
+	private function posts( FakeClient $fake ): int {
+		return count( array_filter( $fake->calls(), static fn( $call ) => 'POST' === $call['method'] ) );
+	}
+
+	public function test_a_free_order_places_no_registrar_order_and_alerts(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource( 'register', 'example.com', 0.0 );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_failed(), (string) $result->error() );
+		$this->assertSame( 'The order was paid below the registrar cost.', $result->error() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+		$this->assertNotSame( '', (string) $r->get( 'alerted' ) );
+	}
+
+	public function test_an_order_paid_exactly_the_registrar_cost_is_registered(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'REQ' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'REQ' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->assertTrue( ( new DomainDriver() )->provision( $this->resource( 'register', 'example.com', 10.0 ) )->is_retry() );
+		$this->assertSame( 1, $this->posts( $fake ) );
+	}
+
+	public function test_a_transfer_is_checked_against_the_transfer_cost_and_a_missing_cost_fails_closed(): void {
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains/transfer', array( 'id' => 124, 'status' => 'REQ' ) );
+		$fake->reply( 'GET', '/domains/124', array( 'id' => 124, 'status' => 'REQ' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->assertTrue( ( new DomainDriver() )->provision( $this->resource( 'transfer', 'example.com', 8.0 ) )->is_failed(), 'Below the transfer cost of 9.' );
+		$this->assertSame( 0, $this->posts( $fake ) );
+		$this->assertTrue( ( new DomainDriver() )->provision( $this->resource( 'transfer', 'example.com', 9.0 ) )->is_retry(), 'Exactly the cost passes.' );
+		$this->assertSame( 1, $this->posts( $fake ) );
+		// The extension is gone from the price table: cost unknown.
+		$r = $this->resource( 'register', 'gone-' . wp_generate_password( 6, false, false ) . '.xyz', 500.0 );
+		$this->assertTrue( ( new DomainDriver() )->provision( $r )->is_failed() );
+		$this->assertSame( 1, $this->posts( $fake ) );
+	}
+
+	public function test_a_resumed_order_is_not_blocked_by_the_spend_guard(): void {
+		$name = 'resume-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array( array( 'id' => 555, 'full_name' => $name, 'owner_handle' => 'AA123-GB' ) ) ) );
+		$fake->reply( 'GET', '/domains/555', array( 'id' => 555, 'status' => 'REQ' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$result = ( new DomainDriver() )->provision( $this->resource( 'register', $name, 0.0 ) );
+		$this->assertTrue( $result->is_retry(), $result->error() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+	}
+
+	public function test_a_domain_in_our_account_without_an_owner_or_with_another_owner_is_refused(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		foreach ( array( array(), array( 'owner_handle' => 'ZZ999-GB' ), array( 'owner_handle' => '' ) ) as $owner ) {
+			$name = 'held-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+			$fake = new FakeClient();
+			$fake->reply( 'GET', '/domains', array( 'results' => array( array( 'id' => 556, 'full_name' => $name ) + $owner ) ) );
+			remove_all_filters( 'beltoft_services_domains_client' );
+			add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+			$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+			$r = $this->resource( 'register', $name );
+			$result = ( new DomainDriver() )->provision( $r );
+			$this->assertTrue( $result->is_failed(), (string) $result->error() );
+			$this->assertSame( 'This domain is held by a different registrant.', $result->error() );
+			$this->assertNotSame( '', (string) $r->get( 'alerted' ) );
+			$this->assertSame( 0, $this->posts( $fake ) );
+		}
+	}
+
+	/** @return array<string, array{0:string,1:int,2:string}> */
+	public static function error_cases(): array {
+		return array(
+			'429 with a registrar code' => array( 'op_100', 429, 'retry' ),
+			'408 timeout'               => array( 'op_101', 408, 'retry' ),
+			'503 with a registrar code' => array( 'op_102', 503, 'retry' ),
+			'400 with a registrar code' => array( 'op_399', 400, 'fail' ),
+			'plain 502'                 => array( 'http_502', 502, 'retry' ),
+		);
+	}
+
+	/** @dataProvider error_cases */
+	public function test_registrar_errors_retry_only_when_temporary( string $code, int $status, string $expected ): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', new \WP_Error( $code, 'Registrar request failed.', array( 'status' => $status, 'desc' => 'x' ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$result = ( new DomainDriver() )->provision( $this->resource() );
+		$this->assertTrue( 'retry' === $expected ? $result->is_retry() : $result->is_failed() );
 	}
 
 	public function test_register_happy_path(): void {

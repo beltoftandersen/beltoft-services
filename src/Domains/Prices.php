@@ -39,6 +39,18 @@ final class Prices {
 		return null;
 	}
 
+	/** The registrar's cost for one action ('create', 'renew' or 'transfer') on a full domain, in EUR, or null if no price is stored. */
+	public static function cost( string $domain, string $key ): ?float {
+		$table = get_option( self::OPTION, array() );
+		if ( ! is_array( $table ) || ! in_array( $key, array( 'create', 'renew', 'transfer' ), true ) ) { return null; }
+		$tlds = array_keys( $table );
+		usort( $tlds, static fn( $a, $b ) => strlen( (string) $b ) <=> strlen( (string) $a ) );
+		foreach ( $tlds as $tld ) {
+			if ( str_ends_with( $domain, '.' . $tld ) ) { return is_array( $table[ $tld ] ) && isset( $table[ $tld ][ $key ] ) && is_numeric( $table[ $tld ][ $key ] ) ? (float) $table[ $tld ][ $key ] : null; }
+		}
+		return null;
+	}
+
 	public static function sellable( string $tld ): bool {
 		$tld = strtolower( ltrim( $tld, '.' ) );
 		$table = get_option( self::OPTION, array() );

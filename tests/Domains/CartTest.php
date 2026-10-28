@@ -132,4 +132,58 @@ class CartTest extends TestCase {
 		$this->assertSame( 'dns_verification_required', $other_way->get_error_code() );
 		WC()->cart->empty_cart();
 	}
+
+	private function cart_with( array $line, array $extra = array() ): void {
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		wc_clear_notices();
+		$product = $this->service_product( 'domain' );
+		WC()->cart->cart_contents = array( 'line' => array_merge( array( 'key' => 'line', 'product_id' => $product->get_id(), 'quantity' => 1, 'data' => $product, 'beltoft_services_domain' => $line ), $extra ) );
+	}
+
+	public function test_a_domain_line_whose_extension_left_the_price_table_is_blocked(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$this->cart_with( array( 'domain' => 'gone.xyz', 'mode' => 'register' ) );
+		Cart::check_unpriced_domain_items();
+		$notices = wc_get_notices( 'error' );
+		$this->assertCount( 1, $notices );
+		$this->assertSame( 'This domain extension is not offered any more. Remove it from your cart and search again.', wp_strip_all_tags( $notices[0]['notice'] ) );
+		$errors = new \WP_Error();
+		Cart::validate_unpriced_domain_checkout( array(), $errors );
+		$this->assertSame( 'domain_not_offered', $errors->get_error_code() );
+		wc_clear_notices();
+	}
+
+	public function test_priced_transfer_and_continuation_lines_are_not_blocked(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$this->cart_with( array( 'domain' => 'fine.com', 'mode' => 'transfer' ) );
+		Cart::check_unpriced_domain_items();
+		$this->assertSame( array(), wc_get_notices( 'error' ) );
+		$this->cart_with( array( 'domain' => 'gone.xyz', 'mode' => 'register' ), array( 'subscription_renewal' => true ) );
+		Cart::check_unpriced_domain_items();
+		$errors = new \WP_Error();
+		Cart::validate_unpriced_domain_checkout( array(), $errors );
+		$this->assertSame( array(), wc_get_notices( 'error' ) );
+		$this->assertFalse( $errors->has_errors() );
+		WC()->cart->empty_cart();
+	}
+
+	public function test_a_registrar_error_on_the_cart_route_is_generic(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$fake = new \BeltoftServices\Domains\FakeClient();
+		$fake->reply( 'POST', '/domains/check', new \WP_Error( 'op_399', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'secret registrar detail' ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->service_product( 'domain' );
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		$result = Cart::rest_add( $this->add_request( 'generic-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com', 'register' ) );
+		$this->assertWPError( $result );
+		$this->assertSame( 'registrar_unavailable', $result->get_error_code() );
+		$this->assertSame( 'This domain cannot be added right now. Try again in a few minutes.', $result->get_error_message() );
+		$this->assertSame( array( 'status' => 503 ), $result->get_error_data() );
+		$json = wp_json_encode( rest_convert_error_to_response( $result )->get_data() );
+		$this->assertStringNotContainsString( 'op_', $json );
+		$this->assertStringNotContainsString( 'secret', $json );
+		$this->assertStringNotContainsString( 'desc', $json );
+	}
 }

@@ -18,6 +18,8 @@ final class Cart {
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unverified_dns_items' ) );
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unpriced_domain_items' ) );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_unpriced_domain_checkout' ), 10, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_dns_checkout' ), 10, 2 );
 		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'bind_dns_claims' ) );
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( __CLASS__, 'bind_dns_claims' ) );
@@ -65,7 +67,10 @@ final class Cart {
 		if ( ! $product ) { return new \WP_Error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		if ( 'register' === $mode || 'transfer' === $mode ) {
 			$search = Search::find( $data['beltoft_services_domain']['domain'], true );
-			if ( is_wp_error( $search ) ) { return $search; }
+			if ( is_wp_error( $search ) ) {
+				// Only the plugin's own answers pass; the registrar's errors become one generic text.
+				return 'registrar_unavailable' === $search->get_error_code() ? new \WP_Error( 'registrar_unavailable', __( 'This domain cannot be added right now. Try again in a few minutes.', 'beltoft-services' ), array( 'status' => 503 ) ) : $search;
+			}
 			$status = $search['results'][0]['status'] ?? 'not_sold';
 			if ( ( 'register' === $mode && 'free' !== $status ) || ( 'transfer' === $mode && 'taken' !== $status ) ) {
 				$message = 'transfer' === $mode
@@ -160,6 +165,34 @@ final class Cart {
 			$ok = self::dns_claim_ok( $item, get_current_user_id() );
 			if ( is_wp_error( $ok ) ) {
 				$errors->add( 'dns_claim_expired', $ok->get_error_message() );
+				return;
+			}
+		}
+	}
+
+	/** Is a new registration or transfer line for an extension that is no longer in the price table? Such a line would keep the product's base price. */
+	private static function is_unpriced_domain_line( array $item ): bool {
+		$mode = $item['beltoft_services_domain']['mode'] ?? '';
+		return in_array( $mode, array( 'register', 'transfer' ), true ) && ! self::is_continuation( $item ) && null === self::price_for( $item );
+	}
+
+	/** Stop registration and transfer lines without a sellable price from reaching checkout. */
+	public static function check_unpriced_domain_items(): void {
+		if ( ! WC()->cart ) { return; }
+		foreach ( WC()->cart->get_cart() as $item ) {
+			if ( self::is_unpriced_domain_line( $item ) ) {
+				wc_add_notice( __( 'This domain extension is not offered any more. Remove it from your cart and search again.', 'beltoft-services' ), 'error' );
+				return;
+			}
+		}
+	}
+
+	/** The same rule when the classic checkout form is posted. */
+	public static function validate_unpriced_domain_checkout( $data, $errors ): void {
+		if ( ! WC()->cart || ! $errors instanceof \WP_Error ) { return; }
+		foreach ( WC()->cart->get_cart() as $item ) {
+			if ( self::is_unpriced_domain_line( $item ) ) {
+				$errors->add( 'domain_not_offered', __( 'This domain extension is not offered any more. Remove it from your cart and search again.', 'beltoft-services' ) );
 				return;
 			}
 		}

@@ -79,4 +79,36 @@ class LiveClientTest extends TestCase {
 	public function test_token_cache_is_per_mode(): void {
 		$this->assertNotSame( LiveClient::token_key( 'sandbox' ), LiveClient::token_key( 'live' ) );
 	}
+
+	/** @return array<string, array{0:\WP_Error,1:bool}> */
+	public static function transient_cases(): array {
+		return array(
+			'transport'                => array( new \WP_Error( 'transport', 'x' ), true ),
+			'bad response'             => array( new \WP_Error( 'bad_response', 'x' ), true ),
+			'429 with a registrar code' => array( new \WP_Error( 'op_100', 'x', array( 'status' => 429 ) ), true ),
+			'408 with a registrar code' => array( new \WP_Error( 'op_100', 'x', array( 'status' => 408 ) ), true ),
+			'503 with a registrar code' => array( new \WP_Error( 'op_100', 'x', array( 'status' => 503 ) ), true ),
+			'http_502 without status'  => array( new \WP_Error( 'http_502', 'x' ), true ),
+			'400 with a registrar code' => array( new \WP_Error( 'op_399', 'x', array( 'status' => 400 ) ), false ),
+			'401'                      => array( new \WP_Error( 'http_401', 'x', array( 'status' => 401 ) ), false ),
+			'404'                      => array( new \WP_Error( 'http_404', 'x', array( 'status' => 404 ) ), false ),
+		);
+	}
+
+	/** @dataProvider transient_cases */
+	public function test_errors_are_temporary_by_http_status( \WP_Error $error, bool $expected ): void {
+		$this->assertSame( $expected, LiveClient::is_transient( $error ) );
+	}
+
+	public function test_the_transfer_code_is_scrubbed_from_the_registrars_explanation(): void {
+		$client = new LiveClient( 'sandbox', 'u', 'p' );
+		$this->respond_with( function ( $url ) {
+			if ( str_ends_with( $url, '/auth/login' ) ) { return $this->reply( array( 'data' => array( 'token' => 'token-one' ) ) ); }
+			return $this->reply( array( 'code' => 399, 'desc' => 'Invalid auth code Zq9-secret-code for the domain' ), 400 );
+		} );
+		$error = $client->request( 'POST', '/domains/transfer', array( 'auth_code' => 'Zq9-secret-code' ) );
+		$this->assertWPError( $error );
+		$this->assertStringNotContainsString( 'Zq9-secret-code', $error->get_error_data()['desc'] );
+		$this->assertStringContainsString( '[hidden]', $error->get_error_data()['desc'] );
+	}
 }

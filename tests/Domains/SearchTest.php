@@ -133,4 +133,26 @@ class SearchTest extends TestCase {
 		$this->assertSame( 'taken', $result['results'][0]['status'] );
 		$this->assertSame( 26, $result['results'][0]['price'] );
 	}
+
+	public function test_a_registrar_error_on_the_check_route_is_generic(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'POST', '/domains/check', new \WP_Error( 'op_399', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'secret registrar detail' ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$request = new \WP_REST_Request( 'GET', '/beltoft-services/v1/domains/check' );
+		$request->set_query_params( array( 'name' => $this->unique( 'generic' ) . '.com' ) );
+		$result = Search::rest_check( $request );
+		$this->assertWPError( $result );
+		$this->assertSame( 'registrar_unavailable', $result->get_error_code() );
+		$this->assertSame( 'Domain search is not available right now. Try again in a few minutes.', $result->get_error_message() );
+		$this->assertSame( array( 'status' => 503 ), $result->get_error_data() );
+		$json = wp_json_encode( rest_convert_error_to_response( $result )->get_data() );
+		$this->assertStringNotContainsString( 'op_', $json );
+		$this->assertStringNotContainsString( 'secret', $json );
+		$this->assertStringNotContainsString( 'desc', $json );
+	}
+
+	public function test_the_plugins_own_errors_stay_as_they_are(): void {
+		$this->assertSame( 'bad_domain', Search::find( '-bad-.com' )->get_error_code() );
+	}
 }

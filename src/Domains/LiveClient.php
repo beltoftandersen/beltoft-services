@@ -23,6 +23,20 @@ class LiveClient implements Client {
 		$this->password = $password;
 	}
 
+	/**
+	 * Is this error one where the registrar may be fine on a later try (and an order may even have gone through)?
+	 * The HTTP status decides first, whatever the registrar's own code: transport, bad answer, timeout (408),
+	 * rate limit (429) and 5xx are temporary; any other refusal is definitive.
+	 */
+	public static function is_transient( \WP_Error $error ): bool {
+		$code = (string) $error->get_error_code();
+		if ( in_array( $code, array( 'transport', 'bad_response' ), true ) ) { return true; }
+		$data = $error->get_error_data();
+		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
+		if ( 0 === $status && 1 === preg_match( '/^http_(\d{3})$/', $code, $match ) ) { $status = (int) $match[1]; }
+		return 408 === $status || 429 === $status || $status >= 500;
+	}
+
 	public static function token_key( string $mode, string $username = '' ): string {
 		return 'beltoft_services_domains_token_' . $mode . '_' . substr( hash( 'sha256', $username ), 0, 12 );
 	}
@@ -89,7 +103,7 @@ class LiveClient implements Client {
 			$code = is_array( $decoded ) ? (int) ( $decoded['code'] ?? 0 ) : 0;
 			// The registrar's own explanation is kept for staff (it is what says why an order was refused); customers never see it.
 			$desc = is_array( $decoded ) ? mb_substr( sanitize_text_field( (string) ( $decoded['desc'] ?? '' ) ), 0, 200 ) : '';
-			foreach ( array_filter( array( $this->password, preg_replace( '/^Bearer\s+/', '', $authorization ), is_array( $body ) ? (string) ( $body['password'] ?? '' ) : '' ) ) as $secret ) { $desc = str_replace( $secret, '[hidden]', $desc ); }
+			foreach ( array_filter( array( $this->password, preg_replace( '/^Bearer\s+/', '', $authorization ), is_array( $body ) ? (string) ( $body['password'] ?? '' ) : '', is_array( $body ) ? (string) ( $body['auth_code'] ?? $body['authCode'] ?? '' ) : '' ) ) as $secret ) { $desc = str_replace( $secret, '[hidden]', $desc ); }
 			return new \WP_Error( $code > 0 && 401 !== $status ? 'op_' . $code : 'http_' . $status, 'Registrar request failed.', array( 'status' => $status, 'desc' => $desc ) );
 		}
 		if ( ! is_array( $decoded ) || ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
