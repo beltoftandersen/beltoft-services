@@ -66,7 +66,7 @@ if ( $beltoft_time ) {
 				<form class="beltoft-services-domain-transfer" data-domain-transfer data-domain="<?php echo esc_attr( (string) $r->get( 'domain' ) ); ?>" data-cart="<?php echo esc_url( rest_url( \BeltoftServices\Api\Routes::NAMESPACE . '/domains/cart' ) ); ?>" data-store-nonce="<?php echo esc_attr( wp_create_nonce( 'wc_store_api' ) ); ?>" data-rest-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-busy="<?php esc_attr_e( 'Adding to order…', 'beltoft-services' ); ?>">
 					<label class="beltoft-services-domain__label" for="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>"><?php esc_html_e( 'Transfer code', 'beltoft-services' ); ?></label>
 					<span class="beltoft-services-domain__inline">
-						<input type="text" id="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>" name="auth_code" autocomplete="off" spellcheck="false" required>
+						<input type="text" id="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>" name="auth_code" autocomplete="off" spellcheck="false" minlength="6" maxlength="64" required>
 						<button type="submit" class="button"><?php esc_html_e( 'Transfer to us', 'beltoft-services' ); ?></button>
 					</span>
 					<p class="beltoft-services-domain__error" role="alert" hidden></p>

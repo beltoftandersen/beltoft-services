@@ -121,7 +121,10 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( is_wp_error( $detail ) ) { return $this->error( $r, $detail, $steps ); }
 			if ( 'ACT' !== ( $detail['status'] ?? '' ) ) {
 				$since = (int) ( $r->get( 'pending_since' ) ?: time() );
-				if ( time() - $since > 14 * DAY_IN_SECONDS ) { return StepResult::fail( 'The registrar did not complete this domain within 14 days.' ); }
+				if ( time() - $since > 14 * DAY_IN_SECONDS ) {
+					if ( 'transfer' === $mode ) { self::forget_code( $r ); }
+					return StepResult::fail( 'The registrar did not complete this domain within 14 days.' );
+				}
 				$reason = 'transfer' === $mode ? 'transfer_approval' : ( str_ends_with( $name, '.dk' ) ? 'registrant_check' : '' );
 				if ( '' !== $reason && $reason !== $r->get( 'action_needed_sent' ) ) {
 					$r->set( array( 'action_needed_sent' => $reason ) );
@@ -132,6 +135,8 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			$expiry = (string) ( $detail['expiration_date'] ?? '' );
 			$steps[] = 'active';
 			if ( ! $r->set( array( 'steps' => $steps, 'expires_at' => $expiry, 'registrar_status' => 'ACT' ) ) ) { return StepResult::retry( 3600, 'Domain status could not be saved.' ); }
+			// The transfer is accepted: the code has done its work and is not kept.
+			if ( 'transfer' === $mode ) { self::forget_code( $r ); }
 		}
 		if ( 'transfer' === $mode && ! in_array( 'transfer_year', $steps, true ) ) {
 			$year = Renewals::transfer_year( $r );
@@ -180,6 +185,26 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array( 'steps' => $steps, 'is_locked' => ! is_wp_error( $locked ) ) ) ) { return StepResult::retry( 3600, 'Transfer lock could not be saved.' ); }
 		}
 		return StepResult::done( array( 'steps' => $steps, 'remote_id' => $r->get( 'remote_id' ), 'expires_at' => $r->get( 'expires_at' ) ), 'Domain active' );
+	}
+
+	/**
+	 * Deletes the encrypted transfer code from the resource, its order line and its subscription lines: it is kept only while the
+	 * transfer is pending. A line that cannot be reached is left for the next call; nothing here fails the order.
+	 */
+	public static function forget_code( Resource $r ): void {
+		if ( null !== $r->get( 'auth' ) ) { $r->set( array( 'auth' => null ) ); }
+		$items = array();
+		$item  = (int) $r->get( 'order_item_id' ) > 0 ? \WC_Order_Factory::get_order_item( (int) $r->get( 'order_item_id' ) ) : null;
+		if ( $item ) { $items[] = $item; }
+		$subscription_id = (int) ( $r->license()['subscription_id'] ?? 0 );
+		$subscription    = $subscription_id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $subscription_id ) : null;
+		if ( $subscription ) { $items = array_merge( $items, array_values( $subscription->get_items() ) ); }
+		foreach ( $items as $line ) {
+			if ( is_object( $line ) && method_exists( $line, 'get_meta' ) && '' !== (string) $line->get_meta( '_beltoft_services_domain_auth', true ) ) {
+				$line->delete_meta_data( '_beltoft_services_domain_auth' );
+				$line->save();
+			}
+		}
 	}
 
 	/** The name servers stored before a transfer order, as a list of host names. */

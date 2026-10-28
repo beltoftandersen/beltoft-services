@@ -23,6 +23,22 @@ class CartTest extends TestCase {
 		$this->assertSame( 'auth-secret', Crypto::decrypt( $data['beltoft_services_domain_auth'] ) );
 	}
 
+	public function test_the_transfer_code_length_and_characters_are_bounded(): void {
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 'x', 32 ) ) );
+		foreach ( array( 'short', str_repeat( 'a', 65 ), "tab\tcode123", 'caf' . "\xc3\xa9" . 'code1', "line\nbreak12" ) as $bad ) {
+			$result = Cart::line_data( 'test.com', 'transfer', $bad );
+			$this->assertWPError( $result, $bad );
+			$this->assertSame( 'auth_invalid', $result->get_error_code() );
+			$this->assertSame( 400, $result->get_error_data()['status'] );
+			$this->assertStringContainsString( '6 to 64 characters', $result->get_error_message() );
+		}
+		foreach ( array( 'abcdef', str_repeat( 'a', 64 ), '  Zx9!pQ7#kL  ', 'A1b2-C3d4/E5=' ) as $good ) {
+			$this->assertIsArray( Cart::line_data( 'test.com', 'transfer', $good ), $good );
+		}
+		$this->assertSame( 'Zx9!pQ7#kL', Crypto::decrypt( Cart::line_data( 'test.com', 'transfer', '  Zx9!pQ7#kL  ' )['beltoft_services_domain_auth'] ), 'Stored trimmed.' );
+		$this->assertSame( 'auth_required', Cart::line_data( 'test.com', 'transfer', '   ' )->get_error_code() );
+	}
+
 	public function test_search_markup_carries_a_rest_nonce_so_logged_in_users_keep_their_identity(): void {
 		$html = \BeltoftServices\Domains\Search::shortcode();
 		$this->assertStringContainsString( 'data-nonce="' . wp_create_nonce( 'wc_store_api' ) . '"', $html );

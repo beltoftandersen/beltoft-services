@@ -323,6 +323,60 @@ class DomainDriverTest extends TestCase {
 		$this->assertSame( '777', $saved->get( 'remote_id' ) );
 	}
 
+	private function keep_code_on_the_order_line( Resource $r ): \WC_Order_Item {
+		$item = \WC_Order_Factory::get_order_item( (int) $r->get( 'order_item_id' ) );
+		$item->update_meta_data( '_beltoft_services_domain_auth', (string) $r->get( 'auth' ) );
+		$item->save();
+		return $item;
+	}
+
+	public function test_the_encrypted_transfer_code_is_deleted_once_the_transfer_is_accepted(): void {
+		[ $fake ] = $this->transfer_fakes();
+		$this->delegation();
+		$r = $this->resource( 'transfer', 'accepted-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com' );
+		$item = $this->keep_code_on_the_order_line( $r );
+		$this->assertNotSame( '', (string) $item->get_meta( '_beltoft_services_domain_auth', true ) );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$saved = Resource::find( $r->id() );
+		$this->assertNull( $saved->get( 'auth' ), 'Not in the resource.' );
+		$this->assertSame( '', (string) \WC_Order_Factory::get_order_item( $item->get_id() )->get_meta( '_beltoft_services_domain_auth', true ), 'Not on the order line.' );
+		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => '/domains/transfer' === $c['path'] ) );
+		$this->assertCount( 1, $posts, 'The code was used for the order first.' );
+	}
+
+	public function test_the_transfer_code_is_kept_while_the_transfer_is_pending(): void {
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains/transfer', array( 'id' => 555, 'status' => 'REQ' ) );
+		$fake->reply( 'GET', '/domains/555', array( 'id' => 555, 'status' => 'REQ' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->delegation();
+		$r = $this->resource( 'transfer', 'pending-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com' );
+		$item = $this->keep_code_on_the_order_line( $r );
+		$this->assertTrue( ( new DomainDriver() )->provision( $r )->is_retry() );
+		$this->assertNotSame( '', (string) Resource::find( $r->id() )->get( 'auth' ) );
+		$this->assertNotSame( '', (string) \WC_Order_Factory::get_order_item( $item->get_id() )->get_meta( '_beltoft_services_domain_auth', true ) );
+	}
+
+	public function test_the_transfer_code_is_deleted_when_the_transfer_gives_up(): void {
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains/555', array( 'id' => 555, 'status' => 'REQ' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource( 'transfer', 'gaveup-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com' );
+		$item = $this->keep_code_on_the_order_line( $r );
+		$this->assertTrue( $r->set( array( 'transfer_ns' => array( 'ns1.stored.example', 'ns2.stored.example' ), 'steps' => array( 'contact', 'zone_prepared', 'order' ), 'contact_handle' => 'AA123-GB', 'remote_id' => '555', 'pending_since' => time() - 15 * DAY_IN_SECONDS ) ) );
+		$this->assertTrue( ( new DomainDriver() )->provision( Resource::find( $r->id() ) )->is_failed() );
+		$this->assertNull( Resource::find( $r->id() )->get( 'auth' ) );
+		$this->assertSame( '', (string) \WC_Order_Factory::get_order_item( $item->get_id() )->get_meta( '_beltoft_services_domain_auth', true ) );
+	}
+
 	public function test_a_transfer_of_a_domain_our_dns_serves_is_unchanged(): void {
 		[ $fake, $dns ] = $this->transfer_fakes();
 		$lookups = $this->delegation();

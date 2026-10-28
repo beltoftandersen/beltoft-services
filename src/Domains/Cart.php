@@ -97,13 +97,19 @@ final class Cart {
 			$suffix = implode( '.', array_slice( $parts, 1 ) );
 			if ( ! is_array( $table ) || ! isset( $table[ $suffix ] ) ) { return new \WP_Error( 'subdomain', 'Enter the main domain, without a subdomain.' ); }
 		}
-		if ( 'transfer' === $mode && '' === trim( $auth_code ) ) { return new \WP_Error( 'auth_required', 'Enter the transfer code.' ); }
+		if ( 'transfer' === $mode && '' === trim( $auth_code ) ) { return new \WP_Error( 'auth_required', __( 'Enter the transfer code.', 'beltoft-services' ), array( 'status' => 400 ) ); }
+		if ( 'transfer' === $mode && ! self::auth_code_valid( trim( $auth_code ) ) ) { return new \WP_Error( 'auth_invalid', __( 'The transfer code must be 6 to 64 characters, letters, digits and common symbols only.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		$data = array( 'beltoft_services_domain' => array( 'domain' => $domain, 'mode' => $mode ) );
 		if ( 'transfer' === $mode ) {
 			try { $data['beltoft_services_domain_auth'] = Crypto::encrypt( trim( $auth_code ) ); }
 			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', 'Transfer cannot start until secure storage is configured.' ); }
 		}
 		return $data;
+	}
+
+	/** Registrar transfer codes are short printable ASCII text; anything else is a typing or paste mistake, and the length is bounded. */
+	public static function auth_code_valid( string $code ): bool {
+		return 1 === preg_match( '/^[\x20-\x7E]{6,64}$/', $code );
 	}
 
 	/** Is this a renewal, resubscribe or switch line, which carries no new ownership proof? */
