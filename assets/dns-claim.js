@@ -190,9 +190,38 @@
 		poll( id, function ( claim ) { return 'checking' !== claim.status; } );
 	}
 
+	// The last check's answer per name server, so a failed check says what was found where.
+	function lastCheck( claim, full ) {
+		var servers = claim.servers || {};
+		var names = Object.keys( servers );
+		if ( ! claim.checked_at || ! names.length ) {
+			return null;
+		}
+		var silent = names.every( function ( name ) { return [ 'timeout', 'error', 'no_address' ].indexOf( servers[ name ] ) !== -1; } );
+		var box = el( 'div', 'beltoft-dns-claim__result' );
+		box.setAttribute( 'role', 'status' );
+		box.appendChild( el( 'p', 'beltoft-dns-claim__status', silent ? t.not_checked : t.not_found ) );
+		box.appendChild( message( claim.message ) );
+		box.appendChild( el( 'p', 'beltoft-dns-claim__note', t.looked_for.replace( '%s', full ) ) );
+		var list = el( 'ul', 'beltoft-dns-claim__servers' );
+		names.forEach( function ( name ) {
+			var state = t.server_states[ servers[ name ] ] || servers[ name ];
+			list.appendChild( el( 'li', '', name + ': ' + state ) );
+		} );
+		box.appendChild( list );
+		var when = new Date( claim.checked_at );
+		if ( ! isNaN( when.getTime() ) ) {
+			box.appendChild( el( 'p', 'beltoft-dns-claim__note', t.checked_at.replace( '%s', when.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } ) ) ) );
+		}
+		return box;
+	}
+
 	function pending( claim, block ) {
 		var s = state( claim.id );
-		block.appendChild( message( claim.message ) );
+		var fullName = claim.txt_name || '';
+		var result = lastCheck( claim, fullName );
+		if ( result ) { block.appendChild( result ); }
+		block.appendChild( message( t.add_record ) );
 		block.appendChild( plainRow( t.type, 'TXT' ) );
 		// Most DNS panels add the domain to the name themselves, so the host part comes first.
 		var full = claim.txt_name || '';

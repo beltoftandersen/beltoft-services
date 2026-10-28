@@ -9,8 +9,41 @@
 
 .beltoft-dns-claim__form {
 	display: grid;
-	gap: 0.5em;
+	gap: 0.3em;
 	max-width: 36em;
+	margin-top: 1.25em;
+}
+
+/* Themes often set a row gap on forms; the label belongs right above its field. */
+.beltoft-dns-claim form.beltoft-dns-claim__form,
+.woocommerce-MyAccount-content .beltoft-dns-claim form.beltoft-dns-claim__form {
+	gap: 0.35em;
+	row-gap: 0.35em;
+}
+
+.beltoft-dns-claim .beltoft-dns-claim__form label {
+	display: block;
+	margin: 0;
+	padding: 0;
+	font-size: 0.875em;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.beltoft-dns-claim__result {
+	margin: 0.5em 0 1.25em;
+	padding: 0.75em 1em;
+	border-left: 3px solid currentColor;
+}
+
+.beltoft-dns-claim__result > :first-child {
+	margin-top: 0;
+}
+
+.beltoft-dns-claim__servers {
+	margin: 0.25em 0 0.5em 1.25em;
+	padding: 0;
+	overflow-wrap: anywhere;
 }
 
 .beltoft-dns-claim__field {
@@ -20,6 +53,7 @@
 }
 
 .beltoft-dns-claim__field input {
+	margin: 0;
 	flex: 1 1 14em;
 	min-width: 0;
 	box-sizing: border-box;

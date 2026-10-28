@@ -125,6 +125,22 @@ final class DnsClaimPanel {
 			'type'          => __( 'Type', 'beltoft-services' ),
 			'name'          => __( 'Name', 'beltoft-services' ),
 			'value'         => __( 'Value', 'beltoft-services' ),
+			'add_record'    => __( 'Add this TXT record at your current DNS provider, then check.', 'beltoft-services' ),
+			'not_found'     => __( 'Not found yet', 'beltoft-services' ),
+			'not_checked'   => __( 'Could not check', 'beltoft-services' ),
+			/* translators: %s: the time of the last check */
+			'checked_at'    => __( 'Checked at %s', 'beltoft-services' ),
+			/* translators: %s: the record name that was looked up, for example _beltoft-verify.example.com */
+			'looked_for'    => __( 'We looked for a TXT record named %s on each of your name servers:', 'beltoft-services' ),
+			'server_states' => array(
+				'found'      => __( 'Found', 'beltoft-services' ),
+				'missing'    => __( 'Not found', 'beltoft-services' ),
+				'wrong'      => __( 'Found, but with a different value. Check that the value matches exactly.', 'beltoft-services' ),
+				'cname'      => __( 'A CNAME, not a TXT record', 'beltoft-services' ),
+				'timeout'    => __( 'No answer', 'beltoft-services' ),
+				'error'      => __( 'No answer', 'beltoft-services' ),
+				'no_address' => __( 'No answer', 'beltoft-services' ),
+			),
 			/* translators: %s: the full record name, for example _beltoft-verify.example.com */
 			'full_name'     => __( 'Some DNS providers ask for the full name: %s', 'beltoft-services' ),
 			'ttl'           => __( 'TTL', 'beltoft-services' ),
