@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-28T05:33:12+00:00\n"
+"POT-Creation-Date: 2026-10-28T05:53:49+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -589,7 +589,7 @@ msgid "Too many requests. Please wait a minute."
 msgstr ""
 
 #: src/Domains/Cart.php:53
-#: src/Domains/DnsClaimRoutes.php:330
+#: src/Domains/DnsClaimRoutes.php:336
 msgid "The cart is unavailable."
 msgstr ""
 
@@ -607,7 +607,7 @@ msgid "This domain cannot be ordered in that way."
 msgstr ""
 
 #: src/Domains/Cart.php:75
-#: src/Domains/DnsClaimRoutes.php:364
+#: src/Domains/DnsClaimRoutes.php:370
 msgid "The domain could not be added to your cart."
 msgstr ""
 
@@ -625,24 +625,24 @@ msgid "This DNS hosting check has expired. Start again from My Account, Domains.
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:175
+#: src/Domains/Cart.php:176
 #, php-format
 msgid "DNS hosting for %s: the ownership check is no longer valid, so the domain was not reserved for this order."
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:183
+#: src/Domains/Cart.php:184
 #, php-format
 msgid "DNS hosting for %s: the domain could not be tied to this order."
 msgstr ""
 
-#: src/Domains/Cart.php:227
-#: src/Domains/Cart.php:237
+#: src/Domains/Cart.php:228
+#: src/Domains/Cart.php:238
 msgid "Choose a domain on the domain search page first."
 msgstr ""
 
-#: src/Domains/Cart.php:272
-#: src/Domains/Cart.php:285
+#: src/Domains/Cart.php:273
+#: src/Domains/Cart.php:286
 #: src/Domains/EmailDetails.php:13
 msgid "Domain"
 msgstr ""
@@ -683,7 +683,7 @@ msgstr ""
 
 #: src/Domains/DnsAssignments.php:39
 #: src/Domains/DnsClaimRoutes.php:281
-#: src/Domains/DnsClaimRoutes.php:437
+#: src/Domains/DnsClaimRoutes.php:443
 msgid "This domain cannot be added here. Contact support."
 msgstr ""
 
@@ -699,7 +699,24 @@ msgstr ""
 msgid "This domain is already added to your account."
 msgstr ""
 
-#: src/Domains/DnsCancel.php:39
+#: src/Domains/DnsAssignments.php:133
+#: src/Domains/DnsAssignments.php:153
+msgid "Finish or cancel your open order for this domain first."
+msgstr ""
+
+#: src/Domains/DnsAssignments.php:369
+msgid "The domain is held by another assignment. Release it first."
+msgstr ""
+
+#: src/Domains/DnsAssignments.php:373
+msgid "The domain already has an active or releasing assignment for this customer. Nothing changed."
+msgstr ""
+
+#: src/Domains/DnsAssignments.php:395
+msgid "The assignment could not be written."
+msgstr ""
+
+#: src/Domains/DnsCancel.php:48
 msgid "DNS hosting ends at once when cancelled."
 msgstr ""
 
@@ -756,7 +773,7 @@ msgid "Working…"
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:134
-#: src/Domains/DnsClaimRoutes.php:542
+#: src/Domains/DnsClaimRoutes.php:557
 msgid "Checking your name servers…"
 msgstr ""
 
@@ -769,7 +786,7 @@ msgid "Verified"
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:137
-#: src/Domains/DnsClaimRoutes.php:546
+#: src/Domains/DnsClaimRoutes.php:561
 msgid "This domain needs a manual check. Contact support."
 msgstr ""
 
@@ -875,47 +892,47 @@ msgstr ""
 msgid "Check the TXT record again before you continue."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:314
+#: src/Domains/DnsClaimRoutes.php:320
 msgid "Try again in a minute."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:419
+#: src/Domains/DnsClaimRoutes.php:425
 msgid "This domain check was not found."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:473
+#: src/Domains/DnsClaimRoutes.php:488
 msgid "You already have this domain."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:532
+#: src/Domains/DnsClaimRoutes.php:547
 msgid "The TXT record must not be a CNAME."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:533
+#: src/Domains/DnsClaimRoutes.php:548
 msgid "The record was not found on every name server yet. DNS changes can take a while; check again in a few minutes."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:537
+#: src/Domains/DnsClaimRoutes.php:552
 msgid "Your name servers did not answer. Check again in a few minutes."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:540
+#: src/Domains/DnsClaimRoutes.php:555
 msgid "Add this TXT record at your current DNS provider, then check."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:544
+#: src/Domains/DnsClaimRoutes.php:559
 msgid "Verified. You can bring your records and continue."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:548
+#: src/Domains/DnsClaimRoutes.php:563
 msgid "This check has expired. Start again."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:550
+#: src/Domains/DnsClaimRoutes.php:565
 msgid "Cancelled."
 msgstr ""
 
-#: src/Domains/DnsClaimRoutes.php:560
+#: src/Domains/DnsClaimRoutes.php:575
 msgid "This is not possible in the current state of the domain check."
 msgstr ""
 
@@ -1038,7 +1055,7 @@ msgid "DNS hosting for domains registered elsewhere"
 msgstr ""
 
 #: src/Domains/DomainSettings.php:53
-msgid "Customers can verify a domain with a TXT record and add DNS hosting for it."
+msgid "Customers can verify a domain with a TXT record and add DNS hosting for it. Needs at least two name servers below."
 msgstr ""
 
 #: src/Domains/DomainSettings.php:54

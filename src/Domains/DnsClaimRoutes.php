@@ -306,10 +306,16 @@ final class DnsClaimRoutes {
 			switch ( $reserved->get_error_code() ) {
 				case 'domain_taken':
 					return $generic;
+				case 'order_open':
+					return self::error( 'order_open', $reserved->get_error_message(), 409 );
 				case 'already_yours':
 					$row = DnsAssignments::get( $domain );
 
-					return self::mine( (int) ( $row['resource_id'] ?? 0 ) );
+					if ( ! $row || 'release_pending' === $row['status'] || empty( $row['resource_id'] ) ) {
+						return $generic;
+					}
+
+					return self::mine( (int) $row['resource_id'] );
 				default:
 					return self::error( 'busy', __( 'Try again in a minute.', 'beltoft-services' ), 503 );
 			}
@@ -455,6 +461,15 @@ final class DnsClaimRoutes {
 		$assigned = DnsAssignments::get( $domain );
 
 		if ( $assigned ) {
+			// An expired reservation is free: it is replaced when the customer reserves the name.
+			if ( 'reserved' === $assigned['status'] && ! empty( $assigned['reserved_until'] ) && $assigned['reserved_until'] < gmdate( 'Y-m-d H:i:s' ) ) {
+				return null;
+			}
+
+			if ( 'release_pending' === $assigned['status'] ) {
+				return $other;
+			}
+
 			return (int) $assigned['user_id'] === $user_id && ! empty( $assigned['resource_id'] ) ? self::mine( (int) $assigned['resource_id'] ) : $other;
 		}
 

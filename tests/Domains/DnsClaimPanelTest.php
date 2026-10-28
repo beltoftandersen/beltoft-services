@@ -8,7 +8,7 @@ use BeltoftServices\Tests\TestCase;
 class DnsClaimPanelTest extends TestCase {
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'domain_dns_claims_enabled' => 1 ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1 ) );
 		wp_set_current_user( self::factory()->user->create() );
 	}
 

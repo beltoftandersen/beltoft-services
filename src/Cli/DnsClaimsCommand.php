@@ -120,8 +120,10 @@ final class DnsClaimsCommand {
 			\WP_CLI::error( sprintf( 'Add --yes to reserve %s for user %d for 7 days.', $domain, $user_id ) );
 		}
 
-		if ( ! DnsAssignments::assign_reserved( $domain, $user_id ) ) {
-			\WP_CLI::error( 'The assignment could not be written.' );
+		$assigned = DnsAssignments::assign_reserved( $domain, $user_id );
+
+		if ( is_wp_error( $assigned ) ) {
+			\WP_CLI::error( $assigned->get_error_message() );
 		}
 
 		do_action( 'beltoft_services_dns_event', 'assign', $domain, $user_id );

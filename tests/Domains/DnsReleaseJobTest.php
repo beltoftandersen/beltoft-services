@@ -14,7 +14,7 @@ class DnsReleaseJobTest extends TestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'admin_email' => 'admin@example.com' ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1, 'admin_email' => 'admin@example.com' ) );
 		$this->result = array( 'status' => 'ok', 'reason' => 'delegated', 'ns' => array(), 'ips' => array(), 'ds' => null, 'ours' => false );
 		$this->calls = array();
 		$this->mails = array();

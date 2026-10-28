@@ -115,6 +115,7 @@ final class Cart {
 	private static function dns_claim_ok( array $data, int $user_id, ?int $order_id = null ) {
 		$fail = new \WP_Error( 'dns_claim_expired', __( 'This DNS hosting check has expired. Start again from My Account, Domains.', 'beltoft-services' ) );
 		$line = $data['beltoft_services_domain'] ?? null;
+		if ( ! DnsClaimsFeature::enabled() ) { return $fail; }
 		if ( $user_id <= 0 || ! is_array( $line ) || 'dns' !== ( $line['mode'] ?? '' ) || ! isset( $line['claim_id'] ) || ! is_int( $line['claim_id'] ) || $line['claim_id'] <= 0 ) { return $fail; }
 		$claim = DnsClaims::get( $line['claim_id'] );
 		if ( ! $claim || (int) $claim['user_id'] !== $user_id || '' === (string) ( $line['domain'] ?? '' ) || (string) $claim['domain'] !== (string) $line['domain'] ) { return $fail; }

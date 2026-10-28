@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Domains;
 
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,10 +21,18 @@ defined( 'ABSPATH' ) || exit;
 final class DnsCancel {
 
 	/**
+	 * Subscriptions this class cancelled during the current event.
+	 *
+	 * @var array<int, bool>
+	 */
+	private static array $cancelled = array();
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_action( 'woocommerce_subscription_status_pending-cancel', array( __CLASS__, 'on_pending_cancel' ), 5 );
+		add_action( 'woocommerce_subscription_status_pending-cancel', array( __CLASS__, 'expire_after_licenses' ), 20 );
 	}
 
 	/**
@@ -37,6 +46,48 @@ final class DnsCancel {
 		}
 
 		$subscription->update_status( 'cancelled', __( 'DNS hosting ends at once when cancelled.', 'beltoft-services' ) );
+
+		self::$cancelled[ (int) $subscription->get_id() ] = true;
+	}
+
+	/**
+	 * Runs after beltoft-licenses has handled the same pending-cancel event (priority 10), which sets the
+	 * licenses' expiry to the end of the term, over the "now" that the cancel gave them.
+	 *
+	 * @param mixed $subscription Subscription.
+	 */
+	public static function expire_after_licenses( $subscription ): void {
+		if ( ! is_object( $subscription ) || ! method_exists( $subscription, 'get_id' ) ) {
+			return;
+		}
+
+		$id = (int) $subscription->get_id();
+
+		if ( empty( self::$cancelled[ $id ] ) ) {
+			return;
+		}
+
+		unset( self::$cancelled[ $id ] );
+		self::expire_licenses( $id );
+	}
+
+	/**
+	 * beltoft-licenses ends a cancelled subscription's licenses at "now", which still counts as active for
+	 * that second. One second in the past makes them expired right away, through the licenses API, so its
+	 * expiry action fires and the service is paused at once instead of at the next sweep.
+	 *
+	 * @param int $subscription_id Subscription.
+	 */
+	private static function expire_licenses( int $subscription_id ): void {
+		if ( $subscription_id <= 0 || ! class_exists( Licenses::class ) ) {
+			return;
+		}
+
+		foreach ( Licenses::where( 'subscription_id', $subscription_id ) as $license ) {
+			if ( Licenses::STATUS_ACTIVE === $license['status'] ) {
+				Licenses::update( (int) $license['id'], array( 'expires_at' => time() - 1 ) );
+			}
+		}
 	}
 
 	/**

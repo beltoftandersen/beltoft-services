@@ -14,7 +14,7 @@ class DnsClaimCheckoutTest extends TestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'dns_claims_max_per_user' => 50 ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1, 'dns_claims_max_per_user' => 50 ) );
 		$this->user  = self::factory()->user->create();
 		$this->other = self::factory()->user->create();
 		$this->service_product( 'dns' );
@@ -337,5 +337,40 @@ class DnsClaimCheckoutTest extends TestCase {
 		$r = $this->checkout( $claim['id'] );
 		$this->assertSame( 503, $r->get_status() );
 		$this->assertNull( DnsAssignments::get( 'noproduct.com' ) );
+	}
+
+	public function test_a_newer_claim_cannot_take_a_domain_bound_to_an_open_order(): void {
+		$first = $this->in_cart();
+		$this->assertTrue( DnsAssignments::bind_order( 'example.com', $this->user, 900, 9 ) );
+		$second = $this->claim( 'verified', 'example.com' );
+		$r      = $this->checkout( $second['id'] );
+		$this->assertSame( 409, $r->get_status() );
+		$this->assertSame( 'order_open', $r->get_data()['code'] );
+		$this->assertSame( $first['id'], (int) DnsAssignments::get( 'example.com' )['claim_id'] );
+	}
+
+	public function test_feature_off_refuses_every_new_dns_line_but_not_a_renewal(): void {
+		$product = $this->service_product( 'dns' );
+		$claim   = $this->in_cart();
+		$this->assertSame( 0, $this->cart_error_count() );
+		wp_set_current_user( $this->user );
+		$data = array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns', 'claim_id' => $claim['id'] ) );
+		$this->assertSame( $data, Cart::require_domain_selection( $data, $product->get_id() ) );
+
+		$this->settings( array( 'domain_dns_claims_enabled' => 0 ) );
+		$this->assertSame( 1, $this->cart_error_count(), 'The cart check.' );
+		$errors = new \WP_Error();
+		Cart::validate_dns_checkout( array(), $errors );
+		$this->assertNotEmpty( $errors->get_error_codes(), 'The checkout validation.' );
+		try {
+			Cart::require_domain_selection( $data, $product->get_id() );
+			$this->fail( 'A direct add must be refused.' );
+		} catch ( \Exception $e ) {
+			$this->assertStringContainsString( 'expired', $e->getMessage() );
+		}
+
+		WC()->cart->set_cart_contents( array( 'renew' => array( 'subscription_renewal' => array( 'x' => 1 ), 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ) ) );
+		$this->assertSame( 0, $this->cart_error_count(), 'A renewal line is not touched.' );
+		$this->assertSame( array( 'subscription_renewal' => true ), Cart::require_domain_selection( array( 'subscription_renewal' => true ), $product->get_id() ) );
 	}
 }

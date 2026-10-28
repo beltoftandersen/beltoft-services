@@ -19,7 +19,7 @@ class DnsSchemaTest extends TestCase {
 	}
 
 	public function test_failed_verification_keeps_the_feature_off(): void {
-		$this->settings( array( 'domain_dns_claims_enabled' => 1 ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1 ) );
 		$this->assertTrue( DnsClaimsFeature::enabled() );
 
 		add_filter( 'beltoft_services_dns_missing_keys', static fn() => array( 'assignments.PRIMARY' ) );
@@ -28,7 +28,7 @@ class DnsSchemaTest extends TestCase {
 	}
 
 	public function test_old_version_is_not_ready(): void {
-		$this->settings( array( 'domain_dns_claims_enabled' => 1 ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1 ) );
 		update_option( DnsSchema::OPTION_DB_VERSION, '0' );
 		$this->assertFalse( DnsSchema::ready() );
 		$this->assertFalse( DnsClaimsFeature::enabled() );
@@ -45,5 +45,12 @@ class DnsSchemaTest extends TestCase {
 		$this->assertSame( $name, Locks::domain( 'example.com' ) );
 		$this->assertNotSame( $name, Locks::domain( 'example.org' ) );
 		$this->assertLessThanOrEqual( 64, strlen( Locks::domain( str_repeat( 'a', 253 ) ) ) );
+	}
+
+	public function test_the_feature_needs_two_name_servers(): void {
+		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'domain_nameservers' => 'ns1.example.net' ) );
+		$this->assertFalse( DnsClaimsFeature::enabled() );
+		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$this->assertTrue( DnsClaimsFeature::enabled() );
 	}
 }

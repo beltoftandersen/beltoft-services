@@ -128,22 +128,29 @@ final class DnsAssignments {
 				return new \WP_Error( 'already_yours', __( 'This domain is already added to your account.', 'beltoft-services' ) );
 			}
 
+			// A row tied to an order is never re-pointed: that order still needs its proof.
+			if ( ! empty( $row['order_id'] ) ) {
+				return new \WP_Error( 'order_open', __( 'Finish or cancel your open order for this domain first.', 'beltoft-services' ) );
+			}
+
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
-			$wpdb->update(
-				self::table(),
-				array(
-					'claim_id'       => $claim_id,
-					'reserved_until' => $until,
-					'updated_at'     => $now,
-				),
-				array(
-					'domain'  => $domain,
-					'user_id' => $user_id,
-					'status'  => 'reserved',
+			$changed = $wpdb->query(
+				$wpdb->prepare(
+					"UPDATE %i SET claim_id = %d, reserved_until = %s, updated_at = %s WHERE domain = %s AND user_id = %d AND status = 'reserved' AND ( order_id IS NULL OR order_id = 0 )",
+					self::table(),
+					$claim_id,
+					$until,
+					$now,
+					$domain,
+					$user_id
 				)
 			);
 
-			return true;
+			if ( false !== $changed && ( (int) $changed > 0 || self::refreshed( $domain, $user_id, $claim_id ) ) ) {
+				return true;
+			}
+
+			return new \WP_Error( 'order_open', __( 'Finish or cancel your open order for this domain first.', 'beltoft-services' ) );
 		}
 
 		if ( 'reserved' === $row['status'] && null !== $row['reserved_until'] && $row['reserved_until'] < $now ) {
@@ -166,6 +173,19 @@ final class DnsAssignments {
 		}
 
 		return self::taken();
+	}
+
+	/**
+	 * A refresh that changed nothing (same values in the same second) still counts when the row is as asked.
+	 *
+	 * @param string $domain   Domain.
+	 * @param int    $user_id  Customer.
+	 * @param int    $claim_id Claim.
+	 */
+	private static function refreshed( string $domain, int $user_id, int $claim_id ): bool {
+		$row = self::get( $domain );
+
+		return $row && 'reserved' === $row['status'] && (int) $row['user_id'] === $user_id && (int) $row['claim_id'] === $claim_id && empty( $row['order_id'] );
 	}
 
 	/**
@@ -335,16 +355,30 @@ final class DnsAssignments {
 	 * @param int    $user_id Customer.
 	 * @param int    $seconds How long the reservation lasts.
 	 */
-	public static function assign_reserved( string $domain, int $user_id, int $seconds = 7 * DAY_IN_SECONDS ): bool {
+	public static function assign_reserved( string $domain, int $user_id, int $seconds = 7 * DAY_IN_SECONDS ) {
 		global $wpdb;
 
-		$now = self::now();
+		$domain = strtolower( $domain );
+		$now    = self::now();
+		$row    = self::get( $domain );
+
+		if ( null !== $row ) {
+			$expired = 'reserved' === $row['status'] && ! empty( $row['reserved_until'] ) && $row['reserved_until'] < $now;
+
+			if ( ! $expired && (int) $row['user_id'] !== $user_id ) {
+				return new \WP_Error( 'assignment_held', __( 'The domain is held by another assignment. Release it first.', 'beltoft-services' ) );
+			}
+
+			if ( ! $expired && in_array( $row['status'], array( 'active', 'release_pending' ), true ) ) {
+				return new \WP_Error( 'assignment_held', __( 'The domain already has an active or releasing assignment for this customer. Nothing changed.', 'beltoft-services' ) );
+			}
+		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table; REPLACE swaps the one row by its primary key.
-		return false !== $wpdb->replace(
+		$ok = false !== $wpdb->replace(
 			self::table(),
 			array(
-				'domain'         => strtolower( $domain ),
+				'domain'         => $domain,
 				'user_id'        => $user_id,
 				'claim_id'       => null,
 				'status'         => 'reserved',
@@ -357,6 +391,8 @@ final class DnsAssignments {
 				'updated_at'     => $now,
 			)
 		);
+
+		return $ok ? true : new \WP_Error( 'db_error', __( 'The assignment could not be written.', 'beltoft-services' ) );
 	}
 
 	/**

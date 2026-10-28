@@ -70,6 +70,8 @@ class DnsClaimsCommandTest extends TestCase {
 		$new = self::factory()->user->create();
 		$claim = DnsClaims::create( $old, 'assign.example.com' );
 		DnsAssignments::reserve( $old, $claim['id'], 'assign.example.com' );
+		global $wpdb;
+		$wpdb->update( \BeltoftServices\Domains\DnsSchema::tables()['assignments'], array( 'reserved_until' => gmdate( 'Y-m-d H:i:s', time() - 60 ) ), array( 'domain' => 'assign.example.com' ) );
 		$this->fails( fn() => $this->cmd()->assign( array( 'assign.example.com' ), array( 'user' => $new ) ) );
 		$this->assertSame( $old, (int) DnsAssignments::get( 'assign.example.com' )['user_id'] );
 		$this->assertStringContainsString( 'assign.example.com', \WP_CLI::text(), 'The current row is printed first.' );
@@ -111,10 +113,12 @@ class DnsClaimsCommandTest extends TestCase {
 		$this->assertStringContainsString( 'existing zone', \WP_CLI::text() );
 		$this->assertNotTrue( Resource::find( $r->id() )->get( 'zone_claimed' ) );
 
+		DnsAssignments::release( 'zone.example.com' );
 		DnsAssignments::assign_reserved( 'zone.example.com', $other );
 		$this->fails( fn() => $this->cmd()->approve_zone( array( (string) $license ), array( 'yes' => true ) ) );
 		$this->assertNotTrue( Resource::find( $r->id() )->get( 'zone_claimed' ) );
 
+		DnsAssignments::release( 'zone.example.com' );
 		DnsAssignments::assign_reserved( 'zone.example.com', $user );
 		$r->set( array( 'op' => 'provision', 'attempts' => 4 ) );
 		as_unschedule_all_actions( '', array(), Jobs::GROUP );
@@ -149,5 +153,17 @@ class DnsClaimsCommandTest extends TestCase {
 			$this->assertStringContainsString( 'Your DNS records are kept but no longer answered.', $this->send( $dns, 'beltoft_services_paused', $type ) );
 			$this->assertStringNotContainsString( 'no longer answered', $this->send( $reg, 'beltoft_services_paused', $type ) );
 		}
+	}
+
+	public function test_assign_prints_the_refusal_for_an_active_row(): void {
+		$old = self::factory()->user->create();
+		$new = self::factory()->user->create();
+		$claim = DnsClaims::create( $old, 'kept.example.com' );
+		DnsAssignments::reserve( $old, $claim['id'], 'kept.example.com' );
+		DnsAssignments::activate( 'kept.example.com', $old, 5, 6 );
+		$message = $this->fails( fn() => $this->cmd()->assign( array( 'kept.example.com' ), array( 'user' => $new, 'yes' => true ) ) );
+		$this->assertStringContainsString( 'Release it first', $message );
+		$this->assertSame( $old, (int) DnsAssignments::get( 'kept.example.com' )['user_id'] );
+		$this->assertSame( array(), $this->events );
 	}
 }

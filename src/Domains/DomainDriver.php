@@ -165,17 +165,29 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		if ( $old && 'dns' === $old->get( 'driver' ) && function_exists( 'wcs_get_subscription' ) ) {
 			$subscription = wcs_get_subscription( (int) ( $old->license()['subscription_id'] ?? 0 ) );
 			if ( $subscription && ! $subscription->has_status( 'cancelled' ) ) {
-				if ( count( $subscription->get_items() ) <= 1 ) {
+				if ( $this->is_dns_line_of( $subscription, $old, (string) $held['domain'] ) ) {
 					$subscription->update_status( 'cancelled', 'Replaced by the domain registration.' );
 				} else {
 					// Other DNS lines of this subscription may still be in use: leave it for staff.
-					$subscription->add_order_note( 'The domain ' . $held['domain'] . ' is now registered here. This subscription has other lines, so it was not cancelled.' );
+					$subscription->add_order_note( 'The domain ' . $held['domain'] . ' is now registered here. This subscription has other lines or a line that could not be tied to this domain, so it was not cancelled.' );
 					Alerts::admin( $r, 'A DNS-only subscription with several lines was not cancelled after its domain was registered here: subscription ' . $subscription->get_id() . '.' );
 				}
 			}
 		}
 		if ( ! DnsAssignments::move_to( (string) $held['domain'], $user, (int) ( $r->license()['id'] ?? 0 ), $r->id() ) ) { return false; }
 		return $r->set( array( 'adopt_enable' => true ) );
+	}
+
+	/** The subscription holds exactly one line and it is the DNS-only line for this domain (by its domain choice or by the old service's license). */
+	private function is_dns_line_of( $subscription, Resource $old, string $domain ): bool {
+		$items = $subscription->get_items();
+		if ( 1 !== count( $items ) ) { return false; }
+		$item = reset( $items );
+		if ( ! is_object( $item ) || ! method_exists( $item, 'get_meta' ) ) { return false; }
+		$line = $item->get_meta( '_beltoft_services_domain', true );
+		if ( is_array( $line ) && 'dns' === ( $line['mode'] ?? '' ) && strtolower( (string) ( $line['domain'] ?? '' ) ) === strtolower( $domain ) ) { return true; }
+		$license_id = (int) ( $old->license()['id'] ?? 0 );
+		return $license_id > 0 && (int) $item->get_meta( '_beltoft_services_domain_license', true ) === $license_id;
 	}
 
 	private function error( Resource $r, \WP_Error $error, array $steps ): StepResult {

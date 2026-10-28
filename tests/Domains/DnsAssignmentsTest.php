@@ -150,4 +150,43 @@ class DnsAssignmentsTest extends TestCase {
 		$this->assertSame( 4, (int) $row['resource_id'] );
 		$this->assertNull( $row['reserved_until'] );
 	}
+
+	public function test_a_newer_claim_does_not_repoint_a_row_bound_to_an_order(): void {
+		$this->assertTrue( DnsAssignments::reserve( 1, 10, 'bound.example' ) );
+		$this->assertTrue( DnsAssignments::reserve( 1, 11, 'bound.example' ), 'An unbound reservation refreshes, even with the same values.' );
+		$this->assertTrue( DnsAssignments::bind_order( 'bound.example', 1, 500, 5 ) );
+		$again = DnsAssignments::reserve( 1, 12, 'bound.example' );
+		$this->assertWPError( $again );
+		$this->assertSame( 'order_open', $again->get_error_code() );
+		$this->assertSame( 'Finish or cancel your open order for this domain first.', $again->get_error_message() );
+		$row = DnsAssignments::get( 'bound.example' );
+		$this->assertSame( 11, (int) $row['claim_id'] );
+		$this->assertSame( 500, (int) $row['order_id'] );
+	}
+
+	public function test_assign_reserved_refuses_a_live_row_and_replaces_only_what_is_free(): void {
+		$this->assertTrue( DnsAssignments::assign_reserved( 'fresh.example', 1 ), 'No row.' );
+
+		DnsAssignments::reserve( 1, 10, 'active.example' );
+		DnsAssignments::activate( 'active.example', 1, 7, 8 );
+		$this->assertWPError( DnsAssignments::assign_reserved( 'active.example', 2 ), 'Another user, active.' );
+		$this->assertWPError( DnsAssignments::assign_reserved( 'active.example', 1 ), 'Same user, active: its resource may be gone but the name may still point at us.' );
+		$this->assertSame( 'active', DnsAssignments::get( 'active.example' )['status'] );
+
+		DnsAssignments::reserve( 1, 10, 'pending.example' );
+		DnsAssignments::activate( 'pending.example', 1, 7, 8 );
+		$this->set( 'pending.example', array( 'status' => 'release_pending' ) );
+		$this->assertWPError( DnsAssignments::assign_reserved( 'pending.example', 2 ) );
+		$this->assertWPError( DnsAssignments::assign_reserved( 'pending.example', 1 ) );
+		$this->assertSame( 'release_pending', DnsAssignments::get( 'pending.example' )['status'] );
+
+		DnsAssignments::reserve( 1, 10, 'live.example' );
+		$this->assertWPError( DnsAssignments::assign_reserved( 'live.example', 2 ), 'Another user, reservation still open.' );
+
+		$this->set( 'live.example', array( 'reserved_until' => $this->past() ) );
+		$this->assertTrue( DnsAssignments::assign_reserved( 'live.example', 2 ), 'An expired reservation is free.' );
+		$this->assertSame( 2, (int) DnsAssignments::get( 'live.example' )['user_id'] );
+
+		$this->assertTrue( DnsAssignments::assign_reserved( 'live.example', 2 ), 'The same user may extend their own reservation.' );
+	}
 }

@@ -282,4 +282,18 @@ class DnsDriverTest extends TestCase {
 		$this->assertSame( array(), $driver->pause( $intruder )->meta() );
 		$this->assertCount( $before, $dns->calls() );
 	}
+
+	public function test_pause_and_resume_retry_while_the_storage_is_not_ready(): void {
+		$dns = $this->fakes();
+		$r = $this->resource( 'notready-example.net', self::factory()->user->create() );
+		$driver = new DnsDriver();
+		$this->assertTrue( $driver->provision( $r )->is_done() );
+		add_filter( 'beltoft_services_dns_missing_keys', static fn() => array( 'assignments.PRIMARY' ) );
+		foreach ( array( $driver->pause( $r ), $driver->resume( $r ) ) as $result ) {
+			$this->assertTrue( $result->is_retry() );
+			$this->assertSame( 3600, $result->delay() );
+			$this->assertSame( 'DNS hosting storage is not ready.', $result->error() );
+		}
+		foreach ( $dns->zone( 'notready-example.net' )['rrsets'] ?? array() as $set ) { foreach ( $set['records'] as $record ) { $this->assertFalse( $record['disabled'] ); } }
+	}
 }

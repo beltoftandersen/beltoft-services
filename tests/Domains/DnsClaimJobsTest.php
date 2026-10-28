@@ -15,7 +15,7 @@ class DnsClaimJobsTest extends TestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'domain_dns_claims_enabled' => 1 ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1 ) );
 		$this->proof = array();
 		$this->mails = array();
 		add_filter(

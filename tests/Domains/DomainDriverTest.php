@@ -187,6 +187,12 @@ class DomainDriverTest extends TestCase {
 		$this->assertCount( 1, array_filter( $fake->calls(), static fn( $call ) => '/domains/123/renew' === $call['path'] ) );
 	}
 
+	/** Item rows outlive the test transaction and can share a reused subscription id: start from none. */
+	private function clear_items( \WC_Subscription $sub ): void {
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'woocommerce_order_items', array( 'order_id' => $sub->get_id() ) );
+	}
+
 	private function register_fakes(): void {
 		$fake = new FakeClient();
 		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
@@ -204,6 +210,9 @@ class DomainDriverTest extends TestCase {
 		$r = $this->resource( 'register', $name );
 		$user = (int) $r->license()['user_id'];
 		$sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1, 'status' => 'active' ) );
+		$this->clear_items( $sub );
+		$item_id = $sub->add_product( $this->service_product( 'dns' ), 1 );
+		wc_add_order_item_meta( $item_id, '_beltoft_services_domain', array( 'domain' => $name, 'mode' => 'dns', 'claim_id' => 1 ) );
 		$sub->save();
 		$dns_license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
 		$claim = DnsClaims::create( $user, $name );
@@ -232,10 +241,14 @@ class DomainDriverTest extends TestCase {
 	}
 
 	/** A DNS-only service for the domain's customer: subscription with $lines lines, resource, assignment (active). */
-	private function dns_only( Resource $r, string $name, int $lines = 1 ): array {
+	private function dns_only( Resource $r, string $name, int $lines = 1, string $line_domain = '' ): array {
 		$user = (int) $r->license()['user_id'];
 		$sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1, 'status' => 'active' ) );
-		for ( $i = 0; $i < $lines; $i++ ) { $sub->add_product( $this->service_product( 'dns' ), 1 ); }
+		$this->clear_items( $sub );
+		for ( $i = 0; $i < $lines; $i++ ) {
+			$item_id = $sub->add_product( $this->service_product( 'dns' ), 1 );
+			wc_add_order_item_meta( $item_id, '_beltoft_services_domain', array( 'domain' => '' !== $line_domain ? $line_domain : $name, 'mode' => 'dns', 'claim_id' => 1 ) );
+		}
 		$sub->save();
 		$license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
 		$claim = DnsClaims::create( $user, $name );
@@ -285,5 +298,18 @@ class DomainDriverTest extends TestCase {
 		$this->assertSame( $r->id(), (int) DnsAssignments::get( $name )['resource_id'] );
 		$notes = array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) );
 		$this->assertNotEmpty( array_filter( $notes, static fn( $n ) => str_contains( $n, 'other lines' ) ) );
+	}
+
+	public function test_a_single_line_for_another_domain_is_not_cancelled(): void {
+		$this->register_fakes();
+		$name = 'lineother-' . wp_generate_password( 6, false, false ) . '.com';
+		$r = $this->resource( 'register', $name );
+		list( $sub ) = $this->dns_only( $r, $name, 1, 'someother-' . wp_generate_password( 6, false, false ) . '.com' );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status() );
+		$this->assertSame( $r->id(), (int) DnsAssignments::get( $name )['resource_id'] );
+		$notes = array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) );
+		$this->assertNotEmpty( array_filter( $notes, static fn( $n ) => str_contains( $n, 'could not be tied' ) ) );
 	}
 }

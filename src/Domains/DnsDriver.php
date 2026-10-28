@@ -100,6 +100,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 	}
 
 	public function pause( Resource $r ): StepResult {
+		if ( ! DnsSchema::ready() ) { return StepResult::retry( 3600, 'DNS hosting storage is not ready.' ); }
 		if ( ! $this->holds_row( $r ) || 'domain' === Zone::owner( $r ) ) { return StepResult::done(); }
 		$off = Records::set_disabled( (string) $r->get( 'domain' ), true );
 		if ( is_wp_error( $off ) ) {
@@ -109,6 +110,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		return StepResult::done( array( 'records_off' => true ) );
 	}
 	public function resume( Resource $r ): StepResult {
+		if ( ! DnsSchema::ready() ) { return StepResult::retry( 3600, 'DNS hosting storage is not ready.' ); }
 		if ( ! $this->holds_row( $r ) ) { return StepResult::done(); }
 		$on = Records::set_disabled( (string) $r->get( 'domain' ), false );
 		if ( is_wp_error( $on ) && 'zone_missing' !== $on->get_error_code() ) { return StepResult::retry( 3600, 'The DNS records could not be switched on.' ); }

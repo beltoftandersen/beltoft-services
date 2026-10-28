@@ -2,6 +2,12 @@
 /** DNS-only subscriptions end at once. @package BeltoftServices */
 namespace BeltoftServices\Tests\Domains;
 
+use BeltoftLicenses\Licenses;
+use BeltoftServices\Domains\DnsAssignments;
+use BeltoftServices\Domains\DnsClaims;
+use BeltoftServices\Domains\DnsDriver;
+use BeltoftServices\Domains\FakeDns;
+use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
 class DnsCancelTest extends TestCase {
@@ -42,5 +48,47 @@ class DnsCancelTest extends TestCase {
 		$sub = $this->subscription( array( 'fake' ) );
 		$sub->update_status( 'pending-cancel' );
 		$this->assertSame( 'pending-cancel', wcs_get_subscription( $sub->get_id() )->get_status() );
+	}
+
+	public function test_cancel_expires_the_license_at_once(): void {
+		$sub = $this->subscription( array( 'dns' ) );
+		$this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => (int) $sub->get_user_id(), 'subscription_id' => $sub->get_id() ) );
+		$this->assertNotEmpty( Licenses::where( 'subscription_id', $sub->get_id() ), 'The subscription holds a license.' );
+		$sub->update_status( 'pending-cancel' );
+		foreach ( Licenses::where( 'subscription_id', $sub->get_id() ) as $license ) {
+			$this->assertNotEmpty( $license['expires_at'] );
+			$this->assertLessThan( time(), strtotime( $license['expires_at'] . ' UTC' ) );
+			$this->assertSame( Licenses::STATUS_EXPIRED, Licenses::effective_status( $license ) );
+		}
+	}
+
+	public function test_cancel_pauses_the_service_and_switches_the_records_off_at_once(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$name = 'cancel-' . wp_generate_password( 6, false, false ) . '.com';
+		$user = self::factory()->user->create();
+		$sub  = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1, 'status' => 'active' ) );
+		$sub->add_product( $this->service_product( 'dns' ), 1, array( 'subtotal' => '0', 'total' => '0' ) );
+		$sub->calculate_totals();
+		$sub->save();
+		$license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
+		$claim   = DnsClaims::create( $user, $name );
+		$this->assertTrue( DnsAssignments::reserve( $user, $claim['id'], $name ) );
+		$r = Resource::create( $license, new DnsDriver(), array(), array( 'domain' => $name, 'mode' => 'dns', 'claim_id' => $claim['id'] ) );
+		$this->assertInstanceOf( Resource::class, $r );
+		DnsAssignments::bind_order( $name, $user, 1, 1 );
+		$this->assertTrue( DnsAssignments::activate( $name, $user, (int) $license['id'], $r->id() ) );
+		$this->assertTrue( $r->set( array( 'state' => 'ready', 'desired' => 'ready', 'zone_claimed' => true ) ) );
+		$dns->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) );
+		$dns->replace_rrsets( $name, array( array( 'name' => $name . '.', 'type' => 'A', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '192.0.2.10', 'disabled' => false ) ) ) ) );
+
+		$sub->update_status( 'pending-cancel' );
+
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status() );
+		$this->assertSame( Licenses::STATUS_EXPIRED, Licenses::effective_status( Licenses::find( (int) $license['id'] ) ) );
+		$this->assertSame( 'paused', Resource::find( $r->id() )->get( 'desired' ) );
+		$this->run_jobs();
+		$this->assertTrue( $dns->zone( $name )['rrsets'][0]['records'][0]['disabled'] );
 	}
 }

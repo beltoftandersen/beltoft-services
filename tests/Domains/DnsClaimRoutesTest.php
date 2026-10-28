@@ -16,7 +16,7 @@ class DnsClaimRoutesTest extends TestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'dns_claims_max_per_user' => 50 ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_dns_claims_enabled' => 1, 'dns_claims_max_per_user' => 50 ) );
 		$this->user  = self::factory()->user->create();
 		$this->other = self::factory()->user->create();
 
@@ -428,5 +428,27 @@ class DnsClaimRoutesTest extends TestCase {
 		$this->assertTrue( $view['ds_present'] );
 		DnsClaims::set_status( $claim['id'], 'support' );
 		$this->assertSame( 'This domain needs a manual check. Contact support.', $this->call( 'GET', '/' . $claim['id'], $this->user )->get_data()['message'] );
+	}
+
+	public function test_an_expired_reservation_of_someone_else_does_not_block_a_new_claim(): void {
+		global $wpdb;
+		$theirs = $this->claim( 'verified', 'lapsed.net', $this->other );
+		$this->assertTrue( DnsAssignments::reserve( $this->other, $theirs['id'], 'lapsed.net' ) );
+		$this->assertSame( 409, $this->call( 'POST', '', $this->user, array( 'domain' => 'lapsed.net' ) )->get_status(), 'Still open.' );
+		$wpdb->update( \BeltoftServices\Domains\DnsSchema::tables()['assignments'], array( 'reserved_until' => gmdate( 'Y-m-d H:i:s', time() - 60 ) ), array( 'domain' => 'lapsed.net' ) );
+		$this->assertSame( 201, $this->call( 'POST', '', $this->user, array( 'domain' => 'lapsed.net' ) )->get_status() );
+	}
+
+	public function test_a_releasing_name_never_links_to_a_dead_resource(): void {
+		global $wpdb;
+		$claim = $this->claim( 'verified', 'leaving.net', $this->user );
+		$this->assertTrue( DnsAssignments::reserve( $this->user, $claim['id'], 'leaving.net' ) );
+		DnsAssignments::activate( 'leaving.net', $this->user, 9001, 9001 );
+		$wpdb->update( \BeltoftServices\Domains\DnsSchema::tables()['assignments'], array( 'status' => 'release_pending' ), array( 'domain' => 'leaving.net' ) );
+		$response = $this->call( 'POST', '', $this->user, array( 'domain' => 'leaving.net' ) );
+		$this->assertSame( 409, $response->get_status() );
+		$this->assertSame( 'domain_taken', $response->get_data()['code'] );
+		$this->assertSame( 'This domain cannot be added here. Contact support.', $response->get_data()['message'] );
+		$this->assertArrayNotHasKey( 'resource_id', $response->get_data()['data'] );
 	}
 }

@@ -68,6 +68,15 @@
 		return null;
 	}
 
+	/* Claims that are over are not shown: nothing is left to do for them. */
+	function finished( claim ) {
+		return 'consumed' === claim.status || 'expired' === claim.status || 'cancelled' === claim.status;
+	}
+
+	function valid( claim ) {
+		return !! claim && 'object' === typeof claim && 'number' === typeof claim.id && 'string' === typeof claim.status;
+	}
+
 	function put( claim ) {
 		var known = find( claim.id );
 		if ( known ) { claims[ claims.indexOf( known ) ] = claim; } else { claims.unshift( claim ); }
@@ -153,6 +162,7 @@
 			request( 'GET', '/' + id ).then( function ( claim ) {
 				var known = find( id );
 				if ( ! known ) { return; }
+				if ( ! valid( claim ) ) { poll( id, until ); return; }
 				claims[ claims.indexOf( known ) ] = claim;
 				if ( until( claim ) ) {
 					s.scanning = false;
@@ -212,6 +222,8 @@
 				waitForCheck( claim.id );
 			}
 		}
+		var failure = errorLine( claim.id );
+		if ( failure ) { block.appendChild( failure ); }
 		block.appendChild( el( 'p', 'beltoft-dns-claim__actions' ) ).appendChild( cancelLink( claim ) );
 	}
 
@@ -359,10 +371,27 @@
 
 		if ( true === claim.ds_present ) { block.appendChild( message( t.dnssec, 'beltoft-dns-claim__warning' ) ); }
 
+		/* The rows ticked now are what goes into the order: save them first unless they are the saved ones. */
+		function unsaved() {
+			var current = find( claim.id ) || claim;
+			var chosen = rows.filter( function ( item ) { return ! s.off[ item.key ]; } );
+			var saved = {};
+			( current.draft_records || [] ).forEach( function ( row ) { saved[ key( row ) ] = true; } );
+			var same = chosen.length === Object.keys( saved ).length && chosen.every( function ( item ) { return saved[ item.key ]; } );
+			return same ? null : chosen.map( function ( item ) { return item.row; } );
+		}
+
 		var go = button( t.checkout );
 		go.addEventListener( 'click', function () {
 			s.error = '';
-			busy( go, function () { return request( 'POST', '/' + claim.id + '/checkout' ); } ).then( function ( answer ) {
+			busy( go, function () {
+				var changed = rows.length ? unsaved() : null;
+				var first = null === changed ? Promise.resolve( null ) : request( 'POST', '/' + claim.id + '/records', { records: changed } );
+				return first.then( function ( view ) {
+					if ( valid( view ) && find( claim.id ) ) { claims[ claims.indexOf( find( claim.id ) ) ] = view; }
+					return request( 'POST', '/' + claim.id + '/checkout' );
+				} );
+			} ).then( function ( answer ) {
 				if ( answer && answer.checkout_url ) {
 					go.disabled = true;
 					window.location.assign( answer.checkout_url );
@@ -381,6 +410,11 @@
 	function draw( id ) {
 		var claim = find( id );
 		if ( ! claim ) { return; }
+		if ( finished( claim ) ) {
+			window.clearTimeout( timers[ id ] );
+			drop( id );
+			return;
+		}
 		var block = list.querySelector( '[data-claim="' + id + '"]' );
 		var fresh = ! block;
 		var s = state( id );
@@ -398,6 +432,8 @@
 		else if ( 'verified' === claim.status ) { verified( claim, block ); }
 		else if ( 'support' === claim.status ) {
 			block.appendChild( message( t.support ) );
+			var trouble = errorLine( claim.id );
+			if ( trouble ) { block.appendChild( trouble ); }
 			block.appendChild( el( 'p', 'beltoft-dns-claim__actions' ) ).appendChild( cancelLink( claim ) );
 		}
 
@@ -435,26 +471,30 @@
 		var label = submit.textContent;
 		submit.disabled = true;
 		submit.textContent = t.adding;
+		function restore() {
+			submit.disabled = false;
+			submit.textContent = label;
+		}
 		request( 'POST', '', { domain: value } ).then( function ( claim ) {
+			if ( ! valid( claim ) ) { throw new Error( t.failed ); }
 			input.value = '';
 			put( claim );
-		}, function ( error ) {
+		} ).catch( function ( error ) {
+			error = error || {};
 			var id = error.data && error.data.data ? error.data.data.resource_id : 0;
 			if ( 'already_yours' === ( error.data && error.data.code ) ) {
 				var link = id ? cardLink( id ) : null;
 				showError( t.alreadyYours + ( link ? ' ' : '' ), link );
 			} else {
-				showError( error.message );
+				showError( error.message || t.failed );
 			}
-		} ).then( function () {
-			submit.disabled = false;
-			submit.textContent = label;
-		} );
+		} ).then( restore, restore );
 	} );
 
 	request( 'GET', '' ).then( function ( all ) {
-		claims = all.filter( function ( claim ) { return 'cancelled' !== claim.status && 'expired' !== claim.status; } );
+		if ( ! Array.isArray( all ) || ! all.every( valid ) ) { throw new Error( t.failed ); }
+		claims = all.filter( function ( claim ) { return ! finished( claim ); } );
 		claims.sort( function ( a, b ) { return b.id - a.id; } );
 		claims.slice().forEach( function ( claim ) { draw( claim.id ); } );
-	}, function ( error ) { showError( error.message ); } );
+	} ).catch( function ( error ) { showError( error && error.message ? error.message : t.failed ); } );
 }() );
