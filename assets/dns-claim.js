@@ -6,6 +6,8 @@
 	var root = document.querySelector( '.beltoft-dns-claim' );
 	if ( ! config || ! root ) { return; }
 
+	var MAX_ZONE_BYTES = 100 * 1024;
+
 	var t = config.strings;
 	var list = root.querySelector( '[data-dns-claim-list]' );
 	var form = root.querySelector( '[data-dns-claim-add]' );
@@ -370,8 +372,51 @@
 				draw( claim.id );
 			}, function ( failure ) { s.error = failure.message; draw( claim.id ); } );
 		} );
+		// A dropped or chosen file is read here in the browser; only its text goes to the zone-file route,
+		// which checks size and lines again and parses it. Nothing is uploaded or stored as a file.
+		function useFile( file ) {
+			s.error = '';
+			if ( ! file ) { return; }
+			if ( file.size > MAX_ZONE_BYTES ) { s.error = t.fileTooLarge; draw( claim.id ); return; }
+			var name = String( file.name || '' ).toLowerCase();
+			var textType = '' === file.type || 0 === file.type.indexOf( 'text/' );
+			if ( ! textType || ! /\.(txt|zone|bind|db|dns)$|^[^.]*$/.test( name ) ) { s.error = t.fileType; draw( claim.id ); return; }
+			var reader = new window.FileReader();
+			reader.onload = function () {
+				var text = String( reader.result || '' );
+				if ( /[\u0000-\u0008\u000E-\u001F]/.test( text ) ) { s.error = t.fileBinary; draw( claim.id ); return; }
+				area.value = s.zone = text;
+				read.click();
+			};
+			reader.onerror = function () { s.error = t.fileUnread; draw( claim.id ); };
+			reader.readAsText( file );
+		}
+		var picker = el( 'input' );
+		picker.type = 'file';
+		picker.accept = '.txt,.zone,.bind,.db,.dns,text/plain';
+		picker.id = 'beltoft-dns-zone-file-' + claim.id;
+		picker.className = 'beltoft-dns-claim__file';
+		picker.addEventListener( 'change', function () { useFile( picker.files && picker.files[0] ); picker.value = ''; } );
+		var choose = el( 'label', 'beltoft-dns-claim__link', t.chooseFile );
+		choose.setAttribute( 'for', picker.id );
+		var hint = el( 'span', 'beltoft-dns-claim__note', ' ' + t.dropHint );
+		[ 'dragenter', 'dragover' ].forEach( function ( type ) {
+			zone.addEventListener( type, function ( event ) { event.preventDefault(); zone.classList.add( 'is-dragover' ); } );
+		} );
+		[ 'dragleave', 'drop' ].forEach( function ( type ) {
+			zone.addEventListener( type, function ( event ) { event.preventDefault(); zone.classList.remove( 'is-dragover' ); } );
+		} );
+		zone.addEventListener( 'drop', function ( event ) {
+			var files = event.dataTransfer && event.dataTransfer.files;
+			useFile( files && files[0] );
+		} );
 		zone.appendChild( label );
 		zone.appendChild( area );
+		var fileLine = el( 'p', 'beltoft-dns-claim__fileline' );
+		fileLine.appendChild( picker );
+		fileLine.appendChild( choose );
+		fileLine.appendChild( hint );
+		zone.appendChild( fileLine );
 		zone.appendChild( read );
 		block.appendChild( zone );
 

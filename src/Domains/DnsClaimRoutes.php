@@ -206,6 +206,10 @@ final class DnsClaimRoutes {
 			return $claim;
 		}
 
+		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:dns_claim_zone_' . md5( $claim['domain'] ), 20, HOUR_IN_SECONDS ) ) {
+			return self::error( 'rate_limited', __( 'Too many tries. Wait a while and try again.', 'beltoft-services' ), 429 );
+		}
+
 		$parsed = ZoneFile::parse( (string) $request->get_param( 'text' ), (string) $claim['domain'] );
 
 		if ( is_wp_error( $parsed ) ) {

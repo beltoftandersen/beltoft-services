@@ -225,6 +225,16 @@ class DnsClaimRoutesTest extends TestCase {
 		$this->assertSame( 429, $this->call( 'POST', '/' . $claim['id'] . '/check', $this->user )->get_status() );
 	}
 
+	public function test_zone_file_is_limited_and_checked_on_the_server(): void {
+		$claim = $this->claim( 'verified' );
+		$big   = str_repeat( "a 3600 IN TXT \"x\"\n", 6000 );
+		$this->assertSame( 400, $this->call( 'POST', '/' . $claim['id'] . '/zone-file', $this->user, array( 'text' => $big ) )->get_status() );
+		for ( $i = 2; $i <= 20; $i++ ) {
+			$this->call( 'POST', '/' . $claim['id'] . '/zone-file', $this->user, array( 'text' => 'a 3600 IN A 192.0.2.1' ) );
+		}
+		$this->assertSame( 429, $this->call( 'POST', '/' . $claim['id'] . '/zone-file', $this->user, array( 'text' => 'a 3600 IN A 192.0.2.1' ) )->get_status() );
+	}
+
 	public function test_polling_the_claim_runs_a_check_that_has_waited(): void {
 		$claim = $this->claim();
 		add_filter( 'beltoft_services_dns_proof_result', static function ( $pre, $call ) {

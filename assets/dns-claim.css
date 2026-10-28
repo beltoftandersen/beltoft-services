@@ -289,3 +289,32 @@
 		opacity: 0.75;
 	}
 }
+
+/* Zone file: a dropped or chosen file fills the box (read in the browser). */
+.beltoft-dns-claim__zone.is-dragover textarea {
+	outline: 2px dashed currentColor;
+	outline-offset: 2px;
+}
+
+.beltoft-dns-claim__file {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.beltoft-dns-claim__fileline {
+	margin: 0.35em 0 0.75em;
+}
+
+.beltoft-dns-claim__fileline label.beltoft-dns-claim__link {
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.beltoft-dns-claim__file:focus-visible + label {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
