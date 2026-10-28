@@ -50,6 +50,8 @@ final class DomainSettings {
 		$fields['domain_seller_name'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Seller name in the .dk agreement', 'beltoft-services' ), 'desc' => __( 'The company that is paid for the registration, as named in the .dk checkout agreement. Empty uses the site name.', 'beltoft-services' ) );
 		$fields['domain_dns_url'] = $base + array( 'type' => 'text', 'default' => 'http://127.0.0.1:8081', 'label' => __( 'DNS API URL', 'beltoft-services' ) );
 		$fields['domain_dns_primary_query_address'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Primary DNS query address', 'beltoft-services' ), 'desc' => __( 'Local IP address used to check the first name server when its public address cannot be reached from this server.', 'beltoft-services' ) );
+		$fields['domain_dns_claims_enabled'] = $base + array( 'type' => 'checkbox', 'default' => 0, 'label' => __( 'DNS hosting for domains registered elsewhere', 'beltoft-services' ), 'desc' => __( 'Customers can verify a domain with a TXT record and add DNS hosting for it.', 'beltoft-services' ) );
+		$fields['dns_claims_max_per_user'] = $base + array( 'type' => 'number', 'default' => 20, 'min' => 1, 'label' => __( 'DNS hosting domains per customer', 'beltoft-services' ) );
 		return $fields;
 	}
 

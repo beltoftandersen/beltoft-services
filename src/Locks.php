@@ -30,6 +30,17 @@ final class Locks {
 	}
 
 	/**
+	 * The lock name for one domain name, case-insensitive (at most 64 chars).
+	 *
+	 * @param string $domain Domain name.
+	 */
+	public static function domain( string $domain ): string {
+		global $wpdb;
+
+		return 'bs_' . self::site_hash( DB_NAME, (string) $wpdb->prefix ) . '_dnsd_' . md5( strtolower( $domain ) );
+	}
+
+	/**
 	 * Short hash of a database name and table prefix.
 	 *
 	 * @param string $database Database name.
