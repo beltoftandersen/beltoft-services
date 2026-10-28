@@ -618,6 +618,36 @@ final class DiskSteps {
 		return StepResult::done( array( 'size_gb' => null ), 'Extra disk removed' );
 	}
 
+	/**
+	 * D10: the snapshots that cover the disk go before the disk does (a refused delete would stall a billing-driven
+	 * removal), under the server's lock because they live in the server's meta and task slot. The customer is told
+	 * once per disk.
+	 *
+	 * @param Resource $server The server.
+	 * @param string   $volid  The disk's volume id.
+	 * @return StepResult|null Null when none is left.
+	 */
+	private function drop_snapshots( Resource $server, string $volid ): ?StepResult {
+		if ( ! Snapshots::tracked( $server ) ) {
+			return null;
+		}
+		$answer = null;
+		$ran    = $server->locked(
+			static function () use ( $server, $volid, &$answer ): bool {
+				$had    = array() !== Snapshots::covering( $server, $volid );
+				$answer = ( new Snapshots( $server ) )->drop_covering( $volid );
+				if ( $had && $answer->is_done() ) {
+					SnapshotExpiry::notify( $server, 'disk_removed', $volid );
+				}
+				return true;
+			}
+		);
+		if ( null === $ran ) {
+			return StepResult::retry( 60, 'The server is busy; its snapshots of this disk are deleted first.' );
+		}
+		return $answer->is_done() ? null : $answer;
+	}
+
 	public function delete(): StepResult {
 		if ( $this->r->get( 'linked' ) ) {
 			return StepResult::fail( 'An adopted disk is not deleted automatically.' );
@@ -646,11 +676,15 @@ final class DiskSteps {
 		if ( $polled ) {
 			return $polled;
 		}
+		$volid = $this->volume_id( $ctx );
+		$gone  = $this->drop_snapshots( $server, $volid );
+		if ( $gone ) {
+			return $gone;
+		}
 		$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
 		if ( is_wp_error( $config ) ) {
 			return $this->classify( $config, 'disk removal' );
 		}
-		$volid = $this->volume_id( $ctx );
 		$attached = $this->attached( $config, $volid );
 		if ( $attached ) {
 			$done = $this->client->request( 'PUT', self::config_path( $ctx ), array( 'delete' => $attached['slot'], 'digest' => (string) ( $config['digest'] ?? '' ) ) );

@@ -713,6 +713,8 @@ final class Actions {
 			'wipe_old_boot'     => null,
 			'wipe_boot_phase'   => null,
 			'wipe_power'        => null,
+			'wipe_snapshots'    => null,
+			'wipe_snapshot_tries' => null,
 			'disks_check'       => null,
 			'steps'             => array_values( array_intersect( (array) $this->r->get( 'steps' ), $boot ? array( 'ip', 'vmid', 'clone' ) : array( 'ip', 'vmid' ) ) ),
 			'task'              => null,
@@ -814,6 +816,13 @@ final class Actions {
 		}
 
 		if ( 'restored' === $phase ) {
+			// The restore recreated the VM: its snapshots are gone (D9). Nothing is asked of Proxmox when none were listed.
+			$forgot = Snapshots::tracked( $this->r ) ? ( new Snapshots( $this->r ) )->forget_all() : null;
+
+			if ( null !== $forgot && ! $forgot->is_done() ) {
+				return $forgot;
+			}
+
 			$planned = $this->restore_plan( $record );
 
 			if ( null !== $planned ) {

@@ -287,6 +287,12 @@ final class Provision {
 
 			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
 
+			$purged = $this->wipe_snapshots();
+
+			if ( null !== $purged ) {
+				return $purged;
+			}
+
 			if ( 'running' === $v['status'] ) {
 				// The disk is destroyed anyway: no graceful shutdown, a plain stop.
 				$off = $this->wipe_power_off( $record, $base, false );
@@ -322,6 +328,38 @@ final class Provision {
 		}
 
 		return StepResult::retry( 0, 'wipe: the VM did not reach the wanted state' );
+	}
+
+	/**
+	 * D8: the server's snapshots go before the wipe touches the VM or its boot volume (Proxmox keeps a volume a
+	 * snapshot still holds). Once per attempt: meta `wipe_snapshots` = done is cleared with the wipe. A snapshot
+	 * that cannot be deleted is tried again, never skipped, and the admin is told once after the third round.
+	 *
+	 * @return StepResult|null Null when no snapshot is left.
+	 */
+	private function wipe_snapshots(): ?StepResult {
+		if ( 'done' === $this->r->get( 'wipe_snapshots' ) ) {
+			return null;
+		}
+
+		if ( Snapshots::tracked( $this->r ) ) {
+			$purged = ( new Snapshots( $this->r ) )->purge_all();
+
+			if ( ! $purged->is_done() ) {
+				$tries = (int) $this->r->get( 'wipe_snapshot_tries' ) + 1;
+
+				$this->r->set( array( 'wipe_snapshot_tries' => $tries ) );
+
+				if ( $tries >= 3 ) {
+					Alerts::admin( $this->r, 'The reinstall waits: a snapshot of the server could not be deleted. Last answer: ' . $this->scrub( $purged->error(), 160 ) );
+				}
+
+				// Never a failure: the reinstall must not run past a snapshot, and must not give up either.
+				return StepResult::retry( $purged->delay(), 'wipe: ' . $purged->error() );
+			}
+		}
+
+		return $this->r->set( array( 'wipe_snapshots' => 'done', 'wipe_snapshot_tries' => null ) ) ? null : StepResult::retry( 0, 'wipe: the snapshot clean-up could not be recorded' );
 	}
 
 	/**
@@ -428,6 +466,12 @@ final class Provision {
 			}
 
 			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
+
+			$purged = $this->wipe_snapshots();
+
+			if ( null !== $purged ) {
+				return $purged;
+			}
 
 			if ( 'running' === $v['status'] ) {
 				// The extra disks keep their data: their filesystems get the graceful shutdown first.
@@ -593,6 +637,7 @@ final class Provision {
 			'wipe_old_boot'   => null,
 			'wipe_boot_phase' => null,
 			'wipe_power'      => null,
+			'wipe_snapshots'  => null,
 			'disks_check'     => true,
 			'task'            => null,
 			'agent'           => null,
@@ -610,9 +655,10 @@ final class Provision {
 		$keep = array_values( array_intersect( $this->r->get( 'steps' ), array( 'ip', 'vmid' ) ) );
 
 		return array(
-			'wipe'       => null,
-			'wipe_power' => null,
-			'task'       => null,
+			'wipe'           => null,
+			'wipe_power'     => null,
+			'wipe_snapshots' => null,
+			'task'           => null,
 			'agent'      => null,
 			'configured' => array(),
 			'steps'      => $keep,

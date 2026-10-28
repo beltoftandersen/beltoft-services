@@ -18,100 +18,9 @@ use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/SnapshotsTestCase.php';
 
-class SnapshotsTest extends BackupTestCase {
-
-	public function set_up(): void {
-		parent::set_up();
-
-		// The seeded template boots from a raw file, as the real one does: a clone of it is qcow2.
-		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/9000/config', array( 'scsi0' => 'disk-store:vm-9000-disk-0.raw,size=10G' ) ) );
-		delete_transient( 'beltoft_services_disk_products' );
-	}
-
-	public function tear_down(): void {
-		remove_all_filters( 'beltoft_services_proxmox_disk_format' );
-		remove_all_filters( 'beltoft_services_snapshot_paid_slots' );
-		remove_all_filters( 'beltoft_services_snapshot_rolled_back' );
-		delete_transient( 'beltoft_services_disk_products' );
-		parent::tear_down();
-	}
-
-	// -- Helpers ---------------------------------------------------------------------------------
-
-	/**
-	 * Switches snapshots on.
-	 *
-	 * @param array<string, mixed> $more Settings.
-	 */
-	private function on( array $more = array() ): void {
-		$this->settings( array_merge( array( 'snapshots_enabled' => 1, 'snapshot_free_slots' => 3, 'snapshot_free_days' => 7, 'snapshot_paid_days' => 30, 'snapshot_max_slots' => 10 ), $more ) );
-	}
-
-	private function server(): Resource {
-		$this->on();
-
-		return $this->ready_vm();
-	}
-
-	private function disk_for( Resource $server ): Resource {
-		$server_license = $server->license();
-		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		$product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
-		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $server_license['user_id'] ) );
-		$disk    = Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $product->get_id() ), array( 'server_license' => $server_license['id'] ) );
-		$this->assertInstanceOf( Resource::class, $disk );
-		Jobs::run( $disk->id() );
-		$disk = Resource::find( $disk->id() );
-		$this->assertSame( 'ready', $disk->get( 'state' ), (string) $disk->get( 'last_error' ) );
-
-		return $disk;
-	}
-
-	private function fresh( Resource $r ): Resource {
-		return Resource::find( $r->id() );
-	}
-
-	private function act( Resource $r, string $action, array $args = array() ): void {
-		Jobs::act( $r->id(), $action, $args );
-	}
-
-	private function take( Resource $r, string $label = 'first' ): array {
-		$this->act( $r, 'snapshot_take', array( 'label' => $label ) );
-
-		foreach ( Snapshots::entries( $this->fresh( $r ) ) as $entry ) {
-			if ( $entry['label'] === $label ) {
-				return $entry;
-			}
-		}
-
-		$this->fail( 'The snapshot "' . $label . '" is not in the list.' );
-	}
-
-	private function config(): array {
-		return $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/config' );
-	}
-
-	private function lines(): array {
-		return array_map( static fn( $c ) => $c['method'] . ' ' . $c['path'], $this->fake->calls() );
-	}
-
-	private function events_of( Resource $r ): string {
-		return implode( "\n", array_column( \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] ), 'message' ) );
-	}
-
-	private function admin_mails(): array {
-		return array_values( array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ) );
-	}
-
-	private function route( int $id, int $user, string $action, array $args = array() ): \WP_REST_Response {
-		wp_set_current_user( $user );
-		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $id . '/actions/' . $action );
-		$request->set_param( 'args', $args );
-
-		return rest_get_server()->dispatch( $request );
-	}
+class SnapshotsTest extends SnapshotsTestCase {
 
 	// -- Settings and rules ----------------------------------------------------------------------
 
@@ -587,13 +496,6 @@ class SnapshotsTest extends BackupTestCase {
 		$this->assertWPError( $this->fake->request( 'POST', $vm . '/snapshot', array( 'snapname' => 'ok2' ) ) );
 		$this->assertWPError( $this->fake->request( 'DELETE', $vm . '/snapshot/ok1' ) );
 		$this->assertWPError( $this->fake->request( 'POST', $vm . '/snapshot/ok1/rollback' ) );
-	}
-
-	private function backup_volid( Resource $r ): string {
-		$this->assertIsString( $this->fake->task( 'POST', '/nodes/node-a/vzdump', array( 'vmid' => (int) $r->get( 'vmid' ), 'storage' => 'backup-store' ) ) );
-		$list = ( new \BeltoftServices\Proxmox\Backups( $this->fresh( $r ) ) )->list();
-
-		return $list[0]['volid'];
 	}
 
 	// -- Roll back -------------------------------------------------------------------------------

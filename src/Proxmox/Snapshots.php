@@ -62,6 +62,11 @@ final class Snapshots {
 	public const ROLLBACK = 'snapshot_rollback';
 
 	/**
+	 * Meta: the last problem of a snapshot action, for the admin.
+	 */
+	public const ERROR = 'snapshot_error';
+
+	/**
 	 * The customer's actions.
 	 */
 	public const ACTIONS = array( 'snapshot_take', 'snapshot_delete', 'snapshot_rollback' );
@@ -162,6 +167,16 @@ final class Snapshots {
 	}
 
 	/**
+	 * Whether the server has anything of snapshots in its meta (a list entry or a marker), whether or not the
+	 * setting is on. What callers use to skip a Proxmox call when there is nothing to clean up.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function tracked( Resource $r ): bool {
+		return array() !== self::entries( $r ) || array() !== (array) $r->get( self::OP ) || is_array( $r->get( self::ROLLBACK ) );
+	}
+
+	/**
 	 * The snapshots in the list, oldest first.
 	 *
 	 * @param Resource $r Resource.
@@ -177,6 +192,49 @@ final class Snapshots {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The entries that cover a volume.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $volid Volume id.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function covering( Resource $r, string $volid ): array {
+		return array_values(
+			array_filter(
+				self::entries( $r ),
+				static fn( $e ) => in_array( $volid, (array) ( $e['covers'] ?? array() ), true )
+			)
+		);
+	}
+
+	/**
+	 * What the reinstall form says about the snapshots (D8): they all go, with their number. Empty when there are
+	 * none. The card (phase E) shows it; nothing else uses it.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function reinstall_warning( Resource $r ): string {
+		$count = count( self::entries( $r ) );
+
+		if ( 0 === $count ) {
+			return '';
+		}
+
+		/* translators: %d: number of snapshots */
+		return sprintf( _n( 'Reinstalling deletes %d snapshot of this server.', 'Reinstalling deletes all %d snapshots of this server.', $count, 'beltoft-services' ), $count );
+	}
+
+	/**
+	 * What the restore form says about the snapshots (D9): a restore replaces the server, so its snapshots go.
+	 * Empty when there are none.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function restore_warning( Resource $r ): string {
+		return array() === self::entries( $r ) ? '' : __( 'Restoring a backup deletes the snapshots of this server.', 'beltoft-services' );
 	}
 
 	/**
@@ -450,6 +508,35 @@ final class Snapshots {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public function run( string $action, array $args ): StepResult {
+		$result = $this->dispatch( $action, $args );
+
+		$this->note( $result );
+
+		return $result;
+	}
+
+	/**
+	 * Keeps the last problem for the admin panel (meta `snapshot_error`): set by a failure or a retry, cleared
+	 * by an action that finished. Written only when it changes.
+	 *
+	 * @param StepResult $result Outcome of an action.
+	 */
+	private function note( StepResult $result ): void {
+		$now  = (string) $this->r->get( self::ERROR );
+		$next = $result->is_done() ? '' : $this->scrub( $result->error(), 200 );
+
+		if ( $now !== $next ) {
+			$this->r->set( array( self::ERROR => '' === $next ? null : $next ) );
+		}
+	}
+
+	/**
+	 * One action.
+	 *
+	 * @param string               $action Action.
+	 * @param array<string, mixed> $args   Arguments.
+	 */
+	private function dispatch( string $action, array $args ): StepResult {
 		$began = $this->begin( $action, true );
 
 		if ( $began instanceof StepResult ) {
@@ -499,7 +586,7 @@ final class Snapshots {
 	 * @param string $volid Volume id.
 	 */
 	public function drop_covering( string $volid ): StepResult {
-		$began = $this->begin( 'snapshot_drop', false );
+		$began = $this->begin( 'snapshot_drop', true );
 
 		if ( $began instanceof StepResult ) {
 			return $began;
@@ -1160,11 +1247,16 @@ final class Snapshots {
 		$now = time();
 
 		foreach ( self::entries( $this->r ) as $entry ) {
-			if ( 'deleting' === ( $entry['state'] ?? '' ) || ( 'ok' === ( $entry['state'] ?? 'ok' ) && (int) ( $entry['expires_at'] ?? 0 ) <= $now ) ) {
-				$done = $this->delete( $record, $v, (string) $entry['id'] );
+			if ( SnapshotExpiry::is_due( $entry, $now ) ) {
+				$lapsed = 'ok' === ( $entry['state'] ?? 'ok' );
+				$done   = $this->delete( $record, $v, (string) $entry['id'] );
 
 				if ( ! $done->is_done() ) {
 					return $done;
+				}
+
+				if ( $lapsed ) {
+					SnapshotExpiry::notify( $this->r, 'expired', (string) $entry['id'] );
 				}
 			}
 		}
