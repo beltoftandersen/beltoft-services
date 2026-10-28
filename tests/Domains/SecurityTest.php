@@ -26,7 +26,7 @@ class SecurityTest extends TestCase {
 			10,
 			2
 		);
-		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'domain_relock_days' => 7 ) );
 	}
 
 	private function domain( array $meta = array() ): Resource {
@@ -197,5 +197,36 @@ class SecurityTest extends TestCase {
 	public function test_the_security_email_is_registered_and_never_carries_the_code(): void {
 		$this->assertContains( 'beltoft_services_domain_security', Emails::IDS );
 		$this->assertInstanceOf( \BeltoftServices\Emails\DomainSecurity::class, Emails::get( 'beltoft_services_domain_security' ) );
+	}
+
+	public function test_the_relock_is_off_by_default(): void {
+		delete_option( \BeltoftServices\Settings::OPTION );
+		$this->assertSame( 0, Security::days() );
+		$this->domain( array( 'is_locked' => false, 'unlocked_at' => time() - 60 * DAY_IN_SECONDS ) );
+		$op = $this->registrar();
+		Security::relock();
+		$this->assertSame( array(), $op->calls() );
+	}
+
+	public function test_asking_for_the_transfer_code_restarts_the_relock_clock(): void {
+		$r  = $this->domain( array( 'is_locked' => false, 'unlocked_at' => time() - 20 * DAY_IN_SECONDS ) );
+		$op = $this->registrar();
+		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5 );
+		$this->mails = array();
+		Security::relock();
+		$this->assertCount( 1, $op->calls(), 'Only the code was read: the domain is not locked mid-transfer.' );
+		$this->assertSame( array(), $this->mails );
+	}
+
+	public function test_a_failed_code_request_also_restarts_the_clock(): void {
+		$r  = $this->domain( array( 'is_locked' => false, 'unlocked_at' => time() - 20 * DAY_IN_SECONDS ) );
+		$op = $this->registrar();
+		$op->reply( 'GET', '/domains/321/authcode', new \WP_Error( 'http_404', 'No.' ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5 );
 	}
 }

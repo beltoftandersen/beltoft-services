@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * A domain that is unlocked for transfer is exposed, so the customer is told when it is unlocked, when its transfer code is
  * shown and when its name servers change (never with the code itself), and a domain left unlocked is locked again after a
- * number of days (setting domain_relock_days, 0 turns it off) unless the registrar shows an outgoing transfer under way.
+ * number of days (setting domain_relock_days, default 0 = off) unless the registrar shows an outgoing transfer under way.
  */
 final class Security {
 	public const HOOK = 'beltoft_services_domains_relock';

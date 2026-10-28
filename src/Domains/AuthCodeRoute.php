@@ -27,6 +27,8 @@ final class AuthCodeRoute {
 			elseif ( 'domain' !== $r->get( 'driver' ) || ! ctype_digit( (string) $r->get( 'remote_id' ) ) ) {
 				$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', 'This code is unavailable.', array( 'status' => 403 ) ) );
 			} else {
+				// Asking for the code means a transfer may be starting: the re-lock clock restarts.
+				if ( ! $r->get( 'is_locked' ) ) { $r->set( array( 'unlocked_at' => time() ) ); }
 				$reply = Clients::registrar()->request( 'GET', '/domains/' . $r->get( 'remote_id' ) . '/authcode' );
 				$code = is_wp_error( $reply ) ? '' : (string) ( $reply['auth_code'] ?? '' );
 				if ( '' === $code ) {
