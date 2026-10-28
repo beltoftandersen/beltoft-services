@@ -12,6 +12,7 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Product;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -160,6 +161,7 @@ final class Panel {
 		);
 
 		if ( $owner ) {
+			Progress::render( Progress::build( $resource ) );
 			self::owner_part( $resource );
 		}
 
@@ -235,7 +237,8 @@ final class Panel {
 		 */
 		do_action( 'beltoft_services_account_assets', self::HANDLE );
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
+		wp_enqueue_script( 'beltoft-services-progress', plugins_url( 'assets/progress.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/progress.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array( 'beltoft-services-progress' ), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesAccount',
@@ -251,6 +254,7 @@ final class Panel {
 					'tooMany' => __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ),
 					'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'expired' => __( 'Your session has expired. Please reload the page.', 'beltoft-services' ),
+					'working' => __( 'Working…', 'beltoft-services' ),
 				),
 			)
 		);

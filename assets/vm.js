@@ -60,6 +60,29 @@
 		} );
 	}
 
+	// A clicked button shows it is working until the page reloads; reset() gives it back after an error.
+	function busy( button ) {
+		button.disabled = true;
+		button.setAttribute( 'aria-busy', 'true' );
+		button.classList.add( 'is-busy' );
+
+		if ( undefined === button.beltoftLabel ) {
+			button.beltoftLabel = button.textContent;
+			button.textContent = vm.strings.working;
+		}
+	}
+
+	function reset( button ) {
+		button.disabled = false;
+		button.removeAttribute( 'aria-busy' );
+		button.classList.remove( 'is-busy' );
+
+		if ( undefined !== button.beltoftLabel ) {
+			button.textContent = button.beltoftLabel;
+			button.beltoftLabel = undefined;
+		}
+	}
+
 	function submit( panel, form ) {
 		var args = {};
 		var button = form.querySelector( 'button[type="submit"]' );
@@ -79,26 +102,25 @@
 		}
 
 		if ( button ) {
-			button.disabled = true;
+			busy( button );
 		}
 
 		post( panel, 'actions/' + encodeURIComponent( form.getAttribute( 'data-action' ) ), { args: args } ).then( function ( response ) {
 			if ( 202 === response.status ) {
 				notice( panel, vm.strings.queued );
-				window.setTimeout( function () {
-					window.location.reload();
-				}, 8000 );
+				// The panel's status poll (account.js) shows the progress and reloads when it is over.
+				panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
 				return null;
 			}
 
 			if ( button ) {
-				button.disabled = false;
+				reset( button );
 			}
 
 			return reply( panel, response, vm.strings.failed );
 		} ).catch( function () {
 			if ( button ) {
-				button.disabled = false;
+				reset( button );
 			}
 			notice( panel, vm.strings.failed );
 		} );

@@ -63,6 +63,7 @@ final class Panels {
 					'failed'    => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'expired'   => __( 'Your session has expired. Please reload the page.', 'beltoft-services' ),
 					'tooMany'   => __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ),
+					'working'   => __( 'Working…', 'beltoft-services' ),
 					'gone'      => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),
 					'reinstall' => __( 'Reinstalling erases everything on the server. Continue?', 'beltoft-services' ),
 					'reinstallDisks' => __( 'Reinstalling erases the server\'s main disk. Extra disks are kept with their data and stay attached. Continue?', 'beltoft-services' ),

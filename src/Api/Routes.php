@@ -12,6 +12,7 @@ use BeltoftServices\Drivers\Opens;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -148,11 +149,12 @@ final class Routes {
 
 		return new \WP_REST_Response(
 			array(
-				'state'   => $state,
-				'desired' => (string) $resource->get( 'desired' ),
-				'working' => Jobs::acting( $resource->id() ),
-				'label'   => Panel::label( $state, $resource ),
-				'message' => Panel::message( $state, $resource ),
+				'state'    => $state,
+				'desired'  => (string) $resource->get( 'desired' ),
+				'working'  => Jobs::acting( $resource->id() ),
+				'label'    => Panel::label( $state, $resource ),
+				'message'  => Panel::message( $state, $resource ),
+				'progress' => Progress::build( $resource ),
 			),
 			200
 		);
@@ -199,6 +201,8 @@ final class Routes {
 			return self::error( $refusal->get_error_code(), $refusal->get_error_message(), $status );
 		}
 
+		// The card shows "requested" at once; the job clears the mark when it has run.
+		Progress::mark( $resource, $action );
 		Jobs::queue_act( $resource->id(), $action, $args );
 
 		return new \WP_REST_Response(

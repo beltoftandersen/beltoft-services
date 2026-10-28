@@ -77,16 +77,57 @@
 		if ( message && data.message ) {
 			message.textContent = data.message;
 		}
+
+		// The live progress block: drawn from the payload this same poll fetched.
+		var block = panel.querySelector( '[data-progress]' );
+
+		if ( block && data.progress && window.BeltoftServicesProgress ) {
+			panel.beltoftActive = window.BeltoftServicesProgress.render( block, data.progress ) || panel.beltoftActive;
+			return data.progress.active;
+		}
+
+		return false;
+	}
+
+	// A button that has been clicked shows it is working; reset() gives it back after an error.
+	function busy( button ) {
+		button.disabled = true;
+		button.setAttribute( 'aria-busy', 'true' );
+		button.classList.add( 'is-busy' );
+
+		if ( undefined === button.beltoftLabel ) {
+			button.beltoftLabel = button.textContent;
+			button.textContent = config.strings.working;
+		}
+	}
+
+	function reset( button ) {
+		button.disabled = false;
+		button.removeAttribute( 'aria-busy' );
+		button.classList.remove( 'is-busy' );
+
+		if ( undefined !== button.beltoftLabel ) {
+			button.textContent = button.beltoftLabel;
+			button.beltoftLabel = undefined;
+		}
 	}
 
 	function poll( panel ) {
 		var id = panel.getAttribute( 'data-resource' );
 		var first = panel.getAttribute( 'data-state' );
+		var run = ( panel.beltoftRun || 0 ) + 1;
+		var block = panel.querySelector( '[data-progress]' );
+
+		// Only the newest chain goes on: a queued action starts a fresh one at once.
+		panel.beltoftRun = run;
+		panel.beltoftActive = panel.beltoftActive || ( !! block && /^(queued|running)$/.test( block.getAttribute( 'data-phase' ) ) );
 
 		request( 'GET', id ).then( function ( response ) {
 			if ( 429 === response.status ) {
 				window.setTimeout( function () {
-					poll( panel );
+					if ( run === panel.beltoftRun ) {
+						poll( panel );
+					}
 				}, retryAfter( response ) );
 				return null;
 			}
@@ -103,19 +144,23 @@
 				return null;
 			} );
 		} ).then( function ( data ) {
-			if ( ! data ) {
+			var active;
+
+			if ( ! data || run !== panel.beltoftRun ) {
 				return;
 			}
 
-			show( panel, data );
+			active = show( panel, data );
 
 			// A failed service waits for the shop: no point in asking again.
-			if ( data.state !== data.desired && 'failed' !== data.state ) {
+			if ( ( data.state !== data.desired || active ) && 'failed' !== data.state ) {
 				window.setTimeout( function () {
-					poll( panel );
-				}, parseInt( config.interval, 10 ) || 10000 );
-			} else if ( data.state !== first ) {
-				// Settled in a new state: the driver's part and the buttons change with it.
+					if ( run === panel.beltoftRun ) {
+						poll( panel );
+					}
+				}, active ? 5000 : ( parseInt( config.interval, 10 ) || 10000 ) );
+			} else if ( data.state !== first || panel.beltoftActive ) {
+				// Settled in a new state, or the work shown has finished: the driver's part and the buttons change with it.
 				window.location.reload();
 			}
 		} ).catch( function () {} );
@@ -155,7 +200,7 @@
 	function act( panel, button ) {
 		var id = panel.getAttribute( 'data-resource' );
 
-		button.disabled = true;
+		busy( button );
 
 		request( 'POST', id + '/actions/' + encodeURIComponent( button.getAttribute( 'data-action' ) ) ).then( function ( response ) {
 			if ( 202 === response.status ) {
@@ -164,7 +209,7 @@
 				return;
 			}
 
-			button.disabled = false;
+			reset( button );
 
 			return expired( response ).then( function ( stale ) {
 				if ( stale ) {
@@ -176,7 +221,7 @@
 				}
 			} );
 		} ).catch( function () {
-			button.disabled = false;
+			reset( button );
 			notice( panel, config.strings.failed );
 		} );
 	}
@@ -219,6 +264,12 @@
 
 	document.querySelectorAll( '.beltoft-services-panel[data-resource]' ).forEach( function ( panel ) {
 		poll( panel );
+
+		// A form of another script (the server card) queued a slow action: show its progress now.
+		panel.addEventListener( 'beltoft-services:queued', function () {
+			panel.beltoftActive = true;
+			poll( panel );
+		} );
 
 		panel.addEventListener( 'click', function ( event ) {
 			var button = event.target.closest( '.beltoft-services-action' );

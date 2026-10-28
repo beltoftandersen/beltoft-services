@@ -299,6 +299,7 @@ final class Jobs {
 			if ( ! $allowed ) {
 				// Dropped, but not silently: the customer asked for something that did not happen.
 				if ( $resource ) {
+					Progress::clear( $resource );
 					Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', sprintf( 'Customer action "%s" was not run: it is not available any more', $action ) );
 				}
 
@@ -348,7 +349,8 @@ final class Jobs {
 
 		$license_id = (int) ( $r->license()['id'] ?? 0 );
 
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0 ) ) ) ) {
+		// The action is over, done or failed: the card shows the real state from here, not "requested".
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, Progress::MARKER => null ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
