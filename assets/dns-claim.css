@@ -1,0 +1,237 @@
+/*
+ * My Account → Domains: add a domain for DNS hosting. Layout only: fonts and colours come from
+ * the theme. Square corners, few borders.
+ */
+.beltoft-dns-claim {
+	margin: 0 0 2.5em;
+	max-width: 100%;
+}
+
+.beltoft-dns-claim__form {
+	display: grid;
+	gap: 0.5em;
+	max-width: 36em;
+}
+
+.beltoft-dns-claim__field {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5em;
+}
+
+.beltoft-dns-claim__field input {
+	flex: 1 1 14em;
+	min-width: 0;
+	border-radius: 0;
+}
+
+.beltoft-dns-claim button,
+.beltoft-dns-claim input,
+.beltoft-dns-claim textarea {
+	border-radius: 0;
+}
+
+.beltoft-dns-claim__error {
+	margin: 0;
+	color: #b32d2e;
+}
+
+.beltoft-dns-claim__list {
+	display: grid;
+	gap: 1.5em;
+	margin-top: 1.5em;
+}
+
+.beltoft-dns-claim__claim {
+	min-width: 0;
+	padding-top: 1em;
+	border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.beltoft-dns-claim__domain {
+	margin: 0 0 0.5em;
+	overflow-wrap: anywhere;
+}
+
+.beltoft-dns-claim__step {
+	margin: 1.25em 0 0.5em;
+}
+
+.beltoft-dns-claim__status {
+	margin: 0;
+	font-weight: 700;
+}
+
+.beltoft-dns-claim__message,
+.beltoft-dns-claim__note,
+.beltoft-dns-claim__warning {
+	margin: 0.5em 0;
+}
+
+.beltoft-dns-claim__note {
+	font-size: 0.875em;
+	opacity: 0.75;
+}
+
+.beltoft-dns-claim__row {
+	display: grid;
+	grid-template-columns: 4.5em minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.5em;
+	margin: 0.35em 0;
+}
+
+.beltoft-dns-claim__row input {
+	width: 100%;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.beltoft-dns-claim__label {
+	font-size: 0.875em;
+	opacity: 0.75;
+}
+
+.beltoft-dns-claim button.beltoft-dns-claim__link {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.beltoft-dns-claim__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5em 1.25em;
+	margin: 0.75em 0;
+}
+
+.beltoft-dns-claim__zone {
+	display: grid;
+	gap: 0.5em;
+	justify-items: start;
+	margin-top: 0.5em;
+}
+
+.beltoft-dns-claim__zone textarea {
+	width: 100%;
+	font-family: monospace;
+}
+
+.beltoft-dns-claim__table-wrap {
+	margin-top: 1em;
+}
+
+.beltoft-dns-claim__table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+}
+
+.beltoft-dns-claim__table th,
+.beltoft-dns-claim__table td {
+	padding: 0.35em 0.5em;
+	text-align: left;
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+
+.beltoft-dns-claim__table th:first-child,
+.beltoft-dns-claim__table td:first-child {
+	width: 2.25em;
+}
+
+.beltoft-dns-claim__skipped {
+	margin: 0;
+	padding-left: 1.25em;
+	overflow-wrap: anywhere;
+}
+
+.beltoft-dns-claim__loading {
+	display: grid;
+	gap: 0.6em;
+	padding: 1em 0;
+}
+
+.beltoft-dns-claim__bar {
+	position: relative;
+	display: block;
+	width: 100%;
+	max-width: 22em;
+	height: 4px;
+	overflow: hidden;
+	background: rgba(0, 0, 0, 0.12);
+}
+
+.beltoft-dns-claim__bar::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	width: 30%;
+	background: currentColor;
+	animation: beltoft-dns-claim-wait 1.1s ease-in-out infinite;
+}
+
+.beltoft-dns-claim__loading-text {
+	font-weight: 700;
+}
+
+@keyframes beltoft-dns-claim-wait {
+	from { transform: translateX(-100%); }
+	to { transform: translateX(340%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.beltoft-dns-claim__bar::before {
+		width: 100%;
+		opacity: 0.35;
+		animation: none;
+	}
+}
+
+@media (max-width: 480px) {
+	.beltoft-dns-claim__row {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.beltoft-dns-claim__label {
+		grid-column: 1 / -1;
+		margin-bottom: -0.25em;
+	}
+
+	/* Rows become stacked blocks so a long value never forces a sideways scroll. */
+	.beltoft-dns-claim__table thead {
+		position: absolute;
+		left: -9999px;
+	}
+
+	.beltoft-dns-claim__table,
+	.beltoft-dns-claim__table tbody,
+	.beltoft-dns-claim__table tr,
+	.beltoft-dns-claim__table td {
+		display: block;
+		width: 100%;
+	}
+
+	.beltoft-dns-claim__table tr {
+		padding: 0.5em 0;
+		border-top: 1px solid rgba(0, 0, 0, 0.12);
+	}
+
+	.beltoft-dns-claim__table td,
+	.beltoft-dns-claim__table td:first-child {
+		width: auto;
+		padding: 0.1em 0;
+	}
+
+	.beltoft-dns-claim__table td[data-label]::before {
+		content: attr(data-label) ": ";
+		opacity: 0.75;
+	}
+}
