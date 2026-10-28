@@ -170,6 +170,13 @@ final class Commands {
 				if ( $other && $other->get( 'domain' ) === $domain && $kind === $driver->kind() ) { \WP_CLI::error( 'This domain already has a resource of this kind.' ); }
 			}
 		}
+		if ( ! $dns_only ) {
+			// The id must be this domain's: a wrong id would manage another registration.
+			$found = DomainClients::registrar()->request( 'GET', '/domains/' . $remote_id );
+			if ( is_wp_error( $found ) ) { \WP_CLI::error( 'The registrar could not confirm the registrar id.' ); }
+			$named = isset( $found['full_name'] ) ? (string) $found['full_name'] : trim( (string) ( $found['domain']['name'] ?? '' ) . '.' . (string) ( $found['domain']['extension'] ?? '' ), '.' );
+			if ( strtolower( rtrim( $named, '.' ) ) !== $domain ) { \WP_CLI::error( 'The registrar id belongs to a different domain.' ); }
+		}
 		if ( $dns_only ) {
 			$zone = DomainClients::dns()->zone( $domain );
 			if ( is_wp_error( $zone ) || null === $zone ) { \WP_CLI::error( 'The DNS zone must exist before linking.' ); }
