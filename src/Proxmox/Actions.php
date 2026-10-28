@@ -37,6 +37,7 @@ defined( 'ABSPATH' ) || exit;
 final class Actions {
 
 	use Steps;
+	use Prepares;
 	use RestoreSteps;
 
 	/**
@@ -225,27 +226,28 @@ final class Actions {
 			}
 		}
 
-		if ( 'rollback' === $action ) {
-			if ( $attention ) {
-				return __( 'An extra disk on this server needs attention from support before a rollback. Contact support.', 'beltoft-services' );
-			}
-
-			return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Rolling back is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
+		if ( ! $attention && ! $policy ) {
+			return null;
 		}
 
-		if ( 'reinstall' === $action ) {
-			if ( $attention ) {
-				return __( 'An extra disk on this server needs attention from support before a reinstall. Contact support.', 'beltoft-services' );
-			}
+		// Whole sentences per action, so a translation never has to join pieces.
+		$texts = array(
+			'rollback'  => array(
+				'attention' => __( 'An extra disk on this server needs attention from support before a rollback. Contact support.', 'beltoft-services' ),
+				'policy'    => __( 'This server has an extra disk that is detached because its subscription is not active. Rolling back is possible again once the disk is active or removed.', 'beltoft-services' ),
+			),
+			'reinstall' => array(
+				'attention' => __( 'An extra disk on this server needs attention from support before a reinstall. Contact support.', 'beltoft-services' ),
+				'policy'    => __( 'This server has an extra disk that is detached because its subscription is not active. Reinstall is possible again once the disk is active or removed.', 'beltoft-services' ),
+			),
+			'restore'   => array(
+				'attention' => __( 'An extra disk on this server needs attention from support before a restore. Contact support.', 'beltoft-services' ),
+				'policy'    => __( 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.', 'beltoft-services' ),
+			),
+		);
+		$text  = $texts[ $action ] ?? $texts['restore'];
 
-			return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Reinstall is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
-		}
-
-		if ( $attention ) {
-			return __( 'An extra disk on this server needs attention from support before a restore. Contact support.', 'beltoft-services' );
-		}
-
-		return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
+		return $attention ? $text['attention'] : $text['policy'];
 	}
 
 	/**
@@ -462,41 +464,6 @@ final class Actions {
 			default:
 				return $this->reinstall( $record, $args );
 		}
-	}
-
-	/**
-	 * Builds the client of the record's cluster. Failures are permanent.
-	 *
-	 * @param array<string, mixed> $record VM record.
-	 */
-	private function prepare( array $record ): ?StepResult {
-		$cluster = Clusters::get( (string) $record['cluster'] );
-
-		if ( null === $cluster ) {
-			return StepResult::fail( 'The cluster of this VM is not configured' );
-		}
-
-		$this->cluster = $cluster;
-		$this->secrets = array( (string) $cluster['token_secret'] );
-
-		$gate = Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() );
-
-		if ( null !== $gate ) {
-			return StepResult::retry( 0, $gate );
-		}
-
-		try {
-			$this->client = Clients::for( $cluster );
-		} catch ( \Throwable $e ) {
-			unset( $e );
-
-			return StepResult::fail( 'The Proxmox client could not be built for this cluster' );
-		}
-
-		$wait       = (int) Settings::get( 'task_wait' );
-		$this->wait = $wait > 0 ? $wait : 25;
-
-		return null;
 	}
 
 	/**

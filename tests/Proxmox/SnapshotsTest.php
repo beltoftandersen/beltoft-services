@@ -836,4 +836,202 @@ class SnapshotsTest extends BackupTestCase {
 		Jobs::run( $server->id() );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 	}
+
+	// -- Review fixes ----------------------------------------------------------------------------
+
+	private function stale_op( Resource $r, array $entry, int $age = 3 * HOUR_IN_SECONDS ): void {
+		$this->fresh( $r )->set( array( Snapshots::LIST => array( array_merge( $entry, array( 'state' => 'creating' ) ) ), Snapshots::OP => array( 'op' => 'take', 'id' => $entry['id'], 'phase' => 'sent', 'at' => time() - $age ) ) );
+	}
+
+	public function test_a_take_without_a_label_resumes_by_its_op_not_by_its_label(): void {
+		$this->on( array( 'snapshot_free_slots' => 1 ) );
+		$r = $this->ready_vm();
+		$this->fake->next_task( array( 'polls' => 10 ) );
+		$this->act( $r, 'snapshot_take' );
+		$entries = Snapshots::entries( $this->fresh( $r ) );
+		$this->assertCount( 1, $entries );
+
+		// The retry minutes later makes another date label: the op still owns the entry.
+		$this->fresh( $r )->set( array( Snapshots::LIST => array( array_merge( $entries[0], array( 'label' => 'Snapshot 2001-01-01 00:00' ) ) ) ) );
+		$this->assertNull( Snapshots::check( $this->fresh( $r ), 'snapshot_take', array() ) );
+
+		for ( $i = 0; $i < 4 && 'ok' !== ( Snapshots::entries( $this->fresh( $r ) )[0]['state'] ?? '' ); $i++ ) {
+			$this->act( $r, 'snapshot_take' );
+		}
+
+		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( 'ok', Snapshots::entries( $this->fresh( $r ) )[0]['state'] );
+		$this->assertCount( 1, $this->calls( 'POST', '/qemu/5000/snapshot' ) );
+	}
+
+	public function test_a_snapshot_that_vanishes_during_a_rollback_ends_it_cleanly(): void {
+		$server = $this->server();
+		$a      = $this->take( $server, 'A' );
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->mails = array();
+		$this->fake->task( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		$this->fresh( $server )->set( array( Snapshots::LIST => array(), Snapshots::ROLLBACK => array( 'id' => $a['id'], 'phase' => 'stopping', 'was_running' => true, 'at' => time() ) ) );
+
+		$this->rollback( $server, $a );
+
+		$fresh = $this->fresh( $server );
+		$this->assertNull( $fresh->get( Snapshots::ROLLBACK ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'], 'A server that ran is started again.' );
+		$this->assertTrue( (bool) $fresh->get( 'plan_dirty' ), 'The plan is queued again.' );
+		$this->assertNotEmpty( $this->mails, 'The customer is told, and the admin alerted.' );
+		$this->assertNotEmpty( $this->admin_mails() );
+		$this->assertSame( array(), $this->calls( 'POST', '/rollback' ) );
+	}
+
+	public function test_nothing_else_starts_while_a_take_or_a_rollback_is_open(): void {
+		$r = $this->server();
+		$a = $this->take( $r, 'A' );
+		$this->fake->next_task( array( 'polls' => 10 ) );
+		$this->act( $r, 'snapshot_take', array( 'label' => 'slow' ) );
+		$open  = $this->fresh( $r );
+		$slow  = array_values( array_filter( Snapshots::entries( $open ), static fn( $e ) => 'slow' === $e['label'] ) )[0];
+		$busy  = 'Another snapshot action is still running on this server. Try again in a few minutes.';
+		$roll  = array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' );
+
+		$this->assertSame( 'creating', $slow['state'] );
+		$this->assertSame( $busy, Snapshots::check( $open, 'snapshot_delete', array( 'id' => $a['id'] ) ) );
+		$this->assertSame( $busy, Snapshots::check( $open, 'snapshot_rollback', $roll ) );
+		$this->assertSame( $busy, Snapshots::check( $open, 'snapshot_delete', array( 'id' => $slow['id'] ) ), 'An entry that is still being made is not deleted either.' );
+		$this->assertNull( Snapshots::check( $open, 'snapshot_take', array( 'label' => 'slow' ) ), 'The take that owns the op resumes.' );
+
+		$this->act( $r, 'snapshot_delete', array( 'id' => $a['id'] ) );
+		$this->assertCount( 2, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), $this->calls( 'DELETE', '/snapshot/' ) );
+
+		// A rollback in flight: another id, a take and a delete are refused; its own id resumes.
+		$b = $this->take( $this->server(), 'unused' );
+		unset( $b );
+		$this->fresh( $r )->set( array( Snapshots::OP => null, Snapshots::LIST => array( $a ), Snapshots::ROLLBACK => array( 'id' => $a['id'], 'phase' => 'rolling', 'was_running' => true, 'at' => time() ) ) );
+		$mid = $this->fresh( $r );
+		$this->assertSame( $busy, Snapshots::check( $mid, 'snapshot_rollback', array( 'id' => 'deadbeef', 'confirm' => 'ROLLBACK' ) ) );
+		$this->assertSame( $busy, Snapshots::check( $mid, 'snapshot_take', array( 'label' => 'x' ) ) );
+		$this->assertSame( $busy, Snapshots::check( $mid, 'snapshot_delete', array( 'id' => $a['id'] ) ) );
+		$this->assertNull( Snapshots::check( $mid, 'snapshot_rollback', $roll ) );
+		$this->assertSame( $a['id'], $this->fresh( $r )->get( Snapshots::ROLLBACK )['id'], 'The marker was not overwritten.' );
+	}
+
+	public function test_an_entry_that_is_not_ok_is_not_deleted_by_a_customer(): void {
+		$r     = $this->server();
+		$entry = $this->take( $r, 'A' );
+		$this->fresh( $r )->set( array( Snapshots::LIST => array( array_merge( $entry, array( 'state' => 'creating' ) ) ), Snapshots::OP => null ) );
+		$this->assertSame( 'Choose one of your snapshots.', Snapshots::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $entry['id'] ) ) );
+		$this->act( $r, 'snapshot_delete', array( 'id' => $entry['id'] ) );
+		$this->assertSame( array(), $this->calls( 'DELETE', '/snapshot/' ) );
+		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+	}
+
+	public function test_a_snapshot_action_never_takes_over_the_task_of_another_job(): void {
+		$r = $this->server();
+		$upid = $this->fake->task( 'POST', '/nodes/node-a/qemu/5000/status/reboot' );
+		$this->assertIsString( $upid );
+		$foreign = array( 'step' => 'reboot', 'phase' => '', 'upid' => $upid, 'node' => 'node-a' );
+		$r->set( array( 'task' => $foreign ) );
+		$polls = count( $this->calls( 'GET', '/tasks/' ) );
+
+		$this->act( $r, 'snapshot_take', array( 'label' => 'early' ) );
+
+		$this->assertSame( $foreign, $this->fresh( $r )->get( 'task' ), 'The other job\'s task is neither polled to the end nor cleared.' );
+		$this->assertSame( $polls, count( $this->calls( 'GET', '/tasks/' ) ), 'It was not even polled.' );
+		$this->assertSame( array(), $this->calls( 'POST', '/qemu/5000/snapshot' ) );
+		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+
+		// Once the owner has cleared its task, the snapshot goes ahead.
+		$this->fresh( $r )->set( array( 'task' => null ) );
+		$this->assertSame( 'ok', $this->take( $r, 'early' )['state'] );
+	}
+
+	public function test_a_take_that_ran_out_of_time_is_closed_and_the_entry_dropped(): void {
+		$r     = $this->server();
+		$entry = $this->take( $r, 'A' );
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->mails = array();
+		$gone        = array_merge( $entry, array( 'id' => 'abcdef01', 'snap' => 'bs0000000000', 'label' => 'ghost' ) );
+		$this->fresh( $r )->set( array( Snapshots::LIST => array( $entry, array_merge( $gone, array( 'state' => 'creating' ) ) ), Snapshots::OP => array( 'op' => 'take', 'id' => 'abcdef01', 'phase' => 'sent', 'at' => time() - 3 * HOUR_IN_SECONDS ) ) );
+
+		$this->act( $r, 'snapshot_delete', array( 'id' => $entry['id'] ) );
+
+		$fresh = $this->fresh( $r );
+		$this->assertNull( $fresh->get( Snapshots::OP ) );
+		$this->assertNull( Snapshots::entry( $fresh, 'abcdef01' ), 'A creating entry whose snapshot does not exist is dropped.' );
+		$this->assertCount( 1, $this->admin_mails(), 'The admin hears about it once.' );
+	}
+
+	public function test_a_take_that_ran_out_of_time_keeps_a_snapshot_that_exists(): void {
+		$r     = $this->server();
+		$entry = $this->take( $r, 'A' );
+		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->mails = array();
+		$this->stale_op( $r, $entry );
+
+		$this->act( $r, 'snapshot_sync' );
+
+		$fresh = $this->fresh( $r );
+		$this->assertNull( $fresh->get( Snapshots::OP ) );
+		$this->assertSame( 'ok', Snapshots::entry( $fresh, $entry['id'] )['state'] );
+		$this->assertCount( 1, $this->admin_mails() );
+
+		$this->act( $r, 'snapshot_sync' );
+		$this->assertCount( 1, $this->admin_mails(), 'Once.' );
+	}
+
+	public function test_a_take_inside_its_age_limit_stays_open(): void {
+		$r     = $this->server();
+		$entry = $this->take( $r, 'A' );
+		$this->stale_op( $r, $entry, HOUR_IN_SECONDS );
+		$this->act( $r, 'snapshot_sync' );
+		$this->assertSame( 'take', $this->fresh( $r )->get( Snapshots::OP )['op'] );
+	}
+
+	public function test_snapshots_are_not_offered_while_something_else_changes_the_server(): void {
+		$r = $this->server();
+		$this->take( $r, 'A' );
+		$a = Snapshots::entries( $this->fresh( $r ) )[0];
+		$this->assertTrue( Snapshots::enabled( $this->fresh( $r ) ) );
+
+		$cases = array(
+			'restore marker' => array( 'restore' => array( 'volid' => 'x', 'phase' => 'task' ) ),
+			'wipe'           => array( 'wipe' => true ),
+			'pending op'     => array( 'op' => 'update_plan' ),
+			'plan change'    => array( 'plan_dirty' => true ),
+			'not ready'      => array( 'state' => 'provisioning' ),
+			'not desired'    => array( 'desired' => 'paused' ),
+		);
+
+		foreach ( $cases as $name => $meta ) {
+			$r = $this->fresh( $r );
+			$old = array();
+			foreach ( $meta as $k => $unused ) {
+				$old[ $k ] = $r->get( $k );
+			}
+			$this->assertTrue( $r->set( $meta ), $name );
+			$busy = $this->fresh( $r );
+			$this->assertFalse( Snapshots::enabled( $busy ), $name );
+			$this->assertArrayNotHasKey( 'snapshot_take', Snapshots::offered( $busy ), $name );
+			$this->assertArrayNotHasKey( 'snapshot_rollback', Snapshots::offered( $busy ), $name );
+			$this->assertNotNull( Snapshots::check( $busy, 'snapshot_take', array( 'label' => 'n' ) ), $name );
+			$this->assertNotNull( Snapshots::check( $busy, 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) ), $name );
+			$this->assertTrue( $this->fresh( $r )->set( $old ), $name );
+		}
+
+		$this->assertTrue( Snapshots::enabled( $this->fresh( $r ) ) );
+	}
+
+	public function test_the_disk_block_texts_are_whole_sentences_per_action(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+		$disk->set( array( 'state' => 'paused' ) );
+		foreach ( array( 'restore' => 'Restore is possible', 'reinstall' => 'Reinstall is possible', 'rollback' => 'Rolling back is possible' ) as $action => $part ) {
+			$this->assertStringContainsString( $part, (string) Actions::disk_block( $this->fresh( $server ), $action ) );
+		}
+		$disk->set( array( 'state' => 'failed' ) );
+		foreach ( array( 'restore', 'reinstall' ) as $action ) {
+			$this->assertStringContainsString( 'before a ' . $action, (string) Actions::disk_block( $this->fresh( $server ), $action ) );
+		}
+		$this->assertStringContainsString( 'before a rollback', (string) Actions::disk_block( $this->fresh( $server ), 'rollback' ) );
+	}
 }

@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -39,7 +40,10 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Snapshots {
 
-	use Steps;
+	use Steps {
+		poll_task as private poll_any_task;
+	}
+	use Prepares;
 	use RestoreSteps;
 
 	/**
@@ -66,6 +70,11 @@ final class Snapshots {
 	 * The actions queued by the plugin itself, never offered to a customer (Drivers\InternalActions).
 	 */
 	public const INTERNAL = array( 'snapshot_expire', 'snapshot_purge', 'snapshot_sync' );
+
+	/**
+	 * Seconds a take may stay open. Past that the next action closes it (see close_stale()).
+	 */
+	public const OP_MAX_AGE = 2 * HOUR_IN_SECONDS;
 
 	/**
 	 * The word a customer types to confirm a rollback.
@@ -121,7 +130,7 @@ final class Snapshots {
 			return false;
 		}
 
-		if ( 'qcow2' !== $r->get( 'boot_format' ) ) {
+		if ( 'qcow2' !== $r->get( 'boot_format' ) || ! self::idle( $r ) ) {
 			return false;
 		}
 
@@ -134,6 +143,22 @@ final class Snapshots {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Is nothing else changing the server? It is ready and meant to be, with no reconciler operation or plan
+	 * change pending, no restore marker and no reinstall or wipe under way. A take, a delete or a rollback never
+	 * starts over any of these.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function idle( Resource $r ): bool {
+		return 'ready' === $r->get( 'state' )
+			&& 'ready' === $r->get( 'desired' )
+			&& '' === (string) $r->get( 'op' )
+			&& ! $r->get( 'plan_dirty' )
+			&& ! is_array( $r->get( 'restore' ) )
+			&& ! $r->get( 'wipe' );
 	}
 
 	/**
@@ -152,6 +177,26 @@ final class Snapshots {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Is a take open (marker and entry both there) that has not outlived its age limit?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function take_open( Resource $r ): bool {
+		$op = (array) $r->get( self::OP );
+
+		return 'take' === ( $op['op'] ?? '' ) && null !== self::entry( $r, $op['id'] ?? null ) && ! self::stale( $op );
+	}
+
+	/**
+	 * Has the operation been open longer than OP_MAX_AGE?
+	 *
+	 * @param array<string, mixed> $op Marker.
+	 */
+	private static function stale( array $op ): bool {
+		return 'take' === ( $op['op'] ?? '' ) && (int) ( $op['at'] ?? 0 ) > 0 && time() - (int) $op['at'] > self::OP_MAX_AGE;
 	}
 
 	/**
@@ -308,12 +353,7 @@ final class Snapshots {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
-		$op = (array) $r->get( self::OP );
-
-		if ( 'snapshot_delete' === $action ) {
-			return self::owns( $r, $args['id'] ?? null ) ? null : __( 'Choose one of your snapshots.', 'beltoft-services' );
-		}
-
+		$op      = (array) $r->get( self::OP );
 		$rolling = (array) $r->get( self::ROLLBACK );
 
 		// A rollback that has begun is finished whatever happens to the switch or a disk meanwhile: the server is off.
@@ -321,8 +361,21 @@ final class Snapshots {
 			return null;
 		}
 
-		if ( 'snapshot_take' === $action && 'take' === ( $op['op'] ?? '' ) && ( self::entry( $r, $op['id'] ?? null )['label'] ?? '' ) === self::label_from( $args ) ) {
+		// A take that is under way is resumed by the next take, whatever label it carries; the op owns the entry.
+		if ( 'snapshot_take' === $action && 'take' === ( $op['op'] ?? '' ) && null !== self::entry( $r, $op['id'] ?? null ) ) {
 			return null;
+		}
+
+		// Nothing else starts while a rollback or a take is open (a take past its age limit is closed by the next run).
+		if ( $rolling || self::take_open( $r ) ) {
+			return __( 'Another snapshot action is still running on this server. Try again in a few minutes.', 'beltoft-services' );
+		}
+
+		if ( 'snapshot_delete' === $action ) {
+			$entry = self::entry( $r, $args['id'] ?? null );
+
+			// An entry that is still being made is the take's; one that is being deleted may be asked again.
+			return null !== $entry && in_array( $entry['state'] ?? 'ok', array( 'ok', 'deleting' ), true ) ? null : __( 'Choose one of your snapshots.', 'beltoft-services' );
 		}
 
 		if ( ! self::enabled( $r ) ) {
@@ -404,6 +457,12 @@ final class Snapshots {
 		}
 
 		list( $record, $v ) = $began;
+
+		$closed = $this->close_stale( $record, $v );
+
+		if ( null !== $closed ) {
+			return $closed;
+		}
 
 		switch ( $action ) {
 			case 'snapshot_take':
@@ -512,38 +571,22 @@ final class Snapshots {
 	}
 
 	/**
-	 * Builds the client of the record's cluster. Failures are permanent.
-	 *
-	 * @param array<string, mixed> $record VM record.
+	 * Polls the task in the shared `task` slot only when a snapshot flow owns it: a task of step `snapshot`, or
+	 * any task while a rollback is open (its stop and its disk steps use the slot too). A task of another job is
+	 * never polled or cleared here: that job's own run does it, and this one waits for it.
 	 */
-	private function prepare( array $record ): ?StepResult {
-		$cluster = Clusters::get( (string) $record['cluster'] );
+	protected function poll_task(): ?StepResult {
+		$task = $this->r->get( 'task' );
 
-		if ( null === $cluster ) {
-			return StepResult::fail( 'The cluster of this VM is not configured' );
+		if ( ! is_array( $task ) || empty( $task['upid'] ) || ! is_string( $task['upid'] ) ) {
+			return null;
 		}
 
-		$this->cluster = $cluster;
-		$this->secrets = array( (string) $cluster['token_secret'] );
-
-		$gate = Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() );
-
-		if ( null !== $gate ) {
-			return StepResult::retry( 0, $gate );
+		if ( 'snapshot' !== (string) ( $task['step'] ?? '' ) && ! is_array( $this->r->get( self::ROLLBACK ) ) ) {
+			return StepResult::retry( 0, 'snapshot: waiting for another task on the server to end' );
 		}
 
-		try {
-			$this->client = Clients::for( $cluster );
-		} catch ( \Throwable $e ) {
-			unset( $e );
-
-			return StepResult::fail( 'The Proxmox client could not be built for this cluster' );
-		}
-
-		$wait       = (int) Settings::get( 'task_wait' );
-		$this->wait = $wait > 0 ? $wait : 25;
-
-		return null;
+		return $this->poll_any_task();
 	}
 
 	/**
@@ -678,6 +721,46 @@ final class Snapshots {
 	}
 
 	// -- Take ------------------------------------------------------------------------------------
+
+	/**
+	 * A take that has been open longer than OP_MAX_AGE (it ran out of retries, or its job was lost) is closed
+	 * here, by whichever action or sync comes next: the entry stays as `ok` when Proxmox lists the snapshot,
+	 * and goes when it does not. The admin is told once, because the marker goes with it.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return StepResult|null Null when nothing was stale or it is closed; a retry otherwise.
+	 */
+	private function close_stale( array $record, array $v ): ?StepResult {
+		$op = $this->open_op();
+
+		if ( null === $op || ! self::stale( $op ) ) {
+			return null;
+		}
+
+		$entry = self::entry( $this->r, $op['id'] ?? null );
+
+		if ( null === $entry ) {
+			return $this->save( null, null ) ? null : StepResult::retry( 0, 'snapshot: the old request could not be closed' );
+		}
+
+		$remote = $this->remote( $record, $v );
+
+		if ( $remote instanceof StepResult ) {
+			return $remote;
+		}
+
+		$kept = isset( $remote[ $entry['snap'] ] );
+		$list = $kept ? $this->with( (string) $entry['id'], array( 'state' => 'ok' ) ) : $this->with( (string) $entry['id'], null );
+
+		if ( ! $this->save( $list, null ) ) {
+			return StepResult::retry( 0, 'snapshot: the old request could not be closed' );
+		}
+
+		Alerts::admin( $this->r, 'A snapshot request ("' . $this->scrub( (string) $entry['label'], 60 ) . '") ran out of time without finishing. ' . ( $kept ? 'Proxmox lists the snapshot, so it was kept.' : 'Proxmox does not list it, so the entry was dropped.' ) );
+
+		return null;
+	}
 
 	/**
 	 * Takes a snapshot. The entry is written down (`creating`, with the volumes it will cover) before Proxmox is
@@ -966,7 +1049,7 @@ final class Snapshots {
 		}
 
 		if ( null === $entry ) {
-			return StepResult::fail( 'Rollback: the snapshot left the list while it ran', array( self::ROLLBACK => null ) );
+			return $this->rollback_failed( $record, $v, $marker, 'the snapshot left the list while it ran' );
 		}
 
 		if ( 'stopping' === $phase ) {
@@ -1052,6 +1135,11 @@ final class Snapshots {
 			if ( is_string( $upid ) ) {
 				$this->client->wait_task( $upid, $this->wait );
 			}
+		}
+
+		// Whatever the failed rollback left, the paid plan is applied again (it starts the server when it ran).
+		if ( true === $this->r->change_plan( (array) $this->r->get( 'plan' ), 'Plan re-applied after a failed rollback' ) ) {
+			Jobs::enqueue( $this->r->id() );
 		}
 
 		$this->tell_customer( 'rollback' );
