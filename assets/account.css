@@ -151,3 +151,31 @@ div.beltoft-services-domain [hidden] { display: none; }
 .beltoft-services-domain__code { display: flex; gap: 8px; max-width: 520px; margin-top: 12px; }
 div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; background: var(--bsd-warm); font-size: 17px; font-weight: 500; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .beltoft-services-domain__code .button { flex: none; min-width: 5.5em; }
+
+/* DNS hosting card: move the registration here. */
+.beltoft-services-domain__transfer .beltoft-services-domain__label {
+	display: block;
+	margin: 0.5em 0 0.3em;
+	font-size: 0.875em;
+	font-weight: 600;
+}
+
+.beltoft-services-domain__inline {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5em;
+	max-width: 36em;
+}
+
+.beltoft-services-domain__inline input {
+	flex: 1 1 14em;
+	min-width: 0;
+	margin: 0;
+	box-sizing: border-box;
+	border-radius: 0;
+}
+
+.beltoft-services-domain__error {
+	margin: 0.5em 0 0;
+	color: #b32d2e;
+}

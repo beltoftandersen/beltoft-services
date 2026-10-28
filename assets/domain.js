@@ -198,3 +198,38 @@
 		if ( show ) { show.click(); }
 	}() );
 }() );
+
+// DNS hosting card: move the registration here. The transfer goes through the same cart route as the
+// domain search; the transfer code is sent once, over HTTPS, and stored encrypted by the server.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-domain-transfer]' ) ) { return; }
+		event.preventDefault();
+		var input = form.querySelector( 'input[name="auth_code"]' );
+		var button = form.querySelector( 'button[type="submit"]' );
+		var error = form.querySelector( '[role="alert"]' );
+		var code = input ? input.value.trim() : '';
+		if ( ! code ) { if ( input ) { input.focus(); } return; }
+		var label = button ? button.textContent : '';
+		if ( button ) { button.disabled = true; button.textContent = form.getAttribute( 'data-busy' ) || label; }
+		if ( error ) { error.hidden = true; error.textContent = ''; }
+		window.fetch( form.getAttribute( 'data-cart' ), {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': form.getAttribute( 'data-store-nonce' ), 'X-WP-Nonce': form.getAttribute( 'data-rest-nonce' ) },
+			body: JSON.stringify( { domain: form.getAttribute( 'data-domain' ), mode: 'transfer', auth_code: code } )
+		} ).then( function ( response ) {
+			return response.json().catch( function () { return {}; } ).then( function ( data ) { return { ok: response.ok, data: data }; } );
+		} ).then( function ( result ) {
+			if ( result.ok && result.data && result.data.checkout_url ) {
+				window.location.assign( result.data.checkout_url );
+				return;
+			}
+			throw new Error( ( result.data && result.data.message ) || 'Error' );
+		} ).catch( function ( failure ) {
+			if ( button ) { button.disabled = false; button.textContent = label; }
+			if ( error ) { error.textContent = failure.message; error.hidden = false; }
+		} );
+	} );
+}() );

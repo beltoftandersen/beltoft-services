@@ -68,7 +68,10 @@ final class Cart {
 			if ( is_wp_error( $search ) ) { return $search; }
 			$status = $search['results'][0]['status'] ?? 'not_sold';
 			if ( ( 'register' === $mode && 'free' !== $status ) || ( 'transfer' === $mode && 'taken' !== $status ) ) {
-				return new \WP_Error( 'domain_unavailable', __( 'This domain cannot be ordered in that way.', 'beltoft-services' ), array( 'status' => 409 ) );
+				$message = 'transfer' === $mode
+					? __( 'This domain cannot be transferred here. Check that it is registered and that its extension is offered here.', 'beltoft-services' )
+					: __( 'This domain cannot be ordered in that way.', 'beltoft-services' );
+				return new \WP_Error( 'domain_unavailable', $message, array( 'status' => 409 ) );
 			}
 		}
 		$key = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );

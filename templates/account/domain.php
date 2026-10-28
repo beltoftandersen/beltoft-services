@@ -40,6 +40,34 @@ if ( $beltoft_time ) {
 			<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the reason some records were not imported. */ __( 'Some imported records could not be added: %s. Add them below.', 'beltoft-services' ), (string) $r->get( 'import_error' ) ) ); ?></p>
 		<?php endif; ?>
 		<p class="beltoft-services-domain__note"><?php esc_html_e( 'Copy your DNS records here before changing the name servers at your registrar.', 'beltoft-services' ); ?></p>
+		<?php
+		$beltoft_transfer_price = $beltoft_can ? \BeltoftServices\Domains\Cart::price_for( array( 'beltoft_services_domain' => array( 'domain' => (string) $r->get( 'domain' ), 'mode' => 'transfer' ) ) ) : null;
+		?>
+		<?php if ( null !== $beltoft_transfer_price ) : ?>
+			<section class="beltoft-services-domain__section beltoft-services-domain__transfer">
+				<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'Move the registration here', 'beltoft-services' ); ?></h4>
+				<p class="beltoft-services-domain__note"><?php esc_html_e( 'Transfer the registration to us and keep the domain and its DNS in one place. Your DNS records here stay as they are. The free DNS hosting ends when the transfer is done, because DNS is included with a domain.', 'beltoft-services' ); ?></p>
+				<p class="beltoft-services-domain__note">
+					<?php
+					echo wp_kses_post(
+						sprintf(
+							/* translators: %s: transfer price per year */
+							__( 'At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, excluding VAT.', 'beltoft-services' ),
+							wc_price( $beltoft_transfer_price )
+						)
+					);
+					?>
+				</p>
+				<form class="beltoft-services-domain-transfer" data-domain-transfer data-domain="<?php echo esc_attr( (string) $r->get( 'domain' ) ); ?>" data-cart="<?php echo esc_url( rest_url( \BeltoftServices\Api\Routes::NAMESPACE . '/domains/cart' ) ); ?>" data-store-nonce="<?php echo esc_attr( wp_create_nonce( 'wc_store_api' ) ); ?>" data-rest-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-busy="<?php esc_attr_e( 'Adding to order…', 'beltoft-services' ); ?>">
+					<label class="beltoft-services-domain__label" for="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>"><?php esc_html_e( 'Transfer code', 'beltoft-services' ); ?></label>
+					<span class="beltoft-services-domain__inline">
+						<input type="text" id="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>" name="auth_code" autocomplete="off" spellcheck="false" required>
+						<button type="submit" class="button"><?php esc_html_e( 'Transfer to us', 'beltoft-services' ); ?></button>
+					</span>
+					<p class="beltoft-services-domain__error" role="alert" hidden></p>
+				</form>
+			</section>
+		<?php endif; ?>
 	<?php else : ?>
 		<?php if ( '' !== $beltoft_expires ) : ?>
 			<dl class="beltoft-services-domain__facts">

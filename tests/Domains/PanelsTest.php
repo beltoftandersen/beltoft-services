@@ -71,6 +71,23 @@ class PanelsTest extends TestCase {
 		$this->assertStringNotContainsString( '<textarea', $html );
 	}
 
+	public function test_active_dns_card_offers_to_move_the_registration_here(): void {
+		update_option( \BeltoftServices\Domains\Prices::OPTION, array( 'com' => array( 'price' => 22, 'restricted' => false ) ) );
+		$html = $this->render( new DnsDriver(), array( 'domain' => 'move-here.com', 'mode' => 'dns' ), true );
+		$this->assertStringContainsString( 'Move the registration here', $html );
+		$this->assertStringContainsString( 'data-domain-transfer', $html );
+		$this->assertStringContainsString( 'data-domain="move-here.com"', $html );
+		$this->assertStringContainsString( 'name="auth_code"', $html );
+		$this->assertStringContainsString( '22', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+
+		// Not offered while the service is not active, nor for an extension that is not sold here.
+		$this->assertStringNotContainsString( 'data-domain-transfer', $this->render( new DnsDriver(), array( 'domain' => 'paused-here.com', 'mode' => 'dns' ) ) );
+		$this->assertStringNotContainsString( 'data-domain-transfer', $this->render( new DnsDriver(), array( 'domain' => 'not-sold.xyz', 'mode' => 'dns' ), true ) );
+		// Nor on a registered domain's own card.
+		$this->assertStringNotContainsString( 'data-domain-transfer', $this->render( new DomainDriver(), array( 'domain' => 'mine.com', 'mode' => 'register' ), true ) );
+	}
+
 	public function test_dns_card_status_lines_and_notes(): void {
 		$ours = $this->render( new DnsDriver(), array( 'domain' => 'a.example.com', 'mode' => 'dns', 'delegation' => 'ours', 'parent_ds' => true ), true );
 		$this->assertStringContainsString( 'Pointing at our name servers', $ours );
