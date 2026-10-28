@@ -748,7 +748,7 @@ final class Operations {
 		}
 
 		$this->progressed = $was;
-		$again            = $this->verified( $record, $step );
+		$again            = $this->reread_power( $record, $step, true );
 
 		if ( $again instanceof StepResult ) {
 			return $again;
@@ -842,6 +842,22 @@ final class Operations {
 				'ok'    => true === $done,
 				'exit'  => true === $done ? 'OK' : (string) $done['failed'],
 			);
+
+			if ( 'delete' === $phase ) {
+				continue;
+			}
+
+			// The status can lag behind a finished task: read again before the next round.
+			$after = $this->reread_power( $record, $step, false );
+
+			if ( $after instanceof StepResult ) {
+				return $after;
+			}
+
+			// A plug pull that left the VM listed as running is still going through: wait, it is no error and no round.
+			if ( 'stop' === $phase && 'running' === $after['status'] ) {
+				return StepResult::retry( 0, $step . ': waiting for the server to stop' );
+			}
 		}
 
 		return StepResult::retry( 0, $step . ': the VM did not reach the wanted state' );

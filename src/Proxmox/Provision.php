@@ -285,11 +285,14 @@ final class Provision {
 			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
 
 			if ( 'running' === $v['status'] ) {
-				$phase = ( $this->finished && 'wipe' === $this->finished['step'] && 'shutdown' === $this->finished['phase'] ) ? 'stop' : 'shutdown';
-				$call  = 'shutdown' === $phase
-					? array( $base . '/status/shutdown', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ) )
-					: array( $base . '/status/stop', array() );
-				$done  = $this->run_task( 'wipe', 'POST', $call[0], $call[1], $phase );
+				// The disk is destroyed anyway: no graceful shutdown, a plain stop.
+				$off = $this->wipe_power_off( $record, $base, false );
+
+				if ( $off instanceof StepResult ) {
+					return $off;
+				}
+
+				continue;
 			} else {
 				$done = $this->run_task(
 					'wipe',
@@ -309,13 +312,76 @@ final class Provision {
 
 			$this->finished = array(
 				'step'  => 'wipe',
-				'phase' => 'running' === $v['status'] ? $phase : 'delete',
+				'phase' => 'delete',
 				'ok'    => true === $done,
 				'exit'  => true === $done ? 'OK' : (string) $done['failed'],
 			);
 		}
 
 		return StepResult::retry( 0, 'wipe: the VM did not reach the wanted state' );
+	}
+
+	/**
+	 * Switches the running VM of a reinstall off. With extra disks: a graceful shutdown first (their filesystems are
+	 * flushed), then a stop when it is still running. Without: a plain stop, the disk is destroyed anyway. A task that
+	 * ended is followed by re-reads (the status can lag), and a VM that still shows as running then is waited for
+	 * with a retry, never counted as a failed round. Meta `wipe_power` = stop remembers that the graceful stage is
+	 * over, so a later run does not start it again.
+	 *
+	 * @param array<string, mixed> $record   VM record.
+	 * @param string               $base     VM path.
+	 * @param bool                 $graceful Try a shutdown first.
+	 * @return true|StepResult True when the VM is read as stopped.
+	 */
+	private function wipe_power_off( array $record, string $base, bool $graceful ) {
+		// A stop was sent by an earlier run: the status may only be late, and a stop on a stopped VM is an error.
+		if ( 'stop' === $this->r->get( 'wipe_power' ) ) {
+			$late = $this->reread_power( $record, 'wipe', false );
+
+			if ( $late instanceof StepResult ) {
+				return $late;
+			}
+
+			if ( 'running' !== $late['status'] ) {
+				return true;
+			}
+		}
+
+		$stop_first = ! $graceful || 'stop' === $this->r->get( 'wipe_power' )
+			|| ( $this->finished && 'wipe' === $this->finished['step'] && 'shutdown' === $this->finished['phase'] );
+
+		foreach ( $stop_first ? array( 'stop' ) : array( 'shutdown', 'stop' ) as $phase ) {
+			if ( 'stop' === $phase && ! $this->r->set( array( 'wipe_power' => 'stop' ) ) ) {
+				return StepResult::retry( 0, 'wipe: the power phase could not be recorded' );
+			}
+
+			$done = 'shutdown' === $phase
+				? $this->run_task( 'wipe', 'POST', $base . '/status/shutdown', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ), $phase )
+				: $this->run_task( 'wipe', 'POST', $base . '/status/stop', array(), $phase );
+
+			if ( $done instanceof StepResult ) {
+				return $done;
+			}
+
+			$this->finished = array(
+				'step'  => 'wipe',
+				'phase' => $phase,
+				'ok'    => true === $done,
+				'exit'  => true === $done ? 'OK' : (string) $done['failed'],
+			);
+
+			$after = $this->reread_power( $record, 'wipe', false );
+
+			if ( $after instanceof StepResult ) {
+				return $after;
+			}
+
+			if ( 'running' !== $after['status'] ) {
+				return true;
+			}
+		}
+
+		return StepResult::retry( 0, 'wipe: waiting for the server to stop' );
 	}
 
 	/**
@@ -361,22 +427,13 @@ final class Provision {
 			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
 
 			if ( 'running' === $v['status'] ) {
-				$phase = ( $this->finished && 'wipe' === $this->finished['step'] && 'shutdown' === $this->finished['phase'] ) ? 'stop' : 'shutdown';
-				$call  = 'shutdown' === $phase
-					? array( $base . '/status/shutdown', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ) )
-					: array( $base . '/status/stop', array() );
-				$done  = $this->run_task( 'wipe', 'POST', $call[0], $call[1], $phase );
+				// The extra disks keep their data: their filesystems get the graceful shutdown first.
+				$off = $this->wipe_power_off( $record, $base, true );
 
-				if ( $done instanceof StepResult ) {
-					return $done;
+				if ( $off instanceof StepResult ) {
+					return $off;
 				}
 
-				$this->finished = array(
-					'step'  => 'wipe',
-					'phase' => $phase,
-					'ok'    => true === $done,
-					'exit'  => true === $done ? 'OK' : (string) $done['failed'],
-				);
 				continue;
 			}
 
@@ -531,6 +588,7 @@ final class Provision {
 			'wipe'            => null,
 			'wipe_old_boot'   => null,
 			'wipe_boot_phase' => null,
+			'wipe_power'      => null,
 			'disks_check'     => true,
 			'task'            => null,
 			'agent'           => null,
@@ -549,6 +607,7 @@ final class Provision {
 
 		return array(
 			'wipe'       => null,
+			'wipe_power' => null,
 			'task'       => null,
 			'agent'      => null,
 			'configured' => array(),
@@ -1134,7 +1193,7 @@ final class Provision {
 			}
 
 			if ( true !== $done ) {
-				$again = $this->verified( $record, 'start' );
+				$again = $this->reread_power( $record, 'start', true );
 
 				if ( $again instanceof StepResult ) {
 					return $again;

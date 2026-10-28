@@ -30,6 +30,13 @@ abstract class TestCase extends \WP_UnitTestCase {
 	 */
 	protected $http_responder = null;
 
+	/**
+	 * Seconds the Proxmox status re-reads would have slept.
+	 *
+	 * @var int[]
+	 */
+	protected $pauses = array();
+
 	public function set_up(): void {
 		parent::set_up();
 		// The licenses activation table is outside WordPress' per-test rollback. A domain resource
@@ -42,6 +49,15 @@ abstract class TestCase extends \WP_UnitTestCase {
 		$this->http_responder = null;
 
 		add_filter( 'pre_http_request', array( $this, 'record_http' ), 10, 3 );
+
+		// Re-reads of a lagging Proxmox status never sleep in tests; the pauses are counted.
+		$this->pauses = array();
+		add_filter(
+			'beltoft_services_proxmox_pause',
+			fn() => function ( int $seconds ): void {
+				$this->pauses[] = $seconds;
+			}
+		);
 	}
 
 	public function tear_down(): void {

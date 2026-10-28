@@ -1031,7 +1031,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $resource->id() );
 
 		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
-		$this->assertSame( 18, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
+		$this->assertSame( 6, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before, 'One graceful try per run (a stop that leaves the VM running waits instead of looping); the budget ends it.' );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 
 		// The same for a plan change.
@@ -1042,7 +1042,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $other->id() );
 
 		$this->assertSame( 'failed', Resource::find( $other->id() )->get( 'state' ) );
-		$this->assertSame( 18, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before );
+		$this->assertSame( 6, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before, 'One graceful try per run (a stop that leaves the VM running waits instead of looping); the budget ends it.' );
 		$this->assertSame( 'running', $this->fake->vm( 5001 )['status'] );
 	}
 

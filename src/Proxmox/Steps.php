@@ -139,6 +139,35 @@ trait Steps {
 	}
 
 	/**
+	 * The VM read again after a power task, until it shows the wanted power state. A task that ended OK can be
+	 * followed by a status that still shows the old state for a moment (a VM that is still shutting down, a start
+	 * that is not listed yet): up to 3 reads, one second apart, so that lag is not taken for a failure. Filter
+	 * `beltoft_services_proxmox_pause` (callable, seconds) replaces the sleep, for tests.
+	 *
+	 * @param array<string, mixed> $record  VM record.
+	 * @param string               $step    Step name for messages.
+	 * @param bool                 $running True to wait for a running VM, false for a stopped one.
+	 * @return array<string, mixed>|StepResult The last read (it may still show the old state), or retry/fail.
+	 */
+	protected function reread_power( array $record, string $step, bool $running ) {
+		$v = $this->verified( $record, $step );
+
+		for ( $read = 1; $read < 3 && is_array( $v ) && $running !== ( 'running' === $v['status'] ); $read++ ) {
+			$pause = apply_filters( 'beltoft_services_proxmox_pause', null );
+
+			if ( is_callable( $pause ) ) {
+				$pause( 1 );
+			} else {
+				sleep( 1 );
+			}
+
+			$v = $this->verified( $record, $step );
+		}
+
+		return $v;
+	}
+
+	/**
 	 * Ownership failures are permanent, an absent VM and client errors follow the usual rules.
 	 *
 	 * @param \WP_Error $e    Error.

@@ -1170,11 +1170,12 @@ class ProvisionTest extends TestCase {
 		$calls = array_slice( $this->fake->calls(), $seen );
 		$paths = array_map( static fn( $c ) => $c['method'] . ' ' . $c['path'], $calls );
 
-		$shutdown = array_search( 'POST /nodes/node-a/qemu/5000/status/shutdown', $paths, true );
-		$delete   = array_search( 'DELETE /nodes/node-a/qemu/5000', $paths, true );
-		$this->assertNotFalse( $shutdown );
+		$stop   = array_search( 'POST /nodes/node-a/qemu/5000/status/stop', $paths, true );
+		$delete = array_search( 'DELETE /nodes/node-a/qemu/5000', $paths, true );
+		$this->assertNotFalse( $stop );
 		$this->assertNotFalse( $delete );
-		$this->assertLessThan( $delete, $shutdown, 'Shutdown first, never a plug pull first.' );
+		$this->assertLessThan( $delete, $stop, 'The VM is stopped before it is deleted.' );
+		$this->assertNotContains( 'POST /nodes/node-a/qemu/5000/status/shutdown', $paths, 'A reinstall without extra disks does not wait for a graceful shutdown.' );
 
 		foreach ( $calls as $call ) {
 			if ( 'DELETE' === $call['method'] ) {

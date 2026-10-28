@@ -186,6 +186,38 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * A status that lags: after the next power task of this VM (start, stop, shutdown) has ended OK and changed
+	 * the VM, the next $reads status reads (cluster resources and status/current) still show the old status, as
+	 * a VM that is still shutting down or a start that is not listed yet does. Writes and the task itself use the
+	 * real state (modelled).
+	 *
+	 * @param int $vmid  VM id.
+	 * @param int $reads How many reads show the old status.
+	 */
+	public function lag_status( int $vmid, int $reads ): void {
+		$this->load();
+		$this->state['lag_next'][ $vmid ] = max( 0, $reads );
+		$this->save();
+	}
+
+	/**
+	 * The status a read shows: the old one while a lag is left, which uses up one read.
+	 *
+	 * @param array<string, mixed> $vm VM as stored.
+	 */
+	private function shown_status( array $vm ): string {
+		$id = (int) $vm['vmid'];
+
+		if ( ( $this->state['lag'][ $id ]['reads'] ?? 0 ) > 0 ) {
+			--$this->state['lag'][ $id ]['reads'];
+
+			return (string) $this->state['lag'][ $id ]['shows'];
+		}
+
+		return (string) $vm['status'];
+	}
+
+	/**
 	 * Applies a pending detach to the running configuration without an unusedN entry (modelled: the
 	 * drive is gone from the VM and the volume stays on the storage, linked to nothing).
 	 *
@@ -699,7 +731,7 @@ class FakeClient implements Client {
 				'vmid'     => $vm['vmid'],
 				'node'     => $vm['node'],
 				'name'     => $vm['name'],
-				'status'   => $vm['status'],
+				'status'   => $this->shown_status( $vm ),
 				'template' => (int) $vm['template'],
 				'pool'     => $vm['pool'],
 				'lock'     => $vm['lock'],
@@ -1095,6 +1127,16 @@ class FakeClient implements Client {
 			'qm' . $action,
 			$a[1],
 			function () use ( $a, $action ) {
+				$id = (int) $a[1];
+
+				if ( isset( $this->state['lag_next'][ $id ] ) && in_array( $action, array( 'start', 'stop', 'shutdown' ), true ) ) {
+					$this->state['lag'][ $id ] = array(
+						'reads' => (int) $this->state['lag_next'][ $id ],
+						'shows' => $this->state['vms'][ $id ]['status'],
+					);
+					unset( $this->state['lag_next'][ $id ] );
+				}
+
 				if ( 'start' === $action ) {
 					$this->state['vms'][ (int) $a[1] ]['status'] = 'running';
 				} elseif ( in_array( $action, array( 'stop', 'shutdown' ), true ) ) {
@@ -1118,13 +1160,14 @@ class FakeClient implements Client {
 			return $vm;
 		}
 
+		$shown   = $this->shown_status( $vm );
 		$running = 'running' === $vm['status'];
 
 		return array(
 			'vmid'      => $vm['vmid'],
 			'name'      => $vm['name'],
-			'status'    => $vm['status'],
-			'qmpstatus' => $vm['status'],
+			'status'    => $shown,
+			'qmpstatus' => $shown,
 			'lock'      => $vm['lock'],
 			'cpu'       => 0,
 			'mem'       => $running ? (int) ( $vm['config']['memory'] ?? 512 ) * 524288 : 0,

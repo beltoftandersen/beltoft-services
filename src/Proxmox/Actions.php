@@ -504,7 +504,7 @@ final class Actions {
 			return $done;
 		}
 
-		$again = $this->verified( $record, 'start' );
+		$again = $this->reread_power( $record, 'start', true );
 
 		if ( $again instanceof StepResult ) {
 			return $again;
@@ -720,6 +720,7 @@ final class Actions {
 			'wipe'              => $boot ? 'boot' : true,
 			'wipe_old_boot'     => null,
 			'wipe_boot_phase'   => null,
+			'wipe_power'        => null,
 			'disks_check'       => null,
 			'steps'             => array_values( array_intersect( (array) $this->r->get( 'steps' ), $boot ? array( 'ip', 'vmid', 'clone' ) : array( 'ip', 'vmid' ) ) ),
 			'task'              => null,
