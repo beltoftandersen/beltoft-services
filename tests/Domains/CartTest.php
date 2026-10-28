@@ -5,6 +5,7 @@ namespace BeltoftServices\Tests\Domains;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Cart;
 use BeltoftServices\Domains\Prices;
+use BeltoftServices\Domains\Search;
 use BeltoftServices\Tests\TestCase;
 
 class CartTest extends TestCase {
@@ -184,10 +185,84 @@ class CartTest extends TestCase {
 		WC()->cart->empty_cart();
 	}
 
-	private function held_domain( string $name ): void {
+	private function held_domain( string $name, string $state = 'ready', array $license_data = array() ): int {
 		$product = $this->service_product( 'domain', array(), array( 'slug' => 'held-domain-test' ) );
 		$license = $this->service_license( $product, array( 'fire' => false ) );
-		$this->assertInstanceOf( \BeltoftServices\Resource::class, \BeltoftServices\Resource::create( $license, new \BeltoftServices\Domains\DomainDriver(), array(), array( 'state' => 'ready', 'domain' => $name, 'mode' => 'register', 'remote_id' => '12' ) ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, \BeltoftServices\Resource::create( $license, new \BeltoftServices\Domains\DomainDriver(), array(), array( 'state' => $state, 'domain' => $name, 'mode' => 'register', 'remote_id' => '12' ) ) );
+		if ( $license_data ) { $this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $license['id'], $license_data ) ); }
+		return (int) $license['user_id'];
+	}
+
+	public function test_a_held_domain_message_names_the_holder_only_to_the_holder(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 16, 'restricted' => false ) ) );
+		$name = 'whose-' . strtolower( wp_generate_password( 8, false, false ) ) . '.com';
+		$owner = $this->held_domain( $name );
+		$this->service_product( 'domain' );
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		wp_set_current_user( self::factory()->user->create() );
+		$other = Cart::rest_add( $this->add_request( $name, 'register' ) );
+		$this->assertSame( 'This domain cannot be added right now.', $other->get_error_message() );
+		wp_set_current_user( 0 );
+		$this->assertSame( 'This domain cannot be added right now.', Cart::rest_add( $this->add_request( $name, 'register' ) )->get_error_message() );
+		wp_set_current_user( $owner );
+		$own = Cart::rest_add( $this->add_request( $name, 'register' ) );
+		$this->assertSame( 'domain_held', $own->get_error_code() );
+		$this->assertSame( 'This domain is already registered here.', $own->get_error_message() );
+		$this->cart_with( array( 'domain' => $name, 'mode' => 'register' ) );
+		Cart::check_duplicate_domain_items();
+		$this->assertStringContainsString( 'already registered here', wp_strip_all_tags( wc_get_notices( 'error' )[0]['notice'] ) );
+		wc_clear_notices();
+		wp_set_current_user( self::factory()->user->create() );
+		Cart::check_duplicate_domain_items();
+		$notice = wp_strip_all_tags( wc_get_notices( 'error' )[0]['notice'] );
+		$this->assertStringContainsString( 'cannot be added right now', $notice );
+		$this->assertStringNotContainsString( 'registered here', $notice );
+		wc_clear_notices();
+		WC()->cart->empty_cart();
+	}
+
+	public function test_a_failed_service_or_one_waiting_out_retention_does_not_hold_the_name(): void {
+		$failed = 'failed-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$this->held_domain( $failed, 'failed' );
+		$this->assertNull( Cart::domain_held( $failed ) );
+		$lapsed = 'lapsed-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$this->held_domain( $lapsed, 'paused', array( 'status' => 'expired' ) );
+		$this->assertNull( Cart::domain_held( $lapsed ) );
+		$revoked = 'revoked-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$this->held_domain( $revoked, 'paused', array( 'status' => 'revoked' ) );
+		$this->assertNull( Cart::domain_held( $revoked ) );
+		$paused = 'paused-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$user = $this->held_domain( $paused, 'paused' );
+		$this->assertSame( $user, Cart::domain_held( $paused ), 'Paused by an admin on an active license still holds it.' );
+		$live = 'live-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$user = $this->held_domain( $live );
+		$this->assertSame( $user, Cart::domain_held( $live ) );
+	}
+
+	public function test_a_cart_add_works_when_public_searches_have_used_their_share(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 16, 'restricted' => false ) ) );
+		add_filter( 'beltoft_services_domain_lookup_limit', static fn() => 2 );
+		$fake = new \BeltoftServices\Domains\FakeClient();
+		$names = array();
+		foreach ( array( 'pa', 'pb', 'pc' ) as $p ) {
+			$names[ $p ] = $p . '-' . strtolower( wp_generate_password( 6, false, false ) );
+			if ( 'pc' === $p ) { continue; }
+			$fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => $names[ $p ] . '.com', 'status' => 'free', 'is_premium' => false ) ) ) );
+		}
+		$fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => 'buy-' . $names['pc'] . '.com', 'status' => 'free', 'is_premium' => false ) ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		add_filter( 'woocommerce_set_cookie_enabled', '__return_false' );
+		$this->service_product( 'domain' );
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		Search::find( $names['pa'] . '.com' );
+		Search::find( $names['pb'] . '.com' );
+		$this->assertSame( 'search_busy', Search::find( $names['pc'] . '.com' )->get_error_code(), 'Public searches are used up.' );
+		$added = Cart::rest_add( $this->add_request( 'buy-' . $names['pc'] . '.com', 'register' ) );
+		$this->assertInstanceOf( \WP_REST_Response::class, $added );
+		$this->assertSame( 201, $added->get_status() );
+		WC()->cart->empty_cart();
 	}
 
 	public function test_a_domain_already_held_here_cannot_be_added_to_the_cart(): void {
@@ -215,7 +290,7 @@ class CartTest extends TestCase {
 	public function test_checkout_stops_a_domain_held_here_or_twice_in_the_cart_but_not_a_renewal(): void {
 		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
 		$name = 'held-checkout-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
-		$this->held_domain( $name );
+		wp_set_current_user( $this->held_domain( $name ) );
 		$this->cart_with( array( 'domain' => $name, 'mode' => 'register' ) );
 		Cart::check_duplicate_domain_items();
 		$this->assertCount( 1, wc_get_notices( 'error' ) );

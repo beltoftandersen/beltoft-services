@@ -65,8 +65,13 @@ final class Cart {
 			}
 		}
 		$mode = $data['beltoft_services_domain']['mode'];
-		if ( in_array( $mode, array( 'register', 'transfer' ), true ) && self::domain_held( $data['beltoft_services_domain']['domain'] ) ) {
-			return new \WP_Error( 'domain_held', __( 'This domain is already registered here.', 'beltoft-services' ), array( 'status' => 409 ) );
+		if ( in_array( $mode, array( 'register', 'transfer' ), true ) ) {
+			$holder = self::domain_held( $data['beltoft_services_domain']['domain'] );
+			if ( null !== $holder ) {
+				// Only the holder is told it is theirs; anyone else gets an answer that does not say who has the name.
+				$message = get_current_user_id() > 0 && $holder === get_current_user_id() ? __( 'This domain is already registered here.', 'beltoft-services' ) : __( 'This domain cannot be added right now.', 'beltoft-services' );
+				return new \WP_Error( 'domain_held', $message, array( 'status' => 409 ) );
+			}
 		}
 		$product = self::product_for( 'dns' === $mode ? 'dns' : 'domain' );
 		if ( ! $product ) { return new \WP_Error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
@@ -181,13 +186,22 @@ final class Cart {
 		}
 	}
 
-	/** Does a live domain service here already hold this name? Buying it again would only fail at provisioning, after payment. */
-	public static function domain_held( string $domain ): bool {
+	/**
+	 * The customer of a domain service here that holds this name, or null. Buying it again would only fail at provisioning, after
+	 * payment. A failed service, and one paused after its license ended (waiting out retention), do not hold it: a retry or a new
+	 * purchase is allowed.
+	 */
+	public static function domain_held( string $domain ): ?int {
 		foreach ( Resource::live_ids( 'domain' ) as $id ) {
 			$other = Resource::find( $id );
-			if ( $other && 'deleted' !== $other->get( 'state' ) && strtolower( (string) $other->get( 'domain' ) ) === strtolower( $domain ) ) { return true; }
+			if ( ! $other || strtolower( (string) $other->get( 'domain' ) ) !== strtolower( $domain ) ) { continue; }
+			$state   = $other->get( 'state' );
+			$license = $other->license();
+			if ( in_array( $state, array( 'deleted', 'failed' ), true ) ) { continue; }
+			if ( 'paused' === $state && ( ! $license || \BeltoftLicenses\Licenses::STATUS_ACTIVE !== \BeltoftLicenses\Licenses::effective_status( $license ) ) ) { continue; }
+			return (int) ( $license['user_id'] ?? 0 );
 		}
-		return false;
+		return null;
 	}
 
 	/** The message for a cart that holds a domain twice or one that is already held here, or null. */
@@ -203,9 +217,14 @@ final class Cart {
 				return sprintf( __( '%s is in your cart twice. Remove one of them.', 'beltoft-services' ), $name );
 			}
 			$seen[ $name ] = true;
-			if ( self::domain_held( $name ) ) {
+			$holder = self::domain_held( $name );
+			if ( null !== $holder ) {
+				if ( get_current_user_id() > 0 && $holder === get_current_user_id() ) {
+					/* translators: %s: domain name */
+					return sprintf( __( '%s is already registered here. Remove it from your cart.', 'beltoft-services' ), $name );
+				}
 				/* translators: %s: domain name */
-				return sprintf( __( '%s is already registered here. Remove it from your cart.', 'beltoft-services' ), $name );
+				return sprintf( __( '%s cannot be added right now. Remove it from your cart.', 'beltoft-services' ), $name );
 			}
 		}
 		return null;
