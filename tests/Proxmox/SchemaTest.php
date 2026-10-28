@@ -297,6 +297,36 @@ class SchemaTest extends TestCase {
 		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $t['assignments'] ) ) ); // phpcs:ignore
 	}
 
+	public function test_uninstall_keeps_assignments_when_the_count_fails(): void {
+		global $wpdb;
+		$t = \BeltoftServices\Domains\DnsSchema::tables();
+		\BeltoftServices\Domains\DnsSchema::create_tables();
+		update_option( 'beltoft_services_dns_db_version', '1' );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $t['assignments'] ) ); // phpcs:ignore
+		$break = static function ( $query ) {
+			return false !== strpos( $query, 'COUNT(*)' ) && false !== strpos( $query, 'dns_assignments' )
+				? str_replace( 'status IN', 'no_such_column IN', $query ) : $query;
+		};
+		add_filter( 'query', $break, 2 );
+		$queries = $this->uninstall( 1 );
+		remove_filter( 'query', $break, 2 );
+		$joined = implode( ' ', preg_grep( '/DROP TABLE/i', $queries ) );
+		$this->assertStringNotContainsString( $t['assignments'], $joined, 'A failed check keeps the table.' );
+		wp_cache_flush();
+		$this->assertSame( '1', get_option( 'beltoft_services_dns_db_version' ) );
+	}
+
+	public function test_uninstall_proceeds_when_the_assignments_table_is_missing(): void {
+		global $wpdb;
+		$t = \BeltoftServices\Domains\DnsSchema::tables();
+		\BeltoftServices\Domains\DnsSchema::create_tables();
+		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . $t['assignments'] ); // phpcs:ignore
+		update_option( 'beltoft_services_dns_db_version', '1' );
+		$this->uninstall( 1 );
+		wp_cache_flush();
+		$this->assertFalse( get_option( 'beltoft_services_dns_db_version' ) );
+	}
+
 	public function test_uninstall_leaves_dns_tables_without_the_setting(): void {
 		$queries = $this->uninstall( 0 );
 		$this->assertSame( array(), preg_grep( '/DROP TABLE/i', $queries ) );

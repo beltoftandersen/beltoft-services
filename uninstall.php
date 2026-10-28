@@ -50,12 +50,15 @@ foreach ( array( 'beltoft_services_ips', 'beltoft_services_vms' ) as $beltoft_se
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own table.
 $wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . 'beltoft_services_dns_claims' ) );
 $beltoft_services_assignments = $wpdb->prefix . 'beltoft_services_dns_assignments';
-// A missing table counts as empty (the query then fails quietly and returns null).
+// Fail closed: drop only when the count succeeded and is exactly 0, or the table is positively absent
+// (error 1146). Any other failure keeps the table and the schema version.
 $beltoft_services_quiet = $wpdb->suppress_errors( true );
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the plugin's own table.
-$beltoft_services_open = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status IN (%s, %s)', $beltoft_services_assignments, 'active', 'release_pending' ) );
+$beltoft_services_open = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status IN (%s, %s)', $beltoft_services_assignments, 'active', 'release_pending' ) );
+$beltoft_services_error = (string) $wpdb->last_error;
 $wpdb->suppress_errors( $beltoft_services_quiet );
-if ( 0 === $beltoft_services_open ) {
+$beltoft_services_absent = '' !== $beltoft_services_error && false !== stripos( $beltoft_services_error, "doesn't exist" );
+if ( ( '' === $beltoft_services_error && '0' === (string) $beltoft_services_open ) || $beltoft_services_absent ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own table.
 	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $beltoft_services_assignments ) );
 	delete_option( 'beltoft_services_dns_db_version' );
