@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-28T06:56:52+00:00\n"
+"POT-Creation-Date: 2026-10-28T07:00:42+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -559,7 +559,7 @@ msgid "You have already used the trial for %s."
 msgstr ""
 
 #: src/Domains/Actions.php:17
-#: templates/account/domain.php:117
+#: templates/account/domain.php:122
 msgid "Save DNS records"
 msgstr ""
 
@@ -725,30 +725,30 @@ msgid "DNS hosting ends at once when cancelled."
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:123
-#: templates/account/domain.php:139
+#: templates/account/domain.php:144
 msgid "Copy"
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:124
-#: templates/account/domain.php:139
+#: templates/account/domain.php:144
 msgid "Copied"
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:125
 #: templates/account/domain.php:105
-#: templates/account/domain.php:110
+#: templates/account/domain.php:115
 msgid "Type"
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:126
 #: templates/account/domain.php:105
-#: templates/account/domain.php:110
+#: templates/account/domain.php:115
 msgid "Name"
 msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:127
 #: templates/account/domain.php:105
-#: templates/account/domain.php:110
+#: templates/account/domain.php:115
 msgid "Value"
 msgstr ""
 
@@ -808,7 +808,7 @@ msgstr ""
 
 #: src/Domains/DnsClaimPanel.php:146
 #: templates/account/domain.php:105
-#: templates/account/domain.php:110
+#: templates/account/domain.php:115
 msgid "TTL"
 msgstr ""
 
@@ -3127,7 +3127,7 @@ msgid "Adding to order…"
 msgstr ""
 
 #: templates/account/domain.php:62
-#: templates/account/domain.php:137
+#: templates/account/domain.php:142
 msgid "Transfer code"
 msgstr ""
 
@@ -3192,39 +3192,57 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: templates/account/domain.php:109
-msgid "No DNS records yet."
+#: templates/account/domain.php:108
+msgid "Search records"
+msgstr ""
+
+#. translators: %d: number of DNS records
+#: templates/account/domain.php:110
+#, php-format
+msgid "Show all %d records"
+msgstr ""
+
+#: templates/account/domain.php:111
+msgid "Show fewer"
+msgstr ""
+
+#: templates/account/domain.php:112
+msgid "No records match."
 msgstr ""
 
 #: templates/account/domain.php:114
+msgid "No DNS records yet."
+msgstr ""
+
+#: templates/account/domain.php:119
 msgid "Changes are saved when you press Save DNS records."
 msgstr ""
 
-#: templates/account/domain.php:116
+#: templates/account/domain.php:121
 msgid "Add record"
 msgstr ""
 
-#: templates/account/domain.php:126
+#: templates/account/domain.php:131
 msgid "Transfer to another registrar"
 msgstr ""
 
-#: templates/account/domain.php:127
+#: templates/account/domain.php:132
 msgid "Your domain is locked, so it cannot be moved to another registrar."
 msgstr ""
 
-#: templates/account/domain.php:127
+#: templates/account/domain.php:132
 msgid "Your domain is unlocked. Enter the transfer code at your new registrar."
 msgstr ""
 
-#: templates/account/domain.php:130
+#: templates/account/domain.php:135
 msgid "Unlock and show transfer code"
 msgstr ""
 
-#: templates/account/domain.php:132
+#: templates/account/domain.php:137
 msgid "Show transfer code"
 msgstr ""
 
-#: templates/account/domain.php:133
+#: templates/account/domain.php:138
 msgid "Lock again"
 msgstr ""
 

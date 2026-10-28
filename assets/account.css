@@ -167,6 +167,15 @@ div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { fl
 	max-width: 36em;
 }
 
+.beltoft-services-domain__inline .button {
+	margin: 0;
+	align-self: stretch;
+}
+
+.beltoft-services-domain__inline {
+	align-items: stretch;
+}
+
 .beltoft-services-domain__inline input {
 	flex: 1 1 14em;
 	min-width: 0;
@@ -178,4 +187,38 @@ div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { fl
 .beltoft-services-domain__error {
 	margin: 0.5em 0 0;
 	color: #b32d2e;
+}
+
+/* DNS records: search and show all for long zones. */
+div.beltoft-services-domain .beltoft-dns-search {
+	display: block;
+	width: 100%;
+	max-width: 24em;
+	margin: 0 0 0.75em;
+	box-sizing: border-box;
+	border-radius: 0;
+}
+
+div.beltoft-services-domain .beltoft-dns-nomatch {
+	margin: 0.5em 0;
+}
+
+div.beltoft-services-domain .beltoft-dns-more {
+	margin: 0.5em 0 0;
+}
+
+/* The transfer form: themes put a row gap on account forms and a margin on inputs. */
+div.beltoft-services-domain form.beltoft-services-domain-transfer,
+.woocommerce-MyAccount-content div.beltoft-services-domain form.beltoft-services-domain-transfer {
+	gap: 0.35em;
+	row-gap: 0.35em;
+}
+
+div.beltoft-services-domain form.beltoft-services-domain-transfer .beltoft-services-domain__label {
+	margin: 0.5em 0 0;
+}
+
+div.beltoft-services-domain .beltoft-services-domain__inline input,
+div.beltoft-services-domain .beltoft-services-domain__inline .button {
+	margin: 0;
 }

@@ -72,6 +72,54 @@
 		var none = ! form.querySelector( 'tbody tr' );
 		form.querySelector( 'table' ).hidden = none;
 		form.querySelector( '.beltoft-services-domain__empty' ).hidden = ! none;
+		filter( form );
+	}
+	// Long zones: the first rows show, a search finds the rest, and a toggle shows them all. Hidden rows
+	// stay in the form, so saving still sends every record.
+	var SHOWN = 10;
+	function filterControls( form ) {
+		if ( form.querySelector( '.beltoft-dns-search' ) ) { return; }
+		var t = JSON.parse( form.dataset.i18n );
+		var search = document.createElement( 'input' );
+		search.type = 'search';
+		search.className = 'beltoft-dns-search';
+		search.placeholder = t.search;
+		search.setAttribute( 'aria-label', t.search );
+		search.addEventListener( 'input', function () { filter( form ); } );
+		var none = document.createElement( 'p' );
+		none.className = 'beltoft-dns-nomatch';
+		none.textContent = t.no_match;
+		none.hidden = true;
+		var more = document.createElement( 'button' );
+		more.type = 'button';
+		more.className = 'beltoft-services-domain__link beltoft-dns-more';
+		more.addEventListener( 'click', function () { form.dataset.all = form.dataset.all ? '' : '1'; filter( form ); } );
+		var table = form.querySelector( 'table' );
+		table.parentNode.insertBefore( search, table );
+		table.parentNode.insertBefore( none, table.nextSibling );
+		none.parentNode.insertBefore( more, none.nextSibling );
+	}
+	function filter( form ) {
+		var rows = Array.prototype.slice.call( form.querySelectorAll( 'tbody tr' ) );
+		var search = form.querySelector( '.beltoft-dns-search' );
+		if ( rows.length <= SHOWN && ! search ) { return; }
+		filterControls( form );
+		search = form.querySelector( '.beltoft-dns-search' );
+		var t = JSON.parse( form.dataset.i18n );
+		var query = search.value.trim().toLowerCase();
+		var matches = 0;
+		rows.forEach( function ( tr, i ) {
+			var text = Array.prototype.map.call( tr.querySelectorAll( 'input, select' ), function ( c ) { return c.value; } ).join( ' ' ).toLowerCase();
+			var hit = '' === query ? true : -1 !== text.indexOf( query );
+			if ( hit ) { matches++; }
+			// A row added now is always shown, so it can be filled in.
+			tr.hidden = ! tr.dataset.added && ( ! hit || ( '' === query && ! form.dataset.all && i >= SHOWN ) );
+		} );
+		var more = form.querySelector( '.beltoft-dns-more' );
+		more.hidden = '' !== query || rows.length <= SHOWN;
+		more.textContent = form.dataset.all ? t.show_fewer : t.show_all.replace( '%d', rows.length );
+		form.querySelector( '.beltoft-dns-nomatch' ).hidden = '' === query || matches > 0;
+		search.hidden = rows.length <= SHOWN && '' === query;
 	}
 	function serialise( form ) {
 		var rows = [];
@@ -94,7 +142,7 @@
 	} );
 	document.addEventListener( 'click', function ( event ) {
 		var add = event.target.closest( '.beltoft-dns-add' );
-		if ( add ) { addRow( add.closest( 'form' ), {} ).querySelector( '[data-f=name]' ).focus(); syncEmpty( add.closest( 'form' ) ); return; }
+		if ( add ) { var fresh = addRow( add.closest( 'form' ), {} ); fresh.dataset.added = '1'; syncEmpty( add.closest( 'form' ) ); fresh.querySelector( '[data-f=name]' ).focus(); return; }
 		var remove = event.target.closest( '.beltoft-dns-remove' );
 		if ( remove ) { var form = remove.closest( 'form' ); remove.closest( 'tr' ).remove(); syncEmpty( form ); }
 	} );

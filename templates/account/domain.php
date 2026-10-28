@@ -105,6 +105,11 @@ if ( $beltoft_time ) {
 				'name' => __( 'Name', 'beltoft-services' ), 'name_hint' => __( '@ for the domain itself, or a name like www', 'beltoft-services' ), 'type' => __( 'Type', 'beltoft-services' ), 'ttl' => __( 'TTL', 'beltoft-services' ), 'value' => __( 'Value', 'beltoft-services' ),
 				'priority' => __( 'Priority', 'beltoft-services' ), 'weight' => __( 'Weight', 'beltoft-services' ), 'port' => __( 'Port', 'beltoft-services' ),
 				'flag' => __( 'Flag', 'beltoft-services' ), 'tag' => __( 'Tag', 'beltoft-services' ), 'remove' => __( 'Remove', 'beltoft-services' ),
+				'search' => __( 'Search records', 'beltoft-services' ),
+				/* translators: %d: number of DNS records */
+				'show_all' => __( 'Show all %d records', 'beltoft-services' ),
+				'show_fewer' => __( 'Show fewer', 'beltoft-services' ),
+				'no_match' => __( 'No records match.', 'beltoft-services' ),
 			) ) ); ?>">
 				<p class="beltoft-services-domain__empty" hidden><?php esc_html_e( 'No DNS records yet.', 'beltoft-services' ); ?></p>
 				<table><thead><tr><th><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'TTL', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th><th></th></tr></thead><tbody></tbody></table>
