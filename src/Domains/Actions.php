@@ -86,6 +86,9 @@ final class Actions {
 				$zone = Zone::ensure( $r, true, false );
 				if ( ! $zone->is_done() ) { return $zone; }
 				$keys = (array) ( $zone->meta()['dnssec_keys'] ?? array() );
+				// The DS is published only once every name server serves the keys; nothing was changed yet, so a retry is safe.
+				$signed = $keys ? Zone::served_signed( $name ) : StepResult::done();
+				if ( ! $signed->is_done() ) { return $signed; }
 			}
 			$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'ns_group' => '', 'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), $hosts ) ) );
 			if ( is_wp_error( $reply ) ) { return StepResult::retry( 60, 'Name servers could not be changed.' ); }

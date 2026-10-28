@@ -24,7 +24,7 @@ final class DnsQuery {
 		}
 		return null;
 	}
-	/** Read a SOA serial or the earliest apex RRSIG expiration from an authoritative server. */
+	/** Read a SOA serial (type 6), the earliest apex RRSIG expiration (46) or the number of apex DNSKEY records (48) from an authoritative server. */
 	public static function read( string $server, string $domain, int $type ): int|\WP_Error {
 		$test = apply_filters( 'beltoft_services_dns_query', null, $server, $domain, $type );
 		if ( null !== $test ) { return is_int( $test ) || is_wp_error( $test ) ? $test : new \WP_Error( 'bad_query', 'Invalid DNS query result.' ); }
@@ -32,6 +32,7 @@ final class DnsQuery {
 		if ( $client instanceof FakeDns ) {
 			$zone = $client->zone( $domain );
 			if ( ! is_array( $zone ) ) { return new \WP_Error( 'dns_missing', 'Fake zone is missing.' ); }
+			if ( 48 === $type ) { return ! empty( $zone['secured'] ) ? 1 : new \WP_Error( 'dns_missing', 'Fake zone has no DNSKEY.' ); }
 			return 6 === $type ? (int) ( $zone['serial'] ?? 1 ) : time() + 30 * DAY_IN_SECONDS;
 		}
 		$id = random_int( 1, 65535 );
@@ -59,11 +60,12 @@ final class DnsQuery {
 				if ( 6 === $type ) {
 					$pos = $offset;
 					if ( self::skip_name( $data, $pos ) && self::skip_name( $data, $pos ) && $pos + 4 <= $end ) { $values[] = unpack( 'Nserial', substr( $data, $pos, 4 ) )['serial']; }
+				} elseif ( 48 === $type ) { $values[] = 1;
 				} elseif ( 46 === $type && $offset + 12 <= $end ) { $values[] = unpack( 'Nexpiry', substr( $data, $offset + 8, 4 ) )['expiry']; }
 			}
 			$offset = $end;
 		}
-		return $values ? min( $values ) : new \WP_Error( 'dns_missing', 'Name server did not return the requested record.' );
+		return $values ? ( 48 === $type ? count( $values ) : min( $values ) ) : new \WP_Error( 'dns_missing', 'Name server did not return the requested record.' );
 	}
 
 	/**

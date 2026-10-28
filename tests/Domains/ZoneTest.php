@@ -38,6 +38,53 @@ class ZoneTest extends TestCase {
 		$this->assertSame( true, $op->calls()[0]['body']['is_dnssec_enabled'] );
 	}
 
+	public function test_the_ds_waits_until_both_name_servers_serve_dnskey_and_rrsig(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		$op = new FakeClient();
+		$op->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		$lagging = array( 'type' => 48 );
+		add_filter( 'beltoft_services_dns_query', static function ( $value, $server, $domain, $type ) use ( &$lagging ) {
+			if ( 'ns2.example.net' === $server && $type === $lagging['type'] ) { return new \WP_Error( 'dns_missing', 'Not served yet.' ); }
+			return 6 === $type ? 1 : ( 48 === $type ? 1 : time() + 30 * DAY_IN_SECONDS );
+		}, 10, 4 );
+		$r = $this->resource();
+		$result = Zone::ensure( $r );
+		$this->assertTrue( $result->is_retry(), 'The secondary has no DNSKEY yet.' );
+		$this->assertSame( 300, $result->delay() );
+		$this->assertSame( array(), $op->calls(), 'No DS at the registrar.' );
+		$lagging['type'] = 46;
+		$this->assertTrue( Zone::ensure( $r )->is_retry(), 'The secondary has no RRSIG yet.' );
+		$this->assertSame( array(), $op->calls() );
+		$lagging['type'] = 0;
+		$this->assertTrue( Zone::ensure( $r )->is_done() );
+		$this->assertCount( 1, $op->calls() );
+		$this->assertSame( true, $op->calls()[0]['body']['is_dnssec_enabled'] );
+	}
+
+	public function test_the_primary_without_dnskey_also_holds_the_ds_back(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		$op = new FakeClient();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		add_filter( 'beltoft_services_dns_query', static fn( $value, $server, $domain, $type ) => 'ns1.example.net' === $server && 48 === $type ? 0 : ( 6 === $type ? 1 : time() + DAY_IN_SECONDS ), 10, 4 );
+		$this->assertTrue( Zone::ensure( $this->resource() )->is_retry() );
+		$this->assertSame( array(), $op->calls() );
+	}
+
+	public function test_a_fake_zone_serves_dnskey_only_once_secured(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$dns->create_zone( 'plain.example.com', Zone::nameservers() );
+		$this->assertWPError( DnsQuery::read( 'ns2.example.net', 'plain.example.com', 48 ) );
+		$dns->secure( 'plain.example.com' );
+		$this->assertSame( 1, DnsQuery::read( 'ns2.example.net', 'plain.example.com', 48 ) );
+	}
+
 	public function test_no_zone_when_nameservers_unset(): void {
 		$this->settings( array( 'domain_nameservers' => '' ) );
 		$dns = new FakeDns();

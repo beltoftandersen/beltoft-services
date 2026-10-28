@@ -95,9 +95,23 @@ final class Zone {
 		if ( ! $publish_ds ) { return StepResult::done( array( 'zone_ready' => true, 'dnssec_keys' => $keys ) ); }
 		$remote_id = (string) $r->get( 'remote_id' );
 		if ( '' === $remote_id ) { return StepResult::retry( 3600, 'Registrar id is not stored yet.' ); }
+		// A DS that points at keys the registry cannot find breaks the domain: it is published only once every name server serves them.
+		$signed = self::served_signed( $name );
+		if ( ! $signed->is_done() ) { return $signed; }
 		$reply = Clients::registrar()->request( 'PUT', '/domains/' . rawurlencode( $remote_id ), array( 'dnssec_keys' => $keys, 'is_dnssec_enabled' => true ) );
 		if ( is_wp_error( $reply ) ) { return StepResult::retry( 3600, 'DNSSEC could not be published at the registry.' ); }
 		return StepResult::done( array( 'zone_ready' => true, 'dnssec_keys' => $keys ) );
+	}
+
+	/** Do all our name servers serve the zone's DNSKEY and RRSIG? The secondary can lag behind the primary. */
+	public static function served_signed( string $name ): StepResult {
+		foreach ( self::nameservers() as $server ) {
+			$keys = DnsQuery::read( $server, $name, 48 );
+			if ( is_wp_error( $keys ) || $keys < 1 ) { return StepResult::retry( 300, 'The name servers do not serve the DNSKEY yet.' ); }
+			$signature = DnsQuery::read( $server, $name, 46 );
+			if ( is_wp_error( $signature ) ) { return StepResult::retry( 300, 'The name servers do not serve the signatures yet.' ); }
+		}
+		return StepResult::done();
 	}
 
 	public static function remove( Resource $r ): StepResult {
