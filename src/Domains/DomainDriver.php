@@ -206,15 +206,22 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		$found  = Delegation::lookup( $name );
 		$status = (string) ( $found['status'] ?? '' );
 		$hosts  = array();
+		$invalid = false;
 		foreach ( (array) ( $found['ns'] ?? array() ) as $host ) {
 			$host = strtolower( rtrim( trim( (string) $host ), '.' ) );
-			if ( '' !== $host && ! is_wp_error( Search::normalise( $host ) ) ) { $hosts[ $host ] = $host; }
+			if ( '' === $host || is_wp_error( Search::normalise( $host ) ) ) { $invalid = true; continue; }
+			$hosts[ $host ] = $host;
 		}
 		$hosts = array_values( $hosts );
 		$ours  = ! empty( $found['ours'] ) || array() !== array_intersect( $hosts, Zone::nameservers() );
 		if ( $ours ) {
 			if ( ! $r->get( 'transfer_ns_alerted' ) ) { Alerts::admin( $r, 'The domain is delegated to our name servers but no DNS service of this customer serves it. Staff review needed before the transfer.' ); $r->set( array( 'transfer_ns_alerted' => true ) ); }
 			return StepResult::retry( 3600, 'The current name servers include our own. Staff review needed before the transfer.' );
+		}
+		if ( 'ok' === $status && ( $invalid || count( $hosts ) < 2 ) ) {
+			// A partial list could break the domain: never sent.
+			if ( ! $r->get( 'transfer_ns_alerted' ) ) { Alerts::admin( $r, 'The current name servers of the domain are not usable for a transfer (fewer than two, or an invalid name). Staff review needed.' ); $r->set( array( 'transfer_ns_alerted' => true ) ); }
+			return StepResult::retry( 3600, 'The delegated name servers are fewer than two or include an invalid name. Staff review needed before the transfer.' );
 		}
 		if ( 'ok' !== $status || array() === $hosts || count( $hosts ) > ProofResolver::MAX_NS ) {
 			return StepResult::retry( 3600, 'The current name servers of the domain could not be read (' . ( '' !== (string) ( $found['reason'] ?? '' ) ? (string) $found['reason'] : 'none found' ) . '). Trying again later.' );

@@ -267,6 +267,8 @@ class DomainDriverTest extends TestCase {
 			'lookup failure' => array( array(), 'unknown', 'parent_unreachable', false ),
 			'none found' => array( array(), 'ok', 'delegated', false ),
 			'not delegated' => array( array(), 'support', 'not_delegated', false ),
+			'one name server only' => array( array( 'ns1.old-host.example' ), 'ok', 'delegated', false ),
+			'an invalid name' => array( array( 'ns1.old-host.example', 'ns2.old-host.example', 'bad name!' ), 'ok', 'delegated', false ),
 			'our own name server' => array( array( 'ns1.old-host.example', 'ns1.example.net' ), 'ok', 'delegated', false ),
 			'flagged as ours' => array( array( 'ns1.old-host.example', 'ns2.old-host.example' ), 'support', 'delegated_to_us', true ),
 		);
@@ -285,6 +287,40 @@ class DomainDriverTest extends TestCase {
 		$this->assertNull( $dns->zone( $name ) );
 		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'transfer_ns' ) );
 		$this->assertStringNotContainsString( 'ns1.example.net', (string) wp_json_encode( $fake->calls() ), 'Never our name servers.' );
+	}
+
+	public function test_a_partial_delegation_alerts_staff_once(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $atts ) use ( &$mails ) { $mails[] = $atts; return true; }, 10, 2 );
+		[ $fake ] = $this->transfer_fakes();
+		$this->delegation( array( 'ns1.old-host.example', 'bad name!' ) );
+		$r = $this->resource( 'transfer', 'partial-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com' );
+		$this->assertTrue( ( new DomainDriver() )->provision( $r )->is_retry() );
+		$this->assertTrue( ( new DomainDriver() )->provision( Resource::find( $r->id() ) )->is_retry() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+		$this->assertCount( 1, $mails, 'One admin alert.' );
+	}
+
+	public function test_a_crash_after_the_transfer_post_resumes_without_a_second_post(): void {
+		$name = 'postcrash-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array( array( 'id' => 777, 'full_name' => $name, 'owner_handle' => 'AA123-GB' ) ) ) );
+		$fake->reply( 'GET', '/domains/777', array( 'id' => 777, 'status' => 'REQ' ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$lookups = $this->delegation( array( 'ns7.other.example', 'ns8.other.example' ) );
+		$r = $this->resource( 'transfer', $name );
+		$this->assertTrue( $r->set( array( 'transfer_ns' => array( 'ns1.stored.example', 'ns2.stored.example' ), 'steps' => array( 'contact', 'zone_prepared' ), 'contact_handle' => 'AA123-GB' ) ) );
+		$result = ( new DomainDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $result->is_retry(), $result->error() );
+		$this->assertSame( 0, $this->posts( $fake ), 'No second POST.' );
+		$this->assertCount( 0, $lookups );
+		$saved = Resource::find( $r->id() );
+		$this->assertSame( array( 'ns1.stored.example', 'ns2.stored.example' ), $saved->get( 'transfer_ns' ) );
+		$this->assertSame( '777', $saved->get( 'remote_id' ) );
 	}
 
 	public function test_a_transfer_of_a_domain_our_dns_serves_is_unchanged(): void {
