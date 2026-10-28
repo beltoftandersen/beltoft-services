@@ -1372,22 +1372,8 @@ class FakeClient implements Client {
 		}
 
 		if ( isset( $this->state['images'][ $a[1] ][ $volid ] ) ) {
-			// A volume that a VM configuration still refers to is refused (modelled, as pvesm does for a used volume).
-			foreach ( $this->state['vms'] as $vm ) {
-				foreach ( $vm['config'] as $key => $value ) {
-					if ( 1 === preg_match( '/^(?:scsi\d+|unused\d+)$/', (string) $key ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
-						return $this->error( 500, "volume '" . $volid . "' is used by a VM" );
-					}
-				}
-			}
-			return $this->new_task(
-				$a[0],
-				'imgdel',
-				(string) $this->state['images'][ $a[1] ][ $volid ]['vmid'],
-				function () use ( $a, $volid ) {
-					unset( $this->state['images'][ $a[1] ][ $volid ] );
-				}
-			);
+			// Live (PVE 9.1.6, narrow token): deleting a disk volume through the storage is forbidden, for any volume (it needs Datastore.Allocate).
+			return $this->error( 403, 'Permission check failed (/storage/' . $a[1] . ', Datastore.Allocate)' );
 		}
 
 		return $this->error( 500, "volume '" . $volid . "' does not exist" );
@@ -1507,7 +1493,7 @@ class FakeClient implements Client {
 				$id = (int) $p['vmid'];
 
 				if ( $exists ) {
-					$this->state['vms'][ $id ]['config'] = $found['config'];
+					$this->state['vms'][ $id ]['config'] = $this->restored_config( $id, $this->state['vms'][ $id ]['config'], $found['config'] );
 
 					if ( ! empty( $this->state['restore_drops_pool'] ) ) {
 						$pool = (string) $this->state['vms'][ $id ]['pool'];
@@ -1536,6 +1522,70 @@ class FakeClient implements Client {
 				);
 			}
 		);
+	}
+
+	/**
+	 * The configuration after a forced restore over an existing VM, as observed live (PVE 9.1.6): the
+	 * boot disk comes back from the backup; a disk with backup=0 is not in the backup and its volume
+	 * survives as an unusedN entry. A volume of the VM that no configuration entry referred to (never
+	 * attached) shows up as unusedN too, first, then what the old configuration held as unusedN, then
+	 * the attached backup=0 drives in slot order.
+	 *
+	 * @param int                  $id  VMID.
+	 * @param array<string, mixed> $old Configuration before the restore.
+	 * @param array<string, mixed> $new Configuration in the backup.
+	 * @return array<string, mixed>
+	 */
+	private function restored_config( int $id, array $old, array $new ): array {
+		$referenced = array();
+		$extra      = array();
+
+		foreach ( $old as $key => $value ) {
+			if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/', (string) $key ) && is_string( $value ) ) {
+				$referenced[ explode( ',', $value )[0] ] = true;
+			}
+		}
+
+		// A drive with backup=0 is not part of the backup: its entry is not restored.
+		foreach ( $new as $key => $value ) {
+			if ( 1 === preg_match( '/^scsi\d+$/', (string) $key ) && is_string( $value ) && false !== strpos( ',' . $value . ',', ',backup=0,' ) ) {
+				unset( $new[ $key ] );
+			}
+		}
+		foreach ( $new as $key => $value ) {
+			if ( 1 === preg_match( '/^(?:scsi\d+|unused\d+)$/', (string) $key ) && is_string( $value ) ) {
+				$referenced[ explode( ',', $value )[0] ] = true;
+			}
+		}
+
+		foreach ( $this->state['images'] as $images ) {
+			foreach ( $images as $volid => $image ) {
+				if ( (int) $image['vmid'] === $id && ! isset( $referenced[ $volid ] ) ) {
+					$extra[] = $volid;
+				}
+			}
+		}
+		foreach ( $old as $key => $value ) {
+			if ( 1 === preg_match( '/^unused\d+$/', (string) $key ) ) {
+				$extra[] = (string) $value;
+			}
+		}
+
+		$slots = array_filter(
+			array_keys( $old ),
+			static fn( $key ) => 1 === preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', (string) $key ) && is_string( $old[ $key ] ) && false !== strpos( ',' . $old[ $key ] . ',', ',backup=0,' )
+		);
+		natsort( $slots );
+		foreach ( $slots as $key ) {
+			$extra[] = explode( ',', (string) $old[ $key ] )[0];
+		}
+
+		$n = 0;
+		foreach ( array_unique( $extra ) as $volid ) {
+			$new[ 'unused' . $n++ ] = $volid;
+		}
+
+		return $new;
 	}
 
 	/**

@@ -80,7 +80,7 @@ $beltoft_services_power_labels = array(
 					<?php esc_html_e( 'When a disk subscription ends, billing stops. The disk is detached from your server and its data is kept until we remove the disk.', 'beltoft-services' ); ?>
 				<?php endif; ?>
 			</p>
-			<p class="description"><?php esc_html_e( 'Reinstall and restore are unavailable until the extra disks are removed.', 'beltoft-services' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Reinstall is unavailable until the extra disks are removed.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
 		<?php if ( $extra_disks['add'] ) : ?>
 			<p><?php esc_html_e( 'Add a disk:', 'beltoft-services' ); ?>
@@ -170,11 +170,12 @@ $beltoft_services_power_labels = array(
 					</table>
 				<?php endif; ?>
 
-				<?php if ( $backups['can_restore'] && ! $extra_disks['items'] ) : ?>
+				<?php if ( $backups['can_restore'] ) : ?>
 					<details class="beltoft-services-vm__more">
 						<summary><?php esc_html_e( 'Restore from a backup', 'beltoft-services' ); ?></summary>
 						<form class="beltoft-services-vm-form" data-action="restore">
 							<p class="description"><?php esc_html_e( 'Restoring replaces everything on the server with the backup. The server is switched off while it is restored. The password and the SSH key go back to the ones the backup had. The IP address stays.', 'beltoft-services' ); ?></p>
+							<?php if ( $extra_disks['items'] ) : ?><p class="description"><?php esc_html_e( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', 'beltoft-services' ); ?></p><?php endif; ?>
 							<p>
 								<label for="beltoft-vm-backup"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></label>
 								<select id="beltoft-vm-backup" name="volid">

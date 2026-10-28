@@ -143,10 +143,7 @@ final class Actions {
 		if ( true === $r->get( 'linked' ) ) {
 			return $out;
 		}
-		if ( DiskMeta::for_server( $r ) ) {
-			$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
-			return $out;
-		}
+		$has_disks = (bool) DiskMeta::for_server( $r );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -154,7 +151,9 @@ final class Actions {
 		}
 
 		$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
-		$out['reinstall']      = __( 'Reinstall', 'beltoft-services' );
+		if ( ! $has_disks ) {
+			$out['reinstall'] = __( 'Reinstall', 'beltoft-services' );
+		}
 
 		return $out;
 	}
@@ -205,8 +204,8 @@ final class Actions {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
-		if ( in_array( $action, array( 'reinstall', 'restore' ), true ) && DiskMeta::for_server( $r ) ) {
-			return __( 'Remove the extra disks before reinstalling or restoring this server.', 'beltoft-services' );
+		if ( 'reinstall' === $action && DiskMeta::for_server( $r ) ) {
+			return __( 'Remove the extra disks before reinstalling this server.', 'beltoft-services' );
 		}
 		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore' ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
@@ -913,6 +912,12 @@ final class Actions {
 		}
 
 		// The queued plan change owns the one start (was_running): it applies the plan to the stopped VM and starts it, so a VM that has only just booted is never shut down again.
+		$disks = $this->restore_disks();
+
+		if ( null !== $disks ) {
+			return $disks;
+		}
+
 		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => true ) ) ) {
 			return StepResult::retry( 0, 'restore: progress could not be stored' );
 		}
@@ -924,6 +929,32 @@ final class Actions {
 		}
 
 		Jobs::enqueue( $this->r->id() );
+
+		return null;
+	}
+
+	/**
+	 * The extra disks are not part of the backup: a forced restore keeps their volumes as unusedN entries.
+	 * Each one that was attached goes back to its own slot, while the server is still off. One that cannot
+	 * (volume missing, slot taken) is failed with one admin alert and left alone; the restore goes on.
+	 * Null: done.
+	 */
+	private function restore_disks(): ?StepResult {
+		foreach ( DiskMeta::for_server( $this->r ) as $disk ) {
+			$result = ( new DiskSteps( $disk ) )->reattach_after_restore( $this->r );
+
+			if ( $result->is_done() ) {
+				continue;
+			}
+
+			if ( ! $result->is_failed() ) {
+				return $result;
+			}
+
+			$disk->set( array( 'last_error' => $result->error() ) );
+			$disk->transition( 'failed', 'Extra disk could not be attached again after the restore: ' . $result->error() );
+			Alerts::admin( $disk, 'After the restore of the server the extra disk could not be attached again: ' . $result->error() . ' The volume was left alone.' );
+		}
 
 		return null;
 	}

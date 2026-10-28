@@ -468,6 +468,69 @@ final class DiskSteps {
 		return StepResult::done( array( 'slot' => $attached['slot'], 'detached' => null ), 'Extra disk attached again' );
 	}
 
+	/**
+	 * After a restore of the server (it is off): the extra disk that was attached goes back to its own slot.
+	 * A forced restore keeps the volumes of backup=0 disks as unusedN entries of the restored configuration.
+	 * Done: attached again, or nothing to do (never attached, adopted, detached by policy, failed). Retry: try
+	 * again. Fail: the volume is missing or the slot is taken; nothing is guessed and the volume is left alone.
+	 *
+	 * @param Resource $server The server resource.
+	 */
+	public function reattach_after_restore( Resource $server ): StepResult {
+		$steps = (array) $this->r->get( 'steps' );
+		if ( $this->r->get( 'linked' ) || 'ready' !== $this->r->get( 'state' ) || ! $this->r->get( 'volname' ) || ! in_array( 'attach', $steps, true ) || ! in_array( 'verify', $steps, true ) || $this->r->get( 'detached' ) ) {
+			return StepResult::done( array(), 'Nothing to attach again after the restore' );
+		}
+		$ctx = $this->context( $server );
+		if ( $ctx instanceof StepResult ) {
+			return $ctx;
+		}
+		$polled = $this->poll_task();
+		if ( $polled ) {
+			return $polled;
+		}
+		$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
+		if ( is_wp_error( $config ) ) {
+			return $this->classify( $config, 'disk after restore' );
+		}
+		$volid    = $this->volume_id( $ctx );
+		$attached = $this->attached( $config, $volid );
+		if ( ! $attached ) {
+			$held = false;
+			foreach ( $config as $key => $value ) {
+				if ( 1 === preg_match( '/^unused\d+$/', (string) $key ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
+					$held = true;
+				}
+			}
+			if ( ! $held ) {
+				return StepResult::fail( 'The disk volume ' . $volid . ' is not in the restored server configuration.' );
+			}
+			$slot = (string) $this->r->get( 'slot' );
+			if ( 1 !== preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', $slot ) ) {
+				return StepResult::fail( 'The disk slot is not known.' );
+			}
+			if ( isset( $config[ $slot ] ) ) {
+				return StepResult::fail( 'Another disk occupies the slot ' . $slot . ' of this disk after the restore.' );
+			}
+			if ( '' !== $ctx['lock'] ) {
+				return StepResult::retry( 60, 'The server is locked.' );
+			}
+			$task = $this->run_task( 'disk reattach', 'POST', self::config_path( $ctx ), array( $slot => $volid . ',backup=0', 'digest' => (string) ( $config['digest'] ?? '' ) ) );
+			if ( $task instanceof StepResult ) {
+				return $task;
+			}
+			$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
+			if ( is_wp_error( $config ) ) {
+				return $this->classify( $config, 'disk after restore verify' );
+			}
+			$attached = $this->attached( $config, $volid );
+			if ( ! $attached ) {
+				return StepResult::retry( 60, 'The disk volume is not attached yet.' );
+			}
+		}
+		return StepResult::done( array( 'slot' => $attached['slot'] ), 'Extra disk attached again after the restore' );
+	}
+
 	private function has_image( array $images, string $volid ): bool {
 		foreach ( $images as $image ) {
 			if ( is_array( $image ) && ( $image['volid'] ?? '' ) === $volid ) {
@@ -479,16 +542,15 @@ final class DiskSteps {
 
 	/**
 	 * The volume was allocated but never attached (no attach step was ever recorded), and is in no drive and
-	 * no unusedN entry: delete it by its own exact name, once it is certain that the running server does not use it.
+	 * no unusedN entry. The plugin's token cannot delete a volume through the storage (live: 403 for any
+	 * volume), so it is left where it is, recorded on the disk, and goes with the server (deleting the VM
+	 * removes every vm-<vmid>-* volume). Only once it is certain that the running server does not use it.
 	 */
 	private function remove_orphan( array $ctx, string $volid ): StepResult {
 		$uuid = strtolower( preg_replace( '/[^a-f0-9]/i', '', (string) $this->r->get( 'uuid' ) ) );
 		$vmid = (int) $ctx['record']['vmid'];
 		if ( '' === $uuid || 1 !== preg_match( '/^vm-' . $vmid . '-bs(?:[1-9]|[12][0-9]|30)-' . $uuid . '\.raw$/', (string) $this->r->get( 'volname' ) ) ) {
-			return StepResult::fail( 'The disk volume name does not belong to this disk, so it is not deleted.' );
-		}
-		if ( '' !== $ctx['lock'] ) {
-			return StepResult::retry( 60, 'The server is locked.' );
+			return StepResult::fail( 'The disk volume name does not belong to this disk, so it is not touched.' );
 		}
 		$holds = $this->running_holds( $ctx, $volid );
 		if ( $holds instanceof StepResult ) {
@@ -497,30 +559,11 @@ final class DiskSteps {
 		if ( $holds ) {
 			return $this->pending_detach();
 		}
-		$by_hand = 'The unattached disk volume ' . $volid . ' could not be removed; remove it by hand.';
-		$upid = $this->client->task( 'DELETE', self::content_path( $ctx ) . '/' . rawurlencode( $volid ) );
-		if ( is_wp_error( $upid ) ) {
-			// An error reply (a refusal, a permission) is final: nothing was touched. Without a status it is a transport problem and is retried.
-			$data = $upid->get_error_data();
-			return is_array( $data ) && (int) ( $data['status'] ?? 0 ) >= 400 && ! in_array( (int) $data['status'], array( 408, 429 ), true )
-				? StepResult::fail( $by_hand . ' (' . $this->text( $upid ) . ')' )
-				: $this->classify( $upid, 'disk volume delete' );
+		if ( ! $this->r->set( array( 'left_volume' => $volid ) ) ) {
+			return StepResult::retry( 60, 'The left volume could not be recorded.' );
 		}
-		$result = $this->client->wait_task( (string) $upid, $this->wait );
-		if ( is_wp_error( $result ) && 'task_pending' === $result->get_error_code() ) {
-			return StepResult::retry( 0, 'disk volume delete: waiting for the Proxmox task' );
-		}
-		if ( is_wp_error( $result ) && 'task_failed' === $result->get_error_code() ) {
-			return StepResult::fail( $by_hand );
-		}
-		if ( is_wp_error( $result ) ) {
-			return StepResult::retry( 0, 'disk volume delete: ' . $this->text( $result ) );
-		}
-		$images = $this->images( $ctx );
-		if ( $images instanceof StepResult ) {
-			return $images;
-		}
-		return $this->has_image( $images, $volid ) ? StepResult::retry( 60, 'The disk volume still exists.' ) : $this->finish_delete();
+		DiskCapacity::release( $this->r );
+		return StepResult::done( array( 'size_gb' => null ), 'Extra disk removed. The unattached volume stays on the storage and is removed with its server.' );
 	}
 
 	private function finish_delete(): StepResult {

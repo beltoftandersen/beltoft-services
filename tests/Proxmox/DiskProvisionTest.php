@@ -120,7 +120,7 @@ class DiskProvisionTest extends BackupTestCase {
 		}
 	}
 
-	public function test_orphan_volume_never_attached_is_removed_by_its_exact_name_only(): void {
+	public function test_orphan_volume_never_attached_is_left_in_place_and_recorded_without_a_storage_delete(): void {
 		list( $server, $disk ) = $this->removable_disk();
 		$uuid = str_replace( '-', '', (string) $disk->get( 'uuid' ) );
 		$name = 'vm-5000-bs1-' . $uuid . '.raw';
@@ -128,12 +128,39 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
 		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-bs1-' . $uuid . 'x.raw', 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
 		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-bs2-other.raw', 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->mails = array();
 		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
 		$this->assertTrue( $result->is_done(), $result->error() );
-		$left = array_column( $this->images(), 'volid' );
-		sort( $left );
-		$this->assertSame( array( 'disk-store:5000/vm-5000-bs1-' . $uuid . 'x.raw', 'disk-store:5000/vm-5000-bs2-other.raw' ), $left, 'Similar names are untouched.' );
-		$this->assertCount( 1, $this->calls( 'DELETE', rawurlencode( 'disk-store:5000/' . $name ) ) );
+		$this->assertStringContainsString( 'stays on the storage and is removed with its server', $result->event() );
+		$this->assertCount( 3, $this->images(), 'No volume is removed.' );
+		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ), 'The plugin token cannot delete a volume through the storage (403 live): no call is made.' );
+		$this->assertCount( 0, array_filter( $this->fake->calls(), static fn( $c ) => 'DELETE' === $c['method'] ) );
+		$this->assertSame( 'disk-store:5000/' . $name, $disk->get( 'left_volume' ) );
+		$this->assertCount( 0, $this->mails, 'The normal case sends no admin alert.' );
+	}
+
+	public function test_an_orphan_volume_that_a_restore_put_in_unused_is_removed_through_the_configuration(): void {
+		list( , $disk ) = $this->removable_disk();
+		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
+		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
+		$volid = $this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'scsi1' => $volid . ',backup=0' ) );
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'scsi1' ) );
+		$this->assertSame( $volid, $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/config' )['unused0'] );
+		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertCount( 0, $this->images() );
+		$this->assertNull( $disk->get( 'left_volume' ) );
+		$this->assertCount( 0, array_filter( $this->fake->calls(), static fn( $c ) => 'DELETE' === $c['method'] && false !== strpos( $c['path'], '/content/' ) ) );
+	}
+
+	public function test_the_fake_refuses_a_storage_delete_of_a_disk_volume_like_the_live_token(): void {
+		$this->ready_vm();
+		$volid = $this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-x.raw', 'size' => '1G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$reply = $this->fake->request( 'DELETE', '/nodes/node-a/storage/disk-store/content/' . rawurlencode( $volid ) );
+		$this->assertWPError( $reply );
+		$this->assertSame( 403, $reply->get_error_data()['status'] );
+		$this->assertCount( 1, $this->images() );
 	}
 
 	public function test_orphan_removal_keeps_every_guard(): void {
@@ -152,24 +179,6 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed() );
 		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
 		$this->assertCount( 2, $this->images() );
-	}
-
-	public function test_a_refused_orphan_delete_fails_with_the_by_hand_text_and_touches_nothing(): void {
-		list( , $disk ) = $this->removable_disk();
-		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
-		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
-		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
-		$this->fake->fail_next( 'DELETE', '#/content/#', new \WP_Error( 'http_500', 'a guest with VMID 5000 exists', array( 'status' => 500 ) ) );
-		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
-		$this->assertTrue( $result->is_failed() );
-		$this->assertStringContainsString( 'could not be removed; remove it by hand.', $result->error() );
-		$this->assertStringContainsString( 'disk-store:5000/' . $name, $result->error() );
-		$this->assertCount( 1, $this->images() );
-		// A failed task is final too.
-		$this->fake->next_task( array( 'exitstatus' => 'volume busy' ) );
-		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
-		$this->assertTrue( $result->is_failed() );
-		$this->assertCount( 1, $this->images() );
 	}
 
 	public function test_a_pending_detach_alerts_the_admin_once_after_retries_and_names_the_restart(): void {
@@ -234,14 +243,15 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertCount( 1, $this->calls( 'POST', '/storage/disk-store/content' ), 'A verified disk is not provisioned again.' );
 	}
 
-	public function test_extra_disk_blocks_reinstall_and_restore_before_a_remote_call(): void {
+	public function test_extra_disk_blocks_reinstall_but_not_restore_before_a_remote_call(): void {
 		$server = $this->ready_vm();
 		$disk = $this->disk_for( $server );
 		Jobs::run( $disk->id() );
 		$this->assertNotContains( 'reinstall', array_keys( Actions::offered( $server ) ) );
-		$this->assertNotContains( 'restore', array_keys( Actions::offered( $server ) ) );
-		$this->assertStringContainsString( 'Remove the extra disks', Actions::check( $server, 'reinstall', array( 'confirm' => 'REINSTALL' ) ) );
-		$this->assertStringContainsString( 'Remove the extra disks', Actions::check( $server, 'restore', array( 'confirm' => 'RESTORE' ) ) );
+		$this->assertContains( 'restore', array_keys( Actions::offered( $server ) ) );
+		$this->assertSame( 'Remove the extra disks before reinstalling this server.', Actions::check( $server, 'reinstall', array( 'confirm' => 'REINSTALL' ) ) );
+		$volid = 'backup-store:backup/vm/5000/x';
+		$this->assertNotSame( 'Remove the extra disks before reinstalling this server.', (string) Actions::check( $server, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) ) );
 	}
 
 	public function test_account_panel_reports_disk_and_deletion_setting(): void {
