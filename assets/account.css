@@ -224,13 +224,13 @@ div.beltoft-services-domain .beltoft-services-domain__inline .button {
 }
 
 /* Domain cards: closed by default, the header opens them. */
-.beltoft-services-domain__toggle {
+section.beltoft-licenses__license:has(.beltoft-services-domain) > header {
 	cursor: pointer;
 	position: relative;
 	padding-right: 1.75em;
 }
 
-.beltoft-services-domain__toggle::after {
+section.beltoft-licenses__license:has(.beltoft-services-domain) > header::after {
 	content: "";
 	position: absolute;
 	right: 0.25em;
@@ -242,7 +242,7 @@ div.beltoft-services-domain .beltoft-services-domain__inline .button {
 	transform: translateY(-75%) rotate(45deg);
 }
 
-.beltoft-services-domain__toggle[aria-expanded="true"]::after {
+section.beltoft-licenses__license:has(.beltoft-services-domain) > header[aria-expanded="true"]::after {
 	transform: translateY(-25%) rotate(-135deg);
 }
 
@@ -257,8 +257,8 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 }
 
 /* The domain name in a card header: a heading, not a page title. */
-.beltoft-licenses__license:has(.beltoft-services-domain) .beltoft-services-domain__toggle .beltoft-licenses__product,
-.beltoft-services-domain__toggle h3 {
+section.beltoft-licenses__license:has(.beltoft-services-domain) > header .beltoft-licenses__product,
+section.beltoft-licenses__license:has(.beltoft-services-domain) > header h3 {
 	font-size: 20px;
 	line-height: 1.3;
 	margin: 0;
