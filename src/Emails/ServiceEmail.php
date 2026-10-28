@@ -42,6 +42,7 @@ abstract class ServiceEmail extends \WC_Email {
 		$this->placeholders   = array(
 			'{product_name}'  => '',
 			'{deletion_date}' => '',
+			'{domain_name}'   => '',
 		);
 
 		parent::__construct();
@@ -84,6 +85,9 @@ abstract class ServiceEmail extends \WC_Email {
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
 				'domain_name'   => in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : '',
 				'domain_action_reason' => in_array( $data['domain_action_reason'] ?? '', array( 'registrant_check', 'transfer_approval' ), true ) ? $data['domain_action_reason'] : 'transfer_approval',
+				'domain_renews' => self::domain_renews( $r ),
+				'domains_url'   => function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '',
+				'nameservers_shown' => 'domain' === $r->get( 'driver' ) && 'custom' !== $r->get( 'ns_mode' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
 				'dns_only'      => 'dns' === $r->get( 'driver' ),
 				'nameservers'   => 'dns' === $r->get( 'driver' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
 				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk' ), true ) ? $data['reason'] : 'down',
@@ -93,6 +97,7 @@ abstract class ServiceEmail extends \WC_Email {
 
 			$this->placeholders['{product_name}']  = $this->values['product_name'];
 			$this->placeholders['{deletion_date}'] = $this->values['deletion_date'];
+			$this->placeholders['{domain_name}']   = $this->values['domain_name'];
 
 			if ( $this->is_enabled() && $this->get_recipient() ) {
 				$sent = (bool) $this->send( $this->get_recipient(), $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );
@@ -103,6 +108,23 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		return $sent;
+	}
+
+	/**
+	 * The next renewal date of a domain, formatted, or ''. A prepaid transfer year counts from the
+	 * prepaid expiry, as the billing dates do.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function domain_renews( Resource $r ): string {
+		if ( 'domain' !== $r->get( 'driver' ) ) {
+			return '';
+		}
+
+		$expiry = (string) ( $r->get( 'prepaid_expiry' ) ?: $r->get( 'expires_at' ) );
+		$time   = '' !== $expiry ? strtotime( $expiry . ' UTC' ) : false;
+
+		return $time ? wp_date( (string) get_option( 'date_format' ), $time ) : '';
 	}
 
 	/**

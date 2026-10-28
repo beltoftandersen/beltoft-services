@@ -36,7 +36,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Emails {
 
-	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert' );
+	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered' );
 
 	public const USAGE_HOOK = 'beltoft_services_usage';
 	public const USAGE_CRON = '0 6 * * *';
@@ -54,6 +54,8 @@ final class Emails {
 		'BeltoftServices_ProvisionDelay'  => ProvisionDelay::class,
 		'BeltoftServices_DomainActionNeeded' => DomainActionNeeded::class,
 		'BeltoftServices_MonitorAlert' => MonitorAlert::class,
+		'BeltoftServices_DomainTransferred' => DomainTransferred::class,
+		'BeltoftServices_DomainRegistered' => DomainRegistered::class,
 	);
 
 	/**
@@ -145,7 +147,7 @@ final class Emails {
 
 			if ( 'ready' === $new && 'ready' !== $told ) {
 				$r->set( array( 'notified' => 'ready' ) );
-				self::send( 'beltoft_services_ready', $r );
+				self::send( self::ready_email_id( $r ), $r );
 			} elseif ( 'paused' === $new && 'paused' !== $told && ( 'ready' === $told || 'ready' === $old ) ) {
 				$r->set( array( 'notified' => 'paused' ) );
 				self::send( 'beltoft_services_paused', $r );
@@ -157,6 +159,20 @@ final class Emails {
 		} catch ( \Throwable $e ) {
 			error_log( sprintf( 'Beltoft Services: service email failed: %s', $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a failed email must not stop the job; this is its only record.
 		}
+	}
+
+	/**
+	 * The email that tells the customer a service is ready: a finished domain has its own
+	 * (transferred or registered), everything else the generic one.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function ready_email_id( Resource $r ): string {
+		if ( 'domain' !== $r->get( 'driver' ) ) {
+			return 'beltoft_services_ready';
+		}
+
+		return 'transfer' === $r->get( 'mode' ) ? 'beltoft_services_domain_transferred' : 'beltoft_services_domain_registered';
 	}
 
 	/**
