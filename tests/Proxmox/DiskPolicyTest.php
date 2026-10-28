@@ -59,7 +59,7 @@ class DiskPolicyTest extends BackupTestCase {
 		$this->assertArrayNotHasKey( 'scsi1', $config );
 		$this->assertContains( 'disk-store:5000/' . $volname, array_values( array_filter( $config, static fn( $k ) => 0 === strpos( (string) $k, 'unused' ), ARRAY_FILTER_USE_KEY ) ) );
 		$this->assertCount( 1, $this->images(), 'The volume and its data stay on the storage.' );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 		$again = $driver->pause( Resource::find( $disk->id() ) );
 		$this->assertTrue( $again->is_done(), 'A repeat is idempotent: ' . $again->error() );
 		$this->assertCount( 1, $this->images() );
@@ -82,7 +82,7 @@ class DiskPolicyTest extends BackupTestCase {
 		$this->assertTrue( $result->is_retry(), $result->error() );
 		$this->assertStringContainsString( 'restarted', $result->error() );
 		$this->assertCount( 1, $this->images() );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 	}
 
 	public function test_pause_leaves_a_linked_disk_attached(): void {

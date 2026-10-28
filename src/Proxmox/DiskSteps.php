@@ -131,7 +131,7 @@ final class DiskSteps {
 					continue;
 				}
 				$uuid = preg_replace( '/[^a-f0-9]/i', '', (string) $this->r->get( 'uuid' ) );
-				$name = 'vm-' . (int) $ctx['record']['vmid'] . '-bs' . $number . '-' . strtolower( $uuid ) . '.raw';
+				$name = 'vm-' . (int) $ctx['record']['vmid'] . '-bs' . $number . '-' . strtolower( $uuid ) . '.' . Provision::disk_format();
 				return $this->r->set( array( 'slot' => $slot, 'volname' => $name ) ) ? null : StepResult::retry( 60, 'The disk slot claim could not be stored.' );
 			}
 			return StepResult::fail( 'No SCSI disk slot is available.' );
@@ -230,7 +230,7 @@ final class DiskSteps {
 			if ( '' !== $ctx['lock'] ) {
 				return StepResult::retry( 60, 'The server is locked.' );
 			}
-			$made = $this->client->request( 'POST', self::content_path( $ctx ), array( 'filename' => $this->r->get( 'volname' ), 'size' => $size . 'G', 'vmid' => (int) $ctx['record']['vmid'], 'format' => 'raw' ) );
+			$made = $this->client->request( 'POST', self::content_path( $ctx ), array( 'filename' => $this->r->get( 'volname' ), 'size' => $size . 'G', 'vmid' => (int) $ctx['record']['vmid'], 'format' => Provision::disk_format() ) );
 			if ( is_wp_error( $made ) ) {
 				return $this->classify( $made, 'disk allocation' );
 			}
@@ -579,7 +579,7 @@ final class DiskSteps {
 	private function remove_orphan( array $ctx, string $volid ): StepResult {
 		$uuid = strtolower( preg_replace( '/[^a-f0-9]/i', '', (string) $this->r->get( 'uuid' ) ) );
 		$vmid = (int) $ctx['record']['vmid'];
-		if ( '' === $uuid || 1 !== preg_match( '/^vm-' . $vmid . '-bs(?:[1-9]|[12][0-9]|30)-' . $uuid . '\.raw$/', (string) $this->r->get( 'volname' ) ) ) {
+		if ( '' === $uuid || 1 !== preg_match( '/^vm-' . $vmid . '-bs(?:[1-9]|[12][0-9]|30)-' . $uuid . '\.(?:raw|qcow2)$/', (string) $this->r->get( 'volname' ) ) ) {
 			return StepResult::fail( 'The disk volume name does not belong to this disk, so it is not touched.' );
 		}
 		$holds = $this->running_holds( $ctx, $volid );

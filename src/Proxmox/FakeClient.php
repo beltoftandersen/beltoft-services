@@ -465,6 +465,7 @@ class FakeClient implements Client {
 					'name'        => array( 'dnsname' ),
 					'full'        => array( 'bool' ),
 					'storage'     => array( 'string' ),
+					'format'      => array( 'enum', false, array( 'values' => array( 'raw', 'qcow2' ) ) ),
 					'description' => array( 'string' ),
 					'pool'        => array( 'string' ),
 					'target'      => array( 'string' ),
@@ -576,7 +577,7 @@ class FakeClient implements Client {
 					'filename' => array( 'string', true ),
 					'size'     => array( 'size', true ),
 					'vmid'     => array( 'int', true, array( 'min' => 100 ) ),
-					'format'   => array( 'enum', false, array( 'values' => array( 'raw' ) ) ),
+					'format'   => array( 'enum', false, array( 'values' => array( 'raw', 'qcow2' ) ) ),
 				),
 			),
 			array( 'GET', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/status$#', 'h_storage_status', $none ),
@@ -912,7 +913,7 @@ class FakeClient implements Client {
 	}
 
 	/**
-	 * `<storage>:0,import-from=<volid>` into a free slot: a new volume vm-<vmid>-disk-<n>.raw (the first free n)
+	 * `<storage>:0,import-from=<volid>` into a free slot: a new volume vm-<vmid>-disk-<n>.<format> (raw unless format= says qcow2; the first free n)
 	 * in the storage, the size of the source; the config value is the new volume with the other options.
 	 * The slot must be empty (the old drive was detached and its unused volume deleted first).
 	 *
@@ -925,11 +926,14 @@ class FakeClient implements Client {
 		$parts  = explode( ',', $value );
 		$target = array_shift( $parts );
 		$source = '';
+		$format = 'raw';
 		$rest   = array();
 
 		foreach ( $parts as $part ) {
 			if ( 0 === strpos( $part, 'import-from=' ) ) {
 				$source = substr( $part, 12 );
+			} elseif ( 0 === strpos( $part, 'format=' ) ) {
+				$format = substr( $part, 7 );
 			} else {
 				$rest[] = $part;
 			}
@@ -963,12 +967,17 @@ class FakeClient implements Client {
 			return $this->error( 500, 'unable to find the volume ' . $source . ' to import' );
 		}
 
+		if ( ! in_array( $format, array( 'raw', 'qcow2' ), true ) ) {
+			return $this->error( 400, 'Parameter verification failed: ' . $slot . ': invalid format' );
+		}
+
 		for ( $n = 0;; $n++ ) {
-			$volid = $m[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.raw';
-			$taken = isset( $this->state['images'][ $m[1] ][ $volid ] );
+			$volid = $m[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.' . $format;
+			$other = $m[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.' . ( 'raw' === $format ? 'qcow2' : 'raw' );
+			$taken = isset( $this->state['images'][ $m[1] ][ $volid ] ) || isset( $this->state['images'][ $m[1] ][ $other ] ); // Free disk numbers ignore the extension, as on Proxmox.
 
 			foreach ( $this->state['vms'][ $id ]['config'] as $drive ) {
-				$taken = $taken || ( is_string( $drive ) && explode( ',', $drive )[0] === $volid );
+				$taken = $taken || ( is_string( $drive ) && in_array( explode( ',', $drive )[0], array( $volid, $other ), true ) );
 			}
 
 			if ( ! $taken ) {
@@ -979,7 +988,7 @@ class FakeClient implements Client {
 		$this->state['images'][ $m[1] ][ $volid ] = array(
 			'volid'   => $volid,
 			'vmid'    => $id,
-			'format'  => 'raw',
+			'format'  => $format,
 			'size'    => $gb * 1073741824,
 			'content' => 'images',
 		);
@@ -1016,13 +1025,22 @@ class FakeClient implements Client {
 			$config['description'] = $p['description'];
 		}
 
+		$format = $p['format'] ?? 'raw';
+
+		foreach ( $config as $key => $drive ) {
+			if ( is_string( $drive ) && 1 === preg_match( '/^[^,]+\.(?:raw|qcow2)(?=,|$)/', $drive ) ) {
+				$config[ $key ] = preg_replace( '/\.(?:raw|qcow2)(?=,|$)/', '.' . $format, $drive, 1 );
+			}
+		}
+
 		return $this->new_task(
 			$a[0],
 			'qmclone',
 			$a[1],
-			function () use ( $p, $node, $config, $source ) {
+			function () use ( $p, $node, $config, $source, $format ) {
 				$id = (int) $p['newid'];
 				$this->state['vms'][ $id ] = array(
+					'disk_format'      => $format,
 					'vmid'             => $id,
 					'node'             => $node,
 					'name'             => $p['name'] ?? 'Copy-of-VM-' . $source['name'],
@@ -1431,14 +1449,15 @@ class FakeClient implements Client {
 		return $out;
 	}
 
-	/** Allocate a named raw image on directory storage (modelled). */
+	/** Allocate a named raw or qcow2 image on directory storage (modelled); the extension must match the format. */
 	private function h_content_create( array $a, array $p ) {
 		$vmid = (int) $p['vmid'];
 		$name = (string) $p['filename'];
 		if ( ! isset( $this->state['nodes'][ $a[0] ] ) || ! isset( $this->state['vms'][ $vmid ] ) ) {
 			return $this->error( 500, 'node or VM not found' );
 		}
-		if ( 1 !== preg_match( '/^vm-' . $vmid . '-[A-Za-z0-9._-]+\.raw$/', $name ) ) {
+		$format = (string) ( $p['format'] ?? 'raw' );
+		if ( 1 !== preg_match( '/^vm-' . $vmid . '-[A-Za-z0-9._-]+\.' . preg_quote( $format, '/' ) . '$/', $name ) ) {
 			return $this->error( 400, 'illegal image name' );
 		}
 		$volid = $a[1] . ':' . $vmid . '/' . $name;
@@ -1451,7 +1470,7 @@ class FakeClient implements Client {
 		$this->state['images'][ $a[1] ][ $volid ] = array(
 			'volid' => $volid,
 			'vmid' => $vmid,
-			'format' => 'raw',
+			'format' => $format,
 			'size' => (int) $size[1] * 1073741824,
 			'content' => 'images',
 		);

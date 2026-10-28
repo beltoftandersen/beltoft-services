@@ -115,7 +115,7 @@ class DiskProvisionTest extends BackupTestCase {
 			$this->assertStringContainsString( 'restarted', $result->error() );
 			$this->assertContains( 'attach', (array) $disk->get( 'steps' ) );
 			$this->assertCount( 0, $this->calls( 'DELETE', rawurlencode( 'disk-store:5000/' . $volname ) ), 'The volume is never deleted by a direct storage delete (an attached disk goes through the configuration only).' );
-			$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+			$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 			$this->assertCount( 1, $this->images() );
 		}
 	}
@@ -133,7 +133,7 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$this->assertStringContainsString( 'stays on the storage and is removed with its server', $result->event() );
 		$this->assertCount( 3, $this->images(), 'No volume is removed.' );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ), 'The plugin token cannot delete a volume through the storage (403 live): no call is made.' );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ), 'The plugin token cannot delete a volume through the storage (403 live): no call is made.' );
 		$this->assertCount( 0, array_filter( $this->fake->calls(), static fn( $c ) => 'DELETE' === $c['method'] ) );
 		$this->assertSame( 'disk-store:5000/' . $name, $disk->get( 'left_volume' ) );
 		$this->assertCount( 0, $this->mails, 'The normal case sends no admin alert.' );
@@ -174,10 +174,10 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-bs1-someoneelse.raw', 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
 		$this->assertTrue( $disk->set( array( 'volname' => 'vm-5000-bs1-someoneelse.raw' ) ) );
 		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed(), 'A name not built from this uuid is refused.' );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 		$this->assertTrue( $disk->set( array( 'volname' => $name, 'linked' => true ) ) );
 		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed() );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 		$this->assertCount( 2, $this->images() );
 	}
 
@@ -208,7 +208,7 @@ class DiskProvisionTest extends BackupTestCase {
 		$result = Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) );
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'belongs to another customer', $result->error() );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 	}
 
 	public function test_ever_attached_volume_in_no_drive_and_no_unused_entry_fails_with_a_by_hand_alert(): void {
@@ -224,13 +224,13 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertTrue( $result->is_failed(), $result->error() );
 		$this->assertStringContainsString( 'is on the storage but not linked to the server; remove it by hand.', $result->error() );
 		$this->assertStringContainsString( 'disk-store:5000/' . $disk->get( 'volname' ), $result->error() );
-		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 0, array_merge( $this->calls( 'DELETE', '.raw' ), $this->calls( 'DELETE', '.qcow2' ) ) );
 		$this->assertCount( 1, $this->images() );
 	}
 
 	public function test_resume_between_claim_and_attach_provisions_instead_of_claiming_ready(): void {
 		list( , $disk ) = $this->removable_disk();
-		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
+		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.qcow2';
 		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
 		$result = Registry::get( 'proxmox-disk' )->resume( $disk );
 		$this->assertTrue( $result->is_done(), $result->error() );
