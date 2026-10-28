@@ -516,4 +516,53 @@ final class EmailsTest extends TestCase {
 
 		$this->assertSame( 1, $restored, 'The locale is restored.' );
 	}
+
+	/**
+	 * The snapshot notice in each reason, as html and plain text: its words, no em dash, no hosting provider, no ids.
+	 */
+	public function test_the_snapshot_notice_reads_right_for_each_reason_in_both_formats(): void {
+		$this->assertContains( 'beltoft_services_snapshot_notice', Emails::IDS );
+		$this->assertInstanceOf( \BeltoftServices\Emails\SnapshotNotice::class, Emails::get( 'beltoft_services_snapshot_notice' ) );
+
+		$this->fake_driver();
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) )->id() );
+		$words    = array(
+			'disk_removed'  => 'snapshots that included that disk were deleted',
+			'slots_reduced' => 'allowance went down',
+			'expired'       => 'reached the end of its keeping time',
+		);
+
+		foreach ( array( 'html', 'plain' ) as $type ) {
+			foreach ( $words as $reason => $text ) {
+				$this->mails = array();
+				$email             = Emails::get( 'beltoft_services_snapshot_notice' );
+				$email->email_type = $type;
+				$this->assertTrue( $email->trigger( $resource, array( 'snapshot_reason' => $reason, 'deletes_at' => time() + 3 * DAY_IN_SECONDS ) ), $reason );
+
+				$mail = $this->customer_mails()[0];
+				$body = (string) preg_replace( '/\s+/', ' ', (string) $mail['subject'] . ' ' . wp_strip_all_tags( (string) $mail['message'] ) );
+				$this->assertStringContainsString( $text, $body, $reason . ' ' . $type );
+				$this->assertStringNotContainsString( '—', $body );
+				$this->assertStringNotContainsString( 'Hetzner', $body );
+				$this->assertStringNotContainsString( 'Proxmox', $body );
+				$this->assertSame( 'About your server snapshots', $mail['subject'] );
+
+				if ( 'slots_reduced' === $reason ) {
+					$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), time() + 3 * DAY_IN_SECONDS ), $body );
+				}
+			}
+		}
+	}
+
+	public function test_an_unknown_snapshot_reason_falls_back_to_the_expired_text(): void {
+		$this->fake_driver();
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) )->id() );
+		$this->mails = array();
+		Emails::get( 'beltoft_services_snapshot_notice' )->trigger( $resource, array( 'snapshot_reason' => '<script>' ) );
+		$this->assertStringContainsString( 'reached the end of its keeping time', (string) preg_replace( '/\s+/', ' ', (string) $this->customer_mails()[0]['message'] ) );
+	}
 }

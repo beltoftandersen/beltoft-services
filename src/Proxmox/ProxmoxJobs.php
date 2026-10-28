@@ -52,6 +52,8 @@ final class ProxmoxJobs {
 	public const BACKUP       = 'beltoft_services_proxmox_backup';
 	public const BACKUP_NEXT  = 'beltoft_services_proxmox_backup_next';
 	public const BACKUP_RUN   = 'beltoft_services_proxmox_backup_run';
+	public const SNAPSHOTS    = 'beltoft_services_proxmox_snapshots';
+	public const SNAP_SYNCED  = 'beltoft_services_proxmox_snapshots_synced';
 
 	public const RUNNING_PREFIX = 'beltoft_services_proxmox_running_';
 	public const QUEUE          = 'beltoft_services_proxmox_abuse_queue';
@@ -87,6 +89,7 @@ final class ProxmoxJobs {
 		self::ABUSE    => '20 * * * *',
 		self::DISK     => '10 */6 * * *',
 		self::BACKUP   => '30 3 * * *',
+		self::SNAPSHOTS => '40 * * * *',
 	);
 
 	/**
@@ -107,6 +110,7 @@ final class ProxmoxJobs {
 		add_action( self::DISK_BATCH, array( __CLASS__, 'disk_batch' ) );
 		add_action( self::BACKUP, array( __CLASS__, 'backup' ) );
 		add_action( self::BACKUP_NEXT, array( __CLASS__, 'backup_next' ) );
+		add_action( self::SNAPSHOTS, array( __CLASS__, 'snapshots' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
 		// After the sweep itself (priority 10): one password purge a day.
 		add_action( Jobs::SWEEP, array( __CLASS__, 'purge_passwords' ), 20 );
@@ -879,6 +883,57 @@ final class ProxmoxJobs {
 
 		if ( ! as_has_scheduled_action( self::BACKUP_NEXT, array(), Jobs::GROUP ) ) {
 			as_schedule_single_action( time() + self::BACKUP_DELAY, self::BACKUP_NEXT, array(), Jobs::GROUP );
+		}
+	}
+
+	// -- Snapshots -------------------------------------------------------------------------------
+
+	/**
+	 * Hourly: reads the servers' meta only. A server whose snapshots are past their time gets the internal
+	 * `snapshot_expire`, and once a day one with snapshots gets `snapshot_sync`, both through the act queue
+	 * (which runs them under the server's lock, also on a paused server), BATCH_DELAY apart. The clamp for
+	 * paid slots that ended runs here too, before the picking. Nothing runs while the kill switch is on. It also
+	 * runs with the customer switch off: what is there still expires.
+	 */
+	public static function snapshots(): void {
+		if ( Settings::get( 'pause_all' ) ) {
+			return;
+		}
+
+		$driver = Registry::get( SshKeyField::DRIVER );
+
+		if ( ! $driver ) {
+			return;
+		}
+
+		$daily = false === get_transient( self::SNAP_SYNCED );
+		$slot  = 0;
+		$now   = time();
+
+		if ( $daily ) {
+			set_transient( self::SNAP_SYNCED, 1, DAY_IN_SECONDS );
+		}
+
+		foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
+			$resource = Resource::find( $id );
+
+			if ( ! $resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! Snapshots::tracked( $resource ) ) {
+				continue;
+			}
+
+			if ( SnapshotExpiry::needs_clamp( $resource ) ) {
+				SnapshotExpiry::clamp( $resource, $now );
+
+				$resource = Resource::find( $id ) ?? $resource;
+			}
+			$action   = SnapshotExpiry::due( $resource, $now ) ? 'snapshot_expire' : ( $daily ? 'snapshot_sync' : '' );
+
+			if ( '' === $action ) {
+				continue;
+			}
+
+			Jobs::queue_act( $id, $action, array(), $slot * self::BATCH_DELAY );
+			++$slot;
 		}
 	}
 

@@ -98,6 +98,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk' ), true ) ? $data['reason'] : 'down',
 				'monitor_disk_used' => max( 0, (int) ( $data['disk_used'] ?? 0 ) ),
 				'monitor_disk_total' => max( 0, (int) ( $data['disk_total'] ?? 0 ) ),
+				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);
 
 			$this->placeholders['{product_name}']  = $this->values['product_name'];

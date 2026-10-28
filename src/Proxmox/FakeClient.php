@@ -870,6 +870,10 @@ class FakeClient implements Client {
 			}
 			if ( 1 === preg_match( '/^unused\d+$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
 				$volid = (string) $this->state['vms'][ $id ]['config'][ $key ];
+				if ( $this->snapshot_references( $id, $volid ) ) {
+					// Modelled, not yet seen live: a volume a snapshot still holds is not destroyed.
+					return $this->error( 500, "volume '" . $volid . "' is referenced by a snapshot and cannot be removed" );
+				}
 				foreach ( $this->state['images'] as $storage => $images ) {
 					unset( $this->state['images'][ $storage ][ $volid ] );
 				}
@@ -2133,6 +2137,22 @@ class FakeClient implements Client {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Whether a snapshot of the VM holds a volume.
+	 *
+	 * @param int    $id    VMID.
+	 * @param string $volid Volume id.
+	 */
+	private function snapshot_references( int $id, string $volid ): bool {
+		foreach ( (array) ( $this->state['snapshots'][ $id ] ?? array() ) as $snap ) {
+			if ( in_array( $volid, self::snapshot_disks( (array) ( $snap['config'] ?? array() ) ), true ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

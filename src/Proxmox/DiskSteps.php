@@ -618,6 +618,38 @@ final class DiskSteps {
 		return StepResult::done( array( 'size_gb' => null ), 'Extra disk removed' );
 	}
 
+	/**
+	 * D10: the snapshots that cover the disk go before the disk does (a refused delete would stall a billing-driven
+	 * removal), under the server's lock because they live in the server's meta and task slot. The customer is told
+	 * once per disk.
+	 *
+	 * @param Resource $server The server.
+	 * @param string   $volid  The disk's volume id.
+	 * @return StepResult|null Null when none is left.
+	 */
+	private function drop_snapshots( Resource $server, string $volid ): ?StepResult {
+		// Meta only, outside the lock: no snapshot covers this volume, so nothing to drop or to lock for.
+		if ( array() === Snapshots::covering( $server, $volid ) ) {
+			return null;
+		}
+		$disk   = $this->r->id();
+		$answer = null;
+		$ran    = $server->locked(
+			static function () use ( $server, $volid, $disk, &$answer ): bool {
+				$answer = ( new Snapshots( $server ) )->drop_covering( $volid );
+				if ( $answer->is_done() ) {
+					// Keyed by the disk resource: a volume id comes back for a later disk, which is told again.
+					SnapshotExpiry::notify( $server, 'disk_removed', $disk . ':' . $volid );
+				}
+				return true;
+			}
+		);
+		if ( null === $ran ) {
+			return StepResult::retry( 60, 'The server is busy; its snapshots of this disk are deleted first.' );
+		}
+		return $answer->is_done() ? null : $answer;
+	}
+
 	public function delete(): StepResult {
 		if ( $this->r->get( 'linked' ) ) {
 			return StepResult::fail( 'An adopted disk is not deleted automatically.' );
@@ -646,11 +678,15 @@ final class DiskSteps {
 		if ( $polled ) {
 			return $polled;
 		}
+		$volid = $this->volume_id( $ctx );
+		$gone  = $this->drop_snapshots( $server, $volid );
+		if ( $gone ) {
+			return $gone;
+		}
 		$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
 		if ( is_wp_error( $config ) ) {
 			return $this->classify( $config, 'disk removal' );
 		}
-		$volid = $this->volume_id( $ctx );
 		$attached = $this->attached( $config, $volid );
 		if ( $attached ) {
 			$done = $this->client->request( 'PUT', self::config_path( $ctx ), array( 'delete' => $attached['slot'], 'digest' => (string) ( $config['digest'] ?? '' ) ) );

@@ -229,6 +229,12 @@ final class ProxmoxSettings {
 		$fields['snapshot_free_days'] = $base + array( 'type' => 'number', 'default' => 7, 'min' => self::RANGES['snapshot_free_days'][0], 'label' => __( 'Days a free snapshot is kept', 'beltoft-services' ) );
 		$fields['snapshot_paid_days'] = $base + array( 'type' => 'number', 'default' => 30, 'min' => self::RANGES['snapshot_paid_days'][0], 'label' => __( 'Days a snapshot is kept with paid slots', 'beltoft-services' ) );
 		$fields['snapshot_max_slots'] = $base + array( 'type' => 'number', 'default' => 10, 'min' => self::RANGES['snapshot_max_slots'][0], 'label' => __( 'Most snapshots per server', 'beltoft-services' ), 'desc' => __( 'Free and paid slots together never go above this.', 'beltoft-services' ) );
+		$fields['snapshot_expired_email'] = $base + array(
+			'type'    => 'checkbox',
+			'default' => 0,
+			'label'   => __( 'Email when a snapshot expires', 'beltoft-services' ),
+			'desc'    => __( 'Tell the customer when a snapshot reached the end of its keeping time and was deleted. The emails about a removed disk and fewer slots are always sent.', 'beltoft-services' ),
+		);
 		$fields['snapshot_reserve_gb'] = $base + array(
 			'type'    => 'number',
 			'default' => 0,
