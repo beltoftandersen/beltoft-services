@@ -24,11 +24,21 @@ final class Contacts {
 		$hash  = self::hash( $read['key'] );
 		$saved = self::details( $user_id );
 		if ( '' !== $cached && ( $saved['handle'] ?? '' ) === $cached && ( $saved['hash'] ?? '' ) === $hash ) { return $cached; }
+		if ( '' !== $cached && array() === $saved ) {
+			// A handle from before the details were kept: the first complete order adopts it, so a deploy alone makes no new handle.
+			self::remember( $user_id, $cached, $hash, $read );
+			return $cached;
+		}
 		$result = Clients::registrar()->request( 'POST', '/customers', $read['body'] );
 		if ( is_wp_error( $result ) ) { return $result; }
 		$handle = (string) ( $result['handle'] ?? '' );
 		if ( '' === $handle ) { return new \WP_Error( 'bad_response', 'Registrar did not return a contact handle.' ); }
 		update_user_meta( $user_id, self::META_HANDLE, $handle );
+		self::remember( $user_id, $handle, $hash, $read );
+		return $handle;
+	}
+
+	private static function remember( int $user_id, string $handle, string $hash, array $read ): void {
 		update_user_meta( $user_id, self::META_DETAILS, array(
 			'handle'   => $handle,
 			'hash'     => $hash,
@@ -36,7 +46,6 @@ final class Contacts {
 			'vat'      => '' !== $read['key']['vat'],
 			'private'  => 'private' === $read['type'],
 		) );
-		return $handle;
 	}
 
 	/** What is known of the registrant behind a handle, or an empty array when the handle was made before the details were kept. */

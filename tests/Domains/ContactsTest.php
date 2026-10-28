@@ -93,14 +93,18 @@ class ContactsTest extends TestCase {
 		$this->assertCount( 1, $fake->calls() );
 	}
 
-	public function test_a_handle_from_before_the_details_were_kept_is_replaced_by_a_complete_order_but_kept_for_an_incomplete_one(): void {
+	public function test_a_handle_from_before_the_details_were_kept_is_adopted_not_replaced(): void {
 		$user = self::factory()->user->create();
 		update_user_meta( $user, '_beltoft_services_domain_handle', 'OLD-DK' );
 		$fake = $this->fake_with_handles( 'NEW-DK' );
 		$blank = wc_create_order( array( 'customer_id' => $user ) );
 		$this->assertSame( 'OLD-DK', Contacts::handle_for( $user, $blank ), 'No billing details to compare: the handle stays.' );
+		$this->assertSame( array(), Contacts::details_of( $user, 'OLD-DK' ) );
+		$this->assertSame( 'OLD-DK', Contacts::handle_for( $user, $this->order( $user ) ), 'The first complete order adopts it: no new handle from the deploy.' );
 		$this->assertCount( 0, $fake->calls() );
-		$this->assertSame( 'NEW-DK', Contacts::handle_for( $user, $this->order( $user ) ) );
+		$this->assertSame( 'DK', Contacts::details_of( $user, 'OLD-DK' )['country'] );
+		$this->assertSame( 'OLD-DK', Contacts::handle_for( $user, $this->order( $user ) ) );
+		$this->assertSame( 'NEW-DK', Contacts::handle_for( $user, $this->order( $user, array( 'city' => 'Odense' ) ) ), 'A real change after that makes a new handle.' );
 	}
 
 	public function test_incomplete_billing_without_a_handle_is_an_error(): void {
