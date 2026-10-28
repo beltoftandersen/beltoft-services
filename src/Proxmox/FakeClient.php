@@ -2116,7 +2116,7 @@ class FakeClient implements Client {
 	}
 
 	/**
-	 * Drive keys of a config that hold a disk (a cd-rom and an empty drive do not).
+	 * Drive keys of a config that hold a disk (a cd-rom, the cloud-init drive and an empty drive do not).
 	 *
 	 * @param array<string, mixed> $config VM config.
 	 * @return array<string, string> Key => volume id.
@@ -2125,7 +2125,7 @@ class FakeClient implements Client {
 		$out = array();
 
 		foreach ( $config as $key => $value ) {
-			if ( 1 !== preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0)$/', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || 'none' === $value ) {
+			if ( 1 !== preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0)$/', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || false !== strpos( explode( ',', $value )[0], 'cloudinit' ) || 'none' === $value ) {
 				continue;
 			}
 
