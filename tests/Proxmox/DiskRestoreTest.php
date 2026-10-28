@@ -219,6 +219,55 @@ class DiskRestoreTest extends BackupTestCase {
 		$this->assertNotEmpty( array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ) );
 	}
 
+	public function test_a_restore_under_way_finishes_when_a_disk_fails_or_is_paused_between_rounds(): void {
+		foreach ( array( 'failed', 'paused' ) as $state ) {
+			$server = $this->ready_vm();
+			$disk   = $this->disk_for( $server );
+			$volid  = $this->backup_of( $server );
+			$vmid   = (int) $server->get( 'vmid' );
+			$this->fake->task( 'POST', '/nodes/node-a/qemu/' . $vmid . '/status/stop' );
+			$this->fake->task( 'POST', '/nodes/node-a/qemu', array( 'vmid' => $vmid, 'archive' => $volid, 'force' => 1, 'storage' => 'disk-store' ) );
+			$this->assertTrue( $server->set( array( 'restore' => array( 'volid' => $volid, 'ctime' => 1, 'phase' => 'restored' ) ) ) );
+			$this->assertTrue( $disk->transition( $state, 'test' ) );
+			$args = array( 'confirm' => 'RESTORE', 'volid' => $volid );
+			$this->assertNull( Actions::check( Resource::find( $server->id() ), 'restore', $args ), $state );
+			Jobs::act( $server->id(), 'restore', $args );
+			$fresh = Resource::find( $server->id() );
+			$this->assertNull( $fresh->get( 'restore' ), $state . ': the restore finished.' );
+			$this->assertTrue( $fresh->get( 'plan_dirty' ), $state );
+			Jobs::run( $server->id() );
+			$this->assertSame( 'running', $this->fake->vm( $vmid )['status'], $state . ': the server starts.' );
+		}
+	}
+
+	public function test_a_failed_or_deleting_disk_needs_support_and_a_paused_one_waits_for_payment(): void {
+		$server = $this->ready_vm();
+		$disk   = $this->disk_for( $server );
+		$args   = array( 'confirm' => 'RESTORE', 'volid' => $this->backup_of( $server ) );
+		$policy = 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.';
+		$help   = 'An extra disk on this server needs attention from support before a restore. Contact support.';
+		foreach ( array( 'failed' => $help, 'deleting' => $help, 'paused' => $policy, 'ready' => null ) as $state => $text ) {
+			$this->assertTrue( Resource::find( $disk->id() )->transition( $state, 'test' ) );
+			$this->assertSame( $text, Actions::check( Resource::find( $server->id() ), 'restore', $args ), $state );
+		}
+	}
+
+	public function test_a_left_volume_is_counted_in_the_capacity_check_until_the_server_goes(): void {
+		$server = $this->ready_vm();
+		$disk   = $this->disk_for( $server );
+		$this->settings( array( 'deletion_mode' => 'on', 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
+		$name = 'vm-5000-bs4-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
+		$this->assertTrue( $disk->set( array( 'slot' => 'scsi4', 'volname' => $name, 'steps' => array(), 'size_gb' => null ) ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		$this->assertTrue( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 10 ) );
+		$result = Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$left = (array) Resource::find( $server->id() )->get( 'left_volumes' );
+		$this->assertSame( array( 'disk-store:5000/' . $name => 50 ), $left );
+		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 10 ), 'The left volume still takes its space.' );
+	}
+
 	public function test_the_restore_text_tells_about_the_extra_disks(): void {
 		$server = $this->ready_vm();
 		$this->disk_for( $server );

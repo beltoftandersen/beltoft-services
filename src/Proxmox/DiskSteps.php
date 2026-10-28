@@ -559,7 +559,11 @@ final class DiskSteps {
 		if ( $holds ) {
 			return $this->pending_detach();
 		}
-		if ( ! $this->r->set( array( 'left_volume' => $volid ) ) ) {
+		$gb   = (int) ( ( (array) $this->r->get( 'plan' ) )['disk_gb'] ?? 0 );
+		$left = (array) $ctx['server']->get( 'left_volumes' );
+		// The volume keeps its space until the server is deleted: it is counted on the server (see DiskCapacity::fits).
+		$left[ $volid ] = $gb;
+		if ( ! $ctx['server']->set( array( 'left_volumes' => $left ) ) || ! $this->r->set( array( 'left_volume' => $volid ) ) ) {
 			return StepResult::retry( 60, 'The left volume could not be recorded.' );
 		}
 		DiskCapacity::release( $this->r );

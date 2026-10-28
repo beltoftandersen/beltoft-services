@@ -196,22 +196,35 @@ final class Actions {
 	// -- Checks that need no Proxmox call ----------------------------------------------------------
 
 	/**
-	 * Does the server have an extra disk that was attached once and is now detached (paused by policy) or
-	 * otherwise not an attached, ready drive? A forced restore may not keep such a volume.
+	 * Why a restore may not start because of an extra disk, in words for the customer; null when none stops it.
+	 * A disk that was attached once and is detached by the subscription policy (paused) waits for payment; a
+	 * disk that failed, is being deleted or is otherwise not a ready drive needs support. A forced restore may
+	 * not be started over either, because their volumes are not known to survive it.
 	 *
 	 * @param Resource $r Server resource.
 	 */
-	public static function disk_detached( Resource $r ): bool {
+	public static function disk_block( Resource $r ): ?string {
+		$attention = false;
+		$policy    = false;
+
 		foreach ( DiskMeta::for_server( $r ) as $disk ) {
 			if ( $disk->get( 'linked' ) || ! in_array( 'attach', (array) $disk->get( 'steps' ), true ) ) {
 				continue;
 			}
-			if ( 'ready' !== $disk->get( 'state' ) || $disk->get( 'detached' ) ) {
-				return true;
+			$state = $disk->get( 'state' );
+
+			if ( 'paused' === $state || ( 'ready' === $state && $disk->get( 'detached' ) ) ) {
+				$policy = true;
+			} elseif ( 'ready' !== $state ) {
+				$attention = true;
 			}
 		}
 
-		return false;
+		if ( $attention ) {
+			return __( 'An extra disk on this server needs attention from support before a restore. Contact support.', 'beltoft-services' );
+		}
+
+		return $policy ? __( 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.', 'beltoft-services' ) : null;
 	}
 
 	/**
@@ -226,8 +239,15 @@ final class Actions {
 		if ( 'reinstall' === $action && DiskMeta::for_server( $r ) ) {
 			return __( 'Remove the extra disks before reinstalling this server.', 'beltoft-services' );
 		}
-		if ( 'restore' === $action && self::disk_detached( $r ) ) {
-			return __( 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.', 'beltoft-services' );
+		if ( 'restore' === $action ) {
+			// A restore that has begun is finished whatever happens to a disk meanwhile: the server is off and must start.
+			$state = $r->get( 'restore' );
+			$under = is_array( $state ) && isset( $args['volid'] ) && ( $state['volid'] ?? '' ) === $args['volid'];
+			$block = $under ? null : self::disk_block( $r );
+
+			if ( null !== $block ) {
+				return $block;
+			}
 		}
 		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore' ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
@@ -740,9 +760,9 @@ final class Actions {
 			$phase = 'task';
 		}
 
-		if ( '' === $phase && self::disk_detached( $this->r ) ) {
+		if ( '' === $phase && null !== self::disk_block( $this->r ) ) {
 			// Checked again here: a disk paused after the request must stop the restore before the VM is touched.
-			return StepResult::fail( 'Restore refused: an extra disk is detached; the server was not touched', array( 'restore' => null ) );
+			return StepResult::fail( 'Restore refused: an extra disk is detached or needs attention; the server was not touched', array( 'restore' => null ) );
 		}
 
 		if ( '' === $phase ) {

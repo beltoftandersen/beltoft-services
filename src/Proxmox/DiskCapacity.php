@@ -68,6 +68,8 @@ final class DiskCapacity {
 			if ( $server && $server->is_live() ) {
 				$plan = (array) $server->get( 'plan' );
 				$promised += max( (int) ( $plan['disk_gb'] ?? 0 ), (int) $server->get( 'disk_gb' ) );
+				// Volumes left on the storage by deleted disks stay until the server goes.
+				$promised += (int) array_sum( array_map( 'intval', array_filter( (array) $server->get( 'left_volumes' ), 'is_numeric' ) ) );
 			}
 		}
 		foreach ( Resource::live_ids( 'disk' ) as $id ) {
