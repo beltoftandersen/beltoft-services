@@ -39,7 +39,8 @@ final class ProofResolver {
 		$outcomes = array();
 		$glue     = array();
 		$asked    = array();
-		foreach ( array_slice( $servers, 0, 2 ) as $ip ) {
+		$servers_asked = array_slice( $servers, 0, 2 );
+		foreach ( $servers_asked as $ip ) {
 			$response = self::ask( $ip, $ascii, DnsWire::NS, $deadline );
 			if ( is_wp_error( $response ) ) {
 				if ( 'budget' === $response->get_error_code() ) { return self::delegation_result( 'unknown', 'budget' ); }
@@ -60,27 +61,35 @@ final class ProofResolver {
 				if ( in_array( $rr['type'], array( DnsWire::A, DnsWire::AAAA ), true ) && is_string( $rr['data'] ) ) { $glue[ $rr['name'] ][ $rr['data'] ] = $rr['data']; }
 			}
 		}
-		if ( ! $outcomes ) { return self::delegation_result( 'unknown', 'parent_unreachable' ); }
+		// Two servers were asked: both must answer. One server alone may answer only when it is the only one.
+		if ( ! $outcomes || count( $outcomes ) < count( $servers_asked ) ) { return self::delegation_result( 'unknown', 'parent_unreachable' ); }
 		if ( count( array_unique( $outcomes ) ) > 1 ) { return self::delegation_result( 'unknown', 'parent_disagrees' ); }
 		if ( 'nxdomain' === $outcomes[0] ) { return self::delegation_result( 'support', 'not_delegated' ); }
 		$names = explode( ',', $outcomes[0] );
 		if ( count( $names ) > self::MAX_NS ) { return self::delegation_result( 'support', 'too_many_ns' ); }
 
-		$ips = array();
+		$ips  = array();
+		$full = array(); // Every address found, for the comparison with ours; $ips is capped for querying.
 		foreach ( $names as $name ) {
 			if ( self::expired( $deadline ) ) { return self::delegation_result( 'unknown', 'budget' ); }
 			$inside = $name === $ascii || str_ends_with( $name, '.' . $ascii );
 			if ( $inside ) {
-				$ips[ $name ] = array_values( array_filter( array_values( $glue[ $name ] ?? array() ), array( DnsAddress::class, 'is_public' ) ) );
+				$list = array();
+				foreach ( array_values( $glue[ $name ] ?? array() ) as $ip ) {
+					$ip = DnsAddress::canonical( (string) $ip );
+					if ( null !== $ip && DnsAddress::is_public( $ip ) ) { $list[ $ip ] = $ip; }
+				}
+				$full[ $name ] = array_values( $list );
 			} else {
-				$ips[ $name ] = DnsAddress::public_ips( $name );
+				$full[ $name ] = DnsAddress::all_public_ips( $name );
 			}
+			$ips[ $name ] = array_slice( $full[ $name ], 0, 8 );
 		}
 
 		$ours = array_intersect( $names, Zone::nameservers() ) ? true : false;
 		if ( ! $ours ) {
 			$own = DnsAddress::our_ips();
-			foreach ( $ips as $list ) {
+			foreach ( $full as $list ) {
 				if ( array_intersect( $list, $own ) ) { $ours = true; break; }
 			}
 		}

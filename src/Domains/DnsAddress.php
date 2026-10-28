@@ -16,6 +16,12 @@ final class DnsAddress {
 	/** @var array<string, string[]> */
 	private static array $own = array();
 
+	/** The canonical text of an address (so equal addresses compare equal), or null when it is not one. */
+	public static function canonical( string $ip ): ?string {
+		$bin = @inet_pton( trim( $ip ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- inet_pton warns on text that is not an address; false is handled.
+		return false === $bin ? null : inet_ntop( $bin );
+	}
+
 	public static function is_public( string $ip ): bool {
 		$bin = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- inet_pton warns on text that is not an address; false is handled.
 		if ( false === $bin ) { return false; }
@@ -32,8 +38,13 @@ final class DnsAddress {
 		return true;
 	}
 
-	/** The public A and AAAA addresses of a host, from the system resolver. Anything private is dropped. */
+	/** The public A and AAAA addresses of a host to query, canonical, at most 8. Anything private is dropped. */
 	public static function public_ips( string $host ): array {
+		return array_slice( self::all_public_ips( $host ), 0, self::MAX_IPS );
+	}
+
+	/** Every public address of a host, canonical and not capped: what a comparison against our own addresses must see. */
+	public static function all_public_ips( string $host ): array {
 		$host = strtolower( rtrim( trim( $host ), '.' ) );
 		if ( '' === $host || strlen( $host ) > 253 || ! preg_match( '/^[a-z0-9_]([a-z0-9_-]{0,62})(\.[a-z0-9_]([a-z0-9_-]{0,62}))*$/', $host ) ) { return array(); }
 		/** Tests: a non-null array of IPs replaces the system lookup for this host. */
@@ -49,9 +60,10 @@ final class DnsAddress {
 		}
 		$ips = array();
 		foreach ( $found as $ip ) {
-			if ( is_string( $ip ) && self::is_public( $ip ) ) { $ips[ $ip ] = $ip; }
+			$ip = is_string( $ip ) ? self::canonical( $ip ) : null;
+			if ( null !== $ip && self::is_public( $ip ) ) { $ips[ $ip ] = $ip; }
 		}
-		return array_slice( array_values( $ips ), 0, self::MAX_IPS );
+		return array_values( $ips );
 	}
 
 	/** The public IPs of our own name servers, plus any the site adds with a filter. */
@@ -60,13 +72,14 @@ final class DnsAddress {
 		$key   = implode( ',', $hosts );
 		if ( ! isset( self::$own[ $key ] ) ) {
 			$ips = array();
-			foreach ( $hosts as $host ) { $ips = array_merge( $ips, self::public_ips( $host ) ); }
+			foreach ( $hosts as $host ) { $ips = array_merge( $ips, self::all_public_ips( $host ) ); }
 			self::$own[ $key ] = array_values( array_unique( $ips ) );
 		}
 		$extra = apply_filters( 'beltoft_services_dns_own_ips', array() );
 		$more  = array();
 		foreach ( is_array( $extra ) ? $extra : array() as $ip ) {
-			if ( is_string( $ip ) && self::is_public( $ip ) ) { $more[] = $ip; }
+			$ip = is_string( $ip ) ? self::canonical( $ip ) : null;
+			if ( null !== $ip && self::is_public( $ip ) ) { $more[] = $ip; }
 		}
 		return array_values( array_unique( array_merge( self::$own[ $key ], $more ) ) );
 	}

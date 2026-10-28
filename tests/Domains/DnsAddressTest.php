@@ -81,4 +81,14 @@ class DnsAddressTest extends TestCase {
 		$this->assertSame( 'a.gtld.net', $names[0] );
 		$this->assertSame( 'n1.gtld.net', $names[1] );
 	}
+
+	public function test_addresses_are_canonical_and_the_full_list_is_kept_for_comparison(): void {
+		add_filter( 'beltoft_services_dns_resolve', static fn( $pre, $host ) => array_merge( array_map( static fn( $i ) => "8.8.8.$i", range( 1, 10 ) ), array( '2606:4700:0:0:0:0:0:6810', 'junk' ) ), 10, 2 );
+		$this->assertCount( 8, DnsAddress::public_ips( 'ns.example.net' ) );
+		$all = DnsAddress::all_public_ips( 'ns.example.net' );
+		$this->assertCount( 11, $all );
+		$this->assertSame( '2606:4700::6810', end( $all ) );
+		$this->assertSame( '2606:4700::6810', DnsAddress::canonical( '2606:4700:0000::6810' ) );
+		$this->assertNull( DnsAddress::canonical( 'junk' ) );
+	}
 }

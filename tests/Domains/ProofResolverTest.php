@@ -141,13 +141,40 @@ class ProofResolverTest extends TestCase {
 		$this->assertSame( array( 'support', 'not_delegated' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
 	}
 
-	public function test_one_parent_failing_still_answers_but_none_is_unknown(): void {
+	public function test_two_parents_must_both_answer_but_a_single_parent_may_stand_alone(): void {
 		$this->refer( 'example.com', array( 'ns1.dnshost.net' ) );
 		$this->hosts['ns1.dnshost.net'] = array( self::N1 );
 		unset( $this->net[ self::P1 . '|example.com|2' ] );
-		$this->assertSame( 'ok', ProofResolver::delegation( 'example.com' )['status'] );
+		$this->assertSame( array( 'unknown', 'parent_unreachable' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
 		unset( $this->net[ self::P2 . '|example.com|2' ] );
 		$this->assertSame( array( 'unknown', 'parent_unreachable' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
+		// A parent zone with one server (with a public address) is enough on its own.
+		$this->refer( 'example.com', array( 'ns1.dnshost.net' ) );
+		$this->zones['com'] = array( 'a.parent.test' );
+		$this->assertSame( 'ok', ProofResolver::delegation( 'example.com' )['status'] );
+		unset( $this->net[ self::P1 . '|example.com|2' ] );
+		$this->assertSame( array( 'unknown', 'parent_unreachable' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
+	}
+
+	public function test_our_address_is_matched_in_any_ipv6_spelling_and_beyond_the_eighth_address(): void {
+		add_filter( 'beltoft_services_dns_own_ips', static fn() => array( '2606:4700:0000:0000:0000:0000:0000:6810' ) );
+		$this->refer( 'example.com', array( 'ns1.example.com' ), array( 'ns1.example.com' => '2606:4700::6810' ) );
+		$this->assertSame( array( 'support', 'delegated_to_us' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
+		// The reverse: ours canonical, the resolved address in upper case and uncompressed.
+		remove_all_filters( 'beltoft_services_dns_own_ips' );
+		add_filter( 'beltoft_services_dns_own_ips', static fn() => array( '2606:4700::6810' ) );
+		$this->hosts['ns.other.net'] = array( '2606:4700:0:0:0:0:0:6810'  );
+		$this->refer( 'example.com', array( 'ns.other.net' ) );
+		$this->assertSame( array( 'support', 'delegated_to_us' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
+		// Nine decoys before ours do not hide it, and the stored list stays capped.
+		$this->hosts['ns.other.net'] = array_merge( array_map( static fn( $i ) => "8.8.8.$i", range( 1, 9 ) ), array( '2606:4700::6810' ) );
+		$this->assertSame( array( 'support', 'delegated_to_us' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
+		$this->assertCount( 8, ProofResolver::delegation( 'example.com' )['ips']['ns.other.net'] );
+		// The same through glue.
+		$this->net[ self::P1 . '|example.com|2' ]['additional'] = array_merge( $this->glue( array( 'ns1.example.com' => '8.8.8.1' ) ), $this->glue( array( 'ns1.example.com' => '2606:4700::6810' ) ) );
+		$this->net[ self::P1 . '|example.com|2' ]['authority'] = $this->ns_rrs( 'example.com', array( 'ns1.example.com' ) );
+		$this->net[ self::P2 . '|example.com|2' ] = $this->net[ self::P1 . '|example.com|2' ];
+		$this->assertSame( array( 'support', 'delegated_to_us' ), $this->pair( ProofResolver::delegation( 'example.com' ) ) );
 	}
 
 	public function test_a_parent_that_is_authoritative_answers_in_the_answer_section(): void {
