@@ -4,6 +4,11 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <div class="beltoft-services-disk">
 	<p><?php /* translators: %d: extra disk size in gigabytes. */ echo esc_html( sprintf( __( 'Extra disk: %d GB', 'beltoft-services' ), (int) $size ) ); ?><?php if ( $slot ) : ?> (<?php echo esc_html( $slot ); ?>)<?php endif; ?></p>
+	<?php if ( ! empty( $paused ) ) : ?>
+		<p><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p>
+</div>
+		<?php return; ?>
+	<?php endif; ?>
 	<?php if ( $server ) : ?><p><?php esc_html_e( 'Attached to your server.', 'beltoft-services' ); ?></p><?php endif; ?>
 	<?php if ( $needs_reboot ) : ?><p><?php esc_html_e( 'Restart the server if the disk does not appear yet.', 'beltoft-services' ); ?></p><?php endif; ?>
 	<p><?php esc_html_e( 'This disk is empty. In the server, use lsblk -f to identify the new device. Check the device name before formatting it.', 'beltoft-services' ); ?></p>

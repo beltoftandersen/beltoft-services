@@ -317,6 +317,149 @@ final class DiskSteps {
 		return StepResult::retry( 300, self::PENDING_DETACH );
 	}
 
+	/**
+	 * Does the running configuration still hold the drive? A detach on a running server without
+	 * disk hotplug is only pending: the default view merges it, `current` does not.
+	 *
+	 * @return bool|StepResult
+	 */
+	private function running_holds( array $ctx, string $volid ) {
+		$running = $this->client->request( 'GET', self::config_path( $ctx ), array( 'current' => 1 ) );
+		if ( is_wp_error( $running ) ) {
+			return $this->classify( $running, 'disk running configuration' );
+		}
+		return ! is_array( $running ) || null !== $this->attached( $running, $volid );
+	}
+
+	/** Lapsed subscription: the drive is detached and the volume stays on the storage with its data. */
+	public function pause(): StepResult {
+		if ( $this->r->get( 'linked' ) ) {
+			return StepResult::done( array(), 'An adopted disk stays attached' );
+		}
+		$steps = (array) $this->r->get( 'steps' );
+		if ( ! $this->r->get( 'volname' ) || ! in_array( 'attach', $steps, true ) ) {
+			return StepResult::done( array(), 'The disk was never attached, so there is nothing to detach' );
+		}
+		$server_id = (int) $this->r->get( 'server_license' );
+		$server    = $server_id > 0 ? Resource::for_license( $server_id ) : null;
+		if ( $server && 'deleted' === $server->get( 'state' ) ) {
+			return StepResult::done( array(), 'The server was deleted, so there is nothing to detach' );
+		}
+		$server_license = $server_id > 0 ? Licenses::find( $server_id ) : null;
+		$own_license    = $this->r->license();
+		if ( ! $server || ! $server_license || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) || (int) ( $server_license['user_id'] ?? 0 ) < 1 || (int) $server_license['user_id'] !== (int) ( $own_license['user_id'] ?? 0 ) ) {
+			return StepResult::fail( 'The server cannot be verified for detaching the disk.' );
+		}
+		$ctx = $this->context( $server );
+		if ( $ctx instanceof StepResult ) {
+			return $ctx;
+		}
+		$polled = $this->poll_task();
+		if ( $polled ) {
+			return $polled;
+		}
+		$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
+		if ( is_wp_error( $config ) ) {
+			return $this->classify( $config, 'disk detach' );
+		}
+		$volid    = $this->volume_id( $ctx );
+		$attached = $this->attached( $config, $volid );
+		if ( $attached ) {
+			if ( '' !== $ctx['lock'] ) {
+				return StepResult::retry( 60, 'The server is locked.' );
+			}
+			$done = $this->client->request( 'PUT', self::config_path( $ctx ), array( 'delete' => $attached['slot'], 'digest' => (string) ( $config['digest'] ?? '' ) ) );
+			if ( is_wp_error( $done ) ) {
+				return $this->classify( $done, 'disk detach' );
+			}
+			$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
+			if ( is_wp_error( $config ) ) {
+				return $this->classify( $config, 'disk detach verify' );
+			}
+			if ( $this->attached( $config, $volid ) ) {
+				return $this->pending_detach();
+			}
+		}
+		$holds = $this->running_holds( $ctx, $volid );
+		if ( $holds instanceof StepResult ) {
+			return $holds;
+		}
+		if ( $holds ) {
+			return $this->pending_detach();
+		}
+		$images = $this->images( $ctx );
+		if ( $images instanceof StepResult ) {
+			return $images;
+		}
+		if ( ! $this->has_image( $images, $volid ) ) {
+			return StepResult::fail( 'The disk volume is not on the storage after the detach; nothing was deleted.' );
+		}
+		$slot = $attached ? $attached['slot'] : (string) ( ( (array) $this->r->get( 'detached' ) )['slot'] ?? $this->r->get( 'slot' ) );
+		return StepResult::done( array( 'detached' => array( 'volid' => $volid, 'slot' => $slot ) ), 'Extra disk detached, its data is kept' );
+	}
+
+	/** The subscription is active again: the same volume goes back into its slot. */
+	public function reattach(): StepResult {
+		if ( $this->r->get( 'linked' ) ) {
+			return StepResult::done();
+		}
+		$steps = (array) $this->r->get( 'steps' );
+		if ( ! $this->r->get( 'volname' ) || ! in_array( 'attach', $steps, true ) || ! in_array( 'verify', $steps, true ) ) {
+			return $this->provision();
+		}
+		$server = $this->server();
+		if ( $server instanceof StepResult ) {
+			return $server;
+		}
+		$ctx = $this->context( $server );
+		if ( $ctx instanceof StepResult ) {
+			return $ctx;
+		}
+		$polled = $this->poll_task();
+		if ( $polled ) {
+			return $polled;
+		}
+		$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
+		if ( is_wp_error( $config ) ) {
+			return $this->classify( $config, 'disk reattach' );
+		}
+		$volid    = $this->volume_id( $ctx );
+		$attached = $this->attached( $config, $volid );
+		if ( ! $attached ) {
+			$images = $this->images( $ctx );
+			if ( $images instanceof StepResult ) {
+				return $images;
+			}
+			if ( ! $this->has_image( $images, $volid ) ) {
+				return StepResult::fail( 'The disk volume is missing from the storage; it is not recreated.' );
+			}
+			$marker = (array) $this->r->get( 'detached' );
+			$slot   = (string) ( $marker['slot'] ?? $this->r->get( 'slot' ) );
+			if ( 1 !== preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', $slot ) ) {
+				return StepResult::fail( 'The disk slot is not known.' );
+			}
+			if ( isset( $config[ $slot ] ) ) {
+				return StepResult::fail( 'Another disk occupies the slot of this disk.' );
+			}
+			if ( '' !== $ctx['lock'] ) {
+				return StepResult::retry( 60, 'The server is locked.' );
+			}
+			$task = $this->run_task( 'disk reattach', 'POST', self::config_path( $ctx ), array( $slot => $volid . ',backup=0', 'digest' => (string) ( $config['digest'] ?? '' ) ) );
+			if ( $task instanceof StepResult ) {
+				return $task;
+			}
+			$config = Ownership::config( $this->client, $ctx['node'], (int) $ctx['record']['vmid'] );
+			if ( is_wp_error( $config ) ) {
+				return $this->classify( $config, 'disk reattach verify' );
+			}
+			$attached = $this->attached( $config, $volid );
+			if ( ! $attached ) {
+				return StepResult::retry( 60, 'The disk volume is not attached yet.' );
+			}
+		}
+		return StepResult::done( array( 'slot' => $attached['slot'], 'detached' => null ), 'Extra disk attached again' );
+	}
+
 	private function has_image( array $images, string $volid ): bool {
 		foreach ( $images as $image ) {
 			if ( is_array( $image ) && ( $image['volid'] ?? '' ) === $volid ) {
@@ -339,12 +482,11 @@ final class DiskSteps {
 		if ( '' !== $ctx['lock'] ) {
 			return StepResult::retry( 60, 'The server is locked.' );
 		}
-		// A detach on a running server without disk hotplug is only pending: the running configuration still holds the drive.
-		$running = $this->client->request( 'GET', self::config_path( $ctx ), array( 'current' => 1 ) );
-		if ( is_wp_error( $running ) ) {
-			return $this->classify( $running, 'disk running configuration' );
+		$holds = $this->running_holds( $ctx, $volid );
+		if ( $holds instanceof StepResult ) {
+			return $holds;
 		}
-		if ( ! is_array( $running ) || $this->attached( $running, $volid ) ) {
+		if ( $holds ) {
 			return $this->pending_detach();
 		}
 		$by_hand = 'The unattached disk volume ' . $volid . ' could not be removed; remove it by hand.';

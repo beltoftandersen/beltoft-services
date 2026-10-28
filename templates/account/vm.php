@@ -59,6 +59,7 @@ $beltoft_services_power_labels = array(
 		<?php foreach ( $extra_disks['items'] as $beltoft_extra_disk ) : ?>
 			<div class="beltoft-services-vm__disk">
 				<p><strong><?php echo esc_html( ( $beltoft_extra_disk['slot'] ?: __( 'Extra disk', 'beltoft-services' ) ) . ': ' . $beltoft_extra_disk['size'] . ' GB' ); ?></strong> <?php echo esc_html( $beltoft_extra_disk['state'] ); ?></p>
+				<?php if ( ! empty( $beltoft_extra_disk['paused'] ) ) : ?><p class="description"><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a><?php endif; ?>
 			</div>
@@ -70,13 +71,13 @@ $beltoft_services_power_labels = array(
 					$beltoft_disk_retention = (int) ( $extra_disks['items'][0]['retention_days'] ?? 0 );
 					if ( $beltoft_disk_retention > 0 ) {
 						/* translators: %d: days after the disk subscription's paid period ends. */
-						echo esc_html( sprintf( _n( 'When a disk subscription ends, the disk and its data are removed %d day after the paid period ends.', 'When a disk subscription ends, the disk and its data are removed %d days after the paid period ends.', $beltoft_disk_retention, 'beltoft-services' ), $beltoft_disk_retention ) );
+						echo esc_html( sprintf( _n( 'When a disk subscription ends, the disk is detached from your server and its data is kept, then removed %d day after the paid period ends.', 'When a disk subscription ends, the disk is detached from your server and its data is kept, then removed %d days after the paid period ends.', $beltoft_disk_retention, 'beltoft-services' ), $beltoft_disk_retention ) );
 					} else {
-						esc_html_e( 'When a disk subscription ends, the disk and its data stay attached until we remove them.', 'beltoft-services' );
+						esc_html_e( 'When a disk subscription ends, the disk is detached from your server and its data is kept until we remove the disk.', 'beltoft-services' );
 					}
 					?>
 				<?php else : ?>
-					<?php esc_html_e( 'When a disk subscription ends, billing stops. The disk stays attached until we remove it.', 'beltoft-services' ); ?>
+					<?php esc_html_e( 'When a disk subscription ends, billing stops. The disk is detached from your server and its data is kept until we remove the disk.', 'beltoft-services' ); ?>
 				<?php endif; ?>
 			</p>
 			<p class="description"><?php esc_html_e( 'Reinstall and restore are unavailable until the extra disks are removed.', 'beltoft-services' ); ?></p>

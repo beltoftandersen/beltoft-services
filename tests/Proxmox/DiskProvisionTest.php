@@ -233,7 +233,7 @@ class DiskProvisionTest extends BackupTestCase {
 		$html = ob_get_clean();
 		$this->assertStringContainsString( 'Disks', $html );
 		$this->assertStringContainsString( 'scsi1: 50 GB', $html );
-		$this->assertStringContainsString( 'The disk stays attached until we remove it.', $html );
+		$this->assertStringContainsString( 'The disk is detached from your server and its data is kept until we remove the disk.', $html );
 		$this->assertStringNotContainsString( 'data-action="reinstall"', $html );
 		$this->assertStringNotContainsString( 'data-action="restore"', $html );
 	}

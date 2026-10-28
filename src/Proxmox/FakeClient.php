@@ -842,6 +842,15 @@ class FakeClient implements Client {
 				}
 			}
 
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) ) {
+				// Attaching a volume that sits in an unusedN entry takes it out of that entry (modelled).
+				foreach ( $this->state['vms'][ $id ]['config'] as $other => $held ) {
+					if ( 1 === preg_match( '/^unused\d+$/', (string) $other ) && $held === explode( ',', $value )[0] ) {
+						unset( $this->state['vms'][ $id ]['config'][ $other ] );
+					}
+				}
+			}
+
 			$this->state['vms'][ $id ]['config'][ $key ] = $value;
 		}
 
