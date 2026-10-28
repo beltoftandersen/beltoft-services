@@ -108,10 +108,19 @@ final class DnsAssignments {
 					'updated_at'     => $now,
 				)
 			);
+			$error = (string) $wpdb->last_error;
 			$wpdb->suppress_errors( $suppress );
 
-			// A duplicate key means another request won; that is a refusal, not an error.
-			return $ok ? true : self::taken();
+			if ( $ok ) {
+				return true;
+			}
+
+			// A duplicate key means another request won: a refusal. Anything else is a real failure.
+			if ( false !== stripos( $error, 'Duplicate entry' ) ) {
+				return self::taken();
+			}
+
+			return new \WP_Error( 'db_error', __( 'The domain could not be reserved. Try again.', 'beltoft-services' ) );
 		}
 
 		if ( (int) $row['user_id'] === $user_id ) {

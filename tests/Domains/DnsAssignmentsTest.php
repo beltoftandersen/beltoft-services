@@ -27,11 +27,46 @@ class DnsAssignmentsTest extends TestCase {
 
 	public function test_duplicate_key_insert_is_a_refusal_not_an_error(): void {
 		global $wpdb;
-		// The row appears between the read and the insert: the primary key decides.
-		$now = gmdate( 'Y-m-d H:i:s' );
-		$wpdb->insert( DnsSchema::tables()['assignments'], array( 'domain' => 'race.example', 'user_id' => 9, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now ) );
+		$table = DnsSchema::tables()['assignments'];
+		$fired = false;
+		// The competing row appears after reserve() read "no row" and just before its INSERT.
+		$race = function ( $query ) use ( &$race, &$fired, $table, $wpdb ) {
+			if ( 0 === strpos( $query, 'INSERT INTO `' . $table . '`' ) ) {
+				remove_filter( 'query', $race );
+				$fired = true;
+				$now   = gmdate( 'Y-m-d H:i:s' );
+				$wpdb->insert( $table, array( 'domain' => 'race.example', 'user_id' => 9, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now ) );
+			}
+			return $query;
+		};
+		add_filter( 'query', $race );
+
+		ob_start();
 		$result = DnsAssignments::reserve( 2, 20, 'race.example' );
+		$output = ob_get_clean();
+
+		$this->assertTrue( $fired, 'the competing insert ran before the INSERT' );
+		$this->assertWPError( $result );
 		$this->assertSame( 'domain_taken', $result->get_error_code() );
+		$this->assertSame( '', $output, 'no database error was printed' );
+		$this->assertSame( 9, (int) DnsAssignments::get( 'race.example' )['user_id'] );
+	}
+
+	public function test_other_insert_failure_is_db_error_not_domain_taken(): void {
+		$table = DnsSchema::tables()['assignments'];
+		$break = static function ( $query ) use ( $table ) {
+			return 0 === strpos( $query, 'INSERT INTO `' . $table . '`' ) ? str_replace( $table, $table . '_missing', $query ) : $query;
+		};
+		add_filter( 'query', $break );
+		ob_start();
+		$result = DnsAssignments::reserve( 2, 20, 'broken.example' );
+		$output = ob_get_clean();
+		remove_filter( 'query', $break );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'db_error', $result->get_error_code() );
+		$this->assertSame( '', $output );
+		$this->assertNull( DnsAssignments::get( 'broken.example' ) );
 	}
 
 	public function test_expired_reservation_can_be_taken_over(): void {
