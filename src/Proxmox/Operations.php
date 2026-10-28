@@ -856,7 +856,7 @@ final class Operations {
 
 			// A plug pull that left the VM listed as running is still going through: wait, it is no error and no round.
 			if ( 'stop' === $phase && 'running' === $after['status'] ) {
-				return StepResult::retry( 0, $step . ': waiting for the server to stop' );
+				return StepResult::retry( 0, $step . ': waiting for the server to stop' . ( true === $done ? '' : ' (the stop task failed: ' . $done['failed'] . ')' ) );
 			}
 		}
 

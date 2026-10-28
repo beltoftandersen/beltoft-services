@@ -231,6 +231,7 @@ class PowerLagTest extends BackupTestCase {
 
 		$this->assertTrue( $result->is_retry() );
 		$this->assertStringContainsString( 'waiting for the server to stop', $result->error() );
+		$this->assertNotEmpty( $this->calls( 'POST', '/status/stop' ), 'The stop follows the shutdown that left the VM running.' );
 		$this->assertNotNull( $this->fake->vm( 5000 ), 'Nothing is deleted while the VM shows as running.' );
 	}
 
@@ -242,5 +243,31 @@ class PowerLagTest extends BackupTestCase {
 
 		$read = fn() => $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/status/current' )['status'];
 		$this->assertSame( array( 'running', 'running', 'stopped', 'stopped' ), array( $read(), $read(), $read(), $read() ) );
+	}
+
+	public function test_a_guest_that_ignores_acpi_is_stopped_after_the_shutdown_in_pause_and_delete(): void {
+		foreach ( array( 'pause', 'delete' ) as $operation ) {
+			$r = $this->ready_vm();
+			$this->fake->next_task( array( 'exitstatus' => 'VM quit/powerdown failed - got timeout', 'effect' => false ) );
+			$seen = count( $this->fake->calls() );
+
+			$result = ( new ProxmoxDriver() )->$operation( Resource::find( $r->id() ) );
+			$vmid   = (int) Resource::find( $r->id() )->get( 'vmid' ) ?: (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'];
+
+			$this->assertTrue( $result->is_done(), $operation . ': ' . $result->error() );
+			$power = $this->power( $seen );
+			$this->assertSame( array( 'POST /nodes/node-a/qemu/' . $vmid . '/status/shutdown', 'POST /nodes/node-a/qemu/' . $vmid . '/status/stop' ), array_slice( $power, 0, 2 ), $operation );
+		}
+	}
+
+	public function test_the_waiting_message_carries_the_failed_stop_exit_status(): void {
+		$r = $this->ready_vm();
+		$this->fake->next_task( array( 'exitstatus' => 'VM quit/powerdown failed - got timeout', 'effect' => false ) );
+		$this->fake->next_task( array( 'exitstatus' => 'stop failed: busy', 'effect' => false ) );
+
+		$result = ( new ProxmoxDriver() )->delete( Resource::find( $r->id() ) );
+
+		$this->assertTrue( $result->is_retry() );
+		$this->assertStringContainsString( 'waiting for the server to stop (the stop task failed: stop failed: busy)', $result->error() );
 	}
 }

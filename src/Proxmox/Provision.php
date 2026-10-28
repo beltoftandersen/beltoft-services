@@ -381,7 +381,7 @@ final class Provision {
 			}
 		}
 
-		return StepResult::retry( 0, 'wipe: waiting for the server to stop' );
+		return StepResult::retry( 0, 'wipe: waiting for the server to stop' . ( true === $done ? '' : ' (the stop task failed: ' . $done['failed'] . ')' ) );
 	}
 
 	/**
