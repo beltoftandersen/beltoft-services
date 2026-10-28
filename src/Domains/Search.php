@@ -24,8 +24,7 @@ final class Search {
 	}
 
 	public static function rest_check( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
-		$id = (int) sprintf( '%u', crc32( $ip ) );
+		$id = RateLimit::visitor();
 		/** Searches allowed per visitor: per minute and per hour. */
 		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
 		$per_hour   = (int) apply_filters( 'beltoft_services_domain_search_hourly_limit', 200 );
@@ -60,11 +59,11 @@ final class Search {
 	/**
 	 * The registrar's answer for these names. Availability is cached for a few minutes (prices are
 	 * not: they are read from the price table each time), a lookup that has to reach the registrar
-	 * counts against a site-wide hourly cap, and an order always asks again ($fresh) so a cached
+	 * (also a fresh one) counts against a site-wide hourly cap, and an order always asks again ($fresh) so a cached
 	 * answer is never what a domain is sold on. Failures are not cached.
 	 *
 	 * @param array<int, array<string, string>> $check Names and extensions.
-	 * @param bool                               $fresh Skip the cache and the cap.
+	 * @param bool                               $fresh Skip the cache.
 	 */
 	private static function availability( array $check, bool $fresh ): array|\WP_Error {
 		/** Seconds an availability answer is kept; 0 turns the cache off. */
@@ -78,7 +77,8 @@ final class Search {
 
 		/** Registrar lookups allowed per hour for the whole site; 0 means no cap. */
 		$cap = (int) apply_filters( 'beltoft_services_domain_lookup_limit', 600 );
-		if ( ! $fresh && RateLimit::exceeded( 0, 'domain-registrar-lookups', $cap, HOUR_IN_SECONDS ) ) {
+		// A fresh lookup (an order asks again) reaches the registrar too, so it counts against the same cap.
+		if ( RateLimit::exceeded( 0, 'domain-registrar-lookups', $cap, HOUR_IN_SECONDS ) ) {
 			return new \WP_Error( 'search_busy', __( 'Domain search is busy. Please try again in a few minutes.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 

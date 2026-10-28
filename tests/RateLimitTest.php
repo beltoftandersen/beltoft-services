@@ -70,8 +70,38 @@ final class RateLimitTest extends TestCase {
 	 * @param int    $window Window in seconds.
 	 */
 	private function timeout_for( string $key, int $window ): int {
-		$name = 'rl_' . md5( '7|' . $key . '|' . (int) floor( time() / $window ) );
+		$name = 'rl_' . substr( hash( 'sha256', '7|' . $key . '|' . (int) floor( time() / $window ) ), 0, 40 );
 
 		return (int) get_option( '_transient_timeout_beltoft_services_' . $name, 0 );
+	}
+
+	public function test_a_visitor_key_buckets_ipv6_by_its_64_and_ipv4_by_the_address(): void {
+		$key = static function ( string $ip ): string {
+			$_SERVER['REMOTE_ADDR'] = $ip;
+			return RateLimit::visitor();
+		};
+		$this->assertSame( $key( '2001:db8:1:2::1' ), $key( '2001:db8:1:2:ffff:ffff:ffff:ffff' ), 'One /64 is one visitor.' );
+		$this->assertNotSame( $key( '2001:db8:1:2::1' ), $key( '2001:db8:1:3::1' ), 'Another /64 is another visitor.' );
+		$this->assertNotSame( $key( '203.0.113.5' ), $key( '203.0.113.6' ) );
+		$this->assertSame( $key( '203.0.113.5' ), $key( '::ffff:203.0.113.5' ), 'A mapped address is its IPv4 address.' );
+		$this->assertMatchesRegularExpression( '/^v_[0-9a-f]{64}$/', $key( '203.0.113.5' ), 'A hash, not a checksum.' );
+		$this->assertMatchesRegularExpression( '/^v_[0-9a-f]{64}$/', $key( 'not-an-ip' ) );
+		$this->assertMatchesRegularExpression( '/^v_[0-9a-f]{64}$/', $key( '' ) );
+	}
+
+	public function test_the_client_address_can_come_from_a_filter(): void {
+		$_SERVER['REMOTE_ADDR'] = '10.0.0.1';
+		$proxy = RateLimit::visitor();
+		add_filter( 'beltoft_services_client_ip', static fn() => '198.51.100.9' );
+		$this->assertNotSame( $proxy, RateLimit::visitor() );
+		$_SERVER['REMOTE_ADDR'] = '10.0.0.2';
+		$this->assertSame( RateLimit::visitor(), RateLimit::visitor() );
+	}
+
+	public function test_a_visitor_key_counts_like_a_user(): void {
+		$_SERVER['REMOTE_ADDR'] = '2001:db8:9:9::1';
+		$this->assertFalse( RateLimit::exceeded( RateLimit::visitor(), 'v', 1 ) );
+		$_SERVER['REMOTE_ADDR'] = '2001:db8:9:9::2';
+		$this->assertTrue( RateLimit::exceeded( RateLimit::visitor(), 'v', 1 ), 'Another address in the same /64.' );
 	}
 }

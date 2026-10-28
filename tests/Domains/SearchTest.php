@@ -74,7 +74,7 @@ class SearchTest extends TestCase {
 
 	public function test_registrar_lookups_have_a_site_wide_hourly_cap_that_cached_answers_do_not_use(): void {
 		list( $a, $b, $c, $d ) = array( $this->unique( 'capa' ), $this->unique( 'capb' ), $this->unique( 'capc' ), $this->unique( 'capd' ) );
-		$fake = $this->client( array( $a, $b, $d ) );
+		$fake = $this->client( array( $a, $b ) );
 		add_filter( 'beltoft_services_domain_lookup_limit', static fn() => 2 );
 
 		$this->assertIsArray( Search::find( $a . '.com' ) );
@@ -84,8 +84,10 @@ class SearchTest extends TestCase {
 		$this->assertWPError( $busy );
 		$this->assertSame( 'search_busy', $busy->get_error_code() );
 		$this->assertIsArray( Search::find( $a . '.com' ), 'A cached search still works while the cap is reached.' );
-		$this->assertIsArray( Search::find( $d . '.com', true ), 'An order is never refused by the cap.' );
-		$this->assertSame( 3, $this->lookups( $fake ), 'The refused and the cached searches made no registrar call.' );
+		$fresh = Search::find( $d . '.com', true );
+		$this->assertWPError( $fresh, 'A fresh lookup reaches the registrar too, so the cap applies to it.' );
+		$this->assertSame( 'search_busy', $fresh->get_error_code() );
+		$this->assertSame( 2, $this->lookups( $fake ), 'The refused and the cached searches made no registrar call.' );
 	}
 
 	public function test_a_visitor_is_limited_per_minute_and_the_answer_is_kept_privately(): void {
