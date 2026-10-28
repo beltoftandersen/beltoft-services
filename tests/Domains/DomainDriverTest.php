@@ -461,6 +461,22 @@ class DomainDriverTest extends TestCase {
 		$this->assertCount( 0, array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] ), 'Nothing is ordered without the agreement.' );
 	}
 
+	public function test_a_eu_domain_is_not_registered_for_a_registrant_outside_the_eu(): void {
+		$r = $this->resource( 'register', 'eligible-' . wp_generate_password( 6, false, false ) . '.eu' );
+		$user = (int) $r->license()['user_id'];
+		delete_user_meta( $user, '_beltoft_services_domain_handle' );
+		$order = wc_get_order( (int) $r->license()['order_id'] );
+		foreach ( array( 'first_name' => 'Ada', 'last_name' => 'Lovelace', 'email' => 'ada@example.test', 'address_1' => 'Main Street 2', 'city' => 'Austin', 'postcode' => '73301', 'country' => 'US', 'phone' => '+15125550100' ) as $k => $v ) { $order->{"set_billing_$k"}( $v ); }
+		$order->save();
+		$fake = new FakeClient();
+		$fake->reply( 'POST', '/customers', array( 'handle' => 'US-1' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'needs a registrant in the EU', $result->error() );
+		$this->assertCount( 0, array_filter( $fake->calls(), static fn( $c ) => '/domains' === $c['path'] ), 'Nothing is ordered.' );
+	}
+
 	public function test_incomplete_billing_waits_instead_of_failing(): void {
 		$r = $this->resource();
 		delete_user_meta( (int) $r->license()['user_id'], '_beltoft_services_domain_handle' );

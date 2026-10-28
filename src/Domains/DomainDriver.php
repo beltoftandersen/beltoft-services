@@ -40,6 +40,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $order ) { return StepResult::retry( 3600, 'The domain order is unavailable.' ); }
 			$handle = Contacts::handle_for( (int) ( $license['user_id'] ?? 0 ), $order );
 			if ( is_wp_error( $handle ) ) { return $this->error( $r, $handle, $steps ); }
+			// The extension's rules are tested on the registrant behind the handle that is sent, not on what the order says now.
+			$eligible = Contacts::eligible( $name, Contacts::details_of( (int) ( $license['user_id'] ?? 0 ), $handle ) );
+			if ( is_wp_error( $eligible ) ) {
+				Alerts::admin( $r, $eligible->get_error_message() );
+				return StepResult::fail( $eligible->get_error_message(), array( 'steps' => $steps ) );
+			}
 			$steps[] = 'contact';
 			if ( ! $r->set( array( 'contact_handle' => $handle, 'steps' => $steps ) ) ) { return StepResult::retry( 3600, 'Registrant contact could not be saved.' ); }
 		}
