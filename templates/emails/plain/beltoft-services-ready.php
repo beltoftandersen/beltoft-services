@@ -12,6 +12,8 @@
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
  * @var array<string, string> $details        Lines about the service (label => value), may be empty. Never a password.
+ * @var string            $disk_server_url    Card of the server an extra disk is on, or ''.
+ * @var string            $disk_guide_url     The disk's setup guide, or ''.
  * @var bool              $dns_only           DNS hosting only.
  * @var string[]          $nameservers        Our name servers (DNS hosting only).
  * @var string            $usage              Usage line (limit exceeded), or ''.
@@ -44,6 +46,12 @@ foreach ( $details as $beltoft_services_label => $beltoft_services_value ) {
 
 if ( $details ) {
 	echo "\n";
+}
+
+if ( ! empty( $disk_server_url ) ) {
+	echo __( 'Find your disk in My account > VPS > your server > Disks.', 'beltoft-services' ) . "\n";
+	echo __( 'Open your server:', 'beltoft-services' ) . ' ' . esc_url_raw( $disk_server_url ) . "\n";
+	echo __( 'Disk setup guide:', 'beltoft-services' ) . ' ' . esc_url_raw( $disk_guide_url ) . "\n\n";
 }
 
 if ( ! empty( $dns_only ) && $nameservers ) {

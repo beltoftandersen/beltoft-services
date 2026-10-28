@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 foreach ( $domains as $beltoft_domain => $beltoft_ds ) :
 	$beltoft_display = function_exists( 'idn_to_utf8' ) ? (string) ( idn_to_utf8( $beltoft_domain, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) ?: $beltoft_domain ) : $beltoft_domain;
 	?>
-<section class="beltoft-dns-next-steps" style="margin: 0 0 2em;">
+<section class="beltoft-next__block beltoft-dns-next-steps">
 	<h3>
 		<?php
 		/* translators: %s: domain name */
@@ -27,7 +27,7 @@ foreach ( $domains as $beltoft_domain => $beltoft_ds ) :
 		<li>
 			<?php esc_html_e( 'Check your records and add anything that is missing:', 'beltoft-services' ); ?>
 			<?php if ( '' !== $account_url ) : ?>
-				<a href="<?php echo esc_url( $account_url ); ?>" style="text-decoration: underline;"><?php esc_html_e( 'My Account, Domains', 'beltoft-services' ); ?></a>
+				<a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'My Account, Domains', 'beltoft-services' ); ?></a>
 			<?php endif; ?>
 		</li>
 		<?php if ( false !== $beltoft_ds ) : ?>

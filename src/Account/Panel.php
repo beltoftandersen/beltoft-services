@@ -142,7 +142,7 @@ final class Panel {
 		$group = self::group( $state );
 		$owner = ! empty( $license['user_id'] ) && (int) $license['user_id'] === get_current_user_id();
 
-		echo '<div class="beltoft-services-panel"';
+		echo '<div class="beltoft-services-panel" id="beltoft-service-' . (int) $resource->id() . '"';
 		if ( $owner ) {
 			printf(
 				' data-resource="%d" data-state="%s" data-desired="%s"',

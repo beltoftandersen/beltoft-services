@@ -59,7 +59,7 @@ final class DiskPanels {
 
 	public static function account( Resource $disk ): void {
 		$server = Resource::for_license( (int) $disk->get( 'server_license' ) );
-		$state = array( 'size' => max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) ), 'slot' => (string) $disk->get( 'slot' ), 'server' => $server, 'needs_reboot' => (bool) $disk->get( 'needs_reboot' ), 'paused' => 'paused' === $disk->get( 'state' ) );
+		$state = array( 'size' => max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) ), 'slot' => (string) $disk->get( 'slot' ), 'server' => $server, 'needs_reboot' => (bool) $disk->get( 'needs_reboot' ), 'paused' => 'paused' === $disk->get( 'state' ), 'guide' => DiskGuide::guide( DiskGuide::os_label( $server ) ), 'guide_id' => DiskGuide::anchor( $disk->id() ) );
 		( static function ( array $vars ): void {
 			extract( $vars, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Fixed template data.
 			include BELTOFT_SERVICES_PATH . 'templates/account/disk.php';

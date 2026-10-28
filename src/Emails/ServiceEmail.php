@@ -80,6 +80,8 @@ abstract class ServiceEmail extends \WC_Email {
 				'deletes_on'    => self::deletes_on( $r, $license ),
 				'details'       => $this->details( $r ),
 				'extra_disks'   => self::extra_disks( $r ),
+				'disk_server_url' => \BeltoftServices\Proxmox\DiskDriver::ID === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::server_url( $r ) : '',
+				'disk_guide_url'  => \BeltoftServices\Proxmox\DiskDriver::ID === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::guide_url( $r ) : '',
 				'used'          => $used,
 				'limit'         => $limit,
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),

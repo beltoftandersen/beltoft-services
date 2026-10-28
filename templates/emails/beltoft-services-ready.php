@@ -12,6 +12,8 @@
  * @var string            $account_url        My Account → Licenses.
  * @var string            $deletion_date      Date of the deletion (deletion warning), or ''.
  * @var array<string, string> $details        Lines about the service (label => value), may be empty. Never a password.
+ * @var string            $disk_server_url    Card of the server an extra disk is on, or ''.
+ * @var string            $disk_guide_url     The disk's setup guide, or ''.
  * @var bool              $dns_only           DNS hosting only.
  * @var string[]          $nameservers        Our name servers (DNS hosting only).
  * @var string            $usage              Usage line (limit exceeded), or ''.
@@ -49,6 +51,9 @@ echo esc_html( sprintf( __( 'Your %s is ready to use.', 'beltoft-services' ), $p
 	</tr>
 	<?php endforeach; ?>
 </table>
+<?php endif; ?>
+<?php if ( ! empty( $disk_server_url ) ) : ?>
+<p><?php esc_html_e( 'Find your disk in My account > VPS > your server > Disks.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $disk_server_url ); ?>"><?php esc_html_e( 'Open your server', 'beltoft-services' ); ?></a>. <a href="<?php echo esc_url( $disk_guide_url ); ?>"><?php esc_html_e( 'Read the disk setup guide', 'beltoft-services' ); ?></a>.</p>
 <?php endif; ?>
 <?php if ( ! empty( $dns_only ) && $nameservers ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: %s: our name servers, comma separated. */ __( 'Our name servers: %s', 'beltoft-services' ), implode( ', ', array_map( 'strval', $nameservers ) ) ) ); ?></p>

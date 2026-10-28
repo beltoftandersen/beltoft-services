@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  * A DNS hosting order changes nothing for the domain until the customer moves its name servers, so
  * the thank-you page says what to do next: check the records, remove an old DS record, change the
  * name servers. It is printed inside the order details, or on the classic
- * thank-you hook, once.
+ * thank-you hook, once. BeltoftServices\ThankYou owns the hooks and prints these blocks inside its "What happens next" area.
  */
 final class ThankYou {
 
@@ -24,15 +24,6 @@ final class ThankYou {
 	 * @var array<int, bool>
 	 */
 	private static array $printed = array();
-
-	/**
-	 * Hooks.
-	 */
-	public static function register(): void {
-		// Inside the order details, under the thank-you heading (also where page builders print it).
-		add_action( 'woocommerce_order_details_before_order_table', array( __CLASS__, 'render_details' ), 5 );
-		add_action( 'woocommerce_thankyou', array( __CLASS__, 'render' ), 5 );
-	}
 
 	/**
 	 * The DNS hosting domains of an order: domain => parent DS present (true, false or null when unknown).
@@ -89,17 +80,6 @@ final class ThankYou {
 		 * @param int $days Days, 5 by default (the usual time a losing registrar has to respond).
 		 */
 		return max( 1, (int) apply_filters( 'beltoft_services_transfer_days', 5 ) );
-	}
-
-	/**
-	 * The order details hook: only on the order received page, not when an order is viewed later.
-	 *
-	 * @param mixed $order Order.
-	 */
-	public static function render_details( $order ): void {
-		if ( $order instanceof \WC_Order && function_exists( 'is_order_received_page' ) && is_order_received_page() ) {
-			self::render( $order->get_id() );
-		}
 	}
 
 	/**

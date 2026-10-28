@@ -11,12 +11,22 @@ defined( 'ABSPATH' ) || exit;
 	<?php endif; ?>
 	<?php if ( $server ) : ?><p><?php esc_html_e( 'Attached to your server.', 'beltoft-services' ); ?></p><?php endif; ?>
 	<?php if ( $needs_reboot ) : ?><p><?php esc_html_e( 'Restart the server if the disk does not appear yet.', 'beltoft-services' ); ?></p><?php endif; ?>
-	<p><?php esc_html_e( 'This disk is empty. In the server, use lsblk -f to identify the new device. Check the device name before formatting it.', 'beltoft-services' ); ?></p>
-	<pre><code>lsblk -f
-sudo mkfs.ext4 /dev/DEVICE
-sudo mkdir -p /mnt/data
-sudo mount /dev/DEVICE /mnt/data
-sudo blkid /dev/DEVICE</code></pre>
-	<p><?php esc_html_e( 'Use the UUID shown by blkid in /etc/fstab to mount the disk after a restart. After making the disk larger, grow the file system with sudo resize2fs /dev/DEVICE.', 'beltoft-services' ); ?></p>
+	<p><?php esc_html_e( 'This disk is empty. Format it once, inside your server.', 'beltoft-services' ); ?></p>
+	<details class="beltoft-services-disk__guide" id="<?php echo esc_attr( $guide_id ); ?>">
+		<summary><?php esc_html_e( 'Set up this disk', 'beltoft-services' ); ?></summary>
+		<p class="beltoft-services-disk__warning"><strong><?php echo esc_html( $guide['warning'] ); ?></strong></p>
+		<p><?php echo esc_html( $guide['intro'] ); ?></p>
+		<ol>
+			<?php foreach ( $guide['steps'] as $beltoft_services_step ) : ?>
+				<li><?php echo esc_html( $beltoft_services_step['text'] ); ?><pre><code><?php echo esc_html( $beltoft_services_step['code'] ); ?></code></pre></li>
+			<?php endforeach; ?>
+		</ol>
+		<?php if ( ! empty( $guide['grow'] ) ) : ?>
+			<?php foreach ( $guide['grow'] as $beltoft_services_step ) : ?>
+				<p><?php echo esc_html( $beltoft_services_step['text'] ); ?></p>
+				<pre><code><?php echo esc_html( $beltoft_services_step['code'] ); ?></code></pre>
+			<?php endforeach; ?>
+		<?php endif; ?>
+	</details>
 	<p><?php esc_html_e( 'Extra disks are not included in the nightly backups.', 'beltoft-services' ); ?></p>
 </div>
