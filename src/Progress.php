@@ -119,10 +119,18 @@ final class Progress {
 	/**
 	 * The steps of a server reinstall and restore.
 	 *
-	 * @param string $kind reinstall or restore.
+	 * @param string $kind reinstall, restore or rollback.
 	 * @return array<string, string>
 	 */
 	private static function server_steps( string $kind ): array {
+		if ( 'rollback' === $kind ) {
+			return array(
+				'rollback' => __( 'Go back to the snapshot', 'beltoft-services' ),
+				'plan'     => __( 'Apply your plan', 'beltoft-services' ),
+				'start'    => __( 'Start the server', 'beltoft-services' ),
+			);
+		}
+
 		if ( 'restore' === $kind ) {
 			return array(
 				'restore' => __( 'Restore the backup', 'beltoft-services' ),
@@ -155,6 +163,8 @@ final class Progress {
 				return __( 'Reinstalling your server', 'beltoft-services' );
 			case 'restore':
 				return __( 'Restoring your server from a backup', 'beltoft-services' );
+			case 'rollback':
+				return __( 'Going back to your snapshot', 'beltoft-services' );
 			case 'delete':
 				return __( 'Removing your service', 'beltoft-services' );
 			case 'update':
@@ -185,6 +195,7 @@ final class Progress {
 			'build'     => 3,
 			'reinstall' => 3,
 			'restore'   => 10,
+			'rollback'  => 5,
 			'delete'    => 1,
 			'update'    => 2,
 			'pause'     => 1,
@@ -237,10 +248,12 @@ final class Progress {
 			$kind = 'resume';
 		} elseif ( is_array( $r->get( 'restore' ) ) ) {
 			$kind = 'restore';
+		} elseif ( is_array( $r->get( 'snapshot_rollback' ) ) ) {
+			$kind = 'rollback';
 		} elseif ( $r->get( 'plan_dirty' ) ) {
 			$kind = 'update';
 		} elseif ( $marker ) {
-			$kind  = in_array( $marker['action'], array( 'reinstall', 'restore' ), true ) ? $marker['action'] : 'action';
+			$kind  = in_array( $marker['action'], array( 'reinstall', 'restore' ), true ) ? $marker['action'] : ( 'snapshot_rollback' === $marker['action'] ? 'rollback' : 'action' );
 			$phase = 'queued';
 		}
 
@@ -341,6 +354,10 @@ final class Progress {
 				return __( 'Restore requested. It starts in a moment.', 'beltoft-services' );
 			}
 
+			if ( 'rollback' === $kind && $marker ) {
+				return __( 'Going back to the snapshot was requested. It starts in a moment.', 'beltoft-services' );
+			}
+
 			if ( 'action' === $kind && $marker && '' !== $marker['label'] ) {
 				/* translators: %s: what the customer asked for, such as "Replace SSH key". */
 				return sprintf( __( '%s requested. It starts in a moment.', 'beltoft-services' ), $marker['label'] );
@@ -408,6 +425,11 @@ final class Progress {
 			$order  = array( 'restored' => 1, 'planned' => 2 );
 			$count  = $order[ $phase ] ?? 0;
 			$done   = array_slice( array_keys( $labels ), 0, $count );
+		} elseif ( 'rollback' === $kind && SshKeyField::DRIVER === $driver ) {
+			$labels = self::server_steps( 'rollback' );
+			$state  = $r->get( 'snapshot_rollback' );
+			$mark   = is_array( $state ) ? (string) ( $state['phase'] ?? '' ) : '';
+			$done   = array_slice( array_keys( $labels ), 0, 'rolled' === $mark ? 1 : 0 );
 		} elseif ( 'build' === $kind ) {
 			$labels = self::build_steps()[ $driver ] ?? array();
 			$done   = array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) );

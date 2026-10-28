@@ -12,6 +12,14 @@ defined( 'ABSPATH' ) || exit;
 final class DiskPanels {
 	public static function server( Resource $server ): array {
 		$disks = array();
+		$volumes = array();
+		$located = VmRecords::for_resource( $server->id() );
+		$where = $located ? Clusters::get( $located['cluster'] ) : null;
+		if ( $located && $where && Snapshots::tracked( $server ) ) {
+			foreach ( DiskSteps::volumes( $server, (string) $where['storage'], (int) $located['vmid'], false ) as $volume ) {
+				$volumes[ $volume['id'] ] = $volume['volid'];
+			}
+		}
 		foreach ( DiskMeta::for_server( $server ) as $disk ) {
 			$license = $disk->license();
 			$grow_url = 'ready' === $disk->get( 'state' ) ? DiskCart::grow_url( $disk ) : '';
@@ -36,6 +44,7 @@ final class DiskPanels {
 				'grow_url' => $grow_url,
 				'grow_price' => $grow_price,
 				'paused' => 'paused' === $disk->get( 'state' ),
+				'snapshots_covering' => isset( $volumes[ $disk->id() ] ) ? count( Snapshots::covering( $server, $volumes[ $disk->id() ] ) ) : 0,
 				'remove_url' => 'ready' === $disk->get( 'state' ) ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
 			);
 		}

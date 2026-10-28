@@ -69,6 +69,7 @@ final class Panels {
 					'reinstallDisks' => __( 'Reinstalling erases the server\'s main disk. Extra disks are kept with their data and stay attached. Continue?', 'beltoft-services' ),
 					'restoreDisks' => __( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', 'beltoft-services' ),
 					'restore'   => __( 'Restoring replaces everything on the server with this backup, and the password and SSH key go back to the backup\'s. Continue?', 'beltoft-services' ),
+					'snapshotDelete' => __( 'Delete this snapshot? This cannot be undone.', 'beltoft-services' ),
 				),
 			)
 		);
@@ -123,6 +124,11 @@ final class Panels {
 			'disk_used'  => $disk['used'] ?? null,
 			'disk_total' => $disk['total'] ?? null,
 			'extra_disks' => DiskPanels::server( $r ),
+			'snapshots'  => self::snapshots( $r ),
+			'snapshot_warnings' => array(
+				'reinstall' => Snapshots::reinstall_warning( $r ),
+				'restore'   => Snapshots::restore_warning( $r ),
+			),
 		);
 
 		( static function ( array $vars ): void {
@@ -130,6 +136,33 @@ final class Panels {
 			extract( $vars, EXTR_SKIP );
 			include BELTOFT_SERVICES_PATH . 'templates/account/vm.php';
 		} )( $state );
+	}
+
+	/**
+	 * What the card's Snapshots block shows, or null when the block is absent (the switch is off, the server gets none
+	 * or it is busy). Dates are formatted here; the template only prints.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>|null
+	 */
+	public static function snapshots( Resource $r ): ?array {
+		$panel = Snapshots::panel( $r );
+
+		if ( null === $panel || ! $panel['enabled'] ) {
+			return null;
+		}
+
+		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+
+		foreach ( $panel['entries'] as $i => $entry ) {
+			$panel['entries'][ $i ]['taken']  = $entry['taken_at'] > 0 ? wp_date( $format, $entry['taken_at'] ) : '';
+			$panel['entries'][ $i ]['keeps']  = $entry['expires_at'] > 0 ? wp_date( $format, $entry['expires_at'] ) : '';
+		}
+
+		$panel['full']      = $panel['used'] >= $panel['slots'];
+		$panel['max_label'] = Snapshots::MAX_LABEL;
+
+		return $panel;
 	}
 
 	/**

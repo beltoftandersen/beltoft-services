@@ -36,7 +36,7 @@
 	}
 
 	function notice( panel, text ) {
-		var line = panel.querySelector( '[data-notice]' );
+		var line = panel.querySelector( 'dialog[open] [data-notice]' ) || panel.querySelector( '[data-notice]' );
 
 		if ( line ) {
 			line.textContent = text;
@@ -101,12 +101,22 @@
 			return;
 		}
 
+		if ( 'snapshot_delete' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.snapshotDelete ) ) {
+			return;
+		}
+
 		if ( button ) {
 			busy( button );
 		}
 
 		post( panel, 'actions/' + encodeURIComponent( form.getAttribute( 'data-action' ) ), { args: args } ).then( function ( response ) {
 			if ( 202 === response.status ) {
+				var dialog = form.closest( 'dialog' );
+
+				if ( dialog && dialog.close ) {
+					dialog.close();
+				}
+
 				notice( panel, vm.strings.queued );
 				// The panel's status poll (account.js) shows the progress and reloads when it is over.
 				panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
@@ -160,7 +170,35 @@
 		} );
 
 		panel.addEventListener( 'click', function ( event ) {
+			var roll = event.target.closest( '[data-snapshot-rollback]' );
+			var cancel = event.target.closest( '[data-snapshot-cancel]' );
+			var dialog = panel.querySelector( '[data-snapshot-dialog]' );
 			var button = event.target.closest( '[data-vm-reveal]' );
+
+			if ( roll && dialog ) {
+				dialog.querySelector( 'input[name="id"]' ).value = roll.getAttribute( 'data-snapshot-rollback' );
+				dialog.querySelector( '[data-snapshot-dialog-name]' ).textContent = roll.getAttribute( 'data-snapshot-name' );
+				dialog.querySelector( 'input[name="confirm"]' ).value = '';
+				notice( panel, '' );
+
+				if ( dialog.showModal ) {
+					dialog.showModal();
+				} else {
+					dialog.setAttribute( 'open', '' );
+				}
+
+				return;
+			}
+
+			if ( cancel && dialog ) {
+				if ( dialog.close ) {
+					dialog.close();
+				} else {
+					dialog.removeAttribute( 'open' );
+				}
+
+				return;
+			}
 
 			if ( button && ! button.disabled ) {
 				reveal( panel, button );

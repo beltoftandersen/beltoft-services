@@ -124,6 +124,45 @@ final class ProgressTest extends TestCase {
 		}
 	}
 
+	public function test_a_snapshot_rollback_follows_its_phase_while_the_server_stays_ready(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready', 'snapshot_rollback' => array( 'id' => 'a', 'phase' => 'stopping' ) ) );
+
+		$expect = array(
+			'stopping' => array( 'rollback' => 'current', 'plan' => 'todo', 'start' => 'todo' ),
+			'rolling'  => array( 'rollback' => 'current', 'plan' => 'todo', 'start' => 'todo' ),
+			'rolled'   => array( 'rollback' => 'done', 'plan' => 'current', 'start' => 'todo' ),
+		);
+
+		foreach ( $expect as $phase => $statuses ) {
+			$r->set( array( 'snapshot_rollback' => array( 'id' => 'a', 'phase' => $phase ) ) );
+			$p = Progress::build( $r );
+
+			$this->assertSame( 'rollback', $p['kind'], $phase );
+			$this->assertTrue( $p['active'], $phase );
+			$this->assertSame( $statuses, $this->statuses( $p ), $phase );
+			$this->assertSame( 'Going back to your snapshot', $p['title'] );
+		}
+
+		$labels = array_column( $p['steps'], 'label' );
+		$this->assertSame( array( 'Go back to the snapshot', 'Apply your plan', 'Start the server' ), $labels );
+	}
+
+	public function test_a_requested_rollback_is_queued_with_its_steps_and_a_requested_take_is_a_generic_action(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready' ) );
+
+		Progress::mark( $r, 'snapshot_rollback', 'Roll back to a snapshot' );
+		$p = Progress::build( $r );
+		$this->assertSame( 'rollback', $p['kind'] );
+		$this->assertSame( 'queued', $p['phase'] );
+		$this->assertSame( array( 'todo' ), array_values( array_unique( $this->statuses( $p ) ) ) );
+
+		Progress::mark( $r, 'snapshot_take', 'Take a snapshot' );
+		$p = Progress::build( $r );
+		$this->assertSame( 'action', $p['kind'] );
+		$this->assertTrue( $p['active'] );
+		$this->assertSame( 'Take a snapshot requested. It starts in a moment.', $p['text'] );
+	}
+
 	public function test_an_extra_disk_attach_has_its_own_steps(): void {
 		list( $r ) = $this->resource( 'proxmox-disk', array( 'state' => 'provisioning', 'steps' => array( 'server', 'slot' ) ) );
 
