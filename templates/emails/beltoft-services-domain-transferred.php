@@ -10,6 +10,7 @@
  * @var string   $customer_name      Customer's first name, or ''.
  * @var string   $domain_name        The domain.
  * @var bool     $dns_stays          Our DNS already served the domain.
+ * @var bool     $dns_external       The DNS stays with the current name servers.
  * @var string   $domain_renews      Next renewal date, or ''.
  * @var string   $domains_url        My Account, Domains.
  * @var string[] $nameservers_shown  Name servers of the domain (registration only).
@@ -35,6 +36,8 @@ if ( '' !== $customer_name ) {
 <p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your domain %s is now with us. We are its registrar from now on.', 'beltoft-services' ), $domain_name ) ); ?></p>
 <?php if ( $dns_stays ) : ?>
 <p><?php esc_html_e( 'Your DNS stays as it is.', 'beltoft-services' ); ?></p>
+<?php elseif ( $dns_external ) : ?>
+<p><?php esc_html_e( 'Your DNS stays where it is now. Your name servers do not change.', 'beltoft-services' ); ?></p>
 <?php else : ?>
 <p><?php esc_html_e( 'The domain now uses our name servers. Check that your DNS records are in My account > Domains, so your website and email keep working.', 'beltoft-services' ); ?></p>
 <?php endif; ?>

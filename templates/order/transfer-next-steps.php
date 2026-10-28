@@ -36,7 +36,7 @@ foreach ( $domains as $beltoft_domain => $beltoft_served ) :
 	<?php if ( $beltoft_served ) : ?>
 		<p><?php esc_html_e( 'Your DNS stays as it is.', 'beltoft-services' ); ?></p>
 	<?php else : ?>
-		<p><?php esc_html_e( 'When the transfer is done, the domain uses our name servers. Add your DNS records in My account > Domains first, so your website and email keep working.', 'beltoft-services' ); ?></p>
+		<p><?php esc_html_e( 'Your DNS stays where it is now. Your name servers do not change.', 'beltoft-services' ); ?></p>
 	<?php endif; ?>
 	<?php if ( '' !== $account_url ) : ?>
 		<p><a href="<?php echo esc_url( $account_url ); ?>" style="text-decoration: underline;"><?php esc_html_e( 'My Account, Domains', 'beltoft-services' ); ?></a></p>

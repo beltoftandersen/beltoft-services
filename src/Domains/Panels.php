@@ -31,7 +31,7 @@ final class Panels {
 	public static function account( Resource $r ): void {
 		$domain = (string) $r->get( 'domain' );
 		$dns_only = 'dns' === $r->get( 'driver' );
-		$zone = $dns_only || 'custom' !== $r->get( 'ns_mode' ) ? Clients::dns()->zone( $domain ) : null;
+		$zone = $dns_only || ( 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ) ? Clients::dns()->zone( $domain ) : null;
 		$rrsets = is_array( $zone ) ? (array) ( $zone['rrsets'] ?? array() ) : array();
 		$rows = Records::to_rows( $domain, $rrsets );
 		include BELTOFT_SERVICES_PATH . 'templates/account/domain.php';

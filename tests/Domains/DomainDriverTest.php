@@ -45,6 +45,33 @@ class DomainDriverTest extends TestCase {
 		return $r;
 	}
 
+	/** The parent delegation a fake resolver reports; every lookup is counted in the returned object. */
+	private function delegation( array $ns = array( 'ns1.old-host.example', 'ns2.old-host.example' ), string $status = 'ok', string $reason = 'delegated', bool $ours = false ): \ArrayObject {
+		$calls = new \ArrayObject();
+		add_filter( 'beltoft_services_dns_proof_result', static function ( $pre, $call, $args ) use ( $calls, $ns, $status, $reason, $ours ) {
+			if ( 'delegation' !== $call ) { return $pre; }
+			$calls[] = $args[0];
+			return array( 'status' => $status, 'reason' => $reason, 'ns' => $ns, 'ips' => array(), 'ds' => false, 'ours' => $ours );
+		}, 10, 3 );
+		return $calls;
+	}
+
+	private function transfer_fakes( int $id = 123 ): array {
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains/transfer', array( 'id' => $id, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/' . $id, array( 'id' => $id, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/' . $id, array( 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'POST', '/domains/' . $id . '/renew', array( 'status' => 'ACT' ) );
+		$fake->reply( 'GET', '/domains/' . $id, array( 'expiration_date' => '2028-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/' . $id, array( 'success' => true ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		return array( $fake, $dns );
+	}
+
 	private function posts( FakeClient $fake ): int {
 		return count( array_filter( $fake->calls(), static fn( $call ) => 'POST' === $call['method'] ) );
 	}
@@ -105,6 +132,7 @@ class DomainDriverTest extends TestCase {
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		$dns = new FakeDns();
 		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->delegation();
 		$this->assertTrue( ( new DomainDriver() )->provision( $this->resource( 'transfer', 'example.com', 8.0 ) )->is_failed(), 'Below the transfer cost of 9.' );
 		$this->assertSame( 0, $this->posts( $fake ) );
 		$this->assertTrue( ( new DomainDriver() )->provision( $this->resource( 'transfer', 'example.com', 9.0 ) )->is_retry(), 'Exactly the cost passes.' );
@@ -201,6 +229,105 @@ class DomainDriverTest extends TestCase {
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$this->assertSame( '123', $result->meta()['remote_id'] );
 		$this->assertSame( 'off', $fake->calls()[1]['body']['autorenew'] );
+	}
+
+	public function test_a_transfer_without_our_dns_sends_the_delegated_name_servers_and_makes_no_zone_or_dnssec(): void {
+		[ $fake, $dns ] = $this->transfer_fakes();
+		$lookups = $this->delegation( array( 'NS1.Old-Host.example.', 'ns2.old-host.example' ) );
+		$name = 'keep-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$r = $this->resource( 'transfer', $name );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$post = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains/transfer' === $c['path'] ) );
+		$this->assertCount( 1, $post );
+		$this->assertSame( array( array( 'name' => 'ns1.old-host.example' ), array( 'name' => 'ns2.old-host.example' ) ), $post[0]['body']['name_servers'] );
+		$this->assertSame( array( 'ns1.old-host.example', 'ns2.old-host.example' ), Resource::find( $r->id() )->get( 'transfer_ns' ) );
+		$this->assertSame( array( $name ), $lookups->getArrayCopy() );
+		$this->assertNull( $dns->zone( $name ), 'No zone.' );
+		$this->assertSame( array(), $dns->calls(), 'No zone, no DNSSEC.' );
+		$this->assertSame( array(), array_filter( $fake->calls(), static fn( $c ) => 'PUT' === $c['method'] && isset( $c['body']['dnssec_keys'] ) ), 'No DS at the registrar.' );
+		$this->assertTrue( (bool) Resource::find( $r->id() )->get( 'dns_external' ) );
+		$this->assertArrayNotHasKey( 'dnssec_keys', $result->meta() );
+	}
+
+	public function test_a_retry_after_a_crash_reuses_the_stored_name_servers_without_a_second_lookup(): void {
+		[ $fake ] = $this->transfer_fakes();
+		$lookups = $this->delegation( array( 'ns9.elsewhere.example', 'ns8.elsewhere.example' ) );
+		$r = $this->resource( 'transfer', 'crash-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com' );
+		$this->assertTrue( $r->set( array( 'transfer_ns' => array( 'ns1.stored.example', 'ns2.stored.example' ), 'steps' => array( 'contact' ), 'contact_handle' => 'AA123-GB' ) ) );
+		$result = ( new DomainDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertCount( 0, $lookups, 'No second lookup.' );
+		$post = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains/transfer' === $c['path'] ) );
+		$this->assertSame( array( array( 'name' => 'ns1.stored.example' ), array( 'name' => 'ns2.stored.example' ) ), $post[0]['body']['name_servers'] );
+	}
+
+	public static function unreadable_delegations(): array {
+		return array(
+			'lookup failure' => array( array(), 'unknown', 'parent_unreachable', false ),
+			'none found' => array( array(), 'ok', 'delegated', false ),
+			'not delegated' => array( array(), 'support', 'not_delegated', false ),
+			'our own name server' => array( array( 'ns1.old-host.example', 'ns1.example.net' ), 'ok', 'delegated', false ),
+			'flagged as ours' => array( array( 'ns1.old-host.example', 'ns2.old-host.example' ), 'support', 'delegated_to_us', true ),
+		);
+	}
+
+	/** @dataProvider unreadable_delegations */
+	public function test_an_unreadable_or_our_own_delegation_retries_and_sends_nothing( array $ns, string $status, string $reason, bool $ours ): void {
+		[ $fake, $dns ] = $this->transfer_fakes();
+		$this->delegation( $ns, $status, $reason, $ours );
+		$name = 'noread-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$r = $this->resource( 'transfer', $name );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertNotSame( '', $result->error() );
+		$this->assertSame( 0, $this->posts( $fake ), 'Nothing is sent.' );
+		$this->assertNull( $dns->zone( $name ) );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'transfer_ns' ) );
+		$this->assertStringNotContainsString( 'ns1.example.net', (string) wp_json_encode( $fake->calls() ), 'Never our name servers.' );
+	}
+
+	public function test_a_transfer_of_a_domain_our_dns_serves_is_unchanged(): void {
+		[ $fake, $dns ] = $this->transfer_fakes();
+		$lookups = $this->delegation();
+		$name = 'served-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$r = $this->resource( 'transfer', $name );
+		$user = (int) $r->license()['user_id'];
+		$claim = DnsClaims::create( $user, $name );
+		$this->assertTrue( DnsAssignments::reserve( $user, (int) $claim['id'], $name ) );
+		$dns_license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => $user ) );
+		$old = Resource::create( $dns_license, new DnsDriver(), array(), array( 'domain' => $name, 'mode' => 'dns', 'claim_id' => $claim['id'] ) );
+		$this->assertTrue( DnsAssignments::activate( $name, $user, (int) $dns_license['id'], $old->id() ) );
+		$dns->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertCount( 0, $lookups );
+		$post = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains/transfer' === $c['path'] ) );
+		$this->assertSame( array( array( 'name' => 'ns1.example.net' ), array( 'name' => 'ns2.example.net' ) ), $post[0]['body']['name_servers'], 'Our name servers.' );
+		$this->assertNotEmpty( array_filter( $dns->calls(), static fn( $c ) => 'secure' === $c[0] ), 'DNSSEC is enabled.' );
+		$this->assertNotEmpty( array_filter( $fake->calls(), static fn( $c ) => 'PUT' === $c['method'] && ! empty( $c['body']['dnssec_keys'] ) ), 'The DS is published.' );
+		$this->assertEmpty( Resource::find( $r->id() )->get( 'dns_external' ) );
+	}
+
+	public function test_a_registration_is_unchanged_and_never_reads_a_delegation(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$lookups = $this->delegation();
+		$name = 'reg-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$r = $this->resource( 'register', $name );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertCount( 0, $lookups );
+		$this->assertNotNull( $dns->zone( $name ), 'A new domain has our zone.' );
+		$this->assertSame( array( array( 'name' => 'ns1.example.net' ), array( 'name' => 'ns2.example.net' ) ), $fake->calls()[1]['body']['name_servers'] );
+		$this->assertEmpty( Resource::find( $r->id() )->get( 'dns_external' ) );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'transfer_ns' ) );
 	}
 
 	public function test_pending_registration_stays_retrying(): void {
@@ -339,6 +466,7 @@ class DomainDriverTest extends TestCase {
 		$dns = new FakeDns();
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->delegation();
 		$result = ( new DomainDriver() )->provision( $this->resource( 'transfer', 'example.nl' ) );
 		$this->assertTrue( $result->is_done() );
 		$this->assertSame( '2028-10-26 00:00:00', $result->meta()['expires_at'] );

@@ -44,6 +44,13 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array( 'contact_handle' => $handle, 'steps' => $steps ) ) ) { return StepResult::retry( 3600, 'Registrant contact could not be saved.' ); }
 		}
 		if ( ! in_array( 'order', $steps, true ) ) {
+			if ( ! in_array( 'zone_prepared', $steps, true ) && 'transfer' === $mode && self::keeps_dns( $r ) ) {
+				// Our DNS does not serve this domain: it keeps the name servers it has and no zone is made here.
+				$kept = $this->current_nameservers( $r );
+				if ( ! $kept->is_done() ) { return $kept; }
+				$steps[] = 'zone_prepared';
+				if ( ! $r->set( array_merge( $kept->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+			}
 			if ( ! in_array( 'zone_prepared', $steps, true ) ) {
 				$prepared = Zone::prepare( $r );
 				if ( ! $prepared->is_done() ) { return $prepared; }
@@ -75,7 +82,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					'tech_handle' => (string) $r->get( 'contact_handle' ),
 					'billing_handle' => (string) $r->get( 'contact_handle' ),
 					'ns_group' => '',
-					'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), $nameservers ),
+					'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), self::is_external( $r ) ? self::stored_nameservers( $r ) : $nameservers ),
 					'autorenew' => 'off',
 					'is_dnssec_enabled' => false,
 				);
@@ -126,6 +133,11 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			$steps[] = 'transfer_year';
 			if ( ! $r->set( array_merge( $year->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'Transfer renewal status could not be saved.' ); }
 		}
+		if ( ! in_array( 'zone', $steps, true ) && self::is_external( $r ) ) {
+			// The DNS stays where it was: no zone, no DNSSEC and no DS here.
+			$steps[] = 'zone';
+			if ( ! $r->set( array( 'steps' => $steps, 'dns_external' => true ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+		}
 		if ( ! in_array( 'zone', $steps, true ) ) {
 			$user = (int) ( $r->license()['user_id'] ?? 0 );
 			$held = DnsSchema::ready() ? DnsAssignments::get( $name ) : null;
@@ -162,6 +174,52 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array( 'steps' => $steps, 'is_locked' => ! is_wp_error( $locked ) ) ) ) { return StepResult::retry( 3600, 'Transfer lock could not be saved.' ); }
 		}
 		return StepResult::done( array( 'steps' => $steps, 'remote_id' => $r->get( 'remote_id' ), 'expires_at' => $r->get( 'expires_at' ) ), 'Domain active' );
+	}
+
+	/** The name servers stored before a transfer order, as a list of host names. */
+	public static function stored_nameservers( Resource $r ): array {
+		$stored = $r->get( 'transfer_ns' );
+		return is_array( $stored ) ? array_values( array_filter( array_map( 'strval', $stored ) ) ) : array();
+	}
+
+	/** A transfer that keeps the domain's current name servers: stored before the order, so a retry reuses them. */
+	public static function is_external( Resource $r ): bool {
+		return 'transfer' === $r->get( 'mode' ) && array() !== self::stored_nameservers( $r );
+	}
+
+	/** Does this transfer leave the DNS where it is? Not when our DNS already serves the domain for this customer. */
+	private static function keeps_dns( Resource $r ): bool {
+		if ( array() !== self::stored_nameservers( $r ) ) { return true; }
+		return ! Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $r->license()['user_id'] ?? 0 ) );
+	}
+
+	/** Reads the delegation at the parent zone and stores it. Our own name servers are never a fallback. */
+	private function current_nameservers( Resource $r ): StepResult {
+		$name = (string) $r->get( 'domain' );
+		if ( array() !== self::stored_nameservers( $r ) ) { return StepResult::done(); }
+		$owner = Zone::owner( $r );
+		if ( 'other' === $owner ) {
+			if ( ! $r->get( 'zone_conflict_alerted' ) ) { Alerts::admin( $r, 'Domain zone belongs to a different customer.' ); $r->set( array( 'zone_conflict_alerted' => true ) ); }
+			return StepResult::retry( 3600, 'A domain zone is assigned to another customer.' );
+		}
+		if ( 'domain' === $owner ) { return StepResult::fail( 'This domain is already registered here.' ); }
+		$found  = Delegation::lookup( $name );
+		$status = (string) ( $found['status'] ?? '' );
+		$hosts  = array();
+		foreach ( (array) ( $found['ns'] ?? array() ) as $host ) {
+			$host = strtolower( rtrim( trim( (string) $host ), '.' ) );
+			if ( '' !== $host && ! is_wp_error( Search::normalise( $host ) ) ) { $hosts[ $host ] = $host; }
+		}
+		$hosts = array_values( $hosts );
+		$ours  = ! empty( $found['ours'] ) || array() !== array_intersect( $hosts, Zone::nameservers() );
+		if ( $ours ) {
+			if ( ! $r->get( 'transfer_ns_alerted' ) ) { Alerts::admin( $r, 'The domain is delegated to our name servers but no DNS service of this customer serves it. Staff review needed before the transfer.' ); $r->set( array( 'transfer_ns_alerted' => true ) ); }
+			return StepResult::retry( 3600, 'The current name servers include our own. Staff review needed before the transfer.' );
+		}
+		if ( 'ok' !== $status || array() === $hosts || count( $hosts ) > ProofResolver::MAX_NS ) {
+			return StepResult::retry( 3600, 'The current name servers of the domain could not be read (' . ( '' !== (string) ( $found['reason'] ?? '' ) ? (string) $found['reason'] : 'none found' ) . '). Trying again later.' );
+		}
+		return StepResult::done( array( 'transfer_ns' => $hosts ) );
 	}
 
 	/** Moves the assignment to this domain resource and ends the DNS-only subscription when it holds nothing else. The cancel comes first, so a failed move is retried with the old row still in place. */

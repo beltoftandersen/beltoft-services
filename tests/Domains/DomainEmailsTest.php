@@ -50,6 +50,7 @@ class DomainEmailsTest extends TestCase {
 
 	public function test_a_finished_transfer_sends_the_transferred_email_once_instead_of_ready(): void {
 		$r = $this->domain( 'transfer' );
+		$this->assertTrue( $r->set( array( 'dns_external' => true ) ) );
 		$this->ready( $r );
 		$this->ready( $r );
 		$this->assertCount( 1, $this->mails );
@@ -58,7 +59,8 @@ class DomainEmailsTest extends TestCase {
 		$this->assertStringContainsString( 'Dana', $mail['message'] );
 		$this->assertStringContainsString( date_i18n( get_option( 'date_format' ), strtotime( '2027-10-26 UTC' ) ), $mail['message'], 'The renewal date.' );
 		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $mail['message'], 'It links to My Account, Domains.' );
-		$this->assertStringContainsString( 'The domain now uses our name servers.', $mail['message'] );
+		$this->assertStringContainsString( 'Your DNS stays where it is now. Your name servers do not change.', $mail['message'] );
+		$this->assertStringNotContainsString( 'uses our name servers', $mail['message'] );
 		$this->assertStringNotContainsString( 'Your DNS stays as it is.', $mail['message'] );
 		$this->assertStringNotContainsString( 'AUTH-CODE-NEVER-IN-MAIL', $mail['subject'] . $mail['message'] );
 		$this->assertStringNotContainsString( ' is ready', $mail['subject'], 'Not the generic ready mail.' );

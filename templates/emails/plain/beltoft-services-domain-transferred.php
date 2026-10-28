@@ -10,6 +10,7 @@
  * @var string   $customer_name      Customer's first name, or ''.
  * @var string   $domain_name        The domain.
  * @var bool     $dns_stays          Our DNS already served the domain.
+ * @var bool     $dns_external       The DNS stays with the current name servers.
  * @var string   $domain_renews      Next renewal date, or ''.
  * @var string   $domains_url        My Account, Domains.
  * @var string[] $nameservers_shown  Name servers of the domain (registration only).
@@ -36,6 +37,8 @@ if ( '' !== $customer_name ) {
 echo wp_strip_all_tags( sprintf( /* translators: %s: domain name. */ __( 'Your domain %s is now with us. We are its registrar from now on.', 'beltoft-services' ), $domain_name ) ) . "\n\n";
 if ( $dns_stays ) {
 	echo __( 'Your DNS stays as it is.', 'beltoft-services' ) . "\n\n";
+} elseif ( $dns_external ) {
+	echo __( 'Your DNS stays where it is now. Your name servers do not change.', 'beltoft-services' ) . "\n\n";
 } else {
 	echo __( 'The domain now uses our name servers. Check that your DNS records are in My account > Domains, so your website and email keep working.', 'beltoft-services' ) . "\n\n";
 }

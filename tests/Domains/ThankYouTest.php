@@ -74,7 +74,9 @@ final class ThankYouTest extends TestCase {
 		$this->assertStringContainsString( 'may ask you to approve the transfer', $html );
 		$this->assertStringContainsString( 'The transfer takes up to 5 days.', $html );
 		$this->assertStringContainsString( 'We email you when the domain is with us.', $html );
-		$this->assertStringContainsString( 'the domain uses our name servers. Add your DNS records in My account &gt; Domains first', $html );
+		$this->assertStringContainsString( 'Your DNS stays where it is now. Your name servers do not change.', $html );
+		$this->assertStringNotContainsString( 'Add your DNS records', $html );
+		$this->assertStringNotContainsString( 'uses our name servers', $html );
 		$this->assertStringNotContainsString( 'Your DNS stays as it is.', $html );
 		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $html );
 		$this->assertStringNotContainsString( 'beltoft-dns-next-steps', $html, 'No DNS block for a transfer.' );
@@ -90,6 +92,7 @@ final class ThankYouTest extends TestCase {
 		$html = $this->page( $order->get_id() );
 		$this->assertStringContainsString( 'Your DNS stays as it is.', $html );
 		$this->assertStringNotContainsString( 'uses our name servers', $html );
+		$this->assertStringNotContainsString( 'name servers do not change', $html );
 	}
 
 	public function test_the_transfer_days_have_a_filter(): void {

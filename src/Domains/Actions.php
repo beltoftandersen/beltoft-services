@@ -30,6 +30,7 @@ final class Actions {
 	}
 
 	private static function validate( Resource $r, string $action, array $args ): true|\WP_Error {
+		if ( 'set_records' === $action && $r->get( 'dns_external' ) ) { return new \WP_Error( 'dns_external', 'This domain\'s DNS is hosted elsewhere.' ); }
 		if ( 'set_records' === $action && $r->get( 'records_off' ) ) { return new \WP_Error( 'paused', 'DNS hosting is paused.' ); }
 		if ( ! isset( self::offered( $r )[ $action ] ) ) { return new \WP_Error( 'unavailable', 'This action is unavailable.' ); }
 		if ( 'set_records' === $action ) {
@@ -41,7 +42,8 @@ final class Actions {
 		}
 		if ( 'set_nameservers' === $action ) {
 			$mode = (string) ( $args['mode'] ?? '' );
-			if ( 'ours' === $mode ) { return true; }
+			// Moving DNS here needs the zone built and the records in it before the switch: not offered while the DNS is hosted elsewhere.
+			if ( 'ours' === $mode ) { return $r->get( 'dns_external' ) ? new \WP_Error( 'dns_external', 'This domain\'s DNS is hosted elsewhere. Contact support to move it here.' ) : true; }
 			$hosts = self::hosts( (string) ( $args['hosts'] ?? '' ) );
 			return 'custom' === $mode && ! is_wp_error( $hosts ) ? true : new \WP_Error( 'bad_nameservers', 'Enter two to six valid name servers.' );
 		}

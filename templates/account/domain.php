@@ -6,8 +6,13 @@
  */
 defined( 'ABSPATH' ) || exit;
 
-$beltoft_ours    = $dns_only || 'custom' !== $r->get( 'ns_mode' );
-$beltoft_hosts   = $beltoft_ours ? \BeltoftServices\Domains\Zone::nameservers() : (array) $r->get( 'nameservers' );
+$beltoft_external = ! $dns_only && (bool) $r->get( 'dns_external' );
+$beltoft_ours    = ! $beltoft_external && ( $dns_only || 'custom' !== $r->get( 'ns_mode' ) );
+if ( $beltoft_external ) {
+	$beltoft_hosts = 'custom' === $r->get( 'ns_mode' ) ? (array) $r->get( 'nameservers' ) : \BeltoftServices\Domains\DomainDriver::stored_nameservers( $r );
+} else {
+	$beltoft_hosts = $beltoft_ours ? \BeltoftServices\Domains\Zone::nameservers() : (array) $r->get( 'nameservers' );
+}
 $beltoft_locked  = (bool) $r->get( 'is_locked' );
 $beltoft_can     = $r->accepts_actions();
 $beltoft_off     = $dns_only && (bool) $r->get( 'records_off' );
@@ -83,13 +88,18 @@ if ( $beltoft_time ) {
 				<li><?php echo esc_html( (string) $beltoft_host ); ?></li>
 			<?php endforeach; ?>
 		</ul>
+		<?php if ( $beltoft_external ) : ?>
+			<p class="beltoft-services-domain__note"><?php esc_html_e( '(DNS is hosted elsewhere)', 'beltoft-services' ); ?></p>
+		<?php endif; ?>
 		<?php if ( $beltoft_can && $dns_only ) : ?>
 			<form class="beltoft-services-domain-form" data-domain-action="check_delegation"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Check name servers', 'beltoft-services' ); ?></button></form>
 		<?php elseif ( $beltoft_can ) : ?>
 			<form class="beltoft-services-domain-form beltoft-services-domain__ns" data-domain-action="set_nameservers">
 				<fieldset class="beltoft-services-domain__choices">
 					<legend class="screen-reader-text"><?php esc_html_e( 'Name server mode', 'beltoft-services' ); ?></legend>
+					<?php if ( ! $beltoft_external ) : ?>
 					<label class="beltoft-services-domain__choice"><input type="radio" name="mode" value="ours"<?php checked( $beltoft_ours ); ?>> <?php esc_html_e( 'Our name servers', 'beltoft-services' ); ?></label>
+					<?php endif; ?>
 					<label class="beltoft-services-domain__choice"><input type="radio" name="mode" value="custom"<?php checked( ! $beltoft_ours ); ?>> <?php esc_html_e( 'Custom name servers', 'beltoft-services' ); ?></label>
 				</fieldset>
 				<label class="beltoft-services-domain__custom"<?php echo $beltoft_ours ? ' hidden' : ''; ?>><?php esc_html_e( 'Custom name servers, separated by commas', 'beltoft-services' ); ?> <input name="hosts" type="text" autocomplete="off" value="<?php echo esc_attr( $beltoft_ours ? '' : implode( ', ', array_map( 'strval', $beltoft_hosts ) ) ); ?>"></label>

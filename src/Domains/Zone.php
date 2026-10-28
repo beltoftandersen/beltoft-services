@@ -79,7 +79,7 @@ final class Zone {
 	public static function ensure( Resource $r, bool $switching_to_ours = false, bool $publish_ds = true ): StepResult {
 		$name = (string) $r->get( 'domain' );
 		$nameservers = self::nameservers();
-		if ( ! $nameservers || ( ! $switching_to_ours && 'custom' === $r->get( 'ns_mode' ) ) ) { return StepResult::done(); }
+		if ( ! $nameservers || ( ! $switching_to_ours && ( 'custom' === $r->get( 'ns_mode' ) || $r->get( 'dns_external' ) ) ) ) { return StepResult::done(); }
 		$dns = Clients::dns();
 		$existing = $dns->zone( $name );
 		if ( is_wp_error( $existing ) ) { return StepResult::retry( 3600, 'DNS zone could not be checked.' ); }

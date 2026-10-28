@@ -26,6 +26,18 @@ class ActionsTest extends TestCase {
 		$this->assertFalse( ( new DnsDriver() )->act( $r, 'set_nameservers', array() )->is_done() );
 	}
 
+	public function test_a_domain_with_dns_hosted_elsewhere_refuses_records_and_the_switch_to_our_servers(): void {
+		$r = $this->resource( 'domain' );
+		$r->set( array( 'dns_external' => true ) );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$records = array( 'records' => wp_json_encode( array( array( 'name' => '@', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.1' ) ) ) );
+		$this->assertInstanceOf( \WP_Error::class, Actions::refusal( null, $r, 'set_records', $records ) );
+		$this->assertInstanceOf( \WP_Error::class, Actions::refusal( null, $r, 'set_nameservers', array( 'mode' => 'ours' ) ) );
+		$this->assertNull( Actions::refusal( null, $r, 'set_nameservers', array( 'mode' => 'custom', 'hosts' => 'ns1.custom.net,ns2.custom.net' ) ), 'Another set of name servers is allowed.' );
+		$this->assertSame( array(), $dns->calls() );
+	}
+
 	public function test_bad_records_refused_before_dns_call(): void {
 		$r = $this->resource( 'dns' );
 		$dns = new FakeDns();

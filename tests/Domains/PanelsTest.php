@@ -62,6 +62,34 @@ class PanelsTest extends TestCase {
 		$this->assertSame( array( 'other' ), array_keys( $buttons ), 'The generic button row keeps nothing the panel shows itself.' );
 	}
 
+	public function test_a_domain_whose_dns_is_hosted_elsewhere_shows_its_name_servers_and_no_records_editor(): void {
+		$html = $this->render( new DomainDriver(), array( 'domain' => 'external-card.com', 'mode' => 'transfer', 'dns_external' => true, 'transfer_ns' => array( 'ns1.old-host.example', 'ns2.old-host.example' ) ), true );
+		$this->assertStringContainsString( '<li>ns1.example.net</li>', $this->render( new DomainDriver(), array( 'domain' => 'ours-card.com', 'mode' => 'register' ), true ), 'A domain with our DNS is unchanged.' );
+		$this->assertStringContainsString( '<li>ns1.old-host.example</li>', $html );
+		$this->assertStringContainsString( '<li>ns2.old-host.example</li>', $html );
+		$this->assertStringNotContainsString( 'ns1.example.net', $html );
+		$this->assertStringContainsString( '(DNS is hosted elsewhere)', $html );
+		$this->assertStringNotContainsString( 'beltoft-dns-editor', $html );
+		$this->assertStringNotContainsString( 'Save DNS records', $html );
+		$this->assertStringNotContainsString( 'value="ours"', $html, 'Moving the DNS here is not offered.' );
+		$this->assertStringContainsString( 'value="custom"', $html );
+		$this->assertStringNotContainsString( 'Your DNS records here stay as they are', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+	}
+
+	public function test_a_domain_with_our_dns_keeps_its_records_editor_and_ours_choice(): void {
+		$html = $this->render( new DomainDriver(), array( 'domain' => 'ours-card-2.com', 'mode' => 'transfer' ), true );
+		$this->assertStringContainsString( 'beltoft-dns-editor', $html );
+		$this->assertStringContainsString( 'value="ours"', $html );
+		$this->assertStringNotContainsString( '(DNS is hosted elsewhere)', $html );
+	}
+
+	public function test_the_dns_only_card_keeps_the_transfer_note_about_its_records(): void {
+		update_option( \BeltoftServices\Domains\Prices::OPTION, array( 'com' => array( 'price' => 22, 'restricted' => false ) ) );
+		$html = $this->render( new DnsDriver(), array( 'domain' => 'note-here.com', 'mode' => 'dns' ), true );
+		$this->assertStringContainsString( 'Your DNS records here stay as they are.', $html );
+	}
+
 	public function test_dns_hosting_panel_renders_the_records_section(): void {
 		$html = $this->render( new DnsDriver(), array( 'domain' => 'dns-panel-test.com', 'mode' => 'dns' ), true );
 		$this->assertStringContainsString( '<li>ns1.example.net</li>', $html );
