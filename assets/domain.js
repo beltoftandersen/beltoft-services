@@ -289,6 +289,9 @@
 	function opened() {
 		try { return JSON.parse( window.sessionStorage.getItem( KEY ) || '[]' ); } catch ( e ) { return []; }
 	}
+	function decodeHash( hash ) {
+		try { return decodeURIComponent( hash ); } catch ( e ) { return hash; }
+	}
 	function remember( id, open ) {
 		var list = opened().filter( function ( item ) { return item !== id; } );
 		if ( open ) { list.push( id ); }
@@ -307,7 +310,8 @@
 			card.classList.toggle( 'beltoft-services-domain--open', !! open );
 			head.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
 		}
-		set( -1 !== opened().indexOf( id ) || ( '' !== window.location.hash && card.querySelector( window.location.hash.replace( /[^#\w-]/g, '' ) ) ) );
+		var target = window.location.hash.length > 1 ? document.getElementById( decodeHash( window.location.hash.slice( 1 ) ) ) : null;
+		set( -1 !== opened().indexOf( id ) || ( target && card.contains( target ) ) );
 		function toggle( event ) {
 			if ( event.target.closest( 'a, button, input, select, textarea' ) ) { return; }
 			var open = 'true' !== head.getAttribute( 'aria-expanded' );
