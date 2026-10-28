@@ -186,4 +186,17 @@ class CartTest extends TestCase {
 		$this->assertStringNotContainsString( 'secret', $json );
 		$this->assertStringNotContainsString( 'desc', $json );
 	}
+
+	public function test_a_restricted_extension_that_is_not_allowlisted_is_blocked(): void {
+		update_option( Prices::OPTION, array( 'eu' => array( 'price' => 14, 'restricted' => true ), 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$this->settings( array( 'domain_restricted_allowlist' => 'dk' ) );
+		$this->cart_with( array( 'domain' => 'shop.eu', 'mode' => 'register' ) );
+		Cart::check_unpriced_domain_items();
+		$this->assertCount( 1, wc_get_notices( 'error' ) );
+		wc_clear_notices();
+		$this->settings( array( 'domain_restricted_allowlist' => 'dk,eu' ) );
+		Cart::check_unpriced_domain_items();
+		$this->assertSame( array(), wc_get_notices( 'error' ) );
+		WC()->cart->empty_cart();
+	}
 }

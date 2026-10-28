@@ -24,6 +24,8 @@ final class SpendGuard {
 		$cost = Prices::cost( $name, $key );
 		if ( null === $cost ) { return 'The registrar cost for this domain is unknown.'; }
 		if ( ! $item instanceof \WC_Order_Item_Product ) { return 'The paid order line for this domain is unavailable.'; }
+		$order = $item->get_order();
+		if ( ! $order || 'EUR' !== strtoupper( (string) $order->get_currency() ) ) { return 'The order is not in EUR; the registrar cost cannot be compared.'; }
 		if ( (float) $item->get_total() + 0.01 < $cost ) { return self::MESSAGE; }
 		return null;
 	}
@@ -37,6 +39,7 @@ final class SpendGuard {
 
 	/** The domain's line on a renewal order: tagged with the domain, else the only product line. */
 	public static function item_of_order( \WC_Order $order, string $name ) {
+		$name = strtolower( $name );
 		$only = array();
 		foreach ( $order->get_items() as $item ) {
 			if ( ! $item instanceof \WC_Order_Item_Product ) { continue; }

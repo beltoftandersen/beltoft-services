@@ -52,6 +52,7 @@ class RenewalsTest extends TestCase {
 
 	/** The renewal order's one domain line (stale item rows from reused ids are dropped first). */
 	private function domain_line( \WC_Order $order, \WC_Product $product, float $total ): void {
+		$order->set_currency( 'EUR' );
 		$order->remove_order_items( 'line_item' );
 		$order->add_product( $product, 1, array( 'subtotal' => $total, 'total' => $total ) );
 		$order->save();
@@ -144,6 +145,7 @@ class RenewalsTest extends TestCase {
 		update_option( Prices::OPTION, array( 'com' => array( 'create' => 10.0, 'renew' => 12.5, 'transfer' => 0.0, 'restricted' => false, 'price' => 20 ) ) );
 		$product = $this->service_product( 'domain' );
 		$order = wc_create_order();
+		$order->set_currency( 'EUR' );
 		$line = new \WC_Order_Item_Product();
 		$line->set_props( array( 'name' => 'Domain', 'quantity' => 1, 'subtotal' => 30, 'total' => 30 ) );
 		$order->add_item( $line );
@@ -167,6 +169,7 @@ class RenewalsTest extends TestCase {
 		update_option( Prices::OPTION, array( 'com' => array( 'create' => 10.0, 'renew' => 12.5, 'transfer' => 0.0, 'restricted' => false, 'price' => 20 ) ) );
 		$product = $this->service_product( 'domain' );
 		$order = wc_create_order();
+		$order->set_currency( 'EUR' );
 		$line = new \WC_Order_Item_Product();
 		$line->set_props( array( 'name' => 'Domain', 'quantity' => 1, 'subtotal' => 0, 'total' => 0 ) );
 		$order->add_item( $line );
@@ -189,6 +192,33 @@ class RenewalsTest extends TestCase {
 		$this->assertSame( 0, Renewals::sweep(), 'A waiting job is not queued twice.' );
 		$pending = as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Jobs::ACT, 'args' => array( $r->id(), 'renew', array( 'order' => (string) $order->get_id() ) ), 'group' => 'beltoft-services', 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' );
 		$this->assertCount( 1, $pending );
+		// Leave no Action Scheduler row behind: it would outlive the test transaction.
+		foreach ( as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Jobs::ACT, 'per_page' => -1 ), 'ids' ) as $id ) {
+			\ActionScheduler::store()->delete_action( (string) $id );
+		}
+	}
+
+	public function test_a_mixed_case_resource_domain_still_finds_its_renewal_line(): void {
+		list( $r, $order ) = $this->paid_renewal( 5.0, array( 'domain' => 'Example.COM' ) );
+		foreach ( $order->get_items() as $item ) { $item->update_meta_data( '_beltoft_services_domain', array( 'domain' => 'example.com', 'mode' => 'register' ) ); $item->save(); }
+		$this->assertInstanceOf( \WC_Order_Item_Product::class, \BeltoftServices\Domains\SpendGuard::item_of_order( $order, 'Example.COM' ) );
+		$extra = new \WC_Order_Item_Product();
+		$extra->set_props( array( 'name' => 'Other', 'quantity' => 1, 'total' => 999 ) );
+		$order->add_item( $extra );
+		$order->save();
+		$found = \BeltoftServices\Domains\SpendGuard::item_of_order( $order, 'Example.COM' );
+		$this->assertEquals( 5.0, (float) $found->get_total(), 'With two lines only the tagged one counts.' );
+	}
+
+	public function test_a_renewal_order_not_in_euro_places_no_order(): void {
+		list( $r, $order ) = $this->paid_renewal( 50.0 );
+		$order->set_currency( 'USD' );
+		$order->save();
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2027-10-26 00:00:00' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertTrue( Renewals::renew( $r, (string) $order->get_id() )->is_failed() );
+		$this->assertSame( 0, $this->posts( $fake ) );
 	}
 
 	public function test_the_sweep_is_scheduled_daily_in_the_services_group(): void {

@@ -32,6 +32,7 @@ class DomainDriverTest extends TestCase {
 		$user = self::factory()->user->create();
 		update_user_meta( $user, '_beltoft_services_domain_handle', 'AA123-GB' );
 		$order = wc_create_order( array( 'customer_id' => $user ) );
+		$order->set_currency( 'EUR' );
 		$line = new \WC_Order_Item_Product();
 		$line->set_props( array( 'name' => 'Domain', 'quantity' => 1, 'subtotal' => $total, 'total' => $total ) );
 		$order->add_item( $line );
@@ -59,6 +60,24 @@ class DomainDriverTest extends TestCase {
 		$result = ( new DomainDriver() )->provision( $r );
 		$this->assertTrue( $result->is_failed(), (string) $result->error() );
 		$this->assertSame( 'The order was paid below the registrar cost.', $result->error() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+		$this->assertNotSame( '', (string) $r->get( 'alerted' ) );
+	}
+
+	public function test_an_order_not_in_euro_places_no_registrar_order_and_alerts(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource( 'register', 'example.com', 500.0 );
+		$order = wc_get_order( (int) $r->license()['order_id'] );
+		$order->set_currency( 'DKK' );
+		$order->save();
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( 'The order is not in EUR; the registrar cost cannot be compared.', $result->error() );
 		$this->assertSame( 0, $this->posts( $fake ) );
 		$this->assertNotSame( '', (string) $r->get( 'alerted' ) );
 	}
@@ -118,7 +137,7 @@ class DomainDriverTest extends TestCase {
 			remove_all_filters( 'beltoft_services_domains_client' );
 			add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 			$dns = new FakeDns();
-		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+			add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
 			$r = $this->resource( 'register', $name );
 			$result = ( new DomainDriver() )->provision( $r );
 			$this->assertTrue( $result->is_failed(), (string) $result->error() );
