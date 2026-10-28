@@ -89,6 +89,13 @@
 	overflow-wrap: anywhere;
 }
 
+.beltoft-dns-claim__hint {
+	margin: 0.25em 0 0.5em;
+	font-size: 0.875em;
+	opacity: 0.75;
+	overflow-wrap: anywhere;
+}
+
 .beltoft-dns-claim__value {
 	grid-column: 2 / -1;
 	justify-self: start;

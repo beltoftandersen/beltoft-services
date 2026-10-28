@@ -194,8 +194,14 @@
 		var s = state( claim.id );
 		block.appendChild( message( claim.message ) );
 		block.appendChild( plainRow( t.type, 'TXT' ) );
-		block.appendChild( copyRow( t.name, claim.txt_name || '' ) );
+		// Most DNS panels add the domain to the name themselves, so the host part comes first.
+		var full = claim.txt_name || '';
+		var host = full.slice( -( claim.domain.length + 1 ) ) === '.' + claim.domain ? full.slice( 0, -( claim.domain.length + 1 ) ) : full;
+		block.appendChild( copyRow( t.name, host ) );
 		block.appendChild( copyRow( t.value, claim.txt_value || '' ) );
+		if ( host !== full ) {
+			block.appendChild( el( 'p', 'beltoft-dns-claim__hint', t.full_name.replace( '%s', full ) ) );
+		}
 		if ( claim.expires_at ) {
 			var date = new Date( claim.expires_at );
 			if ( ! isNaN( date.getTime() ) ) {

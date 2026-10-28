@@ -125,6 +125,8 @@ final class DnsClaimPanel {
 			'type'          => __( 'Type', 'beltoft-services' ),
 			'name'          => __( 'Name', 'beltoft-services' ),
 			'value'         => __( 'Value', 'beltoft-services' ),
+			/* translators: %s: the full record name, for example _beltoft-verify.example.com */
+			'full_name'     => __( 'Some DNS providers ask for the full name: %s', 'beltoft-services' ),
 			'ttl'           => __( 'TTL', 'beltoft-services' ),
 			/* translators: %s: date and time. */
 			'validUntil'    => __( 'Valid until %s', 'beltoft-services' ),
