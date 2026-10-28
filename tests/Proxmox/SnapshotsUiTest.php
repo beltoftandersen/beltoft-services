@@ -71,11 +71,11 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'before upgrade', $html );
 		$this->assertStringContainsString( 'data-snapshot="' . $entry['id'] . '"', $html );
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $entry['expires_at'] ), $html );
-		$this->assertSame( $entry['consistent'] ? 1 : 0, substr_count( $html, 'Consistent' ) );
-		$this->assertSame( $entry['consistent'] ? 0 : 1, substr_count( $html, 'Taken without the guest agent' ) );
+		$this->assertSame( $entry['consistent'] ? 1 : 0, substr_count( $html, ', consistent' ) );
+		$this->assertSame( $entry['consistent'] ? 0 : 1, substr_count( $html, 'taken without the guest agent' ) );
 		$this->assertStringContainsString( 'data-snapshot-rollback="' . $entry['id'] . '"', $html );
 		$this->assertStringContainsString( 'Go back to this snapshot', $html );
-		$this->assertStringContainsString( 'data-action="snapshot_delete"', $html );
+		$this->assertStringContainsString( 'data-snapshot-delete="' . $entry['id'] . '"', $html );
 		$this->assertStringContainsString( 'ROLLBACK', $html, 'The word to type is on the page.' );
 		$this->assertStringContainsString( 'data-action="snapshot_rollback"', $html );
 	}
@@ -87,7 +87,7 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$list[0]['consistent'] = false;
 		$this->assertTrue( $this->fresh( $r )->set( array( Snapshots::LIST => $list ) ) );
 
-		$this->assertStringContainsString( 'Taken without the guest agent', $this->card( $r ) );
+		$this->assertStringContainsString( 'taken without the guest agent', $this->card( $r ) );
 		$this->assertSame( $entry['id'], $list[0]['id'] );
 	}
 
@@ -114,8 +114,9 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 
 		$html = $this->card( $r );
 
-		$this->assertStringContainsString( 'Being deleted', $html );
+		$this->assertStringContainsString( 'being deleted', $html );
 		$this->assertStringNotContainsString( 'data-snapshot-rollback="', $html );
+		$this->assertStringNotContainsString( 'data-snapshot-delete="', $html );
 	}
 
 	public function test_the_reinstall_and_restore_forms_warn_only_when_snapshots_exist(): void {

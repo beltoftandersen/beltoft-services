@@ -83,35 +83,14 @@
 		}
 	}
 
-	function submit( panel, form ) {
-		var args = {};
-		var button = form.querySelector( 'button[type="submit"]' );
-
-		Array.prototype.forEach.call( form.elements, function ( field ) {
-			if ( field.name ) {
-				args[ field.name ] = field.value;
-			}
-		} );
-
-		if ( 'reinstall' === form.getAttribute( 'data-action' ) && ! window.confirm( form.hasAttribute( 'data-disks' ) ? vm.strings.reinstallDisks : vm.strings.reinstall ) ) {
-			return;
-		}
-
-		if ( 'restore' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.restore + ( form.hasAttribute( 'data-disks' ) ? ' ' + vm.strings.restoreDisks : '' ) ) ) {
-			return;
-		}
-
-		if ( 'snapshot_delete' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.snapshotDelete ) ) {
-			return;
-		}
-
+	function send( panel, action, args, button, form ) {
 		if ( button ) {
 			busy( button );
 		}
 
-		post( panel, 'actions/' + encodeURIComponent( form.getAttribute( 'data-action' ) ), { args: args } ).then( function ( response ) {
+		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
 			if ( 202 === response.status ) {
-				var dialog = form.closest( 'dialog' );
+				var dialog = form ? form.closest( 'dialog' ) : null;
 
 				if ( dialog && dialog.close ) {
 					dialog.close();
@@ -134,6 +113,27 @@
 			}
 			notice( panel, vm.strings.failed );
 		} );
+	}
+
+	function submit( panel, form ) {
+		var args = {};
+		var button = form.querySelector( 'button[type="submit"]' );
+
+		Array.prototype.forEach.call( form.elements, function ( field ) {
+			if ( field.name ) {
+				args[ field.name ] = field.value;
+			}
+		} );
+
+		if ( 'reinstall' === form.getAttribute( 'data-action' ) && ! window.confirm( form.hasAttribute( 'data-disks' ) ? vm.strings.reinstallDisks : vm.strings.reinstall ) ) {
+			return;
+		}
+
+		if ( 'restore' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.restore + ( form.hasAttribute( 'data-disks' ) ? ' ' + vm.strings.restoreDisks : '' ) ) ) {
+			return;
+		}
+
+		send( panel, form.getAttribute( 'data-action' ), args, button, form );
 	}
 
 	function reveal( panel, button ) {
@@ -172,6 +172,7 @@
 		panel.addEventListener( 'click', function ( event ) {
 			var roll = event.target.closest( '[data-snapshot-rollback]' );
 			var cancel = event.target.closest( '[data-snapshot-cancel]' );
+			var drop = event.target.closest( '[data-snapshot-delete]' );
 			var dialog = panel.querySelector( '[data-snapshot-dialog]' );
 			var button = event.target.closest( '[data-vm-reveal]' );
 
@@ -185,6 +186,14 @@
 					dialog.showModal();
 				} else {
 					dialog.setAttribute( 'open', '' );
+				}
+
+				return;
+			}
+
+			if ( drop && ! drop.disabled ) {
+				if ( window.confirm( vm.strings.snapshotDelete ) ) {
+					send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, drop, null );
 				}
 
 				return;

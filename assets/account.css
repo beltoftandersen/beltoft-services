@@ -306,22 +306,11 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-disk__guide pre { margin: 0.35em 0 0; overflow-x: auto; }
 .beltoft-services-disk__guide :target, .beltoft-services-disk__guide[open] { scroll-margin-top: 1.5em; }
 
-.beltoft-services-vm__snapshot-list { max-width: 100%; }
+.beltoft-services-vm__snapshot { padding: 12px 0; }
 
-.beltoft-services-vm__snapshot-list td { vertical-align: top; }
+.beltoft-services-vm__snapshot .beltoft-services-panel__actions { margin: 12px 0 0; }
 
-.beltoft-services-vm__snapshot-list th:last-child,
-.beltoft-services-vm__snapshot-list td:last-child { text-align: left; }
-
-.beltoft-services-vm__snapshot-list tr[data-snapshot] td { padding-top: 10px; }
-
-.beltoft-services-vm__note { display: block; font-size: 13px; color: var(--ink-soft, #5e7080); }
-
-.beltoft-services-vm__snapshot-actions td { padding: 2px 0 10px; }
-
-.beltoft-services-vm__snapshot-actions .button { margin: 0 8px 0 0; }
-
-.beltoft-services-vm__snapshot-actions form.beltoft-services-vm__inline { display: inline-block; margin: 0; padding: 0; background: none; }
+.beltoft-services-vm__snapshot .beltoft-services-panel__actions .button { margin: 0; }
 
 .beltoft-services-vm__dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
 

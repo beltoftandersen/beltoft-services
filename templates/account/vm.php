@@ -249,50 +249,38 @@ $beltoft_services_power_labels = array(
 			<?php if ( array() === $snapshots['entries'] ) : ?>
 				<p><?php esc_html_e( 'You have no snapshots yet.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
-				<table class="beltoft-services-vm__backup-list beltoft-services-vm__snapshot-list">
-					<thead>
-						<tr>
-							<th scope="col"><?php esc_html_e( 'Snapshot', 'beltoft-services' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Taken', 'beltoft-services' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Kept until', 'beltoft-services' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $snapshots['entries'] as $beltoft_services_snapshot ) : ?>
-							<tr data-snapshot="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>">
-								<td>
-									<?php echo esc_html( $beltoft_services_snapshot['label'] ); ?>
-									<span class="beltoft-services-vm__note">
-										<?php
-										if ( 'creating' === $beltoft_services_snapshot['state'] ) {
-											esc_html_e( 'Being taken', 'beltoft-services' );
-										} elseif ( 'deleting' === $beltoft_services_snapshot['state'] ) {
-											esc_html_e( 'Being deleted', 'beltoft-services' );
-										} elseif ( $beltoft_services_snapshot['consistent'] ) {
-											esc_html_e( 'Consistent', 'beltoft-services' );
-										} else {
-											esc_html_e( 'Taken without the guest agent', 'beltoft-services' );
-										}
-										?>
-									</span>
-								</td>
-								<td><?php echo esc_html( $beltoft_services_snapshot['taken'] ); ?></td>
-								<td><?php echo esc_html( $beltoft_services_snapshot['keeps'] ); ?></td>
-							</tr>
-							<?php if ( 'ok' === $beltoft_services_snapshot['state'] ) : ?>
-								<tr class="beltoft-services-vm__snapshot-actions">
-									<td colspan="3">
-										<button type="button" class="button woocommerce-button" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( $beltoft_services_snapshot['label'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
-										<form class="beltoft-services-vm-form beltoft-services-vm__inline" data-action="snapshot_delete">
-											<input type="hidden" name="id" value="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>">
-											<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
-										</form>
-									</td>
-								</tr>
-							<?php endif; ?>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
+				<?php foreach ( $snapshots['entries'] as $beltoft_services_snapshot ) : ?>
+					<div class="beltoft-services-vm__disk beltoft-services-vm__snapshot" data-snapshot="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>">
+						<dl class="beltoft-services-vm__facts">
+							<dt><?php esc_html_e( 'Snapshot', 'beltoft-services' ); ?></dt>
+							<dd><?php echo esc_html( $beltoft_services_snapshot['label'] ); ?></dd>
+							<dt><?php esc_html_e( 'Taken', 'beltoft-services' ); ?></dt>
+							<dd>
+								<?php
+								if ( 'creating' === $beltoft_services_snapshot['state'] ) {
+									$beltoft_services_how = __( 'being taken', 'beltoft-services' );
+								} elseif ( 'deleting' === $beltoft_services_snapshot['state'] ) {
+									$beltoft_services_how = __( 'being deleted', 'beltoft-services' );
+								} elseif ( $beltoft_services_snapshot['consistent'] ) {
+									$beltoft_services_how = __( 'consistent', 'beltoft-services' );
+								} else {
+									$beltoft_services_how = __( 'taken without the guest agent', 'beltoft-services' );
+								}
+
+								echo esc_html( $beltoft_services_snapshot['taken'] . ', ' . $beltoft_services_how );
+								?>
+							</dd>
+							<dt><?php esc_html_e( 'Kept until', 'beltoft-services' ); ?></dt>
+							<dd><?php echo esc_html( $beltoft_services_snapshot['keeps'] ); ?></dd>
+						</dl>
+						<?php if ( 'ok' === $beltoft_services_snapshot['state'] ) : ?>
+							<p class="beltoft-services-panel__actions">
+								<button type="button" class="button woocommerce-button" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( $beltoft_services_snapshot['label'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
+								<button type="button" class="button woocommerce-button" data-snapshot-delete="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
+							</p>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
 			<?php endif; ?>
 
 			<?php if ( $snapshots['full'] ) : ?>
