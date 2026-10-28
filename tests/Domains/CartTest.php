@@ -184,6 +184,62 @@ class CartTest extends TestCase {
 		WC()->cart->empty_cart();
 	}
 
+	private function held_domain( string $name ): void {
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'held-domain-test' ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, \BeltoftServices\Resource::create( $license, new \BeltoftServices\Domains\DomainDriver(), array(), array( 'state' => 'ready', 'domain' => $name, 'mode' => 'register', 'remote_id' => '12' ) ) );
+	}
+
+	public function test_a_domain_already_held_here_cannot_be_added_to_the_cart(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 16, 'restricted' => false ) ) );
+		$name = 'held-' . strtolower( wp_generate_password( 8, false, false ) ) . '.com';
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 'x', 32 ) ) );
+		$this->held_domain( $name );
+		$fake = new \BeltoftServices\Domains\FakeClient();
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->service_product( 'domain' );
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		foreach ( array( 'register', 'transfer' ) as $mode ) {
+			$request = $this->add_request( strtoupper( $name ), $mode );
+			$request->set_body_params( array( 'domain' => strtoupper( $name ), 'mode' => $mode, 'auth_code' => 'transfer-code-1' ) );
+			$result = Cart::rest_add( $request );
+			$this->assertWPError( $result, $mode );
+			$this->assertSame( 'domain_held', $result->get_error_code() );
+			$this->assertSame( 409, $result->get_error_data()['status'] );
+		}
+		$this->assertSame( array(), $fake->calls(), 'The registrar was not asked.' );
+		$this->assertCount( 0, WC()->cart->get_cart() );
+	}
+
+	public function test_checkout_stops_a_domain_held_here_or_twice_in_the_cart_but_not_a_renewal(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$name = 'held-checkout-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$this->held_domain( $name );
+		$this->cart_with( array( 'domain' => $name, 'mode' => 'register' ) );
+		Cart::check_duplicate_domain_items();
+		$this->assertCount( 1, wc_get_notices( 'error' ) );
+		$this->assertStringContainsString( 'already registered here', wp_strip_all_tags( wc_get_notices( 'error' )[0]['notice'] ) );
+		$errors = new \WP_Error();
+		Cart::validate_duplicate_domain_checkout( array(), $errors );
+		$this->assertSame( 'domain_duplicate', $errors->get_error_code() );
+		wc_clear_notices();
+		$this->cart_with( array( 'domain' => $name, 'mode' => 'register' ), array( 'subscription_renewal' => true ) );
+		Cart::check_duplicate_domain_items();
+		$this->assertSame( array(), wc_get_notices( 'error' ) );
+		$free = 'free-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		$this->cart_with( array( 'domain' => $free, 'mode' => 'register' ) );
+		$product = WC()->cart->cart_contents['line']['data'];
+		WC()->cart->cart_contents['second'] = array( 'key' => 'second', 'product_id' => $product->get_id(), 'quantity' => 1, 'data' => $product, 'beltoft_services_domain' => array( 'domain' => $free, 'mode' => 'transfer' ) );
+		Cart::check_duplicate_domain_items();
+		$this->assertStringContainsString( 'in your cart twice', wp_strip_all_tags( wc_get_notices( 'error' )[0]['notice'] ) );
+		wc_clear_notices();
+		unset( WC()->cart->cart_contents['second'] );
+		Cart::check_duplicate_domain_items();
+		$this->assertSame( array(), wc_get_notices( 'error' ), 'A free name once in the cart is fine.' );
+		WC()->cart->empty_cart();
+	}
+
 	public function test_a_registrar_error_on_the_cart_route_is_generic(): void {
 		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
 		$fake = new \BeltoftServices\Domains\FakeClient();

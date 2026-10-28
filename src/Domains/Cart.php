@@ -5,6 +5,7 @@ namespace BeltoftServices\Domains;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Crypto;
 use BeltoftServices\Product;
+use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -19,6 +20,8 @@ final class Cart {
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unverified_dns_items' ) );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unpriced_domain_items' ) );
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_duplicate_domain_items' ) );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_duplicate_domain_checkout' ), 10, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_unpriced_domain_checkout' ), 10, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_dns_checkout' ), 10, 2 );
 		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'bind_dns_claims' ) );
@@ -62,6 +65,9 @@ final class Cart {
 			}
 		}
 		$mode = $data['beltoft_services_domain']['mode'];
+		if ( in_array( $mode, array( 'register', 'transfer' ), true ) && self::domain_held( $data['beltoft_services_domain']['domain'] ) ) {
+			return new \WP_Error( 'domain_held', __( 'This domain is already registered here.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
 		$product = self::product_for( 'dns' === $mode ? 'dns' : 'domain' );
 		if ( ! $product ) { return new \WP_Error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		if ( 'register' === $mode || 'transfer' === $mode ) {
@@ -173,6 +179,47 @@ final class Cart {
 				return;
 			}
 		}
+	}
+
+	/** Does a live domain service here already hold this name? Buying it again would only fail at provisioning, after payment. */
+	public static function domain_held( string $domain ): bool {
+		foreach ( Resource::live_ids( 'domain' ) as $id ) {
+			$other = Resource::find( $id );
+			if ( $other && 'deleted' !== $other->get( 'state' ) && strtolower( (string) $other->get( 'domain' ) ) === strtolower( $domain ) ) { return true; }
+		}
+		return false;
+	}
+
+	/** The message for a cart that holds a domain twice or one that is already held here, or null. */
+	private static function duplicate_message(): ?string {
+		if ( ! WC()->cart ) { return null; }
+		$seen = array();
+		foreach ( WC()->cart->get_cart() as $item ) {
+			$line = $item['beltoft_services_domain'] ?? null;
+			if ( ! is_array( $line ) || ! in_array( $line['mode'] ?? '', array( 'register', 'transfer' ), true ) || self::is_continuation( $item ) ) { continue; }
+			$name = strtolower( (string) ( $line['domain'] ?? '' ) );
+			if ( isset( $seen[ $name ] ) ) {
+				/* translators: %s: domain name */
+				return sprintf( __( '%s is in your cart twice. Remove one of them.', 'beltoft-services' ), $name );
+			}
+			$seen[ $name ] = true;
+			if ( self::domain_held( $name ) ) {
+				/* translators: %s: domain name */
+				return sprintf( __( '%s is already registered here. Remove it from your cart.', 'beltoft-services' ), $name );
+			}
+		}
+		return null;
+	}
+
+	public static function check_duplicate_domain_items(): void {
+		$message = self::duplicate_message();
+		if ( null !== $message ) { wc_add_notice( $message, 'error' ); }
+	}
+
+	/** The same rule when the classic checkout form is posted. */
+	public static function validate_duplicate_domain_checkout( $data, $errors ): void {
+		$message = $errors instanceof \WP_Error ? self::duplicate_message() : null;
+		if ( null !== $message ) { $errors->add( 'domain_duplicate', $message ); }
 	}
 
 	/** Is a new registration or transfer line for an extension that is no longer in the price table? Such a line would keep the product's base price. */
