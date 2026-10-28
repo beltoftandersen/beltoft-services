@@ -52,6 +52,29 @@ final class BackupField {
 		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render' ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 20, 2 );
+	}
+
+	/** Show the paid backup choice as its own line, with the surcharge inside the server price. */
+	public static function item_data( array $data, array $item ): array {
+		$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
+		if ( ! $driver || SshKeyField::DRIVER !== $driver->id() ) {
+			return $data;
+		}
+		$variation = wc_get_product( (int) ( $item['variation_id'] ?? 0 ) );
+		if ( ! $variation instanceof \WC_Product_Variation ) {
+			return $data;
+		}
+		$backup_label = wc_attribute_label( 'backups', $variation );
+		$data = array_values( array_filter( $data, static fn( $row ) => ! is_array( $row ) || (string) ( $row['key'] ?? '' ) !== $backup_label ) );
+		$plan = Product::plan( (int) $item['product_id'], $variation->get_id() );
+		if ( (int) ( $plan['backup_days'] ?? 0 ) < 1 ) {
+			return $data;
+		}
+		$without = Backups::sibling( $variation, false, true );
+		$value = $without ? Backups::price_difference( $without, $variation ) : __( 'Enabled', 'beltoft-services' );
+		$data[] = array( 'key' => __( 'Daily backups', 'beltoft-services' ), 'value' => $value );
+		return $data;
 	}
 
 	// -- The cart --------------------------------------------------------------------------------
@@ -239,13 +262,23 @@ final class BackupField {
 		$qty    = max( 1, (int) ( $item['quantity'] ?? 1 ) );
 		$data   = array_diff_key( $item, array_flip( self::CART_KEYS ) );
 
-		$cart->remove_cart_item( $server['key'] );
-
-		$added = $cart->add_to_cart( (int) $item['product_id'], $qty, $target->get_id(), self::attributes( $target ), $data );
-
-		if ( false === $added ) {
+		$added = DiskField::during_server_swap( static function () use ( $cart, $server, $item, $qty, $target, $data ): bool {
+			$cart->remove_cart_item( $server['key'] );
+			$new_key = $cart->add_to_cart( (int) $item['product_id'], $qty, $target->get_id(), self::attributes( $target ), $data );
+			if ( false !== $new_key ) {
+				self::server_first( $cart, (string) $new_key );
+				return true;
+			}
 			// Put the first one back: the customer keeps what they had.
-			$cart->add_to_cart( (int) $item['product_id'], $qty, $server['variation']->get_id(), self::attributes( $server['variation'] ), $data );
+			$restored_key = $cart->add_to_cart( (int) $item['product_id'], $qty, $server['variation']->get_id(), self::attributes( $server['variation'] ), $data );
+			if ( false !== $restored_key ) {
+				self::server_first( $cart, (string) $restored_key );
+			}
+			return false;
+		} );
+		$cart->calculate_totals();
+
+		if ( ! $added ) {
 
 			return array(
 				'ok'           => false,
@@ -275,5 +308,16 @@ final class BackupField {
 		}
 
 		return $out;
+	}
+
+	/** Keep the server above its extra disk after replacing the variation. */
+	private static function server_first( \WC_Cart $cart, string $key ): void {
+		$contents = $cart->get_cart();
+		if ( ! isset( $contents[ $key ] ) ) {
+			return;
+		}
+		$item = $contents[ $key ];
+		unset( $contents[ $key ] );
+		$cart->set_cart_contents( array( $key => $item ) + $contents );
 	}
 }

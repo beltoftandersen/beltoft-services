@@ -10,6 +10,7 @@ defined( 'ABSPATH' ) || exit;
 final class DiskField {
 	public const AJAX = 'beltoft_services_disk_field';
 	private const NONCE = 'beltoft-services-disk-field';
+	private static int $server_swap_depth = 0;
 
 	public static function register(): void {
 		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render' ) );
@@ -128,8 +129,29 @@ final class DiskField {
 		return (bool) $added;
 	}
 
+	/** Keep an attached disk while a server cart line is being replaced. */
+	public static function during_server_swap( callable $swap ): bool {
+		self::$server_swap_depth++;
+		try {
+			return (bool) $swap();
+		} finally {
+			self::$server_swap_depth--;
+			if ( 0 === self::$server_swap_depth ) {
+				self::clean_orphan();
+			}
+		}
+	}
+
+	/** Checkout's one-item cart rule must leave the attached disk during this replacement. */
+	public static function server_swap_in_progress(): bool {
+		return self::$server_swap_depth > 0;
+	}
+
 	/** A removed server must not leave an unprovisionable disk in the cart. */
 	public static function clean_orphan(): void {
+		if ( self::$server_swap_depth > 0 ) {
+			return;
+		}
 		if ( self::cart_server() ) {
 			return;
 		}

@@ -6,6 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Proxmox\DiskCart;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Product;
 
 require_once __DIR__ . '/BackupTestCase.php';
@@ -117,5 +118,27 @@ class DiskCartTest extends BackupTestCase {
 		$this->assertCount( 2, WC()->cart->get_cart(), 'Changing the checkout disk leaves exactly one disk line.' );
 		$this->assertTrue( DiskField::choose( 0 ) );
 		$this->assertCount( 1, WC()->cart->get_cart() );
+	}
+
+	public function test_backup_changes_keep_the_selected_disk_but_server_removal_cleans_it(): void {
+		$server = $this->variable_product();
+		$disk = $this->variation();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $server['a-None']->get_parent_id(), 1, $server['a-None']->get_id(), array( 'attribute_tier' => 'a', 'attribute_backups' => 'None' ) ) );
+		$this->assertTrue( DiskField::choose( $disk->get_id() ) );
+
+		foreach ( array( true, false ) as $with_backups ) {
+			$this->assertTrue( BackupField::swap( $with_backups )['ok'] );
+			$this->assertCount( 2, WC()->cart->get_cart() );
+			$items = WC()->cart->get_cart();
+			$first = reset( $items );
+			$this->assertSame( $server['a-None']->get_parent_id(), (int) $first['product_id'], 'The server stays above its disk.' );
+			$disks = array_filter( WC()->cart->get_cart(), static fn( $item ) => 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) );
+			$this->assertCount( 1, $disks );
+			$this->assertSame( $disk->get_id(), (int) reset( $disks )['variation_id'] );
+		}
+
+		$server_key = BackupField::cart_server()['key'];
+		WC()->cart->remove_cart_item( $server_key );
+		$this->assertCount( 0, WC()->cart->get_cart(), 'A real server removal still cleans its disk.' );
 	}
 }

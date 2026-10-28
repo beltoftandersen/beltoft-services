@@ -150,6 +150,25 @@ class BackupFieldTest extends BackupTestCase {
 		$this->assertCount( 1, WC()->cart->get_cart() );
 	}
 
+	public function test_cart_item_data_names_daily_backups_and_shows_the_surcharge(): void {
+		$v = $this->variable_product();
+		$this->add( $v['a-Daily'] );
+		$cart = WC()->cart->get_cart();
+		$item = reset( $cart );
+		$data = BackupField::item_data( array( array( 'key' => 'Tier', 'value' => 'a' ), array( 'key' => 'Backups', 'value' => 'Daily' ) ), $item );
+		$this->assertCount( 2, $data );
+		$this->assertSame( 'Daily backups', $data[1]['key'] );
+		$this->assertStringStartsWith( '+', $data[1]['value'] );
+		$this->assertStringContainsString( '2.00', $data[1]['value'] );
+
+		WC()->cart->empty_cart();
+		$this->add( $v['a-None'] );
+		$cart = WC()->cart->get_cart();
+		$item = reset( $cart );
+		$data = BackupField::item_data( array( array( 'key' => 'Backups', 'value' => 'None' ) ), $item );
+		$this->assertSame( array(), $data );
+	}
+
 	public function test_asking_for_the_state_the_cart_already_has_changes_nothing(): void {
 		$v   = $this->variable_product();
 		$key = $this->add( $v['a-None'] );
