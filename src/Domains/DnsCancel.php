@@ -85,7 +85,9 @@ final class DnsCancel {
 
 		foreach ( Licenses::where( 'subscription_id', $subscription_id ) as $license ) {
 			if ( Licenses::STATUS_ACTIVE === $license['status'] ) {
-				Licenses::update( (int) $license['id'], array( 'expires_at' => time() - 1 ) );
+				// Always strictly earlier than the stored expiry, so the update is a change and its action fires.
+				$stored = empty( $license['expires_at'] ) ? time() : (int) strtotime( $license['expires_at'] . ' UTC' );
+				Licenses::update( (int) $license['id'], array( 'expires_at' => min( $stored, time() ) - 1 ) );
 			}
 		}
 	}

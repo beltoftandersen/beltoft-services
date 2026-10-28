@@ -91,4 +91,21 @@ class DnsCancelTest extends TestCase {
 		$this->run_jobs();
 		$this->assertTrue( $dns->zone( $name )['rrsets'][0]['records'][0]['disabled'] );
 	}
+
+	public function test_an_expiry_already_at_now_minus_one_still_fires_the_action_and_pauses(): void {
+		$sub = $this->subscription( array( 'dns' ) );
+		$license = $this->service_license( $this->service_product( 'dns' ), array( 'fire' => false, 'user_id' => (int) $sub->get_user_id(), 'subscription_id' => $sub->get_id() ) );
+		$r = Resource::create( $license, new DnsDriver(), array(), array( 'domain' => 'same-second.example.com', 'mode' => 'dns' ) );
+		$this->assertTrue( $r->set( array( 'state' => 'ready', 'desired' => 'ready' ) ) );
+		$fired = 0;
+		add_action( 'beltoft_licenses_expiry_changed', static function () use ( &$fired ) { ++$fired; } );
+		// Licenses::ended() already stored a value equal to the one the old code wrote.
+		add_action( 'woocommerce_subscription_status_pending-cancel', function () use ( $license ) {
+			Licenses::update( (int) $license['id'], array( 'expires_at' => time() - 1 ) );
+		}, 15 );
+		$sub->update_status( 'pending-cancel' );
+		$this->assertGreaterThan( 0, $fired );
+		$this->assertLessThanOrEqual( time() - 1, strtotime( Licenses::find( (int) $license["id"] )["expires_at"] . " UTC" ) );
+		$this->assertSame( 'paused', Resource::find( $r->id() )->get( 'desired' ) );
+	}
 }
