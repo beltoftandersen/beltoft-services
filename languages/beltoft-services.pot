@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.5.0\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.6.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-27T01:49:59+00:00\n"
+"POT-Creation-Date: 2026-10-28T04:09:49+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -74,7 +74,7 @@ msgstr ""
 #: src/Account/Panel.php:105
 #: templates/emails/beltoft-services-provision-delay.php:34
 #: templates/emails/plain/beltoft-services-provision-delay.php:33
-msgid "There's a delay setting up your server. We're on it."
+msgid "There's a delay setting up your service. We're on it."
 msgstr ""
 
 #: src/Account/Panel.php:109
@@ -98,7 +98,7 @@ msgid "Something went wrong with your service. Please contact us and we will sor
 msgstr ""
 
 #: src/Account/Panel.php:249
-#: src/Api/Routes.php:198
+#: src/Api/Routes.php:207
 #: src/Proxmox/Panels.php:62
 msgid "Your request is on its way. This can take a minute."
 msgstr ""
@@ -108,7 +108,7 @@ msgid "This is not available right now."
 msgstr ""
 
 #: src/Account/Panel.php:251
-#: src/Api/Routes.php:281
+#: src/Api/Routes.php:290
 #: src/Proxmox/RevealRoute.php:73
 msgid "Too many requests. Please wait a minute and try again."
 msgstr ""
@@ -121,6 +121,23 @@ msgstr ""
 #: src/Account/Panel.php:253
 #: src/Proxmox/Panels.php:64
 msgid "Your session has expired. Please reload the page."
+msgstr ""
+
+#: src/Account/Tabs.php:39
+#: src/Domains/DomainSettings.php:29
+msgid "Domains"
+msgstr ""
+
+#: src/Account/Tabs.php:40
+msgid "You have no domains yet."
+msgstr ""
+
+#: src/Account/Tabs.php:45
+msgid "VPS"
+msgstr ""
+
+#: src/Account/Tabs.php:46
+msgid "You have no servers yet."
 msgstr ""
 
 #: src/Admin/ListTable.php:53
@@ -157,7 +174,7 @@ msgstr ""
 
 #: src/Admin/ListTable.php:59
 #: src/Admin/Panel.php:640
-#: src/Proxmox/Panels.php:198
+#: src/Proxmox/Panels.php:199
 msgid "Last error"
 msgstr ""
 
@@ -388,15 +405,15 @@ msgstr ""
 
 #: src/Admin/Panel.php:641
 #: src/Product.php:595
-#: src/Proxmox/Panels.php:196
 #: src/Proxmox/Panels.php:197
+#: src/Proxmox/Panels.php:198
 msgid "Yes"
 msgstr ""
 
 #: src/Admin/Panel.php:641
 #: src/Product.php:596
-#: src/Proxmox/Panels.php:196
 #: src/Proxmox/Panels.php:197
+#: src/Proxmox/Panels.php:198
 msgid "No"
 msgstr ""
 
@@ -513,18 +530,22 @@ msgstr ""
 msgid "Services"
 msgstr ""
 
-#: src/Api/Routes.php:170
+#: src/Api/Routes.php:179
 msgid "This action is not available."
 msgstr ""
 
-#: src/Api/Routes.php:221
+#: src/Api/Routes.php:230
 msgid "This service cannot be opened from here."
 msgstr ""
 
-#: src/Api/Routes.php:227
-#: src/Api/Routes.php:294
+#: src/Api/Routes.php:236
+#: src/Api/Routes.php:303
 #: src/Proxmox/MetricsRoute.php:33
 msgid "This service is not available."
+msgstr ""
+
+#: src/BillingRequirements.php:98
+msgid "Enter your full billing details (name, address, country and phone) to order this service."
 msgstr ""
 
 #. translators: %s: product name.
@@ -534,11 +555,12 @@ msgid "You have already used the trial for %s."
 msgstr ""
 
 #: src/Domains/Actions.php:17
-#: templates/account/domain.php:37
+#: templates/account/domain.php:68
 msgid "Save DNS records"
 msgstr ""
 
 #: src/Domains/Actions.php:18
+#: templates/account/domain.php:39
 msgid "Check name servers"
 msgstr ""
 
@@ -554,81 +576,89 @@ msgstr ""
 msgid "Unlock transfer"
 msgstr ""
 
-#: src/Domains/Cart.php:34
+#: src/Domains/Cart.php:35
 msgid "Refresh the page and try again."
 msgstr ""
 
-#: src/Domains/Cart.php:41
+#: src/Domains/Cart.php:39
+msgid "Too many requests. Please wait a minute."
+msgstr ""
+
+#: src/Domains/Cart.php:46
 msgid "The cart is unavailable."
 msgstr ""
 
-#: src/Domains/Cart.php:44
+#: src/Domains/Cart.php:53
 msgid "This domain is already in your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:49
+#: src/Domains/Cart.php:58
 msgid "This service is not available yet."
 msgstr ""
 
-#: src/Domains/Cart.php:55
+#: src/Domains/Cart.php:64
 msgid "This domain cannot be ordered in that way."
 msgstr ""
 
-#: src/Domains/Cart.php:59
+#: src/Domains/Cart.php:68
 msgid "The domain could not be added to your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:68
-#: src/Domains/DkAgreement.php:62
+#: src/Domains/Cart.php:77
+#: src/Domains/Cart.php:120
+msgid "DNS hosting for a domain registered elsewhere requires ownership verification. This option is temporarily unavailable."
+msgstr ""
+
+#: src/Domains/Cart.php:78
+#: src/Domains/DkAgreement.php:94
 msgid ".dk orders are not available yet."
 msgstr ""
 
 #: src/Domains/Cart.php:100
-#: src/Domains/Cart.php:110
+msgid "DNS hosting for a domain registered elsewhere requires ownership verification. Remove this item from your cart for now."
+msgstr ""
+
+#: src/Domains/Cart.php:124
+#: src/Domains/Cart.php:134
 msgid "Choose a domain on the domain search page first."
 msgstr ""
 
-#: src/Domains/Cart.php:144
-#: src/Domains/Cart.php:157
+#: src/Domains/Cart.php:168
+#: src/Domains/Cart.php:181
 #: src/Domains/EmailDetails.php:13
 msgid "Domain"
 msgstr ""
 
-#: src/Domains/DkAgreement.php:45
+#: src/Domains/DkAgreement.php:75
 msgid ".dk registration agreement"
 msgstr ""
 
-#: src/Domains/DkAgreement.php:46
-msgid "Requested domain names"
+#: src/Domains/DkAgreement.php:77
+#: src/Domains/DomainDriver.php:19
+msgid "Domain name"
 msgstr ""
 
-#: src/Domains/DkAgreement.php:47
+#: src/Domains/DkAgreement.php:78
 msgid "Applicant"
 msgstr ""
 
-#: src/Domains/DkAgreement.php:49
-msgid "For each name above, I apply for a right to use that .dk domain under Punktum dk’s terms. I will keep the registrant details accurate and complete any requested identity check. I understand that the name may be suspended, transferred, blocked or deleted under those terms, and that the agreement has no ordinary withdrawal right. I will pay beltoft.net for the first registration period and for later periods under my chosen management arrangement. Punktum dk handles my personal data under its privacy policy; if I register for a legal entity, its published email address must not contain personal data unless permitted by Punktum dk."
+#: src/Domains/DkAgreement.php:79
+msgid "Applicant's name and address are required."
 msgstr ""
 
-#: src/Domains/DkAgreement.php:50
-msgid "Punktum dk terms"
+#: src/Domains/DkAgreement.php:80
+msgid "Address and agreement text in Danish and English"
 msgstr ""
 
-#: src/Domains/DkAgreement.php:50
-msgid "Punktum dk privacy policy"
-msgstr ""
-
-#. translators: %s: .dk domain name.
-#: src/Domains/DkAgreement.php:54
-#, php-format
-msgid "I accept the agreement with Punktum dk A/S for %s."
-msgstr ""
-
-#: src/Domains/DkAgreement.php:65
+#: src/Domains/DkAgreement.php:97
 msgid "Accept the Punktum dk agreement for each .dk domain."
 msgstr ""
 
-#: src/Domains/DkAgreement.php:85
+#: src/Domains/DkAgreement.php:104
+msgid "A .dk domain ordered by a business needs a VAT number."
+msgstr ""
+
+#: src/Domains/DkAgreement.php:124
 msgid "Complete the .dk agreement in the website checkout."
 msgstr ""
 
@@ -644,21 +674,13 @@ msgid_plural "%d zones"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Domains/DomainDriver.php:18
-msgid "Domain name"
-msgstr ""
-
 #. translators: %d: number of domains.
-#: src/Domains/DomainDriver.php:22
+#: src/Domains/DomainDriver.php:23
 #, php-format
 msgid "%d domain"
 msgid_plural "%d domains"
 msgstr[0] ""
 msgstr[1] ""
-
-#: src/Domains/DomainSettings.php:29
-msgid "Domains"
-msgstr ""
 
 #: src/Domains/DomainSettings.php:34
 msgid "Domain registration and DNS"
@@ -686,6 +708,7 @@ msgstr ""
 #: src/Domains/DomainSettings.php:42
 #: src/Domains/EmailDetails.php:14
 #: src/Proxmox/ClustersScreen.php:289
+#: templates/account/domain.php:32
 msgid "Name servers"
 msgstr ""
 
@@ -726,57 +749,65 @@ msgid "Low registrar balance in EUR"
 msgstr ""
 
 #: src/Domains/DomainSettings.php:50
+msgid "Seller name in the .dk agreement"
+msgstr ""
+
+#: src/Domains/DomainSettings.php:50
+msgid "The company that is paid for the registration, as named in the .dk checkout agreement. Empty uses the site name."
+msgstr ""
+
+#: src/Domains/DomainSettings.php:51
 msgid "DNS API URL"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:51
+#: src/Domains/DomainSettings.php:52
 msgid "Primary DNS query address"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:51
+#: src/Domains/DomainSettings.php:52
 msgid "Local IP address used to check the first name server when its public address cannot be reached from this server."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:57
+#: src/Domains/DomainSettings.php:58
 msgid "Live mode is blocked until BELTOFT_SERVICES_DOMAINS_LIVE is enabled in wp-config.php."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:65
+#: src/Domains/DomainSettings.php:66
 msgid "Registrar and DNS credentials"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:70
+#: src/Domains/DomainSettings.php:71
 msgid "Registrar username"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:70
+#: src/Domains/DomainSettings.php:71
 msgid "Reseller handle"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:70
+#: src/Domains/DomainSettings.php:71
 msgid "Registrar password"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:70
+#: src/Domains/DomainSettings.php:71
 msgid "DNS API key"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:73
+#: src/Domains/DomainSettings.php:74
 #: src/Http/ConnectionsScreen.php:305
 #: src/Proxmox/ClustersScreen.php:266
 #: src/Settings.php:346
 msgid "Saved"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:77
+#: src/Domains/DomainSettings.php:78
 msgid "Save credentials"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:82
+#: src/Domains/DomainSettings.php:83
 msgid "Not allowed."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:89
+#: src/Domains/DomainSettings.php:90
 msgid "Configure the encryption key before saving credentials."
 msgstr ""
 
@@ -796,20 +827,42 @@ msgstr ""
 msgid "Domain DNS health needs attention"
 msgstr ""
 
-#: src/Domains/Panels.php:42
+#: src/Domains/Panels.php:51
 msgid "Subscription"
 msgstr ""
 
-#: src/Domains/Search.php:30
+#: src/Domains/Search.php:33
 msgid "Too many searches. Please wait a minute."
 msgstr ""
 
-#: src/Domains/Search.php:99
-msgid "Find a domain"
+#: src/Domains/Search.php:82
+msgid "Domain search is busy. Please try again in a few minutes."
+msgstr ""
+
+#: src/Domains/Search.php:97
+#: src/Domains/Search.php:98
+msgid "Websites on this extension need HTTPS."
 msgstr ""
 
 #: src/Domains/Search.php:99
+msgid "The registrant must be in the EU."
+msgstr ""
+
+#: src/Domains/Search.php:100
+msgid "A business needs a VAT number to register this extension."
+msgstr ""
+
+#: src/Domains/Search.php:154
+msgid "Find a domain"
+msgstr ""
+
+#: src/Domains/Search.php:154
 msgid "Search"
+msgstr ""
+
+#: src/Domains/TldRules.php:35
+#: src/Domains/TldRules.php:42
+msgid "A .eu domain needs a registrant in the EU. Choose an EU country as the billing country."
 msgstr ""
 
 #: src/Emails/Deleted.php:22
@@ -913,7 +966,7 @@ msgid "Service setup delayed"
 msgstr ""
 
 #: src/Emails/ProvisionDelay.php:24
-msgid "Sent once to the customer when setting up their server failed and needs attention."
+msgid "Sent once to the customer when setting up their server, domain or DNS hosting failed and needs attention."
 msgstr ""
 
 #: src/Emails/ProvisionDelay.php:35
@@ -921,7 +974,7 @@ msgid "A delay setting up your {product_name}"
 msgstr ""
 
 #: src/Emails/ProvisionDelay.php:42
-msgid "There is a delay setting up your server"
+msgid "There is a delay setting up your service"
 msgstr ""
 
 #: src/Emails/Ready.php:22
@@ -1109,7 +1162,7 @@ msgid "Status"
 msgstr ""
 
 #: src/Http/ConnectionsScreen.php:163
-#: templates/account/vm.php:56
+#: templates/account/vm.php:95
 msgid "Usage"
 msgstr ""
 
@@ -1304,7 +1357,7 @@ msgid "No answer"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:191
+#: src/Plugin.php:199
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -1389,98 +1442,112 @@ msgstr ""
 msgid "Reset password"
 msgstr ""
 
-#: src/Proxmox/Actions.php:149
-#: templates/account/vm.php:135
-msgid "Restore from a backup"
-msgstr ""
-
-#: src/Proxmox/Actions.php:152
-#: templates/account/vm.php:185
-#: templates/account/vm.php:192
+#: src/Proxmox/Actions.php:147
+#: src/Proxmox/Actions.php:156
+#: templates/account/vm.php:224
+#: templates/account/vm.php:231
 msgid "Replace SSH key"
 msgstr ""
 
-#: src/Proxmox/Actions.php:152
-#: templates/account/vm.php:185
-#: templates/account/vm.php:192
+#: src/Proxmox/Actions.php:147
+#: src/Proxmox/Actions.php:156
+#: templates/account/vm.php:224
+#: templates/account/vm.php:231
 msgid "Add SSH key"
 msgstr ""
 
 #: src/Proxmox/Actions.php:153
-#: templates/account/vm.php:197
+#: templates/account/vm.php:174
+msgid "Restore from a backup"
+msgstr ""
+
+#: src/Proxmox/Actions.php:157
+#: templates/account/vm.php:236
 msgid "Reinstall"
 msgstr ""
 
-#: src/Proxmox/Actions.php:205
+#: src/Proxmox/Actions.php:209
+msgid "Remove the extra disks before reinstalling or restoring this server."
+msgstr ""
+
+#: src/Proxmox/Actions.php:212
 msgid "This is not available for this server. Please contact support."
 msgstr ""
 
-#: src/Proxmox/Actions.php:214
+#: src/Proxmox/Actions.php:221
 msgid "Resetting the password is not available for this server."
 msgstr ""
 
-#: src/Proxmox/Actions.php:217
+#: src/Proxmox/Actions.php:224
 msgid "The password can be reset three times an hour. Please try again later."
 msgstr ""
 
 #. translators: %s: the word to type, REINSTALL.
-#: src/Proxmox/Actions.php:230
+#: src/Proxmox/Actions.php:237
 #, php-format
 msgid "Type %s to confirm. Reinstalling erases everything on the server."
 msgstr ""
 
-#: src/Proxmox/Actions.php:238
+#: src/Proxmox/Actions.php:245
 msgid "Choose one of the listed operating systems."
 msgstr ""
 
-#: src/Proxmox/Actions.php:245
+#: src/Proxmox/Actions.php:252
 msgid "A server can be reinstalled once an hour. Please try again later."
 msgstr ""
 
-#: src/Proxmox/Actions.php:264
+#: src/Proxmox/Actions.php:271
 msgid "Restoring is not available for this server."
 msgstr ""
 
 #. translators: %s: the word to type, RESTORE.
-#: src/Proxmox/Actions.php:269
+#: src/Proxmox/Actions.php:276
 #, php-format
 msgid "Type %s to confirm. Restoring replaces everything on the server with the backup."
 msgstr ""
 
-#: src/Proxmox/Actions.php:273
+#: src/Proxmox/Actions.php:280
 msgid "Choose one of the listed backups."
 msgstr ""
 
-#: src/Proxmox/Actions.php:300
+#: src/Proxmox/Actions.php:307
 #: src/Proxmox/Panels.php:65
 msgid "Too many requests. Please wait a while and try again."
 msgstr ""
 
 #. translators: %s: site name
-#: src/Proxmox/Actions.php:874
+#: src/Proxmox/Actions.php:881
 #, php-format
 msgid "[%s] Your server restore did not finish"
 msgstr ""
 
-#: src/Proxmox/Actions.php:875
+#: src/Proxmox/Actions.php:882
 msgid "The restore of your server did not finish. We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support."
 msgstr ""
 
+#: src/Proxmox/BackupField.php:75
+msgid "Enabled"
+msgstr ""
+
+#: src/Proxmox/BackupField.php:76
+msgid "Daily backups"
+msgstr ""
+
 #. translators: %s: price difference such as +€12.00 / month
-#: src/Proxmox/BackupField.php:147
+#: src/Proxmox/BackupField.php:170
 #, php-format
 msgid "Daily backups (%s)"
 msgstr ""
 
 #. translators: %d: number of days
-#: src/Proxmox/BackupField.php:155
+#: src/Proxmox/BackupField.php:178
 #, php-format
-msgid "A backup of the whole server every night, kept for %d day. You can restore it from your account."
-msgid_plural "A backup of the whole server every night, kept for %d days. You can restore it from your account."
+msgid "The server's boot disk is backed up every night and kept for %d day. Extra disks are not included. You can restore the server from your account."
+msgid_plural "The server's boot disk is backed up every night and kept for %d days. Extra disks are not included. You can restore the server from your account."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Proxmox/BackupField.php:178
+#: src/Proxmox/BackupField.php:201
 msgid "The backups option could not be changed. Please reload the page and try again."
 msgstr ""
 
@@ -1757,6 +1824,7 @@ msgid "Optional Proxmox pool id for new machines."
 msgstr ""
 
 #: src/Proxmox/ClustersScreen.php:287
+#: templates/account/vm.php:56
 msgid "Boot disk"
 msgstr ""
 
@@ -1832,46 +1900,161 @@ msgstr ""
 msgid "Save cluster"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:49
-#: src/Proxmox/Panels.php:182
+#: src/Proxmox/DiskCart.php:100
+msgid "This extra disk must be sold as a subscription."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:108
+msgid "Choose one disk for a server in your account."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:118
+#: src/Proxmox/DiskCart.php:177
+msgid "This server has reached its extra disk limit."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:133
+msgid "Choose a disk for a server in your account first."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:169
+msgid "The server for this disk is no longer available."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:185
+msgid "This disk size is no longer available for the server."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:193
+msgid "Choose only one extra disk with a new server."
+msgstr ""
+
+#: src/Proxmox/DiskCart.php:211
+msgid "The server and extra disk cannot be delivered with the available capacity."
+msgstr ""
+
+#: src/Proxmox/DiskDriver.php:27
+#: src/Proxmox/DiskField.php:76
+#: src/Proxmox/DiskPanels.php:85
+#: src/Proxmox/EmailDetails.php:42
+#: templates/account/vm.php:61
+msgid "Extra disk"
+msgstr ""
+
+#. translators: 1: disks used, 2: disks allowed.
+#: src/Proxmox/DiskDriver.php:36
+#, php-format
+msgid "%1$d of %2$d disk"
+msgid_plural "%1$d of %2$d disks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Proxmox/DiskDriver.php:41
+msgid "Disk size (GB)"
+msgstr ""
+
+#: src/Proxmox/DiskDriver.php:41
+msgid "The disk can grow but cannot shrink."
+msgstr ""
+
+#: src/Proxmox/DiskField.php:77
+msgid "None"
+msgstr ""
+
+#: src/Proxmox/DiskField.php:83
+msgid "excl. VAT"
+msgstr ""
+
+#: src/Proxmox/DiskField.php:94
+msgid "The extra disk could not be changed. Reload checkout and try again."
+msgstr ""
+
+#: src/Proxmox/DiskPanels.php:71
+msgid "Server license"
+msgstr ""
+
+#: src/Proxmox/DiskPanels.php:72
+msgid "Slot"
+msgstr ""
+
+#: src/Proxmox/DiskPanels.php:73
+msgid "Volume name"
+msgstr ""
+
+#: src/Proxmox/DiskPanels.php:74
+#: src/Proxmox/EmailDetails.php:69
+#: src/Proxmox/Panels.php:186
+#: templates/account/vm.php:162
+msgid "Size"
+msgstr ""
+
+#: src/Proxmox/DiskPanels.php:75
+msgid "Completed steps"
+msgstr ""
+
+#: src/Proxmox/DiskPanels.php:79
+msgid "Reserved capacity"
+msgstr ""
+
+#. translators: %d: WooCommerce order ID to review for a refund.
+#: src/Proxmox/DiskPanels.php:83
+msgid "Paid but not delivered"
+msgstr ""
+
+#. translators: %d: WooCommerce order ID to review for a refund.
+#: src/Proxmox/DiskPanels.php:83
+#, php-format
+msgid "Check and refund order #%d if the disk could not be delivered."
+msgstr ""
+
+#: src/Proxmox/EmailDetails.php:44
+msgid "Server"
+msgstr ""
+
+#: src/Proxmox/EmailDetails.php:46
+#: src/Proxmox/Panels.php:194
+#: templates/account/vm.php:130
+msgid "Backups"
+msgstr ""
+
+#: src/Proxmox/EmailDetails.php:46
+msgid "Extra disks are not included in nightly backups."
+msgstr ""
+
+#: src/Proxmox/EmailDetails.php:61
+#: src/Proxmox/Panels.php:183
 #: templates/account/vm.php:24
 msgid "IP address"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:50
+#: src/Proxmox/EmailDetails.php:62
 #: templates/account/vm.php:26
 msgid "Log in"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:54
+#: src/Proxmox/EmailDetails.php:66
 #: src/Proxmox/OsField.php:289
 #: src/Proxmox/OsField.php:381
 #: src/Proxmox/OsField.php:382
 #: templates/account/vm.php:44
-#: templates/account/vm.php:202
+#: templates/account/vm.php:241
 msgid "Operating system"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:57
-#: src/Proxmox/Panels.php:185
-#: templates/account/vm.php:123
-msgid "Size"
-msgstr ""
-
 #. translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB
-#: src/Proxmox/EmailDetails.php:59
-#: src/Proxmox/Panels.php:187
+#: src/Proxmox/EmailDetails.php:71
+#: src/Proxmox/Panels.php:188
 #: templates/account/vm.php:35
 #, php-format
 msgid "%1$d vCPU, %2$d MB RAM, %3$d GB disk"
 msgstr ""
 
-#: src/Proxmox/EmailDetails.php:66
+#: src/Proxmox/EmailDetails.php:78
 msgid "Password"
 msgstr ""
 
 #. translators: %d: number of days the password can be revealed
-#: src/Proxmox/EmailDetails.php:68
+#: src/Proxmox/EmailDetails.php:80
 #, php-format
 msgid "Shown once in your account, within %d day: use the link below, open your server and click \"Show password once\"."
 msgid_plural "Shown once in your account, within %d days: use the link below, open your server and click \"Show password once\"."
@@ -2022,7 +2205,7 @@ msgid "Choose an operating system"
 msgstr ""
 
 #: src/Proxmox/Panels.php:44
-#: templates/account/vm.php:76
+#: templates/account/vm.php:115
 msgid "Loading usage…"
 msgstr ""
 
@@ -2035,7 +2218,7 @@ msgid "Usage is unavailable. Please try again later."
 msgstr ""
 
 #: src/Proxmox/Panels.php:47
-#: templates/account/vm.php:78
+#: templates/account/vm.php:117
 msgid "CPU"
 msgstr ""
 
@@ -2085,252 +2268,257 @@ msgid "Restoring replaces everything on the server with this backup, and the pas
 msgstr ""
 
 #. translators: %d: days of backups kept
-#: src/Proxmox/Panels.php:148
+#: src/Proxmox/Panels.php:149
 #, php-format
 msgid "daily, kept %d day"
 msgid_plural "daily, kept %d days"
 msgstr[0] ""
 msgstr[1] ""
 
-#. translators: %s: transfer lock state.
-#: src/Proxmox/Panels.php:149
-#: templates/account/domain.php:17
+#: src/Proxmox/Panels.php:150
 msgid "off"
 msgstr ""
 
 #. translators: %s: date and time
-#: src/Proxmox/Panels.php:152
+#: src/Proxmox/Panels.php:153
 #, php-format
 msgid "last OK %s"
 msgstr ""
 
-#: src/Proxmox/Panels.php:153
+#: src/Proxmox/Panels.php:154
 msgid "no backup yet"
 msgstr ""
 
 #. translators: %d: number of backups kept
-#: src/Proxmox/Panels.php:158
+#: src/Proxmox/Panels.php:159
 #, php-format
 msgid "%d kept"
 msgstr ""
 
 #. translators: %s: error text
-#: src/Proxmox/Panels.php:163
+#: src/Proxmox/Panels.php:164
 #, php-format
 msgid "last error: %s"
 msgstr ""
 
-#: src/Proxmox/Panels.php:179
-#: src/Proxmox/ProxmoxDriver.php:85
+#: src/Proxmox/Panels.php:180
+#: src/Proxmox/ProxmoxDriver.php:86
 msgid "Cluster"
 msgstr ""
 
-#: src/Proxmox/Panels.php:180
+#: src/Proxmox/Panels.php:181
 msgid "Node"
 msgstr ""
 
-#: src/Proxmox/Panels.php:181
+#: src/Proxmox/Panels.php:182
 msgid "VMID"
 msgstr ""
 
-#: src/Proxmox/Panels.php:183
+#: src/Proxmox/Panels.php:184
 msgid "Ownership tag"
 msgstr ""
 
-#: src/Proxmox/Panels.php:184
+#: src/Proxmox/Panels.php:185
 #: templates/account/vm.php:48
 msgid "Power"
 msgstr ""
 
-#: src/Proxmox/Panels.php:192
+#: src/Proxmox/Panels.php:193
 msgid "Template"
 msgstr ""
 
-#: src/Proxmox/Panels.php:193
-#: templates/account/vm.php:91
-msgid "Backups"
-msgstr ""
-
-#: src/Proxmox/Panels.php:194
+#: src/Proxmox/Panels.php:195
 msgid "Disk reading"
 msgstr ""
 
-#: src/Proxmox/Panels.php:195
+#: src/Proxmox/Panels.php:196
 msgid "Down since"
 msgstr ""
 
-#: src/Proxmox/Panels.php:196
+#: src/Proxmox/Panels.php:197
 msgid "Down alert sent"
 msgstr ""
 
-#: src/Proxmox/Panels.php:197
+#: src/Proxmox/Panels.php:198
 msgid "Disk alert sent"
 msgstr ""
 
-#: src/Proxmox/Panels.php:201
+#: src/Proxmox/Panels.php:202
 msgid "Virtual machine"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:41
+#: src/Proxmox/ProxmoxDriver.php:42
 msgid "Proxmox VM"
 msgstr ""
 
 #. translators: 1: servers used, 2: servers allowed
-#: src/Proxmox/ProxmoxDriver.php:59
+#: src/Proxmox/ProxmoxDriver.php:60
 #, php-format
 msgid "%1$d of %2$d server"
 msgid_plural "%1$d of %2$d servers"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Proxmox/ProxmoxDriver.php:80
+#: src/Proxmox/ProxmoxDriver.php:81
 msgid "none yet"
 msgstr ""
 
 #. translators: %s: cluster ids, comma separated.
-#: src/Proxmox/ProxmoxDriver.php:87
+#: src/Proxmox/ProxmoxDriver.php:88
 #, php-format
 msgid "The id of the Proxmox cluster to build on. Configured: %s"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:93
+#: src/Proxmox/ProxmoxDriver.php:94
 msgid "Template VMID"
 msgstr ""
 
 #. translators: %s: templates per cluster.
-#: src/Proxmox/ProxmoxDriver.php:95
+#: src/Proxmox/ProxmoxDriver.php:96
 #, php-format
 msgid "The fallback template VMID, used when the customer made no operating system choice (older orders, licenses issued by an admin). It must be in the cluster's template list. Configured: %s"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:101
+#: src/Proxmox/ProxmoxDriver.php:102
 msgid "CPU cores"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:108
+#: src/Proxmox/ProxmoxDriver.php:109
 msgid "Memory (MB)"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:115
+#: src/Proxmox/ProxmoxDriver.php:116
 msgid "Disk (GB)"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:116
+#: src/Proxmox/ProxmoxDriver.php:117
 msgid "The boot disk grows to this size. It is never shrunk."
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:122
+#: src/Proxmox/ProxmoxDriver.php:123
 msgid "Backup days"
 msgstr ""
 
-#: src/Proxmox/ProxmoxDriver.php:123
+#: src/Proxmox/ProxmoxDriver.php:124
 msgid "Daily backups kept for this many days. 0 means no backups. Needs a backup storage on the cluster."
 msgstr ""
 
 #. translators: %s: cluster ids.
-#: src/Proxmox/ProxmoxSettings.php:91
+#: src/Proxmox/ProxmoxSettings.php:94
 #, php-format
 msgid "No site tag is set, so nothing is done to the live Proxmox cluster(s) %s: new servers wait and no machine is changed."
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:96
+#: src/Proxmox/ProxmoxSettings.php:99
 msgid "Set the site tag"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:108
+#: src/Proxmox/ProxmoxSettings.php:111
 msgid "Proxmox"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:109
+#: src/Proxmox/ProxmoxSettings.php:112
 msgid "Proxmox clusters"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:110
+#: src/Proxmox/ProxmoxSettings.php:113
 msgid "IP pool"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:124
+#: src/Proxmox/ProxmoxSettings.php:127
 msgid "Proxmox virtual machines"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:187
+#: src/Proxmox/ProxmoxSettings.php:190
 msgid "Site tag"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:188
+#: src/Proxmox/ProxmoxSettings.php:191
 msgid "Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. It cannot be changed while machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only."
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:194
+#: src/Proxmox/ProxmoxSettings.php:197
 msgid "Shutdown timeout in seconds"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:195
+#: src/Proxmox/ProxmoxSettings.php:198
 msgid "How long a pause waits for a clean shutdown before the machine is stopped."
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:201
+#: src/Proxmox/ProxmoxSettings.php:204
 msgid "Seconds to wait for one Proxmox task"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:202
+#: src/Proxmox/ProxmoxSettings.php:205
 msgid "A step waits this long, then keeps the task and checks it again later. Keep it below the PHP time limit of this server."
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:208
+#: src/Proxmox/ProxmoxSettings.php:211
 msgid "Memory kept free on each node, in GB"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:209
+#: src/Proxmox/ProxmoxSettings.php:212
 msgid "A node counts as full when the memory promised to the virtual machines of this site, plus this reserve, reaches the memory of the node. It leaves room for Proxmox itself and for machines this site did not create."
 msgstr ""
 
+#: src/Proxmox/ProxmoxSettings.php:214
+msgid "Storage kept free on each node (GB)"
+msgstr ""
+
 #: src/Proxmox/ProxmoxSettings.php:215
-#: src/Proxmox/ProxmoxSettings.php:237
-msgid "Off"
+msgid "Maximum promised storage (%)"
 msgstr ""
 
 #: src/Proxmox/ProxmoxSettings.php:216
+msgid "Maximum extra disks per server"
+msgstr ""
+
+#: src/Proxmox/ProxmoxSettings.php:221
+#: src/Proxmox/ProxmoxSettings.php:243
+msgid "Off"
+msgstr ""
+
+#: src/Proxmox/ProxmoxSettings.php:222
 msgid "Report only: alert, change nothing"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:217
+#: src/Proxmox/ProxmoxSettings.php:223
 msgid "Pause the service"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:219
+#: src/Proxmox/ProxmoxSettings.php:225
 msgid "Sustained high CPU"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:225
+#: src/Proxmox/ProxmoxSettings.php:231
 msgid "High CPU means above this percent"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:231
+#: src/Proxmox/ProxmoxSettings.php:237
 msgid "for at least this many hours"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:232
+#: src/Proxmox/ProxmoxSettings.php:238
 msgid "One reading covers about an hour, so the hours are counted over several hourly readings: with 1 hour the first alert comes with the second reading, with 3 hours after about three."
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:237
+#: src/Proxmox/ProxmoxSettings.php:243
 msgid "On"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:238
+#: src/Proxmox/ProxmoxSettings.php:244
 msgid "Customer monitoring emails"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:239
+#: src/Proxmox/ProxmoxSettings.php:245
 msgid "Email the customer when their server stays down unexpectedly or its disk is nearly full."
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:245
+#: src/Proxmox/ProxmoxSettings.php:251
 msgid "Disk alert threshold, percent"
 msgstr ""
 
-#: src/Proxmox/ProxmoxSettings.php:287
+#: src/Proxmox/ProxmoxSettings.php:293
 msgid "The site tag was not changed: virtual machines already carry it in their description, and a different tag would make this site refuse to manage every one of them. Change it only after every service has been deleted."
 msgstr ""
 
@@ -2340,7 +2528,7 @@ msgstr ""
 
 #: src/Proxmox/SshKeyField.php:384
 #: src/Proxmox/SshKeyField.php:464
-#: templates/account/vm.php:188
+#: templates/account/vm.php:227
 msgid "SSH public key"
 msgstr ""
 
@@ -2352,7 +2540,15 @@ msgstr ""
 msgid "SSH public key (optional)"
 msgstr ""
 
-#: src/Proxmox/Switches.php:85
+#: src/Proxmox/Switches.php:69
+msgid "Disks can't be made smaller. Choose a size at least as large as your current disk."
+msgstr ""
+
+#: src/Proxmox/Switches.php:72
+msgid "The disk for this subscription could not be found."
+msgstr ""
+
+#: src/Proxmox/Switches.php:106
 msgid "Servers can't be downgraded. Choose a plan at least as large as your current one."
 msgstr ""
 
@@ -2441,85 +2637,176 @@ msgstr ""
 msgid "Open Settings → Licenses"
 msgstr ""
 
-#: templates/account/domain.php:8
+#. translators: %d: extra disk size in gigabytes.
+#: templates/account/disk.php:6
+#, php-format
+msgid "Extra disk: %d GB"
+msgstr ""
+
+#. translators: %d: extra disk size in gigabytes.
+#: templates/account/disk.php:7
+msgid "Attached to your server."
+msgstr ""
+
+#: templates/account/disk.php:8
+msgid "Restart the server if the disk does not appear yet."
+msgstr ""
+
+#: templates/account/disk.php:9
+msgid "This disk is empty. In the server, use lsblk -f to identify the new device. Check the device name before formatting it."
+msgstr ""
+
+#: templates/account/disk.php:15
+msgid "Use the UUID shown by blkid in /etc/fstab to mount the disk after a restart. After making the disk larger, grow the file system with sudo resize2fs /dev/DEVICE."
+msgstr ""
+
+#: templates/account/disk.php:16
+msgid "Extra disks are not included in the nightly backups."
+msgstr ""
+
+#: templates/account/domain.php:19
+msgid "Updating…"
+msgstr ""
+
+#: templates/account/domain.php:19
+msgid "This can take up to a minute."
+msgstr ""
+
+#: templates/account/domain.php:21
 msgid "Pointing at our name servers"
 msgstr ""
 
-#: templates/account/domain.php:8
+#: templates/account/domain.php:21
 msgid "Not pointing at our name servers yet"
 msgstr ""
 
-#: templates/account/domain.php:9
+#: templates/account/domain.php:22
 msgid "Copy your DNS records here before changing the name servers at your registrar."
 msgstr ""
 
-#. translators: %s: domain expiry date.
-#: templates/account/domain.php:13
-#, php-format
-msgid "Expires: %s"
+#: templates/account/domain.php:26
+msgid "Expires"
 msgstr ""
 
-#. translators: %s: transfer lock state.
-#: templates/account/domain.php:17
-#, php-format
-msgid "Transfer lock: %s"
-msgstr ""
-
-#. translators: %s: transfer lock state.
-#: templates/account/domain.php:17
-msgid "on"
-msgstr ""
-
-#: templates/account/domain.php:20
-msgid "Name servers:"
-msgstr ""
-
-#: templates/account/domain.php:24
+#: templates/account/domain.php:43
 msgid "Name server mode"
 msgstr ""
 
-#: templates/account/domain.php:24
+#: templates/account/domain.php:44
 msgid "Our name servers"
 msgstr ""
 
-#: templates/account/domain.php:24
-msgid "Custom"
+#: templates/account/domain.php:45
+msgid "Custom name servers"
 msgstr ""
 
-#: templates/account/domain.php:25
+#: templates/account/domain.php:47
 msgid "Custom name servers, separated by commas"
 msgstr ""
 
-#: templates/account/domain.php:26
+#: templates/account/domain.php:48
 msgid "Save name servers"
 msgstr ""
 
-#: templates/account/domain.php:28
-msgid "Show transfer code"
-msgstr ""
-
-#: templates/account/domain.php:31
+#: templates/account/domain.php:55
 msgid "DNS records"
 msgstr ""
 
-#: templates/account/domain.php:32
+#: templates/account/domain.php:57
+#: templates/account/domain.php:62
 msgid "Name"
 msgstr ""
 
-#: templates/account/domain.php:32
+#: templates/account/domain.php:57
+msgid "@ for the domain itself, or a name like www"
+msgstr ""
+
+#: templates/account/domain.php:57
+#: templates/account/domain.php:62
 msgid "Type"
 msgstr ""
 
-#: templates/account/domain.php:32
+#: templates/account/domain.php:57
+#: templates/account/domain.php:62
 msgid "TTL"
 msgstr ""
 
-#: templates/account/domain.php:32
+#: templates/account/domain.php:57
+#: templates/account/domain.php:62
 msgid "Value"
 msgstr ""
 
-#: templates/account/domain.php:37
-msgid "Records as JSON. Saving replaces all customer records."
+#: templates/account/domain.php:58
+msgid "Priority"
+msgstr ""
+
+#: templates/account/domain.php:58
+msgid "Weight"
+msgstr ""
+
+#: templates/account/domain.php:58
+msgid "Port"
+msgstr ""
+
+#: templates/account/domain.php:59
+msgid "Flag"
+msgstr ""
+
+#: templates/account/domain.php:59
+msgid "Tag"
+msgstr ""
+
+#: templates/account/domain.php:59
+#: templates/account/vm.php:63
+msgid "Remove"
+msgstr ""
+
+#: templates/account/domain.php:61
+msgid "No DNS records yet."
+msgstr ""
+
+#: templates/account/domain.php:65
+msgid "Changes are saved when you press Save DNS records."
+msgstr ""
+
+#: templates/account/domain.php:67
+msgid "Add record"
+msgstr ""
+
+#: templates/account/domain.php:76
+msgid "Transfer to another registrar"
+msgstr ""
+
+#: templates/account/domain.php:77
+msgid "Your domain is locked, so it cannot be moved to another registrar."
+msgstr ""
+
+#: templates/account/domain.php:77
+msgid "Your domain is unlocked. Enter the transfer code at your new registrar."
+msgstr ""
+
+#: templates/account/domain.php:80
+msgid "Unlock and show transfer code"
+msgstr ""
+
+#: templates/account/domain.php:82
+msgid "Show transfer code"
+msgstr ""
+
+#: templates/account/domain.php:83
+msgid "Lock again"
+msgstr ""
+
+#: templates/account/domain.php:87
+msgid "Transfer code"
+msgstr ""
+
+#: templates/account/domain.php:89
+msgid "Copied"
+msgstr ""
+
+#: templates/account/domain.php:89
+msgid "Copy"
 msgstr ""
 
 #: templates/account/vm.php:17
@@ -2534,118 +2821,150 @@ msgstr ""
 msgid "Plan"
 msgstr ""
 
-#: templates/account/vm.php:57
+#: templates/account/vm.php:54
+msgid "Disks"
+msgstr ""
+
+#: templates/account/vm.php:62
+msgid "Make larger"
+msgstr ""
+
+#. translators: %d: days after the disk subscription's paid period ends.
+#: templates/account/vm.php:73
+#, php-format
+msgid "When a disk subscription ends, the disk and its data are removed %d day after the paid period ends."
+msgid_plural "When a disk subscription ends, the disk and its data are removed %d days after the paid period ends."
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/account/vm.php:75
+msgid "When a disk subscription ends, the disk and its data stay attached until we remove them."
+msgstr ""
+
+#: templates/account/vm.php:79
+msgid "When a disk subscription ends, billing stops. The disk stays attached until we remove it."
+msgstr ""
+
+#: templates/account/vm.php:82
+msgid "Reinstall and restore are unavailable until the extra disks are removed."
+msgstr ""
+
+#: templates/account/vm.php:85
+msgid "Add a disk:"
+msgstr ""
+
+#: templates/account/vm.php:96
 msgid "Time range"
 msgstr ""
 
-#: templates/account/vm.php:58
+#: templates/account/vm.php:97
 msgid "1 hour"
 msgstr ""
 
-#: templates/account/vm.php:59
+#: templates/account/vm.php:98
 msgid "1 day"
 msgstr ""
 
-#: templates/account/vm.php:60
+#: templates/account/vm.php:99
 msgid "30 days"
 msgstr ""
 
 #. translators: 1: used disk space in GB, 2: total disk space in GB.
-#: templates/account/vm.php:67
+#: templates/account/vm.php:106
 #, php-format
 msgid "Disk used: %1$s of %2$s GB"
 msgstr ""
 
 #. translators: %d: the plan's disk size in GB.
-#: templates/account/vm.php:72
+#: templates/account/vm.php:111
 #, php-format
 msgid "Disk: %d GB"
 msgstr ""
 
-#: templates/account/vm.php:78
+#: templates/account/vm.php:117
 msgid "Memory"
 msgstr ""
 
-#: templates/account/vm.php:78
+#: templates/account/vm.php:117
 msgid "Network"
 msgstr ""
 
-#: templates/account/vm.php:78
+#: templates/account/vm.php:117
 msgid "Disk activity"
 msgstr ""
 
-#: templates/account/vm.php:98
+#: templates/account/vm.php:137
 msgid "Add daily backups"
 msgstr ""
 
 #. translators: %s: price difference such as +€12.00 / month
-#: templates/account/vm.php:100
+#: templates/account/vm.php:139
 #, php-format
 msgid "Add daily backups (%s)"
 msgstr ""
 
-#: templates/account/vm.php:105
+#: templates/account/vm.php:144
 msgid "A backup of the whole server is taken every night."
 msgstr ""
 
 #. translators: %d: number of days
-#: templates/account/vm.php:112
+#: templates/account/vm.php:151
 #, php-format
 msgid "A backup is taken every night and kept for %d day."
 msgid_plural "A backup is taken every night and kept for %d days."
 msgstr[0] ""
 msgstr[1] ""
 
-#: templates/account/vm.php:119
+#: templates/account/vm.php:158
 msgid "The first backup will appear here after tonight's run."
 msgstr ""
 
-#: templates/account/vm.php:123
-#: templates/account/vm.php:139
+#: templates/account/vm.php:162
+#: templates/account/vm.php:178
 msgid "Backup"
 msgstr ""
 
-#: templates/account/vm.php:137
+#: templates/account/vm.php:176
 msgid "Restoring replaces everything on the server with the backup. The server is switched off while it is restored. The password and the SSH key go back to the ones the backup had. The IP address stays."
 msgstr ""
 
 #. translators: %s: the word to type, RESTORE
 #. translators: %s: the word to type, REINSTALL
-#: templates/account/vm.php:152
-#: templates/account/vm.php:216
+#: templates/account/vm.php:191
+#: templates/account/vm.php:255
 #, php-format
 msgid "Type %s to confirm"
 msgstr ""
 
-#: templates/account/vm.php:160
+#: templates/account/vm.php:199
 msgid "Restore now"
 msgstr ""
 
-#: templates/account/vm.php:167
+#: templates/account/vm.php:206
 msgid "Remove backups"
 msgstr ""
 
-#: templates/account/vm.php:169
+#: templates/account/vm.php:208
 msgid "If you remove backups, all backups of this server are deleted."
 msgstr ""
 
-#: templates/account/vm.php:178
+#: templates/account/vm.php:217
 msgid "Show password once"
 msgstr ""
 
-#: templates/account/vm.php:181
+#: templates/account/vm.php:220
 msgid "The password is shown one time only. Copy it now and keep it safe."
 msgstr ""
 
-#: templates/account/vm.php:191
+#: templates/account/vm.php:230
 msgid "Paste the single line from your .pub file. It replaces the key now on the server."
 msgstr ""
 
-#: templates/account/vm.php:199
+#: templates/account/vm.php:238
 msgid "Reinstalling erases everything on the server and installs the system again. The IP address stays. You get a new password."
 msgstr ""
 
-#: templates/account/vm.php:224
+#: templates/account/vm.php:263
 msgid "Reinstall now"
 msgstr ""
 

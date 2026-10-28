@@ -175,7 +175,7 @@ final class BackupField {
 			echo '<p class="description">' . esc_html(
 				sprintf(
 					/* translators: %d: number of days */
-					_n( 'A backup of the whole server every night, kept for %d day. You can restore it from your account.', 'A backup of the whole server every night, kept for %d days. You can restore it from your account.', $server['days'], 'beltoft-services' ),
+					_n( 'The server\'s boot disk is backed up every night and kept for %d day. Extra disks are not included. You can restore the server from your account.', 'The server\'s boot disk is backed up every night and kept for %d days. Extra disks are not included. You can restore the server from your account.', $server['days'], 'beltoft-services' ),
 					$server['days']
 				)
 			) . '</p>';
