@@ -281,3 +281,41 @@
 		} );
 	} );
 }() );
+
+// Domain cards start closed: the header shows the domain and its status, a click (or Enter / Space)
+// opens the rest. A card that was open stays open when the page reloads after a change.
+( function () {
+	var KEY = 'beltoftDomainOpen';
+	function opened() {
+		try { return JSON.parse( window.sessionStorage.getItem( KEY ) || '[]' ); } catch ( e ) { return []; }
+	}
+	function remember( id, open ) {
+		var list = opened().filter( function ( item ) { return item !== id; } );
+		if ( open ) { list.push( id ); }
+		try { window.sessionStorage.setItem( KEY, JSON.stringify( list ) ); } catch ( e ) { /* storage can be blocked */ }
+	}
+	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-services-domain' ), function ( panel ) {
+		var card = panel.closest( 'section' );
+		var head = card ? card.querySelector( 'header' ) : null;
+		if ( ! card || ! head || head.hasAttribute( 'aria-expanded' ) ) { return; }
+		var id = card.getAttribute( 'aria-labelledby' ) || panel.getAttribute( 'data-domain-resource' ) || '';
+		head.classList.add( 'beltoft-services-domain__toggle' );
+		head.setAttribute( 'role', 'button' );
+		head.setAttribute( 'tabindex', '0' );
+		function set( open ) {
+			card.classList.toggle( 'beltoft-services-domain--closed', ! open );
+			head.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+		}
+		set( -1 !== opened().indexOf( id ) || ( '' !== window.location.hash && card.querySelector( window.location.hash.replace( /[^#\w-]/g, '' ) ) ) );
+		function toggle( event ) {
+			if ( event.target.closest( 'a, button, input, select, textarea' ) ) { return; }
+			var open = 'true' !== head.getAttribute( 'aria-expanded' );
+			set( open );
+			remember( id, open );
+		}
+		head.addEventListener( 'click', toggle );
+		head.addEventListener( 'keydown', function ( event ) {
+			if ( 'Enter' === event.key || ' ' === event.key ) { event.preventDefault(); toggle( event ); }
+		} );
+	} );
+}() );

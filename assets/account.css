@@ -222,3 +222,35 @@ div.beltoft-services-domain .beltoft-services-domain__inline input,
 div.beltoft-services-domain .beltoft-services-domain__inline .button {
 	margin: 0;
 }
+
+/* Domain cards: closed by default, the header opens them. */
+.beltoft-services-domain__toggle {
+	cursor: pointer;
+	position: relative;
+	padding-right: 1.75em;
+}
+
+.beltoft-services-domain__toggle::after {
+	content: "";
+	position: absolute;
+	right: 0.25em;
+	top: 50%;
+	width: 0.5em;
+	height: 0.5em;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: translateY(-75%) rotate(45deg);
+}
+
+.beltoft-services-domain__toggle[aria-expanded="true"]::after {
+	transform: translateY(-25%) rotate(-135deg);
+}
+
+.beltoft-services-domain__toggle:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 4px;
+}
+
+section.beltoft-services-domain--closed > :not(header) {
+	display: none !important;
+}
