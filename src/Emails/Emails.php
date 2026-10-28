@@ -110,7 +110,7 @@ final class Emails {
 	 */
 	public static function send( string $id, Resource $r, array $data = array() ): bool {
 		try {
-			if ( Import::is_running() ) {
+			if ( Import::is_running() || $r->folded_into() > 0 ) {
 				return false;
 			}
 
@@ -132,7 +132,7 @@ final class Emails {
 	 */
 	public static function on_state_changed( $r, $old, $new ): void {
 		try {
-			if ( ! $r instanceof Resource || Import::is_running() ) {
+			if ( ! $r instanceof Resource || Import::is_running() || $r->folded_into() > 0 ) {
 				return;
 			}
 

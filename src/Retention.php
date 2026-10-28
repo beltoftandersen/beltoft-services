@@ -175,7 +175,7 @@ final class Retention {
 	 * @param string   $mode report or on.
 	 */
 	private static function check( Resource $r, string $mode ): void {
-		if ( ! $r->is_valid() || ! $r->is_live() || $r->get( 'protected' ) || 'paused' !== $r->get( 'desired' ) ) {
+		if ( ! $r->is_valid() || ! $r->is_live() || $r->get( 'protected' ) || 'paused' !== $r->get( 'desired' ) || $r->folded_into() > 0 ) {
 			return;
 		}
 

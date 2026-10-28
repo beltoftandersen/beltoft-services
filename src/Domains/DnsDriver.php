@@ -100,6 +100,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 	}
 
 	public function pause( Resource $r ): StepResult {
+		if ( $r->folded_into() > 0 ) { return StepResult::done(); }
 		if ( ! DnsSchema::ready() ) { return StepResult::retry( 3600, 'DNS hosting storage is not ready.' ); }
 		if ( ! $this->holds_row( $r ) || 'domain' === Zone::owner( $r ) ) { return StepResult::done(); }
 		$off = Records::set_disabled( (string) $r->get( 'domain' ), true );
@@ -110,6 +111,7 @@ final class DnsDriver implements Driver, StopsOnDelete {
 		return StepResult::done( array( 'records_off' => true ) );
 	}
 	public function resume( Resource $r ): StepResult {
+		if ( $r->folded_into() > 0 ) { return StepResult::done(); }
 		if ( ! DnsSchema::ready() ) { return StepResult::retry( 3600, 'DNS hosting storage is not ready.' ); }
 		if ( ! $this->holds_row( $r ) ) { return StepResult::done(); }
 		$on = Records::set_disabled( (string) $r->get( 'domain' ), false );
@@ -118,6 +120,8 @@ final class DnsDriver implements Driver, StopsOnDelete {
 	}
 	public function update_plan( Resource $r ): StepResult { return StepResult::done(); }
 	public function delete( Resource $r ): StepResult {
+		// The zone, its records and the name belong to the domain that this service was folded into.
+		if ( $r->folded_into() > 0 ) { return StepResult::done(); }
 		$owner = Zone::owner( $r );
 		$removed = Zone::remove( $r );
 		// The name stays locked to the customer until the release job sees that the parent no longer lists our name servers.

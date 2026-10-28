@@ -171,7 +171,11 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			$subscription = wcs_get_subscription( (int) ( $old->license()['subscription_id'] ?? 0 ) );
 			if ( $subscription && ! $subscription->has_status( 'cancelled' ) ) {
 				if ( $this->is_dns_line_of( $subscription, $old, (string) $held['domain'] ) ) {
-					$subscription->update_status( 'cancelled', 'Replaced by the domain registration.' );
+					// Marked first: the cancel ends the license, and the ending of a folded service is silent and leaves the zone alone.
+					if ( ! $old->set( array( 'folded_into' => $r->id() ) ) ) { return false; }
+					$subscription->update_meta_data( DnsCancel::FOLDED_META, $r->id() );
+					$subscription->save();
+					$subscription->update_status( 'cancelled', sprintf( 'DNS hosting for %s moved into the domain registration. No further charge.', (string) $held['domain'] ) );
 				} else {
 					// Other DNS lines of this subscription may still be in use: leave it for staff.
 					$subscription->add_order_note( 'The domain ' . $held['domain'] . ' is now registered here. This subscription has other lines or a line that could not be tied to this domain, so it was not cancelled.' );

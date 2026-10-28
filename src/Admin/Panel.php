@@ -625,6 +625,10 @@ final class Panel {
 
 		echo '<h2>' . esc_html__( 'Service', 'beltoft-services' ) . '</h2>';
 
+		if ( $r->folded_into() > 0 ) {
+			echo '<p class="description"><strong>' . esc_html__( 'Folded into the domain registration.', 'beltoft-services' ) . '</strong> ' . esc_html__( 'The customer does not see this service and is sent no email about it. It never changes the DNS zone.', 'beltoft-services' ) . '</p>';
+		}
+
 		if ( isset( $problems[ $r->id() ]['message'] ) ) {
 			echo '<div class="notice notice-error inline"><p>' . esc_html( (string) $problems[ $r->id() ]['message'] ) . '</p></div>';
 		}

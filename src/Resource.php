@@ -320,6 +320,14 @@ final class Resource {
 	}
 
 	/**
+	 * The domain resource this DNS hosting was folded into (0 when it was not). A folded resource
+	 * is history: it sends no mail, is not listed, and never touches the zone the domain owns.
+	 */
+	public function folded_into(): int {
+		return (int) $this->get( 'folded_into' );
+	}
+
+	/**
 	 * One property, typed, with its default when unset.
 	 *
 	 * @param string $key Property.

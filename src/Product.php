@@ -46,8 +46,36 @@ final class Product {
 		add_filter( 'beltoft_licenses_resource_label', array( __CLASS__, 'resource_label' ), 10, 4 );
 		add_filter( 'beltoft_licenses_account_show_key', array( __CLASS__, 'show_key' ), 10, 2 );
 		add_filter( 'beltoft_licenses_account_show_usage', array( __CLASS__, 'show_key' ), 10, 2 );
+		add_filter( 'beltoft_licenses_account_licenses', array( __CLASS__, 'hide_folded' ) );
 		add_filter( 'beltoft_licenses_send_status_email', array( __CLASS__, 'no_license_email' ), 10, 2 );
 		add_filter( 'beltoft_licenses_send_update_email', array( __CLASS__, 'no_license_email' ), 10, 2 );
+	}
+
+	/**
+	 * My Account does not list a DNS license that was folded into a domain registration.
+	 *
+	 * @param mixed $licenses License rows.
+	 * @return mixed
+	 */
+	public static function hide_folded( $licenses ) {
+		if ( ! is_array( $licenses ) ) {
+			return $licenses;
+		}
+
+		return array_values(
+			array_filter(
+				$licenses,
+				static function ( $license ) {
+					if ( ! is_array( $license ) || empty( $license['id'] ) || ! self::is_service_license( $license ) ) {
+						return true;
+					}
+
+					$resource = Resource::for_license( (int) $license['id'] );
+
+					return ! $resource || $resource->folded_into() <= 0;
+				}
+			)
+		);
 	}
 
 	/**

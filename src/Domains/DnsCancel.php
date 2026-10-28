@@ -28,11 +28,32 @@ final class DnsCancel {
 	private static array $cancelled = array();
 
 	/**
+	 * Subscription meta: DNS hosting that was folded into a domain registration (the domain's resource id).
+	 */
+	public const FOLDED_META = '_beltoft_services_folded_into';
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_action( 'woocommerce_subscription_status_pending-cancel', array( __CLASS__, 'on_pending_cancel' ), 5 );
 		add_action( 'woocommerce_subscription_status_pending-cancel', array( __CLASS__, 'expire_after_licenses' ), 20 );
+		add_filter( 'woocommerce_email_enabled_cancelled_subscription', array( __CLASS__, 'folded_email_enabled' ), 10, 2 );
+	}
+
+	/**
+	 * The "Cancelled Subscription" admin email is not sent for DNS hosting that was folded into a domain
+	 * registration: the cancel is the plugin's own and the subscription's order note says so.
+	 *
+	 * @param mixed $enabled      Whether the email is enabled.
+	 * @param mixed $subscription Subscription.
+	 */
+	public static function folded_email_enabled( $enabled, $subscription = null ) {
+		if ( is_object( $subscription ) && method_exists( $subscription, 'get_meta' ) && (int) $subscription->get_meta( self::FOLDED_META, true ) > 0 ) {
+			return false;
+		}
+
+		return $enabled;
 	}
 
 	/**

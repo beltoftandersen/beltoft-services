@@ -94,6 +94,8 @@ final class Zone {
 	}
 
 	public static function remove( Resource $r ): StepResult {
+		// A folded DNS service never removes the zone that the domain now owns.
+		if ( $r->folded_into() > 0 ) { return StepResult::done(); }
 		$name = (string) $r->get( 'domain' );
 		if ( ! $r->get( 'zone_claimed' ) && ! $r->get( 'zone_ready' ) ) { return StepResult::done(); }
 		$owner = self::owner( $r );

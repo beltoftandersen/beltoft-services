@@ -452,4 +452,108 @@ class DomainDriverTest extends TestCase {
 		$notes = array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) );
 		$this->assertNotEmpty( array_filter( $notes, static fn( $n ) => str_contains( $n, 'could not be tied' ) ) );
 	}
+
+	/** Adopts a DNS-only service into a registration: records on the zone, then returns what the tests inspect. */
+	private function folded_setup( string $prefix ): array {
+		$this->register_fakes();
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$name = strtolower( $prefix . '-' . wp_generate_password( 6, false, false ) . '.com' );
+		$r = $this->resource( 'register', $name );
+		list( $sub, $old ) = $this->dns_only( $r, $name );
+		$dns->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) );
+		$dns->replace_rrsets( $name, array( array( 'name' => $name . '.', 'type' => 'A', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '192.0.2.10', 'disabled' => false ) ) ) ) );
+		$old->set( array( 'zone_claimed' => true, 'zone_ready' => true, 'state' => 'ready', 'notified' => 'ready' ) );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		return array( $name, $r, $sub, $old, $dns );
+	}
+
+	public function test_adoption_marks_the_dns_service_folded_and_says_so_on_the_subscription(): void {
+		list( $name, $r, $sub, $old ) = $this->folded_setup( 'fold' );
+		$old = Resource::find( $old->id() );
+		$this->assertSame( $r->id(), $old->folded_into() );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status() );
+		$notes = array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) );
+		$this->assertNotEmpty( array_filter( $notes, static fn( $n ) => str_contains( $n, 'DNS hosting for ' . $name . ' moved into the domain registration. No further charge.' ) ) );
+		$this->assertFalse( \BeltoftServices\Domains\DnsCancel::folded_email_enabled( true, wcs_get_subscription( $sub->get_id() ) ), 'The cancelled-subscription admin email is off for it.' );
+		$this->assertTrue( \BeltoftServices\Domains\DnsCancel::folded_email_enabled( true, wcs_create_subscription( array( 'customer_id' => 1, 'billing_period' => 'year', 'billing_interval' => 1 ) ) ), 'Other cancellations keep it.' );
+	}
+
+	public function test_a_folded_dns_license_ending_sends_nothing_and_leaves_the_zone_alone(): void {
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $atts ) use ( &$mails ) { $mails[] = (string) $atts['subject']; return true; }, 10, 2 );
+		list( $name, $r, $sub, $old, $dns ) = $this->folded_setup( 'quiet' );
+		$r->set( array( 'notified' => 'ready' ) ); // The domain's own ready mail is not what this test looks at.
+		$mails = array();
+		$id = (int) $old->license()['id'];
+		// The cancel ends the license: the normal pause runs for the folded resource.
+		\BeltoftLicenses\Licenses::update( $id, array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED, 'expires_at' => time() - 60 ) );
+		$this->run_jobs();
+		$this->assertSame( array(), $mails, 'No paused, deleted, warning or licence mail.' );
+		$zone = $dns->zone( $name );
+		$this->assertNotNull( $zone );
+		$this->assertFalse( $zone['rrsets'][0]['records'][0]['disabled'], 'The records still answer.' );
+		$this->assertSame( $r->id(), (int) DnsAssignments::get( $name )['resource_id'] );
+	}
+
+	public function test_a_forced_delete_of_a_folded_dns_resource_keeps_zone_records_and_assignment(): void {
+		list( $name, $r, $sub, $old, $dns ) = $this->folded_setup( 'keep' );
+		$old = Resource::find( $old->id() );
+		$calls = count( $dns->calls() );
+		// Even when the domain resource is no longer a live owner, the folded one must not remove anything.
+		$r->set( array( 'state' => 'deleted' ) );
+		$this->assertTrue( ( new DnsDriver() )->delete( $old )->is_done() );
+		$this->assertTrue( \BeltoftServices\Domains\Zone::remove( $old )->is_done() );
+		$this->assertTrue( ( new DnsDriver() )->pause( $old )->is_done() );
+		$this->assertSame( array(), array_filter( array_slice( $dns->calls(), $calls ), static fn( $c ) => 'delete_zone' === $c[0] ) );
+		$this->assertNotNull( $dns->zone( $name ) );
+		$this->assertFalse( $dns->zone( $name )['rrsets'][0]['records'][0]['disabled'] );
+		$this->assertSame( 'active', DnsAssignments::get( $name )['status'] );
+	}
+
+	public function test_retention_skips_a_folded_dns_resource_and_sends_no_warning(): void {
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $atts ) use ( &$mails ) { $mails[] = (string) $atts['subject']; return true; }, 10, 2 );
+		list( $name, $r, $sub, $old ) = $this->folded_setup( 'retain' );
+		$this->settings( array( 'deletion_mode' => 'on', 'warning_days' => 7 ) );
+		update_post_meta( $old->license()['product_id'], \BeltoftServices\Product::META_RETENTION, 30 );
+		$old->set( array( 'desired' => 'paused', 'state' => 'paused', 'paused_at' => time() - 90 * DAY_IN_SECONDS ) );
+		$mails = array();
+		\BeltoftServices\Retention::run();
+		$fresh = Resource::find( $old->id() );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ), 'No deletion was requested.' );
+		$this->assertNull( $fresh->get( 'warned_at' ) );
+		$this->assertSame( array(), $mails );
+	}
+
+	public function test_a_folded_license_is_not_listed_in_my_account_and_a_retry_changes_nothing(): void {
+		list( $name, $r, $sub, $old ) = $this->folded_setup( 'list' );
+		$domain_license = $r->license();
+		$listed = apply_filters( 'beltoft_licenses_account_licenses', array( $old->license(), $domain_license ), (int) $domain_license['user_id'] );
+		$this->assertSame( array( (int) $domain_license['id'] ), array_map( static fn( $l ) => (int) $l['id'], $listed ) );
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $atts ) use ( &$mails ) { $mails[] = $atts; return true; }, 10, 2 );
+		// The move back to the DNS service and the zone step undone: the adopt runs again, as after a failed move.
+		DnsAssignments::move_to( $name, (int) $r->license()['user_id'], (int) $old->license()['id'], $old->id() );
+		$r->set( array( 'steps' => array_values( array_diff( (array) $r->get( 'steps' ), array( 'zone' ) ) ) ) );
+		$again_fake = new FakeClient();
+		$again_fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $again_fake, 20 );
+		$again = ( new DomainDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $again->is_done(), (string) $again->error() );
+		$this->assertSame( array(), $mails );
+		$this->assertSame( $r->id(), Resource::find( $old->id() )->folded_into() );
+	}
+
+	public function test_the_emails_skip_a_folded_resource(): void {
+		list( $name, $r, $sub, $old ) = $this->folded_setup( 'mail' );
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $atts ) use ( &$mails ) { $mails[] = $atts; return true; }, 10, 2 );
+		$old = Resource::find( $old->id() );
+		\BeltoftServices\Emails\Emails::on_state_changed( $old, 'ready', 'paused' );
+		\BeltoftServices\Emails\Emails::on_state_changed( $old, 'paused', 'deleted' );
+		\BeltoftServices\Emails\Emails::on_deletion_warning( $old, time() + DAY_IN_SECONDS );
+		$this->assertSame( array(), $mails );
+	}
 }
