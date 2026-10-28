@@ -74,7 +74,7 @@
 			return;
 		}
 
-		if ( 'restore' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.restore ) ) {
+		if ( 'restore' === form.getAttribute( 'data-action' ) && ! window.confirm( vm.strings.restore + ( form.hasAttribute( 'data-disks' ) ? ' ' + vm.strings.restoreDisks : '' ) ) ) {
 			return;
 		}
 

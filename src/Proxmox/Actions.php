@@ -196,6 +196,25 @@ final class Actions {
 	// -- Checks that need no Proxmox call ----------------------------------------------------------
 
 	/**
+	 * Does the server have an extra disk that was attached once and is now detached (paused by policy) or
+	 * otherwise not an attached, ready drive? A forced restore may not keep such a volume.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function disk_detached( Resource $r ): bool {
+		foreach ( DiskMeta::for_server( $r ) as $disk ) {
+			if ( $disk->get( 'linked' ) || ! in_array( 'attach', (array) $disk->get( 'steps' ), true ) ) {
+				continue;
+			}
+			if ( 'ready' !== $disk->get( 'state' ) || $disk->get( 'detached' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Why an action with these arguments cannot be accepted, in words for the customer; null when
 	 * it can. Used by the route (answered at once) and again by act() as a second line.
 	 *
@@ -206,6 +225,9 @@ final class Actions {
 	public static function check( Resource $r, string $action, array $args ): ?string {
 		if ( 'reinstall' === $action && DiskMeta::for_server( $r ) ) {
 			return __( 'Remove the extra disks before reinstalling this server.', 'beltoft-services' );
+		}
+		if ( 'restore' === $action && self::disk_detached( $r ) ) {
+			return __( 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.', 'beltoft-services' );
 		}
 		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore' ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
@@ -716,6 +738,11 @@ final class Actions {
 				'ctime' => $ctime,
 			);
 			$phase = 'task';
+		}
+
+		if ( '' === $phase && self::disk_detached( $this->r ) ) {
+			// Checked again here: a disk paused after the request must stop the restore before the VM is touched.
+			return StepResult::fail( 'Restore refused: an extra disk is detached; the server was not touched', array( 'restore' => null ) );
 		}
 
 		if ( '' === $phase ) {

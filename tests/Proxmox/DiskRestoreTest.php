@@ -135,22 +135,47 @@ class DiskRestoreTest extends BackupTestCase {
 		$this->assertTrue( Resource::find( $server->id() )->get( 'plan_dirty' ) );
 	}
 
-	public function test_a_disk_detached_by_policy_stays_detached(): void {
-		$server = $this->ready_vm();
-		$disk   = $this->disk_for( $server );
+	private function pause_disk( Resource $disk ): Resource {
 		$paused = Registry::get( 'proxmox-disk' )->pause( $disk );
 		$this->assertTrue( $paused->is_done(), $paused->error() );
 		$this->assertTrue( $disk->set( $paused->meta() ) );
 		$disk = Resource::find( $disk->id() );
 		$this->assertTrue( $disk->transition( 'paused', 'test' ) );
-		$this->assertNotEmpty( $disk->get( 'detached' ) );
-		$this->restore( $server, $this->backup_of( $server ) );
-		$config = $this->config();
-		$this->assertArrayNotHasKey( 'scsi1', $config, 'Resume reattaches it later, not the restore.' );
-		$this->assertContains( 'disk-store:5000/' . $disk->get( 'volname' ), $config );
-		$this->assertSame( 'paused', Resource::find( $disk->id() )->get( 'state' ) );
-		$this->assertTrue( Registry::get( 'proxmox-disk' )->resume( Resource::find( $disk->id() ) )->is_done() );
-		$this->assertArrayHasKey( 'scsi1', $this->config() );
+		return Resource::find( $disk->id() );
+	}
+
+	public function test_restore_is_refused_while_a_disk_is_detached_and_works_again_after_resume(): void {
+		$server = $this->ready_vm();
+		$disk   = $this->disk_for( $server );
+		$volid  = $this->backup_of( $server );
+		$args   = array( 'confirm' => 'RESTORE', 'volid' => $volid );
+		$this->assertNull( Actions::check( $server, 'restore', $args ) );
+		$disk = $this->pause_disk( $disk );
+		$text = 'This server has an extra disk that is detached because its subscription is not active. Restore is possible again once the disk is active or removed.';
+		$this->assertSame( $text, Actions::check( $server, 'restore', $args ) );
+		$seen = count( $this->fake->calls() );
+		$this->restore( $server, $volid );
+		$this->assertSame( array(), array_values( array_filter( array_slice( $this->fake->calls(), $seen ), static fn( $c ) => 'GET' !== $c['method'] ) ), 'The job writes nothing.' );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+		$this->assertContains( 'disk-store:5000/' . $disk->get( 'volname' ), $this->config() );
+		$resumed = Registry::get( 'proxmox-disk' )->resume( $disk );
+		$this->assertTrue( $resumed->is_done(), $resumed->error() );
+		$this->assertTrue( $disk->set( $resumed->meta() ) );
+		$this->assertTrue( $disk->transition( 'ready', 'test' ) );
+		$this->assertSame( array(), array_filter( array( Actions::check( Resource::find( $server->id() ), 'restore', $args ) ) ) );
+	}
+
+	public function test_a_disk_paused_after_the_request_stops_the_restore_before_the_vm_is_touched(): void {
+		$server = $this->ready_vm();
+		$disk   = $this->disk_for( $server );
+		$volid  = $this->backup_of( $server );
+		$this->assertNull( Actions::check( $server, 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) ) );
+		$this->pause_disk( $disk );
+		$seen = count( $this->fake->calls() );
+		$this->restore( $server, $volid );
+		$this->assertSame( array(), array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => false !== strpos( $l, '/status/' ) || 'POST /nodes/node-a/qemu' === $l ) );
+		$this->assertNull( Resource::find( $server->id() )->get( 'restore' ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 	}
 
 	public function test_a_missing_volume_alerts_once_fails_that_disk_and_the_restore_completes(): void {
@@ -203,6 +228,7 @@ class DiskRestoreTest extends BackupTestCase {
 		$html = ob_get_clean();
 		$this->assertStringContainsString( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', $html );
 		$this->assertStringNotContainsString( "\xE2\x80\x94", $html );
+		$this->assertStringContainsString( 'data-disks="1"', $html );
 		$this->assertStringContainsString( 'Reinstall is unavailable until the extra disks are removed.', $html );
 	}
 }

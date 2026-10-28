@@ -173,7 +173,7 @@ $beltoft_services_power_labels = array(
 				<?php if ( $backups['can_restore'] ) : ?>
 					<details class="beltoft-services-vm__more">
 						<summary><?php esc_html_e( 'Restore from a backup', 'beltoft-services' ); ?></summary>
-						<form class="beltoft-services-vm-form" data-action="restore">
+						<form class="beltoft-services-vm-form" data-action="restore"<?php echo $extra_disks['items'] ? ' data-disks="1"' : ''; ?>>
 							<p class="description"><?php esc_html_e( 'Restoring replaces everything on the server with the backup. The server is switched off while it is restored. The password and the SSH key go back to the ones the backup had. The IP address stays.', 'beltoft-services' ); ?></p>
 							<?php if ( $extra_disks['items'] ) : ?><p class="description"><?php esc_html_e( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', 'beltoft-services' ); ?></p><?php endif; ?>
 							<p>
