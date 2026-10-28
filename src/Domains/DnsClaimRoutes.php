@@ -145,18 +145,17 @@ final class DnsClaimRoutes {
 			return self::error( 'rate_limited', __( 'Too many checks. Try again in a few minutes.', 'beltoft-services' ), 429 );
 		}
 
-		if ( 'checking' !== $claim['status'] ) {
-			if ( ! in_array( $claim['status'], array( 'pending', 'verified' ), true ) ) {
-				return self::wrong_state();
-			}
-
-			// A verified claim stays verified until the new result is in.
-			if ( 'pending' === $claim['status'] && ! DnsClaimJobs::transition( $claim['id'], array( 'pending' ), 'checking' ) ) {
-				return self::wrong_state();
-			}
-
-			DnsClaimJobs::enqueue( DnsClaimJobs::CHECK, $claim['id'] );
+		if ( ! in_array( $claim['status'], array( 'pending', 'checking', 'verified' ), true ) ) {
+			return self::wrong_state();
 		}
+
+		// A verified claim stays verified until the new result is in. A claim already checking is
+		// queued again (the job is idempotent and not doubled), so a lost job can be recovered.
+		if ( 'pending' === $claim['status'] && ! DnsClaimJobs::transition( $claim['id'], array( 'pending' ), 'checking' ) ) {
+			return self::wrong_state();
+		}
+
+		DnsClaimJobs::enqueue( DnsClaimJobs::CHECK, $claim['id'] );
 
 		return new \WP_REST_Response( self::view( (array) DnsClaims::get( $claim['id'] ) ), 202 );
 	}
@@ -180,7 +179,7 @@ final class DnsClaimRoutes {
 		$last = $claim['last_result'];
 		unset( $last['scan'], $last['scan_reason'] );
 
-		DnsClaimJobs::transition( $claim['id'], array( 'verified' ), 'verified', array( 'last_result' => $last ) );
+		DnsClaimJobs::update( $claim['id'], array( 'last_result' => $last ) );
 		DnsClaimJobs::enqueue( DnsClaimJobs::SCAN, $claim['id'] );
 
 		return new \WP_REST_Response( self::view( (array) DnsClaims::get( $claim['id'] ) ), 202 );
@@ -207,7 +206,7 @@ final class DnsClaimRoutes {
 		$last              = $claim['last_result'];
 		$last['zone_file'] = $parsed;
 
-		if ( ! DnsClaimJobs::transition( $claim['id'], array( 'verified' ), 'verified', array( 'last_result' => $last ) ) ) {
+		if ( ! DnsClaimJobs::update( $claim['id'], array( 'last_result' => $last ) ) ) {
 			return self::wrong_state();
 		}
 
@@ -244,7 +243,7 @@ final class DnsClaimRoutes {
 			$draft[] = array_intersect_key( (array) $row, array_flip( self::ROW_KEYS ) );
 		}
 
-		if ( ! DnsClaimJobs::transition( $claim['id'], array( 'verified' ), 'verified', array( 'draft_records' => $draft ) ) ) {
+		if ( ! DnsClaimJobs::update( $claim['id'], array( 'draft_records' => $draft ) ) ) {
 			return self::wrong_state();
 		}
 

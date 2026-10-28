@@ -106,7 +106,7 @@ final class Records {
 			if ( '' === $value || strlen( $value ) > 2048 ) { return new \WP_Error( 'bad_txt', 'A TXT value must contain 1 to 2048 bytes.' ); }
 			// A string is at most 255 bytes in DNS: a longer value is written as several strings.
 			$parts = array();
-			foreach ( str_split( $value, 255 ) as $part ) { $parts[] = '"' . addcslashes( $part, '"\\' ) . '"'; }
+			foreach ( self::chunks( $value ) as $part ) { $parts[] = '"' . addcslashes( $part, '"\\' ) . '"'; }
 			return implode( ' ', $parts );
 		}
 		if ( 'MX' === $type ) {
@@ -131,6 +131,20 @@ final class Records {
 			return $flag . ' ' . $tag . ' "' . addcslashes( $value, '"\\' ) . '"';
 		}
 		return new \WP_Error( 'bad_record', 'A DNS record is invalid.' );
+	}
+
+	/** Pieces of at most 255 bytes that never cut a UTF-8 character. */
+	private static function chunks( string $value ): array {
+		$chunks = array();
+		while ( '' !== $value ) {
+			$length = min( 255, strlen( $value ) );
+			if ( strlen( $value ) > $length ) {
+				while ( $length > 1 && ( ord( $value[ $length ] ) & 0xC0 ) === 0x80 ) { --$length; }
+			}
+			$chunks[] = substr( $value, 0, $length );
+			$value = (string) substr( $value, $length );
+		}
+		return $chunks;
 	}
 
 	private static function target( string $value ): string|\WP_Error {

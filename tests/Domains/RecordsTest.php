@@ -23,6 +23,20 @@ class RecordsTest extends TestCase {
 		$this->assertIsArray( Records::validate( 'example.com', array( array( 'name' => '@', 'type' => 'TXT', 'value' => str_repeat( 'x', 2048 ) ) ) ) );
 	}
 
+	public function test_a_multibyte_character_on_the_255_byte_boundary_is_never_cut(): void {
+		$value = str_repeat( 'a', 254 ) . 'é' . str_repeat( 'b', 5 ) . '€' . str_repeat( 'c', 300 );
+		$sets  = Records::validate( 'example.com', array( array( 'name' => '@', 'type' => 'TXT', 'value' => $value ) ) );
+		$content = $sets[0]['records'][0]['content'];
+		preg_match_all( '/"((?:[^"\\\\]|\\\\.)*)"/', $content, $m );
+		foreach ( $m[1] as $chunk ) {
+			$raw = stripcslashes( $chunk );
+			$this->assertLessThanOrEqual( 255, strlen( $raw ) );
+			$this->assertSame( 1, preg_match( '//u', $raw ) );
+		}
+		$rows = Records::to_rows( 'example.com', array( array( 'name' => 'example.com.', 'type' => 'TXT', 'records' => array( array( 'content' => $content ) ) ) ) );
+		$this->assertSame( $value, $rows[0]['value'] );
+	}
+
 	public function test_a_quote_inside_a_long_txt_value_stays_escaped_per_string(): void {
 		$value = str_repeat( 'a', 254 ) . '"' . str_repeat( 'b', 10 );
 		$sets = Records::validate( 'example.com', array( array( 'name' => '@', 'type' => 'TXT', 'value' => $value ) ) );

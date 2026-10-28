@@ -212,6 +212,49 @@ class DnsClaimRoutesTest extends TestCase {
 		$this->assertCount( 1, $this->queued( DnsClaimJobs::CHECK ) );
 	}
 
+	public function test_a_claim_stuck_in_checking_is_queued_again_within_the_rate_limit(): void {
+		$claim = $this->claim( 'checking' );
+		$this->assertCount( 0, $this->queued( DnsClaimJobs::CHECK ) );
+		$this->assertSame( 202, $this->call( 'POST', '/' . $claim['id'] . '/check', $this->user )->get_status() );
+		$this->assertCount( 1, $this->queued( DnsClaimJobs::CHECK ) );
+		$this->assertSame( 202, $this->call( 'POST', '/' . $claim['id'] . '/check', $this->user )->get_status() );
+		$this->assertCount( 1, $this->queued( DnsClaimJobs::CHECK ) );
+		for ( $i = 3; $i <= 5; $i++ ) {
+			$this->call( 'POST', '/' . $claim['id'] . '/check', $this->user );
+		}
+		$this->assertSame( 429, $this->call( 'POST', '/' . $claim['id'] . '/check', $this->user )->get_status() );
+	}
+
+	private function expiry( int $id ): string {
+		return (string) DnsClaims::get( $id )['expires_at'];
+	}
+
+	public function test_saves_on_a_verified_claim_never_extend_its_window(): void {
+		global $wpdb;
+		$claim = $this->claim( 'verified' );
+		$fixed = gmdate( 'Y-m-d H:i:s', time() + 3600 );
+		$wpdb->update( \BeltoftServices\Domains\DnsSchema::tables()['claims'], array( 'expires_at' => $fixed ), array( 'id' => $claim['id'] ) );
+
+		$this->call( 'POST', '/' . $claim['id'] . '/records', $this->user, array( 'records' => array( array( 'name' => '@', 'type' => 'A', 'value' => '192.0.2.1' ) ) ) );
+		$this->assertSame( $fixed, $this->expiry( $claim['id'] ) );
+		$this->call( 'POST', '/' . $claim['id'] . '/zone-file', $this->user, array( 'text' => 'a IN A 192.0.2.1' ) );
+		$this->assertSame( $fixed, $this->expiry( $claim['id'] ) );
+		$this->call( 'POST', '/' . $claim['id'] . '/scan', $this->user );
+		$this->assertSame( $fixed, $this->expiry( $claim['id'] ) );
+
+		add_filter( 'beltoft_services_dns_proof_result', static function ( $pre, $call ) {
+			if ( 'delegation' === $call ) { return array( 'status' => 'ok', 'reason' => 'delegated', 'ns' => array( 'ns1.host.net' ), 'ips' => array(), 'ds' => null, 'ours' => false ); }
+			if ( 'scan' === $call ) { return array( 'records' => array( array( 'name' => '@' ) ), 'server' => '', 'queries' => 1 ); }
+			return array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		}, 10, 2 );
+		DnsClaimJobs::scan( $claim['id'] );
+		$this->assertNotNull( DnsClaims::get( $claim['id'] )['last_result']['scan'] ?? null );
+		$this->assertSame( $fixed, $this->expiry( $claim['id'] ) );
+
+		DnsClaimJobs::check( $claim['id'] );
+		$this->assertGreaterThan( strtotime( $fixed . ' UTC' ) + 3600, strtotime( $this->expiry( $claim['id'] ) . ' UTC' ), 'a new successful check refreshes the window' );
+	}
+
 	public function test_check_of_a_verified_claim_keeps_it_verified_and_queues_a_job(): void {
 		$claim    = $this->claim( 'verified' );
 		$response = $this->call( 'POST', '/' . $claim['id'] . '/check', $this->user );

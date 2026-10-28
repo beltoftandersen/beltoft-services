@@ -217,16 +217,7 @@ final class DnsClaims {
 	public static function set_status( int $id, string $status, array $fields = array() ): bool {
 		global $wpdb;
 
-		$allowed = array( 'parent_ns', 'ds_present', 'last_result', 'draft_records', 'verified_at', 'checked_at', 'check_failures' );
-		$data    = array( 'status' => $status );
-
-		foreach ( $fields as $key => $value ) {
-			if ( ! in_array( $key, $allowed, true ) ) {
-				continue;
-			}
-
-			$data[ $key ] = in_array( $key, self::JSON_FIELDS, true ) ? wp_json_encode( $value ) : $value;
-		}
+		$data = array( 'status' => $status ) + self::field_data( $fields );
 
 		if ( 'verified' === $status ) {
 			$data['expires_at'] = self::now( self::VERIFIED_TTL );
@@ -234,6 +225,44 @@ final class DnsClaims {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
 		return false !== $wpdb->update( self::table(), $data, array( 'id' => $id ) );
+	}
+
+	/**
+	 * Changes fields only: neither the status nor the expiry is touched.
+	 *
+	 * @param int                  $id     Claim id.
+	 * @param array<string, mixed> $fields As for set_status().
+	 */
+	public static function update_fields( int $id, array $fields ): bool {
+		global $wpdb;
+
+		$data = self::field_data( $fields );
+
+		if ( ! $data ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
+		return false !== $wpdb->update( self::table(), $data, array( 'id' => $id ) );
+	}
+
+	/**
+	 * The allowed fields, ready for the database.
+	 *
+	 * @param array<string, mixed> $fields Fields.
+	 * @return array<string, mixed>
+	 */
+	private static function field_data( array $fields ): array {
+		$allowed = array( 'parent_ns', 'ds_present', 'last_result', 'draft_records', 'verified_at', 'checked_at', 'check_failures' );
+		$data    = array();
+
+		foreach ( $fields as $key => $value ) {
+			if ( in_array( $key, $allowed, true ) ) {
+				$data[ $key ] = in_array( $key, self::JSON_FIELDS, true ) ? wp_json_encode( $value ) : $value;
+			}
+		}
+
+		return $data;
 	}
 
 	/**

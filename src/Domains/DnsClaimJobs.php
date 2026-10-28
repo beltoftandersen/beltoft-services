@@ -99,6 +99,23 @@ final class DnsClaimJobs {
 	}
 
 	/**
+	 * Saves fields of a verified claim without changing its status or its expiry: only a new
+	 * verification starts the 24 hour window again.
+	 *
+	 * @param int                  $id     Claim id.
+	 * @param array<string, mixed> $fields Fields (see DnsClaims::set_status()).
+	 */
+	public static function update( int $id, array $fields ): bool {
+		$claim = DnsClaims::get( $id );
+
+		if ( ! $claim || 'verified' !== $claim['status'] || self::past( $claim ) ) {
+			return false;
+		}
+
+		return DnsClaims::update_fields( $id, $fields );
+	}
+
+	/**
 	 * Checks the TXT record of a claim that is being checked (a verified claim asked again is
 	 * checked too and stays verified until the new result).
 	 *
@@ -204,7 +221,7 @@ final class DnsClaimJobs {
 		}
 
 		// A claim that changed while the servers were asked (cancelled, expired) is left as it is.
-		self::transition( $claim_id, array( 'verified' ), 'verified', array( 'last_result' => $last ) );
+		self::update( $claim_id, array( 'last_result' => $last ) );
 	}
 
 	/**
