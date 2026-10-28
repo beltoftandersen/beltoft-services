@@ -51,7 +51,9 @@ final class DiskDriver implements Driver {
 	}
 
 	public function resume( Resource $r ): StepResult {
-		return $r->get( 'volname' ) ? StepResult::done() : $this->provision( $r );
+		// The volume name is stored when the slot is claimed, before anything is allocated or attached: only a verified attach counts.
+		$steps = (array) $r->get( 'steps' );
+		return $r->get( 'volname' ) && in_array( 'attach', $steps, true ) && in_array( 'verify', $steps, true ) ? StepResult::done() : $this->provision( $r );
 	}
 
 	public function update_plan( Resource $r ): StepResult {

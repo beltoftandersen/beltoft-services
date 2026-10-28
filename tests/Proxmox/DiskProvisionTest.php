@@ -91,6 +91,82 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertSame( array(), $this->fake->request( 'GET', '/nodes/node-a/storage/disk-store/content', array( 'content' => 'images', 'vmid' => 5000 ) ) );
 	}
 
+	private function removable_disk(): array {
+		$server = $this->ready_vm();
+		$disk = $this->disk_for( $server );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		return array( $server, $disk );
+	}
+
+	private function images(): array {
+		return $this->fake->request( 'GET', '/nodes/node-a/storage/disk-store/content', array( 'content' => 'images', 'vmid' => 5000 ) );
+	}
+
+	public function test_hot_detach_pending_keeps_the_volume_until_the_detach_applies(): void {
+		list( , $disk ) = $this->removable_disk();
+		Jobs::run( $disk->id() );
+		$disk = Resource::find( $disk->id() );
+		$this->assertSame( 'ready', $disk->get( 'state' ) );
+		$volname = (string) $disk->get( 'volname' );
+		foreach ( array( true, false ) as $hide ) {
+			$this->fake->hold_detach( 5000, $hide );
+			$result = Registry::get( 'proxmox-disk' )->delete( $disk );
+			$this->assertTrue( $result->is_retry(), 'Hide ' . var_export( $hide, true ) . ': ' . $result->error() );
+			$this->assertStringContainsString( 'restarted', $result->error() );
+			$this->assertCount( 0, $this->calls( 'DELETE', rawurlencode( 'disk-store:5000/' . $volname ) ), 'The volume is never deleted while the running server holds it.' );
+			$this->assertCount( 1, $this->images() );
+		}
+	}
+
+	public function test_orphan_volume_never_attached_is_removed_by_its_exact_name_only(): void {
+		list( $server, $disk ) = $this->removable_disk();
+		$uuid = str_replace( '-', '', (string) $disk->get( 'uuid' ) );
+		$name = 'vm-5000-bs1-' . $uuid . '.raw';
+		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-bs1-' . $uuid . 'x.raw', 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-bs2-other.raw', 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$result = Registry::get( 'proxmox-disk' )->delete( $disk );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$left = array_column( $this->images(), 'volid' );
+		sort( $left );
+		$this->assertSame( array( 'disk-store:5000/vm-5000-bs1-' . $uuid . 'x.raw', 'disk-store:5000/vm-5000-bs2-other.raw' ), $left, 'Similar names are untouched.' );
+		$this->assertCount( 1, $this->calls( 'DELETE', rawurlencode( 'disk-store:5000/' . $name ) ) );
+	}
+
+	public function test_orphan_removal_keeps_every_guard(): void {
+		list( , $disk ) = $this->removable_disk();
+		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
+		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->settings( array( 'deletion_mode' => 'report' ) );
+		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed() );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-bs1-someoneelse.raw', 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
+		$this->assertTrue( $disk->set( array( 'volname' => 'vm-5000-bs1-someoneelse.raw' ) ) );
+		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed(), 'A name not built from this uuid is refused.' );
+		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertTrue( $disk->set( array( 'volname' => $name, 'linked' => true ) ) );
+		$this->assertTrue( Registry::get( 'proxmox-disk' )->delete( $disk )->is_failed() );
+		$this->assertCount( 0, $this->calls( 'DELETE', '.raw' ) );
+		$this->assertCount( 2, $this->images() );
+	}
+
+	public function test_resume_between_claim_and_attach_provisions_instead_of_claiming_ready(): void {
+		list( , $disk ) = $this->removable_disk();
+		$name = 'vm-5000-bs1-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
+		$this->assertTrue( $disk->set( array( 'slot' => 'scsi1', 'volname' => $name ) ) );
+		$result = Registry::get( 'proxmox-disk' )->resume( $disk );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$config = $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/config' );
+		$this->assertStringContainsString( $name, (string) $config['scsi1'], 'The volume was allocated and attached by the resume.' );
+		$this->assertCount( 1, $this->images() );
+		$this->assertCount( 1, $this->calls( 'POST', '/storage/disk-store/content' ) );
+		$this->assertTrue( $disk->set( array( 'steps' => array( 'server', 'slot', 'allocate', 'attach', 'verify' ) ) ) );
+		$this->assertTrue( Registry::get( 'proxmox-disk' )->resume( $disk )->is_done() );
+		$this->assertCount( 1, $this->calls( 'POST', '/storage/disk-store/content' ), 'A verified disk is not provisioned again.' );
+	}
+
 	public function test_extra_disk_blocks_reinstall_and_restore_before_a_remote_call(): void {
 		$server = $this->ready_vm();
 		$disk = $this->disk_for( $server );

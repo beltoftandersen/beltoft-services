@@ -38,6 +38,46 @@ class DiskCapacityTest extends BackupTestCase {
 		$this->assertNull( DiskCapacity::reservation( $disk ) );
 	}
 
+	private function disk_resource( Resource $server ): Resource {
+		$product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $server->license()['user_id'] ) );
+		$disk = Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $product->get_id() ), array( 'server_license' => $server->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $disk );
+		return $disk;
+	}
+
+	public function test_reserve_replaces_an_existing_reservation_of_a_different_size(): void {
+		$server = $this->ready_vm();
+		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		$this->settings( array( 'disk_promise_percent' => 100, 'disk_reserve_gb' => 0 ) );
+		$disk = $this->disk_resource( $server );
+		$this->assertTrue( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 50 ) );
+		$this->assertTrue( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 70 ), 'A changed target replaces the reservation.' );
+		$this->assertCount( 1, get_option( DiskCapacity::RESERVATIONS ) );
+		$this->assertSame( 70, DiskCapacity::reservation( $disk )['gb'] );
+		$this->settings( array( 'disk_promise_percent' => 1 ) );
+		$this->assertFalse( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 90 ), 'The new size still has to fit.' );
+		$this->assertSame( 70, DiskCapacity::reservation( $disk )['gb'], 'A refused replacement keeps the old reservation.' );
+	}
+
+	public function test_hourly_capacity_job_sweeps_stale_reservations(): void {
+		$server = $this->ready_vm();
+		$live = $this->disk_resource( $server );
+		$old = time() - 2 * DAY_IN_SECONDS;
+		update_option( DiskCapacity::RESERVATIONS, array(
+			$live->id() => array( 'cluster' => 'lab', 'node' => 'node-a', 'storage' => 'disk-store', 'gb' => 50, 'at' => $old ),
+			999999 => array( 'cluster' => 'lab', 'node' => 'node-a', 'storage' => 'disk-store', 'gb' => 50, 'at' => $old ),
+			888888 => array( 'cluster' => 'lab', 'node' => 'node-a', 'storage' => 'disk-store', 'gb' => 50, 'at' => time() ),
+		), false );
+		$this->assertTrue( $live->is_live() );
+		\BeltoftServices\Proxmox\ProxmoxJobs::capacity();
+		$left = array_keys( (array) get_option( DiskCapacity::RESERVATIONS ) );
+		sort( $left );
+		$expected = array( 888888, $live->id() );
+		sort( $expected );
+		$this->assertSame( $expected, $left, 'An old reservation of a missing disk goes; a live disk and a fresh one stay.' );
+	}
+
 	public function test_disk_product_stock_follows_verified_storage_capacity(): void {
 		$product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
 		$this->assertFalse( Stock::available( $product ) );

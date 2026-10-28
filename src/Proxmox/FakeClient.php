@@ -173,6 +173,19 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * A running VM without disk hotplug: a detach (delete=scsiN) becomes a pending change and the
+	 * drive stays in the running configuration (modelled).
+	 *
+	 * @param int  $vmid VM id.
+	 * @param bool $hide Whether the default config view (pending values) hides the pending drive, as PVE does.
+	 */
+	public function hold_detach( int $vmid, bool $hide = true ): void {
+		$this->load();
+		$this->state['hold_detach'][ $vmid ] = $hide;
+		$this->save();
+	}
+
+	/**
 	 * Seeds a backup in a storage: vmid, ctime, size, notes, config (the VM config it restores), volid
 	 * (default storage:backup/vm/<vmid>/<iso8601 of ctime>).
 	 *
@@ -727,14 +740,21 @@ class FakeClient implements Client {
 	 * @param array<string, mixed> $p Parameters.
 	 */
 	private function h_config_get( array $a, array $p ) {
-		unset( $p );
 		$vm = $this->find( $a );
 
 		if ( is_wp_error( $vm ) ) {
 			return $vm;
 		}
 
-		return array_merge( $vm['config'], array( 'digest' => $this->digest( $vm ) ) );
+		$config = $vm['config'];
+		// The default view merges pending changes (modelled): a pending detach hides the drive unless the listing is hold_detach( ..., false ).
+		if ( empty( $p['current'] ) && ! empty( $this->state['hold_detach'][ (int) $a[1] ] ) ) {
+			foreach ( array_keys( $this->state['pending'][ (int) $a[1] ] ?? array() ) as $key ) {
+				unset( $config[ $key ] );
+			}
+		}
+
+		return array_merge( $config, array( 'digest' => $this->digest( $vm ) ) );
 	}
 
 	/**
@@ -787,6 +807,11 @@ class FakeClient implements Client {
 		$id = (int) $a[1];
 
 		foreach ( array_filter( array_map( 'trim', explode( ',', (string) ( $p['delete'] ?? '' ) ) ) ) as $key ) {
+			if ( isset( $this->state['hold_detach'][ $id ] ) && 1 === preg_match( '/^scsi\d+$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+				// Hot detach without disk hotplug (modelled): a pending change, the drive stays in the running configuration.
+				$this->state['pending'][ $id ][ $key ] = true;
+				continue;
+			}
 			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
 				$unused = 0;
 				while ( isset( $this->state['vms'][ $id ]['config'][ 'unused' . $unused ] ) ) {
@@ -1322,6 +1347,25 @@ class FakeClient implements Client {
 					}
 				);
 			}
+		}
+
+		if ( isset( $this->state['images'][ $a[1] ][ $volid ] ) ) {
+			// A volume that a VM configuration still refers to is refused (modelled, as pvesm does for a used volume).
+			foreach ( $this->state['vms'] as $vm ) {
+				foreach ( $vm['config'] as $key => $value ) {
+					if ( 1 === preg_match( '/^(?:scsi\d+|unused\d+)$/', (string) $key ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
+						return $this->error( 500, "volume '" . $volid . "' is used by a VM" );
+					}
+				}
+			}
+			return $this->new_task(
+				$a[0],
+				'imgdel',
+				(string) $this->state['images'][ $a[1] ][ $volid ]['vmid'],
+				function () use ( $a, $volid ) {
+					unset( $this->state['images'][ $a[1] ][ $volid ] );
+				}
+			);
 		}
 
 		return $this->error( 500, "volume '" . $volid . "' does not exist" );

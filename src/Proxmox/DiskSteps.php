@@ -307,6 +307,58 @@ final class DiskSteps {
 		return StepResult::done( array( 'size_gb' => $target, 'slot' => $attached['slot'] ), 'Extra disk size updated' );
 	}
 
+	private const PENDING_DETACH = 'The disk detach is pending on the running server and applies when the server is restarted.';
+
+	private function has_image( array $images, string $volid ): bool {
+		foreach ( $images as $image ) {
+			if ( is_array( $image ) && ( $image['volid'] ?? '' ) === $volid ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The volume is in no drive and in no unusedN entry of the server (a volume allocated but never
+	 * attached, or one a detach left behind): delete it by its own exact name, once it is certain
+	 * that the running server no longer uses it.
+	 */
+	private function remove_orphan( array $ctx, string $volid, bool $may_delete ): StepResult {
+		if ( ! $may_delete ) {
+			return StepResult::retry( 60, 'The disk volume still exists.' );
+		}
+		$uuid = strtolower( preg_replace( '/[^a-f0-9]/i', '', (string) $this->r->get( 'uuid' ) ) );
+		$vmid = (int) $ctx['record']['vmid'];
+		if ( '' === $uuid || 1 !== preg_match( '/^vm-' . $vmid . '-bs(?:[1-9]|[12][0-9]|30)-' . $uuid . '\.raw$/', (string) $this->r->get( 'volname' ) ) ) {
+			return StepResult::fail( 'The disk volume name does not belong to this disk, so it is not deleted.' );
+		}
+		if ( '' !== $ctx['lock'] ) {
+			return StepResult::retry( 60, 'The server is locked.' );
+		}
+		// A detach on a running server without disk hotplug is only pending: the running configuration still holds the drive.
+		$running = $this->client->request( 'GET', self::config_path( $ctx ), array( 'current' => 1 ) );
+		if ( is_wp_error( $running ) ) {
+			return $this->classify( $running, 'disk running configuration' );
+		}
+		if ( ! is_array( $running ) || $this->attached( $running, $volid ) ) {
+			return StepResult::retry( 300, self::PENDING_DETACH );
+		}
+		$task = $this->run_task( 'disk volume delete', 'DELETE', self::content_path( $ctx ) . '/' . rawurlencode( $volid ) );
+		if ( $task instanceof StepResult ) {
+			return $task;
+		}
+		$images = $this->images( $ctx );
+		if ( $images instanceof StepResult ) {
+			return $images;
+		}
+		return $this->has_image( $images, $volid ) ? StepResult::retry( 60, 'The disk volume still exists.' ) : $this->finish_delete();
+	}
+
+	private function finish_delete(): StepResult {
+		DiskCapacity::release( $this->r );
+		return StepResult::done( array( 'size_gb' => null ), 'Extra disk removed' );
+	}
+
 	public function delete(): StepResult {
 		if ( $this->r->get( 'linked' ) ) {
 			return StepResult::fail( 'An adopted disk is not deleted automatically.' );
@@ -345,6 +397,9 @@ final class DiskSteps {
 			if ( is_wp_error( $config ) ) {
 				return $this->classify( $config, 'disk detach verify' );
 			}
+			if ( $this->attached( $config, $volid ) ) {
+				return StepResult::retry( 300, self::PENDING_DETACH );
+			}
 		}
 		$unused = null;
 		foreach ( $config as $slot => $value ) {
@@ -371,12 +426,9 @@ final class DiskSteps {
 		if ( $images instanceof StepResult ) {
 			return $images;
 		}
-		foreach ( $images as $image ) {
-			if ( is_array( $image ) && ( $image['volid'] ?? '' ) === $volid ) {
-				return StepResult::retry( 60, 'The disk volume still exists.' );
-			}
+		if ( $this->has_image( $images, $volid ) ) {
+			return $this->remove_orphan( $ctx, $volid, ! $unused );
 		}
-		DiskCapacity::release( $this->r );
-		return StepResult::done( array( 'size_gb' => null ), 'Extra disk removed' );
+		return $this->finish_delete();
 	}
 }

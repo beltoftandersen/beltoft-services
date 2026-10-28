@@ -90,10 +90,11 @@ final class DiskCapacity {
 		list( $locked, $ok ) = Locks::with( Locks::name( 'disk_capacity', 0 ), Locks::allocation_wait(), static function () use ( $disk, $cluster, $node, $storage, $gb ): bool {
 			$entries = (array) get_option( self::RESERVATIONS, array() );
 			$existing = $entries[ $disk->id() ] ?? null;
-			if ( is_array( $existing ) ) {
-				return $existing['cluster'] === $cluster && $existing['node'] === $node && $existing['storage'] === $storage && (int) $existing['gb'] === $gb;
+			if ( is_array( $existing ) && $existing['cluster'] === $cluster && $existing['node'] === $node && $existing['storage'] === $storage && (int) $existing['gb'] === $gb ) {
+				return true;
 			}
-			if ( ! self::fits( $cluster, $node, $storage, $gb ) ) {
+			// A different size or place (a grow retried after the target moved) replaces this resource's own reservation, which does not count against itself.
+			if ( ! self::fits( $cluster, $node, $storage, $gb, $disk->id() ) ) {
 				return false;
 			}
 			$entries[ $disk->id() ] = array( 'cluster' => $cluster, 'node' => $node, 'storage' => $storage, 'gb' => $gb, 'at' => time() );

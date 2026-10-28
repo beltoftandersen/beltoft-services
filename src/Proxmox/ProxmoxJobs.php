@@ -210,6 +210,8 @@ final class ProxmoxJobs {
 		foreach ( self::clusters() as $id => $one ) {
 			self::cache_capacity( $id, $one['client'] );
 		}
+		// Stale extra-disk reservations of closed or missing disks are freed (local, no remote call).
+		DiskCapacity::sweep();
 	}
 
 	/**
