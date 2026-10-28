@@ -240,7 +240,7 @@ class SchemaTest extends TestCase {
 
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
-		$this->assertCount( 2, $drops );
+		$this->assertCount( 4, $drops );
 		$this->assertStringContainsString( $t['ips'], implode( ' ', $drops ) );
 		$this->assertStringContainsString( $t['vms'], implode( ' ', $drops ) );
 		wp_cache_flush(); // The uninstall script deletes straight from the database.
@@ -256,5 +256,74 @@ class SchemaTest extends TestCase {
 		}
 
 		$this->assertEquals( 1, get_transient( 'someone_elses_transient' ), 'Other plugins\' transients are left alone.' );
+	}
+
+	public function test_uninstall_drops_dns_claims_and_empty_assignments(): void {
+		global $wpdb;
+		$t = \BeltoftServices\Domains\DnsSchema::tables();
+		\BeltoftServices\Domains\DnsSchema::create_tables();
+		update_option( 'beltoft_services_dns_db_version', '1' );
+		update_option( 'beltoft_services_dns_release_alerted', 1 );
+		update_option( 'beltoft_services_dns_release_cursor', 5 );
+		set_transient( 'beltoft_services_dns_schema_retry', 1, 600 );
+
+		$queries = $this->uninstall( 1 );
+		$joined  = implode( ' ', preg_grep( '/DROP TABLE/i', $queries ) );
+		$this->assertStringContainsString( $t['claims'], $joined );
+		$this->assertStringContainsString( $t['assignments'], $joined );
+		wp_cache_flush();
+		$this->assertFalse( get_option( 'beltoft_services_dns_db_version' ) );
+		$this->assertFalse( get_option( 'beltoft_services_dns_release_alerted' ) );
+		$this->assertFalse( get_option( 'beltoft_services_dns_release_cursor' ) );
+		$this->assertFalse( get_transient( 'beltoft_services_dns_schema_retry' ) );
+	}
+
+	public function test_uninstall_keeps_assignments_with_an_open_row(): void {
+		global $wpdb;
+		$t = \BeltoftServices\Domains\DnsSchema::tables();
+		\BeltoftServices\Domains\DnsSchema::create_tables();
+		update_option( 'beltoft_services_dns_db_version', '1' );
+		$cols = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $t['assignments'] ) ); // phpcs:ignore
+		$this->assertContains( 'status', $cols );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $t['assignments'] ) ); // phpcs:ignore
+		$wpdb->insert( $t['assignments'], $this->assignment_row( 'keep.example', 'release_pending' ) ); // phpcs:ignore
+
+		$queries = $this->uninstall( 1 );
+		$joined  = implode( ' ', preg_grep( '/DROP TABLE/i', $queries ) );
+		$this->assertStringContainsString( $t['claims'], $joined );
+		$this->assertStringNotContainsString( $t['assignments'], $joined );
+		wp_cache_flush();
+		$this->assertSame( '1', get_option( 'beltoft_services_dns_db_version' ), 'The schema version stays with the table.' );
+		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $t['assignments'] ) ) ); // phpcs:ignore
+	}
+
+	public function test_uninstall_leaves_dns_tables_without_the_setting(): void {
+		$queries = $this->uninstall( 0 );
+		$this->assertSame( array(), preg_grep( '/DROP TABLE/i', $queries ) );
+	}
+
+	/**
+	 * A minimal assignments row.
+	 *
+	 * @param string $name   The domain.
+	 * @param string $status The status.
+	 * @return array
+	 */
+	private function assignment_row( string $name, string $status ): array {
+		global $wpdb;
+		$t    = \BeltoftServices\Domains\DnsSchema::tables();
+		$cols = $wpdb->get_results( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $t['assignments'] ), ARRAY_A ); // phpcs:ignore
+		$row  = array();
+		foreach ( $cols as $c ) {
+			if ( 'auto_increment' === $c['Extra'] ) {
+				continue;
+			}
+			if ( 'status' === $c['Field'] ) {
+				$row['status'] = $status;
+			} elseif ( 'NO' === $c['Null'] && null === $c['Default'] ) {
+				$row[ $c['Field'] ] = preg_match( '/int/', $c['Type'] ) ? 1 : ( preg_match( '/datetime|timestamp/', $c['Type'] ) ? gmdate( 'Y-m-d H:i:s' ) : $name );
+			}
+		}
+		return $row;
 	}
 }
