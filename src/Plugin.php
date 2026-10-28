@@ -58,6 +58,7 @@ final class Plugin {
 		Domains\DnsClaimJobs::register();
 		Domains\DnsReleaseJob::register();
 		Domains\DnsCancel::register();
+		Domains\ThankYou::register();
 		Domains\DnsClaimRoutes::register();
 		Domains\DnsClaimPanel::register();
 		Domains\Panels::register();

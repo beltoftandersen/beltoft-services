@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-28T06:37:04+00:00\n"
+"POT-Creation-Date: 2026-10-28T06:48:24+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -1751,7 +1751,7 @@ msgid "Last answer"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:205
+#: src/Plugin.php:206
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -3545,4 +3545,38 @@ msgstr ""
 
 #: templates/emails/plain/beltoft-services-ready.php:50
 msgid "Our name servers:"
+msgstr ""
+
+#. translators: %s: domain name
+#: templates/order/dns-next-steps.php:22
+#, php-format
+msgid "Next steps for %s"
+msgstr ""
+
+#: templates/order/dns-next-steps.php:25
+msgid "Your DNS zone is being set up with the records you chose. Nothing changes for your domain until you change its name servers."
+msgstr ""
+
+#: templates/order/dns-next-steps.php:28
+msgid "Check your records and add anything that is missing:"
+msgstr ""
+
+#: templates/order/dns-next-steps.php:30
+msgid "My Account, Domains"
+msgstr ""
+
+#: templates/order/dns-next-steps.php:38
+msgid "Your domain uses DNSSEC. Remove the DS record at your registrar first, then wait a day before the next step."
+msgstr ""
+
+#: templates/order/dns-next-steps.php:39
+msgid "If your domain uses DNSSEC, remove the DS record at your registrar first, then wait a day before the next step."
+msgstr ""
+
+#: templates/order/dns-next-steps.php:45
+msgid "At the registrar where the domain is registered, change its name servers to:"
+msgstr ""
+
+#: templates/order/dns-next-steps.php:53
+msgid "The change usually shows within an hour. Your domain page shows when the name servers point here."
 msgstr ""
