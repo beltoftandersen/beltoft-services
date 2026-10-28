@@ -7,6 +7,9 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 final class Panels {
+	/** Seconds the account page waits for the DNS server. */
+	public const PAGE_TIMEOUT = 5;
+
 	public static function register(): void {
 		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ) );
 		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'buttons' ), 10, 2 );
@@ -31,7 +34,12 @@ final class Panels {
 	public static function account( Resource $r ): void {
 		$domain = (string) $r->get( 'domain' );
 		$dns_only = 'dns' === $r->get( 'driver' );
-		$zone = $dns_only || ( 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ) ? Clients::dns()->zone( $domain ) : null;
+		$client = Clients::dns();
+		// A page a customer waits for gets a few seconds, not the thirty a background job may take.
+		if ( $client instanceof LiveDns ) { $client = $client->with_timeout( self::PAGE_TIMEOUT ); }
+		$zone = $dns_only || ( 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ) ? $client->zone( $domain ) : null;
+		// Without the zone the editor would show no records, and saving would delete them: it is not shown.
+		$zone_unavailable = is_wp_error( $zone );
 		$rrsets = is_array( $zone ) ? (array) ( $zone['rrsets'] ?? array() ) : array();
 		$rows = Records::to_rows( $domain, $rrsets );
 		include BELTOFT_SERVICES_PATH . 'templates/account/domain.php';

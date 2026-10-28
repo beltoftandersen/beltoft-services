@@ -52,4 +52,17 @@ class LiveDnsTest extends TestCase {
 			$this->assertWPError( $result );
 		}
 	}
+
+	public function test_a_page_client_waits_a_few_seconds_and_a_job_client_thirty(): void {
+		$dns = new LiveDns( 'http://127.0.0.1:8081', 'secret', true );
+		$seen = array();
+		$this->respond_with( function ( $url, $args ) use ( &$seen ) {
+			$seen[] = $args['timeout'];
+			return array( 'headers' => array(), 'body' => '{}', 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array() );
+		} );
+		$dns->zone( 'example.com' );
+		$dns->with_timeout( 5 )->zone( 'example.com' );
+		$dns->with_timeout( 500 )->zone( 'example.com' );
+		$this->assertSame( array( 30, 5, 30 ), $seen, 'The short client is a copy; the cap is thirty.' );
+	}
 }

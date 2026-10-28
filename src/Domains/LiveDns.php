@@ -7,6 +7,7 @@ defined( 'ABSPATH' ) || exit;
 class LiveDns implements Dns {
 	private string $base;
 	private string $key;
+	private int $timeout = 30;
 
 	public function __construct( string $url, string $key, bool $allowed = false ) {
 		if ( ! $allowed ) { throw new \RuntimeException( 'Live DNS client is disabled.' ); }
@@ -17,6 +18,13 @@ class LiveDns implements Dns {
 		$this->key = $key;
 	}
 
+	/** The same client with a shorter wait, for a page a customer is looking at. */
+	public function with_timeout( int $seconds ): static {
+		$copy = clone $this;
+		$copy->timeout = max( 1, min( 30, $seconds ) );
+		return $copy;
+	}
+
 	private function path( string $name ): string {
 		return '/' . rawurlencode( strtolower( rtrim( $name, '.' ) ) . '.' );
 	}
@@ -24,7 +32,7 @@ class LiveDns implements Dns {
 	/** @return array|\WP_Error */
 	private function call( string $method, string $path, ?array $body = null ): array|\WP_Error {
 		if ( '' === $this->key ) { return new \WP_Error( 'credentials_missing', 'DNS API key is not configured.' ); }
-		$args = array( 'method' => $method, 'timeout' => 30, 'redirection' => 0, 'headers' => array( 'Accept' => 'application/json', 'X-API-Key' => $this->key ) );
+		$args = array( 'method' => $method, 'timeout' => $this->timeout, 'redirection' => 0, 'headers' => array( 'Accept' => 'application/json', 'X-API-Key' => $this->key ) );
 		if ( null !== $body ) { $args['headers']['Content-Type'] = 'application/json'; $args['body'] = wp_json_encode( $body ); }
 		$response = wp_remote_request( $this->base . $path, $args );
 		if ( is_wp_error( $response ) ) { return new \WP_Error( 'transport', 'DNS request could not be completed.' ); }

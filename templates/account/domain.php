@@ -108,7 +108,12 @@ if ( $beltoft_time ) {
 		<?php endif; ?>
 	</section>
 
-	<?php if ( ( $beltoft_can || $beltoft_off ) && $beltoft_ours ) : ?>
+	<?php if ( ( $beltoft_can || $beltoft_off ) && $beltoft_ours && ! empty( $zone_unavailable ) ) : ?>
+		<section class="beltoft-services-domain__section">
+			<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></h4>
+			<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your DNS records cannot be shown right now. Reload the page in a minute.', 'beltoft-services' ); ?></p>
+		</section>
+	<?php elseif ( ( $beltoft_can || $beltoft_off ) && $beltoft_ours ) : ?>
 		<section class="beltoft-services-domain__section">
 			<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></h4>
 			<form class="beltoft-services-domain-form beltoft-dns-editor" data-domain-action="set_records"<?php echo $beltoft_off ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $rows ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( array(

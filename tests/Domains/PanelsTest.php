@@ -169,4 +169,20 @@ class PanelsTest extends TestCase {
 		Panels::admin( $r );
 		$this->assertStringContainsString( 'First clear check:', (string) ob_get_clean() );
 	}
+
+	public function test_the_account_page_does_not_offer_the_editor_when_the_zone_cannot_be_read(): void {
+		$down = new class() extends \BeltoftServices\Domains\FakeDns {
+			public function zone( string $name ): array|\WP_Error|null { return new \WP_Error( 'transport', 'DNS request could not be completed.' ); }
+		};
+		add_filter( 'beltoft_services_domains_dns', static fn() => $down );
+		$html = $this->render( new DomainDriver(), array( 'domain' => 'down-test.com', 'mode' => 'register' ), true );
+		$this->assertStringContainsString( 'cannot be shown right now', $html );
+		$this->assertStringNotContainsString( 'beltoft-dns-editor', $html, 'An empty editor could be saved over the real records.' );
+		$up = new \BeltoftServices\Domains\FakeDns();
+		$up->create_zone( 'up-test.com', array( 'ns1.example.net', 'ns2.example.net' ) );
+		remove_all_filters( 'beltoft_services_domains_dns' );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $up );
+		$html = $this->render( new DomainDriver(), array( 'domain' => 'up-test.com', 'mode' => 'register' ), true );
+		$this->assertStringContainsString( 'beltoft-dns-editor', $html );
+	}
 }
