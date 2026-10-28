@@ -103,8 +103,11 @@ final class Records {
 		}
 		if ( 'CNAME' === $type ) { return self::target( $value ); }
 		if ( 'TXT' === $type ) {
-			if ( '' === $value || strlen( $value ) > 255 ) { return new \WP_Error( 'bad_txt', 'A TXT string must contain 1 to 255 bytes.' ); }
-			return '"' . addcslashes( $value, '"\\' ) . '"';
+			if ( '' === $value || strlen( $value ) > 2048 ) { return new \WP_Error( 'bad_txt', 'A TXT value must contain 1 to 2048 bytes.' ); }
+			// A string is at most 255 bytes in DNS: a longer value is written as several strings.
+			$parts = array();
+			foreach ( str_split( $value, 255 ) as $part ) { $parts[] = '"' . addcslashes( $part, '"\\' ) . '"'; }
+			return implode( ' ', $parts );
 		}
 		if ( 'MX' === $type ) {
 			$priority = self::number( $record['priority'] ?? null, 0, 65535 );

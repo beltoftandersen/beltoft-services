@@ -55,6 +55,8 @@ final class Plugin {
 		Domains\Renewals::register();
 		Domains\Actions::register();
 		Domains\AuthCodeRoute::register();
+		Domains\DnsClaimJobs::register();
+		Domains\DnsClaimRoutes::register();
 		Domains\Panels::register();
 		Domains\Sync::register();
 		Domains\EmailDetails::register();
