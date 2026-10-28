@@ -34,6 +34,11 @@ final class ProxmoxSettings {
 		'disk_reserve_gb' => array( 0, 10000 ),
 		'disk_promise_percent' => array( 1, 100 ),
 		'disk_max_extra' => array( 1, 30 ),
+		'snapshot_free_slots' => array( 0, 50 ),
+		'snapshot_free_days' => array( 1, 365 ),
+		'snapshot_paid_days' => array( 1, 365 ),
+		'snapshot_max_slots' => array( 1, 50 ),
+		'snapshot_reserve_gb' => array( 0, 10000 ),
 	);
 
 	/**
@@ -214,6 +219,23 @@ final class ProxmoxSettings {
 		$fields['disk_reserve_gb'] = $base + array( 'type' => 'number', 'default' => 200, 'min' => 0, 'label' => __( 'Storage kept free on each node (GB)', 'beltoft-services' ) );
 		$fields['disk_promise_percent'] = $base + array( 'type' => 'number', 'default' => 100, 'min' => 1, 'label' => __( 'Maximum promised storage (%)', 'beltoft-services' ) );
 		$fields['disk_max_extra'] = $base + array( 'type' => 'number', 'default' => 4, 'min' => 1, 'label' => __( 'Maximum extra disks per server', 'beltoft-services' ) );
+		$fields['snapshots_enabled'] = $base + array(
+			'type'    => 'checkbox',
+			'default' => 0,
+			'label'   => __( 'Customer snapshots', 'beltoft-services' ),
+			'desc'    => __( 'Let customers take snapshots of their server and roll back to them. Only servers whose disks are all qcow2 get them. Leave it off until the token has the snapshot privileges and the checks on the cluster have passed.', 'beltoft-services' ),
+		);
+		$fields['snapshot_free_slots'] = $base + array( 'type' => 'number', 'default' => 1, 'min' => self::RANGES['snapshot_free_slots'][0], 'label' => __( 'Free snapshots per server', 'beltoft-services' ) );
+		$fields['snapshot_free_days'] = $base + array( 'type' => 'number', 'default' => 7, 'min' => self::RANGES['snapshot_free_days'][0], 'label' => __( 'Days a free snapshot is kept', 'beltoft-services' ) );
+		$fields['snapshot_paid_days'] = $base + array( 'type' => 'number', 'default' => 30, 'min' => self::RANGES['snapshot_paid_days'][0], 'label' => __( 'Days a snapshot is kept with paid slots', 'beltoft-services' ) );
+		$fields['snapshot_max_slots'] = $base + array( 'type' => 'number', 'default' => 10, 'min' => self::RANGES['snapshot_max_slots'][0], 'label' => __( 'Most snapshots per server', 'beltoft-services' ), 'desc' => __( 'Free and paid slots together never go above this.', 'beltoft-services' ) );
+		$fields['snapshot_reserve_gb'] = $base + array(
+			'type'    => 'number',
+			'default' => 0,
+			'min'     => self::RANGES['snapshot_reserve_gb'][0],
+			'label'   => __( 'Storage kept free for snapshots (GB)', 'beltoft-services' ),
+			'desc'    => __( 'A snapshot is refused when the storage of the server has less than this free. 0 uses the storage kept free for extra disks.', 'beltoft-services' ),
+		);
 		$fields['abuse_mode']       = $base + array(
 			'type'    => 'select',
 			'default' => 'report',

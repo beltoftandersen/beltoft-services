@@ -373,7 +373,7 @@ class FakeClient implements Client {
 
 		$matched = null;
 
-		foreach ( self::routes() as $route ) {
+		foreach ( array_merge( self::routes(), self::snapshot_routes() ) as $route ) {
 			if ( $route[0] === $method && 1 === preg_match( $route[1], $path, $m ) ) {
 				$matched = array( $route, $m );
 				break;
@@ -1220,6 +1220,7 @@ class FakeClient implements Client {
 			$a[1],
 			function () use ( $a ) {
 				$id = (int) $a[1];
+				unset( $this->state['snapshots'][ $id ] ); // The VM's snapshots go with it.
 
 				foreach ( $this->state['pools'] as $poolid => $pool ) {
 					$this->state['pools'][ $poolid ]['members'] = array_values( array_diff( $pool['members'], array( $id ) ) );
@@ -1640,6 +1641,7 @@ class FakeClient implements Client {
 			(string) $p['vmid'],
 			function () use ( $a, $p, $found, $exists ) {
 				$id = (int) $p['vmid'];
+				unset( $this->state['snapshots'][ $id ] ); // A restore recreates the VM: its snapshots are gone (modelled).
 
 				if ( $exists ) {
 					$this->state['vms'][ $id ]['config'] = $this->restored_config( $id, $this->state['vms'][ $id ]['config'], $found['config'] );
@@ -2071,5 +2073,287 @@ class FakeClient implements Client {
 		if ( $this->persist ) {
 			update_option( self::OPTION, $this->state, false );
 		}
+	}
+
+	// Snapshots (modelled on the live results of 2026-10-28, VM 992 on PVE 9): own routes, handlers and helpers.
+
+	/**
+	 * The snapshot endpoints (API viewer #/nodes/{node}/qemu/{vmid}/snapshot).
+	 *
+	 * @return array<int, array{0: string, 1: string, 2: string, 3: array<string, array>}>
+	 */
+	private static function snapshot_routes(): array {
+		$vm = '#^/nodes/([A-Za-z0-9.\-]+)/qemu/(\d+)/snapshot';
+
+		return array(
+			array( 'GET', $vm . '$#', 'h_snapshot_list', array() ),
+			array(
+				'POST',
+				$vm . '$#',
+				'h_snapshot_take',
+				array(
+					'snapname'    => array( 'string', true ),
+					'description' => array( 'string', false, array( 'max' => 8192 ) ),
+					'vmstate'     => array( 'bool' ),
+				),
+			),
+			array( 'GET', $vm . '/([A-Za-z0-9_\-]+)/config$#', 'h_snapshot_config', array() ),
+			array( 'DELETE', $vm . '/([A-Za-z0-9_\-]+)$#', 'h_snapshot_delete', array( 'force' => array( 'bool' ) ) ),
+			array( 'POST', $vm . '/([A-Za-z0-9_\-]+)/rollback$#', 'h_snapshot_rollback', array( 'start' => array( 'bool' ) ) ),
+		);
+	}
+
+	/**
+	 * The snapshots of a VM, name => record (inspection for tests).
+	 *
+	 * @param int $vmid VMID.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function snapshots( int $vmid ): array {
+		$this->load();
+
+		return (array) ( $this->state['snapshots'][ $vmid ] ?? array() );
+	}
+
+	/**
+	 * Drive keys of a config that hold a disk (a cd-rom, the cloud-init drive and an empty drive do not).
+	 *
+	 * @param array<string, mixed> $config VM config.
+	 * @return array<string, string> Key => volume id.
+	 */
+	private static function snapshot_disks( array $config ): array {
+		$out = array();
+
+		foreach ( $config as $key => $value ) {
+			if ( 1 !== preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0)$/', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || false !== strpos( explode( ',', $value )[0], 'cloudinit' ) || 'none' === $value ) {
+				continue;
+			}
+
+			$out[ (string) $key ] = explode( ',', $value )[0];
+		}
+
+		return $out;
+	}
+
+	/**
+	 * GET snapshot: the snapshots, then the `current` line.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snapshot_list( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$out    = array();
+		$parent = null;
+
+		foreach ( $this->state['snapshots'][ (int) $a[1] ] ?? array() as $name => $snap ) {
+			$out[]  = array(
+				'name'        => $name,
+				'description' => $snap['description'],
+				'snaptime'    => $snap['snaptime'],
+				'parent'      => $snap['parent'],
+			);
+			$parent = $name;
+		}
+
+		$current = array(
+			'name'        => 'current',
+			'description' => 'You are here!',
+			'running'     => 'running' === $vm['status'] ? 1 : 0,
+		);
+
+		if ( null !== $parent ) {
+			$current['parent'] = $parent;
+		}
+
+		$out[] = $current;
+
+		return $out;
+	}
+
+	/**
+	 * POST snapshot: a task. Every disk of the VM is included, a `backup=0` one too; a raw volume cannot be
+	 * snapshotted (internal snapshots need qcow2); a locked VM is refused. The name rule is modelled.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snapshot_take( array $a, array $p ) {
+		$vm = $this->find_writable( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$id = (int) $a[1];
+
+		if ( 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9_\-]{0,39}$/', $p['snapname'] ) || 'current' === $p['snapname'] ) {
+			return $this->error( 400, 'Parameter verification failed: snapname: value does not match the format' );
+		}
+
+		if ( isset( $this->state['snapshots'][ $id ][ $p['snapname'] ] ) ) {
+			return $this->error( 500, "snapshot name '" . $p['snapname'] . "' already used" );
+		}
+
+		foreach ( self::snapshot_disks( $vm['config'] ) as $volid ) {
+			if ( 1 === preg_match( '/\.raw$/', $volid ) ) {
+				return $this->error( 500, "snapshot feature is not available for volume '" . $volid . "'" );
+			}
+		}
+
+		return $this->new_task(
+			$a[0],
+			'qmsnapshot',
+			$a[1],
+			function () use ( $id, $p ) {
+				$list = (array) ( $this->state['snapshots'][ $id ] ?? array() );
+				$last = array_key_last( $list );
+
+				$this->state['snapshots'][ $id ][ $p['snapname'] ] = array(
+					'description' => (string) ( $p['description'] ?? '' ),
+					'snaptime'    => time(),
+					'parent'      => $last,
+					'config'      => $this->state['vms'][ $id ]['config'],
+					'vmstate'     => ! empty( $p['vmstate'] ) ? 1 : 0,
+				);
+			}
+		);
+	}
+
+	/**
+	 * GET snapshot/{name}/config: the configuration the snapshot holds.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snapshot_config( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$snap = $this->state['snapshots'][ (int) $a[1] ][ $a[2] ] ?? null;
+
+		if ( null === $snap ) {
+			return $this->error( 500, "snapshot '" . $a[2] . "' does not exist" );
+		}
+
+		return array_merge( $snap['config'], array( 'snaptime' => $snap['snaptime'], 'digest' => sha1( (string) wp_json_encode( $snap['config'] ) ) ) );
+	}
+
+	/**
+	 * DELETE snapshot/{name}: a task.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snapshot_delete( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find_writable( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( ! isset( $this->state['snapshots'][ (int) $a[1] ][ $a[2] ] ) ) {
+			return $this->error( 500, "snapshot '" . $a[2] . "' does not exist" );
+		}
+
+		return $this->new_task(
+			$a[0],
+			'qmdelsnapshot',
+			$a[1],
+			function () use ( $a ) {
+				$id = (int) $a[1];
+
+				foreach ( $this->state['snapshots'][ $id ] as $name => $snap ) {
+					if ( $snap['parent'] === $a[2] ) {
+						$this->state['snapshots'][ $id ][ $name ]['parent'] = $this->state['snapshots'][ $id ][ $a[2] ]['parent'];
+					}
+				}
+
+				unset( $this->state['snapshots'][ $id ][ $a[2] ] );
+			}
+		);
+	}
+
+	/**
+	 * POST snapshot/{name}/rollback: a task, observed live: the VM is left stopped, the configuration (disk
+	 * sizes included) goes back to the snapshot's, a volume attached after the snapshot is kept as an unusedN
+	 * entry, and every snapshot survives, also the ones taken after the one rolled back to.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snapshot_rollback( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find_writable( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( ! isset( $this->state['snapshots'][ (int) $a[1] ][ $a[2] ] ) ) {
+			return $this->error( 500, "snapshot '" . $a[2] . "' does not exist" );
+		}
+
+		return $this->new_task(
+			$a[0],
+			'qmrollback',
+			$a[1],
+			function () use ( $a ) {
+				$id     = (int) $a[1];
+				$config = $this->state['snapshots'][ $id ][ $a[2] ]['config'];
+				$held   = array();
+
+				foreach ( $config as $key => $value ) {
+					if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/', (string) $key ) && is_string( $value ) ) {
+						$held[ explode( ',', $value )[0] ] = true;
+
+						// The old size comes back (modelled on the live result).
+						if ( 1 === preg_match( '/(?:^|,)size=(\d+)G/', $value, $size ) ) {
+							foreach ( $this->state['images'] as $storage => $images ) {
+								if ( isset( $images[ explode( ',', $value )[0] ] ) ) {
+									$this->state['images'][ $storage ][ explode( ',', $value )[0] ]['size'] = (int) $size[1] * 1073741824;
+								}
+							}
+						}
+					}
+				}
+
+				$later = array();
+
+				foreach ( $this->state['vms'][ $id ]['config'] as $key => $value ) {
+					if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/', (string) $key ) && is_string( $value ) && false === strpos( ',' . $value . ',', ',media=cdrom,' ) ) {
+						$volid = explode( ',', $value )[0];
+
+						if ( ! isset( $held[ $volid ] ) ) {
+							$later[ $volid ] = true;
+						}
+					}
+				}
+
+				$n = 0;
+
+				foreach ( array_keys( $later ) as $volid ) {
+					while ( isset( $config[ 'unused' . $n ] ) ) {
+						++$n;
+					}
+
+					$config[ 'unused' . $n ] = $volid;
+				}
+
+				$this->state['vms'][ $id ]['config'] = $config;
+				$this->state['vms'][ $id ]['status'] = 'stopped';
+			}
+		);
 	}
 }

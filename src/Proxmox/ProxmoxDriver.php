@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
@@ -21,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * provisioning; pause, resume, delete and the plan change arrive with the next task, and until
  * then they refuse without touching Proxmox. No sign-in link: a VM has none (no Drivers\Opens).
  */
-class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling {
+class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions {
 
 	/**
 	 * Days a VM product is kept after its license ends, unless the product says otherwise.
@@ -239,6 +240,13 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling {
 	 */
 	public function act( Resource $r, string $action, array $args ): StepResult {
 		return ( new Actions( $r ) )->run( $action, $args );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function internal_actions(): array {
+		return Snapshots::INTERNAL;
 	}
 
 	/**

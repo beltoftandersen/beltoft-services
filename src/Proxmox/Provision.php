@@ -470,7 +470,7 @@ final class Provision {
 			// (it may even carry the old name): it is never detached again.
 			if ( 'import' === $phase ) {
 				if ( '' !== $volid ) {
-					return $this->wiped_boot();
+					return $this->wiped_boot( $volid );
 				}
 			} elseif ( '' !== $volid && $volid !== $old ) {
 				return StepResult::fail( 'wipe: the boot slot holds a volume that is not the recorded old boot volume; nothing was changed' );
@@ -586,8 +586,9 @@ final class Provision {
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function wiped_boot(): array {
+	private function wiped_boot( string $volid ): array {
 		return array(
+			'boot_format'     => Snapshots::format_of( $volid ),
 			'wipe'            => null,
 			'wipe_old_boot'   => null,
 			'wipe_boot_phase' => null,
@@ -885,7 +886,8 @@ final class Provision {
 			VmRecords::move( $this->r->id(), $node );
 		}
 
-		return array();
+		// What the boot volume is (snapshots need qcow2), read from the config the build already has.
+		return array( 'boot_format' => Snapshots::format_of( explode( ',', (string) ( $config[ (string) $this->cluster['boot_disk'] ] ?? '' ) )[0] ) );
 	}
 
 	/**

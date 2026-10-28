@@ -29,7 +29,15 @@ final class DiskCapacity {
 			set_transient( 'beltoft_services_disk_products', $found, 10 * MINUTE_IN_SECONDS );
 		}
 
-		return (bool) apply_filters( 'beltoft_services_disk_capacity_enabled', 'yes' === $found );
+		// Snapshots read the storage before each take too.
+		return (bool) apply_filters( 'beltoft_services_disk_capacity_enabled', 'yes' === $found || (bool) Settings::get( 'snapshots_enabled' ) );
+	}
+
+	/** Free bytes of the last fresh storage reading, or null when there is none. */
+	public static function available( string $cluster, string $node, string $storage ): ?int {
+		$row = get_transient( self::cache_key( $cluster, $node, $storage ) );
+
+		return is_array( $row ) && time() - (int) ( $row['read_at'] ?? 0 ) < 2 * HOUR_IN_SECONDS ? (int) $row['avail'] : null;
 	}
 
 	/** Store only a real storage-status reply. */
