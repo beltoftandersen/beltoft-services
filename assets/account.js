@@ -307,7 +307,9 @@
 
 	// A link to a card's details block (the disk setup guide) opens it.
 	function openTarget() {
-		var target = window.location.hash ? document.getElementById( decodeURIComponent( window.location.hash.slice( 1 ) ) ) : null;
+		var id = window.location.hash.slice( 1 );
+		try { id = decodeURIComponent( id ); } catch ( e ) { /* a malformed hash is used as it is */ }
+		var target = id ? document.getElementById( id ) : null;
 
 		if ( target && 'DETAILS' === target.tagName ) {
 			target.open = true;

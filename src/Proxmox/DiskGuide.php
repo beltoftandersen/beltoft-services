@@ -107,7 +107,7 @@ final class DiskGuide {
 					array( 'text' => __( 'Create a folder for it.', 'beltoft-services' ), 'code' => 'sudo mkdir -p /mnt/data' ),
 					array( 'text' => __( 'Mount it.', 'beltoft-services' ), 'code' => 'sudo mount /dev/DEVICE /mnt/data' ),
 					array( 'text' => __( 'Find its UUID.', 'beltoft-services' ), 'code' => 'sudo blkid' ),
-					array( 'text' => __( 'To mount it after every restart, add this line to /etc/fstab with your UUID.', 'beltoft-services' ), 'code' => 'UUID=… /mnt/data ext4 defaults,nofail 0 2' ),
+					array( 'text' => __( 'To mount it after every restart, add this line to /etc/fstab, with YOUR-UUID replaced by the UUID that blkid showed.', 'beltoft-services' ), 'code' => 'UUID=YOUR-UUID /mnt/data ext4 defaults,nofail 0 2' ),
 					array( 'text' => __( 'Test the line.', 'beltoft-services' ), 'code' => 'sudo mount -a' ),
 				),
 				'grow'    => array(

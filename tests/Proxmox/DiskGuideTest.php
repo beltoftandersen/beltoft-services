@@ -48,7 +48,7 @@ final class DiskGuideTest extends TestCase {
 
 		$this->assertSame( 'linux', $guide['family'] );
 		$this->assertSame( 'lsblk -f', $guide['steps'][0]['code'], 'The device names come first.' );
-		foreach ( array( 'sudo mkfs.ext4 /dev/DEVICE', 'sudo mkdir -p /mnt/data', 'sudo mount /dev/DEVICE /mnt/data', 'sudo blkid', 'UUID=… /mnt/data ext4 defaults,nofail 0 2', 'sudo mount -a', 'sudo resize2fs /dev/DEVICE', 'sudo xfs_growfs /mnt/data' ) as $line ) {
+		foreach ( array( 'sudo mkfs.ext4 /dev/DEVICE', 'sudo mkdir -p /mnt/data', 'sudo mount /dev/DEVICE /mnt/data', 'sudo blkid', 'UUID=YOUR-UUID /mnt/data ext4 defaults,nofail 0 2', 'sudo mount -a', 'sudo resize2fs /dev/DEVICE', 'sudo xfs_growfs /mnt/data' ) as $line ) {
 			$this->assertStringContainsString( $line, $codes );
 		}
 		$this->assertLessThan( strpos( $codes, 'blkid' ), strpos( $codes, 'mkfs.ext4' ) );
