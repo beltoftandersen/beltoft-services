@@ -29,21 +29,26 @@ class CartTest extends TestCase {
 		$this->assertStringContainsString( 'data-rest-nonce="' . wp_create_nonce( 'wp_rest' ) . '"', $html );
 	}
 
-	public function test_unverified_dns_hosting_cannot_be_added(): void {
+	public function test_public_cart_route_still_refuses_dns_hosting(): void {
 		$this->assertSame( 'dns_verification_required', Cart::line_data( 'example.com', 'dns' )->get_error_code() );
 		$this->assertSame( 'dns_verification_required', Cart::line_data( 'www.example.com', 'dns' )->get_error_code() );
+	}
+
+	public function test_direct_dns_add_without_a_claim_is_refused(): void {
 		$product = $this->service_product( 'dns' );
 		$this->expectException( \Exception::class );
+		$this->expectExceptionMessage( 'This DNS hosting check has expired. Start again from My Account, Domains.' );
 		Cart::require_domain_selection( array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ), $product->get_id() );
 	}
 
-	public function test_saved_unverified_dns_cart_item_blocks_checkout(): void {
+	public function test_saved_dns_cart_item_without_a_valid_claim_blocks_checkout(): void {
 		wc_load_cart();
 		WC()->cart->empty_cart();
 		WC()->cart->set_cart_contents( array( 'old-dns-selection' => array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ) ) );
 		wc_clear_notices();
 		Cart::check_unverified_dns_items();
-		$this->assertTrue( wc_notice_count( 'error' ) > 0 );
+		$this->assertSame( 1, wc_notice_count( 'error' ) );
+		$this->assertSame( 'This DNS hosting check has expired. Start again from My Account, Domains.', wc_get_notices( 'error' )[0]['notice'] );
 		WC()->cart->empty_cart();
 		wc_clear_notices();
 	}
@@ -125,5 +130,6 @@ class CartTest extends TestCase {
 		$other_way = Cart::rest_add( $this->add_request( $name, 'dns' ) );
 		$this->assertWPError( $other_way, 'Unverified DNS hosting remains closed even when a domain is in the cart.' );
 		$this->assertSame( 'dns_verification_required', $other_way->get_error_code() );
+		WC()->cart->empty_cart();
 	}
 }

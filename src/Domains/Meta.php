@@ -35,6 +35,10 @@ final class Meta {
 			$item->save();
 			$meta['domain'] = (string) $data['domain'];
 			$meta['mode'] = $mode;
+			if ( 'dns' === $mode ) {
+				$claim_id = (int) ( $data['claim_id'] ?? $item->get_meta( '_beltoft_services_dns_claim', true ) );
+				if ( $claim_id > 0 ) { $meta['claim_id'] = $claim_id; }
+			}
 			$auth = $item->get_meta( '_beltoft_services_domain_auth', true );
 			if ( 'transfer' === $mode && is_string( $auth ) ) { $meta['auth'] = $auth; }
 			$meta['order_item_id'] = (int) $item->get_id();

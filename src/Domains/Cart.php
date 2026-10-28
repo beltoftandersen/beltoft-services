@@ -18,6 +18,13 @@ final class Cart {
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unverified_dns_items' ) );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_dns_checkout' ), 10, 2 );
+		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'bind_dns_claims' ) );
+		add_action( 'woocommerce_store_api_checkout_order_processed', array( __CLASS__, 'bind_dns_claims' ) );
+		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'release_dns_claims' ) );
+		add_action( 'woocommerce_order_status_failed', array( __CLASS__, 'release_dns_claims' ) );
+		add_action( 'woocommerce_trash_order', array( __CLASS__, 'release_dns_claims' ) );
+		add_action( 'wp_trash_post', array( __CLASS__, 'release_trashed_post' ) );
 		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
 	}
 
@@ -91,15 +98,91 @@ final class Cart {
 		return $data;
 	}
 
-	/** Stop DNS selections saved before ownership verification was required from reaching checkout. */
+	/** Is this a renewal, resubscribe or switch line, which carries no new ownership proof? */
+	private static function is_continuation( array $item ): bool {
+		return ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_resubscribe'] ) || ! empty( $item['subscription_switch'] );
+	}
+
+	/**
+	 * May this DNS hosting line be bought by this customer now? Only with a verified claim of their own for the
+	 * same domain, and the domain reserved for them (or, once the claim went into an unpaid order, held by it).
+	 *
+	 * @param array<string, mixed> $data    Cart item, or an array with the line's beltoft_services_domain.
+	 * @param int                  $user_id Customer.
+	 * @return true|\WP_Error
+	 */
+	private static function dns_claim_ok( array $data, int $user_id ) {
+		$fail = new \WP_Error( 'dns_claim_expired', __( 'This DNS hosting check has expired. Start again from My Account, Domains.', 'beltoft-services' ) );
+		$line = $data['beltoft_services_domain'] ?? null;
+		if ( $user_id <= 0 || ! is_array( $line ) || 'dns' !== ( $line['mode'] ?? '' ) || ! isset( $line['claim_id'] ) || ! is_int( $line['claim_id'] ) || $line['claim_id'] <= 0 ) { return $fail; }
+		$claim = DnsClaims::get( $line['claim_id'] );
+		if ( ! $claim || (int) $claim['user_id'] !== $user_id || '' === (string) ( $line['domain'] ?? '' ) || (string) $claim['domain'] !== (string) $line['domain'] ) { return $fail; }
+		$row = DnsAssignments::get( (string) $claim['domain'] );
+		if ( ! $row || (int) $row['user_id'] !== $user_id || (int) $row['claim_id'] !== (int) $claim['id'] ) { return $fail; }
+		if ( 'active' === $row['status'] ) { return true; }
+		if ( 'reserved' !== $row['status'] ) { return $fail; }
+		if ( ! empty( $row['reserved_until'] ) && strtotime( (string) $row['reserved_until'] . ' UTC' ) <= time() ) { return $fail; }
+		if ( DnsClaims::usable( $claim, $user_id ) ) { return true; }
+		if ( 'consumed' === $claim['status'] && (int) $row['order_id'] > 0 ) {
+			$order = wc_get_order( (int) $row['order_id'] );
+			if ( $order && (int) $order->get_customer_id() === $user_id && $order->has_status( array( 'pending', 'on-hold' ) ) ) { return true; }
+		}
+		return $fail;
+	}
+
+	/** Stop DNS lines without a valid, current ownership claim of the logged-in customer from reaching checkout. */
 	public static function check_unverified_dns_items(): void {
 		if ( ! WC()->cart ) { return; }
 		foreach ( WC()->cart->get_cart() as $item ) {
-			if ( 'dns' !== ( $item['beltoft_services_domain']['mode'] ?? '' ) ) { continue; }
-			if ( ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_resubscribe'] ) || ! empty( $item['subscription_switch'] ) ) { continue; }
-			wc_add_notice( __( 'DNS hosting for a domain registered elsewhere requires ownership verification. Remove this item from your cart for now.', 'beltoft-services' ), 'error' );
-			return;
+			if ( 'dns' !== ( $item['beltoft_services_domain']['mode'] ?? '' ) || self::is_continuation( $item ) ) { continue; }
+			$ok = self::dns_claim_ok( $item, get_current_user_id() );
+			if ( is_wp_error( $ok ) ) {
+				wc_add_notice( $ok->get_error_message(), 'error' );
+				return;
+			}
 		}
+	}
+
+	/** The same rule when the classic checkout form is posted. */
+	public static function validate_dns_checkout( $data, $errors ): void {
+		if ( ! WC()->cart || ! $errors instanceof \WP_Error ) { return; }
+		foreach ( WC()->cart->get_cart() as $item ) {
+			if ( 'dns' !== ( $item['beltoft_services_domain']['mode'] ?? '' ) || self::is_continuation( $item ) ) { continue; }
+			$ok = self::dns_claim_ok( $item, get_current_user_id() );
+			if ( is_wp_error( $ok ) ) {
+				$errors->add( 'dns_claim_expired', $ok->get_error_message() );
+				return;
+			}
+		}
+	}
+
+	/** The proof is used up when the order exists: the reservation is tied to it and the claim is consumed. */
+	public static function bind_dns_claims( $order ): void {
+		if ( ! $order instanceof \WC_Order ) { return; }
+		foreach ( $order->get_items() as $item ) {
+			$claim_id = (int) $item->get_meta( '_beltoft_services_dns_claim', true );
+			$line = $item->get_meta( '_beltoft_services_domain', true );
+			if ( $claim_id <= 0 || ! is_array( $line ) ) { continue; }
+			$user_id = (int) $order->get_customer_id();
+			$ok = self::dns_claim_ok( array( 'beltoft_services_domain' => $line ), $user_id );
+			if ( is_wp_error( $ok ) ) {
+				/* translators: %s: domain name */
+				$order->add_order_note( sprintf( __( 'DNS hosting for %s: the ownership check is no longer valid, so the domain was not reserved for this order.', 'beltoft-services' ), (string) ( $line['domain'] ?? '' ) ) );
+				continue;
+			}
+			if ( DnsAssignments::bind_order( (string) $line['domain'], $user_id, (int) $order->get_id(), (int) $item->get_id() ) ) {
+				DnsClaims::set_status( $claim_id, 'consumed' );
+			}
+		}
+	}
+
+	/** An order that will not be paid frees its reservation. Active rows are never touched. */
+	public static function release_dns_claims( $order_id ): void {
+		DnsAssignments::release_for_order( (int) $order_id );
+	}
+
+	public static function release_trashed_post( $post_id ): void {
+		if ( 'shop_order' === get_post_type( (int) $post_id ) ) { self::release_dns_claims( $post_id ); }
 	}
 
 	/** Prevent a direct product add from creating an unprovisionable license. */
@@ -117,7 +200,9 @@ final class Cart {
 			if ( ! empty( $data[ $key ] ) ) { return; }
 		}
 		if ( 'dns' === $driver->id() ) {
-			throw new \Exception( esc_html__( 'DNS hosting for a domain registered elsewhere requires ownership verification. This option is temporarily unavailable.', 'beltoft-services' ) );
+			$ok = self::dns_claim_ok( $data, get_current_user_id() );
+			if ( is_wp_error( $ok ) ) { throw new \Exception( esc_html( $ok->get_error_message() ) ); }
+			return;
 		}
 		$chosen = $data['beltoft_services_domain'] ?? null;
 		if ( ! is_array( $chosen ) || empty( $chosen['domain'] ) || is_wp_error( Search::normalise( (string) $chosen['domain'] ) ) || ( ( 'dns' === $driver->id() ) !== ( 'dns' === ( $chosen['mode'] ?? '' ) ) ) ) {
@@ -165,6 +250,7 @@ final class Cart {
 	public static function order_item( \WC_Order_Item_Product $item, string $cart_item_key, array $values, \WC_Order $order ): void {
 		if ( isset( $values['beltoft_services_domain'] ) ) {
 			$item->add_meta_data( '_beltoft_services_domain', $values['beltoft_services_domain'], true );
+			if ( ! empty( $values['beltoft_services_domain']['claim_id'] ) ) { $item->add_meta_data( '_beltoft_services_dns_claim', (int) $values['beltoft_services_domain']['claim_id'], true ); }
 			$item->add_meta_data( __( 'Domain', 'beltoft-services' ), (string) ( $values['beltoft_services_domain']['domain'] ?? '' ), true );
 		}
 		if ( isset( $values['beltoft_services_domain_auth'] ) ) { $item->add_meta_data( '_beltoft_services_domain_auth', $values['beltoft_services_domain_auth'], true ); }
@@ -187,6 +273,11 @@ final class Cart {
 	public static function recurring_key( string $key, array $cart_item ): string {
 		$domain = (string) ( $cart_item['beltoft_services_domain']['domain'] ?? '' );
 		return '' === $domain ? $key : $key . '_domain_' . md5( $domain );
+	}
+
+	/** The DNS hosting product, for the claim checkout route. */
+	public static function dns_product(): ?\WC_Product {
+		return self::product_for( 'dns' );
 	}
 
 	private static function product_for( string $driver ): ?\WC_Product {

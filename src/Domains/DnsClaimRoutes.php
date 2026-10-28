@@ -50,6 +50,7 @@ final class DnsClaimRoutes {
 			array( $one . '/scan', \WP_REST_Server::CREATABLE, 'scan', $id ),
 			array( $one . '/zone-file', \WP_REST_Server::CREATABLE, 'zone_file', $id ),
 			array( $one . '/records', \WP_REST_Server::CREATABLE, 'records', $id ),
+			array( $one . '/checkout', \WP_REST_Server::CREATABLE, 'checkout', $id ),
 			array( $one, \WP_REST_Server::DELETABLE, 'cancel', $id ),
 		);
 
@@ -248,6 +249,116 @@ final class DnsClaimRoutes {
 		}
 
 		return new \WP_REST_Response( self::view( (array) DnsClaims::get( $claim['id'] ) ), 200 );
+	}
+
+	/**
+	 * Reserves the domain and puts the DNS hosting line, carrying the claim, in the cart.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	private static function checkout( \WP_REST_Request $request ): \WP_REST_Response {
+		$claim = self::load( $request );
+
+		if ( ! is_array( $claim ) ) {
+			return $claim;
+		}
+
+		$user_id = get_current_user_id();
+
+		if ( 'consumed' === $claim['status'] ) {
+			return self::error( 'dns_claim_used', __( 'This domain is already in an order.', 'beltoft-services' ), 409 );
+		}
+
+		if ( ! DnsClaims::usable( $claim, $user_id ) ) {
+			return self::error( 'dns_claim_not_verified', __( 'Check the TXT record again before you continue.', 'beltoft-services' ), 409 );
+		}
+
+		if ( RateLimit::exceeded( $user_id, 'beltoft-services:dns_claim_checkout', 10, HOUR_IN_SECONDS ) ) {
+			return self::error( 'rate_limited', __( 'Too many attempts. Try again later.', 'beltoft-services' ), 429 );
+		}
+
+		$domain  = (string) $claim['domain'];
+		$generic = self::error( 'domain_taken', __( 'This domain cannot be added here. Contact support.', 'beltoft-services' ), 409 );
+
+		foreach ( array( 'domain', 'dns' ) as $kind ) {
+			foreach ( Resource::live_ids( $kind ) as $resource_id ) {
+				$resource = Resource::find( $resource_id );
+
+				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain ) {
+					continue;
+				}
+
+				return (int) ( $resource->license()['user_id'] ?? 0 ) === $user_id ? self::mine( $resource_id ) : $generic;
+			}
+		}
+
+		$reserved = DnsAssignments::reserve( $user_id, (int) $claim['id'], $domain, 2 * HOUR_IN_SECONDS );
+
+		if ( is_wp_error( $reserved ) ) {
+			switch ( $reserved->get_error_code() ) {
+				case 'domain_taken':
+					return $generic;
+				case 'already_yours':
+					$row = DnsAssignments::get( $domain );
+
+					return self::mine( (int) ( $row['resource_id'] ?? 0 ) );
+				default:
+					return self::error( 'busy', __( 'Try again in a minute.', 'beltoft-services' ), 503 );
+			}
+		}
+
+		// WooCommerce leaves its cart unloaded on custom REST routes.
+		if ( ! WC()->cart && function_exists( 'wc_load_cart' ) ) {
+			wc_load_cart();
+		}
+
+		$cart = WC()->cart;
+
+		if ( ! $cart ) {
+			return self::error( 'no_cart', __( 'The cart is unavailable.', 'beltoft-services' ), 503 );
+		}
+
+		foreach ( $cart->get_cart() as $key => $item ) {
+			$line = $item['beltoft_services_domain'] ?? array();
+
+			if ( ( $line['domain'] ?? '' ) !== $domain || 'dns' !== ( $line['mode'] ?? '' ) ) {
+				continue;
+			}
+
+			if ( (int) ( $line['claim_id'] ?? 0 ) === (int) $claim['id'] ) {
+				return new \WP_REST_Response( array( 'checkout_url' => wc_get_checkout_url() ), 200 );
+			}
+
+			$cart->remove_cart_item( $key ); // A line from an older check of this domain.
+		}
+
+		$product = Cart::dns_product();
+
+		if ( ! $product ) {
+			return self::error( 'product_missing', __( 'This service is not available yet.', 'beltoft-services' ), 503 );
+		}
+
+		$data = array(
+			'beltoft_services_domain' => array(
+				'domain'   => $domain,
+				'mode'     => 'dns',
+				'claim_id' => (int) $claim['id'],
+			),
+		);
+
+		if ( ! $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data ) ) {
+			return self::error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), 400 );
+		}
+
+		WC()->session->set_customer_session_cookie( true );
+
+		return new \WP_REST_Response(
+			array(
+				'added'        => true,
+				'checkout_url' => wc_get_checkout_url(),
+			),
+			201
+		);
 	}
 
 	/**
