@@ -344,6 +344,7 @@ class ClustersTest extends TestCase {
 			array( 'storage' => 'bad storage' ),
 			array( 'cloudinit_storage' => '' ),
 			array( 'bridge' => 'vm br' ),
+			array( 'private_bridge' => 'vm br' ),
 			array( 'vlan' => '0' ),
 			array( 'vlan' => '4095' ),
 			array( 'pool' => 'bad pool' ),
@@ -371,6 +372,7 @@ class ClustersTest extends TestCase {
 				$this->input(
 					array(
 						'vlan'           => '120',
+						'private_bridge' => 'vmbr1',
 						'pool'           => 'customers',
 						'vendor_snippet' => 'local:snippets/vendor.yaml',
 						'pool_api'       => 'pools_id',
@@ -381,6 +383,7 @@ class ClustersTest extends TestCase {
 		);
 		$c = Clusters::get( 'lab' );
 		$this->assertSame( 120, $c['vlan'] );
+		$this->assertSame( 'vmbr1', $c['private_bridge'] );
 		$this->assertSame( 'customers', $c['pool'] );
 		$this->assertSame( 'local:snippets/vendor.yaml', $c['vendor_snippet'] );
 		$this->assertSame( 'pools_id', $c['pool_api'] );
@@ -424,7 +427,7 @@ class ClustersTest extends TestCase {
 	public function test_no_built_in_default_names_an_infrastructure_value(): void {
 		$d = Clusters::defaults();
 
-		foreach ( array( 'api_url', 'token_id', 'token_secret', 'storage', 'cloudinit_storage', 'bridge', 'pool', 'gateway', 'nodes', 'templates', 'vendor_snippet', 'backup_storage' ) as $key ) {
+		foreach ( array( 'api_url', 'token_id', 'token_secret', 'storage', 'cloudinit_storage', 'bridge', 'private_bridge', 'pool', 'gateway', 'nodes', 'templates', 'vendor_snippet', 'backup_storage' ) as $key ) {
 			$this->assertContains( $d[ $key ], array( '', array() ), $key );
 		}
 

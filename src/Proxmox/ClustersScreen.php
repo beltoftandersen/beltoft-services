@@ -282,6 +282,7 @@ final class ClustersScreen {
 		self::row( 'storage', __( 'Disk storage', 'beltoft-services' ), (string) $c['storage'] );
 		self::row( 'cloudinit_storage', __( 'Cloud-init storage', 'beltoft-services' ), (string) $c['cloudinit_storage'] );
 		self::row( 'bridge', __( 'Network bridge', 'beltoft-services' ), (string) $c['bridge'] );
+		self::row( 'private_bridge', __( 'Private network bridge', 'beltoft-services' ), (string) $c['private_bridge'], __( 'Optional. Configure an isolated VLAN-aware bridge on the host before using it.', 'beltoft-services' ) );
 		self::row( 'vlan', __( 'VLAN tag', 'beltoft-services' ), $c['vlan'] ? (string) $c['vlan'] : '', __( 'Optional, 1 to 4094.', 'beltoft-services' ) );
 		self::row( 'pool', __( 'Pool', 'beltoft-services' ), (string) $c['pool'], __( 'Optional Proxmox pool id for new machines.', 'beltoft-services' ) );
 		self::row( 'boot_disk', __( 'Boot disk', 'beltoft-services' ), (string) $c['boot_disk'] );

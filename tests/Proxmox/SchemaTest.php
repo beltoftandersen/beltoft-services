@@ -53,7 +53,7 @@ class SchemaTest extends TestCase {
 		return $keys;
 	}
 
-	public function test_the_bootstrap_created_both_tables_with_their_unique_keys(): void {
+	public function test_the_bootstrap_created_tables_with_their_unique_keys(): void {
 		$t = Schema::tables();
 
 		$this->assertSame( array(), Schema::missing_keys() );
@@ -73,6 +73,8 @@ class SchemaTest extends TestCase {
 			),
 			$this->unique_keys( $t['vms'] )
 		);
+		$this->assertSame( array( 'PRIMARY' => array( 'id' ), 'vlan' => array( 'vlan' ), 'cidr' => array( 'cidr' ), 'user_id' => array( 'user_id' ) ), $this->unique_keys( $t['private_nets'] ) );
+		$this->assertSame( array( 'PRIMARY' => array( 'id' ), 'resource_id' => array( 'resource_id' ), 'net_address' => array( 'net_id', 'address' ) ), $this->unique_keys( $t['private_ips'] ) );
 	}
 
 	public function test_schema_verifies_indexes_before_storing_version(): void {
@@ -240,7 +242,7 @@ class SchemaTest extends TestCase {
 
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
-		$this->assertCount( 4, $drops );
+		$this->assertCount( 6, $drops );
 		$this->assertStringContainsString( $t['ips'], implode( ' ', $drops ) );
 		$this->assertStringContainsString( $t['vms'], implode( ' ', $drops ) );
 		wp_cache_flush(); // The uninstall script deletes straight from the database.

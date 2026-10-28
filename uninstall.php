@@ -39,8 +39,8 @@ delete_option( 'beltoft_services_db_version' );
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time cleanup of the plugin's own transients.
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_beltoft_services_' ) . '%', $wpdb->esc_like( '_transient_timeout_beltoft_services_' ) . '%' ) );
 
-// The IP pool and the VM records. The warning is on the setting's description.
-foreach ( array( 'beltoft_services_ips', 'beltoft_services_vms' ) as $beltoft_services_table ) {
+// The IP pool, VM records and private network allocations. The warning is on the setting's description.
+foreach ( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets' ) as $beltoft_services_table ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables.
 	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . $beltoft_services_table ) );
 }

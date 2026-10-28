@@ -1,6 +1,6 @@
 <?php
 /**
- * This plugin's own tables: the IP pool and the VM records.
+ * This plugin's own Proxmox allocation tables.
  *
  * @package BeltoftServices
  */
@@ -10,14 +10,14 @@ namespace BeltoftServices\Proxmox;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Creates and upgrades the two tables, the way beltoft-licenses' Install does: dbDelta, and the
+ * Creates and upgrades the allocation tables, the way beltoft-licenses' Install does: dbDelta, and the
  * schema version is stored only once the unique keys are verified in place, so a failed attempt
  * is tried again on the next request. (Not named Install: Retention and Resource import
  * BeltoftLicenses\Install.)
  */
 final class Schema {
 
-	public const DB_VERSION        = '1';
+	public const DB_VERSION        = '2';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -33,6 +33,15 @@ final class Schema {
 			'resource_id' => array( 'resource_id' ),
 			'cluster_vm'  => array( 'cluster', 'vmid' ),
 		),
+		'private_nets' => array(
+			'user_id' => array( 'user_id' ),
+			'vlan'    => array( 'vlan' ),
+			'cidr'    => array( 'cidr' ),
+		),
+		'private_ips' => array(
+			'resource_id' => array( 'resource_id' ),
+			'net_address' => array( 'net_id', 'address' ),
+		),
 	);
 
 	/**
@@ -46,6 +55,8 @@ final class Schema {
 		return array(
 			'ips' => $wpdb->prefix . 'beltoft_services_ips',
 			'vms' => $wpdb->prefix . 'beltoft_services_vms',
+			'private_nets' => $wpdb->prefix . 'beltoft_services_private_nets',
+			'private_ips' => $wpdb->prefix . 'beltoft_services_private_ips',
 		);
 	}
 
@@ -151,6 +162,35 @@ final class Schema {
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_id (resource_id),
 				UNIQUE KEY cluster_vm (cluster,vmid)
+			) $collate;"
+		);
+
+		dbDelta(
+			"CREATE TABLE {$t['private_nets']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				user_id bigint(20) unsigned NULL DEFAULT NULL,
+				vlan smallint(5) unsigned NOT NULL,
+				cidr varchar(18) NOT NULL,
+				state varchar(12) NOT NULL DEFAULT 'free',
+				updated_at datetime NOT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY user_id (user_id),
+				UNIQUE KEY vlan (vlan),
+				UNIQUE KEY cidr (cidr),
+				KEY state (state,id)
+			) $collate;"
+		);
+
+		dbDelta(
+			"CREATE TABLE {$t['private_ips']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				net_id bigint(20) unsigned NOT NULL,
+				resource_id bigint(20) unsigned NOT NULL,
+				address varchar(45) NOT NULL,
+				updated_at datetime NOT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY resource_id (resource_id),
+				UNIQUE KEY net_address (net_id,address)
 			) $collate;"
 		);
 

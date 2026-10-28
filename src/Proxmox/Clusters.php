@@ -43,6 +43,7 @@ final class Clusters {
 			'storage'           => '',
 			'cloudinit_storage' => '',
 			'bridge'            => '',
+			'private_bridge'    => '',
 			'vlan'              => 0,
 			'pool'              => '',
 			'boot_disk'         => 'scsi0',
@@ -358,6 +359,12 @@ final class Clusters {
 		}
 
 		$clean['bridge'] = $bridge;
+
+		$private_bridge = trim( (string) ( $input['private_bridge'] ?? '' ) );
+		if ( '' !== $private_bridge && ! preg_match( '/^[A-Za-z][A-Za-z0-9_.-]{0,14}$/', $private_bridge ) ) {
+			return self::error( 'private_bridge', __( 'The private bridge is a network device name such as vmbr1.', 'beltoft-services' ) );
+		}
+		$clean['private_bridge'] = $private_bridge;
 
 		$vlan = trim( (string) ( $input['vlan'] ?? '' ) );
 
