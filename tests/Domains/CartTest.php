@@ -29,8 +29,23 @@ class CartTest extends TestCase {
 		$this->assertStringContainsString( 'data-rest-nonce="' . wp_create_nonce( 'wp_rest' ) . '"', $html );
 	}
 
-	public function test_dns_mode_refuses_subdomain(): void {
-		$this->assertWPError( Cart::line_data( 'www.example.com', 'dns', '' ) );
+	public function test_unverified_dns_hosting_cannot_be_added(): void {
+		$this->assertSame( 'dns_verification_required', Cart::line_data( 'example.com', 'dns' )->get_error_code() );
+		$this->assertSame( 'dns_verification_required', Cart::line_data( 'www.example.com', 'dns' )->get_error_code() );
+		$product = $this->service_product( 'dns' );
+		$this->expectException( \Exception::class );
+		Cart::require_domain_selection( array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ), $product->get_id() );
+	}
+
+	public function test_saved_unverified_dns_cart_item_blocks_checkout(): void {
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		WC()->cart->set_cart_contents( array( 'old-dns-selection' => array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ) ) );
+		wc_clear_notices();
+		Cart::check_unverified_dns_items();
+		$this->assertTrue( wc_notice_count( 'error' ) > 0 );
+		WC()->cart->empty_cart();
+		wc_clear_notices();
 	}
 
 	public function test_dk_orders_wait_for_agreement_approval(): void {
@@ -108,7 +123,7 @@ class CartTest extends TestCase {
 		$this->assertCount( 1, WC()->cart->get_cart(), 'Nothing is added twice.' );
 
 		$other_way = Cart::rest_add( $this->add_request( $name, 'dns' ) );
-		$this->assertWPError( $other_way, 'The same name chosen another way is still explained.' );
-		$this->assertSame( 'duplicate_domain', $other_way->get_error_code() );
+		$this->assertWPError( $other_way, 'Unverified DNS hosting remains closed even when a domain is in the cart.' );
+		$this->assertSame( 'dns_verification_required', $other_way->get_error_code() );
 	}
 }

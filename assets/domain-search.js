@@ -118,7 +118,6 @@
       if (item.status === 'free') actions.appendChild(action('Register domain', item.domain, 'register', false));
       if (item.status === 'taken') {
         actions.appendChild(action('Transfer domain', item.domain, 'transfer', false));
-        actions.appendChild(action('Use DNS hosting', item.domain, 'dns', true));
       }
       if (actions.children.length) row.appendChild(actions);
       return row;

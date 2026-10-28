@@ -17,6 +17,7 @@ final class Cart {
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unverified_dns_items' ) );
 		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
 	}
 
@@ -73,6 +74,7 @@ final class Cart {
 		$domain = Search::normalise( $domain );
 		if ( is_wp_error( $domain ) ) { return $domain; }
 		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', 'Choose registration, transfer or DNS hosting.' ); }
+		if ( 'dns' === $mode ) { return new \WP_Error( 'dns_verification_required', __( 'DNS hosting for a domain registered elsewhere requires ownership verification. This option is temporarily unavailable.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		if ( 'dns' !== $mode && str_ends_with( $domain, '.dk' ) && ! DkAgreement::ready() ) { return new \WP_Error( 'dk_pending', __( '.dk orders are not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		$parts = explode( '.', $domain );
 		if ( 'dns' === $mode && count( $parts ) > 2 ) {
@@ -89,6 +91,17 @@ final class Cart {
 		return $data;
 	}
 
+	/** Stop DNS selections saved before ownership verification was required from reaching checkout. */
+	public static function check_unverified_dns_items(): void {
+		if ( ! WC()->cart ) { return; }
+		foreach ( WC()->cart->get_cart() as $item ) {
+			if ( 'dns' !== ( $item['beltoft_services_domain']['mode'] ?? '' ) ) { continue; }
+			if ( ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_resubscribe'] ) || ! empty( $item['subscription_switch'] ) ) { continue; }
+			wc_add_notice( __( 'DNS hosting for a domain registered elsewhere requires ownership verification. Remove this item from your cart for now.', 'beltoft-services' ), 'error' );
+			return;
+		}
+	}
+
 	/** Prevent a direct product add from creating an unprovisionable license. */
 	public static function require_domain_selection( array $data, int $product_id ): array {
 		// Store API invokes this filter before its validation hook. Let that hook return a normal 400 response.
@@ -102,6 +115,9 @@ final class Cart {
 		if ( ! $driver || ! in_array( $driver->id(), array( 'domain', 'dns' ), true ) ) { return; }
 		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
 			if ( ! empty( $data[ $key ] ) ) { return; }
+		}
+		if ( 'dns' === $driver->id() ) {
+			throw new \Exception( esc_html__( 'DNS hosting for a domain registered elsewhere requires ownership verification. This option is temporarily unavailable.', 'beltoft-services' ) );
 		}
 		$chosen = $data['beltoft_services_domain'] ?? null;
 		if ( ! is_array( $chosen ) || empty( $chosen['domain'] ) || is_wp_error( Search::normalise( (string) $chosen['domain'] ) ) || ( ( 'dns' === $driver->id() ) !== ( 'dns' === ( $chosen['mode'] ?? '' ) ) ) ) {
