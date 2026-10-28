@@ -40,6 +40,9 @@ final class Provision {
 	 */
 	public const LOGIN_USER = 'root';
 
+	/** The disk format of new volumes: qcow2 (snapshots need it). Existing raw volumes are left as they are. */
+	public const DISK_FORMAT = 'qcow2';
+
 	/**
 	 * Recorded as the old boot volume when the VM had no boot drive.
 	 */
@@ -516,7 +519,7 @@ final class Provision {
 				'POST',
 				$path,
 				array(
-					$boot    => $this->cluster['storage'] . ':0,import-from=' . $source,
+					$boot    => $this->cluster['storage'] . ':0,import-from=' . $source . ',format=' . self::disk_format(),
 					'boot'   => 'order=' . $boot,
 					'digest' => $digest,
 				),
@@ -699,6 +702,15 @@ final class Provision {
 	}
 
 	/**
+	 * The format for new volumes: qcow2, or raw when the filter says so. Anything else is qcow2.
+	 */
+	public static function disk_format(): string {
+		$format = apply_filters( 'beltoft_services_proxmox_disk_format', self::DISK_FORMAT );
+
+		return in_array( $format, array( 'raw', 'qcow2' ), true ) ? $format : self::DISK_FORMAT;
+	}
+
+	/**
 	 * Step 3: clone the template, unless a clone of ours is already there.
 	 *
 	 * @return array<string, mixed>|StepResult
@@ -789,6 +801,7 @@ final class Provision {
 			'name'        => 'vm-' . substr( $this->r->get( 'uuid' ), 0, 8 ),
 			'full'        => 1,
 			'storage'     => (string) $this->cluster['storage'],
+			'format'      => self::disk_format(),
 			'description' => Ownership::tag( $this->r ),
 		);
 

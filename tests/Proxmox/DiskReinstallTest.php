@@ -14,6 +14,7 @@ require_once __DIR__ . '/BackupTestCase.php';
 
 class DiskReinstallTest extends BackupTestCase {
 	private const BOOT = 'disk-store:5000/vm-5000-disk-0.raw';
+	private const NEW_BOOT = 'disk-store:5000/vm-5000-disk-0.qcow2';
 
 	private function disk_for( Resource $server ): Resource {
 		$server_license = $server->license();
@@ -101,7 +102,7 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->assert_disks_attached( $disks );
 		$config = $this->config();
 		$this->assertSame( $before['scsi1'], $config['scsi1'], 'The extra drive string is untouched.' );
-		$this->assertStringStartsWith( self::BOOT, $config['scsi0'] );
+		$this->assertStringStartsWith( self::NEW_BOOT, $config['scsi0'] );
 		$this->assertStringContainsString( 'size=30G', $config['scsi0'], 'The boot disk is resized to the plan.' );
 		$this->assertArrayNotHasKey( 'unused0', $config );
 		$this->assertCount( 2, $this->images() );
@@ -129,7 +130,7 @@ class DiskReinstallTest extends BackupTestCase {
 		$deletes = array_values( array_filter( $calls, static fn( $c ) => 'PUT' === $c['method'] && isset( $c['params']['delete'] ) ) );
 		$this->assertSame( array( 'scsi0', 'unused0' ), array_column( array_column( $deletes, 'params' ), 'delete' ), 'Exactly the boot drive, then the unused entry of the old boot volume.' );
 		$importcall = array_values( array_filter( $calls, static fn( $c ) => isset( $c['params']['boot'] ) ) )[0];
-		$this->assertSame( 'disk-store:0,import-from=disk-store:vm-9000-disk-0', $importcall['params']['scsi0'] );
+		$this->assertSame( 'disk-store:0,import-from=disk-store:vm-9000-disk-0,format=qcow2', $importcall['params']['scsi0'] );
 		$this->assertSame( 'order=scsi0', $importcall['params']['boot'] );
 		$this->assertLessThan( strpos( $flat, '/status/start' ), $import );
 	}
@@ -152,7 +153,7 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->rebuild( $server->id() );
 		$import = array_values( array_filter( $this->fake->calls(), static fn( $c ) => isset( $c['params']['boot'] ) ) );
 		$this->assertCount( 1, $import );
-		$this->assertSame( 'disk-store:0,import-from=disk-store:vm-9001-disk-0', $import[0]['params']['scsi0'] );
+		$this->assertSame( 'disk-store:0,import-from=disk-store:vm-9001-disk-0,format=qcow2', $import[0]['params']['scsi0'] );
 	}
 
 	public function test_a_server_without_extra_disks_still_deletes_and_clones(): void {
@@ -235,7 +236,7 @@ class DiskReinstallTest extends BackupTestCase {
 				$this->assertTrue( Resource::find( $id )->set( array( 'wipe_boot_phase' => 'import' ) ) );
 			}
 			if ( 'after_import_before_ready' === $phase ) {
-				$upid = $this->fake->request( 'POST', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0', 'boot' => 'order=scsi0' ) );
+				$upid = $this->fake->request( 'POST', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0,format=qcow2', 'boot' => 'order=scsi0' ) );
 				$this->assertTrue( $this->fake->wait_task( $upid, 5 ) );
 			}
 			$seen = count( $this->fake->calls() );
@@ -253,8 +254,8 @@ class DiskReinstallTest extends BackupTestCase {
 			);
 			$this->assertSame( $expected[ $phase ], $deleted, $phase . ': only the old boot drive and its unused entry, each once.' );
 			$config = $this->config();
-			$this->assertStringStartsWith( self::BOOT, $config['scsi0'], $phase . ': the new boot disk is there.' );
-			$this->assertContains( self::BOOT, $this->images(), $phase . ': the new boot volume exists.' );
+			$this->assertStringStartsWith( self::NEW_BOOT, $config['scsi0'], $phase . ': the new boot disk is there.' );
+			$this->assertContains( self::NEW_BOOT, $this->images(), $phase . ': the new boot volume exists.' );
 			$this->assert_disks_attached( $disks );
 		}
 	}
@@ -267,17 +268,17 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'scsi0' ) ) );
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'unused0' ) ) );
 		$this->assertNotContains( self::BOOT, $this->images() );
-		$upid = $this->fake->request( 'POST', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0', 'boot' => 'order=scsi0' ) );
+		$upid = $this->fake->request( 'POST', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0,format=qcow2', 'boot' => 'order=scsi0' ) );
 		$this->assertTrue( $this->fake->wait_task( $upid, 5 ) );
-		$this->assertStringStartsWith( self::BOOT, $this->config()['scsi0'], 'The new disk has the old name.' );
+		$this->assertStringStartsWith( self::NEW_BOOT, $this->config()['scsi0'], 'The new disk has the old name.' );
 		$this->assertTrue( Resource::find( $server->id() )->set( array( 'wipe_old_boot' => self::BOOT, 'wipe_boot_phase' => 'import' ) ) );
 		$seen = count( $this->fake->calls() );
 		$this->rebuild( $server->id() );
 		$new_calls = array_slice( $this->fake->calls(), $seen );
 		$this->assertSame( array(), array_filter( $new_calls, static fn( $c ) => isset( $c['params']['delete'] ) ), 'Nothing is detached or destroyed.' );
 		$this->assertCount( 0, array_filter( $new_calls, static fn( $c ) => isset( $c['params']['boot'] ) ), 'No second import.' );
-		$this->assertContains( self::BOOT, $this->images(), 'The new boot volume is kept.' );
-		$this->assertStringStartsWith( self::BOOT, $this->config()['scsi0'], 'It is still in the boot slot.' );
+		$this->assertContains( self::NEW_BOOT, $this->images(), 'The new boot volume is kept.' );
+		$this->assertStringStartsWith( self::NEW_BOOT, $this->config()['scsi0'], 'It is still in the boot slot.' );
 		$this->assert_disks_attached( $disks );
 	}
 
@@ -358,13 +359,13 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'scsi0' ) ) );
 		$this->assertSame( self::BOOT, $this->config()['unused0'] );
 		// The old volume is still there: the next free name is disk-1.
-		$upid = $this->fake->request( 'POST', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0', 'boot' => 'order=scsi0' ) );
+		$upid = $this->fake->request( 'POST', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0,format=qcow2', 'boot' => 'order=scsi0' ) );
 		$this->assertTrue( $this->fake->wait_task( $upid, 5 ) );
-		$this->assertSame( 'disk-store:5000/vm-5000-disk-1.raw,size=10G', $this->config()['scsi0'] );
+		$this->assertSame( 'disk-store:5000/vm-5000-disk-1.qcow2,size=10G', $this->config()['scsi0'] );
 		$this->assertContains( self::BOOT, $this->images() );
 		$this->assertSame( self::BOOT, $this->config()['unused0'] );
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'unused0' ) ) );
 		$this->assertNotContains( self::BOOT, $this->images() );
-		$this->assertWPError( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0' ) ), 'An occupied slot is not overwritten.' );
+		$this->assertWPError( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0,format=qcow2' ) ), 'An occupied slot is not overwritten.' );
 	}
 }

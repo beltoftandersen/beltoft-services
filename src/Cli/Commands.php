@@ -93,8 +93,8 @@ final class Commands {
 		$size = Provision::gigabytes( $value );
 		$variation_id = (int) ( $disk_license['variation_id'] ?? 0 );
 		$plan = Product::plan( (int) $disk_license['product_id'], $variation_id > 0 ? $variation_id : null );
-		if ( ! preg_match( '/^vm-' . (int) $record['vmid'] . '-[A-Za-z0-9._-]+\.raw$/', $name ) || null === $size || (int) $size !== (int) ( $plan['disk_gb'] ?? 0 ) ) {
-			\WP_CLI::error( 'The slot must hold a raw volume on the server storage with exactly the licensed size.' );
+		if ( ! preg_match( '/^vm-' . (int) $record['vmid'] . '-[A-Za-z0-9._-]+\.(?:raw|qcow2)$/', $name ) || null === $size || (int) $size !== (int) ( $plan['disk_gb'] ?? 0 ) ) {
+			\WP_CLI::error( 'The slot must hold a raw or qcow2 volume on the server storage with exactly the licensed size.' );
 		}
 		$resource = Resource::create( $disk_license, $driver, $plan, array( 'server_license' => (int) $server_license['id'], 'slot' => $slot, 'volname' => $name, 'size_gb' => (int) $size, 'state' => 'ready', 'desired' => 'ready', 'linked' => true, 'protected' => true, 'steps' => array( 'server', 'slot', 'allocate', 'attach', 'verify' ), 'notified' => 'ready' ) );
 		if ( is_wp_error( $resource ) ) {

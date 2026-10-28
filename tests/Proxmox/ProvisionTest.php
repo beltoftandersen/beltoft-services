@@ -427,6 +427,7 @@ class ProvisionTest extends TestCase {
 				'name'        => 'vm-' . substr( $fresh->get( 'uuid' ), 0, 8 ),
 				'full'        => 1,
 				'storage'     => 'disk-store',
+				'format'      => 'qcow2',
 				'description' => 'beltoft-services:' . \BeltoftServices\Proxmox\ProxmoxSettings::site_tag() . ':' . $fresh->get( 'uuid' ),
 				'pool'        => 'customers',
 			),
