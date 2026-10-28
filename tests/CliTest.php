@@ -95,6 +95,9 @@ class CliTest extends TestCase {
 
 	public function test_dry_run_writes_nothing(): void {
 		$license = $this->license();
+		// Compared with what was pending before: rows other tests left in the shared queue are not ours.
+		$pending = array( 'hook' => Jobs::HOOK, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 );
+		$before  = array_keys( as_get_scheduled_actions( $pending ) );
 
 		( new Commands() )->link_http(
 			array( (string) $license['id'] ),
@@ -108,7 +111,7 @@ class CliTest extends TestCase {
 		$this->assertSame( array(), $this->http_calls() );
 		$this->assertStringContainsString( 'tenant-42', \WP_CLI::text() );
 		$this->assertStringContainsString( 'update_plan', \WP_CLI::text() );
-		$this->assertSame( array(), as_get_scheduled_actions( array( 'hook' => Jobs::HOOK, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
+		$this->assertSame( $before, array_keys( as_get_scheduled_actions( $pending ) ) );
 	}
 
 	public function test_link_refuses_a_license_that_already_has_a_resource(): void {
