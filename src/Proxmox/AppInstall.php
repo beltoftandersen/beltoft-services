@@ -39,8 +39,16 @@ final class AppInstall {
 
 	/** Is "Try again" offered: a ready server whose app failed or never reported back. */
 	public static function can_retry( Resource $r ): bool {
-		return 'ready' === $r->get( 'state' ) && '' !== (string) $r->get( 'app_id' ) && null !== Apps::definition( (string) $r->get( 'app_id' ) )
-			&& in_array( $r->get( 'app_state' ), array( 'failed', 'unknown' ), true ) && $r->accepts_actions();
+		$state = (string) $r->get( 'app_state' );
+		if ( 'ready' !== $r->get( 'state' ) || '' === (string) $r->get( 'app_id' ) || null === Apps::definition( (string) $r->get( 'app_id' ) ) || ! $r->accepts_actions() ) {
+			return false;
+		}
+		// The app installed but its login file could not be read: a second install would not help, support must look.
+		if ( 'failed' === $state ) {
+			return 'credentials' !== (string) $r->get( 'app_step' );
+		}
+		// Silent: only after an hour without a report. A pending install is already queued.
+		return 'unknown' === $state && time() - (int) $r->get( 'app_started_at' ) > HOUR_IN_SECONDS;
 	}
 
 	/**

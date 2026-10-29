@@ -93,7 +93,7 @@ final class AppTab {
 				'strings' => array(
 					'gone'   => __( 'The login has already been shown or is no longer available.', 'beltoft-services' ),
 					'failed' => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
-					'retrying' => __( 'Trying again. This page updates by itself.', 'beltoft-services' ),
+					'retrying' => __( 'Starting again…', 'beltoft-services' ),
 					'limit'  => __( 'You can try again three times an hour. Please wait and try again later.', 'beltoft-services' ),
 					'user'   => __( 'Username', 'beltoft-services' ),
 					'email'  => __( 'Email', 'beltoft-services' ),

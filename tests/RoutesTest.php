@@ -141,7 +141,8 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( 'ready', $data['desired'] );
 		$this->assertSame( 'Getting ready', $data['label'] );
 		$this->assertNotSame( '', $data['message'] );
-		$this->assertSame( array( 'state', 'desired', 'working', 'label', 'message', 'progress', 'last_result', 'now' ), array_keys( $data ) );
+		$this->assertSame( '', $data['app_state'] );
+		$this->assertSame( array( 'state', 'desired', 'working', 'app_state', 'label', 'message', 'progress', 'last_result', 'now' ), array_keys( $data ) );
 		$this->assertSame( array(), $driver->calls(), 'A REST request never calls the driver.' );
 	}
 

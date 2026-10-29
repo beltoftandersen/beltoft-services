@@ -62,7 +62,7 @@ $beltoft_services_status_text = array(
 	<?php elseif ( 'slow' === $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Taking longer than usual', 'beltoft-services' ); ?></h4>
-			<p><?php esc_html_e( 'The install has not reported back yet. Your server is running. If this stays for more than an hour, contact support.', 'beltoft-services' ); ?></p>
+			<p><?php esc_html_e( 'The install has not reported back yet. Your server is running. After an hour you can try again, or contact support.', 'beltoft-services' ); ?></p>
 			<?php if ( $view['can_retry'] ) : ?>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-app-retry><?php esc_html_e( 'Try again', 'beltoft-services' ); ?></button></p>
 				<p class="beltoft-services-panel__notice" data-app-notice role="status" aria-live="polite"></p>

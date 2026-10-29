@@ -439,7 +439,7 @@
 
 		Array.prototype.forEach.call( form.elements, function ( field ) {
 			// A group of radios (the system and app tiles) sends the checked one only.
-			if ( field.name && ( 'radio' !== field.type || field.checked ) ) {
+			if ( field.name && ! field.disabled && ( 'radio' !== field.type || field.checked ) ) {
 				args[ field.name ] = field.value;
 			}
 		} );

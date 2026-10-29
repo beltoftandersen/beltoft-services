@@ -262,7 +262,7 @@ class AppTabTest extends MonitoringTestCase {
 
 	public function test_a_failed_app_on_a_ready_server_offers_try_again_and_only_then(): void {
 		foreach ( array( 'failed', 'unknown' ) as $state ) {
-			$r = $this->with_app( array( 'app_state' => $state ), 5010 + strlen( $state ) );
+			$r = $this->with_app( array( 'app_state' => $state, 'app_started_at' => time() - 4000 ), 5010 + strlen( $state ) );
 			$this->assertArrayHasKey( 'app_retry', Actions::offered( $r ), $state );
 			$this->assertStringContainsString( 'data-app-retry', $this->pane( $this->page( $r, 'app' ) ), $state );
 		}
@@ -277,6 +277,23 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertNotNull( Actions::check( Resource::find( $r->id() ), 'app_retry', array() ) );
 		$plain = $this->ready_vm( 5031 );
 		$this->assertArrayNotHasKey( 'app_retry', Actions::offered( $plain ) );
+	}
+
+	public function test_try_again_from_silent_waits_an_hour_and_never_follows_a_credentials_failure(): void {
+		$fresh = $this->with_app( array( 'app_state' => 'unknown', 'app_started_at' => time() - 1800 ), 5040 );
+		$this->assertFalse( \BeltoftServices\Proxmox\AppInstall::can_retry( $fresh ) );
+		$this->assertStringNotContainsString( 'data-app-retry', $this->pane( $this->page( $fresh, 'app' ) ) );
+		$old = $this->with_app( array( 'app_state' => 'unknown', 'app_started_at' => time() - 3700 ), 5041 );
+		$this->assertTrue( \BeltoftServices\Proxmox\AppInstall::can_retry( $old ) );
+		$failed = $this->with_app( array( 'app_state' => 'failed', 'app_step' => 'download' ), 5042 );
+		$this->assertTrue( \BeltoftServices\Proxmox\AppInstall::can_retry( $failed ) );
+		$login = $this->with_app( array( 'app_state' => 'failed', 'app_step' => 'credentials' ), 5043 );
+		$this->assertFalse( \BeltoftServices\Proxmox\AppInstall::can_retry( $login ) );
+		$pane = $this->pane( $this->page( $login, 'app' ) );
+		$this->assertStringNotContainsString( 'data-app-retry', $pane );
+		$this->assertStringContainsString( 'Contact support', $pane );
+		$pending = $this->with_app( array( 'app_state' => 'pending', 'app_started_at' => time() - 9000 ), 5044 );
+		$this->assertFalse( \BeltoftServices\Proxmox\AppInstall::can_retry( $pending ) );
 	}
 
 	public function test_try_again_resets_the_app_to_pending_with_a_new_request_and_queues_the_install_without_a_reinstall(): void {

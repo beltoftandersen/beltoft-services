@@ -86,6 +86,26 @@
 		} );
 	}
 
+	function waitForRestart( box, button, panel, tries ) {
+		window.setTimeout( function () {
+			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
+				return response.ok ? response.json() : null;
+			} ).then( function ( data ) {
+				if ( data && 'failed' !== data.app_state && 'unknown' !== data.app_state ) {
+					window.location.reload();
+				} else if ( tries < 30 ) {
+					waitForRestart( box, button, panel, tries + 1 );
+				} else {
+					window.location.reload();
+				}
+			} ).catch( function () {
+				if ( tries < 30 ) {
+					waitForRestart( box, button, panel, tries + 1 );
+				}
+			} );
+		}, 4000 );
+	}
+
 	// A failed install, tried again: the server queues the job again and the page reloads to show it installing.
 	function retry( box, button ) {
 		var panel = box.closest( '[data-resource]' );
@@ -115,10 +135,9 @@
 				return;
 			}
 
+			// The button stays off. The status route is asked until the app has left failed/unknown, then the page reloads.
 			line( box, app.strings.retrying );
-			window.setTimeout( function () {
-				window.location.reload();
-			}, 4000 );
+			waitForRestart( box, button, panel, 0 );
 		} ).catch( function () {
 			button.disabled = false;
 			line( box, app.strings.failed );

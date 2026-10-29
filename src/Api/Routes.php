@@ -152,6 +152,7 @@ final class Routes {
 				'state'    => $state,
 				'desired'  => (string) $resource->get( 'desired' ),
 				'working'  => Jobs::acting( $resource->id() ),
+				'app_state' => (string) $resource->get( 'app_state' ),
 				'label'    => Panel::label( $state, $resource ),
 				'message'  => Panel::message( $state, $resource ),
 				'progress' => Progress::build( $resource ),
