@@ -88,7 +88,7 @@ class DomainDangerTest extends TestCase {
 
 		$this->assertMatchesRegularExpression( '#data-tab-link="danger"#', $html );
 		$this->assertStringContainsString( 'Turn off auto-renew', $html );
-		$this->assertStringContainsString( 'You get an invoice by email instead of an automatic charge. The domain stays registered until', $html );
+		$this->assertStringContainsString( 'If you turn it off, you get an invoice by email instead of an automatic charge. The domain stays registered until', $html );
 		$this->assertStringContainsString( 'beltoft_domain_danger', $html );
 		$this->assertStringNotContainsString( '<dialog', $html, 'A registered domain has no stop dialog.' );
 	}

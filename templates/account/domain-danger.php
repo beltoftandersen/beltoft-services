@@ -70,10 +70,10 @@ $beltoft_form  = static function ( string $what ) use ( $action, $nonce, $licens
 				'' !== $expires
 					? sprintf(
 						/* translators: %s: date the registration ends */
-						__( 'You get an invoice by email instead of an automatic charge. The domain stays registered until %s.', 'beltoft-services' ),
+						__( 'If you turn it off, you get an invoice by email instead of an automatic charge. The domain stays registered until %s.', 'beltoft-services' ),
 						$expires
 					)
-					: __( 'You get an invoice by email instead of an automatic charge. The domain stays registered until its end date.', 'beltoft-services' )
+					: __( 'If you turn it off, you get an invoice by email instead of an automatic charge. The domain stays registered until its end date.', 'beltoft-services' )
 			);
 			?>
 		</p>
