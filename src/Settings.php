@@ -84,6 +84,14 @@ final class Settings {
 				'label'   => __( 'Delete the settings when the plugin is deleted', 'beltoft-services' ),
 				'desc'    => __( 'This also deletes the IP pool and the virtual machine records. Machines that exist can then no longer be matched to their services.', 'beltoft-services' ),
 			),
+			'account_billing' => array(
+				'tab'     => 'general',
+				'section' => 'account',
+				'type'    => 'checkbox',
+				'default' => 0,
+				'label'   => __( 'Group the billing pages', 'beltoft-services' ),
+				'desc'    => __( 'My Account shows one Billing item instead of Orders, Subscriptions, Payment methods and Addresses, and those pages get a tab bar. Their addresses stay the same.', 'beltoft-services' ),
+			),
 			'welcome_servers_url' => array(
 				'tab'     => 'general',
 				'section' => 'account',

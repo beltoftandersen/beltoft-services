@@ -71,6 +71,7 @@ final class Plugin {
 		Account\Tabs::register();
 		Account\Servers::register();
 		Account\Overview::register();
+		Account\Billing::register();
 
 		Lifecycle::register();
 		Retention::register();
