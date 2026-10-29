@@ -41,14 +41,10 @@ final class AppAlerts {
 
 	/** A record we made could not be checked or removed after all retries. Tell an admin once. */
 	public static function domain_release_failed( Resource $r, string $domain, string $reason ): void {
-		if ( $r->get( 'app_domain_release_alerted' ) ) {
-			return;
-		}
 		$to = (string) Settings::get( 'admin_email' );
 		if ( ! is_email( $to ) ) {
 			return;
 		}
 		wp_mail( $to, sprintf( 'App DNS record removal failed for server %d', $r->id() ), sprintf( "Server resource: %d\nDomain: %s\nReason: %s\n", $r->id(), $domain, $reason ) );
-		$r->set( array( 'app_domain_release_alerted' => true ) );
 	}
 }

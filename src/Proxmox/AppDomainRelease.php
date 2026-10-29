@@ -46,61 +46,110 @@ final class AppDomainRelease {
 		foreach ( (array) $ids as $id ) {
 			$r = Resource::find( (int) $id );
 			$old = $r ? (array) $r->get( 'app_domain_old' ) : array();
-			if ( $r && $r->is_live() && $old && time() - (int) ( $old[0]['at'] ?? 0 ) >= MINUTE_IN_SECONDS ) {
+			if ( $r && $r->is_live() && $old && time() - (int) ( $old[0]['at'] ?? 0 ) >= ( empty( $old[0]['in_progress'] ) ? MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS ) ) {
 				self::schedule( $r->id() );
 			}
 		}
 	}
 
-	/** One bounded attempt. Records::delete_set takes the zone lock; this job never takes the resource lock. */
+	/** One bounded attempt. The resource and zone locks are held on separate turns. */
 	public static function run( int $id ): void {
 		$r = Resource::find( $id );
 		if ( ! $r || ! $r->is_live() ) {
 			return;
 		}
-		$old = (array) $r->get( 'app_domain_old' );
-		if ( ! $old ) {
+		$entry = null;
+		$wait = 0;
+		$claimed = $r->locked( static function () use ( $r, &$entry, &$wait ): bool {
+			$old = (array) $r->get( 'app_domain_old' );
+			if ( ! is_array( $old[0] ?? null ) ) {
+				return false;
+			}
+			$first = $old[0];
+			$age = time() - (int) ( $first['at'] ?? 0 );
+			if ( ! empty( $first['in_progress'] ) && $age < 10 * MINUTE_IN_SECONDS ) {
+				$wait = max( 30, 10 * MINUTE_IN_SECONDS - $age );
+				return false;
+			}
+			$first['in_progress'] = wp_generate_uuid4();
+			$first['at'] = time();
+			$old[0] = $first;
+			if ( ! $r->set( array( 'app_domain_old' => $old ) ) ) {
+				$wait = 30;
+				return false;
+			}
+			$entry = $first;
+			return true;
+		} );
+		if ( true !== $claimed ) {
+			if ( null === $claimed || $wait > 0 ) {
+				self::schedule( $id, $wait > 0 ? $wait : 30 );
+			}
 			return;
 		}
-		$entry = array_shift( $old );
-		if ( ! is_array( $entry ) ) {
-			$r->set( array( 'app_domain_old' => $old ) );
+
+		// No resource lock is held across this DNS read or the zone-locked deletion.
+		$done = self::attempt( Resource::find( $id ) ?: $r, $entry );
+		$next = null;
+		$alert = false;
+		$finished = $r->locked( static function () use ( $r, $entry, $done, &$next, &$alert ): bool {
+			$old = (array) $r->get( 'app_domain_old' );
+			if ( ! is_array( $old[0] ?? null ) || ( $old[0]['in_progress'] ?? '' ) !== $entry['in_progress'] ) {
+				return false;
+			}
+			array_shift( $old );
+			$meta = array();
+			if ( is_wp_error( $done ) ) {
+				$tries = (int) ( $entry['tries'] ?? 0 );
+				if ( $tries < count( self::DELAYS ) ) {
+					$entry['tries'] = $tries + 1;
+					unset( $entry['in_progress'] );
+					$entry['at'] = time();
+					array_unshift( $old, $entry );
+					$next = self::DELAYS[ $tries ];
+				} elseif ( ! $r->get( 'app_domain_release_alerted' ) ) {
+					$meta['app_domain_release_alerted'] = true;
+					$alert = true;
+				}
+			}
+			$meta['app_domain_old'] = $old;
+			if ( ! $r->set( $meta ) ) {
+				$alert = false;
+				return false;
+			}
+			if ( null === $next && $old ) {
+				$next = 0;
+			}
+			return true;
+		} );
+		if ( true !== $finished ) {
+			self::schedule( $id, 30 );
 			return;
 		}
+		if ( $alert ) {
+			AppAlerts::domain_release_failed( $r, (string) ( $entry['name'] ?? '' ), $done->get_error_message() );
+		}
+		if ( null !== $next ) {
+			self::schedule( $id, $next );
+		}
+	}
+
+	/** DNS work only; every queue mutation happens in run() under the server lock. */
+	private static function attempt( Resource $r, array $entry ): true|\WP_Error {
 		$zone = (string) ( $entry['zone'] ?? '' );
 		$name = (string) ( $entry['name'] ?? '' );
 		$ip = (string) ( $entry['ip'] ?? '' );
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
 		if ( '' === $zone || '' === $name || $name === (string) $r->get( 'app_domain' ) || $name === (string) $r->get( 'app_domain_want' ) || false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! self::editable( $zone, $user ) ) {
-			$r->set( array( 'app_domain_old' => $old ) );
-			if ( $old ) { self::schedule( $id ); }
-			return;
+			return true;
 		}
 		$existing = AppDomains::existing( $zone, $name );
 		if ( is_array( $existing ) && array_diff( array_keys( $existing ), array( 'A' ) ) ) {
-			$r->set( array( 'app_domain_old' => $old ) );
-			if ( $old ) { self::schedule( $id ); }
-			return;
+			return true;
 		}
 		$expect = array( array( 'ttl' => AppDomains::TTL, 'value' => $ip ) );
 		$done = Records::delete_set( $zone, $name, 'A', $expect );
-		if ( true === $done || in_array( $done->get_error_code(), array( 'stale', 'records_off', 'zone_missing' ), true ) ) {
-			$r->set( array( 'app_domain_old' => $old ) );
-			if ( $old ) { self::schedule( $id ); }
-			return;
-		}
-		$tries = (int) ( $entry['tries'] ?? 0 );
-		if ( $tries < count( self::DELAYS ) ) {
-			$entry['tries'] = $tries + 1;
-			$entry['at'] = time();
-			array_unshift( $old, $entry );
-			$r->set( array( 'app_domain_old' => $old ) );
-			self::schedule( $id, self::DELAYS[ $tries ] );
-			return;
-		}
-		$r->set( array( 'app_domain_old' => $old ) );
-		AppAlerts::domain_release_failed( $r, $name, $done->get_error_message() );
-		if ( $old ) { self::schedule( $id ); }
+		return true === $done || in_array( $done->get_error_code(), array( 'stale', 'records_off', 'zone_missing' ), true ) ? true : $done;
 	}
 
 	/** The current owner must still be able to edit this precise zone. */

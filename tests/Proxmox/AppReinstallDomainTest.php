@@ -325,4 +325,28 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		remove_filter( 'pre_wp_mail', $capture, 10 );
 		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
 	}
+
+	public function test_release_meta_update_keeps_provision_progress_written_during_dns(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$dns = new class(true) extends FakeDns {
+			public int $resource_id = 0;
+			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+				if ( 'DELETE' === ( $rrsets[0]['changetype'] ?? '' ) ) {
+					Resource::find( $this->resource_id )->set( array( 'task' => 'provision-task', 'steps' => array( 'ip', 'vmid', 'clone' ) ) );
+				}
+				return parent::replace_rrsets( $zone, $rrsets );
+			}
+		};
+		$dns->resource_id = $r->id();
+		$filter = static fn() => $dns;
+		add_filter( 'beltoft_services_domains_dns', $filter, 20 );
+		AppDomainRelease::run( $r->id() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'provision-task', $fresh->get( 'task' ) );
+		$this->assertSame( array( 'ip', 'vmid', 'clone' ), $fresh->get( 'steps' ) );
+		$this->assertSame( array(), (array) $fresh->get( 'app_domain_old' ) );
+		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
+	}
 }
