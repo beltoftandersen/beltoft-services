@@ -1,7 +1,6 @@
 /**
  * My Account → Servers → the App tab: shows the app's login once, keeps an install that is still running
- * up to date by reloading the page now and then, and keeps the operating system of a reinstall on
- * Ubuntu 24.04 while an app is selected. The login is only held in the page while the customer looks at it.
+ * up to date by reloading the page now and then, and tries a failed install again. The login is only held in the page while the customer looks at it.
  * No dependencies.
  */
 ( function () {
@@ -149,32 +148,5 @@
 				window.location.reload();
 			}
 		}, 20000 );
-	}
-
-	// A reinstall with an app stays on the app's operating system.
-	var holder = document.querySelector( '[data-app-reinstall]' );
-	var choice = holder ? holder.querySelector( '[data-app-reinstall-select]' ) : null;
-	var system = choice ? choice.closest( 'form' ).querySelector( 'select[name="os"]' ) : null;
-
-	function lock() {
-		var want = holder.getAttribute( 'data-os' );
-		var on = 'none' !== choice.value && want;
-
-		if ( ! system ) {
-			return;
-		}
-
-		Array.prototype.forEach.call( system.options, function ( option ) {
-			option.disabled = on && option.value !== want;
-		} );
-
-		if ( on ) {
-			system.value = want;
-		}
-	}
-
-	if ( choice ) {
-		choice.addEventListener( 'change', lock );
-		lock();
 	}
 }() );

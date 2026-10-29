@@ -100,6 +100,7 @@ final class AppReinstall {
 		$plan['disk_gb'] = Panels::disk_gb( $r );
 		$choices         = array( self::NONE => __( 'No app, keep as it is', 'beltoft-services' ) );
 		$groups          = array();
+		$apps            = array();
 
 		foreach ( $offered as $id => $app ) {
 			foreach ( $app['choices'] as $vid => $version ) {
@@ -115,6 +116,8 @@ final class AppReinstall {
 					$label = sprintf( /* translators: %s: app version */ __( '%s (needs a larger plan)', 'beltoft-services' ), $label );
 				}
 
+				$apps[ $id ]['def']                                  = $app;
+				$apps[ $id ]['versions'][ $id . '/' . $vid ]         = array( 'label' => $label, 'disabled' => $disabled, 'version' => $version );
 				$choices[ $id . '/' . $vid ]                       = $label;
 				$groups[ (string) ( $app['name'] ?? $id ) ][ $id . '/' . $vid ] = array( 'label' => $label, 'disabled' => $disabled );
 			}
@@ -127,6 +130,7 @@ final class AppReinstall {
 			'selected' => self::NONE,
 			'retired'  => false,
 			'groups'   => $groups,
+			'apps'     => $apps,
 			'cluster'  => $cluster,
 			'plan'     => $plan,
 		);
@@ -192,29 +196,90 @@ final class AppReinstall {
 		$record = VmRecords::for_resource( $resource_id );
 		$os     = $record ? Apps::os_template( (array) Clusters::get( $record['cluster'] ) ) : 0;
 
-		echo '<p class="beltoft-services-app-reinstall" data-app-reinstall data-os="' . esc_attr( (string) $os ) . '">';
-		echo '<label for="beltoft-vm-app-' . (int) $resource_id . '">' . esc_html( (string) $options['app']['name'] ) . '</label>';
-		echo '<select id="beltoft-vm-app-' . (int) $resource_id . '" name="app_version" data-app-reinstall-select>';
+		$items = array();
 
 		if ( $options['plain'] ) {
-			echo '<option value="' . esc_attr( self::NONE ) . '" selected="selected">' . esc_html( (string) $options['choices'][ self::NONE ] ) . '</option>';
+			$items[] = array(
+				'value'   => self::NONE,
+				'name'    => __( 'No app', 'beltoft-services' ),
+				'line'    => __( 'Keep the server as it is', 'beltoft-services' ),
+				'logo'    => Tiles::app_logo( array() ),
+				'checked' => true,
+				'attrs'   => array( 'data-none' => '1' ),
+			);
 
-			foreach ( $options['groups'] as $group => $entries ) {
-				echo '<optgroup label="' . esc_attr( (string) $group ) . '">';
+			foreach ( (array) $options['apps'] as $app_id => $entry ) {
+				$versions = array();
+				$first    = '';
 
-				foreach ( $entries as $value => $entry ) {
-					echo '<option value="' . esc_attr( (string) $value ) . '"' . disabled( $entry['disabled'], true, false ) . '>' . esc_html( $entry['label'] ) . '</option>';
+				foreach ( $entry['versions'] as $value => $version ) {
+					$versions[] = array( 'value' => (string) $value, 'label' => $version['label'], 'disabled' => $version['disabled'] );
+					$first      = '' === $first && ! $version['disabled'] ? (string) $value : $first;
 				}
 
-				echo '</optgroup>';
+				$usable  = '' !== $first;
+				$current = reset( $entry['versions'] );
+				$items[] = array(
+					'value'    => $usable ? $first : (string) array_key_first( $entry['versions'] ),
+					'name'     => (string) ( $entry['def']['name'] ?? $app_id ),
+					'line'     => (string) ( $entry['def']['summary'] ?? '' ),
+					'logo'     => Tiles::app_logo( (array) $entry['def'] ),
+					'disabled' => ! $usable,
+					'why'      => $usable ? '' : AppField::needs( (array) $current['version'] ),
+					'attrs'    => array( 'data-versions' => (string) wp_json_encode( $versions ) ),
+				);
 			}
 		} else {
-			foreach ( $options['choices'] as $value => $label ) {
-				echo '<option value="' . esc_attr( (string) $value ) . '"' . selected( (string) $value, $options['selected'], false ) . '>' . esc_html( $label ) . '</option>';
+			$versions = array();
+			$value    = '';
+
+			foreach ( $options['choices'] as $choice => $label ) {
+				if ( self::NONE === (string) $choice ) {
+					continue;
+				}
+
+				$versions[] = array( 'value' => (string) $choice, 'label' => (string) $label );
+				$value      = '' === $value || (string) $choice === $options['selected'] ? (string) $choice : $value;
 			}
+
+			if ( array() !== $versions ) {
+				$items[] = array(
+					'value'   => $value,
+					'name'    => (string) $options['app']['name'],
+					'line'    => (string) ( $options['app']['summary'] ?? '' ),
+					'logo'    => Tiles::app_logo( (array) $options['app'] ),
+					'checked' => self::NONE !== $options['selected'],
+					'attrs'   => array( 'data-versions' => (string) wp_json_encode( $versions ) ),
+				);
+			}
+
+			$items[] = array(
+				'value'   => self::NONE,
+				'name'    => __( 'No app', 'beltoft-services' ),
+				'line'    => __( 'Just the operating system', 'beltoft-services' ),
+				'logo'    => Tiles::app_logo( array() ),
+				'checked' => self::NONE === $options['selected'],
+				'attrs'   => array( 'data-none' => '1' ),
+			);
 		}
 
-		echo '</select></p>';
+		// The version select under the tiles has no name: the script writes its choice into the checked tile's value, which is what is posted.
+		echo '<div class="beltoft-services-app-reinstall" data-app-reinstall data-tiles-merge>';
+
+		Tiles::print_group(
+			array(
+				'kind'   => 'app',
+				'id'     => 'beltoft-vm-app-' . $resource_id,
+				'name'   => 'app_version',
+				'legend' => __( 'App', 'beltoft-services' ),
+				'items'  => $items,
+				'attrs'  => array( 'data-os' => (string) $os ),
+			)
+		);
+
+		echo '<p class="form-row" data-tiles-version-row hidden><label for="beltoft-vm-app-version-' . (int) $resource_id . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
+		echo '<select id="beltoft-vm-app-version-' . (int) $resource_id . '" data-tiles-version></select></p>';
+		echo '</div>';
 
 		if ( $options['retired'] ) {
 			echo '<p class="description">' . esc_html__( 'The version on this server can no longer be installed. The current version is selected instead.', 'beltoft-services' ) . '</p>';

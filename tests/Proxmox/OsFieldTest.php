@@ -108,16 +108,19 @@ class OsFieldTest extends TestCase {
 		WC()->cart->add_to_cart( $this->vm()->get_id() );
 		$html = $this->html();
 
-		$this->assertStringContainsString( '<select', $html );
-		$this->assertStringContainsString( 'name="' . OsField::POST_KEY . '"', $html );
+		$this->assertStringNotContainsString( '<select', $html, 'Square radio tiles, not a select.' );
+		$this->assertStringContainsString( 'data-tiles="os"', $html );
 		$this->assertStringContainsString( 'Operating system', $html );
-		$this->assertMatchesRegularExpression( '#<option value="9000"[^>]*selected[^>]*>Ubuntu 26\.04#', $html, 'The default is preselected.' );
-		$this->assertStringContainsString( '>Ubuntu 24.04</option>', $html );
+		$this->assertSame( 2, preg_match_all( '#<input[^>]*type="radio"[^>]*name="' . OsField::POST_KEY . '"#', $html ), 'One radio input per template, posting under the same name.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio"[^>]*value="9000"[^>]*checked#', $html, 'The default is preselected.' );
+		$this->assertDoesNotMatchRegularExpression( '#value="9001"[^>]*checked#', $html );
+		$this->assertStringContainsString( '>Version 24.04</span>', $html );
+		$this->assertStringContainsString( '<svg', $html, 'Ubuntu has its logo.' );
 		$this->assertStringContainsString( 'validate-required', $html, 'Marked required.' );
 
 		// A marker on the other template moves the preselection.
 		$this->save_cluster( 'lab', "9000 = Ubuntu 26.04\n9001 = Ubuntu 24.04", '9001' );
-		$this->assertMatchesRegularExpression( '#<option value="9001"[^>]*selected[^>]*>Ubuntu 24\.04#', $this->html() );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio"[^>]*value="9001"[^>]*checked#', $this->html() );
 
 		// No templates configured: no field.
 		delete_option( Clusters::OPTION );

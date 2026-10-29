@@ -246,10 +246,12 @@ class AppFieldTest extends TestCase {
 		WC()->cart->add_to_cart( $this->vm()->get_id() );
 		$html = $this->html();
 
-		$this->assertMatchesRegularExpression( '#<option value="">None, just the operating system</option>\s*<option value="docker">Docker</option>#', $html );
-		$this->assertStringContainsString( '>Docker</option>', $html );
-		$this->assertStringContainsString( '>WordPress</option>', $html );
-		$this->assertMatchesRegularExpression( '#<option value="coolify"[^>]*disabled[^>]*>Coolify \(needs the Performance plan\)</option>#', $html, 'Below its minimum the app is listed but cannot be chosen.' );
+		$this->assertMatchesRegularExpression( '#type="radio" name="' . AppField::POST_APP . '" value="" checked=\'checked\' data-none="1".*?>No app</span>.*?value="docker"#s', $html, 'No app is the first tile and is checked.' );
+		$this->assertStringContainsString( '>Docker</span>', $html );
+		$this->assertStringContainsString( '>WordPress</span>', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled[^>]*>.*?>Coolify</span>.*?>Needs Performance</span>#s', $html, 'Below its minimum the app is listed but cannot be chosen.' );
+		$this->assertStringNotContainsString( '<select name="' . AppField::POST_APP . '"', $html );
+		$this->assertStringContainsString( '<svg', $html, 'The apps have logos.' );
 		$this->assertStringContainsString( 'App (optional)', $html );
 		$this->assertStringContainsString( 'data-apps=', $html );
 		$this->assertStringContainsString( 'Ubuntu 24.04', $html );
@@ -258,7 +260,7 @@ class AppFieldTest extends TestCase {
 	public function test_a_big_enough_plan_can_choose_coolify(): void {
 		WC()->cart->add_to_cart( $this->vm( array( 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 100 ) )->get_id() );
 		$html = $this->html();
-		$this->assertDoesNotMatchRegularExpression( '#<option value="coolify"[^>]*disabled#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled#', $html );
 		$this->assertSame( array(), $this->check( array( AppField::POST_APP => 'coolify' ) ) );
 	}
 
@@ -622,8 +624,40 @@ class AppFieldTest extends TestCase {
 
 	// -- Review fixes ---------------------------------------------------------------------------
 
+	public function test_the_tiles_assets_load_on_checkout_only_and_only_with_a_server_in_the_cart(): void {
+		wp_dequeue_script( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+
+		\BeltoftServices\Proxmox\Tiles::checkout_assets();
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not the checkout page.' );
+
+		add_filter( 'woocommerce_is_checkout', '__return_true' );
+		\BeltoftServices\Proxmox\Tiles::checkout_assets();
+		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
+		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
+
+		wp_dequeue_script( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		WC()->cart->empty_cart();
+		\BeltoftServices\Proxmox\Tiles::checkout_assets();
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'No server in the cart, no tiles.' );
+		remove_filter( 'woocommerce_is_checkout', '__return_true' );
+	}
+
+	public function test_the_checkout_markup_has_the_tiles_the_version_row_and_the_forced_system(): void {
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+		$html = $this->html();
+
+		$this->assertStringContainsString( 'data-tiles="app"', $html );
+		$this->assertStringContainsString( 'data-os="9001"', $html, 'The system the apps run on.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="docker"[^>]*data-versions="\[\{&quot;value&quot;:&quot;29&quot;#', $html );
+		$this->assertMatchesRegularExpression( '#<p[^>]*data-tiles-version-row hidden>.*?<select name="' . AppField::POST_VERSION . '"#s', $html, 'The version select is hidden until an app with several versions is chosen.' );
+		$this->assertStringContainsString( 'data-app-note', $html );
+	}
+
 	public function test_the_script_tells_the_order_summary_when_it_forces_or_restores_the_system(): void {
-		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-field.js' );
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
 		$this->assertStringContainsString( "new Event( 'change', { bubbles: true } )", $js );
 		$this->assertStringContainsString( "window.jQuery( document.body ).trigger( 'update_checkout' )", $js );
 		$this->assertMatchesRegularExpression( '/if \( window\.jQuery \)/', $js );

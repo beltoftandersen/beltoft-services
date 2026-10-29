@@ -9,7 +9,7 @@
  * the sections follow each other with no tabs.
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
- * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_options
+ * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_cluster, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
  * $snapshots (null when the block is absent, or slots, used, included, added, packs (the packs the server has: slots, days, paused), buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
@@ -729,14 +729,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<?php endif; ?>
 				<?php if ( '' !== $snapshot_warnings['reinstall'] ) : ?><p class="description" data-snapshot-warning><?php echo esc_html( $snapshot_warnings['reinstall'] ); ?></p><?php endif; ?>
 				<?php if ( $os_options ) : ?>
-					<p>
-						<label for="beltoft-vm-os"><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></label>
-						<select id="beltoft-vm-os" name="os">
-							<?php foreach ( $os_options as $beltoft_services_vmid => $beltoft_services_label ) : ?>
-								<option value="<?php echo esc_attr( (string) $beltoft_services_vmid ); ?>" <?php selected( (int) $beltoft_services_vmid, (int) $os_current ); ?>><?php echo esc_html( $beltoft_services_label ); ?></option>
-							<?php endforeach; ?>
-						</select>
-					</p>
+					<div class="beltoft-services-vm-os"><?php \BeltoftServices\Proxmox\Tiles::print_os( (string) $os_cluster, $os_options, (int) $os_current, 'os', 'beltoft-vm-os' ); ?></div>
 				<?php endif; ?>
 				<?php
 				/**

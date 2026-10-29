@@ -1,0 +1,28 @@
+/* Square radio tiles for the operating system and the app (checkout and the Reinstall tab). No radius, no borders: the
+   selected tile is navy with light text. The radio input stays in the tile, hidden but focusable. */
+.beltoft-services-tiles { min-width: 0; margin: 0 0 16px; padding: 0; border: 0; }
+.beltoft-services-tiles .beltoft-services-tiles__legend { margin: 0 0 8px; padding: 0; color: var(--navy, #0c1535); font-size: 15px; font-weight: 500; line-height: 1.4; }
+.beltoft-services-tiles__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.beltoft-services-tiles .beltoft-services-tile { position: relative; display: block; margin: 0; padding: 0; line-height: 1.4; cursor: pointer; }
+.beltoft-services-tiles .beltoft-services-tile__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
+.beltoft-services-tile__face { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; box-sizing: border-box; height: 100%; min-height: 116px; padding: 14px; border: 0; border-radius: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); transition: background-color 0.12s ease, color 0.12s ease; }
+.beltoft-services-tiles .beltoft-services-tile:hover .beltoft-services-tile__face { background: var(--rule, #d6d2c8); }
+.beltoft-services-tile__logo { display: block; width: 28px; height: 28px; margin-bottom: 6px; }
+.beltoft-services-tile__logo svg { display: block; width: 100%; height: 100%; }
+.beltoft-services-tile__name { font-size: 15px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.beltoft-services-tile__line { font-size: 13px; line-height: 1.4; opacity: 0.8; overflow-wrap: anywhere; }
+.beltoft-services-tile__why { margin-top: auto; font-size: 13px; font-weight: 500; line-height: 1.4; }
+.beltoft-services-tiles .beltoft-services-tile__input:checked + .beltoft-services-tile__face, .beltoft-services-tiles .beltoft-services-tile:hover .beltoft-services-tile__input:checked + .beltoft-services-tile__face { background: var(--navy, #0c1535); color: var(--bg-card, #fff); }
+.beltoft-services-tiles .beltoft-services-tile__input:focus-visible + .beltoft-services-tile__face { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
+.beltoft-services-tiles .beltoft-services-tile.is-disabled { cursor: not-allowed; }
+.beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__face, .beltoft-services-tiles .beltoft-services-tile.is-disabled:hover .beltoft-services-tile__face { background: var(--bg-warm, #eeece6); color: var(--ink-muted, #8a98a6); }
+.beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__logo, .beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__line { opacity: 0.55; }
+.beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__why { color: var(--navy, #0c1535); }
+.beltoft-services-tiles__note { margin: 8px 0 0; color: var(--ink-soft, inherit); font-size: 14px; line-height: 1.5; }
+.beltoft-services-tiles [hidden] { display: none !important; }
+.beltoft-services-os .description, .beltoft-services-app-reinstall .description { display: block; margin-top: 6px; color: var(--ink-soft, inherit); font-size: 14px; line-height: 1.5; }
+.beltoft-services-app-reinstall [data-tiles-version-row] { margin: 0 0 16px; }
+.beltoft-services-app-reinstall [data-tiles-version-row] select { display: block; margin-top: 4px; }
+@media (max-width: 600px) {
+	.beltoft-services-tiles__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

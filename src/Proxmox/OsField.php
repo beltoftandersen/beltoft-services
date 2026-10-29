@@ -13,8 +13,8 @@ use BeltoftServices\Product;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A required "Operating system" select for carts that hold a VM, built the way SshKeyField is: a
- * classic checkout field saved on the order line item, and a block checkout additional field of
+ * A required "Operating system" choice for carts that hold a VM, built the way SshKeyField is: a
+ * classic checkout field (square radio tiles with logos, see Tiles) saved on the order line item, and a block checkout additional field of
  * location "order" shown only for VM carts. The options are the template list of the product's
  * cluster (Settings → Proxmox clusters), labelled with the list's own labels; the preselected one
  * is the cluster's default template.
@@ -266,7 +266,7 @@ final class OsField {
 	// -- Classic checkout ---------------------------------------------------------------------
 
 	/**
-	 * Shows the select when the cart holds a VM with templates.
+	 * Shows the system tiles (radio inputs) when the cart holds a VM with templates.
 	 */
 	public static function render_classic(): void {
 		$choice = self::cart_needs_choice() ? self::cart_choice() : null;
@@ -280,20 +280,11 @@ final class OsField {
 			return;
 		}
 
-		echo '<div class="beltoft-services-os">';
+		echo '<div class="beltoft-services-os form-row form-row-wide validate-required" id="' . esc_attr( self::POST_KEY ) . '_field">';
 
-		woocommerce_form_field(
-			self::POST_KEY,
-			array(
-				'type'        => 'select',
-				'label'       => __( 'Operating system', 'beltoft-services' ),
-				'description' => __( 'The system your server is installed with. It is used for every server of this product on the order.', 'beltoft-services' ),
-				'required'    => true,
-				'options'     => $choice['options'],
-			),
-			(string) $choice['default']
-		);
+		Tiles::print_os( $choice['cluster'], $choice['options'], (int) $choice['default'], self::POST_KEY, self::POST_KEY );
 
+		echo '<span class="description">' . esc_html__( 'The system your server is installed with. It is used for every server of this product on the order.', 'beltoft-services' ) . '</span>';
 		echo '</div>';
 	}
 

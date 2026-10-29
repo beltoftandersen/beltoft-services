@@ -13,7 +13,7 @@ use BeltoftServices\Product;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * An optional "App" select with a "Version" select and, for apps that serve a website, a domain
+ * An optional "App" choice (square radio tiles with logos, see Tiles) with a "Version" select for an app with more than one version and, for apps that serve a website, a domain
  * picker. Built the way OsField is (classic checkout field, saved on the order line item, handed to
  * the resource through beltoft_services_initial_meta), with no edit to OsField.
  *
@@ -233,29 +233,52 @@ final class AppField {
 
 		echo '<div class="beltoft-services-app" data-app-field data-os="' . esc_attr( (string) $offer['os'] ) . '" data-apps="' . esc_attr( (string) wp_json_encode( $data ) ) . '">';
 
-		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_APP ) . '">' . esc_html__( 'App (optional)', 'beltoft-services' ) . '</label>';
-		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_APP ) . '" id="' . esc_attr( self::POST_APP ) . '" data-app-select>';
-		echo '<option value="">' . esc_html__( 'None, just the operating system', 'beltoft-services' ) . '</option>';
+		$items = array(
+			array(
+				'value'   => '',
+				'name'    => __( 'No app', 'beltoft-services' ),
+				'line'    => __( 'Just the operating system', 'beltoft-services' ),
+				'logo'    => Tiles::app_logo( array() ),
+				'checked' => true,
+				'attrs'   => array( 'data-none' => '1' ),
+			),
+		);
 
 		foreach ( $offer['apps'] as $id => $app ) {
-			$current = reset( $app['choices'] );
-			$why     = Apps::plan_refusal( $current, (array) $offer['plan'] );
-			$label   = (string) $app['name'];
+			$current  = reset( $app['choices'] );
+			$why      = Apps::plan_refusal( $current, (array) $offer['plan'] );
+			$versions = array();
 
-			if ( null !== $why ) {
-				$name = Apps::plan_name( $current );
-				/* translators: 1: app name, 2: plan name such as Performance */
-				$label = '' !== $name ? sprintf( __( '%1$s (needs the %2$s plan)', 'beltoft-services' ), $label, $name ) : sprintf( __( '%s (needs a larger plan)', 'beltoft-services' ), $label );
+			foreach ( $app['choices'] as $vid => $version ) {
+				$versions[] = array( 'value' => (string) $vid, 'label' => Apps::version_label( $version ) );
 			}
 
-			echo '<option value="' . esc_attr( (string) $id ) . '"' . disabled( null !== $why, true, false ) . '>' . esc_html( $label ) . '</option>';
+			$items[] = array(
+				'value'    => (string) $id,
+				'name'     => (string) $app['name'],
+				'line'     => (string) ( $app['summary'] ?? '' ),
+				'logo'     => Tiles::app_logo( $app ),
+				'disabled' => null !== $why,
+				'why'      => null === $why ? '' : self::needs( $current ),
+				'attrs'    => array( 'data-versions' => (string) wp_json_encode( $versions ) ),
+			);
 		}
 
-		echo '</select></span>';
-		echo '<span class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed on Ubuntu 24.04 after the server starts. Without an app, you choose the operating system above.', 'beltoft-services' ) . '</span></p>';
+		Tiles::print_group(
+			array(
+				'kind'   => 'app',
+				'id'     => self::POST_APP,
+				'name'   => self::POST_APP,
+				'legend' => __( 'App (optional)', 'beltoft-services' ),
+				'items'  => $items,
+				'attrs'  => array( 'data-os' => (string) $offer['os'] ),
+			)
+		);
 
-		echo '<p class="form-row form-row-wide" data-app-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
-		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-app-version></select></span></p>';
+		echo '<p class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed on Ubuntu 24.04 after the server starts. Without an app, you choose the operating system above.', 'beltoft-services' ) . '</p>';
+
+		echo '<p class="form-row form-row-wide" data-tiles-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
+		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version></select></span></p>';
 
 		if ( array() !== $zones ) {
 			echo '<div class="beltoft-services-app__domain" data-app-domain hidden>';
@@ -275,6 +298,18 @@ final class AppField {
 		}
 
 		echo '</div>';
+	}
+
+	/**
+	 * The short line on a tile that the plan is too small for: "Needs Performance".
+	 *
+	 * @param array<string, mixed> $version Version.
+	 */
+	public static function needs( array $version ): string {
+		$name = Apps::plan_name( $version );
+
+		/* translators: %s: plan name such as Performance */
+		return '' !== $name ? sprintf( __( 'Needs %s', 'beltoft-services' ), $name ) : __( 'Needs a larger plan', 'beltoft-services' );
 	}
 
 	/**

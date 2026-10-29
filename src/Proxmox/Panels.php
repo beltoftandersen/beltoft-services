@@ -210,6 +210,7 @@ final class Panels {
 			'busy'       => (bool) \BeltoftServices\Progress::build( $r )['active'],
 			'power'      => null === $status ? '' : (string) $status['power'],
 			'os_label'   => (string) ( $list[ $chosen ] ?? '' ),
+			'os_cluster' => null === $record ? '' : (string) $record['cluster'],
 			'os_options' => $list,
 			'os_current' => $select,
 			'has_key'    => Actions::has_key( $r ),

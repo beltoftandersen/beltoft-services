@@ -312,6 +312,38 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertContains( $this->retry_route( $r, (int) $r->license()['user_id'] )->get_status(), array( 403, 422 ) );
 	}
 
+	public function test_the_tiles_assets_load_on_a_server_page_only(): void {
+		$r = $this->with_app();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		wp_dequeue_script( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
+
+		unset( $GLOBALS['wp']->query_vars['vps'] );
+		do_action( 'beltoft_services_account_assets', 'parent-handle', Servers::slug() );
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not on the list.' );
+
+		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
+		do_action( 'beltoft_services_account_assets', 'parent-handle', 'licenses' );
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not on another endpoint.' );
+
+		do_action( 'beltoft_services_account_assets', 'parent-handle', Servers::slug() );
+		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
+		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
+	}
+
+	public function test_the_reinstall_tiles_lock_the_system_and_offer_the_version_select(): void {
+		$r    = $this->plain();
+		$html = $this->reinstall_html( $r );
+		$this->assertMatchesRegularExpression( '#<p[^>]*data-tiles-version-row hidden>.*?<select[^>]*data-tiles-version>#s', $html );
+		$this->assertStringNotContainsString( 'name="app_version_pick"', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<select[^>]*data-tiles-version[^>]*name=#', $html, 'The version select has no name: its choice is written into the checked tile.' );
+		$this->assertStringContainsString( 'data-tiles-note hidden', $this->page( $r, 'reinstall' ), 'The system tiles carry the note about the forced Ubuntu.' );
+
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
+		$this->assertStringContainsString( 'radio.disabled = on && radio.value !== want', $js );
+		$this->assertStringContainsString( 'radio.value = select.value', $js );
+	}
+
 	public function test_a_newer_version_and_a_retired_one_are_noted(): void {
 		$dir = BELTOFT_SERVICES_PATH . 'apps/docker/28-test';
 		mkdir( $dir );
@@ -403,9 +435,11 @@ class AppTabTest extends MonitoringTestCase {
 		$r    = $this->plain();
 		$html = $this->reinstall_html( $r );
 
-		$this->assertMatchesRegularExpression( '#<option value="none" selected="selected">No app, keep as it is</option>#', $html );
-		$this->assertStringContainsString( '<option value="wordpress/7.1.4">', $html );
-		$this->assertStringContainsString( '<option value="docker/29">', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio" name="app_version" value="none" checked=\'checked\'[^>]*>.*?>No app</span>#s', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="wordpress/7.1.4"(?![^>]*disabled=)#', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="docker/29"(?![^>]*disabled=)#', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="coolify/4.5.1" disabled#', $html );
+		$this->assertStringContainsString( '>Needs Performance</span>', $html );
 		$this->assertStringContainsString( 'name="app_version"', $html );
 		$this->assertStringContainsString( 'data-os="9001"', $html );
 		$this->assertStringContainsString( 'Ubuntu 24.04', $html, 'The forced system is said plainly.' );
@@ -478,13 +512,16 @@ class AppTabTest extends MonitoringTestCase {
 		$r    = $this->with_app();
 		$html = $this->reinstall_html( $r );
 
-		$this->assertMatchesRegularExpression( '#<option value="keep" selected=\'selected\'>Same app and version</option>#', $html );
-		$this->assertStringContainsString( '<option value="none">No app, just the operating system</option>', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="keep" checked=\'checked\'#', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="none" data-none="1"#', $html );
+		$this->assertStringContainsString( '>No app</span>', $html );
 		$this->assertStringContainsString( 'name="app_version"', $html );
 		$this->assertStringNotContainsString( 'no longer be installed', $html );
 
 		$both = $this->page( $r, 'reinstall' );
-		$this->assertStringContainsString( 'data-app-reinstall-select', $both, 'The form prints the choice.' );
+		$this->assertStringContainsString( 'data-app-reinstall', $both, 'The form prints the choice.' );
+		$this->assertStringContainsString( 'data-tiles="os"', $both, 'The system is chosen with tiles too.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio" name="os" value="9001" checked#', $both );
 	}
 
 	public function test_the_domain_notice_shows_in_every_state(): void {
@@ -543,7 +580,7 @@ class AppTabTest extends MonitoringTestCase {
 
 			$html = $this->reinstall_html( $r );
 			$this->assertStringContainsString( 'can no longer be installed', $html );
-			$this->assertMatchesRegularExpression( '#<option value="29" selected=\'selected\'>Current: Docker Engine 29#', $html );
+			$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="29" checked=\'checked\'[^>]*data-versions=\'?"[^"]*Current: Docker Engine 29#', $html );
 			$this->assertStringNotContainsString( 'Docker Engine 27', $html );
 
 			$this->assertNull( AppReinstall::check( null, $r, array( 'app_version' => '29' ) ) );

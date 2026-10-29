@@ -1,6 +1,7 @@
 {
   "id": "wordpress",
   "name": "WordPress",
+  "logo": "logo.svg",
   "summary": "WordPress with Caddy, PHP 8.3 and MariaDB. Optional domain with HTTPS.",
   "getting_started": "Open /wp-admin/ at your server address and sign in with the admin login shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json. Add a domain for HTTPS. Configure SMTP on port 587 before relying on site email. Set up a backup plan before making changes. You keep WordPress, plugins and themes up to date yourself.",
   "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
