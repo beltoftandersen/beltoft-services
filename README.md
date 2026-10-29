@@ -22,7 +22,7 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or ne
 Waits for something that is still running are polls, not errors: the next look is about 5 seconds away and the admin panel shows "Waiting: ...". Action Scheduler is normally started once a minute by cron, so a step that is 5 seconds away would still wait for the next tick. `wp beltoft-services run-due` runs this plugin's due jobs (reconcile and customer actions only) every 3 seconds for 55 seconds. Add one cron line next to the WordPress cron line:
 
 ```
-* * * * * www-data flock -n /run/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=/path/to/wordpress --quiet
+* * * * * www-data flock -n /run/lock/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=/path/to/wordpress --quiet
 ```
 
 It honours the kill switch and the per-service lock; the `flock -n` in the line is required, it keeps a slow minute from stacking a second runner. No job is started after `--seconds`, so a run ends within that plus one run budget. Without it everything still works, only slower. One run lasts at most 45 seconds (10 in a web request); filter `beltoft_services_run_budget`.

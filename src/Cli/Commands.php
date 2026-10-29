@@ -131,7 +131,7 @@ final class Commands {
 	 * own runner keeps everything else. It honours the kill switch, the resource locks and the run budget.
 	 *
 	 * Put it in cron next to the normal WordPress cron line. `flock -n` is required: it keeps a slow minute from stacking a second runner:
-	 * `* * * * * <user> flock -n /run/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=<wordpress path> --quiet`
+	 * `* * * * * <user> flock -n /run/lock/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=<wordpress path> --quiet`
 	 * Without it everything still works, only slower.
 	 *
 	 * ## OPTIONS
