@@ -131,8 +131,7 @@ if ( $d['dns_only'] ) {
 				<form class="beltoft-services-domain-form" data-domain-action="check_delegation"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Check name servers', 'beltoft-services' ); ?></button></form>
 			<?php elseif ( $d['can'] ) : ?>
 				<form class="beltoft-services-domain-form beltoft-services-domain__ns" data-domain-action="set_nameservers">
-					<fieldset class="beltoft-services-domain__choices">
-						<legend class="screen-reader-text"><?php esc_html_e( 'Name server mode', 'beltoft-services' ); ?></legend>
+					<fieldset class="beltoft-services-domain__choices" aria-label="<?php esc_attr_e( 'Name server mode', 'beltoft-services' ); ?>">
 						<?php if ( ! $d['external'] ) : ?>
 						<label class="beltoft-services-domain__choice"><input type="radio" name="mode" value="ours"<?php checked( $d['ours'] ); ?>> <?php esc_html_e( 'Our name servers', 'beltoft-services' ); ?></label>
 						<?php endif; ?>
