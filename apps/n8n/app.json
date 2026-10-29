@@ -1,0 +1,19 @@
+{
+  "id": "n8n",
+  "name": "n8n",
+  "logo": "logo.svg",
+  "summary": "n8n workflow automation with Caddy and PostgreSQL. Optional domain with HTTPS.",
+  "getting_started": "Open your server address and sign in with the email and password shown once. The login and the encryption key are also stored on the server in /root/.beltoft-app/credentials.json. Keep the encryption key safe: without it, the logins you save in n8n cannot be restored on another server. Change the password in n8n's settings. Add a domain for HTTPS before you connect real accounts; without a domain the address is not encrypted. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465. Times in n8n use UTC until you change the timezone in settings. Set up a backup plan before you build workflows. You keep n8n up to date yourself, and you use it under n8n's Sustainable Use License (your own business use, not resale): https://github.com/n8n-io/n8n/blob/master/LICENSE.md",
+  "needs_email": true,
+  "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
+  "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}, {"port": 80, "proto": "tcp", "label": "HTTP"}, {"port": 443, "proto": "tcp", "label": "HTTPS"}],
+  "minutes": 6,
+  "credentials": ["root_email", "root_password", "encryption_key"],
+  "steps": ["download", "os", "packages", "docker", "credentials", "n8n", "web", "firewall", "verify", "install", "complete"],
+  "domain": true,
+  "open": {"path": "/"},
+  "docs_url": "https://docs.n8n.io/hosting/",
+  "versions": [
+    {"id": "2", "label": "n8n 2", "upstream": "2.45.6", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "9e538941a8736834b4e746a5828546d6770f9e5a2158816bff8840ab0968f08f", "eol": ""}
+  ]
+}

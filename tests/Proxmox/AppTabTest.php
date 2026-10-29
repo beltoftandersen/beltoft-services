@@ -728,4 +728,71 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertSame( array( 9001 => 'ubuntu-24.04', 9000 => 'debian-12' ), $saved['template_families'] );
 		$this->assertSame( 9001, Apps::os_template( $saved ) );
 	}
+
+	// -- n8n -----------------------------------------------------------------------------------
+
+	public function test_n8n_ready_pane_shows_the_address_without_a_port_and_the_login_button(): void {
+		$key = base64_encode( str_repeat( 'k', 32 ) );
+		remove_all_filters( 'beltoft_services_key' );
+		add_filter( 'beltoft_services_key', fn() => $key );
+		$meta = array(
+			'app_id'           => 'n8n',
+			'app_version'      => '2',
+			'app_state'        => 'ready',
+			'app_step'         => 'complete',
+			'app_reveal'       => Crypto::encrypt( wp_json_encode( array( 'root_email' => 'a@example.invalid', 'root_password' => 'Pw-1', 'encryption_key' => str_repeat( 'a', 64 ) ) ) ),
+			'app_reveal_until' => time() + DAY_IN_SECONDS,
+		);
+		$pane = $this->pane( $this->page( $this->with_app( $meta ), 'app' ) );
+		$this->assertStringContainsString( 'href="http://192.0.2.10/"', $pane );
+		$this->assertStringContainsString( 'This address is not encrypted', $pane );
+		$this->assertStringContainsString( 'Show login once', $pane );
+		$this->assertStringContainsString( 'Sustainable Use License', $pane );
+		$this->assertStringNotContainsString( str_repeat( 'a', 64 ), $pane );
+
+		$domain = $this->pane( $this->page( $this->with_app( array_merge( $meta, array( 'app_domain' => 'flows.mine.example' ) ), 5003 ), 'app' ) );
+		$this->assertStringContainsString( 'href="https://flows.mine.example/"', $domain );
+		$this->assertStringNotContainsString( 'This address is not encrypted', $domain );
+	}
+
+	public function test_the_reveal_returns_email_password_and_key_once_and_checks_the_key_length(): void {
+		$key = base64_encode( str_repeat( 'k', 32 ) );
+		remove_all_filters( 'beltoft_services_key' );
+		add_filter( 'beltoft_services_key', fn() => $key );
+		$values = array( 'root_email' => 'a@example.invalid', 'root_password' => 'Pw-1', 'encryption_key' => bin2hex( random_bytes( 32 ) ) );
+		$this->assertSame( 64, strlen( $values['encryption_key'] ) );
+		$r = $this->with_app( array( 'app_id' => 'n8n', 'app_version' => '2', 'app_state' => 'ready', 'app_reveal' => Crypto::encrypt( wp_json_encode( $values ) ), 'app_reveal_until' => time() + DAY_IN_SECONDS ) );
+		$owner = (int) $r->license()['user_id'];
+		$this->assertSame( $values, \BeltoftServices\Proxmox\AppReveal::take( $r, $owner ) );
+		$this->assertNull( \BeltoftServices\Proxmox\AppReveal::take( Resource::find( $r->id() ), $owner ) );
+	}
+
+	public function test_the_status_check_reads_the_three_n8n_keys_and_refuses_a_key_with_a_newline(): void {
+		$key = base64_encode( str_repeat( 'k', 32 ) );
+		remove_all_filters( 'beltoft_services_key' );
+		add_filter( 'beltoft_services_key', fn() => $key );
+		foreach ( array( 'good' => bin2hex( random_bytes( 32 ) ), 'bad' => "abc\ndef" ) as $case => $enc ) {
+			$r = $this->with_app( array( 'app_id' => 'n8n', 'app_version' => '2', 'app_state' => 'installing', 'app_request' => 'req-' . $case, 'app_started_at' => time() - 60 ), 5004 + ( 'bad' === $case ? 1 : 0 ) );
+			$fake = new \BeltoftServices\Proxmox\FakeClient();
+			$fake->add_node( 'node-a' );
+			$fake->add_vm( array( 'vmid' => (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'], 'node' => 'node-a', 'status' => 'running', 'config' => array( 'agent' => '1' ) ) );
+			$fake->simulate_app( (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'], 'req-' . $case, 'ready', 'complete', array( 'root_email' => 'a@example.invalid', 'root_password' => 'Pw-1', 'encryption_key' => $enc ) );
+			\BeltoftServices\Proxmox\AppStatus::check( $r, $fake, 'node-a', (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'] );
+			$fresh = Resource::find( $r->id() );
+			if ( 'good' === $case ) {
+				$this->assertSame( 'ready', $fresh->get( 'app_state' ) );
+				$this->assertSame( 'a@example.invalid', \BeltoftServices\Proxmox\AppReveal::take( $fresh, (int) $fresh->license()['user_id'] )['root_email'] );
+			} else {
+				$this->assertNotSame( 'ready', $fresh->get( 'app_state' ), 'A key with a control character is not accepted as a login.' );
+				$this->assertSame( '', (string) $fresh->get( 'app_reveal' ) );
+			}
+		}
+	}
+
+	public function test_the_app_tab_script_has_a_label_for_the_encryption_key(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-tab.js' );
+		$this->assertStringContainsString( "encryption_key: 'key'", $js );
+		$php = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/AppTab.php' );
+		$this->assertStringContainsString( "'key'    => __( 'Encryption key'", $php );
+	}
 }

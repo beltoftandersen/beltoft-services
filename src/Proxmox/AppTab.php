@@ -99,6 +99,7 @@ final class AppTab {
 					'user'   => __( 'Username', 'beltoft-services' ),
 					'email'  => __( 'Email', 'beltoft-services' ),
 					'pass'   => __( 'Password', 'beltoft-services' ),
+					'key'    => __( 'Encryption key', 'beltoft-services' ),
 				),
 			)
 		);
@@ -136,6 +137,7 @@ final class AppTab {
 			'wordpress'   => __( 'Installing WordPress', 'beltoft-services' ),
 			'web'         => __( 'Setting up the web server', 'beltoft-services' ),
 			'coolify'     => __( 'Installing Coolify', 'beltoft-services' ),
+			'n8n'         => __( 'Setting up n8n', 'beltoft-services' ),
 			'credentials' => __( 'Saving the login', 'beltoft-services' ),
 			'firewall'    => __( 'Setting up the firewall', 'beltoft-services' ),
 			'verify'      => __( 'Checking the install', 'beltoft-services' ),
