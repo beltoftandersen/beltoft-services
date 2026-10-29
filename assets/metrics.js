@@ -163,8 +163,9 @@
 				if ( current !== serial ) { return; }
 				var points = body && Array.isArray( body.points ) ? body.points : [];
 				notice.textContent = points.length ? '' : labels.empty;
+				block.classList.toggle( 'is-empty', ! points.length );
 				block.querySelectorAll( '[data-chart]' ).forEach( function ( chart ) { render( chart, points, specs[ chart.getAttribute( 'data-chart' ) ], asked ); } );
-			} ).catch( function () { if ( current === serial ) { notice.textContent = labels.unavailable; } } );
+			} ).catch( function () { if ( current === serial ) { notice.textContent = labels.unavailable; block.classList.add( 'is-empty' ); } } );
 		}
 		// The charts are asked for when they can be seen: a tab that is not shown at load asks when it first is.
 		function start() {
