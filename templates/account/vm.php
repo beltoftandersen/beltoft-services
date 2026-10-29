@@ -666,8 +666,10 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<p class="description"><?php esc_html_e( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
 			<?php if ( $beltoft_services_reset && null !== $beltoft_services_page ) : ?>
-				<p><button type="button" class="button woocommerce-button beltoft-services-action" data-action="reset_password"><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
-				<p class="description"><?php esc_html_e( 'Sets a new password on the server. Use Show password once to see it.', 'beltoft-services' ); ?></p>
+				<div class="beltoft-services-vm__reset">
+					<p><button type="button" class="button woocommerce-button beltoft-services-action" data-action="reset_password"><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
+					<p class="description"><?php esc_html_e( 'Sets a new password on the server. Use Show password once to see it.', 'beltoft-services' ); ?></p>
+				</div>
 			<?php endif; ?>
 
 		<?php $beltoft_services_more_open( $has_key ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' ) ); ?>
