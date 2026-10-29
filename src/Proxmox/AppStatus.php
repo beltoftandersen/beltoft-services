@@ -3,7 +3,6 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Alerts;
 use BeltoftServices\Crypto;
 use BeltoftServices\Resource;
 
@@ -30,12 +29,23 @@ final class AppStatus {
 
 	/** Recover a lost poll after an interrupted worker. */
 	public static function sweep(): void {
-		foreach ( Resource::live_ids( 'vm' ) as $id ) {
+		foreach ( self::candidates() as $id ) {
 			$r = Resource::find( $id );
 			if ( $r && in_array( $r->get( 'app_state' ), array( 'installing', 'unknown' ), true ) && time() - (int) $r->get( 'app_started_at' ) < self::LIMIT ) {
 				self::schedule( $id, 15 );
 			}
 		}
+	}
+
+	/** Narrow the sweep in SQL before loading resources. Verify each match after reading it. */
+	public static function candidates(): array {
+		global $wpdb;
+		$table = \BeltoftLicenses\Install::tables()['activations'];
+		$installing = '%' . $wpdb->esc_like( '"app_state":"installing"' ) . '%';
+		$unknown = '%' . $wpdb->esc_like( '"app_state":"unknown"' ) . '%';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- bounded custom-table sweep, always fresh.
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND (meta LIKE %s OR meta LIKE %s)", $table, $installing, $unknown ) );
+		return array_map( 'intval', (array) $ids );
 	}
 
 	public static function run( int $id ): void {
@@ -90,11 +100,11 @@ final class AppStatus {
 			}
 			$r->set( $meta );
 			if ( 'failed' === $state ) {
-				Alerts::admin( $r, 'App installation failed at ' . $status['step'] );
+				AppAlerts::failure( $r, 'Installation failed at ' . $status['step'] );
 			}
 		} elseif ( time() - (int) $r->get( 'app_started_at' ) > 1800 ) {
 			$r->set( array( 'app_state' => 'unknown', 'app_checked_at' => time() ) );
-			Alerts::admin( $r, 'App installation has not reported a valid status within 30 minutes' );
+			AppAlerts::failure( $r, 'Installation has not reported a valid status within 30 minutes' );
 		}
 		if ( in_array( $r->get( 'app_state' ), array( 'installing', 'unknown' ), true ) && time() - (int) $r->get( 'app_started_at' ) < self::LIMIT ) {
 			self::schedule( $r->id(), time() - (int) $r->get( 'app_started_at' ) < 120 ? 15 : 30 );

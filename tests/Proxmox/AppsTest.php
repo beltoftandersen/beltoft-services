@@ -16,6 +16,12 @@ final class AppsTest extends TestCase {
 		$this->assertNull( Apps::version( 'docker', '../29' ) );
 	}
 
+	public function test_docker_getting_started_warns_about_published_ports(): void {
+		$text = (string) Apps::current( 'docker' )['getting_started'];
+		$this->assertStringContainsString( 'Ports you publish with Docker are open to the internet even though the firewall is on', $text );
+		$this->assertStringContainsString( '127.0.0.1', $text );
+	}
+
 	public function test_retired_version_is_readable_only_for_existing_server(): void {
 		$filter = static function ( $data ) {
 			$data['versions'][0]['status'] = 'retired';

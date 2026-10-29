@@ -53,7 +53,7 @@ final class Provision {
 	/**
 	 * Order of the steps. `wipe` only runs while meta `wipe` is set.
 	 */
-	private const STEPS = array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'app', 'ready' );
+	private const STEPS = array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' );
 
 	/**
 	 * Fixed comment of the outgoing SMTP rule, how it is recognised on a retry.
@@ -123,9 +123,6 @@ final class Provision {
 		$steps = $this->r->get( 'steps' );
 
 		foreach ( self::STEPS as $name ) {
-			if ( 'app' === $name && '' === (string) $this->r->get( 'app_id' ) ) {
-				continue;
-			}
 			if ( 'wipe' === $name ? ! $this->r->get( 'wipe' ) : in_array( $name, $steps, true ) ) {
 				continue;
 			}
@@ -233,12 +230,6 @@ final class Provision {
 			}
 		}
 
-		if ( '' !== (string) $this->r->get( 'app_id' ) ) {
-			$why = Apps::check( $cluster, $this->plan, (string) $this->r->get( 'app_id' ), (string) $this->r->get( 'app_version' ) );
-			if ( null !== $why ) {
-				return StepResult::fail( 'app: ' . $why, array( 'app_state' => 'failed' ) );
-			}
-		}
 
 		$gate = Clients::gate( $this->cluster_id, $cluster, Clients::live_allowed() );
 
@@ -1322,11 +1313,6 @@ final class Provision {
 		return array( 'agent' => $agent );
 	}
 
-	/** Queue a versioned install only for a newly built app server. */
-	private function step_app() {
-		return AppInstall::queue( $this->r, $this->client, $this->cluster, $this->plan );
-	}
-
 	/**
 	 * Final step: the address is in use, and the meta says where everything is.
 	 *
@@ -1368,7 +1354,7 @@ final class Provision {
 			return $checked;
 		}
 
-		return array(
+		$meta = array(
 			'disks_check' => null,
 			'ip'          => $ip['address'],
 			'node'        => $record['node'],
@@ -1380,6 +1366,10 @@ final class Provision {
 			),
 			'task'        => null,
 		);
+		if ( '' !== (string) $this->r->get( 'app_id' ) && ! $this->r->get( 'app_state' ) ) {
+			$meta['app_state'] = 'pending';
+		}
+		return $meta;
 	}
 
 	/**

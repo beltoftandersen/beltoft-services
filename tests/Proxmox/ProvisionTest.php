@@ -13,6 +13,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Access;
 use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppReveal;
 use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\Clusters;
@@ -86,6 +87,7 @@ class ProvisionTest extends TestCase {
 	 * @var QuickProxmoxDriver
 	 */
 	private $driver;
+	private int $app_mails = 0;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -95,7 +97,9 @@ class ProvisionTest extends TestCase {
 
 		$this->wipe_tables();
 		delete_option( Clusters::OPTION );
-		$this->settings( array( 'task_wait' => 5 ) );
+		$this->settings( array( 'task_wait' => 5, 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$this->app_mails = 0;
+		add_filter( 'pre_wp_mail', array( $this, 'capture_mail' ), 10, 2 );
 
 		$this->fake = new FakeClient();
 		add_filter( 'beltoft_services_proxmox_client', fn() => $this->fake );
@@ -120,12 +124,20 @@ class ProvisionTest extends TestCase {
 	}
 
 	public function tear_down(): void {
+		remove_filter( 'pre_wp_mail', array( $this, 'capture_mail' ) );
 		remove_all_filters( 'beltoft_services_key' );
 		remove_all_filters( 'beltoft_services_proxmox_client' );
 		delete_option( Clusters::OPTION );
 		$this->wipe_tables();
 
 		parent::tear_down();
+	}
+
+	public function capture_mail( $preempt, array $args ): bool {
+		if ( str_contains( (string) ( $args['subject'] ?? '' ), 'App installation failed' ) ) {
+			++$this->app_mails;
+		}
+		return true;
 	}
 
 	private function wipe_tables(): void {
@@ -326,7 +338,10 @@ class ProvisionTest extends TestCase {
 		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
 		$this->assert_done( $this->run_provision( $resource ) );
 		$fresh = Resource::find( $resource->id() );
-		$this->assertContains( 'app', $fresh->get( 'steps' ) );
+		$this->assertContains( 'ready', $fresh->get( 'steps' ) );
+		$fresh->set( array( 'state' => 'ready' ) );
+		AppInstall::run( $resource->id() );
+		$fresh = Resource::find( $resource->id() );
 		$this->assertSame( 'installing', $fresh->get( 'app_state' ) );
 		$job = json_decode( $this->fake->guest_file( 5000, Apps::JOB ), true );
 		$this->assertSame( '29', $job['version'] );
@@ -341,7 +356,8 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'app_state' ) );
 	}
 
-	public function test_docker_below_minimum_is_refused_before_clone(): void {
+	public function test_docker_below_minimum_fails_only_the_app(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
 		$this->cluster( array(
 			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
 			'apps_ready' => 1,
@@ -349,9 +365,11 @@ class ProvisionTest extends TestCase {
 			'template_families' => array( 9001 => 'ubuntu-24.04' ),
 		) );
 		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 30 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
-		$result = $this->run_provision( $resource );
-		$this->assertTrue( $result->is_failed() );
-		$this->assertSame( array(), $this->calls( 'POST', '/clone' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		AppInstall::run( $resource->id() );
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'app_state' ) );
+		$this->assertCount( 1, $this->calls( 'POST', '/clone' ) );
 	}
 
 	public function test_app_credentials_are_encrypted_and_revealed_once_to_owner(): void {
@@ -370,6 +388,8 @@ class ProvisionTest extends TestCase {
 		try {
 			$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
 			$this->assert_done( $this->run_provision( $resource ) );
+			$resource->set( array( 'state' => 'ready' ) );
+			AppInstall::run( $resource->id() );
 			$fresh = Resource::find( $resource->id() );
 			$secret = 'OnlyInGuestAndEncryptedMeta!';
 			$this->fake->simulate_app( 5000, $fresh->get( 'app_request' ), 'ready', 'complete', array( 'admin_password' => $secret ) );
@@ -394,18 +414,79 @@ class ProvisionTest extends TestCase {
 			'template_families' => array( 9001 => 'ubuntu-24.04' ),
 		) );
 		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$resource->set( array( 'state' => 'ready' ) );
 		$this->fake->fail_next( 'POST', '#/agent/file-write$#', array( 'status' => 500, 'message' => 'No such directory' ) );
-		$first = $this->run_provision( $resource );
-		$this->assertTrue( $first->is_retry() );
+		AppInstall::run( $resource->id() );
 		$fresh = Resource::find( $resource->id() );
 		$request = $fresh->get( 'app_request' );
 		$this->assertNotEmpty( $request );
+		$this->assertSame( 'pending', $fresh->get( 'app_state' ) );
 		$this->fake->require_app_directory( 5000, false );
-		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		AppInstall::run( $resource->id() );
+		$this->assertSame( 'pending', Resource::find( $resource->id() )->get( 'app_state' ) );
 		$this->fake->require_app_directory( 5000, true );
-		$this->assert_done( $this->run_provision( $resource ) );
+		AppInstall::run( $resource->id() );
+		$this->assertSame( 'installing', Resource::find( $resource->id() )->get( 'app_state' ) );
 		$this->assertSame( $request, Resource::find( $resource->id() )->get( 'app_request' ) );
 		$this->assertSame( $request, json_decode( $this->fake->guest_file( 5000, Apps::JOB ), true )['request'] );
+	}
+
+	public function test_app_file_write_403_does_not_fail_the_server(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->fake->fail_next( 'POST', '#/agent/file-write$#', array( 'status' => 403, 'message' => 'forbidden' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertContains( 'ready', Resource::find( $resource->id() )->get( 'steps' ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		AppInstall::run( $resource->id() );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'app_state' ) );
+		$this->assertSame( 1, $this->app_mails );
+	}
+
+	public function test_app_guest_timeout_does_not_fail_the_server(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29', 'app_queue_until' => time() - 1 ) );
+		$this->fake->fail_next( 'POST', '#/agent/file-write$#', array( 'status' => 500, 'message' => 'no agent' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertContains( 'ready', Resource::find( $resource->id() )->get( 'steps' ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		AppInstall::run( $resource->id() );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'app_state' ) );
+		$this->assertSame( 1, $this->app_mails );
+	}
+
+	public function test_app_status_sweep_selects_only_unfinished_app_resources(): void {
+		$installing = $this->resource( array(), array( 'app_id' => 'docker', 'app_state' => 'installing', 'app_started_at' => time() ) );
+		$plain = $this->resource();
+		$this->assertContains( $installing->id(), AppStatus::candidates() );
+		$this->assertNotContains( $plain->id(), AppStatus::candidates() );
+	}
+
+	public function test_ready_transition_queues_install_and_sweep_recovers_a_lost_job(): void {
+		$resource = $this->resource( array(), array( 'app_id' => 'docker', 'app_version' => '29', 'app_state' => 'pending' ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		AppInstall::state_changed( $resource, 'provisioning', 'ready' );
+		$jobs = as_get_scheduled_actions( array( 'hook' => AppInstall::HOOK, 'args' => array( $resource->id() ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' );
+		$this->assertCount( 1, $jobs );
+		as_unschedule_all_actions( AppInstall::HOOK, array( $resource->id() ), Jobs::GROUP );
+		AppInstall::sweep();
+		$jobs = as_get_scheduled_actions( array( 'hook' => AppInstall::HOOK, 'args' => array( $resource->id() ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' );
+		$this->assertCount( 1, $jobs );
 	}
 
 	public function test_medusa_clone_failure_resumes_at_clone(): void {
