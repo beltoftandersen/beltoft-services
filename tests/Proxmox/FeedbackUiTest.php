@@ -108,14 +108,13 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'Everything on the server is erased and the system is installed again. All data on it is lost.', $html );
 		$this->assertStringContainsString( 'You get a new password.', $html );
 		$this->assertStringNotContainsString( 'Your SSH key stays on the server.', $html );
-		$this->assertStringNotContainsString( 'snapshots are deleted first', $html );
-		$this->assertStringNotContainsString( 'snapshot is deleted first', $html );
+		$this->assertStringNotContainsString( 'deleted first', $html );
 
 		$this->take( $r, 'one' );
-		$this->assertStringContainsString( 'Your 1 snapshot is deleted first.', $this->card( $r ) );
+		$this->assertStringContainsString( 'Your snapshot is deleted first.', $this->card( $r ) );
 
 		$this->take( $r, 'two' );
-		$this->assertStringContainsString( 'All 2 of your snapshots are deleted first.', $this->card( $r ) );
+		$this->assertStringContainsString( 'Your 2 snapshots are deleted first.', $this->card( $r ) );
 
 		$this->assertTrue( $this->fresh( $r )->set( array( 'ssh_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA test' ) ) );
 		$this->assertStringContainsString( 'You get a new password. Your SSH key stays on the server.', $this->card( $r ) );
@@ -174,7 +173,10 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		$this->assertNull( $item['ending'] );
 
 		$html = $this->card( $server );
-		$this->assertStringContainsString( 'data-confirm-open="beltoft-vm-disk-confirm-' . $item['id'] . '" data-confirm-url', $html );
+		$this->assertStringContainsString( 'data-confirm-open="beltoft-vm-disk-confirm-' . $item['id'] . '" data-cancel-url="' . esc_url( $item['remove_url'] ) . '"', $html );
+		$this->assertStringNotContainsString( 'href="' . esc_url( $item['remove_url'] ) . '"', $html, 'The cancel address is never a link.' );
+		$this->assertStringContainsString( '<noscript>', $html );
+		$this->assertStringContainsString( 'Manage subscription', $html );
 		$this->assertStringContainsString( 'id="beltoft-vm-disk-confirm-' . $item['id'] . '"', $html );
 		$this->assertStringContainsString( 'The disk stays on your server until its paid period ends on ' . $until . '.', $html );
 		$this->assertStringContainsString( 'The snapshots that include this disk are deleted with it:', $html );
@@ -206,8 +208,78 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		$html = $this->card( $server );
 		$this->assertStringContainsString( 'data-disk-ending', $html );
 		$this->assertStringContainsString( 'The extra disk will be removed on ' . $when . '.', $html );
-		$this->assertMatchesRegularExpression( '/data-subscription-link>Undo<\/a>/', $html );
-		$this->assertStringNotContainsString( 'data-confirm-url', $html, 'Nothing to remove twice.' );
+		$this->assertStringContainsString( 'data-undo-url="' . esc_url( $item['ending']['undo_url'] ) . '"', $html );
+		$this->assertStringNotContainsString( 'href="' . esc_url( $item['ending']['undo_url'] ) . '"', $html, 'Undo is not a link that acts by itself.' );
+		$this->assertStringNotContainsString( 'data-cancel-url', $html, 'Nothing to remove twice.' );
+	}
+
+	// -- The server's record of what a confirmed action came to -------------------------------------
+
+	public function test_a_rollback_that_was_done_records_ok_and_the_status_route_says_so(): void {
+		$r = $this->server();
+		$e = $this->take( $r, 'one' );
+		$before = time();
+		$this->act( $r, 'snapshot_rollback', array( 'id' => $e['id'], 'confirm' => 'ROLLBACK' ) );
+
+		$result = $this->fresh( $r )->get( \BeltoftServices\Jobs::RESULT );
+		$this->assertSame( 'snapshot_rollback', $result['action'] );
+		$this->assertTrue( $result['ok'] );
+		$this->assertGreaterThanOrEqual( $before, $result['at'] );
+		$this->assertSame( '', $result['text'] );
+
+		$data = $this->status( $r );
+		$this->assertSame( $result, $data['last_result'] );
+		$this->assertGreaterThanOrEqual( $result['at'], $data['now'] );
+	}
+
+	public function test_a_rollback_to_a_snapshot_that_is_gone_records_a_refusal_with_a_fixed_text(): void {
+		$r = $this->server();
+		$this->take( $r, 'one' );
+		$this->act( $r, 'snapshot_rollback', array( 'id' => 'nosuchid', 'confirm' => 'ROLLBACK' ) );
+
+		$result = $this->fresh( $r )->get( \BeltoftServices\Jobs::RESULT );
+		$this->assertFalse( $result['ok'] );
+		$this->assertSame( 'This was not done. Your server was not changed.', $result['text'] );
+		$this->assertStringNotContainsString( 'snapshot', strtolower( $result['text'] ), 'No driver text reaches the customer.' );
+		$this->assertFalse( $this->status( $r )['last_result']['ok'] );
+	}
+
+	public function test_a_rollback_refused_for_a_detached_disk_records_a_refusal(): void {
+		list( $server, $disk ) = $this->server_and_disk();
+		$e = $this->take( $server, 'with disk' );
+		$this->assertTrue( $disk->transition( 'paused', 'test' ) );
+		$this->act( $server, 'snapshot_rollback', array( 'id' => $e['id'], 'confirm' => 'ROLLBACK' ) );
+
+		$result = $this->fresh( $server )->get( \BeltoftServices\Jobs::RESULT );
+		$this->assertFalse( $result['ok'] );
+		$this->assertNotSame( '', $result['text'] );
+		$this->assertStringContainsString( 'Snapshot rollback refused', $this->events_of( $server ) );
+	}
+
+	public function test_an_action_that_is_not_offered_any_more_records_a_refusal_too(): void {
+		$r = $this->server();
+		$this->act( $r, 'snapshot_rollback', array( 'id' => 'x' ) );
+
+		$this->assertFalse( $this->fresh( $r )->get( \BeltoftServices\Jobs::RESULT )['ok'] );
+	}
+
+	public function test_the_queued_reply_carries_the_servers_time_and_the_script_compares_it(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
+
+		$this->assertStringContainsString( 'result.at >= asked.queued', $js );
+		$this->assertStringContainsString( "text.replace( '%s', function", $js );
+		$this->assertStringContainsString( 'beltoftPending', $js );
+		$this->assertStringContainsString( "addEventListener( 'cancel'", $js );
+		$this->assertStringContainsString( 'safe.focus()', $js );
+		$this->assertStringContainsString( "'beltoft-services:status'", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' ) );
+	}
+
+	/** @return array<string, mixed> */
+	private function status( Resource $r ): array {
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$response = rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() ) );
+
+		return $response->get_data();
 	}
 
 	public function test_the_new_texts_have_no_em_dash_and_no_rounded_corners(): void {

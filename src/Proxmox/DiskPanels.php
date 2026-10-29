@@ -49,6 +49,7 @@ final class DiskPanels {
 			$disks[] = array(
 				'id' => $disk->id(),
 				'ending' => $ending,
+				'manage_url' => $subscription instanceof \WC_Subscription ? $subscription->get_view_order_url() : '',
 				'paid_until' => self::date_of( $subscription, 'next_payment' ),
 				'snapshot_labels' => $labels,
 				'retention_days' => Product::retention_days( (int) ( $license['product_id'] ?? 0 ) ),

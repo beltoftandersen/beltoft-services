@@ -169,6 +169,8 @@
 			}
 
 			active = show( panel, data );
+			// Other scripts of the card (the server card's done line) look at the same status.
+			panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:status', { detail: data } ) );
 			panel.beltoftActive = panel.beltoftActive || active;
 
 			// A failed service waits for the shop: no point in asking again.

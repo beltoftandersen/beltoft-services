@@ -96,11 +96,18 @@
 		}
 	}
 
+	// The safe button has the focus when a question opens: Enter or a stray Space does not confirm.
 	function openDialog( dialog ) {
+		var safe = dialog.querySelector( '[data-confirm-cancel], [data-snapshot-cancel]' );
+
 		if ( dialog.showModal ) {
 			dialog.showModal();
 		} else {
 			dialog.setAttribute( 'open', '' );
+		}
+
+		if ( safe ) {
+			safe.focus();
 		}
 	}
 
@@ -117,99 +124,100 @@
 		return 'beltoftServicesVm:' + panel.getAttribute( 'data-resource' );
 	}
 
-	function remember( panel, info ) {
+	function read( panel, name ) {
+		var box = store();
+
+		try {
+			return box ? JSON.parse( box.getItem( key( panel ) + name ) ) : null;
+		} catch ( e ) {
+			return null;
+		}
+	}
+
+	function write( panel, name, value ) {
 		var box = store();
 
 		if ( box ) {
 			try {
-				box.setItem( key( panel ), JSON.stringify( { info: info, at: Date.now() } ) );
+				if ( null === value ) {
+					box.removeItem( key( panel ) + name );
+				} else {
+					box.setItem( key( panel ) + name, JSON.stringify( value ) );
+				}
 			} catch ( e ) { /* not kept */ }
 		}
 	}
 
+	// What this tab asked for: the card's start and done lines (they name the snapshot), and the server's clock at the request.
 	function recall( panel ) {
-		var box = store();
-		var entry = null;
-
-		try {
-			entry = box ? JSON.parse( box.getItem( key( panel ) ) ) : null;
-		} catch ( e ) {
-			entry = null;
-		}
+		var entry = read( panel, ':asked' );
 
 		// Half an hour is longer than any of these takes.
-		return entry && entry.info && Date.now() - entry.at < 1800000 ? entry.info : null;
+		return entry && entry.info && Date.now() - entry.local < 1800000 ? entry : null;
 	}
 
-	function forget( panel ) {
-		var box = store();
-
-		if ( box ) {
-			try {
-				box.removeItem( key( panel ) );
-			} catch ( e ) { /* nothing to remove */ }
-		}
-	}
-
-	// The card's own line, at the top of the server card: working (with the pulsing squares) or done.
+	// The card's own line, at the top of the server card: working (with the pulsing squares), done or not done.
 	function flash( panel, text, kind ) {
 		var line = panel.querySelector( '[data-flash]' );
+		var power = panel.querySelector( '[data-power-line]' );
+		var changed;
 
 		if ( ! line ) {
 			return;
 		}
 
+		changed = line.textContent !== text || line.className !== 'beltoft-services-vm__flash is-' + kind;
 		line.textContent = text;
 		line.className = 'beltoft-services-vm__flash is-' + kind;
 		line.hidden = false;
+		// The flash says what is happening: the progress sentence under it would say it twice, and the power is not "Running" while it works.
+		panel.classList.toggle( 'has-working-flash', 'working' === kind );
 
-		if ( line.scrollIntoView ) {
+		if ( 'working' === kind && power ) {
+			power.textContent = vm.strings.busy;
+		}
+
+		// Looked at once, not on every poll.
+		if ( changed && line.scrollIntoView ) {
 			line.scrollIntoView( { block: 'nearest' } );
 		}
 	}
 
+	// Plain replacement: a "$" in a snapshot's name stays as it is.
 	function fill( text, name ) {
-		return text.replace( '%s', name );
+		return text.replace( '%s', function () {
+			return name;
+		} );
 	}
 
-	// What the card says for an action that is confirmed in a dialog: start, done, and whether the server is running again.
+	// What the card says for an action that is confirmed in a dialog: start and done lines, whether the server is running again, and the lines when the name is not known (another device).
 	function describe( action, name ) {
 		var s = vm.strings;
 
 		switch ( action ) {
 			case 'snapshot_rollback':
-				return { start: fill( s.rollbackStart, name ), done: fill( s.rollbackDone, name ), running: true };
+				return { action: action, start: fill( s.rollbackStart, name ), done: name ? fill( s.rollbackDone, name ) : s.rollbackDoneAnon, running: true };
 			case 'restore':
-				return { start: s.restoreStart, done: s.restoreDone, running: true };
+				return { action: action, start: s.restoreStart, done: s.restoreDone, running: true };
 			case 'reinstall':
-				return { start: s.reinstallStart, done: s.reinstallDone, running: true, password: true };
+				return { action: action, start: s.reinstallStart, done: s.reinstallDone, running: true, password: true };
 			case 'snapshot_delete':
-				return { start: fill( s.deleteStart, name ), done: fill( s.deleteDone, name ) };
+				return { action: action, start: fill( s.deleteStart, name ), done: name ? fill( s.deleteDone, name ) : s.deleteDoneAnon };
 			default:
 				return null;
 		}
 	}
 
-	// At page load: the work the customer confirmed is still going (say so) or over (say it is done, once).
-	function showOutcome( panel ) {
-		var info = recall( panel );
-		var block = panel.querySelector( '[data-progress]' );
-		var phase = block ? block.getAttribute( 'data-phase' ) : 'idle';
+	// Shows the end of a confirmed action once, from the server's record of it: done only when the job said it was.
+	function ended( panel, result, info ) {
 		var card = panel.querySelector( '.beltoft-services-vm' );
 		var text;
 
-		if ( ! info ) {
-			return;
-		}
+		write( panel, ':seen', result.at );
 
-		if ( 'queued' === phase || 'running' === phase ) {
-			flash( panel, info.start, 'working' );
-			return;
-		}
+		if ( ! result.ok ) {
+			flash( panel, result.text || vm.strings.failed, 'failed' );
 
-		forget( panel );
-
-		if ( 'failed' === phase ) {
 			return;
 		}
 
@@ -226,6 +234,41 @@
 		flash( panel, text, 'done' );
 	}
 
+	// On every status of the card (account.js): working while it works, then done or not done. Works on a device that did not ask too, for ten minutes.
+	function outcome( panel, data ) {
+		var result = data.last_result;
+		var asked = recall( panel );
+		var info;
+
+		if ( data.progress && data.progress.active ) {
+			if ( asked ) {
+				flash( panel, asked.info.start, 'working' );
+			}
+
+			return;
+		}
+
+		info = result ? describe( result.action, '' ) : null;
+
+		if ( ! info ) {
+			return;
+		}
+
+		if ( asked ) {
+			// The record has to be the answer to this request: the same action, from the server's clock at or after it.
+			if ( asked.info.action === result.action && result.at >= asked.queued ) {
+				write( panel, ':asked', null );
+				ended( panel, result, asked.info );
+			}
+
+			return;
+		}
+
+		if ( data.now - result.at <= 600 && read( panel, ':seen' ) !== result.at ) {
+			ended( panel, result, info );
+		}
+	}
+
 	// A dialog that asks first. source: an element with the paragraphs (hidden, in the card), or text; name: the thing it is about.
 	function confirmFirst( panel, options ) {
 		var dialog = panel.querySelector( '[data-confirm-dialog]' );
@@ -235,6 +278,11 @@
 
 		if ( ! dialog ) {
 			return false;
+		}
+
+		// A request is on its way: nothing new is asked until it has answered.
+		if ( panel.beltoftPending ) {
+			return true;
 		}
 
 		body = dialog.querySelector( '[data-confirm-body]' );
@@ -273,33 +321,46 @@
 	}
 
 	function send( panel, action, args, button, dialog, info ) {
+		if ( panel.beltoftPending ) {
+			return;
+		}
+
+		panel.beltoftPending = true;
+
 		if ( button ) {
 			busy( button );
 		}
 
 		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
 			if ( 202 === response.status ) {
-				if ( dialog ) {
-					// The button goes back to normal: the dialog is used again for the next action.
-					if ( button ) {
-						reset( button );
+				return response.json().catch( function () {
+					return null;
+				} ).then( function ( body ) {
+					panel.beltoftPending = false;
+
+					if ( dialog ) {
+						// The button goes back to normal: the dialog is used again for the next action.
+						if ( button ) {
+							reset( button );
+						}
+
+						closeDialog( dialog );
 					}
 
-					closeDialog( dialog );
-				}
+					if ( info ) {
+						notice( panel, '' );
+						flash( panel, info.start, 'working' );
+						write( panel, ':asked', { info: info, queued: body && body.at ? body.at : 0, local: Date.now() } );
+					} else {
+						notice( panel, vm.strings.queued );
+					}
 
-				if ( info ) {
-					notice( panel, '' );
-					flash( panel, info.start, 'working' );
-					remember( panel, info );
-				} else {
-					notice( panel, vm.strings.queued );
-				}
-
-				// The panel's status poll (account.js) shows the progress and reloads when it is over.
-				panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
-				return null;
+					// The panel's status poll (account.js) shows the progress and reloads when it is over.
+					panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
+				} );
 			}
+
+			panel.beltoftPending = false;
 
 			if ( button ) {
 				reset( button );
@@ -307,6 +368,8 @@
 
 			return reply( panel, response, vm.strings.failed );
 		} ).catch( function () {
+			panel.beltoftPending = false;
+
 			if ( button ) {
 				reset( button );
 			}
@@ -316,6 +379,12 @@
 
 	// A WooCommerce Subscriptions link (cancel, reactivate) is a GET that does its work and redirects: do it in the background, then show the card again.
 	function subscriptionLink( panel, url, button ) {
+		if ( panel.beltoftPending ) {
+			return;
+		}
+
+		panel.beltoftPending = true;
+
 		if ( button ) {
 			busy( button );
 		}
@@ -327,6 +396,8 @@
 
 			window.location.reload();
 		} ).catch( function () {
+			panel.beltoftPending = false;
+
 			if ( button ) {
 				reset( button );
 			}
@@ -402,7 +473,26 @@
 	}
 
 	document.querySelectorAll( '.beltoft-services-panel[data-resource]' ).forEach( function ( panel ) {
-		showOutcome( panel );
+		var line = panel.querySelector( '[data-flash]' );
+		var progress = panel.querySelector( '[data-progress]' );
+
+		// The card's line goes above the steps, so there is one message and then the steps.
+		if ( line && progress && progress.parentNode ) {
+			progress.parentNode.insertBefore( line, progress );
+		}
+
+		// Esc does not close a question while its request is on its way.
+		Array.prototype.forEach.call( panel.querySelectorAll( 'dialog' ), function ( box ) {
+			box.addEventListener( 'cancel', function ( event ) {
+				if ( panel.beltoftPending ) {
+					event.preventDefault();
+				}
+			} );
+		} );
+
+		panel.addEventListener( 'beltoft-services:status', function ( event ) {
+			outcome( panel, event.detail || {} );
+		} );
 
 		panel.addEventListener( 'submit', function ( event ) {
 			var form = event.target.closest( '.beltoft-services-vm-form' );
@@ -417,11 +507,12 @@
 			var roll = event.target.closest( '[data-snapshot-rollback]' );
 			var cancel = event.target.closest( '[data-snapshot-cancel], [data-confirm-cancel]' );
 			var drop = event.target.closest( '[data-snapshot-delete]' );
-			var remove = event.target.closest( '[data-confirm-url]' );
-			var undo = event.target.closest( '[data-subscription-link]' );
+			var remove = event.target.closest( '[data-cancel-url]' );
+			var undo = event.target.closest( '[data-undo-url]' );
 			var dialog = panel.querySelector( '[data-snapshot-dialog]' );
 			var button = event.target.closest( '[data-vm-reveal]' );
 			var name;
+			var source;
 
 			if ( roll && dialog ) {
 				dialog.querySelector( 'input[name="id"]' ).value = roll.getAttribute( 'data-snapshot-rollback' );
@@ -453,29 +544,30 @@
 			}
 
 			if ( remove ) {
-				// Without the dialog the link keeps working as a link.
-				if ( confirmFirst( panel, {
-					title: document.getElementById( remove.getAttribute( 'data-confirm-open' ) ).getAttribute( 'data-confirm-title' ),
-					label: document.getElementById( remove.getAttribute( 'data-confirm-open' ) ).getAttribute( 'data-confirm-yes' ),
-					source: document.getElementById( remove.getAttribute( 'data-confirm-open' ) ),
-					run: function ( yes ) {
-						subscriptionLink( panel, remove.href, yes );
-					}
-				} ) ) {
-					event.preventDefault();
+				// The cancel address is only ever used from the dialog's button.
+				source = document.getElementById( remove.getAttribute( 'data-confirm-open' ) );
+
+				if ( source ) {
+					confirmFirst( panel, {
+						title: source.getAttribute( 'data-confirm-title' ),
+						label: source.getAttribute( 'data-confirm-yes' ),
+						source: source,
+						run: function ( yes ) {
+							subscriptionLink( panel, remove.getAttribute( 'data-cancel-url' ), yes );
+						}
+					} );
 				}
 
 				return;
 			}
 
 			if ( undo ) {
-				event.preventDefault();
-				subscriptionLink( panel, undo.href, null );
+				subscriptionLink( panel, undo.getAttribute( 'data-undo-url' ), undo );
 
 				return;
 			}
 
-			if ( cancel ) {
+			if ( cancel && ! panel.beltoftPending ) {
 				closeDialog( cancel.closest( 'dialog' ) );
 
 				return;

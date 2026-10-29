@@ -155,6 +155,9 @@ final class Routes {
 				'label'    => Panel::label( $state, $resource ),
 				'message'  => Panel::message( $state, $resource ),
 				'progress' => Progress::build( $resource ),
+				// The outcome of the last customer action (action, ok, at, text) and the server's clock to compare it with.
+				'last_result' => is_array( $resource->get( Jobs::RESULT ) ) ? $resource->get( Jobs::RESULT ) : null,
+				'now'      => time(),
 			),
 			200
 		);
@@ -208,6 +211,7 @@ final class Routes {
 		return new \WP_REST_Response(
 			array(
 				'queued'  => true,
+				'at'      => time(),
 				'message' => __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
 			),
 			202

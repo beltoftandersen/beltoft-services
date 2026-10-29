@@ -351,6 +351,12 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-vm__flash[hidden] { display: none; }
 .beltoft-services-vm__flash.is-done::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.6em; background: #1a7f37; }
 .beltoft-services-vm__ending { font-weight: 600; }
+.beltoft-services-vm__flash.is-failed::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.6em; background: #b42318; }
+.beltoft-services-panel.has-working-flash .beltoft-services-progress__text { display: none; }
+.beltoft-services-vm .beltoft-services-vm__link { display: inline; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.beltoft-services-vm .beltoft-services-vm__link:hover { background: none; }
+.beltoft-services-vm .beltoft-services-vm__link.is-busy { cursor: progress; }
 
 .beltoft-services-vm__dialog .beltoft-services-vm__confirm-body p { margin: 0 0 12px; }
 .beltoft-services-vm__dialog .beltoft-services-vm__confirm-body ul { margin: 0 0 12px; padding-left: 1.25em; }
+.beltoft-services-vm__ending .beltoft-services-vm__link { margin-left: 0.5em; }

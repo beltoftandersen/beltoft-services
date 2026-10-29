@@ -25,6 +25,10 @@ final class Jobs {
 	public const HOOK  = 'beltoft_services_reconcile';
 	public const SWEEP = 'beltoft_services_sweep';
 	public const ACT   = 'beltoft_services_act';
+	/**
+	 * Meta key of the outcome of the last customer action, for the card.
+	 */
+	public const RESULT = 'last_result';
 	public const USAGE = 'beltoft_services_usage_refresh';
 	public const GROUP = 'beltoft-services';
 	public const CRON  = '*/15 * * * *';
@@ -443,6 +447,7 @@ final class Jobs {
 				// Dropped, but not silently: the customer asked for something that did not happen.
 				if ( $resource ) {
 					Progress::clear( $resource );
+					$resource->set( array( self::RESULT => self::result( $action, false ) ) );
 					Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', sprintf( 'Customer action "%s" was not run: it is not available any more', $action ) );
 				}
 
@@ -501,7 +506,11 @@ final class Jobs {
 		$episodes = (array) $r->get( 'act_wait_since' );
 		unset( $episodes[ $action ] );
 
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null ) ) ) ) {
+		// What the customer is told about the outcome: success only for a done action that did not refuse. Fixed texts, never the driver's.
+		$refused = 1 === preg_match( '/\brefused\b/i', $result->event() . ' ' . $result->error() );
+		$ok      = $result->is_done() && ! $refused;
+
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, self::RESULT => self::result( $action, $ok, $result->is_failed() && ! $refused ) ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
@@ -517,6 +526,26 @@ final class Jobs {
 
 		Events::add( $license_id, 'service', $error );
 		Alerts::admin( $r, $error );
+	}
+
+	/**
+	 * The outcome of a customer action for the card: {action, ok, at, text}. The text is fixed, for the customer.
+	 *
+	 * @param string $action Action name.
+	 * @param bool   $ok     Whether it was done.
+	 * @param bool   $failed Whether it failed part way (not just refused).
+	 * @return array{action: string, ok: bool, at: int, text: string}
+	 */
+	private static function result( string $action, bool $ok, bool $failed = false ): array {
+		$text = '';
+
+		if ( ! $ok ) {
+			$text = $failed
+				? __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' )
+				: __( 'This was not done. Your server was not changed.', 'beltoft-services' );
+		}
+
+		return array( 'action' => $action, 'ok' => $ok, 'at' => time(), 'text' => $text );
 	}
 
 	/**

@@ -51,10 +51,10 @@ $beltoft_services_power_labels = array(
 		<?php endif; ?>
 		<?php if ( ! empty( $busy ) ) : ?>
 			<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
-			<dd><?php esc_html_e( 'Busy', 'beltoft-services' ); ?></dd>
+			<dd data-power-line><?php esc_html_e( 'Busy', 'beltoft-services' ); ?></dd>
 		<?php elseif ( isset( $beltoft_services_power_labels[ $power ] ) ) : ?>
 			<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
-			<dd><?php echo esc_html( $beltoft_services_power_labels[ $power ] ); ?></dd>
+			<dd data-power-line><?php echo esc_html( $beltoft_services_power_labels[ $power ] ); ?></dd>
 		<?php endif; ?>
 	</dl>
 
@@ -69,7 +69,10 @@ $beltoft_services_power_labels = array(
 				<p><strong><?php echo esc_html( ( $beltoft_extra_disk['slot'] ?: __( 'Extra disk', 'beltoft-services' ) ) . ': ' . $beltoft_extra_disk['size'] . ' GB' ); ?></strong> <?php echo esc_html( $beltoft_extra_disk['state'] ); ?></p>
 				<?php if ( ! empty( $beltoft_extra_disk['paused'] ) ) : ?><p class="description"><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
-				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>" data-confirm-open="beltoft-vm-disk-confirm-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-confirm-url><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a><?php endif; ?>
+				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-confirm-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-cancel-url="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?>
+				<?php if ( ( $beltoft_extra_disk['remove_url'] || ( $beltoft_extra_disk['ending'] && '' !== $beltoft_extra_disk['ending']['undo_url'] ) ) && '' !== $beltoft_extra_disk['manage_url'] ) : ?>
+					<noscript><p class="description"><?php esc_html_e( 'To remove this disk or to undo it, use', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $beltoft_extra_disk['manage_url'] ); ?>"><?php esc_html_e( 'Manage subscription', 'beltoft-services' ); ?></a>.</p></noscript>
+				<?php endif; ?>
 				<?php if ( $beltoft_extra_disk['ending'] ) : ?>
 					<p class="beltoft-services-vm__ending" data-disk-ending>
 						<?php
@@ -80,7 +83,7 @@ $beltoft_services_power_labels = array(
 								: sprintf( __( 'The extra disk will be removed on %s.', 'beltoft-services' ), $beltoft_extra_disk['ending']['date'] )
 						);
 						?>
-						<?php if ( '' !== $beltoft_extra_disk['ending']['undo_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['ending']['undo_url'] ); ?>" data-subscription-link><?php esc_html_e( 'Undo', 'beltoft-services' ); ?></a><?php endif; ?>
+						<?php if ( '' !== $beltoft_extra_disk['ending']['undo_url'] ) : ?><button type="button" class="beltoft-services-vm__link" data-undo-url="<?php echo esc_url( $beltoft_extra_disk['ending']['undo_url'] ); ?>"><?php esc_html_e( 'Undo', 'beltoft-services' ); ?></button><?php endif; ?>
 					</p>
 				<?php endif; ?>
 				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?>
@@ -503,7 +506,7 @@ $beltoft_services_power_labels = array(
 					<p><?php echo $extra_disks['items'] ? esc_html__( 'The main disk of the server is erased and the system is installed again. Everything on it is lost. Extra disks keep their data and stay attached.', 'beltoft-services' ) : esc_html__( 'Everything on the server is erased and the system is installed again. All data on it is lost.', 'beltoft-services' ); ?></p>
 					<?php if ( $beltoft_services_lost > 0 ) : ?>
 						<?php /* translators: %d: number of snapshots */ ?>
-						<p><?php echo esc_html( sprintf( _n( 'Your %d snapshot is deleted first.', 'All %d of your snapshots are deleted first.', $beltoft_services_lost, 'beltoft-services' ), $beltoft_services_lost ) ); ?></p>
+						<p><?php echo esc_html( sprintf( _n( 'Your snapshot is deleted first.', 'Your %d snapshots are deleted first.', $beltoft_services_lost, 'beltoft-services' ), $beltoft_services_lost ) ); ?></p>
 					<?php endif; ?>
 					<p><?php echo $has_key ? esc_html__( 'You get a new password. Your SSH key stays on the server.', 'beltoft-services' ) : esc_html__( 'You get a new password.', 'beltoft-services' ); ?></p>
 					<p><?php esc_html_e( 'The IP address stays.', 'beltoft-services' ); ?></p>
