@@ -835,6 +835,63 @@ class AppFieldTest extends TestCase {
 		$this->assertTrue( AppDomains::publish( $me, 'same.example', 'shop.same.example', '192.0.2.10' ), 'Exactly this server is fine.' );
 	}
 
+	public function test_an_app_record_and_an_editor_save_do_not_lose_each_others_sets_and_a_busy_zone_retries(): void {
+		$me  = self::factory()->user->create();
+		$dns = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns, 20 );
+		$this->domain( $me, 'both.example', array(), array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.1' ), array( 'name' => '@', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'v=spf1 -all' ) ) );
+
+		// While another connection holds the zone, the app record waits for a retry and nothing is written.
+		add_filter( 'beltoft_services_zone_lock_wait', '__return_zero' );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( \BeltoftServices\Locks::zone( 'both.example' ) ) . "', 0)" );
+		$before = count( array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+		$busy   = AppDomains::publish( $me, 'both.example', 'shop.both.example', '192.0.2.10' );
+		$this->assertWPError( $busy );
+		$this->assertSame( 'transient', $busy->get_error_code() );
+		$this->assertCount( $before, array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+		$other->close();
+
+		// The editor saves its list (as the customer saw it), then the app record lands: all three sets are there.
+		$this->assertTrue( \BeltoftServices\Domains\Records::replace( 'both.example', array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.2' ), array( 'name' => '@', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'v=spf1 -all' ) ) ) );
+		$this->assertTrue( AppDomains::publish( $me, 'both.example', 'shop.both.example', '192.0.2.10' ) );
+		$names = array_map( static fn( $s ) => $s['name'] . $s['type'], $dns->zone( 'both.example' )['rrsets'] );
+		foreach ( array( 'www.both.example.A', 'both.example.TXT', 'shop.both.example.A' ) as $want ) {
+			$this->assertContains( $want, $names );
+		}
+
+		// The save after the app record only writes the set it changes, so the app record survives it.
+		$this->assertTrue( \BeltoftServices\Domains\Records::replace( 'both.example', array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.2' ), array( 'name' => '@', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'v=spf1 ~all' ), array( 'name' => 'shop', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$names = array_map( static fn( $s ) => $s['name'] . $s['type'], $dns->zone( 'both.example' )['rrsets'] );
+		$this->assertContains( 'shop.both.example.A', $names );
+		remove_filter( 'beltoft_services_zone_lock_wait', '__return_zero' );
+	}
+
+	public function test_a_paused_zone_gives_a_plain_final_reason_not_a_retry(): void {
+		$me  = self::factory()->user->create();
+		$dns = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns, 20 );
+		$this->domain( $me, 'off.example', array(), array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.1' ) ) );
+		$this->assertTrue( \BeltoftServices\Domains\Records::set_disabled( 'off.example', true ) );
+		$before = count( array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+
+		$made = AppDomains::publish( $me, 'off.example', 'shop.off.example', '192.0.2.10' );
+		$this->assertIsString( $made, 'a final reason, so the install records it once without retries' );
+		$this->assertSame( 'DNS hosting is paused for this domain.', $made );
+		$this->assertCount( $before, array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+	}
+
+	public function test_a_single_set_change_leaves_an_app_record_the_editor_never_saw(): void {
+		$me  = self::factory()->user->create();
+		$dns = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns, 20 );
+		$this->domain( $me, 'stale.example', array(), array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.1' ) ) );
+		$this->assertTrue( AppDomains::publish( $me, 'stale.example', 'shop.stale.example', '192.0.2.10' ) );
+		$this->assertTrue( \BeltoftServices\Domains\Records::change( 'stale.example', 'www', 'A', array( array( 'value' => '192.0.2.3' ) ) ) );
+		$names = array_map( static fn( $s ) => $s['name'] . $s['type'], $dns->zone( 'stale.example' )['rrsets'] );
+		$this->assertContains( 'shop.stale.example.A', $names, 'a single-set change leaves the app record alone' );
+	}
+
 	public function test_a_name_the_dns_layer_would_refuse_is_refused_at_checkout_before_payment(): void {
 		$me   = self::factory()->user->create();
 		$zone = str_repeat( 'a', 63 ) . '.' . str_repeat( 'b', 63 ) . '.' . str_repeat( 'c', 63 ) . '.example';

@@ -155,28 +155,38 @@ final class AppDomains {
 		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
 			return 'The domain name is not valid for a DNS record.';
 		}
-		// Read immediately before the write: what is at the name now decides.
-		$zone_data = DnsClients::dns()->zone( $zone );
-		if ( is_wp_error( $zone_data ) ) {
-			return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
-		}
-		if ( ! is_array( $zone_data ) ) {
-			return 'The DNS zone does not exist.';
-		}
-		$have = array();
-		foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
-			if ( in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) && self::row_name( $zone, (string) $row['name'] ) === $fqdn ) {
-				$have[ $row['type'] ][] = (string) $row['value'];
+		// The zone lock covers the read and the write, so an editor save or a pause cannot slip in between.
+		$locked = Records::locked(
+			$zone,
+			static function () use ( $zone, $fqdn, $ip, $set ) {
+				// Read immediately before the write: what is at the name now decides.
+				$zone_data = DnsClients::dns()->zone( $zone );
+				if ( is_wp_error( $zone_data ) ) {
+					return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
+				}
+				if ( ! is_array( $zone_data ) ) {
+					return 'The DNS zone does not exist.';
+				}
+				$have = array();
+				foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
+					if ( in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) && self::row_name( $zone, (string) $row['name'] ) === $fqdn ) {
+						$have[ $row['type'] ][] = (string) $row['value'];
+					}
+				}
+				if ( Records::paused( $zone, $zone_data ) ) {
+					return 'DNS hosting is paused for this domain.';
+				}
+				if ( array( 'A' => array( $ip ) ) === $have ) {
+					return true;
+				}
+				if ( array() !== $have ) {
+					return 'The name already has a DNS record.';
+				}
+				$set[0]['changetype'] = 'REPLACE';
+				$done = DnsClients::dns()->replace_rrsets( $zone, $set );
+				return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : true;
 			}
-		}
-		if ( array( 'A' => array( $ip ) ) === $have ) {
-			return true;
-		}
-		if ( array() !== $have ) {
-			return 'The name already has a DNS record.';
-		}
-		$set[0]['changetype'] = 'REPLACE';
-		$done = DnsClients::dns()->replace_rrsets( $zone, $set );
-		return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : true;
+		);
+		return is_wp_error( $locked ) ? new \WP_Error( 'transient', 'The DNS zone is being changed.' ) : $locked;
 	}
 }

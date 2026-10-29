@@ -24,7 +24,7 @@ class RecordsEditorRowsTest extends TestCase {
 	public function test_rows_skip_our_ns_and_soa_and_use_editor_fields(): void {
 		$rows = Records::to_rows( 'example.com', $this->sets() );
 		$this->assertCount( 8, $rows, 'Two A records, CNAME, MX, TXT, SRV, CAA and the deep name; no NS or SOA.' );
-		$this->assertSame( array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ), $rows[0] );
+		$this->assertSame( array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10', 'disabled' => false ), $rows[0] );
 		$this->assertSame( 'www', $rows[2]['name'] );
 		$this->assertSame( array( 10, 'mail.example.com' ), array( $rows[3]['priority'], $rows[3]['value'] ) );
 		$this->assertSame( 'v=spf1 include:"x" -all', $rows[4]['value'] );

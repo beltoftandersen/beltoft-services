@@ -52,7 +52,8 @@ final class Zone {
 		if ( is_wp_error( $existing ) ) { return StepResult::retry( 3600, 'DNS zone could not be checked.' ); }
 		if ( null === $existing ) {
 			if ( ! $r->set( array( 'zone_claimed' => true ) ) ) { return StepResult::retry( 3600, 'DNS zone claim could not be saved.' ); }
-			$created = $dns->create_zone( $name, $nameservers );
+			$created = Records::locked( $name, static fn() => $dns->create_zone( $name, $nameservers ) );
+			if ( is_wp_error( $created ) && 'zone_busy' === $created->get_error_code() ) { return StepResult::retry( 30, 'The DNS zone is being changed, trying again shortly.' ); }
 			if ( is_wp_error( $created ) ) {
 				if ( 'zone_exists' === $created->get_error_code() || 'http_409' === $created->get_error_code() ) { $r->set( array( 'zone_claimed' => false ) ); }
 				return StepResult::retry( 3600, 'DNS zone could not be created.' );
@@ -84,13 +85,15 @@ final class Zone {
 		$existing = $dns->zone( $name );
 		if ( is_wp_error( $existing ) ) { return StepResult::retry( 3600, 'DNS zone could not be checked.' ); }
 		if ( null === $existing ) {
-			$created = $dns->create_zone( $name, $nameservers );
+			$created = Records::locked( $name, static fn() => $dns->create_zone( $name, $nameservers ) );
+			if ( is_wp_error( $created ) && 'zone_busy' === $created->get_error_code() ) { return StepResult::retry( 30, 'The DNS zone is being changed, trying again shortly.' ); }
 			if ( is_wp_error( $created ) ) { return StepResult::retry( 3600, 'DNS zone could not be created.' ); }
 		}
 		if ( 'dns' === $r->get( 'driver' ) ) { return StepResult::done( array( 'zone_ready' => true ) ); }
 		// Sandbox registration has only a fake zone; its fake DNSKEY must never be sent to a registry.
 		if ( 'sandbox' === Clients::mode() && $dns instanceof FakeDns ) { return StepResult::done( array( 'zone_ready' => true, 'dnssec_keys' => array() ) ); }
-		$keys = $dns->secure( $name );
+		$keys = Records::locked( $name, static fn() => $dns->secure( $name ) );
+		if ( is_wp_error( $keys ) && 'zone_busy' === $keys->get_error_code() ) { return StepResult::retry( 30, 'The DNS zone is being changed, trying again shortly.' ); }
 		if ( is_wp_error( $keys ) ) { return StepResult::retry( 3600, 'DNSSEC signing could not be enabled.' ); }
 		if ( ! $publish_ds ) { return StepResult::done( array( 'zone_ready' => true, 'dnssec_keys' => $keys ) ); }
 		$remote_id = (string) $r->get( 'remote_id' );
@@ -127,7 +130,8 @@ final class Zone {
 			if ( is_wp_error( $reply ) ) { return StepResult::retry( 3600, 'DNSSEC could not be removed at the registry.' ); }
 		}
 		if ( 'domain' === $owner || 'dns' === $owner ) { return StepResult::done( array( 'zone_ready' => false, 'dnssec_keys' => array() ) ); }
-		$deleted = Clients::dns()->delete_zone( $name );
+		$deleted = Records::locked( $name, static fn() => Clients::dns()->delete_zone( $name ) );
+		if ( is_wp_error( $deleted ) && 'zone_busy' === $deleted->get_error_code() ) { return StepResult::retry( 30, 'The DNS zone is being changed, trying again shortly.' ); }
 		if ( is_wp_error( $deleted ) && 'http_404' !== $deleted->get_error_code() ) { return StepResult::retry( 3600, 'DNS zone could not be removed.' ); }
 		// Autosecondary does not replicate deletion. Keep the resource open until staff clears any secondary copy.
 		foreach ( array_slice( self::nameservers(), 1 ) as $secondary ) {

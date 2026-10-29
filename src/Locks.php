@@ -41,6 +41,30 @@ final class Locks {
 	}
 
 	/**
+	 * The lock name for one DNS zone, case-insensitive (at most 64 chars). Every read-modify-write of a
+	 * zone's customer records holds it, so a save, a pause and an app's A record never overwrite each other.
+	 *
+	 * @param string $zone Zone name.
+	 */
+	public static function zone( string $zone ): string {
+		global $wpdb;
+
+		return 'bs_' . self::site_hash( DB_NAME, (string) $wpdb->prefix ) . '_dnsz_' . md5( strtolower( rtrim( $zone, '.' ) ) );
+	}
+
+	/**
+	 * Seconds a DNS change waits for the zone lock (default 10).
+	 */
+	public static function zone_wait(): int {
+		/**
+		 * Filters how long a DNS change waits for the zone lock.
+		 *
+		 * @param int $seconds Seconds (default 10).
+		 */
+		return max( 0, (int) apply_filters( 'beltoft_services_zone_lock_wait', 10 ) );
+	}
+
+	/**
 	 * Short hash of a database name and table prefix.
 	 *
 	 * @param string $database Database name.
