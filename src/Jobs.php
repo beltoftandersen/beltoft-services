@@ -283,8 +283,8 @@ final class Jobs {
 	}
 
 	/**
-	 * The site runner behind `wp beltoft-services run-due`: for $seconds, runs the due reconcile and customer-action
-	 * jobs of this plugin (and only those) one by one, and looks again every $interval seconds when nothing is due, so
+	 * The site runner behind `wp beltoft-services run-due`: for $seconds, runs the due reconcile, customer-action and app
+	 * install and status jobs of this plugin (and only those) one by one, and looks again every $interval seconds when nothing is due, so
 	 * a follow-up a few seconds away is not left waiting for the next once-a-minute cron tick. Everything else stays
 	 * with Action Scheduler.
 	 *
@@ -336,6 +336,16 @@ final class Jobs {
 	}
 
 	/**
+	 * The hooks the site runner claims: reconcile and customer actions, and the app install and status jobs (so an
+	 * app does not wait for the next Action Scheduler tick between pending, installing and the status reads).
+	 *
+	 * @return string[]
+	 */
+	private static function runner_hooks(): array {
+		return array( self::HOOK, self::ACT, \BeltoftServices\Proxmox\AppInstall::HOOK, \BeltoftServices\Proxmox\AppStatus::HOOK );
+	}
+
+	/**
 	 * Claims one due job of this plugin, runs it, releases the claim.
 	 *
 	 * @return bool Whether a job was run.
@@ -348,11 +358,11 @@ final class Jobs {
 		$store = \ActionScheduler::store();
 
 		try {
-			$claim = $store->stake_claim( 1, null, array( self::HOOK, self::ACT ), self::GROUP );
+			$claim = $store->stake_claim( 1, null, self::runner_hooks(), self::GROUP );
 		} catch ( \InvalidArgumentException $e ) {
 			// A store that is still migrating (hybrid) does not know the group in its old half: the hook names
 			// are this plugin's own, so claim by them alone.
-			$claim = $store->stake_claim( 1, null, array( self::HOOK, self::ACT ) );
+			$claim = $store->stake_claim( 1, null, self::runner_hooks() );
 		}
 
 		$ran = false;

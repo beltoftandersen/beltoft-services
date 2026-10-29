@@ -428,6 +428,21 @@ final class PollTest extends TestCase {
 		$this->assertSame( 0, \ActionScheduler::store()->get_claim_count(), 'The claim is released.' );
 	}
 
+	public function test_run_due_also_runs_the_app_install_and_app_status_jobs(): void {
+		$seen = array();
+		add_action( \BeltoftServices\Proxmox\AppInstall::HOOK, static function ( $id ) use ( &$seen ) { $seen[] = 'install ' . $id; }, 5 );
+		add_action( \BeltoftServices\Proxmox\AppStatus::HOOK, static function ( $id ) use ( &$seen ) { $seen[] = 'status ' . $id; }, 5 );
+		as_schedule_single_action( time() - 5, \BeltoftServices\Proxmox\AppInstall::HOOK, array( 987654 ), Jobs::GROUP );
+		as_schedule_single_action( time() - 5, \BeltoftServices\Proxmox\AppStatus::HOOK, array( 987654 ), Jobs::GROUP );
+
+		list( , $now, $sleep ) = $this->clock();
+		$ran                   = Jobs::run_due( 3, 3, $sleep, $now );
+
+		$this->assertSame( 2, $ran );
+		sort( $seen );
+		$this->assertSame( array( 'install 987654', 'status 987654' ), $seen );
+	}
+
 	public function test_run_due_leaves_future_jobs_and_other_hooks_alone(): void {
 		list( $resource, $driver ) = $this->resource();
 		Jobs::enqueue( $resource->id(), 600 );
