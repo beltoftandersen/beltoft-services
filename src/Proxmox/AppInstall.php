@@ -202,7 +202,7 @@ final class AppInstall {
 		$license = $resource->license();
 		$owner = get_userdata( (int) ( $license['user_id'] ?? 0 ) );
 		$email = $owner ? (string) $owner->user_email : '';
-		if ( in_array( $id, array( 'wordpress', 'coolify' ), true ) && ! is_email( $email ) ) {
+		if ( ! empty( $app['needs_email'] ) && ! is_email( $email ) ) {
 			return StepResult::fail( 'The account email is unavailable for app setup' );
 		}
 		$request = (string) $resource->get( 'app_request' );
@@ -230,7 +230,7 @@ final class AppInstall {
 			'params' => array(),
 			'key_only' => '' !== (string) $resource->get( 'ssh_key' ),
 		);
-		if ( in_array( $id, array( 'wordpress', 'coolify' ), true ) ) {
+		if ( ! empty( $app['needs_email'] ) ) {
 			$job['email'] = $email;
 		}
 		$base = '/nodes/' . rawurlencode( $record['node'] ) . '/qemu/' . $record['vmid'];

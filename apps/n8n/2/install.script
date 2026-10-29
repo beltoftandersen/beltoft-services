@@ -1,0 +1,178 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+app=/opt/n8n
+job="$state/job.running"
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+domain=$(jq -er '.domain // ""' "$job")
+ip=$(jq -er '.ip' "$job")
+email=$(jq -er '.email' "$job")
+[[ "$ip" =~ ^[0-9.]+$ ]]
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+if [ -n "$domain" ]; then
+  [[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+  [[ "$domain" == *.* ]]
+fi
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates curl gnupg jq openssl ufw unattended-upgrades
+  install -m 0755 -d /etc/apt/keyrings
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key -o /etc/apt/keyrings/caddy.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/caddy.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '65760C51EDEA2017CEA2CA15155B6D79CA56EA34' ]
+  chmod a+r /etc/apt/keyrings/caddy.asc
+  printf 'deb [signed-by=/etc/apt/keyrings/caddy.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main\n' > /etc/apt/sources.list.d/caddy.list
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y 'caddy=2.11.7'
+  systemctl enable --now unattended-upgrades
+  touch "$state/stage.1"
+fi
+step=docker
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '9DC858229FC7DD38854AE2D88D81803C0EBFCD88' ]
+  chmod a+r /etc/apt/keyrings/docker.asc
+  printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/docker.sources
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y \
+    'docker-ce=5:29.9.2-1~ubuntu.24.04~noble' \
+    'docker-ce-cli=5:29.9.2-1~ubuntu.24.04~noble' \
+    'containerd.io=2.4.2-3~ubuntu.24.04~noble' \
+    'docker-buildx-plugin=0.38.1-1~ubuntu.24.04~noble' \
+    'docker-compose-plugin=5.6.1-1~ubuntu.24.04~noble'
+  install -m 0755 -d /etc/docker
+  printf '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}\n' > /etc/docker/daemon.json
+  systemctl enable --now docker
+  systemctl restart docker
+  touch "$state/stage.2"
+fi
+step=credentials
+status installing
+install -m 0700 -d "$secrets"
+if [ ! -e "$secrets/n8n.json" ]; then
+  # The generated values contain only letters and digits. n8n needs a password of 8 or more characters with a digit and a capital.
+  jq -n --arg email "$email" --arg password "$(openssl rand -hex 16)Aa1" --arg key "$(openssl rand -hex 32)" --arg db "$(openssl rand -hex 24)" '{root_email:$email,root_password:$password,encryption_key:$key,db_password:$db}' > "$secrets/n8n.json"
+  chmod 0600 "$secrets/n8n.json"
+fi
+step=n8n
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  install -m 0700 -d "$app" "$app/postgres"
+  install -m 0700 -d -o 1000 -g 1000 "$app/data"
+  cat > "$app/compose.yaml" <<'YAML'
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    restart: always
+    env_file: postgres.env
+    volumes:
+      - /opt/n8n/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  n8n:
+    image: n8nio/n8n:2.45.6@sha256:45edf89655fd66dd55ea9336c1791ad14777599fdbf6c5aec6db583ede99a40b
+    restart: always
+    env_file: n8n.env
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - /opt/n8n/data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+YAML
+  if [ -n "$domain" ]; then
+    host="$domain"
+    protocol=https
+    secure=true
+  else
+    host="$ip"
+    protocol=http
+    secure=false
+  fi
+  dbpass=$(jq -er '.db_password' "$secrets/n8n.json")
+  printf 'POSTGRES_USER=n8n\nPOSTGRES_DB=n8n\nPOSTGRES_PASSWORD=%s\n' "$dbpass" > "$app/postgres.env"
+  {
+    printf 'DB_TYPE=postgresdb\nDB_POSTGRESDB_HOST=postgres\nDB_POSTGRESDB_PORT=5432\nDB_POSTGRESDB_DATABASE=n8n\nDB_POSTGRESDB_USER=n8n\nDB_POSTGRESDB_PASSWORD=%s\n' "$dbpass"
+    printf 'N8N_ENCRYPTION_KEY=%s\n' "$(jq -er '.encryption_key' "$secrets/n8n.json")"
+    printf 'N8N_HOST=%s\nN8N_PROTOCOL=%s\nN8N_WEBHOOK_URL=%s://%s/\nN8N_EDITOR_BASE_URL=%s://%s/\n' "$host" "$protocol" "$protocol" "$host" "$protocol" "$host"
+    printf 'N8N_PROXY_HOPS=1\nN8N_SECURE_COOKIE=%s\n' "$secure"
+    printf 'N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true\nNODE_ENV=production\nGENERIC_TIMEZONE=UTC\nTZ=UTC\nN8N_DIAGNOSTICS_ENABLED=false\n'
+  } > "$app/n8n.env"
+  unset dbpass
+  chmod 0600 "$app/compose.yaml" "$app/postgres.env" "$app/n8n.env"
+  step=download
+  status installing
+  (cd "$app" && timeout 900 docker compose pull)
+  step=n8n
+  status installing
+  (cd "$app" && timeout 300 docker compose up -d)
+  touch "$state/stage.3"
+fi
+if [ ! -e "$state/stage.4" ]; then
+  # Create the owner on localhost before the web server and the firewall let anyone else in.
+  ready=0
+  for _ in $(seq 1 60); do
+    if curl --fail --silent --max-time 5 http://127.0.0.1:5678/healthz -o /dev/null; then
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+  [ "$ready" = 1 ]
+  # The password goes to curl on stdin, never in process arguments.
+  jq -n --arg email "$(jq -er '.root_email' "$secrets/n8n.json")" --arg password "$(jq -er '.root_password' "$secrets/n8n.json")" '{email:$email,firstName:"Owner",lastName:"Account",password:$password}' \
+    | curl --fail --silent --show-error --max-time 30 -X POST -H 'Content-Type: application/json' --data @- http://127.0.0.1:5678/rest/owner/setup -o /dev/null
+  touch "$state/stage.4"
+fi
+step=web
+status installing
+if [ ! -e "$state/stage.5" ]; then
+  address="http://$ip"
+  [ -z "$domain" ] || address="$domain"
+  printf '%s {\n  encode zstd gzip\n  reverse_proxy 127.0.0.1:5678\n}\n' "$address" > /etc/caddy/Caddyfile
+  if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+    fallocate -l 2G /swapfile
+    chmod 0600 /swapfile
+    mkswap /swapfile >/dev/null
+    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+    swapon /swapfile
+  fi
+  systemctl enable --now caddy
+  systemctl restart caddy
+  touch "$state/stage.5"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.6" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+  touch "$state/stage.6"
+fi
+step=verify
+status installing
+curl --fail --silent --show-error --max-time 15 --resolve "${domain:-$ip}:80:$ip" "http://${domain:-$ip}/healthz" -o /dev/null
+[ "$(docker inspect --format '{{.State.Health.Status}}' "$(cd "$app" && docker compose ps -q postgres)")" = healthy ]
+jq '{root_email,root_password,encryption_key}' "$secrets/n8n.json" > "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"
