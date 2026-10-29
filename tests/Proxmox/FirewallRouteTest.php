@@ -275,6 +275,14 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertSame( '', Firewall::view( Resource::find( $r->id() ) )['rules'][0]['ufw'] );
 	}
 
+	public function test_the_account_buttons_do_not_draw_the_firewall_actions(): void {
+		list( $r ) = $this->on();
+		$buttons   = \BeltoftServices\Proxmox\Actions::buttons( ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->customer_actions( $r ), $r, 'page' );
+
+		$this->assertArrayNotHasKey( 'fw_apply', $buttons );
+		$this->assertArrayNotHasKey( 'fw_reset', $buttons );
+	}
+
 	public function test_the_assets_load_only_where_the_customer_manages_the_server(): void {
 		list( $r ) = $this->ready();
 		$r         = Resource::find( $r->id() );
