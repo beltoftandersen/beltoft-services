@@ -167,10 +167,11 @@ final class AppInstall {
 			return $done;
 		}
 
-		$made = AppDomains::publish( $user_id, (string) $resource->get( 'app_zone' ), $want, $ip );
+		$wrote = false;
+		$made = AppDomains::publish( $user_id, (string) $resource->get( 'app_zone' ), $want, $ip, $wrote );
 
 		if ( true === $made ) {
-			$resource->set( array( 'app_domain' => $want ) );
+			$resource->set( array( 'app_domain' => $want, 'app_domain_made' => $wrote ) );
 			return $want;
 		}
 

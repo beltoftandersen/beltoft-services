@@ -111,6 +111,21 @@ $beltoft_services_status_text = array(
 		</p>
 	<?php endif; ?>
 
+	<?php if ( '' !== $view['domain_left'] ) : ?>
+		<p class="description" data-app-domain-left>
+			<?php
+			printf(
+				/* translators: %s: old domain name. */
+				esc_html__( 'The DNS record for %s was not made by us, so it was left in place.', 'beltoft-services' ),
+				esc_html( $view['domain_left'] )
+			);
+			?>
+			<?php if ( '' !== $view['domain_left_url'] ) : ?>
+				<a href="<?php echo esc_url( $view['domain_left_url'] ); ?>"><?php esc_html_e( 'You can remove it in DNS records.', 'beltoft-services' ); ?></a>
+			<?php endif; ?>
+		</p>
+	<?php endif; ?>
+
 	<?php if ( '' !== $view['getting_started'] && 'failed' !== $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Getting started', 'beltoft-services' ); ?></h4>

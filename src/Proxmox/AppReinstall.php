@@ -406,7 +406,7 @@ final class AppReinstall {
 	/** Refuse a removal that cannot safely remember the old record. */
 	private static function domain_release_refusal( Resource $r, array $choice ): ?string {
 		$published = (string) $r->get( 'app_domain' );
-		if ( '' === $published || '' === (string) $r->get( 'app_zone' ) || 'keep' === $choice['mode'] ) {
+		if ( '' === $published || true !== $r->get( 'app_domain_made' ) || '' === (string) $r->get( 'app_zone' ) || 'keep' === $choice['mode'] ) {
 			return null;
 		}
 		$ip = IpPool::for_resource( $r->id() );
@@ -552,10 +552,16 @@ final class AppReinstall {
 		}
 
 		$meta['app_domain'] = null;
+		$meta['app_domain_made'] = null;
 		$meta['app_domain_want'] = 'change' === $choice['mode'] ? $choice['fqdn'] : null;
 		$meta['app_zone'] = 'change' === $choice['mode'] ? $choice['zone'] : null;
 
-		if ( '' !== $published && '' !== (string) $r->get( 'app_zone' ) ) {
+		if ( '' !== $published && true !== $r->get( 'app_domain_made' ) ) {
+			$meta['app_domain_left'] = array( 'zone' => (string) $r->get( 'app_zone' ), 'name' => $published );
+		} else {
+			$meta['app_domain_left'] = null;
+		}
+		if ( '' !== $published && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_zone' ) ) {
 			$ip = IpPool::for_resource( $r->id() );
 			$old = (array) $r->get( 'app_domain_old' );
 			$old[] = array(

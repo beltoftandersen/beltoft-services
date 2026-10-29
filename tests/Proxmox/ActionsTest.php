@@ -242,6 +242,19 @@ class ActionsTest extends TestCase {
 
 	// -- Reinstall ---------------------------------------------------------------------------------
 
+	public function test_reinstall_starts_domain_release_after_storing_meta_but_plain_transition_does_not(): void {
+		list( $r ) = $this->ready();
+		$r->set( array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
+		$this->assertFalse( as_has_scheduled_action( \BeltoftServices\Proxmox\AppDomainRelease::HOOK, array( $r->id() ), Jobs::GROUP ) );
+		$this->act( $r, 'reinstall', array( 'confirm' => 'REINSTALL', 'os' => '9001' ) );
+		$this->assertSame( 'provisioning', Resource::find( $r->id() )->get( 'state' ) );
+		$this->assertNotFalse( as_has_scheduled_action( \BeltoftServices\Proxmox\AppDomainRelease::HOOK, array( $r->id() ), Jobs::GROUP ) );
+		list( $other ) = $this->ready();
+		$other->set( array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.11', 'tries' => 0 ) ) ) );
+		$this->assertTrue( $other->transition( 'provisioning', 'Direct transition' ) );
+		$this->assertFalse( as_has_scheduled_action( \BeltoftServices\Proxmox\AppDomainRelease::HOOK, array( $other->id() ), Jobs::GROUP ) );
+	}
+
 	public function test_medusa_reinstall_ends_ready_on_the_same_vmid_and_ip(): void {
 		list( $r ) = $this->ready();
 		$vmid      = (int) $r->get( 'vmid' );

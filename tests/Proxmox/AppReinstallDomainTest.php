@@ -8,6 +8,10 @@ use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Proxmox\AppReinstall;
+use BeltoftServices\Proxmox\AppDomainRelease;
+use BeltoftServices\Proxmox\AppInstall;
+use BeltoftServices\Proxmox\AppTab;
+use BeltoftServices\Domains\Records;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\OsField;
@@ -136,7 +140,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 	}
 
 	public function test_meta_keeps_changes_and_clears_domain_without_writing_dns(): void {
-		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_want' => 'old.mine.example', 'app_zone' => 'mine.example', 'app_domain_error' => 'old failure' ) );
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_domain_want' => 'old.mine.example', 'app_zone' => 'mine.example', 'app_domain_error' => 'old failure' ) );
 		$this->zone( (int) $r->license()['user_id'] );
 		$dns = new class(true) extends FakeDns {
 			public int $reads = 0;
@@ -170,7 +174,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 	}
 
 	public function test_no_app_and_second_reinstall_preserve_old_record_requests(): void {
-		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_zone' => 'mine.example', 'app_domain_old' => array( array( 'zone' => 'first.example', 'name' => 'old.first.example', 'ip' => '192.0.2.10', 'tries' => 1 ) ) ) );
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example', 'app_domain_old' => array( array( 'zone' => 'first.example', 'name' => 'old.first.example', 'ip' => '192.0.2.10', 'tries' => 1 ) ) ) );
 		$meta = AppReinstall::meta( array(), $r, array( 'app_version' => 'none' ) );
 		$this->assertSame( '', $meta['app_id'] );
 		$this->assertNull( $meta['app_domain'] );
@@ -185,10 +189,140 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 	}
 
 	public function test_plain_server_with_a_leftover_published_domain_clears_and_queues_it(): void {
-		$r = $this->server( '', array( 'app_domain' => 'old.mine.example', 'app_zone' => 'mine.example' ) );
+		$r = $this->server( '', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
 		$meta = AppReinstall::meta( array( 'wipe' => true ), $r, array( 'app_version' => 'none' ) );
 		$this->assertNull( $meta['app_domain'] );
 		$this->assertNull( $meta['app_zone'] );
 		$this->assertSame( 'old.mine.example', $meta['app_domain_old'][0]['name'] );
+	}
+
+	public function test_adopted_customer_record_is_never_queued_for_removal_and_has_a_dns_link(): void {
+		$r = $this->server();
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$r->set( array( 'app_zone' => 'mine.example', 'app_domain_want' => 'old.mine.example' ) );
+		$this->assertSame( 'old.mine.example', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', (int) $r->license()['user_id'] ) );
+		$this->assertFalse( $r->get( 'app_domain_made' ) );
+		$meta = AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'change', 'app_zone' => 'mine.example', 'app_sub' => 'new' ) );
+		$this->assertArrayNotHasKey( 'app_domain_old', $meta );
+		$this->assertSame( 'old.mine.example', $meta['app_domain_left']['name'] );
+		$r->set( $meta );
+		$this->assertSame( 'old.mine.example', AppTab::view( $r )['domain_left'] );
+		$this->assertStringContainsString( '/dns', AppTab::view( $r )['domain_left_url'] );
+		AppDomainRelease::run( $r->id() );
+		$this->assertNotEmpty( DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+	}
+
+	public function test_legacy_domain_without_ownership_flag_is_left_in_place(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$meta = AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'none' ) );
+		$this->assertArrayNotHasKey( 'app_domain_old', $meta );
+		$this->assertSame( 'old.mine.example', $meta['app_domain_left']['name'] );
+		$r->set( $meta );
+		AppDomainRelease::run( $r->id() );
+		$this->assertNotEmpty( DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+	}
+
+	public function test_no_app_still_shows_the_left_record_notice_on_its_app_tab(): void {
+		$r = $this->server( '', array( 'app_domain_left' => array( 'zone' => 'mine.example', 'name' => 'old.mine.example' ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertArrayHasKey( 'app', AppTab::tabs( array( 'overview' => 'Overview' ), $r->id() ) );
+		ob_start();
+		AppTab::pane( 'app', $r->id() );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'old.mine.example', $html );
+		$this->assertStringContainsString( '/dns', $html );
+	}
+
+	public function test_record_written_by_app_is_removed_at_reinstall_start(): void {
+		$r = $this->server();
+		$this->zone( (int) $r->license()['user_id'] );
+		$r->set( array( 'app_zone' => 'mine.example', 'app_domain_want' => 'old.mine.example' ) );
+		$this->assertSame( 'old.mine.example', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', (int) $r->license()['user_id'] ) );
+		$this->assertTrue( $r->get( 'app_domain_made' ) );
+		$meta = AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'none' ) );
+		$this->assertCount( 1, $meta['app_domain_old'] );
+		$r->set( $meta );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+		$this->assertSame( array(), DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+	}
+
+	public function test_customer_edit_to_app_record_is_kept(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 600, 'value' => '192.0.2.10' ) ) ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+		$this->assertNotEmpty( DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+	}
+
+	public function test_release_preserves_other_rrsets_and_is_scheduled_by_reinstall_event(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array(
+			array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ),
+			array( 'name' => '@', 'type' => 'MX', 'ttl' => 600, 'priority' => 10, 'value' => 'mail.mine.example' ),
+		) ) );
+		$before = DnsClients::dns()->zone( 'mine.example' )['rrsets'];
+		$dns = new FakeDns( true );
+		$filter = static fn() => $dns;
+		add_filter( 'beltoft_services_domains_dns', $filter, 20 );
+		do_action( 'beltoft_services_reinstall_started', $r, array() );
+		$this->assertNotFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $r->id() ), \BeltoftServices\Jobs::GROUP ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertCount( 1, $dns->calls() );
+		$this->assertSame( 'DELETE', $dns->calls()[0][2][0]['changetype'] );
+		$this->assertSame( 'A', $dns->calls()[0][2][0]['type'] );
+		$this->assertSame( array( $before[1] ), DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
+	}
+
+	public function test_paused_zone_is_left_alone_without_a_release_alert(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		foreach ( \BeltoftLicenses\Licenses::where( 'user_id', (int) $r->license()['user_id'] ) as $license ) {
+			$domain = Resource::for_license( (int) $license['id'] );
+			if ( $domain && 'mine.example' === $domain->get( 'domain' ) ) {
+				$domain->set( array( 'records_off' => true ) );
+			}
+		}
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+		$this->assertNotEmpty( DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+		$this->assertFalse( (bool) $r->get( 'app_domain_release_alerted' ) );
+	}
+
+	public function test_release_transport_errors_retry_four_times_then_alert_once(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$dns = new class(true) extends FakeDns {
+			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+				return new \WP_Error( 'transport', 'Temporary DNS error' );
+			}
+		};
+		$filter = static fn() => $dns;
+		add_filter( 'beltoft_services_domains_dns', $filter, 20 );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$mails = array();
+		$capture = static function ( $pre, $mail ) use ( &$mails ) { $mails[] = $mail; return true; };
+		add_filter( 'pre_wp_mail', $capture, 10, 2 );
+		for ( $attempt = 1; $attempt <= 4; ++$attempt ) {
+			AppDomainRelease::run( $r->id() );
+			$this->assertSame( $attempt, Resource::find( $r->id() )->get( 'app_domain_old' )[0]['tries'] );
+		}
+		$this->assertSame( array(), $mails );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+		$this->assertCount( 1, $mails );
+		$this->assertSame( 'christian.beltoft@gmail.com', $mails[0]['to'] );
+		AppDomainRelease::run( $r->id() );
+		$this->assertCount( 1, $mails );
+		remove_filter( 'pre_wp_mail', $capture, 10 );
+		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
 	}
 }

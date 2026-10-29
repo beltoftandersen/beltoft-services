@@ -89,6 +89,7 @@ final class Plugin {
 		Proxmox\RevealRoute::register();
 		Proxmox\AppReveal::register();
 		Proxmox\AppInstall::register();
+		Proxmox\AppDomainRelease::register();
 		Proxmox\AppStatus::register();
 		Proxmox\MetricsRoute::register();
 		Proxmox\Switches::register();

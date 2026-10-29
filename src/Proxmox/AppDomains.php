@@ -159,7 +159,8 @@ final class AppDomains {
 	 * @return true|string|\WP_Error True when the record is there, the reason in plain words when it can never work,
 	 *                               or a WP_Error when the DNS layer failed and a later try may succeed.
 	 */
-	public static function publish( int $user_id, string $zone, string $fqdn, string $ip ) {
+	public static function publish( int $user_id, string $zone, string $fqdn, string $ip, ?bool &$wrote = null ) {
+		$wrote = false;
 		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			return 'The server address is not known yet.';
 		}
@@ -173,7 +174,7 @@ final class AppDomains {
 		// The zone lock covers the read and the write, so an editor save or a pause cannot slip in between.
 		$locked = Records::locked(
 			$zone,
-			static function () use ( $zone, $fqdn, $ip, $set ) {
+			static function () use ( $zone, $fqdn, $ip, $set, &$wrote ) {
 				// Read immediately before the write: what is at the name now decides.
 				$zone_data = DnsClients::dns()->zone( $zone );
 				if ( is_wp_error( $zone_data ) ) {
@@ -199,6 +200,9 @@ final class AppDomains {
 				}
 				$set[0]['changetype'] = 'REPLACE';
 				$done = DnsClients::dns()->replace_rrsets( $zone, $set );
+				if ( ! is_wp_error( $done ) ) {
+					$wrote = true;
+				}
 				return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : true;
 			}
 		);

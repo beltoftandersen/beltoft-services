@@ -663,7 +663,8 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertTrue( $r->set( $meta ) );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( '', $fresh->get( 'app_id' ) );
-		$this->assertStringNotContainsString( 'data-tab-link="app"', $this->page( $fresh ), 'The tab goes with the app.' );
+		$this->assertStringContainsString( 'data-tab-link="app"', $this->page( $fresh ), 'The tab keeps the notice for a legacy DNS record left in place.' );
+		$this->assertStringContainsString( 'The DNS record for shop.mine.example was not made by us', $this->page( $fresh ) );
 	}
 
 	public function test_an_invalid_choice_changes_nothing_in_the_meta(): void {

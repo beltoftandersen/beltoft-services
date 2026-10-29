@@ -888,6 +888,9 @@ final class Actions {
 			return StepResult::retry( 0, 'reinstall: the state could not be stored' );
 		}
 
+		/** Fires after a reinstall request and its metadata are stored, before the server job is queued. */
+		do_action( 'beltoft_services_reinstall_started', $this->r, $args );
+
 		Jobs::enqueue( $this->r->id() );
 
 		return StepResult::done();

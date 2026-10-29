@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\Domains;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -49,7 +50,7 @@ final class AppTab {
 	public static function tabs( $tabs, $resource_id = 0 ) {
 		$r = is_array( $tabs ) ? Resource::find( (int) $resource_id ) : null;
 
-		if ( ! $r || '' === (string) $r->get( 'app_id' ) || null === Apps::definition( (string) $r->get( 'app_id' ) ) ) {
+		if ( ! $r || ( ! (array) $r->get( 'app_domain_left' ) && '' === (string) $r->get( 'app_id' ) ) || ( '' !== (string) $r->get( 'app_id' ) && null === Apps::definition( (string) $r->get( 'app_id' ) ) ) ) {
 			return $tabs;
 		}
 
@@ -214,6 +215,18 @@ final class AppTab {
 		$retired   = null !== $full && null === Apps::version( $id, $vid );
 		$steps_n   = count( $order );
 		$position  = false === $at ? 0 : min( $steps_n, (int) $at + 1 );
+		$left = (array) $r->get( 'app_domain_left' );
+		$left_url = '';
+		$user = (int) ( $r->license()['user_id'] ?? 0 );
+		if ( '' !== (string) ( $left['zone'] ?? '' ) && $user > 0 ) {
+			foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
+				$domain_resource = Resource::for_license( (int) $license['id'] );
+				if ( $domain_resource && strtolower( (string) $domain_resource->get( 'domain' ) ) === $left['zone'] && AppDomains::editable( $domain_resource, $user ) ) {
+					$left_url = Domains::url( $license, 'dns' );
+					break;
+				}
+			}
+		}
 
 		return array(
 			'resource_id'     => $r->id(),
@@ -232,6 +245,8 @@ final class AppTab {
 			'domain'          => $domain,
 			'domain_wanted'   => (string) $r->get( 'app_domain_want' ),
 			'domain_failed'   => '' !== (string) $r->get( 'app_domain_error' ),
+			'domain_left'     => (string) ( $left['name'] ?? '' ),
+			'domain_left_url' => $left_url,
 			'can_retry'       => AppInstall::can_retry( $r ),
 			'can_reveal'      => 'ready' === $kind && $reveal && $r->accepts_actions(),
 			'getting_started' => (string) ( $app['getting_started'] ?? '' ),
@@ -257,6 +272,25 @@ final class AppTab {
 		$view = $r ? self::view( $r ) : null;
 
 		if ( null === $view ) {
+			$left = $r ? (array) $r->get( 'app_domain_left' ) : array();
+			if ( '' !== (string) ( $left['name'] ?? '' ) && '' === (string) $r->get( 'app_id' ) ) {
+				$user = (int) ( $r->license()['user_id'] ?? 0 );
+				$url = '';
+				foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
+					$domain = Resource::for_license( (int) $license['id'] );
+					if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === (string) ( $left['zone'] ?? '' ) && AppDomains::editable( $domain, $user ) ) {
+						$url = Domains::url( $license, 'dns' );
+						break;
+					}
+				}
+				echo '<p class="description" data-app-domain-left>';
+				/* translators: %s: old domain name. */
+				printf( esc_html__( 'The DNS record for %s was not made by us, so it was left in place.', 'beltoft-services' ), esc_html( (string) $left['name'] ) );
+				if ( '' !== $url ) {
+					echo ' <a href="' . esc_url( $url ) . '">' . esc_html__( 'You can remove it in DNS records.', 'beltoft-services' ) . '</a>';
+				}
+				echo '</p>';
+			}
 			return;
 		}
 
