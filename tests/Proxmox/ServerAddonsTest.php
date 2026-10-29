@@ -73,6 +73,17 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		$this->assertStringNotContainsString( 'You have no servers yet', $html );
 	}
 
+	public function test_a_disk_with_no_server_linked_is_a_plain_card_too(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+		$disk->set( array( 'server_license' => 0 ) );
+		$html = $this->render( $this->views( $server, $disk ) );
+
+		$this->assertSame( 1, substr_count( $html, 'class="beltoft-services-srv"' ) );
+		$this->assertSame( 1, substr_count( $html, 'beltoft-services-srv--addon' ) );
+		$this->assertStringNotContainsString( 'beltoft-services-badge', $html );
+	}
+
 	public function test_the_disks_tab_carries_the_setup_guide_and_the_restart_note(): void {
 		$server = $this->server();
 		$disk   = $this->disk_for( $server );

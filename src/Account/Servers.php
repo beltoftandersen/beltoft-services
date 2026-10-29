@@ -179,7 +179,7 @@ final class Servers {
 				static function ( $view ) use ( $servers ): bool {
 					$parent = self::parent_of( $view );
 
-					return null === $parent || ! isset( $servers[ $parent['license_id'] ] );
+					return null === $parent || 0 === $parent['license_id'] || ! isset( $servers[ $parent['license_id'] ] );
 				}
 			)
 		);
@@ -200,7 +200,7 @@ final class Servers {
 	}
 
 	/**
-	 * The server an extra disk or a snapshot pack belongs to, from its view; null for any other license.
+	 * What an extra disk or a snapshot pack is, from its view (see parent_of_license()); null for any other license.
 	 *
 	 * @param mixed $view License view.
 	 * @return array{license_id: int, tab: string, resource: Resource}|null
@@ -214,7 +214,8 @@ final class Servers {
 	}
 
 	/**
-	 * The server an add-on license belongs to: its license id, the tab the add-on lives on, and the add-on's resource.
+	 * What an extra disk or a snapshot pack license is: the license id of its server (0 when none is linked), the tab it
+	 * lives on, and its resource. Null for any other license.
 	 *
 	 * @param int $license_id Add-on license id.
 	 * @return array{license_id: int, tab: string, resource: Resource}|null
@@ -232,14 +233,8 @@ final class Servers {
 			return null;
 		}
 
-		$server = (int) $resource->get( 'server_license' );
-
-		if ( $server < 1 ) {
-			return null;
-		}
-
 		return array(
-			'license_id' => $server,
+			'license_id' => max( 0, (int) $resource->get( 'server_license' ) ),
 			'tab'        => DiskDriver::ID === $driver ? 'disks' : 'snapshots',
 			'resource'   => $resource,
 		);
@@ -280,7 +275,7 @@ final class Servers {
 		}
 
 		$parent = self::parent_of_license( $asked['id'] );
-		$server = $parent ? Licenses::find( $parent['license_id'] ) : null;
+		$server = $parent && $parent['license_id'] > 0 ? Licenses::find( $parent['license_id'] ) : null;
 
 		if ( ! $parent || ! $server || (int) ( $server['user_id'] ?? 0 ) !== get_current_user_id() || ! self::is_server( $server ) ) {
 			return '';
