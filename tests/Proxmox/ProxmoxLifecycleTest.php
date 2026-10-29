@@ -17,6 +17,7 @@ use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\Switches;
@@ -495,6 +496,18 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ) );
 	}
 
+	public function test_delete_releases_private_address_and_quarantines_empty_network(): void {
+		$r = $this->built();
+		$owner = (int) $r->license()['user_id'];
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$this->assertNotNull( PrivateNets::hold( $owner ) );
+		$this->assertSame( '10.64.0.2', PrivateNets::address( $owner, $r->id() ) );
+
+		$this->assert_done( $this->op( 'delete', $r ) );
+		$this->assertNull( PrivateNets::address_for_resource( $r->id() ) );
+		$this->assertSame( 'quarantine', PrivateNets::for_user( $owner )['state'] );
+	}
+
 	public function test_delete_refuses_a_vm_that_is_not_ours(): void {
 		$r = $this->built();
 		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
@@ -556,6 +569,9 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->fake->add_vm( array( 'vmid' => 5000, 'node' => 'node-a', 'status' => 'running', 'config' => array( 'description' => 'not ours' ) ) );
 		$this->assertTrue( $this->run_provision( $resource )->is_failed() );
 		$this->assertNotNull( VmRecords::for_resource( $resource->id() ) );
+		$owner = (int) $resource->license()['user_id'];
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$this->assertSame( '10.64.0.2', PrivateNets::reserve( $owner, $resource->id() )['address'] );
 		$seen = count( $this->fake->calls() );
 
 		$this->assert_done( $this->op( 'delete', $resource ) );
@@ -564,6 +580,8 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
 		$this->assertNull( IpPool::for_resource( $resource->id() ) );
+		$this->assertNull( PrivateNets::address_for_resource( $resource->id() ), 'The absent original VM no longer keeps its private address.' );
+		$this->assertSame( 'quarantine', PrivateNets::for_user( $owner )['state'] );
 
 		// A clone that never started: nothing at the id, the id is confirmed free.
 		$other = $this->resource();

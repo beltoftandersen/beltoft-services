@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\PostgresProfile;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\Schema;
@@ -69,19 +70,62 @@ class PrivateNetsTest extends TestCase {
 		$this->assertSame( 'quarantine', PrivateNets::for_user( 11 )['state'] );
 		$this->assertNull( PrivateNets::hold( 12 ), 'A quarantined VLAN cannot be assigned to another customer.' );
 		$this->assertSame( 0, PrivateNets::reclaim(), 'The 30-day quarantine has not elapsed.' );
-		$this->assertSame( 'held', PrivateNets::hold( 11 )['state'], 'The original customer can return during quarantine.' );
+		$this->assertSame( 'held_return', PrivateNets::hold( 11 )['state'], 'The original customer can return during quarantine.' );
+	}
+
+	public function test_reclaim_skips_an_unready_schema_and_a_busy_pool_lock(): void {
+		$queries = array();
+		$track = static function ( $sql ) use ( &$queries ) { $queries[] = $sql; return $sql; };
+		update_option( Schema::OPTION_DB_VERSION, '1' );
+		add_filter( 'query', $track );
+		try {
+			$this->assertSame( 0, PrivateNets::reclaim() );
+		} finally {
+			remove_filter( 'query', $track );
+		}
+		$this->assertCount( 0, array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'beltoft_services_private_nets' ) ), 'A pre-v2 site must not query the private tables.' );
+
+		update_option( Schema::OPTION_DB_VERSION, Schema::DB_VERSION );
+		$busy = static fn( $sql ) => str_contains( $sql, 'GET_LOCK(' ) && str_contains( $sql, '_privnet_0' ) ? 'SELECT 0' : $sql;
+		add_filter( 'query', $busy );
+		try {
+			$this->assertSame( 0, PrivateNets::reclaim(), 'A busy pool should leave the sweep action successful.' );
+		} finally {
+			remove_filter( 'query', $busy );
+		}
+	}
+
+	public function test_failed_first_attach_preserves_a_returning_customers_quarantine(): void {
+		global $wpdb;
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$this->assertNotNull( PrivateNets::hold( 11 ) );
+		$this->assertTrue( PrivateNets::retire( 11 ) );
+		$started = gmdate( 'Y-m-d H:i:s', time() - 10 * DAY_IN_SECONDS );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test clock fixture.
+		$wpdb->update( Schema::tables()['private_nets'], array( 'updated_at' => $started ), array( 'user_id' => 11 ) );
+		$resource = $this->resource( 11 );
+		$this->assertSame( '10.64.0.2', PrivateNets::reserve( 11, $resource->id() )['address'] );
+		$this->assertTrue( PrivateNets::abandon_address( 11, $resource->id() ) );
+		$after = PrivateNets::for_user( 11 );
+		$this->assertSame( 'quarantine', $after['state'] );
+		$this->assertSame( $started, $after['updated_at'], 'A failed return must preserve the original 30-day clock.' );
+		$this->assertNull( PrivateNets::hold( 12 ) );
+		$this->assertSame( 0, PrivateNets::reclaim() );
 	}
 
 	public function test_postgres_profile_has_only_a_private_interface(): void {
 		$net = array( 'cidr' => '10.64.0.0/28', 'vlan' => 1000 );
 		$vm  = PostgresProfile::vm( $net, '10.64.0.2', 'vmbr1', 2, 4096, 60 );
-		$this->assertSame( 'virtio,bridge=vmbr1,tag=1000,firewall=1', $vm['net1'] );
-		$this->assertSame( 'ip=10.64.0.2/28', $vm['ipconfig1'] );
-		$this->assertArrayNotHasKey( 'net0', $vm );
-		$this->assertArrayNotHasKey( 'gateway', $vm );
+		$this->assertSame( 'virtio,bridge=vmbr1,tag=1000,firewall=1', $vm['config']['net1'] );
+		$this->assertSame( 'ip=10.64.0.2/28', $vm['config']['ipconfig1'] );
+		$this->assertSame( 60, $vm['requirements']['disk_gb'] );
+		$this->assertArrayNotHasKey( 'disk_gb', $vm['config'] );
+		$this->assertArrayNotHasKey( 'net0', $vm['config'] );
+		$this->assertArrayNotHasKey( 'gateway', $vm['config'] );
 		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.1', 'vmbr1', 2, 4096, 60 ) ) );
 		$this->assertTrue( is_wp_error( PostgresProfile::vm( array( 'cidr' => '198.51.100.0/28', 'vlan' => 1000 ), '198.51.100.2', 'vmbr1', 2, 4096, 60 ) ) );
 		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.2', 'vmbr1', 2, 512, 60 ) ) );
+		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.2', 'abcdefghijklmnop', 2, 4096, 60 ) ), 'Linux bridge names cannot exceed 15 characters.' );
 		$this->assertSame( 'postgresql://app:PASSWORD@10.64.0.2:5432/appdb?sslmode=require', PostgresProfile::connection( '10.64.0.2', 'appdb', 'app' ) );
 		$this->assertNull( PostgresProfile::connection( '10.64.0.2', 'bad name', 'app' ) );
 	}
@@ -97,5 +141,57 @@ class PrivateNetsTest extends TestCase {
 		$this->assertSame( 1, PrivateNets::reclaim() );
 		$this->assertNull( PrivateNets::for_user( 11 ) );
 		$this->assertSame( 1000, PrivateNets::hold( 12 )['vlan'] );
+	}
+
+	public function test_releasing_the_last_address_quarantines_and_the_sweep_reclaims(): void {
+		global $wpdb;
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$one = $this->resource( 11 );
+		$two = $this->resource( 11 );
+		$this->assertNotNull( PrivateNets::reserve( 11, $one->id() ) );
+		$this->assertNotNull( PrivateNets::reserve( 11, $two->id() ) );
+		$this->assertTrue( PrivateNets::release_and_retire( $one->id() ) );
+		$this->assertSame( 'held', PrivateNets::for_user( 11 )['state'] );
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ) );
+		$this->assertSame( 'quarantine', PrivateNets::for_user( 11 )['state'] );
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ), 'Cleanup is idempotent.' );
+		$this->assertNotFalse( has_action( Jobs::SWEEP, array( PrivateNets::class, 'reclaim' ) ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test clock fixture.
+		$wpdb->update( Schema::tables()['private_nets'], array( 'updated_at' => gmdate( 'Y-m-d H:i:s', time() - 31 * DAY_IN_SECONDS ) ), array( 'user_id' => 11 ) );
+		$this->assertSame( 1, PrivateNets::reclaim() );
+		$this->assertNull( PrivateNets::for_user( 11 ) );
+	}
+
+	public function test_reserve_takes_one_pool_lock_and_seed_does_not_scan_all_networks(): void {
+		$queries = array();
+		$track = static function ( $sql ) use ( &$queries ) {
+			$queries[] = $sql;
+			return $sql;
+		};
+		add_filter( 'query', $track );
+		try {
+			$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+			$one = $this->resource( 11 );
+			$this->assertSame( '10.64.0.2', PrivateNets::reserve( 11, $one->id() )['address'] );
+		} finally {
+			remove_filter( 'query', $track );
+		}
+		$locks = array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'GET_LOCK(' ) && str_contains( $sql, '_privnet_0' ) );
+		$full_scans = array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'SELECT vlan, cidr FROM' ) );
+		$this->assertCount( 2, $locks, 'Seed and one atomic reservation each take the pool lock once.' );
+		$this->assertCount( 0, $full_scans );
+	}
+
+	public function test_seed_uses_unique_keys_without_a_full_pool_read(): void {
+		$queries = array();
+		$track = static function ( $sql ) use ( &$queries ) { $queries[] = $sql; return $sql; };
+		add_filter( 'query', $track );
+		try {
+			$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+			$this->assertFalse( PrivateNets::add( 1001, '10.64.0.0/28' ) );
+		} finally {
+			remove_filter( 'query', $track );
+		}
+		$this->assertCount( 0, array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'SELECT vlan, cidr FROM' ) ) );
 	}
 }

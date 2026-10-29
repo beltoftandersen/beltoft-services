@@ -1394,13 +1394,7 @@ final class Provision {
 	 * @param string $current Current net0 (empty: none).
 	 */
 	private function net0( string $current ): string {
-		$props = array();
-
-		foreach ( '' === $current ? array() : explode( ',', $current ) as $token ) {
-			$pair = explode( '=', $token, 2 );
-
-			$props[ $pair[0] ] = $pair[1] ?? null;
-		}
+		$props = NetConfig::parse( $current );
 
 		if ( array() === $props ) {
 			$props['virtio'] = null; // The MAC is generated when none is given.
@@ -1413,13 +1407,7 @@ final class Provision {
 			$props['tag'] = (string) (int) $this->cluster['vlan'];
 		}
 
-		$out = array();
-
-		foreach ( $props as $key => $value ) {
-			$out[] = null === $value ? $key : $key . '=' . $value;
-		}
-
-		return implode( ',', $out );
+		return NetConfig::format( $props );
 	}
 
 	/**

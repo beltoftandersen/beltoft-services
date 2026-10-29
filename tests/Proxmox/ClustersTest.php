@@ -11,6 +11,7 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Clients;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
 
@@ -87,6 +88,14 @@ class ClustersTest extends TestCase {
 		$this->assertSame( 1, $c['block_smtp'] );
 		$this->assertSame( 'fake', $c['client'] );
 		$this->assertNull( Clusters::get( 'nope' ) );
+	}
+
+	public function test_private_bridge_and_public_vlan_cannot_overlap(): void {
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'private_bridge' => 'vmbr9' ) ) ) );
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'private_bridge' => 'vmbr2', 'vlan' => '1000' ) ) ) );
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'private_bridge' => 'vmbr2', 'vlan' => '2000' ) ) ) );
+		$this->assertFalse( PrivateNets::add( 2000, '10.64.0.16/28' ) );
 	}
 
 	public function test_vmid_range_is_validated(): void {
