@@ -123,11 +123,9 @@ final class Panel {
 	 * state.
 	 *
 	 * @param mixed $license License row.
-	 * @param mixed $view    Display values (unused).
+	 * @param mixed $view    Display values of the license (the title of a server page).
 	 */
 	public static function render( $license, $view = array() ): void {
-		unset( $view );
-
 		if ( ! is_array( $license ) || empty( $license['id'] ) || ! Product::is_service_license( $license ) ) {
 			return;
 		}

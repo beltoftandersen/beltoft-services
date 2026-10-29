@@ -39,7 +39,8 @@
 
 	function clock( seconds, range ) {
 		var date = new Date( seconds * 1000 );
-		return 'month' === range ? date.toLocaleDateString( [], { day: 'numeric', month: 'short' } ) : date.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } );
+		if ( 'month' === range ) { return date.toLocaleDateString( [], { day: 'numeric', month: 'short' } ); }
+		return 'day' === range ? date.toLocaleString( [], { weekday: 'short', hour: '2-digit', minute: '2-digit' } ) : date.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } );
 	}
 
 	function span( text ) {
@@ -103,20 +104,19 @@
 		} );
 		function show( index ) {
 			var point = points[ index ];
-			var date = new Date( point.t * 1000 ).toLocaleString();
+			var date = clock( point.t, range );
 			var parts = spec.keys.map( function ( key, series ) {
 				var n = value( point, spec, key );
 				return spec.names[ series ] + ': ' + ( null === n ? labels.noReading : withUnit( n, spec.unit ) );
 			} );
-			readout.textContent = date + '  ' + parts.join( '  ' );
+			readout.textContent = date + '   ' + parts.join( '   ' );
 		}
 		svg.addEventListener( 'pointermove', function ( event ) {
 			var rect = svg.getBoundingClientRect();
 			show( Math.max( 0, Math.min( points.length - 1, Math.round( ( event.clientX - rect.left ) / rect.width * ( points.length - 1 ) ) ) ) );
 		} );
-		svg.addEventListener( 'pointerleave', function () { show( points.length - 1 ); } );
+		svg.addEventListener( 'pointerleave', function () { readout.textContent = ''; } );
 		plot.appendChild( svg );
-		show( points.length - 1 );
 		// The current value, large, and the last point marked with a square (a page element, so it keeps its shape when the graph stretches).
 		if ( last && now ) {
 			var big = document.createElement( 'b' );
@@ -125,10 +125,10 @@
 			var lastIndex = points.indexOf( last );
 			var marker = document.createElement( 'i' );
 			var kind = chart.getAttribute( 'data-chart' );
-			big.textContent = format( current );
-			small.textContent = 'mem' === kind && null !== value( last, spec, 'maxmem' ) ? fill( labels.of, format( value( last, spec, 'maxmem' ) ) ) : spec.unit + ( 'cpu' === kind ? '' : ' ' + spec.names[ 0 ] );
+			big.textContent = 'cpu' === kind ? withUnit( current, spec.unit ) : format( current );
+			small.textContent = 'mem' === kind && null !== value( last, spec, 'maxmem' ) ? fill( labels.of, format( value( last, spec, 'maxmem' ) ) ) : ( 'cpu' === kind ? '' : spec.unit + ' ' + spec.names[ 0 ] );
 			now.appendChild( big );
-			now.appendChild( small );
+			if ( small.textContent ) { now.appendChild( small ); }
 			marker.className = 'beltoft-vm-usage__point';
 			marker.style.left = ( xOf( lastIndex ) / 6 ) + '%';
 			marker.style.top = ( yOf( current ) / 160 * 100 ) + '%';

@@ -219,7 +219,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<div class="beltoft-vm-usage__chart beltoft-vm-usage__chart--disk">
 					<div class="beltoft-vm-usage__top">
 						<h5><?php esc_html_e( 'Disk', 'beltoft-services' ); ?></h5>
-						<?php if ( null !== $beltoft_services_disk_pct ) : ?><span class="beltoft-vm-usage__now"><?php echo (int) $beltoft_services_disk_pct; ?><small>%</small></span><?php endif; ?>
+						<?php if ( null !== $beltoft_services_disk_pct ) : ?><span class="beltoft-vm-usage__now"><b><?php echo (int) $beltoft_services_disk_pct; ?>%</b></span><?php endif; ?>
 					</div>
 					<?php if ( null !== $beltoft_services_disk_pct ) : ?>
 						<div class="beltoft-vm-usage__bar" role="img" aria-label="<?php /* translators: %d: percent of the disk in use */ echo esc_attr( sprintf( __( 'Disk, %d percent used', 'beltoft-services' ), (int) $beltoft_services_disk_pct ) ); ?>"><i style="width:<?php echo (int) $beltoft_services_disk_pct; ?>%"></i></div>
