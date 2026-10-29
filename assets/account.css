@@ -570,7 +570,7 @@ div.beltoft-services-domain .beltoft-dnse__empty { margin: 0 0 12px; color: var(
 .beltoft-dnse__table td:nth-child(3) { width: 8em; }
 .beltoft-dnse__table td.beltoft-dnse__value { overflow-wrap: anywhere; word-break: break-word; }
 .beltoft-dnse__table td.beltoft-dnse__actions { width: 1%; text-align: right; white-space: nowrap; }
-.beltoft-dnse__actions > * + * { margin-left: 16px; }
+div.beltoft-services-domain.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: 16px; }
 .beltoft-dnse__ask { color: var(--bsd-ink); font-weight: 500; }
 div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link.beltoft-dnse__danger { color: #b32d2e; }
 .beltoft-dnse__rowerror td { padding-top: 0; color: #b32d2e; }
