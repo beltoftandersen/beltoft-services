@@ -12,6 +12,8 @@ use BeltoftLicenses\Account\View;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\DiskGuide;
+use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\SnapshotMeta;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -175,6 +177,14 @@ final class ThankYou {
 			'url'      => DiskGuide::card_url( $r ),
 		);
 
+		if ( SnapshotDriver::ID === (string) $r->get( 'driver' ) ) {
+			$row['url']      = DiskGuide::server_url( $r );
+			$row['snapshot'] = array(
+				'slots'      => SnapshotMeta::slots_of( $r ),
+				'server_url' => $row['url'],
+			);
+		}
+
 		if ( DiskDriver::ID === (string) $r->get( 'driver' ) ) {
 			$row['disk'] = array(
 				'server_url' => DiskGuide::server_url( $r ),
@@ -194,6 +204,7 @@ final class ThankYou {
 		$labels = array(
 			'vm'     => __( 'Open your server', 'beltoft-services' ),
 			'disk'   => __( 'Open your disk', 'beltoft-services' ),
+			'snapshot' => __( 'Open your server', 'beltoft-services' ),
 			'domain' => __( 'Open your domain', 'beltoft-services' ),
 			'dns'    => __( 'Open your DNS hosting', 'beltoft-services' ),
 		);

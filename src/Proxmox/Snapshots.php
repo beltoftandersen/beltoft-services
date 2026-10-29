@@ -144,11 +144,21 @@ final class Snapshots {
 	 * @param Resource $r Resource.
 	 */
 	public static function enabled( Resource $r ): bool {
+		return self::eligible( $r ) && self::idle( $r );
+	}
+
+	/**
+	 * Could this server get snapshots, leaving aside what it is doing now? The switch is on, it is not an adopted
+	 * machine, and every disk is qcow2. What the paid slots are sold on.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function eligible( Resource $r ): bool {
 		if ( ! self::switched_on() || true === $r->get( 'linked' ) || SshKeyField::DRIVER !== $r->get( 'driver' ) || null === VmRecords::for_resource( $r->id() ) ) {
 			return false;
 		}
 
-		if ( 'qcow2' !== $r->get( 'boot_format' ) || ! self::idle( $r ) ) {
+		if ( 'qcow2' !== $r->get( 'boot_format' ) ) {
 			return false;
 		}
 
@@ -305,7 +315,13 @@ final class Snapshots {
 	 * @param Resource $r Resource.
 	 */
 	public static function days_for( Resource $r ): int {
-		return max( 1, (int) Settings::get( self::paid_slots( $r ) > 0 ? 'snapshot_paid_days' : 'snapshot_free_days' ) );
+		if ( self::paid_slots( $r ) > 0 ) {
+			$own = SnapshotMeta::days_for( $r ); // A pack's own period wins over the setting.
+
+			return max( 1, $own > 0 ? $own : (int) Settings::get( 'snapshot_paid_days' ) );
+		}
+
+		return max( 1, (int) Settings::get( 'snapshot_free_days' ) );
 	}
 
 	/**

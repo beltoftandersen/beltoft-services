@@ -44,7 +44,7 @@ final class Tabs {
 				'slug'  => 'vps',
 				'label' => __( 'VPS', 'beltoft-services' ),
 				'empty' => __( 'You have no servers yet.', 'beltoft-services' ),
-				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk' ) ),
+				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot' ) ),
 			),
 		);
 

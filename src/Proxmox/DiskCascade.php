@@ -1,5 +1,5 @@
 <?php
-/** A server's subscription ending ends the subscriptions of its extra disks. @package BeltoftServices */
+/** A server's subscription ending ends the subscriptions of its add-ons (extra disks, snapshot slots). @package BeltoftServices */
 
 namespace BeltoftServices\Proxmox;
 
@@ -11,8 +11,8 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Runs after beltoft-licenses has handled the same event (priority 10). A disk subscription is only
- * touched when every line and every license on it is a disk of the ending server; anything else gets a
+ * Runs after beltoft-licenses has handled the same event (priority 10). An add-on subscription is only
+ * touched when every line and every license on it is an add-on of the ending server; anything else gets a
  * note and one admin alert, and is never cancelled.
  */
 final class DiskCascade {
@@ -24,6 +24,38 @@ final class DiskCascade {
 
 	/** Subscription meta: the end date the disk subscription had before the cascade (empty: none). */
 	public const ORIGINAL_END = '_beltoft_services_original_end';
+
+	/** Add-on resources linked to a server: its extra disks and its snapshot packs, live, whatever their state. */
+	public static function addons( Resource $server ): array {
+		return array_merge( DiskMeta::for_server( $server ), SnapshotMeta::for_server( $server ) );
+	}
+
+	/**
+	 * Ends the subscription of an add-on that cannot be delivered (the server is gone, adopted or not fit), the same
+	 * way a server ending does: only when every line on it is an add-on product, else a note and the admin decide.
+	 * No refund is made here.
+	 *
+	 * @param Resource $addon  The add-on resource.
+	 * @param string   $reason Admin note.
+	 */
+	public static function cancel_undelivered( Resource $addon, string $reason ): void {
+		$id = (int) ( $addon->license()['subscription_id'] ?? 0 );
+		if ( $id < 1 || ! function_exists( 'wcs_get_subscription' ) ) {
+			return;
+		}
+		$subscription = wcs_get_subscription( $id );
+		if ( ! $subscription instanceof \WC_Subscription || in_array( $subscription->get_status(), array( 'cancelled', 'expired', 'trash' ), true ) ) {
+			return;
+		}
+		foreach ( $subscription->get_items() as $item ) {
+			$driver = Product::driver_for( (int) $item->get_product_id() );
+			if ( ! $driver || ! in_array( $driver->id(), Stock::addon_drivers(), true ) ) {
+				$subscription->add_order_note( $reason . ' The subscription also holds other lines and was not cancelled.' );
+				return;
+			}
+		}
+		$subscription->update_status( 'cancelled', $reason );
+	}
 
 	public static function register(): void {
 		add_action( 'woocommerce_subscription_status_active', array( __CLASS__, 'on_active' ), 20 );
@@ -67,7 +99,7 @@ final class DiskCascade {
 				continue;
 			}
 			$seen = array();
-			foreach ( DiskMeta::for_server( $server ) as $disk ) {
+			foreach ( self::addons( $server ) as $disk ) {
 				$id = (int) ( $disk->license()['subscription_id'] ?? 0 );
 				if ( $id < 1 || isset( $seen[ $id ] ) ) {
 					continue;
@@ -96,15 +128,20 @@ final class DiskCascade {
 					Alerts::admin( $disk, $text );
 					continue;
 				}
-				/* translators: %d: disk subscription number. */
-				$subscription->add_order_note( sprintf( __( 'Extra disk subscription #%d is active again with this server.', 'beltoft-services' ), $id ) );
+				$subscription->add_order_note(
+					SnapshotDriver::ID === $disk->get( 'driver' )
+						/* translators: %d: add-on subscription number. */
+						? sprintf( __( 'Snapshot slots subscription #%d is active again with this server.', 'beltoft-services' ), $id )
+						/* translators: %d: disk subscription number. */
+						: sprintf( __( 'Extra disk subscription #%d is active again with this server.', 'beltoft-services' ), $id )
+				);
 			}
 		}
 	}
 
 	private static function end_disks( $server_subscription, Resource $server, string $status ): void {
 		$by_subscription = array();
-		foreach ( DiskMeta::for_server( $server ) as $disk ) {
+		foreach ( self::addons( $server ) as $disk ) {
 			$id = (int) ( $disk->license()['subscription_id'] ?? 0 );
 			if ( $id > 0 ) {
 				$by_subscription[ $id ][] = $disk;
@@ -115,7 +152,7 @@ final class DiskCascade {
 			if ( ! $disk_subscription instanceof \WC_Subscription || in_array( $disk_subscription->get_status(), array( 'cancelled', 'expired', 'trash' ), true ) || ( 'pending-cancel' === $status && 'pending-cancel' === $disk_subscription->get_status() ) ) {
 				continue;
 			}
-			if ( ! self::only_disks_of( $disk_subscription, $server ) ) {
+			if ( ! self::only_addons_of( $disk_subscription, $server ) ) {
 				$text = sprintf( 'Server subscription #%1$d ended, but disk subscription #%2$d also holds other lines or licenses. It was not changed; end the extra disks by hand.', (int) $server_subscription->get_id(), $id );
 				$server_subscription->add_order_note( $text );
 				$disk_subscription->add_order_note( $text );
@@ -133,27 +170,32 @@ final class DiskCascade {
 			} else {
 				$disk_subscription->update_status( 'cancelled', __( 'Cancelled with its server.', 'beltoft-services' ) );
 			}
-			/* translators: %d: disk subscription number. */
-			$server_subscription->add_order_note( sprintf( __( 'Extra disk subscription #%d ends with this server.', 'beltoft-services' ), $id ) );
+			$server_subscription->add_order_note(
+				SnapshotDriver::ID === $disks[0]->get( 'driver' )
+					/* translators: %d: add-on subscription number. */
+					? sprintf( __( 'Snapshot slots subscription #%d ends with this server.', 'beltoft-services' ), $id )
+					/* translators: %d: disk subscription number. */
+					: sprintf( __( 'Extra disk subscription #%d ends with this server.', 'beltoft-services' ), $id )
+			);
 		}
 	}
 
-	/** Every line is a disk product and every license on the subscription belongs to a disk of this server. */
-	private static function only_disks_of( \WC_Subscription $subscription, Resource $server ): bool {
+	/** Every line is an add-on product and every license on the subscription belongs to an add-on of this server. */
+	private static function only_addons_of( \WC_Subscription $subscription, Resource $server ): bool {
 		$items = $subscription->get_items();
 		if ( ! $items ) {
 			return false;
 		}
 		foreach ( $items as $item ) {
 			$driver = Product::driver_for( (int) $item->get_product_id() );
-			if ( ! $driver || DiskDriver::ID !== $driver->id() ) {
+			if ( ! $driver || ! in_array( $driver->id(), Stock::addon_drivers(), true ) ) {
 				return false;
 			}
 		}
 		$server_license = (int) ( $server->license()['id'] ?? 0 );
 		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
 			$disk = Resource::for_license( (int) $license['id'] );
-			if ( ! $disk || DiskDriver::ID !== $disk->get( 'driver' ) || (int) $disk->get( 'server_license' ) !== $server_license ) {
+			if ( ! $disk || ! in_array( $disk->get( 'driver' ), Stock::addon_drivers(), true ) || (int) $disk->get( 'server_license' ) !== $server_license ) {
 				return false;
 			}
 		}

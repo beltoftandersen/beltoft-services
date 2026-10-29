@@ -8,7 +8,9 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -179,8 +181,67 @@ final class Panels {
 
 		$panel['full']      = $panel['used'] >= $panel['slots'];
 		$panel['max_label'] = Snapshots::MAX_LABEL;
+		$panel['included']  = min( $panel['slots'], max( 0, (int) Settings::get( 'snapshot_free_slots' ) ) );
+		$panel['added']     = $panel['slots'] - $panel['included'];
+		$panel['free_days'] = max( 1, (int) Settings::get( 'snapshot_free_days' ) );
+		$panel['paid_days'] = max( 1, (int) Settings::get( 'snapshot_paid_days' ) );
+		$panel['buy']       = 'full' === $panel['mode'] ? self::snapshot_packs( $r ) : array();
+
+		if ( $panel['added'] > 0 ) {
+			$panel['paid_days'] = Snapshots::days_for( $r );
+		}
 
 		return $panel;
+	}
+
+	/**
+	 * The packs of snapshot slots the server could add now, from the published snapshot product: slots, price and
+	 * the link to the cart. Empty when the site has no such product or the server cannot take one.
+	 *
+	 * @param Resource $r Server resource.
+	 * @return array<int, array{slots: int, url: string, price: string, days: int}>
+	 */
+	private static function snapshot_packs( Resource $r ): array {
+		$out = array();
+
+		foreach ( SnapshotCart::packs() as $variation ) {
+			$url = SnapshotCart::add_url( $r, $variation );
+
+			if ( '' === $url ) {
+				continue;
+			}
+
+			$days  = (int) ( Product::plan( $variation->get_parent_id(), $variation->get_id() )['snapshot_days'] ?? 0 );
+			$out[] = array(
+				'slots' => SnapshotCart::slots_of( $variation ),
+				'url'   => $url,
+				'price' => wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) . self::per( $variation ),
+				'days'  => $days > 0 ? $days : max( 1, (int) Settings::get( 'snapshot_paid_days' ) ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * " a month" for a subscription billed every month, and likewise for the other periods; '' for other intervals.
+	 *
+	 * @param \WC_Product $product Subscription product.
+	 */
+	private static function per( \WC_Product $product ): string {
+		if ( ! class_exists( '\\WC_Subscriptions_Product' ) || 1 !== (int) \WC_Subscriptions_Product::get_interval( $product ) ) {
+			return '';
+		}
+
+		$labels = array(
+			'day'   => __( 'a day', 'beltoft-services' ),
+			'week'  => __( 'a week', 'beltoft-services' ),
+			'month' => __( 'a month', 'beltoft-services' ),
+			'year'  => __( 'a year', 'beltoft-services' ),
+		);
+		$period = (string) \WC_Subscriptions_Product::get_period( $product );
+
+		return isset( $labels[ $period ] ) ? ' ' . $labels[ $period ] : '';
 	}
 
 	/**

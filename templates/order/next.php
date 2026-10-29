@@ -28,6 +28,14 @@ defined( 'ABSPATH' ) || exit;
 						<p class="beltoft-service__open" data-service-open<?php echo $beltoft_row['ready'] ? '' : ' hidden'; ?>>
 							<a href="<?php echo esc_url( $beltoft_row['url'] ); ?>"><?php echo esc_html( BeltoftServices\ThankYou::open_label( $beltoft_row['kind'] ) ); ?></a>
 						</p>
+						<?php if ( ! empty( $beltoft_row['snapshot'] ) && 'failed' !== $beltoft_row['group'] ) : ?>
+							<p class="beltoft-service__note">
+								<?php
+								/* translators: %d: snapshot slots added to the server. */
+								echo esc_html( sprintf( __( 'Snapshot slots +%d. Find them in My account > VPS > your server > Snapshots.', 'beltoft-services' ), (int) $beltoft_row['snapshot']['slots'] ) );
+								?>
+							</p>
+						<?php endif; ?>
 						<?php if ( ! empty( $beltoft_row['disk'] ) && 'failed' !== $beltoft_row['group'] ) : ?>
 							<p class="beltoft-service__note"><?php esc_html_e( 'Find your disk in My account > VPS > your server > Disks.', 'beltoft-services' ); ?></p>
 							<p class="beltoft-service__links">
