@@ -516,6 +516,7 @@ final class Overview {
 
 			$items[] = array(
 				'tone'  => 'busy',
+				'sep'   => ':',
 				'state' => __( 'Working', 'beltoft-services' ),
 				'name'  => $names[ $id ] ?? View::product_name( $license ),
 				'text'  => (string) $progress['title'],
@@ -537,6 +538,7 @@ final class Overview {
 
 			$items[] = array(
 				'tone'  => 'bad',
+				'sep'   => '',
 				'state' => __( 'Payment', 'beltoft-services' ),
 				'name'  => self::covers( $subscription, $by_subscription ),
 				'text'  => $text,
