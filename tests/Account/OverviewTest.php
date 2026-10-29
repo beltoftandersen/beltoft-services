@@ -423,10 +423,118 @@ class OverviewTest extends MonitoringTestCase {
 		$token->set_expiry_year( gmdate( 'Y', strtotime( '+2 years' ) ) );
 		$token->save();
 		\WC_Payment_Tokens::set_users_default( $user, $token->get_id() );
-		$this->subscription( $user, 'active', 10, 'Server' );
+		$sub = $this->subscription( $user, 'active', 10, 'Server' );
+		$this->auto_renewal( $sub, 'cod' );
 		$this->as_user( $user );
 
 		$this->assertStringContainsString( 'Visa ending 4242', $this->html( 'next_payment' ) );
+	}
+
+	private function auto_renewal( \WC_Subscription $sub, string $gateway ): void {
+		$sub->set_requires_manual_renewal( false );
+		$sub->set_payment_method( $gateway );
+		$sub->set_payment_method_title( 'Card payment' );
+		$sub->save();
+		add_filter( 'woocommerce_subscription_is_manual', '__return_false' );
+	}
+
+	private function card_token( int $user, string $gateway, string $last4, string $type = 'visa' ): \WC_Payment_Token_CC {
+		$token = new \WC_Payment_Token_CC();
+		$token->set_token( 'tok_' . wp_generate_password( 8, false ) );
+		$token->set_gateway_id( $gateway );
+		$token->set_user_id( $user );
+		$token->set_card_type( $type );
+		$token->set_last4( $last4 );
+		$token->set_expiry_month( '12' );
+		$token->set_expiry_year( gmdate( 'Y', strtotime( '+2 years' ) ) );
+		$token->save();
+
+		return $token;
+	}
+
+	public function test_a_manual_renewal_never_shows_a_card(): void {
+		$user  = self::factory()->user->create();
+		$token = $this->card_token( $user, 'cod', '4242' );
+		\WC_Payment_Tokens::set_users_default( $user, $token->get_id() );
+		$sub = $this->subscription( $user, 'active', 10, 'Server' );
+		$sub->set_payment_method( 'cod' );
+		$sub->set_payment_method_title( 'Bank transfer' );
+		$sub->save();
+		$this->as_user( $user );
+		$html = $this->html( 'next_payment' );
+
+		$this->assertStringNotContainsString( '4242', $html );
+		$this->assertStringContainsString( 'Bank transfer', $html );
+	}
+
+	public function test_a_manual_renewal_without_a_method_is_paid_by_invoice(): void {
+		$user = self::factory()->user->create();
+		$this->subscription( $user, 'active', 10, 'Server' );
+		$this->as_user( $user );
+
+		$this->assertStringContainsString( 'Paid by invoice', $this->html( 'next_payment' ) );
+	}
+
+	public function test_the_subscriptions_own_token_wins_over_the_default_card(): void {
+		$user    = self::factory()->user->create();
+		$default = $this->card_token( $user, 'cod', '1111', 'mastercard' );
+		$own     = $this->card_token( $user, 'cod', '4242' );
+		\WC_Payment_Tokens::set_users_default( $user, $default->get_id() );
+		$sub = $this->subscription( $user, 'active', 10, 'Server' );
+		$this->auto_renewal( $sub, 'cod' );
+		$sub->add_payment_token( $own );
+		$this->as_user( $user );
+		$html = $this->html( 'next_payment' );
+
+		$this->assertStringContainsString( 'Visa ending 4242', $html );
+		$this->assertStringNotContainsString( '1111', $html );
+	}
+
+	public function test_a_default_card_of_another_gateway_is_not_shown_for_this_subscription(): void {
+		$user  = self::factory()->user->create();
+		$token = $this->card_token( $user, 'stripe_cc', '4242' );
+		\WC_Payment_Tokens::set_users_default( $user, $token->get_id() );
+		$sub = $this->subscription( $user, 'active', 10, 'Server' );
+		$this->auto_renewal( $sub, 'paypal' );
+		$sub->set_payment_method_title( 'PayPal' );
+		$sub->save();
+		$this->as_user( $user );
+		$html = $this->html( 'next_payment' );
+
+		$this->assertStringNotContainsString( '4242', $html );
+		$this->assertStringContainsString( 'PayPal', $html );
+	}
+
+	public function test_the_dates_are_converted_once_in_the_site_timezone(): void {
+		update_option( 'timezone_string', 'Europe/Copenhagen' );
+		$user = self::factory()->user->create();
+		$sub  = $this->subscription( $user, 'active', 10, 'Server' );
+		// 22:30 on 15 July 2027 in Copenhagen (UTC+2) is 20:30 UTC.
+		$sub->update_dates( array( 'next_payment' => '2027-07-15 20:30:00' ) );
+		$sub->save();
+		$this->as_user( $user );
+		$data = Overview::data();
+
+		$this->assertSame( wp_date( (string) get_option( 'date_format' ), strtotime( '2027-07-15 20:30:00 UTC' ) ), $data['next_payment']['date'] );
+		$this->assertStringContainsString( '15', $data['next_payment']['date'] );
+		$this->assertSame( '2027-07-15T20:30:00+00:00', $data['next_payment']['time'] );
+	}
+
+	public function test_the_failed_renewal_date_is_converted_once_in_the_site_timezone(): void {
+		update_option( 'timezone_string', 'Europe/Copenhagen' );
+		$user = self::factory()->user->create();
+		$sub  = $this->subscription( $user, 'on-hold', 5, 'Server' );
+		$order = wc_create_order( array( 'customer_id' => $user ) );
+		// 22:30 local time (UTC+2) is 20:30 UTC.
+		$order->set_date_created( '2026-07-15 22:30:00' );
+		$order->save();
+		$order->update_meta_data( '_subscription_renewal', $sub->get_id() );
+		$order->save();
+		$this->as_user( $user );
+		$html = $this->html( 'attention' );
+
+		$this->assertStringContainsString( 'July 15, 2026', $html );
+		$this->assertStringNotContainsString( 'July 16, 2026', $html );
 	}
 
 	public function test_the_next_payment_is_hidden_without_an_active_subscription_and_ignores_other_customers(): void {
@@ -448,7 +556,8 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertSame( 'web-01: restored from a backup', Overview::describe( 'Server restored from the backup of 2026-10-01 10:00 UTC', 'web-01', false ) );
 		$this->assertSame( 'web-01: restored from a backup', Overview::describe( 'Server restored from a backup', 'web-01', false ) );
 		$this->assertSame( 'web-01: ready', Overview::describe( 'Service provisioned', 'web-01', false ) );
-		$this->assertSame( 'web-01: payment failed, paused', Overview::describe( 'Service paused', 'web-01', true ) );
+		$this->assertSame( 'web-01: paused', Overview::describe( 'Service paused', 'web-01', true ) );
+		$this->assertSame( 'web-01: payment failed, paused', Overview::describe( 'Service paused', 'web-01', true, true ) );
 	}
 
 	public function test_admin_only_events_are_left_out(): void {
@@ -505,6 +614,34 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'other-01', $html );
 	}
 
+	public function test_matching_events_are_found_behind_many_other_events(): void {
+		global $wpdb;
+		$user   = self::factory()->user->create();
+		$mine   = $this->server( $user );
+		$id     = (int) $mine->license()['id'];
+		$events = \BeltoftLicenses\Install::tables()['events'];
+
+		$wpdb->insert( $events, array( 'license_id' => $id, 'type' => 'service', 'message' => 'Customer took the snapshot "old"', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 900000 ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+
+		for ( $i = 0; $i < 150; $i++ ) {
+			$wpdb->insert( $events, array( 'license_id' => $id, 'type' => 'service', 'message' => 'Monitoring email: server down ' . $i, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 800000 + $i ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		}
+
+		$this->as_user( $user );
+
+		$this->assertStringContainsString( 'snapshot &quot;old&quot; taken', $this->html( 'activity' ) );
+	}
+
+	public function test_a_percent_or_underscore_in_a_message_is_not_a_wildcard(): void {
+		global $wpdb;
+		$user = self::factory()->user->create();
+		$id   = (int) $this->server( $user )->license()['id'];
+		$wpdb->insert( \BeltoftLicenses\Install::tables()['events'], array( 'license_id' => $id, 'type' => 'service', 'message' => 'Snapshot_"x" deleted', 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		$this->as_user( $user );
+
+		$this->assertSame( array(), Overview::data()['activity'] );
+	}
+
 	public function test_a_finished_backup_is_in_the_feed(): void {
 		$user = self::factory()->user->create();
 		$this->server( $user, array( 'backup_ok_at' => time() - 3600 ) );
@@ -513,7 +650,7 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'web-01: backup finished', $this->html( 'activity' ) );
 	}
 
-	public function test_a_pause_is_a_failed_payment_only_when_the_subscription_is_on_hold(): void {
+	public function test_a_pause_is_shown_only_when_the_subscription_is_on_hold(): void {
 		global $wpdb;
 		$user = self::factory()->user->create();
 		$sub  = $this->subscription( $user, 'on-hold', 5, 'Server' );
@@ -523,6 +660,35 @@ class OverviewTest extends MonitoringTestCase {
 		$wpdb->insert( \BeltoftLicenses\Install::tables()['events'], array( 'license_id' => $id, 'type' => 'service', 'message' => 'Service paused', 'created_at' => gmdate( 'Y-m-d H:i:s' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
 		$this->as_user( $user );
 
+		$this->assertStringContainsString( 'web-01: paused', $this->html( 'activity' ) );
+	}
+
+	public function test_a_pause_is_payment_failed_only_after_a_failed_renewal(): void {
+		global $wpdb;
+		$user = self::factory()->user->create();
+		$sub  = $this->subscription( $user, 'on-hold', 5, 'Server' );
+		$r    = $this->server( $user );
+		$id   = (int) $r->license()['id'];
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'subscription_id' => $sub->get_id() ), array( 'id' => $id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		$wpdb->insert( \BeltoftLicenses\Install::tables()['events'], array( 'license_id' => $id, 'type' => 'service', 'message' => 'Service paused', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3600 ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+
+		// No failed renewal at all: just paused.
+		$this->as_user( $user );
+		$this->assertStringContainsString( 'web-01: paused', $this->html( 'activity' ) );
+		$this->assertStringNotContainsString( 'payment failed', $this->html( 'activity' ) );
+
+		// A renewal that failed after the pause: still just paused.
+		$late = wcs_create_renewal_order( $sub );
+		$late->set_status( 'failed' );
+		$late->set_date_created( time() - 600 );
+		$late->save();
+		$this->as_user( $user );
+		$this->assertStringNotContainsString( 'payment failed', $this->html( 'activity' ) );
+
+		// A renewal that failed before the pause: payment failed.
+		$late->set_date_created( time() - 7200 );
+		$late->save();
+		$this->as_user( $user );
 		$this->assertStringContainsString( 'web-01: payment failed, paused', $this->html( 'activity' ) );
 	}
 

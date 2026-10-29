@@ -54,9 +54,22 @@ final class Overview {
 	public const FEED = 5;
 
 	/**
-	 * How many of the newest history rows are read to find the feed's items.
+	 * How many of the newest matching history rows are read to find the feed's items.
 	 */
-	private const HISTORY_ROWS = 100;
+	private const HISTORY_ROWS = 20;
+
+	/**
+	 * The beginnings of the history texts that can become a customer sentence (the rest is never read).
+	 */
+	private const MESSAGE_PREFIXES = array(
+		'Customer took the snapshot "',
+		'Snapshot "',
+		'Server rolled back to the snapshot "',
+		'Server restored from a backup',
+		'Server restored from the backup',
+		'Service provisioned',
+		'Service paused',
+	);
 
 	/**
 	 * The values for one user, by user id.
@@ -530,7 +543,7 @@ final class Overview {
 				continue;
 			}
 
-			$when = (int) $subscription->get_time( 'last_order_date_created', 'site' );
+			$when = (int) $subscription->get_time( 'last_order_date_created', 'gmt' );
 			$text = $when > 0
 				/* translators: %s: date */
 				? sprintf( __( 'could not be renewed on %s.', 'beltoft-services' ), wp_date( (string) get_option( 'date_format' ), $when ) )
@@ -638,7 +651,7 @@ final class Overview {
 				continue;
 			}
 
-			$next = (int) $subscription->get_time( 'next_payment', 'site' );
+			$next = (int) $subscription->get_time( 'next_payment', 'gmt' );
 
 			if ( $next <= 0 ) {
 				continue;
@@ -712,14 +725,39 @@ final class Overview {
 	}
 
 	/**
-	 * The default card as "Visa ending 4242", else what the subscription says it is paid with, else ''.
+	 * How the subscription is paid, as text. A card ("Visa ending 4242") only when it renews by itself: the
+	 * subscription's own token, else the customer's default token if it belongs to the same gateway. Otherwise
+	 * the payment method's title; a manual renewal with no title is "Paid by invoice".
 	 *
 	 * @param int               $user_id      Customer.
 	 * @param \WC_Subscription  $subscription A subscription due.
 	 */
 	private static function card( int $user_id, \WC_Subscription $subscription ): string {
+		$title = trim( wp_strip_all_tags( (string) $subscription->get_payment_method_title() ) );
+
+		if ( $subscription->is_manual() ) {
+			return '' !== $title ? $title : __( 'Paid by invoice', 'beltoft-services' );
+		}
+
 		if ( class_exists( '\WC_Payment_Tokens' ) ) {
-			$token = \WC_Payment_Tokens::get_customer_default_token( $user_id );
+			$token = null;
+
+			foreach ( $subscription->get_payment_tokens() as $token_id ) {
+				$found = \WC_Payment_Tokens::get( (int) $token_id );
+
+				if ( $found instanceof \WC_Payment_Token_CC && (int) $found->get_user_id() === $user_id ) {
+					$token = $found;
+					break;
+				}
+			}
+
+			if ( ! $token ) {
+				$default = \WC_Payment_Tokens::get_customer_default_token( $user_id );
+
+				if ( $default instanceof \WC_Payment_Token_CC && $default->get_gateway_id() === $subscription->get_payment_method() ) {
+					$token = $default;
+				}
+			}
 
 			if ( $token instanceof \WC_Payment_Token_CC && '' !== (string) $token->get_last4() ) {
 				$type = (string) $token->get_card_type();
@@ -729,7 +767,7 @@ final class Overview {
 			}
 		}
 
-		return wp_strip_all_tags( (string) $subscription->get_payment_method_title() );
+		return $title;
 	}
 
 	/**
@@ -763,12 +801,19 @@ final class Overview {
 		if ( $ids && class_exists( \BeltoftLicenses\Install::class ) ) {
 			$table = \BeltoftLicenses\Install::tables()['events'];
 			$in    = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+			$like  = implode( ' OR ', array_fill( 0, count( self::MESSAGE_PREFIXES ), 'message LIKE %s' ) );
+			$likes = array_map(
+				static function ( string $prefix ) use ( $wpdb ): string {
+					return $wpdb->esc_like( $prefix ) . '%';
+				},
+				self::MESSAGE_PREFIXES
+			);
 
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, one query per page; the placeholders are generated.
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT license_id, message, created_at FROM %i WHERE type = 'service' AND license_id IN ($in) ORDER BY id DESC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-					array_merge( array( $table ), $ids, array( self::HISTORY_ROWS ) )
+					"SELECT license_id, message, created_at FROM %i WHERE type = 'service' AND license_id IN ($in) AND ($like) ORDER BY id DESC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					array_merge( array( $table ), $ids, $likes, array( self::HISTORY_ROWS ) )
 				),
 				ARRAY_A
 			);
@@ -777,17 +822,24 @@ final class Overview {
 			foreach ( is_array( $rows ) ? $rows : array() as $row ) {
 				$license_id = (int) $row['license_id'];
 				$held       = false;
+				$failed     = false;
+				$at         = (int) strtotime( $row['created_at'] . ' UTC' );
 				$sub        = $subscription_of[ $license_id ] ?? 0;
 
-				if ( $sub > 0 && isset( $subscriptions[ $sub ] ) && $subscriptions[ $sub ] instanceof \WC_Subscription ) {
+				if ( 'Service paused' === $row['message'] && $sub > 0 && isset( $subscriptions[ $sub ] ) && $subscriptions[ $sub ] instanceof \WC_Subscription ) {
 					$held = $subscriptions[ $sub ]->has_status( 'on-hold' );
+
+					if ( $held ) {
+						$bad    = self::last_failed_renewal( $subscriptions[ $sub ] );
+						$failed = $bad > 0 && $at >= $bad;
+					}
 				}
 
-				$text = self::describe( (string) $row['message'], (string) ( $names[ $license_id ] ?? '' ), $held );
+				$text = self::describe( (string) $row['message'], (string) ( $names[ $license_id ] ?? '' ), $held, $failed );
 
 				if ( '' !== $text ) {
 					$items[] = array(
-						'at'   => (int) strtotime( $row['created_at'] . ' UTC' ),
+						'at'   => $at,
 						'text' => $text,
 					);
 				}
@@ -828,13 +880,31 @@ final class Overview {
 	}
 
 	/**
+	 * When the subscription's newest failed renewal order was created (Unix time), 0 when it has none.
+	 *
+	 * @param \WC_Subscription $subscription Subscription.
+	 */
+	private static function last_failed_renewal( \WC_Subscription $subscription ): int {
+		$latest = 0;
+
+		foreach ( $subscription->get_related_orders( 'all', 'renewal' ) as $order ) {
+			if ( $order instanceof \WC_Order && $order->has_status( 'failed' ) && $order->get_date_created() ) {
+				$latest = max( $latest, (int) $order->get_date_created()->getTimestamp() );
+			}
+		}
+
+		return $latest;
+	}
+
+	/**
 	 * A history message as a customer sentence, or '' when it is not for customers.
 	 *
 	 * @param string $message History text.
 	 * @param string $name    The service's name.
-	 * @param bool   $held    Whether its subscription is on hold (a payment failed).
+	 * @param bool   $held    Whether its subscription is on hold.
+	 * @param bool   $failed  Whether a failed renewal payment came before the pause.
 	 */
-	public static function describe( string $message, string $name, bool $held ): string {
+	public static function describe( string $message, string $name, bool $held, bool $failed = false ): string {
 		if ( '' === $name ) {
 			return '';
 		}
@@ -865,6 +935,11 @@ final class Overview {
 		}
 
 		if ( 'Service paused' === $message && $held ) {
+			if ( ! $failed ) {
+				/* translators: %s: name of the server or service */
+				return sprintf( __( '%s: paused', 'beltoft-services' ), $name );
+			}
+
 			/* translators: %s: name of the server or service */
 			return sprintf( __( '%s: payment failed, paused', 'beltoft-services' ), $name );
 		}
