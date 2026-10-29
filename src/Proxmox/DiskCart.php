@@ -47,7 +47,8 @@ final class DiskCart {
 		return $driver && DiskDriver::ID === $driver->id();
 	}
 
-	private static function flow( array $data ): bool {
+	/** A renewal, resubscribe or switch cart: the line was bought before. */
+	public static function flow( array $data ): bool {
 		foreach ( array( 'subscription_renewal', 'subscription_renewal_early', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
 			if ( ! empty( $data[ $key ] ) ) {
 				return true;
@@ -57,7 +58,7 @@ final class DiskCart {
 	}
 
 	/** Confirm WCS is switching this customer's existing disk line. */
-	private static function valid_switch( int $product_id ): bool {
+	public static function valid_switch( int $product_id ): bool {
 		$subscription_id = isset( $_GET['switch-subscription'] ) ? absint( wp_unslash( $_GET['switch-subscription'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validates the switch before this hook.
 		$item_id = isset( $_GET['item'] ) ? absint( wp_unslash( $_GET['item'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- ownership and WCS ability checked below.
 		if ( ! $subscription_id || ! $item_id || ! function_exists( 'wcs_get_subscription' ) || ! class_exists( '\\WC_Subscriptions_Switcher' ) ) {

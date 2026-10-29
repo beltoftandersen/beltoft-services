@@ -6,7 +6,7 @@
  * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
- * $snapshots (null when the block is absent, or slots, used, full, days, max_label, entries of id/label/taken/keeps/consistent/state),
+ * $snapshots (null when the block is absent, or slots, used, included, added, buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
  * $resource_id (the resource id, for ids that must be unique on a page),
  * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty).
  * The password is never part of this template: the reveal button asks the server for it once.
@@ -245,8 +245,24 @@ $beltoft_services_power_labels = array(
 						(int) $snapshots['slots']
 					)
 				);
+				if ( $snapshots['added'] > 0 ) {
+					echo esc_html(
+						' ' . sprintf(
+							/* translators: 1: free snapshot slots, 2: snapshot slots added by a subscription */
+							__( '(%1$d included, %2$d added)', 'beltoft-services' ),
+							(int) $snapshots['included'],
+							(int) $snapshots['added']
+						)
+					);
+				}
 				?>
 			</p>
+			<?php if ( $snapshots['buy'] ) : ?>
+				<p class="description" data-snapshot-add><?php esc_html_e( 'Need more?', 'beltoft-services' ); ?>
+				<?php foreach ( $snapshots['buy'] as $beltoft_services_pack ) : ?>
+					<a href="<?php echo esc_url( $beltoft_services_pack['url'] ); ?>"><?php /* translators: 1: snapshot slots in the pack, 2: price with period */ echo esc_html( sprintf( _n( 'Add %1$d snapshot (%2$s excluding VAT)', 'Add %1$d snapshots (%2$s excluding VAT)', (int) $beltoft_services_pack['slots'], 'beltoft-services' ), (int) $beltoft_services_pack['slots'], $beltoft_services_pack['price'] ) ); ?></a>
+				<?php endforeach; ?></p>
+			<?php endif; ?>
 			<?php if ( array() === $snapshots['entries'] ) : ?>
 				<p><?php esc_html_e( 'You have no snapshots yet.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
@@ -313,12 +329,21 @@ $beltoft_services_power_labels = array(
 						_n(
 							'Includes every disk. The server is off for a moment while it goes back. The password and SSH key go back to the ones saved. Free snapshots are kept %d day.',
 							'Includes every disk. The server is off for a moment while it goes back. The password and SSH key go back to the ones saved. Free snapshots are kept %d days.',
-							(int) $snapshots['days'],
+							(int) $snapshots['free_days'],
 							'beltoft-services'
 						),
-						(int) $snapshots['days']
+						(int) $snapshots['free_days']
 					)
 				);
+				if ( $snapshots['buy'] || $snapshots['added'] > 0 ) {
+					echo ' ' . esc_html(
+						sprintf(
+							/* translators: %d: days a snapshot is kept while the server has added slots */
+							_n( 'With added slots, snapshots are kept %d day.', 'With added slots, snapshots are kept %d days.', (int) $snapshots['paid_days'], 'beltoft-services' ),
+							(int) $snapshots['paid_days']
+						)
+					);
+				}
 				?>
 			</p>
 

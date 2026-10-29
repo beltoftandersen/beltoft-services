@@ -128,6 +128,24 @@ final class Stock {
 	}
 
 	/**
+	 * The add-on drivers sold next to a server: an add-on belongs to a server and is not built by itself.
+	 *
+	 * @return string[]
+	 */
+	public static function addon_drivers(): array {
+		return array( DiskDriver::ID, SnapshotDriver::ID );
+	}
+
+	/**
+	 * Every driver whose products this class looks after: the server driver and the add-ons.
+	 *
+	 * @return string[]
+	 */
+	public static function drivers(): array {
+		return array_merge( array( 'proxmox' ), self::addon_drivers() );
+	}
+
+	/**
 	 * Filter woocommerce_cart_item_is_purchasable: an item restored from the session that carries a
 	 * flow key stays.
 	 *
@@ -144,7 +162,7 @@ final class Stock {
 
 		$driver = Product::driver_for( $product->get_id() );
 
-		return $driver && in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) ? true : $purchasable;
+		return $driver && in_array( $driver->id(), self::drivers(), true ) ? true : $purchasable;
 	}
 
 	/**
@@ -162,7 +180,7 @@ final class Stock {
 
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( ! $driver || ! in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) ) {
+		if ( ! $driver || ! in_array( $driver->id(), self::drivers(), true ) ) {
 			return $in_stock;
 		}
 
@@ -196,7 +214,7 @@ final class Stock {
 		if ( ! $value && $product instanceof \WC_Product ) {
 			$driver = Product::driver_for( $product->get_id() );
 
-			if ( $driver && in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) && self::existing_customer_flow( $product ) ) {
+			if ( $driver && in_array( $driver->id(), self::drivers(), true ) && self::existing_customer_flow( $product ) ) {
 				return true;
 			}
 		}
@@ -218,7 +236,7 @@ final class Stock {
 
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( ! $driver || ! in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) || self::existing_customer_flow( $product ) ) {
+		if ( ! $driver || ! in_array( $driver->id(), self::drivers(), true ) || self::existing_customer_flow( $product ) ) {
 			return $value;
 		}
 
@@ -251,6 +269,9 @@ final class Stock {
 	 */
 	private static function availability( \WC_Product $product ): ?bool {
 		$driver = Product::driver_for( $product->get_id() );
+		if ( $driver && SnapshotDriver::ID === $driver->id() ) {
+			return true; // Slots are an entitlement: nothing is built, so nothing runs out.
+		}
 		if ( $driver && DiskDriver::ID === $driver->id() ) {
 			$size = (int) ( Product::plan( $product->get_id() )['disk_gb'] ?? 0 );
 			if ( $size < 1 ) {
@@ -337,7 +358,7 @@ final class Stock {
 		$id     = $parent > 0 ? $parent : $product->get_id();
 		$driver = Product::driver_for( $id );
 
-		if ( $driver && in_array( $driver->id(), array( 'proxmox', DiskDriver::ID ), true ) ) {
+		if ( $driver && in_array( $driver->id(), self::drivers(), true ) ) {
 			self::sync_ids( array( $id ), null );
 		}
 	}
@@ -436,7 +457,7 @@ final class Stock {
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
 				'no_found_rows'  => true,
-				'meta_query'     => array( array( 'key' => Product::META_DRIVER, 'value' => array( 'proxmox', DiskDriver::ID ), 'compare' => 'IN' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Small service-product catalogue.
+				'meta_query'     => array( array( 'key' => Product::META_DRIVER, 'value' => self::drivers(), 'compare' => 'IN' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Small service-product catalogue.
 			)
 		);
 
@@ -456,7 +477,7 @@ final class Stock {
 		}
 
 		$driver = Product::driver_for( $product->get_id() );
-		if ( null !== $cluster_id && ( ! $driver || DiskDriver::ID !== $driver->id() ) && (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) !== $cluster_id ) {
+		if ( null !== $cluster_id && ( ! $driver || ! in_array( $driver->id(), self::addon_drivers(), true ) ) && (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) !== $cluster_id ) {
 			return false;
 		}
 

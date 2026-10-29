@@ -90,6 +90,8 @@ final class Plugin {
 		Proxmox\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );
 		Proxmox\DiskCart::register();
+		Proxmox\SnapshotMeta::register();
+		Proxmox\SnapshotCart::register();
 		Proxmox\DiskField::register();
 		Proxmox\Actions::register();
 		Proxmox\Panels::register();

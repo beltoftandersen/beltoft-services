@@ -31,6 +31,7 @@ final class Registry {
 				'http'    => new \BeltoftServices\Http\HttpDriver(),
 				'proxmox' => new \BeltoftServices\Proxmox\ProxmoxDriver(),
 				'proxmox-disk' => new \BeltoftServices\Proxmox\DiskDriver(),
+				'proxmox-snapshots' => new \BeltoftServices\Proxmox\SnapshotDriver(),
 				'domain'  => new \BeltoftServices\Domains\DomainDriver(),
 				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
 			)

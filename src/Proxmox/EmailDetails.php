@@ -46,6 +46,18 @@ final class EmailDetails {
 			$details[ __( 'Backups', 'beltoft-services' ) ] = __( 'Extra disks are not included in nightly backups.', 'beltoft-services' );
 			return $details;
 		}
+		if ( SnapshotDriver::ID === $r->get( 'driver' ) ) {
+			$server = SnapshotMeta::server_of( $r );
+			$days   = SnapshotMeta::days_of( $r );
+			$days   = $days > 0 ? $days : max( 1, (int) \BeltoftServices\Settings::get( 'snapshot_paid_days' ) );
+			$details[ __( 'Snapshot slots', 'beltoft-services' ) ] = '+' . SnapshotMeta::slots_of( $r );
+			if ( $server ) {
+				$details[ __( 'Server', 'beltoft-services' ) ] = (string) $server->get( 'ip' );
+			}
+			/* translators: %d: days a snapshot is kept */
+			$details[ __( 'Kept', 'beltoft-services' ) ] = sprintf( _n( 'Snapshots are kept %d day.', 'Snapshots are kept %d days.', $days, 'beltoft-services' ), $days );
+			return $details;
+		}
 		if ( SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
 			return $details;
 		}
