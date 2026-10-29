@@ -570,6 +570,32 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertSame( '', $this->html( 'next_payment' ) );
 	}
 
+	public function test_the_next_payment_card_is_hidden_when_the_total_is_zero_but_the_data_keeps_it(): void {
+		$user = self::factory()->user->create();
+		$this->subscription( $user, 'active', 10, 'Free trial', '0.00' );
+		$this->as_user( $user );
+
+		$this->assertSame( '', $this->html( 'next_payment' ) );
+		$this->assertSame( 0.0, Overview::data()['next_payment']['total'] );
+	}
+
+	public function test_only_the_payment_and_activity_row_is_a_pair_and_a_license_alone_is_a_plain_section(): void {
+		$user = self::factory()->user->create();
+		$this->plugin_license( $user );
+		$this->as_user( $user );
+		$html = Overview::all();
+
+		$this->assertStringContainsString( 'beltoft-services-ov__licenses', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-ov__two', $html );
+
+		$this->subscription( $user, 'active', 10, 'Server', '15.00' );
+		Overview::reset();
+		$html = Overview::all();
+
+		$this->assertStringContainsString( 'beltoft-services-ov__two is-single', $html );
+		$this->assertStringContainsString( 'beltoft-services-ov__money', $html );
+	}
+
 	// -- Activity ------------------------------------------------------------------------------
 
 	public function test_events_are_mapped_to_plain_customer_text(): void {

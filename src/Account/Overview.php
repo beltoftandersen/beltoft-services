@@ -237,7 +237,8 @@ final class Overview {
 					)
 				) : '';
 			case 'next_payment':
-				return $data['next_payment'] ? self::template( 'overview/next-payment.php', array( 'payment' => $data['next_payment'] ) ) : '';
+				// Nothing is due when the total is 0 (a free trial, a credit), so there is no card.
+				return $data['next_payment'] && $data['next_payment']['total'] > 0 ? self::template( 'overview/next-payment.php', array( 'payment' => $data['next_payment'] ) ) : '';
 			case 'activity':
 				return $data['activity'] ? self::template( 'overview/activity.php', array( 'items' => $data['activity'] ) ) : '';
 			default:
@@ -730,6 +731,7 @@ final class Overview {
 		return array(
 			'date'   => wp_date( (string) get_option( 'date_format' ), (int) $first['time'] ),
 			'time'   => gmdate( 'c', (int) $first['time'] ),
+			'total'  => (float) $first['total'],
 			'amount' => wc_price( (float) $first['total'], array( 'currency' => (string) $first['currency'] ) ),
 			'covers' => implode( ', ', $names ),
 			'card'   => $card['text'],

@@ -12,7 +12,6 @@
 defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_pairs = array(
-	array( 'domains', 'licenses' ),
 	array( 'next_payment', 'activity' ),
 );
 ?>
@@ -22,6 +21,8 @@ $beltoft_services_pairs = array(
 	echo $parts['attention']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	echo $parts['welcome']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	echo $parts['servers']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	echo $parts['domains']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	echo $parts['licenses']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 	foreach ( $beltoft_services_pairs as $beltoft_services_pair ) :
 		$beltoft_services_left  = $parts[ $beltoft_services_pair[0] ];
