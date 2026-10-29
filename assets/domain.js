@@ -372,4 +372,20 @@
 	window.addEventListener( 'popstate', function () {
 		Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), function ( page ) { show( page, fromLocation( page ) ); } );
 	} );
+	// The tab bar scrolls sideways on a narrow screen: the open tab is brought into view, now and after a switch.
+	function reveal( page ) {
+		var nav = page.querySelector( '.beltoft-services-tabs' );
+		var link = nav ? nav.querySelector( 'a[aria-current="page"]' ) : null;
+		if ( ! nav || ! link || nav.scrollWidth <= nav.clientWidth ) { return; }
+		nav.scrollLeft = Math.max( 0, link.offsetLeft - ( nav.clientWidth - link.offsetWidth ) / 2 );
+	}
+	document.addEventListener( 'click', function ( event ) {
+		var link = event.target.closest ? event.target.closest( 'a[data-tab-link]' ) : null;
+		var page = link ? link.closest( '[data-domain-page]' ) : null;
+		if ( page ) { window.setTimeout( function () { reveal( page ); }, 0 ); }
+	} );
+	window.addEventListener( 'popstate', function () {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), reveal );
+	} );
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), reveal );
 }() );

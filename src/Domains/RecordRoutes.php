@@ -148,7 +148,7 @@ final class RecordRoutes {
 		}
 
 		if ( ! $rows ) {
-			return self::failure( new \WP_Error( 'bad_record', 'A DNS record is invalid.' ) );
+			return self::failure( new \WP_Error( 'bad_record', __( 'A DNS record is invalid.', 'beltoft-services' ) ) );
 		}
 
 		$done = Records::change( $zone, $name, $type, $rows, $expect, $to );
@@ -212,10 +212,15 @@ final class RecordRoutes {
 		}
 
 		$keep  = array();
+		$seen  = array();
 		$found = false;
 
 		foreach ( Records::to_rows( $zone, (array) ( $data['rrsets'] ?? array() ) ) as $row ) {
 			$same = Records::fqdn( $zone, (string) $row['name'], (string) $row['type'] ) === $fqdn && $row['type'] === $type;
+
+			if ( $same ) {
+				$seen[] = $row;
+			}
 
 			if ( $same && ! $found && strtolower( (string) $row['value'] ) === strtolower( trim( $value ) ) ) {
 				$found = true;
@@ -229,10 +234,10 @@ final class RecordRoutes {
 		}
 
 		if ( ! $found ) {
-			return new \WP_Error( 'not_found', 'That record was not found.' );
+			return new \WP_Error( 'not_found', __( 'That record was not found.', 'beltoft-services' ) );
 		}
 
-		return Records::change( $zone, $name, $type, $keep );
+		return Records::change( $zone, $name, $type, $keep, $seen );
 	}
 
 	/**
@@ -307,11 +312,15 @@ final class RecordRoutes {
 		}
 
 		if ( ! in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) || $r->folded_into() > 0 ) {
-			return self::failure( new \WP_Error( 'forbidden', 'This service is not available.' ), 403 );
+			return self::failure( new \WP_Error( 'forbidden', __( 'This service is not available.', 'beltoft-services' ) ), 403 );
+		}
+
+		if ( $r->get( 'records_off' ) && (int) ( $r->license()['user_id'] ?? 0 ) === get_current_user_id() ) {
+			return self::failure( new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ), 403 );
 		}
 
 		if ( ! AppDomains::editable( $r, get_current_user_id() ) ) {
-			return self::failure( new \WP_Error( 'not_ours', 'The DNS of this domain is not hosted here, so its records cannot be changed.' ), 409 );
+			return self::failure( new \WP_Error( 'not_ours', __( 'The DNS of this domain is not hosted here, so its records cannot be changed.', 'beltoft-services' ) ), 409 );
 		}
 
 		if ( $write ) {
@@ -324,7 +333,7 @@ final class RecordRoutes {
 			$max = (int) apply_filters( 'beltoft_services_dns_write_limit', 20, (string) $r->get( 'domain' ) );
 
 			if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:dns-write:' . strtolower( (string) $r->get( 'domain' ) ), $max, MINUTE_IN_SECONDS ) ) {
-				return self::failure( new \WP_Error( 'rate_limited', 'Too many changes. Try again in a minute.' ), 429 );
+				return self::failure( new \WP_Error( 'rate_limited', __( 'Too many changes. Try again in a minute.', 'beltoft-services' ) ), 429 );
 			}
 		}
 
@@ -362,7 +371,7 @@ final class RecordRoutes {
 			return $data;
 		}
 
-		return null === $data ? new \WP_Error( 'zone_missing', 'The DNS zone does not exist.' ) : $data;
+		return null === $data ? new \WP_Error( 'zone_missing', __( 'The DNS zone does not exist.', 'beltoft-services' ) ) : $data;
 	}
 
 	/**

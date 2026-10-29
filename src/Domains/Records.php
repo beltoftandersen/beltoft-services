@@ -50,27 +50,27 @@ final class Records {
 	public static function validate( string $zone, array $records ): array|\WP_Error {
 		$zone = Search::normalise( $zone );
 		if ( is_wp_error( $zone ) ) { return $zone; }
-		if ( count( $records ) > 200 ) { return new \WP_Error( 'too_many_records', 'A zone can have at most 200 customer records.' ); }
+		if ( count( $records ) > 200 ) { return new \WP_Error( 'too_many_records', __( 'A zone can have at most 200 customer records.', 'beltoft-services' ) ); }
 		$groups = array();
 		$types = array();
 		foreach ( $records as $record ) {
-			if ( ! is_array( $record ) ) { return new \WP_Error( 'bad_record', 'A DNS record is invalid.' ); }
+			if ( ! is_array( $record ) ) { return new \WP_Error( 'bad_record', __( 'A DNS record is invalid.', 'beltoft-services' ) ); }
 			$type = strtoupper( (string) ( $record['type'] ?? '' ) );
 			$name = self::name( $zone, (string) ( $record['name'] ?? '' ), $type );
 			$ttl = isset( $record['ttl'] ) ? (int) $record['ttl'] : 3600;
 			if ( is_wp_error( $name ) ) { return $name; }
-			if ( ! in_array( $type, self::TYPES, true ) || $ttl < 60 || $ttl > 86400 ) { return new \WP_Error( 'bad_record', 'A DNS record type or TTL is invalid.' ); }
-			if ( 'CNAME' === $type && $name === $zone . '.' ) { return new \WP_Error( 'cname_apex', 'A CNAME cannot be placed at the domain root.' ); }
+			if ( ! in_array( $type, self::TYPES, true ) || $ttl < 60 || $ttl > 86400 ) { return new \WP_Error( 'bad_record', __( 'A DNS record type or TTL is invalid.', 'beltoft-services' ) ); }
+			if ( 'CNAME' === $type && $name === $zone . '.' ) { return new \WP_Error( 'cname_apex', __( 'A CNAME cannot be placed at the domain root.', 'beltoft-services' ) ); }
 			$content = self::content( $type, $record );
 			if ( is_wp_error( $content ) ) { return $content; }
 			$key = $name . '|' . $type;
-			if ( isset( $groups[ $key ] ) && $groups[ $key ]['ttl'] !== $ttl ) { return new \WP_Error( 'mixed_ttl', 'Records in one set must use one TTL.' ); }
+			if ( isset( $groups[ $key ] ) && $groups[ $key ]['ttl'] !== $ttl ) { return new \WP_Error( 'mixed_ttl', __( 'Records in one set must use one TTL.', 'beltoft-services' ) ); }
 			if ( ! isset( $groups[ $key ] ) ) { $groups[ $key ] = array( 'name' => $name, 'type' => $type, 'ttl' => $ttl, 'changetype' => 'REPLACE', 'records' => array() ); }
 			$groups[ $key ]['records'][] = array( 'content' => $content, 'disabled' => false );
 			$types[ $name ][ $type ] = true;
 		}
 		foreach ( $types as $by_type ) {
-			if ( isset( $by_type['CNAME'] ) && count( $by_type ) > 1 ) { return new \WP_Error( 'cname_conflict', 'A CNAME cannot share its name with another record type.' ); }
+			if ( isset( $by_type['CNAME'] ) && count( $by_type ) > 1 ) { return new \WP_Error( 'cname_conflict', __( 'A CNAME cannot share its name with another record type.', 'beltoft-services' ) ); }
 		}
 		return array_values( $groups );
 	}
@@ -83,36 +83,36 @@ final class Records {
 		if ( '@' === $raw || '' === $raw ) { return $zone . '.'; }
 		if ( str_ends_with( $raw, '.' ) ) {
 			$name = rtrim( $raw, '.' );
-			if ( $name !== $zone && ! str_ends_with( $name, '.' . $zone ) ) { return new \WP_Error( 'outside_zone', 'A record name must stay inside the domain.' ); }
+			if ( $name !== $zone && ! str_ends_with( $name, '.' . $zone ) ) { return new \WP_Error( 'outside_zone', __( 'A record name must stay inside the domain.', 'beltoft-services' ) ); }
 		} elseif ( $raw === $zone || str_ends_with( $raw, '.' . $zone ) ) {
 			$name = $raw;
 		} else {
-			if ( substr_count( $raw, '.' ) > 1 ) { return new \WP_Error( 'outside_zone', 'A record name must stay inside the domain.' ); }
+			if ( substr_count( $raw, '.' ) > 1 ) { return new \WP_Error( 'outside_zone', __( 'A record name must stay inside the domain.', 'beltoft-services' ) ); }
 			$name = $raw . '.' . $zone;
 		}
-		if ( strlen( $name ) > 253 ) { return new \WP_Error( 'bad_name', 'A record name is invalid.' ); }
+		if ( strlen( $name ) > 253 ) { return new \WP_Error( 'bad_name', __( 'A record name is invalid.', 'beltoft-services' ) ); }
 		$labels = explode( '.', $name );
 		if ( '*' === $labels[0] && count( $labels ) > 1 ) {
 			// A wildcard is the whole leftmost label, and only some types may use it.
-			if ( ! in_array( $type, self::WILDCARD_TYPES, true ) ) { return new \WP_Error( 'bad_name', 'This record type cannot use a wildcard name.' ); }
+			if ( ! in_array( $type, self::WILDCARD_TYPES, true ) ) { return new \WP_Error( 'bad_name', __( 'This record type cannot use a wildcard name.', 'beltoft-services' ) ); }
 			array_shift( $labels );
 		}
 		foreach ( $labels as $label ) {
-			if ( ! preg_match( '/^_?[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?$/', $label ) ) { return new \WP_Error( 'bad_name', 'A record name is invalid.' ); }
+			if ( ! preg_match( '/^_?[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?$/', $label ) ) { return new \WP_Error( 'bad_name', __( 'A record name is invalid.', 'beltoft-services' ) ); }
 		}
 		return $name . '.';
 	}
 
 	private static function content( string $type, array $record ): string|\WP_Error {
 		$value = trim( (string) ( $record['value'] ?? '' ) );
-		if ( in_array( $type, array( 'TXT', 'CAA' ), true ) && preg_match( '/[\x00-\x1F\x7F]/', $value ) ) { return new \WP_Error( 'bad_txt', 'A record value cannot contain control characters.' ); }
+		if ( in_array( $type, array( 'TXT', 'CAA' ), true ) && preg_match( '/[\x00-\x1F\x7F]/', $value ) ) { return new \WP_Error( 'bad_txt', __( 'A record value cannot contain control characters.', 'beltoft-services' ) ); }
 		if ( 'A' === $type || 'AAAA' === $type ) {
 			$family = 'A' === $type ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6;
-			return filter_var( $value, FILTER_VALIDATE_IP, $family ) ? $value : new \WP_Error( 'bad_ip', 'Enter a valid IP address.' );
+			return filter_var( $value, FILTER_VALIDATE_IP, $family ) ? $value : new \WP_Error( 'bad_ip', __( 'Enter a valid IP address.', 'beltoft-services' ) );
 		}
 		if ( 'CNAME' === $type ) { return self::target( $value ); }
 		if ( 'TXT' === $type ) {
-			if ( '' === $value || strlen( $value ) > 2048 ) { return new \WP_Error( 'bad_txt', 'A TXT value must contain 1 to 2048 bytes.' ); }
+			if ( '' === $value || strlen( $value ) > 2048 ) { return new \WP_Error( 'bad_txt', __( 'A TXT value must contain 1 to 2048 bytes.', 'beltoft-services' ) ); }
 			// A string is at most 255 bytes in DNS: a longer value is written as several strings.
 			$parts = array();
 			foreach ( self::chunks( $value ) as $part ) { $parts[] = '"' . addcslashes( $part, '"\\' ) . '"'; }
@@ -136,10 +136,10 @@ final class Records {
 		if ( 'CAA' === $type ) {
 			$flag = self::number( $record['flag'] ?? null, 0, 255 );
 			$tag = strtolower( (string) ( $record['tag'] ?? '' ) );
-			if ( is_wp_error( $flag ) || ! in_array( $tag, array( 'issue', 'issuewild', 'iodef' ), true ) || '' === $value || strlen( $value ) > 255 ) { return new \WP_Error( 'bad_caa', 'A CAA record is invalid.' ); }
+			if ( is_wp_error( $flag ) || ! in_array( $tag, array( 'issue', 'issuewild', 'iodef' ), true ) || '' === $value || strlen( $value ) > 255 ) { return new \WP_Error( 'bad_caa', __( 'A CAA record is invalid.', 'beltoft-services' ) ); }
 			return $flag . ' ' . $tag . ' "' . addcslashes( $value, '"\\' ) . '"';
 		}
-		return new \WP_Error( 'bad_record', 'A DNS record is invalid.' );
+		return new \WP_Error( 'bad_record', __( 'A DNS record is invalid.', 'beltoft-services' ) );
 	}
 
 	/** Pieces of at most 255 bytes that never cut a UTF-8 character. */
@@ -158,13 +158,13 @@ final class Records {
 
 	private static function target( string $value ): string|\WP_Error {
 		$target = Search::normalise( $value );
-		return is_wp_error( $target ) ? new \WP_Error( 'bad_target', 'Enter a valid target host name.' ) : $target . '.';
+		return is_wp_error( $target ) ? new \WP_Error( 'bad_target', __( 'Enter a valid target host name.', 'beltoft-services' ) ) : $target . '.';
 	}
 
 	private static function number( $value, int $min, int $max ): int|\WP_Error {
-		if ( ! is_scalar( $value ) || ! ctype_digit( (string) $value ) ) { return new \WP_Error( 'bad_number', 'A DNS record number is invalid.' ); }
+		if ( ! is_scalar( $value ) || ! ctype_digit( (string) $value ) ) { return new \WP_Error( 'bad_number', __( 'A DNS record number is invalid.', 'beltoft-services' ) ); }
 		$number = (int) $value;
-		return $number >= $min && $number <= $max ? $number : new \WP_Error( 'bad_number', 'A DNS record number is invalid.' );
+		return $number >= $min && $number <= $max ? $number : new \WP_Error( 'bad_number', __( 'A DNS record number is invalid.', 'beltoft-services' ) );
 	}
 
 	/**
@@ -175,14 +175,14 @@ final class Records {
 	 */
 	public static function locked( string $zone, callable $fn ) {
 		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::zone( $zone ), \BeltoftServices\Locks::zone_wait(), $fn );
-		return $taken ? $result : new \WP_Error( 'zone_busy', 'Your DNS is being changed. Try again in a moment.' );
+		return $taken ? $result : new \WP_Error( 'zone_busy', __( 'Your DNS is being changed. Try again in a moment.', 'beltoft-services' ) );
 	}
 
 	/** The zone as the DNS server has it right now: array, or a WP_Error (zone_missing when there is none). */
 	private static function read( string $zone ): array|\WP_Error {
 		$current = Clients::dns()->zone( $zone );
 		if ( is_wp_error( $current ) ) { return $current; }
-		if ( null === $current ) { return new \WP_Error( 'zone_missing', 'The DNS zone does not exist.' ); }
+		if ( null === $current ) { return new \WP_Error( 'zone_missing', __( 'The DNS zone does not exist.', 'beltoft-services' ) ); }
 		return $current;
 	}
 
@@ -294,18 +294,18 @@ final class Records {
 		$zone = Search::normalise( $zone );
 		if ( is_wp_error( $zone ) ) { return $zone; }
 		$type = strtoupper( $type );
-		if ( ! in_array( $type, self::TYPES, true ) ) { return new \WP_Error( 'bad_record', 'A DNS record type or TTL is invalid.' ); }
+		if ( ! in_array( $type, self::TYPES, true ) ) { return new \WP_Error( 'bad_record', __( 'A DNS record type or TTL is invalid.', 'beltoft-services' ) ); }
 		$fqdn = self::name( $zone, $name, $type );
 		if ( is_wp_error( $fqdn ) ) { return $fqdn; }
 		$new_type = strtoupper( (string) ( $to['type'] ?? $type ) );
-		if ( ! in_array( $new_type, self::TYPES, true ) ) { return new \WP_Error( 'bad_record', 'A DNS record type or TTL is invalid.' ); }
+		if ( ! in_array( $new_type, self::TYPES, true ) ) { return new \WP_Error( 'bad_record', __( 'A DNS record type or TTL is invalid.', 'beltoft-services' ) ); }
 		$new_fqdn = self::name( $zone, (string) ( $to['name'] ?? $name ), $new_type );
 		if ( is_wp_error( $new_fqdn ) ) { return $new_fqdn; }
 		$moving = strtolower( $new_fqdn ) !== strtolower( $fqdn ) || $new_type !== $type;
-		if ( $moving && ! $records ) { return new \WP_Error( 'bad_record', 'A DNS record is invalid.' ); }
+		if ( $moving && ! $records ) { return new \WP_Error( 'bad_record', __( 'A DNS record is invalid.', 'beltoft-services' ) ); }
 		$rows = array();
 		foreach ( $records as $row ) {
-			if ( ! is_array( $row ) ) { return new \WP_Error( 'bad_record', 'A DNS record is invalid.' ); }
+			if ( ! is_array( $row ) ) { return new \WP_Error( 'bad_record', __( 'A DNS record is invalid.', 'beltoft-services' ) ); }
 			$rows[] = array_merge( $row, array( 'name' => $new_fqdn, 'type' => $new_type ) );
 		}
 		$set = array();
@@ -317,16 +317,16 @@ final class Records {
 		return self::locked( $zone, static function () use ( $zone, $fqdn, $type, $new_fqdn, $new_type, $moving, $set, $expect ) {
 			$data = self::read( $zone );
 			if ( is_wp_error( $data ) ) { return $data; }
-			if ( self::paused( $zone, $data ) ) { return new \WP_Error( 'records_off', 'DNS hosting is paused for this domain.' ); }
+			if ( self::paused( $zone, $data ) ) { return new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ); }
 			$have    = self::customer_sets( $data );
 			$old_key = strtolower( $fqdn ) . '|' . $type;
 			$key     = strtolower( $new_fqdn ) . '|' . $new_type;
 			$old     = $have[ $old_key ] ?? null;
 			if ( null !== $expect && self::shown( $zone, $old ) !== self::shown( $zone, null, $expect ) ) {
-				return new \WP_Error( 'stale', 'This record changed. Reload the list.' );
+				return new \WP_Error( 'stale', __( 'This record changed. Reload the list.', 'beltoft-services' ) );
 			}
-			if ( $moving && ! $old ) { return new \WP_Error( 'stale', 'This record changed. Reload the list.' ); }
-			if ( $moving && isset( $have[ $key ] ) ) { return new \WP_Error( 'exists', 'A record of this type already exists at that name.' ); }
+			if ( $moving && ! $old ) { return new \WP_Error( 'stale', __( 'This record changed. Reload the list.', 'beltoft-services' ) ); }
+			if ( $moving && isset( $have[ $key ] ) ) { return new \WP_Error( 'exists', __( 'A record of this type already exists at that name.', 'beltoft-services' ) ); }
 			if ( ! $set ) {
 				return $old ? Clients::dns()->replace_rrsets( $zone, array( array( 'name' => $old['name'], 'type' => $type, 'changetype' => 'DELETE' ) ) ) : true;
 			}
@@ -335,13 +335,13 @@ final class Records {
 				$other_type = strtoupper( (string) ( $other['type'] ?? '' ) );
 				$other_key  = strtolower( (string) ( $other['name'] ?? '' ) ) . '|' . $other_type;
 				if ( strtolower( (string) ( $other['name'] ?? '' ) ) !== strtolower( $new_fqdn ) || $other_type === $new_type || empty( $other['records'] ) || ( $moving && $other_key === $old_key ) ) { continue; }
-				if ( 'CNAME' === $new_type || 'CNAME' === $other_type ) { return new \WP_Error( 'cname_conflict', 'A CNAME cannot share its name with another record type.' ); }
+				if ( 'CNAME' === $new_type || 'CNAME' === $other_type ) { return new \WP_Error( 'cname_conflict', __( 'A CNAME cannot share its name with another record type.', 'beltoft-services' ) ); }
 			}
 			$total = count( (array) ( $set['records'] ) );
 			foreach ( $have as $k => $existing ) {
 				if ( $k !== $key && ! ( $moving && $k === $old_key ) ) { $total += count( (array) ( $existing['records'] ?? array() ) ); }
 			}
-			if ( $total > 200 ) { return new \WP_Error( 'too_many_records', 'A zone can have at most 200 customer records.' ); }
+			if ( $total > 200 ) { return new \WP_Error( 'too_many_records', __( 'A zone can have at most 200 customer records.', 'beltoft-services' ) ); }
 			$set = self::with_flags( $set, $moving ? null : $old, false );
 			if ( ! $moving && $old && self::signature( (string) $set['type'], $set['records'], $set['ttl'] ) === self::signature( (string) $set['type'], (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { return true; }
 			$sets = array( $set );
@@ -385,7 +385,7 @@ final class Records {
 			if ( is_wp_error( $data ) ) { return $data; }
 			// A paused service takes no customer writes; a zone with no holder is judged by its own records.
 			$off = self::holder_off( $zone );
-			if ( true === $off ) { return new \WP_Error( 'records_off', 'DNS hosting is paused for this domain.' ); }
+			if ( true === $off ) { return new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ); }
 			$have = self::customer_sets( $data );
 			$paused = null === $off && self::zone_paused( $data );
 			$sets = array();

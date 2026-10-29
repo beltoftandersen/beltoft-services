@@ -239,11 +239,44 @@ class RecordRoutesTest extends TestCase {
 		$this->assertSame( array(), $this->writes() );
 	}
 
-	public function test_a_paused_service_is_refused(): void {
+	public function test_a_paused_service_is_403_paused_with_its_own_message(): void {
 		$r = $this->domain( $this->user, 'paused.example', array( 'records_off' => true ) );
-		$this->assertContains( $this->call( 'PUT', $r->id() . '/dns-records/A/www', $this->user, $this->a( '192.0.2.1' ) )->get_status(), array( 403, 409 ) );
-		$this->assertContains( $this->call( 'GET', $r->id() . '/dns-records', $this->user )->get_status(), array( 403, 409 ) );
+		foreach ( array( $this->call( 'PUT', $r->id() . '/dns-records/A/www', $this->user, $this->a( '192.0.2.1' ) ), $this->call( 'GET', $r->id() . '/dns-records', $this->user ), $this->call( 'DELETE', $r->id() . '/dns-records/A/www', $this->user ) ) as $response ) {
+			$this->assertSame( 403, $response->get_status() );
+			$this->assertSame( 'paused', $response->get_data()['code'] );
+			$this->assertSame( 'DNS hosting is paused for this domain.', $response->get_data()['message'] );
+		}
 		$this->assertSame( array(), $this->writes() );
+	}
+
+	public function test_deleting_one_value_is_checked_against_the_rows_read(): void {
+		$r = $this->domain( $this->user, 'example.com' );
+		$this->call( 'PUT', $r->id() . '/dns-records/A/rr', $this->user, array( 'ttl' => 300, 'records' => array( array( 'value' => '192.0.2.1' ), array( 'value' => '192.0.2.2' ) ) ) );
+		$dns = $this->dns;
+		// Another edit lands between the read and the write: the write must be refused as stale.
+		$racing = new class( $dns ) extends FakeDns {
+			public FakeDns $inner;
+			public function __construct( FakeDns $inner ) { $this->inner = $inner; }
+			public function zone( string $zone ): array|\WP_Error|null {
+				$data = $this->inner->zone( $zone );
+				if ( ! $this->done ) {
+					$this->done = true;
+					$this->inner->replace_rrsets( $zone, array( array( 'name' => 'rr.' . $zone . '.', 'type' => 'A', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '192.0.2.1', 'disabled' => false ), array( 'content' => '192.0.2.2', 'disabled' => false ), array( 'content' => '192.0.2.3', 'disabled' => false ) ) ) ) );
+				}
+				return $data;
+			}
+			public bool $done = false;
+			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error { return $this->inner->replace_rrsets( $zone, $rrsets ); }
+			public function calls(): array { return $this->inner->calls(); }
+		};
+		remove_all_filters( 'beltoft_services_domains_dns' );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $racing );
+		$response = $this->call( 'DELETE', $r->id() . '/dns-records/A/rr', $this->user, array(), array( 'value' => '192.0.2.1' ) );
+		$this->assertSame( 409, $response->get_status() );
+		$this->assertSame( 'stale', $response->get_data()['code'] );
+		$values = array_column( Records::to_rows( 'example.com', $dns->zone( 'example.com' )['rrsets'] ), 'value' );
+		sort( $values );
+		$this->assertSame( array( '192.0.2.1', '192.0.2.2', '192.0.2.3' ), $values );
 	}
 
 	public function test_a_folded_dns_service_is_refused(): void {
