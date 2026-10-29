@@ -290,9 +290,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 @keyframes beltoft-services-pulse { 50% { opacity: 0.3; } }
 @keyframes beltoft-services-dots {
-	0%, 100% { background-size: 0.3em 0.3em, 0.12em 0.12em, 0.12em 0.12em; }
-	33% { background-size: 0.12em 0.12em, 0.3em 0.3em, 0.12em 0.12em; }
-	66% { background-size: 0.12em 0.12em, 0.12em 0.12em, 0.3em 0.3em; }
+	0%, 100% { background-size: 0.44em 0.44em, 0.18em 0.18em, 0.18em 0.18em; }
+	33% { background-size: 0.18em 0.18em, 0.44em 0.44em, 0.18em 0.18em; }
+	66% { background-size: 0.18em 0.18em, 0.18em 0.18em, 0.44em 0.44em; }
 }
 
 /* Work in progress: three squares that take turns to pulse. Before the text of a busy button, of a running progress block and of the card's working line. */
@@ -302,11 +302,11 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-vm__flash.is-working::before {
 	content: "";
 	display: inline-block;
-	width: 1.1em;
-	height: 0.3em;
+	width: 1.5em;
+	height: 0.44em;
 	margin-right: 0.6em;
-	vertical-align: 0.1em;
-	background: linear-gradient(currentColor, currentColor) 0 50% / 0.3em 0.3em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.12em 0.12em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.12em 0.12em no-repeat;
+	vertical-align: 0.02em;
+	background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat;
 	animation: beltoft-services-dots 1.2s ease-in-out infinite;
 }
 
@@ -314,7 +314,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 	.beltoft-services-progress__steps li.is-current::before { animation: none; }
 	.beltoft-services-panel .is-busy::before, .beltoft-services-domain-transfer .is-busy::before,
 	.beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before,
-	.beltoft-services-vm__flash.is-working::before { animation: none; background-size: 0.2em 0.2em, 0.2em 0.2em, 0.2em 0.2em; }
+	.beltoft-services-vm__flash.is-working::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; }
 }
 .beltoft-services-progress__leave { margin: 0.75em 0 0; color: var(--bsp-soft); }
 .beltoft-services-progress__leave[hidden] { display: none; }
