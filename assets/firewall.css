@@ -49,3 +49,10 @@
 	.beltoft-services-fw__row > span:nth-child(4) { grid-column: 1 / -1; justify-content: flex-start; }
 	.beltoft-services-fw__form { grid-template-columns: 1fr; }
 }
+.beltoft-services-fw form.beltoft-services-fw__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; max-width: 640px; }
+.beltoft-services-fw form.beltoft-services-fw__form > p { grid-column: auto; }
+.beltoft-services-fw form.beltoft-services-fw__form > p[data-fw-sources-row], .beltoft-services-fw form.beltoft-services-fw__form > p:last-child, .beltoft-services-fw form.beltoft-services-fw__form > .beltoft-services-fw__error { grid-column: 1 / -1; }
+.beltoft-services-fw .button:disabled { opacity: 0.45; cursor: default; }
+.beltoft-services-fw__layers { margin-bottom: 0; }
+.beltoft-services-fw__again { margin-top: 20px; }
+@media (max-width: 760px) { .beltoft-services-fw form.beltoft-services-fw__form { grid-template-columns: 1fr; } }
