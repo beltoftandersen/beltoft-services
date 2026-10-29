@@ -21,6 +21,7 @@ final class DiskPanels {
 				$volumes[ $volume['id'] ] = $volume['volid'];
 			}
 		}
+		$names = DiskMeta::labels( $server );
 		foreach ( DiskMeta::for_server( $server ) as $disk ) {
 			$license = $disk->license();
 			$grow_url = 'ready' === $disk->get( 'state' ) ? DiskCart::grow_url( $disk ) : '';
@@ -54,6 +55,7 @@ final class DiskPanels {
 				'snapshot_labels' => $labels,
 				'retention_days' => Product::retention_days( (int) ( $license['product_id'] ?? 0 ) ),
 				'size' => max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) ),
+				'name' => $names[ $disk->id() ] ?? __( 'Data disk', 'beltoft-services' ),
 				'slot' => (string) $disk->get( 'slot' ),
 				'state' => Resource::state_label( (string) $disk->get( 'state' ) ),
 				'grow_url' => $grow_url,
@@ -113,7 +115,7 @@ final class DiskPanels {
 
 	public static function account( Resource $disk ): void {
 		$server = Resource::for_license( (int) $disk->get( 'server_license' ) );
-		$state = array( 'size' => max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) ), 'slot' => (string) $disk->get( 'slot' ), 'server' => $server, 'needs_reboot' => (bool) $disk->get( 'needs_reboot' ), 'paused' => 'paused' === $disk->get( 'state' ), 'guide' => DiskGuide::guide( DiskGuide::os_label( $server ) ), 'guide_id' => DiskGuide::anchor( $disk->id() ) );
+		$state = array( 'size' => max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) ), 'name' => DiskMeta::label( $disk ), 'server' => $server, 'needs_reboot' => (bool) $disk->get( 'needs_reboot' ), 'paused' => 'paused' === $disk->get( 'state' ), 'guide' => DiskGuide::guide( DiskGuide::os_label( $server ) ), 'guide_id' => DiskGuide::anchor( $disk->id() ) );
 		( static function ( array $vars ): void {
 			extract( $vars, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Fixed template data.
 			include BELTOFT_SERVICES_PATH . 'templates/account/disk.php';

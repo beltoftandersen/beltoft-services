@@ -3,7 +3,7 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 <div class="beltoft-services-disk">
-	<p><?php /* translators: %d: extra disk size in gigabytes. */ echo esc_html( sprintf( __( 'Extra disk: %d GB', 'beltoft-services' ), (int) $size ) ); ?><?php if ( $slot ) : ?> (<?php echo esc_html( $slot ); ?>)<?php endif; ?></p>
+	<p><?php /* translators: 1: the name of the extra disk, such as Data disk 1. 2: its size in gigabytes. */ echo esc_html( sprintf( __( '%1$s: %2$d GB', 'beltoft-services' ), $name, (int) $size ) ); ?></p>
 	<?php if ( ! empty( $paused ) ) : ?>
 		<p><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p>
 </div>

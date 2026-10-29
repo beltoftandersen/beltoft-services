@@ -73,6 +73,7 @@ final class Actions {
 		'replace_ssh_key' => array( 10, HOUR_IN_SECONDS ),
 		'reinstall'      => array( 5, HOUR_IN_SECONDS ),
 		'restore'        => array( 3, HOUR_IN_SECONDS ),
+		'rename'         => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
 		'snapshot_delete'   => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
@@ -129,7 +130,7 @@ final class Actions {
 	public static function offered( Resource $r ): array {
 		$status = Operations::cached_status( $r->id() );
 		$power  = null === $status ? '' : (string) $status['power'];
-		$out    = array();
+		$out    = array( ServerName::ACTION => __( 'Rename', 'beltoft-services' ) );
 
 		if ( 'running' !== $power ) {
 			$out['start'] = __( 'Start', 'beltoft-services' );
@@ -191,7 +192,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
-			unset( $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
+			unset( $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
 		}
 
 		return $actions;
@@ -295,8 +296,16 @@ final class Actions {
 				return $block;
 			}
 		}
-		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore' ), true ) ) {
+		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore', ServerName::ACTION ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
+		}
+
+		if ( ServerName::ACTION === $action ) {
+			$name = ServerName::normalise( $args['name'] ?? null );
+
+			if ( null === $name || '' === $name ) {
+				return ServerName::invalid_message();
+			}
 		}
 
 		if ( 'replace_ssh_key' === $action && null === SshKeyField::normalise( $args['key'] ?? null ) ) {
@@ -461,6 +470,8 @@ final class Actions {
 				return $this->replace_ssh_key( $record, $v, (string) $args['key'] );
 			case 'restore':
 				return $this->restore( $record, (string) $args['volid'] );
+			case ServerName::ACTION:
+				return $this->rename( $record, $v, (string) $args['name'] );
 			default:
 				return $this->reinstall( $record, $args );
 		}
@@ -505,7 +516,7 @@ final class Actions {
 
 			$this->mark_sent( null );
 			Operations::remember_power( $this->r->id(), 'running' );
-			$this->r->set( array( 'stopped_by_customer' => null ) );
+			$this->r->set( array( 'stopped_by_customer' => null, ServerName::PENDING => null ) );
 
 			return StepResult::done( array(), 'Customer started the server' );
 		}
@@ -528,7 +539,7 @@ final class Actions {
 
 		$this->mark_sent( null );
 		Operations::remember_power( $this->r->id(), 'running' );
-		$this->r->set( array( 'stopped_by_customer' => null ) );
+		$this->r->set( array( 'stopped_by_customer' => null, ServerName::PENDING => null ) );
 
 		return StepResult::done( array(), 'Customer started the server' );
 	}
@@ -594,7 +605,52 @@ final class Actions {
 			return StepResult::done( array(), 'Reboot did not finish: the system did not restart in time' );
 		}
 
+		$this->r->set( array( ServerName::PENDING => null ) );
+
 		return StepResult::done( array(), 'Customer restarted the server' );
+	}
+
+	/**
+	 * Renames the VM: the name is stored first (a reinstall then clones with it too), then written with the
+	 * digest of the config just read, in one PUT. Proxmox cloud-init sets the hostname from the VM name when
+	 * it next boots, so the customer is told to reboot; the server is never rebooted here.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @param string               $name   The name as sent (checked again here).
+	 */
+	private function rename( array $record, array $v, string $name ): StepResult {
+		$clean = ServerName::normalise( $name );
+
+		if ( null === $clean || '' === $clean ) {
+			return StepResult::done( array(), 'Rename refused: the name is not valid' );
+		}
+
+		if ( ServerName::of( $this->r ) === $clean && ( $v['config']['name'] ?? '' ) === $clean ) {
+			return StepResult::done( array(), 'Customer renamed the server (already named so)' );
+		}
+
+		if ( ! $this->r->set( array( ServerName::META => $clean ) ) ) {
+			return StepResult::retry( 0, 'rename: the name could not be stored' );
+		}
+
+		$params = array( 'name' => $clean );
+
+		if ( isset( $v['config']['digest'] ) && is_string( $v['config']['digest'] ) ) {
+			$params['digest'] = $v['config']['digest'];
+		}
+
+		$answer = $this->client->request( 'PUT', self::base( $record, $v ) . '/config', $params );
+
+		if ( is_wp_error( $answer ) ) {
+			return $this->classify( $answer, 'rename' );
+		}
+
+		if ( ! $this->r->set( array( ServerName::PENDING => $clean ) ) ) {
+			return StepResult::retry( 0, 'rename: the result could not be stored' );
+		}
+
+		return StepResult::done( array(), 'Customer renamed the server; the hostname changes at the next boot' );
 	}
 
 	/**
@@ -748,6 +804,7 @@ final class Actions {
 			Access::META_RESET  => null,
 			Access::META_PREV   => null,
 			'last_reinstall_at' => time(),
+			ServerName::PENDING => null,
 		);
 
 		if ( isset( $args['os'] ) && '' !== $args['os'] ) {

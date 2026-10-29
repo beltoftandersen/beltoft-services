@@ -8,10 +8,10 @@
 namespace BeltoftServices;
 
 use BeltoftLicenses\Licenses;
-use BeltoftLicenses\Account\View;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\DiskGuide;
+use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\SnapshotMeta;
 
@@ -163,7 +163,7 @@ final class ThankYou {
 		$license = $r->license();
 		$name    = in_array( $kind, array( 'domain', 'dns' ), true ) && '' !== (string) $r->get( 'domain' )
 			? (string) $r->get( 'domain' )
-			: View::product_name( $license );
+			: ServerName::display( $r, $license );
 
 		$row = array(
 			'id'       => $r->id(),

@@ -470,6 +470,7 @@ class FakeClient implements Client {
 			'net1'       => array( 'string' ),
 			'ide2'       => array( 'string' ),
 			'description' => array( 'string', false, array( 'max' => 8192 ) ),
+			'name'       => array( 'dnsname' ),
 			'digest'     => array( 'string', false, array( 'max' => 40 ) ),
 			'delete'     => array( 'string' ),
 			'boot'       => array( 'string' ),
@@ -948,6 +949,10 @@ class FakeClient implements Client {
 			}
 
 			$this->state['vms'][ $id ]['config'][ $key ] = $value;
+
+			if ( 'name' === $key ) {
+				$this->state['vms'][ $id ]['name'] = $value;
+			}
 		}
 
 		return true;

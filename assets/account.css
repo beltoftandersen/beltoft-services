@@ -19,9 +19,6 @@
 .beltoft-services-badge {
 	display: inline-block;
 	font-size: 0.875em;
-	padding: 0.1em 0.6em;
-	border: 1px solid currentColor;
-	border-radius: 1em;
 	white-space: nowrap;
 }
 

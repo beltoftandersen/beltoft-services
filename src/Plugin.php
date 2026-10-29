@@ -83,6 +83,7 @@ final class Plugin {
 		Proxmox\Switches::register();
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Operations::class, 'on_state_changed' ), 10, 3 );
+		Proxmox\ServerName::register();
 		Proxmox\SshKeyField::register();
 		Proxmox\OsField::register();
 		Proxmox\BackupField::register();

@@ -261,7 +261,7 @@ class DiskProvisionTest extends BackupTestCase {
 		\BeltoftServices\Proxmox\Panels::account( $server );
 		$html = ob_get_clean();
 		$this->assertStringContainsString( 'Disks', $html );
-		$this->assertStringContainsString( 'scsi1: 50 GB', $html );
+		$this->assertStringContainsString( 'Data disk 1: 50 GB', $html );
 		$this->assertStringContainsString( 'The disk is detached from your server and its data is kept until we remove the disk.', $html );
 		$this->assertStringContainsString( 'data-action="reinstall" data-disks="1"', $html );
 		$this->assertStringNotContainsString( 'data-action="restore"', $html );

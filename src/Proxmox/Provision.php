@@ -758,6 +758,18 @@ final class Provision {
 	}
 
 	/**
+	 * The name the VM is cloned with, which cloud-init uses as the guest's hostname: the customer's server
+	 * name when one is set, else vm-<first 8 characters of the uuid>.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function vm_name( Resource $r ): string {
+		$name = ServerName::of( $r );
+
+		return '' !== $name ? $name : 'vm-' . substr( (string) $r->get( 'uuid' ), 0, 8 );
+	}
+
+	/**
 	 * The format for new volumes: qcow2, or raw when the filter says so. Anything else is qcow2.
 	 */
 	public static function disk_format(): string {
@@ -854,7 +866,7 @@ final class Provision {
 
 		$params = array(
 			'newid'       => $vmid,
-			'name'        => 'vm-' . substr( $this->r->get( 'uuid' ), 0, 8 ),
+			'name'        => self::vm_name( $this->r ),
 			'full'        => 1,
 			'storage'     => (string) $this->cluster['storage'],
 			'format'      => self::disk_format(),

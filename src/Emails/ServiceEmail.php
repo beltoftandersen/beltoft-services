@@ -8,9 +8,9 @@
 namespace BeltoftServices\Emails;
 
 use BeltoftLicenses\Account\Endpoint;
-use BeltoftLicenses\Account\View;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
 use BeltoftServices\Settings;
@@ -70,7 +70,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$this->object    = $r;
 			$this->recipient = (string) ( $license['email'] ?? '' );
 			$this->values    = array(
-				'product_name'  => $license ? View::product_name( $license ) : '',
+				'product_name'  => $license ? ServerName::display( $r, $license ) : '',
 				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
 				'account_url'   => $license ? Endpoint::url_for_license( $license ) : wc_get_account_endpoint_url( Endpoint::slug() ),
 				'deletion_date' => (string) $date,

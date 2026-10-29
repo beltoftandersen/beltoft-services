@@ -98,6 +98,42 @@ final class DiskMeta {
 		return $out;
 	}
 
+	/**
+	 * What the customer calls the extra disks of a server: "Data disk 1", "Data disk 2", in slot
+	 * order (the number of the slot, scsi2 before scsi10; a disk with no slot yet comes last, by id).
+	 * The slot name itself is for the admin views. Disk id => label.
+	 *
+	 * @param Resource $server Server resource.
+	 * @return array<int, string>
+	 */
+	public static function labels( Resource $server ): array {
+		$disks = self::for_server( $server );
+		$slot  = static fn( Resource $d ): int => 1 === preg_match( '/(\d+)$/', (string) $d->get( 'slot' ), $m ) ? (int) $m[1] : PHP_INT_MAX;
+
+		usort( $disks, static fn( Resource $a, Resource $b ): int => array( $slot( $a ), $a->id() ) <=> array( $slot( $b ), $b->id() ) );
+
+		$out = array();
+
+		foreach ( array_values( $disks ) as $i => $disk ) {
+			/* translators: %d: the number of the extra disk of a server, 1 for the first. */
+			$out[ $disk->id() ] = sprintf( __( 'Data disk %d', 'beltoft-services' ), $i + 1 );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The customer's name for one extra disk, or 'Data disk' when its server is not known.
+	 *
+	 * @param Resource $disk Disk resource.
+	 */
+	public static function label( Resource $disk ): string {
+		$server = Resource::for_license( (int) $disk->get( 'server_license' ) );
+		$labels = $server ? self::labels( $server ) : array();
+
+		return $labels[ $disk->id() ] ?? __( 'Data disk', 'beltoft-services' );
+	}
+
 	/** Reclaim reservations after failure; account for disks lost with a deleted parent VM. */
 	public static function state_changed( $resource, $old, $new ): void {
 		if ( ! $resource instanceof Resource ) {

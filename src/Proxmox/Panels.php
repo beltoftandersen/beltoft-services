@@ -143,6 +143,9 @@ final class Panels {
 			'extra_disks' => DiskPanels::server( $r ),
 			'snapshots'  => self::snapshots( $r, $r->accepts_actions() ),
 			'resource_id' => $r->id(),
+			'server_name' => ServerName::of( $r ),
+			'can_rename'  => $r->accepts_actions() && true !== $r->get( 'linked' ),
+			'hostname_pending' => is_string( $r->get( ServerName::PENDING ) ) ? (string) $r->get( ServerName::PENDING ) : '',
 			'snapshot_warnings' => array(
 				'reinstall' => Snapshots::reinstall_warning( $r ),
 				'restore'   => Snapshots::restore_warning( $r ),

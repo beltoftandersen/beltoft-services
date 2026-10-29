@@ -8,6 +8,7 @@
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
  * $snapshots (null when the block is absent, or slots, used, included, added, buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
  * $resource_id (the resource id, for ids that must be unique on a page),
+ * $server_name (the name now set, or empty), $can_rename (whether the rename form is shown), $hostname_pending (a name the server has not taken yet, or empty),
  * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty).
  * Each extra disk has id, ending (null, or date and undo_url once its subscription is ended), paid_until, snapshot_labels (the snapshots that include it), remove_url.
  * The password is never part of this template: the reveal button asks the server for it once.
@@ -16,6 +17,10 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+$hostname_pending = $hostname_pending ?? '';
+$can_rename       = $can_rename ?? false;
+$server_name      = $server_name ?? '';
 
 $beltoft_services_power_labels = array(
 	'running' => __( 'Running', 'beltoft-services' ),
@@ -58,6 +63,27 @@ $beltoft_services_power_labels = array(
 		<?php endif; ?>
 	</dl>
 
+	<?php if ( '' !== $hostname_pending ) : ?>
+		<p class="description" data-hostname-note>
+			<?php esc_html_e( "The new name is used as the hostname after the next reboot. Your SSH client may warn that the server's host key changed.", 'beltoft-services' ); ?>
+			<?php if ( $forms && 'stopped' !== $power ) : ?><button type="button" class="beltoft-services-action beltoft-services-vm__link" data-action="reboot"><?php esc_html_e( 'Reboot', 'beltoft-services' ); ?></button><?php endif; ?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( $can_rename ) : ?>
+		<details class="beltoft-services-vm__more">
+			<summary><?php esc_html_e( 'Rename', 'beltoft-services' ); ?></summary>
+			<form class="beltoft-services-vm-form" data-action="rename">
+				<p>
+					<label for="beltoft-vm-name-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Server name', 'beltoft-services' ); ?></label>
+					<input type="text" id="beltoft-vm-name-<?php echo (int) $resource_id; ?>" name="name" value="<?php echo esc_attr( $server_name ); ?>" maxlength="63" autocomplete="off" spellcheck="false" required>
+				</p>
+				<p class="description"><?php esc_html_e( "Used as the server's hostname, for example web-01. Lowercase letters, digits and hyphens. The change shows on the server after the next reboot.", 'beltoft-services' ); ?></p>
+				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Save name', 'beltoft-services' ); ?></button></p>
+			</form>
+		</details>
+	<?php endif; ?>
+
 	<section class="beltoft-services-vm__disks">
 		<h4><?php esc_html_e( 'Disks', 'beltoft-services' ); ?></h4>
 		<dl class="beltoft-services-vm__facts">
@@ -66,7 +92,7 @@ $beltoft_services_power_labels = array(
 		</dl>
 		<?php foreach ( $extra_disks['items'] as $beltoft_extra_disk ) : ?>
 			<div class="beltoft-services-vm__disk">
-				<p><strong><?php echo esc_html( ( $beltoft_extra_disk['slot'] ?: __( 'Extra disk', 'beltoft-services' ) ) . ': ' . $beltoft_extra_disk['size'] . ' GB' ); ?></strong> <?php echo esc_html( $beltoft_extra_disk['state'] ); ?></p>
+				<p><strong><?php echo esc_html( $beltoft_extra_disk['name'] . ': ' . $beltoft_extra_disk['size'] . ' GB' ); ?></strong> <?php echo esc_html( $beltoft_extra_disk['state'] ); ?></p>
 				<?php if ( ! empty( $beltoft_extra_disk['paused'] ) ) : ?><p class="description"><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-confirm-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-cancel-url="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?>
