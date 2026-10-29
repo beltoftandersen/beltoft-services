@@ -201,12 +201,47 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * Like lag_status(), but in time: after the next power task of this VM has ended OK, the status shows the old
+	 * state until $seconds have passed. Time passes only through elapse(), which the tests call from the
+	 * `beltoft_services_proxmox_pause` filter, so nothing ever sleeps.
+	 *
+	 * @param int $vmid    VM id.
+	 * @param int $seconds Seconds the old status is shown for.
+	 */
+	public function lag_status_seconds( int $vmid, int $seconds ): void {
+		$this->load();
+		$this->state['lag_next_s'][ $vmid ] = max( 0, $seconds );
+		$this->save();
+	}
+
+	/**
+	 * Lets virtual time pass (the pause a driver asked for).
+	 *
+	 * @param int $seconds Seconds.
+	 */
+	public function elapse( int $seconds ): void {
+		$this->load();
+
+		foreach ( array_keys( $this->state['lag'] ?? array() ) as $id ) {
+			if ( isset( $this->state['lag'][ $id ]['secs'] ) ) {
+				$this->state['lag'][ $id ]['secs'] = max( 0, (int) $this->state['lag'][ $id ]['secs'] - $seconds );
+			}
+		}
+
+		$this->save();
+	}
+
+	/**
 	 * The status a read shows: the old one while a lag is left, which uses up one read.
 	 *
 	 * @param array<string, mixed> $vm VM as stored.
 	 */
 	private function shown_status( array $vm ): string {
 		$id = (int) $vm['vmid'];
+
+		if ( ( $this->state['lag'][ $id ]['secs'] ?? 0 ) > 0 ) {
+			return (string) $this->state['lag'][ $id ]['shows'];
+		}
 
 		if ( ( $this->state['lag'][ $id ]['reads'] ?? 0 ) > 0 ) {
 			--$this->state['lag'][ $id ]['reads'];
@@ -1152,6 +1187,15 @@ class FakeClient implements Client {
 			$a[1],
 			function () use ( $a, $action ) {
 				$id = (int) $a[1];
+
+				if ( isset( $this->state['lag_next_s'][ $id ] ) && in_array( $action, array( 'start', 'stop', 'shutdown' ), true ) ) {
+					$this->state['lag'][ $id ] = array(
+						'reads' => 0,
+						'secs'  => (int) $this->state['lag_next_s'][ $id ],
+						'shows' => $this->state['vms'][ $id ]['status'],
+					);
+					unset( $this->state['lag_next_s'][ $id ] );
+				}
 
 				if ( isset( $this->state['lag_next'][ $id ] ) && in_array( $action, array( 'start', 'stop', 'shutdown' ), true ) ) {
 					$this->state['lag'][ $id ] = array(

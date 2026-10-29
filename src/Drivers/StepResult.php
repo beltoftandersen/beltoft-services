@@ -64,6 +64,12 @@ final class StepResult {
 	/** Deadline for an explicitly bounded external wait; zero uses normal retry limits. */
 	private int $wait_until = 0;
 
+	/** Seconds until the next look of a poll (zero: not a poll). */
+	private int $poll_seconds = 0;
+
+	/** Seconds a poll episode may last before it counts as an error (zero: not a poll). */
+	private int $poll_budget = 0;
+
 	/**
 	 * Use the named constructors.
 	 *
@@ -120,6 +126,37 @@ final class StepResult {
 	}
 
 	/**
+	 * Waiting for something that is still running, which is no error: look again in a few seconds. The
+	 * Reconciler neither counts an attempt nor applies the retry backoff, and shows the reason as "Waiting"
+	 * instead of an error, until the episode has lasted $budget seconds; after that it is a normal counted retry.
+	 *
+	 * @param int                  $seconds Seconds until the next look (2 to 60).
+	 * @param string               $why     What it waits for.
+	 * @param int                  $budget  Seconds the wait may last.
+	 * @param array<string, mixed> $meta    Meta to merge.
+	 * @return self
+	 */
+	public static function poll( int $seconds, string $why, int $budget, array $meta = array() ): self {
+		$result               = self::retry( max( 2, min( 60, $seconds ) ), $why, $meta );
+		$result->poll_seconds = $result->delay;
+		$result->poll_budget  = max( 1, $budget );
+
+		return $result;
+	}
+
+	public function is_poll(): bool {
+		return $this->is_retry() && $this->poll_budget > 0;
+	}
+
+	public function poll_seconds(): int {
+		return $this->poll_seconds;
+	}
+
+	public function poll_budget(): int {
+		return $this->poll_budget;
+	}
+
+	/**
 	 * This result with the progress flag set (a retry only; other results are returned as they are).
 	 *
 	 * @return self
@@ -129,8 +166,10 @@ final class StepResult {
 			return $this;
 		}
 
-		$result = self::retry( $this->delay, $this->error, $this->meta, true );
-		$result->wait_until = $this->wait_until;
+		$result               = self::retry( $this->delay, $this->error, $this->meta, true );
+		$result->wait_until   = $this->wait_until;
+		$result->poll_seconds = $this->poll_seconds;
+		$result->poll_budget  = $this->poll_budget;
 		return $result;
 	}
 

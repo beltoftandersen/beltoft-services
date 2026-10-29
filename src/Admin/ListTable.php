@@ -150,6 +150,11 @@ final class ListTable extends \WP_List_Table {
 			case 'error':
 				$html = esc_html( $item->get( 'last_error' ) );
 
+				if ( '' === $html && '' !== (string) $item->get( 'waiting' ) ) {
+					/* translators: %s: what the service waits for. */
+					$html = esc_html( sprintf( __( 'Waiting: %s', 'beltoft-services' ), (string) $item->get( 'waiting' ) ) );
+				}
+
 				if ( isset( $this->problems[ $item->id() ] ) ) {
 					$html .= '<br><span class="dashicons dashicons-warning" aria-hidden="true"></span> ' . esc_html__( 'The failure alert could not be sent.', 'beltoft-services' );
 				}

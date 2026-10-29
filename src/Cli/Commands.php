@@ -15,6 +15,7 @@ use BeltoftServices\Domains\Prices as DomainPrices;
 use BeltoftServices\Domains\Search as DomainSearch;
 use BeltoftServices\Domains\Health as DomainHealth;
 use BeltoftServices\Jobs;
+use BeltoftServices\Plugin;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\LinkVm;
@@ -122,6 +123,43 @@ final class Commands {
 			$disk = GuestDisk::read( $resource );
 			\WP_CLI::log( 'Disk: ' . wp_json_encode( $disk ) );
 		}
+	}
+
+	/**
+	 * Runs the plugin's due jobs every few seconds for a while, so a step that is a few seconds away does not wait
+	 * for the once-a-minute cron tick. Only this plugin's reconcile and customer-action jobs are run; Action Scheduler's
+	 * own runner keeps everything else. It honours the kill switch, the resource locks and the run budget.
+	 *
+	 * Put it in cron next to the normal WordPress cron line; flock keeps a slow minute from stacking:
+	 * `* * * * * <user> flock -n /run/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=<wordpress path> --quiet`
+	 * Without it everything still works, only slower.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--seconds=<seconds>]
+	 * : How long to keep running. Default 55 (0 runs one pass). At most 3600.
+	 *
+	 * [--interval=<seconds>]
+	 * : Seconds between two passes. Default 3 (1 to 30).
+	 *
+	 * @subcommand run-due
+	 */
+	public function run_due( array $args, array $assoc_args ): void {
+		if ( ! Plugin::requirements_met() ) {
+			\WP_CLI::warning( 'Beltoft Services is not running: a requirement is missing.' );
+			return;
+		}
+
+		$seconds  = max( 0, min( 3600, (int) ( $assoc_args['seconds'] ?? 55 ) ) );
+		$interval = max( 1, min( 30, (int) ( $assoc_args['interval'] ?? 3 ) ) );
+		$ran      = Jobs::run_due( $seconds, $interval );
+
+		if ( $ran < 0 ) {
+			\WP_CLI::log( 'Another runner is active; nothing to do.' );
+			return;
+		}
+
+		\WP_CLI::log( sprintf( 'Ran %d due job(s) in %d second(s).', $ran, $seconds ) );
 	}
 
 	/**

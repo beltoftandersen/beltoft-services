@@ -368,6 +368,7 @@ final class Panels {
 			__( 'Down since', 'beltoft-services' ) => $r->get( 'monitor_down_since' ) ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_down_since' ) ) : '',
 			__( 'Down alert sent', 'beltoft-services' ) => $r->get( 'monitor_down_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'Disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
+			__( 'Waiting', 'beltoft-services' )       => '' !== (string) $r->get( 'waiting' ) ? sprintf( /* translators: %s: what the server waits for. */ __( 'Waiting: %s', 'beltoft-services' ), (string) $r->get( 'waiting' ) ) : '',
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),
 		);
 

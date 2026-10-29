@@ -825,11 +825,25 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 	}
 
-	public function test_a_long_clone_uses_the_five_attempt_budget(): void {
+	public function test_a_long_clone_is_a_poll_not_an_error_until_its_budget_is_used_then_the_five_attempt_budget_ends_it(): void {
 		$resource = $this->resource();
 		$id       = $resource->id();
 
 		$this->fake->next_task( array( 'polls' => 400 ) );
+
+		for ( $run = 1; $run <= 5; $run++ ) {
+			Jobs::run( $id );
+			$state = Resource::find( $id );
+			$this->assertSame( 'provisioning', $state->get( 'state' ), 'Run ' . $run );
+			$this->assertSame( 0, $state->get( 'attempts' ), 'A task that still runs is a wait, not an attempt.' );
+			$this->assertSame( '', $state->get( 'last_error' ) );
+			$this->assertStringContainsString( 'waiting for the Proxmox task', $state->get( 'waiting' ) );
+			$this->assertLessThanOrEqual( time() + 6, $state->get( 'next_attempt_at' ), 'Due in about 5 seconds, not after the 60 second floor.' );
+			$state->set( array( 'next_attempt_at' => time() - 1 ) );
+		}
+
+		// Half an hour later the clone still runs: now it counts, as before.
+		Resource::find( $id )->set( array( 'wait_since' => time() - 1801 ) );
 
 		for ( $run = 1; $run <= 5; $run++ ) {
 			Jobs::run( $id );
@@ -840,7 +854,7 @@ class ProvisionTest extends TestCase {
 		}
 
 		Jobs::run( $id );
-		$this->assertSame( 'failed', Resource::find( $id )->get( 'state' ), 'The sixth waiting run is the end of the budget.' );
+		$this->assertSame( 'failed', Resource::find( $id )->get( 'state' ), 'The sixth counted run is the end of the budget.' );
 		$this->assertCount( 1, $this->calls( 'POST', '/clone' ) );
 	}
 

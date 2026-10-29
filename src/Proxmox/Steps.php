@@ -8,7 +8,9 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -60,6 +62,80 @@ trait Steps {
 	protected $progressed = false;
 
 	/**
+	 * Seconds to wait for a task now: the task wait, never more than what is left of the run's budget (the
+	 * resource lock is held for the run, so a run stays within about one budget).
+	 */
+	protected function task_wait(): int {
+		return max( 0, min( $this->wait, Jobs::time_left() ) );
+	}
+
+	/**
+	 * The budget of a wait for a task: a shutdown or a stop gets the shutdown timeout plus a minute, anything
+	 * else (clone, resize, rollback, snapshot) 30 minutes. Filter `beltoft_services_poll_budget` (seconds, phase).
+	 *
+	 * @param string $phase Phase kept with the task.
+	 */
+	protected function task_budget( string $phase ): int {
+		$budget = in_array( $phase, array( 'shutdown', 'stop' ), true ) ? max( 10, (int) Settings::get( 'shutdown_timeout' ) ) + 60 : 1800;
+
+		/**
+		 * Seconds a wait for a Proxmox task may last before it counts as an error.
+		 *
+		 * @param int    $budget Seconds.
+		 * @param string $phase  Phase: shutdown, stop or another.
+		 */
+		return max( 1, (int) apply_filters( 'beltoft_services_poll_budget', $budget, $phase ) );
+	}
+
+	/**
+	 * Was a power task of this kind (`stop`: shutdown or stop; `start`) sent and ended OK in the last minute? The
+	 * status can show the old state for a while after it, and a second one would be a second write: the step waits.
+	 *
+	 * @param string $what stop or start.
+	 */
+	protected function sent_recently( string $what ): bool {
+		$sent = $this->r->get( 'power_sent' );
+
+		return is_array( $sent ) && ( $sent['what'] ?? '' ) === $what && time() - (int) ( $sent['at'] ?? 0 ) < 60;
+	}
+
+	/**
+	 * A task that ended OK: a shutdown, stop or start is remembered for a minute (see sent_recently()).
+	 *
+	 * @param string $phase Phase kept with the task.
+	 */
+	protected function note_ended( string $phase ): void {
+		if ( in_array( $phase, array( 'shutdown', 'stop' ), true ) ) {
+			$this->mark_sent( 'stop' );
+		} elseif ( 'start' === $phase ) {
+			$this->mark_sent( 'start' );
+		}
+	}
+
+	/**
+	 * Remembers a power task that ended OK (or forgets it).
+	 *
+	 * @param string|null $what stop, start, or null to forget.
+	 */
+	protected function mark_sent( ?string $what ): void {
+		if ( null === $what && ! is_array( $this->r->get( 'power_sent' ) ) ) {
+			return;
+		}
+
+		$this->r->set( array( 'power_sent' => null === $what ? null : array( 'what' => $what, 'at' => time() ) ) );
+	}
+
+	/**
+	 * A wait for something that still runs: no error, no counted attempt (see StepResult::poll()).
+	 *
+	 * @param string $why    What it waits for.
+	 * @param int    $budget Seconds.
+	 */
+	protected function waiting( string $why, int $budget ): StepResult {
+		return StepResult::poll( 5, $why, $budget );
+	}
+
+	/**
 	 * Flags a retry as progress when this run advanced (never for merely polling a task that still runs).
 	 *
 	 * @param StepResult $result Result of the run.
@@ -98,10 +174,10 @@ trait Steps {
 		}
 
 		$step   = (string) ( $task['step'] ?? '' );
-		$result = $this->client->wait_task( $task['upid'], $this->wait );
+		$result = $this->client->wait_task( $task['upid'], $this->task_wait() );
 
 		if ( is_wp_error( $result ) && 'task_pending' === $result->get_error_code() ) {
-			return StepResult::retry( 0, $step . ': waiting for the Proxmox task' );
+			return $this->waiting( $step . ': waiting for the Proxmox task', $this->task_budget( (string) ( $task['phase'] ?? '' ) ) );
 		}
 
 		if ( is_wp_error( $result ) && 'task_failed' !== $result->get_error_code() ) {
@@ -116,6 +192,10 @@ trait Steps {
 		);
 
 		$this->progressed = $this->progressed || self::accepted( $result );
+
+		if ( true === $result ) {
+			$this->note_ended( (string) ( $task['phase'] ?? '' ) );
+		}
 
 		if ( ! $this->r->set( array( 'task' => null ) ) ) {
 			return StepResult::retry( 0, $step . ': the finished task could not be cleared' );
@@ -141,8 +221,10 @@ trait Steps {
 	/**
 	 * The VM read again after a power task, until it shows the wanted power state. A task that ended OK can be
 	 * followed by a status that still shows the old state for a moment (a VM that is still shutting down, a start
-	 * that is not listed yet): up to 3 reads, one second apart, so that lag is not taken for a failure. Filter
-	 * `beltoft_services_proxmox_pause` (callable, seconds) replaces the sleep, for tests.
+	 * that is not listed yet, Proxmox refreshes the status every few seconds): the VM is read again every 2 seconds
+	 * for up to 20 seconds (filter `beltoft_services_power_settle`, seconds), never past the run's budget, so that
+	 * lag is not taken for a failure. Filter `beltoft_services_proxmox_pause` (callable, seconds) replaces the
+	 * sleep, for tests; the settle time counts the seconds asked for, not the clock.
 	 *
 	 * @param array<string, mixed> $record  VM record.
 	 * @param string               $step    Step name for messages.
@@ -152,13 +234,31 @@ trait Steps {
 	protected function reread_power( array $record, string $step, bool $running ) {
 		$v = $this->verified( $record, $step );
 
-		for ( $read = 1; $read < 3 && is_array( $v ) && $running !== ( 'running' === $v['status'] ); $read++ ) {
+		/**
+		 * Seconds a VM is read again for after a power task.
+		 *
+		 * @param int $seconds Default 20.
+		 */
+		$settle = max( 0, (int) apply_filters( 'beltoft_services_power_settle', 20 ) );
+		$waited = 0;
+
+		while ( is_array( $v ) && $running !== ( 'running' === $v['status'] ) && $waited + 2 <= $settle && Jobs::time_left() >= 2 ) {
 			$pause = apply_filters( 'beltoft_services_proxmox_pause', null );
 
 			if ( is_callable( $pause ) ) {
-				$pause( 1 );
+				$pause( 2 );
 			} else {
-				sleep( 1 );
+				sleep( 2 );
+			}
+
+			$waited += 2;
+
+			// One cheap call per look; the full verified read only once the VM shows the wanted state (or when
+			// the live status cannot be read).
+			$live = $this->client->request( 'GET', '/nodes/' . rawurlencode( (string) $v['node'] ) . '/qemu/' . (int) ( $record['vmid'] ?? 0 ) . '/status/current' );
+
+			if ( is_array( $live ) && isset( $live['status'] ) && $running !== ( 'running' === $live['status'] ) ) {
+				continue;
 			}
 
 			$v = $this->verified( $record, $step );
@@ -215,10 +315,10 @@ trait Steps {
 			return StepResult::retry( 0, $step . ': the task id could not be stored' );
 		}
 
-		$result = $this->client->wait_task( $upid, $this->wait );
+		$result = $this->client->wait_task( $upid, $this->task_wait() );
 
 		if ( is_wp_error( $result ) && 'task_pending' === $result->get_error_code() ) {
-			return StepResult::retry( 0, $step . ': waiting for the Proxmox task' );
+			return $this->waiting( $step . ': waiting for the Proxmox task', $this->task_budget( $phase ) );
 		}
 
 		if ( is_wp_error( $result ) && 'task_failed' !== $result->get_error_code() ) {
@@ -226,6 +326,10 @@ trait Steps {
 		}
 
 		$this->progressed = $this->progressed || self::accepted( $result );
+
+		if ( true === $result ) {
+			$this->note_ended( $phase );
+		}
 
 		if ( ! $this->r->set( array( 'task' => null ) ) ) {
 			return StepResult::retry( 0, $step . ': the finished task could not be cleared' );

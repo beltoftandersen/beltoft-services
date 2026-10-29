@@ -641,6 +641,7 @@ final class Panel {
 			__( 'Operation', 'beltoft-services' )      => (string) $r->get( 'op' ) . ( '' !== (string) $r->get( 'failed_op' ) ? ' (' . sprintf( /* translators: %s: operation. */ __( 'failed: %s', 'beltoft-services' ), (string) $r->get( 'failed_op' ) ) . ')' : '' ),
 			__( 'Attempts', 'beltoft-services' )       => (string) $r->get( 'attempts' ),
 			__( 'Next attempt', 'beltoft-services' )   => $next ? wp_date( $format, $next ) : '',
+			__( 'Waiting', 'beltoft-services' )        => '' !== (string) $r->get( 'waiting' ) ? sprintf( /* translators: %s: what the service waits for. */ __( 'Waiting: %s', 'beltoft-services' ), (string) $r->get( 'waiting' ) ) : '',
 			__( 'Last error', 'beltoft-services' )     => $r->get( 'last_error' ),
 			__( 'Protected', 'beltoft-services' )      => $r->get( 'protected' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'Paused since', 'beltoft-services' )   => $paused ? wp_date( $format, $paused ) : '',

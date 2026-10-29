@@ -65,7 +65,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'action_pending' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'action_pending', 'waiting', 'wait_since', 'act_wait_since' );
 
 	/**
 	 * How often one operation may restart its retry count because a run made progress. After
@@ -178,6 +178,7 @@ final class Reconciler {
 		$operation = self::operation( $r );
 
 		if ( null === $operation ) {
+			self::clear_stale( $r );
 			return;
 		}
 
@@ -224,6 +225,8 @@ final class Reconciler {
 					'progress_resets' => 0,
 					'next_attempt_at' => null,
 					'alerted'         => '',
+					'waiting'         => '',
+					'wait_since'      => null,
 				)
 			);
 
@@ -281,7 +284,7 @@ final class Reconciler {
 		if ( $result->is_done() ) {
 			self::done( $fresh, $operation, $result, $meta, $plan );
 		} elseif ( $result->is_retry() ) {
-			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta, $result->has_progress(), $result->wait_until() );
+			self::retry( $fresh, $operation, $result->delay(), $result->error(), $meta, $result->has_progress(), $result->wait_until(), $result->poll_seconds(), $result->poll_budget() );
 		} else {
 			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
@@ -344,7 +347,7 @@ final class Reconciler {
 		$error = 'Pause before delete: ' . ( '' !== $result->error() ? $result->error() : 'Unknown error' );
 
 		if ( $result->is_retry() ) {
-			self::retry( $fresh, 'delete', $result->delay(), $error, $meta, $result->has_progress() );
+			self::retry( $fresh, 'delete', $result->delay(), $error, $meta, $result->has_progress(), 0, $result->poll_seconds(), $result->poll_budget() );
 		} else {
 			self::fail( $fresh, 'delete', $error, $meta );
 		}
@@ -390,11 +393,31 @@ final class Reconciler {
 			'progress_resets' => 0,
 			'next_attempt_at' => null,
 			'last_error'      => '',
+			'waiting'         => '',
+			'wait_since'      => null,
 			'failed_op'       => '',
 			'failed_desired'  => '',
 			'alerted'         => '',
 			'delete_paused'   => false,
 		);
+	}
+
+	/**
+	 * Clears an error or a wait that no operation owns any more (the plan was applied by another path, the desired
+	 * state moved on): a state that is not failed has nothing to report. Bookkeeping keys only.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function clear_stale( Resource $r ): void {
+		if ( 'failed' === $r->get( 'state' ) ) {
+			return;
+		}
+
+		if ( '' === (string) $r->get( 'last_error' ) && '' === (string) $r->get( 'waiting' ) && ! $r->get( 'wait_since' ) ) {
+			return;
+		}
+
+		$r->set( array( 'last_error' => '', 'waiting' => '', 'wait_since' => null ) );
 	}
 
 	/**
@@ -501,9 +524,20 @@ final class Reconciler {
 	 * @param string               $error     Error.
 	 * @param array<string, mixed> $meta      Driver meta.
 	 * @param bool                 $progress  The driver got further in this run: the count starts again at this retry (at most MAX_PROGRESS_RESETS times per operation).
+	 * @param int                  $wait_until Deadline of a bounded external wait.
+	 * @param int                  $poll_seconds Seconds to the next look of a poll (StepResult::poll()).
+	 * @param int                  $poll_budget  Seconds the poll episode may last.
 	 */
-	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta, bool $progress = false, int $wait_until = 0 ): void {
+	private static function retry( Resource $r, string $operation, int $delay, string $error, array $meta, bool $progress = false, int $wait_until = 0, int $poll_seconds = 0, int $poll_budget = 0 ): void {
 		$resets = $r->get( 'op' ) === $operation ? $r->get( 'progress_resets' ) : 0;
+
+		if ( $poll_budget > 0 && self::polled( $r, $operation, $error, $meta, $progress, $resets, $poll_seconds, $poll_budget ) ) {
+			return;
+		}
+
+		// A poll past its budget is a counted retry like any other, and the episode stays over (meta wait_since
+		// is kept), so every further run of it counts too and the usual five end in a failure.
+		$expired = $poll_budget > 0;
 
 		if ( $wait_until > time() ) {
 			$attempts = 1;
@@ -527,7 +561,12 @@ final class Reconciler {
 			'progress_resets' => $resets,
 			'next_attempt_at' => time() + $delay,
 			'last_error'      => $error,
+			'waiting'         => '',
 		);
+
+		if ( ! $expired ) {
+			$bookkeeping['wait_since'] = null;
+		}
 
 		if ( ! self::record( $r, $meta, $bookkeeping ) ) {
 			return;
@@ -540,6 +579,67 @@ final class Reconciler {
 		if ( null !== $next ) {
 			Jobs::enqueue( $r->id(), $next === $operation ? $delay : 0 );
 		}
+	}
+
+	/**
+	 * A poll: waiting for something that still runs. Within its budget it counts no attempt, applies no backoff and
+	 * writes no error: the reason is meta `waiting`, the next look is a few seconds away. A run that progressed starts
+	 * the episode again (at most MAX_PROGRESS_RESETS times per operation, so a wait that "progresses" for ever still
+	 * ends). Past the budget this returns false and the caller counts it as the normal retry it always was.
+	 *
+	 * @param Resource             $r            Fresh resource.
+	 * @param string               $operation    Operation.
+	 * @param string               $why          What it waits for.
+	 * @param array<string, mixed> $meta         Driver meta.
+	 * @param bool                 $progress     The run progressed.
+	 * @param int                  $resets       Progress resets so far (before this run).
+	 * @param int                  $seconds      Seconds to the next look.
+	 * @param int                  $budget       Budget in seconds.
+	 * @return bool True when the poll was stored and queued.
+	 */
+	private static function polled( Resource $r, string $operation, string $why, array $meta, bool $progress, int $resets, int $seconds, int $budget ): bool {
+		/**
+		 * The longest a wait may last whatever a driver asks for.
+		 *
+		 * @param int $seconds Default 1800.
+		 */
+		$budget = min( $budget, max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+		$since  = $r->get( 'op' ) === $operation ? (int) $r->get( 'wait_since' ) : 0;
+
+		if ( $progress && $resets < self::MAX_PROGRESS_RESETS ) {
+			++$resets;
+			$since = 0;
+		}
+
+		if ( $since <= 0 ) {
+			$since = time();
+		}
+
+		if ( time() - $since > $budget ) {
+			return false;
+		}
+
+		$bookkeeping = array(
+			'op'              => $operation,
+			'progress_resets' => $resets,
+			'next_attempt_at' => time() + $seconds,
+			'last_error'      => '',
+			'waiting'         => $why,
+			'wait_since'      => $since,
+		);
+
+		if ( ! self::record( $r, $meta, $bookkeeping ) ) {
+			return true;
+		}
+
+		$fresh = Resource::find( $r->id() );
+		$next  = $fresh ? self::operation( $fresh ) : null;
+
+		if ( null !== $next ) {
+			Jobs::enqueue( $r->id(), $next === $operation ? $seconds : 0 );
+		}
+
+		return true;
 	}
 
 	/**
@@ -558,6 +658,8 @@ final class Reconciler {
 			'attempts'        => $r->get( 'attempts' ) + 1,
 			'next_attempt_at' => null,
 			'last_error'      => $error,
+			'waiting'         => '',
+			'wait_since'      => null,
 			'failed_op'       => $operation,
 			'failed_desired'  => $r->get( 'desired' ),
 		);

@@ -484,10 +484,30 @@ final class Actions {
 	 */
 	private function start( array $record, array $v ): StepResult {
 		if ( 'running' === $v['status'] ) {
+			$this->mark_sent( null );
 			Operations::remember_power( $this->r->id(), 'running' );
 			$this->r->set( array( 'stopped_by_customer' => null ) );
 
 			return StepResult::done( array(), 'Start: the server was already running' );
+		}
+
+		// A start sent a moment ago that the status does not show yet is waited for, never sent again.
+		if ( $this->sent_recently( 'start' ) ) {
+			$late = $this->reread_power( $record, 'start', true );
+
+			if ( $late instanceof StepResult ) {
+				return $late;
+			}
+
+			if ( 'running' !== $late['status'] ) {
+				return StepResult::poll( 5, 'start: the start task did not leave the VM running (OK)', 60 );
+			}
+
+			$this->mark_sent( null );
+			Operations::remember_power( $this->r->id(), 'running' );
+			$this->r->set( array( 'stopped_by_customer' => null ) );
+
+			return StepResult::done( array(), 'Customer started the server' );
 		}
 
 		$done = $this->run_task( 'act', 'POST', self::base( $record, $v ) . '/status/start', array(), 'start' );
@@ -503,9 +523,10 @@ final class Actions {
 		}
 
 		if ( 'running' !== $again['status'] ) {
-			return StepResult::retry( 0, 'start: the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')' );
+			return StepResult::poll( 5, 'start: the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')', 60 );
 		}
 
+		$this->mark_sent( null );
 		Operations::remember_power( $this->r->id(), 'running' );
 		$this->r->set( array( 'stopped_by_customer' => null ) );
 
@@ -899,7 +920,7 @@ final class Actions {
 		}
 
 		if ( 'running' === $v['status'] ) {
-			return StepResult::retry( 0, 'restore: the server did not switch off' );
+			return $this->waiting( 'restore: the server did not switch off', $this->task_budget( 'stop' ) );
 		}
 
 		$done = $this->run_task(

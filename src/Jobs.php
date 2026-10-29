@@ -40,9 +40,24 @@ final class Jobs {
 	public const PAUSED_DELAY = 900;
 
 	/**
-	 * Seconds a job waits when another runner holds the resource.
+	 * Seconds a job waits when another runner holds the resource. Short: a follow-up job normally meets the
+	 * step that queued it still holding the lock, and a retry of the same job is free.
 	 */
-	public const LOCKED_DELAY = 60;
+	public const LOCKED_DELAY = 5;
+
+	/**
+	 * Seconds one run (the work of one job while it holds the resource lock) may last: in a cron or
+	 * WP-CLI run, and in a web request.
+	 */
+	public const RUN_BUDGET = 45;
+	public const WEB_BUDGET = 10;
+
+	/**
+	 * Start of the job running now (unix time), or null outside a job.
+	 *
+	 * @var int|null
+	 */
+	private static $run_started = null;
 
 	/**
 	 * Hooks.
@@ -136,6 +151,32 @@ final class Jobs {
 	}
 
 	/**
+	 * Seconds one run may last: 45 in a cron or WP-CLI run, 10 in a web request (filter
+	 * beltoft_services_run_budget). Drivers keep within it so the resource lock is never held for long.
+	 */
+	public static function budget(): int {
+		$default = ( wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) || 'cli' === PHP_SAPI ) ? self::RUN_BUDGET : self::WEB_BUDGET;
+
+		/**
+		 * Seconds one run may last.
+		 *
+		 * @param int $seconds Default 45 (10 in a web request).
+		 */
+		return max( 0, min( 60, (int) apply_filters( 'beltoft_services_run_budget', $default ) ) );
+	}
+
+	/**
+	 * Seconds of the budget left to the job running now (the whole budget outside a job).
+	 */
+	public static function time_left(): int {
+		if ( null === self::$run_started ) {
+			return self::budget();
+		}
+
+		return max( 0, self::budget() - ( time() - self::$run_started ) );
+	}
+
+	/**
 	 * The reconcile job: one step for one resource, under its lock.
 	 *
 	 * @param int $activation_id Activation id.
@@ -153,6 +194,9 @@ final class Jobs {
 			return;
 		}
 
+		$outer             = self::$run_started;
+		self::$run_started = time();
+
 		try {
 			// Read under the lock: whatever was decided before it was taken may be stale.
 			$resource = Resource::find( $activation_id );
@@ -161,6 +205,7 @@ final class Jobs {
 				Reconciler::step( $resource );
 			}
 		} finally {
+			self::$run_started = $outer;
 			self::release( $lock );
 		}
 	}
@@ -223,6 +268,90 @@ final class Jobs {
 				\ActionScheduler::runner()->process_action( $id, 'Beltoft Services' );
 			}
 		}
+	}
+
+	/**
+	 * The site runner behind `wp beltoft-services run-due`: for $seconds, every $interval seconds, runs the due
+	 * reconcile and customer-action jobs of this plugin (and only those), so a follow-up a few seconds away is not
+	 * left waiting for the next once-a-minute cron tick. Everything else stays with Action Scheduler.
+	 *
+	 * Each job still goes through run() or act(), so the kill switch, the resource lock and the budget apply as
+	 * always. Actions are claimed (atomically, like Action Scheduler's own runner) only while they are processed,
+	 * never while the runner sleeps. One runner at a time: a second one returns -1 at once.
+	 *
+	 * @param int           $seconds  How long to keep running (0: one pass).
+	 * @param int           $interval Seconds between two passes.
+	 * @param callable|null $sleep    Sleep function (seconds); sleep() by default. For tests.
+	 * @param callable|null $now      Clock (unix time); time() by default. For tests.
+	 * @return int Jobs run, or -1 when another runner is active.
+	 */
+	public static function run_due( int $seconds, int $interval = 3, ?callable $sleep = null, ?callable $now = null ): int {
+		if ( ! class_exists( '\ActionScheduler' ) ) {
+			return 0;
+		}
+
+		$sleep    = $sleep ?? 'sleep';
+		$now      = $now ?? 'time';
+		$interval = max( 1, $interval );
+		$lock     = Locks::name( 'runner', 0 );
+
+		if ( ! self::acquire( $lock ) ) {
+			return -1;
+		}
+
+		$end = (int) $now() + max( 0, $seconds );
+		$ran = 0;
+
+		try {
+			do {
+				$ran += self::run_pass();
+				$left = $end - (int) $now();
+
+				if ( $left <= 0 ) {
+					break;
+				}
+
+				$sleep( min( $interval, $left ) );
+			} while ( (int) $now() < $end );
+		} finally {
+			self::release( $lock );
+		}
+
+		return $ran;
+	}
+
+	/**
+	 * One pass of the runner: claims the due jobs of this plugin, runs them, releases the claim.
+	 *
+	 * @return int Jobs run.
+	 */
+	private static function run_pass(): int {
+		if ( Settings::get( 'pause_all' ) ) {
+			return 0;
+		}
+
+		$store = \ActionScheduler::store();
+
+		try {
+			$claim = $store->stake_claim( 10, null, array( self::HOOK, self::ACT ), self::GROUP );
+		} catch ( \InvalidArgumentException $e ) {
+			// A store that is still migrating (hybrid) does not know the group in its old half: the hook names
+			// are this plugin's own, so claim by them alone.
+			$claim = $store->stake_claim( 10, null, array( self::HOOK, self::ACT ) );
+		}
+
+		$ran = 0;
+
+		try {
+			foreach ( $claim->get_actions() as $action_id ) {
+				\ActionScheduler::runner()->process_action( (int) $action_id, 'Beltoft Services' );
+				++$ran;
+			}
+		} finally {
+			$store->release_claim( $claim );
+		}
+
+		return $ran;
 	}
 
 	/**
@@ -290,6 +419,9 @@ final class Jobs {
 			return;
 		}
 
+		$outer             = self::$run_started;
+		self::$run_started = time();
+
 		try {
 			$resource = Resource::find( $activation_id );
 			$driver   = $resource ? Registry::get( $resource->get( 'driver' ) ) : null;
@@ -318,6 +450,7 @@ final class Jobs {
 
 			self::acted( Resource::find( $activation_id ) ?? $resource, $action, $args, $result );
 		} finally {
+			self::$run_started = $outer;
 			self::release( $lock );
 		}
 	}
@@ -335,9 +468,13 @@ final class Jobs {
 		$attempts = (int) $r->get( 'act_attempts' ) + 1;
 		$backoff  = Reconciler::BACKOFF;
 
+		if ( $result->is_poll() && self::polled( $r, $action, $args, $result, $meta ) ) {
+			return;
+		}
+
 		if ( $result->is_retry() && $attempts <= count( $backoff ) ) {
 			// Without the attempt stored the backoff would never run out: alert, never loop.
-			if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => $attempts ) ) ) ) {
+			if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => $attempts, 'waiting' => '', 'act_wait_since' => null ) ) ) ) {
 				Alerts::write_failed( $r, 'Resource could not be updated' );
 				return;
 			}
@@ -350,11 +487,14 @@ final class Jobs {
 		$license_id = (int) ( $r->license()['id'] ?? 0 );
 
 		// The action is over, done or failed: the card shows the real state from here, not "requested".
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, Progress::MARKER => null ) ) ) ) {
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => null, Progress::MARKER => null ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
 		if ( $result->is_done() ) {
+			// An error left by an earlier try of the reconciler has no owner any more.
+			Reconciler::clear_stale( Resource::find( $r->id() ) ?? $r );
+
 			Events::add( $license_id, 'service', '' !== $result->event() ? $result->event() : sprintf( 'Customer action "%s" done', $action ) );
 			return;
 		}
@@ -363,6 +503,36 @@ final class Jobs {
 
 		Events::add( $license_id, 'service', $error );
 		Alerts::admin( $r, $error );
+	}
+
+	/**
+	 * A customer action that waits for something still running: queued again in a few seconds, no attempt counted,
+	 * until its wait has lasted its budget (then the counted retry takes over). Progress starts the wait again.
+	 *
+	 * @param Resource             $r      Fresh resource.
+	 * @param string               $action Action name.
+	 * @param array<string, mixed> $args   Arguments.
+	 * @param StepResult           $result Poll result.
+	 * @param array<string, mixed> $meta   Driver meta.
+	 * @return bool True when the poll was stored and queued.
+	 */
+	private static function polled( Resource $r, string $action, array $args, StepResult $result, array $meta ): bool {
+		$budget = min( $result->poll_budget(), max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+		$since  = $result->has_progress() ? 0 : (int) $r->get( 'act_wait_since' );
+		$since  = $since > 0 ? $since : time();
+
+		if ( time() - $since > $budget ) {
+			return false;
+		}
+
+		if ( ! $r->set( array_merge( $meta, array( 'waiting' => $result->error(), 'act_wait_since' => $since ) ) ) ) {
+			Alerts::write_failed( $r, 'Resource could not be updated' );
+			return true;
+		}
+
+		self::queue_act( $r->id(), $action, $args, $result->poll_seconds() );
+
+		return true;
 	}
 
 	/**

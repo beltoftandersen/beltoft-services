@@ -15,7 +15,17 @@ Requires WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.0 or ne
 - Domain registration, transfer and DNS hosting drivers (0.4.0), with a public search, one domain per subscription, customer DNS records and name servers, DNSSEC, paid renewals and daily health checks.
 - VPS monitoring (0.5.0): owner-only usage graphs, cached root disk usage, and optional customer emails for unexpected downtime or a nearly full disk.
 - Extra disks (0.6.0): one variable subscription variation per size, with one license and resource per disk. Disks attach to a managed VPS without a restart, can grow, and are excluded from daily backups.
-- WP-CLI: `wp beltoft-services link-http`, `link-vm`, `vm-metrics`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list` and `status`.
+- WP-CLI: `wp beltoft-services link-http`, `link-vm`, `vm-metrics`, `ip-pool-add`, `ip-pool-block`, `ip-pool-release`, `ip-pool-list`, `status` and `run-due`.
+
+## Faster steps (optional runner)
+
+Waits for something that is still running are polls, not errors: the next look is about 5 seconds away and the admin panel shows "Waiting: ...". Action Scheduler is normally started once a minute by cron, so a step that is 5 seconds away would still wait for the next tick. `wp beltoft-services run-due` runs this plugin's due jobs (reconcile and customer actions only) every 3 seconds for 55 seconds. Add one cron line next to the WordPress cron line:
+
+```
+* * * * * www-data flock -n /run/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=/path/to/wordpress --quiet
+```
+
+It honours the kill switch and the per-service lock; a second copy exits at once. Without it everything still works, only slower. One run lasts at most 45 seconds (10 in a web request); filter `beltoft_services_run_budget`.
 
 ## Setup
 

@@ -722,7 +722,7 @@ final class Snapshots {
 					: StepResult::retry( 0, 'snapshot: the wait could not be counted' );
 			}
 
-			return StepResult::retry( 0, 'snapshot: waiting for another task on the server to end' );
+			return $this->waiting( 'snapshot: waiting for another task on the server to end', $this->task_budget( '' ) );
 		}
 
 		return $this->poll_any_task();
@@ -1211,7 +1211,7 @@ final class Snapshots {
 			}
 
 			if ( 'running' === $again['status'] ) {
-				return StepResult::retry( 0, 'rollback: the server did not switch off' );
+				return $this->waiting( 'rollback: the server did not switch off', $this->task_budget( 'stop' ) );
 			}
 
 			$marker['phase'] = 'rolling';

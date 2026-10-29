@@ -72,7 +72,7 @@ class PowerLagTest extends BackupTestCase {
 		Jobs::act( $r->id(), 'start', array() );
 
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
-		$this->assertSame( array( 1 ), $this->pauses, 'One re-read, one second later.' );
+		$this->assertSame( array( 2 ), $this->pauses, 'One re-read, two seconds later.' );
 		$this->assertSame( '', (string) Resource::find( $r->id() )->get( 'last_error' ) );
 		$this->assertCount( $before + 1, $this->calls( 'POST', '/status/start' ), 'The start is not sent twice.' );
 	}
@@ -86,11 +86,11 @@ class PowerLagTest extends BackupTestCase {
 
 		Jobs::act( $r->id(), 'start', array() );
 
-		$this->assertSame( array( 1, 1 ), $this->pauses );
+		$this->assertSame( array( 2, 2 ), $this->pauses );
 		$this->assertSame( '', (string) Resource::find( $r->id() )->get( 'last_error' ) );
 	}
 
-	public function test_a_vm_that_never_starts_still_retries_after_three_reads(): void {
+	public function test_a_vm_that_never_starts_is_a_wait_for_a_minute_after_the_settle(): void {
 		$r = $this->ready_vm();
 		Jobs::act( $r->id(), 'shutdown', array() );
 		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
@@ -100,8 +100,10 @@ class PowerLagTest extends BackupTestCase {
 		$result = ( new ProxmoxDriver() )->act( Resource::find( $r->id() ), 'start', array() );
 
 		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
-		$this->assertSame( array( 1, 1 ), $this->pauses, 'Three reads in all.' );
-		$this->assertTrue( $result->is_retry() );
+		$this->assertSame( array_fill( 0, 10, 2 ), $this->pauses, 'Read every 2 seconds for 20 seconds.' );
+		$this->assertTrue( $result->is_poll(), 'A start the status does not show yet is a wait, not an error.' );
+		$this->assertSame( 60, $result->poll_budget() );
+		$this->assertSame( 5, $result->poll_seconds() );
 		$this->assertStringContainsString( 'did not leave the VM running', $result->error() );
 	}
 
@@ -151,15 +153,16 @@ class PowerLagTest extends BackupTestCase {
 
 	public function test_a_stop_that_shows_running_for_longer_waits_without_a_false_error(): void {
 		$server = $this->ready_vm();
-		$this->fake->lag_status( 5000, 4 ); // More than the three reads of one run.
+		$this->fake->lag_status_seconds( 5000, 30 ); // More than the 20 seconds one run settles for.
 		$seen = count( $this->fake->calls() );
 
 		Jobs::act( $server->id(), 'reinstall', array( 'confirm' => 'REINSTALL' ) );
 		Jobs::run( $server->id() );
 		$mid = Resource::find( $server->id() );
 		$this->assertSame( 'stop', $mid->get( 'wipe_power' ) );
-		$this->assertStringContainsString( 'waiting for the server to stop', (string) $mid->get( 'last_error' ) );
-		$this->assertStringNotContainsString( 'wanted state', (string) $mid->get( 'last_error' ) );
+		$this->assertStringContainsString( 'waiting for the server to stop', (string) $mid->get( 'waiting' ), 'A wait, shown as Waiting.' );
+		$this->assertSame( '', (string) $mid->get( 'last_error' ), 'Not an error.' );
+		$this->assertSame( 0, $mid->get( 'attempts' ), 'Not a counted attempt.' );
 
 		$this->rebuild( $server->id() );
 
@@ -226,10 +229,10 @@ class PowerLagTest extends BackupTestCase {
 	public function test_a_delete_with_a_stop_that_is_slow_to_show_waits_instead_of_a_wanted_state_error(): void {
 		$r = $this->ready_vm();
 		$this->fake->next_task( array( 'exitstatus' => 'VM quit/powerdown failed - got timeout', 'effect' => false ) ); // Shutdown times out.
-		$this->fake->lag_status( 5000, 6 );
+		$this->fake->lag_status_seconds( 5000, 60 );
 		$result = ( new ProxmoxDriver() )->delete( Resource::find( $r->id() ) );
 
-		$this->assertTrue( $result->is_retry() );
+		$this->assertTrue( $result->is_poll() );
 		$this->assertStringContainsString( 'waiting for the server to stop', $result->error() );
 		$this->assertNotEmpty( $this->calls( 'POST', '/status/stop' ), 'The stop follows the shutdown that left the VM running.' );
 		$this->assertNotNull( $this->fake->vm( 5000 ), 'Nothing is deleted while the VM shows as running.' );

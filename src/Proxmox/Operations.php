@@ -711,12 +711,32 @@ final class Operations {
 	 */
 	private function start_if_stopped( array $record, array $v, string $step ) {
 		if ( 'running' === $v['status'] ) {
+			$this->mark_sent( null );
+
 			return true;
+		}
+
+		// A start sent a moment ago that the status does not show yet is waited for, never sent again.
+		if ( $this->sent_recently( 'start' ) ) {
+			$late = $this->reread_power( $record, $step, true );
+
+			if ( $late instanceof StepResult ) {
+				return $late;
+			}
+
+			if ( 'running' === $late['status'] ) {
+				$this->progressed = true;
+				$this->mark_sent( null );
+
+				return true;
+			}
+
+			return StepResult::poll( 5, $step . ': the start task did not leave the VM running (OK)', 60 );
 		}
 
 		// A task that ended OK is no progress by itself: only the re-read below can show that the VM is up.
 		$was  = $this->progressed;
-		$done = $this->run_task( $step, 'POST', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/status/start' );
+		$done = $this->run_task( $step, 'POST', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/status/start', array(), 'start' );
 
 		if ( $done instanceof StepResult ) {
 			return $done;
@@ -731,11 +751,13 @@ final class Operations {
 
 		if ( 'running' === $again['status'] ) {
 			$this->progressed = true;
+			$this->mark_sent( null );
 
 			return true;
 		}
 
-		return StepResult::retry( 0, $step . ': the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')' );
+		// After the settle read: a start the status does not show yet is a wait, an error only after its minute.
+		return StepResult::poll( 5, $step . ': the start task did not leave the VM running (' . ( true === $done ? 'OK' : $done['failed'] ) . ')', 60 );
 	}
 
 	/**
@@ -781,10 +803,31 @@ final class Operations {
 				$was              = true;
 			}
 
+			if ( 'running' !== $v['status'] ) {
+				$this->mark_sent( null );
+			}
+
 			$prev = $v['status'];
 			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'];
 
 			if ( 'running' === $v['status'] ) {
+				// A shutdown or stop that ended OK a moment ago and is not shown yet: wait, never send a second one.
+				if ( $this->sent_recently( 'stop' ) ) {
+					$late = $this->reread_power( $record, $step, false );
+
+					if ( $late instanceof StepResult ) {
+						return $late;
+					}
+
+					if ( 'running' !== $late['status'] ) {
+						$this->progressed = true;
+						$was              = true;
+						continue;
+					}
+
+					return $this->waiting( $step . ': waiting for the server to stop', $this->task_budget( 'stop' ) );
+				}
+
 				$phase = ( $this->finished && $step === $this->finished['step'] && 'shutdown' === $this->finished['phase'] ) ? 'stop' : 'shutdown';
 				$done  = 'shutdown' === $phase
 					? $this->run_task( $step, 'POST', $base . '/status/shutdown', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ), $phase )
@@ -831,7 +874,7 @@ final class Operations {
 
 			// A plug pull that left the VM listed as running is still going through: wait, it is no error and no round.
 			if ( 'stop' === $phase && 'running' === $after['status'] ) {
-				return StepResult::retry( 0, $step . ': waiting for the server to stop' . ( true === $done ? '' : ' (the stop task failed: ' . $done['failed'] . ')' ) );
+				return $this->waiting( $step . ': waiting for the server to stop' . ( true === $done ? '' : ' (the stop task failed: ' . $done['failed'] . ')' ), $this->task_budget( 'stop' ) );
 			}
 		}
 

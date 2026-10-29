@@ -54,6 +54,16 @@ abstract class BackupTestCase extends TestCase {
 			2
 		);
 
+		// Time passes in the fake cluster when a driver pauses (the status lag by seconds); nothing sleeps.
+		add_filter(
+			'beltoft_services_proxmox_pause',
+			fn() => function ( int $seconds ): void {
+				$this->pauses[] = $seconds;
+				$this->fake->elapse( $seconds );
+			},
+			20
+		);
+
 		$key = base64_encode( random_bytes( 32 ) );
 		add_filter( 'beltoft_services_key', fn() => $key );
 

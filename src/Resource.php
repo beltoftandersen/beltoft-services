@@ -352,6 +352,8 @@ final class Resource {
 				return is_array( $value ) ? $value : array();
 			case 'attempts':
 			case 'progress_resets':
+			case 'wait_since':
+			case 'act_wait_since':
 				return (int) $value;
 			case 'plan_dirty':
 			case 'protected':
@@ -371,6 +373,7 @@ final class Resource {
 			case 'uuid':
 			case 'driver':
 			case 'last_error':
+			case 'waiting':
 			case 'remote_id':
 			case 'breach_reason':
 				return is_scalar( $value ) ? (string) $value : '';

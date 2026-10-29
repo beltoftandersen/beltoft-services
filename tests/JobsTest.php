@@ -135,7 +135,7 @@ final class JobsTest extends TestCase {
 		$this->assertSame( 'requested', Resource::find( $resource->id() )->get( 'state' ) );
 		$pending = $this->pending( $resource->id() );
 		$this->assertCount( 1, $pending );
-		$this->assertEqualsWithDelta( $before + 60, $pending[0], 2 );
+		$this->assertEqualsWithDelta( $before + Jobs::LOCKED_DELAY, $pending[0], 2 );
 
 		// With the other runner gone, the lock is free again.
 		Jobs::run( $resource->id() );
