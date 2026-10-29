@@ -351,6 +351,20 @@ class ServerPickerTest extends BackupTestCase {
 		$this->assertMatchesRegularExpression( '#<input[^>]*value="' . $this->v['a-None']->get_id() . '"[^>]*checked#', $html, 'The first plan that can be bought starts selected.' );
 	}
 
+	public function test_a_plan_note_comes_only_from_the_filter_and_is_printed_as_text(): void {
+		$this->assertStringNotContainsString( 'beltoft-services-plan__note', $this->page(), 'No note unless the site gives one.' );
+
+		$a    = $this->v['a-None']->get_id();
+		$note = static fn( string $text, \WC_Product_Variation $variation ): string => $a === $variation->get_id() ? '<b>For small sites</b> & tests.' : '';
+		add_filter( 'beltoft_services_picker_plan_note', $note, 10, 2 );
+		$html = $this->page();
+		remove_filter( 'beltoft_services_picker_plan_note', $note, 10 );
+
+		$this->assertSame( 'For small sites & tests.', Offers::plans()[ $a ]['note'] ?? null, 'Tags are stripped.' );
+		$this->assertSame( 1, substr_count( $html, 'beltoft-services-plan__note' ), 'Only the plan with a note prints one.' );
+		$this->assertStringContainsString( '<span class="beltoft-services-plan__note">For small sites &amp; tests.</span>', $html );
+	}
+
 	public function test_a_plan_the_app_does_not_fit_is_greyed_and_a_sold_out_plan_is_plain_text(): void {
 		$html = $this->page();
 		$this->assertMatchesRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled[^>]*>.*?>Needs Performance</span>#s', $html, 'Coolify is not for the small plan.' );

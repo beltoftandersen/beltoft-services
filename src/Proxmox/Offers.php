@@ -194,7 +194,25 @@ final class Offers {
 			'in_stock'     => self::in_stock( $variation ),
 			'unknown'      => Stock::unknown( $variation ),
 			'backups'      => $backups,
+			'note'         => self::note( $product, $variation ),
 		);
+	}
+
+	/**
+	 * A short line under the plan name, such as what the plan suits. Empty unless the site supplies one.
+	 *
+	 * @param \WC_Product_Variable  $product   Parent.
+	 * @param \WC_Product_Variation $variation Plan.
+	 */
+	private static function note( \WC_Product_Variable $product, \WC_Product_Variation $variation ): string {
+		/**
+		 * Filters the short line printed under a plan's name in the server picker.
+		 *
+		 * @param string                $note      Empty by default.
+		 * @param \WC_Product_Variation $variation The plan.
+		 * @param \WC_Product_Variable  $product   Its product.
+		 */
+		return trim( wp_strip_all_tags( (string) apply_filters( 'beltoft_services_picker_plan_note', '', $variation, $product ) ) );
 	}
 
 	/**
