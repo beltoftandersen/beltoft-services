@@ -544,3 +544,9 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-domain__transfer + .beltoft-services-domain__transfer-out { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--bsd-rule); }
 .beltoft-services-domain--page .beltoft-services-domain__title { font-size: 16px; }
 .beltoft-services-domain--page .beltoft-services-domain__hosts { margin-bottom: 12px; }
+.beltoft-services-domain--page .beltoft-services-facts { background: none; }
+.beltoft-services-panel--page .beltoft-services-panel__driver > .beltoft-services-domain--page { min-width: 0; max-width: 100%; }
+.beltoft-services-domain--page .beltoft-services-tabs { max-width: 100%; }
+.beltoft-services-panel--page .beltoft-services-panel__driver { grid-template-columns: minmax(0, 1fr); }
+div.beltoft-services-domain legend.screen-reader-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+div.beltoft-services-domain.beltoft-services-domain button[hidden] { display: none; }

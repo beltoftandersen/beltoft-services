@@ -15,11 +15,11 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <div class="beltoft-services-domains">
 	<?php if ( $buttons ) : ?>
-		<p class="beltoft-services-list-actions">
+		<div class="beltoft-services-list-actions">
 			<?php foreach ( $buttons as $beltoft_services_i => $beltoft_services_button ) : ?>
 				<a class="beltoft-services-list-btn<?php echo count( $buttons ) - 1 === $beltoft_services_i ? '' : ' is-ghost'; ?>" href="<?php echo esc_url( $beltoft_services_button['url'] ); ?>"><?php echo esc_html( $beltoft_services_button['label'] ); ?></a>
 			<?php endforeach; ?>
-		</p>
+		</div>
 	<?php endif; ?>
 	<?php if ( $rows ) : ?>
 		<div class="beltoft-services-servers beltoft-services-servers--domains">
