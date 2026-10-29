@@ -506,7 +506,7 @@ $beltoft_services_power_labels = array(
 					<p><?php echo $extra_disks['items'] ? esc_html__( 'The main disk of the server is erased and the system is installed again. Everything on it is lost. Extra disks keep their data and stay attached.', 'beltoft-services' ) : esc_html__( 'Everything on the server is erased and the system is installed again. All data on it is lost.', 'beltoft-services' ); ?></p>
 					<?php if ( $beltoft_services_lost > 0 ) : ?>
 						<?php /* translators: %d: number of snapshots */ ?>
-						<p><?php echo esc_html( sprintf( _n( 'Your snapshot is deleted first.', 'Your %d snapshots are deleted first.', $beltoft_services_lost, 'beltoft-services' ), $beltoft_services_lost ) ); ?></p>
+						<p><?php echo esc_html( 1 === $beltoft_services_lost ? __( 'Your snapshot is deleted first.', 'beltoft-services' ) : sprintf( __( 'Your %d snapshots are deleted first.', 'beltoft-services' ), $beltoft_services_lost ) ); ?></p>
 					<?php endif; ?>
 					<p><?php echo $has_key ? esc_html__( 'You get a new password. Your SSH key stays on the server.', 'beltoft-services' ) : esc_html__( 'You get a new password.', 'beltoft-services' ); ?></p>
 					<p><?php esc_html_e( 'The IP address stays.', 'beltoft-services' ); ?></p>
