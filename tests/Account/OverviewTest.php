@@ -558,11 +558,39 @@ class OverviewTest extends MonitoringTestCase {
 		do_action( 'woocommerce_account_dashboard' );
 		$this->assertStringContainsString( 'Gift Cards Pro', (string) ob_get_clean() );
 
+		Overview::reset();
 		add_filter( 'beltoft_services_overview_auto', '__return_false' );
 		ob_start();
 		do_action( 'woocommerce_account_dashboard' );
 		$this->assertSame( '', (string) ob_get_clean() );
 		remove_all_filters( 'beltoft_services_overview_auto' );
+	}
+
+	public function test_the_overview_is_printed_once_when_both_dashboard_hooks_fire(): void {
+		$user = self::factory()->user->create();
+		$this->plugin_license( $user );
+		$this->as_user( $user );
+
+		ob_start();
+		do_action( 'woocommerce_account_dashboard' );
+		$first = (string) ob_get_clean();
+		ob_start();
+		do_action( 'woocommerce_account_dashboard' );
+		$second = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'beltoft-services-overview', $first );
+		$this->assertSame( '', $second );
+	}
+
+	public function test_the_account_content_hook_prints_it_only_on_the_dashboard(): void {
+		$user = self::factory()->user->create();
+		$this->plugin_license( $user );
+		$this->as_user( $user );
+
+		// Not an account page here: the account content hook adds nothing of ours.
+		ob_start();
+		do_action( 'woocommerce_account_content' );
+		$this->assertStringNotContainsString( 'beltoft-services-overview', (string) ob_get_clean() );
 	}
 
 	public function test_the_stylesheet_is_loaded_with_a_section(): void {

@@ -73,6 +73,13 @@ final class Overview {
 	private static $subscriptions = array();
 
 	/**
+	 * Whether the Dashboard already printed the overview in this request.
+	 *
+	 * @var bool
+	 */
+	private static $printed = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -86,7 +93,9 @@ final class Overview {
 		}
 
 		add_shortcode( 'beltoft_services_overview', array( __CLASS__, 'all' ) );
+		// WooCommerce fires the first on its own Dashboard; a Bricks Dashboard state replaces that and only fires the second.
 		add_action( 'woocommerce_account_dashboard', array( __CLASS__, 'dashboard' ), 20 );
+		add_action( 'woocommerce_account_content', array( __CLASS__, 'dashboard' ), 20 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 	}
 
@@ -96,6 +105,7 @@ final class Overview {
 	public static function reset(): void {
 		self::$memo          = array();
 		self::$subscriptions = array();
+		self::$printed       = false;
 	}
 
 	/**
@@ -111,6 +121,16 @@ final class Overview {
 	 * Prints the whole overview on the Dashboard endpoint of My Account.
 	 */
 	public static function dashboard(): void {
+		if ( self::$printed ) {
+			return;
+		}
+
+		if ( 'woocommerce_account_content' === current_action() && ( ! function_exists( 'is_account_page' ) || ! is_account_page() || is_wc_endpoint_url() ) ) {
+			return;
+		}
+
+		self::$printed = true;
+
 		/**
 		 * Whether the Dashboard endpoint prints the overview itself. A site that places the shortcodes in a
 		 * page builder returns false.
