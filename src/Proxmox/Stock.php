@@ -253,6 +253,16 @@ final class Stock {
 	}
 
 	/**
+	 * True when it cannot be told whether a machine can be built (no capacity cache). Checkout lets such a plan through on its stored
+	 * status, so a picker may offer it.
+	 *
+	 * @param \WC_Product $product Product or variation.
+	 */
+	public static function unknown( \WC_Product $product ): bool {
+		return null === self::availability( $product );
+	}
+
+	/**
 	 * Can a new machine be built for this product now? False with no capacity cache.
 	 *
 	 * @param \WC_Product $product Product or variation.

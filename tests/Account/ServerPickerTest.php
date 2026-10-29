@@ -243,7 +243,89 @@ class ServerPickerTest extends BackupTestCase {
 		$this->v['b-None']->save();
 		delete_transient( 'beltoft_services_proxmox_capacity_lab' );
 		Offers::reset();
-		$this->assertFalse( Offers::plans()[ $this->v['a-None']->get_id() ]['in_stock'], 'No cached capacity is no room.' );
+		$plan = Offers::plans()[ $this->v['a-None']->get_id() ];
+		$this->assertTrue( $plan['in_stock'], 'No cached capacity is unknown, not no room: checkout lets it through too.' );
+		$this->assertTrue( $plan['unknown'] );
+	}
+
+	public function test_unknown_stock_shows_selectable_plans_and_a_line_while_a_full_cluster_stays_closed(): void {
+		delete_transient( 'beltoft_services_proxmox_capacity_lab' );
+		$html = $this->page();
+		$this->assertStringNotContainsString( 'out of stock', strtolower( $html ) );
+		$this->assertStringContainsString( 'Availability is checked again at checkout.', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<input[^>]*name="' . ServerPicker::PLAN . '"[^>]*disabled#', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="' . $this->v['a-None']->get_id() . '"[^>]*checked#', $html );
+		$this->assertTrue( wc_get_product( $this->v['a-None']->get_id() )->is_in_stock(), 'Checkout treats a missing cache as it did: the stored status stands.' );
+		$this->assertSame( array(), $this->send()['errors'] );
+
+		WC()->cart->empty_cart();
+		set_transient( 'beltoft_services_proxmox_capacity_lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 68719476736 ) ), HOUR_IN_SECONDS );
+		$html = $this->page();
+		$this->assertStringContainsString( 'Every plan is out of stock', $html );
+		$this->assertStringNotContainsString( 'Availability is checked again', $html );
+		$this->assertFalse( wc_get_product( $this->v['a-None']->get_id() )->is_in_stock(), 'A really full cluster is still refused by the shop.' );
+		$this->assertArrayHasKey( 'plan', $this->send()['errors'] );
+	}
+
+	private function fake_line( array $item ): string {
+		$key  = md5( wp_json_encode( $item ) );
+		$cart = WC()->cart->get_cart_contents();
+		$cart[ $key ] = array_merge( array( 'key' => $key, 'variation_id' => 0, 'variation' => array(), 'quantity' => 1, 'data' => wc_get_product( $item['product_id'] ) ), $item );
+		WC()->cart->set_cart_contents( $cart );
+
+		return $key;
+	}
+
+	public function test_an_add_the_shop_refuses_leaves_the_cart_as_it_was(): void {
+		$this->send( array( ServerName::POST_KEY => 'first' ) );
+		$before = array_keys( WC()->cart->get_cart() );
+		// The shop's own refusal of an add: a cart-item-data filter that throws, as WooCommerce reports it.
+		add_filter(
+			'woocommerce_add_cart_item_data',
+			static function ( $data ) {
+				throw new \Exception( 'No room for that.' );
+			}
+		);
+		$result = $this->send( array( ServerPicker::PLAN => (string) $this->v['b-None']->get_id(), ServerName::POST_KEY => 'second' ) );
+		remove_all_filters( 'woocommerce_add_cart_item_data' );
+
+		$this->assertSame( array( 'form' => 'No room for that.' ), $result['errors'] );
+		$this->assertSame( $before, array_keys( WC()->cart->get_cart() ) );
+		$this->assertSame( 'first', $this->server_lines()[0][ Picked::KEY ]['name'] );
+	}
+
+	public function test_a_subscription_payment_in_the_cart_refuses_the_picker_and_stays(): void {
+		$simple = new \WC_Product_Simple();
+		$simple->set_name( 'Other' );
+		$simple->set_regular_price( '5' );
+		$simple->set_status( 'publish' );
+		$simple->save();
+		$kinds = array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe' );
+
+		foreach ( $kinds as $kind ) {
+			WC()->cart->empty_cart();
+			$key    = $this->fake_line( array( 'product_id' => $simple->get_id(), $kind => array( 'subscription_id' => 1 ) ) );
+			$result = $this->send();
+			$this->assertSame( 'Finish or remove the subscription payment in your cart first.', $result['errors']['form'], $kind );
+			$this->assertSame( array( $key ), array_keys( WC()->cart->get_cart() ), $kind );
+		}
+	}
+
+	public function test_replacing_the_server_takes_its_extra_disk_with_it(): void {
+		$this->send( array( ServerName::POST_KEY => 'first' ) );
+		$simple = new \WC_Product_Simple();
+		$simple->set_name( 'Disk' );
+		$simple->set_regular_price( '3' );
+		$simple->set_status( 'publish' );
+		$simple->save();
+		$mine  = $this->fake_line( array( 'product_id' => $simple->get_id(), 'beltoft_services_disk_for' => 'cart_server' ) );
+		$other = $this->fake_line( array( 'product_id' => $simple->get_id(), 'beltoft_services_disk_for' => 55 ) );
+
+		$this->assertSame( array(), $this->send( array( ServerPicker::PLAN => (string) $this->v['b-None']->get_id(), ServerName::POST_KEY => 'second' ) )['errors'] );
+		$cart = WC()->cart->get_cart();
+		$this->assertArrayNotHasKey( $mine, $cart, 'The disk of the replaced server goes.' );
+		$this->assertArrayHasKey( $other, $cart, 'A disk for an existing server stays.' );
+		$this->assertCount( 2, $cart );
 	}
 
 	// -- The page ----------------------------------------------------------------------------------

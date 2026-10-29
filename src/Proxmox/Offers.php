@@ -192,6 +192,7 @@ final class Offers {
 			'disk_gb'      => (int) ( $numbers['disk_gb'] ?? 0 ),
 			'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
 			'in_stock'     => self::in_stock( $variation ),
+			'unknown'      => Stock::unknown( $variation ),
 			'backups'      => $backups,
 		);
 	}
@@ -202,7 +203,7 @@ final class Offers {
 	 * @param \WC_Product_Variation $variation Variation.
 	 */
 	public static function in_stock( \WC_Product_Variation $variation ): bool {
-		return $variation->is_purchasable() && $variation->is_in_stock() && Stock::available( $variation );
+		return $variation->is_purchasable() && $variation->is_in_stock() && ( Stock::available( $variation ) || Stock::unknown( $variation ) );
 	}
 
 	/**

@@ -10,6 +10,8 @@ namespace BeltoftServices\Account;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\DiskCart;
+use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\Picked;
@@ -320,12 +322,19 @@ final class ServerPicker {
 			return __( 'The server could not be added. Please try again.', 'beltoft-services' );
 		}
 
-		// The shop treats the same plan again as "already in the cart" and would keep the old choices.
+		// A payment for a subscription that exists (renewal, switch, resubscribe) is never touched or mixed with a new server.
+		$old = array();
+
 		foreach ( $cart->get_cart() as $key => $item ) {
+			if ( DiskCart::flow( (array) $item ) ) {
+				return __( 'Finish or remove the subscription payment in your cart first.', 'beltoft-services' );
+			}
+
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			if ( $driver && SshKeyField::DRIVER === $driver->id() ) {
-				$cart->remove_cart_item( (string) $key );
+			// The earlier try's server, and the extra disk that was tied to it.
+			if ( ( $driver && SshKeyField::DRIVER === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) ) {
+				$old[] = (string) $key;
 			}
 		}
 
@@ -334,6 +343,23 @@ final class ServerPicker {
 		$key = $cart->add_to_cart( (int) $checked['plan']['product_id'], 1, $variation->get_id(), BackupField::attributes( $variation ), array( Picked::KEY => $checked['choices'] ) );
 
 		if ( false !== $key ) {
+			// The old lines go only now that the new one is in. The shop treats the same plan with the same choices as "already in
+			// the cart" and returns that line: it stays, at one.
+			DiskField::during_server_swap(
+				static function () use ( $cart, $old, $key ): bool {
+					foreach ( $old as $old_key ) {
+						if ( (string) $key === $old_key ) {
+							$cart->set_quantity( $old_key, 1, false );
+						} else {
+							$cart->remove_cart_item( $old_key );
+						}
+					}
+
+					return true;
+				}
+			);
+			$cart->calculate_totals();
+
 			return null;
 		}
 
@@ -433,6 +459,7 @@ final class ServerPicker {
 		wp_nonce_field( self::NONCE, self::FIELD );
 
 		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) );
+		$unknown   = array() !== array_filter( $available, static fn( $plan ) => ! empty( $plan['unknown'] ) );
 
 		echo '<fieldset class="beltoft-services-picker__plans"><legend class="beltoft-services-picker__legend">' . esc_html__( 'Plan', 'beltoft-services' ) . '</legend>';
 
@@ -452,6 +479,10 @@ final class ServerPicker {
 			}
 
 			echo '</div>';
+		}
+
+		if ( $unknown ) {
+			echo '<p class="beltoft-services-picker__soldout">' . esc_html__( 'Availability is checked again at checkout.', 'beltoft-services' ) . '</p>';
 		}
 
 		self::error( $errors, 'plan' );
