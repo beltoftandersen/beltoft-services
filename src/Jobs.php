@@ -151,6 +151,14 @@ final class Jobs {
 	}
 
 	/**
+	 * The clock the wait episodes (polls, power_sent) are measured on: time(), unless a test moves it (filter
+	 * beltoft_services_now). Scheduled times always use the real clock.
+	 */
+	public static function now(): int {
+		return (int) apply_filters( 'beltoft_services_now', time() );
+	}
+
+	/**
 	 * Seconds one run may last: 45 in a cron or WP-CLI run, 10 in a web request (filter
 	 * beltoft_services_run_budget). Drivers keep within it so the resource lock is never held for long.
 	 */
@@ -271,19 +279,23 @@ final class Jobs {
 	}
 
 	/**
-	 * The site runner behind `wp beltoft-services run-due`: for $seconds, every $interval seconds, runs the due
-	 * reconcile and customer-action jobs of this plugin (and only those), so a follow-up a few seconds away is not
-	 * left waiting for the next once-a-minute cron tick. Everything else stays with Action Scheduler.
+	 * The site runner behind `wp beltoft-services run-due`: for $seconds, runs the due reconcile and customer-action
+	 * jobs of this plugin (and only those) one by one, and looks again every $interval seconds when nothing is due, so
+	 * a follow-up a few seconds away is not left waiting for the next once-a-minute cron tick. Everything else stays
+	 * with Action Scheduler.
 	 *
-	 * Each job still goes through run() or act(), so the kill switch, the resource lock and the budget apply as
-	 * always. Actions are claimed (atomically, like Action Scheduler's own runner) only while they are processed,
-	 * never while the runner sleeps. One runner at a time: a second one returns -1 at once.
+	 * Each job still goes through run() or act(), so the kill switch, the resource lock and the run budget apply as
+	 * always. One action is claimed at a time (atomically, like Action Scheduler's own runner) and the claim is
+	 * released as soon as it is processed, so nothing else is held while a job runs or the runner sleeps, and a fatal
+	 * error leaves at most one claim for Action Scheduler's normal stale-claim recovery. No new job is started once
+	 * $seconds have passed (the first one always is), so the command ends within $seconds plus one run budget. Run it
+	 * under `flock -n`: that, not the plugin, keeps two runners from stacking.
 	 *
-	 * @param int           $seconds  How long to keep running (0: one pass).
-	 * @param int           $interval Seconds between two passes.
+	 * @param int           $seconds  How long to keep starting jobs.
+	 * @param int           $interval Seconds between two looks when nothing is due.
 	 * @param callable|null $sleep    Sleep function (seconds); sleep() by default. For tests.
 	 * @param callable|null $now      Clock (unix time); time() by default. For tests.
-	 * @return int Jobs run, or -1 when another runner is active.
+	 * @return int Jobs run.
 	 */
 	public static function run_due( int $seconds, int $interval = 3, ?callable $sleep = null, ?callable $now = null ): int {
 		if ( ! class_exists( '\ActionScheduler' ) ) {
@@ -293,59 +305,58 @@ final class Jobs {
 		$sleep    = $sleep ?? 'sleep';
 		$now      = $now ?? 'time';
 		$interval = max( 1, $interval );
-		$lock     = Locks::name( 'runner', 0 );
+		$end      = (int) $now() + max( 0, $seconds );
+		$ran      = 0;
 
-		if ( ! self::acquire( $lock ) ) {
-			return -1;
-		}
+		while ( true ) {
+			if ( self::run_one() ) {
+				++$ran;
 
-		$end = (int) $now() + max( 0, $seconds );
-		$ran = 0;
-
-		try {
-			do {
-				$ran += self::run_pass();
-				$left = $end - (int) $now();
-
-				if ( $left <= 0 ) {
+				if ( (int) $now() >= $end ) {
 					break;
 				}
 
-				$sleep( min( $interval, $left ) );
-			} while ( (int) $now() < $end );
-		} finally {
-			self::release( $lock );
+				continue;
+			}
+
+			$left = $end - (int) $now();
+
+			if ( $left <= 0 ) {
+				break;
+			}
+
+			$sleep( min( $interval, $left ) );
 		}
 
 		return $ran;
 	}
 
 	/**
-	 * One pass of the runner: claims the due jobs of this plugin, runs them, releases the claim.
+	 * Claims one due job of this plugin, runs it, releases the claim.
 	 *
-	 * @return int Jobs run.
+	 * @return bool Whether a job was run.
 	 */
-	private static function run_pass(): int {
+	private static function run_one(): bool {
 		if ( Settings::get( 'pause_all' ) ) {
-			return 0;
+			return false;
 		}
 
 		$store = \ActionScheduler::store();
 
 		try {
-			$claim = $store->stake_claim( 10, null, array( self::HOOK, self::ACT ), self::GROUP );
+			$claim = $store->stake_claim( 1, null, array( self::HOOK, self::ACT ), self::GROUP );
 		} catch ( \InvalidArgumentException $e ) {
 			// A store that is still migrating (hybrid) does not know the group in its old half: the hook names
 			// are this plugin's own, so claim by them alone.
-			$claim = $store->stake_claim( 10, null, array( self::HOOK, self::ACT ) );
+			$claim = $store->stake_claim( 1, null, array( self::HOOK, self::ACT ) );
 		}
 
-		$ran = 0;
+		$ran = false;
 
 		try {
 			foreach ( $claim->get_actions() as $action_id ) {
 				\ActionScheduler::runner()->process_action( (int) $action_id, 'Beltoft Services' );
-				++$ran;
+				$ran = true;
 			}
 		} finally {
 			$store->release_claim( $claim );
@@ -474,7 +485,7 @@ final class Jobs {
 
 		if ( $result->is_retry() && $attempts <= count( $backoff ) ) {
 			// Without the attempt stored the backoff would never run out: alert, never loop.
-			if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => $attempts, 'waiting' => '', 'act_wait_since' => null ) ) ) ) {
+			if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => $attempts, 'waiting' => '' ) ) ) ) {
 				Alerts::write_failed( $r, 'Resource could not be updated' );
 				return;
 			}
@@ -487,7 +498,10 @@ final class Jobs {
 		$license_id = (int) ( $r->license()['id'] ?? 0 );
 
 		// The action is over, done or failed: the card shows the real state from here, not "requested".
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => null, Progress::MARKER => null ) ) ) ) {
+		$episodes = (array) $r->get( 'act_wait_since' );
+		unset( $episodes[ $action ] );
+
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
@@ -517,15 +531,31 @@ final class Jobs {
 	 * @return bool True when the poll was stored and queued.
 	 */
 	private static function polled( Resource $r, string $action, array $args, StepResult $result, array $meta ): bool {
-		$budget = min( $result->poll_budget(), max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
-		$since  = $result->has_progress() ? 0 : (int) $r->get( 'act_wait_since' );
-		$since  = $since > 0 ? $since : time();
+		$budget   = min( $result->poll_budget(), max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+		$episodes = (array) $r->get( 'act_wait_since' );
+		$episode  = is_array( $episodes[ $action ] ?? null ) ? $episodes[ $action ] : array( 'since' => 0, 'resets' => 0 );
+		$since    = (int) $episode['since'];
+		$resets   = (int) $episode['resets'];
 
-		if ( time() - $since > $budget ) {
+		// Progress starts the wait again, at most as often as the reconciler allows.
+		if ( $result->has_progress() && $resets < Reconciler::MAX_PROGRESS_RESETS ) {
+			++$resets;
+			$since = 0;
+		}
+
+		$since = $since > 0 ? $since : self::now();
+
+		// One episode per action name, kept when it has run out: every later run of it counts.
+		$episodes[ $action ] = array( 'since' => $since, 'resets' => $resets );
+		$expired             = self::now() - $since > $budget;
+
+		if ( $expired ) {
+			$r->set( array( 'act_wait_since' => $episodes ) );
+
 			return false;
 		}
 
-		if ( ! $r->set( array_merge( $meta, array( 'waiting' => $result->error(), 'act_wait_since' => $since ) ) ) ) {
+		if ( ! $r->set( array_merge( $meta, array( 'waiting' => $result->error(), 'act_wait_since' => $episodes ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 			return true;
 		}

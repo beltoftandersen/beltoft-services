@@ -386,6 +386,11 @@ final class Provision {
 			if ( 'running' !== $late['status'] ) {
 				return true;
 			}
+
+			// The stop ended OK a moment ago and the status still shows the VM: wait, a second hard stop is a second write.
+			if ( $this->sent_recently( 'stop' ) ) {
+				return $this->still_running( 'wipe: waiting for the server to stop' );
+			}
 		}
 
 		$stop_first = ! $graceful || 'stop' === $this->r->get( 'wipe_power' )
@@ -422,7 +427,7 @@ final class Provision {
 			}
 		}
 
-		return $this->waiting( 'wipe: waiting for the server to stop' . ( true === $done ? '' : ' (the stop task failed: ' . $done['failed'] . ')' ), $this->task_budget( 'stop' ) );
+		return $this->still_running( 'wipe: waiting for the server to stop', $done );
 	}
 
 	/**

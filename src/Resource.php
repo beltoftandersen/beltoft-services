@@ -353,7 +353,6 @@ final class Resource {
 			case 'attempts':
 			case 'progress_resets':
 			case 'wait_since':
-			case 'act_wait_since':
 				return (int) $value;
 			case 'plan_dirty':
 			case 'protected':

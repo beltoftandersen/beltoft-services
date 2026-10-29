@@ -612,10 +612,10 @@ final class Reconciler {
 		}
 
 		if ( $since <= 0 ) {
-			$since = time();
+			$since = Jobs::now();
 		}
 
-		if ( time() - $since > $budget ) {
+		if ( Jobs::now() - $since > $budget ) {
 			return false;
 		}
 

@@ -210,6 +210,99 @@ class FasterActionsTest extends SnapshotsTestCase {
 		$this->assertCount( 1, array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => str_ends_with( $l, '/status/shutdown' ) ), 'One shutdown.' );
 	}
 
+	// -- Review fixes ------------------------------------------------------------------------------
+
+	private function fail_tasks( int $count ): void {
+		for ( $i = 0; $i < $count; $i++ ) {
+			$this->fake->next_task( array( 'exitstatus' => 'storage full', 'effect' => false ) );
+		}
+	}
+
+	public function test_a_failed_stop_is_one_shutdown_and_one_stop_then_a_counted_retry_not_a_resend_every_five_seconds(): void {
+		$r = $this->ready_vm();
+		$this->fail_tasks( 20 );
+		$this->assertTrue( Resource::find( $r->id() )->desire( 'paused', 'test' ) );
+		$seen = count( $this->fake->calls() );
+
+		Jobs::run( $r->id() );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 1, $fresh->get( 'attempts' ), 'Counted.' );
+		$this->assertNotSame( '', $fresh->get( 'last_error' ) );
+		$this->assertSame( '', (string) $fresh->get( 'waiting' ), 'Not a free wait.' );
+		$this->assertGreaterThanOrEqual( time() + 59, $fresh->get( 'next_attempt_at' ), 'The backoff applies.' );
+		$writes = array_values( array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => (bool) preg_match( '#^POST .*/status/#', $l ) ) );
+		$this->assertSame( array( 'POST /nodes/node-a/qemu/5000/status/shutdown', 'POST /nodes/node-a/qemu/5000/status/stop' ), $writes );
+
+		// The job that comes back too early (a sweep, a wake) writes nothing.
+		Jobs::run( $r->id() );
+		$this->assertCount( 2, array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => (bool) preg_match( '#^POST .*/status/#', $l ) ) );
+	}
+
+	public function test_a_hard_stop_that_the_status_shows_late_for_half_a_minute_is_sent_once_by_a_reinstall(): void {
+		$server = $this->ready_vm();
+		$this->fake->lag_status_seconds( 5000, 70 );
+		Jobs::act( $server->id(), 'reinstall', array( 'confirm' => 'REINSTALL' ) );
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			Resource::find( $server->id() )->set( array( 'next_attempt_at' => time() - 1 ) );
+			Jobs::run( $server->id() );
+		}
+
+		$this->assertCount( 1, array_filter( $this->lines(), static fn( $l ) => str_ends_with( $l, 'POST /nodes/node-a/qemu/5000/status/stop' ) ), 'Exactly one stop.' );
+		$this->assertSame( '', (string) Resource::find( $server->id() )->get( 'last_error' ) );
+		$this->assertCount( 0, $this->calls( 'DELETE', '/qemu/5000' ), 'Nothing is destroyed while the VM is shown running.' );
+	}
+
+	public function test_the_kill_switch_turned_on_in_the_middle_of_a_run_stops_the_next_write(): void {
+		$r = $this->ready_vm();
+		// The shutdown fails, so the next round would send a stop; the switch is turned on while the run waits.
+		$this->fake->next_task( array( 'exitstatus' => 'VM quit/powerdown failed - got timeout', 'effect' => false ) );
+		add_filter(
+			'beltoft_services_proxmox_pause',
+			function () {
+				return function ( int $seconds ): void {
+					$this->settings( array( 'pause_all' => 1 ) );
+				};
+			},
+			30
+		);
+
+		$result = ( new ProxmoxDriver() )->pause( Resource::find( $r->id() ) );
+
+		$this->assertTrue( $result->is_retry() );
+		$this->assertCount( 1, $this->calls( 'POST', '/status/shutdown' ) );
+		$this->assertCount( 0, $this->calls( 'POST', '/status/stop' ), 'No write after the switch.' );
+		$this->assertStringContainsString( 'paused', $result->error() );
+		$this->assertFalse( $result->is_poll() );
+		$this->assertGreaterThan( time() + 3600, $result->wait_until(), 'A free wait that never fails the service.' );
+	}
+
+	public function test_a_rollback_whose_server_never_stops_ends_in_the_admin_alert_with_few_writes(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$server = $this->server();
+		$a      = $this->take( $server, 'A' );
+		$this->fake->lag_status_seconds( 5000, 1000000 ); // The status shows running for good.
+		$this->mails        = array();
+		$seen               = count( $this->fake->calls() );
+
+		$skew = 0;
+		add_filter( 'beltoft_services_now', static function ( $t ) use ( &$skew ) { return $t + $skew; } );
+
+		for ( $run = 1; $run <= 90 && ! $this->mails; $run++ ) {
+			Jobs::act( $server->id(), 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) );
+			as_unschedule_all_actions( Jobs::ACT, array(), Jobs::GROUP );
+			$skew += 6;
+		}
+
+		$this->assertNotEmpty( $this->mails, 'The admin is told.' );
+		// Bound: the wait of shutdown timeout + 60 seconds (about 10 to 30 looks), then five counted retries and the failure.
+		$this->assertLessThanOrEqual( 40, $run );
+		$shutdowns = count( array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => str_ends_with( $l, '/status/shutdown' ) ) );
+		$this->assertLessThanOrEqual( 10, $shutdowns, 'A shutdown at most once a minute of waiting and once per counted retry.' );
+		$this->assertCount( 0, array_filter( array_slice( $this->lines(), $seen ), static fn( $l ) => str_ends_with( $l, '/rollback' ) ), 'The rollback is never sent to a server that does not stop.' );
+	}
+
 	// -- Kill switch -------------------------------------------------------------------------------
 
 	public function test_the_kill_switch_still_stops_everything(): void {

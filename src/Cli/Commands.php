@@ -130,14 +130,14 @@ final class Commands {
 	 * for the once-a-minute cron tick. Only this plugin's reconcile and customer-action jobs are run; Action Scheduler's
 	 * own runner keeps everything else. It honours the kill switch, the resource locks and the run budget.
 	 *
-	 * Put it in cron next to the normal WordPress cron line; flock keeps a slow minute from stacking:
+	 * Put it in cron next to the normal WordPress cron line. `flock -n` is required: it keeps a slow minute from stacking a second runner:
 	 * `* * * * * <user> flock -n /run/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=<wordpress path> --quiet`
 	 * Without it everything still works, only slower.
 	 *
 	 * ## OPTIONS
 	 *
 	 * [--seconds=<seconds>]
-	 * : How long to keep running. Default 55 (0 runs one pass). At most 3600.
+	 * : How long to keep starting jobs. Default 55 (0 runs at most one job). No job is started after that, so it ends within the seconds plus one run budget (45 s). At most 3600.
 	 *
 	 * [--interval=<seconds>]
 	 * : Seconds between two passes. Default 3 (1 to 30).
@@ -153,11 +153,6 @@ final class Commands {
 		$seconds  = max( 0, min( 3600, (int) ( $assoc_args['seconds'] ?? 55 ) ) );
 		$interval = max( 1, min( 30, (int) ( $assoc_args['interval'] ?? 3 ) ) );
 		$ran      = Jobs::run_due( $seconds, $interval );
-
-		if ( $ran < 0 ) {
-			\WP_CLI::log( 'Another runner is active; nothing to do.' );
-			return;
-		}
 
 		\WP_CLI::log( sprintf( 'Ran %d due job(s) in %d second(s).', $ran, $seconds ) );
 	}

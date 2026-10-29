@@ -1211,7 +1211,7 @@ final class Snapshots {
 			}
 
 			if ( 'running' === $again['status'] ) {
-				return $this->waiting( 'rollback: the server did not switch off', $this->task_budget( 'stop' ) );
+				return $this->still_running( 'rollback: the server did not switch off' );
 			}
 
 			$marker['phase'] = 'rolling';

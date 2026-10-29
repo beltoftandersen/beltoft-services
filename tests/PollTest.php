@@ -289,7 +289,7 @@ final class PollTest extends TestCase {
 
 		Jobs::act( $resource->id(), 'restart', array() );
 		as_unschedule_all_actions( Jobs::ACT, array( $resource->id(), 'restart', array() ), Jobs::GROUP );
-		Resource::find( $resource->id() )->set( array( 'act_wait_since' => time() - 181 ) );
+		Resource::find( $resource->id() )->set( array( 'act_wait_since' => array( 'restart' => array( 'since' => time() - 181, 'resets' => 0 ) ) ) );
 
 		$before = time();
 		Jobs::act( $resource->id(), 'restart', array() );
@@ -303,7 +303,7 @@ final class PollTest extends TestCase {
 	}
 
 	public function test_an_act_that_ends_clears_the_wait_and_a_stale_error(): void {
-		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready', 'last_error' => 'update: the start task did not leave the VM running (OK)', 'waiting' => 'x', 'act_wait_since' => time() - 5 ) );
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready', 'last_error' => 'update: the start task did not leave the VM running (OK)', 'waiting' => 'x', 'act_wait_since' => array( 'restart' => array( 'since' => time() - 5, 'resets' => 0 ) ) ) );
 		$driver->will( 'act', StepResult::done() );
 
 		Jobs::act( $resource->id(), 'restart', array() );
@@ -311,7 +311,69 @@ final class PollTest extends TestCase {
 		$fresh = Resource::find( $resource->id() );
 		$this->assertSame( '', $fresh->get( 'last_error' ) );
 		$this->assertSame( '', $fresh->get( 'waiting' ) );
-		$this->assertSame( 0, $fresh->get( 'act_wait_since' ) );
+		$this->assertEmpty( $fresh->get( 'act_wait_since' ) );
+	}
+
+	public function test_an_expired_act_episode_is_kept_so_every_later_run_counts(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$driver->will( 'act', StepResult::poll( 5, 'Waiting', 180 ) );
+		$resource->set( array( 'act_wait_since' => array( 'restart' => array( 'since' => time() - 500, 'resets' => 0 ) ) ) );
+
+		foreach ( array( 1, 2, 3 ) as $attempt ) {
+			Jobs::act( $resource->id(), 'restart', array() );
+			as_unschedule_all_actions( Jobs::ACT, array( $resource->id(), 'restart', array() ), Jobs::GROUP );
+			$this->assertSame( $attempt, (int) Resource::find( $resource->id() )->get( 'act_attempts' ), 'Counted, not a fresh free episode.' );
+		}
+	}
+
+	public function test_an_act_episode_belongs_to_its_action_name(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$driver->customer_actions = array( 'restart' => 'Restart', 'other' => 'Other' );
+		$driver->will( 'act', StepResult::poll( 5, 'Waiting', 180 ) );
+		$resource->set( array( 'act_wait_since' => array( 'restart' => array( 'since' => time() - 500, 'resets' => 0 ) ) ) );
+
+		Jobs::act( $resource->id(), 'other', array() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 0, (int) $fresh->get( 'act_attempts' ), 'Action B starts its own episode.' );
+		$this->assertNotSame( '', $fresh->get( 'waiting' ) );
+		$this->assertArrayHasKey( 'restart', $fresh->get( 'act_wait_since' ) );
+		$this->assertArrayHasKey( 'other', $fresh->get( 'act_wait_since' ) );
+	}
+
+	public function test_act_progress_renews_the_episode_only_up_to_the_cap(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$driver->will( 'act', StepResult::poll( 5, 'Moving', 180 )->with_progress() );
+		$resource->set( array( 'act_wait_since' => array( 'restart' => array( 'since' => time() - 500, 'resets' => Reconciler::MAX_PROGRESS_RESETS - 1 ) ) ) );
+
+		Jobs::act( $resource->id(), 'restart', array() );
+		as_unschedule_all_actions( Jobs::ACT, array( $resource->id(), 'restart', array() ), Jobs::GROUP );
+		$this->assertSame( 0, (int) Resource::find( $resource->id() )->get( 'act_attempts' ), 'The last renewal is free.' );
+
+		Resource::find( $resource->id() )->set( array( 'act_wait_since' => array( 'restart' => array( 'since' => time() - 500, 'resets' => Reconciler::MAX_PROGRESS_RESETS ) ) ) );
+		Jobs::act( $resource->id(), 'restart', array() );
+
+		$this->assertSame( 1, (int) Resource::find( $resource->id() )->get( 'act_attempts' ), 'Past the cap the old episode counts.' );
+	}
+
+	public function test_an_act_that_waits_for_ever_reaches_the_admin_alert(): void {
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'ready' ) );
+		$driver->will( 'act', StepResult::poll( 5, 'The server did not switch off', 180 ) );
+
+		$skew = 0;
+		add_filter( 'beltoft_services_now', static function ( $t ) use ( &$skew ) { return $t + $skew; } );
+
+		// Five-second polls for the 180 second budget, then the five counted retries, then the failure.
+		for ( $run = 1; $run <= 80 && ! $this->mails; $run++ ) {
+			Jobs::act( $resource->id(), 'restart', array() );
+			as_unschedule_all_actions( Jobs::ACT, array( $resource->id(), 'restart', array() ), Jobs::GROUP );
+			$skew += 6;
+		}
+
+		$this->assertCount( 1, $this->mails, 'The admin is told.' );
+		$this->assertLessThanOrEqual( 180 / 6 + 8, $run, 'About 31 free polls, 5 counted retries, then the failure.' );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'state' ), 'A failed action never changes the service state.' );
 	}
 
 	// -- Locks ----------------------------------------------------------------------------------------
@@ -357,7 +419,8 @@ final class PollTest extends TestCase {
 		list( $other, $driver )   = $this->resource();
 		Jobs::enqueue( $other->id(), 0 );
 
-		$ran = Jobs::run_due( 0 );
+		list( $t, $now, $sleep ) = $this->clock();
+		$ran                     = Jobs::run_due( 3, 3, $sleep, $now );
 
 		$this->assertSame( 2, $ran );
 		$this->assertCount( 1, $driver->calls( 'act' ) );
@@ -406,28 +469,11 @@ final class PollTest extends TestCase {
 		$this->assertSame( 'provisioning', Resource::find( $resource->id() )->get( 'state' ) );
 	}
 
-	public function test_run_due_seconds_zero_is_one_pass_and_never_sleeps(): void {
+	public function test_run_due_seconds_zero_with_nothing_due_never_sleeps(): void {
 		list( $t, $now, $sleep ) = $this->clock();
 
 		$this->assertSame( 0, Jobs::run_due( 0, 3, $sleep, $now ) );
 		$this->assertSame( array(), $t->sleeps );
-	}
-
-	public function test_a_second_runner_exits_at_once(): void {
-		list( $resource, $driver ) = $this->resource();
-		Jobs::enqueue( $resource->id(), 0 );
-
-		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
-		global $wpdb;
-		$held = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', Locks::name( 'runner', 0 ) ) );
-		$this->assertSame( '1', $held->fetch_row()[0] );
-
-		$ran = Jobs::run_due( 0 );
-		$other->close();
-
-		$this->assertSame( -1, $ran );
-		$this->assertSame( array(), $driver->calls() );
-		$this->assertSame( 1, Jobs::run_due( 0 ), 'With the other runner gone the lock is free.' );
 	}
 
 	public function test_run_due_never_runs_an_action_another_claim_holds(): void {
@@ -462,6 +508,31 @@ final class PollTest extends TestCase {
 		$this->assertNotEmpty( Jobs::pending( $resource->id() ), 'It is queued again.' );
 	}
 
+	public function test_run_due_starts_no_job_after_its_seconds_and_leaves_the_rest_pending_and_unclaimed(): void {
+		$driver = $this->fake_driver();
+		$ids    = array();
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			$product  = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+			$license  = $this->service_license( $product, array( 'fire' => false ) );
+			$resource = Resource::create( $license, $driver, array(), array() );
+			Jobs::enqueue( $resource->id(), 0 );
+			$ids[] = $resource->id();
+		}
+
+		list( $t, $now, $sleep ) = $this->clock();
+		// Every job "takes" a whole run budget of 45 seconds on the injected clock.
+		add_action( Jobs::HOOK, static function () use ( $t ) { $t->now += 45; }, 5 );
+
+		$start = $t->now;
+		$ran   = Jobs::run_due( 10, 3, $sleep, $now );
+
+		$this->assertSame( 1, $ran, 'The first job ran, none was started after the 10 seconds.' );
+		$this->assertLessThanOrEqual( 10 + 45, $t->now - $start, 'Within the seconds plus one job budget.' );
+		$this->assertSame( 0, \ActionScheduler::store()->get_claim_count(), 'Nothing stays claimed.' );
+		$this->assertCount( 4, $this->queued( Jobs::HOOK ), 'The rest is still pending.' );
+	}
+
 	// -- WP-CLI -----------------------------------------------------------------------------------------
 
 	public function test_the_run_due_command_reports_the_jobs_it_ran(): void {
@@ -471,17 +542,6 @@ final class PollTest extends TestCase {
 		( new Commands() )->run_due( array(), array( 'seconds' => '0' ) );
 
 		$this->assertStringContainsString( 'Ran 1 due job(s)', \WP_CLI::$lines[0][1] );
-	}
-
-	public function test_the_run_due_command_says_so_when_another_runner_is_active(): void {
-		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
-		global $wpdb;
-		$other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', Locks::name( 'runner', 0 ) ) );
-
-		( new Commands() )->run_due( array(), array( 'seconds' => '0' ) );
-		$other->close();
-
-		$this->assertStringContainsString( 'Another runner is active', \WP_CLI::$lines[0][1] );
 	}
 
 	public function test_the_run_due_command_is_documented_as_a_subcommand(): void {

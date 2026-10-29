@@ -920,7 +920,7 @@ final class Actions {
 		}
 
 		if ( 'running' === $v['status'] ) {
-			return $this->waiting( 'restore: the server did not switch off', $this->task_budget( 'stop' ) );
+			return $this->still_running( 'restore: the server did not switch off' );
 		}
 
 		$done = $this->run_task(

@@ -25,7 +25,7 @@ Waits for something that is still running are polls, not errors: the next look i
 * * * * * www-data flock -n /run/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=/path/to/wordpress --quiet
 ```
 
-It honours the kill switch and the per-service lock; a second copy exits at once. Without it everything still works, only slower. One run lasts at most 45 seconds (10 in a web request); filter `beltoft_services_run_budget`.
+It honours the kill switch and the per-service lock; the `flock -n` in the line is required, it keeps a slow minute from stacking a second runner. No job is started after `--seconds`, so a run ends within that plus one run budget. Without it everything still works, only slower. One run lasts at most 45 seconds (10 in a web request); filter `beltoft_services_run_budget`.
 
 ## Setup
 

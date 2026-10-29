@@ -94,9 +94,26 @@ trait Steps {
 	 * @param string $what stop or start.
 	 */
 	protected function sent_recently( string $what ): bool {
-		$sent = $this->r->get( 'power_sent' );
+		// Read again: another class of the same run (a rollback's own pause) may have written it.
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+		$sent  = $fresh->get( 'power_sent' );
 
-		return is_array( $sent ) && ( $sent['what'] ?? '' ) === $what && time() - (int) ( $sent['at'] ?? 0 ) < 60;
+		return is_array( $sent ) && ( $sent['what'] ?? '' ) === $what && Jobs::now() - (int) ( $sent['at'] ?? 0 ) < 60;
+	}
+
+	/**
+	 * A VM that still shows as running after a stop. A free wait only when the task ended OK (the status lags);
+	 * a stop task that failed is a counted retry with the usual backoff, so it is never sent again every few seconds.
+	 *
+	 * @param string                       $why  Message.
+	 * @param true|array{failed: string}|null $done The stop task's outcome, or null when it was sent earlier.
+	 */
+	protected function still_running( string $why, $done = null ): StepResult {
+		if ( true === $done || ( null === $done && $this->sent_recently( 'stop' ) ) ) {
+			return $this->waiting( $why, $this->task_budget( 'stop' ) );
+		}
+
+		return StepResult::retry( 0, $why . ( is_array( $done ) ? ' (the stop task failed: ' . $done['failed'] . ')' : '' ) );
 	}
 
 	/**
@@ -122,7 +139,7 @@ trait Steps {
 			return;
 		}
 
-		$this->r->set( array( 'power_sent' => null === $what ? null : array( 'what' => $what, 'at' => time() ) ) );
+		$this->r->set( array( 'power_sent' => null === $what ? null : array( 'what' => $what, 'at' => Jobs::now() ) ) );
 	}
 
 	/**
@@ -296,6 +313,12 @@ trait Steps {
 	 * @return true|array{failed: string}|StepResult True: ended OK. failed: the exit status (read the state before believing it). StepResult: retry or fail.
 	 */
 	protected function run_task( string $step, string $method, string $path, array $params = array(), string $phase = '' ) {
+		// The kill switch can be turned on while a run is going: nothing is written after that. The wait is
+		// free (never a failure); the job's own check takes over when it runs again.
+		if ( Settings::get( 'pause_all' ) ) {
+			return StepResult::wait( Jobs::PAUSED_DELAY, $step . ': all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
+		}
+
 		$upid = $this->client->task( $method, $path, $params );
 
 		if ( is_wp_error( $upid ) ) {

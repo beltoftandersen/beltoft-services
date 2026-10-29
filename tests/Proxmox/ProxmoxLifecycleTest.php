@@ -1013,11 +1013,20 @@ class ProxmoxLifecycleTest extends TestCase {
 	 * Runs the reconciler until the resource fails or the rounds are used.
 	 */
 	private function run_to_failure( int $id ): void {
-		for ( $run = 0; $run < 40 && 'failed' !== Resource::find( $id )->get( 'state' ); $run++ ) {
-			// Time passes: a wait that has lasted its budget counts as an error (nothing sleeps in tests).
-			Resource::find( $id )->set( array( 'next_attempt_at' => time() - 1, 'wait_since' => time() - 5000 ) );
+		// Time passes on the wait clock only (nothing sleeps): six seconds a run, the way the five-second polls
+		// come back. A wait that has lasted its budget then counts as an error by itself.
+		$skew = 0;
+		add_filter( 'beltoft_services_now', static function ( $t ) use ( &$skew ) { return $t + $skew; } );
+		add_filter( 'beltoft_services_poll_budget', static fn() => 30 );
+
+		for ( $run = 0; $run < 80 && 'failed' !== Resource::find( $id )->get( 'state' ); $run++ ) {
+			$skew += 6;
+			Resource::find( $id )->set( array( 'next_attempt_at' => time() - 1 ) );
 			Jobs::run( $id );
 		}
+
+		remove_all_filters( 'beltoft_services_now' );
+		remove_all_filters( 'beltoft_services_poll_budget' );
 	}
 
 	private function fail_tasks( int $count ): void {
@@ -1050,7 +1059,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $resource->id() );
 
 		$this->assertSame( 'failed', Resource::find( $resource->id() )->get( 'state' ) );
-		$this->assertSame( 7, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before, 'One graceful try per run (a stop that leaves the VM running waits instead of looping); the first run is a free wait, then the budget of five ends it.' );
+		$this->assertSame( 6, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before, 'One graceful try per counted attempt: a failed task is a counted retry, never a free wait.' );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 
 		// The same for a plan change.
@@ -1061,7 +1070,7 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->run_to_failure( $other->id() );
 
 		$this->assertSame( 'failed', Resource::find( $other->id() )->get( 'state' ) );
-		$this->assertSame( 7, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before, 'One graceful try per run (a stop that leaves the VM running waits instead of looping); the first run is a free wait, then the budget of five ends it.' );
+		$this->assertSame( 6, count( $this->calls( 'POST', '/status/shutdown' ) ) - $before, 'One graceful try per counted attempt: a failed task is a counted retry, never a free wait.' );
 		$this->assertSame( 'running', $this->fake->vm( 5001 )['status'] );
 	}
 
@@ -1099,7 +1108,8 @@ class ProxmoxLifecycleTest extends TestCase {
 		$r = Resource::find( $resource->id() );
 		$this->assertSame( 'failed', $r->get( 'state' ) );
 		$this->assertNotEmpty( $this->mails );
-		$this->assertLessThanOrEqual( 150, count( $this->fake->calls() ) - $before );
+		$this->assertLessThanOrEqual( 300, count( $this->fake->calls() ) - $before, 'Bounded: mostly 2 second status looks, not writes.' );
+		$this->assertLessThanOrEqual( 8, count( $this->calls( 'POST', '/status/start' ) ), 'At most one start per run of the episodes.' );
 	}
 
 	/**
