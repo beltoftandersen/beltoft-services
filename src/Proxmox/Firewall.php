@@ -522,7 +522,10 @@ final class Firewall {
 			$out[] = __( 'Outgoing mail on port 25 is blocked on every server.', 'beltoft-services' );
 		}
 
-		$out[] = __( 'Protection against address spoofing is always on.', 'beltoft-services' );
+		// macfilter is always written; the IP filter only where the cluster turned it on (fw_ipfilter).
+		$out[] = null !== $cluster && ! empty( $cluster['fw_ipfilter'] )
+			? __( 'Protection against address spoofing is always on.', 'beltoft-services' )
+			: __( 'Protection against network card address spoofing is always on.', 'beltoft-services' );
 
 		if ( null !== PrivateNets::for_resource( $r->id() ) ) {
 			$out[] = __( 'Traffic on your private network is not affected by the rules above.', 'beltoft-services' );
