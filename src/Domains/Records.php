@@ -273,24 +273,40 @@ final class Records {
 		return $set;
 	}
 
+	/** The full name (with the trailing dot) a record name and type stand for in a zone, or an error. */
+	public static function fqdn( string $zone, string $name, string $type = '' ): string|\WP_Error {
+		$zone = Search::normalise( $zone );
+		return is_wp_error( $zone ) ? $zone : self::name( $zone, $name, strtoupper( $type ) );
+	}
+
 	/**
 	 * Replaces the RRset at one name and type, or deletes it when the list is empty. Only that RRset is written;
 	 * every other record of the zone, and every record's disabled flag, is left as it is.
 	 *
+	 * With $to (a new name and/or type) the RRset moves: the rows are written at the new name and type and the old
+	 * RRset is deleted, both in one write the DNS server applies as a whole.
+	 *
 	 * @param array      $records Rows (value, priority, weight, port, flag, tag, ttl) of this one name and type.
 	 * @param array|null $expect  The rows the customer saw for this name and type; a different RRset now gives `stale`.
+	 * @param array|null $to      Array with `name` and/or `type`: where the RRset goes. Needs at least one row.
 	 */
-	public static function change( string $zone, string $name, string $type, array $records, ?array $expect = null ): true|\WP_Error {
+	public static function change( string $zone, string $name, string $type, array $records, ?array $expect = null, ?array $to = null ): true|\WP_Error {
 		$zone = Search::normalise( $zone );
 		if ( is_wp_error( $zone ) ) { return $zone; }
 		$type = strtoupper( $type );
 		if ( ! in_array( $type, self::TYPES, true ) ) { return new \WP_Error( 'bad_record', 'A DNS record type or TTL is invalid.' ); }
 		$fqdn = self::name( $zone, $name, $type );
 		if ( is_wp_error( $fqdn ) ) { return $fqdn; }
+		$new_type = strtoupper( (string) ( $to['type'] ?? $type ) );
+		if ( ! in_array( $new_type, self::TYPES, true ) ) { return new \WP_Error( 'bad_record', 'A DNS record type or TTL is invalid.' ); }
+		$new_fqdn = self::name( $zone, (string) ( $to['name'] ?? $name ), $new_type );
+		if ( is_wp_error( $new_fqdn ) ) { return $new_fqdn; }
+		$moving = strtolower( $new_fqdn ) !== strtolower( $fqdn ) || $new_type !== $type;
+		if ( $moving && ! $records ) { return new \WP_Error( 'bad_record', 'A DNS record is invalid.' ); }
 		$rows = array();
 		foreach ( $records as $row ) {
 			if ( ! is_array( $row ) ) { return new \WP_Error( 'bad_record', 'A DNS record is invalid.' ); }
-			$rows[] = array_merge( $row, array( 'name' => $fqdn, 'type' => $type ) );
+			$rows[] = array_merge( $row, array( 'name' => $new_fqdn, 'type' => $new_type ) );
 		}
 		$set = array();
 		if ( $rows ) {
@@ -298,33 +314,39 @@ final class Records {
 			if ( is_wp_error( $validated ) ) { return $validated; }
 			$set = $validated[0];
 		}
-		return self::locked( $zone, static function () use ( $zone, $fqdn, $type, $set, $expect ) {
+		return self::locked( $zone, static function () use ( $zone, $fqdn, $type, $new_fqdn, $new_type, $moving, $set, $expect ) {
 			$data = self::read( $zone );
 			if ( is_wp_error( $data ) ) { return $data; }
 			if ( self::paused( $zone, $data ) ) { return new \WP_Error( 'records_off', 'DNS hosting is paused for this domain.' ); }
-			$have = self::customer_sets( $data );
-			$key = strtolower( $fqdn ) . '|' . $type;
-			$old = $have[ $key ] ?? null;
+			$have    = self::customer_sets( $data );
+			$old_key = strtolower( $fqdn ) . '|' . $type;
+			$key     = strtolower( $new_fqdn ) . '|' . $new_type;
+			$old     = $have[ $old_key ] ?? null;
 			if ( null !== $expect && self::shown( $zone, $old ) !== self::shown( $zone, null, $expect ) ) {
 				return new \WP_Error( 'stale', 'This record changed. Reload the list.' );
 			}
+			if ( $moving && ! $old ) { return new \WP_Error( 'stale', 'This record changed. Reload the list.' ); }
+			if ( $moving && isset( $have[ $key ] ) ) { return new \WP_Error( 'exists', 'A record of this type already exists at that name.' ); }
 			if ( ! $set ) {
 				return $old ? Clients::dns()->replace_rrsets( $zone, array( array( 'name' => $old['name'], 'type' => $type, 'changetype' => 'DELETE' ) ) ) : true;
 			}
-			// What else lives at this name in the live zone, of any type, decides the CNAME rule.
+			// What else lives at the name in the live zone, of any type, decides the CNAME rule. The RRset that moves away does not count.
 			foreach ( (array) ( $data['rrsets'] ?? array() ) as $other ) {
 				$other_type = strtoupper( (string) ( $other['type'] ?? '' ) );
-				if ( strtolower( (string) ( $other['name'] ?? '' ) ) !== strtolower( $fqdn ) || $other_type === $type || empty( $other['records'] ) ) { continue; }
-				if ( 'CNAME' === $type || 'CNAME' === $other_type ) { return new \WP_Error( 'cname_conflict', 'A CNAME cannot share its name with another record type.' ); }
+				$other_key  = strtolower( (string) ( $other['name'] ?? '' ) ) . '|' . $other_type;
+				if ( strtolower( (string) ( $other['name'] ?? '' ) ) !== strtolower( $new_fqdn ) || $other_type === $new_type || empty( $other['records'] ) || ( $moving && $other_key === $old_key ) ) { continue; }
+				if ( 'CNAME' === $new_type || 'CNAME' === $other_type ) { return new \WP_Error( 'cname_conflict', 'A CNAME cannot share its name with another record type.' ); }
 			}
 			$total = count( (array) ( $set['records'] ) );
 			foreach ( $have as $k => $existing ) {
-				if ( $k !== $key ) { $total += count( (array) ( $existing['records'] ?? array() ) ); }
+				if ( $k !== $key && ! ( $moving && $k === $old_key ) ) { $total += count( (array) ( $existing['records'] ?? array() ) ); }
 			}
 			if ( $total > 200 ) { return new \WP_Error( 'too_many_records', 'A zone can have at most 200 customer records.' ); }
-			$set = self::with_flags( $set, $old, false );
-			if ( $old && self::signature( (string) $set['type'], $set['records'], $set['ttl'] ) === self::signature( (string) $set['type'], (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { return true; }
-			return Clients::dns()->replace_rrsets( $zone, array( $set ) );
+			$set = self::with_flags( $set, $moving ? null : $old, false );
+			if ( ! $moving && $old && self::signature( (string) $set['type'], $set['records'], $set['ttl'] ) === self::signature( (string) $set['type'], (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { return true; }
+			$sets = array( $set );
+			if ( $moving ) { array_unshift( $sets, array( 'name' => $old['name'], 'type' => $type, 'changetype' => 'DELETE' ) ); }
+			return Clients::dns()->replace_rrsets( $zone, $sets );
 		} );
 	}
 
