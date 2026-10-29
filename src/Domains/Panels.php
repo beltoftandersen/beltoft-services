@@ -17,7 +17,7 @@ final class Panels {
 	}
 	public static function assets( $parent, $endpoint = null ): void {
 		// The domain script is for the Domains endpoint only (the Servers and Licenses pages have no domain panel).
-		if ( is_string( $endpoint ) && 'domains' !== $endpoint ) {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\Domains::slug() !== $endpoint ) {
 			return;
 		}
 
@@ -37,6 +37,13 @@ final class Panels {
 		return '' !== $domain ? $domain : $title;
 	}
 	public static function account( Resource $r ): void {
+		// On a domain page (My Account → Domains → one domain) the tabs print instead of the one card.
+		$page = \BeltoftServices\Account\Domains::page();
+		if ( $page && (int) ( $page['license']['id'] ?? 0 ) === (int) ( $r->license()['id'] ?? -1 ) ) {
+			$d = \BeltoftServices\Account\DomainPage::build( $r, $page );
+			include \BeltoftServices\Account\Domains::file( 'domain-page.php' );
+			return;
+		}
 		$domain = (string) $r->get( 'domain' );
 		$dns_only = 'dns' === $r->get( 'driver' );
 		$client = Clients::dns();

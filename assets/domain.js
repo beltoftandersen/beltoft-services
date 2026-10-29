@@ -308,6 +308,8 @@
 		try { window.sessionStorage.setItem( KEY, JSON.stringify( list ) ); } catch ( e ) { /* storage can be blocked */ }
 	}
 	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-services-domain' ), function ( panel ) {
+		// A domain's own page has tabs, not a card to open.
+		if ( panel.hasAttribute( 'data-domain-page' ) ) { return; }
 		var card = panel.closest( 'section' );
 		var head = card ? card.querySelector( 'header' ) : null;
 		if ( ! card || ! head || head.hasAttribute( 'aria-expanded' ) ) { return; }
@@ -332,5 +334,42 @@
 		head.addEventListener( 'keydown', function ( event ) {
 			if ( 'Enter' === event.key || ' ' === event.key ) { event.preventDefault(); toggle( event ); }
 		} );
+	} );
+}() );
+
+// A domain's page: the tab links switch the panes without a reload. Every pane is in the page and the links are real
+// addresses, so without this script (or with a modified click) the browser opens the tab itself.
+( function () {
+	function show( page, slug ) {
+		var found = false;
+		Array.prototype.forEach.call( page.querySelectorAll( '.beltoft-services-tab' ), function ( pane ) {
+			var on = slug === pane.getAttribute( 'data-tab' );
+			pane.hidden = ! on;
+			found = found || on;
+		} );
+		if ( ! found ) { return false; }
+		Array.prototype.forEach.call( page.querySelectorAll( '.beltoft-services-tabs a[data-tab-link]' ), function ( link ) {
+			if ( slug === link.getAttribute( 'data-tab-link' ) ) { link.setAttribute( 'aria-current', 'page' ); } else { link.removeAttribute( 'aria-current' ); }
+		} );
+		return true;
+	}
+	function fromLocation( page ) {
+		var found = 'overview';
+		Array.prototype.forEach.call( page.querySelectorAll( '.beltoft-services-tabs a[data-tab-link]' ), function ( link ) {
+			if ( link.href.replace( /\/$/, '' ) === window.location.href.split( '#' )[ 0 ].split( '?' )[ 0 ].replace( /\/$/, '' ) ) { found = link.getAttribute( 'data-tab-link' ); }
+		} );
+		return found;
+	}
+	document.addEventListener( 'click', function ( event ) {
+		var link = event.target.closest ? event.target.closest( 'a[data-tab-link]' ) : null;
+		var page = link ? link.closest( '[data-domain-page]' ) : null;
+		if ( ! page || 0 !== event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || ! window.history || ! window.history.pushState ) { return; }
+		if ( show( page, link.getAttribute( 'data-tab-link' ) ) ) {
+			event.preventDefault();
+			window.history.pushState( { beltoftDomainTab: link.getAttribute( 'data-tab-link' ) }, '', link.href );
+		}
+	} );
+	window.addEventListener( 'popstate', function () {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), function ( page ) { show( page, fromLocation( page ) ); } );
 	} );
 }() );
