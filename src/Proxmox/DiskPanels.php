@@ -22,7 +22,10 @@ final class DiskPanels {
 			}
 		}
 		$names = DiskMeta::labels( $server );
-		foreach ( DiskMeta::for_server( $server ) as $disk ) {
+		$order = array_flip( array_keys( $names ) );
+		$live  = DiskMeta::for_server( $server );
+		usort( $live, static fn( Resource $a, Resource $b ): int => ( $order[ $a->id() ] ?? PHP_INT_MAX ) <=> ( $order[ $b->id() ] ?? PHP_INT_MAX ) );
+		foreach ( $live as $disk ) {
 			$license = $disk->license();
 			$grow_url = 'ready' === $disk->get( 'state' ) ? DiskCart::grow_url( $disk ) : '';
 			$grow_price = '';

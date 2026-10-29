@@ -430,6 +430,7 @@ class ServerNameTest extends BackupTestCase {
 		\BeltoftServices\Proxmox\Panels::account( Resource::find( $server->id() ) );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Data disk 1: 50 GB', $html );
+		$this->assertTrue( strpos( $html, 'Data disk 1:' ) < strpos( $html, 'Data disk 2:' ) && strpos( $html, 'Data disk 2:' ) < strpos( $html, 'Data disk 3:' ), 'Listed in slot order.' );
 		$this->assertStringNotContainsString( 'scsi1', $html );
 		$this->assertStringNotContainsString( 'scsi2', $html );
 
