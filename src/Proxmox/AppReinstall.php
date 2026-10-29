@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Account\Servers;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -11,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
  * A server with an app is reinstalled with the same app and version (the default), another version
  * that can still be ordered, or no app. A server without an app is offered the apps that checkout
  * would offer on its cluster and plan (default: no app, as it is); an app picked there is posted as
- * `app/version`, sets Ubuntu 24.04 as at checkout, and the domain picker is not part of a reinstall.
+ * `app/version`, sets Ubuntu 24.04 as at checkout, and may choose a domain for supported apps.
  * A version that has been retired is never offered; if the server
  * has one, the current version is preselected and the form says why. The field is posted as
  * `app_version`: `keep`, a version id, or `none`.
@@ -20,6 +21,7 @@ final class AppReinstall {
 
 	public const NONE = 'none';
 	public const KEEP = 'keep';
+	public const HANDLE = 'beltoft-services-app-reinstall';
 
 	/**
 	 * Hooks.
@@ -28,6 +30,21 @@ final class AppReinstall {
 		add_action( 'beltoft_services_reinstall_fields', array( __CLASS__, 'fields' ) );
 		add_filter( 'beltoft_services_reinstall_check', array( __CLASS__, 'check' ), 10, 3 );
 		add_filter( 'beltoft_services_reinstall_meta', array( __CLASS__, 'meta' ), 10, 3 );
+		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ), 25, 2 );
+	}
+
+	/** Load the reinstall domain controls only on a server page. */
+	public static function assets( $parent, $endpoint = null ): void {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+			return;
+		}
+		$asked = Servers::requested();
+		$r = $asked['id'] > 0 ? Resource::for_license( (int) $asked['id'] ) : null;
+		if ( ! $r || (int) ( $r->license()['user_id'] ?? 0 ) !== get_current_user_id() || null === self::options( $r ) ) {
+			return;
+		}
+		wp_enqueue_style( AppTab::HANDLE, plugins_url( 'assets/app-tab.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-tab.css' ) );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-reinstall.js', BELTOFT_SERVICES_FILE ), array( Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/app-reinstall.js' ), true );
 	}
 
 	/**
@@ -170,6 +187,7 @@ final class AppReinstall {
 			'app_started_at'     => null,
 			'app_ready_since'    => null,
 			'app_domain_tries'   => null,
+			'app_domain_error'   => null,
 			'app_domain_alerted' => null,
 			'app_installed_at'   => null,
 			'app_queue_until'    => null,
@@ -226,7 +244,7 @@ final class AppReinstall {
 					'logo'     => Tiles::app_logo( (array) $entry['def'] ),
 					'disabled' => ! $usable,
 					'why'      => $usable ? '' : AppField::needs( (array) $current['version'] ),
-					'attrs'    => array( 'data-versions' => (string) wp_json_encode( $versions ) ),
+					'attrs'    => array( 'data-versions' => (string) wp_json_encode( $versions ) ) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
 		} else {
@@ -249,7 +267,7 @@ final class AppReinstall {
 					'line'    => (string) ( $options['app']['summary'] ?? '' ),
 					'logo'    => Tiles::app_logo( (array) $options['app'] ),
 					'checked' => self::NONE !== $options['selected'],
-					'attrs'   => array( 'data-versions' => (string) wp_json_encode( $versions ) ),
+					'attrs'   => array( 'data-versions' => (string) wp_json_encode( $versions ) ) + ( ! empty( $options['app']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
 
@@ -279,6 +297,7 @@ final class AppReinstall {
 
 		echo '<p class="form-row" data-tiles-version-row hidden><label for="beltoft-vm-app-version-' . (int) $resource_id . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
 		echo '<select id="beltoft-vm-app-version-' . (int) $resource_id . '" data-tiles-version></select></p>';
+		self::domain_fields( $r, $options );
 		echo '</div>';
 
 		if ( $options['retired'] ) {
@@ -286,6 +305,49 @@ final class AppReinstall {
 		}
 
 		echo '<p class="description">' . esc_html( $options['plain'] ? __( 'Choosing an app installs Ubuntu 24.04, because the app runs on it.', 'beltoft-services' ) : __( 'An app runs on Ubuntu 24.04, so the operating system stays the same while an app is selected.', 'beltoft-services' ) ) . '</p>';
+	}
+
+	/** Domain controls shared by same-app and plain-server reinstall choices. */
+	private static function domain_fields( Resource $r, array $options ): void {
+		$user = (int) ( $r->license()['user_id'] ?? 0 );
+		$zones = AppDomains::zones( $user );
+		$supports = ! empty( $options['app']['domain'] );
+		foreach ( (array) ( $options['apps'] ?? array() ) as $entry ) {
+			$supports = $supports || ! empty( $entry['def']['domain'] );
+		}
+		if ( ! $zones || ! $supports ) {
+			return;
+		}
+
+		$current = self::current_domain( $r );
+		$default = '' === $current ? 'none' : 'keep';
+		$id = 'beltoft-app-domain-' . $r->id();
+		echo '<fieldset class="beltoft-services-app-reinstall__domain" data-app-domain data-current-domain="' . esc_attr( $current ) . '"' . ( $options['plain'] || self::NONE === $options['selected'] ? ' hidden' : '' ) . '><legend>' . esc_html__( 'Domain', 'beltoft-services' ) . '</legend>';
+		if ( '' !== $current ) {
+			echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="keep" checked> ';
+			/* translators: %s: existing app domain. */
+			echo esc_html( sprintf( __( 'Keep %s', 'beltoft-services' ), $current ) );
+			echo '<span class="description">' . esc_html__( 'The record stays as it is.', 'beltoft-services' ) . '</span></label>';
+		}
+		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="change"> ' . esc_html__( 'Use another domain', 'beltoft-services' );
+		echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) . '</span></label>';
+		echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-fields hidden>';
+		echo '<label for="' . esc_attr( $id . '-zone' ) . '">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><select id="' . esc_attr( $id . '-zone' ) . '" name="app_zone">';
+		foreach ( $zones as $zone ) {
+			echo '<option value="' . esc_attr( $zone ) . '">' . esc_html( $zone ) . '</option>';
+		}
+		echo '</select><label for="' . esc_attr( $id . '-sub' ) . '">' . esc_html__( 'Subdomain', 'beltoft-services' ) . '</label>';
+		echo '<input type="text" id="' . esc_attr( $id . '-sub' ) . '" name="app_sub" maxlength="120" placeholder="www" autocomplete="off">';
+		echo '<span class="description">' . esc_html__( 'Leave empty to use the domain itself.', 'beltoft-services' ) . '</span></div>';
+		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="none"' . checked( $default, 'none', false ) . '> ' . esc_html__( 'No domain', 'beltoft-services' );
+		echo '<span class="description">' . esc_html__( 'The app uses the server address.', 'beltoft-services' ) . '</span></label>';
+		echo '</fieldset>';
+	}
+
+	/** A published name takes precedence over a requested name. */
+	private static function current_domain( Resource $r ): string {
+		$published = (string) $r->get( 'app_domain' );
+		return '' !== $published ? $published : (string) $r->get( 'app_domain_want' );
 	}
 
 	/**
@@ -308,6 +370,53 @@ final class AppReinstall {
 		return self::KEEP === $raw ? (string) $r->get( 'app_version' ) : $raw;
 	}
 
+	/** The effective domain choice, including a same-name change that is really a keep. */
+	private static function domain_choice( Resource $r, array $args, array $app, bool $check_dns = true ) {
+		$current = self::current_domain( $r );
+		$raw = $args['app_domain_mode'] ?? '';
+		$mode = '' === $raw ? ( '' === $current ? 'none' : 'keep' ) : $raw;
+
+		if ( ! $app ) {
+			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
+		}
+		if ( empty( $app['domain'] ) ) {
+			if ( in_array( $raw, array( 'change', 'keep' ), true ) ) {
+				return __( 'This app does not use a domain at install. You can add one later.', 'beltoft-services' );
+			}
+			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
+		}
+		if ( 'none' === $mode ) {
+			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
+		}
+		if ( 'keep' === $mode ) {
+			return '' === $current ? __( 'This server has no domain to keep.', 'beltoft-services' ) : array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current );
+		}
+		if ( 'change' !== $mode ) {
+			return __( 'Choose a domain option.', 'beltoft-services' );
+		}
+
+		$ip = IpPool::for_resource( $r->id() );
+		$choice = AppDomains::choose( $app, (string) ( $args['app_zone'] ?? '' ), $args['app_sub'] ?? '', (int) ( $r->license()['user_id'] ?? 0 ), $check_dns, (string) ( $ip['address'] ?? '' ) );
+		if ( is_string( $choice ) ) {
+			return $choice;
+		}
+		return $current === $choice['fqdn'] ? array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current ) : array( 'mode' => 'change', 'zone' => $choice['zone'], 'fqdn' => $choice['fqdn'] );
+	}
+
+	/** Refuse a removal that cannot safely remember the old record. */
+	private static function domain_release_refusal( Resource $r, array $choice ): ?string {
+		$published = (string) $r->get( 'app_domain' );
+		if ( '' === $published || '' === (string) $r->get( 'app_zone' ) || 'keep' === $choice['mode'] ) {
+			return null;
+		}
+		$ip = IpPool::for_resource( $r->id() );
+		if ( '' === (string) ( $ip['address'] ?? $r->get( 'ip' ) ) ) {
+			return __( 'The old domain record cannot be checked right now. Try again later.', 'beltoft-services' );
+		}
+		$pending = (array) $r->get( 'app_domain_old' );
+		return count( $pending ) >= 3 ? __( 'The old domain records are still being checked. Try again later.', 'beltoft-services' ) : null;
+	}
+
 	/**
 	 * Refuses a choice that is not listed, a plan below the minimum, or an operating system the app cannot run on.
 	 *
@@ -318,7 +427,13 @@ final class AppReinstall {
 	 */
 	public static function check( $why, $r, $args ) {
 		if ( $r instanceof Resource && '' === (string) $r->get( 'app_id' ) ) {
-			return self::plain_check( $why, $r, $args );
+			$why = self::plain_check( $why, $r, $args );
+			if ( null !== $why ) {
+				return $why;
+			}
+			$pick = self::plain_pick( $r, $args['app_version'] ?? '' );
+			$choice = self::domain_choice( $r, $args, is_array( $pick ) ? (array) Apps::definition( $pick[0] ) : array() );
+			return is_string( $choice ) ? $choice : self::domain_release_refusal( $r, $choice );
 		}
 
 		$options = $r instanceof Resource ? self::options( $r ) : null;
@@ -334,7 +449,7 @@ final class AppReinstall {
 		}
 
 		if ( '' === $version ) {
-			return null;
+			return self::domain_release_refusal( $r, array( 'mode' => 'none' ) );
 		}
 
 		$full    = Apps::version( (string) $r->get( 'app_id' ), $version );
@@ -366,7 +481,8 @@ final class AppReinstall {
 			return $why . '.';
 		}
 
-		return null;
+		$choice = self::domain_choice( $r, $args, (array) $options['app'] );
+		return is_string( $choice ) ? $choice : self::domain_release_refusal( $r, $choice );
 	}
 
 	/**
@@ -418,6 +534,41 @@ final class AppReinstall {
 		return null === $why ? null : $why . '.';
 	}
 
+	/** Domain target and an exact old A-record deletion request, stored without doing DNS work. */
+	private static function domain_meta( Resource $r, array $args, array $app ): array {
+		$choice = self::domain_choice( $r, $args, $app, false );
+		if ( is_string( $choice ) || null !== self::domain_release_refusal( $r, $choice ) ) {
+			return array();
+		}
+
+		$meta = array( 'app_domain_error' => null, 'app_domain_tries' => null );
+		$published = (string) $r->get( 'app_domain' );
+		if ( 'keep' === $choice['mode'] ) {
+			if ( '' !== (string) $r->get( 'app_domain_error' ) ) {
+				$meta['app_domain'] = null;
+				$meta['app_domain_want'] = $choice['fqdn'];
+			}
+			return $meta;
+		}
+
+		$meta['app_domain'] = null;
+		$meta['app_domain_want'] = 'change' === $choice['mode'] ? $choice['fqdn'] : null;
+		$meta['app_zone'] = 'change' === $choice['mode'] ? $choice['zone'] : null;
+
+		if ( '' !== $published && '' !== (string) $r->get( 'app_zone' ) ) {
+			$ip = IpPool::for_resource( $r->id() );
+			$old = (array) $r->get( 'app_domain_old' );
+			$old[] = array(
+				'zone' => (string) $r->get( 'app_zone' ),
+				'name' => $published,
+				'ip' => (string) ( $ip['address'] ?? $r->get( 'ip' ) ),
+				'tries' => 0,
+			);
+			$meta['app_domain_old'] = array_slice( $old, 0, 3 );
+		}
+		return $meta;
+	}
+
 	/**
 	 * The meta of a reinstall that follows the choice: a fresh install state for the app, or no app.
 	 *
@@ -432,12 +583,15 @@ final class AppReinstall {
 			$record = VmRecords::for_resource( $r->id() );
 			$os     = $record ? Apps::os_template( (array) Clusters::get( $record['cluster'] ) ) : 0;
 
-			if ( ! is_array( $pick ) || $os <= 0 || null === Apps::version( $pick[0], $pick[1] ) ) {
+			if ( ! is_array( $pick ) ) {
+				return null === $pick && ( '' !== self::current_domain( $r ) || $r->get( 'app_domain_old' ) ) ? array_merge( $meta, self::domain_meta( $r, $args, array() ) ) : $meta;
+			}
+			if ( $os <= 0 || null === Apps::version( $pick[0], $pick[1] ) ) {
 				return $meta;
 			}
 
 			// The app runs on Ubuntu 24.04, as at checkout, whatever system was posted.
-			return array_merge( $meta, self::fresh(), array( 'app_id' => $pick[0], 'app_version' => $pick[1], OsField::META => $os ) );
+			return array_merge( $meta, self::fresh(), self::domain_meta( $r, $args, (array) Apps::definition( $pick[0] ) ), array( 'app_id' => $pick[0], 'app_version' => $pick[1], OsField::META => $os ) );
 		}
 
 		$options = is_array( $meta ) && $r instanceof Resource ? self::options( $r ) : null;
@@ -453,42 +607,21 @@ final class AppReinstall {
 		}
 
 		// The install starts again from nothing: a new request, no old status, no old login.
-		$meta = array_merge(
-			$meta,
-			array(
-				'app_state'        => null,
-				'app_step'         => null,
-				'app_request'      => null,
-				'app_checked_at'   => null,
-				'app_started_at'   => null,
-				'app_ready_since'  => null,
-				'app_domain_tries' => null,
-				'app_domain_alerted' => null,
-				'app_installed_at' => null,
-				'app_queue_until'  => null,
-				'app_recipe'       => null,
-				'app_upstream'     => null,
-				'app_reveal'       => '',
-				'app_reveal_until' => 0,
-			)
-		);
+		$meta = array_merge( $meta, self::fresh() );
 
 		if ( '' === $version ) {
 			return array_merge(
 				$meta,
+				self::domain_meta( $r, $args, array() ),
 				array(
 					'app_id'          => '',
 					'app_version'     => '',
-					'app_domain'      => null,
-					'app_domain_want' => null,
-					'app_domain_error' => null,
-					'app_zone'        => null,
 				)
 			);
 		}
 
 		$meta['app_version'] = $version;
 
-		return $meta;
+		return array_merge( $meta, self::domain_meta( $r, $args, (array) $options['app'] ) );
 	}
 }
