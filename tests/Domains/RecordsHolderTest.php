@@ -156,12 +156,15 @@ class RecordsHolderTest extends TestCase {
 
 		$result = $driver->delete( $r );
 		$this->assertTrue( $result->is_retry(), 'a held zone makes delete try again later' );
+		$this->assertSame( 30, $result->delay(), 'a busy zone is tried again shortly, not after an hour' );
 		$this->assertNotNull( $this->dns->zone( 'locked.example' ), 'the zone was not deleted' );
 		$this->assertSame( array(), array_filter( array_slice( $this->dns->calls(), $before ), static fn( $c ) => 'delete_zone' === $c[0] ) );
 
 		$this->dns->delete_zone( 'locked.example' );
 		$made = count( array_filter( $this->dns->calls(), static fn( $c ) => 'create_zone' === $c[0] ) );
-		$this->assertTrue( \BeltoftServices\Domains\Zone::ensure( $r )->is_retry(), 'creating the zone waits for the lock' );
+		$ensure = \BeltoftServices\Domains\Zone::ensure( $r );
+		$this->assertTrue( $ensure->is_retry(), 'creating the zone waits for the lock' );
+		$this->assertSame( 30, $ensure->delay(), 'a busy zone is tried again shortly, not after an hour' );
 		$this->assertCount( $made, array_filter( $this->dns->calls(), static fn( $c ) => 'create_zone' === $c[0] ) );
 		$this->dns->create_zone( 'locked.example', array( 'ns1.example.net', 'ns2.example.net' ) );
 
