@@ -18,9 +18,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$hostname_pending = $hostname_pending ?? '';
-$can_rename       = $can_rename ?? false;
-$server_name      = $server_name ?? '';
+$beltoft_services_pending = (string) ( $hostname_pending ?? '' );
+$beltoft_services_rename  = (bool) ( $can_rename ?? false );
+$beltoft_services_named   = (string) ( $server_name ?? '' );
 
 $beltoft_services_power_labels = array(
 	'running' => __( 'Running', 'beltoft-services' ),
@@ -63,20 +63,20 @@ $beltoft_services_power_labels = array(
 		<?php endif; ?>
 	</dl>
 
-	<?php if ( '' !== $hostname_pending ) : ?>
+	<?php if ( '' !== $beltoft_services_pending ) : ?>
 		<p class="description" data-hostname-note>
 			<?php esc_html_e( "The new name is used as the hostname after the next reboot. Your SSH client may warn that the server's host key changed.", 'beltoft-services' ); ?>
 			<?php if ( $forms && 'stopped' !== $power ) : ?><button type="button" class="beltoft-services-action beltoft-services-vm__link" data-action="reboot"><?php esc_html_e( 'Reboot', 'beltoft-services' ); ?></button><?php endif; ?>
 		</p>
 	<?php endif; ?>
 
-	<?php if ( $can_rename ) : ?>
+	<?php if ( $beltoft_services_rename ) : ?>
 		<details class="beltoft-services-vm__more">
 			<summary><?php esc_html_e( 'Rename', 'beltoft-services' ); ?></summary>
 			<form class="beltoft-services-vm-form" data-action="rename">
 				<p>
 					<label for="beltoft-vm-name-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Server name', 'beltoft-services' ); ?></label>
-					<input type="text" id="beltoft-vm-name-<?php echo (int) $resource_id; ?>" name="name" value="<?php echo esc_attr( $server_name ); ?>" maxlength="63" autocomplete="off" spellcheck="false" required>
+					<input type="text" id="beltoft-vm-name-<?php echo (int) $resource_id; ?>" name="name" value="<?php echo esc_attr( $beltoft_services_named ); ?>" maxlength="63" autocomplete="off" spellcheck="false" required>
 				</p>
 				<p class="description"><?php esc_html_e( "Used as the server's hostname, for example web-01. Lowercase letters, digits and hyphens. The change shows on the server after the next reboot.", 'beltoft-services' ); ?></p>
 				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Save name', 'beltoft-services' ); ?></button></p>
