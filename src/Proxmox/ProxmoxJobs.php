@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
  * - capacity, per cluster and hour (and once after a cluster is saved): GET /nodes and GET /cluster/resources?type=vm (two calls);
  * - power, per cluster and 15 minutes: GET /cluster/resources?type=vm (one call for every VM);
  * - abuse, per running VM and hour: GET /nodes/{node}/qemu/{vmid}/rrddata.
- * - disk, per running VM and six hours: GET /nodes/{node}/qemu/{vmid}/agent/get-fsinfo.
+ * - disk, per running VM and six hours (hourly while the disk is at 85 percent or more): GET /nodes/{node}/qemu/{vmid}/agent/get-fsinfo.
  *
  * Resource meta writes use the resource lock (Resource::locked() or Resource::desire());
  * power state and abuse "high since" live in transients, while monitoring alert state is meta.
@@ -87,7 +87,7 @@ final class ProxmoxJobs {
 		self::CAPACITY => '0 * * * *',
 		self::POWER    => '*/15 * * * *',
 		self::ABUSE    => '20 * * * *',
-		self::DISK     => '10 */6 * * *',
+		self::DISK     => '10 * * * *',
 		self::BACKUP   => '30 3 * * *',
 		self::SNAPSHOTS => '40 * * * *',
 	);
@@ -95,7 +95,7 @@ final class ProxmoxJobs {
 	/**
 	 * A gap this long between two readings means the "high since" value is not continuous.
 	 */
-	private const CONTINUITY_SLACK = 900;
+	public const CONTINUITY_SLACK = 900;
 
 	/**
 	 * Hooks.
@@ -485,7 +485,12 @@ final class ProxmoxJobs {
 				continue;
 			}
 			foreach ( $list as $item ) {
-				if ( is_array( $item ) && count( $queue ) < self::MAX_VMS ) {
+				if ( ! is_array( $item ) || count( $queue ) >= self::MAX_VMS ) {
+					continue;
+				}
+				// The job runs hourly: a server is read when its reading is old, or hourly while its disk is high.
+				$r = Resource::find( (int) ( $item['resource'] ?? 0 ) );
+				if ( ! $r || GuestDisk::due( $r ) ) {
 					$queue[] = $item;
 				}
 			}
@@ -545,7 +550,7 @@ final class ProxmoxJobs {
 	 * the first batch. A queue left over from an earlier run is replaced.
 	 */
 	public static function abuse(): void {
-		if ( Settings::get( 'pause_all' ) || 'off' === (string) Settings::get( 'abuse_mode' ) ) {
+		if ( Settings::get( 'pause_all' ) || ! self::reads_usage() ) {
 			return;
 		}
 
@@ -604,7 +609,7 @@ final class ProxmoxJobs {
 	public static function abuse_batch(): void {
 		$queue = get_transient( self::QUEUE );
 
-		if ( Settings::get( 'pause_all' ) || 'off' === (string) Settings::get( 'abuse_mode' ) || ! is_array( $queue ) || ! isset( $queue['items'], $queue['cursor'] ) ) {
+		if ( Settings::get( 'pause_all' ) || ! self::reads_usage() || ! is_array( $queue ) || ! isset( $queue['items'], $queue['cursor'] ) ) {
 			delete_transient( self::QUEUE );
 			return;
 		}
@@ -684,6 +689,28 @@ final class ProxmoxJobs {
 			return;
 		}
 
+		// One read feeds both the abuse check (operator) and the customer usage alerts.
+		if ( 'off' !== (string) Settings::get( 'abuse_mode' ) ) {
+			self::check_abuse( $resource, $samples );
+		}
+
+		if ( 'on' === Settings::get( 'monitor_alerts' ) ) {
+			Monitor::usage( $resource, $samples );
+		}
+	}
+
+	/** Whether the hourly usage read is needed: the abuse check or the customer alerts use it. */
+	private static function reads_usage(): bool {
+		return 'off' !== (string) Settings::get( 'abuse_mode' ) || 'on' === Settings::get( 'monitor_alerts' );
+	}
+
+	/**
+	 * The abuse analysis of one reading.
+	 *
+	 * @param Resource          $resource Resource.
+	 * @param array<int, mixed> $samples  Rows of rrddata.
+	 */
+	private static function check_abuse( Resource $resource, array $samples ): void {
 		$threshold = (int) Settings::get( 'abuse_cpu' );
 		$reading   = self::analyse( $samples, (float) $threshold );
 
@@ -770,31 +797,7 @@ final class ProxmoxJobs {
 	 * @return int|null Timestamp, or null when the newest sample is below the threshold.
 	 */
 	private static function since( int $resource_id, array $reading ): ?int {
-		$key = self::SINCE_PREFIX . $resource_id;
-
-		if ( null === $reading['trailing'] ) {
-			delete_transient( $key );
-			return null;
-		}
-
-		$since = $reading['trailing'];
-		$prev  = get_transient( $key );
-
-		// The run reaches back to the first sample, and the earlier reading ended where this one begins.
-		if ( is_array( $prev ) && isset( $prev['since'], $prev['last'] ) && $reading['trailing'] === $reading['first'] && (int) $prev['last'] >= $reading['first'] - self::CONTINUITY_SLACK ) {
-			$since = min( $since, (int) $prev['since'] );
-		}
-
-		set_transient(
-			$key,
-			array(
-				'since' => $since,
-				'last'  => $reading['last'],
-			),
-			( max( 1, (int) Settings::get( 'abuse_hours' ) ) + 24 ) * HOUR_IN_SECONDS
-		);
-
-		return $since;
+		return Usage::since( self::SINCE_PREFIX, $resource_id, $reading, max( 1, (int) Settings::get( 'abuse_hours' ) ) + 24 );
 	}
 
 	/**

@@ -37,3 +37,10 @@ body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__disk { margin: 0;
 .beltoft-vm-usage__chart--disk body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__axis { margin-top: 8px; }
 @media (max-width: 900px) { .beltoft-vm-usage__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .beltoft-vm-usage__grid, .beltoft-vm-usage__more .beltoft-vm-usage__grid { grid-template-columns: minmax(0, 1fr); gap: 8px; } .beltoft-vm-usage__bar { margin-top: 12px; } }
+.beltoft-vm-usage__alerts { margin: 0 0 12px; }
+body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__state { margin: 0 0 6px; color: var(--bvu-ink); font-size: 14px; font-weight: 600; }
+.beltoft-vm-usage__switch { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--bvu-soft); font-size: 14px; cursor: pointer; }
+.beltoft-vm-usage__switch input { width: 16px; height: 16px; margin: 0; border-radius: 0; accent-color: var(--bvu-ink); }
+.beltoft-vm-usage__switch input:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }
+body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note { margin: 4px 0 0; color: var(--bvu-soft); font-size: 13px; }
+body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note:empty { display: none; }

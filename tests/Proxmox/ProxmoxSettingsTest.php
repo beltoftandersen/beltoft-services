@@ -52,7 +52,11 @@ class ProxmoxSettingsTest extends TestCase {
 		$this->assertSame( 'report', Settings::get( 'abuse_mode' ) );
 		$this->assertSame( 90, Settings::get( 'abuse_cpu' ) );
 		$this->assertSame( 2, Settings::get( 'abuse_hours' ) );
-		$this->assertSame( 'off', Settings::get( 'monitor_alerts' ) );
+		$this->assertSame( 'on', Settings::get( 'monitor_alerts' ) );
+		$this->assertSame( 97, Settings::get( 'monitor_disk_urgent_percent' ) );
+		$this->assertSame( 90, Settings::get( 'monitor_cpu_percent' ) );
+		$this->assertSame( 3, Settings::get( 'monitor_cpu_hours' ) );
+		$this->assertSame( 7, Settings::get( 'monitor_cooldown_days' ) );
 		$this->assertSame( 90, Settings::get( 'monitor_disk_percent' ) );
 	}
 

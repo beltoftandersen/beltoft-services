@@ -922,4 +922,60 @@ class AppFieldTest extends TestCase {
 		$this->assertSame( 'mine.example', AppDomains::fqdn( 'mine.example', '' ) );
 		$this->assertSame( 'shop.mine.example', AppDomains::fqdn( 'mine.example', 'shop' ) );
 	}
+
+	// -- n8n -----------------------------------------------------------------------------------
+
+	public function test_n8n_is_listed_with_a_domain_picker_and_is_choosable_on_starter(): void {
+		$this->save_cluster( array( 'apps_enabled' => array( 'docker', 'wordpress', 'coolify', 'n8n' ) ) );
+		WC()->cart->add_to_cart( $this->vm( array( 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 40 ) )->get_id() );
+		$html = $this->html();
+
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="n8n"[^>]*>#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<input[^>]*value="n8n"[^>]*disabled#', $html );
+		$this->assertStringContainsString( '>n8n</span>', $html );
+		$this->assertSame( array(), $this->check( array( AppField::POST_APP => 'n8n' ) ) );
+		$data = html_entity_decode( $html );
+		$this->assertMatchesRegularExpression( '#"n8n":\{[^}]*"domain":true#', $data );
+	}
+
+	public function test_n8n_install_passes_the_account_email_and_the_domain_in_the_job(): void {
+		$me = self::factory()->user->create( array( 'user_email' => 'christian.beltoft+n8n@gmail.com' ) );
+		$this->domain( $me, 'mine.example' );
+		[ $r, $fake ] = $this->server( $me, array( 'app_id' => 'n8n', 'app_version' => '2', 'app_zone' => 'mine.example', 'app_domain_want' => 'flows.mine.example', 'app_state' => 'pending', OsField::META => 9001 ) );
+
+		$this->assertTrue( AppInstall::queue( $r, $fake )->is_done() );
+		$job = json_decode( $fake->guest_file( 5000, Apps::JOB ), true );
+		$this->assertSame( 'n8n', $job['app'] );
+		$this->assertSame( '2', $job['version'] );
+		$this->assertSame( 'flows.mine.example', $job['domain'] );
+		$this->assertSame( 'christian.beltoft+n8n@gmail.com', $job['email'] );
+		$this->assertSame( Apps::version( 'n8n', '2' )['sha256'], $job['sha256'] );
+	}
+
+	/**
+	 * @dataProvider email_apps
+	 */
+	public function test_an_app_that_needs_the_email_fails_without_one(string $id, string $version): void {
+		global $wpdb;
+		$me = self::factory()->user->create();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( $wpdb->users, array( 'user_email' => '' ), array( 'ID' => $me ) );
+		clean_user_cache( $me );
+		[ $r, $fake ] = $this->server( $me, array( 'app_id' => $id, 'app_version' => $version, 'app_state' => 'pending', OsField::META => 9001 ) );
+
+		$result = AppInstall::queue( $r, $fake );
+		$this->assertFalse( $result->is_done() );
+		$this->assertSame( 'The account email is unavailable for app setup', $result->error() );
+	}
+
+	public static function email_apps(): array {
+		return array( 'wordpress' => array( 'wordpress', '7.1.4' ), 'coolify' => array( 'coolify', '4.5.1' ), 'n8n' => array( 'n8n', '2' ) );
+	}
+
+	public function test_docker_job_has_no_email(): void {
+		$me = self::factory()->user->create();
+		[ $r, $fake ] = $this->server( $me, array( 'app_id' => 'docker', 'app_version' => '29', 'app_state' => 'pending', OsField::META => 9001 ) );
+		$this->assertTrue( AppInstall::queue( $r, $fake )->is_done() );
+		$this->assertArrayNotHasKey( 'email', json_decode( $fake->guest_file( 5000, Apps::JOB ), true ) );
+	}
 }

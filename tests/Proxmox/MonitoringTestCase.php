@@ -43,9 +43,9 @@ abstract class MonitoringTestCase extends TestCase {
 		parent::tear_down();
 	}
 
-	protected function ready_vm( int $vmid = 5000 ): Resource {
+	protected function ready_vm( int $vmid = 5000, string $email = '' ): Resource {
 		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
-		$license = $this->service_license( $product, array( 'fire' => false ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) + ( '' !== $email ? array( 'email' => $email ) : array() ) );
 		$r = Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $product->get_id() ) );
 		$this->assertInstanceOf( Resource::class, $r );
 		$this->assertSame( $vmid, VmRecords::allocate( $r->id(), 'lab', $vmid, $vmid, array(), static fn() => true ) );
