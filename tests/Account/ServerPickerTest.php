@@ -84,6 +84,10 @@ class ServerPickerTest extends BackupTestCase {
 	public function tear_down(): void {
 		WC()->cart->empty_cart();
 		wc_clear_notices();
+		foreach ( array( ServerPicker::HANDLE, \BeltoftServices\Proxmox\Tiles::HANDLE, AppField::HANDLE ) as $handle ) {
+			wp_dequeue_style( $handle );
+			wp_dequeue_script( $handle );
+		}
 		remove_all_filters( 'beltoft_services_picker_products' );
 		remove_all_filters( 'beltoft_services_picker_can_buy' );
 		remove_all_filters( 'beltoft_services_picker_rate_limit' );
