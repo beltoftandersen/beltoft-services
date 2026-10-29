@@ -41,12 +41,13 @@ final class Panel {
 	/**
 	 * The badge group of a state: getting-ready, ready, paused, removed or failed.
 	 *
-	 * @param string $state Resource state.
+	 * @param string        $state Resource state.
+	 * @param Resource|null $r     The resource: a server whose app is still being installed is still getting ready.
 	 */
-	public static function group( string $state ): string {
+	public static function group( string $state, ?Resource $r = null ): string {
 		switch ( $state ) {
 			case 'ready':
-				return 'ready';
+				return $r && 'installing' === \BeltoftServices\Proxmox\AppProgress::state( $r ) ? 'getting-ready' : 'ready';
 			case 'failed':
 				return 'failed';
 			case 'paused':
@@ -78,6 +79,12 @@ final class Panel {
 			return __( 'Delayed', 'beltoft-services' );
 		}
 
+		$app = $r ? \BeltoftServices\Proxmox\AppProgress::line( $r ) : '';
+
+		if ( '' !== $app ) {
+			return $app;
+		}
+
 		$labels = array(
 			'getting-ready' => __( 'Getting ready', 'beltoft-services' ),
 			'ready'         => __( 'Ready', 'beltoft-services' ),
@@ -86,7 +93,7 @@ final class Panel {
 			'failed'        => __( 'Failed: contact us', 'beltoft-services' ),
 		);
 
-		return $labels[ self::group( $state ) ];
+		return $labels[ self::group( $state, $r ) ];
 	}
 
 	/**
@@ -104,6 +111,12 @@ final class Panel {
 		// A server that could not be set up: a delay, never what went wrong.
 		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
 			return __( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
+		}
+
+		$app = $r ? \BeltoftServices\Proxmox\AppProgress::message( $r ) : '';
+
+		if ( '' !== $app ) {
+			return $app;
 		}
 
 		$messages = array(
@@ -141,7 +154,7 @@ final class Panel {
 		}
 
 		$state = (string) $resource->get( 'state' );
-		$group = self::group( $state );
+		$group = self::group( $state, $resource );
 		$owner = ! empty( $license['user_id'] ) && (int) $license['user_id'] === get_current_user_id();
 
 		echo '<div class="beltoft-services-panel' . ( null !== $page ? ' beltoft-services-panel--page' : '' ) . '" id="beltoft-service-' . (int) $resource->id() . '"';

@@ -158,7 +158,7 @@ final class ThankYou {
 	 */
 	public static function row( Resource $r ): array {
 		$state   = (string) $r->get( 'state' );
-		$group   = Account\Panel::group( $state );
+		$group   = Account\Panel::group( $state, $r );
 		$driver  = Registry::get( (string) $r->get( 'driver' ) );
 		$kind    = $driver ? $driver->kind() : '';
 		$license = $r->license();

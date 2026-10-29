@@ -467,7 +467,7 @@ final class Overview {
 		}
 
 		$state = (string) $resource->get( 'state' );
-		$group = Panel::group( $state );
+		$group = Panel::group( $state, $resource );
 
 		if ( 'ready' === $group && ! $resource->on_hold() ) {
 			$tone = 'ok';
@@ -548,7 +548,7 @@ final class Overview {
 				'sep'   => ':',
 				'state' => __( 'Working', 'beltoft-services' ),
 				'name'  => $names[ $id ] ?? View::product_name( $license ),
-				'text'  => (string) $progress['title'],
+				'text'  => 'app' === $progress['kind'] ? \BeltoftServices\Proxmox\AppProgress::line( $resource ) : (string) $progress['title'],
 				'link'  => self::follow_url( $license ),
 				'label' => __( 'Follow it', 'beltoft-services' ),
 			);

@@ -4,7 +4,7 @@
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::page_head()): $title, $group (getting-ready, ready, paused, removed or failed),
  * $badge (the state text), $message (a sentence about the state), $show_power (the power replaces the state text),
- * $busy, $power (running, stopped or empty), $plan (the plan's name, or empty), $renews (a sentence such as "Renews 29/11/2026", or empty),
+ * $busy, $show_message (print the message line: not ready, or the app is not done), $power (running, stopped or empty), $plan (the plan's name, or empty), $renews (a sentence such as "Renews 29/11/2026", or empty),
  * $ip, $ssh_user, $actions (start, reboot, shutdown => label, the ones offered now).
  * Reboot and Shut down ask first in the page's dialog (assets/vm.js). The state text and the message are the ones the
  * status poll keeps up to date, so the elements keep their data attributes.
@@ -25,7 +25,7 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 			<?php if ( '' !== $plan ) : ?><span class="beltoft-services-page__plan"><?php echo esc_html( $plan ); ?></span><?php endif; ?>
 			<?php if ( '' !== $renews ) : ?><span class="beltoft-services-page__renews"><?php echo esc_html( $renews ); ?></span><?php endif; ?>
 		</p>
-		<p class="beltoft-services-panel__message" data-message<?php echo 'ready' === $group ? ' hidden' : ''; ?>><?php echo esc_html( $message ); ?></p>
+		<p class="beltoft-services-panel__message" data-message<?php echo ! empty( $show_message ) ? '' : ' hidden'; ?>><?php echo esc_html( $message ); ?></p>
 	</div>
 	<?php if ( '' !== $ip || $actions ) : ?>
 		<div class="beltoft-services-page__actions">

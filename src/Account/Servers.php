@@ -469,7 +469,7 @@ final class Servers {
 	 */
 	private static function row( array $view, array $license, Resource $resource ): array {
 		$state  = (string) $resource->get( 'state' );
-		$group  = Panel::group( $state );
+		$group  = Panel::group( $state, $resource );
 		$status = Operations::cached_status( $resource->id() );
 		$power  = null === $status ? '' : (string) $status['power'];
 		$busy   = (bool) Progress::build( $resource )['active'];
@@ -478,7 +478,13 @@ final class Servers {
 		$title  = (string) ( $view['product'] ?? '' );
 		$kind   = \BeltoftLicenses\Account\View::product_name( $license );
 
-		if ( $busy ) {
+		$app = $resource->on_hold() ? '' : \BeltoftServices\Proxmox\AppProgress::line( $resource );
+
+		if ( '' !== $app ) {
+			// The server is up but its app is not done: the row says so, never "Running" or "Ready".
+			$text = $app;
+			$tone = 'failed' === \BeltoftServices\Proxmox\AppProgress::state( $resource ) ? 'bad' : 'busy';
+		} elseif ( $busy ) {
 			$text = __( 'Working', 'beltoft-services' );
 			$tone = 'busy';
 		} elseif ( 'ready' === $group && ! $resource->on_hold() && 'running' === $power ) {

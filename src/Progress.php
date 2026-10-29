@@ -7,6 +7,8 @@
 
 namespace BeltoftServices;
 
+use BeltoftServices\Proxmox\AppProgress;
+use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\SshKeyField;
 
@@ -198,6 +200,7 @@ final class Progress {
 	private static function minutes( string $kind, string $driver ): int {
 		$defaults = array(
 			'build'     => 3,
+			'app'       => 3,
 			'reinstall' => 3,
 			'restore'   => 10,
 			'rollback'  => 5,
@@ -264,6 +267,12 @@ final class Progress {
 			$phase = 'queued';
 		}
 
+		// The server is ready but its app is still being installed: the build is not over for the customer.
+		if ( '' === $kind && 'installing' === AppProgress::state( $r ) ) {
+			$kind  = 'app';
+			$phase = 'running';
+		}
+
 		if ( '' === $kind ) {
 			$phase = 'idle';
 		}
@@ -289,12 +298,12 @@ final class Progress {
 			'kind'    => $kind,
 			'phase'   => $phase,
 			'active'  => in_array( $phase, array( 'queued', 'running' ), true ),
-			'title'   => '' === $kind ? '' : self::title( $kind, $driver, $marker ),
+			'title'   => 'app' === $kind ? sprintf( /* translators: %s: app name such as WordPress */ __( 'Installing %s', 'beltoft-services' ), AppProgress::name( $r ) ) : ( '' === $kind ? '' : self::title( $kind, $driver, $marker ) ),
 			'steps'   => $steps,
 			'current' => $current,
 			'minutes' => $minutes,
 			'eta'     => $eta,
-			'text'    => self::text( $kind, $phase, $marker, $eta, $driver ),
+			'text'    => 'app' === $kind ? trim( AppProgress::line( $r ) . '. ' . $eta ) : self::text( $kind, $phase, $marker, $eta, $driver ),
 			'leave'   => in_array( $phase, array( 'queued', 'running' ), true ) ? self::leave() : '',
 			'started' => self::started( $r, $kind, $marker ),
 		);
@@ -408,6 +417,10 @@ final class Progress {
 			return $marker['at'];
 		}
 
+		if ( 'app' === $kind ) {
+			return (int) $r->get( 'app_started_at' );
+		}
+
 		if ( 'build' === $kind ) {
 			$created = (string) ( $r->license()['created_at'] ?? '' );
 			$time    = '' === $created ? false : strtotime( $created . ' UTC' );
@@ -449,6 +462,19 @@ final class Progress {
 		} elseif ( 'build' === $kind ) {
 			$labels = self::build_steps()[ $driver ] ?? array();
 			$done   = array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) );
+		} elseif ( 'app' === $kind ) {
+			// The server's own steps are over; the app's steps follow them.
+			$labels = self::build_steps()[ $driver ] ?? array();
+			$done   = array_keys( $labels );
+			$info   = AppProgress::steps( $r );
+
+			foreach ( $info['codes'] as $i => $code ) {
+				$labels[ 'app_' . $code ] = self::app_label( $code );
+
+				if ( false !== $info['at'] && $i < $info['at'] ) {
+					$done[] = 'app_' . $code;
+				}
+			}
 		} else {
 			$labels = array();
 		}
@@ -488,7 +514,28 @@ final class Progress {
 			);
 		}
 
+		// A server that will get an app lists the app's steps after its own, all still to do.
+		if ( in_array( $kind, array( 'build', 'reinstall' ), true ) && SshKeyField::DRIVER === $driver && AppProgress::planned( $r ) ) {
+			foreach ( AppProgress::steps( $r )['codes'] as $code ) {
+				$out[] = array(
+					'key'          => 'app_' . $code,
+					'label'        => self::app_label( $code ),
+					'status'       => 'todo',
+					'status_label' => self::status_label( 'todo' ),
+				);
+			}
+		}
+
 		return $out;
+	}
+
+	/**
+	 * The words for a step of an app's install.
+	 *
+	 * @param string $code Step code.
+	 */
+	private static function app_label( string $code ): string {
+		return AppTab::step_labels()[ $code ] ?? __( 'Installing', 'beltoft-services' );
 	}
 
 	/**

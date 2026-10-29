@@ -54,7 +54,8 @@ final class Panels {
 		}
 
 		$state   = (string) $resource->get( 'state' );
-		$group   = \BeltoftServices\Account\Panel::group( $state );
+		$group   = \BeltoftServices\Account\Panel::group( $state, $resource );
+		$app     = '' !== AppProgress::state( $resource ) && ! $resource->on_hold();
 		$status  = Operations::cached_status( $resource->id() );
 		$power   = null === $status ? '' : (string) $status['power'];
 		$busy    = (bool) \BeltoftServices\Progress::build( $resource )['active'];
@@ -68,8 +69,10 @@ final class Panels {
 			'group'      => $group,
 			'badge'      => \BeltoftServices\Account\Panel::label( $state, $resource ),
 			'message'    => \BeltoftServices\Account\Panel::message( $state, $resource ),
-			'show_power' => 'ready' === $group && ! $resource->on_hold() && ( $busy || isset( array( 'running' => 1, 'stopped' => 1 )[ $power ] ) ),
+			// The app's words replace the power while the app is not done: the server is not simply "Running" yet.
+			'show_power' => ! $app && 'ready' === $group && ! $resource->on_hold() && ( $busy || isset( array( 'running' => 1, 'stopped' => 1 )[ $power ] ) ),
 			'busy'       => $busy,
+			'show_message' => 'ready' !== $group || $app,
 			'power'      => $power,
 			'plan'       => $product !== $title ? $product : '',
 			'renews'     => \BeltoftServices\Account\Servers::renewal( $license ),
