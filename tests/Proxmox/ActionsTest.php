@@ -820,8 +820,8 @@ class ActionsTest extends TestCase {
 
 		$html = $this->panel( $r, $owner );
 
-		$this->assertMatchesRegularExpression( '#<option value="9000"[^>]*selected#', $html );
-		$this->assertDoesNotMatchRegularExpression( '#<option value="9001"[^>]*selected#', $html );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio" name="os" value="9000" checked#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<input[^>]*type="radio" name="os" value="9001" checked#', $html );
 	}
 
 	public function test_a_permanent_cipassword_failure_restores_the_unread_first_password(): void {
@@ -899,14 +899,14 @@ class ActionsTest extends TestCase {
 		$this->assertStringContainsString( 'name="confirm"', $html );
 		$this->assertStringContainsString( 'Add SSH key', $html );
 		$this->assertStringContainsString( 'name="os"', $html );
-		$this->assertMatchesRegularExpression( '#<option value="9000"[^>]*selected#', $html, 'The current system is preselected.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio" name="os" value="9000" checked#', $html, 'The current system is preselected.' );
 	}
 
 	public function test_reinstall_form_preselects_the_current_os(): void {
 		list( $r, $owner ) = $this->ready( array( 'os_template' => 9001 ) );
 
-		$this->assertMatchesRegularExpression( '#<option value="9001"[^>]*selected#', $this->panel( $r, $owner ) );
-		$this->assertDoesNotMatchRegularExpression( '#<option value="9000"[^>]*selected#', $this->panel( $r, $owner ) );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio" name="os" value="9001" checked#', $this->panel( $r, $owner ) );
+		$this->assertDoesNotMatchRegularExpression( '#<input[^>]*type="radio" name="os" value="9000" checked#', $this->panel( $r, $owner ) );
 	}
 
 	public function test_panel_never_prints_the_password(): void {
