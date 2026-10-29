@@ -8,7 +8,7 @@
 
 	var account = window.beltoftServicesAccount;
 	var app = window.beltoftServicesApp;
-	var labels = { admin_user: 'user', admin_password: 'pass', root_email: 'email', root_password: 'pass' };
+	var labels = { admin_user: 'user', admin_password: 'pass', root_email: 'email', root_password: 'pass', encryption_key: 'key' };
 
 	if ( ! account || ! app || ! window.fetch ) {
 		return;
