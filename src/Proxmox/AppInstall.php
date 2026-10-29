@@ -107,12 +107,18 @@ final class AppInstall {
 		AppAlerts::failure( $r, $reason );
 	}
 
+	/** Tries at a zone read or write before the domain is dropped. */
+	private const DOMAIN_TRIES = 4;
+
 	/**
 	 * The domain the app is served on. When the customer ticked the box at checkout, the A record is made now, once,
-	 * in a zone the customer still holds with us. If it cannot be made the app is installed without a domain (plain
-	 * HTTP at the address) and the App tab says so; the server and the install never wait for DNS.
+	 * in a zone the customer still holds with us. A DNS failure that may pass is tried again a few times; a name that
+	 * can never be used is dropped at once. A dropped domain installs the app without one (plain HTTP at the address),
+	 * the App tab says so and an admin is told; the server and the install never wait for DNS for long.
+	 *
+	 * @return string|StepResult The domain ('' for none), or a poll result to look again shortly.
 	 */
-	private static function domain( Resource $resource, string $ip, int $user_id ): string {
+	private static function domain( Resource $resource, string $ip, int $user_id ) {
 		$done = (string) $resource->get( 'app_domain' );
 		$want = (string) $resource->get( 'app_domain_want' );
 
@@ -127,7 +133,17 @@ final class AppInstall {
 			return $want;
 		}
 
+		if ( is_wp_error( $made ) ) {
+			$tries = (int) $resource->get( 'app_domain_tries' ) + 1;
+			if ( $tries < self::DOMAIN_TRIES ) {
+				$resource->set( array( 'app_domain_tries' => $tries ) );
+				return StepResult::poll( 30, 'app: DNS did not answer, trying again', 900 );
+			}
+			$made = $made->get_error_message();
+		}
+
 		$resource->set( array( 'app_domain_error' => $made ) );
+		AppAlerts::domain_dropped( $resource, $want, $made );
 
 		return '';
 	}
@@ -156,6 +172,9 @@ final class AppInstall {
 			}
 		}
 		$domain = self::domain( $resource, (string) $ip['address'], (int) ( $license['user_id'] ?? 0 ) );
+		if ( $domain instanceof StepResult ) {
+			return $domain;
+		}
 		$job = array(
 			'v' => 1,
 			'op' => 'install',

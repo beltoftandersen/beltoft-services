@@ -43,6 +43,10 @@ final class AppDomains {
 			if ( 'dns' === $r->get( 'driver' ) && ! Zone::served_for( $name, $user_id ) ) {
 				continue;
 			}
+			// A registered domain needs the same proof: not another customer's name, and a zone that is ours for this customer.
+			if ( 'domain' === $r->get( 'driver' ) && ( 'other' === Zone::owner( $r ) || ! ( $r->get( 'zone_ready' ) || $r->get( 'zone_claimed' ) || Zone::served_for( $name, $user_id ) ) ) ) {
+				continue;
+			}
 			$zones[ $name ] = $name;
 		}
 		$zones = array_values( $zones );
@@ -120,10 +124,25 @@ final class AppDomains {
 	}
 
 	/**
-	 * Adds the A record. Every record already in the zone is kept as it is; a name that has an address
-	 * record already is refused; a zone that is not the customer's is refused.
+	 * Would a name and address make a record the DNS layer accepts? Used at checkout so a customer is refused before paying.
 	 *
-	 * @return true|string True when the record is there, or the reason in plain words.
+	 * @return string|null The reason, or null when the record could be written.
+	 */
+	public static function dry_run( string $zone, string $fqdn ): ?string {
+		$labels = explode( '.', $fqdn );
+		if ( strlen( $fqdn ) > 253 || count( array_filter( $labels, static fn( $l ) => strlen( $l ) > 63 || '' === $l ) ) > 0 ) {
+			return 'The domain name is too long.';
+		}
+		$set = Records::validate( $zone, array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => '192.0.2.1' ) ) );
+		return is_wp_error( $set ) ? 'The domain name is not valid for a DNS record.' : null;
+	}
+
+	/**
+	 * Adds the A record as one RRset of its own: nothing else in the zone is read back and rewritten. A name
+	 * that has an address record already is refused; a zone that is not the customer's is refused.
+	 *
+	 * @return true|string|\WP_Error True when the record is there, the reason in plain words when it can never work,
+	 *                               or a WP_Error when the DNS layer failed and a later try may succeed.
 	 */
 	public static function publish( int $user_id, string $zone, string $fqdn, string $ip ) {
 		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
@@ -132,13 +151,20 @@ final class AppDomains {
 		if ( ! in_array( $zone, self::zones( $user_id ), true ) || ( $fqdn !== $zone && ! str_ends_with( $fqdn, '.' . $zone ) ) ) {
 			return 'The domain is not one of your domains on our name servers.';
 		}
-		$zone_data = DnsClients::dns()->zone( $zone );
-		if ( ! is_array( $zone_data ) ) {
-			return 'The DNS zone could not be read.';
+		$set = Records::validate( $zone, array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => $ip ) ) );
+		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
+			return 'The domain name is not valid for a DNS record.';
 		}
-		$rows = Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) );
+		// Read immediately before the write: what is at the name now decides.
+		$zone_data = DnsClients::dns()->zone( $zone );
+		if ( is_wp_error( $zone_data ) ) {
+			return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
+		}
+		if ( ! is_array( $zone_data ) ) {
+			return 'The DNS zone does not exist.';
+		}
 		$have = array();
-		foreach ( $rows as $row ) {
+		foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
 			if ( in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) && self::row_name( $zone, (string) $row['name'] ) === $fqdn ) {
 				$have[ $row['type'] ][] = (string) $row['value'];
 			}
@@ -149,8 +175,8 @@ final class AppDomains {
 		if ( array() !== $have ) {
 			return 'The name already has a DNS record.';
 		}
-		$rows[] = array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => $ip );
-		$done   = Records::replace( $zone, $rows );
-		return is_wp_error( $done ) ? 'The DNS record could not be saved.' : true;
+		$set[0]['changetype'] = 'REPLACE';
+		$done = DnsClients::dns()->replace_rrsets( $zone, $set );
+		return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : true;
 	}
 }

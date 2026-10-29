@@ -148,6 +148,11 @@ final class AppField {
 		}
 
 		$fqdn = AppDomains::fqdn( $zone, $sub );
+		$bad  = AppDomains::dry_run( $zone, $fqdn );
+
+		if ( null !== $bad ) {
+			return str_contains( $bad, 'long' ) ? __( 'That domain name is too long. A name can have up to 253 characters and each part up to 63. Choose a shorter subdomain.', 'beltoft-services' ) : __( 'That domain name cannot be used for a DNS record. Choose another subdomain.', 'beltoft-services' );
+		}
 
 		if ( $check_dns ) {
 			$free = AppDomains::is_free( $zone, $fqdn );

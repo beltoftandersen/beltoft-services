@@ -405,6 +405,45 @@ class ProvisionTest extends TestCase {
 		}
 	}
 
+	public function test_ready_without_a_readable_login_for_ten_minutes_is_a_failed_install_with_one_alert(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$filter = static function ( $data ) {
+			$data['credentials'] = array( 'admin_password' );
+			return $data;
+		};
+		add_filter( 'beltoft_services_apps', $filter );
+		try {
+			$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+			$this->assert_done( $this->run_provision( $resource ) );
+			$resource->set( array( 'state' => 'ready' ) );
+			AppInstall::run( $resource->id() );
+			$fresh = Resource::find( $resource->id() );
+			$this->fake->simulate_app( 5000, $fresh->get( 'app_request' ), 'ready', 'complete' );
+
+			AppStatus::check( $fresh, $this->fake, 'node-a', 5000 );
+			$fresh = Resource::find( $resource->id() );
+			$this->assertSame( 'installing', $fresh->get( 'app_state' ), 'Not yet: the login may still appear.' );
+			$this->assertSame( 'credentials', $fresh->get( 'app_step' ) );
+			$this->assertSame( 0, $this->app_mails );
+
+			$fresh->set( array( 'app_ready_since' => time() - 601 ) );
+			AppStatus::check( Resource::find( $resource->id() ), $this->fake, 'node-a', 5000 );
+			$fresh = Resource::find( $resource->id() );
+			$this->assertSame( 'failed', $fresh->get( 'app_state' ) );
+			$this->assertSame( 'credentials', $fresh->get( 'app_step' ) );
+			$this->assertSame( 'ready', $fresh->get( 'state' ), 'The server is not affected.' );
+			$this->assertSame( 1, $this->app_mails );
+		} finally {
+			remove_filter( 'beltoft_services_apps', $filter );
+		}
+	}
+
 	public function test_app_job_retries_with_the_same_request_after_guest_directory_race(): void {
 		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
 		$this->cluster( array(

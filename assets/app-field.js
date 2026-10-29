@@ -32,10 +32,12 @@
 		apps = {};
 	}
 
-	function lockSystem( on ) {
+	function lockSystem( on, force ) {
 		if ( ! system || ! os ) {
 			return;
 		}
+
+		var before = system.value;
 
 		if ( on && null === remembered ) {
 			remembered = system.value;
@@ -51,9 +53,20 @@
 			system.value = remembered;
 			remembered = null;
 		}
+
+		if ( ! force && system.value === before ) {
+			return;
+		}
+
+		// The order summary reads the choice from the session: tell the form it changed.
+		system.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+
+		if ( window.jQuery ) {
+			window.jQuery( document.body ).trigger( 'update_checkout' );
+		}
 	}
 
-	function update() {
+	function update( event ) {
 		var chosen = apps[ select.value ];
 
 		versionRow.hidden = ! chosen;
@@ -62,7 +75,7 @@
 		}
 
 		version.textContent = '';
-		lockSystem( !! chosen );
+		lockSystem( !! chosen, !! event );
 
 		if ( ! chosen ) {
 			note.textContent = plain;

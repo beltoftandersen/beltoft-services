@@ -330,12 +330,86 @@ class AppTabTest extends MonitoringTestCase {
 		return (string) ob_get_clean();
 	}
 
-	public function test_a_server_without_an_app_gets_no_app_choice_when_reinstalled(): void {
-		$r = $this->ready_vm();
-		$this->assertSame( '', $this->reinstall_html( $r ) );
-		$this->assertNull( AppReinstall::check( null, $r, array( 'app_version' => 'none' ) ) );
+	private function plain( array $plan = array(), int $vmid = 5000 ): Resource {
+		$r = $this->ready_vm( $vmid );
+		$r->set( array( 'ip' => '192.0.2.10', OsField::META => 9000, 'plan' => array_merge( array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 ), $plan ) ) );
+
+		return Resource::find( $r->id() );
+	}
+
+	public function test_a_server_without_an_app_is_offered_apps_with_no_app_as_the_default(): void {
+		$r    = $this->plain();
+		$html = $this->reinstall_html( $r );
+
+		$this->assertMatchesRegularExpression( '#<option value="none" selected="selected">No app, keep as it is</option>#', $html );
+		$this->assertStringContainsString( '<option value="wordpress/7.1.4">', $html );
+		$this->assertStringContainsString( '<option value="docker/29">', $html );
+		$this->assertStringContainsString( 'name="app_version"', $html );
+		$this->assertStringContainsString( 'data-os="9001"', $html );
+		$this->assertStringContainsString( 'Ubuntu 24.04', $html, 'The forced system is said plainly.' );
+		$this->assertStringContainsString( 'disabled', $html, 'Coolify is too big for this plan.' );
+		$this->assertStringContainsString( 'needs the Performance plan or larger', $html );
+		$this->assertStringNotContainsString( 'Docker Engine 27', $html );
+		$this->assertStringNotContainsString( 'name="domain', $html, 'No domain picker on a reinstall.' );
+	}
+
+	public function test_no_apps_are_offered_when_the_cluster_is_not_ready_or_the_app_is_not_enabled(): void {
+		$this->cluster( array( 'apps_ready' => 0 ) );
+		$this->assertSame( '', $this->reinstall_html( $this->plain() ) );
+
+		$this->cluster( array( 'apps_enabled' => array( 'docker' ) ) );
+		$html = $this->reinstall_html( $this->plain( array(), 5001 ) );
+		$this->assertStringContainsString( 'docker/29', $html );
+		$this->assertStringNotContainsString( 'wordpress/', $html );
+	}
+
+	public function test_no_app_keeps_a_plain_reinstall_unchanged_and_an_app_sets_ubuntu_and_a_fresh_install(): void {
+		$r    = $this->plain();
 		$meta = array( 'wipe' => true );
-		$this->assertSame( $meta, AppReinstall::meta( $meta, $r, array( 'app_version' => 'none' ) ) );
+
+		foreach ( array( array(), array( 'app_version' => 'none' ), array( 'app_version' => 'keep' ), array( 'app_version' => '' ) ) as $args ) {
+			$this->assertNull( AppReinstall::check( null, $r, $args ) );
+			$this->assertSame( $meta, AppReinstall::meta( $meta, $r, $args ) );
+		}
+
+		$args = array( 'app_version' => 'wordpress/7.1.4', 'os' => '9001' );
+		$this->assertNull( AppReinstall::check( null, $r, $args ) );
+		$this->assertNull( AppReinstall::check( null, $r, array( 'app_version' => 'wordpress/7.1.4' ) ), 'No system posted: the app sets it.' );
+		$out = AppReinstall::meta( $meta, $r, array( 'app_version' => 'wordpress/7.1.4', 'os' => '9000' ) );
+		$this->assertTrue( $out['wipe'] );
+		$this->assertSame( 'wordpress', $out['app_id'] );
+		$this->assertSame( '7.1.4', $out['app_version'] );
+		$this->assertSame( 9001, $out[ OsField::META ], 'Ubuntu 24.04 whatever was posted.' );
+		$this->assertNull( $out['app_state'] );
+		$this->assertNull( $out['app_request'] );
+	}
+
+	public function test_a_plain_server_reinstall_cannot_get_an_app_by_a_crafted_post(): void {
+		$r = $this->plain();
+
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => 'wordpress/0.0.1' ) ) );
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => 'nope/1' ) ) );
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => '../../x/1' ) ) );
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => '7.1.4' ) ) );
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => array( 'x' ) ) ) );
+		$this->assertStringContainsString( 'needs Ubuntu 24.04', (string) AppReinstall::check( null, $r, array( 'app_version' => 'wordpress/7.1.4', 'os' => '9000' ) ) );
+		$this->assertSame( 'already refused', AppReinstall::check( 'already refused', $r, array( 'app_version' => 'wordpress/7.1.4' ) ) );
+
+		$small = $this->plain( array( 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 25 ), 5002 );
+		$this->assertSame( 'Coolify needs the Performance plan or larger. Choose a larger plan or no app.', AppReinstall::check( null, $small, array( 'app_version' => 'coolify/4.5.1' ) ) );
+		$this->assertSame( array( 'wipe' => true ), AppReinstall::meta( array( 'wipe' => true ), $r, array( 'app_version' => 'nope/1' ) ), 'An invalid pick changes nothing.' );
+
+		$this->cluster( array( 'apps_enabled' => array( 'docker' ) ) );
+		$this->assertNotNull( AppReinstall::check( null, $r, array( 'app_version' => 'wordpress/7.1.4' ) ), 'Not enabled here.' );
+		$this->cluster( array( 'apps_ready' => 0 ) );
+		$this->assertNotNull( AppReinstall::check( null, $r, array( 'app_version' => 'docker/29' ) ) );
+	}
+
+	public function test_the_reinstall_action_still_needs_the_confirmation_for_an_app(): void {
+		$r = $this->plain();
+		$this->assertStringContainsString( 'REINSTALL', (string) Actions::check( $r, 'reinstall', array( 'app_version' => 'wordpress/7.1.4' ) ) );
+		$this->assertNotSame( 'Choose one of the listed app versions.', (string) Actions::check( $r, 'reinstall', array( 'confirm' => Actions::CONFIRM, 'app_version' => 'wordpress/7.1.4' ) ) );
+		$this->assertSame( 'Choose one of the listed app versions.', Actions::check( $r, 'reinstall', array( 'confirm' => Actions::CONFIRM, 'app_version' => 'wordpress/9.9' ) ) );
 	}
 
 	public function test_the_default_is_the_same_app_and_version_and_none_is_offered(): void {
@@ -349,6 +423,31 @@ class AppTabTest extends MonitoringTestCase {
 
 		$both = $this->page( $r, 'reinstall' );
 		$this->assertStringContainsString( 'data-app-reinstall-select', $both, 'The form prints the choice.' );
+	}
+
+	public function test_the_domain_notice_shows_in_every_state(): void {
+		$vmid = 5100;
+		foreach ( array( 'pending' => 'The app uses the server address instead.', 'installing' => 'The app uses the server address instead.', 'ready' => 'The app uses the server address instead.', 'failed' => '' ) as $state => $tail ) {
+			$r    = $this->with_app( array( 'app_state' => $state, 'app_step' => 'packages', 'app_domain_want' => 'shop.mine.example', 'app_domain_error' => 'The name already has a DNS record.' ), ++$vmid );
+			$pane = $this->pane( $this->page( $r, 'app' ) );
+			$this->assertStringContainsString( 'The domain shop.mine.example could not be pointed at this server.', $pane, $state );
+			if ( '' !== $tail ) {
+				$this->assertStringContainsString( $tail, $pane, $state );
+			} else {
+				$this->assertStringNotContainsString( 'The app uses the server address', $pane, $state );
+			}
+		}
+
+		$quiet = $this->with_app( array( 'app_state' => 'installing', 'app_step' => 'packages' ), ++$vmid );
+		$this->assertStringNotContainsString( 'could not be pointed', $this->pane( $this->page( $quiet, 'app' ) ) );
+	}
+
+	public function test_the_refusal_says_what_is_wrong_and_the_system_wording_is_only_for_the_system(): void {
+		$r = $this->with_app();
+		$this->cluster( array( 'apps_ready' => 0 ) );
+		$why = (string) AppReinstall::check( null, $r, array( 'app_version' => 'keep' ) );
+		$this->assertSame( 'The app is not enabled on this cluster.', $why );
+		$this->assertStringNotContainsString( 'Ubuntu', $why );
 	}
 
 	public function test_other_versions_are_listed_and_a_retired_server_version_preselects_the_current_one_with_a_note(): void {

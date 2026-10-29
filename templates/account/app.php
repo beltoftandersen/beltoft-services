@@ -88,16 +88,17 @@ $beltoft_services_status_text = array(
 		<?php endif; ?>
 	<?php endif; ?>
 
-	<?php if ( 'ready' === $beltoft_services_kind && $view['domain_failed'] ) : ?>
-		<p class="description">
+	<?php if ( $view['domain_failed'] ) : ?>
+		<p class="description" data-app-domain-notice>
 			<?php
 			echo esc_html(
 				sprintf(
 					/* translators: %s: a domain name */
-					__( 'The domain %s could not be pointed at this server, so the app is on the server address. Check the domain in your DNS settings.', 'beltoft-services' ),
+					__( 'The domain %s could not be pointed at this server. Check the domain in your DNS settings.', 'beltoft-services' ),
 					(string) $view['domain_wanted']
 				)
 			);
+			echo ' ' . ( 'failed' === $beltoft_services_kind ? '' : esc_html__( 'The app uses the server address instead.', 'beltoft-services' ) );
 			?>
 		</p>
 	<?php endif; ?>

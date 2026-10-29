@@ -11,6 +11,8 @@ defined( 'ABSPATH' ) || exit;
 final class AppStatus {
 	public const HOOK = 'beltoft_services_app_check';
 	private const LIMIT = 21600;
+	/** Seconds a ready app may wait for its login file. */
+	public const CREDENTIALS_WAIT = 600;
 
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
@@ -88,8 +90,15 @@ final class AppStatus {
 			if ( 'ready' === $state ) {
 				$credentials = self::credentials( $r, $client, $node, $vmid );
 				if ( array() !== (array) ( $app['credentials'] ?? array() ) && null === $credentials ) {
+					$since = (int) $r->get( 'app_ready_since' );
+					$since = $since > 0 ? $since : time();
+					$meta['app_ready_since'] = $since;
 					$meta['app_state'] = 'installing';
 					$meta['app_step'] = 'credentials';
+					// Ready, but the login cannot be read: not for ever. After ten minutes it is a failed install.
+					if ( time() - $since > self::CREDENTIALS_WAIT ) {
+						$meta['app_state'] = 'failed';
+					}
 				} else {
 					$meta['app_installed_at'] = time();
 				}
@@ -101,6 +110,8 @@ final class AppStatus {
 			$r->set( $meta );
 			if ( 'failed' === $state ) {
 				AppAlerts::failure( $r, 'Installation failed at ' . $status['step'] );
+			} elseif ( 'failed' === $meta['app_state'] ) {
+				AppAlerts::failure( $r, 'The app reported ready but its login could not be read for ' . ( self::CREDENTIALS_WAIT / 60 ) . ' minutes' );
 			}
 		} elseif ( time() - (int) $r->get( 'app_started_at' ) > 1800 ) {
 			$r->set( array( 'app_state' => 'unknown', 'app_checked_at' => time() ) );

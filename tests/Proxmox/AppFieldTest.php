@@ -13,6 +13,7 @@ use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\AppAlerts;
 use BeltoftServices\Proxmox\AppDomains;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppInstall;
@@ -172,7 +173,7 @@ class AppFieldTest extends TestCase {
 	private function domain( int $user, string $name, array $meta = array(), array $rows = array() ): Resource {
 		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
-		$r       = Resource::create( $license, new DomainDriver(), array(), array_merge( array( 'domain' => $name, 'mode' => 'register' ), $meta ) );
+		$r       = Resource::create( $license, new DomainDriver(), array(), array_merge( array( 'domain' => $name, 'mode' => 'register', 'zone_ready' => true ), $meta ) );
 		$this->assertInstanceOf( Resource::class, $r );
 		$r->set( array( 'state' => 'ready' ) );
 		$this->assertTrue( DnsClients::dns()->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) ) );
@@ -617,6 +618,206 @@ class AppFieldTest extends TestCase {
 		AppField::assets();
 		$this->assertFalse( wp_script_is( AppField::HANDLE, 'enqueued' ), 'No field, no script.' );
 		remove_filter( 'woocommerce_is_checkout', '__return_true' );
+	}
+
+	// -- Review fixes ---------------------------------------------------------------------------
+
+	public function test_the_script_tells_the_order_summary_when_it_forces_or_restores_the_system(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-field.js' );
+		$this->assertStringContainsString( "new Event( 'change', { bubbles: true } )", $js );
+		$this->assertStringContainsString( "window.jQuery( document.body ).trigger( 'update_checkout' )", $js );
+		$this->assertMatchesRegularExpression( '/if \( window\.jQuery \)/', $js );
+	}
+
+	public function test_a_registered_domain_needs_proof_that_the_zone_is_ours_for_this_customer(): void {
+		$me    = self::factory()->user->create();
+		$other = self::factory()->user->create();
+
+		$this->domain( $me, 'ready.example' );
+		$this->domain( $me, 'claimed.example', array( 'zone_ready' => false, 'zone_claimed' => true ) );
+		$this->domain( $me, 'unproven.example', array( 'zone_ready' => false ) );
+		$this->domain( $me, 'served.example', array( 'zone_ready' => false ) );
+		$this->domain( $me, 'taken.example' );
+
+		global $wpdb;
+		$table = \BeltoftServices\Domains\DnsSchema::tables()['assignments'];
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( $me, 11, 'served.example' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( $table, array( 'status' => 'active' ), array( 'domain' => 'served.example' ) );
+		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( $other, 12, 'taken.example' ) );
+
+		$this->assertSame( array( 'claimed.example', 'ready.example', 'served.example' ), AppDomains::zones( $me ), 'Not unproven, not assigned to someone else.' );
+		$this->assertSame( array( 'Choose one of your domains that uses our name servers.' ), $this->check_for( $me, 'taken.example' ) );
+	}
+
+	private function check_for( int $user, string $zone ): array {
+		wp_set_current_user( $user );
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+
+		return $this->check( array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => '1', AppField::POST_ZONE => $zone, AppField::POST_SUB => 'shop' ) );
+	}
+
+	/** A DNS fake that fails a number of reads or writes first, like a name server that is briefly down. */
+	private function flaky( int $reads, int $writes ): FakeDns {
+		$dns = new class( true ) extends FakeDns {
+			public int $reads  = 0;
+			public int $writes = 0;
+
+			public function zone( string $name ): array|\WP_Error|null {
+				if ( $this->reads > 0 ) {
+					--$this->reads;
+					return new \WP_Error( 'down', 'down' );
+				}
+
+				return parent::zone( $name );
+			}
+
+			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+				if ( $this->writes > 0 ) {
+					--$this->writes;
+					return new \WP_Error( 'down', 'down' );
+				}
+
+				return parent::replace_rrsets( $zone, $rrsets );
+			}
+		};
+		$dns->reads  = $reads;
+		$dns->writes = $writes;
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+
+		return $dns;
+	}
+
+	/** Subjects of the mails sent from now on, nothing leaves the test. */
+	private function mail_log( array &$sent ): void {
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $args ) use ( &$sent ) {
+				$sent[] = $args['subject'];
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft+test@gmail.com' ) );
+	}
+
+	private function domain_server( int $user ): array {
+		$this->domain( $user, 'mine.example', array(), array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 600, 'value' => '192.0.2.77' ) ) );
+
+		return $this->server( $user, array( 'app_id' => 'wordpress', 'app_version' => '7.1.4', 'app_zone' => 'mine.example', 'app_domain_want' => 'shop.mine.example', 'app_state' => 'pending', OsField::META => 9001 ) );
+	}
+
+	public function test_a_dns_failure_that_passes_is_tried_again_and_then_the_domain_is_made(): void {
+		$me = self::factory()->user->create();
+		[ $r, $fake ] = $this->domain_server( $me );
+		$dns  = $this->flaky( 1, 1 );
+		$sent = array();
+		$this->mail_log( $sent );
+
+		$first = AppInstall::queue( $r, $fake );
+		$this->assertTrue( $first->is_poll(), 'The zone read failed: look again, do not drop the domain.' );
+		$this->assertNull( Resource::find( $r->id() )->get( 'app_domain_error' ) );
+
+		$second = AppInstall::queue( Resource::find( $r->id() ), $fake );
+		$this->assertTrue( $second->is_poll(), 'The write failed.' );
+
+		$third = AppInstall::queue( Resource::find( $r->id() ), $fake );
+		$this->assertTrue( $third->is_done(), $third->error() );
+		$this->assertSame( 'shop.mine.example', Resource::find( $r->id() )->get( 'app_domain' ) );
+		$this->assertSame( 'shop.mine.example', json_decode( $fake->guest_file( 5000, Apps::JOB ), true )['domain'] );
+		$this->assertSame( array(), $sent );
+		$this->assertSame( 0, $dns->reads );
+	}
+
+	public function test_a_dns_failure_that_stays_drops_the_domain_after_a_few_tries_and_tells_an_admin_once(): void {
+		$me = self::factory()->user->create();
+		[ $r, $fake ] = $this->domain_server( $me );
+		$this->flaky( 99, 0 );
+		$sent = array();
+		$this->mail_log( $sent );
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$this->assertTrue( AppInstall::queue( Resource::find( $r->id() ), $fake )->is_poll(), 'Try ' . ( $i + 1 ) );
+		}
+
+		$this->assertSame( array(), $sent );
+		$this->assertTrue( AppInstall::queue( Resource::find( $r->id() ), $fake )->is_done(), 'The install goes on without the domain.' );
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( 'app_domain' ) );
+		$this->assertNotSame( '', (string) $fresh->get( 'app_domain_error' ) );
+		$this->assertSame( '', json_decode( $fake->guest_file( 5000, Apps::JOB ), true )['domain'] );
+		$this->assertSame( array( 'App domain dropped for server ' . $r->id() ), $sent );
+
+		AppAlerts::domain_dropped( Resource::find( $r->id() ), 'shop.mine.example', 'again' );
+		$this->assertCount( 1, $sent, 'One alert only.' );
+	}
+
+	public function test_a_name_that_already_has_a_record_is_dropped_at_once_with_one_alert(): void {
+		$me = self::factory()->user->create();
+		$this->domain( $me, 'mine.example', array(), array( array( 'name' => 'shop', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.99' ) ) );
+		[ $r, $fake ] = $this->server( $me, array( 'app_id' => 'wordpress', 'app_version' => '7.1.4', 'app_zone' => 'mine.example', 'app_domain_want' => 'shop.mine.example', 'app_state' => 'pending', OsField::META => 9001 ) );
+		$sent = array();
+		$this->mail_log( $sent );
+
+		$this->assertTrue( AppInstall::queue( $r, $fake )->is_done(), 'No waiting for a definite refusal.' );
+		$this->assertSame( 'The name already has a DNS record.', Resource::find( $r->id() )->get( 'app_domain_error' ) );
+		$this->assertCount( 1, $sent );
+	}
+
+	public function test_only_the_new_a_set_is_written_and_nothing_else_in_the_zone_is_touched(): void {
+		$me  = self::factory()->user->create();
+		$dns = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		[ $r, $fake ] = $this->domain_server( $me );
+
+		$this->assertTrue( AppInstall::queue( $r, $fake )->is_done() );
+
+		$writes = array_values( array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] && 'mine.example' === $c[1] ) );
+		$last   = end( $writes );
+		$this->assertCount( 1, $last[2], 'One RRset in the write.' );
+		$this->assertSame( 'shop.mine.example.', $last[2][0]['name'] );
+		$this->assertSame( 'A', $last[2][0]['type'] );
+		$this->assertSame( 'REPLACE', $last[2][0]['changetype'] );
+		$this->assertSame( '192.0.2.10', $last[2][0]['records'][0]['content'] );
+		$this->assertFalse( $last[2][0]['records'][0]['disabled'] );
+	}
+
+	public function test_an_address_or_alias_record_at_the_name_stops_the_write(): void {
+		$me = self::factory()->user->create();
+
+		foreach ( array( 'AAAA' => '2001:db8::1', 'CNAME' => 'other.mine.example' ) as $type => $value ) {
+			$name = strtolower( $type ) . 'host';
+			$this->domain( $me, $name . '.example', array(), array( array( 'name' => 'shop', 'type' => $type, 'ttl' => 300, 'value' => $value ) ) );
+			$dns    = new FakeDns( true );
+			add_filter( 'beltoft_services_domains_dns', static fn() => $dns, 20 );
+			$made   = AppDomains::publish( $me, $name . '.example', 'shop.' . $name . '.example', '192.0.2.10' );
+			$this->assertSame( 'The name already has a DNS record.', $made, $type );
+			$writes = array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] );
+			$this->assertSame( array(), array_values( $writes ), 'No write for ' . $type );
+		}
+
+		$this->domain( $me, 'same.example', array(), array( array( 'name' => 'shop', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) );
+		$this->assertTrue( AppDomains::publish( $me, 'same.example', 'shop.same.example', '192.0.2.10' ), 'Exactly this server is fine.' );
+	}
+
+	public function test_a_name_the_dns_layer_would_refuse_is_refused_at_checkout_before_payment(): void {
+		$me   = self::factory()->user->create();
+		$zone = str_repeat( 'a', 63 ) . '.' . str_repeat( 'b', 63 ) . '.' . str_repeat( 'c', 63 ) . '.example';
+		$this->domain( $me, $zone );
+		$this->domain( $me, 'mine.example' );
+		wp_set_current_user( $me );
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+
+		$long = $this->check( array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => '1', AppField::POST_ZONE => $zone, AppField::POST_SUB => str_repeat( 'd', 40 ) . '.' . str_repeat( 'e', 40 ) ) );
+		$this->assertCount( 1, $long );
+		$this->assertStringContainsString( 'too long', $long[0] );
+		$this->assertSame( array(), $this->check( array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => '1', AppField::POST_ZONE => 'mine.example', AppField::POST_SUB => 'ok' ) ) );
+
+		$this->assertSame( 'The domain name is too long.', AppDomains::dry_run( 'mine.example', str_repeat( 'x', 64 ) . '.mine.example' ), 'A part over 63.' );
+		$this->assertSame( 'The domain name is too long.', AppDomains::dry_run( $zone, str_repeat( 'f', 60 ) . '.' . $zone ) );
+		$this->assertNull( AppDomains::dry_run( 'mine.example', 'shop.mine.example' ) );
+		$this->assertNotNull( AppDomains::dry_run( 'mine.example', 'bad_name!.mine.example' ) );
 	}
 
 	public function test_subdomain_rules(): void {
