@@ -113,6 +113,10 @@ final class AppStatus {
 			} elseif ( 'failed' === $meta['app_state'] ) {
 				AppAlerts::failure( $r, 'The app reported ready but its login could not be read for ' . ( self::CREDENTIALS_WAIT / 60 ) . ' minutes' );
 			}
+		} elseif ( self::bootstrap_failed( $status, $r ) ) {
+			// The guest could not read the job at all (no request id to match): failed now, not after half an hour.
+			$r->set( array( 'app_state' => 'failed', 'app_step' => 'download', 'app_checked_at' => time() ) );
+			AppAlerts::failure( $r, 'The guest could not start the installation (it reported a failure without a request id)' );
 		} elseif ( time() - (int) $r->get( 'app_started_at' ) > 1800 ) {
 			$r->set( array( 'app_state' => 'unknown', 'app_checked_at' => time() ) );
 			AppAlerts::failure( $r, 'Installation has not reported a valid status within 30 minutes' );
@@ -120,6 +124,22 @@ final class AppStatus {
 		if ( in_array( $r->get( 'app_state' ), array( 'installing', 'unknown' ), true ) && time() - (int) $r->get( 'app_started_at' ) < self::LIMIT ) {
 			self::schedule( $r->id(), time() - (int) $r->get( 'app_started_at' ) < 120 ? 15 : 30 );
 		}
+	}
+
+	/**
+	 * A guest status that says failed with an empty request id and was written after our job (app_started_at): the
+	 * bootstrap could not parse the job. An older one is a leftover and says nothing about this install.
+	 *
+	 * @param mixed $status Decoded status.
+	 */
+	private static function bootstrap_failed( $status, Resource $r ): bool {
+		$started = (int) $r->get( 'app_started_at' );
+		if ( ! is_array( $status ) || $started <= 0 || ! is_string( $status['request'] ?? null ) || '' !== $status['request'] || 'failed' !== ( $status['state'] ?? '' ) || ! is_string( $status['updated'] ?? null ) ) {
+			return false;
+		}
+		$at = strtotime( $status['updated'] );
+		// app_started_at is stored after the file-write returns, so the guest may have written a moment before it.
+		return false !== $at && $at >= $started - 5;
 	}
 
 	private static function credentials( Resource $r, Client $client, string $node, int $vmid ): ?array {

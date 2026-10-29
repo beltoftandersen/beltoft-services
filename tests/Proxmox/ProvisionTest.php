@@ -356,6 +356,55 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'app_state' ) );
 	}
 
+	public function test_a_failed_guest_status_without_a_request_id_fails_the_app_at_once_when_it_is_newer_than_our_write(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		AppInstall::run( $resource->id() );
+
+		// An old status (from before our job write) is not ours.
+		Resource::find( $resource->id() )->set( array( 'app_started_at' => time() + 600 ) );
+		$this->fake->simulate_app( 5000, '', 'failed', 'download' );
+		AppStatus::check( Resource::find( $resource->id() ), $this->fake, 'node-a', 5000 );
+		$this->assertSame( 'installing', Resource::find( $resource->id() )->get( 'app_state' ) );
+		$this->assertSame( 0, $this->app_mails );
+
+		// Newer than our write: failed now, one alert, the server untouched.
+		Resource::find( $resource->id() )->set( array( 'app_started_at' => time() - 20 ) );
+		AppStatus::check( Resource::find( $resource->id() ), $this->fake, 'node-a', 5000 );
+		AppStatus::check( Resource::find( $resource->id() ), $this->fake, 'node-a', 5000 );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $fresh->get( 'app_state' ) );
+		$this->assertSame( 'download', $fresh->get( 'app_step' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 1, $this->app_mails );
+	}
+
+	public function test_a_status_without_a_request_id_that_is_not_a_failure_is_still_ignored(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		AppInstall::run( $resource->id() );
+		Resource::find( $resource->id() )->set( array( 'app_started_at' => time() - 20 ) );
+		$this->fake->simulate_app( 5000, '', 'ready', 'complete' );
+		AppStatus::check( Resource::find( $resource->id() ), $this->fake, 'node-a', 5000 );
+		$this->assertSame( 'installing', Resource::find( $resource->id() )->get( 'app_state' ) );
+	}
+
 	public function test_docker_below_minimum_fails_only_the_app(): void {
 		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
 		$this->cluster( array(
