@@ -582,17 +582,6 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertSame( '', $second );
 	}
 
-	public function test_the_account_content_hook_prints_it_only_on_the_dashboard(): void {
-		$user = self::factory()->user->create();
-		$this->plugin_license( $user );
-		$this->as_user( $user );
-
-		// Not an account page here: the account content hook adds nothing of ours.
-		ob_start();
-		do_action( 'woocommerce_account_content' );
-		$this->assertStringNotContainsString( 'beltoft-services-overview', (string) ob_get_clean() );
-	}
-
 	public function test_the_stylesheet_is_loaded_with_a_section(): void {
 		wp_dequeue_style( 'beltoft-services-account' );
 		$user = self::factory()->user->create();

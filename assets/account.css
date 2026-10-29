@@ -490,7 +490,7 @@ div.beltoft-services-vm__more > h4 { margin-top: 28px; }
 .beltoft-services-ov__money a { justify-self: start; color: #fff !important; text-decoration: underline !important; text-underline-offset: 3px; }
 .beltoft-services-ov__feed { padding: 6px 0; background: var(--bg-card, #fff); }
 .beltoft-services-ov__feed ul { margin: 0; padding: 0; list-style: none; }
-.beltoft-services-ov__feed li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; margin: 0; padding: 9px 18px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
+.beltoft-services-ov__feed li { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 12px; margin: 0; padding: 9px 18px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
 .beltoft-services-ov__feed time { color: var(--ink-muted, #8a98a6); font-size: 13px; font-variant-numeric: tabular-nums; }
 .beltoft-services-ov__welcome h2 { margin: 0; color: var(--navy, #0c1535); font-size: 26px; font-weight: 700; line-height: 1.2; }
 .beltoft-services-ov__welcome > p { margin: 6px 0 20px; color: var(--ink-soft, #5e7080); }
