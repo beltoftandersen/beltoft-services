@@ -531,7 +531,7 @@ final class ServerPicker {
 	}
 
 	/**
-	 * One plan card: a radio, with the name, the price and the numbers. A plan that cannot be bought says so in plain text.
+	 * One plan card: a radio, with the name, the site's short note when it gives one, the price and the numbers. A plan that cannot be bought says so in plain text.
 	 *
 	 * @param array<string, mixed> $plan     Plan.
 	 * @param bool                 $selected Checked.
@@ -561,6 +561,11 @@ final class ServerPicker {
 		echo '>';
 		echo '<span class="beltoft-services-plan__face">';
 		echo '<span class="beltoft-services-plan__name">' . esc_html( (string) $plan['name'] ) . '</span>';
+
+		if ( '' !== (string) ( $plan['note'] ?? '' ) ) {
+			echo '<span class="beltoft-services-plan__note">' . esc_html( (string) $plan['note'] ) . '</span>';
+		}
+
 		echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( (float) $plan['price'] ) ) . '</b> <span>' . esc_html( self::per( (string) $plan['period'] ) ) . '</span></span>';
 		echo '<span class="beltoft-services-plan__specs">';
 		/* translators: %d: number of virtual CPU cores */

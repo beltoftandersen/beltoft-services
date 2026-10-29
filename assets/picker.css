@@ -13,6 +13,7 @@
 .beltoft-services-plan__face { display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; height: 100%; min-height: 168px; padding: 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); transition: background-color 0.12s ease, color 0.12s ease; }
 .beltoft-services-plan:hover .beltoft-services-plan__face { background: var(--rule, #d6d2c8); }
 .beltoft-services-plan__name { font-size: 17px; font-weight: 700; line-height: 1.25; }
+.beltoft-services-plan__note { margin-top: -6px; font-size: 13px; line-height: 1.4; opacity: 0.8; }
 .beltoft-services-plan__price { display: grid; gap: 1px; font-size: 13px; line-height: 1.35; }
 .beltoft-services-plan__price b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .beltoft-services-plan__price .woocommerce-Price-amount, .beltoft-services-plan__price bdi { color: inherit; }
