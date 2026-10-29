@@ -30,6 +30,33 @@ final class DiskCascade {
 		return array_merge( DiskMeta::for_server( $server ), SnapshotMeta::for_server( $server ) );
 	}
 
+	/**
+	 * Ends the subscription of an add-on that cannot be delivered (the server is gone, adopted or not fit), the same
+	 * way a server ending does: only when every line on it is an add-on product, else a note and the admin decide.
+	 * No refund is made here.
+	 *
+	 * @param Resource $addon  The add-on resource.
+	 * @param string   $reason Admin note.
+	 */
+	public static function cancel_undelivered( Resource $addon, string $reason ): void {
+		$id = (int) ( $addon->license()['subscription_id'] ?? 0 );
+		if ( $id < 1 || ! function_exists( 'wcs_get_subscription' ) ) {
+			return;
+		}
+		$subscription = wcs_get_subscription( $id );
+		if ( ! $subscription instanceof \WC_Subscription || in_array( $subscription->get_status(), array( 'cancelled', 'expired', 'trash' ), true ) ) {
+			return;
+		}
+		foreach ( $subscription->get_items() as $item ) {
+			$driver = Product::driver_for( (int) $item->get_product_id() );
+			if ( ! $driver || ! in_array( $driver->id(), Stock::addon_drivers(), true ) ) {
+				$subscription->add_order_note( $reason . ' The subscription also holds other lines and was not cancelled.' );
+				return;
+			}
+		}
+		$subscription->update_status( 'cancelled', $reason );
+	}
+
 	public static function register(): void {
 		add_action( 'woocommerce_subscription_status_active', array( __CLASS__, 'on_active' ), 20 );
 		foreach ( self::HOOKS as $status ) {

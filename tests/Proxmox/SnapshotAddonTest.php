@@ -319,6 +319,234 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 		$this->assertSame( 'snapshot_limit', $errors->get_error_code(), 'The pack bought meanwhile leaves no room.' );
 	}
 
+
+	// -- Review fixes ----------------------------------------------------------------------------
+
+	/** A pack with its own subscription on the server, not yet provisioned (like an order's pack). */
+	private function pack_with_subscription( Resource $server, int $slots ): array {
+		$user    = (int) $server->license()['user_id'];
+		$product = $this->service_product( 'proxmox-snapshots', array( 'snapshot_slots' => $slots ), array( 'slug' => 'snap-' . wp_generate_password( 6, false ) ) );
+		$sub     = $this->subscription( $user );
+		$sub->add_product( $product, 1, array( 'subtotal' => '2', 'total' => '2' ) );
+		$sub->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
+		$pack    = Resource::create( $license, Registry::get( SnapshotDriver::ID ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $server->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $pack );
+
+		return array( $pack, $sub );
+	}
+
+	private function inject( array $line ): void {
+		WC()->cart->cart_contents['k' . count( WC()->cart->cart_contents )] = array_merge( array( 'quantity' => 1, 'variation_id' => 0 ), $line );
+	}
+
+	public function test_a_switch_adds_only_the_difference_and_must_fit_the_room(): void {
+		$this->on( array( 'snapshot_free_slots' => 1, 'snapshot_max_slots' => 6 ) );
+		$server = $this->ready_vm();
+		list( , $sub ) = $this->pack_with_subscription( $server, 2 );
+		$this->pack_with_subscription( $server, 3 ); // 1 free + 2 + 3 = 6: no room left.
+		$this->as_owner( $server );
+		$product = $this->product();
+		$two     = $this->variation( $product, 2 );
+		$five    = $this->variation( $product, 5 );
+		$data    = array( 'subscription_switch' => array( 'subscription_id' => $sub->get_id() ) );
+
+		$this->assertFalse( SnapshotCart::validate( true, $five->get_parent_id(), 1, $five->get_id(), array(), $data ), '2 to 5 adds 3, the room is 0.' );
+		$this->assertTrue( SnapshotCart::validate( true, $two->get_parent_id(), 1, $two->get_id(), array(), $data ), '2 to 2 adds nothing.' );
+
+		$this->inject( array( 'product_id' => $five->get_parent_id(), 'variation_id' => $five->get_id() ) + $data );
+		$this->inject( array( 'product_id' => $five->get_parent_id(), 'variation_id' => $five->get_id(), 'subscription_switch' => $data['subscription_switch'] ) );
+		$errors = new \WP_Error();
+		SnapshotCart::checkout_validation( array(), $errors );
+		$this->assertSame( 'snapshot_limit', $errors->get_error_code(), 'The checkout refuses it as well.' );
+
+		WC()->cart->empty_cart();
+		$this->inject( array( 'product_id' => $two->get_parent_id(), 'variation_id' => $two->get_id() ) + $data );
+		$errors = new \WP_Error();
+		SnapshotCart::checkout_validation( array(), $errors );
+		$this->assertFalse( $errors->has_errors(), $errors->get_error_message() );
+	}
+
+	public function test_a_switch_that_is_no_pack_switch_is_refused(): void {
+		$this->on();
+		$server = $this->ready_vm();
+		$this->as_owner( $server );
+		$two = $this->variation( $this->product(), 2 );
+		$this->assertFalse( SnapshotCart::validate( true, $two->get_parent_id(), 1, $two->get_id(), array(), array( 'subscription_switch' => array( 'subscription_id' => 999999 ) ) ) );
+	}
+
+	public function test_packs_not_counted_now_still_hold_their_room(): void {
+		$this->on( array( 'snapshot_free_slots' => 1, 'snapshot_max_slots' => 6 ) );
+		$server = $this->ready_vm();
+		$this->as_owner( $server );
+		$two = $this->variation( $this->product(), 2 );
+		$this->assertSame( 5, SnapshotCart::room( $server ) );
+
+		list( $paused ) = $this->pack_with_subscription( $server, 3 ); // Requested, not provisioned.
+		$this->assertSame( 0, SnapshotMeta::paid_for( $this->fresh( $server ) ), 'Not counted for the slots.' );
+		$this->assertSame( 2, SnapshotCart::room( $this->fresh( $server ) ), 'But it holds 3 of the room.' );
+
+		$this->assertTrue( $paused->desire( 'paused', 'hold' ) );
+		$this->assertSame( 2, SnapshotCart::room( $this->fresh( $server ) ), 'Paused too.' );
+		$this->assertNotSame( '', SnapshotCart::add_url( $this->fresh( $server ), $two ) );
+		$this->pack_with_subscription( $server, 2 );
+		$this->assertSame( 0, SnapshotCart::room( $this->fresh( $server ) ) );
+		$this->assertSame( '', SnapshotCart::add_url( $this->fresh( $server ), $two ) );
+		$this->request_for( $server );
+		$this->assertFalse( SnapshotCart::validate( true, $two->get_parent_id(), 1, $two->get_id(), array(), array() ) );
+	}
+
+	public function test_a_deleted_or_failed_pack_gives_its_room_back(): void {
+		$this->on( array( 'snapshot_free_slots' => 1, 'snapshot_max_slots' => 6 ) );
+		$server = $this->ready_vm();
+		list( $pack ) = $this->pack_with_subscription( $server, 3 );
+		$this->assertSame( 2, SnapshotCart::room( $server ) );
+		$this->assertTrue( $pack->set( array( 'state' => 'failed' ) ) );
+		$this->assertSame( 5, SnapshotCart::room( $server ) );
+	}
+
+	public function test_provisioning_rechecks_the_server_and_cancels_what_cannot_be_delivered(): void {
+		$this->on();
+		$driver = Registry::get( SnapshotDriver::ID );
+
+		// An adopted server.
+		$server = $this->ready_vm();
+		list( $pack, $sub ) = $this->pack_with_subscription( $server, 2 );
+		$this->assertTrue( $server->set( array( 'linked' => true ) ) );
+		$this->mails = array();
+		$result = $driver->provision( $this->fresh( $pack ) );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'adopted', $result->error() );
+		$this->assertStringContainsString( 'refund order', $result->error() );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status(), 'The subscription is cancelled like the cascade does.' );
+
+		// A deleted server.
+		$server = $this->ready_vm();
+		list( $pack, $sub ) = $this->pack_with_subscription( $server, 2 );
+		$this->assertTrue( $server->set( array( 'state' => 'deleted' ) ) );
+		$this->assertTrue( $driver->provision( $this->fresh( $pack ) )->is_failed() );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status() );
+
+		// Snapshots off.
+		$server = $this->ready_vm();
+		list( $pack, $sub ) = $this->pack_with_subscription( $server, 2 );
+		$this->settings( array( 'snapshots_enabled' => 0 ) );
+		$this->assertTrue( $driver->provision( $this->fresh( $pack ) )->is_failed() );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status() );
+		$this->on();
+
+		// A raw server.
+		$server = $this->ready_vm();
+		list( $pack, $sub ) = $this->pack_with_subscription( $server, 2 );
+		$this->assertTrue( $server->set( array( 'boot_format' => 'raw' ) ) );
+		$this->assertTrue( $driver->provision( $this->fresh( $pack ) )->is_failed() );
+
+		// Another customer's server.
+		$server = $this->ready_vm();
+		$other  = $this->service_license( $this->service_product( 'proxmox-snapshots', array( 'snapshot_slots' => 2 ), array( 'slug' => 'snap-' . wp_generate_password( 6, false ) ) ), array( 'fire' => false, 'user_id' => self::factory()->user->create() ) );
+		$pack   = Resource::create( $other, $driver, array( 'snapshot_slots' => 2 ), array( 'server_license' => (int) $server->license()['id'] ) );
+		$result = $driver->provision( $pack );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'another customer', $result->error() );
+	}
+
+	public function test_provisioning_waits_for_a_server_that_is_not_ready_and_gives_up_after_six_hours(): void {
+		$this->on();
+		$driver = Registry::get( SnapshotDriver::ID );
+		$server = $this->ready_vm();
+		list( $pack, $sub ) = $this->pack_with_subscription( $server, 2 );
+		$this->assertTrue( $server->set( array( 'state' => 'paused' ) ) );
+		$result = $driver->provision( $this->fresh( $pack ) );
+		$this->assertFalse( $result->is_failed() );
+		$this->assertFalse( $result->is_done() );
+		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status() );
+
+		$this->assertTrue( $this->fresh( $pack )->set( array( 'server_wait_until' => time() - 1 ) ) );
+		$this->assertTrue( $driver->provision( $this->fresh( $pack ) )->is_failed() );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $sub->get_id() )->get_status() );
+
+		// A ready, fit server: delivered.
+		$this->assertTrue( $server->set( array( 'state' => 'ready' ) ) );
+		list( $pack2 ) = $this->pack_with_subscription( $server, 2 );
+		$this->assertTrue( $driver->provision( $this->fresh( $pack2 ) )->is_done() );
+	}
+
+	public function test_a_subscription_with_other_lines_is_not_cancelled_when_a_pack_cannot_be_delivered(): void {
+		$this->on();
+		$server = $this->ready_vm();
+		list( $pack, $sub ) = $this->pack_with_subscription( $server, 2 );
+		$sub->add_product( $this->service_product( 'fake' ), 1, array( 'subtotal' => '3', 'total' => '3' ) );
+		$sub->save();
+		$this->assertTrue( $server->set( array( 'linked' => true ) ) );
+		$this->assertTrue( Registry::get( SnapshotDriver::ID )->provision( $this->fresh( $pack ) )->is_failed() );
+		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status() );
+	}
+
+	public function test_the_order_line_is_not_linked_to_an_adopted_deleted_or_user_less_server(): void {
+		$server  = $this->ready_vm();
+		$mine    = $server->license();
+		$product = $this->service_product( 'proxmox-snapshots', array( 'snapshot_slots' => 2 ), array( 'slug' => 'snap-' . wp_generate_password( 6, false ) ) );
+		$cases   = array( 'linked' => array( 'linked' => true ), 'deleted' => array( 'state' => 'deleted' ) );
+		foreach ( $cases as $name => $patch ) {
+			$this->assertTrue( $server->set( $patch ), $name );
+			$order = wc_create_order( array( 'customer_id' => (int) $mine['user_id'] ) );
+			$item  = $order->get_item( $order->add_product( $product, 1 ) );
+			$item->add_meta_data( '_beltoft_services_snapshot_server', (int) $mine['id'], true );
+			$item->save();
+			$order->save();
+			$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $mine['user_id'], 'order_id' => $order->get_id() ) );
+			$this->assertArrayNotHasKey( 'server_license', Lifecycle::initial_meta( $license, Registry::get( SnapshotDriver::ID ) ), $name );
+			$this->assertTrue( $server->set( array( 'linked' => false, 'state' => 'ready' ) ) );
+		}
+		// A license with no user.
+		$order = wc_create_order( array() );
+		$item  = $order->get_item( $order->add_product( $product, 1 ) );
+		$item->add_meta_data( '_beltoft_services_snapshot_server', (int) $mine['id'], true );
+		$item->save();
+		$order->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => 0, 'order_id' => $order->get_id() ) );
+		$this->assertArrayNotHasKey( 'server_license', Lifecycle::initial_meta( $license, Registry::get( SnapshotDriver::ID ) ) );
+	}
+
+	public function test_user_id_zero_never_owns_a_server(): void {
+		$this->on();
+		$server = $this->ready_vm();
+		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $server->license()['id'], array( 'user_id' => 0 ) ) );
+		wp_set_current_user( 0 );
+		$this->request_for( $this->fresh( $server ) );
+		$two = $this->variation( $this->product(), 2 );
+		$this->assertFalse( $this->add( $two ) );
+		$this->assertFalse( SnapshotCart::validate( true, $two->get_parent_id(), 1, $two->get_id(), array(), array() ) );
+		$this->assertCount( 0, WC()->cart->get_cart() );
+	}
+
+	public function test_a_resubscribe_of_a_pack_is_refused_at_add_and_checkout(): void {
+		$this->on();
+		$server = $this->ready_vm();
+		$this->as_owner( $server );
+		$two = $this->variation( $this->product(), 2 );
+		$this->assertFalse( SnapshotCart::validate( true, $two->get_parent_id(), 1, $two->get_id(), array(), array( 'subscription_resubscribe' => array( 'subscription_id' => 1 ) ) ) );
+		$this->assertStringContainsString( 'from your server', wp_json_encode( wc_get_notices() ) );
+
+		$this->inject( array( 'product_id' => $two->get_parent_id(), 'variation_id' => $two->get_id(), 'subscription_resubscribe' => array( 'subscription_id' => 1 ) ) );
+		$errors = new \WP_Error();
+		SnapshotCart::checkout_validation( array(), $errors );
+		$this->assertSame( 'snapshot_resubscribe', $errors->get_error_code() );
+
+		// A renewal is the same pack again and stays allowed.
+		$this->assertTrue( SnapshotCart::validate( true, $two->get_parent_id(), 1, $two->get_id(), array(), array( 'subscription_renewal' => array( 'subscription_id' => 1 ) ) ) );
+	}
+
+	public function test_the_packs_of_a_server_are_found_by_one_query_and_never_another_servers(): void {
+		$this->on();
+		$a = $this->ready_vm();
+		$b = $this->ready_vm();
+		$pa = $this->pack( $a, 2 );
+		$this->pack( $b, 3 );
+		$this->assertSame( array( $pa->id() ), array_map( static fn( $p ) => $p->id(), SnapshotMeta::for_server( $a ) ) );
+		$this->assertCount( 1, SnapshotMeta::for_server( $b ) );
+	}
+
 	// -- A pack ends -----------------------------------------------------------------------------
 
 	private function three_snapshots(): array {

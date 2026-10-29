@@ -56,7 +56,42 @@ final class SnapshotCart {
 	public static function room( Resource $server, int $in_cart = 0 ): int {
 		$free = max( 0, (int) Settings::get( 'snapshot_free_slots' ) );
 
-		return max( 0, max( 1, (int) Settings::get( 'snapshot_max_slots' ) ) - $free - SnapshotMeta::paid_for( $server ) - $in_cart );
+		// Every pack of the server holds its place, also one that is not counted right now (starting, paused, on hold).
+		return max( 0, max( 1, (int) Settings::get( 'snapshot_max_slots' ) ) - $free - SnapshotMeta::reserved_slots( $server ) - $in_cart );
+	}
+
+	/**
+	 * The pack a WooCommerce Subscriptions switch replaces: its server and its slots, or null when the cart data is no switch of a pack.
+	 *
+	 * @param array<string, mixed> $data Cart item data.
+	 * @return array{server: Resource, slots: int}|null
+	 */
+	private static function switching( array $data ): ?array {
+		$id = (int) ( $data['subscription_switch']['subscription_id'] ?? 0 );
+		if ( $id < 1 && isset( $_GET['switch-subscription'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validated the switch.
+			$id = absint( wp_unslash( $_GET['switch-subscription'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+		foreach ( $id > 0 ? Licenses::where( 'subscription_id', $id ) : array() as $license ) {
+			$pack   = Resource::for_license( (int) $license['id'] );
+			$server = $pack && SnapshotDriver::ID === $pack->get( 'driver' ) ? SnapshotMeta::server_of( $pack ) : null;
+			if ( $server ) {
+				return array( 'server' => $server, 'slots' => SnapshotMeta::slots_of( $pack ) );
+			}
+		}
+
+		return null;
+	}
+
+	/** Does the switch fit: the slots it adds (new pack minus the one replaced) within the room. */
+	private static function switch_fits( array $data, \WC_Product $target ): bool {
+		$switch = self::switching( $data );
+
+		return null !== $switch && self::slots_of( $target ) - $switch['slots'] <= self::room( $switch['server'] );
+	}
+
+	/** A renewal is the same pack again; a resubscribe has no server on its line (packs are bought from the server card). */
+	private static function resubscribing( array $data ): bool {
+		return ! empty( $data['subscription_resubscribe'] );
 	}
 
 	/** May this server take a pack: a ready, owned-by-caller-checked server that gets snapshots (qcow2). */
@@ -112,8 +147,9 @@ final class SnapshotCart {
 	private static function owned( int $license_id ): bool {
 		$license = Licenses::find( $license_id );
 		$server  = $license ? Resource::for_license( $license_id ) : null;
+		$user    = get_current_user_id();
 
-		return $license && (int) ( $license['user_id'] ?? 0 ) === get_current_user_id() && self::server_ok( $server );
+		return $user > 0 && $license && (int) ( $license['user_id'] ?? 0 ) === $user && self::server_ok( $server );
 	}
 
 	/** Slots of the pack lines in the cart for one server, the line being added not included. */
@@ -138,7 +174,18 @@ final class SnapshotCart {
 			wc_add_notice( __( 'These snapshot slots must be sold as a subscription.', 'beltoft-services' ), 'error' );
 			return false;
 		}
-		if ( DiskCart::flow( $data ) || DiskCart::valid_switch( (int) $product_id ) ) {
+		if ( self::resubscribing( $data ) ) {
+			wc_add_notice( __( 'Add snapshot slots again from your server in My account.', 'beltoft-services' ), 'error' );
+			return false;
+		}
+		if ( DiskCart::valid_switch( (int) $product_id ) || ! empty( $data['subscription_switch'] ) ) {
+			if ( ! self::switch_fits( $data, $product ) ) {
+				wc_add_notice( __( 'This server cannot hold that many more snapshots.', 'beltoft-services' ), 'error' );
+				return false;
+			}
+			return true;
+		}
+		if ( DiskCart::flow( $data ) ) {
 			return true;
 		}
 		$link = self::link( $data );
@@ -200,7 +247,21 @@ final class SnapshotCart {
 	public static function checkout_validation( array $data, \WP_Error $errors ): void {
 		$wanted = array();
 		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $item ) {
-			if ( ! isset( $item['beltoft_services_snapshot_uid'] ) || ! self::pack_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
+			if ( ! self::pack_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
+				continue;
+			}
+			if ( self::resubscribing( $item ) ) {
+				$errors->add( 'snapshot_resubscribe', __( 'Add snapshot slots again from your server in My account.', 'beltoft-services' ) );
+				continue;
+			}
+			if ( ! empty( $item['subscription_switch'] ) ) {
+				$target = wc_get_product( (int) ( $item['variation_id'] ?: $item['product_id'] ) );
+				if ( ! $target || ! self::switch_fits( $item, $target ) ) {
+					$errors->add( 'snapshot_limit', __( 'This server cannot hold that many more snapshots.', 'beltoft-services' ) );
+				}
+				continue;
+			}
+			if ( ! isset( $item['beltoft_services_snapshot_uid'] ) ) {
 				continue;
 			}
 			$link = $item['beltoft_services_snapshot_for'] ?? null;

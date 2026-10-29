@@ -25,7 +25,7 @@ final class SnapshotMeta {
 		}
 		$order_id = (int) ( $license['order_id'] ?? 0 );
 		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
-		if ( ! $order ) {
+		if ( ! $order || (int) ( $license['user_id'] ?? 0 ) < 1 ) {
 			return $meta;
 		}
 		$uid             = '';
@@ -59,7 +59,10 @@ final class SnapshotMeta {
 		if ( is_numeric( $link ) && (int) $link > 0 ) {
 			$server = Licenses::find( (int) $link );
 			if ( $server && (int) $server['user_id'] === (int) $license['user_id'] && self::is_server( $server ) ) {
-				$meta['server_license'] = (int) $link;
+				$resource = Resource::for_license( (int) $link );
+				if ( $resource && true !== $resource->get( 'linked' ) && ! in_array( $resource->get( 'state' ), array( 'failed', 'deleted' ), true ) ) {
+					$meta['server_license'] = (int) $link;
+				}
 			}
 		}
 		$meta['order_item_id'] = (int) $matches[0]->get_id();
@@ -86,16 +89,43 @@ final class SnapshotMeta {
 
 	/** Live pack resources linked to one server, whatever their state (the cascade and the card use this). */
 	public static function for_server( Resource $server ): array {
-		$license = $server->license();
-		$out     = array();
-		foreach ( Resource::live_ids( 'snapshot' ) as $id ) {
-			$pack = Resource::find( $id );
-			if ( $pack && SnapshotDriver::ID === $pack->get( 'driver' ) && (int) $pack->get( 'server_license' ) === (int) ( $license['id'] ?? 0 ) ) {
+		global $wpdb;
+		$license_id = (int) ( $server->license()['id'] ?? 0 );
+		$out        = array();
+		if ( $license_id < 1 ) {
+			return $out;
+		}
+		// One query for the candidates (the license id is in the meta text), then the exact check on each: no loading of every pack of every customer.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'snapshot' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id ASC", \BeltoftLicenses\Install::tables()['activations'], '%\"server_license\":%' . $wpdb->esc_like( (string) $license_id ) . '%' ) );
+		foreach ( (array) $ids as $id ) {
+			$pack = Resource::find( (int) $id );
+			if ( $pack && SnapshotDriver::ID === $pack->get( 'driver' ) && (int) $pack->get( 'server_license' ) === $license_id ) {
 				$out[] = $pack;
 			}
 		}
 
 		return $out;
+	}
+
+	/** Packs that hold a place for a purchase check: every live pack that is not failed, deleted, revoked or suspended for good, in any state (requested, provisioning, paused, on hold). */
+	public static function reserved_for( Resource $server ): array {
+		return array_values(
+			array_filter(
+				self::for_server( $server ),
+				static fn( Resource $pack ) => ! in_array( $pack->get( 'state' ), array( 'failed', 'deleted', 'deleting' ), true ) && Licenses::STATUS_REVOKED !== ( $pack->license()['status'] ?? '' )
+			)
+		);
+	}
+
+	/** Slots the packs of a server hold for a purchase check, counted or not at this moment. */
+	public static function reserved_slots( Resource $server ): int {
+		$sum = 0;
+		foreach ( self::reserved_for( $server ) as $pack ) {
+			$sum += self::slots_of( $pack );
+		}
+
+		return $sum;
 	}
 
 	/** Slots one pack gives (its plan, stored on the resource). */

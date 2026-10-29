@@ -42,8 +42,44 @@ final class SnapshotDriver implements Driver {
 	}
 
 	public function provision( Resource $r ): StepResult {
-		if ( null === SnapshotMeta::server_of( $r ) ) {
-			return StepResult::fail( 'The server for these snapshot slots could not be found.' );
+		$license = $r->license();
+		$id      = (int) $r->get( 'server_license' );
+		$server  = SnapshotMeta::server_of( $r );
+		$owner   = $id > 0 ? \BeltoftLicenses\Licenses::find( $id ) : null;
+
+		$why = '';
+		if ( null === $server || ! $owner ) {
+			$why = 'The server for these snapshot slots could not be found.';
+		} elseif ( (int) ( $license['user_id'] ?? 0 ) < 1 || (int) ( $owner['user_id'] ?? 0 ) !== (int) ( $license['user_id'] ?? 0 ) ) {
+			$why = 'The server belongs to another customer.';
+		} elseif ( true === $server->get( 'linked' ) ) {
+			$why = 'An adopted server cannot receive snapshot slots.';
+		} elseif ( in_array( $server->get( 'state' ), array( 'failed', 'deleted', 'deleting' ), true ) ) {
+			$why = 'The server failed or was deleted.';
+		} elseif ( 'ready' === $server->get( 'state' ) && ! Snapshots::eligible( $server ) ) {
+			$why = 'The server does not get snapshots (switch off, or it is not on qcow2).';
+		}
+
+		if ( '' === $why && 'ready' !== $server->get( 'state' ) ) {
+			// Starting, or paused: wait for it like an extra disk does, then give up.
+			$until = (int) $r->get( 'server_wait_until' );
+			if ( $until < 1 ) {
+				$until = time() + 6 * HOUR_IN_SECONDS;
+				if ( ! $r->set( array( 'server_wait_until' => $until ) ) ) {
+					return StepResult::retry( 60, 'The server wait deadline could not be stored.' );
+				}
+			}
+			if ( time() < $until ) {
+				return StepResult::wait( 60, 'Waiting for the server.', $until );
+			}
+			$why = 'The server was not ready within six hours.';
+		}
+
+		if ( '' !== $why ) {
+			$order = (int) ( $license['order_id'] ?? 0 );
+			DiskCascade::cancel_undelivered( $r, $why . ' The snapshot slots were not delivered.' );
+
+			return StepResult::fail( $why . ' Snapshot slots not delivered: review and refund order #' . $order . '; the subscription was cancelled.' );
 		}
 
 		return StepResult::done( array( 'steps' => array( 'ready' ) ) );
