@@ -269,6 +269,7 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'result.at >= asked.queued', $js );
 		$this->assertStringContainsString( "text.replace( '%s', function", $js );
 		$this->assertStringContainsString( 'beltoftPending', $js );
+		$this->assertStringContainsString( 'beltoftStatusSeen', $js );
 		$this->assertStringContainsString( "addEventListener( 'cancel'", $js );
 		$this->assertStringContainsString( 'safe.focus()', $js );
 		$this->assertStringContainsString( "'beltoft-services:status'", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' ) );

@@ -239,6 +239,10 @@
 		var result = data.last_result;
 		var asked = recall( panel );
 		var info;
+		// The first status of a page load that is already over is the page after the reload: the line is shown and used up. One that comes while the work was still on is shown too, and the reload that follows shows it again.
+		var first = ! panel.beltoftStatusSeen;
+
+		panel.beltoftStatusSeen = true;
 
 		if ( data.progress && data.progress.active ) {
 			if ( asked ) {
@@ -257,7 +261,10 @@
 		if ( asked ) {
 			// The record has to be the answer to this request: the same action, from the server's clock at or after it.
 			if ( asked.info.action === result.action && result.at >= asked.queued ) {
-				write( panel, ':asked', null );
+				if ( first ) {
+					write( panel, ':asked', null );
+				}
+
 				ended( panel, result, asked.info );
 			}
 
