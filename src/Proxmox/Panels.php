@@ -447,6 +447,41 @@ final class Panels {
 	}
 
 	/**
+	 * The firewall of the server for the admin: who manages it, on or off, how many rules, whether the last change was
+	 * confirmed, and the last change from the customer. Empty for a server nobody took over.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function firewall_line( Resource $r ): string {
+		if ( true === $r->get( Firewall::LOCKED ) ) {
+			return __( 'Managed with the databases (the customer cannot edit it)', 'beltoft-services' );
+		}
+
+		if ( ! Firewall::managed( $r ) ) {
+			return '';
+		}
+
+		$history = is_array( $r->get( Firewall::HISTORY ) ) ? $r->get( Firewall::HISTORY ) : array();
+		$last    = $history ? end( $history ) : array();
+		$text    = sprintf(
+			/* translators: 1: on or off, 2: number of rules, 3: state (idle, applying, failed), 4: revision applied, 5: revision asked for */
+			__( '%1$s, %2$d rules, %3$s (applied %4$d of %5$d)', 'beltoft-services' ),
+			false === $r->get( Firewall::ON ) ? __( 'off', 'beltoft-services' ) : __( 'on', 'beltoft-services' ),
+			count( Firewall::rules_of( $r ) ),
+			'' === (string) $r->get( Firewall::STATE ) ? 'idle' : (string) $r->get( Firewall::STATE ),
+			(int) $r->get( Firewall::APPLIED ),
+			(int) $r->get( Firewall::REV )
+		);
+
+		if ( is_array( $last ) && ! empty( $last['at'] ) ) {
+			/* translators: 1: date and time, 2: user id */
+			$text .= ' ' . sprintf( __( 'Last change %1$s by user %2$d', 'beltoft-services' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $last['at'] ), (int) ( $last['user'] ?? 0 ) );
+		}
+
+		return $text;
+	}
+
+	/**
 	 * The admin's part: where the VM is and what it is doing. No password, no Proxmox call.
 	 *
 	 * @param Resource $r Resource.
@@ -471,6 +506,8 @@ final class Panels {
 			),
 			__( 'Template', 'beltoft-services' )      => (string) ( (int) $r->get( OsField::META ) > 0 ? $r->get( OsField::META ) : ( (array) $r->get( 'plan' ) )['template'] ?? '' ),
 			__( 'Backups', 'beltoft-services' )       => self::backups_line( $r ),
+			__( 'Firewall', 'beltoft-services' )      => self::firewall_line( $r ),
+			__( 'Firewall error', 'beltoft-services' ) => (string) $r->get( Firewall::ERROR ),
 			__( 'Disk reading', 'beltoft-services' ) => $r->get( 'disk_read_at' ) ? sprintf( '%s / %s bytes at %s', (string) $r->get( 'disk_used' ), (string) $r->get( 'disk_total' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'disk_read_at' ) ) ) : '',
 			__( 'Down since', 'beltoft-services' ) => $r->get( 'monitor_down_since' ) ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_down_since' ) ) : '',
 			__( 'Down alert sent', 'beltoft-services' ) => $r->get( 'monitor_down_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),

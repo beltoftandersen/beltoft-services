@@ -547,6 +547,39 @@ class FirewallTest extends FirewallTestCase {
 		$this->assertSame( array(), $this->fake->writes );
 	}
 
+	public function test_the_admin_panel_shows_the_firewall_line_and_the_error(): void {
+		$show = static function ( Resource $r ): string {
+			ob_start();
+			\BeltoftServices\Proxmox\Panels::admin( $r );
+
+			return (string) ob_get_clean();
+		};
+
+		$r = $this->managed( array( $this->rule( 'tcp', 22 ) ) );
+		$this->assertMatchesRegularExpression( '#Firewall</th><td>on, 1 rules, idle \(applied 1 of 1\) Last change .* by user 1#', $show( $r ) );
+
+		$r->set( array( 'fw_error' => 'boom' ) );
+		$this->assertStringContainsString( 'Firewall error</th><td>boom', $show( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'fw_locked' => true ) );
+		$this->assertStringContainsString( 'Managed with the databases', $show( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_the_cluster_settings_have_safe_defaults_and_are_clamped(): void {
+		$c = \BeltoftServices\Proxmox\Clusters::get( 'lab' );
+		$this->assertSame( 0, $c['fw_enabled'], 'Off until the live checks passed.' );
+		$this->assertSame( 'standard', $c['fw_default_mode'] );
+		$this->assertSame( 30, $c['fw_max_rules'] );
+		$this->assertSame( 0, $c['fw_ipfilter'] );
+
+		$this->save_cluster( array( 'fw_enabled' => '1', 'fw_default_mode' => 'weird', 'fw_max_rules' => '500', 'fw_ipfilter' => '1' ) );
+		$c = \BeltoftServices\Proxmox\Clusters::get( 'lab' );
+		$this->assertSame( array( 1, 'standard', Firewall::MAX_CEILING, 1 ), array( $c['fw_enabled'], $c['fw_default_mode'], $c['fw_max_rules'], $c['fw_ipfilter'] ) );
+		$this->save_cluster( array( 'fw_max_rules' => '0', 'fw_default_mode' => 'open' ) );
+		$c = \BeltoftServices\Proxmox\Clusters::get( 'lab' );
+		$this->assertSame( array( 1, 'open' ), array( $c['fw_max_rules'], $c['fw_default_mode'] ) );
+	}
+
 	public function test_the_texts_have_no_em_dash_and_no_provider_name(): void {
 		$files = array(
 			BELTOFT_SERVICES_PATH . 'src/Proxmox/Firewall.php',

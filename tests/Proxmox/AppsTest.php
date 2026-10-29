@@ -18,7 +18,7 @@ final class AppsTest extends TestCase {
 
 	public function test_docker_getting_started_warns_about_published_ports(): void {
 		$text = (string) Apps::current( 'docker' )['getting_started'];
-		$this->assertStringContainsString( 'Ports you publish with Docker are open to the internet even though the firewall is on', $text );
+		$this->assertStringContainsString( 'Ports you publish with Docker bypass the firewall inside the server. Open or close them in the Firewall tab', $text );
 		$this->assertStringContainsString( '127.0.0.1', $text );
 	}
 

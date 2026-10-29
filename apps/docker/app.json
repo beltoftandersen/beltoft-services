@@ -3,7 +3,7 @@
   "name": "Docker",
   "logo": "logo.svg",
   "summary": "Docker Engine and Compose, ready to use over SSH.",
-  "getting_started": "Log in over SSH to use Docker and Compose. Ports you publish with Docker are open to the internet even though the firewall is on; bind to 127.0.0.1 or use ufw-docker.",
+  "getting_started": "Log in over SSH to use Docker and Compose. Ports you publish with Docker bypass the firewall inside the server. Open or close them in the Firewall tab of your server, and bind to 127.0.0.1 the ports that only the server itself should use.",
   "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
   "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}],
   "minutes": 3,
