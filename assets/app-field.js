@@ -39,7 +39,7 @@
 		}
 
 		if ( note ) {
-			note.textContent = chosen ? chosen.summary + ' ' + chosen.minutes : plain;
+			note.textContent = chosen ? chosen.minutes : plain;
 		}
 
 		if ( ! chosen || ! chosen.domain ) {
