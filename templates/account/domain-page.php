@@ -88,31 +88,62 @@ if ( $d['dns_only'] ) {
 			<?php if ( $d['zone_unavailable'] ) : ?>
 				<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your DNS records cannot be shown right now. Reload the page in a minute.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
-				<form class="beltoft-services-domain-form beltoft-dns-editor" data-domain-action="set_records"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( array(
-					'name' => __( 'Name', 'beltoft-services' ), 'name_hint' => __( '@ for the domain itself, or a name like www', 'beltoft-services' ), 'type' => __( 'Type', 'beltoft-services' ), 'ttl' => __( 'TTL', 'beltoft-services' ), 'value' => __( 'Value', 'beltoft-services' ),
-					'priority' => __( 'Priority', 'beltoft-services' ), 'weight' => __( 'Weight', 'beltoft-services' ), 'port' => __( 'Port', 'beltoft-services' ),
-					'flag' => __( 'Flag', 'beltoft-services' ), 'tag' => __( 'Tag', 'beltoft-services' ), 'remove' => __( 'Remove', 'beltoft-services' ),
-					'search' => __( 'Search records', 'beltoft-services' ),
+				<?php
+				$beltoft_i18n = array(
+					'caption'      => __( 'DNS records', 'beltoft-services' ),
+					'name'         => __( 'Name', 'beltoft-services' ),
+					'name_hint'    => __( '@ for the domain itself, or a name like www', 'beltoft-services' ),
+					'type'         => __( 'Type', 'beltoft-services' ),
+					'ttl'          => __( 'TTL', 'beltoft-services' ),
+					'value'        => __( 'Value', 'beltoft-services' ),
+					'status'       => __( 'Status', 'beltoft-services' ),
+					'actions'      => __( 'Actions', 'beltoft-services' ),
+					'priority'     => __( 'Priority', 'beltoft-services' ),
+					'weight'       => __( 'Weight', 'beltoft-services' ),
+					'port'         => __( 'Port', 'beltoft-services' ),
+					'flag'         => __( 'Flag', 'beltoft-services' ),
+					'tag'          => __( 'Tag', 'beltoft-services' ),
+					'off'          => __( 'Off', 'beltoft-services' ),
+					'add'          => __( 'Add record', 'beltoft-services' ),
+					'edit'         => __( 'Edit', 'beltoft-services' ),
+					'delete'       => __( 'Delete', 'beltoft-services' ),
+					'keep'         => __( 'Keep', 'beltoft-services' ),
+					'save'         => __( 'Save', 'beltoft-services' ),
+					'saving'       => __( 'Saving…', 'beltoft-services' ),
+					'cancel'       => __( 'Cancel', 'beltoft-services' ),
+					'delete_q'     => __( 'Delete this record?', 'beltoft-services' ),
+					/* translators: 1: record type, 2: record name */
+					'edit_label'   => __( 'Edit %1$s record %2$s', 'beltoft-services' ),
+					/* translators: 1: record type, 2: record name */
+					'delete_label' => __( 'Delete %1$s record %2$s', 'beltoft-services' ),
+					'search'       => __( 'Search records', 'beltoft-services' ),
 					/* translators: %d: number of DNS records */
-					'show_all' => __( 'Show all %d records', 'beltoft-services' ),
-					'show_fewer' => __( 'Show fewer', 'beltoft-services' ),
-					'no_match' => __( 'No records match.', 'beltoft-services' ),
-				) ) ); ?>">
-					<?php if ( $d['off'] ) : ?>
-						<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNS hosting is paused. Your records are kept but not answered.', 'beltoft-services' ); ?></p>
-					<?php endif; ?>
-					<p class="beltoft-services-domain__empty" hidden><?php esc_html_e( 'No DNS records yet.', 'beltoft-services' ); ?></p>
-					<table><thead><tr><th><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'TTL', 'beltoft-services' ); ?></th><th><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th><th></th></tr></thead><tbody></tbody></table>
-					<input type="hidden" name="records" value="[]">
-					<p class="beltoft-dns-error" role="alert" hidden></p>
-					<?php if ( ! $d['off'] ) : ?>
-					<p class="beltoft-dns-note"><?php esc_html_e( 'Changes are saved when you press Save DNS records.', 'beltoft-services' ); ?></p>
-					<div class="beltoft-dns-actions">
-						<button type="button" class="beltoft-services-domain__link beltoft-dns-add"><?php esc_html_e( 'Add record', 'beltoft-services' ); ?></button>
-						<button type="submit" class="button"><?php esc_html_e( 'Save DNS records', 'beltoft-services' ); ?></button>
-					</div>
-					<?php endif; ?>
-				</form>
+					'show_all'     => __( 'Show all %d records', 'beltoft-services' ),
+					'show_fewer'   => __( 'Show fewer', 'beltoft-services' ),
+					'no_match'     => __( 'No records match.', 'beltoft-services' ),
+					'empty'        => __( 'No DNS records yet.', 'beltoft-services' ),
+					'saved'        => __( 'Record saved.', 'beltoft-services' ),
+					'deleted'      => __( 'Record deleted.', 'beltoft-services' ),
+					'need_value'   => __( 'Enter a value for the record.', 'beltoft-services' ),
+					'need_number'  => __( 'Enter whole numbers in the number fields.', 'beltoft-services' ),
+					'network'      => __( 'The change could not be sent. Check your connection and try again.', 'beltoft-services' ),
+					'set_hint'     => __( 'Name and type cannot change while this name has several records of this type.', 'beltoft-services' ),
+					'ttl_60'       => __( '1 minute', 'beltoft-services' ),
+					'ttl_300'      => __( '5 minutes', 'beltoft-services' ),
+					'ttl_3600'     => __( '1 hour', 'beltoft-services' ),
+					'ttl_14400'    => __( '4 hours', 'beltoft-services' ),
+					'ttl_86400'    => __( '1 day', 'beltoft-services' ),
+					/* translators: %d: seconds */
+					'ttl_other'    => __( '%d seconds', 'beltoft-services' ),
+				);
+				?>
+				<?php if ( $d['off'] ) : ?>
+					<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNS hosting is paused. Your records are kept but not answered.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
+				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
+					<p class="beltoft-dnse__error" role="alert" hidden></p>
+					<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to see and change your DNS records.', 'beltoft-services' ); ?></p></noscript>
+				</div>
 			<?php endif; ?>
 		</section>
 	<?php endif; ?>

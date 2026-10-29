@@ -303,11 +303,12 @@ class DomainsTest extends TestCase {
 		$html = $this->page( $r );
 
 		$this->assertStringContainsString( 'data-domain-resource="' . $r->id() . '"', $html );
-		$this->assertStringContainsString( 'data-domain-action="set_records"', $html );
+		$this->assertStringContainsString( 'data-dns-editor', $html );
+		$this->assertStringNotContainsString( 'Save DNS records', $html, 'The whole-table save is gone: each row saves itself.' );
+		$this->assertStringNotContainsString( 'data-domain-action="set_records"', $html );
 		$this->assertStringContainsString( 'data-domain-action="set_nameservers"', $html );
 		$this->assertStringContainsString( 'data-domain-action="lock"', $html );
 		$this->assertStringContainsString( 'beltoft-services-domain-auth', $html );
-		$this->assertStringContainsString( 'beltoft-dns-editor', $html );
 		$this->assertStringContainsString( 'data-updating=', $html );
 		$this->assertStringContainsString( 'data-resource="' . $r->id() . '"', $html, 'The service panel keeps its poll attributes.' );
 		$this->assertStringContainsString( 'data-badge', $html );
@@ -335,6 +336,31 @@ class DomainsTest extends TestCase {
 		$this->assertStringContainsString( 'data-readonly="1"', $html );
 		$this->assertStringNotContainsString( 'Save DNS records', $html );
 		$this->assertStringContainsString( 'Paused', $html );
+	}
+
+	public function test_the_editor_gets_the_zone_the_rows_and_its_words(): void {
+		$r = $this->service( $this->user, 'example.com' );
+		$this->assertTrue( Records::replace( 'example.com', array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.7' ) ) ) );
+		$html = $this->page( $r, 'dns' );
+
+		$this->assertStringContainsString( 'data-zone="example.com"', $html );
+		$this->assertStringContainsString( '192.0.2.7', $html );
+		$this->assertStringContainsString( 'Delete this record?', $html );
+		$this->assertStringContainsString( 'role="alert"', $html );
+		$this->assertStringNotContainsString( 'data-readonly', $html );
+	}
+
+	public function test_the_editor_script_loads_on_a_domain_page_only(): void {
+		global $wp;
+		wp_dequeue_script( 'beltoft-services-dns-editor' );
+		$wp->query_vars[ Domains::slug() ] = '';
+		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', Domains::slug() );
+		$this->assertFalse( wp_script_is( 'beltoft-services-dns-editor', 'enqueued' ), 'The list has no editor.' );
+		$wp->query_vars[ Domains::slug() ] = '12/dns';
+		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', Domains::slug() );
+		$this->assertTrue( wp_script_is( 'beltoft-services-dns-editor', 'enqueued' ) );
+		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', 'servers' );
+		unset( $wp->query_vars[ Domains::slug() ] );
 	}
 
 	public function test_no_zone_hides_the_editor(): void {

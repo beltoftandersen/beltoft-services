@@ -550,3 +550,59 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-panel--page .beltoft-services-panel__driver { grid-template-columns: minmax(0, 1fr); }
 div.beltoft-services-domain legend.screen-reader-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 div.beltoft-services-domain.beltoft-services-domain button[hidden] { display: none; }
+
+/* DNS records editor (assets/dns-editor.js): one row, one request. Square, one rule between rows, no chips. */
+.beltoft-dnse { margin: 0; }
+.beltoft-dnse__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; }
+.beltoft-dnse__bar:empty { display: none; }
+div.beltoft-services-domain input[type="search"].beltoft-dnse__search { box-sizing: border-box; flex: 1 1 14em; max-width: 24em; height: 40px; margin: 0; padding: 0 12px; border: 1px solid var(--bsd-rule); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; appearance: none; }
+div.beltoft-services-domain .beltoft-dnse__add.button { height: 40px; margin-left: auto; padding: 0 16px; }
+div.beltoft-services-domain .beltoft-dnse__error { margin: 0 0 12px; color: #b32d2e; }
+div.beltoft-services-domain .beltoft-dnse__status { min-height: 0; margin: 0 0 8px; color: var(--bsd-soft); font-size: 14px; }
+div.beltoft-services-domain .beltoft-dnse__status:empty { display: none; }
+div.beltoft-services-domain .beltoft-dnse__empty { margin: 0 0 12px; color: var(--bsd-soft); }
+.beltoft-dnse__table { width: 100%; margin: 0; border-collapse: collapse; table-layout: auto; }
+.beltoft-dnse__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; color: var(--bsd-soft); font-size: 13px; font-weight: 500; text-align: left; }
+.beltoft-dnse__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; }
+.beltoft-dnse__table tr:last-child td { border-bottom: 0; }
+.beltoft-dnse__table td:nth-child(1) { width: 20%; overflow-wrap: anywhere; }
+.beltoft-dnse__table td:nth-child(2) { width: 5.5em; }
+.beltoft-dnse__table td:nth-child(3) { width: 8em; }
+.beltoft-dnse__table td.beltoft-dnse__value { overflow-wrap: anywhere; word-break: break-word; }
+.beltoft-dnse__table td.beltoft-dnse__actions { width: 1%; text-align: right; white-space: nowrap; }
+.beltoft-dnse__actions > * + * { margin-left: 16px; }
+.beltoft-dnse__ask { color: var(--bsd-ink); font-weight: 500; }
+div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link.beltoft-dnse__danger { color: #b32d2e; }
+.beltoft-dnse__rowerror td { padding-top: 0; color: #b32d2e; }
+.beltoft-dnse__table tr[data-edit-row] td { padding-top: 6px; padding-bottom: 6px; }
+div.beltoft-services-domain .beltoft-dnse__table input[type="text"], div.beltoft-services-domain .beltoft-dnse__table input[type="number"], div.beltoft-services-domain .beltoft-dnse__table select { box-sizing: border-box; width: 100%; height: 40px; margin: 0; padding: 0 10px; border: 1px solid var(--bsd-rule); background-color: var(--bsd-card); box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
+div.beltoft-services-domain .beltoft-dnse__table select { appearance: none; padding-right: 24px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230c1535' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-services-domain .beltoft-dnse__table select:disabled { background-color: var(--bsd-warm); color: var(--bsd-soft); }
+.beltoft-dnse__fields { display: flex; flex-wrap: wrap; gap: 6px; }
+.beltoft-dnse__fields > * { flex: 1 1 6em; min-width: 0; }
+.beltoft-dnse__fields > [data-f="value"] { flex: 4 1 10em; }
+.beltoft-dnse__fields > .beltoft-dnse__extra { flex: 0 0 6em; }
+.beltoft-dnse__fields > [hidden] { display: none; }
+div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 0 16px; }
+.beltoft-dnse__form { display: none; }
+.beltoft-dnse__more { margin-top: 12px; }
+@media (max-width: 640px) {
+	.beltoft-dnse__table thead { display: none; }
+	.beltoft-dnse__table, .beltoft-dnse__table tbody { display: block; }
+	.beltoft-dnse__table tr { display: grid; grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 8px; padding: 10px 0; border-bottom: 1px solid var(--bsd-rule); }
+	.beltoft-dnse__table tr:last-child { border-bottom: 0; }
+	.beltoft-dnse__table td, .beltoft-dnse__table td:nth-child(n) { display: block; width: auto; padding: 0; border: 0; text-align: left; }
+	.beltoft-dnse__table td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 500; }
+	.beltoft-dnse__table td:nth-child(2) { grid-column: 2; grid-row: 1; }
+	.beltoft-dnse__table td:nth-child(3) { grid-column: 3; grid-row: 1; color: var(--bsd-soft); }
+	.beltoft-dnse__table td:nth-child(4) { grid-column: 1 / 4; grid-row: 2; padding-top: 4px; }
+	.beltoft-dnse__table td:nth-child(5):not(.beltoft-dnse__actions) { grid-column: 1 / 4; grid-row: 3; color: var(--bsd-soft); }
+	.beltoft-dnse__table td.beltoft-dnse__actions { grid-column: 1 / 4; padding-top: 6px; text-align: left; white-space: normal; }
+	.beltoft-dnse__table tr[data-edit-row] td::before { content: attr(data-label); display: block; padding: 6px 0 2px; color: var(--bsd-soft); font-size: 12px; }
+	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions::before { content: none; }
+	.beltoft-dnse__table tr[data-edit-row] { gap: 0 6px; }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(n) { padding: 0; }
+	.beltoft-dnse__table tr.beltoft-dnse__rowerror { display: block; padding: 0 0 10px; }
+	.beltoft-dnse__table tr.beltoft-dnse__rowerror td { display: block; padding: 0; }
+	.beltoft-dnse__fields > .beltoft-dnse__extra { flex: 1 1 5em; }
+}
