@@ -4,7 +4,7 @@
  *
  * Variables: $view (see AppTab::view()): name, version, installed, kind (waiting, installing, slow, ready,
  * failed), steps (label and status), position and total, step_label, url, secure, domain, domain_wanted,
- * domain_failed, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
+ * domain_failed, can_retry, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
  * The login is never part of this template: the button asks the server for it once.
  *
  * @package BeltoftServices
@@ -63,12 +63,20 @@ $beltoft_services_status_text = array(
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Taking longer than usual', 'beltoft-services' ); ?></h4>
 			<p><?php esc_html_e( 'The install has not reported back yet. Your server is running. If this stays for more than an hour, contact support.', 'beltoft-services' ); ?></p>
+			<?php if ( $view['can_retry'] ) : ?>
+				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-app-retry><?php esc_html_e( 'Try again', 'beltoft-services' ); ?></button></p>
+				<p class="beltoft-services-panel__notice" data-app-notice role="status" aria-live="polite"></p>
+			<?php endif; ?>
 			<p><a href="<?php echo esc_url( (string) $view['support_url'] ); ?>"><?php esc_html_e( 'Contact support', 'beltoft-services' ); ?></a></p>
 		</div>
 	<?php elseif ( 'failed' === $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'The app could not be installed', 'beltoft-services' ); ?></h4>
 			<p><?php esc_html_e( 'Your server is running and you can log in over SSH. We have been told about the problem. Contact support and we will help you.', 'beltoft-services' ); ?></p>
+			<?php if ( $view['can_retry'] ) : ?>
+				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-app-retry><?php esc_html_e( 'Try again', 'beltoft-services' ); ?></button></p>
+				<p class="beltoft-services-panel__notice" data-app-notice role="status" aria-live="polite"></p>
+			<?php endif; ?>
 			<p><a href="<?php echo esc_url( (string) $view['support_url'] ); ?>"><?php esc_html_e( 'Contact support', 'beltoft-services' ); ?></a></p>
 		</div>
 	<?php elseif ( 'ready' === $beltoft_services_kind ) : ?>

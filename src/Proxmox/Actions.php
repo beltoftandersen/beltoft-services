@@ -74,6 +74,7 @@ final class Actions {
 		'reinstall'      => array( 5, HOUR_IN_SECONDS ),
 		'restore'        => array( 3, HOUR_IN_SECONDS ),
 		'rename'         => array( 10, HOUR_IN_SECONDS ),
+		'app_retry'      => array( 3, HOUR_IN_SECONDS ),
 		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
 		'snapshot_delete'   => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
@@ -141,6 +142,11 @@ final class Actions {
 			$out['reboot']   = __( 'Reboot', 'beltoft-services' );
 		}
 
+		// Only the App tab draws this one (see buttons()): a failed or silent install, tried again without a reinstall.
+		if ( AppInstall::can_retry( $r ) ) {
+			$out[ AppInstall::RETRY ] = __( 'Try again', 'beltoft-services' );
+		}
+
 		if ( self::agent_ok( $r ) ) {
 			$out['reset_password'] = __( 'Reset password', 'beltoft-services' );
 		}
@@ -194,7 +200,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
-			unset( $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -292,6 +298,10 @@ final class Actions {
 				return $block;
 			}
 		}
+		if ( AppInstall::RETRY === $action && ! AppInstall::can_retry( $r ) ) {
+			return __( 'The app cannot be tried again now.', 'beltoft-services' );
+		}
+
 		if ( 'restore' === $action ) {
 			// A restore that has begun is finished whatever happens to a disk meanwhile: the server is off and must start.
 			$state = $r->get( 'restore' );
@@ -456,6 +466,11 @@ final class Actions {
 		// Snapshots have their own steps (verification, task polling and all).
 		if ( $internal || in_array( $action, Snapshots::ACTIONS, true ) ) {
 			return ( new Snapshots( $this->r ) )->run( $action, $args );
+		}
+
+		// No Proxmox call and no reinstall: the install job is queued again, so REINSTALL_GAP does not apply.
+		if ( AppInstall::RETRY === $action ) {
+			return AppInstall::retry( $this->r );
 		}
 
 		$early = $this->prepare( $record );

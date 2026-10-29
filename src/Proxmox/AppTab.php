@@ -93,6 +93,8 @@ final class AppTab {
 				'strings' => array(
 					'gone'   => __( 'The login has already been shown or is no longer available.', 'beltoft-services' ),
 					'failed' => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
+					'retrying' => __( 'Trying again. This page updates by itself.', 'beltoft-services' ),
+					'limit'  => __( 'You can try again three times an hour. Please wait and try again later.', 'beltoft-services' ),
 					'user'   => __( 'Username', 'beltoft-services' ),
 					'email'  => __( 'Email', 'beltoft-services' ),
 					'pass'   => __( 'Password', 'beltoft-services' ),
@@ -230,6 +232,7 @@ final class AppTab {
 			'domain'          => $domain,
 			'domain_wanted'   => (string) $r->get( 'app_domain_want' ),
 			'domain_failed'   => '' !== (string) $r->get( 'app_domain_error' ),
+			'can_retry'       => AppInstall::can_retry( $r ),
 			'can_reveal'      => 'ready' === $kind && $reveal && $r->accepts_actions(),
 			'getting_started' => (string) ( $app['getting_started'] ?? '' ),
 			'docs_url'        => (string) ( $app['docs_url'] ?? '' ),

@@ -13,6 +13,9 @@ defined( 'ABSPATH' ) || exit;
 final class AppInstall {
 	public const HOOK = 'beltoft_services_app_install';
 
+	/** The customer action that tries a failed or silent install again. */
+	public const RETRY = 'app_retry';
+
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 10, 3 );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
@@ -32,6 +35,36 @@ final class AppInstall {
 				self::schedule( (int) $id );
 			}
 		}
+	}
+
+	/** Is "Try again" offered: a ready server whose app failed or never reported back. */
+	public static function can_retry( Resource $r ): bool {
+		return 'ready' === $r->get( 'state' ) && '' !== (string) $r->get( 'app_id' ) && null !== Apps::definition( (string) $r->get( 'app_id' ) )
+			&& in_array( $r->get( 'app_state' ), array( 'failed', 'unknown' ), true ) && $r->accepts_actions();
+	}
+
+	/**
+	 * Puts the app back to pending with a new request id and queues the install job again. The server is not touched.
+	 */
+	public static function retry( Resource $r ): StepResult {
+		if ( ! self::can_retry( $r ) ) {
+			return StepResult::done( array(), 'Try again refused: the app is not failed' );
+		}
+		$ok = $r->set( array(
+			'app_state'       => 'pending',
+			'app_request'     => '',
+			'app_step'        => null,
+			'app_started_at'  => null,
+			'app_checked_at'  => null,
+			'app_queue_until' => null,
+			'app_alerted'     => null,
+			'app_ready_since' => null,
+		) );
+		if ( ! $ok ) {
+			return StepResult::retry( 0, 'The app state could not be reset' );
+		}
+		self::schedule( $r->id() );
+		return StepResult::done( array(), 'The app install was tried again' );
 	}
 
 	public static function state_changed( Resource $r, string $old, string $new ): void {

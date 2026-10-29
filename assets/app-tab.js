@@ -87,12 +87,55 @@
 		} );
 	}
 
+	// A failed install, tried again: the server queues the job again and the page reloads to show it installing.
+	function retry( box, button ) {
+		var panel = box.closest( '[data-resource]' );
+
+		if ( ! panel ) {
+			return;
+		}
+
+		button.disabled = true;
+		line( box, '' );
+		window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/actions/app_retry', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
+			body: '{"args":{}}'
+		} ).then( function ( response ) {
+			var nonce = response.headers.get( 'X-WP-Nonce' );
+
+			if ( nonce ) {
+				account.nonce = nonce;
+			}
+
+			if ( ! response.ok ) {
+				line( box, 429 === response.status ? app.strings.limit : app.strings.failed );
+				button.disabled = false;
+
+				return;
+			}
+
+			line( box, app.strings.retrying );
+			window.setTimeout( function () {
+				window.location.reload();
+			}, 4000 );
+		} ).catch( function () {
+			button.disabled = false;
+			line( box, app.strings.failed );
+		} );
+	}
+
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-app-reveal]' );
+		var button = event.target.closest( '[data-app-reveal], [data-app-retry]' );
 		var box = button ? button.closest( '[data-app-pane]' ) : null;
 
 		if ( button && box ) {
-			reveal( box, button );
+			if ( button.hasAttribute( 'data-app-retry' ) ) {
+				retry( box, button );
+			} else {
+				reveal( box, button );
+			}
 		}
 	} );
 

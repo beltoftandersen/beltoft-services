@@ -250,6 +250,68 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'Contact support', $pane );
 	}
 
+	// -- Try again ------------------------------------------------------------------------------
+
+	private function retry_route( Resource $r, int $user ): \WP_REST_Response {
+		wp_set_current_user( $user );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/app_retry' );
+		$request->set_param( 'args', array() );
+
+		return rest_get_server()->dispatch( $request );
+	}
+
+	public function test_a_failed_app_on_a_ready_server_offers_try_again_and_only_then(): void {
+		foreach ( array( 'failed', 'unknown' ) as $state ) {
+			$r = $this->with_app( array( 'app_state' => $state ), 5010 + strlen( $state ) );
+			$this->assertArrayHasKey( 'app_retry', Actions::offered( $r ), $state );
+			$this->assertStringContainsString( 'data-app-retry', $this->pane( $this->page( $r, 'app' ) ), $state );
+		}
+		foreach ( array( 'pending', 'installing', 'ready' ) as $i => $state ) {
+			$r = $this->with_app( array( 'app_state' => $state ), 5020 + $i );
+			$this->assertArrayNotHasKey( 'app_retry', Actions::offered( $r ), $state );
+			$this->assertStringNotContainsString( 'data-app-retry', $this->pane( $this->page( $r, 'app' ) ), $state );
+		}
+		$r = $this->with_app( array( 'app_state' => 'failed' ), 5030 );
+		$r->set( array( 'state' => 'building' ) );
+		$this->assertArrayNotHasKey( 'app_retry', Actions::offered( Resource::find( $r->id() ) ) );
+		$this->assertNotNull( Actions::check( Resource::find( $r->id() ), 'app_retry', array() ) );
+		$plain = $this->ready_vm( 5031 );
+		$this->assertArrayNotHasKey( 'app_retry', Actions::offered( $plain ) );
+	}
+
+	public function test_try_again_resets_the_app_to_pending_with_a_new_request_and_queues_the_install_without_a_reinstall(): void {
+		$r = $this->with_app( array( 'app_state' => 'failed', 'app_step' => 'download', 'app_request' => 'old', 'app_started_at' => 5, 'app_alerted' => 'x', 'last_reinstall_at' => time() ) );
+		$user = (int) $r->license()['user_id'];
+
+		$this->assertSame( 202, $this->retry_route( $r, $user )->get_status() );
+		\BeltoftServices\Jobs::act( $r->id(), 'app_retry', array() );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'pending', $fresh->get( 'app_state' ) );
+		$this->assertEmpty( $fresh->get( 'app_request' ) );
+		$this->assertEmpty( $fresh->get( 'app_step' ) );
+		$this->assertEmpty( $fresh->get( 'app_alerted' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ), 'The server is not touched.' );
+		$this->assertNotEmpty( as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Proxmox\AppInstall::HOOK, 'args' => array( $r->id() ), 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
+	}
+
+	public function test_try_again_is_for_the_owner_only_and_three_times_an_hour(): void {
+		$r = $this->with_app( array( 'app_state' => 'failed' ) );
+		$other = self::factory()->user->create();
+		$this->assertContains( $this->retry_route( $r, $other )->get_status(), array( 403, 404 ) );
+
+		$user = (int) $r->license()['user_id'];
+		for ( $i = 0; $i < 3; $i++ ) {
+			$this->assertSame( 202, $this->retry_route( $r, $user )->get_status(), 'Try ' . ( $i + 1 ) );
+		}
+		$this->assertSame( 429, $this->retry_route( $r, $user )->get_status() );
+	}
+
+	public function test_try_again_on_an_app_that_is_not_failed_is_refused(): void {
+		$r = $this->with_app( array( 'app_state' => 'installing' ) );
+		$this->assertContains( $this->retry_route( $r, (int) $r->license()['user_id'] )->get_status(), array( 403, 422 ) );
+	}
+
 	public function test_a_newer_version_and_a_retired_one_are_noted(): void {
 		$dir = BELTOFT_SERVICES_PATH . 'apps/docker/28-test';
 		mkdir( $dir );
