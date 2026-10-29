@@ -235,6 +235,21 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 		}
 	}
 
+	public function test_the_buy_link_carries_the_pack_name_exactly(): void {
+		$this->on();
+		$server = $this->ready_vm();
+		$this->as_owner( $server );
+		$product = $this->product();
+		$two     = $this->variation( $product, 2 );
+		$url     = SnapshotCart::add_url( $this->fresh( $server ), $two );
+		$this->assertNotSame( '', $url );
+		$query = array();
+		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+		$this->assertSame( '+2', $query['attribute_pack'], 'The plus sign survives the link.' );
+		$this->assertSame( (string) $two->get_id(), $query['variation_id'] );
+		$this->assertSame( (string) $server->license()['id'], $query['beltoft_services_snapshot_for'] );
+	}
+
 	public function test_a_pack_for_a_raw_server_is_refused(): void {
 		$this->on();
 		$server = $this->ready_vm();

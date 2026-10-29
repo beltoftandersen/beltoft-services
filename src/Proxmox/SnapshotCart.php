@@ -80,7 +80,7 @@ final class SnapshotCart {
 			'variation_id' => $pack->get_id(),
 			'beltoft_services_snapshot_for'   => (int) $license['id'],
 			'beltoft_services_snapshot_nonce' => wp_create_nonce( self::NONCE . ':' . (int) $license['id'] ),
-		), $pack->get_variation_attributes() );
+		), array_map( 'rawurlencode', $pack->get_variation_attributes() ) ); // add_query_arg() leaves values as they are: a "+" in a pack name must not turn into a space.
 
 		return add_query_arg( $args, wc_get_checkout_url() );
 	}
