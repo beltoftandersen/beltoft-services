@@ -1,7 +1,7 @@
 {
   "id": "docker",
   "name": "Docker",
-  "summary": "Docker Engine and Compose on Ubuntu 24.04.",
+  "summary": "Docker Engine and Compose, ready to use over SSH.",
   "getting_started": "Log in over SSH to use Docker and Compose. Ports you publish with Docker are open to the internet even though the firewall is on; bind to 127.0.0.1 or use ufw-docker.",
   "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
   "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}],

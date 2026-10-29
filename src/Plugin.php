@@ -92,6 +92,9 @@ final class Plugin {
 		Proxmox\ServerName::register();
 		Proxmox\SshKeyField::register();
 		Proxmox\OsField::register();
+		Proxmox\AppField::register();
+		Proxmox\AppReinstall::register();
+		Proxmox\AppTab::register();
 		Proxmox\BackupField::register();
 		Proxmox\DiskMeta::register();
 		Proxmox\DiskCascade::register();

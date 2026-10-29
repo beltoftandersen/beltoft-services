@@ -227,6 +227,41 @@ final class ClustersScreen {
 	}
 
 	/**
+	 * The rows for ready-made apps: all off until the owner turns them on for the cluster.
+	 *
+	 * @param array<string, mixed> $c Cluster values.
+	 */
+	private static function apps_rows( array $c ): void {
+		$families = '';
+
+		foreach ( (array) $c['template_families'] as $vmid => $family ) {
+			$families .= $vmid . ' = ' . $family . "\n";
+		}
+
+		echo '<tr><th scope="row">' . esc_html__( 'Apps', 'beltoft-services' ) . '</th><td><input type="hidden" name="apps_form" value="1">';
+		printf(
+			'<label><input type="checkbox" name="apps_ready" value="1" %1$s> %2$s</label><p class="description">%3$s</p>',
+			checked( (int) $c['apps_ready'], 1, false ),
+			esc_html__( 'Apps are ready on this cluster', 'beltoft-services' ),
+			esc_html__( 'Turn on only when the vendor snippet above is vm-vendor-cloudinit-v2.yaml and a template of the family ubuntu-24.04 is listed below. Customers then see the app choice at checkout.', 'beltoft-services' )
+		);
+
+		foreach ( Apps::ids() as $id ) {
+			$def = Apps::definition( $id );
+
+			printf(
+				'<p><label><input type="checkbox" name="apps_enabled[]" value="%1$s" %2$s> %3$s</label></p>',
+				esc_attr( $id ),
+				checked( in_array( $id, (array) $c['apps_enabled'], true ), true, false ),
+				esc_html( null === $def ? $id : (string) $def['name'] )
+			);
+		}
+
+		echo '</td></tr>';
+		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04.', 'beltoft-services' ), 'textarea' );
+	}
+
+	/**
 	 * The add or edit form. The saved secret is never printed.
 	 *
 	 * @param string $id Cluster id, empty to add.
@@ -294,6 +329,7 @@ final class ClustersScreen {
 		self::row( 'templates', __( 'Templates', 'beltoft-services' ), $templates, __( 'One per line: VMID = label. The label is what customers see as the operating system. A template must be outside the customer VMID range.', 'beltoft-services' ), 'textarea' );
 		self::row( 'default_template', __( 'Default template', 'beltoft-services' ), $c['default_template'] ? (string) $c['default_template'] : '', __( 'The VMID from the list above that customers get preselected at checkout and on reinstall. Empty: the first template of the list.', 'beltoft-services' ) );
 		self::row( 'vendor_snippet', __( 'Vendor snippet', 'beltoft-services' ), (string) $c['vendor_snippet'], __( 'Optional cloud-init snippet volume, such as local:snippets/vendor.yaml.', 'beltoft-services' ) );
+		self::apps_rows( $c );
 		self::row( 'backup_storage', __( 'Backup storage', 'beltoft-services' ), (string) $c['backup_storage'], __( 'Optional storage id (a Proxmox Backup Server storage) for customer backups. Empty: no backups on this cluster.', 'beltoft-services' ) );
 
 		printf(

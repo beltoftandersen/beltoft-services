@@ -1,0 +1,10 @@
+/* Checkout: the app fields. Spacing only; fields take the checkout's own look. */
+.beltoft-services-app { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+.beltoft-services-app .form-row { margin: 0; }
+.beltoft-services-app label { display: block; }
+.beltoft-services-app label.checkbox { display: flex; align-items: center; gap: 8px; }
+.beltoft-services-app select, .beltoft-services-app input[type="text"] { width: 100%; box-sizing: border-box; margin-top: 4px; }
+.beltoft-services-app .woocommerce-input-wrapper { display: block; }
+.beltoft-services-app .description { display: block; margin-top: 6px; color: var(--ink-soft, inherit); font-size: 14px; line-height: 1.5; }
+.beltoft-services-app__domain, .beltoft-services-app__domain-fields { display: flex; flex-direction: column; gap: 16px; }
+.beltoft-services-app [hidden] { display: none !important; }

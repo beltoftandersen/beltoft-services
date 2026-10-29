@@ -10,6 +10,123 @@ final class Apps {
 	public const STATUS = '/var/lib/beltoft-app/status.json';
 	public const CREDENTIALS = '/root/.beltoft-app/credentials.json';
 
+	/** The operating system family every v1 app runs on. */
+	public const FAMILY = 'ubuntu-24.04';
+
+	/** App ids shipped with the plugin, by directory name. */
+	public static function ids(): array {
+		$ids = array();
+		foreach ( (array) glob( BELTOFT_SERVICES_PATH . 'apps/*/app.json' ) as $file ) {
+			$id = basename( dirname( $file ) );
+			if ( preg_match( '/^[a-z0-9-]+$/', $id ) ) {
+				$ids[] = $id;
+			}
+		}
+		sort( $ids );
+		return $ids;
+	}
+
+	/** The app's definition, without choosing a version. */
+	public static function definition( string $id ): ?array {
+		if ( ! preg_match( '/^[a-z0-9-]+$/', $id ) ) {
+			return null;
+		}
+		$file = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json';
+		$data = is_readable( $file ) ? json_decode( (string) file_get_contents( $file ), true ) : null;
+		$data = apply_filters( 'beltoft_services_apps', $data, $id );
+		return is_array( $data ) && ( $data['id'] ?? '' ) === $id && is_array( $data['versions'] ?? null ) ? $data : null;
+	}
+
+	/** The template that carries the app operating system on this cluster (VMID), or 0 when there is none. */
+	public static function os_template( array $cluster ): int {
+		foreach ( (array) ( $cluster['template_families'] ?? array() ) as $vmid => $family ) {
+			if ( self::FAMILY === $family && isset( ( (array) ( $cluster['templates'] ?? array() ) )[ (int) $vmid ] ) ) {
+				return (int) $vmid;
+			}
+		}
+		return 0;
+	}
+
+	/** Are apps on offer at all on this cluster: the flag, the v2 snippet and an Ubuntu 24.04 template. */
+	public static function cluster_ready( array $cluster ): bool {
+		return ! empty( $cluster['apps_ready'] ) && 1 === preg_match( '#:snippets/vm-vendor-cloudinit-v2\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ) ) && self::os_template( $cluster ) > 0;
+	}
+
+	/**
+	 * What checkout offers on a cluster: apps that are enabled there, each with its versions that can be
+	 * ordered (current first, then the others in file order). Retired versions are never listed.
+	 *
+	 * @return array<string, array<string, mixed>> App id => definition plus `choices` (version id => version).
+	 */
+	public static function offered( array $cluster ): array {
+		if ( ! self::cluster_ready( $cluster ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( (array) ( $cluster['apps_enabled'] ?? array() ) as $id ) {
+			$data = is_string( $id ) ? self::definition( $id ) : null;
+			if ( null === $data ) {
+				continue;
+			}
+			$current = self::current( $id );
+			if ( null === $current ) {
+				continue;
+			}
+			$choices = array( $current['version_id'] => $current );
+			foreach ( $data['versions'] as $version ) {
+				$vid = is_array( $version ) ? (string) ( $version['id'] ?? '' ) : '';
+				if ( '' === $vid || isset( $choices[ $vid ] ) ) {
+					continue;
+				}
+				$full = self::version( $id, $vid );
+				if ( null !== $full ) {
+					$choices[ $vid ] = $full;
+				}
+			}
+			unset( $data['versions'] );
+			$out[ $id ] = $data + array( 'choices' => $choices );
+		}
+		return $out;
+	}
+
+	/** The plan name an app version needs, for customer text. */
+	public static function plan_name( array $version ): string {
+		return ucfirst( (string) ( $version['min_plan'] ?? '' ) );
+	}
+
+	/**
+	 * Why a plan cannot run an app version, in words for the customer; null when it can.
+	 *
+	 * @param array<string, mixed> $plan Plan (cores, memory_mb, disk_gb).
+	 */
+	public static function plan_refusal( array $version, array $plan ): ?string {
+		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {
+			if ( (int) ( $plan[ $key ] ?? 0 ) >= (int) ( $version['min'][ $key ] ?? 0 ) ) {
+				continue;
+			}
+			$name = self::plan_name( $version );
+			if ( '' !== $name ) {
+				/* translators: 1: app name, 2: plan name such as Performance */
+				return sprintf( __( '%1$s needs the %2$s plan or larger. Choose a larger plan or no app.', 'beltoft-services' ), (string) $version['name'], $name );
+			}
+			/* translators: 1: app name, 2: CPU cores, 3: memory in GB, 4: disk in GB */
+			return sprintf( __( '%1$s needs at least %2$d CPU cores, %3$s GB of memory and %4$d GB of disk. Choose a larger plan or no app.', 'beltoft-services' ), (string) $version['name'], (int) $version['min']['cores'], (string) round( (int) $version['min']['memory_mb'] / 1024, 1 ), (int) $version['min']['disk_gb'] );
+		}
+		return null;
+	}
+
+	/** One line for a version in a list: its label, and the end of support when it has a date. */
+	public static function version_label( array $version ): string {
+		$label = (string) ( $version['label'] ?? $version['version_id'] ?? '' );
+		$eol   = (string) ( $version['eol'] ?? '' );
+		if ( '' === $eol ) {
+			return $label;
+		}
+		$time = strtotime( $eol . ( 1 === preg_match( '/^\d{4}-\d{2}$/', $eol ) ? '-01' : '' ) );
+		/* translators: 1: version label, 2: end of support month and year */
+		return false === $time ? $label : sprintf( __( '%1$s (supported until %2$s)', 'beltoft-services' ), $label, wp_date( 'F Y', $time ) );
+	}
+
 	/** A definition and its exact script checksum, or null when invalid. */
 	public static function version( string $id, string $version_id, bool $existing = false ): ?array {
 		if ( ! preg_match( '/^[a-z0-9-]+$/', $id ) || ! preg_match( '/^[a-zA-Z0-9.-]+$/', $version_id ) ) {

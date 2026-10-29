@@ -60,6 +60,15 @@ if ( null !== $beltoft_services_page ) {
 		$beltoft_services_tabs['reinstall'] = __( 'Reinstall', 'beltoft-services' );
 	}
 
+	/**
+	 * Filters the tabs of a server page, slug => title, in the order they are shown. An extension adds its
+	 * slug to beltoft_services_server_page_tabs too and prints its pane on beltoft_services_server_tab_pane.
+	 *
+	 * @param array<string, string> $tabs        Tabs.
+	 * @param int                   $resource_id The server's resource id.
+	 */
+	$beltoft_services_tabs = (array) apply_filters( 'beltoft_services_server_tabs', $beltoft_services_tabs, (int) $resource_id );
+
 	if ( isset( $beltoft_services_tabs[ (string) ( $beltoft_services_page['tab'] ?? '' ) ] ) ) {
 		$beltoft_services_active = (string) $beltoft_services_page['tab'];
 	}
@@ -729,6 +738,14 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 						</select>
 					</p>
 				<?php endif; ?>
+				<?php
+				/**
+				 * Extra fields of the reinstall form (the app choice).
+				 *
+				 * @param int $resource_id The server's resource id.
+				 */
+				do_action( 'beltoft_services_reinstall_fields', (int) $resource_id );
+				?>
 				<p>
 					<label for="beltoft-vm-confirm">
 						<?php
@@ -758,6 +775,22 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<?php $beltoft_services_more_close(); ?>
 		<?php endif; ?>
 		<?php $beltoft_services_close(); ?>
+	<?php endif; ?>
+
+	<?php if ( null !== $beltoft_services_page ) : ?>
+		<?php foreach ( array_diff( array_keys( $beltoft_services_tabs ), array( 'overview', 'snapshots', 'backups', 'disks', 'access', 'reinstall' ) ) as $beltoft_services_extra ) : ?>
+			<?php $beltoft_services_open( (string) $beltoft_services_extra ); ?>
+			<?php
+			/**
+			 * Prints the pane of a tab an extension added to the server page.
+			 *
+			 * @param string $slug        Tab slug.
+			 * @param int    $resource_id The server's resource id.
+			 */
+			do_action( 'beltoft_services_server_tab_pane', (string) $beltoft_services_extra, (int) $resource_id );
+			?>
+			<?php $beltoft_services_close(); ?>
+		<?php endforeach; ?>
 	<?php endif; ?>
 
 	<?php if ( is_array( $snapshots ) && 'full' === $snapshots['mode'] ) : ?>

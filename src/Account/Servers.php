@@ -47,6 +47,23 @@ final class Servers {
 	public const TABS = array( 'snapshots', 'backups', 'disks', 'access', 'reinstall' );
 
 	/**
+	 * The tab addresses a server page accepts: the built-in ones, plus any an extension adds.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function tabs(): array {
+		/**
+		 * Filters the tab addresses of a server page. An extension that adds a tab (see the filter
+		 * beltoft_services_server_tabs) adds its slug here so the tab has its own address.
+		 *
+		 * @param array<int, string> $slugs Slugs after the overview.
+		 */
+		$slugs = apply_filters( 'beltoft_services_server_page_tabs', self::TABS );
+
+		return array_values( array_filter( is_array( $slugs ) ? $slugs : self::TABS, 'is_string' ) );
+	}
+
+	/**
 	 * The page being printed (license row, requested tab), or null outside a server page.
 	 *
 	 * @var array<string, mixed>|null
@@ -93,7 +110,7 @@ final class Servers {
 			return '';
 		}
 
-		$value = (string) (int) $license['id'] . ( in_array( $tab, self::TABS, true ) ? '/' . $tab : '' );
+		$value = (string) (int) $license['id'] . ( in_array( $tab, self::tabs(), true ) ? '/' . $tab : '' );
 
 		return wc_get_endpoint_url( self::slug(), $value, wc_get_page_permalink( 'myaccount' ) );
 	}
@@ -122,7 +139,7 @@ final class Servers {
 
 		return array(
 			'id'  => $id,
-			'tab' => in_array( $tab, self::TABS, true ) ? $tab : '',
+			'tab' => in_array( $tab, self::tabs(), true ) ? $tab : '',
 		);
 	}
 

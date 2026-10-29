@@ -107,6 +107,31 @@ final class AppInstall {
 		AppAlerts::failure( $r, $reason );
 	}
 
+	/**
+	 * The domain the app is served on. When the customer ticked the box at checkout, the A record is made now, once,
+	 * in a zone the customer still holds with us. If it cannot be made the app is installed without a domain (plain
+	 * HTTP at the address) and the App tab says so; the server and the install never wait for DNS.
+	 */
+	private static function domain( Resource $resource, string $ip, int $user_id ): string {
+		$done = (string) $resource->get( 'app_domain' );
+		$want = (string) $resource->get( 'app_domain_want' );
+
+		if ( '' !== $done || '' === $want || '' !== (string) $resource->get( 'app_domain_error' ) ) {
+			return $done;
+		}
+
+		$made = AppDomains::publish( $user_id, (string) $resource->get( 'app_zone' ), $want, $ip );
+
+		if ( true === $made ) {
+			$resource->set( array( 'app_domain' => $want ) );
+			return $want;
+		}
+
+		$resource->set( array( 'app_domain_error' => $made ) );
+
+		return '';
+	}
+
 	/** One file-write attempt. A missing guest directory gets a free poll, not a counted retry. */
 	public static function queue( Resource $resource, Client $client ): StepResult {
 		$id = (string) $resource->get( 'app_id' );
@@ -130,6 +155,7 @@ final class AppInstall {
 				return StepResult::poll( 10, 'app: request id could not be stored', 600 );
 			}
 		}
+		$domain = self::domain( $resource, (string) $ip['address'], (int) ( $license['user_id'] ?? 0 ) );
 		$job = array(
 			'v' => 1,
 			'op' => 'install',
@@ -139,7 +165,7 @@ final class AppInstall {
 			'recipe' => (int) $app['recipe'],
 			'url' => $app['url'],
 			'sha256' => $app['sha256'],
-			'domain' => (string) $resource->get( 'app_domain' ),
+			'domain' => $domain,
 			'ip' => $ip['address'],
 			'params' => array(),
 			'key_only' => '' !== (string) $resource->get( 'ssh_key' ),

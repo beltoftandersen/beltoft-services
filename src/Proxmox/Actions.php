@@ -348,6 +348,19 @@ final class Actions {
 			}
 		}
 
+		/**
+		 * Lets an extension refuse a reinstall for its own reason (the app choice). Return the text for the customer, or null.
+		 *
+		 * @param string|null          $why  Refusal so far.
+		 * @param Resource             $r    Resource.
+		 * @param array<string, mixed> $args Arguments.
+		 */
+		$why = apply_filters( 'beltoft_services_reinstall_check', null, $r, $args );
+
+		if ( is_string( $why ) && '' !== $why ) {
+			return $why;
+		}
+
 		$last = (int) $r->get( 'last_reinstall_at' );
 
 		if ( $last > 0 && time() - $last < self::REINSTALL_GAP ) {
@@ -842,6 +855,15 @@ final class Actions {
 		if ( isset( $args['os'] ) && '' !== $args['os'] ) {
 			$meta[ OsField::META ] = (int) $args['os'];
 		}
+
+		/**
+		 * Meta a reinstall also sets (the app choice).
+		 *
+		 * @param array<string, mixed> $meta Meta so far.
+		 * @param Resource             $r    Resource.
+		 * @param array<string, mixed> $args Arguments.
+		 */
+		$meta = (array) apply_filters( 'beltoft_services_reinstall_meta', $meta, $this->r, $args );
 
 		if ( ! $this->r->set( $meta ) ) {
 			return StepResult::retry( 0, 'reinstall: the request could not be stored' );

@@ -471,14 +471,24 @@ final class Clusters {
 
 		$clean['vendor_snippet'] = $snippet;
 
-		// The app controls are configured separately until the checkout/dashboard work is merged.
-		// Preserve them when the existing cluster form saves unrelated settings.
-		if ( array_key_exists( 'apps_ready', $input ) ) {
+		// The app controls. The settings form sends apps_form, so an unticked box means off; any other caller
+		// (a script, a test) that leaves the keys out keeps what the cluster has.
+		$apps_form = ! empty( $input['apps_form'] );
+
+		if ( $apps_form || array_key_exists( 'apps_ready', $input ) ) {
 			$clean['apps_ready'] = empty( $input['apps_ready'] ) ? 0 : 1;
 		}
-		if ( array_key_exists( 'apps_enabled', $input ) ) {
-			$ids = is_array( $input['apps_enabled'] ) ? $input['apps_enabled'] : array();
-			$clean['apps_enabled'] = array_values( array_filter( array_map( 'strval', $ids ), static fn( $v ) => (bool) preg_match( '/^[a-z0-9-]+$/', $v ) ) );
+		if ( $apps_form || array_key_exists( 'apps_enabled', $input ) ) {
+			$ids = is_array( $input['apps_enabled'] ?? null ) ? $input['apps_enabled'] : array();
+			$clean['apps_enabled'] = array_values( array_unique( array_filter( array_map( 'strval', $ids ), static fn( $v ) => (bool) preg_match( '/^[a-z0-9-]+$/', $v ) ) ) );
+		}
+		if ( isset( $input['template_families_text'] ) && is_string( $input['template_families_text'] ) ) {
+			$input['template_families'] = array();
+			foreach ( preg_split( '/\R/', $input['template_families_text'] ) as $line ) {
+				if ( 1 === preg_match( '/^\s*(\d+)\s*=\s*(\S+)\s*$/', $line, $m ) ) {
+					$input['template_families'][ (int) $m[1] ] = strtolower( $m[2] );
+				}
+			}
 		}
 		if ( array_key_exists( 'template_families', $input ) && is_array( $input['template_families'] ) ) {
 			$families = array();
