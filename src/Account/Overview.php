@@ -135,7 +135,13 @@ final class Overview {
 	 * The stylesheet on the account page.
 	 */
 	public static function assets(): void {
-		if ( function_exists( 'is_account_page' ) && is_account_page() ) {
+		// Logged-in customers only, on the Overview and the billing pages (the sections and the tab bar print the
+		// stylesheet themselves when they render); not on the login screen or Account details.
+		if ( ! function_exists( 'is_account_page' ) || ! is_account_page() || ! is_user_logged_in() ) {
+			return;
+		}
+
+		if ( ! is_wc_endpoint_url() || '' !== Billing::current_tab() ) {
 			Panel::style();
 		}
 	}

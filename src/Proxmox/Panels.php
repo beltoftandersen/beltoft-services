@@ -30,7 +30,7 @@ final class Panels {
 	 * Hooks the script.
 	 */
 	public static function register(): void {
-		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ) );
+		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ), 10, 2 );
 		add_filter( 'beltoft_services_account_page_head', array( __CLASS__, 'page_head' ), 10, 5 );
 	}
 
@@ -90,9 +90,14 @@ final class Panels {
 	/**
 	 * Enqueues the VM script after the generic panel script.
 	 *
-	 * @param mixed $parent Handle of the generic panel script.
+	 * @param mixed $parent   Handle of the generic panel script.
+	 * @param mixed $endpoint The My Account endpoint being shown; the scripts load on the Servers endpoint only.
 	 */
-	public static function assets( $parent ): void {
+	public static function assets( $parent, $endpoint = null ): void {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\Servers::slug() !== $endpoint ) {
+			return;
+		}
+
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
 		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
 		wp_enqueue_style( 'beltoft-services-metrics', plugins_url( 'assets/metrics.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.css' ) );

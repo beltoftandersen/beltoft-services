@@ -11,11 +11,16 @@ final class Panels {
 	public const PAGE_TIMEOUT = 5;
 
 	public static function register(): void {
-		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ) );
+		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ), 10, 2 );
 		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'buttons' ), 10, 2 );
 		add_filter( 'beltoft_licenses_account_title', array( __CLASS__, 'title' ), 10, 2 );
 	}
-	public static function assets( $parent ): void {
+	public static function assets( $parent, $endpoint = null ): void {
+		// The domain script is for the Domains endpoint only (the Servers and Licenses pages have no domain panel).
+		if ( is_string( $endpoint ) && 'domains' !== $endpoint ) {
+			return;
+		}
+
 		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/domain.js' ), true );
 	}
 	public static function buttons( $buttons, $r ) {

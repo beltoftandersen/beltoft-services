@@ -263,12 +263,22 @@ final class Panel {
 
 		self::style();
 
+		$active = '';
+
+		foreach ( Endpoint::slugs() as $slug ) {
+			if ( is_wc_endpoint_url( $slug ) ) {
+				$active = (string) $slug;
+				break;
+			}
+		}
+
 		/**
-		 * Lets a driver add its own script or style to the panel page.
+		 * Lets a driver add its own script or style to the panel page. Load only what the endpoint needs.
 		 *
-		 * @param string $handle Handle of the generic panel script, which a driver script depends on.
+		 * @param string $handle   Handle of the generic panel script, which a driver script depends on.
+		 * @param string $endpoint The My Account endpoint being shown (servers, domains, licenses).
 		 */
-		do_action( 'beltoft_services_account_assets', self::HANDLE );
+		do_action( 'beltoft_services_account_assets', self::HANDLE, $active );
 
 		wp_enqueue_script( 'beltoft-services-progress', plugins_url( 'assets/progress.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/progress.js' ), true );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array( 'beltoft-services-progress' ), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
