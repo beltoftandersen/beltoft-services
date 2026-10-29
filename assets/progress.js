@@ -45,6 +45,7 @@
 	function render( element, payload ) {
 		var text = element.querySelector( '[data-progress-text]' );
 		var list = element.querySelector( '[data-progress-steps]' );
+		var leave = element.querySelector( '[data-progress-leave]' );
 
 		if ( ! payload || 'object' !== typeof payload ) {
 			return false;
@@ -66,6 +67,11 @@
 
 		if ( list ) {
 			steps( list, payload );
+		}
+
+		if ( leave ) {
+			leave.textContent = payload.leave || '';
+			leave.hidden = ! payload.leave;
 		}
 
 		return !! payload.active;

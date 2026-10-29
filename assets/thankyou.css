@@ -21,4 +21,12 @@
 .beltoft-services-progress__steps li.is-failed { opacity: 1; font-weight: 600; text-decoration: underline; }
 .beltoft-services-progress .screen-reader-text { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @keyframes beltoft-services-pulse { 50% { opacity: 0.3; } }
-@media (prefers-reduced-motion: reduce) { .beltoft-services-progress__steps li.is-current::before { animation: none; } }
+.beltoft-services-progress__leave { margin: 0.75em 0 0; opacity: 0.75; }
+.beltoft-services-progress__leave[hidden] { display: none; }
+@keyframes beltoft-services-dots {
+	0%, 100% { background-size: 0.3em 0.3em, 0.12em 0.12em, 0.12em 0.12em; }
+	33% { background-size: 0.12em 0.12em, 0.3em 0.3em, 0.12em 0.12em; }
+	66% { background-size: 0.12em 0.12em, 0.12em 0.12em, 0.3em 0.3em; }
+}
+.beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { content: ""; display: inline-block; width: 1.1em; height: 0.3em; margin-right: 0.6em; vertical-align: 0.1em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.3em 0.3em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.12em 0.12em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.12em 0.12em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .beltoft-services-progress__steps li.is-current::before { animation: none; } .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { animation: none; background-size: 0.2em 0.2em, 0.2em 0.2em, 0.2em 0.2em; } }

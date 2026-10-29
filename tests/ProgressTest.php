@@ -250,7 +250,7 @@ final class ProgressTest extends TestCase {
 
 		$this->assertStringNotContainsString( '203.0.113.9', $json );
 		$this->assertStringNotContainsString( 'pw-1234', $json );
-		$this->assertSame( array( 'kind', 'phase', 'active', 'title', 'steps', 'current', 'minutes', 'eta', 'text', 'started' ), array_keys( Progress::build( $r ) ) );
+		$this->assertSame( array( 'kind', 'phase', 'active', 'title', 'steps', 'current', 'minutes', 'eta', 'text', 'leave', 'started' ), array_keys( Progress::build( $r ) ) );
 	}
 
 	public function test_the_marker_shows_a_requested_action_at_once(): void {
@@ -474,5 +474,34 @@ final class ProgressTest extends TestCase {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' ) . (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
 		$this->assertStringContainsString( "setAttribute( 'aria-busy', 'true' )", $js );
 		$this->assertStringContainsString( "removeAttribute( 'aria-busy' )", $js );
+	}
+
+	public function test_work_in_progress_says_the_customer_can_leave_and_idle_work_says_nothing(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'ip' ) ) );
+
+		$payload = Progress::build( $r );
+		$this->assertTrue( $payload['active'] );
+		$this->assertSame( 'You can leave this site. The work goes on, and the same progress is in your account.', $payload['leave'] );
+		$this->assertSame( 'vmid', $payload['current'] );
+
+		ob_start();
+		Progress::render( $payload );
+		$html = (string) ob_get_clean();
+		$this->assertMatchesRegularExpression( '/<p class="beltoft-services-progress__leave" data-progress-leave>You can leave this site/', $html );
+
+		$r->set( array( 'state' => 'ready' ) );
+		$payload = Progress::build( $r );
+		$this->assertSame( '', $payload['leave'] );
+		ob_start();
+		Progress::render( $payload );
+		$this->assertStringContainsString( 'data-progress-leave hidden', (string) ob_get_clean() );
+	}
+
+	public function test_the_thank_you_row_and_the_status_route_carry_the_leave_line(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'ip' ) ) );
+
+		$this->assertStringContainsString( 'You can leave this site', \BeltoftServices\ThankYou::row( $r )['progress']['leave'] );
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/progress.js' );
+		$this->assertStringContainsString( 'data-progress-leave', $js );
 	}
 }

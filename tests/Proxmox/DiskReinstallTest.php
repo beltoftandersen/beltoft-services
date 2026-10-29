@@ -347,10 +347,10 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->assertStringContainsString( 'data-action="reinstall" data-disks="1"', $html );
 		$this->assertStringContainsString( 'Extra disks are kept with their data and stay attached.', $html );
 		$this->assertStringNotContainsString( "\xE2\x80\x94", $html );
+		// The confirm is the card's own dialog: its text is printed with the form, not a browser confirm().
+		$this->assertStringContainsString( 'Extra disks keep their data and stay attached.', $html );
 		$js = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/vm.js' );
-		$this->assertStringContainsString( 'vm.strings.reinstallDisks', $js );
-		$panels = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Proxmox/Panels.php' );
-		$this->assertStringContainsString( "Reinstalling erases the server\\'s main disk. Extra disks are kept with their data and stay attached.", $panels );
+		$this->assertStringNotContainsString( 'window.confirm', $js );
 	}
 
 	public function test_the_fake_import_names_the_next_free_volume_and_destroys_nothing_else(): void {

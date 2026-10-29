@@ -37,7 +37,20 @@ final class DiskPanels {
 			$subscription = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $license['subscription_id'] ?? 0 ) ) : null;
 			$actions = $subscription instanceof \WC_Subscription && function_exists( 'wcs_get_all_user_actions_for_subscription' )
 				? wcs_get_all_user_actions_for_subscription( $subscription, get_current_user_id() ) : array();
+			$ending = self::ending( $subscription, $actions );
+			$labels = array();
+			if ( isset( $volumes[ $disk->id() ] ) ) {
+				foreach ( $kept as $entry ) {
+					if ( in_array( $volumes[ $disk->id() ], (array) ( $entry['covers'] ?? array() ), true ) ) {
+						$labels[] = '' !== (string) ( $entry['label'] ?? '' ) ? (string) $entry['label'] : wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) ( $entry['taken_at'] ?? 0 ) );
+					}
+				}
+			}
 			$disks[] = array(
+				'id' => $disk->id(),
+				'ending' => $ending,
+				'paid_until' => self::date_of( $subscription, 'next_payment' ),
+				'snapshot_labels' => $labels,
 				'retention_days' => Product::retention_days( (int) ( $license['product_id'] ?? 0 ) ),
 				'size' => max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) ),
 				'slot' => (string) $disk->get( 'slot' ),
@@ -46,7 +59,7 @@ final class DiskPanels {
 				'grow_price' => $grow_price,
 				'paused' => 'paused' === $disk->get( 'state' ),
 				'snapshots_covering' => isset( $volumes[ $disk->id() ] ) ? count( array_filter( $kept, static fn( $e ) => in_array( $volumes[ $disk->id() ], (array) ( $e['covers'] ?? array() ), true ) ) ) : 0,
-				'remove_url' => 'ready' === $disk->get( 'state' ) ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
+				'remove_url' => 'ready' === $disk->get( 'state' ) && null === $ending ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
 			);
 		}
 		$add = array();
@@ -65,6 +78,36 @@ final class DiskPanels {
 			}
 		}
 		return array( 'items' => $disks, 'add' => $add, 'mode' => (string) Settings::get( 'deletion_mode' ) );
+	}
+
+	/**
+	 * The date of a subscription, formatted for the customer, or '' when it has none.
+	 *
+	 * @param mixed  $subscription Subscription or null.
+	 * @param string $which        WCS date type.
+	 */
+	private static function date_of( $subscription, string $which ): string {
+		$time = $subscription instanceof \WC_Subscription ? (int) $subscription->get_time( $which, 'site' ) : 0;
+
+		return $time > 0 ? date_i18n( get_option( 'date_format' ), $time ) : '';
+	}
+
+	/**
+	 * A disk whose subscription the customer has ended: it stays until the paid period ends. Null when it is not ending.
+	 *
+	 * @param mixed                $subscription Subscription or null.
+	 * @param array<string, mixed> $actions      The customer's actions on it (WCS).
+	 * @return array{date: string, undo_url: string}|null
+	 */
+	private static function ending( $subscription, array $actions ): ?array {
+		if ( ! $subscription instanceof \WC_Subscription || ! $subscription->has_status( 'pending-cancel' ) ) {
+			return null;
+		}
+
+		return array(
+			'date'     => self::date_of( $subscription, 'end' ),
+			'undo_url' => (string) ( $actions['reactivate']['url'] ?? '' ),
+		);
 	}
 
 	public static function account( Resource $disk ): void {

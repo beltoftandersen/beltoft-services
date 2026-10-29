@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * Payload keys: kind, phase (idle, queued, running, failed), active, title, steps (list of
  * key, label, status done|current|todo|failed, status_label), current (step key or ''), minutes, eta, text,
- * started (unix time or 0).
+ * leave (a sentence that says the customer may go away while it runs, empty unless active), started (unix time or 0).
  */
 final class Progress {
 
@@ -295,6 +295,7 @@ final class Progress {
 			'minutes' => $minutes,
 			'eta'     => $eta,
 			'text'    => self::text( $kind, $phase, $marker, $eta, $driver ),
+			'leave'   => in_array( $phase, array( 'queued', 'running' ), true ) ? self::leave() : '',
 			'started' => self::started( $r, $kind, $marker ),
 		);
 	}
@@ -378,6 +379,13 @@ final class Progress {
 		}
 
 		return trim( self::title( $kind, $driver, $marker ) . '. ' . $eta );
+	}
+
+	/**
+	 * The line under the steps of work in progress: the customer does not have to wait here.
+	 */
+	public static function leave(): string {
+		return __( 'You can leave this site. The work goes on, and the same progress is in your account.', 'beltoft-services' );
 	}
 
 	/**

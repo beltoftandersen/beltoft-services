@@ -23,4 +23,5 @@ $beltoft_services_phase = (string) ( $progress['phase'] ?? 'idle' );
 			</li>
 		<?php endforeach; ?>
 	</ol>
+	<p class="beltoft-services-progress__leave" data-progress-leave<?php echo '' === (string) ( $progress['leave'] ?? '' ) ? ' hidden' : ''; ?>><?php echo esc_html( (string) ( $progress['leave'] ?? '' ) ); ?></p>
 </div>

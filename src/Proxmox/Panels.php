@@ -67,11 +67,23 @@ final class Panels {
 					'tooMany'   => __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ),
 					'working'   => __( 'Working…', 'beltoft-services' ),
 					'gone'      => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),
-					'reinstall' => __( 'Reinstalling erases everything on the server. Continue?', 'beltoft-services' ),
-					'reinstallDisks' => __( 'Reinstalling erases the server\'s main disk. Extra disks are kept with their data and stay attached. Continue?', 'beltoft-services' ),
-					'restoreDisks' => __( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', 'beltoft-services' ),
-					'restore'   => __( 'Restoring replaces everything on the server with this backup, and the password and SSH key go back to the backup\'s. Continue?', 'beltoft-services' ),
-					'snapshotDelete' => __( 'Delete this snapshot? This cannot be undone.', 'beltoft-services' ),
+					'snapshotDelete' => __( 'Deleting a snapshot cannot be undone.', 'beltoft-services' ),
+					'deleteTitle'    => __( 'Delete this snapshot?', 'beltoft-services' ),
+					'deleteYes'      => __( 'Delete the snapshot', 'beltoft-services' ),
+					/* translators: %s: name of the snapshot */
+					'deleteStart'    => __( 'Deleting snapshot %s.', 'beltoft-services' ),
+					/* translators: %s: name of the snapshot */
+					'deleteDone'     => __( 'Snapshot %s is deleted.', 'beltoft-services' ),
+					/* translators: %s: name of the snapshot */
+					'rollbackStart'  => __( 'Going back to snapshot %s. The server is off for a moment.', 'beltoft-services' ),
+					/* translators: %s: name of the snapshot */
+					'rollbackDone'   => __( 'Back on snapshot %s.', 'beltoft-services' ),
+					'restoreStart'   => __( 'Restoring your server from the backup. The server is off while it is restored.', 'beltoft-services' ),
+					'restoreDone'    => __( 'Your server is restored from the backup.', 'beltoft-services' ),
+					'reinstallStart' => __( 'Reinstalling your server. The old system is erased first.', 'beltoft-services' ),
+					'reinstallDone'  => __( 'Your server is reinstalled.', 'beltoft-services' ),
+					'running'        => __( 'The server is running.', 'beltoft-services' ),
+					'newPassword'    => __( 'Use "Show password once" for your new password.', 'beltoft-services' ),
 				),
 			)
 		);
