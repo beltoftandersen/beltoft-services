@@ -779,8 +779,8 @@ final class Overview {
 			if ( self::is_card( $token ) ) {
 				$type = (string) $token->get_card_type();
 
-				/* translators: 1: card brand, 2: last four digits */
 				return array(
+					/* translators: 1: card brand, 2: last four digits */
 					'text'    => sprintf( __( '%1$s ending %2$s', 'beltoft-services' ), function_exists( 'wc_get_credit_card_type_label' ) ? wc_get_credit_card_type_label( $type ) : ucfirst( $type ), $token->get_last4() ),
 					'is_card' => true,
 				);
