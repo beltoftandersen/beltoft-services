@@ -1,4 +1,4 @@
-/* Customer VPS usage charts. No provider data is written into the document. */
+/* Customer VPS usage charts. Inline SVG, no library. No provider data is written into the document. */
 ( function () {
 	'use strict';
 	var account = window.beltoftServicesAccount;
@@ -11,6 +11,8 @@
 		net: { keys: [ 'netin', 'netout' ], names: [ labels.in, labels.out ], unit: 'MB/s', divisor: 1048576 },
 		io: { keys: [ 'diskread', 'diskwrite' ], names: [ labels.read, labels.write ], unit: 'MB/s', divisor: 1048576 }
 	};
+	var top = 8;
+	var bottom = 154;
 
 	function svgNode( name, attrs ) {
 		var node = document.createElementNS( ns, name );
@@ -22,29 +24,81 @@
 		return 'number' === typeof point[ key ] && isFinite( point[ key ] ) ? point[ key ] / ( spec.divisor || 1 ) : null;
 	}
 
-	function render( chart, points, spec ) {
+	// 0.8, 2, 31, 6.3: no trailing zeros.
+	function format( n ) {
+		return String( parseFloat( n.toFixed( n < 10 ? 2 : 1 ) ) );
+	}
+
+	function withUnit( n, unit ) {
+		return format( n ) + ( '%' === unit ? '%' : ' ' + unit );
+	}
+
+	function fill( text, part ) {
+		return String( text || '%s' ).replace( '%s', function () { return part; } );
+	}
+
+	function clock( seconds, range ) {
+		var date = new Date( seconds * 1000 );
+		return 'month' === range ? date.toLocaleDateString( [], { day: 'numeric', month: 'short' } ) : date.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } );
+	}
+
+	function span( text ) {
+		var node = document.createElement( 'span' );
+		node.textContent = text;
+		return node;
+	}
+
+	function render( chart, points, spec, range ) {
 		var plot = chart.querySelector( '.beltoft-vm-usage__plot' );
 		var readout = chart.querySelector( '[data-readout]' );
+		var now = chart.querySelector( '[data-now]' );
+		var axis = chart.querySelector( '[data-axis]' );
 		plot.replaceChildren();
 		readout.textContent = '';
+		if ( now ) { now.replaceChildren(); }
+		if ( axis ) { axis.replaceChildren(); }
 		if ( ! points.length ) { return; }
 		var max = 0;
+		var peak = 0;
+		var last = null;
 		points.forEach( function ( point ) {
 			spec.keys.forEach( function ( key ) { var n = value( point, spec, key ); if ( null !== n ) { max = Math.max( max, n ); } } );
+			var first = value( point, spec, spec.keys[ 0 ] );
+			if ( null !== first ) { peak = Math.max( peak, first ); last = point; }
 		} );
 		max = Math.max( max, spec.unit === '%' ? 100 : 0.01 );
-		var svg = svgNode( 'svg', { viewBox: '0 0 600 160', preserveAspectRatio: 'none', role: 'img', 'aria-label': chart.querySelector( 'h5' ).textContent + ' ' + labels.graph } );
+		function xOf( index ) { return points.length === 1 ? 300 : index * 600 / ( points.length - 1 ); }
+		function yOf( n ) { return bottom - Math.max( 0, n ) / max * ( bottom - top ); }
+		var peakText = withUnit( peak, spec.unit );
+		var svg = svgNode( 'svg', { viewBox: '0 0 600 160', preserveAspectRatio: 'none', role: 'img', 'aria-label': chart.querySelector( 'h5' ).textContent + ' ' + labels.graph + ', ' + fill( labels.peak, peakText ) } );
+		[ 1 / 3, 2 / 3 ].forEach( function ( step ) {
+			var y = bottom - step * ( bottom - top );
+			svg.appendChild( svgNode( 'line', { x1: 0, y1: y.toFixed( 2 ), x2: 600, y2: y.toFixed( 2 ), class: 'beltoft-vm-usage__grid-line' } ) );
+		} );
 		svg.appendChild( svgNode( 'line', { x1: 0, y1: 159, x2: 600, y2: 159, class: 'beltoft-vm-usage__baseline' } ) );
 		spec.keys.forEach( function ( key, series ) {
-			var path = '', open = false;
+			var path = '';
+			var area = '';
+			var open = false;
+			var from = 0;
+			var to = 0;
+			function close() {
+				if ( open && 0 === series ) { area += ' L ' + to.toFixed( 2 ) + ' ' + bottom + ' L ' + from.toFixed( 2 ) + ' ' + bottom + ' Z'; }
+				open = false;
+			}
 			points.forEach( function ( point, index ) {
 				var n = value( point, spec, key );
-				if ( null === n ) { open = false; return; }
-				var x = points.length === 1 ? 300 : index * 600 / ( points.length - 1 );
-				var y = 154 - Math.max( 0, n ) / max * 146;
+				if ( null === n ) { close(); return; }
+				var x = xOf( index );
+				var y = yOf( n );
 				path += ( open ? ' L ' : ' M ' ) + x.toFixed( 2 ) + ' ' + y.toFixed( 2 );
+				if ( 0 === series ) { area += ( open ? ' L ' : ' M ' ) + x.toFixed( 2 ) + ' ' + y.toFixed( 2 ); }
+				if ( ! open ) { from = x; }
+				to = x;
 				open = true;
 			} );
+			close();
+			if ( area ) { svg.appendChild( svgNode( 'path', { d: area, class: 'beltoft-vm-usage__area' } ) ); }
 			if ( path ) { svg.appendChild( svgNode( 'path', { d: path, class: 'beltoft-vm-usage__series beltoft-vm-usage__series--' + series } ) ); }
 		} );
 		function show( index ) {
@@ -52,7 +106,7 @@
 			var date = new Date( point.t * 1000 ).toLocaleString();
 			var parts = spec.keys.map( function ( key, series ) {
 				var n = value( point, spec, key );
-				return spec.names[ series ] + ': ' + ( null === n ? labels.noReading : n.toFixed( n < 10 ? 2 : 1 ) + ' ' + spec.unit );
+				return spec.names[ series ] + ': ' + ( null === n ? labels.noReading : withUnit( n, spec.unit ) );
 			} );
 			readout.textContent = date + '  ' + parts.join( '  ' );
 		}
@@ -63,6 +117,28 @@
 		svg.addEventListener( 'pointerleave', function () { show( points.length - 1 ); } );
 		plot.appendChild( svg );
 		show( points.length - 1 );
+		// The current value, large, and the last point marked with a square (a page element, so it keeps its shape when the graph stretches).
+		if ( last && now ) {
+			var big = document.createElement( 'b' );
+			var small = document.createElement( 'small' );
+			var current = value( last, spec, spec.keys[ 0 ] );
+			var lastIndex = points.indexOf( last );
+			var marker = document.createElement( 'i' );
+			var kind = chart.getAttribute( 'data-chart' );
+			big.textContent = format( current );
+			small.textContent = 'mem' === kind && null !== value( last, spec, 'maxmem' ) ? fill( labels.of, format( value( last, spec, 'maxmem' ) ) ) : spec.unit + ( 'cpu' === kind ? '' : ' ' + spec.names[ 0 ] );
+			now.appendChild( big );
+			now.appendChild( small );
+			marker.className = 'beltoft-vm-usage__point';
+			marker.style.left = ( xOf( lastIndex ) / 6 ) + '%';
+			marker.style.top = ( yOf( current ) / 160 * 100 ) + '%';
+			plot.appendChild( marker );
+		}
+		if ( axis ) {
+			axis.appendChild( span( clock( points[ 0 ].t, range ) ) );
+			axis.appendChild( span( fill( labels.peak, peakText ) ) );
+			axis.appendChild( span( clock( points[ points.length - 1 ].t, range ) ) );
+		}
 	}
 
 	document.querySelectorAll( '[data-vm-metrics]' ).forEach( function ( block ) {
@@ -70,10 +146,13 @@
 		if ( ! panel ) { return; }
 		var notice = block.querySelector( '[data-metrics-notice]' );
 		var serial = 0;
-		function load( range ) {
+		var range = 'hour';
+		var started = false;
+		function load() {
 			var current = ++serial;
+			var asked = range;
 			notice.textContent = labels.loading;
-			window.fetch( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/metrics?range=' + encodeURIComponent( range ), {
+			window.fetch( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/metrics?range=' + encodeURIComponent( asked ), {
 				credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce }
 			} ).then( function ( response ) {
 				var nonce = response.headers.get( 'X-WP-Nonce' );
@@ -84,15 +163,23 @@
 				if ( current !== serial ) { return; }
 				var points = body && Array.isArray( body.points ) ? body.points : [];
 				notice.textContent = points.length ? '' : labels.empty;
-				block.querySelectorAll( '[data-chart]' ).forEach( function ( chart ) { render( chart, points, specs[ chart.getAttribute( 'data-chart' ) ] ); } );
+				block.querySelectorAll( '[data-chart]' ).forEach( function ( chart ) { render( chart, points, specs[ chart.getAttribute( 'data-chart' ) ], asked ); } );
 			} ).catch( function () { if ( current === serial ) { notice.textContent = labels.unavailable; } } );
+		}
+		// The charts are asked for when they can be seen: a tab that is not shown at load asks when it first is.
+		function start() {
+			if ( started || block.closest( '[hidden]' ) ) { return; }
+			started = true;
+			load();
 		}
 		block.querySelectorAll( '[data-range]' ).forEach( function ( button ) {
 			button.addEventListener( 'click', function () {
 				block.querySelectorAll( '[data-range]' ).forEach( function ( other ) { other.setAttribute( 'aria-pressed', other === button ? 'true' : 'false' ); } );
-				load( button.getAttribute( 'data-range' ) );
+				range = button.getAttribute( 'data-range' );
+				load();
 			} );
 		} );
-		load( 'hour' );
+		panel.addEventListener( 'beltoft-services:tab', start );
+		start();
 	} );
 }() );

@@ -1,6 +1,12 @@
 <?php
 /**
- * The virtual machine part of the service panel (My Account → Licenses).
+ * The virtual machine part of the service panel (My Account → Servers).
+ *
+ * On a server page (see BeltoftServices\Account\Servers) the card is split in tabs, each one a
+ * link with its own address (overview, snapshots, backups, disks, access, reinstall). Every pane is
+ * printed and the inactive ones are hidden, so the status poll and the forms keep working in any
+ * tab, and without script the links still open the right tab. Elsewhere (a card on the Licenses tab)
+ * the sections follow each other with no tabs.
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
  * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_options
@@ -9,7 +15,8 @@
  * $snapshots (null when the block is absent, or slots, used, included, added, buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
  * $resource_id (the resource id, for ids that must be unique on a page),
  * $server_name (the name now set, or empty), $can_rename (whether the rename form is shown), $hostname_pending (a name the server has not taken yet, or empty),
- * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty).
+ * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty),
+ * $page (null on a card, or the server page: license row and requested tab), $can_reset (whether Reset password is offered).
  * Each extra disk has id, ending (null, or date and undo_url once its subscription is ended), paid_until, snapshot_labels (the snapshots that include it), remove_url.
  * The password is never part of this template: the reveal button asks the server for it once.
  *
@@ -21,53 +28,154 @@ defined( 'ABSPATH' ) || exit;
 $beltoft_services_pending = (string) ( $hostname_pending ?? '' );
 $beltoft_services_rename  = (bool) ( $can_rename ?? false );
 $beltoft_services_named   = (string) ( $server_name ?? '' );
+$beltoft_services_page    = is_array( $page ?? null ) ? $page : null;
+$beltoft_services_reset   = (bool) ( $can_reset ?? false );
 
 $beltoft_services_power_labels = array(
 	'running' => __( 'Running', 'beltoft-services' ),
 	'stopped' => __( 'Stopped', 'beltoft-services' ),
 );
-?>
-<div class="beltoft-services-vm" data-power="<?php echo esc_attr( (string) $power ); ?>">
-	<p class="beltoft-services-vm__flash" data-flash role="status" aria-live="polite" hidden></p>
-	<dl class="beltoft-services-vm__facts">
-		<?php if ( '' !== $ip ) : ?>
-			<dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt>
-			<dd><code><?php echo esc_html( $ip ); ?></code></dd>
-			<dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt>
-			<dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<?php echo esc_html( $ip ); ?></code></dd>
-		<?php endif; ?>
-		<dt><?php esc_html_e( 'Plan', 'beltoft-services' ); ?></dt>
-		<dd>
-			<?php
-			echo esc_html(
-				sprintf(
-					/* translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB */
-					__( '%1$d vCPU, %2$d MB RAM, %3$d GB disk', 'beltoft-services' ),
-					(int) $plan['cores'],
-					(int) $plan['memory_mb'],
-					(int) $plan['disk_gb']
-				)
-			);
-			?>
-		</dd>
-		<?php if ( '' !== $os_label ) : ?>
-			<dt><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></dt>
-			<dd><?php echo esc_html( $os_label ); ?></dd>
-		<?php endif; ?>
-		<?php if ( ! empty( $busy ) ) : ?>
-			<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
-			<dd data-power-line><?php esc_html_e( 'Busy', 'beltoft-services' ); ?></dd>
-		<?php elseif ( isset( $beltoft_services_power_labels[ $power ] ) ) : ?>
-			<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
-			<dd data-power-line><?php echo esc_html( $beltoft_services_power_labels[ $power ] ); ?></dd>
-		<?php endif; ?>
-	</dl>
 
-	<?php if ( '' !== $beltoft_services_pending ) : ?>
+// The tabs of a server page: only the ones that have something to show.
+$beltoft_services_tabs   = array();
+$beltoft_services_active = 'overview';
+
+if ( null !== $beltoft_services_page ) {
+	$beltoft_services_tabs['overview'] = __( 'Overview', 'beltoft-services' );
+
+	if ( is_array( $snapshots ) ) {
+		$beltoft_services_tabs['snapshots'] = __( 'Snapshots', 'beltoft-services' );
+	}
+
+	if ( $forms && is_array( $backups ) ) {
+		$beltoft_services_tabs['backups'] = __( 'Backups', 'beltoft-services' );
+	}
+
+	if ( $extra_disks['items'] || $extra_disks['add'] ) {
+		$beltoft_services_tabs['disks'] = __( 'Disks', 'beltoft-services' );
+	}
+
+	if ( $forms ) {
+		$beltoft_services_tabs['access']    = __( 'Access', 'beltoft-services' );
+		$beltoft_services_tabs['reinstall'] = __( 'Reinstall', 'beltoft-services' );
+	}
+
+	if ( isset( $beltoft_services_tabs[ (string) ( $beltoft_services_page['tab'] ?? '' ) ] ) ) {
+		$beltoft_services_active = (string) $beltoft_services_page['tab'];
+	}
+}
+
+// A pane of the page, opened and closed around a section. On a card they print nothing.
+$beltoft_services_open  = static function ( string $slug ) use ( $beltoft_services_page, $beltoft_services_active, $resource_id ): void {
+	if ( null === $beltoft_services_page ) {
+		return;
+	}
+	?>
+	<section class="beltoft-services-tab" id="beltoft-vm-tab-<?php echo esc_attr( $slug ); ?>-<?php echo (int) $resource_id; ?>" data-tab="<?php echo esc_attr( $slug ); ?>"<?php echo $slug === $beltoft_services_active ? '' : ' hidden'; ?>>
+	<?php
+};
+$beltoft_services_close = static function () use ( $beltoft_services_page ): void {
+	if ( null !== $beltoft_services_page ) {
+		echo '</section>';
+	}
+};
+// The address of a tab.
+$beltoft_services_link  = static function ( string $slug ) use ( $beltoft_services_page ): string {
+	return null === $beltoft_services_page ? '' : \BeltoftServices\Account\Servers::url( $beltoft_services_page['license'], 'overview' === $slug ? '' : $slug );
+};
+// A secondary block: a closed details on a card, a titled block on a page (the tab is already its own place).
+$beltoft_services_more_open  = static function ( string $title ) use ( $beltoft_services_page ): void {
+	echo null === $beltoft_services_page ? '<details class="beltoft-services-vm__more"><summary>' . esc_html( $title ) . '</summary>' : '<div class="beltoft-services-vm__more"><h4>' . esc_html( $title ) . '</h4>';
+};
+$beltoft_services_more_close = static function () use ( $beltoft_services_page ): void {
+	echo null === $beltoft_services_page ? '</details>' : '</div>';
+};
+// The note that a new name is used after the next reboot.
+$beltoft_services_note = static function () use ( $beltoft_services_pending, $forms, $power ): void {
+	if ( '' === $beltoft_services_pending ) {
+		return;
+	}
+	?>
 		<p class="description" data-hostname-note>
 			<?php esc_html_e( "The new name is used as the hostname after the next reboot. Your SSH client may warn that the server's host key changed.", 'beltoft-services' ); ?>
 			<?php if ( $forms && 'stopped' !== $power ) : ?><button type="button" class="beltoft-services-action beltoft-services-vm__link" data-action="reboot"><?php esc_html_e( 'Reboot', 'beltoft-services' ); ?></button><?php endif; ?>
 		</p>
+	<?php
+};
+?>
+<div class="beltoft-services-vm<?php echo null !== $beltoft_services_page ? ' beltoft-services-vm--page' : ''; ?>" data-power="<?php echo esc_attr( (string) $power ); ?>">
+	<p class="beltoft-services-vm__flash" data-flash role="status" aria-live="polite" hidden></p>
+	<?php if ( null !== $beltoft_services_page ) : ?>
+		<?php $beltoft_services_note(); ?>
+		<nav class="beltoft-services-tabs" aria-label="<?php esc_attr_e( 'Server sections', 'beltoft-services' ); ?>">
+			<?php foreach ( $beltoft_services_tabs as $beltoft_services_slug => $beltoft_services_title ) : ?>
+				<a href="<?php echo esc_url( $beltoft_services_link( $beltoft_services_slug ) ); ?>" data-tab-link="<?php echo esc_attr( $beltoft_services_slug ); ?>"<?php echo $beltoft_services_slug === $beltoft_services_active ? ' aria-current="page"' : ''; ?>><?php echo esc_html( $beltoft_services_title ); ?></a>
+			<?php endforeach; ?>
+		</nav>
+	<?php endif; ?>
+
+	<?php $beltoft_services_open( 'overview' ); ?>
+	<?php if ( null !== $beltoft_services_page ) : ?>
+		<dl class="beltoft-services-facts">
+			<?php if ( '' !== $ip ) : ?>
+				<div><dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( $ip ); ?></code></dd></div>
+				<div><dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt><dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<?php echo esc_html( $ip ); ?></code></dd></div>
+			<?php endif; ?>
+			<div>
+				<dt><?php esc_html_e( 'Plan', 'beltoft-services' ); ?></dt>
+				<dd>
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB */
+							__( '%1$d vCPU, %2$d MB RAM, %3$d GB disk', 'beltoft-services' ),
+							(int) $plan['cores'],
+							(int) $plan['memory_mb'],
+							(int) $plan['disk_gb']
+						)
+					);
+					?>
+				</dd>
+			</div>
+			<?php if ( '' !== $os_label ) : ?>
+				<div><dt><?php esc_html_e( 'System', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $os_label ); ?></dd></div>
+			<?php endif; ?>
+		</dl>
+	<?php else : ?>
+		<dl class="beltoft-services-vm__facts">
+			<?php if ( '' !== $ip ) : ?>
+				<dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt>
+				<dd><code><?php echo esc_html( $ip ); ?></code></dd>
+				<dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt>
+				<dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<?php echo esc_html( $ip ); ?></code></dd>
+			<?php endif; ?>
+			<dt><?php esc_html_e( 'Plan', 'beltoft-services' ); ?></dt>
+			<dd>
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB */
+						__( '%1$d vCPU, %2$d MB RAM, %3$d GB disk', 'beltoft-services' ),
+						(int) $plan['cores'],
+						(int) $plan['memory_mb'],
+						(int) $plan['disk_gb']
+					)
+				);
+				?>
+			</dd>
+			<?php if ( '' !== $os_label ) : ?>
+				<dt><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></dt>
+				<dd><?php echo esc_html( $os_label ); ?></dd>
+			<?php endif; ?>
+			<?php if ( ! empty( $busy ) ) : ?>
+				<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
+				<dd data-power-line><?php esc_html_e( 'Busy', 'beltoft-services' ); ?></dd>
+			<?php elseif ( isset( $beltoft_services_power_labels[ $power ] ) ) : ?>
+				<dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt>
+				<dd data-power-line><?php echo esc_html( $beltoft_services_power_labels[ $power ] ); ?></dd>
+			<?php endif; ?>
+		</dl>
+		<?php $beltoft_services_note(); ?>
 	<?php endif; ?>
 
 	<?php if ( $beltoft_services_rename ) : ?>
@@ -84,6 +192,129 @@ $beltoft_services_power_labels = array(
 		</details>
 	<?php endif; ?>
 
+	<?php if ( $metrics ) : ?>
+		<section class="beltoft-vm-usage" data-vm-metrics>
+			<div class="beltoft-vm-usage__head">
+				<h4><?php esc_html_e( 'Monitoring', 'beltoft-services' ); ?></h4>
+				<div class="beltoft-vm-usage__ranges" role="group" aria-label="<?php esc_attr_e( 'Time range', 'beltoft-services' ); ?>">
+					<button type="button" data-range="hour" aria-pressed="true"><?php esc_html_e( '1 hour', 'beltoft-services' ); ?></button>
+					<button type="button" data-range="day" aria-pressed="false"><?php esc_html_e( '1 day', 'beltoft-services' ); ?></button>
+					<button type="button" data-range="month" aria-pressed="false"><?php esc_html_e( '30 days', 'beltoft-services' ); ?></button>
+				</div>
+			</div>
+			<p class="beltoft-vm-usage__notice" data-metrics-notice role="status" aria-live="polite"><?php esc_html_e( 'Loading usage…', 'beltoft-services' ); ?></p>
+			<div class="beltoft-vm-usage__grid">
+				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ), 'mem' => __( 'Memory', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
+					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
+						<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
+						<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
+						<p class="beltoft-vm-usage__axis" data-axis></p>
+						<p class="beltoft-vm-usage__readout" data-readout></p>
+					</div>
+				<?php endforeach; ?>
+				<?php
+				// The disk has no history: one reading from the server's guest agent every six hours, drawn as a bar.
+				$beltoft_services_disk_pct = is_numeric( $disk_used ) && is_numeric( $disk_total ) && (int) $disk_total > 0 ? max( 0, min( 100, (int) round( (int) $disk_used / (int) $disk_total * 100 ) ) ) : null;
+				?>
+				<div class="beltoft-vm-usage__chart beltoft-vm-usage__chart--disk">
+					<div class="beltoft-vm-usage__top">
+						<h5><?php esc_html_e( 'Disk', 'beltoft-services' ); ?></h5>
+						<?php if ( null !== $beltoft_services_disk_pct ) : ?><span class="beltoft-vm-usage__now"><?php echo (int) $beltoft_services_disk_pct; ?><small>%</small></span><?php endif; ?>
+					</div>
+					<?php if ( null !== $beltoft_services_disk_pct ) : ?>
+						<div class="beltoft-vm-usage__bar" role="img" aria-label="<?php /* translators: %d: percent of the disk in use */ echo esc_attr( sprintf( __( 'Disk, %d percent used', 'beltoft-services' ), (int) $beltoft_services_disk_pct ) ); ?>"><i style="width:<?php echo (int) $beltoft_services_disk_pct; ?>%"></i></div>
+					<?php endif; ?>
+					<p class="beltoft-vm-usage__disk" data-disk-line>
+						<?php if ( null !== $beltoft_services_disk_pct ) : ?>
+							<?php
+							/* translators: 1: used disk space in GB, 2: total disk space in GB. */
+							echo esc_html( sprintf( __( 'Disk used: %1$s of %2$s GB', 'beltoft-services' ), number_format_i18n( (int) $disk_used / 1073741824, 1 ), number_format_i18n( (int) $disk_total / 1073741824, 1 ) ) );
+							?>
+						<?php else : ?>
+							<?php
+							/* translators: %d: the plan's disk size in GB. */
+							echo esc_html( sprintf( __( 'Disk: %d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ) );
+							?>
+						<?php endif; ?>
+					</p>
+					<?php if ( null !== $beltoft_services_disk_pct ) : ?><p class="beltoft-vm-usage__axis"><?php esc_html_e( 'Read every 6 hours', 'beltoft-services' ); ?></p><?php endif; ?>
+				</div>
+			</div>
+			<details class="beltoft-vm-usage__more">
+				<summary><?php esc_html_e( 'Network and disk activity', 'beltoft-services' ); ?></summary>
+				<div class="beltoft-vm-usage__grid">
+					<?php foreach ( array( 'net' => __( 'Network', 'beltoft-services' ), 'io' => __( 'Disk activity', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
+						<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
+							<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
+							<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
+							<p class="beltoft-vm-usage__axis" data-axis></p>
+							<p class="beltoft-vm-usage__readout" data-readout></p>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			</details>
+		</section>
+	<?php endif; ?>
+
+	<?php if ( null !== $beltoft_services_page && count( $beltoft_services_tabs ) > 1 ) : ?>
+		<div class="beltoft-services-glance">
+			<?php if ( isset( $beltoft_services_tabs['snapshots'] ) ) : ?>
+				<a class="beltoft-services-glance__item" href="<?php echo esc_url( $beltoft_services_link( 'snapshots' ) ); ?>" data-tab-link="snapshots">
+					<span class="beltoft-services-glance__label"><?php esc_html_e( 'Snapshots', 'beltoft-services' ); ?></span>
+					<?php
+					$beltoft_services_strip = array( 'used' => (int) $snapshots['used'], 'slots' => (int) $snapshots['slots'] );
+					include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
+					?>
+					<span class="beltoft-services-glance__value">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: 1: snapshots in use, 2: snapshots allowed */
+								__( '%1$d of %2$d used', 'beltoft-services' ),
+								(int) $snapshots['used'],
+								(int) $snapshots['slots']
+							)
+						);
+						?>
+					</span>
+				</a>
+			<?php endif; ?>
+			<?php if ( isset( $beltoft_services_tabs['backups'] ) ) : ?>
+				<a class="beltoft-services-glance__item" href="<?php echo esc_url( $beltoft_services_link( 'backups' ) ); ?>" data-tab-link="backups">
+					<span class="beltoft-services-glance__label"><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></span>
+					<span class="beltoft-services-glance__value">
+						<?php
+						echo esc_html(
+							$backups['enabled']
+								/* translators: %d: number of days */
+								? sprintf( _n( 'Every night, kept %d day', 'Every night, kept %d days', (int) $backups['days'], 'beltoft-services' ), (int) $backups['days'] )
+								: __( 'Not added', 'beltoft-services' )
+						);
+						?>
+					</span>
+				</a>
+			<?php endif; ?>
+			<?php if ( isset( $beltoft_services_tabs['disks'] ) ) : ?>
+				<a class="beltoft-services-glance__item" href="<?php echo esc_url( $beltoft_services_link( 'disks' ) ); ?>" data-tab-link="disks">
+					<span class="beltoft-services-glance__label"><?php esc_html_e( 'Disks', 'beltoft-services' ); ?></span>
+					<span class="beltoft-services-glance__value">
+						<?php
+						echo esc_html(
+							$extra_disks['items']
+								/* translators: %d: number of extra disks */
+								? sprintf( _n( '%d extra disk', '%d extra disks', count( $extra_disks['items'] ), 'beltoft-services' ), count( $extra_disks['items'] ) )
+								: __( 'No extra disks', 'beltoft-services' )
+						);
+						?>
+					</span>
+				</a>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
+	<?php $beltoft_services_close(); ?>
+
+	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['disks'] ) ) : ?>
+		<?php $beltoft_services_open( 'disks' ); ?>
 	<section class="beltoft-services-vm__disks">
 		<h4><?php esc_html_e( 'Disks', 'beltoft-services' ); ?></h4>
 		<dl class="beltoft-services-vm__facts">
@@ -196,43 +427,11 @@ $beltoft_services_power_labels = array(
 			<?php endforeach; ?></p>
 		<?php endif; ?>
 	</section>
-
-	<?php if ( $metrics ) : ?>
-		<section class="beltoft-vm-usage" data-vm-metrics>
-			<div class="beltoft-vm-usage__head">
-				<h4><?php esc_html_e( 'Usage', 'beltoft-services' ); ?></h4>
-				<div class="beltoft-vm-usage__ranges" role="group" aria-label="<?php esc_attr_e( 'Time range', 'beltoft-services' ); ?>">
-					<button type="button" data-range="hour" aria-pressed="true"><?php esc_html_e( '1 hour', 'beltoft-services' ); ?></button>
-					<button type="button" data-range="day" aria-pressed="false"><?php esc_html_e( '1 day', 'beltoft-services' ); ?></button>
-					<button type="button" data-range="month" aria-pressed="false"><?php esc_html_e( '30 days', 'beltoft-services' ); ?></button>
-				</div>
-			</div>
-			<p class="beltoft-vm-usage__disk" data-disk-line>
-				<?php if ( is_numeric( $disk_used ) && is_numeric( $disk_total ) && (int) $disk_total > 0 ) : ?>
-					<?php
-					/* translators: 1: used disk space in GB, 2: total disk space in GB. */
-					echo esc_html( sprintf( __( 'Disk used: %1$s of %2$s GB', 'beltoft-services' ), number_format_i18n( (int) $disk_used / 1073741824, 1 ), number_format_i18n( (int) $disk_total / 1073741824, 1 ) ) );
-					?>
-				<?php else : ?>
-					<?php
-					/* translators: %d: the plan's disk size in GB. */
-					echo esc_html( sprintf( __( 'Disk: %d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ) );
-					?>
-				<?php endif; ?>
-			</p>
-			<p class="beltoft-vm-usage__notice" data-metrics-notice role="status" aria-live="polite"><?php esc_html_e( 'Loading usage…', 'beltoft-services' ); ?></p>
-			<div class="beltoft-vm-usage__grid">
-				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ), 'mem' => __( 'Memory', 'beltoft-services' ), 'net' => __( 'Network', 'beltoft-services' ), 'io' => __( 'Disk activity', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
-					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
-						<h5><?php echo esc_html( $beltoft_title ); ?></h5>
-						<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
-						<p class="beltoft-vm-usage__readout" data-readout></p>
-					</div>
-				<?php endforeach; ?>
-			</div>
-		</section>
+		<?php $beltoft_services_close(); ?>
 	<?php endif; ?>
 
+	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['backups'] ) ) : ?>
+		<?php $beltoft_services_open( 'backups' ); ?>
 	<?php if ( $forms && is_array( $backups ) ) : ?>
 		<div class="beltoft-services-vm__backups">
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
@@ -326,10 +525,19 @@ $beltoft_services_power_labels = array(
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
+		<?php $beltoft_services_close(); ?>
+	<?php endif; ?>
 
+	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['snapshots'] ) ) : ?>
+		<?php $beltoft_services_open( 'snapshots' ); ?>
 	<?php if ( is_array( $snapshots ) ) : ?>
 		<div class="beltoft-services-vm__backups beltoft-services-vm__snapshots" data-snapshots>
 			<h4><?php esc_html_e( 'Snapshots', 'beltoft-services' ); ?></h4>
+			<?php
+			// The slots as squares, used ones filled.
+			$beltoft_services_strip = array( 'used' => (int) $snapshots['used'], 'slots' => (int) $snapshots['slots'] );
+			include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
+			?>
 			<p class="description" data-snapshot-slots>
 				<?php
 				echo esc_html(
@@ -441,39 +649,15 @@ $beltoft_services_power_labels = array(
 				}
 				?>
 			</p>
-
-			<dialog class="beltoft-services-vm__dialog" data-snapshot-dialog aria-labelledby="beltoft-vm-rollback-title-<?php echo (int) $resource_id; ?>">
-				<form class="beltoft-services-vm-form" data-action="snapshot_rollback">
-					<h5 id="beltoft-vm-rollback-title-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></h5>
-					<input type="hidden" name="id" value="">
-					<p class="description"><strong data-snapshot-dialog-name></strong></p>
-					<p class="description"><?php esc_html_e( 'Going back replaces everything on the server with the snapshot, extra disks included. The server is off for a moment while it goes back. The password and the SSH key go back to the ones saved. Anything changed since is lost.', 'beltoft-services' ); ?></p>
-					<p>
-						<label for="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>">
-							<?php
-							echo esc_html(
-								sprintf(
-									/* translators: %s: the word to type, ROLLBACK */
-									__( 'Type %s to confirm', 'beltoft-services' ),
-									'ROLLBACK'
-								)
-							);
-							?>
-						</label>
-						<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required>
-					</p>
-					<p class="beltoft-services-panel__notice" data-dialog-notice role="status" aria-live="polite"></p>
-					<p class="beltoft-services-vm__buttons">
-						<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>
-						<button type="button" class="button woocommerce-button" data-snapshot-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
-					</p>
-				</form>
-			</dialog>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
+		<?php $beltoft_services_close(); ?>
+	<?php endif; ?>
 
-	<?php if ( $forms ) : ?>
+	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['access'] ) ) : ?>
+		<?php $beltoft_services_open( 'access' ); ?>
+		<?php if ( $forms ) : ?>
 		<?php if ( $can_reveal ) : ?>
 			<p class="beltoft-services-vm__reveal">
 				<button type="button" class="button woocommerce-button" data-vm-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
@@ -481,9 +665,12 @@ $beltoft_services_power_labels = array(
 			</p>
 			<p class="description"><?php esc_html_e( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
+			<?php if ( $beltoft_services_reset && null !== $beltoft_services_page ) : ?>
+				<p><button type="button" class="button woocommerce-button beltoft-services-action" data-action="reset_password"><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
+				<p class="description"><?php esc_html_e( 'Sets a new password on the server. Use Show password once to see it.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
 
-		<details class="beltoft-services-vm__more">
-			<summary><?php echo $has_key ? esc_html__( 'Replace SSH key', 'beltoft-services' ) : esc_html__( 'Add SSH key', 'beltoft-services' ); ?></summary>
+		<?php $beltoft_services_more_open( $has_key ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' ) ); ?>
 			<form class="beltoft-services-vm-form" data-action="replace_ssh_key">
 				<p>
 					<label for="beltoft-vm-key"><?php esc_html_e( 'SSH public key', 'beltoft-services' ); ?></label>
@@ -492,10 +679,15 @@ $beltoft_services_power_labels = array(
 				<p class="description"><?php esc_html_e( 'Paste the single line from your .pub file. It replaces the key now on the server.', 'beltoft-services' ); ?></p>
 				<p><button type="submit" class="button woocommerce-button"><?php echo $has_key ? esc_html__( 'Replace SSH key', 'beltoft-services' ) : esc_html__( 'Add SSH key', 'beltoft-services' ); ?></button></p>
 			</form>
-		</details>
+		<?php $beltoft_services_more_close(); ?>
+		<?php endif; ?>
+		<?php $beltoft_services_close(); ?>
+	<?php endif; ?>
 
-		<details class="beltoft-services-vm__more">
-			<summary><?php esc_html_e( 'Reinstall', 'beltoft-services' ); ?></summary>
+	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['reinstall'] ) ) : ?>
+		<?php $beltoft_services_open( 'reinstall' ); ?>
+		<?php if ( $forms ) : ?>
+		<?php $beltoft_services_more_open( __( 'Reinstall', 'beltoft-services' ) ); ?>
 			<form class="beltoft-services-vm-form" data-action="reinstall"<?php echo $extra_disks['items'] ? ' data-disks="1"' : ''; ?>>
 				<?php if ( $extra_disks['items'] ) : ?>
 					<p class="description"><?php esc_html_e( 'Reinstalling erases the server\'s main disk and installs the system again. Extra disks are kept with their data and stay attached. The IP address stays. You get a new password.', 'beltoft-services' ); ?></p>
@@ -539,7 +731,39 @@ $beltoft_services_power_labels = array(
 				</div>
 				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
 			</form>
-		</details>
+		<?php $beltoft_services_more_close(); ?>
+		<?php endif; ?>
+		<?php $beltoft_services_close(); ?>
+	<?php endif; ?>
+
+	<?php if ( is_array( $snapshots ) && 'full' === $snapshots['mode'] ) : ?>
+	<dialog class="beltoft-services-vm__dialog" data-snapshot-dialog aria-labelledby="beltoft-vm-rollback-title-<?php echo (int) $resource_id; ?>">
+		<form class="beltoft-services-vm-form" data-action="snapshot_rollback">
+			<h5 id="beltoft-vm-rollback-title-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></h5>
+			<input type="hidden" name="id" value="">
+			<p class="description"><strong data-snapshot-dialog-name></strong></p>
+			<p class="description"><?php esc_html_e( 'Going back replaces everything on the server with the snapshot, extra disks included. The server is off for a moment while it goes back. The password and the SSH key go back to the ones saved. Anything changed since is lost.', 'beltoft-services' ); ?></p>
+			<p>
+				<label for="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: the word to type, ROLLBACK */
+							__( 'Type %s to confirm', 'beltoft-services' ),
+							'ROLLBACK'
+						)
+					);
+					?>
+				</label>
+				<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required>
+			</p>
+			<p class="beltoft-services-panel__notice" data-dialog-notice role="status" aria-live="polite"></p>
+			<p class="beltoft-services-vm__buttons">
+				<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>
+				<button type="button" class="button woocommerce-button" data-snapshot-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
+			</p>
+		</form>
+	</dialog>
 	<?php endif; ?>
 
 	<?php if ( $forms || array_filter( array_column( $extra_disks['items'], 'remove_url' ) ) ) : ?>

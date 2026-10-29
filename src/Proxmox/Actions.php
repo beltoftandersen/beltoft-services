@@ -114,7 +114,7 @@ final class Actions {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_action_refusal', array( __CLASS__, 'refusal' ), 10, 4 );
-		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'buttons' ), 10, 2 );
+		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'buttons' ), 10, 3 );
 	}
 
 	// -- What is offered -------------------------------------------------------------------------
@@ -189,11 +189,16 @@ final class Actions {
 	 *
 	 * @param mixed $actions  Actions so far.
 	 * @param mixed $resource Resource.
+	 * @param mixed $context  card, or page for a server page (its head and Access tab print the power and password buttons).
 	 * @return mixed
 	 */
-	public static function buttons( $actions, $resource ) {
+	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
 			unset( $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
+
+			if ( 'page' === $context ) {
+				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
+			}
 		}
 
 		return $actions;

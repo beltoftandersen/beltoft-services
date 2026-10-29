@@ -6,6 +6,9 @@
  * password is only ever held in the page for as long as the customer looks at it. A confirmed action
  * (rollback, restore, reinstall, snapshot delete) closes its dialog, says at once on the card what is
  * happening, and after the page reloads at the end says that it is done (sessionStorage, shown once).
+ * On a server page (templates/account/vm.php) it also makes the tab links switch the panes without a
+ * page load (the address changes with them, so Back works, and the links are plain links without
+ * script), asks before Reboot and Shut down in the same dialog, and copies the ssh command.
  * No dependencies.
  */
 ( function () {
@@ -203,6 +206,10 @@
 				return { action: action, start: s.reinstallStart, done: s.reinstallDone, running: true, password: true };
 			case 'snapshot_delete':
 				return { action: action, start: fill( s.deleteStart, name ), done: name ? fill( s.deleteDone, name ) : s.deleteDoneAnon };
+			case 'reboot':
+				return { action: action, start: s.rebootStart, done: s.rebootDone, power: true };
+			case 'shutdown':
+				return { action: action, start: s.shutdownStart, done: s.shutdownDone, power: true };
 			default:
 				return null;
 		}
@@ -362,8 +369,8 @@
 						notice( panel, vm.strings.queued );
 					}
 
-					// The panel's status poll (account.js) shows the progress and reloads when it is over.
-					panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued' ) );
+					// The panel's status poll (account.js) shows the progress and reloads when it is over; a power action also looks a few times, as the card's own buttons do.
+					panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued', { detail: { settle: !! ( info && info.power ) } } ) );
 				} );
 			}
 
@@ -479,6 +486,127 @@
 		} );
 	}
 
+	// Reboot and Shut down ask first, in the page's one dialog.
+	function askPower( panel, action ) {
+		var s = vm.strings;
+
+		if ( ! confirmFirst( panel, {
+			title: s[ action + 'Title' ],
+			label: s[ action + 'Yes' ],
+			text: s[ action + 'Text' ],
+			run: function ( yes, box ) {
+				send( panel, action, {}, yes, box, describe( action, '' ) );
+			}
+		} ) ) {
+			send( panel, action, {}, null, null, describe( action, '' ) );
+		}
+	}
+
+	function copyText( text ) {
+		var area;
+
+		if ( window.navigator.clipboard && window.navigator.clipboard.writeText ) {
+			return window.navigator.clipboard.writeText( text );
+		}
+
+		return new Promise( function ( resolve, reject ) {
+			area = document.createElement( 'textarea' );
+			area.value = text;
+			area.setAttribute( 'readonly', '' );
+			area.style.position = 'fixed';
+			area.style.opacity = '0';
+			document.body.appendChild( area );
+			area.select();
+
+			try {
+				if ( document.execCommand( 'copy' ) ) {
+					resolve();
+				} else {
+					reject( new Error( 'copy' ) );
+				}
+			} catch ( e ) {
+				reject( e );
+			}
+
+			document.body.removeChild( area );
+		} );
+	}
+
+	function copyCommand( panel, button ) {
+		var label = button.textContent;
+
+		copyText( button.getAttribute( 'data-copy' ) ).then( function () {
+			button.textContent = button.getAttribute( 'data-copied' ) || label;
+			window.setTimeout( function () {
+				button.textContent = label;
+			}, 2000 );
+		}, function () {
+			notice( panel, vm.strings.failed );
+		} );
+	}
+
+	// The tab of a page by its pane. Every pane stays in the page; only one is shown.
+	function showTab( panel, slug ) {
+		var found = false;
+
+		Array.prototype.forEach.call( panel.querySelectorAll( '.beltoft-services-tab' ), function ( pane ) {
+			var on = slug === pane.getAttribute( 'data-tab' );
+
+			found = found || on;
+			pane.hidden = ! on;
+		} );
+
+		if ( ! found ) {
+			return false;
+		}
+
+		Array.prototype.forEach.call( panel.querySelectorAll( '.beltoft-services-tabs a[data-tab-link]' ), function ( link ) {
+			if ( slug === link.getAttribute( 'data-tab-link' ) ) {
+				link.setAttribute( 'aria-current', 'page' );
+			} else {
+				link.removeAttribute( 'aria-current' );
+			}
+		} );
+
+		// The charts of a tab that was not shown at load are drawn when it first is.
+		panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:tab', { detail: { tab: slug } } ) );
+
+		return true;
+	}
+
+	// Which tab the address says: the nav link that points at it, else the first.
+	function tabFromLocation( panel ) {
+		var links = panel.querySelectorAll( '.beltoft-services-tabs a[data-tab-link]' );
+		var here = window.location.pathname + window.location.search;
+		var found = links.length ? links[ 0 ].getAttribute( 'data-tab-link' ) : '';
+
+		Array.prototype.forEach.call( links, function ( link ) {
+			if ( link.pathname + link.search === here ) {
+				found = link.getAttribute( 'data-tab-link' );
+			}
+		} );
+
+		return found;
+	}
+
+	// A link to something inside a hidden pane (a disk's setup guide) opens its tab first.
+	function revealHash( panel ) {
+		var id = window.location.hash.slice( 1 );
+		var target;
+		var pane;
+
+		try {
+			id = decodeURIComponent( id );
+		} catch ( e ) { /* a malformed hash is used as it is */ }
+
+		target = id ? document.getElementById( id ) : null;
+		pane = target && panel.contains( target ) ? target.closest( '.beltoft-services-tab' ) : null;
+
+		if ( pane && pane.hidden ) {
+			showTab( panel, pane.getAttribute( 'data-tab' ) );
+		}
+	}
+
 	document.querySelectorAll( '.beltoft-services-panel[data-resource]' ).forEach( function ( panel ) {
 		var line = panel.querySelector( '[data-flash]' );
 		var progress = panel.querySelector( '[data-progress]' );
@@ -501,6 +629,21 @@
 			outcome( panel, event.detail || {} );
 		} );
 
+		// Copying needs the clipboard or the old copy command: without either the button stays hidden (the command is printed under Log in).
+		Array.prototype.forEach.call( panel.querySelectorAll( '[data-copy]' ), function ( button ) {
+			button.hidden = false;
+		} );
+
+		if ( panel.querySelector( '.beltoft-services-tab' ) ) {
+			revealHash( panel );
+			window.addEventListener( 'hashchange', function () {
+				revealHash( panel );
+			} );
+			window.addEventListener( 'popstate', function () {
+				showTab( panel, tabFromLocation( panel ) );
+			} );
+		}
+
 		panel.addEventListener( 'submit', function ( event ) {
 			var form = event.target.closest( '.beltoft-services-vm-form' );
 
@@ -518,8 +661,35 @@
 			var undo = event.target.closest( '[data-undo-url]' );
 			var dialog = panel.querySelector( '[data-snapshot-dialog]' );
 			var button = event.target.closest( '[data-vm-reveal]' );
+			var tab = event.target.closest( 'a[data-tab-link]' );
+			var power = event.target.closest( '[data-power-action]' );
+			var copy = event.target.closest( '[data-copy]' );
+			var nav = panel.querySelector( '.beltoft-services-tabs' );
 			var name;
 			var source;
+
+			if ( tab && 0 === event.button && ! ( event.ctrlKey || event.metaKey || event.shiftKey || event.altKey ) && window.history && window.history.pushState && showTab( panel, tab.getAttribute( 'data-tab-link' ) ) ) {
+				event.preventDefault();
+				window.history.pushState( { beltoftTab: tab.getAttribute( 'data-tab-link' ) }, '', tab.href );
+
+				if ( nav && nav.getBoundingClientRect().top < 0 ) {
+					nav.scrollIntoView();
+				}
+
+				return;
+			}
+
+			if ( power && ! power.disabled ) {
+				askPower( panel, power.getAttribute( 'data-power-action' ) );
+
+				return;
+			}
+
+			if ( copy ) {
+				copyCommand( panel, copy );
+
+				return;
+			}
 
 			if ( roll && dialog ) {
 				dialog.querySelector( 'input[name="id"]' ).value = roll.getAttribute( 'data-snapshot-rollback' );

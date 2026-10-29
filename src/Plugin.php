@@ -69,6 +69,7 @@ final class Plugin {
 		Checkout::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
+		Account\Servers::register();
 
 		Lifecycle::register();
 		Retention::register();

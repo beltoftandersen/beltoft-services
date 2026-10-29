@@ -31,6 +31,60 @@ final class Panels {
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ) );
+		add_filter( 'beltoft_services_account_page_head', array( __CLASS__, 'page_head' ), 10, 5 );
+	}
+
+	/**
+	 * Listener of beltoft_services_account_page_head: the head of a server's page. The server's name as
+	 * the title, its state, plan and renewal, and the buttons for copying the ssh command, rebooting,
+	 * shutting down and starting. Nothing here calls Proxmox: the power is the one the last status kept.
+	 *
+	 * @param mixed $handled  Whether another listener printed the head.
+	 * @param mixed $resource Resource.
+	 * @param mixed $license  License row.
+	 * @param mixed $view     Display values of the license.
+	 * @param mixed $page     The page being printed.
+	 * @return mixed
+	 */
+	public static function page_head( $handled, $resource, $license = array(), $view = array(), $page = array() ) {
+		unset( $page );
+
+		if ( $handled || ! $resource instanceof Resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || ! is_array( $license ) ) {
+			return $handled;
+		}
+
+		$state   = (string) $resource->get( 'state' );
+		$group   = \BeltoftServices\Account\Panel::group( $state );
+		$status  = Operations::cached_status( $resource->id() );
+		$power   = null === $status ? '' : (string) $status['power'];
+		$busy    = (bool) \BeltoftServices\Progress::build( $resource )['active'];
+		$ip      = (string) $resource->get( 'ip' );
+		$title   = is_array( $view ) && isset( $view['product'] ) ? (string) $view['product'] : \BeltoftLicenses\Account\View::product_name( $license );
+		$product = \BeltoftLicenses\Account\View::product_name( $license );
+		$offered = $resource->accepts_actions() && 'ready' === $state ? Actions::offered( $resource ) : array();
+
+		$vars = array(
+			'title'      => $title,
+			'group'      => $group,
+			'badge'      => \BeltoftServices\Account\Panel::label( $state, $resource ),
+			'message'    => \BeltoftServices\Account\Panel::message( $state, $resource ),
+			'show_power' => 'ready' === $group && ! $resource->on_hold() && ( $busy || isset( array( 'running' => 1, 'stopped' => 1 )[ $power ] ) ),
+			'busy'       => $busy,
+			'power'      => $power,
+			'plan'       => $product !== $title ? $product : '',
+			'renews'     => \BeltoftServices\Account\Servers::renewal( $license ),
+			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
+			'ssh_user'   => Provision::LOGIN_USER,
+			'actions'    => array_intersect_key( $offered, array_flip( array( 'start', 'reboot', 'shutdown' ) ) ),
+		);
+
+		( static function ( array $vars ): void {
+			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variables, a fixed list built above.
+			extract( $vars, EXTR_SKIP );
+			include BELTOFT_SERVICES_PATH . 'templates/account/vm-head.php';
+		} )( $vars );
+
+		return true;
 	}
 
 	/**
@@ -54,6 +108,10 @@ final class Panels {
 			'read' => __( 'Read', 'beltoft-services' ),
 			'write' => __( 'Write', 'beltoft-services' ),
 			'graph' => __( 'usage graph', 'beltoft-services' ),
+			/* translators: %s: the highest value in the period, such as 31% */
+			'peak' => __( 'peak %s', 'beltoft-services' ),
+			/* translators: %s: the total, such as 2 GB */
+			'of' => __( 'of %s GB', 'beltoft-services' ),
 			'noReading' => __( 'No reading', 'beltoft-services' ),
 		) ) );
 		wp_localize_script(
@@ -84,6 +142,16 @@ final class Panels {
 					'reinstallDone'  => __( 'Your server is reinstalled.', 'beltoft-services' ),
 					'rollbackDoneAnon' => __( 'Your server went back to the snapshot.', 'beltoft-services' ),
 					'deleteDoneAnon' => __( 'The snapshot is deleted.', 'beltoft-services' ),
+					'rebootTitle'    => __( 'Reboot your server?', 'beltoft-services' ),
+					'rebootYes'      => __( 'Reboot now', 'beltoft-services' ),
+					'rebootText'     => __( 'The server restarts and is unavailable for a short while. Anything running on it stops.', 'beltoft-services' ),
+					'rebootStart'    => __( 'Rebooting your server.', 'beltoft-services' ),
+					'rebootDone'     => __( 'Your server has restarted.', 'beltoft-services' ),
+					'shutdownTitle'  => __( 'Shut down your server?', 'beltoft-services' ),
+					'shutdownYes'    => __( 'Shut down now', 'beltoft-services' ),
+					'shutdownText'   => __( 'The server stops and stays off until you start it again. Anything running on it stops.', 'beltoft-services' ),
+					'shutdownStart'  => __( 'Shutting down your server.', 'beltoft-services' ),
+					'shutdownDone'   => __( 'Your server is shut down.', 'beltoft-services' ),
 					'busy'           => __( 'Busy', 'beltoft-services' ),
 					'running'        => __( 'The server is running.', 'beltoft-services' ),
 					'newPassword'    => __( 'Use "Show password once" for your new password.', 'beltoft-services' ),
@@ -120,7 +188,11 @@ final class Panels {
 		$chosen = $chosen > 0 ? $chosen : (int) ( $plan['template'] ?? 0 );
 		// A template that is no longer listed cannot be preselected: the cluster's default is.
 		$select = isset( $list[ $chosen ] ) || null === $record ? $chosen : Clusters::default_template( $record['cluster'] );
+		$page   = \BeltoftServices\Account\Servers::page();
+		$page   = $page && (int) $page['license']['id'] === (int) ( $r->license()['id'] ?? 0 ) ? $page : null;
 		$state  = array(
+			'page'       => $page,
+			'can_reset'  => null !== $page && $r->accepts_actions() && array_key_exists( 'reset_password', Actions::offered( $r ) ),
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'plan'       => array(
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),

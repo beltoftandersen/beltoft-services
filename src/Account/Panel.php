@@ -141,8 +141,10 @@ final class Panel {
 		$state = (string) $resource->get( 'state' );
 		$group = self::group( $state );
 		$owner = ! empty( $license['user_id'] ) && (int) $license['user_id'] === get_current_user_id();
+		$page  = Servers::page();
+		$page  = $page && (int) $page['license']['id'] === (int) $license['id'] ? $page : null;
 
-		echo '<div class="beltoft-services-panel" id="beltoft-service-' . (int) $resource->id() . '"';
+		echo '<div class="beltoft-services-panel' . ( null !== $page ? ' beltoft-services-panel--page' : '' ) . '" id="beltoft-service-' . (int) $resource->id() . '"';
 		if ( $owner ) {
 			printf(
 				' data-resource="%d" data-state="%s" data-desired="%s"',
@@ -153,16 +155,36 @@ final class Panel {
 		}
 		echo '>';
 
-		printf(
-			'<p class="beltoft-services-panel__head"><span class="beltoft-services-badge beltoft-services-badge--%1$s" data-badge>%2$s</span> <span class="beltoft-services-panel__message" data-message>%3$s</span></p>',
-			esc_attr( $group ),
-			esc_html( self::label( $state, $resource ) ),
-			esc_html( self::message( $state, $resource ) )
-		);
+		/**
+		 * Lets a driver print the head of a server page (its name, state and the buttons for what the
+		 * customer does most) in place of the plain state line. It prints and returns true; it must keep the
+		 * [data-badge] and [data-message] elements that the status poll fills in.
+		 *
+		 * @param bool                 $handled  Whether a listener printed the head.
+		 * @param Resource             $resource Resource.
+		 * @param array<string, mixed> $license  License row.
+		 * @param array<string, mixed> $view     Display values of the license.
+		 * @param array<string, mixed> $page     The page being printed: license and requested tab.
+		 */
+		$handled = $owner && null !== $page && (bool) apply_filters( 'beltoft_services_account_page_head', false, $resource, $license, is_array( $view ) ? $view : array(), $page );
+
+		if ( ! $handled ) {
+			printf(
+				'<p class="beltoft-services-panel__head"><span class="beltoft-services-badge beltoft-services-badge--%1$s" data-badge>%2$s</span> <span class="beltoft-services-panel__message" data-message>%3$s</span></p>',
+				esc_attr( $group ),
+				esc_html( self::label( $state, $resource ) ),
+				esc_html( self::message( $state, $resource ) )
+			);
+		}
 
 		if ( $owner ) {
+			// On a server page the line for script feedback sits under the head, where the buttons are.
+			if ( null !== $page ) {
+				echo '<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>';
+			}
+
 			Progress::render( Progress::build( $resource ) );
-			self::owner_part( $resource );
+			self::owner_part( $resource, null !== $page );
 		}
 
 		echo '</div>';
@@ -172,8 +194,9 @@ final class Panel {
 	 * The driver's part, the action buttons and the notice line for script feedback.
 	 *
 	 * @param Resource $resource Resource.
+	 * @param bool     $page     Whether this is a server page (its notice line is printed under the head).
 	 */
-	private static function owner_part( Resource $resource ): void {
+	private static function owner_part( Resource $resource, bool $page = false ): void {
 		$driver = Registry::get( $resource->get( 'driver' ) );
 
 		if ( ! $driver ) {
@@ -193,8 +216,9 @@ final class Panel {
 		 *
 		 * @param array<string, string> $actions  Action name => label.
 		 * @param Resource              $resource Resource.
+		 * @param string                $context  card (a license card) or page (a server page, which prints the power buttons itself).
 		 */
-		$buttons = apply_filters( 'beltoft_services_account_buttons', $actions, $resource );
+		$buttons = apply_filters( 'beltoft_services_account_buttons', $actions, $resource, $page ? 'page' : 'card' );
 		$actions = is_array( $buttons ) ? array_intersect_key( $buttons, $actions ) : $actions;
 
 		if ( $actions ) {
@@ -209,7 +233,9 @@ final class Panel {
 			echo '</p>';
 		}
 
-		echo '<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>';
+		if ( ! $page ) {
+			echo '<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>';
+		}
 	}
 
 	/**

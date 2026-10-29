@@ -287,8 +287,13 @@
 		poll( panel );
 
 		// A form of another script (the server card) queued a slow action: show its progress now.
-		panel.addEventListener( 'beltoft-services:queued', function () {
+		panel.addEventListener( 'beltoft-services:queued', function ( event ) {
 			poll( panel );
+
+			// A power action of the server page: look a few times, then reload, as the card's own buttons do.
+			if ( event.detail && event.detail.settle ) {
+				settle( panel, 5 );
+			}
 		} );
 
 		panel.addEventListener( 'click', function ( event ) {
