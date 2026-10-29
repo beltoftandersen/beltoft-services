@@ -350,6 +350,26 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( 'ready', Resource::find( $b->id() )->get( 'desired' ) );
 	}
 
+	public function test_power_asks_a_late_agent_once_an_hour_until_it_answers(): void {
+		$up   = $this->vm( 5010, 'node-a', 'running' );
+		$down = $this->vm( 5011, 'node-a', 'stopped' );
+		$this->assertTrue( $up->set( array( 'agent' => 'unknown' ) ) );
+		$this->assertTrue( $down->set( array( 'agent' => 'unknown' ) ) );
+
+		ProxmoxJobs::power();
+
+		$this->assertSame( 'ok', Resource::find( $up->id() )->get( 'agent' ), 'The agent that answers is remembered.' );
+		$this->assertSame( 'unknown', Resource::find( $down->id() )->get( 'agent' ), 'A stopped server is not asked.' );
+		$this->assertSame( 1, $this->paths( 'POST', '#/agent/ping$#' ) );
+
+		ProxmoxJobs::power();
+		$this->assertSame( 1, $this->paths( 'POST', '#/agent/ping$#' ), 'An agent that answered is not asked again.' );
+
+		$this->assertTrue( $up->set( array( 'agent' => 'unknown', 'agent_checked_at' => time() - 60 ) ) );
+		ProxmoxJobs::power();
+		$this->assertSame( 1, $this->paths( 'POST', '#/agent/ping$#' ), 'At most once an hour.' );
+	}
+
 	/**
 	 * The resource's stored meta.
 	 *

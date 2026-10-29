@@ -407,6 +407,9 @@ final class ProxmoxJobs {
 				if ( $resource ) { Monitor::power( $resource, $power ); }
 
 				if ( 'running' === $power ) {
+					if ( $resource ) {
+						self::refresh_agent( $one['client'], $resource, (string) ( $vm['node'] ?? '' ), $vmid );
+					}
 					$running[] = array(
 						'resource' => $ours[ $vmid ],
 						'cluster'  => $id,
@@ -418,6 +421,25 @@ final class ProxmoxJobs {
 
 			set_transient( self::RUNNING_PREFIX . $id, $running, 2 * HOUR_IN_SECONDS );
 		}
+	}
+
+	/**
+	 * A server whose guest agent was not up yet when it was built: ask again, at most once an hour,
+	 * until it answers. Reset password and consistent snapshots depend on it.
+	 *
+	 * @param Client   $client Cluster client.
+	 * @param Resource $r      Server resource.
+	 * @param string   $node   Node.
+	 * @param int      $vmid   VMID.
+	 */
+	private static function refresh_agent( Client $client, Resource $r, string $node, int $vmid ): void {
+		if ( 'unknown' !== $r->get( 'agent' ) || '' === $node || (int) $r->get( 'agent_checked_at' ) > time() - HOUR_IN_SECONDS ) {
+			return;
+		}
+
+		$ping = $client->request( 'POST', '/nodes/' . rawurlencode( $node ) . '/qemu/' . $vmid . '/agent/ping' );
+
+		$r->set( is_wp_error( $ping ) ? array( 'agent_checked_at' => time() ) : array( 'agent' => 'ok', 'agent_checked_at' => null ) );
 	}
 
 	// -- Guest disk -------------------------------------------------------------------------------

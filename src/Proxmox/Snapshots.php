@@ -1027,6 +1027,11 @@ final class Snapshots {
 			return $guard;
 		}
 
+		// The agent may have come up after the build: ask, so the snapshot is marked as Proxmox really takes it.
+		if ( 'running' === $v['status'] && ! Actions::agent_ok( $this->r ) && Provision::agent_enabled( (string) ( $v['config']['agent'] ?? '' ) ) && ! is_wp_error( $this->client->request( 'POST', self::base( $record, $v ) . '/agent/ping' ) ) ) {
+			$this->r->set( array( 'agent' => 'ok', 'agent_checked_at' => null ) );
+		}
+
 		$id    = bin2hex( random_bytes( 4 ) );
 		$now   = time();
 		$entry = array(

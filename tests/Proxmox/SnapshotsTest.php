@@ -180,6 +180,18 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertNotEmpty( $this->calls( 'GET', '/storage/disk-store/status' ), 'The host space is read before a take.' );
 	}
 
+	public function test_an_agent_that_came_up_after_the_build_is_asked_and_the_snapshot_is_consistent(): void {
+		$r = $this->server();
+		$this->assertTrue( $r->set( array( 'agent' => 'unknown' ) ), 'The agent was not up yet when the server was built.' );
+		$pings = count( $this->calls( 'POST', '/qemu/5000/agent/ping' ) );
+
+		$entry = $this->take( $r, 'Later' );
+
+		$this->assertTrue( $entry['consistent'], 'Proxmox freezes the filesystems when the agent answers.' );
+		$this->assertSame( 'ok', $this->fresh( $r )->get( 'agent' ), 'Reset password is offered from now on.' );
+		$this->assertCount( $pings + 1, $this->calls( 'POST', '/qemu/5000/agent/ping' ), 'Asked once, before the take.' );
+	}
+
 	public function test_a_snapshot_of_a_server_that_is_off_is_not_marked_consistent(): void {
 		$r = $this->server();
 		$this->fake->task( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
