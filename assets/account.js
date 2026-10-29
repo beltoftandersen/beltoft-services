@@ -284,7 +284,10 @@
 	}
 
 	document.querySelectorAll( '.beltoft-services-panel[data-resource]' ).forEach( function ( panel ) {
-		poll( panel );
+		// A panel the status route would refuse (paused, ended) is not asked on load.
+		if ( '1' !== panel.getAttribute( 'data-idle' ) ) {
+			poll( panel );
+		}
 
 		// A form of another script (the server card) queued a slow action: show its progress now.
 		panel.addEventListener( 'beltoft-services:queued', function ( event ) {

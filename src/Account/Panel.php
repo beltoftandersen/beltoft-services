@@ -147,10 +147,13 @@ final class Panel {
 		echo '<div class="beltoft-services-panel' . ( null !== $page ? ' beltoft-services-panel--page' : '' ) . '" id="beltoft-service-' . (int) $resource->id() . '"';
 		if ( $owner ) {
 			printf(
-				' data-resource="%d" data-state="%s" data-desired="%s"',
+				' data-resource="%d" data-state="%s" data-desired="%s"%s',
 				(int) $resource->id(),
 				esc_attr( $state ),
-				esc_attr( (string) $resource->get( 'desired' ) )
+				esc_attr( (string) $resource->get( 'desired' ) ),
+				// The status route refuses a paused, ended or held service: do not ask on page load (the panel
+				// still polls after one of its own actions).
+				$resource->shows_status() ? '' : ' data-idle="1"'
 			);
 		}
 		echo '>';

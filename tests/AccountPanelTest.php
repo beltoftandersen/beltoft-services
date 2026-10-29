@@ -66,7 +66,18 @@ final class AccountPanelTest extends TestCase {
 		$this->assertStringContainsString( 'data-resource="' . $resource->id() . '"', $html );
 		$this->assertStringContainsString( 'data-state="ready"', $html );
 		$this->assertStringContainsString( 'data-desired="ready"', $html );
+		$this->assertStringNotContainsString( 'data-idle', $html, 'A ready service is asked for its status on load.' );
 		$this->assertSame( array(), $driver->calls(), 'Rendering calls no driver operation.' );
+	}
+
+	public function test_a_paused_service_is_not_polled_on_load(): void {
+		list( $resource ) = $this->resource();
+		$resource->set( array( 'state' => 'paused', 'desired' => 'paused' ) );
+
+		$html = $this->render( $resource->license() );
+
+		$this->assertStringContainsString( 'data-resource="' . $resource->id() . '"', $html );
+		$this->assertStringContainsString( 'data-idle="1"', $html );
 	}
 
 	public function test_badges_by_state(): void {
