@@ -361,6 +361,8 @@ class DomainsTest extends TestCase {
 		$this->assertTrue( wp_script_is( 'beltoft-services-dns-editor', 'enqueued' ) );
 		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', 'servers' );
 		unset( $wp->query_vars[ Domains::slug() ] );
+		wp_dequeue_script( 'beltoft-services-dns-editor' );
+		wp_dequeue_script( 'beltoft-services-domain' );
 	}
 
 	public function test_no_zone_hides_the_editor(): void {

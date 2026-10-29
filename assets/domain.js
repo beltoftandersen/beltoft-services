@@ -389,3 +389,36 @@
 	} );
 	Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), reveal );
 }() );
+
+// Danger zone: the dialog that asks for the domain name before DNS hosting is stopped. The server checks the name
+// again, so the disabled button is only a help.
+( function () {
+	document.addEventListener( 'click', function ( event ) {
+		var open = event.target.closest ? event.target.closest( '[data-danger-open]' ) : null;
+		var dialog = open ? document.getElementById( open.getAttribute( 'data-danger-open' ) ) : null;
+		if ( dialog ) {
+			if ( dialog.showModal ) { dialog.showModal(); } else { dialog.setAttribute( 'open', '' ); }
+			var input = dialog.querySelector( 'input[name="confirm"]' );
+			if ( input ) { input.value = ''; input.dispatchEvent( new Event( 'input', { bubbles: true } ) ); input.focus(); }
+			return;
+		}
+		var cancel = event.target.closest ? event.target.closest( '[data-danger-cancel]' ) : null;
+		var box = cancel ? cancel.closest( 'dialog' ) : null;
+		if ( box ) {
+			if ( box.close ) { box.close(); } else { box.removeAttribute( 'open' ); }
+		}
+	} );
+	function matches( form ) {
+		var input = form.querySelector( 'input[name="confirm"]' );
+		return !! input && input.value.trim().toLowerCase() === form.getAttribute( 'data-danger-domain' );
+	}
+	document.addEventListener( 'input', function ( event ) {
+		var form = event.target.closest ? event.target.closest( 'form[data-danger-domain]' ) : null;
+		var button = form ? form.querySelector( '.beltoft-services-danger__confirm' ) : null;
+		if ( button ) { button.disabled = ! matches( form ); }
+	} );
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target.closest ? event.target.closest( 'form[data-danger-domain]' ) : null;
+		if ( form && ! matches( form ) ) { event.preventDefault(); }
+	} );
+}() );

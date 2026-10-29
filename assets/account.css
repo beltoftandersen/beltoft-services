@@ -606,3 +606,19 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 	.beltoft-dnse__table tr.beltoft-dnse__rowerror td { display: block; padding: 0; }
 	.beltoft-dnse__fields > .beltoft-dnse__extra { flex: 1 1 5em; }
 }
+
+/* Danger zone tab and its dialog. Square, one danger colour for the destructive button only. */
+.beltoft-services-danger .beltoft-services-domain__note { max-width: 62ch; }
+.beltoft-services-danger__form { margin: 16px 0 0; }
+.beltoft-services-danger .button, .beltoft-services-domain__dialog .button { margin: 0; }
+.beltoft-services-danger__open.button { margin-top: 16px; }
+.beltoft-services-domain__dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
+.beltoft-services-domain__dialog::backdrop { background: rgba(12, 21, 53, 0.5); }
+.beltoft-services-danger__dialog-form { margin: 0; padding: 20px; }
+.beltoft-services-domain__dialog h5 { margin: 0 0 12px; font-size: 17px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-domain__dialog p { margin: 0 0 12px; }
+.beltoft-services-domain__dialog label { display: block; margin: 0 0 4px; font-size: 14px; color: var(--ink-soft, #5e7080); }
+.beltoft-services-domain__dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 43px; margin: 0 0 16px; padding: 0 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; box-shadow: none; }
+.beltoft-services-danger__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 0; }
+.beltoft-services-danger__confirm.button { background: #b32d2e; color: #fff; }
+.beltoft-services-danger__confirm.button:disabled { opacity: .45; cursor: not-allowed; }

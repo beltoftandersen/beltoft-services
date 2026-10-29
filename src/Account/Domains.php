@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Domains\DnsClaims;
 use BeltoftServices\Domains\DnsClaimsFeature;
 use BeltoftServices\Domains\DnsClaimPanel;
@@ -99,6 +100,31 @@ final class Domains {
 		$value = (string) (int) $license['id'] . ( in_array( $tab, self::tabs(), true ) ? '/' . $tab : '' );
 
 		return wc_get_endpoint_url( self::slug(), $value, wc_get_page_permalink( 'myaccount' ) );
+	}
+
+	/**
+	 * The page of the domain an order is for: when the order holds exactly one domain and its service exists, that
+	 * domain's page, else the list. The thank-you page and the emails link here.
+	 *
+	 * @param int      $order_id Order id.
+	 * @param string[] $names    Domain names on the order.
+	 */
+	public static function url_for_order( int $order_id, array $names ): string {
+		$names = array_values( array_unique( array_map( 'strtolower', $names ) ) );
+
+		if ( 1 !== count( $names ) || $order_id <= 0 || ! class_exists( Licenses::class ) ) {
+			return self::url_list();
+		}
+
+		foreach ( Licenses::where( 'order_id', $order_id ) as $license ) {
+			$resource = self::is_domain( $license ) ? Resource::for_license( (int) $license['id'] ) : null;
+
+			if ( $resource && 0 === $resource->folded_into() && strtolower( (string) $resource->get( 'domain' ) ) === $names[0] ) {
+				return self::url( $license );
+			}
+		}
+
+		return self::url_list();
 	}
 
 	/**

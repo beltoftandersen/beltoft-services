@@ -90,7 +90,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'domain_security_event' => in_array( $data['domain_event'] ?? '', DomainSecurity::EVENTS, true ) ? $data['domain_event'] : 'unlocked',
 				'dns_stays'     => 'domain' === $r->get( 'driver' ) && \BeltoftServices\Domains\Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $license['user_id'] ?? 0 ) ),
 				'domain_renews' => self::domain_renews( $r ),
-				'domains_url'   => function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '',
+				'domains_url'   => self::domains_url( $r, $license ),
 				'dns_external'  => 'domain' === $r->get( 'driver' ) && (bool) $r->get( 'dns_external' ),
 				'nameservers_shown' => 'domain' === $r->get( 'driver' ) && 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
 				'dns_only'      => 'dns' === $r->get( 'driver' ),
@@ -144,7 +144,25 @@ abstract class ServiceEmail extends \WC_Email {
 
 		$server_license = $server ? $server->license() : null;
 
+		if ( in_array( $driver, array( 'domain', 'dns' ), true ) ) {
+			return self::domains_url( $r, $license );
+		}
+
 		return $server_license ? \BeltoftServices\Account\Servers::url( $server_license, $tab ) : Endpoint::url_for_license( $license );
+	}
+
+	/**
+	 * Where a domain email sends the customer: the domain's own page, or the list when there is no license.
+	 *
+	 * @param Resource                  $r       Resource.
+	 * @param array<string, mixed>|null $license License row.
+	 */
+	private static function domains_url( Resource $r, $license ): string {
+		if ( is_array( $license ) && ! empty( $license['id'] ) && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
+			return \BeltoftServices\Account\Domains::url( $license );
+		}
+
+		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '';
 	}
 
 	/**

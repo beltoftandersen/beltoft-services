@@ -58,7 +58,7 @@ class DomainEmailsTest extends TestCase {
 		$this->assertSame( 'Your domain mail-example.net is now with us', $mail['subject'] );
 		$this->assertStringContainsString( 'Dana', $mail['message'] );
 		$this->assertStringContainsString( date_i18n( get_option( 'date_format' ), strtotime( '2027-10-26 UTC' ) ), $mail['message'], 'The renewal date.' );
-		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $mail['message'], 'It links to My Account, Domains.' );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Domains::url( $r->license() ) ), $mail['message'], 'It links to the domain\'s own page in My Account.' );
 		$this->assertStringContainsString( 'Your DNS stays where it is now. Your name servers do not change.', $mail['message'] );
 		$this->assertStringNotContainsString( 'uses our name servers', $mail['message'] );
 		$this->assertStringNotContainsString( 'Your DNS stays as it is.', $mail['message'] );
@@ -83,7 +83,7 @@ class DomainEmailsTest extends TestCase {
 		$this->assertCount( 1, $this->mails );
 		$this->assertSame( 'Your domain mail-example.net is registered', $this->mails[0]['subject'] );
 		$this->assertStringContainsString( 'ns1.example.net, ns2.example.net', $this->mails[0]['message'] );
-		$this->assertStringContainsString( esc_url( wc_get_account_endpoint_url( 'domains' ) ), $this->mails[0]['message'] );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Domains::url( $r->license() ) ), $this->mails[0]['message'], 'The email links to the domain\'s page.' );
 	}
 
 	public function test_dns_hosting_keeps_the_generic_ready_email(): void {

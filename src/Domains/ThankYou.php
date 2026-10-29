@@ -104,7 +104,8 @@ final class ThankYou {
 
 		self::$printed[ $order_id ] = true;
 
-		$account_url = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '';
+		// One domain on the order: its own page. Several: the list.
+		$account_url = \BeltoftServices\Account\Domains::url_for_order( $order_id, array_merge( array_keys( $domains ), array_keys( $transfers ) ) );
 
 		if ( $transfers ) {
 			wc_get_template(

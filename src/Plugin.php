@@ -73,6 +73,7 @@ final class Plugin {
 		Account\Servers::register();
 		Account\Domains::register();
 		Account\DomainPage::register();
+		Account\DomainDanger::register();
 		Account\ServerPicker::register();
 		Account\Overview::register();
 		Account\Billing::register();
