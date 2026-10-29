@@ -427,7 +427,9 @@ class OverviewTest extends MonitoringTestCase {
 		$this->auto_renewal( $sub, 'cod' );
 		$this->as_user( $user );
 
-		$this->assertStringContainsString( 'Visa ending 4242', $this->html( 'next_payment' ) );
+		$html = $this->html( 'next_payment' );
+		$this->assertStringContainsString( 'Visa ending 4242', $html );
+		$this->assertStringContainsString( '>Card</dt>', $html );
 	}
 
 	private function auto_renewal( \WC_Subscription $sub, string $gateway ): void {
@@ -481,6 +483,8 @@ class OverviewTest extends MonitoringTestCase {
 
 		$this->assertStringNotContainsString( '4242', $html );
 		$this->assertStringContainsString( 'Bank transfer', $html );
+		$this->assertStringContainsString( '>Payment method</dt>', $html );
+		$this->assertStringNotContainsString( '>Card</dt>', $html );
 	}
 
 	public function test_a_manual_renewal_without_a_method_is_paid_by_invoice(): void {
@@ -488,7 +492,9 @@ class OverviewTest extends MonitoringTestCase {
 		$this->subscription( $user, 'active', 10, 'Server' );
 		$this->as_user( $user );
 
-		$this->assertStringContainsString( 'Paid by invoice', $this->html( 'next_payment' ) );
+		$html = $this->html( 'next_payment' );
+		$this->assertStringContainsString( 'Paid by invoice', $html );
+		$this->assertStringContainsString( '>Payment method</dt>', $html );
 	}
 
 	public function test_the_subscriptions_own_token_wins_over_the_default_card(): void {
@@ -519,6 +525,7 @@ class OverviewTest extends MonitoringTestCase {
 
 		$this->assertStringNotContainsString( '4242', $html );
 		$this->assertStringContainsString( 'PayPal', $html );
+		$this->assertStringContainsString( '>Payment method</dt>', $html );
 	}
 
 	public function test_the_dates_are_converted_once_in_the_site_timezone(): void {
@@ -679,7 +686,7 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'web-01: paused', $this->html( 'activity' ) );
 	}
 
-	public function test_a_pause_is_payment_failed_only_after_a_failed_renewal(): void {
+	public function test_a_pause_is_payment_failed_only_when_the_newest_renewal_order_failed(): void {
 		global $wpdb;
 		$user = self::factory()->user->create();
 		$sub  = $this->subscription( $user, 'on-hold', 5, 'Server' );
@@ -688,26 +695,83 @@ class OverviewTest extends MonitoringTestCase {
 		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'subscription_id' => $sub->get_id() ), array( 'id' => $id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
 		$wpdb->insert( \BeltoftLicenses\Install::tables()['events'], array( 'license_id' => $id, 'type' => 'service', 'message' => 'Service paused', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3600 ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
 
-		// No failed renewal at all: just paused.
+		// No renewal order at all: just paused.
 		$this->as_user( $user );
 		$this->assertStringContainsString( 'web-01: paused', $this->html( 'activity' ) );
 		$this->assertStringNotContainsString( 'payment failed', $this->html( 'activity' ) );
 
-		// A renewal that failed after the pause: still just paused.
-		$late = wc_create_order( array( 'customer_id' => $user ) );
-		$late->set_status( 'failed' );
-		$late->set_date_created( time() - 600 );
-		$late->update_meta_data( '_subscription_renewal', $sub->get_id() );
-		$late->save();
-		$this->as_user( $user );
-		$this->assertStringNotContainsString( 'payment failed', $this->html( 'activity' ) );
-
-		// A renewal that failed before the pause: payment failed.
-		$late->set_date_created( time() - 7200 );
-		$late->save();
+		// The newest renewal order failed: payment failed.
+		$bad = wc_create_order( array( 'customer_id' => $user ) );
+		$bad->set_status( 'failed' );
+		$bad->set_date_created( time() - 7200 );
+		$bad->update_meta_data( '_subscription_renewal', $sub->get_id() );
+		$bad->save();
 		$this->as_user( $user );
 		$this->assertStringContainsString( 'web-01: payment failed, paused', $this->html( 'activity' ) );
 
+		// A newer renewal order that is not failed (paid by hand, or pending): the failure is behind us, just paused.
+		$later = wc_create_order( array( 'customer_id' => $user ) );
+		$later->set_status( 'pending' );
+		$later->set_date_created( time() - 600 );
+		$later->update_meta_data( '_subscription_renewal', $sub->get_id() );
+		$later->save();
+		$this->as_user( $user );
+		$html = $this->html( 'activity' );
+		$this->assertStringContainsString( 'web-01: paused', $html );
+		$this->assertStringNotContainsString( 'payment failed', $html );
+	}
+
+	public function test_the_failed_renewal_is_looked_up_once_per_subscription(): void {
+		global $wpdb;
+		$user = self::factory()->user->create();
+		$sub  = $this->subscription( $user, 'on-hold', 5, 'Server' );
+		$id   = (int) $this->server( $user )->license()['id'];
+		$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'subscription_id' => $sub->get_id() ), array( 'id' => $id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		$pause = function ( int $ago ) use ( $wpdb, $id ): void {
+			$wpdb->insert( \BeltoftLicenses\Install::tables()['events'], array( 'license_id' => $id, 'type' => 'service', 'message' => 'Service paused', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - $ago ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		};
+		$count = function () use ( $user ): int {
+			$this->as_user( $user );
+			$calls = 0;
+			add_filter(
+				'woocommerce_subscription_last_order',
+				static function ( $order ) use ( &$calls ) {
+					++$calls;
+					return $order;
+				}
+			);
+			Overview::data();
+			remove_all_filters( 'woocommerce_subscription_last_order' );
+
+			return $calls;
+		};
+
+		$pause( 3600 );
+		$one = $count();
+
+		$pause( 3700 );
+		$pause( 3800 );
+		$pause( 3900 );
+
+		$this->assertSame( $one, $count(), 'More pause rows of one subscription do not add lookups.' );
+	}
+
+	public function test_rows_that_only_start_like_a_customer_message_do_not_use_up_the_window(): void {
+		global $wpdb;
+		$user   = self::factory()->user->create();
+		$id     = (int) $this->server( $user )->license()['id'];
+		$events = \BeltoftLicenses\Install::tables()['events'];
+
+		$wpdb->insert( $events, array( 'license_id' => $id, 'type' => 'service', 'message' => 'Customer took the snapshot "old"', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 900000 ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+
+		for ( $i = 0; $i < 30; $i++ ) {
+			$wpdb->insert( $events, array( 'license_id' => $id, 'type' => 'service', 'message' => 'Snapshot "auto-' . $i . '" quota check', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 800000 + $i ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+			$wpdb->insert( $events, array( 'license_id' => $id, 'type' => 'service', 'message' => 'Service paused by the abuse check ' . $i, 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 700000 + $i ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		}
+
+		$this->as_user( $user );
+
+		$this->assertStringContainsString( 'snapshot &quot;old&quot; taken', $this->html( 'activity' ) );
 	}
 
 	public function test_the_feed_is_hidden_when_there_is_nothing_to_tell(): void {

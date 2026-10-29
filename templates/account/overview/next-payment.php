@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array{date: string, time: string, amount: string, covers: string, card: string, url: string} $payment Values; amount is price markup from WooCommerce.
+ * @var array{date: string, time: string, amount: string, covers: string, card: string, label: string, url: string} $payment Values; amount is price markup from WooCommerce.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 			<dd><?php echo esc_html( $payment['covers'] ); ?></dd>
 		<?php endif; ?>
 		<?php if ( '' !== $payment['card'] ) : ?>
-			<dt><?php esc_html_e( 'Card', 'beltoft-services' ); ?></dt>
+			<dt><?php echo esc_html( $payment['label'] ?? __( 'Payment method', 'beltoft-services' ) ); ?></dt>
 			<dd><?php echo esc_html( $payment['card'] ); ?></dd>
 		<?php endif; ?>
 	</dl>

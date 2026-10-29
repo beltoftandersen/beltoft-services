@@ -232,18 +232,26 @@ final class Billing {
 	}
 
 	/**
-	 * The menu key the Billing item keeps: Subscriptions when listed, else Orders, else ''.
+	 * The menu key the Billing item keeps: Subscriptions when listed and the customer has one, else Orders, else ''.
 	 *
 	 * @param array<string, string> $items Menu items.
 	 */
 	private static function menu_key( array $items ): string {
 		foreach ( array( 'subscriptions', 'orders' ) as $key ) {
-			if ( isset( $items[ $key ] ) ) {
+			if ( isset( $items[ $key ] ) && ( 'subscriptions' !== $key || self::has_subscriptions() ) ) {
 				return $key;
 			}
 		}
 
 		return '';
+	}
+
+	/**
+	 * Whether the customer has any subscription. WooCommerce Subscriptions lists its item for everybody, so
+	 * the menu asks. Without the plugin there is nothing to ask and the list stands.
+	 */
+	private static function has_subscriptions(): bool {
+		return ! function_exists( 'wcs_user_has_subscription' ) || wcs_user_has_subscription( get_current_user_id() );
 	}
 
 	/**
@@ -321,7 +329,7 @@ final class Billing {
 		$tabs    = array();
 
 		foreach ( $labels as $endpoint => $label ) {
-			if ( ! isset( $raw[ $endpoint ] ) && $endpoint !== $current ) {
+			if ( ( ! isset( $raw[ $endpoint ] ) || ( 'subscriptions' === $endpoint && ! self::has_subscriptions() ) ) && $endpoint !== $current ) {
 				continue;
 			}
 

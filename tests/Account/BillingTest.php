@@ -24,7 +24,9 @@ class BillingTest extends TestCase {
 	public function set_up(): void {
 		parent::set_up();
 		Billing::reset();
-		wp_set_current_user( self::factory()->user->create() );
+		$user = self::factory()->user->create();
+		wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1 ) );
+		wp_set_current_user( $user );
 		$this->billing( true );
 	}
 
@@ -81,6 +83,24 @@ class BillingTest extends TestCase {
 		$this->assertArrayNotHasKey( 'subscriptions', $items );
 		$this->assertArrayNotHasKey( 'payment-methods', $items );
 		$this->assertArrayNotHasKey( 'edit-address', $items );
+	}
+
+	public function test_with_no_subscriptions_billing_points_at_orders_and_the_tab_is_hidden(): void {
+		wp_set_current_user( self::factory()->user->create() );
+		$items = $this->menu();
+
+		// WooCommerce Subscriptions lists the item for everybody; the customer has no subscription.
+		$this->assertSame( 'Billing', $items['orders'] );
+		$this->assertArrayNotHasKey( 'subscriptions', $items );
+
+		$this->on( 'orders' );
+		$this->menu();
+		$this->on( 'orders' );
+		$html = Billing::html();
+
+		$this->assertStringNotContainsString( '>Subscriptions</a>', $html );
+		$this->assertStringContainsString( '>Orders and invoices</a>', $html );
+		$this->assertContains( 'is-active', Billing::classes( array(), 'orders' ) );
 	}
 
 	public function test_off_by_default_and_when_the_setting_is_off_the_menu_is_untouched(): void {

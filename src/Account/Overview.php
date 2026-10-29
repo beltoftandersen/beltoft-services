@@ -59,14 +59,16 @@ final class Overview {
 	private const HISTORY_ROWS = 20;
 
 	/**
-	 * The beginnings of the history texts that can become a customer sentence (the rest is never read).
+	 * The history texts that can become a customer sentence, as written by the plugin ("*" is any text). A text
+	 * without a "*" must match completely. The rest is never read, so rows that only start alike do not use up
+	 * the window.
 	 */
-	private const MESSAGE_PREFIXES = array(
-		'Customer took the snapshot "',
-		'Snapshot "',
-		'Server rolled back to the snapshot "',
-		'Server restored from a backup',
-		'Server restored from the backup',
+	private const MESSAGE_PATTERNS = array(
+		'Customer took the snapshot "*"',
+		'Snapshot "*" deleted',
+		'Server rolled back to the snapshot "*" of *',
+		'Server restored from a backup*',
+		'Server restored from the backup*',
 		'Service provisioned',
 		'Service paused',
 	);
@@ -84,6 +86,13 @@ final class Overview {
 	 * @var array<int, array<int, \WC_Subscription>>
 	 */
 	private static $subscriptions = array();
+
+	/**
+	 * Whether a subscription's newest renewal order is a failed one, by subscription id (asked once each).
+	 *
+	 * @var array<int, bool>
+	 */
+	private static $newest_failed = array();
 
 	/**
 	 * Whether the Dashboard already printed the overview in this request.
@@ -118,6 +127,7 @@ final class Overview {
 	public static function reset(): void {
 		self::$memo          = array();
 		self::$subscriptions = array();
+		self::$newest_failed = array();
 		self::$printed       = false;
 	}
 
@@ -709,12 +719,15 @@ final class Overview {
 
 		$billing = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'subscriptions' ) : '';
 
+		$card = self::card( $user_id, $first['subs'][0] );
+
 		return array(
 			'date'   => wp_date( (string) get_option( 'date_format' ), (int) $first['time'] ),
 			'time'   => gmdate( 'c', (int) $first['time'] ),
 			'amount' => wc_price( (float) $first['total'], array( 'currency' => (string) $first['currency'] ) ),
 			'covers' => implode( ', ', $names ),
-			'card'   => self::card( $user_id, $first['subs'][0] ),
+			'card'   => $card['text'],
+			'label'  => $card['is_card'] ? __( 'Card', 'beltoft-services' ) : __( 'Payment method', 'beltoft-services' ),
 			/**
 			 * Where "Go to Billing" leads.
 			 *
@@ -731,12 +744,16 @@ final class Overview {
 	 *
 	 * @param int               $user_id      Customer.
 	 * @param \WC_Subscription  $subscription A subscription due.
+	 * @return array{text: string, is_card: bool} The text, and whether it names a card.
 	 */
-	private static function card( int $user_id, \WC_Subscription $subscription ): string {
+	private static function card( int $user_id, \WC_Subscription $subscription ): array {
 		$title = trim( wp_strip_all_tags( (string) $subscription->get_payment_method_title() ) );
 
 		if ( $subscription->is_manual() ) {
-			return '' !== $title ? $title : __( 'Paid by invoice', 'beltoft-services' );
+			return array(
+				'text'    => '' !== $title ? $title : __( 'Paid by invoice', 'beltoft-services' ),
+				'is_card' => false,
+			);
 		}
 
 		if ( class_exists( '\WC_Payment_Tokens' ) ) {
@@ -763,11 +780,17 @@ final class Overview {
 				$type = (string) $token->get_card_type();
 
 				/* translators: 1: card brand, 2: last four digits */
-				return sprintf( __( '%1$s ending %2$s', 'beltoft-services' ), function_exists( 'wc_get_credit_card_type_label' ) ? wc_get_credit_card_type_label( $type ) : ucfirst( $type ), $token->get_last4() );
+				return array(
+					'text'    => sprintf( __( '%1$s ending %2$s', 'beltoft-services' ), function_exists( 'wc_get_credit_card_type_label' ) ? wc_get_credit_card_type_label( $type ) : ucfirst( $type ), $token->get_last4() ),
+					'is_card' => true,
+				);
 			}
 		}
 
-		return $title;
+		return array(
+			'text'    => $title,
+			'is_card' => false,
+		);
 	}
 
 	/**
@@ -811,13 +834,21 @@ final class Overview {
 		if ( $ids && class_exists( \BeltoftLicenses\Install::class ) ) {
 			$table = \BeltoftLicenses\Install::tables()['events'];
 			$in    = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
-			$like  = implode( ' OR ', array_fill( 0, count( self::MESSAGE_PREFIXES ), 'message LIKE %s' ) );
-			$likes = array_map(
-				static function ( string $prefix ) use ( $wpdb ): string {
-					return $wpdb->esc_like( $prefix ) . '%';
-				},
-				self::MESSAGE_PREFIXES
-			);
+			$conds = array();
+			$likes = array();
+
+			foreach ( self::MESSAGE_PATTERNS as $pattern ) {
+				if ( false === strpos( $pattern, '*' ) ) {
+					$conds[] = 'message = %s';
+					$likes[] = $pattern;
+					continue;
+				}
+
+				$conds[] = 'message LIKE %s';
+				$likes[] = implode( '%', array_map( array( $wpdb, 'esc_like' ), explode( '*', $pattern ) ) );
+			}
+
+			$like = implode( ' OR ', $conds );
 
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, one query per page; the placeholders are generated.
 			$rows = $wpdb->get_results(
@@ -837,12 +868,8 @@ final class Overview {
 				$sub        = $subscription_of[ $license_id ] ?? 0;
 
 				if ( 'Service paused' === $row['message'] && $sub > 0 && isset( $subscriptions[ $sub ] ) && $subscriptions[ $sub ] instanceof \WC_Subscription ) {
-					$held = $subscriptions[ $sub ]->has_status( 'on-hold' );
-
-					if ( $held ) {
-						$bad    = self::last_failed_renewal( $subscriptions[ $sub ] );
-						$failed = $bad > 0 && $at >= $bad;
-					}
+					$held   = $subscriptions[ $sub ]->has_status( 'on-hold' );
+					$failed = $held && self::newest_renewal_failed( $subscriptions[ $sub ] );
 				}
 
 				$text = self::describe( (string) $row['message'], (string) ( $names[ $license_id ] ?? '' ), $held, $failed );
@@ -890,20 +917,20 @@ final class Overview {
 	}
 
 	/**
-	 * When the subscription's newest failed renewal order was created (Unix time), 0 when it has none.
+	 * Whether the subscription's newest renewal order is a failed one. Asked once per subscription, by loading
+	 * only that one order.
 	 *
 	 * @param \WC_Subscription $subscription Subscription.
 	 */
-	private static function last_failed_renewal( \WC_Subscription $subscription ): int {
-		$latest = 0;
+	private static function newest_renewal_failed( \WC_Subscription $subscription ): bool {
+		$id = $subscription->get_id();
 
-		foreach ( $subscription->get_related_orders( 'all', 'renewal' ) as $order ) {
-			if ( $order instanceof \WC_Order && $order->has_status( 'failed' ) && $order->get_date_created() ) {
-				$latest = max( $latest, (int) $order->get_date_created()->getTimestamp() );
-			}
+		if ( ! isset( self::$newest_failed[ $id ] ) ) {
+			$newest                     = $subscription->get_last_order( 'all', 'renewal' );
+			self::$newest_failed[ $id ] = $newest instanceof \WC_Order && $newest->has_status( 'failed' );
 		}
 
-		return $latest;
+		return self::$newest_failed[ $id ];
 	}
 
 	/**
