@@ -248,6 +248,39 @@ final class ThankYouTest extends TestCase {
 		$this->assertStringContainsString( 'Disk setup guide', $html );
 	}
 
+	public function test_the_dashboard_button_opens_the_new_servers_page_even_while_it_builds(): void {
+		$order = $this->order();
+		$vm    = $this->service( $order, 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'ip' ) ) );
+		$url   = \BeltoftServices\Account\Servers::url( $vm->license() );
+
+		$html = $this->page( $order->get_id() );
+
+		$this->assertStringContainsString( 'Go to your dashboard', $html );
+		$this->assertStringContainsString( 'class="beltoft-next__dashboard"><a href="' . esc_url( $url ) . '"', $html );
+		$this->assertSame( 1, substr_count( $html, 'Go to your dashboard' ) );
+	}
+
+	public function test_the_dashboard_button_picks_the_server_among_several_services(): void {
+		$order  = $this->order();
+		$this->service( $order, 'proxmox-disk', array( 'state' => 'ready' ) );
+		$server = $this->service( $order, 'proxmox', array( 'state' => 'ready' ) );
+
+		$html = $this->page( $order->get_id() );
+
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Servers::url( $server->license() ) ) . '"', $html );
+	}
+
+	public function test_the_dashboard_button_follows_a_domain_to_its_card(): void {
+		$order  = $this->order();
+		$domain = $this->service( $order, 'openprovider', array( 'state' => 'ready' ) );
+
+		$html = $this->page( $order->get_id() );
+
+		$this->assertStringContainsString( 'Go to your dashboard', $html );
+		$this->assertStringContainsString( 'beltoft-next__dashboard', $html );
+		$this->assertNotNull( $domain );
+	}
+
 	public function test_an_order_without_a_service_prints_nothing(): void {
 		$this->assertStringNotContainsString( 'beltoft-next', $this->page( $this->order()->get_id() ) );
 		$this->assertStringNotContainsString( 'beltoft-next', $this->page( 0 ) );

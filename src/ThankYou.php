@@ -14,6 +14,7 @@ use BeltoftServices\Proxmox\DiskGuide;
 use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\SnapshotMeta;
+use BeltoftServices\Proxmox\SshKeyField;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -213,6 +214,24 @@ final class ThankYou {
 	}
 
 	/**
+	 * Where "Go to your dashboard" leads: the page of the new server, else the first service's card.
+	 *
+	 * @param Resource[]                       $resources The order's services.
+	 * @param array<int, array<string, mixed>> $rows      Their rows.
+	 */
+	private static function dashboard_url( array $resources, array $rows ): string {
+		foreach ( $resources as $resource ) {
+			$license = $resource->license();
+
+			if ( $license && SshKeyField::DRIVER === (string) $resource->get( 'driver' ) ) {
+				return Account\Servers::url( $license );
+			}
+		}
+
+		return $rows ? (string) $rows[0]['url'] : '';
+	}
+
+	/**
 	 * The order of the order received page, or null.
 	 */
 	private static function current_order(): ?\WC_Order {
@@ -264,7 +283,8 @@ final class ThankYou {
 			return;
 		}
 
-		$rows = array_map( array( __CLASS__, 'row' ), self::resources( $order ) );
+		$resources = self::resources( $order );
+		$rows      = array_map( array( __CLASS__, 'row' ), $resources );
 
 		// The DNS and transfer blocks print inside this area, in the same style.
 		ob_start();
@@ -285,6 +305,7 @@ final class ThankYou {
 				'rows'          => $rows,
 				'domain_blocks' => $domain_blocks,
 				'poll_url'      => $url,
+				'dashboard_url' => self::dashboard_url( $resources, $rows ),
 			),
 			'beltoft-services/',
 			BELTOFT_SERVICES_PATH . 'templates/'

@@ -7,6 +7,7 @@
  * @var array<int, array<string, mixed>> $rows          The order's services (BeltoftServices\ThankYou::row()).
  * @var string                           $domain_blocks The DNS hosting and transfer blocks, already printed HTML.
  * @var string                           $poll_url      The order progress route with the order key.
+ * @var string                           $dashboard_url Where "Go to your dashboard" leads, '' for no button.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -48,6 +49,9 @@ defined( 'ABSPATH' ) || exit;
 					</li>
 				<?php endforeach; ?>
 			</ul>
+			<?php if ( ! empty( $dashboard_url ) ) : ?>
+				<p class="beltoft-next__dashboard"><a href="<?php echo esc_url( $dashboard_url ); ?>"><?php esc_html_e( 'Go to your dashboard', 'beltoft-services' ); ?></a></p>
+			<?php endif; ?>
 		</div>
 	<?php endif; ?>
 	<?php echo $domain_blocks; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- printed by the plugin's own, escaped templates. ?>
