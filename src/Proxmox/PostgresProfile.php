@@ -21,7 +21,7 @@ final class PostgresProfile {
 	 * obtain that address from PrivateNets::address() for the owning resource.
 	 *
 	 * @param array<string,mixed> $net PrivateNets row.
-	 * @return array<string,int|string>|\WP_Error
+	 * @return array{config:array<string,int|string>,requirements:array{disk_gb:int}}|\WP_Error
 	 */
 	public static function vm( array $net, string $address, string $bridge, int $cores, int $memory_mb, int $disk_gb ) {
 		$nic = PrivateNic::params( $net, $address, $bridge );
@@ -33,11 +33,10 @@ final class PostgresProfile {
 			return new \WP_Error( 'invalid_database_plan', 'The PostgreSQL VM size is outside the supported range.' );
 		}
 
-		return array_merge( $nic, array(
-			'cores'     => $cores,
-			'memory'    => $memory_mb,
-			'disk_gb'   => $disk_gb,
-		) );
+		return array(
+			'config' => array_merge( $nic, array( 'cores' => $cores, 'memory' => $memory_mb ) ),
+			'requirements' => array( 'disk_gb' => $disk_gb ),
+		);
 	}
 
 	/**

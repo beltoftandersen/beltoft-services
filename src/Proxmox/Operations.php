@@ -365,6 +365,13 @@ final class Operations {
 	 * @param string $why Reason (admin text).
 	 */
 	private function cleanup( string $why ): StepResult {
+		try {
+			if ( ! PrivateNets::release_and_retire( $this->r->id() ) ) {
+				return StepResult::retry( 0, 'delete: the private address could not be released' );
+			}
+		} catch ( \RuntimeException $e ) {
+			return StepResult::retry( 0, 'delete: the private network pool is busy' );
+		}
 		IpPool::release( $this->r->id() );
 		VmRecords::remove( $this->r->id() );
 		Access::purge( $this->r );

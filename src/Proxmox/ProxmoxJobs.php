@@ -114,6 +114,7 @@ final class ProxmoxJobs {
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
 		// After the sweep itself (priority 10): one password purge a day.
 		add_action( Jobs::SWEEP, array( __CLASS__, 'purge_passwords' ), 20 );
+		add_action( Jobs::SWEEP, array( PrivateNets::class, 'reclaim' ), 21 );
 	}
 
 	/**

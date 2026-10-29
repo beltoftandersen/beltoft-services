@@ -17,6 +17,7 @@ use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\Switches;
@@ -493,6 +494,18 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( $free + 1, IpPool::free_count() );
 		$this->assertNull( Access::take_reveal( Resource::find( $r->id() ), $owner ), 'No unread password survives the VM.' );
 		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ) );
+	}
+
+	public function test_delete_releases_private_address_and_quarantines_empty_network(): void {
+		$r = $this->built();
+		$owner = (int) $r->license()['user_id'];
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$this->assertNotNull( PrivateNets::hold( $owner ) );
+		$this->assertSame( '10.64.0.2', PrivateNets::address( $owner, $r->id() ) );
+
+		$this->assert_done( $this->op( 'delete', $r ) );
+		$this->assertNull( PrivateNets::address_for_resource( $r->id() ) );
+		$this->assertSame( 'quarantine', PrivateNets::for_user( $owner )['state'] );
 	}
 
 	public function test_delete_refuses_a_vm_that_is_not_ours(): void {

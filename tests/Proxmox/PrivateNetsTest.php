@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\PostgresProfile;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\Schema;
@@ -75,13 +76,16 @@ class PrivateNetsTest extends TestCase {
 	public function test_postgres_profile_has_only_a_private_interface(): void {
 		$net = array( 'cidr' => '10.64.0.0/28', 'vlan' => 1000 );
 		$vm  = PostgresProfile::vm( $net, '10.64.0.2', 'vmbr1', 2, 4096, 60 );
-		$this->assertSame( 'virtio,bridge=vmbr1,tag=1000,firewall=1', $vm['net1'] );
-		$this->assertSame( 'ip=10.64.0.2/28', $vm['ipconfig1'] );
-		$this->assertArrayNotHasKey( 'net0', $vm );
-		$this->assertArrayNotHasKey( 'gateway', $vm );
+		$this->assertSame( 'virtio,bridge=vmbr1,tag=1000,firewall=1', $vm['config']['net1'] );
+		$this->assertSame( 'ip=10.64.0.2/28', $vm['config']['ipconfig1'] );
+		$this->assertSame( 60, $vm['requirements']['disk_gb'] );
+		$this->assertArrayNotHasKey( 'disk_gb', $vm['config'] );
+		$this->assertArrayNotHasKey( 'net0', $vm['config'] );
+		$this->assertArrayNotHasKey( 'gateway', $vm['config'] );
 		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.1', 'vmbr1', 2, 4096, 60 ) ) );
 		$this->assertTrue( is_wp_error( PostgresProfile::vm( array( 'cidr' => '198.51.100.0/28', 'vlan' => 1000 ), '198.51.100.2', 'vmbr1', 2, 4096, 60 ) ) );
 		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.2', 'vmbr1', 2, 512, 60 ) ) );
+		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.2', 'abcdefghijklmnop', 2, 4096, 60 ) ), 'Linux bridge names cannot exceed 15 characters.' );
 		$this->assertSame( 'postgresql://app:PASSWORD@10.64.0.2:5432/appdb?sslmode=require', PostgresProfile::connection( '10.64.0.2', 'appdb', 'app' ) );
 		$this->assertNull( PostgresProfile::connection( '10.64.0.2', 'bad name', 'app' ) );
 	}
@@ -97,5 +101,57 @@ class PrivateNetsTest extends TestCase {
 		$this->assertSame( 1, PrivateNets::reclaim() );
 		$this->assertNull( PrivateNets::for_user( 11 ) );
 		$this->assertSame( 1000, PrivateNets::hold( 12 )['vlan'] );
+	}
+
+	public function test_releasing_the_last_address_quarantines_and_the_sweep_reclaims(): void {
+		global $wpdb;
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$one = $this->resource( 11 );
+		$two = $this->resource( 11 );
+		$this->assertNotNull( PrivateNets::reserve( 11, $one->id() ) );
+		$this->assertNotNull( PrivateNets::reserve( 11, $two->id() ) );
+		$this->assertTrue( PrivateNets::release_and_retire( $one->id() ) );
+		$this->assertSame( 'held', PrivateNets::for_user( 11 )['state'] );
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ) );
+		$this->assertSame( 'quarantine', PrivateNets::for_user( 11 )['state'] );
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ), 'Cleanup is idempotent.' );
+		$this->assertNotFalse( has_action( Jobs::SWEEP, array( PrivateNets::class, 'reclaim' ) ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test clock fixture.
+		$wpdb->update( Schema::tables()['private_nets'], array( 'updated_at' => gmdate( 'Y-m-d H:i:s', time() - 31 * DAY_IN_SECONDS ) ), array( 'user_id' => 11 ) );
+		$this->assertSame( 1, PrivateNets::reclaim() );
+		$this->assertNull( PrivateNets::for_user( 11 ) );
+	}
+
+	public function test_reserve_takes_one_pool_lock_and_seed_does_not_scan_all_networks(): void {
+		$queries = array();
+		$track = static function ( $sql ) use ( &$queries ) {
+			$queries[] = $sql;
+			return $sql;
+		};
+		add_filter( 'query', $track );
+		try {
+			$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+			$one = $this->resource( 11 );
+			$this->assertSame( '10.64.0.2', PrivateNets::reserve( 11, $one->id() )['address'] );
+		} finally {
+			remove_filter( 'query', $track );
+		}
+		$locks = array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'GET_LOCK(' ) && str_contains( $sql, '_privnet_0' ) );
+		$full_scans = array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'SELECT vlan, cidr FROM' ) );
+		$this->assertCount( 2, $locks, 'Seed and one atomic reservation each take the pool lock once.' );
+		$this->assertCount( 0, $full_scans );
+	}
+
+	public function test_seed_uses_unique_keys_without_a_full_pool_read(): void {
+		$queries = array();
+		$track = static function ( $sql ) use ( &$queries ) { $queries[] = $sql; return $sql; };
+		add_filter( 'query', $track );
+		try {
+			$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+			$this->assertFalse( PrivateNets::add( 1001, '10.64.0.0/28' ) );
+		} finally {
+			remove_filter( 'query', $track );
+		}
+		$this->assertCount( 0, array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'SELECT vlan, cidr FROM' ) ) );
 	}
 }

@@ -21,6 +21,7 @@ defined( 'ABSPATH' ) || exit;
 final class Clusters {
 
 	public const OPTION = 'beltoft_services_proxmox_clusters';
+	public const BRIDGE_PATTERN = '/^[A-Za-z][A-Za-z0-9_.-]{0,14}$/';
 
 	private const POOL_APIS = array( 'pools', 'pools_id' );
 
@@ -354,15 +355,18 @@ final class Clusters {
 
 		$bridge = trim( (string) ( $input['bridge'] ?? '' ) );
 
-		if ( ! preg_match( '/^[A-Za-z][A-Za-z0-9_.-]{0,14}$/', $bridge ) ) {
+		if ( ! preg_match( self::BRIDGE_PATTERN, $bridge ) ) {
 			return self::error( 'bridge', __( 'The bridge is a network device name such as vmbr1.', 'beltoft-services' ) );
 		}
 
 		$clean['bridge'] = $bridge;
 
 		$private_bridge = trim( (string) ( $input['private_bridge'] ?? '' ) );
-		if ( '' !== $private_bridge && ! preg_match( '/^[A-Za-z][A-Za-z0-9_.-]{0,14}$/', $private_bridge ) ) {
+		if ( '' !== $private_bridge && ! preg_match( self::BRIDGE_PATTERN, $private_bridge ) ) {
 			return self::error( 'private_bridge', __( 'The private bridge is a network device name such as vmbr1.', 'beltoft-services' ) );
+		}
+		if ( '' !== $private_bridge && $private_bridge === $bridge ) {
+			return self::error( 'private_bridge', __( 'The private bridge must differ from the public bridge.', 'beltoft-services' ) );
 		}
 		$clean['private_bridge'] = $private_bridge;
 
@@ -373,6 +377,9 @@ final class Clusters {
 		}
 
 		$clean['vlan'] = '' === $vlan ? 0 : (int) $vlan;
+		if ( $clean['vlan'] > 0 && PrivateNets::uses_vlan( $clean['vlan'] ) ) {
+			return self::error( 'vlan', __( 'The public VLAN is reserved for a private network.', 'beltoft-services' ) );
+		}
 
 		$pool = trim( (string) ( $input['pool'] ?? '' ) );
 
