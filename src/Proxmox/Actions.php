@@ -130,7 +130,7 @@ final class Actions {
 	public static function offered( Resource $r ): array {
 		$status = Operations::cached_status( $r->id() );
 		$power  = null === $status ? '' : (string) $status['power'];
-		$out    = array( ServerName::ACTION => __( 'Rename', 'beltoft-services' ) );
+		$out    = array();
 
 		if ( 'running' !== $power ) {
 			$out['start'] = __( 'Start', 'beltoft-services' );
@@ -145,11 +145,12 @@ final class Actions {
 			$out['reset_password'] = __( 'Reset password', 'beltoft-services' );
 		}
 
-		// An adopted machine keeps what it has: no key swap, no wipe.
+		// An adopted machine keeps what it has: no rename, no key swap, no wipe.
 		if ( true === $r->get( 'linked' ) ) {
 			return $out;
 		}
 
+		$out[ ServerName::ACTION ] = __( 'Rename', 'beltoft-services' );
 		$out = array_merge( $out, Snapshots::offered( $r ) );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
@@ -516,7 +517,7 @@ final class Actions {
 
 			$this->mark_sent( null );
 			Operations::remember_power( $this->r->id(), 'running' );
-			$this->r->set( array( 'stopped_by_customer' => null, ServerName::PENDING => null ) );
+			$this->r->set( array( 'stopped_by_customer' => null, ServerName::PENDING => null, ServerName::PENDING_AT => null ) );
 
 			return StepResult::done( array(), 'Customer started the server' );
 		}
@@ -539,7 +540,7 @@ final class Actions {
 
 		$this->mark_sent( null );
 		Operations::remember_power( $this->r->id(), 'running' );
-		$this->r->set( array( 'stopped_by_customer' => null, ServerName::PENDING => null ) );
+		$this->r->set( array( 'stopped_by_customer' => null, ServerName::PENDING => null, ServerName::PENDING_AT => null ) );
 
 		return StepResult::done( array(), 'Customer started the server' );
 	}
@@ -605,7 +606,7 @@ final class Actions {
 			return StepResult::done( array(), 'Reboot did not finish: the system did not restart in time' );
 		}
 
-		$this->r->set( array( ServerName::PENDING => null ) );
+		$this->r->set( array( ServerName::PENDING => null, ServerName::PENDING_AT => null ) );
 
 		return StepResult::done( array(), 'Customer restarted the server' );
 	}
@@ -626,31 +627,57 @@ final class Actions {
 			return StepResult::done( array(), 'Rename refused: the name is not valid' );
 		}
 
+		// Another operation holds the VM or the server: wait for it, no error, no counted attempt.
+		$busy = $this->rename_busy( $v );
+
+		if ( null !== $busy ) {
+			return $busy;
+		}
+
 		if ( ServerName::of( $this->r ) === $clean && ( $v['config']['name'] ?? '' ) === $clean ) {
 			return StepResult::done( array(), 'Customer renamed the server (already named so)' );
 		}
 
-		if ( ! $this->r->set( array( ServerName::META => $clean ) ) ) {
-			return StepResult::retry( 0, 'rename: the name could not be stored' );
+		// The remote name first: the stored name changes only once Proxmox has taken it, so a refused or failed
+		// write never leaves the card and a later reinstall with a name the VM does not have.
+		$failed = $this->put_name( self::base( $record, $v ), $clean, (array) $v['config'] );
+
+		if ( null !== $failed ) {
+			return $failed;
 		}
 
-		$params = array( 'name' => $clean );
-
-		if ( isset( $v['config']['digest'] ) && is_string( $v['config']['digest'] ) ) {
-			$params['digest'] = $v['config']['digest'];
-		}
-
-		$answer = $this->client->request( 'PUT', self::base( $record, $v ) . '/config', $params );
-
-		if ( is_wp_error( $answer ) ) {
-			return $this->classify( $answer, 'rename' );
-		}
-
-		if ( ! $this->r->set( array( ServerName::PENDING => $clean ) ) ) {
+		if ( ! $this->r->set( array( ServerName::META => $clean ) + ServerName::pending_meta( $clean ) ) ) {
 			return StepResult::retry( 0, 'rename: the result could not be stored' );
 		}
 
 		return StepResult::done( array(), 'Customer renamed the server; the hostname changes at the next boot' );
+	}
+
+	/**
+	 * Is the VM or the server busy with something that a name change must not cross? A lock on the VM (a backup,
+	 * a snapshot, a migration), a restore, a reinstall, a snapshot operation or rollback in progress.
+	 *
+	 * @param array<string, mixed> $v Verified VM.
+	 * @return StepResult|null A free wait, or null when nothing is going on.
+	 */
+	private function rename_busy( array $v ): ?StepResult {
+		if ( '' !== (string) ( $v['lock'] ?? '' ) ) {
+			return $this->waiting( 'rename: the server is locked (' . sanitize_key( (string) $v['lock'] ) . ')', 120 );
+		}
+
+		$running = ( new Backups( $this->r ) )->collect_running();
+
+		if ( null !== $running ) {
+			return $this->waiting( 'rename: ' . $running->error(), 120 );
+		}
+
+		foreach ( array( 'restore', 'wipe', Snapshots::OP, Snapshots::ROLLBACK ) as $key ) {
+			if ( $this->r->get( $key ) ) {
+				return $this->waiting( 'rename: another operation is in progress', 120 );
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -804,7 +831,7 @@ final class Actions {
 			Access::META_RESET  => null,
 			Access::META_PREV   => null,
 			'last_reinstall_at' => time(),
-			ServerName::PENDING => null,
+			ServerName::PENDING => null, ServerName::PENDING_AT => null,
 		);
 
 		if ( isset( $args['os'] ) && '' !== $args['os'] ) {

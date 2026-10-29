@@ -394,6 +394,8 @@ final class ProxmoxJobs {
 					continue;
 				}
 
+				$before = Operations::cached_status( (int) $ours[ $vmid ] );
+
 				set_transient(
 					Operations::STATUS_PREFIX . $ours[ $vmid ],
 					array(
@@ -405,6 +407,7 @@ final class ProxmoxJobs {
 				);
 				$resource = Resource::find( (int) $ours[ $vmid ] );
 				if ( $resource ) { Monitor::power( $resource, $power ); }
+				if ( $resource ) { self::hostname_applied( $resource, $vm, $power, $before ); }
 
 				if ( 'running' === $power ) {
 					if ( $resource ) {
@@ -420,6 +423,32 @@ final class ProxmoxJobs {
 			}
 
 			set_transient( self::RUNNING_PREFIX . $id, $running, 2 * HOUR_IN_SECONDS );
+		}
+	}
+
+	/**
+	 * A server renamed while it ran shows the old hostname until its next boot. A boot after the rename ends the
+	 * notice: the row's uptime says when it booted (now minus uptime, later than the rename); a row without an
+	 * uptime is judged by the first stopped to running change seen after the rename.
+	 *
+	 * @param Resource                  $r      Server resource.
+	 * @param array<string, mixed>      $vm     Cluster row.
+	 * @param string                    $power  Power now.
+	 * @param array<string, mixed>|null $before The cached row of the run before.
+	 */
+	private static function hostname_applied( Resource $r, array $vm, string $power, ?array $before ): void {
+		$at = (int) $r->get( ServerName::PENDING_AT );
+
+		if ( 'running' !== $power || null === $r->get( ServerName::PENDING ) ) {
+			return;
+		}
+
+		$booted = isset( $vm['uptime'] ) && (int) $vm['uptime'] > 0
+			? time() - (int) $vm['uptime'] > $at
+			: ( null !== $before && 'stopped' === $before['power'] );
+
+		if ( $booted ) {
+			$r->set( array( ServerName::PENDING => null, ServerName::PENDING_AT => null ) );
 		}
 	}
 

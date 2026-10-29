@@ -326,7 +326,7 @@ class ServerNameTest extends BackupTestCase {
 		$seen   = count( $this->fake->calls() );
 
 		$this->assertNotNull( Actions::check( $linked, 'rename', array( 'name' => 'web-02' ) ) );
-		$this->assertSame( 422, $this->route( $r->id(), $this->user_of( $r ), 'rename', array( 'name' => 'web-02' ) )->get_status() );
+		$this->assertSame( 403, $this->route( $r->id(), $this->user_of( $r ), 'rename', array( 'name' => 'web-02' ) )->get_status(), 'Not offered for a linked VM.' );
 		Jobs::act( $r->id(), 'rename', array( 'name' => 'web-02' ) );
 
 		$this->assertCount( $seen, $this->fake->calls(), 'No Proxmox call.' );

@@ -58,6 +58,11 @@ final class ServerName {
 	public const PENDING = 'server_name_pending';
 
 	/**
+	 * Resource meta key: when the rename was written (a boot after it ends the notice).
+	 */
+	public const PENDING_AT = 'server_name_pending_at';
+
+	/**
 	 * The customer action.
 	 */
 	public const ACTION = 'rename';
@@ -77,6 +82,19 @@ final class ServerName {
 		add_action( 'woocommerce_init', array( __CLASS__, 'register_block_field' ) );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
 		add_filter( 'beltoft_licenses_account_title', array( __CLASS__, 'title' ), 10, 2 );
+	}
+
+	/**
+	 * The meta that says the VM has the name but the guest may not.
+	 *
+	 * @param string $name Name.
+	 * @return array<string, mixed>
+	 */
+	public static function pending_meta( string $name ): array {
+		return array(
+			self::PENDING    => $name,
+			self::PENDING_AT => time(),
+		);
 	}
 
 	// -- Validation ---------------------------------------------------------------------------
@@ -337,8 +355,19 @@ final class ServerName {
 			}
 		}
 
+		// The block checkout's field belongs to the order, not to a line: it names a server only when the order has exactly one.
+		$servers = 0;
+
+		foreach ( $order->get_items() as $item ) {
+			if ( $item instanceof \WC_Order_Item_Product && \BeltoftServices\Product::driver_for( (int) $item->get_product_id() ) instanceof Driver && SshKeyField::DRIVER === \BeltoftServices\Product::driver_for( (int) $item->get_product_id() )->id() ) {
+				++$servers;
+			}
+		}
+
 		$prefix       = class_exists( \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::class ) ? \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::get_group_key( 'other' ) : '_wc_other/';
-		$candidates[] = $order->get_meta( $prefix . self::BLOCK_FIELD_ID, true );
+		if ( 1 === $servers ) {
+			$candidates[] = $order->get_meta( $prefix . self::BLOCK_FIELD_ID, true );
+		}
 
 		foreach ( $candidates as $candidate ) {
 			$name = self::normalise( $candidate );

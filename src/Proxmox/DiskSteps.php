@@ -132,7 +132,12 @@ final class DiskSteps {
 				}
 				$uuid = preg_replace( '/[^a-f0-9]/i', '', (string) $this->r->get( 'uuid' ) );
 				$name = 'vm-' . (int) $ctx['record']['vmid'] . '-bs' . $number . '-' . strtolower( $uuid ) . '.' . Provision::disk_format();
-				return $this->r->set( array( 'slot' => $slot, 'volname' => $name ) ) ? null : StepResult::retry( 60, 'The disk slot claim could not be stored.' );
+				if ( ! $this->r->set( array( 'slot' => $slot, 'volname' => $name ) ) ) {
+					return StepResult::retry( 60, 'The disk slot claim could not be stored.' );
+				}
+				// The customer's name for the disk ("Data disk N") is fixed here, with the slot, and never reused.
+				DiskMeta::number_disks( $ctx['server'] );
+				return null;
 			}
 			return StepResult::fail( 'No SCSI disk slot is available.' );
 		} );

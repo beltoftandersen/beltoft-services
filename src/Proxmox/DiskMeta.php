@@ -6,6 +6,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
+use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 use BeltoftServices\Alerts;
 
@@ -99,24 +100,94 @@ final class DiskMeta {
 	}
 
 	/**
-	 * What the customer calls the extra disks of a server: "Data disk 1", "Data disk 2", in slot
-	 * order (the number of the slot, scsi2 before scsi10; a disk with no slot yet comes last, by id).
-	 * The slot name itself is for the admin views. Disk id => label.
+	 * Meta of a disk: its number on the server, "Data disk N". Given once and never reused.
+	 */
+	public const NUMBER = 'disk_no';
+
+	/**
+	 * Meta of the server: the highest number ever given to one of its extra disks.
+	 */
+	public const HIGHEST = 'disk_no_max';
+
+	/**
+	 * Gives every extra disk of the server that has no number the next free one, in today's order (the number of
+	 * the slot, then the id), under the server's disk lock. A removed disk's number is not given again: the
+	 * server keeps the highest number ever used. A disk that gets its slot is numbered by the same call.
+	 *
+	 * @param Resource $server Server resource.
+	 * @return bool Whether every disk has a number now (false: the lock was busy).
+	 */
+	public static function number_disks( Resource $server ): bool {
+		$slot  = static fn( Resource $d ): int => 1 === preg_match( '/(\d+)$/', (string) $d->get( 'slot' ), $m ) ? (int) $m[1] : PHP_INT_MAX;
+		$count = 0;
+
+		foreach ( self::for_server( $server ) as $disk ) {
+			$count += $disk->get( self::NUMBER ) ? 0 : 1;
+		}
+
+		if ( 0 === $count ) {
+			return true;
+		}
+
+		list( $locked ) = Locks::with(
+			Locks::name( 'server_disks', $server->id() ),
+			Locks::allocation_wait(),
+			static function () use ( $server, $slot ): void {
+				$fresh   = Resource::find( $server->id() );
+				$disks   = self::for_server( $server );
+				$highest = (int) ( $fresh ? $fresh->get( self::HIGHEST ) : 0 );
+				$missing = array();
+
+				foreach ( $disks as $disk ) {
+					if ( $disk->get( self::NUMBER ) ) {
+						$highest = max( $highest, (int) $disk->get( self::NUMBER ) );
+					} else {
+						$missing[] = $disk;
+					}
+				}
+
+				usort( $missing, static fn( Resource $a, Resource $b ): int => array( $slot( $a ), $a->id() ) <=> array( $slot( $b ), $b->id() ) );
+
+				foreach ( $missing as $disk ) {
+					++$highest;
+					$disk->set( array( self::NUMBER => $highest ) );
+				}
+
+				if ( $fresh && $missing ) {
+					$fresh->set( array( self::HIGHEST => $highest ) );
+				}
+			}
+		);
+
+		return $locked;
+	}
+
+	/**
+	 * What the customer calls the extra disks of a server: "Data disk N" from the disk's own number, in number
+	 * order. The slot name itself is for the admin views. Disk id => label.
 	 *
 	 * @param Resource $server Server resource.
 	 * @return array<int, string>
 	 */
 	public static function labels( Resource $server ): array {
-		$disks = self::for_server( $server );
-		$slot  = static fn( Resource $d ): int => 1 === preg_match( '/(\d+)$/', (string) $d->get( 'slot' ), $m ) ? (int) $m[1] : PHP_INT_MAX;
+		self::number_disks( $server );
 
-		usort( $disks, static fn( Resource $a, Resource $b ): int => array( $slot( $a ), $a->id() ) <=> array( $slot( $b ), $b->id() ) );
+		$disks = array();
 
-		$out = array();
+		foreach ( self::for_server( $server ) as $disk ) {
+			$disks[] = array( (int) $disk->get( self::NUMBER ), $disk->id() );
+		}
 
-		foreach ( array_values( $disks ) as $i => $disk ) {
+		// A disk the busy lock left without a number comes after the numbered ones, not stored.
+		usort( $disks, static fn( array $a, array $b ): int => array( 0 === $a[0] ? PHP_INT_MAX : $a[0], $a[1] ) <=> array( 0 === $b[0] ? PHP_INT_MAX : $b[0], $b[1] ) );
+
+		$out  = array();
+		$next = $disks ? max( array_column( $disks, 0 ) ) : 0;
+
+		foreach ( $disks as $entry ) {
+			$number = $entry[0] > 0 ? $entry[0] : ++$next;
 			/* translators: %d: the number of the extra disk of a server, 1 for the first. */
-			$out[ $disk->id() ] = sprintf( __( 'Data disk %d', 'beltoft-services' ), $i + 1 );
+			$out[ $entry[1] ] = sprintf( __( 'Data disk %d', 'beltoft-services' ), $number );
 		}
 
 		return $out;

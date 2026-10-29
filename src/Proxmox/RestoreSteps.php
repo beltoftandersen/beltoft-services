@@ -130,6 +130,13 @@ trait RestoreSteps {
 			}
 		}
 
+		// The backup or snapshot carries the VM name it had then: the server's own name is written back, in one call.
+		$named = $this->reapply_name( $record );
+
+		if ( null !== $named ) {
+			return $named;
+		}
+
 		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => $was_running ? true : null ) + ( 'rollback' === $what ? array( 'snapshot_rolled_at' => time() ) : array() ) ) ) {
 			return StepResult::retry( 0, $what . ': progress could not be stored' );
 		}
@@ -141,6 +148,33 @@ trait RestoreSteps {
 		}
 
 		Jobs::enqueue( $this->r->id() );
+
+		return null;
+	}
+
+	/**
+	 * After a restore or rollback: the VM gets the name the customer chose (or vm-<uuid>) again, when the archive
+	 * or snapshot restored another one. The config is read again (the extra disks changed its digest). Idempotent.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 */
+	private function reapply_name( array $record ): ?StepResult {
+		$v = $this->verified( $record, 'name' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		$failed = $this->put_name( self::base( $record, $v ), Provision::vm_name( $this->r ), (array) $v['config'] );
+
+		if ( null !== $failed ) {
+			return $failed;
+		}
+
+		// The server is rebuilt from the archive and starts fresh: no hostname change is waiting for a reboot.
+		if ( null !== $this->r->get( ServerName::PENDING ) && ! $this->r->set( array( ServerName::PENDING => null, ServerName::PENDING_AT => null ) ) ) {
+			return StepResult::retry( 0, 'name: the notice could not be cleared' );
+		}
 
 		return null;
 	}

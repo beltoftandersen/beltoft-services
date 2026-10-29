@@ -173,6 +173,17 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * Makes the config read leave out its digest (a test of a writer that must not send without one).
+	 *
+	 * @param bool $omit Whether to leave it out.
+	 */
+	public function omit_digest( bool $omit ): void {
+		$this->load();
+		$this->state['no_digest'] = $omit;
+		$this->save();
+	}
+
+	/**
 	 * A running VM without disk hotplug: a detach (delete=scsiN) becomes a pending change and the
 	 * drive stays in the running configuration (modelled).
 	 *
@@ -778,7 +789,7 @@ class FakeClient implements Client {
 				'mem'      => 'running' === $vm['status'] ? (int) ( $vm['config']['memory'] ?? 512 ) * 524288 : 0,
 				'maxcpu'   => (int) ( $vm['config']['cores'] ?? 1 ),
 				'cpu'      => (float) ( $vm['cpu'] ?? 0 ),
-			);
+			) + ( isset( $vm['uptime'] ) ? array( 'uptime' => (int) $vm['uptime'] ) : array() );
 		}
 
 		return $out;
@@ -839,7 +850,7 @@ class FakeClient implements Client {
 			}
 		}
 
-		return array_merge( $config, array( 'digest' => $this->digest( $vm ) ) );
+		return ! empty( $this->state['no_digest'] ) ? $config : array_merge( $config, array( 'digest' => $this->digest( $vm ) ) );
 	}
 
 	/**
@@ -1094,7 +1105,7 @@ class FakeClient implements Client {
 					'template'         => 0,
 					'pool'             => $p['pool'] ?? '',
 					'lock'             => '',
-					'config'           => $config,
+					'config'           => array_merge( $config, array( 'name' => $p['name'] ?? 'Copy-of-VM-' . $source['name'] ) ),
 					'firewall_rules'   => array(),
 					'firewall_options' => array(),
 				);
@@ -1698,6 +1709,11 @@ class FakeClient implements Client {
 
 				if ( $exists ) {
 					$this->state['vms'][ $id ]['config'] = $this->restored_config( $id, $this->state['vms'][ $id ]['config'], $found['config'] );
+
+					// Proxmox takes the VM name from the archive (modelled): a rename made after the backup is undone.
+					if ( isset( $this->state['vms'][ $id ]['config']['name'] ) ) {
+						$this->state['vms'][ $id ]['name'] = (string) $this->state['vms'][ $id ]['config']['name'];
+					}
 
 					if ( ! empty( $this->state['restore_drops_pool'] ) ) {
 						$pool = (string) $this->state['vms'][ $id ]['pool'];
@@ -2422,6 +2438,11 @@ class FakeClient implements Client {
 
 				$this->state['vms'][ $id ]['config'] = $config;
 				$this->state['vms'][ $id ]['status'] = 'stopped';
+
+				// The name comes back with the snapshot's configuration (modelled).
+				if ( isset( $config['name'] ) ) {
+					$this->state['vms'][ $id ]['name'] = (string) $config['name'];
+				}
 			}
 		);
 	}

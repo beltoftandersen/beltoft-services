@@ -318,6 +318,31 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertCount( 0, $this->fake->calls() );
 	}
 
+	public function test_a_boot_after_a_rename_ends_the_pending_hostname_notice_by_uptime(): void {
+		$old = $this->vm( 5000, 'node-a', 'running', 4096, array( 'uptime' => 7200 ) );
+		$old->set( \BeltoftServices\Proxmox\ServerName::pending_meta( 'web-02' ) );
+		$new = $this->vm( 5001, 'node-a', 'running', 4096, array( 'uptime' => 10 ) );
+		$new->set( array( 'server_name_pending' => 'web-03', 'server_name_pending_at' => time() - 120 ) );
+
+		ProxmoxJobs::power();
+
+		$this->assertSame( 'web-02', Resource::find( $old->id() )->get( 'server_name_pending' ), 'Up since before the rename: still the old hostname.' );
+		$this->assertNull( Resource::find( $new->id() )->get( 'server_name_pending' ), 'Booted after the rename.' );
+		$this->assertNull( Resource::find( $new->id() )->get( 'server_name_pending_at' ) );
+	}
+
+	public function test_without_an_uptime_a_stop_then_run_ends_the_pending_hostname_notice(): void {
+		$r = $this->vm( 5000, 'node-a', 'running' );
+		$r->set( \BeltoftServices\Proxmox\ServerName::pending_meta( 'web-02' ) );
+
+		ProxmoxJobs::power();
+		$this->assertSame( 'web-02', Resource::find( $r->id() )->get( 'server_name_pending' ), 'No earlier stop seen.' );
+
+		Operations::remember_power( $r->id(), 'stopped' );
+		ProxmoxJobs::power();
+		$this->assertNull( Resource::find( $r->id() )->get( 'server_name_pending' ) );
+	}
+
 	public function test_power_state_uses_one_call_per_cluster_and_tracks_unexpected_stop(): void {
 		$a = $this->vm( 5000, 'node-a', 'running', 4096, array( 'cpu' => 0.25 ) );
 		$b = $this->vm( 5001, 'node-b', 'stopped' );

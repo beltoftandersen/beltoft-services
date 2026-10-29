@@ -303,6 +303,43 @@ trait Steps {
 	}
 
 	/**
+	 * Writes the VM name (the hostname cloud-init gives the guest) in one config PUT with the digest of the config
+	 * just read. Nothing is sent when the VM already has the name, without a digest, or while the kill switch is on.
+	 *
+	 * @param string               $base   VM path.
+	 * @param string               $name   Name.
+	 * @param array<string, mixed> $config Config as read (with its digest).
+	 * @return StepResult|null Null when the VM has the name now; retry, wait or fail otherwise.
+	 */
+	protected function put_name( string $base, string $name, array $config ): ?StepResult {
+		if ( ( $config['name'] ?? '' ) === $name ) {
+			return null;
+		}
+
+		$digest = $config['digest'] ?? '';
+
+		if ( ! is_string( $digest ) || '' === $digest ) {
+			return StepResult::retry( 0, 'rename: the VM config has no digest, nothing was written' );
+		}
+
+		// The kill switch can be turned on while a run is going: nothing is written after that.
+		if ( Settings::get( 'pause_all' ) ) {
+			return StepResult::wait( Jobs::PAUSED_DELAY, 'rename: all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
+		}
+
+		$answer = $this->client->request(
+			'PUT',
+			$base . '/config',
+			array(
+				'name'   => $name,
+				'digest' => $digest,
+			)
+		);
+
+		return is_wp_error( $answer ) ? $this->classify( $answer, 'rename' ) : null;
+	}
+
+	/**
 	 * Calls a task endpoint, stores its UPID before waiting, waits the bounded time.
 	 *
 	 * @param string               $step   Step name.
