@@ -106,7 +106,22 @@ $beltoft_services_status_text = array(
 					(string) $view['domain_wanted']
 				)
 			);
-			echo ' ' . ( 'failed' === $beltoft_services_kind ? '' : esc_html__( 'The app uses the server address instead.', 'beltoft-services' ) );
+				if ( '' !== $view['domain_reason'] ) {
+					echo ' ' . esc_html( $view['domain_reason'] );
+				}
+				echo ' ' . ( 'failed' === $beltoft_services_kind ? '' : esc_html__( 'The app uses the server address instead.', 'beltoft-services' ) );
+			?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( '' !== $view['domain_wanted'] && '' === $view['domain'] && ! $view['domain_failed'] ) : ?>
+		<p class="description" data-app-domain-waiting>
+			<?php
+			echo esc_html( sprintf(
+				/* translators: %s: domain name the customer selected. */
+				__( 'We will point %s at this server when the server is ready.', 'beltoft-services' ),
+				$view['domain_wanted']
+			) );
 			?>
 		</p>
 	<?php endif; ?>

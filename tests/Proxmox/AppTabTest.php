@@ -205,7 +205,17 @@ class AppTabTest extends MonitoringTestCase {
 		$r = $this->with_app( array( 'app_state' => 'ready', 'app_step' => 'complete', 'app_domain_want' => 'shop.mine.example', 'app_domain_error' => 'The name already has a DNS record.' ) );
 		$pane = $this->pane( $this->page( $r, 'app' ) );
 		$this->assertStringContainsString( 'The domain shop.mine.example could not be pointed at this server', $pane );
+		$this->assertStringContainsString( 'The name already has a DNS record.', $pane );
 		$this->assertStringContainsString( 'href="http://192.0.2.10/wp-admin/"', $pane );
+	}
+
+	public function test_pending_domain_and_paused_dns_reason_are_shown_on_app_tab(): void {
+		$pending = $this->with_app( array( 'app_state' => 'pending', 'app_domain_want' => 'shop.mine.example', 'app_domain' => null ) );
+		$this->assertStringContainsString( 'We will point shop.mine.example at this server when the server is ready.', $this->pane( $this->page( $pending, 'app' ) ) );
+		$failed = $this->with_app( array( 'app_state' => 'ready', 'app_domain_want' => 'shop.mine.example', 'app_domain_error' => 'DNS hosting is paused for this domain.' ), 5001 );
+		$pane = $this->pane( $this->page( $failed, 'app' ) );
+		$this->assertStringContainsString( 'DNS hosting is paused for this domain.', $pane );
+		$this->assertStringNotContainsString( 'data-app-domain-waiting', $pane );
 	}
 
 	public function test_ready_without_a_login_left_has_no_button_and_coolify_uses_its_port(): void {

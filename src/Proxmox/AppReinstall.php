@@ -28,6 +28,7 @@ final class AppReinstall {
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_reinstall_fields', array( __CLASS__, 'fields' ) );
+		add_action( 'beltoft_services_reinstall_confirm', array( __CLASS__, 'confirm' ) );
 		add_filter( 'beltoft_services_reinstall_check', array( __CLASS__, 'check' ), 10, 3 );
 		add_filter( 'beltoft_services_reinstall_meta', array( __CLASS__, 'meta' ), 10, 3 );
 		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ), 25, 2 );
@@ -322,7 +323,8 @@ final class AppReinstall {
 		$current = self::current_domain( $r );
 		$default = '' === $current ? 'none' : 'keep';
 		$id = 'beltoft-app-domain-' . $r->id();
-		echo '<fieldset class="beltoft-services-app-reinstall__domain" data-app-domain data-current-domain="' . esc_attr( $current ) . '"' . ( $options['plain'] || self::NONE === $options['selected'] ? ' hidden' : '' ) . '><legend>' . esc_html__( 'Domain', 'beltoft-services' ) . '</legend>';
+		$made = '' !== (string) $r->get( 'app_domain' ) && true === $r->get( 'app_domain_made' );
+		echo '<fieldset class="beltoft-services-app-reinstall__domain" data-app-domain data-current-domain="' . esc_attr( $current ) . '"' . ( $made ? ' data-domain-made="1"' : '' ) . ( $options['plain'] || self::NONE === $options['selected'] ? ' hidden' : '' ) . '><legend>' . esc_html__( 'Domain', 'beltoft-services' ) . '</legend>';
 		if ( '' !== $current ) {
 			echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="keep" checked> ';
 			/* translators: %s: existing app domain. */
@@ -342,6 +344,20 @@ final class AppReinstall {
 		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="none"' . checked( $default, 'none', false ) . '> ' . esc_html__( 'No domain', 'beltoft-services' );
 		echo '<span class="description">' . esc_html__( 'The app uses the server address.', 'beltoft-services' ) . '</span></label>';
 		echo '</fieldset>';
+		if ( $made ) {
+			/* translators: %s: the old app domain. */
+			echo '<p class="description" data-app-domain-removal hidden>' . esc_html( sprintf( __( 'If DNS hosting is active and the record is unchanged, we remove the A record we made for %s when the reinstall starts.', 'beltoft-services' ), $current ) ) . '</p>';
+		}
+	}
+
+	/** Adds the old-record consequence to the existing reinstall confirmation dialog. */
+	public static function confirm( int $resource_id ): void {
+		$r = $resource_id > 0 ? Resource::find( $resource_id ) : null;
+		if ( ! $r || (int) ( $r->license()['user_id'] ?? 0 ) !== get_current_user_id() || true !== $r->get( 'app_domain_made' ) || '' === (string) $r->get( 'app_domain' ) ) {
+			return;
+		}
+		/* translators: %s: the old app domain. */
+		echo '<p data-app-domain-confirm hidden>' . esc_html( sprintf( __( 'If DNS hosting is active and the record is unchanged, we remove the A record we made for %s.', 'beltoft-services' ), (string) $r->get( 'app_domain' ) ) ) . '</p>';
 	}
 
 	/** A published name takes precedence over a requested name. */

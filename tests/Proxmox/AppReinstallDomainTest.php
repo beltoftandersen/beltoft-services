@@ -349,4 +349,67 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertSame( array(), (array) $fresh->get( 'app_domain_old' ) );
 		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
 	}
+
+	public function test_confirmation_mentions_removal_only_for_a_record_the_app_made(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$html = $this->html( $r );
+		$this->assertStringContainsString( 'data-domain-made="1"', $html );
+		$this->assertStringContainsString( 'data-app-domain-removal hidden', $html );
+		$this->assertStringContainsString( 'If DNS hosting is active and the record is unchanged', $html );
+		ob_start();
+		AppReinstall::confirm( $r->id() );
+		$this->assertStringContainsString( 'data-app-domain-confirm hidden', (string) ob_get_clean() );
+		$r->set( array( 'app_domain_made' => false ) );
+		$this->assertStringNotContainsString( 'data-app-domain-removal', $this->html( $r ) );
+		ob_start();
+		AppReinstall::confirm( $r->id() );
+		$this->assertSame( '', ob_get_clean() );
+	}
+
+	public function test_keep_domain_pipeline_makes_no_dns_write(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$dns = new FakeDns( true );
+		$filter = static fn() => $dns;
+		add_filter( 'beltoft_services_domains_dns', $filter, 20 );
+		$r->set( AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'keep' ) ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( 'old.mine.example', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', (int) $r->license()['user_id'] ) );
+		$this->assertSame( array(), $dns->calls() );
+		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
+	}
+
+	public function test_change_domain_pipeline_deletes_old_a_then_adds_new_a(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$dns = new FakeDns( true );
+		$filter = static fn() => $dns;
+		add_filter( 'beltoft_services_domains_dns', $filter, 20 );
+		$r->set( AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'change', 'app_zone' => 'mine.example', 'app_sub' => 'new' ) ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( 'new.mine.example', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', (int) $r->license()['user_id'] ) );
+		$this->assertSame( array( 'DELETE', 'REPLACE' ), array_column( array_map( static fn( $call ) => $call[2][0], $dns->calls() ), 'changetype' ) );
+		$this->assertSame( array( 'old.mine.example.', 'new.mine.example.' ), array_column( array_map( static fn( $call ) => $call[2][0], $dns->calls() ), 'name' ) );
+		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
+	}
+
+	public function test_no_domain_pipeline_deletes_old_a_without_adding_another(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain' => 'old.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		$dns = new FakeDns( true );
+		$filter = static fn() => $dns;
+		add_filter( 'beltoft_services_domains_dns', $filter, 20 );
+		$r->set( AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'none' ) ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( '', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', (int) $r->license()['user_id'] ) );
+		$this->assertCount( 1, $dns->calls() );
+		$this->assertSame( 'DELETE', $dns->calls()[0][2][0]['changetype'] );
+		$this->assertSame( 'A', $dns->calls()[0][2][0]['type'] );
+		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
+	}
 }

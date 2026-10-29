@@ -215,6 +215,12 @@ final class AppTab {
 		$retired   = null !== $full && null === Apps::version( $id, $vid );
 		$steps_n   = count( $order );
 		$position  = false === $at ? 0 : min( $steps_n, (int) $at + 1 );
+		$domain_error = (string) $r->get( 'app_domain_error' );
+		$domain_reason = match ( $domain_error ) {
+			'The name already has a DNS record.' => __( 'The name already has a DNS record.', 'beltoft-services' ),
+			'DNS hosting is paused for this domain.' => __( 'DNS hosting is paused for this domain.', 'beltoft-services' ),
+			default => '',
+		};
 		$left = (array) $r->get( 'app_domain_left' );
 		$left_url = '';
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
@@ -245,6 +251,7 @@ final class AppTab {
 			'domain'          => $domain,
 			'domain_wanted'   => (string) $r->get( 'app_domain_want' ),
 			'domain_failed'   => '' !== (string) $r->get( 'app_domain_error' ),
+			'domain_reason'   => $domain_reason,
 			'domain_left'     => (string) ( $left['name'] ?? '' ),
 			'domain_left_url' => $left_url,
 			'can_retry'       => AppInstall::can_retry( $r ),

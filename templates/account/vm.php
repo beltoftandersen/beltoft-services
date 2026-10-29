@@ -762,6 +762,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<?php endif; ?>
 					<p><?php echo $has_key ? esc_html__( 'You get a new password. Your SSH key stays on the server.', 'beltoft-services' ) : esc_html__( 'You get a new password.', 'beltoft-services' ); ?></p>
 					<p><?php esc_html_e( 'The IP address stays.', 'beltoft-services' ); ?></p>
+					<?php do_action( 'beltoft_services_reinstall_confirm', (int) $resource_id ); ?>
 				</div>
 				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
 			</form>
