@@ -56,6 +56,9 @@ final class Clusters {
 			'templates'         => array(),
 			'default_template'  => 0,
 			'vendor_snippet'    => '',
+			'apps_ready'        => 0,
+			'apps_enabled'      => array(),
+			'template_families' => array(),
 			'backup_storage'    => '',
 			'block_smtp'        => 1,
 		);
@@ -467,6 +470,25 @@ final class Clusters {
 		}
 
 		$clean['vendor_snippet'] = $snippet;
+
+		// The app controls are configured separately until the checkout/dashboard work is merged.
+		// Preserve them when the existing cluster form saves unrelated settings.
+		if ( array_key_exists( 'apps_ready', $input ) ) {
+			$clean['apps_ready'] = empty( $input['apps_ready'] ) ? 0 : 1;
+		}
+		if ( array_key_exists( 'apps_enabled', $input ) ) {
+			$ids = is_array( $input['apps_enabled'] ) ? $input['apps_enabled'] : array();
+			$clean['apps_enabled'] = array_values( array_filter( array_map( 'strval', $ids ), static fn( $v ) => (bool) preg_match( '/^[a-z0-9-]+$/', $v ) ) );
+		}
+		if ( array_key_exists( 'template_families', $input ) && is_array( $input['template_families'] ) ) {
+			$families = array();
+			foreach ( array_intersect_key( $input['template_families'], $templates ) as $vmid => $family ) {
+				if ( is_string( $family ) && preg_match( '/^[a-z0-9]+(?:[-.][a-z0-9]+)*$/', $family ) ) {
+					$families[ (int) $vmid ] = $family;
+				}
+			}
+			$clean['template_families'] = $families;
+		}
 
 		$backup = trim( (string) ( $input['backup_storage'] ?? '' ) );
 

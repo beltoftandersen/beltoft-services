@@ -12,6 +12,9 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Access;
+use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Proxmox\AppReveal;
+use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
@@ -310,6 +313,99 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 24, strlen( (string) $password ) );
 		$this->assertStringNotContainsString( (string) $password, (string) wp_json_encode( array( $this->fake->calls(), $this->fake->state(), $result->meta(), $result->error() ) ) );
 		$this->assertNull( Access::take_reveal( Resource::find( $resource->id() ), $owner ), 'Shown once.' );
+	}
+
+	public function test_docker_job_is_versioned_and_status_reads_back(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertContains( 'app', $fresh->get( 'steps' ) );
+		$this->assertSame( 'installing', $fresh->get( 'app_state' ) );
+		$job = json_decode( $this->fake->guest_file( 5000, Apps::JOB ), true );
+		$this->assertSame( '29', $job['version'] );
+		$this->assertSame( Apps::version( 'docker', '29' )['sha256'], $job['sha256'] );
+		$this->assertSame( $fresh->get( 'app_request' ), $job['request'] );
+		$this->assertArrayNotHasKey( 'password', $job );
+		$this->fake->simulate_app( 5000, 'wrong-request', 'ready', 'complete' );
+		AppStatus::check( $fresh, $this->fake, 'node-a', 5000 );
+		$this->assertSame( 'installing', Resource::find( $resource->id() )->get( 'app_state' ) );
+		$this->fake->simulate_app( 5000, $job['request'], 'ready', 'complete' );
+		AppStatus::check( Resource::find( $resource->id() ), $this->fake, 'node-a', 5000 );
+		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'app_state' ) );
+	}
+
+	public function test_docker_below_minimum_is_refused_before_clone(): void {
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 30 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$result = $this->run_provision( $resource );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( array(), $this->calls( 'POST', '/clone' ) );
+	}
+
+	public function test_app_credentials_are_encrypted_and_revealed_once_to_owner(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$filter = static function ( $data ) {
+			$data['credentials'] = array( 'admin_password' );
+			return $data;
+		};
+		add_filter( 'beltoft_services_apps', $filter );
+		try {
+			$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+			$this->assert_done( $this->run_provision( $resource ) );
+			$fresh = Resource::find( $resource->id() );
+			$secret = 'OnlyInGuestAndEncryptedMeta!';
+			$this->fake->simulate_app( 5000, $fresh->get( 'app_request' ), 'ready', 'complete', array( 'admin_password' => $secret ) );
+			AppStatus::check( $fresh, $this->fake, 'node-a', 5000 );
+			$fresh = Resource::find( $resource->id() );
+			$this->assertStringNotContainsString( $secret, (string) $fresh->get( 'app_reveal' ) );
+			$owner = (int) $fresh->license()['user_id'];
+			$this->assertNull( AppReveal::take( $fresh, $owner + 1000 ) );
+			$this->assertSame( array( 'admin_password' => $secret ), AppReveal::take( $fresh, $owner ) );
+			$this->assertNull( AppReveal::take( Resource::find( $resource->id() ), $owner ) );
+		} finally {
+			remove_filter( 'beltoft_services_apps', $filter );
+		}
+	}
+
+	public function test_app_job_retries_with_the_same_request_after_guest_directory_race(): void {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->fake->fail_next( 'POST', '#/agent/file-write$#', array( 'status' => 500, 'message' => 'No such directory' ) );
+		$first = $this->run_provision( $resource );
+		$this->assertTrue( $first->is_retry() );
+		$fresh = Resource::find( $resource->id() );
+		$request = $fresh->get( 'app_request' );
+		$this->assertNotEmpty( $request );
+		$this->fake->require_app_directory( 5000, false );
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->fake->require_app_directory( 5000, true );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertSame( $request, Resource::find( $resource->id() )->get( 'app_request' ) );
+		$this->assertSame( $request, json_decode( $this->fake->guest_file( 5000, Apps::JOB ), true )['request'] );
 	}
 
 	public function test_medusa_clone_failure_resumes_at_clone(): void {

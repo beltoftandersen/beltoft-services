@@ -1,0 +1,14 @@
+{
+  "id": "docker",
+  "name": "Docker",
+  "summary": "Docker Engine and Compose on Ubuntu 24.04.",
+  "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
+  "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}],
+  "minutes": 3,
+  "credentials": [],
+  "steps": ["download", "os", "packages", "docker", "firewall", "verify", "install", "complete"],
+  "docs_url": "https://docs.docker.com/engine/",
+  "versions": [
+    {"id": "29", "label": "Docker Engine 29", "upstream": "29.9.2", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.sh", "sha256": "96e0a54730adc224902bb8c50ac76667f5e40604dfaac88eae7a481300946df1", "eol": ""}
+  ]
+}

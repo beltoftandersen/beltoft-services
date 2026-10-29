@@ -82,6 +82,8 @@ final class Plugin {
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
+		Proxmox\AppReveal::register();
+		Proxmox\AppStatus::register();
 		Proxmox\MetricsRoute::register();
 		Proxmox\Switches::register();
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );

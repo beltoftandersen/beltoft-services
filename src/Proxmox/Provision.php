@@ -53,7 +53,7 @@ final class Provision {
 	/**
 	 * Order of the steps. `wipe` only runs while meta `wipe` is set.
 	 */
-	private const STEPS = array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' );
+	private const STEPS = array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'app', 'ready' );
 
 	/**
 	 * Fixed comment of the outgoing SMTP rule, how it is recognised on a retry.
@@ -123,6 +123,9 @@ final class Provision {
 		$steps = $this->r->get( 'steps' );
 
 		foreach ( self::STEPS as $name ) {
+			if ( 'app' === $name && '' === (string) $this->r->get( 'app_id' ) ) {
+				continue;
+			}
 			if ( 'wipe' === $name ? ! $this->r->get( 'wipe' ) : in_array( $name, $steps, true ) ) {
 				continue;
 			}
@@ -227,6 +230,13 @@ final class Provision {
 		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {
 			if ( $this->plan[ $key ] <= 0 ) {
 				return StepResult::fail( 'The plan value "' . $key . '" must be a positive number' );
+			}
+		}
+
+		if ( '' !== (string) $this->r->get( 'app_id' ) ) {
+			$why = Apps::check( $cluster, $this->plan, (string) $this->r->get( 'app_id' ), (string) $this->r->get( 'app_version' ) );
+			if ( null !== $why ) {
+				return StepResult::fail( 'app: ' . $why, array( 'app_state' => 'failed' ) );
 			}
 		}
 
@@ -1312,8 +1322,13 @@ final class Provision {
 		return array( 'agent' => $agent );
 	}
 
+	/** Queue a versioned install only for a newly built app server. */
+	private function step_app() {
+		return AppInstall::queue( $this->r, $this->client, $this->cluster, $this->plan );
+	}
+
 	/**
-	 * Step 6: the address is in use, and the meta says where everything is.
+	 * Final step: the address is in use, and the meta says where everything is.
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */

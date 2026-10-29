@@ -360,6 +360,24 @@ class FakeClient implements Client {
 		return $this->state['vms'][ $vmid ]['guest_files'][ $path ] ?? null;
 	}
 
+	/** Seed a guest file for file-read and malformed-status tests. */
+	public function set_guest_file( int $vmid, string $path, string $content ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['guest_files'][ $path ] = $content;
+			$this->save();
+		}
+	}
+
+	/** Model the first-boot race: require the app directory before job.json can be written. */
+	public function require_app_directory( int $vmid, bool $exists ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['app_directory'] = $exists ? 'ready' : 'missing';
+			$this->save();
+		}
+	}
+
 	/**
 	 * The whole state (secrets are never in it).
 	 *
@@ -589,6 +607,7 @@ class FakeClient implements Client {
 					'encode'  => array( 'bool' ),
 				),
 			),
+			array( 'GET', $node . '/agent/file-read$#', 'h_agent_file_read', array( 'file' => array( 'string', true ) ) ),
 			array(
 				'GET',
 				$node . '/rrddata$#',
@@ -1392,6 +1411,9 @@ class FakeClient implements Client {
 		if ( 'running' !== $vm['status'] ) {
 			return $this->error( 500, 'VM ' . $a[1] . ' is not running' );
 		}
+		if ( Apps::JOB === $p['file'] && 'missing' === ( $vm['app_directory'] ?? '' ) ) {
+			return $this->error( 500, 'No such directory' );
+		}
 
 		$content = (string) $p['content'];
 
@@ -1402,6 +1424,34 @@ class FakeClient implements Client {
 		$this->state['vms'][ (int) $a[1] ]['guest_files'][ (string) $p['file'] ] = $content;
 
 		return null;
+	}
+
+	/** Model the documented content/truncated wrapper for guest file-read. */
+	private function h_agent_file_read( array $a, array $p ) {
+		$vm = $this->find( $a );
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+		if ( 'running' !== $vm['status'] ) {
+			return $this->error( 500, 'VM ' . $a[1] . ' is not running' );
+		}
+		$file = $vm['guest_files'][ (string) $p['file'] ] ?? null;
+		if ( ! is_string( $file ) ) {
+			return $this->error( 500, 'No such file' );
+		}
+		$truncated = strlen( $file ) > 65536;
+		return array( 'content' => $truncated ? substr( $file, 0, 65536 ) : $file, 'truncated' => $truncated );
+	}
+
+	/** Simulate only the guest-produced files; no install script runs in tests. */
+	public function simulate_app( int $vmid, string $request, string $state, string $step, array $credentials = array() ): void {
+		$this->load();
+		if ( ! isset( $this->state['vms'][ $vmid ] ) ) {
+			return;
+		}
+		$this->state['vms'][ $vmid ]['guest_files'][ Apps::STATUS ] = wp_json_encode( array( 'request' => $request, 'state' => $state, 'step' => $step, 'updated' => gmdate( 'c' ) ) );
+		$this->state['vms'][ $vmid ]['guest_files'][ Apps::CREDENTIALS ] = wp_json_encode( $credentials );
+		$this->save();
 	}
 
 	/**
