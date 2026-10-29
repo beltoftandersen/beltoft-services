@@ -226,7 +226,9 @@ final class Tiles {
 		$kind = 'app' === ( $group['kind'] ?? '' ) ? 'app' : 'os';
 		$id   = (string) ( $group['id'] ?? '' );
 
-		echo '<fieldset class="beltoft-services-tiles beltoft-services-tiles--' . esc_attr( $kind ) . '" data-tiles="' . esc_attr( $kind ) . '"' . ( '' !== $id ? ' id="' . esc_attr( $id ) . '"' : '' ) . self::attributes( (array) ( $group['attrs'] ?? array() ) ) . '>';
+		echo '<fieldset class="beltoft-services-tiles beltoft-services-tiles--' . esc_attr( $kind ) . '" data-tiles="' . esc_attr( $kind ) . '"' . ( '' !== $id ? ' id="' . esc_attr( $id ) . '"' : '' );
+		self::print_attributes( (array) ( $group['attrs'] ?? array() ) );
+		echo '>';
 		echo '<legend class="beltoft-services-tiles__legend">' . esc_html( (string) ( $group['legend'] ?? '' ) ) . '</legend>';
 		echo '<div class="beltoft-services-tiles__grid">';
 
@@ -234,7 +236,11 @@ final class Tiles {
 			$disabled = ! empty( $item['disabled'] );
 
 			echo '<label class="beltoft-services-tile' . ( $disabled ? ' is-disabled' : '' ) . '">';
-			echo '<input class="beltoft-services-tile__input" type="radio" name="' . esc_attr( (string) ( $group['name'] ?? '' ) ) . '" value="' . esc_attr( (string) $item['value'] ) . '"' . checked( ! empty( $item['checked'] ), true, false ) . disabled( $disabled, true, false ) . self::attributes( (array) ( $item['attrs'] ?? array() ) ) . '>';
+			echo '<input class="beltoft-services-tile__input" type="radio" name="' . esc_attr( (string) ( $group['name'] ?? '' ) ) . '" value="' . esc_attr( (string) $item['value'] ) . '"';
+			checked( ! empty( $item['checked'] ), true );
+			disabled( $disabled, true );
+			self::print_attributes( (array) ( $item['attrs'] ?? array() ) );
+			echo '>';
 			echo '<span class="beltoft-services-tile__face">';
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG read and checked by self::svg() from the plugin's own files.
 			echo '<span class="beltoft-services-tile__logo">' . ( $item['logo'] ?? '' ) . '</span>';
@@ -261,19 +267,15 @@ final class Tiles {
 	}
 
 	/**
-	 * Data attributes as an attribute string (names are fixed by the callers, values are escaped).
+	 * Prints data attributes (names are fixed by the callers and checked here, values are escaped).
 	 *
 	 * @param array<string, string> $attrs Name => value.
 	 */
-	private static function attributes( array $attrs ): string {
-		$out = '';
-
+	private static function print_attributes( array $attrs ): void {
 		foreach ( $attrs as $name => $value ) {
 			if ( 1 === preg_match( '/^data-[a-z0-9-]+$/', (string) $name ) ) {
-				$out .= ' ' . $name . '="' . esc_attr( (string) $value ) . '"';
+				echo ' ' . esc_attr( (string) $name ) . '="' . esc_attr( (string) $value ) . '"';
 			}
 		}
-
-		return $out;
 	}
 }
