@@ -306,6 +306,8 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-disk__guide pre { margin: 0.35em 0 0; overflow-x: auto; }
 .beltoft-services-disk__guide :target, .beltoft-services-disk__guide[open] { scroll-margin-top: 1.5em; }
 
+.beltoft-services-vm__snapshots [data-snapshot-add] a { display: block; margin-top: 4px; }
+
 .beltoft-services-vm__snapshot { padding: 12px 0; }
 
 .beltoft-services-vm__snapshot .beltoft-services-panel__actions { margin: 12px 0 0; }
