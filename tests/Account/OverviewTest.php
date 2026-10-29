@@ -33,8 +33,8 @@ class OverviewTest extends MonitoringTestCase {
 	}
 
 	private function server( ?int $user_id = null, array $meta = array() ): Resource {
-		static $vmid = 5000;
-		$r = $this->ready_vm( $vmid++ );
+		static $n = 0;
+		$r = $this->ready_vm( 5000 + ( $n++ % 10 ) );
 
 		if ( null !== $user_id ) {
 			global $wpdb;
@@ -452,6 +452,22 @@ class OverviewTest extends MonitoringTestCase {
 		return $token;
 	}
 
+	public function test_a_gateways_own_token_class_counts_as_a_card(): void {
+		$user = self::factory()->user->create();
+		add_filter( 'woocommerce_payment_token_class', static fn( $class, $type ) => 'GatewayCard' === $type ? OverviewGatewayToken::class : $class, 10, 2 );
+		$token = new OverviewGatewayToken();
+		$token->set_token( 'tok_' . wp_generate_password( 8, false ) );
+		$token->set_gateway_id( 'cod' );
+		$token->set_user_id( $user );
+		$token->save();
+		$sub = $this->subscription( $user, 'active', 10, 'Server' );
+		$this->auto_renewal( $sub, 'cod' );
+		$sub->add_payment_token( $token );
+		$this->as_user( $user );
+
+		$this->assertStringContainsString( 'Visa ending 4242', $this->html( 'next_payment' ) );
+	}
+
 	public function test_a_manual_renewal_never_shows_a_card(): void {
 		$user  = self::factory()->user->create();
 		$token = $this->card_token( $user, 'cod', '4242' );
@@ -678,9 +694,10 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'payment failed', $this->html( 'activity' ) );
 
 		// A renewal that failed after the pause: still just paused.
-		$late = wcs_create_renewal_order( $sub );
+		$late = wc_create_order( array( 'customer_id' => $user ) );
 		$late->set_status( 'failed' );
 		$late->set_date_created( time() - 600 );
+		$late->update_meta_data( '_subscription_renewal', $sub->get_id() );
 		$late->save();
 		$this->as_user( $user );
 		$this->assertStringNotContainsString( 'payment failed', $this->html( 'activity' ) );
@@ -690,6 +707,7 @@ class OverviewTest extends MonitoringTestCase {
 		$late->save();
 		$this->as_user( $user );
 		$this->assertStringContainsString( 'web-01: payment failed, paused', $this->html( 'activity' ) );
+
 	}
 
 	public function test_the_feed_is_hidden_when_there_is_nothing_to_tell(): void {
@@ -756,5 +774,18 @@ class OverviewTest extends MonitoringTestCase {
 		$this->html( 'licenses' );
 
 		$this->assertTrue( wp_style_is( \BeltoftServices\Account\Panel::HANDLE, 'enqueued' ) );
+	}
+}
+
+/** A card token that, like the Stripe plugin's, does not extend WooCommerce's card token. */
+class OverviewGatewayToken extends \WC_Payment_Token {
+	protected $type = 'GatewayCard';
+
+	public function get_last4() {
+		return '4242';
+	}
+
+	public function get_card_type() {
+		return 'Visa';
 	}
 }

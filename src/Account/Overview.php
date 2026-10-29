@@ -745,7 +745,7 @@ final class Overview {
 			foreach ( $subscription->get_payment_tokens() as $token_id ) {
 				$found = \WC_Payment_Tokens::get( (int) $token_id );
 
-				if ( $found instanceof \WC_Payment_Token_CC && (int) $found->get_user_id() === $user_id ) {
+				if ( self::is_card( $found ) && (int) $found->get_user_id() === $user_id ) {
 					$token = $found;
 					break;
 				}
@@ -754,12 +754,12 @@ final class Overview {
 			if ( ! $token ) {
 				$default = \WC_Payment_Tokens::get_customer_default_token( $user_id );
 
-				if ( $default instanceof \WC_Payment_Token_CC && $default->get_gateway_id() === $subscription->get_payment_method() ) {
+				if ( self::is_card( $default ) && $default->get_gateway_id() === $subscription->get_payment_method() ) {
 					$token = $default;
 				}
 			}
 
-			if ( $token instanceof \WC_Payment_Token_CC && '' !== (string) $token->get_last4() ) {
+			if ( self::is_card( $token ) ) {
 				$type = (string) $token->get_card_type();
 
 				/* translators: 1: card brand, 2: last four digits */
@@ -768,6 +768,16 @@ final class Overview {
 		}
 
 		return $title;
+	}
+
+	/**
+	 * Whether a token is a card with its last four digits. Gateways bring their own token classes (the Stripe
+	 * plugin's does not extend WooCommerce's card token), so this asks for the methods, not the class.
+	 *
+	 * @param mixed $token A payment token or false.
+	 */
+	private static function is_card( $token ): bool {
+		return $token instanceof \WC_Payment_Token && method_exists( $token, 'get_last4' ) && method_exists( $token, 'get_card_type' ) && '' !== (string) $token->get_last4();
 	}
 
 	/**

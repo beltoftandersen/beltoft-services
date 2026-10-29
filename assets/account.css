@@ -505,7 +505,7 @@ div.beltoft-services-vm__more > h4 { margin-top: 28px; }
 }
 
 /* Billing: the tab bar over the subscriptions, orders, payment methods and addresses pages. One rule, no chips. */
-.beltoft-services-billing-tabs { margin: 0 0 28px; border-bottom: 1px solid var(--rule, #d9d6cc); font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); overflow-x: auto; }
+.beltoft-services-billing-tabs { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; margin: 0 0 28px; border-bottom: 1px solid var(--rule, #d9d6cc); font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); overflow-x: auto; }
 .beltoft-services-billing-tabs ul { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .beltoft-services-billing-tabs li { margin: 0; padding: 0; }
 .beltoft-services-billing-tabs a { display: block; padding: 10px 14px; color: var(--ink-soft, #5e7080) !important; font-size: 15px; font-weight: 500; white-space: nowrap; text-decoration: none !important; }
