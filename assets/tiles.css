@@ -10,7 +10,7 @@
 .beltoft-services-tile__logo { display: block; width: 28px; height: 28px; margin-bottom: 6px; }
 .beltoft-services-tile__logo svg { display: block; width: 100%; height: 100%; }
 .beltoft-services-tile__name { font-size: 15px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-.beltoft-services-tile__line { font-size: 13px; line-height: 1.4; opacity: 0.8; overflow-wrap: anywhere; }
+.beltoft-services-tile__line { font-size: 13px; font-weight: 400; line-height: 1.4; opacity: 0.8; overflow-wrap: anywhere; }
 .beltoft-services-tile__why { margin-top: auto; font-size: 13px; font-weight: 500; line-height: 1.4; }
 .beltoft-services-tiles .beltoft-services-tile__input:checked + .beltoft-services-tile__face, .beltoft-services-tiles .beltoft-services-tile:hover .beltoft-services-tile__input:checked + .beltoft-services-tile__face { background: var(--navy, #0c1535); color: var(--bg-card, #fff); }
 .beltoft-services-tiles .beltoft-services-tile__input:focus-visible + .beltoft-services-tile__face { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
