@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
  * Other parts add to the page with two filters:
  * - `beltoft_services_settings_tabs` adds a tab (slug => label);
  * - `beltoft_services_settings_fields` adds fields. A field sets `tab` (a tab slug), `section`
- *   (a section slug, titled by `beltoft_services_settings_sections`), `type` (text, textarea,
+ *   (a section slug, titled by `beltoft_services_settings_sections`), `type` (text, url, textarea,
  *   checkbox, number, select, email or secret), `default` and `label`.
  * A `secret` field is a password field whose value is encrypted with Crypto before it is saved.
  */
@@ -84,6 +84,28 @@ final class Settings {
 				'label'   => __( 'Delete the settings when the plugin is deleted', 'beltoft-services' ),
 				'desc'    => __( 'This also deletes the IP pool and the virtual machine records. Machines that exist can then no longer be matched to their services.', 'beltoft-services' ),
 			),
+			'welcome_servers_url' => array(
+				'tab'     => 'general',
+				'section' => 'account',
+				'type'    => 'url',
+				'default' => '',
+				'label'   => __( 'Welcome block: servers link', 'beltoft-services' ),
+				'desc'    => __( 'Address of the page where customers buy a server. A customer with no services sees three starting points in My Account; one without an address is left out.', 'beltoft-services' ),
+			),
+			'welcome_domains_url' => array(
+				'tab'     => 'general',
+				'section' => 'account',
+				'type'    => 'url',
+				'default' => '',
+				'label'   => __( 'Welcome block: domains link', 'beltoft-services' ),
+			),
+			'welcome_plugins_url' => array(
+				'tab'     => 'general',
+				'section' => 'account',
+				'type'    => 'url',
+				'default' => '',
+				'label'   => __( 'Welcome block: plugins link', 'beltoft-services' ),
+			),
 		);
 
 		/**
@@ -120,7 +142,10 @@ final class Settings {
 	 * @return array<string, string>
 	 */
 	public static function sections(): array {
-		$sections = array( 'general' => __( 'General', 'beltoft-services' ) );
+		$sections = array(
+			'general' => __( 'General', 'beltoft-services' ),
+			'account' => __( 'My Account', 'beltoft-services' ),
+		);
 
 		/**
 		 * Filters the section titles of Settings → Services.
@@ -346,6 +371,9 @@ final class Settings {
 					esc_attr( '' !== (string) $value ? __( 'Saved', 'beltoft-services' ) : '' )
 				);
 				break;
+			case 'url':
+				printf( '<input type="url" id="%1$s" name="%2$s" value="%3$s" class="regular-text" placeholder="https://">', esc_attr( $id ), esc_attr( $name ), esc_attr( (string) $value ) );
+				break;
 			case 'email':
 				printf( '<input type="email" id="%1$s" name="%2$s" value="%3$s" class="regular-text">', esc_attr( $id ), esc_attr( $name ), esc_attr( (string) $value ) );
 				break;
@@ -395,6 +423,9 @@ final class Settings {
 					break;
 				case 'textarea':
 					$clean[ $key ] = sanitize_textarea_field( (string) $raw );
+					break;
+				case 'url':
+					$clean[ $key ] = esc_url_raw( trim( (string) $raw ) );
 					break;
 				case 'email':
 					$email         = sanitize_email( (string) $raw );

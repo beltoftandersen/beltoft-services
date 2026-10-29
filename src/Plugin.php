@@ -70,6 +70,7 @@ final class Plugin {
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Servers::register();
+		Account\Overview::register();
 
 		Lifecycle::register();
 		Retention::register();

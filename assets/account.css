@@ -456,3 +456,50 @@ div.beltoft-services-vm__more > h4 { margin-top: 28px; }
 .beltoft-services-servers .beltoft-services-srv--addon:first-child { border-top: 0; }
 .beltoft-services-srv__body { font-size: 14px; }
 .beltoft-services-srv__body p { margin: 0 0 8px; }
+
+/* Overview: sections of the Dashboard. Square corners, no chips; status is a small square and plain text. */
+.beltoft-services-overview { display: grid; gap: 36px; font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); color: var(--navy, #0c1535); }
+.beltoft-services-overview > * { min-width: 0; }
+.beltoft-services-ov__section { min-width: 0; }
+.beltoft-services-ov__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.beltoft-services-ov__head h2 { margin: 0; color: var(--navy, #0c1535); font-size: 18px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-ov__head a { color: var(--ink-soft, #5e7080) !important; font-size: 14px; text-decoration: none !important; }
+.beltoft-services-ov__head a:hover { color: var(--navy, #0c1535) !important; text-decoration: underline !important; }
+.beltoft-services-ov__attention { display: grid; gap: 8px; padding: 14px 18px; background: var(--paper-light, #f0ede4); }
+.beltoft-services-ov__attention > div { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; min-width: 0; }
+.beltoft-services-ov__attention b { font-weight: 500; overflow-wrap: anywhere; }
+.beltoft-services-ov__attention a { color: var(--green, #004400) !important; font-weight: 500; text-decoration: underline !important; text-underline-offset: 3px; }
+.beltoft-services-ov__two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.beltoft-services-ov__two.is-single { grid-template-columns: minmax(0, 1fr); }
+.beltoft-services-ov__rows { background: var(--bg-card, #fff); }
+.beltoft-services-ov__rows a.beltoft-services-ov__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
+.beltoft-services-ov__rows a.beltoft-services-ov__row:first-child { border-top: 0; }
+.beltoft-services-ov__rows a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { background: #fcfbf8; }
+.beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: -2px; }
+.beltoft-services-ov__id, .beltoft-services-ov__end { display: grid; gap: 2px; min-width: 0; }
+.beltoft-services-ov__id b { font-weight: 700; overflow-wrap: anywhere; }
+.beltoft-services-ov__end { justify-items: end; text-align: right; }
+.beltoft-services-ov__money { display: grid; gap: 14px; align-content: start; padding: 22px; background: var(--navy, #0c1535); color: #fff; }
+.beltoft-services-ov__label { color: var(--ink-muted, #8a98a6); font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.beltoft-services-ov__money .beltoft-services-ov__label { color: var(--rail-ink, #aab4c8); }
+.beltoft-services-ov__big { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.beltoft-services-ov__big .woocommerce-Price-amount, .beltoft-services-ov__big bdi { color: inherit; }
+.beltoft-services-ov__money dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 14px; }
+.beltoft-services-ov__money dt { margin: 0; color: var(--rail-ink, #aab4c8); }
+.beltoft-services-ov__money dd { margin: 0; overflow-wrap: anywhere; }
+.beltoft-services-ov__money a { justify-self: start; color: #fff !important; text-decoration: underline !important; text-underline-offset: 3px; }
+.beltoft-services-ov__feed { padding: 6px 0; background: var(--bg-card, #fff); }
+.beltoft-services-ov__feed ul { margin: 0; padding: 0; list-style: none; }
+.beltoft-services-ov__feed li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; margin: 0; padding: 9px 18px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
+.beltoft-services-ov__feed time { color: var(--ink-muted, #8a98a6); font-size: 13px; font-variant-numeric: tabular-nums; }
+.beltoft-services-ov__welcome h2 { margin: 0; color: var(--navy, #0c1535); font-size: 26px; font-weight: 700; line-height: 1.2; }
+.beltoft-services-ov__welcome > p { margin: 6px 0 20px; color: var(--ink-soft, #5e7080); }
+.beltoft-services-ov__cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.beltoft-services-ov__card { display: grid; gap: 10px; align-content: start; padding: 20px; background: var(--bg-card, #fff); }
+.beltoft-services-ov__card h3 { margin: 0; color: var(--navy, #0c1535); font-size: 17px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-ov__card p { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-ov__card a.beltoft-services-ov__btn { justify-self: start; display: inline-block; padding: 9px 16px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; text-decoration: none !important; white-space: nowrap; }
+.beltoft-services-ov__card a.beltoft-services-ov__btn.is-ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
+@media (max-width: 760px) {
+	.beltoft-services-ov__two, .beltoft-services-ov__cards { grid-template-columns: minmax(0, 1fr); }
+}
