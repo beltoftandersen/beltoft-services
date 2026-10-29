@@ -117,6 +117,12 @@ final class AppInstall {
 		if ( null === $app || null === $record || null === $ip ) {
 			return StepResult::fail( 'The app definition, VM record or address is missing' );
 		}
+		$license = $resource->license();
+		$owner = get_userdata( (int) ( $license['user_id'] ?? 0 ) );
+		$email = $owner ? (string) $owner->user_email : '';
+		if ( in_array( $id, array( 'wordpress', 'coolify' ), true ) && ! is_email( $email ) ) {
+			return StepResult::fail( 'The account email is unavailable for app setup' );
+		}
 		$request = (string) $resource->get( 'app_request' );
 		if ( '' === $request ) {
 			$request = wp_generate_uuid4();
@@ -138,6 +144,9 @@ final class AppInstall {
 			'params' => array(),
 			'key_only' => '' !== (string) $resource->get( 'ssh_key' ),
 		);
+		if ( in_array( $id, array( 'wordpress', 'coolify' ), true ) ) {
+			$job['email'] = $email;
+		}
 		$base = '/nodes/' . rawurlencode( $record['node'] ) . '/qemu/' . $record['vmid'];
 		$reply = $client->request( 'POST', $base . '/agent/file-write', array( 'file' => Apps::JOB, 'content' => wp_json_encode( $job ) ) );
 		if ( is_wp_error( $reply ) ) {

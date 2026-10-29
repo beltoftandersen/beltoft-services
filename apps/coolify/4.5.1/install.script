@@ -1,0 +1,118 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+vendor=/data/coolify/vendor
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates curl gnupg jq openssl ufw unattended-upgrades
+  install -m 0755 -d /etc/apt/keyrings
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '9DC858229FC7DD38854AE2D88D81803C0EBFCD88' ]
+  chmod a+r /etc/apt/keyrings/docker.asc
+  printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/docker.sources
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y 'docker-ce=5:29.9.2-1~ubuntu.24.04~noble' 'docker-ce-cli=5:29.9.2-1~ubuntu.24.04~noble' 'containerd.io=2.4.2-3~ubuntu.24.04~noble' 'docker-buildx-plugin=0.38.1-1~ubuntu.24.04~noble' 'docker-compose-plugin=5.6.1-1~ubuntu.24.04~noble'
+  systemctl enable --now docker unattended-upgrades
+  touch "$state/stage.1"
+fi
+email=$(jq -er '.email' "$state/job.running")
+ip=$(jq -er '.ip' "$state/job.running")
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+[[ "$ip" =~ ^[0-9.]+$ ]]
+step=download
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  install -m 0700 -d "$vendor"
+  base=https://raw.githubusercontent.com/coollabsio/coolify/v4.5.1
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL "$base/scripts/install.sh" -o "$vendor/install.sh"
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL "$base/scripts/upgrade.sh" -o "$vendor/upgrade.sh"
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL "$base/scripts/upgrade-postgres.sh" -o "$vendor/upgrade-postgres.sh"
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL "$base/docker-compose.yml" -o "$vendor/docker-compose.yml"
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL "$base/docker-compose.prod.yml" -o "$vendor/docker-compose.prod.yml"
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL "$base/.env.production" -o "$vendor/.env.production"
+  ( cd "$vendor" && printf '%s\n' \
+    '7ef7ff6e5ee4738025d5003cacfca4fcc36df0a8844cc324f6ebb4a20b2dff04  install.sh' \
+    '703794d394e9a3f0dd773a5800385752a48d7015e5f8ea9bd1037117332f74b1  upgrade.sh' \
+    'aa65c277fc13ab5b27c349fbfef12defc59c084b244e4b258329e1f6c570ae8d  upgrade-postgres.sh' \
+    '2532ee9258e10ad4e86cb3c2b46c29fe9329f5a0dace0f7da410744feec279bd  docker-compose.yml' \
+    'f8b104aadfca48d0033fdee6cb87fea13c68bc5c67c63ba18b1934e9f901ff5d  docker-compose.prod.yml' \
+    '7895e54f7c9d40063e76afec9b35839048d91e5c3b5107d64ea49ef6987c304a  .env.production' | sha256sum -c - )
+  # The verified upstream installer reads all deployment files through its CDN variable.
+  # Redirect that variable to verified local copies, including upgrade.sh's second reads.
+  python3 - "$vendor" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+def change(name, old, new, count):
+    f = p / name
+    text = f.read_text()
+    if text.count(old) != count:
+        raise SystemExit('Unexpected Coolify release file: ' + name)
+    f.write_text(text.replace(old, new))
+for name in ('install.sh', 'upgrade.sh'):
+    change(name, 'CDN="https://cdn.coollabs.io/coolify"', 'CDN="file:///data/coolify/vendor"', 1)
+change('install.sh', 'curl -fsSL https://get.docker.com | sh 2>&1 || true', 'false', 1)
+change('install.sh', 'curl -4s --max-time 5 https://ifconfig.io > "$IPV4_TMP" 2>/dev/null &', 'printf "%s" "$BELTOFT_IP" > "$IPV4_TMP" &', 1)
+change('install.sh', 'curl -6s --max-time 5 https://ifconfig.io > "$IPV6_TMP" 2>/dev/null &', ': > "$IPV6_TMP" &', 1)
+change('upgrade.sh', '${REGISTRY_URL:-docker.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION}', 'docker.io/coollabsio/coolify-helper@sha256:b0cf60e6d6ecc73696811fe105d7b187b0fa387bd8ec62c647177420daf42bad', 1)
+change('upgrade.sh', r'\${REGISTRY_URL:-docker.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION}', 'docker.io/coollabsio/coolify-helper@sha256:b0cf60e6d6ecc73696811fe105d7b187b0fa387bd8ec62c647177420daf42bad', 1)
+change('docker-compose.yml', 'postgres:15-alpine', 'postgres@sha256:54e0dd8e8cddcdbb9156c2486eed5a43eccb7214d7c6828097d41ce049fb3984', 1)
+change('docker-compose.yml', 'redis:7-alpine', 'redis@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f', 1)
+change('docker-compose.prod.yml', '${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}', 'docker.io/coollabsio/coolify@sha256:0aebcc2c4038f2cb4533f3ab4430b8832006860982445800138ffb75bd91873b', 2)
+PY
+  # The installer's parser expects the v4 and helper version fields in this order.
+  printf '{\n  "coolify": {\n    "v4": {\n      "version": "4.5.1"\n    },\n    "nightly": {\n      "version": "4.5.1"\n    },\n    "helper": {\n      "version": "1.0.19"\n    }\n  }\n}\n' > "$vendor/versions.json"
+  bash -n "$vendor/install.sh" "$vendor/upgrade.sh"
+  touch "$state/stage.2"
+fi
+step=credentials
+status installing
+install -m 0700 -d "$secrets"
+if [ ! -e "$secrets/coolify.json" ]; then
+  password="$(openssl rand -hex 16)Aa1!"
+  jq -n --arg email "$email" --arg password "$password" '{root_email:$email,root_password:$password}' > "$secrets/coolify.json"
+  chmod 0600 "$secrets/coolify.json"
+  unset password
+fi
+step=coolify
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  export ROOT_USERNAME=admin
+  export ROOT_USER_EMAIL="$(jq -er '.root_email' "$secrets/coolify.json")"
+  export ROOT_USER_PASSWORD="$(jq -er '.root_password' "$secrets/coolify.json")"
+  export AUTOUPDATE=false
+  export BELTOFT_IP="$ip"
+  timeout 1800 bash "$vendor/install.sh" 4.5.1 > "$state/coolify-install.log" 2>&1
+  unset ROOT_USER_PASSWORD
+  touch "$state/stage.3"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.4" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  for port in 22 80 443 8000 6001 6002; do ufw allow "$port/tcp"; done
+  ufw --force enable
+  touch "$state/stage.4"
+fi
+step=verify
+status installing
+[ "$(docker inspect --format '{{.State.Health.Status}}' coolify)" = healthy ]
+curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:8000/api/health" -o /dev/null
+cp "$secrets/coolify.json" "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"

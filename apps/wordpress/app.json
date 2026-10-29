@@ -1,0 +1,15 @@
+{
+  "id": "wordpress",
+  "name": "WordPress",
+  "summary": "WordPress with Caddy, PHP 8.3 and MariaDB on Ubuntu 24.04.",
+  "getting_started": "Open /wp-admin/ at your server address and use the admin details shown once. Add a domain for HTTPS. Configure SMTP on port 587 before relying on site email. Set up a backup plan before making changes.",
+  "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
+  "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}, {"port": 80, "proto": "tcp", "label": "HTTP"}, {"port": 443, "proto": "tcp", "label": "HTTPS"}],
+  "minutes": 6,
+  "credentials": ["admin_user", "admin_password"],
+  "steps": ["download", "os", "packages", "database", "wordpress", "web", "firewall", "verify", "install", "complete"],
+  "docs_url": "https://wordpress.org/documentation/article/how-to-install-wordpress/",
+  "versions": [
+    {"id": "7.1.4", "label": "WordPress 7.1.4", "upstream": "7.1.4", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "3dd922f2202689ee5f057470a40469551558f8fee2730370c68d80b89db1e971", "eol": ""}
+  ]
+}

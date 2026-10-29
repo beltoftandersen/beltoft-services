@@ -1,0 +1,158 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+site=/var/www/wordpress
+job="$state/job.running"
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates curl gnupg jq ufw unattended-upgrades mariadb-server php8.3-cli php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-intl php8.3-mbstring php8.3-xml php8.3-zip php8.3-opcache php8.3-imagick
+  install -m 0755 -d /etc/apt/keyrings
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key -o /etc/apt/keyrings/caddy.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/caddy.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '65760C51EDEA2017CEA2CA15155B6D79CA56EA34' ]
+  chmod a+r /etc/apt/keyrings/caddy.asc
+  printf 'deb [signed-by=/etc/apt/keyrings/caddy.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main\n' > /etc/apt/sources.list.d/caddy.list
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y 'caddy=2.11.7'
+  systemctl enable --now mariadb php8.3-fpm unattended-upgrades
+  touch "$state/stage.1"
+fi
+domain=$(jq -er '.domain // ""' "$job")
+ip=$(jq -er '.ip' "$job")
+email=$(jq -er '.email' "$job")
+[[ "$ip" =~ ^[0-9.]+$ ]]
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+if [ -n "$domain" ]; then
+  [[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+  [[ "$domain" == *.* ]]
+fi
+step=download
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  timeout 180 curl --proto '=https' --tlsv1.2 -fsSL https://wordpress.org/wordpress-7.1.4.tar.gz -o "$state/wordpress.tar.gz"
+  echo '881e53a4681ff2cd911651b11cccdede5ae477ddf0765af5d6a1a8b219a1d835  /var/lib/beltoft-app/wordpress.tar.gz' | sha256sum -c -
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar -o "$state/wp-cli.phar"
+  echo 'ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c  /var/lib/beltoft-app/wp-cli.phar' | sha256sum -c -
+  install -m 0755 "$state/wp-cli.phar" /usr/local/bin/wp
+  touch "$state/stage.2"
+fi
+step=database
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  install -m 0700 -d "$secrets"
+  if [ ! -e "$secrets/db.json" ]; then
+    jq -n --arg db "$(openssl rand -hex 24)" --arg admin "$(openssl rand -hex 24)" --arg user "admin-$(openssl rand -hex 3)" '{db_password:$db,admin_password:$admin,admin_user:$user}' > "$secrets/db.json"
+    chmod 0600 "$secrets/db.json"
+  fi
+  # All SQL identifiers are constants; the generated password contains only hex digits.
+  dbpass=$(jq -er '.db_password' "$secrets/db.json")
+  mariadb -e 'CREATE DATABASE IF NOT EXISTS wordpress CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+  mariadb <<SQL
+CREATE USER IF NOT EXISTS 'wordpress'@'localhost' IDENTIFIED BY '$dbpass';
+ALTER USER 'wordpress'@'localhost' IDENTIFIED BY '$dbpass';
+GRANT ALL ON wordpress.* TO 'wordpress'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+  unset dbpass
+  touch "$state/stage.3"
+fi
+step=wordpress
+status installing
+if [ ! -e "$state/stage.4" ]; then
+  install -m 0755 -d "$site"
+  tar -xzf "$state/wordpress.tar.gz" --strip-components=1 -C "$site" --no-same-owner
+  chown -R www-data:www-data "$site"
+  if [ ! -e "$site/wp-config.php" ]; then
+    php -r '
+      $s=json_decode(file_get_contents("/root/.beltoft-app/db.json"),true,512,JSON_THROW_ON_ERROR);
+      $c="<?php\n";
+      foreach (["DB_NAME"=>"wordpress","DB_USER"=>"wordpress","DB_PASSWORD"=>$s["db_password"],"DB_HOST"=>"localhost","DB_CHARSET"=>"utf8mb4","DB_COLLATE"=>"", "DISALLOW_FILE_EDIT"=>true, "DISABLE_WP_CRON"=>true] as $k=>$v) { $c.="define(".var_export($k,true).", ".var_export($v,true).");\n"; }
+      foreach (["AUTH_KEY","SECURE_AUTH_KEY","LOGGED_IN_KEY","NONCE_KEY","AUTH_SALT","SECURE_AUTH_SALT","LOGGED_IN_SALT","NONCE_SALT"] as $k) { $c.="define(".var_export($k,true).", ".var_export(bin2hex(random_bytes(64)),true).");\n"; }
+      $c.="\$table_prefix = '\''wp_'\'';\nrequire_once ABSPATH . '\''wp-settings.php'\'';\n";
+      $c=str_replace("require_once ABSPATH", "if (!defined('\''ABSPATH'\'')) define('\''ABSPATH'\'', __DIR__ . '\''/'\'');\nrequire_once ABSPATH", $c);
+      file_put_contents("/var/www/wordpress/wp-config.php",$c,LOCK_EX);
+    '
+    chown www-data:www-data "$site/wp-config.php"
+    chmod 0640 "$site/wp-config.php"
+  fi
+  if ! runuser -u www-data -- /usr/local/bin/wp core is-installed --path="$site" >/dev/null 2>&1; then
+    address="http://$ip"
+    [ -z "$domain" ] || address="https://$domain"
+    admin_user=$(jq -er '.admin_user' "$secrets/db.json")
+    # WP-CLI reads the password from stdin; it never appears in process arguments.
+    jq -er '.admin_password' "$secrets/db.json" | runuser -u www-data -- /usr/local/bin/wp core install --path="$site" --url="$address" --title="$(hostname)" --admin_user="$admin_user" --admin_email="$email" --skip-email --prompt=admin_password
+  fi
+  runuser -u www-data -- /usr/local/bin/wp core verify-checksums --path="$site" --version=7.1.4
+  touch "$state/stage.4"
+fi
+step=web
+status installing
+if [ ! -e "$state/stage.5" ]; then
+  cat > /etc/php/8.3/fpm/conf.d/99-beltoft-wordpress.ini <<'INI'
+memory_limit = 256M
+upload_max_filesize = 64M
+post_max_size = 64M
+opcache.enable = 1
+INI
+  address="http://$ip"
+  [ -z "$domain" ] || address="$domain"
+  printf '%s {\n  root * /var/www/wordpress\n  encode zstd gzip\n  php_fastcgi unix//run/php/php8.3-fpm.sock\n  file_server\n}\n' "$address" > /etc/caddy/Caddyfile
+  cat > /etc/systemd/system/beltoft-wp-cron.service <<'UNIT'
+[Unit]
+Description=WordPress cron
+[Service]
+Type=oneshot
+User=www-data
+ExecStart=/usr/local/bin/wp cron event run --due-now --path=/var/www/wordpress
+UNIT
+  cat > /etc/systemd/system/beltoft-wp-cron.timer <<'UNIT'
+[Unit]
+Description=Run WordPress cron every five minutes
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT
+  if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+    fallocate -l 2G /swapfile
+    chmod 0600 /swapfile
+    mkswap /swapfile >/dev/null
+    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+    swapon /swapfile
+  fi
+  systemctl daemon-reload
+  systemctl enable --now beltoft-wp-cron.timer
+  systemctl restart php8.3-fpm caddy
+  touch "$state/stage.5"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.6" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+  touch "$state/stage.6"
+fi
+step=verify
+status installing
+curl --fail --silent --show-error --max-time 15 --resolve "${domain:-$ip}:80:$ip" "http://${domain:-$ip}/wp-login.php" -o /dev/null
+jq -n --arg user "$(jq -er '.admin_user' "$secrets/db.json")" --arg password "$(jq -er '.admin_password' "$secrets/db.json")" '{admin_user:$user,admin_password:$password}' > "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"

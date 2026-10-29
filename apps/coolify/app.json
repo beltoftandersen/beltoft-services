@@ -1,0 +1,15 @@
+{
+  "id": "coolify",
+  "name": "Coolify",
+  "summary": "Coolify self-hosted deployment platform on Ubuntu 24.04.",
+  "getting_started": "Open http://your-server-ip:8000 and sign in with the root email and password shown once. Add a domain and HTTPS for the dashboard. Docker-published ports can be internet-reachable even when ufw is on; review exposed ports before deploying apps. Coolify updates are manual.",
+  "min": {"cores": 2, "memory_mb": 2048, "disk_gb": 80},
+  "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}, {"port": 80, "proto": "tcp", "label": "HTTP"}, {"port": 443, "proto": "tcp", "label": "HTTPS"}, {"port": 8000, "proto": "tcp", "label": "Dashboard"}, {"port": 6001, "proto": "tcp", "label": "Realtime"}, {"port": 6002, "proto": "tcp", "label": "Terminal"}],
+  "minutes": 10,
+  "credentials": ["root_email", "root_password"],
+  "steps": ["download", "os", "packages", "credentials", "coolify", "firewall", "verify", "install", "complete"],
+  "docs_url": "https://coolify.io/docs/start-with-self-hosted",
+  "versions": [
+    {"id": "4.5.1", "label": "Coolify 4.5.1", "upstream": "4.5.1", "recipe": 1, "status": "current", "min_plan": "performance", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "3b385ed3656d12f0d78654500107156a81aed8cc654e210c5f5819152f82047f", "eol": ""}
+  ]
+}
