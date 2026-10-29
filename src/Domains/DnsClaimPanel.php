@@ -8,6 +8,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftLicenses\Account\Endpoint;
+use BeltoftServices\Account\Domains;
 use BeltoftServices\Api\Routes;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,16 +25,10 @@ final class DnsClaimPanel {
 	public const HANDLE = 'beltoft-services-dns-claim';
 
 	/**
-	 * Endpoint slug of the tab.
-	 */
-	private const TAB = 'domains';
-
-	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 20 );
-		add_action( 'woocommerce_account_' . self::TAB . '_endpoint', array( __CLASS__, 'render' ), 5 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 	}
 
@@ -51,7 +46,7 @@ final class DnsClaimPanel {
 	 * @return mixed
 	 */
 	public static function menu( $items ) {
-		if ( ! is_array( $items ) || isset( $items[ self::TAB ] ) || ! self::active() ) {
+		if ( ! is_array( $items ) || isset( $items[ Domains::slug() ] ) || ! self::active() ) {
 			return $items;
 		}
 
@@ -61,21 +56,21 @@ final class DnsClaimPanel {
 
 		foreach ( $items as $key => $label ) {
 			if ( ! $placed && in_array( $key, $before, true ) ) {
-				$out[ self::TAB ] = __( 'Domains', 'beltoft-services' );
+				$out[ Domains::slug() ] = __( 'Domains', 'beltoft-services' );
 				$placed           = true;
 			}
 			$out[ $key ] = $label;
 		}
 
 		if ( ! $placed ) {
-			$out[ self::TAB ] = __( 'Domains', 'beltoft-services' );
+			$out[ Domains::slug() ] = __( 'Domains', 'beltoft-services' );
 		}
 
 		return $out;
 	}
 
 	/**
-	 * Prints the section.
+	 * Prints the section. Called by the add page of the Domains tab (Account\Domains).
 	 */
 	public static function render(): void {
 		if ( ! self::active() ) {
@@ -94,7 +89,8 @@ final class DnsClaimPanel {
 	 * The script and stylesheet, only on the Domains tab.
 	 */
 	public static function assets(): void {
-		if ( ! self::active() || ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( self::TAB ) ) {
+		// Only on the add page: the list and a domain's page do not use the claim script.
+		if ( ! self::active() || ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( Domains::slug() ) || ! Domains::requested()['add'] ) {
 			return;
 		}
 

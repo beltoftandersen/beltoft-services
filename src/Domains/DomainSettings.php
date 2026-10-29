@@ -53,6 +53,7 @@ final class DomainSettings {
 		$fields['domain_dns_url'] = $base + array( 'type' => 'text', 'default' => 'http://127.0.0.1:8081', 'label' => __( 'DNS API URL', 'beltoft-services' ) );
 		$fields['domain_dns_primary_query_address'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Primary DNS query address', 'beltoft-services' ), 'desc' => __( 'Local IP address used to check the first name server when its public address cannot be reached from this server.', 'beltoft-services' ) );
 		$fields['domain_dns_claims_enabled'] = $base + array( 'type' => 'checkbox', 'default' => 0, 'label' => __( 'DNS hosting for domains registered elsewhere', 'beltoft-services' ), 'desc' => __( 'Customers can verify a domain with a TXT record and add DNS hosting for it. Needs at least two name servers below.', 'beltoft-services' ) );
+		$fields['domain_search_url'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Domain search page', 'beltoft-services' ), 'desc' => __( 'The address of the page where customers search for and register a domain, for example /domains/. The account shows a Register a domain button when it is set. Leave empty to hide the button.', 'beltoft-services' ) );
 		$fields['dns_claims_max_per_user'] = $base + array( 'type' => 'number', 'default' => 20, 'min' => 1, 'label' => __( 'DNS hosting domains per customer', 'beltoft-services' ) );
 		return $fields;
 	}

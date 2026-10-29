@@ -388,7 +388,7 @@ final class Overview {
 
 			if ( $resource ) {
 				$domain_resources[ (int) $view['id'] ] = $resource;
-				$data['domains'][]                     = self::domain_row( $view, $resource );
+				$data['domains'][]                     = DomainRows::row( $view, $resource );
 			}
 		}
 
@@ -396,7 +396,7 @@ final class Overview {
 			$data['licenses'][] = self::license_row( $view );
 		}
 
-		$data['domains_url']  = $domains ? Endpoint::url_for_license( $domains[0] ) : '';
+		$data['domains_url']  = $domains ? Domains::url_list() : '';
 		$data['licenses_url'] = $plain ? Endpoint::url_for_license( $plain[0] ) : '';
 
 		$subscriptions = self::subscriptions( $user_id );
@@ -447,57 +447,6 @@ final class Overview {
 		}
 
 		return self::$subscriptions[ $user_id ];
-	}
-
-	/**
-	 * A domain or DNS hosting row.
-	 *
-	 * @param array<string, mixed> $view     License view.
-	 * @param Resource             $resource Resource.
-	 * @return array<string, string>
-	 */
-	private static function domain_row( array $view, Resource $resource ): array {
-		$dns_only = 'dns' === $resource->get( 'driver' );
-		$external = ! $dns_only && (bool) $resource->get( 'dns_external' );
-		$ours     = ! $external && ( $dns_only || 'custom' !== $resource->get( 'ns_mode' ) );
-
-		if ( $dns_only ) {
-			$sub = __( 'DNS with us', 'beltoft-services' );
-		} else {
-			$sub = $ours ? __( 'Registered and DNS with us', 'beltoft-services' ) : __( 'Registered with us', 'beltoft-services' );
-		}
-
-		$state = (string) $resource->get( 'state' );
-		$group = Panel::group( $state, $resource );
-
-		if ( 'ready' === $group && ! $resource->on_hold() ) {
-			$tone = 'ok';
-		} elseif ( 'getting-ready' === $group ) {
-			$tone = 'busy';
-		} else {
-			$tone = 'bad';
-		}
-
-		$renews = Servers::renewal( $view['license'] );
-
-		if ( '' === $renews && 'ready' === $group ) {
-			$expires = (string) $resource->get( 'expires_at' );
-			$time    = '' !== $expires ? strtotime( $expires . ' UTC' ) : false;
-
-			if ( $time ) {
-				/* translators: %s: date the registration ends */
-				$renews = sprintf( __( 'Expires %s', 'beltoft-services' ), wp_date( (string) get_option( 'date_format' ), $time ) );
-			}
-		}
-
-		return array(
-			'url'    => Endpoint::url_for_license( $view['license'] ) . '#beltoft-license-' . (int) $view['id'],
-			'name'   => (string) $view['product'],
-			'sub'    => $sub,
-			'state'  => \BeltoftServices\Account\Panel::label( $state, $resource ),
-			'tone'   => $tone,
-			'renews' => $renews,
-		);
 	}
 
 	/**
@@ -588,6 +537,10 @@ final class Overview {
 	private static function follow_url( array $license ): string {
 		if ( Servers::is_server( $license ) || self::in_servers_tab( $license ) ) {
 			return Servers::url( $license );
+		}
+
+		if ( Domains::is_domain( $license ) ) {
+			return Domains::url( $license );
 		}
 
 		return Endpoint::url_for_license( $license ) . '#beltoft-license-' . (int) $license['id'];

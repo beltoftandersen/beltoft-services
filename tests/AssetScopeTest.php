@@ -16,7 +16,7 @@ use BeltoftServices\ThankYou;
  * Asset scope tests.
  */
 final class AssetScopeTest extends TestCase {
-	private const SCRIPTS = array( 'beltoft-services-account', 'beltoft-services-progress', 'beltoft-services-vm', 'beltoft-services-metrics', 'beltoft-services-domain', 'beltoft-services-thankyou' );
+	private const SCRIPTS = array( 'beltoft-services-account', 'beltoft-services-progress', 'beltoft-services-vm', 'beltoft-services-metrics', 'beltoft-services-domain', 'beltoft-services-dns-editor', 'beltoft-services-thankyou' );
 	private const STYLES  = array( 'beltoft-services-account', 'beltoft-services-metrics', 'beltoft-services-thankyou' );
 
 	public function set_up(): void {

@@ -50,18 +50,15 @@ class DnsClaimPanelTest extends TestCase {
 		$this->assertSame( $given, $items );
 	}
 
-	public function test_the_section_prints_before_the_license_list(): void {
-		add_action( 'woocommerce_account_domains_endpoint', static function (): void { echo '<p id="list">LIST</p>'; } );
-
+	public function test_the_section_prints_on_the_add_page_not_above_the_list(): void {
 		ob_start();
-		do_action( 'woocommerce_account_domains_endpoint' );
+		\BeltoftServices\Domains\DnsClaimPanel::render();
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'Add a domain for DNS hosting', $html );
 		$this->assertStringContainsString( 'Keep your domain where it is registered and host its DNS here.', $html );
 		$this->assertStringContainsString( 'placeholder="example.com"', $html );
-		$this->assertLessThan( strpos( $html, 'id="list"' ), strpos( $html, 'beltoft-dns-claim' ) );
-		$this->assertSame( 5, has_action( 'woocommerce_account_domains_endpoint', array( \BeltoftServices\Domains\DnsClaimPanel::class, 'render' ) ) );
+		$this->assertFalse( has_action( 'woocommerce_account_domains_endpoint', array( \BeltoftServices\Domains\DnsClaimPanel::class, 'render' ) ), 'The list and the domain page no longer print it.' );
 	}
 
 	public function test_nothing_is_printed_when_the_feature_is_off(): void {
@@ -103,6 +100,10 @@ class DnsClaimPanelTest extends TestCase {
 		$GLOBALS['wp']->query_vars['domains'] = '';
 		$this->assertTrue( is_wc_endpoint_url( 'domains' ) );
 		do_action( 'wp_enqueue_scripts' );
+		$this->assertFalse( wp_script_is( 'beltoft-services-dns-claim', 'enqueued' ), 'Not on the list.' );
+
+		$GLOBALS['wp']->query_vars['domains'] = 'add';
+		do_action( 'wp_enqueue_scripts' );
 
 		$this->assertTrue( wp_script_is( 'beltoft-services-dns-claim', 'enqueued' ) );
 		$this->assertTrue( wp_style_is( 'beltoft-services-dns-claim', 'enqueued' ) );
@@ -113,7 +114,7 @@ class DnsClaimPanelTest extends TestCase {
 
 	public function test_assets_do_not_load_when_the_feature_is_off(): void {
 		$this->settings( array( 'domain_dns_claims_enabled' => 0 ) );
-		$GLOBALS['wp']->query_vars['domains'] = '';
+		$GLOBALS['wp']->query_vars['domains'] = 'add';
 		do_action( 'wp_enqueue_scripts' );
 
 		$this->assertFalse( wp_script_is( 'beltoft-services-dns-claim', 'enqueued' ) );

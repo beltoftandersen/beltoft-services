@@ -226,7 +226,7 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'shop-example.dk', $html );
 		$this->assertStringContainsString( 'DNS with us', $html );
 		$this->assertStringContainsString( 'is-ok', $html );
-		$this->assertStringContainsString( '#beltoft-license-' . (int) $dns->license()['id'], $html );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Domains::url( $dns->license() ) ), $html );
 		$this->assertSame( '', $this->html( 'servers' ) );
 	}
 

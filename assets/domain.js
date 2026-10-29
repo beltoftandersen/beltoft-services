@@ -308,6 +308,8 @@
 		try { window.sessionStorage.setItem( KEY, JSON.stringify( list ) ); } catch ( e ) { /* storage can be blocked */ }
 	}
 	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-services-domain' ), function ( panel ) {
+		// A domain's own page has tabs, not a card to open.
+		if ( panel.hasAttribute( 'data-domain-page' ) ) { return; }
 		var card = panel.closest( 'section' );
 		var head = card ? card.querySelector( 'header' ) : null;
 		if ( ! card || ! head || head.hasAttribute( 'aria-expanded' ) ) { return; }
@@ -332,5 +334,91 @@
 		head.addEventListener( 'keydown', function ( event ) {
 			if ( 'Enter' === event.key || ' ' === event.key ) { event.preventDefault(); toggle( event ); }
 		} );
+	} );
+}() );
+
+// A domain's page: the tab links switch the panes without a reload. Every pane is in the page and the links are real
+// addresses, so without this script (or with a modified click) the browser opens the tab itself.
+( function () {
+	function show( page, slug ) {
+		var found = false;
+		Array.prototype.forEach.call( page.querySelectorAll( '.beltoft-services-tab' ), function ( pane ) {
+			var on = slug === pane.getAttribute( 'data-tab' );
+			pane.hidden = ! on;
+			found = found || on;
+		} );
+		if ( ! found ) { return false; }
+		Array.prototype.forEach.call( page.querySelectorAll( '.beltoft-services-tabs a[data-tab-link]' ), function ( link ) {
+			if ( slug === link.getAttribute( 'data-tab-link' ) ) { link.setAttribute( 'aria-current', 'page' ); } else { link.removeAttribute( 'aria-current' ); }
+		} );
+		return true;
+	}
+	function fromLocation( page ) {
+		var found = 'overview';
+		Array.prototype.forEach.call( page.querySelectorAll( '.beltoft-services-tabs a[data-tab-link]' ), function ( link ) {
+			if ( link.href.replace( /\/$/, '' ) === window.location.href.split( '#' )[ 0 ].split( '?' )[ 0 ].replace( /\/$/, '' ) ) { found = link.getAttribute( 'data-tab-link' ); }
+		} );
+		return found;
+	}
+	document.addEventListener( 'click', function ( event ) {
+		var link = event.target.closest ? event.target.closest( 'a[data-tab-link]' ) : null;
+		var page = link ? link.closest( '[data-domain-page]' ) : null;
+		if ( ! page || 0 !== event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || ! window.history || ! window.history.pushState ) { return; }
+		if ( show( page, link.getAttribute( 'data-tab-link' ) ) ) {
+			event.preventDefault();
+			window.history.pushState( { beltoftDomainTab: link.getAttribute( 'data-tab-link' ) }, '', link.href );
+		}
+	} );
+	window.addEventListener( 'popstate', function () {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), function ( page ) { show( page, fromLocation( page ) ); } );
+	} );
+	// The tab bar scrolls sideways on a narrow screen: the open tab is brought into view, now and after a switch.
+	function reveal( page ) {
+		var nav = page.querySelector( '.beltoft-services-tabs' );
+		var link = nav ? nav.querySelector( 'a[aria-current="page"]' ) : null;
+		if ( ! nav || ! link || nav.scrollWidth <= nav.clientWidth ) { return; }
+		nav.scrollLeft = Math.max( 0, link.offsetLeft - ( nav.clientWidth - link.offsetWidth ) / 2 );
+	}
+	document.addEventListener( 'click', function ( event ) {
+		var link = event.target.closest ? event.target.closest( 'a[data-tab-link]' ) : null;
+		var page = link ? link.closest( '[data-domain-page]' ) : null;
+		if ( page ) { window.setTimeout( function () { reveal( page ); }, 0 ); }
+	} );
+	window.addEventListener( 'popstate', function () {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), reveal );
+	} );
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-domain-page]' ), reveal );
+}() );
+
+// Danger zone: the dialog that asks for the domain name before DNS hosting is stopped. The server checks the name
+// again, so the disabled button is only a help.
+( function () {
+	document.addEventListener( 'click', function ( event ) {
+		var open = event.target.closest ? event.target.closest( '[data-danger-open]' ) : null;
+		var dialog = open ? document.getElementById( open.getAttribute( 'data-danger-open' ) ) : null;
+		if ( dialog ) {
+			if ( dialog.showModal ) { dialog.showModal(); } else { dialog.setAttribute( 'open', '' ); }
+			var input = dialog.querySelector( 'input[name="confirm"]' );
+			if ( input ) { input.value = ''; input.dispatchEvent( new Event( 'input', { bubbles: true } ) ); input.focus(); }
+			return;
+		}
+		var cancel = event.target.closest ? event.target.closest( '[data-danger-cancel]' ) : null;
+		var box = cancel ? cancel.closest( 'dialog' ) : null;
+		if ( box ) {
+			if ( box.close ) { box.close(); } else { box.removeAttribute( 'open' ); }
+		}
+	} );
+	function matches( form ) {
+		var input = form.querySelector( 'input[name="confirm"]' );
+		return !! input && input.value.trim().toLowerCase() === form.getAttribute( 'data-danger-domain' );
+	}
+	document.addEventListener( 'input', function ( event ) {
+		var form = event.target.closest ? event.target.closest( 'form[data-danger-domain]' ) : null;
+		var button = form ? form.querySelector( '.beltoft-services-danger__confirm' ) : null;
+		if ( button ) { button.disabled = ! matches( form ); }
+	} );
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target.closest ? event.target.closest( 'form[data-danger-domain]' ) : null;
+		if ( form && ! matches( form ) ) { event.preventDefault(); }
 	} );
 }() );

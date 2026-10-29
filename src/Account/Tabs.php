@@ -35,7 +35,7 @@ final class Tabs {
 		$groups = is_array( $groups ) ? $groups : array();
 		$tabs   = array(
 			array(
-				'slug'  => 'domains',
+				'slug'  => Domains::slug(),
 				'label' => __( 'Domains', 'beltoft-services' ),
 				'empty' => __( 'You have no domains yet.', 'beltoft-services' ),
 				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'domain', 'dns' ) ),

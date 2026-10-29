@@ -62,6 +62,7 @@ final class Plugin {
 		Domains\DnsClaimRoutes::register();
 		Domains\DnsClaimPanel::register();
 		Domains\Panels::register();
+		Domains\RecordRoutes::register();
 		Domains\Sync::register();
 		Domains\Security::register();
 		Domains\EmailDetails::register();
@@ -70,6 +71,9 @@ final class Plugin {
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Servers::register();
+		Account\Domains::register();
+		Account\DomainPage::register();
+		Account\DomainDanger::register();
 		Account\ServerPicker::register();
 		Account\Overview::register();
 		Account\Billing::register();

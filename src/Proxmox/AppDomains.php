@@ -33,25 +33,40 @@ final class AppDomains {
 		$zones = array();
 		foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user_id ) as $license ) {
 			$r = Resource::for_license( (int) $license['id'] );
-			if ( ! $r || ! in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! $r->is_live() || 'ready' !== $r->get( 'state' ) ) {
-				continue;
+			if ( $r && self::editable( $r, $user_id ) ) {
+				$name           = strtolower( (string) $r->get( 'domain' ) );
+				$zones[ $name ] = $name;
 			}
-			$name = strtolower( (string) $r->get( 'domain' ) );
-			if ( '' === $name || $r->get( 'dns_external' ) || $r->get( 'records_off' ) || ( 'domain' === $r->get( 'driver' ) && 'custom' === $r->get( 'ns_mode' ) ) ) {
-				continue;
-			}
-			if ( 'dns' === $r->get( 'driver' ) && ! Zone::served_for( $name, $user_id ) ) {
-				continue;
-			}
-			// A registered domain needs the same proof: not another customer's name, and a zone that is ours for this customer.
-			if ( 'domain' === $r->get( 'driver' ) && ( 'other' === Zone::owner( $r ) || ! ( $r->get( 'zone_ready' ) || $r->get( 'zone_claimed' ) || Zone::served_for( $name, $user_id ) ) ) ) {
-				continue;
-			}
-			$zones[ $name ] = $name;
 		}
 		$zones = array_values( $zones );
 		sort( $zones );
 		return $zones;
+	}
+
+	/**
+	 * May this customer edit the records of the resource's zone? True for a live, ready domain or DNS service whose
+	 * zone our own DNS serves for them: not paused, not hosted elsewhere, not on custom name servers, and a zone
+	 * that is theirs. The one rule behind the app domain list and the DNS record routes.
+	 */
+	public static function editable( Resource $r, int $user_id ): bool {
+		if ( $user_id <= 0 || ! in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || $r->folded_into() > 0 ) {
+			return false;
+		}
+		if ( (int) ( $r->license()['user_id'] ?? 0 ) !== $user_id ) {
+			return false;
+		}
+		$name = strtolower( (string) $r->get( 'domain' ) );
+		if ( '' === $name || $r->get( 'dns_external' ) || $r->get( 'records_off' ) || ( 'domain' === $r->get( 'driver' ) && 'custom' === $r->get( 'ns_mode' ) ) ) {
+			return false;
+		}
+		if ( 'dns' === $r->get( 'driver' ) && ! Zone::served_for( $name, $user_id ) ) {
+			return false;
+		}
+		// A registered domain needs the same proof: not another customer's name, and a zone that is ours for this customer.
+		if ( 'domain' === $r->get( 'driver' ) && ( 'other' === Zone::owner( $r ) || ! ( $r->get( 'zone_ready' ) || $r->get( 'zone_claimed' ) || Zone::served_for( $name, $user_id ) ) ) ) {
+			return false;
+		}
+		return true;
 	}
 
 	/** The part before the zone: '' for the domain itself, else lowercase labels, or null when it is not acceptable. */

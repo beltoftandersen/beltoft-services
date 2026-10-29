@@ -528,3 +528,96 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-billing-tabs a:hover { color: var(--navy, #0c1535) !important; }
 .beltoft-services-billing-tabs a.is-active { color: var(--navy, #0c1535) !important; box-shadow: inset 0 -3px 0 var(--green, #004400); }
 .beltoft-services-billing-tabs a:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: -2px; }
+
+/* Domains: the list (templates/account/domains-list.php), its header buttons, and a domain's page (domain-page.php). Same row, state and tab styles as Servers. */
+.beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
+@container (max-width: 620px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
+@media (max-width: 700px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
+.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; max-width: 880px; margin: 0 0 12px; }
+.beltoft-services-list-actions a.beltoft-services-list-btn { display: inline-block; padding: 7px 14px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; line-height: 1.3; text-decoration: none !important; white-space: nowrap; }
+.beltoft-services-list-actions a.beltoft-services-list-btn.is-ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
+.beltoft-services-list-actions a.beltoft-services-list-btn:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }
+.beltoft-services-domain--page { font-size: 15px; }
+.beltoft-services-domain--page .beltoft-services-domain__note { margin: 12px 0 0; color: var(--bsd-soft); }
+.beltoft-services-domain--page .beltoft-services-domain__note a { color: var(--bsd-ink); text-underline-offset: 3px; }
+.beltoft-services-domain--page .beltoft-services-tab > :first-child { margin-top: 0; }
+.beltoft-services-domain__transfer + .beltoft-services-domain__transfer-out { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--bsd-rule); }
+.beltoft-services-domain--page .beltoft-services-domain__title { font-size: 16px; }
+.beltoft-services-domain--page .beltoft-services-domain__hosts { margin-bottom: 12px; }
+.beltoft-services-domain--page .beltoft-services-facts { background: none; }
+.beltoft-services-panel--page .beltoft-services-panel__driver > .beltoft-services-domain--page { min-width: 0; max-width: 100%; }
+.beltoft-services-domain--page .beltoft-services-tabs { max-width: 100%; }
+.beltoft-services-panel--page .beltoft-services-panel__driver { grid-template-columns: minmax(0, 1fr); }
+div.beltoft-services-domain legend.screen-reader-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+div.beltoft-services-domain.beltoft-services-domain button[hidden] { display: none; }
+
+/* DNS records editor (assets/dns-editor.js): one row, one request. Square, one rule between rows, no chips. */
+.beltoft-dnse { margin: 0; }
+.beltoft-dnse__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; }
+.beltoft-dnse__bar:empty { display: none; }
+div.beltoft-services-domain input[type="search"].beltoft-dnse__search { box-sizing: border-box; flex: 1 1 14em; max-width: 24em; height: 40px; margin: 0; padding: 0 12px; border: 1px solid var(--bsd-rule); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; appearance: none; }
+div.beltoft-services-domain .beltoft-dnse__add.button { height: 40px; margin-left: auto; padding: 0 16px; }
+div.beltoft-services-domain .beltoft-dnse__error { margin: 0 0 12px; color: #b32d2e; }
+div.beltoft-services-domain .beltoft-dnse__status { min-height: 0; margin: 0 0 8px; color: var(--bsd-soft); font-size: 14px; }
+div.beltoft-services-domain .beltoft-dnse__status:empty { display: none; }
+div.beltoft-services-domain .beltoft-dnse__empty { margin: 0 0 12px; color: var(--bsd-soft); }
+.beltoft-dnse__table { width: 100%; margin: 0; border-collapse: collapse; table-layout: auto; }
+.beltoft-dnse__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; color: var(--bsd-soft); font-size: 13px; font-weight: 500; text-align: left; }
+.beltoft-dnse__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; }
+.beltoft-dnse__table tr:last-child td { border-bottom: 0; }
+.beltoft-dnse__table td:nth-child(1) { width: 20%; overflow-wrap: anywhere; }
+.beltoft-dnse__table td:nth-child(2) { width: 5.5em; }
+.beltoft-dnse__table td:nth-child(3) { width: 8em; }
+.beltoft-dnse__table td.beltoft-dnse__value { overflow-wrap: anywhere; word-break: break-word; }
+.beltoft-dnse__table td.beltoft-dnse__actions { width: 1%; text-align: right; white-space: nowrap; }
+div.beltoft-services-domain.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: 16px; }
+.beltoft-dnse__ask { color: var(--bsd-ink); font-weight: 500; }
+div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link.beltoft-dnse__danger { color: #b32d2e; }
+.beltoft-dnse__rowerror td { padding-top: 0; color: #b32d2e; }
+.beltoft-dnse__table tr[data-edit-row] td { padding-top: 6px; padding-bottom: 6px; }
+div.beltoft-services-domain .beltoft-dnse__table input[type="text"], div.beltoft-services-domain .beltoft-dnse__table input[type="number"], div.beltoft-services-domain .beltoft-dnse__table select { box-sizing: border-box; width: 100%; height: 40px; margin: 0; padding: 0 10px; border: 1px solid var(--bsd-rule); background-color: var(--bsd-card); box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
+div.beltoft-services-domain .beltoft-dnse__table select { appearance: none; padding-right: 24px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230c1535' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-services-domain .beltoft-dnse__table select:disabled { background-color: var(--bsd-warm); color: var(--bsd-soft); }
+.beltoft-dnse__fields { display: flex; flex-wrap: wrap; gap: 6px; }
+.beltoft-dnse__fields > * { flex: 1 1 6em; min-width: 0; }
+.beltoft-dnse__fields > [data-f="value"] { flex: 4 1 10em; }
+.beltoft-dnse__fields > .beltoft-dnse__extra { flex: 0 0 6em; }
+.beltoft-dnse__fields > [hidden] { display: none; }
+div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 0 16px; }
+.beltoft-dnse__form { display: none; }
+.beltoft-dnse__more { margin-top: 12px; }
+@media (max-width: 640px) {
+	.beltoft-dnse__table thead { display: none; }
+	.beltoft-dnse__table, .beltoft-dnse__table tbody { display: block; }
+	.beltoft-dnse__table tr { display: grid; grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 8px; padding: 10px 0; border-bottom: 1px solid var(--bsd-rule); }
+	.beltoft-dnse__table tr:last-child { border-bottom: 0; }
+	.beltoft-dnse__table td, .beltoft-dnse__table td:nth-child(n) { display: block; width: auto; padding: 0; border: 0; text-align: left; }
+	.beltoft-dnse__table td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 500; }
+	.beltoft-dnse__table td:nth-child(2) { grid-column: 2; grid-row: 1; }
+	.beltoft-dnse__table td:nth-child(3) { grid-column: 3; grid-row: 1; color: var(--bsd-soft); }
+	.beltoft-dnse__table td:nth-child(4) { grid-column: 1 / 4; grid-row: 2; padding-top: 4px; }
+	.beltoft-dnse__table td:nth-child(5):not(.beltoft-dnse__actions) { grid-column: 1 / 4; grid-row: 3; color: var(--bsd-soft); }
+	.beltoft-dnse__table td.beltoft-dnse__actions { grid-column: 1 / 4; padding-top: 6px; text-align: left; white-space: normal; }
+	.beltoft-dnse__table tr[data-edit-row] td::before { content: attr(data-label); display: block; padding: 6px 0 2px; color: var(--bsd-soft); font-size: 12px; }
+	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions::before { content: none; }
+	.beltoft-dnse__table tr[data-edit-row] { gap: 0 6px; }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(n) { padding: 0; }
+	.beltoft-dnse__table tr.beltoft-dnse__rowerror { display: block; padding: 0 0 10px; }
+	.beltoft-dnse__table tr.beltoft-dnse__rowerror td { display: block; padding: 0; }
+	.beltoft-dnse__fields > .beltoft-dnse__extra { flex: 1 1 5em; }
+}
+
+/* Danger zone tab and its dialog. Square, one danger colour for the destructive button only. */
+.beltoft-services-danger .beltoft-services-domain__note { max-width: 62ch; }
+.beltoft-services-danger__form { margin: 16px 0 0; }
+.beltoft-services-danger .button, .beltoft-services-domain__dialog .button { margin: 0; }
+.beltoft-services-danger__open.button { margin-top: 16px; }
+.beltoft-services-domain__dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
+.beltoft-services-domain__dialog::backdrop { background: rgba(12, 21, 53, 0.5); }
+.beltoft-services-danger__dialog-form { margin: 0; padding: 20px; }
+.beltoft-services-domain__dialog h5 { margin: 0 0 12px; font-size: 17px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-domain__dialog p { margin: 0 0 12px; }
+.beltoft-services-domain__dialog label { display: block; margin: 0 0 4px; font-size: 14px; color: var(--ink-soft, #5e7080); }
+.beltoft-services-domain__dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 43px; margin: 0 0 16px; padding: 0 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; box-shadow: none; }
+.beltoft-services-danger__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 0; }
+.beltoft-services-danger__confirm.button:disabled { opacity: .45; cursor: not-allowed; }

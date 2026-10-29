@@ -17,11 +17,16 @@ final class Panels {
 	}
 	public static function assets( $parent, $endpoint = null ): void {
 		// The domain script is for the Domains endpoint only (the Servers and Licenses pages have no domain panel).
-		if ( is_string( $endpoint ) && 'domains' !== $endpoint ) {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\Domains::slug() !== $endpoint ) {
 			return;
 		}
 
 		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/domain.js' ), true );
+
+		// The row-by-row DNS records editor of a domain's page.
+		if ( \BeltoftServices\Account\Domains::requested()['id'] > 0 ) {
+			wp_enqueue_script( 'beltoft-services-dns-editor', plugins_url( 'assets/dns-editor.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/dns-editor.js' ), true );
+		}
 	}
 	public static function buttons( $buttons, $r ) {
 		if ( is_array( $buttons ) && $r instanceof Resource && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
@@ -37,6 +42,13 @@ final class Panels {
 		return '' !== $domain ? $domain : $title;
 	}
 	public static function account( Resource $r ): void {
+		// On a domain page (My Account → Domains → one domain) the tabs print instead of the one card.
+		$page = \BeltoftServices\Account\Domains::page();
+		if ( $page && (int) ( $page['license']['id'] ?? 0 ) === (int) ( $r->license()['id'] ?? -1 ) ) {
+			$d = \BeltoftServices\Account\DomainPage::build( $r, $page );
+			include \BeltoftServices\Account\Domains::file( 'domain-page.php' );
+			return;
+		}
 		$domain = (string) $r->get( 'domain' );
 		$dns_only = 'dns' === $r->get( 'driver' );
 		$client = Clients::dns();
