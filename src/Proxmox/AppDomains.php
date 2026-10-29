@@ -189,4 +189,50 @@ final class AppDomains {
 		);
 		return is_wp_error( $locked ) ? new \WP_Error( 'transient', 'The DNS zone is being changed.' ) : $locked;
 	}
+
+	/**
+	 * Check a domain choice for checkout or reinstall using the same customer-facing refusals.
+	 *
+	 * @param array<string, mixed> $app App definition or checkout offer entry.
+	 * @param mixed                $sub Raw form input; non-strings are refused by sub().
+	 * @return array{zone: string, fqdn: string}|string A usable name or the refusal text.
+	 */
+	public static function choose( array $app, string $zone, $sub, int $user, bool $check_dns, string $ip = '' ) {
+		if ( empty( $app['domain'] ) ) {
+			return __( 'This app does not use a domain at install. You can add one later.', 'beltoft-services' );
+		}
+
+		$zone = strtolower( trim( $zone ) );
+		$sub  = self::sub( $sub );
+
+		if ( '' === $zone || ! in_array( $zone, self::zones( $user ), true ) ) {
+			return __( 'Choose one of your domains that uses our name servers.', 'beltoft-services' );
+		}
+
+		if ( null === $sub ) {
+			return __( 'The subdomain can have letters (a to z), digits and hyphens, up to three parts separated by dots.', 'beltoft-services' );
+		}
+
+		$fqdn = self::fqdn( $zone, $sub );
+		$bad  = self::dry_run( $zone, $fqdn );
+
+		if ( null !== $bad ) {
+			return str_contains( $bad, 'long' ) ? __( 'That domain name is too long. A name can have up to 253 characters and each part up to 63. Choose a shorter subdomain.', 'beltoft-services' ) : __( 'That domain name cannot be used for a DNS record. Choose another subdomain.', 'beltoft-services' );
+		}
+
+		if ( $check_dns ) {
+			$free = self::is_free( $zone, $fqdn, $ip );
+
+			if ( null === $free ) {
+				return __( 'Your DNS records could not be checked right now. Try again, or leave the domain out and add it later.', 'beltoft-services' );
+			}
+
+			if ( ! $free ) {
+				/* translators: %s: a domain name such as shop.example.com */
+				return sprintf( __( '%s already has a DNS record. Choose another subdomain.', 'beltoft-services' ), $fqdn );
+			}
+		}
+
+		return array( 'zone' => $zone, 'fqdn' => $fqdn );
+	}
 }

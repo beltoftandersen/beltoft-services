@@ -143,43 +143,14 @@ final class AppField {
 			return $out;
 		}
 
-		if ( empty( $app['domain'] ) ) {
-			return __( 'This app does not use a domain at install. You can add one later.', 'beltoft-services' );
+		$choice = AppDomains::choose( $app, (string) ( $input['zone'] ?? '' ), $input['sub'] ?? '', $user, $check_dns );
+
+		if ( is_string( $choice ) ) {
+			return $choice;
 		}
 
-		$zone = strtolower( trim( (string) ( $input['zone'] ?? '' ) ) );
-		$sub  = AppDomains::sub( $input['sub'] ?? '' );
-
-		if ( '' === $zone || ! in_array( $zone, AppDomains::zones( $user ), true ) ) {
-			return __( 'Choose one of your domains that uses our name servers.', 'beltoft-services' );
-		}
-
-		if ( null === $sub ) {
-			return __( 'The subdomain can have letters (a to z), digits and hyphens, up to three parts separated by dots.', 'beltoft-services' );
-		}
-
-		$fqdn = AppDomains::fqdn( $zone, $sub );
-		$bad  = AppDomains::dry_run( $zone, $fqdn );
-
-		if ( null !== $bad ) {
-			return str_contains( $bad, 'long' ) ? __( 'That domain name is too long. A name can have up to 253 characters and each part up to 63. Choose a shorter subdomain.', 'beltoft-services' ) : __( 'That domain name cannot be used for a DNS record. Choose another subdomain.', 'beltoft-services' );
-		}
-
-		if ( $check_dns ) {
-			$free = AppDomains::is_free( $zone, $fqdn );
-
-			if ( null === $free ) {
-				return __( 'Your DNS records could not be checked right now. Try again, or leave the domain out and add it later.', 'beltoft-services' );
-			}
-
-			if ( ! $free ) {
-				/* translators: %s: a domain name such as shop.example.com */
-				return sprintf( __( '%s already has a DNS record. Choose another subdomain.', 'beltoft-services' ), $fqdn );
-			}
-		}
-
-		$out['zone']   = $zone;
-		$out['domain'] = $fqdn;
+		$out['zone']   = $choice['zone'];
+		$out['domain'] = $choice['fqdn'];
 
 		return $out;
 	}

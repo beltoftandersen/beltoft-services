@@ -470,6 +470,35 @@ class AppFieldTest extends TestCase {
 		$this->assertSame( array(), $this->check( array( AppField::POST_APP => 'wordpress', AppField::POST_ZONE => 'theirs.example', AppField::POST_SUB => 'x y' ) ) );
 	}
 
+	public function test_shared_domain_choice_keeps_checkout_refusals_and_accepts_own_address(): void {
+		$me = $this->customer();
+		$this->domain( $me, 'mine.example', array(), array( array( 'name' => 'taken', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) );
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+		$offer = AppField::offer();
+
+		foreach ( array(
+			array( 'wordpress', 'mine.example', 'Shop', true ),
+			array( 'wordpress', 'mine.example', 'taken', true ),
+			array( 'wordpress', 'elsewhere.example', 'shop', true ),
+			array( 'wordpress', 'mine.example', 'bad name', true ),
+			array( 'wordpress', 'mine.example', array( 'bad' ), true ),
+			array( 'wordpress', 'mine.example', 'shop', false ),
+			array( 'docker', 'mine.example', 'shop', true ),
+		) as [ $id, $zone, $sub, $check_dns ] ) {
+			$choice = AppDomains::choose( $offer['apps'][ $id ], $zone, $sub, $me, $check_dns );
+			$at_checkout = AppField::resolve( $offer, array( 'app' => $id, 'domain_on' => true, 'zone' => $zone, 'sub' => $sub ), $me, $check_dns );
+			if ( is_string( $choice ) ) {
+				$this->assertSame( $choice, $at_checkout );
+			} else {
+				$this->assertSame( $choice['zone'], $at_checkout['zone'] );
+				$this->assertSame( $choice['fqdn'], $at_checkout['domain'] );
+			}
+		}
+
+		$this->assertSame( 'taken.mine.example already has a DNS record. Choose another subdomain.', AppDomains::choose( $offer['apps']['wordpress'], 'mine.example', 'taken', $me, true ) );
+		$this->assertSame( array( 'zone' => 'mine.example', 'fqdn' => 'taken.mine.example' ), AppDomains::choose( $offer['apps']['wordpress'], 'mine.example', 'taken', $me, true, '192.0.2.10' ) );
+	}
+
 	public function test_a_ticked_domain_is_saved_on_the_line_and_reaches_the_resource_and_an_unticked_one_does_not(): void {
 		$me = $this->customer();
 		$this->domain( $me, 'mine.example' );
