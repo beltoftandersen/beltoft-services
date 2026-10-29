@@ -28,6 +28,8 @@ final class Product {
 	public const FIELD_MARKER    = '_beltoft_services_plan_driver';
 	public const FIELD_RELEASE   = '_beltoft_services_no_longer_service';
 	public const OPTION_SLUGS    = 'beltoft_services_service_slugs';
+	public const META_PICKER     = '_beltoft_services_in_picker';
+	public const FIELD_PICKER    = '_beltoft_services_picker_shown';
 
 	/**
 	 * Hooks for the product editor and the beltoft-licenses filters.
@@ -423,6 +425,18 @@ final class Product {
 				'value'       => $driver_id,
 			)
 		);
+		if ( 'proxmox' === $driver_id ) {
+			woocommerce_wp_checkbox(
+				array(
+					'id'          => self::META_PICKER,
+					'label'       => __( 'Show in the server picker', 'beltoft-services' ),
+					'description' => __( 'Offer this product on the customer\'s New server page in My account. Its variations without backups are the plans.', 'beltoft-services' ),
+					'value'       => $product && 'no' === $product->get_meta( self::META_PICKER ) ? 'no' : 'yes',
+				)
+			);
+			echo '<input type="hidden" name="' . esc_attr( self::FIELD_PICKER ) . '" value="1">';
+		}
+
 		$connection  = $product ? (string) $product->get_meta( self::META_CONNECTION ) : '';
 		$connections = array( '' => __( '— None —', 'beltoft-services' ) );
 
@@ -568,6 +582,11 @@ final class Product {
 		$retention = isset( $_POST[ self::META_RETENTION ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::META_RETENTION ] ) ) ) : '';
 		$product->update_meta_data( self::META_RETENTION, '' === $retention ? '' : (string) absint( $retention ) );
 		$product->update_meta_data( self::META_TRIAL_PAID, isset( $_POST[ self::META_TRIAL_PAID ] ) ? 'yes' : 'no' );
+
+		// Only when the panel printed the box (a product that just became a server shows it after this save).
+		if ( isset( $_POST[ self::FIELD_PICKER ] ) ) {
+			$product->update_meta_data( self::META_PICKER, isset( $_POST[ self::META_PICKER ] ) ? 'yes' : 'no' );
+		}
 
 		$rendered = isset( $_POST[ self::FIELD_MARKER ] ) ? sanitize_key( wp_unslash( $_POST[ self::FIELD_MARKER ] ) ) : '';
 		if ( $driver && $rendered === $driver_id ) {

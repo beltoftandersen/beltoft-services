@@ -68,16 +68,27 @@ final class AppField {
 			return null;
 		}
 
-		$plan    = Product::plan( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) ?: null );
+		return self::offer_for( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) );
+	}
+
+	/**
+	 * What is offered for a product and variation, with no cart (the picker and checkout ask the same question).
+	 *
+	 * @param int $product_id   Product id.
+	 * @param int $variation_id Variation id, 0 for none.
+	 * @return array{cluster: string, plan: array<string, mixed>, apps: array<string, array<string, mixed>>, os: int}|null
+	 */
+	public static function offer_for( int $product_id, int $variation_id = 0 ): ?array {
+		$plan    = Product::plan( $product_id, $variation_id ?: null );
 		$cluster = Clusters::get( (string) ( $plan['cluster'] ?? '' ) );
 
 		if ( ! $cluster ) {
 			return null;
 		}
 
-		$apps = Apps::offered( $cluster );
-		$os   = Apps::os_template( $cluster );
-		$choice = OsField::cart_choice();
+		$apps   = Apps::offered( $cluster );
+		$os     = Apps::os_template( $cluster );
+		$choice = OsField::choice_for( $product_id, $variation_id );
 
 		if ( array() === $apps || $os <= 0 || null === $choice || ! isset( $choice['options'][ $os ] ) ) {
 			return null;
@@ -193,6 +204,19 @@ final class AppField {
 		};
 		// phpcs:enable
 
+		// A form that does not carry the field at all (the step was not shown) uses what the picker carried. A posted value, even an empty one, wins.
+		if ( ! isset( $_POST[ self::POST_APP ] ) ) {
+			$picked = Picked::for_cart();
+
+			return array(
+				'app'       => $picked['app'],
+				'version'   => $picked['version'],
+				'domain_on' => '' !== $picked['domain_on'],
+				'zone'      => $picked['zone'],
+				'sub'       => $picked['sub'],
+			);
+		}
+
 		return array(
 			'app'       => $get( self::POST_APP ),
 			'version'   => $get( self::POST_VERSION ),
@@ -212,8 +236,21 @@ final class AppField {
 			return;
 		}
 
-		$zones = AppDomains::zones( get_current_user_id() );
-		$data  = array();
+		self::print_fields( $offer, Picked::for_cart() );
+	}
+
+	/**
+	 * The fields for an offer, starting from the given choices (checkout and the picker print the same markup).
+	 *
+	 * @param array<string, mixed>  $offer  From offer() or offer_for().
+	 * @param array<string, string> $picked Choices to start from (Picked::clean() shape), or none.
+	 */
+	public static function print_fields( array $offer, array $picked = array() ): void {
+		$picked    = Picked::clean( $picked );
+		$start     = isset( $offer['apps'][ $picked['app'] ] ) ? $picked['app'] : '';
+		$zones     = AppDomains::zones( get_current_user_id() );
+		$domain_on = '' !== $picked['domain_on'] && '' !== $start && ! empty( $offer['apps'][ $start ]['domain'] ) && in_array( $picked['zone'], $zones, true );
+		$data      = array();
 
 		foreach ( $offer['apps'] as $id => $app ) {
 			$versions = array();
@@ -239,7 +276,7 @@ final class AppField {
 				'name'    => __( 'No app', 'beltoft-services' ),
 				'line'    => __( 'Just the operating system', 'beltoft-services' ),
 				'logo'    => Tiles::app_logo( array() ),
-				'checked' => true,
+				'checked' => '' === $start,
 				'attrs'   => array( 'data-none' => '1' ),
 			),
 		);
@@ -258,9 +295,14 @@ final class AppField {
 				'name'     => (string) $app['name'],
 				'line'     => (string) ( $app['summary'] ?? '' ),
 				'logo'     => Tiles::app_logo( $app ),
+				'checked'  => (string) $id === $start && null === $why,
 				'disabled' => null !== $why,
 				'why'      => null === $why ? '' : self::needs( $current ),
-				'attrs'    => array( 'data-versions' => (string) wp_json_encode( $versions ) ),
+				'attrs'    => array(
+					'data-versions' => (string) wp_json_encode( $versions ),
+					'data-min'      => (string) wp_json_encode( self::minimum( $current ) ),
+					'data-why'      => self::needs( $current ),
+				),
 			);
 		}
 
@@ -278,26 +320,40 @@ final class AppField {
 		echo '<p class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed on Ubuntu 24.04 after the server starts. Without an app, you choose the operating system above.', 'beltoft-services' ) . '</p>';
 
 		echo '<p class="form-row form-row-wide" data-tiles-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
-		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version></select></span></p>';
+		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version data-selected="' . esc_attr( $picked['version'] ) . '"></select></span></p>';
 
 		if ( array() !== $zones ) {
 			echo '<div class="beltoft-services-app__domain" data-app-domain hidden>';
-			echo '<p class="form-row form-row-wide"><label class="checkbox"><input type="checkbox" class="input-checkbox" name="' . esc_attr( self::POST_DOMAIN ) . '" value="1" data-app-domain-on> <span>' . esc_html__( 'Point a domain to this server', 'beltoft-services' ) . '</span></label>';
+			echo '<p class="form-row form-row-wide"><label class="checkbox"><input type="checkbox" class="input-checkbox" name="' . esc_attr( self::POST_DOMAIN ) . '" value="1" data-app-domain-on' . ( $domain_on ? ' checked' : '' ) . '> <span>' . esc_html__( 'Point a domain to this server', 'beltoft-services' ) . '</span></label>';
 			echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) . '</span></p>';
-			echo '<div class="beltoft-services-app__domain-fields" data-app-domain-fields hidden>';
+			echo '<div class="beltoft-services-app__domain-fields" data-app-domain-fields' . ( $domain_on ? '' : ' hidden' ) . '>';
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_ZONE ) . '">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_ZONE ) . '" id="' . esc_attr( self::POST_ZONE ) . '">';
 
 			foreach ( $zones as $zone ) {
-				echo '<option value="' . esc_attr( $zone ) . '">' . esc_html( $zone ) . '</option>';
+				echo '<option value="' . esc_attr( $zone ) . '"' . selected( $picked['zone'], $zone, false ) . '>' . esc_html( $zone ) . '</option>';
 			}
 
 			echo '</select></span></p>';
-			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_SUB ) . '">' . esc_html__( 'Subdomain (optional)', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( self::POST_SUB ) . '" id="' . esc_attr( self::POST_SUB ) . '" maxlength="120" autocomplete="off" spellcheck="false" placeholder="www"></span>';
+			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_SUB ) . '">' . esc_html__( 'Subdomain (optional)', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( self::POST_SUB ) . '" id="' . esc_attr( self::POST_SUB ) . '" maxlength="120" autocomplete="off" spellcheck="false" placeholder="www" value="' . esc_attr( $picked['sub'] ) . '"></span>';
 			echo '<span class="description">' . esc_html__( 'Leave it empty to use the domain itself. The name must not have an address record yet.', 'beltoft-services' ) . '</span></p>';
 			echo '</div></div>';
 		}
 
 		echo '</div>';
+	}
+
+	/**
+	 * The smallest plan an app version runs on: what the picker's script compares a plan card to.
+	 *
+	 * @param array<string, mixed> $version Version.
+	 * @return array{cores: int, memory_mb: int, disk_gb: int}
+	 */
+	public static function minimum( array $version ): array {
+		return array(
+			'cores'     => (int) ( $version['min']['cores'] ?? 0 ),
+			'memory_mb' => (int) ( $version['min']['memory_mb'] ?? 0 ),
+			'disk_gb'   => (int) ( $version['min']['disk_gb'] ?? 0 ),
+		);
 	}
 
 	/**
@@ -376,6 +432,13 @@ final class AppField {
 			return;
 		}
 
+		self::enqueue();
+	}
+
+	/**
+	 * The script and style of the fields (checkout, and the picker, which prints the same fields).
+	 */
+	public static function enqueue(): void {
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/app-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-field.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-field.js' ), true );
 	}

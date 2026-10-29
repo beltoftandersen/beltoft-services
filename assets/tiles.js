@@ -93,6 +93,8 @@
 				return;
 			}
 
+			var wanted = select.getAttribute( 'data-selected' ) || '';
+
 			select.textContent = '';
 			row.hidden = ! ( radio && ! radio.hasAttribute( 'data-none' ) && list.length > 1 );
 
@@ -106,7 +108,7 @@
 				option.value = entry.value;
 				option.textContent = entry.label;
 				option.disabled = !! entry.disabled;
-				option.selected = merge && entry.value === radio.value;
+				option.selected = merge ? entry.value === radio.value : '' !== wanted && entry.value === wanted;
 				select.appendChild( option );
 			} );
 		}

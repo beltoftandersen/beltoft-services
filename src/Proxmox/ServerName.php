@@ -184,6 +184,15 @@ final class ServerName {
 			return;
 		}
 
+		self::print_field( Picked::get( 'name' ) );
+	}
+
+	/**
+	 * The field (checkout and the picker print the same markup).
+	 *
+	 * @param string $value Value to start from.
+	 */
+	public static function print_field( string $value = '' ): void {
 		echo '<div class="beltoft-services-server-name">';
 
 		woocommerce_form_field(
@@ -199,7 +208,7 @@ final class ServerName {
 					'spellcheck'   => 'false',
 				),
 			),
-			''
+			$value
 		);
 
 		echo '</div>';
@@ -213,8 +222,9 @@ final class ServerName {
 			return '';
 		}
 
+		// A form that does not carry the field at all (the step was not shown) uses what the picker carried. A posted value, even an empty one, wins.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce; the value is only used through normalise().
-		$value = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : '';
+		$value = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : Picked::get( 'name' );
 
 		return is_string( $value ) ? $value : '';
 	}

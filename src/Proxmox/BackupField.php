@@ -300,7 +300,7 @@ final class BackupField {
 	 * @param \WC_Product_Variation $variation Variation.
 	 * @return array<string, string>
 	 */
-	private static function attributes( \WC_Product_Variation $variation ): array {
+	public static function attributes( \WC_Product_Variation $variation ): array {
 		$out = array();
 
 		foreach ( $variation->get_attributes() as $name => $value ) {

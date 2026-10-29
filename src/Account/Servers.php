@@ -47,6 +47,11 @@ final class Servers {
 	public const TABS = array( 'snapshots', 'backups', 'disks', 'access', 'reinstall' );
 
 	/**
+	 * The value after the endpoint that is the New server page (the picker).
+	 */
+	public const NEW_VALUE = 'new';
+
+	/**
 	 * The tab addresses a server page accepts: the built-in ones, plus any an extension adds.
 	 *
 	 * @return array<int, string>
@@ -116,6 +121,33 @@ final class Servers {
 	}
 
 	/**
+	 * The address of the New server page (the picker).
+	 *
+	 * @param int $plan Variation id to start with, 0 for none.
+	 */
+	public static function url_new( int $plan = 0 ): string {
+		if ( ! function_exists( 'wc_get_endpoint_url' ) ) {
+			return '';
+		}
+
+		$url = wc_get_endpoint_url( self::slug(), self::NEW_VALUE, wc_get_page_permalink( 'myaccount' ) );
+
+		return $plan > 0 ? add_query_arg( 'plan', $plan, $url ) : $url;
+	}
+
+	/**
+	 * Is the address the New server page (the value after the endpoint is "new")?
+	 */
+	public static function is_new(): bool {
+		global $wp;
+
+		$value = is_object( $wp ) && isset( $wp->query_vars[ self::slug() ] ) ? (string) $wp->query_vars[ self::slug() ] : '';
+		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
+
+		return self::NEW_VALUE === $parts[0];
+	}
+
+	/**
 	 * The server page being printed, or null.
 	 *
 	 * @return array<string, mixed>|null
@@ -168,6 +200,12 @@ final class Servers {
 	 * @param string                           $empty     Text for an empty tab.
 	 */
 	public static function render( array $views, string $empty = '' ): void {
+		if ( self::is_new() ) {
+			ServerPicker::render();
+
+			return;
+		}
+
 		$servers   = array();
 		$resources = array();
 		$others    = array();

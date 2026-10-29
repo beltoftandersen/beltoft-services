@@ -42,20 +42,20 @@ final class Tiles {
 	}
 
 	/**
-	 * The page of one server (its Reinstall tab has the tiles).
+	 * The page of one server (its Reinstall tab has the tiles) and the New server page.
 	 *
 	 * @param mixed $parent   Handle of the generic account script.
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
 	public static function page_assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) || Servers::requested()['id'] <= 0 ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) || ( Servers::requested()['id'] <= 0 && ! Servers::is_new() ) ) {
 			return;
 		}
 
 		self::enqueue();
 	}
 
-	private static function enqueue(): void {
+	public static function enqueue(): void {
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/tiles.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/tiles.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/tiles.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/tiles.js' ), true );
 	}

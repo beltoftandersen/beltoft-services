@@ -158,6 +158,45 @@ final class OsField {
 	}
 
 	/**
+	 * What a product (and variation) offers, with no cart: the same shape as cart_choice() for a cart that holds only that server.
+	 *
+	 * @param int $product_id   Product id.
+	 * @param int $variation_id Variation id, 0 for none.
+	 * @return array{cluster: string, options: array<int, string>, default: int, any: array<int, string>}|null Null: not a VM product, or its cluster has no templates.
+	 */
+	public static function choice_for( int $product_id, int $variation_id = 0 ): ?array {
+		$cluster = self::cluster_of( $product_id, $variation_id );
+		$list    = '' === $cluster ? array() : Clusters::templates( $cluster );
+
+		if ( array() === $list ) {
+			return null;
+		}
+
+		$default = Clusters::default_template( $cluster );
+
+		if ( isset( $list[ $default ] ) ) {
+			$list = array( $default => $list[ $default ] ) + $list;
+		}
+
+		return array(
+			'cluster' => $cluster,
+			'options' => $list,
+			'default' => isset( $list[ $default ] ) ? $default : (int) array_key_first( $list ),
+			'any'     => $list,
+		);
+	}
+
+	/**
+	 * The refusal text for an entry against a choice, or null when it is acceptable (the one check of checkout and the picker).
+	 *
+	 * @param mixed                                                       $raw    Input.
+	 * @param array{options: array<int, string>, any: array<int, string>} $choice What is offered.
+	 */
+	public static function check( $raw, array $choice ): ?string {
+		return self::refusal( $raw, $choice );
+	}
+
+	/**
 	 * Cart item data keys of a renewal and a switch of WooCommerce Subscriptions
 	 * (WCS_Cart_Renewal, WCS_Cart_Switch; what wcs_cart_contains_renewal() and _switches() look for).
 	 * An early renewal item carries `subscription_renewal` too (its own flag is inside that array).
@@ -280,9 +319,21 @@ final class OsField {
 			return;
 		}
 
+		$picked = (int) Picked::get( 'os' );
+
+		self::print_field( $choice, isset( $choice['options'][ $picked ] ) ? $picked : (int) $choice['default'] );
+	}
+
+	/**
+	 * The field: the tiles and their line. Checkout and the picker print the same markup.
+	 *
+	 * @param array{cluster: string, options: array<int, string>} $choice   What is offered.
+	 * @param int                                                 $selected VMID checked first.
+	 */
+	public static function print_field( array $choice, int $selected ): void {
 		echo '<div class="beltoft-services-os form-row form-row-wide validate-required" id="' . esc_attr( self::POST_KEY ) . '_field">';
 
-		Tiles::print_os( $choice['cluster'], $choice['options'], (int) $choice['default'], self::POST_KEY, self::POST_KEY );
+		Tiles::print_os( $choice['cluster'], $choice['options'], $selected, self::POST_KEY, self::POST_KEY );
 
 		echo '<span class="description">' . esc_html__( 'The system your server is installed with. It is used for every server of this product on the order.', 'beltoft-services' ) . '</span>';
 		echo '</div>';
@@ -297,8 +348,9 @@ final class OsField {
 			return '';
 		}
 
+		// A form that does not carry the field at all (the step was not shown) uses what the picker carried. A posted value, even an empty one, wins.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce; the value is only used through pick(), which accepts nothing but a listed VMID.
-		$value = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : '';
+		$value = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : Picked::get( 'os' );
 
 		return is_string( $value ) ? trim( $value ) : '';
 	}

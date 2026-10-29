@@ -70,6 +70,7 @@ final class Plugin {
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Servers::register();
+		Account\ServerPicker::register();
 		Account\Overview::register();
 		Account\Billing::register();
 
