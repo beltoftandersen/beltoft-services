@@ -620,5 +620,4 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-domain__dialog label { display: block; margin: 0 0 4px; font-size: 14px; color: var(--ink-soft, #5e7080); }
 .beltoft-services-domain__dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 43px; margin: 0 0 16px; padding: 0 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; box-shadow: none; }
 .beltoft-services-danger__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 0; }
-.beltoft-services-danger__confirm.button { background: #b32d2e; color: #fff; }
 .beltoft-services-danger__confirm.button:disabled { opacity: .45; cursor: not-allowed; }
