@@ -145,6 +145,30 @@
 		var panel = block.closest( '.beltoft-services-panel[data-resource]' );
 		if ( ! panel ) { return; }
 		var notice = block.querySelector( '[data-metrics-notice]' );
+		var alerts = block.querySelector( '[data-usage-alerts]' );
+		var alertsNote = block.querySelector( '[data-usage-alerts-note]' );
+		if ( alerts ) {
+			alerts.addEventListener( 'change', function () {
+				var wanted = alerts.checked;
+				alerts.disabled = true;
+				window.fetch( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/usage-alerts', {
+					method: 'POST', credentials: 'same-origin',
+					headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
+					body: JSON.stringify( { on: wanted } )
+				} ).then( function ( response ) {
+					var nonce = response.headers.get( 'X-WP-Nonce' );
+					if ( nonce ) { account.nonce = nonce; }
+					if ( ! response.ok ) { throw new Error( 'alerts' ); }
+					return response.json();
+				} ).then( function ( body ) {
+					alerts.checked = !! ( body && body.on );
+					alertsNote.textContent = alerts.checked ? labels.alertsOn : labels.alertsOff;
+				} ).catch( function () {
+					alerts.checked = ! wanted;
+					alertsNote.textContent = labels.alertsFailed;
+				} ).then( function () { alerts.disabled = false; } );
+			} );
+		}
 		var serial = 0;
 		var range = 'hour';
 		var started = false;

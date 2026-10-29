@@ -2,6 +2,7 @@
 /** Owner-only VPS usage route. @package BeltoftServices */
 namespace BeltoftServices\Proxmox;
 
+use BeltoftLicenses\Events;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Resource;
 
@@ -22,6 +23,37 @@ final class MetricsRoute {
 				'range' => array( 'type' => 'string', 'default' => 'hour', 'enum' => array_keys( Metrics::RANGES ) ),
 			),
 		) );
+		register_rest_route( Routes::NAMESPACE, '/resources/(?P<id>\d+)/usage-alerts', array(
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => array( __CLASS__, 'switch_alerts' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args' => array(
+				'id' => array( 'type' => 'integer', 'minimum' => 1, 'required' => true ),
+				'on' => array( 'type' => 'boolean', 'required' => true ),
+			),
+		) );
+	}
+
+	/** Requests a minute for the switch of the usage emails. */
+	private const SWITCH_RATE_LIMIT = 10;
+
+	public static function switch_alerts( \WP_REST_Request $request ): \WP_REST_Response {
+		$resource = Routes::guard( $request, false, self::SWITCH_RATE_LIMIT );
+		if ( ! $resource instanceof Resource ) {
+			return $resource;
+		}
+		if ( 'proxmox' !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) ) {
+			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
+		}
+		$on = (bool) $request['on'];
+		$changed = $on !== Monitor::usage_wanted( $resource );
+		$stored = $resource->locked( static fn(): bool => $resource->set( array( 'usage_alerts' => $on ? null : 'off' ) ) );
+		if ( $changed && $stored ) {
+			Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', $on ? 'Customer turned usage emails on' : 'Customer turned usage emails off' );
+		}
+		$response = new \WP_REST_Response( array( 'on' => Monitor::usage_wanted( Resource::find( $resource->id() ) ) ), $stored ? 200 : 500 );
+		$response->header( 'Cache-Control', 'private, no-store' );
+		return $response;
 	}
 
 	public static function get( \WP_REST_Request $request ): \WP_REST_Response {

@@ -30,6 +30,10 @@ final class ProxmoxSettings {
 		'abuse_cpu'        => array( 1, 100 ),
 		'abuse_hours'      => array( 1, 168 ),
 		'monitor_disk_percent' => array( 50, 99 ),
+		'monitor_disk_urgent_percent' => array( 60, 100 ),
+		'monitor_cpu_percent' => array( 50, 100 ),
+		'monitor_cpu_hours' => array( 1, 24 ),
+		'monitor_cooldown_days' => array( 1, 90 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
 		'disk_reserve_gb' => array( 0, 10000 ),
 		'disk_promise_percent' => array( 1, 100 ),
@@ -267,16 +271,42 @@ final class ProxmoxSettings {
 		);
 		$fields['monitor_alerts'] = $base + array(
 			'type' => 'select',
-			'default' => 'off',
+			'default' => 'on',
 			'options' => array( 'off' => __( 'Off', 'beltoft-services' ), 'on' => __( 'On', 'beltoft-services' ) ),
 			'label' => __( 'Customer monitoring emails', 'beltoft-services' ),
-			'desc' => __( 'Email the customer when their server stays down unexpectedly or its disk is nearly full.', 'beltoft-services' ),
+			'desc' => __( 'Email the customer when their server stays down unexpectedly, its disk is nearly full or its CPU stays high. Customers can turn the usage emails off per server; the server down email is always sent.', 'beltoft-services' ),
 		);
 		$fields['monitor_disk_percent'] = $base + array(
 			'type' => 'number',
 			'default' => 90,
 			'min' => self::RANGES['monitor_disk_percent'][0],
 			'label' => __( 'Disk alert threshold, percent', 'beltoft-services' ),
+		);
+		$fields['monitor_disk_urgent_percent'] = $base + array(
+			'type' => 'number',
+			'default' => 97,
+			'min' => self::RANGES['monitor_disk_urgent_percent'][0],
+			'label' => __( 'Urgent disk alert threshold, percent', 'beltoft-services' ),
+			'desc' => __( 'A second, stronger email when the disk is almost completely full. It is sent once per episode and re-arms five points lower.', 'beltoft-services' ),
+		);
+		$fields['monitor_cpu_percent'] = $base + array(
+			'type' => 'number',
+			'default' => 90,
+			'min' => self::RANGES['monitor_cpu_percent'][0],
+			'label' => __( 'CPU alert threshold, percent', 'beltoft-services' ),
+		);
+		$fields['monitor_cpu_hours'] = $base + array(
+			'type' => 'number',
+			'default' => 3,
+			'min' => self::RANGES['monitor_cpu_hours'][0],
+			'label' => __( 'CPU alert after this many hours', 'beltoft-services' ),
+			'desc' => __( 'Counted over several hourly readings, like the abuse check. Re-arms when the CPU falls below 70 percent.', 'beltoft-services' ),
+		);
+		$fields['monitor_cooldown_days'] = $base + array(
+			'type' => 'number',
+			'default' => 7,
+			'min' => self::RANGES['monitor_cooldown_days'][0],
+			'label' => __( 'Days between two CPU emails for one server', 'beltoft-services' ),
 		);
 
 		return $fields;
