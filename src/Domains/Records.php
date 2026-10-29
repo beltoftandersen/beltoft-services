@@ -208,10 +208,57 @@ final class Records {
 		return $any;
 	}
 
+	/**
+	 * Is the zone paused? The zone holder's `records_off` meta is the source of truth (read fresh, so an empty zone
+	 * or one whose records are all off for another reason is judged right). A zone with no holder has only its own
+	 * records to go by, so there the second guard applies: every customer record is switched off.
+	 */
+	public static function paused( string $zone, array $zone_data ): bool {
+		$off = self::holder_off( $zone );
+		return null === $off ? self::zone_paused( $zone_data ) : $off;
+	}
+
+	/** The holder's records_off flag, or null when the zone has no holding service. */
+	private static function holder_off( string $zone ): ?bool {
+		if ( ! DnsSchema::ready() ) { return null; }
+		$row = DnsAssignments::get( $zone );
+		if ( null === $row || (int) ( $row['resource_id'] ?? 0 ) <= 0 ) { return null; }
+		$holder = \BeltoftServices\Resource::find( (int) $row['resource_id'] );
+		return $holder ? (bool) $holder->get( 'records_off' ) : null;
+	}
+
+	/** One comparable form of a record's content, so spelling that DNS treats as the same does not read as a change. */
+	private static function norm( string $type, string $content ): string {
+		$content = trim( $content );
+		switch ( $type ) {
+			case 'A':
+				return $content;
+			case 'AAAA':
+				$packed = @inet_pton( $content ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- bad input falls back to the text.
+				return false === $packed ? strtolower( $content ) : (string) inet_ntop( $packed );
+			case 'CNAME':
+				return strtolower( rtrim( $content, '.' ) );
+			case 'MX':
+			case 'SRV':
+				$parts = preg_split( '/\s+/', $content );
+				$last = count( $parts ) - 1;
+				$parts[ $last ] = strtolower( rtrim( $parts[ $last ], '.' ) );
+				return implode( ' ', $parts );
+			case 'TXT':
+				// PowerDNS returns the quoted strings; the value is their concatenation, however it was split.
+				if ( preg_match_all( '/"((?:[^"\\\\]|\\\\.)*)"/', $content, $m ) ) { return stripcslashes( implode( '', $m[1] ) ); }
+				return $content;
+			case 'CAA':
+				if ( preg_match( '/^(\d+)\s+(\S+)\s+"((?:[^"\\\\]|\\\\.)*)"$/', $content, $m ) ) { return (int) $m[1] . ' ' . strtolower( $m[2] ) . ' ' . stripcslashes( $m[3] ); }
+				return $content;
+		}
+		return $content;
+	}
+
 	/** Records of a set as sorted [content, disabled] pairs, for comparing two sets. */
-	private static function signature( array $records, int $ttl ): string {
+	private static function signature( string $type, array $records, int $ttl ): string {
 		$list = array();
-		foreach ( $records as $entry ) { $list[] = (string) ( $entry['content'] ?? '' ) . '|' . ( empty( $entry['disabled'] ) ? '0' : '1' ); }
+		foreach ( $records as $entry ) { $list[] = self::norm( $type, (string) ( $entry['content'] ?? '' ) ) . '|' . ( empty( $entry['disabled'] ) ? '0' : '1' ); }
 		sort( $list );
 		return $ttl . '#' . implode( "\n", $list );
 	}
@@ -219,9 +266,9 @@ final class Records {
 	/** Gives each record of a new set the disabled flag of the same content already in the zone, else the zone's state. */
 	private static function with_flags( array $set, ?array $old, bool $paused ): array {
 		$flags = array();
-		foreach ( (array) ( $old['records'] ?? array() ) as $entry ) { $flags[ (string) ( $entry['content'] ?? '' ) ] = ! empty( $entry['disabled'] ); }
+		foreach ( (array) ( $old['records'] ?? array() ) as $entry ) { $flags[ self::norm( (string) $set['type'], (string) ( $entry['content'] ?? '' ) ) ] = ! empty( $entry['disabled'] ); }
 		foreach ( $set['records'] as $i => $entry ) {
-			$set['records'][ $i ]['disabled'] = $flags[ $entry['content'] ] ?? $paused;
+			$set['records'][ $i ]['disabled'] = $flags[ self::norm( (string) $set['type'], $entry['content'] ) ] ?? $paused;
 		}
 		return $set;
 	}
@@ -254,7 +301,7 @@ final class Records {
 		return self::locked( $zone, static function () use ( $zone, $fqdn, $type, $set, $expect ) {
 			$data = self::read( $zone );
 			if ( is_wp_error( $data ) ) { return $data; }
-			if ( self::zone_paused( $data ) ) { return new \WP_Error( 'records_off', 'DNS hosting is paused for this domain.' ); }
+			if ( self::paused( $zone, $data ) ) { return new \WP_Error( 'records_off', 'DNS hosting is paused for this domain.' ); }
 			$have = self::customer_sets( $data );
 			$key = strtolower( $fqdn ) . '|' . $type;
 			$old = $have[ $key ] ?? null;
@@ -276,7 +323,7 @@ final class Records {
 			}
 			if ( $total > 200 ) { return new \WP_Error( 'too_many_records', 'A zone can have at most 200 customer records.' ); }
 			$set = self::with_flags( $set, $old, false );
-			if ( $old && self::signature( $set['records'], $set['ttl'] ) === self::signature( (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { return true; }
+			if ( $old && self::signature( (string) $set['type'], $set['records'], $set['ttl'] ) === self::signature( (string) $set['type'], (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { return true; }
 			return Clients::dns()->replace_rrsets( $zone, array( $set ) );
 		} );
 	}
@@ -314,8 +361,11 @@ final class Records {
 		return self::locked( $zone, static function () use ( $zone, $rrsets ) {
 			$data = self::read( $zone );
 			if ( is_wp_error( $data ) ) { return $data; }
+			// A paused service takes no customer writes; a zone with no holder is judged by its own records.
+			$off = self::holder_off( $zone );
+			if ( true === $off ) { return new \WP_Error( 'records_off', 'DNS hosting is paused for this domain.' ); }
 			$have = self::customer_sets( $data );
-			$paused = self::zone_paused( $data );
+			$paused = null === $off && self::zone_paused( $data );
 			$sets = array();
 			$wanted = array();
 			foreach ( $rrsets as $set ) {
@@ -323,7 +373,7 @@ final class Records {
 				$wanted[ $key ] = true;
 				$old = $have[ $key ] ?? null;
 				$set = self::with_flags( $set, $old, $paused );
-				if ( $old && self::signature( $set['records'], $set['ttl'] ) === self::signature( (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { continue; }
+				if ( $old && self::signature( (string) $set['type'], $set['records'], $set['ttl'] ) === self::signature( (string) $set['type'], (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { continue; }
 				$sets[] = $set;
 			}
 			foreach ( $have as $key => $old ) {

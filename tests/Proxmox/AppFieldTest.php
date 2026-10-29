@@ -867,6 +867,20 @@ class AppFieldTest extends TestCase {
 		remove_filter( 'beltoft_services_zone_lock_wait', '__return_zero' );
 	}
 
+	public function test_a_paused_zone_gives_a_plain_final_reason_not_a_retry(): void {
+		$me  = self::factory()->user->create();
+		$dns = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns, 20 );
+		$this->domain( $me, 'off.example', array(), array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 3600, 'value' => '192.0.2.1' ) ) );
+		$this->assertTrue( \BeltoftServices\Domains\Records::set_disabled( 'off.example', true ) );
+		$before = count( array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+
+		$made = AppDomains::publish( $me, 'off.example', 'shop.off.example', '192.0.2.10' );
+		$this->assertIsString( $made, 'a final reason, so the install records it once without retries' );
+		$this->assertSame( 'DNS hosting is paused for this domain.', $made );
+		$this->assertCount( $before, array_filter( $dns->calls(), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+	}
+
 	public function test_a_single_set_change_leaves_an_app_record_the_editor_never_saw(): void {
 		$me  = self::factory()->user->create();
 		$dns = new FakeDns( true );

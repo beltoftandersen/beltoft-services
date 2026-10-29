@@ -173,8 +173,8 @@ final class AppDomains {
 						$have[ $row['type'] ][] = (string) $row['value'];
 					}
 				}
-				if ( Records::zone_paused( $zone_data ) ) {
-					return new \WP_Error( 'transient', 'The DNS hosting is paused.' );
+				if ( Records::paused( $zone, $zone_data ) ) {
+					return 'DNS hosting is paused for this domain.';
 				}
 				if ( array( 'A' => array( $ip ) ) === $have ) {
 					return true;
