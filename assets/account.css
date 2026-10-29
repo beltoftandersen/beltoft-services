@@ -449,3 +449,10 @@ div.beltoft-services-vm__more > h4 { margin-top: 28px; }
 .beltoft-services-vm--page .beltoft-services-vm__more { border-top: 0; }
 .beltoft-services-vm--page details.beltoft-services-vm__more { margin-top: 12px; }
 .beltoft-services-vm__reset { margin-top: 24px; }
+
+/* An extra disk or snapshot pack with no server on the list: a plain card, the status as text. */
+.beltoft-services-servers--addons { margin-top: 16px; }
+.beltoft-services-servers .beltoft-services-srv--addon { display: grid; gap: 10px; padding: 18px 20px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-servers .beltoft-services-srv--addon:first-child { border-top: 0; }
+.beltoft-services-srv__body { font-size: 14px; }
+.beltoft-services-srv__body p { margin: 0 0 8px; }

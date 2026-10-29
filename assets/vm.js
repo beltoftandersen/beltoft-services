@@ -589,7 +589,7 @@
 		return found;
 	}
 
-	// A link to something inside a hidden pane (a disk's setup guide) opens its tab first.
+	// A link to something inside a hidden pane (a disk's setup guide, in the Disks tab) opens its tab first.
 	function revealHash( panel ) {
 		var id = window.location.hash.slice( 1 );
 		var target;

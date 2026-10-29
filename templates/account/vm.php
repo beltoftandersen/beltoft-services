@@ -12,7 +12,7 @@
  * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
- * $snapshots (null when the block is absent, or slots, used, included, added, buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
+ * $snapshots (null when the block is absent, or slots, used, included, added, packs (the packs the server has: slots, days, paused), buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
  * $resource_id (the resource id, for ids that must be unique on a page),
  * $server_name (the name now set, or empty), $can_rename (whether the rename form is shown), $hostname_pending (a name the server has not taken yet, or empty),
  * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty),
@@ -324,7 +324,19 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<?php foreach ( $extra_disks['items'] as $beltoft_extra_disk ) : ?>
 			<div class="beltoft-services-vm__disk">
 				<p><strong><?php echo esc_html( $beltoft_extra_disk['name'] . ': ' . $beltoft_extra_disk['size'] . ' GB' ); ?></strong> <?php echo esc_html( $beltoft_extra_disk['state'] ); ?></p>
-				<?php if ( ! empty( $beltoft_extra_disk['paused'] ) ) : ?><p class="description"><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p><?php endif; ?>
+				<?php if ( ! empty( $beltoft_extra_disk['paused'] ) ) : ?>
+					<p class="description"><?php esc_html_e( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', 'beltoft-services' ); ?></p>
+				<?php elseif ( ! empty( $beltoft_extra_disk['guide'] ) ) : ?>
+					<div class="beltoft-services-disk">
+						<?php
+						// The setup guide, with the anchor that the emails and the thank-you page link to.
+						$guide        = $beltoft_extra_disk['guide'];
+						$guide_id     = $beltoft_extra_disk['guide_id'];
+						$needs_reboot = ! empty( $beltoft_extra_disk['needs_reboot'] );
+						include BELTOFT_SERVICES_PATH . 'templates/account/disk-guide.php';
+						?>
+					</div>
+				<?php endif; ?>
 				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
 				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-confirm-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-cancel-url="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?>
 				<?php if ( ( $beltoft_extra_disk['remove_url'] || ( $beltoft_extra_disk['ending'] && '' !== $beltoft_extra_disk['ending']['undo_url'] ) ) && '' !== $beltoft_extra_disk['manage_url'] ) : ?>
@@ -560,6 +572,16 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				}
 				?>
 			</p>
+			<?php foreach ( $snapshots['packs'] as $beltoft_services_pack_card ) : ?>
+				<?php
+				// A snapshot pack of this server: its slots, and a note when it is paused.
+				$slots      = $beltoft_services_pack_card['slots'];
+				$days       = $beltoft_services_pack_card['days'];
+				$paused     = $beltoft_services_pack_card['paused'];
+				$server_url = '';
+				include BELTOFT_SERVICES_PATH . 'templates/account/snapshot.php';
+				?>
+			<?php endforeach; ?>
 			<?php if ( $snapshots['buy'] ) : ?>
 				<p class="description" data-snapshot-add><?php esc_html_e( 'Need more?', 'beltoft-services' ); ?>
 				<?php foreach ( $snapshots['buy'] as $beltoft_services_pack ) : ?>

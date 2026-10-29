@@ -130,7 +130,11 @@ final class Panel {
 			return;
 		}
 
-		$resource = Resource::for_license( (int) $license['id'] );
+		$page = Servers::page();
+		$page = $page && (int) $page['license']['id'] === (int) $license['id'] ? $page : null;
+
+		// The server page already loaded the resource: one lookup, not two.
+		$resource = null !== $page && ( $page['resource'] ?? null ) instanceof Resource ? $page['resource'] : Resource::for_license( (int) $license['id'] );
 
 		if ( ! $resource ) {
 			return;
@@ -139,8 +143,6 @@ final class Panel {
 		$state = (string) $resource->get( 'state' );
 		$group = self::group( $state );
 		$owner = ! empty( $license['user_id'] ) && (int) $license['user_id'] === get_current_user_id();
-		$page  = Servers::page();
-		$page  = $page && (int) $page['license']['id'] === (int) $license['id'] ? $page : null;
 
 		echo '<div class="beltoft-services-panel' . ( null !== $page ? ' beltoft-services-panel--page' : '' ) . '" id="beltoft-service-' . (int) $resource->id() . '"';
 		if ( $owner ) {

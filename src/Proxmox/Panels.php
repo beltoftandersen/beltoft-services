@@ -276,6 +276,14 @@ final class Panels {
 		$panel['free_days'] = max( 1, (int) Settings::get( 'snapshot_free_days' ) );
 		$panel['paid_days'] = max( 1, (int) Settings::get( 'snapshot_paid_days' ) );
 		$panel['buy']       = 'full' === $panel['mode'] ? self::snapshot_packs( $r ) : array();
+		$panel['packs']     = array_map(
+			static fn( Resource $pack ): array => array(
+				'slots'  => SnapshotMeta::slots_of( $pack ),
+				'days'   => SnapshotMeta::days_of( $pack ),
+				'paused' => 'paused' === $pack->get( 'state' ),
+			),
+			SnapshotMeta::reserved_for( $r )
+		);
 
 		if ( $panel['added'] > 0 ) {
 			$panel['paid_days'] = Snapshots::days_for( $r );

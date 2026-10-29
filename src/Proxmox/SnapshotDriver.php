@@ -119,7 +119,7 @@ final class SnapshotDriver implements Driver {
 			'slots'      => SnapshotMeta::slots_of( $r ),
 			'days'       => SnapshotMeta::days_of( $r ),
 			'paused'     => 'paused' === $r->get( 'state' ),
-			'server_url' => $server ? DiskGuide::card_url( $server ) : '',
+			'server_url' => $server ? DiskGuide::card_url( $server, '', 'snapshots' ) : '',
 		);
 		( static function ( array $vars ): void {
 			extract( $vars, EXTR_SKIP ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Fixed template data.

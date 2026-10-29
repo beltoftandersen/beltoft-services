@@ -21,6 +21,7 @@ final class DiskPanels {
 				$volumes[ $volume['id'] ] = $volume['volid'];
 			}
 		}
+		$guide = DiskGuide::guide( DiskGuide::os_label( $server ) );
 		$names = DiskMeta::labels( $server );
 		$order = array_flip( array_keys( $names ) );
 		$live  = DiskMeta::for_server( $server );
@@ -64,6 +65,9 @@ final class DiskPanels {
 				'grow_url' => $grow_url,
 				'grow_price' => $grow_price,
 				'paused' => 'paused' === $disk->get( 'state' ),
+				'guide' => $guide,
+				'guide_id' => DiskGuide::anchor( $disk->id() ),
+				'needs_reboot' => (bool) $disk->get( 'needs_reboot' ),
 				'snapshots_covering' => isset( $volumes[ $disk->id() ] ) ? count( array_filter( $kept, static fn( $e ) => in_array( $volumes[ $disk->id() ], (array) ( $e['covers'] ?? array() ), true ) ) ) : 0,
 				'remove_url' => 'ready' === $disk->get( 'state' ) && null === $ending ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
 			);

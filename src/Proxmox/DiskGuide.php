@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Account\Endpoint;
+use BeltoftServices\Account\Servers;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -130,7 +131,7 @@ final class DiskGuide {
 	}
 
 	/**
-	 * Where the server's card is in My Account.
+	 * Where the server's page is in My Account: its Disks tab.
 	 *
 	 * @param Resource $disk The disk resource.
 	 */
@@ -141,7 +142,7 @@ final class DiskGuide {
 	}
 
 	/**
-	 * Where the guide is: on the disk's own card.
+	 * Where the guide is: on the server's Disks tab, at the disk's guide.
 	 *
 	 * @param Resource $disk The disk resource.
 	 */
@@ -150,18 +151,35 @@ final class DiskGuide {
 	}
 
 	/**
-	 * The My Account address of a service's card.
+	 * The My Account address that shows a service: the server's page, on a tab (Disks unless another is given). An
+	 * extra disk or a snapshot pack is shown on its server's page, so it gives the server's address. Another service,
+	 * or an add-on with no server, gives the address of its tab on My Account.
 	 *
 	 * @param Resource $r      Resource.
-	 * @param string   $anchor Fragment, or '' for the card itself.
+	 * @param string   $anchor Fragment, or '' for the service itself.
+	 * @param string   $tab    Tab of the server page, or '' for Disks.
 	 */
-	public static function card_url( Resource $r, string $anchor = '' ): string {
+	public static function card_url( Resource $r, string $anchor = '', string $tab = '' ): string {
 		$license = $r->license();
 
 		if ( ! $license || ! function_exists( 'wc_get_account_endpoint_url' ) ) {
 			return '';
 		}
 
-		return Endpoint::url_for_license( $license ) . '#' . ( '' !== $anchor ? $anchor : 'beltoft-service-' . $r->id() );
+		$tab    = '' !== $tab ? $tab : 'disks';
+		$target = $r;
+		$driver = (string) $r->get( 'driver' );
+
+		if ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver ) {
+			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+			$target = $server ? $server : $r;
+		}
+
+		$license = $target->license();
+		$base    = $license && SshKeyField::DRIVER === (string) $target->get( 'driver' )
+			? Servers::url( $license, $tab )
+			: Endpoint::url_for_license( $license ? $license : $r->license() );
+
+		return $base . '#' . ( '' !== $anchor ? $anchor : 'beltoft-service-' . $target->id() );
 	}
 }

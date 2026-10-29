@@ -7,11 +7,15 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftLicenses\Licenses;
+use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
+use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 
@@ -29,8 +33,10 @@ defined( 'ABSPATH' ) || exit;
  *    overview. Every tab has its own address, so a link in an email or the Back button opens the
  *    right one. The page is the service panel in its page layout (see Panel::render()).
  *
- * A license that is not a server (an extra disk that is not folded into its server, say) is
- * still printed with the default card below the rows. The id must be one of the customer's own
+ * An extra disk or a snapshot pack whose server is in the list is not printed on the list: it lives
+ * on the server's Disks and Snapshots tabs, and its own address (/vps/<its license id>/) redirects
+ * there (see redirect()). One without a server in the list is printed as a plain card below the rows,
+ * and any other license on the tab with the default card. The id must be one of the customer's own
  * server licenses: any other value shows the list with a notice.
  */
 final class Servers {
@@ -59,6 +65,7 @@ final class Servers {
 	 */
 	public static function register(): void {
 		add_filter( 'wc_get_template', array( __CLASS__, 'template' ), 10, 3 );
+		add_action( 'template_redirect', array( __CLASS__, 'redirect' ) );
 	}
 
 	/**
@@ -144,21 +151,43 @@ final class Servers {
 	 * @param string                           $empty     Text for an empty tab.
 	 */
 	public static function render( array $views, string $empty = '' ): void {
-		$servers = array();
-		$others  = array();
+		$servers   = array();
+		$resources = array();
+		$others    = array();
 
 		foreach ( $views as $view ) {
 			if ( is_array( $view ) && isset( $view['license'] ) && self::is_server( $view['license'] ) ) {
-				$servers[ (int) $view['id'] ] = $view;
+				$id = (int) $view['id'];
+
+				$servers[ $id ] = $view;
+
+				// One lookup per server: the rows and the page take the resource from here.
+				$resource = Resource::for_license( (int) $view['license']['id'] );
+
+				if ( $resource ) {
+					$resources[ $id ] = $resource;
+				}
 			} else {
 				$others[] = $view;
 			}
 		}
 
+		// An add-on whose server is in the list is shown on that server's page, not here.
+		$others = array_values(
+			array_filter(
+				$others,
+				static function ( $view ) use ( $servers ): bool {
+					$parent = self::parent_of( $view );
+
+					return null === $parent || ! isset( $servers[ $parent['license_id'] ] );
+				}
+			)
+		);
+
 		$asked = self::requested();
 
 		if ( $asked['id'] > 0 && isset( $servers[ $asked['id'] ] ) ) {
-			self::detail( $servers[ $asked['id'] ], $asked['tab'] );
+			self::detail( $servers[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ] ?? null );
 
 			return;
 		}
@@ -167,7 +196,99 @@ final class Servers {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'That server was not found. Here are your servers.', 'beltoft-services' ) . '</p>';
 		}
 
-		self::list( $servers, $others, $empty );
+		self::list( $servers, $others, $empty, $resources );
+	}
+
+	/**
+	 * The server an extra disk or a snapshot pack belongs to, from its view; null for any other license.
+	 *
+	 * @param mixed $view License view.
+	 * @return array{license_id: int, tab: string, resource: Resource}|null
+	 */
+	private static function parent_of( $view ): ?array {
+		if ( ! is_array( $view ) || empty( $view['license']['id'] ) ) {
+			return null;
+		}
+
+		return self::parent_of_license( (int) $view['license']['id'] );
+	}
+
+	/**
+	 * The server an add-on license belongs to: its license id, the tab the add-on lives on, and the add-on's resource.
+	 *
+	 * @param int $license_id Add-on license id.
+	 * @return array{license_id: int, tab: string, resource: Resource}|null
+	 */
+	public static function parent_of_license( int $license_id ): ?array {
+		$resource = Resource::for_license( $license_id );
+
+		if ( ! $resource ) {
+			return null;
+		}
+
+		$driver = (string) $resource->get( 'driver' );
+
+		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver ) {
+			return null;
+		}
+
+		$server = (int) $resource->get( 'server_license' );
+
+		if ( $server < 1 ) {
+			return null;
+		}
+
+		return array(
+			'license_id' => $server,
+			'tab'        => DiskDriver::ID === $driver ? 'disks' : 'snapshots',
+			'resource'   => $resource,
+		);
+	}
+
+	/**
+	 * Early on a My Account address: the page of an extra disk or a snapshot pack (its own license id) goes to the
+	 * server's Disks or Snapshots tab.
+	 */
+	public static function redirect(): void {
+		$target = self::redirect_target();
+
+		if ( '' !== $target ) {
+			wp_safe_redirect( $target );
+			exit;
+		}
+	}
+
+	/**
+	 * Where the requested address should go instead, or '' when it stays. Only for the customer's own add-on and the
+	 * server it is on.
+	 */
+	public static function redirect_target(): string {
+		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( self::slug() ) || ! is_user_logged_in() ) {
+			return '';
+		}
+
+		$asked = self::requested();
+
+		if ( $asked['id'] < 1 ) {
+			return '';
+		}
+
+		$addon = Licenses::find( $asked['id'] );
+
+		if ( ! $addon || (int) ( $addon['user_id'] ?? 0 ) !== get_current_user_id() ) {
+			return '';
+		}
+
+		$parent = self::parent_of_license( $asked['id'] );
+		$server = $parent ? Licenses::find( $parent['license_id'] ) : null;
+
+		if ( ! $parent || ! $server || (int) ( $server['user_id'] ?? 0 ) !== get_current_user_id() || ! self::is_server( $server ) ) {
+			return '';
+		}
+
+		$anchor = 'disks' === $parent['tab'] ? '#' . \BeltoftServices\Proxmox\DiskGuide::anchor( $parent['resource']->id() ) : '';
+
+		return self::url( $server, $parent['tab'] ) . $anchor;
 	}
 
 	/**
@@ -191,20 +312,40 @@ final class Servers {
 	 * @param array<int, array<string, mixed>> $servers Views of the server licenses.
 	 * @param array<int, array<string, mixed>> $others  Views of the other licenses on the tab.
 	 * @param string                           $empty   Text for an empty tab.
+	 * @param array<int, Resource>             $resources Resources of the servers, by license view id.
 	 */
-	private static function list( array $servers, array $others, string $empty ): void {
-		$rows = self::rows( $servers );
+	private static function list( array $servers, array $others, string $empty, array $resources = array() ): void {
+		$rows = self::rows( $servers, $resources );
 
 		if ( $rows ) {
 			include self::file( 'servers-list.php' );
 		}
+
+		$addons = array();
+		$rest   = array();
+
+		foreach ( $others as $other ) {
+			$card = self::addon_card( $other );
+
+			if ( $card ) {
+				$addons[] = $card;
+			} else {
+				$rest[] = $other;
+			}
+		}
+
+		if ( $addons ) {
+			include self::file( 'addons.php' );
+		}
+
+		$others = $rest;
 
 		if ( $others && '' !== self::$default && is_readable( self::$default ) ) {
 			$licenses    = $others;
 			$account_url = wc_get_account_endpoint_url( self::slug() );
 			$empty       = '';
 			include self::$default;
-		} elseif ( ! $rows && ! $others ) {
+		} elseif ( ! $rows && ! $others && ! $addons ) {
 			echo '<p class="beltoft-licenses__empty">' . esc_html( '' !== $empty ? $empty : __( 'You have no servers yet.', 'beltoft-services' ) ) . '</p>';
 		}
 	}
@@ -214,11 +355,13 @@ final class Servers {
 	 *
 	 * @param array<string, mixed> $view License view.
 	 * @param string               $tab  Requested tab.
+	 * @param Resource|null        $resource The server's resource, when already loaded.
 	 */
-	private static function detail( array $view, string $tab ): void {
+	private static function detail( array $view, string $tab, ?Resource $resource = null ): void {
 		self::$page = array(
-			'license' => $view['license'],
-			'tab'     => $tab,
+			'license'  => $view['license'],
+			'tab'      => $tab,
+			'resource' => $resource,
 		);
 
 		try {
@@ -283,15 +426,16 @@ final class Servers {
 	 * The rows of the list: plain values, ready to print. Reads only what the site already holds
 	 * (resource meta, the cached status, the guest disk reading, the subscription): no Proxmox call.
 	 *
-	 * @param array<int, array<string, mixed>> $views License views of servers.
+	 * @param array<int, array<string, mixed>> $views     License views of servers.
+	 * @param array<int, Resource>             $resources Resources already loaded, by license view id.
 	 * @return array<int, array<string, mixed>>
 	 */
-	public static function rows( array $views ): array {
+	public static function rows( array $views, array $resources = array() ): array {
 		$rows = array();
 
 		foreach ( $views as $view ) {
 			$license  = $view['license'];
-			$resource = Resource::for_license( (int) $license['id'] );
+			$resource = $resources[ (int) ( $view['id'] ?? 0 ) ] ?? Resource::for_license( (int) $license['id'] );
 
 			if ( ! $resource ) {
 				continue;
@@ -388,6 +532,39 @@ final class Servers {
 			'tone'    => $tone,
 			'renews'  => self::renewal( $license ),
 			'bars'    => $bars,
+		);
+	}
+
+	/**
+	 * A plain card for an extra disk or a snapshot pack whose server is not in the list: its name, a status in plain
+	 * text and what its driver prints. Null for anything else.
+	 *
+	 * @param mixed $view License view.
+	 * @return array{name: string, state: string, body: string}|null
+	 */
+	private static function addon_card( $view ): ?array {
+		$parent = self::parent_of( $view );
+
+		if ( ! $parent ) {
+			return null;
+		}
+
+		$resource = $parent['resource'];
+		$license  = $view['license'];
+		$driver   = Registry::get( (string) $resource->get( 'driver' ) );
+		$owner    = ! empty( $license['user_id'] ) && (int) $license['user_id'] === get_current_user_id();
+		$body     = '';
+
+		if ( $driver && $owner ) {
+			ob_start();
+			$driver->render_account( $resource );
+			$body = (string) ob_get_clean();
+		}
+
+		return array(
+			'name'  => (string) ( $view['product'] ?? '' ),
+			'state' => Panel::label( (string) $resource->get( 'state' ), $resource ),
+			'body'  => $body,
 		);
 	}
 

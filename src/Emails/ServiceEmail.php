@@ -72,7 +72,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$this->values    = array(
 				'product_name'  => $license ? ServerName::display( $r, $license ) : '',
 				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
-				'account_url'   => $license ? Endpoint::url_for_license( $license ) : wc_get_account_endpoint_url( Endpoint::slug() ),
+				'account_url'   => self::account_url( $r, $license, $data ),
 				'deletion_date' => (string) $date,
 				'reason'        => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
 				'held'          => $r->on_hold(),
@@ -114,6 +114,37 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		return $sent;
+	}
+
+	/**
+	 * Where the "view in your account" link goes: the page of the server the email is about (Disks tab for an extra
+	 * disk, Snapshots for a snapshot pack or a snapshot notice), else the license's tab. A removed server has no page,
+	 * so its link goes to the tab.
+	 *
+	 * @param Resource                  $r       Resource.
+	 * @param array<string, mixed>|null $license License row.
+	 * @param array<string, mixed>      $data    Trigger data.
+	 */
+	private static function account_url( Resource $r, $license, array $data ): string {
+		if ( ! $license ) {
+			return wc_get_account_endpoint_url( Endpoint::slug() );
+		}
+
+		$driver = (string) $r->get( 'driver' );
+		$tab    = '';
+		$server = null;
+
+		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $driver || \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver ) {
+			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+			$tab    = \BeltoftServices\Proxmox\DiskDriver::ID === $driver ? 'disks' : 'snapshots';
+		} elseif ( \BeltoftServices\Proxmox\SshKeyField::DRIVER === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+			$server = $r;
+			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : '';
+		}
+
+		$server_license = $server ? $server->license() : null;
+
+		return $server_license ? \BeltoftServices\Account\Servers::url( $server_license, $tab ) : Endpoint::url_for_license( $license );
 	}
 
 	/**
