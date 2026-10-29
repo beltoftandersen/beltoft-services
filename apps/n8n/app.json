@@ -14,6 +14,6 @@
   "open": {"path": "/"},
   "docs_url": "https://docs.n8n.io/hosting/",
   "versions": [
-    {"id": "2", "label": "n8n 2", "upstream": "2.45.6", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "9e538941a8736834b4e746a5828546d6770f9e5a2158816bff8840ab0968f08f", "eol": ""}
+    {"id": "2", "label": "n8n 2", "upstream": "2.45.6", "recipe": 2, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "3893f0c5858625ee3f6b247df0e1627695e4bacaaec3cfda4ba6b62b3e0c975a", "eol": ""}
   ]
 }
