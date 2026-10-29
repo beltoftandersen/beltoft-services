@@ -80,7 +80,7 @@ final class PrivateNets {
 		}
 		list( $locked, $result ) = Locks::with( Locks::name( 'privnet', 0 ), Locks::allocation_wait(), static function () use ( $user_id, $resource_id ) {
 			$net = self::hold_locked( $user_id );
-			$address = $net && 'held' === $net['state'] ? self::address_locked( $net, $resource_id ) : null;
+			$address = $net && in_array( $net['state'], array( 'held', 'held_return' ), true ) ? self::address_locked( $net, $resource_id ) : null;
 			return $net && $address ? array( 'network' => $net, 'address' => $address ) : null;
 		} );
 		if ( ! $locked ) {
@@ -95,8 +95,10 @@ final class PrivateNets {
 		$existing = self::for_user( $user_id );
 		if ( null !== $existing ) {
 			if ( 'quarantine' === $existing['state'] ) {
+				// Keep the original quarantine timestamp. If this return's first attach fails,
+				// abandon_address() restores the quarantine with its remaining time.
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- returning customer keeps their VLAN.
-				$wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'held', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $existing['id'], 'state' => 'quarantine' ) );
+				$wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'held_return' ), array( 'id' => $existing['id'], 'state' => 'quarantine' ) );
 				return self::for_user( $user_id );
 			}
 			return $existing;
@@ -181,9 +183,13 @@ final class PrivateNets {
 			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
 			$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE net_id = %d', Schema::tables()['private_ips'], $row['net_id'] ) );
-			if ( 0 === $count ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- no attached NIC was exposed on this network.
-				$wpdb->update( Schema::tables()['private_nets'], array( 'user_id' => null, 'state' => 'free', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row['net_id'], 'user_id' => $user_id ) );
+			if ( 0 === $count && 'held_return' === $row['state'] ) {
+				// The earlier 30-day quarantine still applies; leave updated_at unchanged.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- restore the returning customer's quarantine.
+				$wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine' ), array( 'id' => $row['net_id'], 'user_id' => $user_id, 'state' => 'held_return' ) );
+			} elseif ( 0 === $count && 'held' === $row['state'] ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- a newly claimed, unexposed network can be free immediately.
+				$wpdb->update( Schema::tables()['private_nets'], array( 'user_id' => null, 'state' => 'free', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row['net_id'], 'user_id' => $user_id, 'state' => 'held' ) );
 			}
 			return true;
 		} );
@@ -207,7 +213,7 @@ final class PrivateNets {
 			Locks::allocation_wait(),
 			static function () use ( $user_id, $resource_id ) {
 				$net = self::for_user( $user_id );
-				if ( null === $net || 'held' !== $net['state'] ) {
+				if ( null === $net || ! in_array( $net['state'], array( 'held', 'held_return' ), true ) ) {
 					return null;
 				}
 				return self::address_locked( $net, $resource_id );
@@ -278,7 +284,7 @@ final class PrivateNets {
 			$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE net_id = %d', Schema::tables()['private_ips'], $row['net_id'] ) );
 			if ( 1 === $count && 'quarantine' !== $row['state'] ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- last address starts quarantine.
-				if ( 1 !== $wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row['net_id'], 'state' => 'held' ) ) ) {
+				if ( 1 !== $wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row['net_id'], 'state' => $row['state'] ) ) ) {
 					return false;
 				}
 			}
@@ -301,7 +307,7 @@ final class PrivateNets {
 			Locks::allocation_wait(),
 			static function () use ( $wpdb, $user_id ) {
 				$net = self::for_user( $user_id );
-				if ( null === $net || 'held' !== $net['state'] ) {
+				if ( null === $net || ! in_array( $net['state'], array( 'held', 'held_return' ), true ) ) {
 					return false;
 				}
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
@@ -310,7 +316,7 @@ final class PrivateNets {
 					return false;
 				}
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
-				return 1 === $wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $net['id'], 'state' => 'held' ) );
+				return 1 === $wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $net['id'], 'state' => $net['state'] ) );
 			}
 		);
 		if ( ! $locked ) {
@@ -322,7 +328,11 @@ final class PrivateNets {
 	/** Reclaim quarantined rows only after 30 days, and only if still empty. */
 	public static function reclaim(): int {
 		global $wpdb;
-		list( $locked, $reclaimed ) = Locks::with(
+		if ( ! self::db_ready() ) {
+			return 0;
+		}
+		try {
+			list( $locked, $reclaimed ) = Locks::with(
 			Locks::name( 'privnet', 0 ),
 			Locks::allocation_wait(),
 			static function () use ( $wpdb ) {
@@ -330,11 +340,11 @@ final class PrivateNets {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
 				return (int) $wpdb->query( $wpdb->prepare( "UPDATE %i n SET n.user_id = NULL, n.state = 'free', n.updated_at = %s WHERE n.state = 'quarantine' AND n.updated_at < %s AND NOT EXISTS (SELECT 1 FROM %i i WHERE i.net_id = n.id)", Schema::tables()['private_nets'], gmdate( 'Y-m-d H:i:s' ), $cutoff, Schema::tables()['private_ips'] ) );
 			}
-		);
-		if ( ! $locked ) {
-			throw new \RuntimeException( 'The private network pool is busy.' );
+			);
+		} catch ( \RuntimeException $e ) {
+			return 0;
 		}
-		return $reclaimed;
+		return $locked ? $reclaimed : 0;
 	}
 
 	/** A strict private /28, aligned to 16 addresses. */

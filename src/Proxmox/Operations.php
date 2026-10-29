@@ -353,6 +353,8 @@ final class Operations {
 		}
 
 		if ( in_array( $v->get_error_code(), array( 'not_ours', 'is_template' ), true ) ) {
+			// The original VM is gone: leave the foreign VM untouched, but release this
+			// resource's addresses and record so its old private VLAN can retire.
 			return $this->cleanup( 'The VMID belongs to another machine, which was not touched' );
 		}
 

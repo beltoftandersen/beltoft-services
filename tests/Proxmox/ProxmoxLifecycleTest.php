@@ -569,6 +569,9 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->fake->add_vm( array( 'vmid' => 5000, 'node' => 'node-a', 'status' => 'running', 'config' => array( 'description' => 'not ours' ) ) );
 		$this->assertTrue( $this->run_provision( $resource )->is_failed() );
 		$this->assertNotNull( VmRecords::for_resource( $resource->id() ) );
+		$owner = (int) $resource->license()['user_id'];
+		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
+		$this->assertSame( '10.64.0.2', PrivateNets::reserve( $owner, $resource->id() )['address'] );
 		$seen = count( $this->fake->calls() );
 
 		$this->assert_done( $this->op( 'delete', $resource ) );
@@ -577,6 +580,8 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
 		$this->assertNull( IpPool::for_resource( $resource->id() ) );
+		$this->assertNull( PrivateNets::address_for_resource( $resource->id() ), 'The absent original VM no longer keeps its private address.' );
+		$this->assertSame( 'quarantine', PrivateNets::for_user( $owner )['state'] );
 
 		// A clone that never started: nothing at the id, the id is confirmed free.
 		$other = $this->resource();
