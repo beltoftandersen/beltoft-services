@@ -352,5 +352,5 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-vm__flash.is-done::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.6em; background: #1a7f37; }
 .beltoft-services-vm__ending { font-weight: 600; }
 
-.beltoft-services-vm__confirm-body p { margin: 0 0 8px; }
-.beltoft-services-vm__confirm-body ul { margin: 0 0 8px; padding-left: 1.25em; }
+.beltoft-services-vm__dialog .beltoft-services-vm__confirm-body p { margin: 0 0 12px; }
+.beltoft-services-vm__dialog .beltoft-services-vm__confirm-body ul { margin: 0 0 12px; padding-left: 1.25em; }
