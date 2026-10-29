@@ -141,8 +141,9 @@
 		this.bar.appendChild( this.search );
 		if ( ! this.readonly ) { this.bar.appendChild( this.add ); }
 
-		this.root.addEventListener( 'keydown', function ( event ) {
-			if ( 'Escape' === event.key && ( null !== self.editing || null !== self.confirm ) && ! self.busy ) {
+		// Escape closes the open row wherever the focus is (a re-draw can leave it on the page).
+		document.addEventListener( 'keydown', function ( event ) {
+			if ( 'Escape' === event.key && ! event.defaultPrevented && ( null !== self.editing || null !== self.confirm ) && ! self.busy ) {
 				var id = null !== self.editing ? self.editing : self.confirm;
 				self.editing = null;
 				self.confirm = null;
@@ -239,6 +240,12 @@
 		}
 
 		this.finishRender();
+	};
+
+	// After an error the row stays open: the focus goes to its value, so the alert is read with the field.
+	Editor.prototype.focusField = function () {
+		var field = this.holder.querySelector( '[data-edit-row] [data-f="value"]' );
+		if ( field ) { field.focus(); }
 	};
 
 	Editor.prototype.finishRender = function () {
@@ -421,8 +428,7 @@
 		if ( typed.error ) {
 			this.rowError = { id: original.id, message: typed.error };
 			this.render();
-			var again = this.holder.querySelector( '[data-edit-row] [data-f="value"]' );
-			if ( again ) { again.focus(); }
+			this.focusField();
 			return;
 		}
 
@@ -533,12 +539,14 @@
 			} else {
 				self.rowError = { id: rowId, message: message };
 				self.render();
+				self.focusField();
 			}
 		} ).catch( function () {
 			self.busy = false;
 			self.say( '' );
 			self.rowError = { id: rowId, message: self.t.network };
 			self.render();
+			self.focusField();
 		} );
 	};
 
