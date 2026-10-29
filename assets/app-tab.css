@@ -1,5 +1,7 @@
 /* The App tab of a server page. Layout only: colours come from the dashboard's own variables. */
+.beltoft-services-app-pane .beltoft-services-facts { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .beltoft-services-app-pane .beltoft-services-facts__wide { grid-column: 1 / -1; }
+@media (max-width: 760px) { .beltoft-services-app-pane .beltoft-services-facts { grid-template-columns: 1fr; } }
 .beltoft-services-app-pane .beltoft-services-facts a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .beltoft-services-app-pane > .beltoft-services-vm__more:first-of-type { margin-top: 20px; }
 .beltoft-services-app-pane > .description { margin: 16px 0 0; }

@@ -47,9 +47,7 @@ final class AppReinstall {
 		$choices = array();
 
 		if ( ! $retired ) {
-			$full = Apps::version( $id, $own );
-			/* translators: %s: app and version, such as WordPress 7.1.4 */
-			$choices[ self::KEEP ] = sprintf( __( 'Same app and version (%s)', 'beltoft-services' ), (string) $full['label'] );
+			$choices[ self::KEEP ] = __( 'Same app and version', 'beltoft-services' );
 		}
 
 		foreach ( (array) $def['versions'] as $version ) {

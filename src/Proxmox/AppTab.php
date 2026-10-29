@@ -218,7 +218,7 @@ final class AppTab {
 			'name'            => (string) $app['name'],
 			'version'         => null === $full ? $vid : (string) $full['label'],
 			'upstream'        => (string) ( $full['upstream'] ?? '' ),
-			'installed'       => $installed > 0 ? wp_date( get_option( 'date_format' ), $installed ) : '',
+			'installed'       => 'ready' === $kind && $installed > 0 ? wp_date( get_option( 'date_format' ), $installed ) : '',
 			'kind'            => $kind,
 			'server_ready'    => 'ready' === $server,
 			'steps'           => $steps,

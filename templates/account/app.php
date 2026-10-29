@@ -102,7 +102,7 @@ $beltoft_services_status_text = array(
 		</p>
 	<?php endif; ?>
 
-	<?php if ( '' !== $view['getting_started'] ) : ?>
+	<?php if ( '' !== $view['getting_started'] && 'failed' !== $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Getting started', 'beltoft-services' ); ?></h4>
 			<p><?php echo esc_html( (string) $view['getting_started'] ); ?></p>

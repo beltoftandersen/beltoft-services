@@ -228,7 +228,7 @@ class AppTabTest extends MonitoringTestCase {
 	}
 
 	public function test_failed_shows_a_plain_message_and_a_support_link_and_keeps_the_server_running(): void {
-		$r = $this->with_app( array( 'app_state' => 'failed', 'app_step' => 'packages' ) );
+		$r = $this->with_app( array( 'app_state' => 'failed', 'app_step' => 'packages', 'app_installed_at' => 5 ) );
 		$pane = $this->pane( $this->page( $r, 'app' ) );
 
 		$this->assertStringContainsString( 'The app could not be installed', $pane );
@@ -236,6 +236,8 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertMatchesRegularExpression( '#<a href="[^"]*/support/">Contact support</a>#', $pane );
 		$this->assertStringNotContainsString( 'packages', $pane, 'Nothing the guest said is repeated.' );
 		$this->assertStringNotContainsString( 'data-app-reveal', $pane );
+		$this->assertStringNotContainsString( 'Getting started', $pane );
+		$this->assertStringNotContainsString( 'Installed', $pane );
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );
 
 		add_filter( 'beltoft_services_support_url', fn() => 'https://example.invalid/help/' );
@@ -340,7 +342,7 @@ class AppTabTest extends MonitoringTestCase {
 		$r    = $this->with_app();
 		$html = $this->reinstall_html( $r );
 
-		$this->assertMatchesRegularExpression( '#<option value="keep" selected=\'selected\'>Same app and version \(WordPress 7\.1\.4\)</option>#', $html );
+		$this->assertMatchesRegularExpression( '#<option value="keep" selected=\'selected\'>Same app and version</option>#', $html );
 		$this->assertStringContainsString( '<option value="none">No app, just the operating system</option>', $html );
 		$this->assertStringContainsString( 'name="app_version"', $html );
 		$this->assertStringNotContainsString( 'no longer be installed', $html );
