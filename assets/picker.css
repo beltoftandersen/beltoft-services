@@ -47,5 +47,5 @@
 	.beltoft-services-picker__grid { grid-template-columns: minmax(0, 1fr); }
 	.beltoft-services-plan__face { min-height: 0; }
 	.beltoft-services-picker__go { align-items: stretch; flex-direction: column; }
-	.beltoft-services-picker .beltoft-services-picker__go .beltoft-services-picker__button { display: block; width: 100%; padding: 13px 22px; }
+	.beltoft-services-picker form.beltoft-services-picker__form .beltoft-services-picker__go button.beltoft-services-picker__button { display: block; box-sizing: border-box; width: 100% !important; max-width: none; padding: 13px 22px; }
 }
