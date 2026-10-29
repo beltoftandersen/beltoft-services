@@ -356,7 +356,7 @@ final class ClustersScreen {
 			selected( (string) $c['fw_default_mode'], 'open', false ),
 			esc_html__( 'Start as today (nothing set)', 'beltoft-services' ),
 			esc_html__( 'Most rules per server', 'beltoft-services' ),
-			Firewall::MAX_CEILING,
+			(int) Firewall::MAX_CEILING,
 			(int) $c['fw_max_rules']
 		);
 

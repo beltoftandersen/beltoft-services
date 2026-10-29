@@ -118,8 +118,10 @@ final class FirewallTab {
 			'unsaved'       => __( 'You have changes that are not applied yet.', 'beltoft-services' ),
 			'badPort'       => __( 'A port is a number from 1 to 65535. A range is two numbers, like 8000-8100.', 'beltoft-services' ),
 			'duplicate'     => __( 'That rule is already in the list.', 'beltoft-services' ),
+			/* translators: %d: most rules */
 			'tooMany'       => __( 'A server can have up to %d rules.', 'beltoft-services' ),
 			'noAddress'     => __( 'Enter at least one address, or choose Anyone.', 'beltoft-services' ),
+			/* translators: %s: the customer's IP address */
 			'notIncluded'   => __( 'This does not include the address you are using now: %s', 'beltoft-services' ),
 			'addMine'       => __( 'Add my address', 'beltoft-services' ),
 			'noSsh'         => __( 'No rule lets you in over SSH from where you are now.', 'beltoft-services' ),
