@@ -1202,51 +1202,16 @@ final class Provision {
 	}
 
 	/**
-	 * The VM firewall, and the rule that blocks outgoing SMTP, once.
+	 * The VM firewall: the switch and the SMTP block as always, and for a server the dashboard manages (or a new
+	 * server of a cluster with the standard default) the stored rules with an explicit inbound policy. All of it is
+	 * written by Firewall, the only writer of VM firewall rules.
 	 *
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 * @return array<string, mixed>|StepResult
 	 */
 	private function configure_firewall( array $record, array $v ) {
-		$base   = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/firewall';
-		$answer = $this->client->request( 'PUT', $base . '/options', array( 'enable' => 1 ) );
-
-		if ( is_wp_error( $answer ) ) {
-			return $this->classify( $answer, 'configure' );
-		}
-
-		if ( empty( $this->cluster['block_smtp'] ) ) {
-			return array();
-		}
-
-		$rules = $this->client->request( 'GET', $base . '/rules' );
-
-		if ( is_wp_error( $rules ) ) {
-			return $this->classify( $rules, 'configure' );
-		}
-
-		foreach ( (array) $rules as $rule ) {
-			if ( is_array( $rule ) && self::SMTP_COMMENT === (string) ( $rule['comment'] ?? '' ) ) {
-				return array();
-			}
-		}
-
-		$added = $this->client->request(
-			'POST',
-			$base . '/rules',
-			array(
-				'action'  => 'DROP',
-				'type'    => 'out',
-				'proto'   => 'tcp',
-				'dport'   => '25',
-				'iface'   => 'net0',
-				'enable'  => 1,
-				'comment' => self::SMTP_COMMENT,
-			)
-		);
-
-		return is_wp_error( $added ) ? $this->classify( $added, 'configure' ) : array();
+		return ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure( $record, $v );
 	}
 
 	/**

@@ -61,6 +61,10 @@ final class Clusters {
 			'template_families' => array(),
 			'backup_storage'    => '',
 			'block_smtp'        => 1,
+			'fw_enabled'        => 0,
+			'fw_default_mode'   => 'standard',
+			'fw_max_rules'      => 30,
+			'fw_ipfilter'       => 0,
 		);
 	}
 
@@ -510,6 +514,21 @@ final class Clusters {
 
 		if ( array_key_exists( 'block_smtp', $input ) ) {
 			$clean['block_smtp'] = empty( $input['block_smtp'] ) ? 0 : 1;
+		}
+
+		// The dashboard firewall (Firewall): the switch, what a new server starts with, the most rules, the anti-spoofing filter.
+		foreach ( array( 'fw_enabled', 'fw_ipfilter' ) as $flag ) {
+			if ( array_key_exists( $flag, $input ) ) {
+				$clean[ $flag ] = empty( $input[ $flag ] ) ? 0 : 1;
+			}
+		}
+
+		if ( array_key_exists( 'fw_default_mode', $input ) ) {
+			$clean['fw_default_mode'] = 'open' === $input['fw_default_mode'] ? 'open' : 'standard';
+		}
+
+		if ( array_key_exists( 'fw_max_rules', $input ) ) {
+			$clean['fw_max_rules'] = max( 1, min( Firewall::MAX_CEILING, (int) $input['fw_max_rules'] ) );
 		}
 
 		$secret = self::clean_secret( $input, (string) ( $existing['token_secret'] ?? '' ) );
