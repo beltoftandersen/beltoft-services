@@ -29,7 +29,7 @@ final class Apps {
 				return null;
 			}
 			$script = (string) ( $version['install'] ?? '' );
-			if ( ! preg_match( '/^[a-zA-Z0-9.-]+\.sh$/', $script ) || ! is_array( $version['os'] ?? null ) || ! is_array( $data['min'] ?? null ) ) {
+			if ( ! preg_match( '/^[a-zA-Z0-9.-]+\.script$/', $script ) || ! is_array( $version['os'] ?? null ) || ! is_array( $data['min'] ?? null ) ) {
 				return null;
 			}
 			$path = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $version_id . '/' . $script;
