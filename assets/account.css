@@ -395,7 +395,8 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-server__back { margin: 0 0 14px; font-size: 14px; }
 .beltoft-services-server__back a { color: var(--ink-soft, #5e7080) !important; text-decoration: none !important; }
 .beltoft-services-server__back a:hover { color: var(--navy, #0c1535) !important; text-decoration: underline !important; }
-.beltoft-services-panel--page { margin-top: 0; padding-top: 0; border-top: 0; }
+.beltoft-services-panel.beltoft-services-panel--page { margin-top: 0; padding-top: 0; border-top: 0; }
+.beltoft-services-panel--page .beltoft-services-panel__driver { gap: 0; margin-top: 0; }
 .beltoft-services-page__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
 .beltoft-services-page__title { min-width: 0; }
 .beltoft-services-page__name { margin: 0; color: var(--navy, #0c1535); font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; overflow-wrap: anywhere; }
@@ -444,3 +445,6 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-vm__more { margin: 20px 0 0; }
 div.beltoft-services-vm__more > h4 { margin-top: 28px; }
 .beltoft-services-tab > div.beltoft-services-vm__more:first-child > h4, .beltoft-services-tab > p:first-child + div.beltoft-services-vm__more > h4 { margin-top: 0; }
+.beltoft-services-tab .beltoft-services-vm__backups { padding-top: 0; border-top: 0; }
+.beltoft-services-vm--page .beltoft-services-vm__more { border-top: 0; }
+.beltoft-services-vm--page details.beltoft-services-vm__more { margin-top: 12px; }
