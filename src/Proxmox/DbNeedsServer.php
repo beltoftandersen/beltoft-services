@@ -201,10 +201,11 @@ final class DbNeedsServer {
 			return;
 		}
 
-		if ( ! is_user_logged_in() ) {
-			wc_add_notice( self::message( true ), 'notice' );
-		} elseif ( self::refused( get_current_user_id(), $clusters ) ) {
-			wc_add_notice( self::message( true ), 'error' );
+		// WooCommerce runs the cart check more than once per page: the message is added once.
+		$type = ! is_user_logged_in() ? 'notice' : ( self::refused( get_current_user_id(), $clusters ) ? 'error' : '' );
+
+		if ( '' !== $type && ! wc_has_notice( self::message( true ), $type ) ) {
+			wc_add_notice( self::message( true ), $type );
 		}
 	}
 

@@ -96,7 +96,8 @@ class DbNeedsServerTest extends BackupTestCase {
 		$db = $this->db_product();
 		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
 		do_action( 'woocommerce_check_cart_items' );
-		$this->assertSame( 1, wc_notice_count( 'error' ) );
+		do_action( 'woocommerce_check_cart_items' );
+		$this->assertSame( 1, wc_notice_count( 'error' ), 'Once, however often the check runs.' );
 		$this->assertStringContainsString( 'Order a server first', wc_get_notices( 'error' )[0]['notice'] );
 	}
 
