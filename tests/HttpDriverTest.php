@@ -958,18 +958,18 @@ class HttpDriverTest extends TestCase {
 			return (string) ob_get_clean();
 		};
 
-		$this->assertStringContainsString( 'Usage:', $render(), 'The old answer is cached.' );
+		$this->assertStringContainsString( 'beltoft-services-http-usage', $render(), 'The old answer is cached.' );
 
 		// A failed change keeps it.
 		$fresh->set( array( 'plan' => array( 'limit' => 3, 'attributes' => '' ) ) );
 		$this->answers( array( self::answer( 400, 'no' ) ) );
 		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_failed() );
-		$this->assertStringContainsString( 'Usage:', $render(), 'A refused change leaves it.' );
+		$this->assertStringContainsString( 'beltoft-services-http-usage', $render(), 'A refused change leaves it.' );
 
 		// A successful one drops it, and the next status() asks the service again.
 		$this->answers( array( self::answer( 204 ), self::answer( 200, array( 'used' => 0, 'limit' => 3 ) ) ) );
 		$this->assertTrue( $this->driver()->update_plan( Resource::find( $fresh->id() ) )->is_done() );
-		$this->assertStringNotContainsString( 'Usage:', $render(), 'The old limit is gone.' );
+		$this->assertStringNotContainsString( 'beltoft-services-http-usage', $render(), 'The old limit is gone.' );
 
 		$before = count( $this->http_calls() );
 		$this->assertSame( array( 'used' => 0, 'limit' => 3 ), $this->driver()->status( Resource::find( $fresh->id() ) ) );
@@ -1023,8 +1023,9 @@ class HttpDriverTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertCount( $count, $this->http_calls(), 'Rendering makes no request.' );
-		$this->assertStringContainsString( 'Ready', $html );
-		$this->assertStringContainsString( '2 of 5', $html );
+		$this->assertStringNotContainsString( 'Ready', $html, 'The state is the card head line, not repeated by the driver.' );
+		$this->assertStringContainsString( '<dt>Usage</dt><dd class="beltoft-services-http-usage">2 of 5</dd>', $html );
+		$this->assertStringNotContainsString( '<dt>Limit</dt>', $html, 'Usage already says the limit.' );
 		$this->assertStringContainsString( 'Open app', $html );
 		$this->assertStringNotContainsString( self::SECRET, $html );
 
@@ -1048,7 +1049,6 @@ class HttpDriverTest extends TestCase {
 		ob_start();
 		$this->driver()->render_account( $fresh );
 		$html = (string) ob_get_clean();
-		$this->assertStringContainsString( 'Paused', $html );
 		$this->assertStringNotContainsString( 'Open app', $html );
 
 		// No open URL: no button.

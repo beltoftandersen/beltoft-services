@@ -255,8 +255,8 @@ final class HttpDriver implements Driver, Opens {
 	}
 
 	/**
-	 * The state, the limit, the last known usage and, when the connection has an open URL and
-	 * the resource is ready, an "Open" button. The button links to the open route, which makes
+	 * The last known usage (or the limit while none is known) and, when the connection has an open URL and
+	 * the resource is ready, an "Open" button. The state is the card's own head line, not repeated here. The button links to the open route, which makes
 	 * the five-minute sign-in token when it is clicked. No request is made while rendering.
 	 *
 	 * @param Resource $r Resource.
@@ -268,13 +268,16 @@ final class HttpDriver implements Driver, Opens {
 		$usage   = get_transient( self::usage_key( $r ) );
 
 		echo '<div class="beltoft-services-http">';
-		echo '<p class="beltoft-services-http-state"><strong>' . esc_html__( 'Status:', 'beltoft-services' ) . '</strong> ' . esc_html( Resource::state_label( $state ) ) . '</p>';
-
-		echo '<p class="beltoft-services-http-limit"><strong>' . esc_html__( 'Limit:', 'beltoft-services' ) . '</strong> ' . esc_html( (string) $limit ) . '</p>';
+		echo '<dl class="beltoft-services-http__facts">';
 
 		if ( is_array( $usage ) && isset( $usage['used'], $usage['limit'] ) ) {
-			echo '<p class="beltoft-services-http-usage"><strong>' . esc_html__( 'Usage:', 'beltoft-services' ) . '</strong> ' . esc_html( $this->unit_label( (int) $usage['used'], (int) $usage['limit'] ) ) . '</p>';
+			// "1 of 3" says the limit too.
+			echo '<dt>' . esc_html__( 'Usage', 'beltoft-services' ) . '</dt><dd class="beltoft-services-http-usage">' . esc_html( $this->unit_label( (int) $usage['used'], (int) $usage['limit'] ) ) . '</dd>';
+		} else {
+			echo '<dt>' . esc_html__( 'Limit', 'beltoft-services' ) . '</dt><dd class="beltoft-services-http-limit">' . esc_html( (string) $limit ) . '</dd>';
 		}
+
+		echo '</dl>';
 
 		$connection = $this->connection( $r );
 
