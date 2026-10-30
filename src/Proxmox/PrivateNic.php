@@ -24,15 +24,25 @@ final class PrivateNic {
 	 * @return array{net1:string,ipconfig1:string}|\WP_Error
 	 */
 	public static function params( array $net, string $address, string $bridge ) {
+		$nic = self::nic_params( $net, $address, $bridge );
+		return is_wp_error( $nic ) ? $nic : $nic + array( 'ipconfig1' => 'ip=' . $address . '/28' );
+	}
+
+	/**
+	 * Only the NIC, never ipconfig1. A customer server is not given cloud-init network config for
+	 * the private NIC: changing cloud-init on a booted server regenerates its SSH host keys (T4).
+	 * The guest address is written into the guest instead (PrivateAttach).
+	 *
+	 * @param array<string,mixed> $net A PrivateNets row.
+	 * @return array{net1:string}|\WP_Error
+	 */
+	public static function nic_params( array $net, string $address, string $bridge ) {
 		$cidr = (string) ( $net['cidr'] ?? '' );
 		$vlan = (int) ( $net['vlan'] ?? 0 );
 		if ( ! preg_match( Clusters::BRIDGE_PATTERN, $bridge ) || $vlan < 1 || $vlan > 4094 || PrivateNets::public_vlan_in_use( $vlan ) || ! PrivateNets::contains_host( $cidr, $address ) ) {
 			return new \WP_Error( 'invalid_private_network', 'The private network is not configured.' );
 		}
-		return array(
-			'net1'      => 'virtio,bridge=' . $bridge . ',tag=' . $vlan . ',firewall=1',
-			'ipconfig1' => 'ip=' . $address . '/28',
-		);
+		return array( 'net1' => 'virtio,bridge=' . $bridge . ',tag=' . $vlan . ',firewall=1' );
 	}
 
 	/**
@@ -40,19 +50,23 @@ final class PrivateNic {
 	 * PVE already applied. A foreign occupied net1 is never overwritten; an old owner's matching
 	 * private net1 is removed before a stopped VM is moved to its new owner's VLAN.
 	 *
+	 * With $ipconfig false (customer servers, plan B) only net1 is written, never ipconfig1, and a
+	 * running VM is accepted: the caller restarts it afterwards, so whether PVE hot-plugs the NIC
+	 * or keeps it pending does not matter.
+	 *
 	 * @return array{network:array<string,mixed>,address:string,changed:bool}|\WP_Error
 	 */
-	public static function attach( Resource $resource, Client $client ) {
+	public static function attach( Resource $resource, Client $client, bool $ipconfig = true ) {
 		$result = null;
-		$locked = $resource->locked( static function () use ( $resource, $client, &$result ) {
-			$result = self::attach_locked( $resource, $client );
+		$locked = $resource->locked( static function () use ( $resource, $client, $ipconfig, &$result ) {
+			$result = self::attach_locked( $resource, $client, $ipconfig );
 			return true;
 		} );
 		return null === $locked ? new \WP_Error( 'network_busy', 'The VM resource is busy.' ) : $result;
 	}
 
 	/** Called only while holding the resource lock. */
-	private static function attach_locked( Resource $resource, Client $client ) {
+	private static function attach_locked( Resource $resource, Client $client, bool $ipconfig ) {
 		if ( ! $resource->is_valid() || 'deleted' === $resource->get( 'state' ) ) {
 			return new \WP_Error( 'invalid_resource', 'The VM resource is not active.' );
 		}
@@ -116,7 +130,7 @@ final class PrivateNic {
 				return new \WP_Error( 'network_busy', 'The private network pool is busy.' );
 			}
 		}
-		if ( ! $occupied && 'stopped' !== $verified['status'] ) {
+		if ( $ipconfig && ! $occupied && 'stopped' !== $verified['status'] ) {
 			return new \WP_Error( $reservation ? 'private_nic_pending' : 'vm_running', 'Stop the VM before attaching its private network.' );
 		}
 		// A pre-existing, foreign net1 must not consume a fresh customer VLAN or address.
@@ -134,7 +148,7 @@ final class PrivateNic {
 		}
 		$net = $reserved['network'];
 		$address = $reserved['address'];
-		$params = self::params( $net, $address, $bridge );
+		$params = $ipconfig ? self::params( $net, $address, $bridge ) : self::nic_params( $net, $address, $bridge );
 		if ( is_wp_error( $params ) ) {
 			return $params;
 		}
@@ -160,7 +174,7 @@ final class PrivateNic {
 		$answer = $client->request( 'PUT', $path, $params + array( 'digest' => (string) ( $config['digest'] ?? '' ) ) );
 		// A timeout may mean PVE accepted the write. Verify the final state before returning an error.
 		$after = Ownership::verify( $client, $record, $resource );
-		if ( ! is_wp_error( $after ) && 'stopped' !== $after['status'] ) {
+		if ( $ipconfig && ! is_wp_error( $after ) && 'stopped' !== $after['status'] ) {
 			$resource->set( array( 'private_nic_pending' => 1 ) );
 			return new \WP_Error( 'private_nic_pending', 'The VM started during the private NIC change; stop it before retrying.' );
 		}
@@ -191,8 +205,8 @@ final class PrivateNic {
 	}
 
 	/** PVE may fill in the generated VirtIO MAC, so compare the effective properties. */
-	private static function matches( array $config, array $wanted ): bool {
-		if ( (string) ( $config['ipconfig1'] ?? '' ) !== $wanted['ipconfig1'] ) {
+	public static function matches( array $config, array $wanted ): bool {
+		if ( (string) ( $config['ipconfig1'] ?? '' ) !== (string) ( $wanted['ipconfig1'] ?? '' ) ) {
 			return false;
 		}
 		$parts = NetConfig::parse( (string) ( $config['net1'] ?? '' ) );

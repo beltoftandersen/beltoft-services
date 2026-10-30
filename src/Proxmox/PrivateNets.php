@@ -127,6 +127,46 @@ final class PrivateNets {
 		return is_array( $row ) ? array( 'address' => (string) $row['address'], 'net_id' => (int) $row['net_id'], 'user_id' => (int) $row['user_id'], 'vlan' => (int) $row['vlan'], 'cidr' => (string) $row['cidr'], 'state' => (string) $row['state'] ) : null;
 	}
 
+	/**
+	 * Every network with the number of addresses held on it.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function rows(): array {
+		global $wpdb;
+		if ( ! self::db_ready() ) {
+			return array();
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT n.*, (SELECT COUNT(*) FROM %i i WHERE i.net_id = n.id) AS addresses FROM %i n ORDER BY n.vlan', Schema::tables()['private_ips'], Schema::tables()['private_nets'] ), ARRAY_A );
+		$out  = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$shaped              = self::shape( $row );
+			$shaped['addresses'] = (int) $row['addresses'];
+			$out[]               = $shaped;
+		}
+		return $out;
+	}
+
+	/**
+	 * The addresses held on one network: resource id => address.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function members( int $net_id ): array {
+		global $wpdb;
+		if ( $net_id < 1 || ! self::db_ready() ) {
+			return array();
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT resource_id, address FROM %i WHERE net_id = %d ORDER BY id', Schema::tables()['private_ips'], $net_id ), ARRAY_A );
+		$out  = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$out[ (int) $row['resource_id'] ] = (string) $row['address'];
+		}
+		return $out;
+	}
+
 	/** Return an existing reservation without allocating a new network or address. */
 	public static function address_for_resource( int $resource_id ): ?string {
 		$row = self::for_resource( $resource_id );

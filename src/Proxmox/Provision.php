@@ -126,7 +126,7 @@ final class Provision {
 
 		$steps = $this->r->get( 'steps' );
 
-		foreach ( $this->profile->steps() as $name ) {
+		foreach ( self::build_steps( $this->r, $this->profile->steps() ) as $name ) {
 			if ( 'wipe' === $name ? ! $this->r->get( 'wipe' ) : in_array( $name, $steps, true ) ) {
 				continue;
 			}
@@ -163,6 +163,66 @@ final class Provision {
 		}
 
 		return StepResult::done( array_merge( $this->out, array( 'steps' => $steps ) ) );
+	}
+
+	/**
+	 * The profile's steps, plus the two that put a private network back on a rebuilt server (net1 before the
+	 * first start, the guest file and the one restart after it). Only a server that has the private network.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string[] $steps Profile steps.
+	 * @return string[]
+	 */
+	private static function build_steps( Resource $r, array $steps ): array {
+		if ( ! PrivateAttach::rebuild_wanted( $r ) || ! in_array( 'start', $steps, true ) ) {
+			return $steps;
+		}
+
+		$out = array();
+
+		foreach ( $steps as $name ) {
+			if ( 'start' === $name ) {
+				$out[] = 'private';
+			}
+
+			$out[] = $name;
+
+			if ( 'start' === $name ) {
+				$out[] = 'private_guest';
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Step: the private NIC goes back (net1 only) before the first start.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_private() {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record ) {
+			return StepResult::fail( 'private: the VM record is missing' );
+		}
+
+		return ( new PrivateAttach( $this->r ) )->using( $this->client, $this->cluster )->rebuild_nic( $record );
+	}
+
+	/**
+	 * Step: the guest file, one restart, the agent again.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_private_guest() {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record ) {
+			return StepResult::fail( 'private: the VM record is missing' );
+		}
+
+		return ( new PrivateAttach( $this->r ) )->using( $this->client, $this->cluster )->rebuild_guest( $record );
 	}
 
 	// -- Preflight -------------------------------------------------------------------------------

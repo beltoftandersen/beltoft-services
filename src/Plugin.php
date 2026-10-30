@@ -94,6 +94,7 @@ final class Plugin {
 		Proxmox\MetricsRoute::register();
 		Proxmox\FirewallRoute::register();
 		Proxmox\FirewallTab::register();
+		Proxmox\NetworkTab::register();
 		Proxmox\Switches::register();
 		Proxmox\Upgrades::register();
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );

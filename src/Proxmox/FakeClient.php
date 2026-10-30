@@ -561,6 +561,7 @@ class FakeClient implements Client {
 			array( 'POST', $node . '/status/(reboot)$#', 'h_power', array( 'timeout' => array( 'int', false, array( 'min' => 0 ) ) ) ),
 			array( 'GET', $node . '/status/current$#', 'h_status', $none ),
 			array( 'GET', $node . '/agent/get-fsinfo$#', 'h_fsinfo', $none ),
+			array( 'GET', $node . '/agent/get-osinfo$#', 'h_osinfo', $none ),
 			array(
 				'DELETE',
 				$node . '$#',
@@ -1002,6 +1003,11 @@ class FakeClient implements Client {
 						unset( $this->state['vms'][ $id ]['config'][ $other ] );
 					}
 				}
+			}
+
+			if ( 1 === preg_match( '/^net(\d+)$/D', (string) $key, $nic ) && is_string( $value ) && 0 === strpos( $value, 'virtio,' ) ) {
+				// PVE generates the MAC of a VirtIO NIC given without one (modelled, deterministic).
+				$value = sprintf( 'virtio=BC:24:11:%02X:%02X:%02X', ( $id >> 8 ) & 255, $id & 255, 16 + (int) $nic[1] ) . substr( $value, 6 );
 			}
 
 			$this->state['vms'][ $id ]['config'][ $key ] = $value;
@@ -1965,6 +1971,40 @@ class FakeClient implements Client {
 		$vm = $this->find( $a );
 
 		return is_wp_error( $vm ) ? $vm : (array) ( $vm['rrd'] ?? array() );
+	}
+
+	/** Seed the guest OS the agent reports (PVE: {result: {id, name, version-id, ...}}); null removes it. */
+	public function set_osinfo( int $vmid, ?array $info ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			if ( null === $info ) {
+				unset( $this->state['vms'][ $vmid ]['osinfo'] );
+			} else {
+				$this->state['vms'][ $vmid ]['osinfo'] = $info;
+			}
+			$this->save();
+		}
+	}
+
+	/** The OS reported by every running VM that has none of its own (a rebuilt VM keeps the guest it was cloned from). */
+	public function default_osinfo( ?array $info ): void {
+		$this->load();
+		$this->state['default_osinfo'] = $info;
+		$this->save();
+	}
+
+	/** GET agent/get-osinfo: only a running VM with a seeded reply has an agent that answers (modelled). */
+	private function h_osinfo( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+		$info = $vm['osinfo'] ?? ( $this->state['default_osinfo'] ?? null );
+		if ( 'running' !== (string) ( $vm['status'] ?? '' ) || ! is_array( $info ) ) {
+			return $this->error( 500, 'QEMU guest agent is not running' );
+		}
+		return array( 'result' => $info );
 	}
 
 	/** The guest-agent reply is explicitly seeded; otherwise the model says unavailable. */

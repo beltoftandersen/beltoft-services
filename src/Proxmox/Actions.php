@@ -80,6 +80,8 @@ final class Actions {
 		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
 		'fw_apply'          => array( 20, HOUR_IN_SECONDS ),
 		'fw_reset'          => array( 5, HOUR_IN_SECONDS ),
+		'private_attach'    => array( 5, HOUR_IN_SECONDS ),
+		'private_detach'    => array( 5, HOUR_IN_SECONDS ),
 	);
 
 	/**
@@ -159,7 +161,7 @@ final class Actions {
 		}
 
 		$out[ ServerName::ACTION ] = __( 'Rename', 'beltoft-services' );
-		$out = array_merge( $out, Snapshots::offered( $r ), Firewall::offered( $r ) );
+		$out = array_merge( $out, Snapshots::offered( $r ), Firewall::offered( $r ), PrivateAttach::offered( $r ) );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -202,7 +204,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
-			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -295,6 +297,10 @@ final class Actions {
 
 		if ( in_array( $action, Firewall::ACTIONS, true ) ) {
 			return Firewall::check( $r, $action, $args );
+		}
+
+		if ( in_array( $action, PrivateAttach::ACTIONS, true ) ) {
+			return PrivateAttach::check( $r, $action, $args );
 		}
 
 		if ( 'reinstall' === $action ) {
@@ -477,6 +483,11 @@ final class Actions {
 		// The firewall has its own steps (read, add, remove, policy, read back).
 		if ( in_array( $action, Firewall::ACTIONS, true ) ) {
 			return ( new Firewall( $this->r ) )->run( $action, $args );
+		}
+
+		// The private network has its own steps (probe, NIC, guest file, one restart).
+		if ( in_array( $action, PrivateAttach::ACTIONS, true ) ) {
+			return ( new PrivateAttach( $this->r ) )->run( $action, $args );
 		}
 
 		// No Proxmox call and no reinstall: the install job is queued again, so REINSTALL_GAP does not apply.

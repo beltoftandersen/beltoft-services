@@ -241,6 +241,7 @@ final class Commands {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'beltoft-services', self::class );
 			\WP_CLI::add_command( 'beltoft-services dns-claims', DnsClaimsCommand::class );
+			\WP_CLI::add_command( 'beltoft-services private-net', PrivateNetCommand::class );
 		}
 	}
 
