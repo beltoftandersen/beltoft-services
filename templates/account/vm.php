@@ -721,6 +721,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<p class="beltoft-services-vm__reveal">
 				<button type="button" class="button woocommerce-button" data-vm-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
 				<code class="beltoft-services-vm__password" data-vm-password hidden></code>
+				<button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-vm-password-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
 			</p>
 			<p class="description"><?php esc_html_e( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>

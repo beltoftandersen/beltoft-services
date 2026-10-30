@@ -475,10 +475,18 @@
 			}
 
 			return response.json().then( function ( body ) {
+				var copy = panel.querySelector( '[data-vm-password-copy]' );
+
 				if ( out && body && 'string' === typeof body.password ) {
 					out.textContent = body.password;
 					out.hidden = false;
 					button.hidden = true;
+
+					// The password is only in the page now: a copy button next to it, through the same copy as the ssh command.
+					if ( copy ) {
+						copy.setAttribute( 'data-copy', body.password );
+						copy.hidden = false;
+					}
 				}
 			} );
 		} ).catch( function () {

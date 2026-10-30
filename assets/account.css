@@ -653,3 +653,11 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 @media (max-width: 600px) {
 	.beltoft-services-add__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* The one-time password: shown next to its own Copy button, the password selectable in one click. */
+.beltoft-services-vm__reveal { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.beltoft-services-vm__reveal .button { margin: 0; }
+.beltoft-services-vm__password { padding: 8px 12px; background: var(--bg-warm, #eeece6); font-size: 15px; overflow-wrap: anywhere; user-select: all; }
+.beltoft-services-vm .beltoft-services-vm__copy { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
+.beltoft-services-vm .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-vm__copy[hidden] { display: none !important; }

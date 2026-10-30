@@ -933,6 +933,8 @@ class ActionsTest extends TestCase {
 		$this->assertStringNotContainsString( $plain, $html );
 		$this->assertStringNotContainsString( $stored, $html );
 		$this->assertStringContainsString( 'data-vm-reveal', $html, 'The button that asks the server for it once.' );
+		$this->assertMatchesRegularExpression( '/<button[^>]*data-vm-password-copy[^>]*hidden>/', $html, 'A Copy button waits, hidden and empty, until the password is shown.' );
+		$this->assertDoesNotMatchRegularExpression( '/data-vm-password-copy[^>]*data-copy=/', $html, 'It has nothing to copy before the reveal.' );
 		$this->assertStringContainsString( (string) $r->get( 'ip' ), $html );
 		$this->assertStringContainsString( 'ssh root@' . $r->get( 'ip' ), $html );
 		$this->assertStringContainsString( '2 vCPU, 4096 MB RAM, 30 GB disk', $html );
