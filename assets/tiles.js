@@ -2,8 +2,9 @@
  * Square radio tiles (operating system and app), at checkout and on the Reinstall tab.
  *
  * The tiles are real radio inputs, so everything works without this script. It adds two things a select could not do:
- *  - choosing an app switches the operating system tiles to the system the app runs on and greys out the others (the
- *    previous choice comes back when no app is chosen), and tells the checkout to refresh its order summary;
+ *  - every system stays open. Choosing an app moves the system to one the app runs on (each app tile says which);
+ *    choosing a system an app does not run on sets the app to "No app" and says why. Either change tells the checkout
+ *    to refresh its order summary;
  *  - an app with more than one version gets a small version select under the tiles. At checkout that select is posted as
  *    it is; on the Reinstall tab ([data-tiles-merge]) it has no name and writes its choice into the checked tile's value.
  * No dependencies.
@@ -23,7 +24,7 @@
 		var select = scope.querySelector( '[data-tiles-version]' );
 		var merge = !! scope.closest( '[data-tiles-merge]' ) || scope.hasAttribute( 'data-tiles-merge' );
 		var want = apps.getAttribute( 'data-os' );
-		var remembered = null;
+		var note = document.createElement( 'p' );
 
 		function checked( group ) {
 			return group ? group.querySelector( 'input[type="radio"]:checked' ) : null;
@@ -37,52 +38,77 @@
 			}
 		}
 
-		function lock( on ) {
-			var note = os ? os.querySelector( '[data-tiles-note]' ) : null;
-			var before = checked( os );
+		function families( radio ) {
+			var list = radio && ! radio.hasAttribute( 'data-none' ) ? ( radio.getAttribute( 'data-families' ) || '' ) : '';
+
+			return list ? list.split( ',' ) : [];
+		}
+
+		function family( radio ) {
+			return radio ? radio.getAttribute( 'data-family' ) || '' : '';
+		}
+
+		function changed( radio ) {
+			// The order summary reads the choice from the session: tell the form it changed.
+			radio.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+
+			if ( window.jQuery ) {
+				window.jQuery( document.body ).trigger( 'update_checkout' );
+			}
+		}
+
+		function say( text ) {
+			note.textContent = text;
+			note.hidden = '' === text;
+		}
+
+		// An app was chosen: when the system chosen is not one it runs on, choose the first one it runs on.
+		function follow() {
+			var app = checked( apps );
+			var wanted = families( app );
+			var system = checked( os );
 			var target = null;
 
-			if ( ! os || ! want ) {
+			say( '' );
+
+			if ( ! os || ! wanted.length || ( system && -1 !== wanted.indexOf( family( system ) ) ) ) {
 				return;
 			}
 
-			if ( on && null === remembered && before ) {
-				remembered = before.value;
-			}
-
 			each( os.querySelectorAll( 'input[type="radio"]' ), function ( radio ) {
-				radio.disabled = on && radio.value !== want;
-				radio.closest( '.beltoft-services-tile' ).classList.toggle( 'is-disabled', radio.disabled );
-
-				if ( on && radio.value === want ) {
-					target = radio;
-				}
-
-				if ( ! on && null !== remembered && radio.value === remembered ) {
+				if ( ! target && ! radio.disabled && -1 !== wanted.indexOf( family( radio ) ) ) {
 					target = radio;
 				}
 			} );
 
+			// Without family data (an older cluster setting) the group names the one app system.
+			if ( ! target && want ) {
+				target = os.querySelector( 'input[type="radio"][value="' + want + '"]' );
+			}
+
 			if ( target ) {
 				target.checked = true;
+				changed( target );
+			}
+		}
+
+		// A system was chosen: when the chosen app does not run on it, choose no app and say why.
+		function drop() {
+			var app = checked( apps );
+			var wanted = families( app );
+			var system = checked( os );
+			var none = apps.querySelector( 'input[type="radio"][data-none]' );
+			var name = app ? app.closest( '.beltoft-services-tile' ).querySelector( '.beltoft-services-tile__name' ) : null;
+			var runs = app ? app.closest( '.beltoft-services-tile' ).querySelector( '.beltoft-services-tile__runs' ) : null;
+
+			if ( ! wanted.length || ! system || -1 !== wanted.indexOf( family( system ) ) || ! none ) {
+				return;
 			}
 
-			if ( ! on ) {
-				remembered = null;
-			}
-
-			if ( note ) {
-				note.hidden = ! on;
-			}
-
-			if ( target && before !== target ) {
-				// The order summary reads the choice from the session: tell the form it changed.
-				target.dispatchEvent( new Event( 'change', { bubbles: true } ) );
-
-				if ( window.jQuery ) {
-					window.jQuery( document.body ).trigger( 'update_checkout' );
-				}
-			}
+			none.checked = true;
+			update();
+			changed( none );
+			say( name && runs ? name.textContent + ': ' + runs.textContent + '. ' + ( apps.getAttribute( 'data-dropped' ) || '' ) : '' );
 		}
 
 		function fill() {
@@ -114,17 +140,23 @@
 		}
 
 		function update() {
-			var radio = checked( apps );
-
-			lock( !! radio && ! radio.hasAttribute( 'data-none' ) );
 			fill();
 		}
 
 		apps.addEventListener( 'change', function ( event ) {
-			if ( event.target && 'radio' === event.target.type ) {
+			if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
 				update();
+				follow();
 			}
 		} );
+
+		if ( os ) {
+			os.addEventListener( 'change', function ( event ) {
+				if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
+					drop();
+				}
+			} );
+		}
 
 		if ( select && merge ) {
 			select.addEventListener( 'change', function () {
@@ -136,7 +168,13 @@
 			} );
 		}
 
+		note.className = 'beltoft-services-tiles__note description';
+		note.setAttribute( 'role', 'status' );
+		note.hidden = true;
+		apps.appendChild( note );
+
 		update();
+		follow();
 	}
 
 	each( document.querySelectorAll( '[data-tiles="app"]' ), setup );

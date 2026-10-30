@@ -212,8 +212,9 @@ final class AppReinstall {
 			return;
 		}
 
-		$record = VmRecords::for_resource( $resource_id );
-		$os     = $record ? Apps::os_template( (array) Clusters::get( $record['cluster'] ) ) : 0;
+		$record  = VmRecords::for_resource( $resource_id );
+		$cluster = $record ? (array) Clusters::get( $record['cluster'] ) : array();
+		$os      = $record ? Apps::os_template( $cluster ) : 0;
 
 		$items = array();
 
@@ -236,21 +237,27 @@ final class AppReinstall {
 					$first      = '' === $first && ! $version['disabled'] ? (string) $value : $first;
 				}
 
-				$usable  = '' !== $first;
-				$current = reset( $entry['versions'] );
-				$items[] = array(
+				$usable   = '' !== $first;
+				$current  = reset( $entry['versions'] );
+				$families = Apps::families( array_column( $entry['versions'], 'version' ) );
+				$items[]  = array(
 					'value'    => $usable ? $first : (string) array_key_first( $entry['versions'] ),
 					'name'     => (string) ( $entry['def']['name'] ?? $app_id ),
 					'line'     => (string) ( $entry['def']['summary'] ?? '' ),
+					'runs'     => Apps::runs_on( $cluster, $families ),
 					'logo'     => Tiles::app_logo( (array) $entry['def'] ),
 					'disabled' => ! $usable,
 					'why'      => $usable ? '' : AppField::needs( (array) $current['version'] ),
-					'attrs'    => array( 'data-versions' => (string) wp_json_encode( $versions ) ) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
+					'attrs'    => array(
+						'data-versions' => (string) wp_json_encode( $versions ),
+						'data-families' => implode( ',', $families ),
+					) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
 		} else {
 			$versions = array();
 			$value    = '';
+			$fulls    = array();
 
 			foreach ( $options['choices'] as $choice => $label ) {
 				if ( self::NONE === (string) $choice ) {
@@ -258,17 +265,23 @@ final class AppReinstall {
 				}
 
 				$versions[] = array( 'value' => (string) $choice, 'label' => (string) $label );
+				$fulls[]    = self::KEEP === (string) $choice ? Apps::version( (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ) ) : Apps::version( (string) $r->get( 'app_id' ), (string) $choice );
 				$value      = '' === $value || (string) $choice === $options['selected'] ? (string) $choice : $value;
 			}
 
 			if ( array() !== $versions ) {
-				$items[] = array(
+				$families = Apps::families( $fulls );
+				$items[]  = array(
 					'value'   => $value,
 					'name'    => (string) $options['app']['name'],
 					'line'    => (string) ( $options['app']['summary'] ?? '' ),
+					'runs'    => Apps::runs_on( $cluster, $families ),
 					'logo'    => Tiles::app_logo( (array) $options['app'] ),
 					'checked' => self::NONE !== $options['selected'],
-					'attrs'   => array( 'data-versions' => (string) wp_json_encode( $versions ) ) + ( ! empty( $options['app']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
+					'attrs'   => array(
+						'data-versions' => (string) wp_json_encode( $versions ),
+						'data-families' => implode( ',', $families ),
+					) + ( ! empty( $options['app']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
 
@@ -292,7 +305,10 @@ final class AppReinstall {
 				'name'   => 'app_version',
 				'legend' => __( 'App', 'beltoft-services' ),
 				'items'  => $items,
-				'attrs'  => array( 'data-os' => (string) $os ),
+				'attrs'  => array(
+					'data-os'      => (string) $os,
+					'data-dropped' => __( 'No app is selected now.', 'beltoft-services' ),
+				),
 			)
 		);
 
@@ -305,7 +321,6 @@ final class AppReinstall {
 			echo '<p class="description">' . esc_html__( 'The version on this server can no longer be installed. The current version is selected instead.', 'beltoft-services' ) . '</p>';
 		}
 
-		echo '<p class="description">' . esc_html( $options['plain'] ? __( 'Choosing an app installs Ubuntu 24.04, because the app runs on it.', 'beltoft-services' ) : __( 'An app runs on Ubuntu 24.04, so the operating system stays the same while an app is selected.', 'beltoft-services' ) ) . '</p>';
 	}
 
 	/** Domain controls shared by same-app and plain-server reinstall choices. */

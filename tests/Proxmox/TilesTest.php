@@ -121,6 +121,44 @@ class TilesTest extends TestCase {
 		$this->assertStringContainsString( 'data-tiles-note hidden', $html );
 	}
 
+	public function test_os_tiles_carry_their_family_and_an_app_tile_says_what_it_runs_on(): void {
+		$cluster = array(
+			'templates'         => array( 9000 => 'Ubuntu 24.04 LTS', 9002 => 'Debian 13' ),
+			'template_families' => array( 9000 => 'ubuntu-24.04', 9002 => 'debian-13' ),
+		);
+		update_option( \BeltoftServices\Proxmox\Clusters::OPTION, array( 'tiles' => $cluster ) );
+
+		$items = Tiles::os_items( 'tiles', array( 9000 => 'Ubuntu 24.04 LTS', 9002 => 'Debian 13' ), 9002 );
+		$this->assertSame( 'ubuntu-24.04', $items[0]['attrs']['data-family'] );
+		$this->assertSame( 'debian-13', $items[1]['attrs']['data-family'] );
+
+		$this->assertSame( array( 'ubuntu-24.04', 'debian-13' ), \BeltoftServices\Proxmox\Apps::families( array( array( 'os' => array( 'ubuntu-24.04' ) ), array( 'os' => array( 'ubuntu-24.04', 'debian-13' ) ), null ) ) );
+		$this->assertSame( 'Runs on Ubuntu 24.04', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'ubuntu-24.04' ) ) );
+		$this->assertSame( 'Runs on Ubuntu 24.04 or Debian 13', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'ubuntu-24.04', 'debian-13' ) ) );
+		$this->assertSame( 'Runs on Rocky 9', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'rocky-9' ) ), 'A family without a template still gets a name.' );
+		$this->assertSame( '', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array() ) );
+
+		ob_start();
+		Tiles::print_group(
+			array(
+				'kind'  => 'app',
+				'name'  => 'pick',
+				'items' => array( array( 'value' => 'n8n', 'name' => 'n8n', 'runs' => 'Runs on Ubuntu 24.04', 'logo' => '', 'attrs' => array( 'data-families' => 'ubuntu-24.04' ) ) ),
+			)
+		);
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( '<span class="beltoft-services-tile__line beltoft-services-tile__runs">Runs on Ubuntu 24.04</span>', $html );
+		$this->assertStringContainsString( 'data-families="ubuntu-24.04"', $html );
+	}
+
+	public function test_the_script_keeps_every_system_open_and_drops_an_app_that_does_not_run_on_the_chosen_one(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
+		$this->assertStringNotContainsString( 'radio.disabled = on', $js, 'Systems are never greyed out by an app.' );
+		$this->assertStringContainsString( 'function drop()', $js );
+		$this->assertStringContainsString( 'none.checked = true', $js );
+		$this->assertStringContainsString( 'function follow()', $js );
+	}
+
 	public function test_the_stylesheet_has_square_tiles_in_three_and_two_columns_and_navy_when_chosen(): void {
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.css' );
 

@@ -358,16 +358,19 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
 	}
 
-	public function test_the_reinstall_tiles_lock_the_system_and_offer_the_version_select(): void {
+	public function test_the_reinstall_tiles_keep_the_system_open_say_what_an_app_runs_on_and_offer_the_version_select(): void {
 		$r    = $this->plain();
 		$html = $this->reinstall_html( $r );
 		$this->assertMatchesRegularExpression( '#<p[^>]*data-tiles-version-row hidden>.*?<select[^>]*data-tiles-version>#s', $html );
 		$this->assertStringNotContainsString( 'name="app_version_pick"', $html );
 		$this->assertDoesNotMatchRegularExpression( '#<select[^>]*data-tiles-version[^>]*name=#', $html, 'The version select has no name: its choice is written into the checked tile.' );
-		$this->assertStringContainsString( 'data-tiles-note hidden', $this->page( $r, 'reinstall' ), 'The system tiles carry the note about the forced Ubuntu.' );
+		$page = $this->page( $r, 'reinstall' );
+		$this->assertStringNotContainsString( 'data-tiles-note', $page, 'No note about systems being off: they stay open.' );
+		$this->assertMatchesRegularExpression( '#data-families="[a-z0-9.,-]+"#', $html, 'Each app tile names the systems it runs on.' );
+		$this->assertStringContainsString( 'beltoft-services-tile__runs', $html );
 
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
-		$this->assertStringContainsString( 'radio.disabled = on && radio.value !== want', $js );
+		$this->assertStringNotContainsString( 'radio.disabled = on', $js );
 		$this->assertStringContainsString( 'radio.value = select.value', $js );
 	}
 

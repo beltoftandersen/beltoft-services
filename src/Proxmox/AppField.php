@@ -252,7 +252,10 @@ final class AppField {
 			),
 		);
 
+		$cluster = (array) Clusters::get( (string) ( $offer['cluster'] ?? '' ) );
+
 		foreach ( $offer['apps'] as $id => $app ) {
+			$families = Apps::families( (array) $app['choices'] );
 			$current  = reset( $app['choices'] );
 			$why      = Apps::plan_refusal( $current, (array) $offer['plan'] );
 			$versions = array();
@@ -265,6 +268,7 @@ final class AppField {
 				'value'    => (string) $id,
 				'name'     => (string) $app['name'],
 				'line'     => (string) ( $app['summary'] ?? '' ),
+				'runs'     => Apps::runs_on( $cluster, $families ),
 				'logo'     => Tiles::app_logo( $app ),
 				'checked'  => (string) $id === $start && null === $why,
 				'disabled' => null !== $why,
@@ -273,6 +277,7 @@ final class AppField {
 					'data-versions' => (string) wp_json_encode( $versions ),
 					'data-min'      => (string) wp_json_encode( self::minimum( $current ) ),
 					'data-why'      => self::needs( $current ),
+					'data-families' => implode( ',', $families ),
 				),
 			);
 		}
@@ -284,11 +289,14 @@ final class AppField {
 				'name'   => self::POST_APP,
 				'legend' => __( 'App (optional)', 'beltoft-services' ),
 				'items'  => $items,
-				'attrs'  => array( 'data-os' => (string) $offer['os'] ),
+				'attrs'  => array(
+					'data-os'      => (string) $offer['os'],
+					'data-dropped' => __( 'No app is selected now.', 'beltoft-services' ),
+				),
 			)
 		);
 
-		echo '<p class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed on Ubuntu 24.04 after the server starts. Without an app, you choose the operating system above.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed after the server starts, on a system its tile names.', 'beltoft-services' ) . '</p>';
 
 		echo '<p class="form-row form-row-wide" data-tiles-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
 		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version data-selected="' . esc_attr( $picked['version'] ) . '"></select></span></p>';

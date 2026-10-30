@@ -184,6 +184,7 @@ final class Tiles {
 				'line'    => $parts[1],
 				'logo'    => self::os_logo( (int) $vmid, (string) $label, (string) ( $families[ (int) $vmid ] ?? '' ) ),
 				'checked' => (int) $vmid === $selected,
+				'attrs'   => array( 'data-family' => (string) ( $families[ (int) $vmid ] ?? '' ) ),
 			);
 		}
 
@@ -191,7 +192,7 @@ final class Tiles {
 	}
 
 	/**
-	 * Prints the operating system tiles with the line that explains why they are greyed out while an app is chosen.
+	 * Prints the operating system tiles. Each carries its family, so the app tiles' script can tell which apps run on it.
 	 *
 	 * @param string             $cluster  Cluster id.
 	 * @param array<int, string> $options  VMID => label.
@@ -207,7 +208,6 @@ final class Tiles {
 				'name'   => $name,
 				'legend' => __( 'Operating system', 'beltoft-services' ),
 				'items'  => self::os_items( $cluster, $options, $selected ),
-				'note'   => __( 'An app runs on Ubuntu 24.04, so the other systems are off while an app is chosen.', 'beltoft-services' ),
 			)
 		);
 	}
@@ -218,7 +218,7 @@ final class Tiles {
 	 * Prints a group of tiles.
 	 *
 	 * Group keys: kind (os or app), id, name (the radio input name), legend, items, note (a line the script shows when the group is locked), attrs (data attributes of the group).
-	 * Item keys: value, name, line, logo (SVG markup from this class), checked, disabled, why (the line for a disabled tile), attrs (data attributes of the radio).
+	 * Item keys: value, name, line, runs (the operating systems an app runs on), logo (SVG markup from this class), checked, disabled, why (the line for a disabled tile), attrs (data attributes of the radio).
 	 *
 	 * @param array<string, mixed> $group Group.
 	 */
@@ -248,6 +248,10 @@ final class Tiles {
 
 			if ( '' !== (string) ( $item['line'] ?? '' ) ) {
 				echo '<span class="beltoft-services-tile__line">' . esc_html( (string) $item['line'] ) . '</span>';
+			}
+
+			if ( '' !== (string) ( $item['runs'] ?? '' ) ) {
+				echo '<span class="beltoft-services-tile__line beltoft-services-tile__runs">' . esc_html( (string) $item['runs'] ) . '</span>';
 			}
 
 			if ( $disabled && '' !== (string) ( $item['why'] ?? '' ) ) {

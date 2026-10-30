@@ -47,6 +47,53 @@ final class Apps {
 		return 0;
 	}
 
+	/**
+	 * The operating system families some app versions run on (their "os" lists), in order, each once.
+	 *
+	 * @param array<int|string, mixed> $versions Full versions.
+	 * @return array<int, string>
+	 */
+	public static function families( array $versions ): array {
+		$out = array();
+		foreach ( $versions as $version ) {
+			foreach ( (array) ( is_array( $version ) ? ( $version['os'] ?? array() ) : array() ) as $family ) {
+				if ( is_string( $family ) && '' !== $family && ! in_array( $family, $out, true ) ) {
+					$out[] = $family;
+				}
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * "Runs on Ubuntu 24.04", or "Runs on Ubuntu 24.04 or Debian 12": names from the cluster's template labels.
+	 *
+	 * @param array<string, mixed> $cluster  Cluster.
+	 * @param array<int, string>   $families Families.
+	 */
+	public static function runs_on( array $cluster, array $families ): string {
+		$labels = (array) ( $cluster['templates'] ?? array() );
+		$names  = array();
+		foreach ( $families as $family ) {
+			$name = '';
+			foreach ( (array) ( $cluster['template_families'] ?? array() ) as $vmid => $of ) {
+				if ( $of === $family && isset( $labels[ (int) $vmid ] ) ) {
+					$name = (string) preg_replace( '/\s+LTS$/i', '', trim( (string) $labels[ (int) $vmid ] ) );
+					break;
+				}
+			}
+			$names[] = '' !== $name ? $name : ucwords( str_replace( '-', ' ', $family ) );
+		}
+		if ( array() === $names ) {
+			return '';
+		}
+		$last = array_pop( $names );
+		/* translators: 1: operating systems separated by commas, 2: the last one */
+		$list = array() === $names ? $last : sprintf( __( '%1$s or %2$s', 'beltoft-services' ), implode( ', ', $names ), $last );
+		/* translators: %s: operating systems such as Ubuntu 24.04 */
+		return sprintf( __( 'Runs on %s', 'beltoft-services' ), $list );
+	}
+
 	/** Are apps on offer at all on this cluster: the flag, the v2 snippet and an Ubuntu 24.04 template. */
 	public static function cluster_ready( array $cluster ): bool {
 		return ! empty( $cluster['apps_ready'] ) && 1 === preg_match( '#:snippets/vm-vendor-cloudinit-v2\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ) ) && self::os_template( $cluster ) > 0;
