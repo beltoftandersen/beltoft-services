@@ -183,7 +183,9 @@ final class ServerPicker {
 			'os'        => $get( OsField::POST_KEY ),
 			'app'       => $get( AppField::POST_APP ),
 			'version'   => $get( AppField::POST_VERSION ),
-			'domain_on' => '' !== $get( AppField::POST_DOMAIN ) ? '1' : '',
+			'domain_on' => '' !== $get( AppField::POST_DOMAIN ) && AppField::MODE_OWN !== $get( AppField::POST_DOMAIN ) ? '1' : '',
+			'own_on'    => AppField::MODE_OWN === $get( AppField::POST_DOMAIN ) ? '1' : '',
+			'own'       => $get( AppField::POST_OWN ),
 			'zone'      => $get( AppField::POST_ZONE ),
 			'sub'       => $get( AppField::POST_SUB ),
 			'name'      => $get( ServerName::POST_KEY ),
@@ -255,6 +257,8 @@ final class ServerPicker {
 					'domain_on' => '' !== $values['domain_on'],
 					'zone'      => $values['zone'],
 					'sub'       => $values['sub'],
+					'own_on'    => '' !== $values['own_on'],
+					'own'       => $values['own'],
 				),
 				$user
 			);
@@ -267,6 +271,7 @@ final class ServerPicker {
 				$choices['zone']      = $app['zone'];
 				$choices['sub']       = '' !== $app['domain'] ? $values['sub'] : '';
 				$choices['domain_on'] = '' !== $app['domain'] ? '1' : '';
+				$choices['own']       = $app['own'];
 				// An app runs on its own operating system, whatever the tiles said.
 				$values['os'] = (string) $offer['os'];
 			}

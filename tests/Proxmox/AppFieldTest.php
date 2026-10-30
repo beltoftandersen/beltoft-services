@@ -17,6 +17,7 @@ use BeltoftServices\Proxmox\AppAlerts;
 use BeltoftServices\Proxmox\AppDomains;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppInstall;
+use BeltoftServices\Proxmox\AppOwnDomain;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\FakeClient;
@@ -60,7 +61,7 @@ class AppFieldTest extends TestCase {
 		remove_filter( 'woocommerce_product_is_in_stock', '__return_true', 99 );
 		remove_filter( 'woocommerce_is_purchasable', '__return_true', 99 );
 
-		foreach ( array( AppField::POST_APP, AppField::POST_VERSION, AppField::POST_DOMAIN, AppField::POST_ZONE, AppField::POST_SUB, OsField::POST_KEY ) as $key ) {
+		foreach ( array( AppField::POST_APP, AppField::POST_VERSION, AppField::POST_DOMAIN, AppField::POST_ZONE, AppField::POST_SUB, AppField::POST_OWN, OsField::POST_KEY ) as $key ) {
 			unset( $_POST[ $key ] );
 		}
 
@@ -431,7 +432,7 @@ class AppFieldTest extends TestCase {
 
 		WC()->cart->add_to_cart( $this->vm()->get_id() );
 		$html = $this->html();
-		$this->assertStringContainsString( 'Point a domain to this server', $html );
+		$this->assertStringContainsString( 'A domain on our name servers', $html );
 		$this->assertStringContainsString( '<option value="mine.example">', $html );
 		$this->assertStringNotContainsString( 'theirs.example', $html );
 		$this->assertStringNotContainsString( 'elsewhere.example', $html );
@@ -536,6 +537,66 @@ class AppFieldTest extends TestCase {
 		);
 		Lifecycle::provide( $stranger );
 		$this->assertNull( Resource::for_license( (int) $stranger['id'] )->get( 'app_id' ), 'The whole choice is dropped.' );
+	}
+
+	// -- A domain registered elsewhere ------------------------------------------------------------
+
+	public function test_the_own_domain_choice_is_offered_without_any_zone_of_ours(): void {
+		$this->customer();
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+		$html = $this->html();
+		$this->assertStringContainsString( 'Use my own domain', $html );
+		$this->assertStringContainsString( 'name="' . AppField::POST_OWN . '"', $html );
+		$this->assertStringNotContainsString( 'A domain on our name servers', $html, 'No zone of ours, no such choice.' );
+		$this->assertStringNotContainsString( 'name="' . AppField::POST_ZONE . '"', $html );
+	}
+
+	public function test_the_own_domain_is_checked_before_payment(): void {
+		$me = $this->customer();
+		$this->domain( $me, 'mine.example' );
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+		$own = array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => 'own' );
+
+		$this->assertSame( array(), $this->check( $own + array( AppField::POST_OWN => 'Shop.Example.COM.' ) ) );
+		$this->assertSame( array( 'Enter the domain name you want to use.' ), $this->check( $own + array( AppField::POST_OWN => '  ' ) ) );
+		foreach ( array( 'https://shop.example.com', 'shop.example.com/path', 'nodots', '-bad-.example.com', 'shop_x.example.com', 'shop.example.123', 'shop.local', 'bücher.example', '192.0.2.5' ) as $bad ) {
+			$this->assertStringContainsString( 'not a domain name we can use', implode( ' ', $this->check( $own + array( AppField::POST_OWN => $bad ) ) ), $bad );
+		}
+		$this->assertSame( array( 'This app does not use a domain at install. You can add one later.' ), $this->check( array( AppField::POST_APP => 'docker', AppField::POST_DOMAIN => 'own', AppField::POST_OWN => 'shop.example.com' ) ) );
+		$this->assertSame( 'Choose one domain option.', AppField::resolve( \BeltoftServices\Proxmox\AppField::offer(), array( 'app' => 'wordpress', 'domain_on' => true, 'own_on' => true, 'own' => 'shop.example.com', 'zone' => 'mine.example' ), $me ) );
+	}
+
+	public function test_an_own_domain_reaches_the_resource_as_a_waiting_name_and_writes_no_dns(): void {
+		$me = $this->customer();
+		$this->domain( $me, 'mine.example' );
+		$vm = $this->vm();
+		WC()->cart->add_to_cart( $vm->get_id() );
+		do_action( 'woocommerce_checkout_process' );
+		$_POST[ AppField::POST_APP ]    = 'wordpress';
+		$_POST[ AppField::POST_DOMAIN ] = 'own';
+		$_POST[ AppField::POST_OWN ]    = 'Shop.Elsewhere.Test';
+
+		$item = new \WC_Order_Item_Product();
+		$item->set_product( $vm );
+		AppField::save_on_item( $item );
+		$this->assertSame( 'shop.elsewhere.test', $item->get_meta( AppField::ITEM_OWN ) );
+		$this->assertSame( '', (string) $item->get_meta( AppField::ITEM_DOMAIN ) );
+
+		$license = $this->license_with( array( AppField::ITEM_APP => 'wordpress', AppField::ITEM_VERSION => '7.1.4', AppField::ITEM_OWN => 'shop.elsewhere.test' ), array(), $me );
+		Lifecycle::provide( $license );
+		$r = Resource::for_license( (int) $license['id'] );
+		$this->assertSame( 'shop.elsewhere.test', $r->get( 'app_domain_own' ) );
+		$this->assertSame( 'waiting', $r->get( 'app_domain_dns' ) );
+		$this->assertNull( $r->get( 'app_domain_want' ) );
+		$this->assertNull( $r->get( 'app_zone' ) );
+		$this->assertTrue( AppOwnDomain::waiting( $r ) );
+		$this->assertSame( array(), DnsClients::dns()->zone( 'mine.example' )['rrsets'], 'No DNS is written for a name hosted elsewhere.' );
+	}
+
+	public function test_an_own_domain_on_a_line_that_no_longer_holds_builds_the_server_without_the_app(): void {
+		$license = $this->license_with( array( AppField::ITEM_APP => 'docker', AppField::ITEM_VERSION => '29', AppField::ITEM_OWN => 'shop.elsewhere.test' ) );
+		Lifecycle::provide( $license );
+		$this->assertNull( Resource::for_license( (int) $license['id'] )->get( 'app_id' ) );
 	}
 
 	// -- Install: the record and the job -------------------------------------------------------

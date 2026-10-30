@@ -95,6 +95,7 @@ final class Plugin {
 		Proxmox\AppReveal::register();
 		Proxmox\AppInstall::register();
 		Proxmox\AppDomainRelease::register();
+		Proxmox\AppOwnDomain::register();
 		Proxmox\AppStatus::register();
 		Proxmox\MetricsRoute::register();
 		Proxmox\Flows::register();

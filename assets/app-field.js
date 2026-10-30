@@ -15,8 +15,8 @@
 	var apps = {};
 	var note = root.querySelector( '[data-app-note]' );
 	var domain = root.querySelector( '[data-app-domain]' );
-	var domainOn = root.querySelector( '[data-app-domain-on]' );
 	var domainFields = root.querySelector( '[data-app-domain-fields]' );
+	var ownFields = root.querySelector( '[data-app-domain-own-fields]' );
 	var plain = note ? note.textContent : '';
 
 	try {
@@ -31,6 +31,24 @@
 		return radio ? radio.value : '';
 	}
 
+	function mode() {
+		var radio = root.querySelector( 'input[data-app-domain-mode]:checked' );
+
+		return radio ? radio.value : '';
+	}
+
+	function showFields() {
+		var picked = mode();
+
+		if ( domainFields ) {
+			domainFields.hidden = '1' !== picked;
+		}
+
+		if ( ownFields ) {
+			ownFields.hidden = 'own' !== picked;
+		}
+	}
+
 	function update() {
 		var chosen = apps[ chosenId() ];
 
@@ -43,14 +61,14 @@
 		}
 
 		if ( ! chosen || ! chosen.domain ) {
-			if ( domainOn ) {
-				domainOn.checked = false;
-			}
+			var none = root.querySelector( 'input[data-app-domain-mode][value=""]' );
 
-			if ( domainFields ) {
-				domainFields.hidden = true;
+			if ( none ) {
+				none.checked = true;
 			}
 		}
+
+		showFields();
 	}
 
 	root.addEventListener( 'change', function ( event ) {
@@ -59,11 +77,11 @@
 		}
 	} );
 
-	if ( domainOn ) {
-		domainOn.addEventListener( 'change', function () {
-			domainFields.hidden = ! domainOn.checked;
-		} );
-	}
+	root.addEventListener( 'change', function ( event ) {
+		if ( event.target && event.target.hasAttribute( 'data-app-domain-mode' ) ) {
+			showFields();
+		}
+	} );
 
 	update();
 }() );

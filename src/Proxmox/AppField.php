@@ -34,11 +34,15 @@ final class AppField {
 	public const POST_DOMAIN  = 'beltoft_services_app_domain_on';
 	public const POST_ZONE    = 'beltoft_services_app_zone';
 	public const POST_SUB     = 'beltoft_services_app_sub';
+	public const POST_OWN     = 'beltoft_services_app_own';
+	/** The value of the domain choice (POST_DOMAIN) that means "my own domain, registered elsewhere". */
+	public const MODE_OWN     = 'own';
 
 	public const ITEM_APP     = '_beltoft_services_app';
 	public const ITEM_VERSION = '_beltoft_services_app_version';
 	public const ITEM_ZONE    = '_beltoft_services_app_zone';
 	public const ITEM_DOMAIN  = '_beltoft_services_app_domain';
+	public const ITEM_OWN     = '_beltoft_services_app_own';
 
 	public const HANDLE = 'beltoft-services-app-field';
 
@@ -106,13 +110,13 @@ final class AppField {
 	 * The choice a customer made, checked against what is offered.
 	 *
 	 * @param array<string, mixed> $offer  The offer.
-	 * @param array<string, mixed> $input  app, version, domain_on, zone, sub.
+	 * @param array<string, mixed> $input  app, version, domain_on, zone, sub, own_on, own (a domain registered elsewhere).
 	 * @param int                  $user   The customer.
 	 * @param bool                 $check_dns Whether to read the zone for a free name.
-	 * @return array{app: string, version: string, zone: string, domain: string}|string An empty app when none is wanted; else the refusal text.
+	 * @return array{app: string, version: string, zone: string, domain: string, own: string}|string An empty app when none is wanted; else the refusal text.
 	 */
 	public static function resolve( array $offer, array $input, int $user, bool $check_dns = true ) {
-		$none = array( 'app' => '', 'version' => '', 'zone' => '', 'domain' => '' );
+		$none = array( 'app' => '', 'version' => '', 'zone' => '', 'domain' => '', 'own' => '' );
 		$id   = (string) ( $input['app'] ?? '' );
 
 		if ( '' === $id ) {
@@ -137,7 +141,23 @@ final class AppField {
 			return $why;
 		}
 
-		$out = array( 'app' => $id, 'version' => $version, 'zone' => '', 'domain' => '' );
+		$out = array( 'app' => $id, 'version' => $version, 'zone' => '', 'domain' => '', 'own' => '' );
+
+		if ( ! empty( $input['own_on'] ) ) {
+			if ( ! empty( $input['domain_on'] ) ) {
+				return __( 'Choose one domain option.', 'beltoft-services' );
+			}
+
+			$own = AppOwnDomain::choose( $app, $input['own'] ?? '' );
+
+			if ( is_string( $own ) ) {
+				return $own;
+			}
+
+			$out['own'] = $own['fqdn'];
+
+			return $out;
+		}
 
 		if ( empty( $input['domain_on'] ) ) {
 			return $out;
@@ -185,15 +205,21 @@ final class AppField {
 				'domain_on' => '' !== $picked['domain_on'],
 				'zone'      => $picked['zone'],
 				'sub'       => $picked['sub'],
+				'own_on'    => '' !== $picked['own'],
+				'own'       => $picked['own'],
 			);
 		}
+
+		$mode = $get( self::POST_DOMAIN );
 
 		return array(
 			'app'       => $get( self::POST_APP ),
 			'version'   => $get( self::POST_VERSION ),
-			'domain_on' => '' !== $get( self::POST_DOMAIN ),
+			'domain_on' => '' !== $mode && self::MODE_OWN !== $mode,
 			'zone'      => $get( self::POST_ZONE ),
 			'sub'       => $get( self::POST_SUB ),
+			'own_on'    => self::MODE_OWN === $mode,
+			'own'       => $get( self::POST_OWN ),
 		);
 	}
 
@@ -220,7 +246,10 @@ final class AppField {
 		$picked    = Picked::clean( $picked );
 		$start     = isset( $offer['apps'][ $picked['app'] ] ) ? $picked['app'] : '';
 		$zones     = AppDomains::zones( get_current_user_id() );
-		$domain_on = '' !== $picked['domain_on'] && '' !== $start && ! empty( $offer['apps'][ $start ]['domain'] ) && in_array( $picked['zone'], $zones, true );
+		$supports  = '' !== $start && ! empty( $offer['apps'][ $start ]['domain'] );
+		$domain_on = '' !== $picked['domain_on'] && $supports && in_array( $picked['zone'], $zones, true );
+		$own_on    = '' !== $picked['own'] && $supports;
+		$mode      = $own_on ? self::MODE_OWN : ( $domain_on ? '1' : '' );
 		$data      = array();
 
 		foreach ( $offer['apps'] as $id => $app ) {
@@ -301,11 +330,24 @@ final class AppField {
 		echo '<p class="form-row form-row-wide" data-tiles-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
 		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version data-selected="' . esc_attr( $picked['version'] ) . '"></select></span></p>';
 
+		// The domain choice: none, a domain on our name servers (only when the customer has one), or a domain registered elsewhere.
+		echo '<fieldset class="beltoft-services-app__domain" data-app-domain hidden><legend>' . esc_html__( 'Domain (optional)', 'beltoft-services' ) . '</legend>';
+		$choices = array(
+			array( '', __( 'No domain', 'beltoft-services' ), __( 'The app uses the server address, without HTTPS.', 'beltoft-services' ) ),
+		);
+
 		if ( array() !== $zones ) {
-			echo '<div class="beltoft-services-app__domain" data-app-domain hidden>';
-			echo '<p class="form-row form-row-wide"><label class="checkbox"><input type="checkbox" class="input-checkbox" name="' . esc_attr( self::POST_DOMAIN ) . '" value="1" data-app-domain-on' . ( $domain_on ? ' checked' : '' ) . '> <span>' . esc_html__( 'Point a domain to this server', 'beltoft-services' ) . '</span></label>';
-			echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) . '</span></p>';
-			echo '<div class="beltoft-services-app__domain-fields" data-app-domain-fields' . ( $domain_on ? '' : ' hidden' ) . '>';
+			$choices[] = array( '1', __( 'A domain on our name servers', 'beltoft-services' ), __( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) );
+		}
+
+		$choices[] = array( self::MODE_OWN, __( 'Use my own domain', 'beltoft-services' ), __( 'For a domain registered or hosted elsewhere. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server.', 'beltoft-services' ) );
+
+		foreach ( $choices as $choice ) {
+			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_DOMAIN ) . '" value="' . esc_attr( $choice[0] ) . '" data-app-domain-mode' . checked( $mode, $choice[0], false ) . '> <span>' . esc_html( $choice[1] ) . '</span><span class="description">' . esc_html( $choice[2] ) . '</span></label>';
+		}
+
+		if ( array() !== $zones ) {
+			echo '<div class="beltoft-services-app__domain-fields" data-app-domain-fields="1"' . ( $domain_on ? '' : ' hidden' ) . '>';
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_ZONE ) . '">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_ZONE ) . '" id="' . esc_attr( self::POST_ZONE ) . '">';
 
 			foreach ( $zones as $zone ) {
@@ -315,8 +357,13 @@ final class AppField {
 			echo '</select></span></p>';
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_SUB ) . '">' . esc_html__( 'Subdomain (optional)', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( self::POST_SUB ) . '" id="' . esc_attr( self::POST_SUB ) . '" maxlength="120" autocomplete="off" spellcheck="false" placeholder="www" value="' . esc_attr( $picked['sub'] ) . '"></span>';
 			echo '<span class="description">' . esc_html__( 'Leave it empty to use the domain itself. The name must not have an address record yet.', 'beltoft-services' ) . '</span></p>';
-			echo '</div></div>';
+			echo '</div>';
 		}
+
+		echo '<div class="beltoft-services-app__domain-fields" data-app-domain-own-fields="1"' . ( $own_on ? '' : ' hidden' ) . '>';
+		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_OWN ) . '">' . esc_html__( 'Your domain name', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( self::POST_OWN ) . '" id="' . esc_attr( self::POST_OWN ) . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="shop.example.com" value="' . esc_attr( $picked['own'] ) . '"></span>';
+		echo '<span class="description">' . esc_html__( 'We do not change any DNS records for it. You add the A record where the domain is hosted.', 'beltoft-services' ) . '</span></p>';
+		echo '</div></fieldset>';
 
 		echo '</div>';
 	}
@@ -399,6 +446,10 @@ final class AppField {
 			$item->add_meta_data( self::ITEM_ZONE, $choice['zone'], true );
 			$item->add_meta_data( self::ITEM_DOMAIN, $choice['domain'], true );
 		}
+
+		if ( '' !== $choice['own'] ) {
+			$item->add_meta_data( self::ITEM_OWN, $choice['own'], true );
+		}
 	}
 
 	// -- Assets -------------------------------------------------------------------------------
@@ -475,6 +526,8 @@ final class AppField {
 					'domain_on' => '' !== (string) $item->get_meta( self::ITEM_DOMAIN, true ),
 					'zone'      => (string) $item->get_meta( self::ITEM_ZONE, true ),
 					'sub'       => self::sub_of( (string) $item->get_meta( self::ITEM_DOMAIN, true ), (string) $item->get_meta( self::ITEM_ZONE, true ) ),
+					'own_on'    => '' !== (string) $item->get_meta( self::ITEM_OWN, true ),
+					'own'       => (string) $item->get_meta( self::ITEM_OWN, true ),
 				),
 				(int) ( $license['user_id'] ?? 0 ),
 				false
@@ -491,6 +544,11 @@ final class AppField {
 			if ( '' !== $choice['domain'] ) {
 				$meta['app_zone']        = $choice['zone'];
 				$meta['app_domain_want'] = $choice['domain'];
+			}
+
+			if ( '' !== $choice['own'] ) {
+				// Nothing is written to any DNS: the install waits until the name points at the server (AppOwnDomain).
+				$meta = array_merge( $meta, array_filter( AppOwnDomain::fresh_wait( $choice['own'] ), static fn( $value ) => null !== $value ) );
 			}
 
 			break;
