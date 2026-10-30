@@ -13,8 +13,12 @@
 
 defined( 'ABSPATH' ) || exit;
 ?>
-<div class="beltoft-services-domains">
+<div class="beltoft-services-domains<?php echo $rows ? '' : ' is-empty'; ?>">
+	<?php if ( ! $rows ) : ?>
+		<p class="beltoft-licenses__empty"><?php echo esc_html( $empty ); ?></p>
+	<?php endif; ?>
 	<?php if ( $buttons ) : ?>
+		<?php // Over the list, at its right edge; with no list, under the empty line at the left. ?>
 		<div class="beltoft-services-list-actions">
 			<?php foreach ( $buttons as $beltoft_services_i => $beltoft_services_button ) : ?>
 				<a class="beltoft-services-list-btn<?php echo count( $buttons ) - 1 === $beltoft_services_i ? '' : ' is-ghost'; ?>" href="<?php echo esc_url( $beltoft_services_button['url'] ); ?>"><?php echo esc_html( $beltoft_services_button['label'] ); ?></a>
@@ -37,7 +41,5 @@ defined( 'ABSPATH' ) || exit;
 				</a>
 			<?php endforeach; ?>
 		</div>
-	<?php else : ?>
-		<p class="beltoft-licenses__empty"><?php echo esc_html( $empty ); ?></p>
 	<?php endif; ?>
 </div>
