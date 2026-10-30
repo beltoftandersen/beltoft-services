@@ -328,7 +328,6 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-disk__guide pre { margin: 0.35em 0 0; overflow-x: auto; }
 .beltoft-services-disk__guide :target, .beltoft-services-disk__guide[open] { scroll-margin-top: 1.5em; }
 
-.beltoft-services-vm__snapshots [data-snapshot-add] a { display: block; margin-top: 4px; }
 
 .beltoft-services-vm__snapshot { padding: 12px 0; }
 
@@ -621,3 +620,16 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-domain__dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 43px; margin: 0 0 16px; padding: 0 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; box-shadow: none; }
 .beltoft-services-danger__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 0; }
 .beltoft-services-danger__confirm.button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Add a disk, more snapshots: square tiles to pick from, the size or count over its price. */
+.beltoft-services-add { margin: 16px 0; }
+.beltoft-services-add__title { margin: 0 0 8px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
+.beltoft-services-add__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-width: 720px; }
+.beltoft-services-add a.beltoft-services-add__tile { display: flex; flex-direction: column; gap: 3px; padding: 14px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; transition: background-color 0.12s ease, color 0.12s ease; }
+.beltoft-services-add a.beltoft-services-add__tile:hover { background: var(--navy, #0c1535); color: var(--bg-card, #fff) !important; }
+.beltoft-services-add a.beltoft-services-add__tile:focus-visible { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
+.beltoft-services-add__name { font-size: 18px; font-weight: 700; line-height: 1.25; }
+.beltoft-services-add__price { font-size: 13px; line-height: 1.4; opacity: 0.8; }
+@media (max-width: 600px) {
+	.beltoft-services-add__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

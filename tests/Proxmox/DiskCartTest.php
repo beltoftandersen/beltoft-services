@@ -53,6 +53,22 @@ class DiskCartTest extends BackupTestCase {
 		return wc_get_product( $variation->get_id() );
 	}
 
+	public function test_the_server_card_offers_disk_sizes_as_tiles_with_their_price(): void {
+		$server = $this->ready_vm();
+		wp_set_current_user( (int) $server->license()['user_id'] );
+		$this->variation();
+		$add = \BeltoftServices\Proxmox\DiskPanels::server( $server )['add'];
+		$this->assertNotEmpty( $add, 'The 50 GB size fits and is offered.' );
+		ob_start();
+		\BeltoftServices\Proxmox\Panels::account( \BeltoftServices\Resource::find( $server->id() ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'data-disk-add', $html );
+		$this->assertSame( count( $add ), substr_count( $html, 'class="beltoft-services-add__tile"' ) );
+		$this->assertStringContainsString( '<span class="beltoft-services-add__name">50 GB</span>', $html );
+		$this->assertStringContainsString( 'a month', $add[0]['price'] );
+		$this->assertStringContainsString( 'excluding VAT', $html );
+	}
+
 	public function test_existing_server_two_same_size_disks_keep_distinct_cart_lines(): void {
 		$server = $this->ready_vm();
 		$license = $server->license();

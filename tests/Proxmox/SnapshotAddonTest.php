@@ -701,8 +701,9 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 		$this->assertSame( 30, $panel['buy'][0]['days'] );
 
 		$html = $this->render_card( $this->fresh( $server ) );
-		$this->assertStringContainsString( 'Add 2 snapshots', $html );
-		$this->assertStringContainsString( 'Add 5 snapshots', $html );
+		$this->assertStringContainsString( '+2 snapshots', $html );
+		$this->assertStringContainsString( '+5 snapshots', $html );
+		$this->assertSame( 2, substr_count( $html, 'class="beltoft-services-add__tile"' ), 'Each pack is a tile.' );
 		$this->assertStringContainsString( 'excluding VAT', $html );
 		$this->assertStringContainsString( '0 of 1 used', preg_replace( '/\s+/', ' ', wp_strip_all_tags( $html ) ) );
 	}

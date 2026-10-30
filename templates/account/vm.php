@@ -456,10 +456,17 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			</p>
 		<?php endif; ?>
 		<?php if ( $extra_disks['add'] ) : ?>
-			<p><?php esc_html_e( 'Add a disk:', 'beltoft-services' ); ?>
-			<?php foreach ( $extra_disks['add'] as $beltoft_disk_size ) : ?>
-				<a href="<?php echo esc_url( $beltoft_disk_size['url'] ); ?>"><?php echo esc_html( $beltoft_disk_size['size'] . ' GB (' . $beltoft_disk_size['price'] . ' excluding VAT)' ); ?></a>
-			<?php endforeach; ?></p>
+			<div class="beltoft-services-add" data-disk-add>
+				<h5 class="beltoft-services-add__title"><?php esc_html_e( 'Add a disk', 'beltoft-services' ); ?></h5>
+				<div class="beltoft-services-add__grid">
+				<?php foreach ( $extra_disks['add'] as $beltoft_disk_size ) : ?>
+					<a class="beltoft-services-add__tile" href="<?php echo esc_url( $beltoft_disk_size['url'] ); ?>">
+						<span class="beltoft-services-add__name"><?php echo esc_html( $beltoft_disk_size['size'] . ' GB' ); ?></span>
+						<span class="beltoft-services-add__price"><?php /* translators: %s: price */ echo esc_html( sprintf( __( '%s excluding VAT', 'beltoft-services' ), $beltoft_disk_size['price'] ) ); ?></span>
+					</a>
+				<?php endforeach; ?>
+				</div>
+			</div>
 		<?php endif; ?>
 	</section>
 		<?php $beltoft_services_close(); ?>
@@ -606,10 +613,17 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				?>
 			<?php endforeach; ?>
 			<?php if ( $snapshots['buy'] ) : ?>
-				<p class="description" data-snapshot-add><?php esc_html_e( 'Need more?', 'beltoft-services' ); ?>
-				<?php foreach ( $snapshots['buy'] as $beltoft_services_pack ) : ?>
-					<a href="<?php echo esc_url( $beltoft_services_pack['url'] ); ?>"><?php /* translators: 1: snapshot slots in the pack, 2: price with period */ echo esc_html( sprintf( _n( 'Add %1$d snapshot (%2$s excluding VAT)', 'Add %1$d snapshots (%2$s excluding VAT)', (int) $beltoft_services_pack['slots'], 'beltoft-services' ), (int) $beltoft_services_pack['slots'], $beltoft_services_pack['price'] ) ); ?></a>
-				<?php endforeach; ?></p>
+				<div class="beltoft-services-add" data-snapshot-add>
+					<h5 class="beltoft-services-add__title"><?php esc_html_e( 'Need more snapshots?', 'beltoft-services' ); ?></h5>
+					<div class="beltoft-services-add__grid">
+					<?php foreach ( $snapshots['buy'] as $beltoft_services_pack ) : ?>
+						<a class="beltoft-services-add__tile" href="<?php echo esc_url( $beltoft_services_pack['url'] ); ?>">
+							<span class="beltoft-services-add__name"><?php /* translators: %d: snapshot slots in the pack */ echo esc_html( sprintf( _n( '+%d snapshot', '+%d snapshots', (int) $beltoft_services_pack['slots'], 'beltoft-services' ), (int) $beltoft_services_pack['slots'] ) ); ?></span>
+							<span class="beltoft-services-add__price"><?php /* translators: %s: price */ echo esc_html( sprintf( __( '%s excluding VAT', 'beltoft-services' ), $beltoft_services_pack['price'] ) ); ?></span>
+						</a>
+					<?php endforeach; ?>
+					</div>
+				</div>
 			<?php endif; ?>
 			<?php if ( array() === $snapshots['entries'] ) : ?>
 				<p><?php esc_html_e( 'You have no snapshots yet.', 'beltoft-services' ); ?></p>
