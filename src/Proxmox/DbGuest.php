@@ -22,7 +22,7 @@ final class DbGuest {
 	public const HEALTH      = self::DIR . '/health.json';
 
 	public const STATES = array( 'working', 'ready', 'failed' );
-	public const STEPS  = array( 'job', 'disk', 'cluster', 'tls', 'config', 'database', 'finish', 'allow', 'listen', 'password', 'dump', 'complete', 'start' );
+	public const STEPS  = array( 'job', 'disk', 'cluster', 'container', 'tls', 'config', 'database', 'finish', 'allow', 'listen', 'password', 'dump', 'complete', 'start' );
 
 	public const DATABASE = 'app';
 	public const ROLE     = 'app_user';
@@ -103,10 +103,10 @@ final class DbGuest {
 
 	/**
 	 * The guest's health file, checked: a bounded read, valid JSON, `ok` a boolean, `updated` a date, and each number
-	 * (connections, disk_percent, last_dump, cert_expires, bans) absent, null or a plain non-negative number. Anything
-	 * else rejects the whole file. Times are unix times (0 or null: not known yet).
+	 * (connections, disk_percent, last_dump, cert_expires, bans, and Valkey's memory_percent and evictions) absent, null
+	 * or a plain non-negative number. Anything else rejects the whole file. Times are unix times (0 or null: not known yet).
 	 *
-	 * @return array{ok:bool,updated:int,connections:int|null,disk_percent:float|null,last_dump:int|null,cert_expires:int|null,bans:int|null}|null
+	 * @return array{ok:bool,updated:int,connections:int|null,disk_percent:float|null,last_dump:int|null,cert_expires:int|null,bans:int|null,memory_percent?:float|null,evictions?:int|null}|null
 	 */
 	public static function health( Client $client, string $node, int $vmid ): ?array {
 		$h = self::read( $client, $node, $vmid, self::HEALTH );
@@ -140,6 +140,27 @@ final class DbGuest {
 		}
 
 		$out['disk_percent'] = null === $percent ? null : (float) $percent;
+
+		// Valkey's extras: in the result only when the file has them (a PostgreSQL guest never writes them).
+		if ( array_key_exists( 'memory_percent', $h ) ) {
+			$memory = $h['memory_percent'];
+
+			if ( null !== $memory && ( ! ( is_int( $memory ) || is_float( $memory ) ) || $memory < 0 || $memory > 100 ) ) {
+				return null;
+			}
+
+			$out['memory_percent'] = null === $memory ? null : (float) $memory;
+		}
+
+		if ( array_key_exists( 'evictions', $h ) ) {
+			$evictions = $h['evictions'];
+
+			if ( null !== $evictions && ( ! is_int( $evictions ) || $evictions < 0 ) ) {
+				return null;
+			}
+
+			$out['evictions'] = $evictions;
+		}
 
 		return $out;
 	}

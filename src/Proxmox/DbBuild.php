@@ -53,19 +53,23 @@ final class DbBuild {
 			return 'The public IP of this plan must be 0 or 1';
 		}
 
-		if ( 'postgres' !== ( $plan['engine'] ?? 'postgres' ) ) {
-			return 'Only the postgres engine is available';
+		$engine = DbEngines::for_plan( $plan );
+
+		if ( null === $engine ) {
+			return 'The database engine of this plan (' . mb_substr( sanitize_text_field( (string) ( is_scalar( $plan['engine'] ?? null ) ? $plan['engine'] : '' ) ), 0, 20 ) . ') is not available';
 		}
 
-		if ( ! in_array( self::major( $plan ), DbDriver::SUPPORTED_MAJORS, true ) ) {
-			return 'The PostgreSQL major version of this plan (' . mb_substr( sanitize_text_field( (string) ( is_scalar( $plan['major'] ?? null ) ? $plan['major'] : '' ) ), 0, 10 ) . ') is not supported. Supported: ' . implode( ', ', DbDriver::SUPPORTED_MAJORS );
+		$error = $engine->plan_error( $plan );
+
+		if ( null === $error && $engine instanceof DbEngineTerms && ! DbTermsField::accepted( $r ) ) {
+			return 'The customer has not accepted the licence terms of this database engine at checkout. An admin can accept them with the filter beltoft_services_db_terms_accepted';
 		}
 
-		return null;
+		return $error;
 	}
 
 	/**
-	 * The plan's PostgreSQL major as an integer, 0 when it is not a whole number.
+	 * The plan's major version as an integer, 0 when it is not a whole number.
 	 *
 	 * @param array<string, mixed> $plan Plan.
 	 */
@@ -211,7 +215,7 @@ final class DbBuild {
 		$public = IpPool::for_resource( $this->r->id() );
 		$listen = null === $public ? array( $address ) : array( $address, $public['address'] );
 		$job    = 'init' === $op
-			? array( 'v' => 1, 'request' => $request, 'op' => 'init', 'db' => DbGuest::DATABASE, 'role' => DbGuest::ROLE, 'listen' => $listen, 'private_cidr' => $cidr, 'allow' => array(), 'world' => false, 'max_connections' => DbProfile::max_connections( $this->r ), 'major' => self::major( (array) $this->r->get( 'plan' ) ) )
+			? DbEngines::for_resource( $this->r )->init_job( $this->r, $request, $listen, $cidr )
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
 
 		$sent = DbJob::send( $this->client, $record, $job );

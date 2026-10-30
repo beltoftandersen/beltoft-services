@@ -10,9 +10,11 @@ namespace BeltoftServices\Account;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbNeedsServer;
 use BeltoftServices\Proxmox\DiskCart;
 use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\PostgresEngine;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\RateLimit;
 
@@ -118,6 +120,7 @@ final class DbPicker {
 					'cores'        => (int) ( $numbers['cores'] ?? 0 ),
 					'memory_mb'    => (int) ( $numbers['memory_mb'] ?? 0 ),
 					'disk_gb'      => (int) ( $numbers['disk_gb'] ?? 0 ),
+					'engine'       => (string) ( $numbers['engine'] ?? '' ),
 					'major'        => (int) ( $numbers['major'] ?? 0 ),
 					'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
 					'backup_days'  => 0 === $days ? Backups::DB_DEFAULT_DAYS : $days,
@@ -388,12 +391,14 @@ final class DbPicker {
 	}
 
 	/**
-	 * "PostgreSQL 18", or "PostgreSQL" when the plan names no major.
+	 * "PostgreSQL 18", or "PostgreSQL" when the plan names no major; "SQL Server 2022 Express", "Valkey" for those engines.
 	 *
 	 * @param array<string, mixed> $plan Plan.
 	 */
 	private static function engine( array $plan ): string {
-		return (int) $plan['major'] > 0 ? 'PostgreSQL ' . (int) $plan['major'] : 'PostgreSQL';
+		$engine = DbEngines::for_plan( '' === (string) $plan['engine'] ? array() : array( 'engine' => $plan['engine'] ) );
+
+		return ( $engine ?? new PostgresEngine() )->label( $plan );
 	}
 
 	/**

@@ -24,7 +24,9 @@ defined( 'ABSPATH' ) || exit;
  *  - disk: disk_percent at DISK_AT or more: customer and admin, re-arms below DISK_REARM;
  *  - dump: no nightly dump for DUMP_MAX_AGE: admin;
  *  - cert: the certificate ends within CERT_DAYS days: admin;
- *  - bans: bans at or above the setting monitor_db_bans: admin.
+ *  - bans: bans at or above the setting monitor_db_bans: admin;
+ *  - memory (Valkey): used memory at MEMORY_AT percent of the limit or more: admin, re-arms below MEMORY_REARM;
+ *  - evictions (Valkey): the eviction count went up since the last reading: admin, re-arms on a reading with no new eviction.
  *
  * A server that is restoring, building or changing is not read, so a restore never alerts. Admin mails carry no secret.
  */
@@ -45,6 +47,9 @@ final class DbMonitor {
 	public const DUMP_MAX_AGE = 36 * HOUR_IN_SECONDS;
 
 	public const CERT_DAYS = 30;
+
+	public const MEMORY_AT    = 90;
+	public const MEMORY_REARM = 80;
 
 	public const BANS_DEFAULT = 50;
 
@@ -129,6 +134,8 @@ final class DbMonitor {
 					self::dump( $r, $health, $now, $state, $text );
 					self::cert( $health, $now, $state, $text );
 					self::bans( $health, $now, $state, $text );
+					self::memory( $health, $now, $state, $text );
+					self::evictions( $health, $now, $state, $text );
 				}
 
 				$meta[ self::META ] = $state;
@@ -304,6 +311,65 @@ final class DbMonitor {
 		if ( empty( $state['bans_admin'] ) ) {
 			$state['bans_admin'] = $now;
 			$text[]              = sprintf( 'Many addresses are banned for failed logins (%1$d, the limit is %2$d).', $bans, $limit );
+		}
+	}
+
+	/**
+	 * Memory (Valkey): the share of the memory limit in use, 90 percent or more; re-arms below 80.
+	 *
+	 * @param array<string, mixed> $health Reading.
+	 * @param int                  $now    Time.
+	 * @param array<string, mixed> $state  State (changed).
+	 * @param array<int, string>   $text   Admin lines (added to).
+	 */
+	private static function memory( array $health, int $now, array &$state, array &$text ): void {
+		$percent = $health['memory_percent'] ?? null;
+
+		if ( null === $percent ) {
+			return;
+		}
+
+		if ( $percent < self::MEMORY_REARM ) {
+			unset( $state['memory_admin'] );
+
+			return;
+		}
+
+		if ( $percent >= self::MEMORY_AT && empty( $state['memory_admin'] ) ) {
+			$state['memory_admin'] = $now;
+			$text[]                = sprintf( 'The server uses %d percent of its memory limit.', (int) floor( $percent ) );
+		}
+	}
+
+	/**
+	 * Evictions (Valkey): the count only goes up. The first reading is the baseline; a later one that is higher tells
+	 * the admin once, a reading with no new eviction re-arms (a restart that resets the count does too).
+	 *
+	 * @param array<string, mixed> $health Reading.
+	 * @param int                  $now    Time.
+	 * @param array<string, mixed> $state  State (changed).
+	 * @param array<int, string>   $text   Admin lines (added to).
+	 */
+	private static function evictions( array $health, int $now, array &$state, array &$text ): void {
+		$count = $health['evictions'] ?? null;
+
+		if ( null === $count ) {
+			return;
+		}
+
+		$seen = $state['evictions_seen'] ?? null;
+
+		$state['evictions_seen'] = $count;
+
+		if ( null === $seen || $count <= (int) $seen ) {
+			unset( $state['evictions_admin'] );
+
+			return;
+		}
+
+		if ( empty( $state['evictions_admin'] ) ) {
+			$state['evictions_admin'] = $now;
+			$text[]                   = sprintf( 'The server is evicting keys to stay within its memory limit (%d since the last reading).', $count - (int) $seen );
 		}
 	}
 
