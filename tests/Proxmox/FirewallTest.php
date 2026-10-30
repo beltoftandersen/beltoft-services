@@ -255,7 +255,7 @@ class FirewallTest extends FirewallTestCase {
 		list( $r ) = $this->ready();
 		$vm        = $this->fake->vm( (int) $r->get( 'vmid' ) );
 
-		$this->assertArrayNotHasKey( 'policy_in', $vm['firewall_options'], 'The build wrote no inbound policy.' );
+		$this->assertSame( 'ACCEPT', $vm['firewall_options']['policy_in'], 'The build writes an open inbound policy: Proxmox drops inbound for an unset one once the host enforces VM rules.' );
 		$this->assertFalse( Firewall::managed( $r ) );
 
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
@@ -457,7 +457,8 @@ class FirewallTest extends FirewallTestCase {
 			$vm        = $this->fake->vm( (int) $r->get( 'vmid' ) );
 
 			$this->assertFalse( Firewall::managed( $r ) );
-			$this->assertArrayNotHasKey( 'policy_in', $vm['firewall_options'] );
+			$this->assertSame( 'ACCEPT', $vm['firewall_options']['policy_in'], 'Open, as such a server always was, but written.' );
+			$this->assertSame( 'ACCEPT', $vm['firewall_options']['policy_out'] );
 			$this->assertSame( 1, (int) $vm['firewall_options']['enable'] );
 			$this->assertSame( array( Provision::SMTP_COMMENT ), $this->comments( (int) $r->get( 'vmid' ) ) );
 		}

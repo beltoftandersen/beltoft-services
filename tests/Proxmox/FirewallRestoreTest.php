@@ -31,12 +31,12 @@ class FirewallRestoreTest extends SnapshotsTestCase {
 		$this->assertContains( Provision::SMTP_COMMENT, $comments );
 	}
 
-	public function test_a_rollback_of_a_server_the_dashboard_does_not_manage_writes_no_inbound_policy(): void {
+	public function test_a_rollback_of_a_server_the_dashboard_does_not_manage_keeps_it_open(): void {
 		$server = $this->server();
 		$a      = $this->take( $server, 'A' );
 
 		$this->act( $server, 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) );
 
-		$this->assertArrayNotHasKey( 'policy_in', $this->fake->vm( 5000 )['firewall_options'] );
+		$this->assertSame( 'ACCEPT', $this->fake->vm( 5000 )['firewall_options']['policy_in'] );
 	}
 }

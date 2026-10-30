@@ -1433,7 +1433,9 @@ final class Firewall {
 	private function legacy( string $base, array $v ) {
 		unset( $v );
 
-		$answer = $this->write( 'PUT', $base . '/options', array( 'enable' => 1 ) );
+		// The policies are written, never left unset: Proxmox drops inbound traffic for a VM firewall without a
+		// policy_in, so an unset one would close a new server the moment the host enforces VM rules.
+		$answer = $this->write( 'PUT', $base . '/options', array( 'enable' => 1, 'policy_in' => 'ACCEPT', 'policy_out' => 'ACCEPT' ) );
 
 		if ( is_wp_error( $answer ) ) {
 			return $this->classify( $answer, 'configure' );

@@ -48,7 +48,7 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertStringContainsString( 'no-store', (string) $response->get_headers()['Cache-Control'] );
 		$this->assertFalse( $data['managed'] );
-		$this->assertSame( 'unknown', $data['live'], 'No inbound policy is set on a server nobody took over.' );
+		$this->assertSame( 'open', $data['live'], 'A server nobody took over is built with an explicit open inbound policy.' );
 		$this->assertSame( '203.0.113.9', $data['my_ip'] );
 		$this->assertNotEmpty( $data['defaults'] );
 		$this->assertArrayNotHasKey( 'fw_error', $data );
