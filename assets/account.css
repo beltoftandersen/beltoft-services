@@ -441,8 +441,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-tabs a:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: -2px; }
 .beltoft-services-vm--page > .beltoft-services-vm__flash { margin-bottom: 0; }
 
-.beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--bg-warm, #eeece6); }
-.beltoft-services-facts > div { margin: 0; padding: 10px 14px; background: var(--bg-card, #fff); min-width: 0; }
+/* The lines between the cells are each cell's shadow in the 1px gap, so a row that is not full stays white. */
+.beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; background: var(--bg-card, #fff); }
+.beltoft-services-facts > div { margin: 0; padding: 10px 14px; background: var(--bg-card, #fff); box-shadow: 0 0 0 1px var(--bg-warm, #eeece6); min-width: 0; }
 .beltoft-services-facts dt { margin: 0; color: var(--ink-muted, #8a98a6); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
 .beltoft-services-facts dd { margin: 2px 0 0; font-weight: 500; overflow-wrap: anywhere; }
 .beltoft-services-facts code { padding: 2px 6px; background: var(--bg-warm, #eeece6); font: inherit; font-size: 14px; }
@@ -559,6 +560,7 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-domain--page .beltoft-services-domain__title { font-size: 16px; }
 .beltoft-services-domain--page .beltoft-services-domain__hosts { margin-bottom: 12px; }
 .beltoft-services-domain--page .beltoft-services-facts { gap: 8px; background: none; }
+.beltoft-services-domain--page .beltoft-services-facts > div { box-shadow: none; }
 .beltoft-services-panel--page .beltoft-services-panel__driver > .beltoft-services-domain--page { min-width: 0; max-width: 100%; }
 .beltoft-services-domain--page .beltoft-services-tabs { max-width: 100%; }
 .beltoft-services-panel--page .beltoft-services-panel__driver { grid-template-columns: minmax(0, 1fr); }
