@@ -8,7 +8,7 @@
 .beltoft-services-app .description { display: block; margin-top: 6px; color: var(--ink-soft, inherit); font-size: 14px; line-height: 1.5; }
 .beltoft-services-app__domain, .beltoft-services-app__domain-fields { display: flex; flex-direction: column; gap: 16px; }
 .beltoft-services-app [hidden] { display: none !important; }
-.beltoft-services-app fieldset.beltoft-services-app__domain, .checkout-page .beltoft-services-app fieldset.beltoft-services-app__domain { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; min-width: 0; border: 0 !important; border-radius: 0; background: none; }
+.beltoft-services-app fieldset.beltoft-services-app__domain, .checkout-page .beltoft-services-app fieldset.beltoft-services-app__domain { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; min-width: 0; border: 0 !important; background: none; }
 .beltoft-services-app .beltoft-services-app__domain > legend { float: none; width: auto; margin: 0; padding: 0; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
 .beltoft-services-app .beltoft-services-app__domain label.beltoft-services-app__domain-choice { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; row-gap: 2px; align-items: start; margin: 0; font-weight: 400; }
 .beltoft-services-app .beltoft-services-app__domain-choice input { margin: 4px 0 0; }

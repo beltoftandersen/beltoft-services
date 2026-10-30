@@ -36,7 +36,7 @@
 .beltoft-services-picker__more { display: grid; gap: 14px; }
 .beltoft-services-picker__more .form-row { margin: 0; padding: 0; }
 .beltoft-services-picker__more label { display: block; margin: 0 0 4px; font-weight: 500; }
-.beltoft-services-picker input[type="text"], .beltoft-services-picker textarea, .beltoft-services-picker select { box-sizing: border-box; width: 100%; max-width: 520px; margin: 0; padding: 9px 12px; border: 1px solid var(--rule, #d6d2c8); border-radius: 0; background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; font-size: 15px; box-shadow: none; }
+.beltoft-services-picker input[type="text"], .beltoft-services-picker textarea, .beltoft-services-picker select { box-sizing: border-box; width: 100%; max-width: 520px; margin: 0; padding: 9px 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; font-size: 15px; box-shadow: none; }
 .beltoft-services-picker input[type="text"] { height: 43px; }
 .beltoft-services-picker .description { display: block; margin-top: 4px; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.5; }
 .beltoft-services-picker .woocommerce-input-wrapper { display: block; }
@@ -44,7 +44,7 @@
 .beltoft-services-picker .beltoft-services-app { gap: 12px; }
 .beltoft-services-picker__go { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding-top: 4px; }
 .beltoft-services-picker__summary { margin: 0; font-weight: 500; font-variant-numeric: tabular-nums; }
-.beltoft-services-picker .beltoft-services-picker__button { display: inline-block; height: auto; margin: 0; padding: 11px 22px; border: 0; border-radius: 0; background: var(--navy, #0c1535); box-shadow: none; color: #fff; font: inherit; font-size: 15px; font-weight: 500; line-height: 1.3; cursor: pointer; }
+.beltoft-services-picker .beltoft-services-picker__button { display: inline-block; height: auto; margin: 0; padding: 11px 22px; border: 0; background: var(--navy, #0c1535); box-shadow: none; color: #fff; font: inherit; font-size: 15px; font-weight: 500; line-height: 1.3; cursor: pointer; }
 .beltoft-services-picker .beltoft-services-picker__button:hover { background: var(--navy-2, #16214a); color: #fff; }
 .beltoft-services-picker .beltoft-services-picker__button:focus-visible { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
 .beltoft-services-picker .beltoft-services-picker__button:disabled { opacity: 0.45; cursor: not-allowed; }
