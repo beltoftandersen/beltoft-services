@@ -114,7 +114,7 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.css' );
 		$this->assertStringNotContainsString( 'left: -10000px', $css, 'The keyboard field is not hidden off screen any more.' );
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.js' );
-		$this->assertStringContainsString( 'navigator.clipboard.readText().then( typeText', $js );
+		$this->assertStringContainsString( 'navigator.clipboard.readText().then( function ( text ) { typed( typeText( text )', $js );
 	}
 
 	public function test_open_failure_is_mapped_by_route_code_and_busy_differs_from_stopped(): void {

@@ -77,6 +77,10 @@ final class ConsoleTab {
 				'failed' => __( 'The console is not available right now.', 'beltoft-services' ),
 				'help' => __( 'Use the console when you cannot log in with SSH. It shows the same screen as a monitor on the server.', 'beltoft-services' ),
 				'keyboard' => __( 'Keyboard', 'beltoft-services' ),
+				/* translators: %d: number of characters typed into the console */
+				'typed' => __( 'Typed %d characters. Press Enter in the field below, or in the console, to send Enter.', 'beltoft-services' ),
+				/* translators: %d: number of characters sent to the console */
+				'sent' => __( 'Sent %d characters and Enter.', 'beltoft-services' ),
 				'fullscreen' => __( 'Full screen', 'beltoft-services' ),
 				'cad' => __( 'Ctrl+Alt+Del', 'beltoft-services' ),
 				'disconnect' => __( 'Disconnect', 'beltoft-services' ),

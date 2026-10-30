@@ -58,30 +58,34 @@
 	button.addEventListener( 'click', open );
 	root.querySelector( '[data-console-disconnect]' ).addEventListener( 'click', function () { close( 'disconnected' ); } );
 	root.querySelector( '[data-console-cad]' ).addEventListener( 'click', function () { if ( rfb ) { rfb.sendCtrlAltDel(); } } );
-	// Keyboard shows a field: what is typed or pasted there is sent to the server as keypresses (a login prompt has
-	// no clipboard). Paste types the clipboard the same way.
+	// Keyboard shows a field: its text is sent to the server as keypresses when Enter is pressed (a login prompt has no
+	// clipboard and shows no password, so the status line says what was sent). Paste types the clipboard without Enter.
 	function typeText( text ) {
-		if ( ! rfb || ! text ) { return; }
-		Array.from( text.replace( /\r?\n$/, '' ) ).forEach( function ( character ) { rfb.sendKey( character.codePointAt( 0 ) ); } );
+		if ( ! rfb || ! text ) { return 0; }
+		var chars = Array.from( text.replace( /\r?\n$/, '' ) );
+		chars.forEach( function ( character ) { rfb.sendKey( character.codePointAt( 0 ) ); } );
 		activity();
+		return chars.length;
+	}
+	function typed( count, enter ) {
+		status.textContent = ( cfg.strings[ enter ? 'sent' : 'typed' ] || '' ).replace( '%d', String( count ) );
 	}
 	root.querySelector( '[data-console-keyboard]' ).addEventListener( 'click', function () { input.hidden = ! input.hidden; if ( ! input.hidden ) { input.focus(); } } );
 	var paste = root.querySelector( '[data-console-paste]' );
 	if ( paste ) {
 		paste.hidden = ! ( navigator.clipboard && navigator.clipboard.readText );
 		paste.addEventListener( 'click', function () {
-			navigator.clipboard.readText().then( typeText, function () { input.hidden = false; input.focus(); } );
+			navigator.clipboard.readText().then( function ( text ) { typed( typeText( text ), false ); }, function () { input.hidden = false; input.focus(); } );
 		} );
 	}
 	root.querySelector( '[data-console-fullscreen]' ).addEventListener( 'click', function () { if ( screen.requestFullscreen ) { screen.requestFullscreen(); } } );
 	[ 'pointerdown', 'keydown', 'touchstart' ].forEach( function ( event ) { screen.addEventListener( event, activity, { passive: true } ); } );
-	input.addEventListener( 'input', function () {
-		if ( ! rfb ) { return; }
-		typeText( input.value ); input.value = '';
-	} );
 	input.addEventListener( 'keydown', function ( event ) {
-		if ( ! rfb ) { return; }
-		var keys = { Enter: 0xff0d, Backspace: 0xff08, Tab: 0xff09 };
-		if ( keys[event.key] ) { rfb.sendKey( keys[event.key] ); event.preventDefault(); activity(); }
+		if ( ! rfb || 'Enter' !== event.key ) { return; }
+		event.preventDefault();
+		var count = typeText( input.value );
+		rfb.sendKey( 0xff0d );
+		input.value = '';
+		typed( count, true );
 	} );
 }() );
