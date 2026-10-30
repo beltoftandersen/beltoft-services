@@ -115,6 +115,9 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'left: -10000px', $css, 'The keyboard field is not hidden off screen any more.' );
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.js' );
 		$this->assertStringContainsString( 'navigator.clipboard.readText().then( function ( text ) { typed( typeText( text )', $js );
+		// Capitals and shifted symbols are typed with Shift held, or a generated password never matches.
+		$this->assertStringContainsString( "rfb.sendKey( 0xffe1, 'ShiftLeft', true )", $js );
+		$this->assertStringContainsString( "rfb.sendKey( 0xffe1, 'ShiftLeft', false )", $js );
 	}
 
 	public function test_open_failure_is_mapped_by_route_code_and_busy_differs_from_stopped(): void {

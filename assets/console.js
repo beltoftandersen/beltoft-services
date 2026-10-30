@@ -63,7 +63,15 @@
 	function typeText( text ) {
 		if ( ! rfb || ! text ) { return 0; }
 		var chars = Array.from( text.replace( /\r?\n$/, '' ) );
-		chars.forEach( function ( character ) { rfb.sendKey( character.codePointAt( 0 ) ); } );
+		// The server's virtual keyboard is a US layout and needs Shift held for capitals and shifted symbols;
+		// without it "A" arrives as "a" and "+" as "=", and a password never matches.
+		var shifted = /[A-Z~!@#$%^&*()_+{}|:"<>?]/;
+		chars.forEach( function ( character ) {
+			var shift = shifted.test( character );
+			if ( shift ) { rfb.sendKey( 0xffe1, 'ShiftLeft', true ); }
+			rfb.sendKey( character.codePointAt( 0 ) );
+			if ( shift ) { rfb.sendKey( 0xffe1, 'ShiftLeft', false ); }
+		} );
 		activity();
 		return chars.length;
 	}
