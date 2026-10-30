@@ -17,7 +17,8 @@ defined( 'ABSPATH' ) || exit;
  * Runs hourly (Action Scheduler, group beltoft-services). For every resource of a license with source
  * `usage` it writes, for each full UTC hour it existed in, one row per item (Rates::items()). A resource
  * exists from its activation to its close; one in state deleted that is not closed yet is left out. A
- * server counts in any state but deleted, running or stopped. Writing is idempotent (unique key), and an
+ * server counts in any state but deleted, running or stopped, from the hour it first was ready (a server that
+ * failed to provision, or is still being set up, bills nothing). Writing is idempotent (unique key), and an
  * hour that was missed is written by the next run, up to BACKFILL_HOURS back.
  */
 final class Meter {
@@ -40,6 +41,25 @@ final class Meter {
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
+	}
+
+	/**
+	 * Resource meta: when a pay-as-you-go resource first reached ready (unix time). Nothing is billed before it.
+	 */
+	public const READY_AT = 'usage_ready_at';
+
+	/**
+	 * Records the first time a pay-as-you-go resource is ready.
+	 *
+	 * @param mixed $r   Resource.
+	 * @param mixed $old Previous state.
+	 * @param mixed $new New state.
+	 */
+	public static function on_state_changed( $r, $old, $new ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- action signature.
+		if ( 'ready' === $new && $r instanceof Resource && null === $r->get( self::READY_AT ) && 'usage' === (string) ( $r->license()['source'] ?? '' ) ) {
+			$r->set( array( self::READY_AT => time() ) );
+		}
 	}
 
 	/**
@@ -112,7 +132,18 @@ final class Meter {
 
 		$license = $resource->license();
 		$user_id = (int) ( $license['user_id'] ?? 0 );
-		$start   = max( $horizon, Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ) );
+		$ready   = $resource->get( self::READY_AT );
+
+		// Billing starts in the hour the resource first was ready. One that never got ready (failed or still being set up) bills nothing. One that was ready before the time was recorded (state ready, paused or deleting) starts at its activation.
+		if ( null === $ready ) {
+			if ( ! in_array( $resource->get( 'state' ), array( 'ready', 'paused', 'deleting', 'deleted' ), true ) ) {
+				return 0;
+			}
+
+			$ready = (int) strtotime( $row['activated_at'] . ' UTC' );
+		}
+
+		$start   = max( $horizon, Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ) );
 		$end     = $closed ? min( $last, Ledger::hour( (int) strtotime( $row['deactivated_at'] . ' UTC' ) ) ) : $last;
 
 		if ( $user_id < 1 || $start > $end ) {

@@ -195,6 +195,10 @@ abstract class UsageTestCase extends BackupTestCase {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
 		$wpdb->update( \BeltoftLicenses\Install::tables()['activations'], array( 'activated_at' => gmdate( 'Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS ) ), array( 'id' => $id ) );
+		$resource = Resource::find( $id );
+		if ( $resource && null !== $resource->get( \BeltoftServices\Usage\Meter::READY_AT ) ) {
+			$resource->set( array( \BeltoftServices\Usage\Meter::READY_AT => time() - $hours * HOUR_IN_SECONDS ) );
+		}
 	}
 
 	/**

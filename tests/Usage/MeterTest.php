@@ -148,4 +148,43 @@ class MeterTest extends UsageTestCase {
 		Meter::unschedule();
 		$this->assertFalse( as_has_scheduled_action( Meter::HOOK, array(), 'beltoft-services' ) );
 	}
+
+	public function test_billing_starts_in_the_hour_the_server_first_was_ready(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$r    = $this->usage_vm( $v['u-None'], $user, 10 );
+		$this->assertNotNull( $r->get( Meter::READY_AT ), 'Reaching ready records the time.' );
+
+		// Created 10 hours ago, but ready only 3 hours ago.
+		$r->set( array( Meter::READY_AT => time() - 3 * HOUR_IN_SECONDS ) );
+		Meter::run();
+		$rows = $this->rows( $r->id(), 'server' );
+		$this->assertSame( gmdate( 'Y-m-d H:00:00', time() - 3 * HOUR_IN_SECONDS ), $rows[0]['hour_bucket'] );
+		$this->assertLessThanOrEqual( 3, count( $rows ) );
+	}
+
+	public function test_a_server_that_never_got_ready_bills_nothing(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$r    = $this->usage_vm( $v['u-None'], $user, 10 );
+		// Back to a server that never was ready: no ready time, and it failed.
+		$r->set( array( Meter::READY_AT => null, 'state' => 'failed' ) );
+		$this->assertNull( Resource::find( $r->id() )->get( Meter::READY_AT ) );
+
+		$this->assertSame( 0, Meter::run() );
+		$this->assertSame( array(), $this->rows( $r->id() ) );
+
+		$r->set( array( 'state' => 'provisioning' ) );
+		$this->assertSame( 0, Meter::run(), 'Still being set up: nothing yet.' );
+	}
+
+	public function test_a_server_that_failed_after_it_was_ready_keeps_billing(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$r    = $this->usage_vm( $v['u-None'], $user, 10 );
+		$r->set( array( 'state' => 'failed' ) );
+
+		$this->assertGreaterThan( 0, Meter::run() );
+		$this->assertNotEmpty( $this->rows( $r->id(), 'server' ) );
+	}
 }
