@@ -65,6 +65,7 @@ class DiskCartTest extends BackupTestCase {
 		$this->assertStringContainsString( 'data-disk-add', $html );
 		$this->assertSame( count( $add ), substr_count( $html, 'class="beltoft-services-add__tile"' ) );
 		$this->assertStringContainsString( '<span class="beltoft-services-add__name">50 GB</span>', $html );
+		$this->assertStringContainsString( 'a month', $add[0]['price'] );
 		$this->assertStringContainsString( 'excluding VAT', $html );
 	}
 

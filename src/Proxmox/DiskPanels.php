@@ -83,7 +83,7 @@ final class DiskPanels {
 				}
 				$url = DiskCart::add_url( $server, $variation );
 				if ( $url ) {
-					$add[] = array( 'size' => $size, 'url' => $url, 'price' => wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) );
+					$add[] = array( 'size' => $size, 'url' => $url, 'price' => wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) . Panels::per( $variation ) );
 				}
 			}
 		}

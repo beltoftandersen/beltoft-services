@@ -366,7 +366,7 @@ final class Panels {
 	 *
 	 * @param \WC_Product $product Subscription product.
 	 */
-	private static function per( \WC_Product $product ): string {
+	public static function per( \WC_Product $product ): string {
 		if ( ! class_exists( '\\WC_Subscriptions_Product' ) || 1 !== (int) \WC_Subscriptions_Product::get_interval( $product ) ) {
 			return '';
 		}
