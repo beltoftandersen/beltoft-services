@@ -357,7 +357,8 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$html = $this->html( $r );
 		$this->assertStringContainsString( 'data-domain-made="1"', $html );
 		$this->assertStringContainsString( 'data-app-domain-removal hidden', $html );
-		$this->assertStringContainsString( 'If DNS hosting is active and the record is unchanged', $html );
+		$this->assertStringContainsString( 'We remove the A record we made for old.mine.example when the reinstall starts.', $html );
+		$this->assertStringContainsString( 'beltoft-services-app-reinstall__removal', $html );
 		ob_start();
 		AppReinstall::confirm( $r->id() );
 		$this->assertStringContainsString( 'data-app-domain-confirm hidden', (string) ob_get_clean() );
@@ -366,6 +367,24 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		ob_start();
 		AppReinstall::confirm( $r->id() );
 		$this->assertSame( '', ob_get_clean() );
+	}
+
+	public function test_junk_release_queue_is_cleared_and_sweep_does_not_reschedule_it(): void {
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( 'x' ) ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+		AppDomainRelease::sweep();
+		$this->assertFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $r->id() ), \BeltoftServices\Jobs::GROUP ) );
+	}
+
+	public function test_junk_release_entry_is_skipped_and_the_next_valid_record_is_removed(): void {
+		$entry = array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 );
+		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( 'x', $entry ) ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+		$this->assertSame( array(), DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
 	}
 
 	public function test_keep_domain_pipeline_makes_no_dns_write(): void {

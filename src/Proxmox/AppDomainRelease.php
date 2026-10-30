@@ -61,8 +61,17 @@ final class AppDomainRelease {
 		$entry = null;
 		$wait = 0;
 		$claimed = $r->locked( static function () use ( $r, &$entry, &$wait ): bool {
-			$old = (array) $r->get( 'app_domain_old' );
-			if ( ! is_array( $old[0] ?? null ) ) {
+			$old = array_values( (array) $r->get( 'app_domain_old' ) );
+			$changed = false;
+			while ( $old && ! is_array( $old[0] ) ) {
+				array_shift( $old );
+				$changed = true;
+			}
+			if ( $changed && ! $r->set( array( 'app_domain_old' => $old ) ) ) {
+				$wait = 30;
+				return false;
+			}
+			if ( ! $old ) {
 				return false;
 			}
 			$first = $old[0];
@@ -134,8 +143,8 @@ final class AppDomainRelease {
 		}
 	}
 
-	/** DNS work only; every queue mutation happens in run() under the server lock. */
-	private static function attempt( Resource $r, array $entry ): true|\WP_Error {
+	/** DNS work only; every queue mutation happens in run() under the server lock. @return true|\WP_Error */
+	private static function attempt( Resource $r, array $entry ): bool|\WP_Error {
 		$zone = (string) ( $entry['zone'] ?? '' );
 		$name = (string) ( $entry['name'] ?? '' );
 		$ip = (string) ( $entry['ip'] ?? '' );

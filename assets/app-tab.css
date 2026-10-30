@@ -21,8 +21,9 @@
 .beltoft-services-app-reinstall label { display: block; }
 .beltoft-services-app-reinstall select { width: 100%; }
 .beltoft-services-app-reinstall [hidden] { display: none !important; }
-.beltoft-services-app-reinstall__domain { margin: 18px 0 0; padding: 0; border: 0; }
+.beltoft-services-app-reinstall__domain { margin: 28px 0 0; padding: 0; border: 0; }
 .beltoft-services-app-reinstall__domain legend { margin-bottom: 8px; font-weight: 600; }
+.beltoft-services-app-reinstall__removal { margin: 24px 0 20px; }
 .beltoft-services-app-reinstall__choice { display: block; margin: 0 0 12px; }
 .beltoft-services-app-reinstall__choice input { margin-right: 6px; }
 .beltoft-services-app-reinstall__choice .description { display: block; margin: 3px 0 0 24px; }

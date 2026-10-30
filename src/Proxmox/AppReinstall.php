@@ -346,7 +346,7 @@ final class AppReinstall {
 		echo '</fieldset>';
 		if ( $made ) {
 			/* translators: %s: the old app domain. */
-			echo '<p class="description" data-app-domain-removal hidden>' . esc_html( sprintf( __( 'If DNS hosting is active and the record is unchanged, we remove the A record we made for %s when the reinstall starts.', 'beltoft-services' ), $current ) ) . '</p>';
+			echo '<p class="description beltoft-services-app-reinstall__removal" data-app-domain-removal hidden>' . esc_html( sprintf( __( 'We remove the A record we made for %s when the reinstall starts. If you changed that record, or DNS hosting for the domain has stopped, we leave it.', 'beltoft-services' ), $current ) ) . '</p>';
 		}
 	}
 
@@ -357,7 +357,7 @@ final class AppReinstall {
 			return;
 		}
 		/* translators: %s: the old app domain. */
-		echo '<p data-app-domain-confirm hidden>' . esc_html( sprintf( __( 'If DNS hosting is active and the record is unchanged, we remove the A record we made for %s.', 'beltoft-services' ), (string) $r->get( 'app_domain' ) ) ) . '</p>';
+		echo '<p data-app-domain-confirm hidden>' . esc_html( sprintf( __( 'We remove the A record we made for %s. If you changed that record, or DNS hosting for the domain has stopped, we leave it.', 'beltoft-services' ), (string) $r->get( 'app_domain' ) ) ) . '</p>';
 	}
 
 	/** A published name takes precedence over a requested name. */
