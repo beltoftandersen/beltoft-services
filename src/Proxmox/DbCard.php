@@ -81,9 +81,14 @@ final class DbCard {
 		self::assets();
 
 		$view = self::view( $r );
+		$page = \BeltoftServices\Account\ServiceArea::page();
+		$area = $page && ( $page['area'] ?? null ) instanceof \BeltoftServices\Account\Databases ? $page['area'] : null;
+		$nav  = $area ? $area->nav() : array();
+		$tab  = $area && '' !== (string) $page['tab'] ? (string) $page['tab'] : 'overview';
+		$link = static fn( string $slug ): string => $area && $page ? $area->url( $page['license'], 'overview' === $slug ? '' : $slug ) : '';
 
-		( static function ( array $view ): void {
+		( static function ( array $view, array $nav, string $active, callable $link ): void {
 			include BELTOFT_SERVICES_PATH . 'templates/account/db.php';
-		} )( $view );
+		} )( $view, $nav, $tab, $link );
 	}
 }

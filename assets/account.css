@@ -550,6 +550,16 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
 @container (max-width: 620px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
 @media (max-width: 700px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
+/* Databases and Apps lists: name and detail, state, one more value (the private host), then an arrow or the Open button. A row with a button is a div, the name is its link. */
+.beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1.4fr) auto; }
+.beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top: 0; }
+.beltoft-services-servers--area a.beltoft-services-srv__name { color: var(--navy, #0c1535) !important; text-decoration: none !important; }
+.beltoft-services-servers--area a.beltoft-services-srv__name:hover, .beltoft-services-servers--area a.beltoft-services-srv__name:focus-visible { text-decoration: underline !important; }
+.beltoft-services-srv__extra { color: var(--ink-soft, #5e7080); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.beltoft-services-srv__extra:empty { display: none; }
+@container (max-width: 620px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } }
 .beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; max-width: 880px; margin: 0 0 12px; }
 .beltoft-services-domains.is-empty .beltoft-services-list-actions { justify-content: flex-start; margin: 12px 0 0; }
 .beltoft-services-list-actions a.beltoft-services-list-btn { display: inline-block; padding: 7px 14px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; line-height: 1.3; text-decoration: none !important; white-space: nowrap; }

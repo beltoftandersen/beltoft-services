@@ -1,6 +1,6 @@
 <?php
 /**
- * My Account tabs for domains and servers.
+ * My Account tabs for domains, servers, databases and apps.
  *
  * @package BeltoftServices
  */
@@ -12,7 +12,7 @@ use BeltoftServices\Product;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Beltoft Licenses lists every license on one tab. This gives domains and servers their own
+ * Beltoft Licenses lists every license on one tab. This gives domains, servers, databases and apps their own
  * tabs, so the Licenses tab keeps the plugin keys. Which tabs exist, and what they are called,
  * can be changed with the beltoft_services_account_tabs filter.
  */
@@ -47,6 +47,10 @@ final class Tabs {
 				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot' ) ),
 			),
 		);
+
+		foreach ( ServiceArea::all() as $area ) {
+			$tabs[] = $area->group();
+		}
 
 		/**
 		 * Filters the My Account tabs of the services: slug, label, empty text and a match rule.

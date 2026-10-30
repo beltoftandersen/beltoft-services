@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array<string, string> $parts Printed sections by key (attention, servers, domains, licenses, next_payment, activity, welcome). A section with nothing to show is ''.
+ * @var array<string, string> $parts Printed sections by key (attention, servers, databases, domains, licenses, apps, next_payment, activity, welcome). A section with nothing to show is ''.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -14,7 +14,8 @@ defined( 'ABSPATH' ) || exit;
 // Two columns that stack on their own, so a short box is not stretched to the height of a long one beside it.
 // On a phone it is one column, in the order of the numbers (the columns step aside: display contents).
 $beltoft_services_columns = array(
-	array( 'servers' => 1, 'licenses' => 3, 'apps' => 4, 'next_payment' => 5 ),
+	// Databases share the 1 of servers: equal numbers keep the order they are listed in, so they come right after the servers.
+	array( 'servers' => 1, 'databases' => 1, 'licenses' => 3, 'apps' => 4, 'next_payment' => 5 ),
 	array( 'domains' => 2, 'activity' => 6 ),
 );
 $beltoft_services_filled = array();

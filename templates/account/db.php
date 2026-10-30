@@ -2,7 +2,8 @@
 /**
  * The card of a managed database. Printed by BeltoftServices\Proxmox\DbCard::render().
  *
- * Variables: $view (see DbCard::view()). The password is never part of this template: the button asks the
+ * Variables: $view (see DbCard::view()), $nav (the page's tabs, slug => title, or empty on a card), $active (the tab shown),
+ * $link (a callable that gives a tab's address). The password is never part of this template: the button asks the
  * server for it once and the script puts it into the connection strings.
  *
  * @package BeltoftServices
@@ -17,7 +18,18 @@ $beltoft_services_db_status = array(
 	'failed'   => __( 'Not available', 'beltoft-services' ),
 );
 ?>
+<?php
+$beltoft_services_all = ! $nav;
+?>
 <div class="beltoft-services-db" data-db-card>
+	<?php if ( $nav ) : ?>
+		<nav class="beltoft-services-tabs" aria-label="<?php esc_attr_e( 'Database sections', 'beltoft-services' ); ?>">
+			<?php foreach ( $nav as $beltoft_services_slug => $beltoft_services_title ) : ?>
+				<a href="<?php echo esc_url( $link( $beltoft_services_slug ) ); ?>"<?php echo $beltoft_services_slug === $active ? ' aria-current="page"' : ''; ?>><?php echo esc_html( $beltoft_services_title ); ?></a>
+			<?php endforeach; ?>
+		</nav>
+	<?php endif; ?>
+	<?php if ( $beltoft_services_all || 'overview' === $active ) : ?>
 	<dl class="beltoft-services-facts">
 		<div><dt><?php esc_html_e( 'Status', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $beltoft_services_db_status[ $view['kind'] ] ); ?></dd></div>
 		<div><dt><?php esc_html_e( 'Engine', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $view['version'] > 0 ? 'PostgreSQL ' . $view['version'] : 'PostgreSQL' ); ?></dd></div>
@@ -61,7 +73,10 @@ $beltoft_services_db_status = array(
 				<p><code class="beltoft-services-db__conn"><?php echo esc_html( (string) $view['fingerprint'] ); ?></code></p>
 			<?php endif; ?>
 		</div>
+	<?php endif; // Kind of state. ?>
+	<?php endif; // Overview pane. ?>
 
+	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'password' === $active ) ) : ?>
 		<?php if ( $view['can_reset'] ) : ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>

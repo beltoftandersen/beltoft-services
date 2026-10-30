@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * of that kind. Nothing here calls Proxmox or a registrar: it reads the license rows, the resource meta,
  * the status the power job already cached, the subscriptions and the license history.
  *
- * Shortcodes: beltoft_services_attention, _servers, _domains, _licenses, _next_payment, _activity, _welcome,
+ * Shortcodes: beltoft_services_attention, _servers, _databases, _domains, _licenses, _apps, _next_payment, _activity, _welcome,
  * and _overview (all of them). The templates are in templates/account/overview/ and can be copied to
  * yourtheme/beltoft-services/account/overview/. On the WooCommerce Dashboard endpoint the whole overview is
  * printed by woocommerce_account_dashboard, unless the beltoft_services_overview_auto filter says false (a site
@@ -36,7 +36,9 @@ final class Overview {
 	public const SECTIONS = array(
 		'attention'    => 'beltoft_services_attention',
 		'servers'      => 'beltoft_services_servers',
+		'databases'    => 'beltoft_services_databases',
 		'domains'      => 'beltoft_services_domains',
+		'apps'         => 'beltoft_services_apps',
 		'licenses'     => 'beltoft_services_licenses',
 		'next_payment' => 'beltoft_services_next_payment',
 		'activity'     => 'beltoft_services_activity',
@@ -229,6 +231,18 @@ final class Overview {
 						'rows'    => array_slice( $data['domains'], 0, self::limit() ),
 					)
 				) : '';
+			case 'databases':
+			case 'apps':
+				return $data[ $section ] ? self::template(
+					'overview/rows.php',
+					array(
+						'class'   => $section,
+						'heading' => ServiceArea::get( 'databases' === $section ? Databases::class : Apps::class )->label(),
+						'more'    => ServiceArea::get( 'databases' === $section ? Databases::class : Apps::class )->all_label(),
+						'url'     => $data[ $section . '_url' ],
+						'rows'    => array_slice( $data[ $section ], 0, self::limit() ),
+					)
+				) : '';
 			case 'licenses':
 				return $data['licenses'] ? self::template(
 					'overview/rows.php',
@@ -303,6 +317,10 @@ final class Overview {
 		return array(
 			'attention'    => array(),
 			'servers'      => array(),
+			'databases'    => array(),
+			'databases_url' => '',
+			'apps'         => array(),
+			'apps_url'     => '',
 			'domains'      => array(),
 			'domains_url'  => '',
 			'licenses'     => array(),
@@ -360,6 +378,16 @@ final class Overview {
 			}
 		}
 
+		$area_views = array( 'databases' => array(), 'apps' => array() );
+
+		foreach ( array( 'databases' => Databases::class, 'apps' => Apps::class ) as $key => $class ) {
+			foreach ( array_slice( (array) ( $groups[ ServiceArea::get( $class )->slug() ] ?? array() ), 0, 50 ) as $license ) {
+				$view                          = View::license( $license );
+				$area_views[ $key ][]          = $view;
+				$names[ (int) $license['id'] ] = (string) $view['product'];
+			}
+		}
+
 		foreach ( $domains as $license ) {
 			$view                          = View::license( $license );
 			$domain_views[]                = $view;
@@ -396,6 +424,34 @@ final class Overview {
 			}
 		}
 
+		$area_resources = array();
+
+		foreach ( array( 'databases' => Databases::class, 'apps' => Apps::class ) as $key => $class ) {
+			$area = ServiceArea::get( $class );
+
+			foreach ( $area_views[ $key ] as $view ) {
+				$resource = Resource::for_license( (int) $view['license']['id'] );
+
+				if ( ! $resource ) {
+					continue;
+				}
+
+				$area_resources[ (int) $view['id'] ] = $resource;
+				$row                                 = $area->row( $view, $resource );
+				$sub                                 = array_filter( array( $row['details'], $row['extra'] ), 'strlen' );
+				$data[ $key ][]                      = array(
+					'url'    => $row['url'],
+					'name'   => $row['name'],
+					'sub'    => implode( ' · ', $sub ),
+					'state'  => $row['state'],
+					'tone'   => $row['tone'],
+					'renews' => '',
+				);
+			}
+
+			$data[ $key . '_url' ] = $data[ $key ] ? $area->url_list() : '';
+		}
+
 		foreach ( $license_views as $view ) {
 			$data['licenses'][] = self::license_row( $view );
 		}
@@ -414,7 +470,7 @@ final class Overview {
 			}
 		}
 
-		$all_resources = $resources + $domain_resources;
+		$all_resources = $resources + $domain_resources + $area_resources;
 
 		foreach ( $addons as $license ) {
 			$resource = Resource::for_license( (int) $license['id'] );
@@ -545,6 +601,12 @@ final class Overview {
 
 		if ( Domains::is_domain( $license ) ) {
 			return Domains::url( $license );
+		}
+
+		foreach ( ServiceArea::all() as $area ) {
+			if ( $area->is_member( $license ) ) {
+				return $area->url( $license );
+			}
 		}
 
 		return Endpoint::url_for_license( $license ) . '#beltoft-license-' . (int) $license['id'];

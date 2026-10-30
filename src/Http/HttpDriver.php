@@ -293,6 +293,57 @@ final class HttpDriver implements Driver, Opens {
 	}
 
 	/**
+	 * The usage line of the account rows: the last known usage ("1 of 3 dashboards"), or the limit while none is known.
+	 * Reads only what the site holds, no request.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_text( Resource $r ): string {
+		$usage = $this->cached_usage( $r );
+
+		if ( null !== $usage ) {
+			return $this->unit_label( $usage['used'], $usage['limit'] );
+		}
+
+		$limit = $this->limit( $r, $r->license() );
+
+		/* translators: %d: units allowed */
+		return $limit > 0 ? sprintf( __( 'Limit %d', 'beltoft-services' ), $limit ) : '';
+	}
+
+	/**
+	 * The last usage answer kept for the account panel, or null.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array{used: int, limit: int}|null
+	 */
+	public function cached_usage( Resource $r ): ?array {
+		$usage = get_transient( self::usage_key( $r ) );
+
+		return is_array( $usage ) && isset( $usage['used'], $usage['limit'] ) ? array( 'used' => (int) $usage['used'], 'limit' => (int) $usage['limit'] ) : null;
+	}
+
+	/**
+	 * The text of the Open button: the connection's own label, else "Open".
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function open_label( Resource $r ): string {
+		$connection = $this->connection( $r );
+
+		return $connection && '' !== (string) $connection['open_label'] ? (string) $connection['open_label'] : __( 'Open', 'beltoft-services' );
+	}
+
+	/**
+	 * Can the customer open this service from My Account: it is ready and its connection can sign customers in.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function can_open_resource( Resource $r ): bool {
+		return 'ready' === $r->get( 'state' ) && self::can_open( $this->connection( $r ) );
+	}
+
+	/**
 	 * The connection's open URL with a five-minute sign-in token made now, or null when the
 	 * connection has no open URL or secret. No request is made.
 	 *

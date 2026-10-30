@@ -143,7 +143,7 @@ final class Panel {
 			return;
 		}
 
-		$page = Servers::page() ?? Domains::page();
+		$page = Servers::page() ?? Domains::page() ?? ServiceArea::page();
 		$page = $page && (int) $page['license']['id'] === (int) $license['id'] ? $page : null;
 
 		// The server page already loaded the resource: one lookup, not two.
