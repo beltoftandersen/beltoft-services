@@ -76,6 +76,7 @@ final class Plugin {
 		Account\ServiceArea::register();
 		Account\DomainDanger::register();
 		Account\ServerPicker::register();
+		Account\DbPicker::register();
 		Account\Overview::register();
 		Account\Billing::register();
 

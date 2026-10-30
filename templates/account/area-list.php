@@ -8,15 +8,19 @@
  *
  * @var array<int, array<string, mixed>> $rows  Rows from BeltoftServices\Account\ServiceArea::row(): id, url, name, details, state, tone (ok, busy, off, bad), extra, action (label and url, or empty).
  * @var string                           $empty Text when there are no rows.
+ * @var array<int, array<string, string>> $buttons Action bar buttons (label, url), from ServiceArea::buttons().
  */
 
 defined( 'ABSPATH' ) || exit;
 
 if ( ! $rows ) {
 	echo '<p class="beltoft-licenses__empty">' . esc_html( $empty ) . '</p>';
+	\BeltoftServices\Account\ServiceArea::actions( $buttons, true );
 
 	return;
 }
+
+\BeltoftServices\Account\ServiceArea::actions( $buttons, false );
 ?>
 <div class="beltoft-services-servers beltoft-services-servers--area">
 	<?php foreach ( $rows as $beltoft_services_row ) : ?>

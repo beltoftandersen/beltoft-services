@@ -404,7 +404,7 @@ final class ServerPicker {
 	 *
 	 * @param int $mb Megabytes.
 	 */
-	private static function memory( int $mb ): string {
+	public static function memory( int $mb ): string {
 		if ( $mb >= 1024 ) {
 			/* translators: %s: memory in gigabytes, such as 4 or 1.5 */
 			return sprintf( __( '%s GB RAM', 'beltoft-services' ), (string) ( round( $mb / 1024, 1 ) + 0 ) );
@@ -420,7 +420,7 @@ final class ServerPicker {
 	 * @param float  $amount Amount excluding tax.
 	 * @param string $period "month", "3 months" or '' for a one-off.
 	 */
-	private static function price_text( float $amount, string $period ): string {
+	public static function price_text( float $amount, string $period ): string {
 		$money = html_entity_decode( wp_strip_all_tags( wc_price( $amount ) ), ENT_QUOTES, 'UTF-8' );
 
 		if ( '' === $period ) {
@@ -587,7 +587,7 @@ final class ServerPicker {
 	 *
 	 * @param string $period Period.
 	 */
-	private static function per( string $period ): string {
+	public static function per( string $period ): string {
 		if ( '' === $period ) {
 			return __( 'excluding VAT', 'beltoft-services' );
 		}

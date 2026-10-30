@@ -144,6 +144,25 @@ abstract class ServiceArea {
 	abstract public function row( array $view, Resource $resource ): array;
 
 	/**
+	 * The buttons of the action bar over the list: label and url, the last one the main one. None by default.
+	 *
+	 * @return array<int, array<string, string>>
+	 */
+	protected function buttons(): array {
+		return array();
+	}
+
+	/**
+	 * Prints a list's action bar (templates/account/list-actions.php).
+	 *
+	 * @param array<int, array<string, string>> $buttons Label and url of each button.
+	 * @param bool                              $start   True under an empty line, false over the rows.
+	 */
+	public static function actions( array $buttons, bool $start ): void {
+		include self::file( 'list-actions.php' );
+	}
+
+	/**
 	 * The tabs after the overview: address part => title. Empty for a page without tabs.
 	 *
 	 * @return array<string, string>
@@ -354,8 +373,9 @@ abstract class ServiceArea {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html( $this->not_found_text() ) . '</p>';
 		}
 
-		$rows  = $this->rows( $members, $resources );
-		$empty = '' !== $empty ? $empty : $this->empty_text();
+		$rows    = $this->rows( $members, $resources );
+		$buttons = $this->buttons();
+		$empty   = '' !== $empty ? $empty : $this->empty_text();
 
 		include self::file( 'area-list.php' );
 	}

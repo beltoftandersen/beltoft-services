@@ -150,7 +150,7 @@ final class DbNeedsServer {
 	 * @param int      $user_id  Customer.
 	 * @param string[] $clusters Clusters of the databases being bought.
 	 */
-	private static function refused( int $user_id, array $clusters ): bool {
+	public static function refused( int $user_id, array $clusters ): bool {
 		if ( ! $clusters || ! self::enabled() ) {
 			return false;
 		}

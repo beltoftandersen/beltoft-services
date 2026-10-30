@@ -561,7 +561,7 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 @container (max-width: 620px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } }
 @media (max-width: 700px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } }
 .beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; max-width: 880px; margin: 0 0 12px; }
-.beltoft-services-domains.is-empty .beltoft-services-list-actions { justify-content: flex-start; margin: 12px 0 0; }
+.beltoft-services-domains.is-empty .beltoft-services-list-actions, .beltoft-services-list-actions.is-start { justify-content: flex-start; margin: 12px 0 0; }
 .beltoft-services-list-actions a.beltoft-services-list-btn { display: inline-block; padding: 7px 14px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; line-height: 1.3; text-decoration: none !important; white-space: nowrap; }
 .beltoft-services-list-actions a.beltoft-services-list-btn.is-ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
 .beltoft-services-list-actions a.beltoft-services-list-btn:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }

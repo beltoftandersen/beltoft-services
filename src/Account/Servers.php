@@ -365,9 +365,16 @@ final class Servers {
 	 * @param array<int, Resource>             $resources Resources of the servers, by license view id.
 	 */
 	private static function list( array $servers, array $others, string $empty, array $resources = array() ): void {
-		$rows = self::rows( $servers, $resources );
+		$rows    = self::rows( $servers, $resources );
+		$buttons = array(
+			array(
+				'label' => __( 'Create a server', 'beltoft-services' ),
+				'url'   => self::url_new(),
+			),
+		);
 
 		if ( $rows ) {
+			ServiceArea::actions( $buttons, false );
 			\BeltoftServices\Proxmox\LiveUsage::enqueue();
 			include self::file( 'servers-list.php' );
 		}
@@ -400,6 +407,7 @@ final class Servers {
 			include self::$default;
 		} elseif ( ! $rows && ! $others && ! $addons ) {
 			echo '<p class="beltoft-licenses__empty">' . esc_html( '' !== $empty ? $empty : __( 'You have no servers yet.', 'beltoft-services' ) ) . '</p>';
+			ServiceArea::actions( $buttons, true );
 		}
 	}
 

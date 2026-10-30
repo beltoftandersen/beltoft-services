@@ -19,6 +19,58 @@ defined( 'ABSPATH' ) || exit;
 final class Databases extends ServiceArea {
 
 	/**
+	 * The value after the endpoint that is the New database page (DbPicker).
+	 */
+	public const NEW_VALUE = 'new';
+
+	/**
+	 * The address of the New database page.
+	 */
+	public function url_new(): string {
+		return function_exists( 'wc_get_endpoint_url' ) ? wc_get_endpoint_url( $this->slug(), self::NEW_VALUE, wc_get_page_permalink( 'myaccount' ) ) : '';
+	}
+
+	/**
+	 * Is the address the New database page (the value after the endpoint is "new")?
+	 */
+	public function is_new(): bool {
+		global $wp;
+
+		$value = is_object( $wp ) && isset( $wp->query_vars[ $this->slug() ] ) ? (string) $wp->query_vars[ $this->slug() ] : '';
+		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
+
+		return self::NEW_VALUE === $parts[0];
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param array<int, array<string, mixed>> $views License views.
+	 * @param string                           $empty Text for an empty tab.
+	 */
+	public function render( array $views, string $empty = '' ): void {
+		if ( $this->is_new() ) {
+			DbPicker::render();
+
+			return;
+		}
+
+		parent::render( $views, $empty );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	protected function buttons(): array {
+		return array(
+			array(
+				'label' => __( 'Create a database', 'beltoft-services' ),
+				'url'   => $this->url_new(),
+			),
+		);
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function key(): string {

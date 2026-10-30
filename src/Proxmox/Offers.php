@@ -229,7 +229,7 @@ final class Offers {
 	 *
 	 * @param \WC_Product_Variation $variation Variation.
 	 */
-	private static function period( \WC_Product_Variation $variation ): string {
+	public static function period( \WC_Product_Variation $variation ): string {
 		if ( ! class_exists( '\WC_Subscriptions_Product' ) || ! function_exists( 'wcs_get_subscription_period_strings' ) || ! \WC_Subscriptions_Product::is_subscription( $variation ) ) {
 			return '';
 		}
@@ -246,7 +246,7 @@ final class Offers {
 	 * @param \WC_Product_Variable  $product   Parent.
 	 * @param \WC_Product_Variation $variation Variation.
 	 */
-	private static function label( \WC_Product_Variable $product, \WC_Product_Variation $variation ): string {
+	public static function label( \WC_Product_Variable $product, \WC_Product_Variation $variation ): string {
 		$mine    = $variation->get_attributes();
 		$sibling = Backups::sibling( $variation, true, false );
 		$skip    = array();
