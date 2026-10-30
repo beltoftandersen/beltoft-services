@@ -285,12 +285,21 @@ final class Provision {
 		}
 
 		// A database is built from its engine's template (family postgres-<major>), never from an operating system one.
+		// An unsupported major is refused first, with its own text, before any VM exists.
+		if ( $this->profile instanceof DbProfile ) {
+			$early = DbBuild::plan_error( $this->r );
+
+			if ( null !== $early ) {
+				return StepResult::fail( $early );
+			}
+		}
+
 		$allowed = $this->profile instanceof DbProfile
-			? Clusters::service_templates( $this->cluster_id, 'postgres-' . (int) ( $plan['major'] ?? 0 ) )
+			? Clusters::service_templates( $this->cluster_id, 'postgres-' . DbBuild::major( $plan ) )
 			: Clusters::templates( $this->cluster_id );
 
 		if ( ! array_key_exists( $this->plan['template'], $allowed ) ) {
-			return StepResult::fail( 'Template ' . $this->plan['template'] . ' is not in the template list of this cluster' . ( $this->profile instanceof DbProfile ? ' with the family postgres-' . (int) ( $plan['major'] ?? 0 ) : '' ) );
+			return StepResult::fail( 'Template ' . $this->plan['template'] . ' is not in the template list of this cluster' . ( $this->profile instanceof DbProfile ? ' with the family postgres-' . DbBuild::major( $plan ) : '' ) );
 		}
 
 		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {

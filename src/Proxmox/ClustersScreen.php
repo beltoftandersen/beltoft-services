@@ -258,7 +258,7 @@ final class ClustersScreen {
 		}
 
 		echo '</td></tr>';
-		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04. A managed database template has the family postgres-18.', 'beltoft-services' ), 'textarea' );
+		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04. A managed database template has a postgres family per version it carries, comma separated: 9101 = postgres-17,postgres-18 (a template with only postgres-18 serves version 18 only).', 'beltoft-services' ), 'textarea' );
 	}
 
 	/**

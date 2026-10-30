@@ -246,6 +246,45 @@ class DbBuildTest extends TestCase {
 		$this->assertStringContainsString( 'with the family postgres-17', $result->error() );
 	}
 
+	public function test_init_job_carries_the_plan_major(): void {
+		$r = $this->resource( array( 'major' => 17 ) );
+		$this->set_families( '9100 = postgres-17,postgres-18' );
+		$this->assertTrue( $this->run_provision( $r )->is_poll() );
+		$job = json_decode( (string) $this->guest( DbGuest::JOB ), true );
+		$this->assertSame( 17, $job['major'] );
+	}
+
+	public function test_an_unsupported_major_fails_before_any_vm_is_built(): void {
+		$this->set_families( '9100 = postgres-16,postgres-17,postgres-18' );
+
+		foreach ( array( 16, 19, 0, '18.5', 'abc' ) as $major ) {
+			$r      = $this->resource( array( 'major' => $major ) );
+			$result = $this->run_provision( $r );
+
+			$this->assertTrue( $result->is_failed(), 'Major ' . $major );
+			$this->assertStringContainsString( 'is not supported. Supported: 17, 18', $result->error() );
+			$this->assertNull( VmRecords::for_resource( $r->id() ), 'No VM was made for major ' . $major );
+		}
+	}
+
+	public function test_a_template_with_several_families_serves_each_of_them_and_stays_hidden(): void {
+		$this->set_families( '9100 = postgres-17,postgres-18' );
+
+		$this->assertSame( array( 9100 => 'PostgreSQL 18' ), Clusters::service_templates( 'lab', 'postgres-17' ) );
+		$this->assertSame( array( 9100 => 'PostgreSQL 18' ), Clusters::service_templates( 'lab', 'postgres-18' ) );
+		$this->assertSame( array(), Clusters::service_templates( 'lab', 'postgres-16' ) );
+		$this->assertSame( array(), Clusters::templates( 'lab' ), 'A multi-version database template is never an operating system choice.' );
+		$this->assertSame( 'postgres-17,postgres-18', Clusters::get( 'lab' )['template_families'][9100] );
+
+		$r = $this->resource( array( 'major' => 16 ) );
+		$this->assertTrue( $this->run_provision( $r )->is_failed() );
+	}
+
+	private function set_families( string $text ): void {
+		$c = Clusters::get( 'lab' );
+		$this->assertTrue( Clusters::save( 'lab', array_merge( $c, array( 'token_secret' => '', 'vlan' => '', 'default_template' => '', 'nodes' => 'node-a', 'nameservers' => '192.0.2.53', 'templates' => '9100 = PostgreSQL 18', 'template_families_text' => $text ) ) ) );
+	}
+
 	public function test_profile_is_chosen_by_driver_and_vps_is_unchanged(): void {
 		$this->assertInstanceOf( DbProfile::class, Profiles::for_resource( $this->resource() ) );
 		$this->assertSame( array( 'net', 'vmid', 'clone', 'configure', 'start', 'ready', 'db_init', 'db_ready' ), ( new DbProfile( $this->resource() ) )->steps() );
@@ -289,7 +328,7 @@ class DbBuildTest extends TestCase {
 		$id   = (string) $r->get( 'db_request' );
 		$this->assertMatchesRegularExpression( '/^[a-f0-9-]{36}$/', $id );
 		$this->assertSame(
-			array( 'v' => 1, 'request' => $id, 'op' => 'init', 'db' => 'app', 'role' => 'app_user', 'listen' => array( '10.64.0.2' ), 'private_cidr' => '10.64.0.0/28', 'allow' => array(), 'world' => false, 'max_connections' => 200 ),
+			array( 'v' => 1, 'request' => $id, 'op' => 'init', 'db' => 'app', 'role' => 'app_user', 'listen' => array( '10.64.0.2' ), 'private_cidr' => '10.64.0.0/28', 'allow' => array(), 'world' => false, 'max_connections' => 200, 'major' => 18 ),
 			json_decode( (string) $job, true )
 		);
 		$this->assertStringStartsWith( '{"v":1,"request":"' . $id . '","op":"init","db":"app","role":"app_user","listen":["10.64.0.2"],', (string) $job, 'Key order is the contract\'s.' );

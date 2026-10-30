@@ -55,7 +55,22 @@ final class DbBuild {
 			return 'Only the postgres engine is available';
 		}
 
+		if ( ! in_array( self::major( $plan ), DbDriver::SUPPORTED_MAJORS, true ) ) {
+			return 'The PostgreSQL major version of this plan (' . mb_substr( sanitize_text_field( (string) ( is_scalar( $plan['major'] ?? null ) ? $plan['major'] : '' ) ), 0, 10 ) . ') is not supported. Supported: ' . implode( ', ', DbDriver::SUPPORTED_MAJORS );
+		}
+
 		return null;
+	}
+
+	/**
+	 * The plan's PostgreSQL major as an integer, 0 when it is not a whole number.
+	 *
+	 * @param array<string, mixed> $plan Plan.
+	 */
+	public static function major( array $plan ): int {
+		$major = $plan['major'] ?? 18;
+
+		return is_int( $major ) || ( is_string( $major ) && ctype_digit( $major ) ) ? (int) $major : 0;
 	}
 
 	/**
@@ -192,7 +207,7 @@ final class DbBuild {
 
 		$op  = $this->r->get( 'db_inited' ) ? 'reset_password' : 'init';
 		$job = 'init' === $op
-			? array( 'v' => 1, 'request' => $request, 'op' => 'init', 'db' => DbGuest::DATABASE, 'role' => DbGuest::ROLE, 'listen' => array( $address ), 'private_cidr' => $cidr, 'allow' => array(), 'world' => false, 'max_connections' => DbProfile::max_connections( $this->r ) )
+			? array( 'v' => 1, 'request' => $request, 'op' => 'init', 'db' => DbGuest::DATABASE, 'role' => DbGuest::ROLE, 'listen' => array( $address ), 'private_cidr' => $cidr, 'allow' => array(), 'world' => false, 'max_connections' => DbProfile::max_connections( $this->r ), 'major' => self::major( (array) $this->r->get( 'plan' ) ) )
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
 
 		$sent = DbJob::send( $this->client, $record, $job );
