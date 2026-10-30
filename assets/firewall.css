@@ -36,9 +36,9 @@
 .beltoft-services-fw__fixed ul { margin: 0; padding-left: 1.25em; color: var(--bsf-soft); }
 .beltoft-services-fw__layers p { max-width: 640px; }
 .beltoft-services-fw__again { margin: 24px 0 0; }
-.beltoft-services-fw__dialog p { margin: 12px 20px; }
-.beltoft-services-fw__dialog h5 { margin: 20px 20px 0; }
-.beltoft-services-fw__dialog .beltoft-services-vm__buttons { margin: 16px 20px 20px; }
+.beltoft-services-fw__dialog h5 { margin: 0 0 12px; font-size: 16px; }
+.beltoft-services-fw__dialog p { margin: 0 0 12px; }
+.beltoft-services-fw__dialog .beltoft-services-vm__buttons { margin: 0; }
 @media (max-width: 760px) {
 	.beltoft-services-fw__choices { grid-template-columns: 1fr; }
 	.beltoft-services-fw__row--head { display: none; }
