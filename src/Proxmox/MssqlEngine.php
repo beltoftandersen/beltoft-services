@@ -18,6 +18,8 @@ defined( 'ABSPATH' ) || exit;
  */
 final class MssqlEngine implements DbEngine, DbEngineTerms {
 
+	use SqlEngine;
+
 	/** SQL Server versions the guest and the template carry. */
 	public const SUPPORTED_VERSIONS = array( 2022 );
 

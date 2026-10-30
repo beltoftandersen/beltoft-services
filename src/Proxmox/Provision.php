@@ -285,7 +285,7 @@ final class Provision {
 			$this->plan['template'] = Clusters::default_template( $this->cluster_id );
 		}
 
-		// A database is built from its engine's template (family postgres-<major>, mssql-<version>), never from an operating system one.
+		// A database is built from its engine's template (family postgres-<major>, mssql-<version>, valkey), never from an operating system one.
 		// An unsupported major is refused first, with its own text, before any VM exists.
 		if ( $this->profile instanceof DbProfile ) {
 			$early = DbBuild::plan_error( $this->r );

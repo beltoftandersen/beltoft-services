@@ -62,21 +62,21 @@ final class DbCard {
 		$offered = DbActions::offered( $r );
 		$backups = self::backups( $r, $ready && ! $restore && $r->accepts_actions() && array_key_exists( DbActions::RESTORE, $offered ) );
 		$access  = DbAccess::view( $r );
-		$private = $ready ? $engine->connection( $address ) : array( 'verify' => '', 'require' => '' );
-		$public  = $ready && '' !== $access['address'] ? $engine->connection( $access['address'] ) : array( 'verify' => '', 'require' => '' );
+		$public  = $ready && '' !== $access['address'] ? $engine->connections( $access['address'] ) : array();
 
 		return array(
 			'kind'        => $kind,
 			'cost'        => \BeltoftServices\Usage\Estimate::cost_line( $r->id() ),
 			'host'        => $ready ? $address : '',
 			'engine'      => $engine->label( $plan ),
+			'engine_id'   => $engine->id(),
 			'limits'      => $engine->limits(),
 			'ca_hint'     => $engine->ca_hint(),
 			'port'        => $engine->port(),
 			'database'    => $engine->database(),
 			'user'        => $engine->login(),
-			'conn_verify' => $private['verify'],
-			'conn_require' => $private['require'],
+			'connections' => $ready ? $engine->connections( $address ) : array(),
+			'connection_note' => $engine->connection_note(),
 			'fingerprint' => $ready && 1 === preg_match( '/^[0-9A-F:]{95}$/D', (string) $r->get( 'db_fingerprint' ) ) ? (string) $r->get( 'db_fingerprint' ) : '',
 			'ca_url'      => $ready && DbGuest::pem( (string) $r->get( 'db_ca_pem' ) ) ? DbRoutes::ca_url( $r->id() ) : '',
 			'can_reveal'  => $ready && DbRoutes::revealable( $r ),
@@ -85,8 +85,7 @@ final class DbCard {
 			'confirm'     => DbActions::CONFIRM,
 			'backups'     => $backups,
 			'access'      => $access,
-			'public_verify'  => $public['verify'],
-			'public_require' => $public['require'],
+			'public_connections' => $public,
 			'version'     => (int) ( $plan['major'] ?? 0 ),
 			'size'        => sprintf(
 				/* translators: 1: number of vCPUs, 2: memory in GB, 3: disk in GB */

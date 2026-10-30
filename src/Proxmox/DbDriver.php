@@ -1,6 +1,6 @@
 <?php
 /**
- * The managed database driver: a database engine (PostgreSQL or SQL Server Express, see DbEngines) on its own VM, reachable on the customer's private network.
+ * The managed database driver: a database engine (PostgreSQL, SQL Server Express or Valkey, see DbEngines) on its own VM, reachable on the customer's private network.
  *
  * @package BeltoftServices
  */
@@ -47,9 +47,9 @@ class DbDriver extends ProxmoxDriver {
 		$fields = parent::plan_fields();
 		$out    = array(
 			'cluster'     => $fields['cluster'],
-			'template'    => array( 'number', __( 'Template VMID', 'beltoft-services' ), __( 'The engine\'s template (family postgres-<major> or mssql-<version> in the cluster settings, for example postgres-17,postgres-18 or mssql-2022).', 'beltoft-services' ), '', true ),
-			'engine'      => array( 'text', __( 'Engine', 'beltoft-services' ), __( 'postgres or mssql (SQL Server Express). Empty means postgres.', 'beltoft-services' ), 'postgres', true ),
-			'major'       => array( 'number', __( 'Major version', 'beltoft-services' ), __( 'PostgreSQL: the major version, 17 or 18. SQL Server: the version, 2022.', 'beltoft-services' ), 18, true ),
+			'template'    => array( 'number', __( 'Template VMID', 'beltoft-services' ), __( 'The engine\'s template (family postgres-<major>, mssql-<version> or valkey in the cluster settings, for example postgres-17,postgres-18, mssql-2022 or valkey).', 'beltoft-services' ), '', true ),
+			'engine'      => array( 'text', __( 'Engine', 'beltoft-services' ), __( 'postgres, mssql (SQL Server Express) or valkey. Empty means postgres.', 'beltoft-services' ), 'postgres', true ),
+			'major'       => array( 'number', __( 'Major version', 'beltoft-services' ), __( 'PostgreSQL: the major version, 17 or 18. SQL Server: the version, 2022. Valkey ignores it.', 'beltoft-services' ), 18, true ),
 			'cores'       => $fields['cores'],
 			'memory_mb'   => $fields['memory_mb'],
 			'disk_gb'     => array( 'number', __( 'Data disk (GB)', 'beltoft-services' ), __( 'The disk the database lives on. It is part of the backup.', 'beltoft-services' ), 20, true ),

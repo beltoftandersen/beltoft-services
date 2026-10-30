@@ -13,6 +13,10 @@ defined( 'ABSPATH' ) || exit;
 
 final class PostgresEngine implements DbEngine {
 
+	use SqlEngine;
+
+	public const ID = 'postgres';
+
 	public function id(): string {
 		return 'postgres';
 	}

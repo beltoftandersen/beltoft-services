@@ -1476,7 +1476,7 @@ final class Firewall {
 			}
 		}
 
-		// The public NIC (net0, with the public IP add-on): the engine's port from the allow-list, nothing else.
+		// The public NIC (net0, with the public IP add-on): the engine's port (5432 for PostgreSQL) from the allow-list, nothing else.
 		$access = $this->sync_database_access( $record, $v, 'both' );
 
 		return $access instanceof StepResult ? $access : array();
@@ -1605,7 +1605,7 @@ final class Firewall {
 				}
 
 				$tag  = (string) $listed['comment'];
-				$good = array_key_exists( $tag, $desired ) && ! isset( $seen[ $tag ] ) && self::same_database_rule( $listed, self::database_rule( $tag, $desired[ $tag ] ) );
+				$good = array_key_exists( $tag, $desired ) && ! isset( $seen[ $tag ] ) && self::same_database_rule( $listed, self::database_rule( $tag, $desired[ $tag ], DbEngines::for_resource( $this->r )->port() ) );
 
 				if ( $good ) {
 					$seen[ $tag ] = true;

@@ -26,8 +26,9 @@ final class DbEngines {
 	 */
 	private static function map(): array {
 		return array(
-			'postgres' => PostgresEngine::class,
+			PostgresEngine::ID => PostgresEngine::class,
 			'mssql'    => MssqlEngine::class,
+			ValkeyEngine::ID => ValkeyEngine::class,
 		);
 	}
 
@@ -52,11 +53,11 @@ final class DbEngines {
 	}
 
 	/**
-	 * The prefixes of the template families of all engines, for example postgres-.
+	 * The prefixes of the template families of all engines (Clusters::SERVICE_FAMILIES): postgres-, mssql-, valkey.
 	 *
 	 * @return string[]
 	 */
 	public static function family_prefixes(): array {
-		return array_map( static fn( string $id ): string => $id . '-', array_keys( self::map() ) );
+		return Clusters::SERVICE_FAMILIES;
 	}
 }

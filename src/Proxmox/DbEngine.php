@@ -65,12 +65,28 @@ interface DbEngine {
 	public function init_fields( Resource $r ): array;
 
 	/**
-	 * Connection strings for an address, with PASSWORD where the customer's password goes: `verify` checks the server
-	 * certificate against the CA the customer downloads, `require` only encrypts.
+	 * The whole init job for this engine (the guest protocol's `init`). SQL engines build it with SqlEngine.
 	 *
-	 * @return array{verify:string,require:string}
+	 * @param Resource          $r       Resource.
+	 * @param string            $request Request id.
+	 * @param array<int,string> $listen  Addresses to listen on (the private one first).
+	 * @param string            $cidr    The customer's private network.
+	 * @return array<string, mixed>
 	 */
-	public function connection( string $host ): array;
+	public function init_job( Resource $r, string $request, array $listen, string $cidr ): array;
+
+	/**
+	 * The connection strings of the card for an address, each with PASSWORD where the customer's password goes.
+	 *
+	 * @param string $host Address.
+	 * @return array<int, array{label:string,value:string}>
+	 */
+	public function connections( string $host ): array;
+
+	/**
+	 * A sentence under the connection strings, or an empty string.
+	 */
+	public function connection_note(): string;
 
 	/**
 	 * A sentence on the limits of the engine's edition for the card, or an empty string.

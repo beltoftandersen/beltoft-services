@@ -69,7 +69,7 @@ final class DbBuild {
 	}
 
 	/**
-	 * The plan's PostgreSQL major as an integer, 0 when it is not a whole number.
+	 * The plan's major version as an integer, 0 when it is not a whole number.
 	 *
 	 * @param array<string, mixed> $plan Plan.
 	 */
@@ -215,7 +215,7 @@ final class DbBuild {
 		$public = IpPool::for_resource( $this->r->id() );
 		$listen = null === $public ? array( $address ) : array( $address, $public['address'] );
 		$job    = 'init' === $op
-			? array( 'v' => 1, 'request' => $request, 'op' => 'init', 'db' => DbEngines::for_resource( $this->r )->database(), 'role' => DbEngines::for_resource( $this->r )->login(), 'listen' => $listen, 'private_cidr' => $cidr, 'allow' => array(), 'world' => false, 'max_connections' => DbProfile::max_connections( $this->r ) ) + DbEngines::for_resource( $this->r )->init_fields( $this->r )
+			? DbEngines::for_resource( $this->r )->init_job( $this->r, $request, $listen, $cidr )
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
 
 		$sent = DbJob::send( $this->client, $record, $job );

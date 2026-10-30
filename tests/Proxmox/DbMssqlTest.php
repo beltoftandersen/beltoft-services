@@ -208,7 +208,7 @@ class DbMssqlTest extends TestCase {
 		$this->assertInstanceOf( MssqlEngine::class, DbEngines::for_plan( array( 'engine' => 'mssql' ) ) );
 		$this->assertNull( DbEngines::for_plan( array( 'engine' => 'oracle' ) ) );
 		$this->assertNull( DbEngines::for_plan( array( 'engine' => array( 'mssql' ) ) ) );
-		$this->assertSame( array( 'postgres-', 'mssql-' ), DbEngines::family_prefixes() );
+		$this->assertSame( array( 'postgres-', 'mssql-', 'valkey' ), DbEngines::family_prefixes() );
 		$this->assertInstanceOf( PostgresEngine::class, DbEngines::for_resource( $this->resource( array( 'engine' => 'oracle' ) ) ), 'An unknown engine reads as PostgreSQL where nothing can be refused.' );
 	}
 

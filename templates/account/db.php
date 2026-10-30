@@ -49,7 +49,9 @@ $beltoft_services_db_wait = array(
 		<?php if ( 'ready' === $view['kind'] ) : ?>
 			<div><dt><?php esc_html_e( 'Host', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['host'] ); ?></code></dd></div>
 			<div><dt><?php esc_html_e( 'Port', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['port'] ); ?></code></dd></div>
-			<div><dt><?php esc_html_e( 'Database', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['database'] ); ?></code></dd></div>
+			<?php if ( '' !== (string) $view['database'] ) : ?>
+				<div><dt><?php esc_html_e( 'Database', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['database'] ); ?></code></dd></div>
+			<?php endif; ?>
 			<div><dt><?php esc_html_e( 'User', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['user'] ); ?></code></dd></div>
 		<?php endif; ?>
 	</dl>
@@ -62,15 +64,19 @@ $beltoft_services_db_wait = array(
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Connection', 'beltoft-services' ); ?></h4>
 			<p class="description"><?php esc_html_e( 'Reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
-			<p><?php esc_html_e( 'With certificate check (recommended):', 'beltoft-services' ); ?></p>
-			<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_verify'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
-			<p><?php esc_html_e( 'Encrypted, without certificate check:', 'beltoft-services' ); ?></p>
-			<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_require'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+			<?php foreach ( $view['connections'] as $beltoft_services_conn ) : ?>
+				<p><?php echo esc_html( (string) $beltoft_services_conn['label'] ); ?></p>
+				<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $beltoft_services_conn['value'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+			<?php endforeach; ?>
+			<?php if ( '' !== (string) $view['connection_note'] ) : ?>
+				<p class="description"><?php echo esc_html( (string) $view['connection_note'] ); ?></p>
+			<?php endif; ?>
 
-			<?php if ( '' !== $view['public_verify'] ) : ?>
+			<?php if ( array() !== $view['public_connections'] ) : ?>
 				<p class="description"><?php esc_html_e( 'From anywhere on the internet, for the addresses on your access list (see the Access tab):', 'beltoft-services' ); ?></p>
-				<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['public_verify'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
-				<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['public_require'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+				<?php foreach ( $view['public_connections'] as $beltoft_services_conn ) : ?>
+					<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $beltoft_services_conn['value'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+				<?php endforeach; ?>
 			<?php endif; ?>
 
 			<?php if ( $view['can_reveal'] ) : ?>
