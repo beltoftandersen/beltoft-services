@@ -948,4 +948,17 @@ class SnapshotsTest extends SnapshotsTestCase {
 		}
 		$this->assertStringContainsString( 'before a rollback', (string) Actions::disk_block( $this->fresh( $server ), 'rollback' ) );
 	}
+
+	public function test_slot_squares_only_when_a_snapshot_is_in_use(): void {
+		$render = static function ( int $used, int $slots ): string {
+			$beltoft_services_strip = array( 'used' => $used, 'slots' => $slots );
+			ob_start();
+			include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
+			return (string) ob_get_clean();
+		};
+		$this->assertSame( '', trim( $render( 0, 1 ) ), 'No lone empty box with no snapshots.' );
+		$html = $render( 1, 3 );
+		$this->assertSame( 3, substr_count( $html, '<i' ) );
+		$this->assertSame( 1, substr_count( $html, 'is-used' ) );
+	}
 }
