@@ -1233,6 +1233,8 @@ final class Provision {
 				'cores'     => $this->plan['cores'],
 				'memory'    => $this->plan['memory_mb'],
 				'ciuser'    => self::LOGIN_USER,
+				// The standard display, so the web console shows the screen (the templates carry the serial one).
+				'vga'       => Operations::DISPLAY,
 				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
 			) + $this->profile->network_params( $this->cluster, $ip, $this->net0( (string) ( $v['config']['net0'] ?? '' ) ) );
 

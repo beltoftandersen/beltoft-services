@@ -116,6 +116,7 @@ final class ProxmoxJobs {
 		add_action( Jobs::SWEEP, array( __CLASS__, 'purge_passwords' ), 20 );
 		add_action( Jobs::SWEEP, array( PrivateNets::class, 'reclaim' ), 21 );
 		add_action( Jobs::SWEEP, array( __CLASS__, 'net_rates' ), 22 );
+		add_action( Jobs::SWEEP, array( __CLASS__, 'displays' ), 23 );
 	}
 
 	/**
@@ -401,6 +402,7 @@ final class ProxmoxJobs {
 				$resource = Resource::find( (int) $ours[ $vmid ] );
 				if ( $resource ) { Monitor::power( $resource, $power ); }
 				if ( $resource ) { self::hostname_applied( $resource, $vm, $power, $before ); }
+				if ( $resource ) { self::display_applied( $resource, $vm, $power, $before ); }
 				if ( $resource && DbActions::is_db( $resource ) ) { DbMonitor::check( $resource, $one['client'], (string) ( $vm['node'] ?? '' ), $vmid, $power ); }
 
 				if ( 'running' === $power ) {
@@ -469,6 +471,95 @@ final class ProxmoxJobs {
 		if ( $booted ) {
 			$r->set( array( ServerName::PENDING => null, ServerName::PENDING_AT => null ) );
 		}
+	}
+
+	/**
+	 * A server that got the standard display while it ran shows the serial one until its next boot. A boot after the
+	 * change ends the note (the same test as hostname_applied()).
+	 *
+	 * @param Resource                  $r      Server resource.
+	 * @param array<string, mixed>      $vm     Cluster row.
+	 * @param string                    $power  Power now.
+	 * @param array<string, mixed>|null $before The cached row of the run before.
+	 */
+	private static function display_applied( Resource $r, array $vm, string $power, ?array $before ): void {
+		$at = (int) $r->get( 'display_pending_at' );
+
+		if ( 'running' !== $power || $at <= 0 ) {
+			return;
+		}
+
+		$booted = isset( $vm['uptime'] ) && (int) $vm['uptime'] > 0
+			? time() - (int) $vm['uptime'] > $at
+			: ( null !== $before && 'stopped' === $before['power'] );
+
+		if ( $booted ) {
+			$r->set( array( 'display_pending_at' => null ) );
+		}
+	}
+
+	/**
+	 * From the sweep: gives every server the standard display (see display()). One cluster listing per cluster.
+	 */
+	public static function displays(): void {
+		foreach ( self::clusters() as $id => $one ) {
+			$rows = self::vm_rows( $one['client'] );
+
+			if ( null === $rows ) {
+				continue;
+			}
+
+			$ours = VmRecords::for_cluster( $id );
+
+			foreach ( $rows as $vm ) {
+				$vmid = (int) ( $vm['vmid'] ?? 0 );
+
+				if ( ! empty( $vm['template'] ) || ! isset( $ours[ $vmid ] ) || '' !== (string) ( $vm['lock'] ?? '' ) ) {
+					continue;
+				}
+
+				$resource = Resource::find( (int) $ours[ $vmid ] );
+
+				if ( $resource ) {
+					self::display( $resource, $vm );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Writes `vga=std` to one server that has the serial display (servers built before the standard display), once:
+	 * the `display_std` mark is set when it is written, or when the server already had another display. On a running
+	 * server Proxmox keeps it pending until the next restart: that is done for us, and `display_pending_at` lets the
+	 * console tab say so. NEVER restarts a server. Left alone: a server that is not ready, adopted (linked), on hold,
+	 * or locked by a running operation.
+	 *
+	 * @param Resource             $r  Server resource.
+	 * @param array<string, mixed> $vm Cluster row.
+	 */
+	private static function display( Resource $r, array $vm ): void {
+		if ( null !== $r->get( 'display_std' ) || 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold() || '' === (string) ( $vm['node'] ?? '' ) ) {
+			return;
+		}
+
+		$running = 'running' === (string) ( $vm['status'] ?? '' );
+
+		$r->locked(
+			static function () use ( $r, $running ): bool {
+				// Fresh under the lock: an operation may have started since the cluster row was read.
+				if ( null !== $r->get( 'display_std' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || true === $r->get( 'linked' ) ) {
+					return false;
+				}
+
+				$written = ( new Operations( $r ) )->reconcile_display();
+
+				if ( null === $written ) {
+					return false;
+				}
+
+				return $r->set( array( 'display_std' => time(), 'display_pending_at' => $written && $running ? time() : null ) );
+			}
+		);
 	}
 
 	/**

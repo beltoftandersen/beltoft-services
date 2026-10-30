@@ -38,6 +38,9 @@ final class Operations {
 	/**
 	 * Transient holding the last status of a VM (one hour).
 	 */
+	/** The display of every customer server (the templates have the serial one, which the web console cannot show). */
+	public const DISPLAY = 'std';
+
 	public const STATUS_PREFIX = 'beltoft_services_proxmox_status_';
 
 	/**
@@ -496,6 +499,43 @@ final class Operations {
 		$v = Ownership::verify( $this->client, $record, $this->r );
 
 		return ! is_wp_error( $v ) && ! ( $this->sync_rate( $record, $v ) instanceof StepResult );
+	}
+
+	/**
+	 * Gives the VM the standard display when its config has the serial one (or none): `vga=std`, the only key sent.
+	 * The console then shows the server screen. A running VM keeps the change pending until its next restart and is
+	 * never restarted for it. A VM that already has another display (std, qxl...) is left alone.
+	 *
+	 * @return bool|null True when it was written, false when nothing was needed, null when it could not be checked.
+	 */
+	public function reconcile_display(): ?bool {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record || null !== $this->prepare( $record ) ) {
+			return null;
+		}
+
+		$v = Ownership::verify( $this->client, $record, $this->r );
+
+		if ( is_wp_error( $v ) ) {
+			return null;
+		}
+
+		$vga = (string) ( $v['config']['vga'] ?? '' );
+
+		if ( '' !== $vga && 0 !== strpos( $vga, 'serial' ) ) {
+			return false;
+		}
+
+		$params = array( 'vga' => self::DISPLAY );
+
+		if ( ! empty( $v['config']['digest'] ) ) {
+			$params['digest'] = (string) $v['config']['digest'];
+		}
+
+		$answer = $this->client->request( 'PUT', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/config', $params );
+
+		return is_wp_error( $answer ) ? null : true;
 	}
 
 	/**
