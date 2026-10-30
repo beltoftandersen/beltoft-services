@@ -434,6 +434,15 @@ final class Operations {
 			return $v;
 		}
 
+		// The plan's speed limit on net0, whatever else changes (a hot change, or pending until the next restart).
+		$rate = $this->sync_rate( $record, $v );
+
+		if ( $rate instanceof StepResult ) {
+			return $rate;
+		}
+
+		$v = $rate;
+
 		$was_running = (bool) $this->r->get( 'was_running' );
 		$result      = $this->change( $record, $v, $want, $was_running );
 
@@ -443,6 +452,56 @@ final class Operations {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * The job's version of sync_rate(): the VM is read and verified here, and nothing else is touched. The caller holds the resource lock.
+	 *
+	 * @return bool Whether the NIC now matches the plan.
+	 */
+	public function reconcile_rate(): bool {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record || null !== $this->prepare( $record ) ) {
+			return false;
+		}
+
+		$v = Ownership::verify( $this->client, $record, $this->r );
+
+		return ! is_wp_error( $v ) && ! ( $this->sync_rate( $record, $v ) instanceof StepResult );
+	}
+
+	/**
+	 * Brings net0's `rate=` to the plan's speed: only `rate=` changes in the string. Nothing is sent when it already
+	 * matches, when the VM has no net0 (a database) or when the stored plan has no speed (a service from before the
+	 * field: its NIC is left as it is). A running VM is never restarted for it: Proxmox applies the change at once or
+	 * keeps it pending until the next restart.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return array<string, mixed>|StepResult The VM as it is now.
+	 */
+	public function sync_rate( array $record, array $v ) {
+		$plan = (array) $this->r->get( 'plan' );
+		$net0 = (string) ( $v['config']['net0'] ?? '' );
+
+		if ( ! array_key_exists( 'net_mbit', $plan ) || '' === $net0 || NetConfig::has_rate( $net0, $plan['net_mbit'] ) ) {
+			return $v;
+		}
+
+		$params = array( 'net0' => NetConfig::with_rate( $net0, $plan['net_mbit'] ) );
+
+		if ( ! empty( $v['config']['digest'] ) ) {
+			$params['digest'] = (string) $v['config']['digest'];
+		}
+
+		$answer = $this->client->request( 'PUT', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/config', $params );
+
+		if ( is_wp_error( $answer ) ) {
+			return $this->classify( $answer, 'update' );
+		}
+
+		return $this->verified( $record, 'update' );
 	}
 
 	/**

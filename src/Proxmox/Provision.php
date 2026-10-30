@@ -265,6 +265,7 @@ final class Provision {
 			'cores'     => (int) ( $plan['cores'] ?? 0 ),
 			'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),
 			'disk_gb'   => (int) ( $plan['disk_gb'] ?? 0 ),
+			'net_mbit'  => max( 0, (float) ( $plan['net_mbit'] ?? 0 ) ),
 		);
 
 		// The customer's choice (checkout or reinstall) beats the plan's template, which is the fallback.
@@ -1549,7 +1550,10 @@ final class Provision {
 			$props['tag'] = (string) (int) $this->cluster['vlan'];
 		}
 
-		return NetConfig::format( $props );
+		$net = NetConfig::format( $props );
+
+		// The plan's speed limit goes on the public NIC only (a database has none, and net1 is never written here).
+		return $this->profile instanceof DbProfile ? $net : NetConfig::with_rate( $net, $this->plan['net_mbit'] );
 	}
 
 	/**
