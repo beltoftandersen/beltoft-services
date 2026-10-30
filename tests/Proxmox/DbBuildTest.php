@@ -211,6 +211,27 @@ class DbBuildTest extends TestCase {
 		return Resource::find( $r->id() );
 	}
 
+	public function test_a_database_server_gets_the_private_only_ipfilter_when_the_cluster_asks(): void {
+		$stored                    = get_option( Clusters::OPTION );
+		$stored['lab']['fw_ipfilter'] = 1;
+		update_option( Clusters::OPTION, $stored );
+
+		$r  = $this->built_until_init();
+		$vm = $this->fake->vm( 5000 );
+
+		$this->assertSame( 1, (int) $vm['firewall_options']['ipfilter'] );
+		$this->assertSame( array( 'ipfilter-net1' ), array_keys( $vm['firewall_ipsets'] ), 'No public NIC, so no ipfilter-net0.' );
+		$this->assertSame( array( (string) PrivateNets::address_for_resource( $r->id() ) ), array_column( $vm['firewall_ipsets']['ipfilter-net1'], 'cidr' ) );
+	}
+
+	public function test_a_database_server_gets_no_ipfilter_while_the_cluster_flag_is_off(): void {
+		$this->built_until_init();
+		$vm = $this->fake->vm( 5000 );
+
+		$this->assertArrayNotHasKey( 'ipfilter', $vm['firewall_options'] );
+		$this->assertArrayNotHasKey( 'firewall_ipsets', $vm );
+	}
+
 	public function test_database_templates_are_hidden_from_operating_system_lists(): void {
 		$this->assertSame( array(), Clusters::templates( 'lab' ), 'A postgres-18 template is never an operating system choice.' );
 		$this->assertSame( array( 9100 => 'PostgreSQL 18' ), Clusters::service_templates( 'lab', 'postgres-18' ) );

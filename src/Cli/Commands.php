@@ -18,6 +18,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Plugin;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\IpfilterReport;
 use BeltoftServices\Proxmox\LinkVm;
 use BeltoftServices\Proxmox\Metrics;
 use BeltoftServices\Proxmox\Operations;
@@ -123,6 +124,32 @@ final class Commands {
 			$disk = GuestDisk::read( $resource );
 			\WP_CLI::log( 'Disk: ' . wp_json_encode( $disk ) );
 		}
+	}
+
+	/**
+	 * Read-only report for turning the IP filter (fw_ipfilter) on: per VM of a cluster, the ipfilter sets it should have
+	 * (from the stored address and the private network), what Proxmox holds, and whether ipfilter is on. Changes nothing.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <cluster>
+	 * : The cluster id.
+	 *
+	 * [--format=<format>]
+	 * : table (default) or json.
+	 *
+	 * @subcommand ipfilter-report
+	 */
+	public function ipfilter_report( array $args, array $assoc_args ): void {
+		$cluster = Clusters::get( (string) ( $args[0] ?? '' ) );
+		if ( null === $cluster ) { \WP_CLI::error( 'Unknown cluster.' ); }
+		try {
+			$client = Clients::for( $cluster );
+		} catch ( \RuntimeException $e ) {
+			\WP_CLI::error( 'The cluster has no client: ' . $e->getMessage() );
+		}
+		$rows = IpfilterReport::rows( (string) $args[0], $client );
+		\WP_CLI\Utils\format_items( (string) ( $assoc_args['format'] ?? 'table' ), $rows, array( 'vmid', 'license', 'expected', 'actual', 'ipfilter', 'status' ) );
 	}
 
 	/**

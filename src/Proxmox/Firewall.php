@@ -1165,23 +1165,10 @@ final class Firewall {
 	 * @return bool|StepResult True when the sets are right.
 	 */
 	private function ipfilter_sets( string $base, array $v ) {
-		$sets = array();
-		$ip   = (string) $this->r->get( 'ip' );
+		$sets = self::expected_ipsets( $this->r, self::has_private_nic( $v ) );
 
-		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+		if ( null === $sets ) {
 			return false;
-		}
-
-		$sets['ipfilter-net0'] = $ip;
-
-		if ( self::has_private_nic( $v ) ) {
-			$private = PrivateNets::address_for_resource( $this->r->id() );
-
-			if ( null === $private ) {
-				return false;
-			}
-
-			$sets['ipfilter-net1'] = $private;
 		}
 
 		$list = $this->read_list( $base . '/ipset' );
@@ -1245,7 +1232,113 @@ final class Firewall {
 			}
 		}
 
+		// A private NIC that is gone leaves no allowed private address behind.
+		if ( ! isset( $sets['ipfilter-net1'] ) && in_array( 'ipfilter-net1', $names, true ) ) {
+			$stale = $this->drop_ipset( $base, 'ipfilter-net1' );
+
+			if ( $stale instanceof StepResult ) {
+				return $stale;
+			}
+		}
+
 		return true;
+	}
+
+	/**
+	 * The ipfilter sets a server should have: the public address in ipfilter-net0 when its profile has a public
+	 * address (null while that address is not known), and the private one in ipfilter-net1 when it has a private NIC.
+	 * A server with neither gets no filter (null). A server whose profile has no public address (a managed
+	 * database) is filtered on net1 alone.
+	 *
+	 * @param Resource $r           Resource.
+	 * @param bool     $private_nic Whether the VM has a private NIC (net1).
+	 * @return array<string, string>|null Set name => address.
+	 */
+	public static function expected_ipsets( Resource $r, bool $private_nic ): ?array {
+		$sets = array();
+
+		if ( Profiles::for_resource( $r )->uses_public_ip() ) {
+			$ip = (string) $r->get( 'ip' );
+
+			if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+				return null;
+			}
+
+			$sets['ipfilter-net0'] = $ip;
+		}
+
+		if ( $private_nic ) {
+			$private = PrivateNets::address_for_resource( $r->id() );
+
+			if ( null === $private ) {
+				return null;
+			}
+
+			$sets['ipfilter-net1'] = $private;
+		}
+
+		return $sets ? $sets : null;
+	}
+
+	/**
+	 * Empties and deletes one ipset (Proxmox deletes only an empty set).
+	 *
+	 * @param string $base Firewall path.
+	 * @param string $name Set name.
+	 * @return true|StepResult
+	 */
+	private function drop_ipset( string $base, string $name ) {
+		$entries = $this->read_list( $base . '/ipset/' . $name );
+
+		if ( is_wp_error( $entries ) ) {
+			return $this->stop( $entries );
+		}
+
+		foreach ( $entries as $entry ) {
+			$answer = $this->write( 'DELETE', $base . '/ipset/' . $name . '/' . (string) ( $entry['cidr'] ?? '' ) );
+
+			if ( is_wp_error( $answer ) ) {
+				return $this->stop( $answer );
+			}
+		}
+
+		$answer = $this->write( 'DELETE', $base . '/ipset/' . $name );
+
+		return is_wp_error( $answer ) ? $this->stop( $answer ) : true;
+	}
+
+	/**
+	 * Keeps the ipfilter sets right after the private NIC came or went, for a server whose filter is already on
+	 * (the filter off, or the cluster flag off: nothing to do). The private address is in the set before the server
+	 * starts with the card; after a detach the set is gone.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return true|StepResult
+	 */
+	public function ensure_ipfilter( array $record, array $v ) {
+		if ( empty( $this->cluster['fw_ipfilter'] ) ) {
+			return true;
+		}
+
+		$base    = self::base( $record, $v );
+		$options = $this->read_list( $base . '/options' );
+
+		if ( is_wp_error( $options ) ) {
+			return $this->stop( $options );
+		}
+
+		if ( 1 !== (int) ( $options['ipfilter'] ?? 0 ) ) {
+			return true;
+		}
+
+		$ready = $this->ipfilter_sets( $base, $v );
+
+		if ( $ready instanceof StepResult ) {
+			return $ready;
+		}
+
+		return true === $ready ? true : StepResult::retry( 0, 'firewall: the ipfilter sets could not be confirmed' );
 	}
 
 	/**
@@ -1293,7 +1386,13 @@ final class Firewall {
 			return $this->classify( $rules, 'private' );
 		}
 
-		return $this->add_rule_once( $base, $rules, self::PRIVATE_RULE, array( 'action' => 'ACCEPT', 'type' => 'in', 'iface' => 'net1' ) );
+		$done = $this->add_rule_once( $base, $rules, self::PRIVATE_RULE, array( 'action' => 'ACCEPT', 'type' => 'in', 'iface' => 'net1' ) );
+
+		if ( $done instanceof StepResult ) {
+			return $done;
+		}
+
+		return $this->ensure_ipfilter( $record, $v );
 	}
 
 	/**
@@ -1319,7 +1418,20 @@ final class Firewall {
 			return $done;
 		}
 
-		$want    = array( 'enable' => 1, 'policy_in' => 'DROP', 'policy_out' => 'ACCEPT', 'macfilter' => 1 );
+		$want = array( 'enable' => 1, 'policy_in' => 'DROP', 'policy_out' => 'ACCEPT', 'macfilter' => 1 );
+
+		if ( ! empty( $this->cluster['fw_ipfilter'] ) ) {
+			$ready = $this->ipfilter_sets( $base, $v );
+
+			if ( $ready instanceof StepResult ) {
+				return $ready;
+			}
+
+			if ( true === $ready ) {
+				$want['ipfilter'] = 1;
+			}
+		}
+
 		$options = $this->read_list( $base . '/options' );
 
 		if ( is_wp_error( $options ) ) {

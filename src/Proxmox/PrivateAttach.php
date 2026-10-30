@@ -905,6 +905,19 @@ final class PrivateAttach {
 			}
 		}
 
+		// The private address leaves the ipfilter (when it is on) with the card.
+		$gone = $this->verified( $record, 'private' );
+
+		if ( $gone instanceof StepResult ) {
+			return $gone;
+		}
+
+		$sets = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_ipfilter( $record, $gone );
+
+		if ( $sets instanceof StepResult ) {
+			return $sets;
+		}
+
 		// Only after the removal is verified.
 		try {
 			if ( ! PrivateNets::release_and_retire( $this->r->id() ) ) {
