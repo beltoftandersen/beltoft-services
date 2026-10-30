@@ -349,6 +349,12 @@ final class ClustersScreen {
 			esc_html__( 'Leave both off until the live checks of the firewall have passed.', 'beltoft-services' )
 		);
 		printf(
+			'<tr><th scope="row"><label for="fw_pilot">%1$s</label></th><td><input type="text" id="fw_pilot" name="fw_pilot" value="%2$s" class="regular-text"><p class="description">%3$s</p></td></tr>',
+			esc_html__( 'Firewall pilot', 'beltoft-services' ),
+			esc_attr( implode( ', ', array_map( 'intval', (array) ( $c['fw_pilot'] ?? array() ) ) ) ),
+			esc_html__( 'License IDs of servers that get the dashboard firewall while the switch above is off, for a test or a staged start. Separate with commas.', 'beltoft-services' )
+		);
+		printf(
 			'<tr><th scope="row"><label for="fw_default_mode">%1$s</label></th><td><select id="fw_default_mode" name="fw_default_mode"><option value="standard" %2$s>%3$s</option><option value="open" %4$s>%5$s</option></select> <label>%6$s <input type="number" name="fw_max_rules" min="1" max="%7$d" value="%8$d" class="small-text"></label></td></tr>',
 			esc_html__( 'New servers', 'beltoft-services' ),
 			selected( (string) $c['fw_default_mode'], 'standard', false ),

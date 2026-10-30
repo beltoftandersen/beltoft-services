@@ -133,14 +133,24 @@ final class Firewall {
 	}
 
 	/**
-	 * Is the feature on for this server's cluster (setting fw_enabled)?
+	 * Is the feature on for this server: the cluster's switch (fw_enabled) or its pilot list (fw_pilot)?
 	 *
 	 * @param Resource $r Resource.
 	 */
 	public static function switched_on( Resource $r ): bool {
 		$cluster = self::cluster_of( $r );
 
-		return null !== $cluster && ! empty( $cluster['fw_enabled'] );
+		return null !== $cluster && self::on_for( $cluster, $r );
+	}
+
+	/**
+	 * The cluster switch, or the server in the cluster's pilot list (license IDs, setting fw_pilot).
+	 *
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param Resource             $r       Resource.
+	 */
+	public static function on_for( array $cluster, Resource $r ): bool {
+		return ! empty( $cluster['fw_enabled'] ) || in_array( (int) ( $r->license()['id'] ?? 0 ), array_map( 'intval', (array) ( $cluster['fw_pilot'] ?? array() ) ), true );
 	}
 
 	/**
@@ -1354,7 +1364,7 @@ final class Firewall {
 	public function ensure( array $record, array $v ) {
 		$base    = self::base( $record, $v );
 		$managed = self::managed( $this->r );
-		$fresh   = ! $managed && ! empty( $this->cluster['fw_enabled'] ) && 'standard' === (string) ( $this->cluster['fw_default_mode'] ?? 'standard' ) && true !== $this->r->get( self::LOCKED );
+		$fresh   = ! $managed && self::on_for( (array) $this->cluster, $this->r ) && 'standard' === (string) ( $this->cluster['fw_default_mode'] ?? 'standard' ) && true !== $this->r->get( self::LOCKED );
 
 		if ( $managed || $fresh ) {
 			if ( true === $this->r->get( self::LOCKED ) ) {

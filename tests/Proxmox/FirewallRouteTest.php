@@ -313,4 +313,16 @@ class FirewallRouteTest extends FirewallTestCase {
 			$this->assertDoesNotMatchRegularExpression( '/hetzner/i', $text, $name );
 		}
 	}
+
+	public function test_a_pilot_server_gets_the_firewall_while_the_switch_is_off_and_others_do_not(): void {
+		list( $pilot, $user ) = $this->ready();
+		list( $other, $them ) = $this->ready();
+		$this->save_cluster( array( 'fw_enabled' => '0', 'fw_pilot' => ' ' . $pilot->license()['id'] . ', x, 0' ) );
+
+		$this->assertSame( array( (int) $pilot->license()['id'] ), \BeltoftServices\Proxmox\Clusters::get( 'lab' )['fw_pilot'], 'Only real license IDs are kept.' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Firewall::editable( Resource::find( $pilot->id() ) ) );
+		$this->assertFalse( \BeltoftServices\Proxmox\Firewall::editable( Resource::find( $other->id() ) ) );
+		$this->assertSame( 200, $this->route( 'GET', $pilot->id(), $user )->get_status() );
+		$this->assertNotSame( 200, $this->route( 'GET', $other->id(), $them )->get_status() );
+	}
 }

@@ -65,6 +65,7 @@ final class Clusters {
 			'fw_default_mode'   => 'standard',
 			'fw_max_rules'      => 30,
 			'fw_ipfilter'       => 0,
+			'fw_pilot'          => array(),
 		);
 	}
 
@@ -521,6 +522,12 @@ final class Clusters {
 			if ( array_key_exists( $flag, $input ) ) {
 				$clean[ $flag ] = empty( $input[ $flag ] ) ? 0 : 1;
 			}
+		}
+
+		// Servers (license IDs) that get the firewall while the switch is off: a live test or a staged start.
+		if ( array_key_exists( 'fw_pilot', $input ) ) {
+			$ids               = is_array( $input['fw_pilot'] ) ? $input['fw_pilot'] : preg_split( '/[\s,]+/', (string) $input['fw_pilot'] );
+			$clean['fw_pilot'] = array_slice( array_values( array_unique( array_filter( array_map( 'absint', (array) $ids ) ) ) ), 0, 50 );
 		}
 
 		if ( array_key_exists( 'fw_default_mode', $input ) ) {
