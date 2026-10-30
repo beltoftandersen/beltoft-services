@@ -1,6 +1,6 @@
 <?php
 /**
- * The Security section of Account details: personal API tokens and the API guide.
+ * The Security section of My Account: personal API tokens and the API guide.
  *
  * @package BeltoftServices
  */
@@ -13,7 +13,9 @@ use BeltoftServices\Api\Tokens;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A plain form with a nonce under the Account details form. A new token is shown in the reply to the post that
+ * A plain form with a nonce, printed on the theme's Security tab through the beltoft_account_security_sections
+ * action, or under the Account details form when the theme says it has no such tab (filter
+ * beltoft_services_api_tokens_on_security_tab). A new token is shown in the reply to the post that
  * made it, once: nothing keeps the secret, and a reload shows only the list.
  */
 final class ApiTokens {
@@ -40,7 +42,42 @@ final class ApiTokens {
 	 */
 	public static function register(): void {
 		add_action( 'template_redirect', array( __CLASS__, 'handle' ), 5 );
-		add_action( 'woocommerce_after_edit_account_form', array( __CLASS__, 'render' ) );
+		add_action( 'woocommerce_after_edit_account_form', array( __CLASS__, 'render_under_form' ) );
+		add_action( 'beltoft_account_security_sections', array( __CLASS__, 'render' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+	}
+
+	/**
+	 * Whether the theme prints the section on its Security tab, so not under the Account details form.
+	 */
+	public static function on_security_tab(): bool {
+		/**
+		 * Whether the theme has a Security tab that prints the API tokens (action beltoft_account_security_sections).
+		 *
+		 * @param bool $on Default false: the section goes under the Account details form.
+		 */
+		return (bool) apply_filters( 'beltoft_services_api_tokens_on_security_tab', false );
+	}
+
+	/**
+	 * Listener of woocommerce_after_edit_account_form: the section, unless the Security tab has it.
+	 */
+	public static function render_under_form(): void {
+		if ( ! self::on_security_tab() ) {
+			self::render();
+		}
+	}
+
+	/**
+	 * The layout stylesheet and the copy script, on the pages that can show the section.
+	 */
+	public static function assets(): void {
+		if ( ! is_user_logged_in() || ! function_exists( 'is_wc_endpoint_url' ) || ! ( is_wc_endpoint_url( 'edit-account' ) || is_wc_endpoint_url( 'security' ) ) ) {
+			return;
+		}
+
+		Panel::style();
+		wp_enqueue_script( 'beltoft-services-api-tokens', plugins_url( 'assets/api-tokens.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-tokens.js' ), true );
 	}
 
 	/**
@@ -98,7 +135,7 @@ final class ApiTokens {
 	}
 
 	/**
-	 * Prints the section under the Account details form.
+	 * Prints the section.
 	 */
 	public static function render(): void {
 		if ( ! is_user_logged_in() ) {

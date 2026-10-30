@@ -970,6 +970,16 @@ class DbPhase4Test extends TestCase {
 		return (string) ob_get_clean();
 	}
 
+	public function test_every_tab_of_a_database_that_is_not_ready_says_so(): void {
+		$r = $this->bare_db();
+
+		foreach ( array( 'access', 'overview' ) as $tab ) {
+			$html = $this->card( $r, $tab );
+
+			$this->assertSame( 1, substr_count( $html, 'Your database is being set up.' ), $tab );
+		}
+	}
+
 	public function test_the_access_tab_without_an_address_offers_the_add_on_or_says_sold_out(): void {
 		$r = $this->ready_db();
 		$html = $this->card( $r );

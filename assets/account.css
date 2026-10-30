@@ -442,6 +442,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-tabs a:hover { color: var(--navy, #0c1535) !important; }
 .beltoft-services-tabs a[aria-current="page"] { color: var(--navy, #0c1535) !important; box-shadow: inset 0 -3px 0 var(--green, #004400); }
 .beltoft-services-tabs a:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: -2px; }
+@media (max-width: 600px) {
+	.beltoft-services-tabs { flex-wrap: wrap; max-width: 100%; }
+}
 .beltoft-services-vm--page > .beltoft-services-vm__flash { margin-bottom: 0; }
 
 /* The lines between the cells are each cell's shadow in the 1px gap, so a row that is not full stays white. */
@@ -518,6 +521,11 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-ov__money dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0; font-size: 14px; }
 .beltoft-services-ov__money dt { margin: 0; color: var(--ink-soft, #5e7080); }
 .beltoft-services-ov__money dd { margin: 0; overflow-wrap: anywhere; }
+.woocommerce-MyAccount-content .beltoft-services-ov__section .beltoft-services-ov__money p { max-width: none; margin: 0; font-size: 14px; line-height: 1.5; }
+.beltoft-services-ov__money + .beltoft-services-ov__usage { padding-top: 0; }
+.woocommerce-MyAccount-content .beltoft-services-usage { margin-bottom: 24px; }
+.woocommerce-MyAccount-content .beltoft-services-usage .beltoft-services-ov__money h3 { margin: 4px 0 0; font-size: 15px; font-weight: 700; line-height: 1.3; letter-spacing: 0; }
+.beltoft-services-usage__cap { display: block; color: var(--ink-soft, #5e7080); font-size: 13px; }
 .beltoft-services-ov__feed { padding: 4px 0; background: var(--bg-card, #fff); }
 .beltoft-services-ov__feed ul { margin: 0; padding: 0; list-style: none; }
 .beltoft-services-ov__feed li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; margin: 0; padding: 5px 14px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
@@ -668,8 +676,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-vm__reveal { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .beltoft-services-vm__reveal .button { margin: 0; }
 .beltoft-services-vm__password { padding: 8px 12px; background: var(--bg-warm, #eeece6); font-size: 15px; overflow-wrap: anywhere; user-select: all; }
-.beltoft-services-vm .beltoft-services-vm__copy, .beltoft-services-db .beltoft-services-vm__copy { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
-.beltoft-services-vm .beltoft-services-vm__copy:hover, .beltoft-services-db .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-vm .beltoft-services-vm__copy, .beltoft-services-db .beltoft-services-vm__copy, .beltoft-services-api .beltoft-services-vm__copy { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
+.beltoft-services-vm .beltoft-services-vm__copy:hover, .beltoft-services-db .beltoft-services-vm__copy:hover, .beltoft-services-api .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-vm__copy[hidden] { display: none !important; }
 
 /* Room between the database facts and the text under them. */
@@ -692,3 +700,25 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-db__form label { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--navy, #0c1535); }
 .beltoft-services-db__form input[type="text"], .beltoft-services-db__form select { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
 .beltoft-services-db__form .button { justify-self: start; margin: 0; }
+
+/* Security: the API tokens box, like the two-factor box over it (880px, 24px padding, 18px heading). */
+.woocommerce-MyAccount-content section.beltoft-services-api { display: grid; gap: 12px; box-sizing: border-box; max-width: 880px; padding: 24px; background: var(--bg-card, #fff); border: 1px solid var(--rule, #d6d2c8); }
+.woocommerce-MyAccount-content section.beltoft-services-api > * { max-width: 100%; margin: 0; }
+.woocommerce-MyAccount-content section.beltoft-services-api h3 { margin: 0 0 -4px; }
+.woocommerce-MyAccount-content .beltoft-services-api .form-row { max-width: 520px; margin: 0; }
+.beltoft-services-api__notice.is-error { color: var(--bad, #b42318); font-weight: 500; }
+.beltoft-services-api__block { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+.woocommerce-MyAccount-content .beltoft-services-api code.beltoft-services-api__secret { box-sizing: border-box; flex: 1 1 16em; min-width: 0; margin: 0; padding: 10px 12px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: all; }
+.woocommerce-MyAccount-content .beltoft-services-api table { width: 100%; max-width: 100%; margin: 0; }
+.woocommerce-MyAccount-content .beltoft-services-api td form { display: block; }
+.beltoft-services-api__docs summary { color: var(--navy, #0c1535); font-size: 15px; font-weight: 600; cursor: pointer; }
+.beltoft-services-api__docs[open] { display: grid; gap: 12px; }
+.beltoft-services-api__docs[open] > * { max-width: 100%; margin: 0; min-width: 0; }
+.beltoft-services-api__docs pre { box-sizing: border-box; padding: 10px 14px; background: var(--bg-warm, #eeece6); overflow-x: auto; }
+.woocommerce-MyAccount-content .beltoft-services-api code { padding: 0; border: 0; background: none; color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+.beltoft-services-api__scroll { overflow-x: auto; }
+.beltoft-services-api__docs table { min-width: 560px; }
+.beltoft-services-api__docs th, .beltoft-services-api__docs td { padding: 8px 12px 8px 0; text-align: left; vertical-align: top; }
+@media (max-width: 700px) {
+	.woocommerce-MyAccount-content section.beltoft-services-api { padding: 16px; }
+}

@@ -253,6 +253,42 @@ final class ApiTokensTest extends TestCase {
 		$this->assertStringContainsString( 'curl -u', $html );
 	}
 
+	public function test_the_section_goes_under_the_account_form_unless_the_theme_has_a_security_tab(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+
+		ob_start();
+		Panel::render_under_form();
+		$this->assertStringContainsString( 'id="api-tokens"', (string) ob_get_clean() );
+
+		add_filter( 'beltoft_services_api_tokens_on_security_tab', '__return_true' );
+		ob_start();
+		Panel::render_under_form();
+		$this->assertSame( '', (string) ob_get_clean(), 'The Security tab prints it.' );
+
+		ob_start();
+		do_action( 'beltoft_account_security_sections' );
+		$html = (string) ob_get_clean();
+		remove_filter( 'beltoft_services_api_tokens_on_security_tab', '__return_true' );
+
+		$this->assertStringContainsString( 'id="api-tokens"', $html );
+	}
+
+	public function test_a_new_secret_has_a_copy_button(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+		$_POST = array( Panel::FIELD => 'create', 'token_name' => 'CI', 'token_scope' => Tokens::READ, '_wpnonce' => wp_create_nonce( Panel::NONCE ) );
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		Panel::handle();
+		$_POST = array();
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+
+		ob_start();
+		Panel::render();
+
+		$this->assertStringContainsString( 'data-api-copy="', (string) ob_get_clean() );
+	}
+
 	public function test_the_panel_refuses_without_a_valid_nonce(): void {
 		list( , $user ) = $this->resource();
 

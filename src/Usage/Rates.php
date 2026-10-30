@@ -81,13 +81,23 @@ final class Rates {
 	}
 
 	/**
-	 * An amount for people: the shop's currency code, then the number ("EUR 16.50", "EUR 0.0226").
+	 * An amount for people as plain text, the way the shop shows prices ("€16.50", "€0.0226"): wc_price without its
+	 * markup. Spaces in it are non-breaking, so an amount never wraps inside.
 	 *
-	 * @param float $amount   Amount.
-	 * @param int   $decimals Decimals.
+	 * @param float  $amount   Amount.
+	 * @param int    $decimals Decimals.
+	 * @param string $currency Currency code, '' for the shop's.
 	 */
-	public static function money( float $amount, int $decimals = 2 ): string {
-		return get_woocommerce_currency() . ' ' . number_format( $amount, $decimals, wc_get_price_decimal_separator(), wc_get_price_thousand_separator() );
+	public static function money( float $amount, int $decimals = 2, string $currency = '' ): string {
+		$args = array( 'decimals' => $decimals );
+
+		if ( '' !== $currency ) {
+			$args['currency'] = $currency;
+		}
+
+		$text = html_entity_decode( wp_strip_all_tags( wc_price( $amount, $args ) ), ENT_QUOTES, 'UTF-8' );
+
+		return str_replace( ' ', "\xC2\xA0", trim( $text ) );
 	}
 
 	/**
@@ -122,7 +132,8 @@ final class Rates {
 	}
 
 	/**
-	 * "or EUR 0.0226/hour, max EUR 16.50/month pay as you go" for a monthly variation, or '' when there is no offer.
+	 * "Or €0.0226/hour, max €16.50/month, pay as you go" for a monthly variation, or '' when there is no offer.
+	 * The slash is followed by a word joiner, so a line never breaks inside "€0.0226/hour".
 	 *
 	 * @param \WC_Product_Variation $monthly Monthly variation.
 	 */
@@ -133,8 +144,19 @@ final class Rates {
 			return '';
 		}
 
-		/* translators: 1: hourly price such as EUR 0.0226, 2: monthly cap such as EUR 16.50 */
-		return sprintf( __( 'or %1$s/hour, max %2$s/month pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4 ), self::money( $rates['cap'] ) );
+		/* translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50 */
+		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4 ), self::money( $rates['cap'] ) ) );
+	}
+
+	/**
+	 * The terms of pay as you go, next to the choice: "€0.0226 per hour, max €16.50 per month excluding VAT".
+	 *
+	 * @param float $hourly Price per hour.
+	 * @param float $cap    Monthly cap.
+	 */
+	public static function terms( float $hourly, float $cap ): string {
+		/* translators: 1: price per hour such as €0.0226, 2: monthly cap such as €16.50 */
+		return sprintf( __( '%1$s per hour, max %2$s per month excluding VAT', 'beltoft-services' ), self::money( $hourly, 4 ), self::money( $cap ) );
 	}
 
 	/**

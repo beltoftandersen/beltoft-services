@@ -1,6 +1,6 @@
 <?php
 /**
- * Account details, Security: personal API tokens and the API guide.
+ * My Account, Security: personal API tokens and the API guide.
  *
  * Override by copying to yourtheme/beltoft-services/account/api-tokens.php.
  *
@@ -21,19 +21,21 @@ defined( 'ABSPATH' ) || exit;
 $beltoft_services_fmt = (string) get_option( 'date_format' );
 ?>
 <section class="beltoft-services-api" id="api-tokens">
-	<h3><?php esc_html_e( 'Security', 'beltoft-services' ); ?></h3>
-	<h4><?php esc_html_e( 'API tokens', 'beltoft-services' ); ?></h4>
+	<h3><?php esc_html_e( 'API tokens', 'beltoft-services' ); ?></h3>
 	<p><?php esc_html_e( 'A token lets a script or a tool use your account over the API without your password. Anyone with a token can do what its access allows, so keep it private. It is shown once, and you can revoke it at any time.', 'beltoft-services' ); ?></p>
 
 	<?php if ( is_array( $result ) && '' !== $result['message'] ) : ?>
 		<p class="beltoft-services-api__notice<?php echo $result['ok'] ? '' : ' is-error'; ?>" role="status"><?php echo esc_html( $result['message'] ); ?></p>
 	<?php endif; ?>
 	<?php if ( is_array( $result ) && '' !== $result['password'] ) : ?>
-		<p><code class="beltoft-services-api__secret"><?php echo esc_html( $result['password'] ); ?></code></p>
+		<div class="beltoft-services-api__block">
+			<code class="beltoft-services-api__secret"><?php echo esc_html( $result['password'] ); ?></code>
+			<button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-api-copy="<?php echo esc_attr( $result['password'] ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
+		</div>
 	<?php endif; ?>
 
 	<?php if ( $tokens ) : ?>
-		<table class="beltoft-services-api__tokens">
+		<table class="beltoft-services-api__tokens shop_table shop_table_responsive">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th>
@@ -46,10 +48,10 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			<tbody>
 			<?php foreach ( $tokens as $beltoft_services_token ) : ?>
 				<tr>
-					<td><?php echo esc_html( $beltoft_services_token['name'] ); ?></td>
-					<td><?php echo esc_html( $scopes[ $beltoft_services_token['scope'] ] ?? '' ); ?></td>
-					<td><?php echo esc_html( wp_date( $beltoft_services_fmt, $beltoft_services_token['created'] ) ); ?></td>
-					<td><?php echo esc_html( $beltoft_services_token['last_used'] ? wp_date( $beltoft_services_fmt, $beltoft_services_token['last_used'] ) : __( 'Never', 'beltoft-services' ) ); ?></td>
+					<td data-title="<?php esc_attr_e( 'Name', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_token['name'] ); ?></td>
+					<td data-title="<?php esc_attr_e( 'Access', 'beltoft-services' ); ?>"><?php echo esc_html( $scopes[ $beltoft_services_token['scope'] ] ?? '' ); ?></td>
+					<td data-title="<?php esc_attr_e( 'Created', 'beltoft-services' ); ?>"><?php echo esc_html( wp_date( $beltoft_services_fmt, $beltoft_services_token['created'] ) ); ?></td>
+					<td data-title="<?php esc_attr_e( 'Last used', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_token['last_used'] ? wp_date( $beltoft_services_fmt, $beltoft_services_token['last_used'] ) : __( 'Never', 'beltoft-services' ) ); ?></td>
 					<td>
 						<form method="post">
 							<input type="hidden" name="<?php echo esc_attr( $field ); ?>" value="revoke">
@@ -70,17 +72,19 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 		<form method="post" class="beltoft-services-api__new">
 			<input type="hidden" name="<?php echo esc_attr( $field ); ?>" value="create">
 			<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
-			<p>
+			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field">
 				<label for="beltoft-token-name"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></label>
-				<input type="text" id="beltoft-token-name" name="token_name" maxlength="100" required>
+				<span class="woocommerce-input-wrapper"><input type="text" class="woocommerce-Input input-text" id="beltoft-token-name" name="token_name" maxlength="100" placeholder=" " required></span>
 			</p>
-			<p>
+			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field">
 				<label for="beltoft-token-scope"><?php esc_html_e( 'Access', 'beltoft-services' ); ?></label>
-				<select id="beltoft-token-scope" name="token_scope">
-					<?php foreach ( $scopes as $beltoft_services_key => $beltoft_services_label ) : ?>
-						<option value="<?php echo esc_attr( $beltoft_services_key ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></option>
-					<?php endforeach; ?>
-				</select>
+				<span class="woocommerce-input-wrapper">
+					<select id="beltoft-token-scope" name="token_scope">
+						<?php foreach ( $scopes as $beltoft_services_key => $beltoft_services_label ) : ?>
+							<option value="<?php echo esc_attr( $beltoft_services_key ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</span>
 			</p>
 			<p><button type="submit" class="button"><?php esc_html_e( 'Create token', 'beltoft-services' ); ?></button></p>
 		</form>
@@ -90,7 +94,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 		<summary><?php esc_html_e( 'How to use the API', 'beltoft-services' ); ?></summary>
 		<p><?php esc_html_e( 'Send your username and token as HTTP Basic authentication over HTTPS. All replies are JSON. The examples use 123 for the id of a service; the ids are in the address of each service page.', 'beltoft-services' ); ?></p>
 		<pre><code><?php echo esc_html( 'curl -u "' . $username . ':YOUR TOKEN" ' . $base . 'resources/123' ); ?></code></pre>
-		<table>
+		<div class="beltoft-services-api__scroll"><table>
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Request', 'beltoft-services' ); ?></th>
@@ -107,7 +111,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<tr><td><code>POST resources/123/actions/reboot</code></td><td><?php esc_html_e( 'Asks for an action on a service, for example start, shutdown or reboot. The reply is 202 and the work runs in the background.', 'beltoft-services' ); ?></td><td><?php esc_html_e( 'Actions', 'beltoft-services' ); ?></td></tr>
 				<tr><td><code>PUT or DELETE resources/123/dns-records/A/www</code></td><td><?php esc_html_e( 'Sets or removes one DNS record set.', 'beltoft-services' ); ?></td><td><?php esc_html_e( 'Actions', 'beltoft-services' ); ?></td></tr>
 			</tbody>
-		</table>
+		</table></div>
 		<pre><code><?php echo esc_html( 'curl -u "' . $username . ':YOUR TOKEN" -X POST ' . $base . 'resources/123/actions/reboot' ); ?></code></pre>
 		<p><?php esc_html_e( 'Every change made with a token is written to the history of the service. Passwords, console access and actions that destroy something, such as reinstall, restore and delete, are only available in your dashboard. Requests are limited per token; a reply of 429 means wait a minute.', 'beltoft-services' ); ?></p>
 	</details>

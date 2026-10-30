@@ -21,6 +21,13 @@ $beltoft_services_db_status = array(
 ?>
 <?php
 $beltoft_services_all = ! $nav;
+// What a database that is not ready says, on the Overview and on every other tab.
+$beltoft_services_db_wait = array(
+	'building'  => __( 'Your database is being set up. The connection details appear here when it is ready. You can leave this page.', 'beltoft-services' ),
+	'restoring' => __( 'Your database is being restored from a backup. It is not available until the restore is finished. You can leave this page.', 'beltoft-services' ),
+	'paused'    => __( 'Your applications cannot reach this database until the service is active again.', 'beltoft-services' ),
+	'failed'    => __( 'Your database could not be set up. We have been told about the problem. Please contact support.', 'beltoft-services' ),
+);
 ?>
 <div class="beltoft-services-db" data-db-card>
 	<?php if ( $nav ) : ?>
@@ -48,14 +55,8 @@ $beltoft_services_all = ! $nav;
 	</dl>
 	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
 
-	<?php if ( 'building' === $view['kind'] ) : ?>
-		<p><?php esc_html_e( 'Your database is being set up. The connection details appear here when it is ready. You can leave this page.', 'beltoft-services' ); ?></p>
-	<?php elseif ( 'restoring' === $view['kind'] ) : ?>
-		<p><?php esc_html_e( 'Your database is being restored from a backup. It is not available until the restore is finished. You can leave this page.', 'beltoft-services' ); ?></p>
-	<?php elseif ( 'paused' === $view['kind'] ) : ?>
-		<p><?php esc_html_e( 'Your applications cannot reach this database until the service is active again.', 'beltoft-services' ); ?></p>
-	<?php elseif ( 'failed' === $view['kind'] ) : ?>
-		<p><?php esc_html_e( 'Your database could not be set up. We have been told about the problem. Please contact support.', 'beltoft-services' ); ?></p>
+	<?php if ( isset( $beltoft_services_db_wait[ $view['kind'] ] ) ) : ?>
+		<p><?php echo esc_html( $beltoft_services_db_wait[ $view['kind'] ] ); ?></p>
 	<?php else : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Connection', 'beltoft-services' ); ?></h4>
@@ -89,6 +90,10 @@ $beltoft_services_all = ! $nav;
 		</div>
 	<?php endif; // Kind of state. ?>
 	<?php endif; // Overview pane. ?>
+
+	<?php if ( ! $beltoft_services_all && 'overview' !== $active && isset( $beltoft_services_db_wait[ $view['kind'] ] ) ) : ?>
+		<p><?php echo esc_html( $beltoft_services_db_wait[ $view['kind'] ] ); ?></p>
+	<?php endif; ?>
 
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'access' === $active ) ) : ?>
 		<?php $beltoft_services_access = $view['access']; ?>

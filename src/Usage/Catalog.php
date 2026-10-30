@@ -18,9 +18,9 @@ defined( 'ABSPATH' ) || exit;
  *
  * Bricks dynamic data tags give the offer next to a monthly variation (the current post in a loop, or `:ID`):
  *
- *   {beltoft_usage_line}    "or EUR 0.0226/hour, max EUR 16.50/month pay as you go", empty when there is no offer
- *   {beltoft_usage_hourly}  "EUR 0.0226"
- *   {beltoft_usage_cap}     "EUR 16.50"
+ *   {beltoft_usage_line}    "Or €0.0226/hour, max €16.50/month, pay as you go", empty when there is no offer
+ *   {beltoft_usage_hourly}  "€0.0226"
+ *   {beltoft_usage_cap}     "€16.50"
  *
  * The tags are empty for a variation without a pay-as-you-go sibling, so a text element can hide itself with the
  * condition "dynamic data is not empty".

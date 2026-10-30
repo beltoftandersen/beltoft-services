@@ -19,6 +19,7 @@ use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\Proxmox\Tiles;
 use BeltoftServices\RateLimit;
+use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
@@ -580,8 +581,8 @@ final class ServerPicker {
 			$attrs += array(
 				'data-usage-label'          => self::usage_label( $plan, false ),
 				'data-usage-label-backups'  => self::usage_label( $plan, true ),
-				'data-usage-note'           => self::usage_note( $plan, false ),
-				'data-usage-note-backups'   => self::usage_note( $plan, true ),
+				'data-usage-note'           => BillingField::note(),
+				'data-usage-note-backups'   => BillingField::note(),
 				'data-summary-usage'        => self::summary( $plan, false, true ),
 				'data-summary-usage-backups' => self::summary( $plan, true, true ),
 			);
@@ -706,7 +707,7 @@ final class ServerPicker {
 	}
 
 	/**
-	 * "EUR 0.0226 per hour, max EUR 16.50 per month excluding VAT".
+	 * "€0.0226 per hour, max €16.50 per month excluding VAT".
 	 *
 	 * @param array<string, mixed> $plan    Plan.
 	 * @param bool                 $backups With backups.
@@ -714,19 +715,7 @@ final class ServerPicker {
 	private static function usage_label( array $plan, bool $backups ): string {
 		$rates = self::usage_rates( $plan, $backups );
 
-		/* translators: 1: price per hour such as EUR 0.0226, 2: monthly cap such as EUR 16.50 */
-		return sprintf( __( '%1$s per hour, max %2$s per month excluding VAT', 'beltoft-services' ), Rates::money( $rates['hourly'], 4 ), Rates::money( $rates['cap'] ) );
-	}
-
-	/**
-	 * The explanation under the billing choice.
-	 *
-	 * @param array<string, mixed> $plan    Plan.
-	 * @param bool                 $backups With backups.
-	 */
-	private static function usage_note( array $plan, bool $backups ): string {
-		/* translators: %s: monthly cap such as EUR 16.50 */
-		return sprintf( __( 'Pay as you go: billed per hour each month, never more than %s. A card is required.', 'beltoft-services' ), Rates::money( self::usage_rates( $plan, $backups )['cap'] ) );
+		return Rates::terms( $rates['hourly'], $rates['cap'] );
 	}
 
 	/**
@@ -753,7 +742,7 @@ final class ServerPicker {
 		echo '<label><input type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
 		checked( $usage && $shown, true );
 		echo '> <span>' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></label>';
-		echo '<p class="description" data-picker-usage-note>' . esc_html( $shown ? self::usage_note( $plan, $with ) : '' ) . '</p>';
+		echo '<p class="description" data-picker-usage-note>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
 		echo '</fieldset>';
 	}
 

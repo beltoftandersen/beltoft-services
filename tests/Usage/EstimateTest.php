@@ -98,7 +98,7 @@ class EstimateTest extends UsageTestCase {
 
 		$this->assertSame( 0.0, Estimate::for_user( $user )['total'] );
 		$this->assertSame( '', UsageView::html() );
-		$this->assertSame( 'Cost so far this month: EUR 0.00', Estimate::cost_line( $r->id() ) );
+		$this->assertSame( "Cost so far this month: \u{20AC}0.00", Estimate::cost_line( $r->id() ) );
 	}
 
 	public function test_it_is_built_once_per_request(): void {
@@ -126,7 +126,7 @@ class EstimateTest extends UsageTestCase {
 
 		$this->assertStringContainsString( 'Usage this month', $html );
 		$this->assertStringContainsString( 'excl. VAT', $html );
-		$this->assertStringContainsString( 'EUR 2.26', $html );
+		$this->assertStringContainsString( "\u{20AC}2.26", $html );
 		$this->assertStringContainsString( 'server, 100 hours', $html );
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ), time() + 12 * DAY_IN_SECONDS ), $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
@@ -153,7 +153,7 @@ class EstimateTest extends UsageTestCase {
 		$this->customer( 100 );
 		$html = Overview::section( 'next_payment' );
 
-		$this->assertStringContainsString( 'Usage so far: EUR 2.26 (estimate)', $html );
+		$this->assertStringContainsString( "Usage so far: \u{20AC}2.26 (estimate)", $html );
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ), time() + 12 * DAY_IN_SECONDS ), $html );
 	}
 
@@ -176,7 +176,7 @@ class EstimateTest extends UsageTestCase {
 
 		ob_start();
 		Panels::account( $r );
-		$this->assertStringContainsString( 'Cost so far this month: EUR 2.26', ob_get_clean() );
+		$this->assertStringContainsString( "Cost so far this month: \u{20AC}2.26", ob_get_clean() );
 
 		$monthly = $this->ready_vm();
 		ob_start();
@@ -186,11 +186,11 @@ class EstimateTest extends UsageTestCase {
 
 	public function test_a_database_page_shows_the_cost_for_pay_as_you_go_only(): void {
 		list( , $r ) = $this->customer( 100 );
-		$this->assertSame( 'Cost so far this month: EUR 2.26', DbCard::view( $r )['cost'] );
+		$this->assertSame( "Cost so far this month: \u{20AC}2.26", DbCard::view( $r )['cost'] );
 		$this->assertSame( '', DbCard::view( $this->ready_vm() )['cost'] );
 
 		ob_start();
 		DbCard::render( $r );
-		$this->assertStringContainsString( 'Cost so far this month: EUR 2.26', ob_get_clean() );
+		$this->assertStringContainsString( "Cost so far this month: \u{20AC}2.26", ob_get_clean() );
 	}
 }

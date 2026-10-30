@@ -801,7 +801,7 @@ final class Backups {
 			$now  = \BeltoftServices\Usage\Rates::monthly( $to );
 			$rate = null === $was || null === $now ? 0.0 : \BeltoftServices\Usage\Rates::hourly( $now - $was, \BeltoftServices\Usage\Rates::premium( $to->get_parent_id() ) );
 
-			/* translators: %s: price per hour such as EUR 0.0041 */
+			/* translators: %s: price per hour such as €0.0041 */
 			return sprintf( __( '%s / hour', 'beltoft-services' ), ( $rate < 0 ? '-' : '+' ) . \BeltoftServices\Usage\Rates::money( abs( $rate ), 4 ) );
 		}
 
