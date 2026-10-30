@@ -51,11 +51,6 @@ final class Provision {
 	use Steps;
 
 	/**
-	 * Order of the steps. `wipe` only runs while meta `wipe` is set.
-	 */
-	private const STEPS = array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' );
-
-	/**
 	 * Fixed comment of the outgoing SMTP rule, how it is recognised on a retry.
 	 */
 	public const SMTP_COMMENT = 'beltoft-services: block outgoing SMTP';
@@ -96,12 +91,21 @@ final class Provision {
 	private $out = array();
 
 	/**
+	 * The build profile: the step list and what differs between kinds of build.
+	 *
+	 * @var BuildProfile
+	 */
+	private $profile;
+
+	/**
 	 * @param Resource $r   Resource.
 	 * @param callable $nap fn( int $seconds ): void.
 	 */
 	public function __construct( Resource $r, callable $nap ) {
 		$this->r   = $r;
 		$this->nap = $nap;
+
+		$this->profile = Profiles::for_resource( $r );
 	}
 
 	/**
@@ -122,7 +126,7 @@ final class Provision {
 
 		$steps = $this->r->get( 'steps' );
 
-		foreach ( self::STEPS as $name ) {
+		foreach ( $this->profile->steps() as $name ) {
 			if ( 'wipe' === $name ? ! $this->r->get( 'wipe' ) : in_array( $name, $steps, true ) ) {
 				continue;
 			}
@@ -682,7 +686,7 @@ final class Provision {
 	 */
 	private function step_ip() {
 		try {
-			$ip = IpPool::hold( $this->r->id() );
+			$ip = $this->profile->hold_address( $this->r->id() );
 		} catch ( \RuntimeException $e ) {
 			unset( $e );
 
@@ -984,14 +988,14 @@ final class Provision {
 	 */
 	private function step_configure() {
 		$record = VmRecords::for_resource( $this->r->id() );
-		$ip     = IpPool::for_resource( $this->r->id() );
+		$ip     = $this->profile->uses_public_ip() ? IpPool::for_resource( $this->r->id() ) : null;
 
-		if ( null === $record || null === $ip ) {
+		if ( null === $record || ( null === $ip && $this->profile->uses_public_ip() ) ) {
 			return StepResult::fail( 'configure: the VM record or the address is missing' );
 		}
 
 		// A gateway the pool row brings must be on the address's own network; the cluster's is the routed default.
-		if ( null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
+		if ( null !== $ip && null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
 			return StepResult::fail( sprintf( 'configure: the gateway %1$s of address %2$s is outside %2$s/%3$d; nothing was written to the VM', $ip['gateway'], $ip['address'], (int) $this->cluster['prefix'] ) );
 		}
 
@@ -1074,12 +1078,11 @@ final class Provision {
 	 *
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
-	 * @param array<string, mixed> $ip     Pool address.
+	 * @param array<string, mixed>|null $ip Pool address (null: the profile holds none).
 	 * @return array<string, mixed>|StepResult
 	 */
-	private function configure_config( array $record, array $v, array $ip ) {
+	private function configure_config( array $record, array $v, ?array $ip ) {
 		$key = $this->r->get( 'ssh_key' );
-		$gw  = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $this->cluster['gateway'];
 
 		$login = array();
 
@@ -1112,18 +1115,18 @@ final class Provision {
 			$params = array(
 				'cores'     => $this->plan['cores'],
 				'memory'    => $this->plan['memory_mb'],
-				'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $this->cluster['prefix'] . ',gw=' . $gw,
 				'ciuser'    => self::LOGIN_USER,
-				'net0'      => $this->net0( (string) ( $v['config']['net0'] ?? '' ) ),
 				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
-			);
+			) + $this->profile->network_params( $this->cluster, $ip, $this->net0( (string) ( $v['config']['net0'] ?? '' ) ) );
 
 			if ( array() !== (array) $this->cluster['nameservers'] ) {
 				$params['nameserver'] = implode( ' ', (array) $this->cluster['nameservers'] );
 			}
 
-			if ( '' !== (string) $this->cluster['vendor_snippet'] ) {
-				$params['cicustom'] = 'vendor=' . $this->cluster['vendor_snippet'];
+			$cicustom = $this->profile->cicustom( $this->cluster );
+
+			if ( null !== $cicustom ) {
+				$params['cicustom'] = $cicustom;
 			}
 
 			$answer = $this->client->request( 'PUT', $path, $params + $login );
@@ -1285,9 +1288,9 @@ final class Provision {
 	 */
 	private function step_ready() {
 		$record = VmRecords::for_resource( $this->r->id() );
-		$ip     = IpPool::for_resource( $this->r->id() );
+		$ip     = $this->profile->uses_public_ip() ? IpPool::for_resource( $this->r->id() ) : null;
 
-		if ( null === $record || null === $ip ) {
+		if ( null === $record || ( null === $ip && $this->profile->uses_public_ip() ) ) {
 			return StepResult::fail( 'ready: the VM record or the address is missing' );
 		}
 
@@ -1309,7 +1312,7 @@ final class Provision {
 			$record['node'] = (string) $entry['node'];
 		}
 
-		if ( ! VmRecords::set_ip( $this->r->id(), $ip['id'] ) || ! IpPool::assign( $this->r->id() ) ) {
+		if ( null !== $ip && ( ! VmRecords::set_ip( $this->r->id(), $ip['id'] ) || ! IpPool::assign( $this->r->id() ) ) ) {
 			return StepResult::retry( 0, 'ready: the address could not be recorded as in use' );
 		}
 
@@ -1319,18 +1322,7 @@ final class Provision {
 			return $checked;
 		}
 
-		$meta = array(
-			'disks_check' => null,
-			'ip'          => $ip['address'],
-			'node'        => $record['node'],
-			'vmid'        => $record['vmid'],
-			'vm'          => array(
-				'cluster' => $record['cluster'],
-				'vmid'    => $record['vmid'],
-				'node'    => $record['node'],
-			),
-			'task'        => null,
-		);
+		$meta = $this->profile->post_build_meta( $record, $ip );
 		if ( '' !== (string) $this->r->get( 'app_id' ) && ! $this->r->get( 'app_state' ) ) {
 			$meta['app_state'] = 'pending';
 		}
