@@ -19,6 +19,7 @@ use BeltoftServices\Plugin;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\IpfilterReport;
+use BeltoftServices\Proxmox\IpWho;
 use BeltoftServices\Proxmox\LinkVm;
 use BeltoftServices\Proxmox\Metrics;
 use BeltoftServices\Proxmox\Operations;
@@ -545,6 +546,72 @@ final class Commands {
 		}
 
 		\WP_CLI\Utils\format_items( 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table', $items, array( 'address', 'prefix', 'gateway', 'state', 'resource', 'leftover' ) );
+	}
+
+	/**
+	 * Shows who holds an IPv4 address, or held it at a time (for abuse reports). Read-only.
+	 *
+	 * Looks in the IP pool, the private networks and the holding log: resource, license, customer
+	 * (id, name, email), product and resource state. Without --at every holding is listed, the
+	 * current one with an empty "until". With --at only the holding that covered that time.
+	 * Holdings are logged from the day this was added; an address held before then is shown from
+	 * its resource's activation, with a note.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <ip>
+	 * : The IPv4 address, public or private.
+	 *
+	 * [--at=<datetime>]
+	 * : Who held it then. UTC unless the text names a zone, e.g. "2026-10-29 14:30" or "2026-10-29T14:30:00+02:00".
+	 *
+	 * [--format=<format>]
+	 * : table or json.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp beltoft-services who 192.0.2.10
+	 *     wp beltoft-services who 192.0.2.10 --at="2026-10-29 14:30" --format=json
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function who( array $args, array $assoc_args ): void {
+		$ip = trim( (string) ( $args[0] ?? '' ) );
+
+		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+			\WP_CLI::error( 'Give an IPv4 address.' );
+		}
+
+		$at = null;
+
+		if ( isset( $assoc_args['at'] ) ) {
+			try {
+				$at = ( new \DateTimeImmutable( (string) $assoc_args['at'], new \DateTimeZone( 'UTC' ) ) )->getTimestamp();
+			} catch ( \Exception $e ) {
+				\WP_CLI::error( 'Cannot read --at as a date and time.' );
+			}
+		}
+
+		$items  = IpWho::lookup( $ip, $at );
+		$format = 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table';
+
+		if ( array() === $items ) {
+			if ( 'json' === $format ) {
+				\WP_CLI::log( '[]' );
+			} else {
+				\WP_CLI::warning( null === $at ? 'No resource holds or held ' . $ip . '.' : 'No resource held ' . $ip . ' at that time.' );
+			}
+			return;
+		}
+
+		\WP_CLI\Utils\format_items( $format, $items, array( 'ip', 'kind', 'resource_id', 'license_id', 'customer_id', 'name', 'email', 'product', 'state', 'from', 'until', 'note' ) );
 	}
 
 	/**

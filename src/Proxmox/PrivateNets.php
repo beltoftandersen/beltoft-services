@@ -127,6 +127,17 @@ final class PrivateNets {
 		return is_array( $row ) ? array( 'address' => (string) $row['address'], 'net_id' => (int) $row['net_id'], 'user_id' => (int) $row['user_id'], 'vlan' => (int) $row['vlan'], 'cidr' => (string) $row['cidr'], 'state' => (string) $row['state'] ) : null;
 	}
 
+	/** The resource that holds a private address now, or null. */
+	public static function resource_for_address( string $address ): ?int {
+		global $wpdb;
+		if ( ! self::db_ready() ) {
+			return null;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$id = $wpdb->get_var( $wpdb->prepare( 'SELECT resource_id FROM %i WHERE address = %s', Schema::tables()['private_ips'], $address ) );
+		return null === $id ? null : (int) $id;
+	}
+
 	/**
 	 * Every network with the number of addresses held on it.
 	 *
@@ -281,6 +292,7 @@ final class PrivateNets {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- unique address and resource keys are backstops.
 			$written = $wpdb->query( $wpdb->prepare( 'INSERT IGNORE INTO %i (net_id, resource_id, address, updated_at) VALUES (%d, %d, %s, %s)', $table, $net['id'], $resource_id, $ip, gmdate( 'Y-m-d H:i:s' ) ) );
 			if ( 1 === $written ) {
+				IpHistory::start( 'private', $ip, $resource_id );
 				return $ip;
 			}
 		}
@@ -301,7 +313,11 @@ final class PrivateNets {
 			Locks::allocation_wait(),
 			static function () use ( $wpdb, $resource_id ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
-				return 1 === $wpdb->delete( Schema::tables()['private_ips'], array( 'resource_id' => $resource_id ) );
+				$deleted = 1 === $wpdb->delete( Schema::tables()['private_ips'], array( 'resource_id' => $resource_id ) );
+				if ( $deleted ) {
+					IpHistory::end( 'private', $resource_id );
+				}
+				return $deleted;
 			}
 		);
 		if ( ! $locked ) {
@@ -329,7 +345,11 @@ final class PrivateNets {
 				}
 			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
-			return 1 === $wpdb->delete( Schema::tables()['private_ips'], array( 'resource_id' => $resource_id, 'net_id' => $row['net_id'] ) );
+			$deleted = 1 === $wpdb->delete( Schema::tables()['private_ips'], array( 'resource_id' => $resource_id, 'net_id' => $row['net_id'] ) );
+			if ( $deleted ) {
+				IpHistory::end( 'private', $resource_id );
+			}
+			return $deleted;
 		} );
 		if ( ! $locked ) {
 			throw new \RuntimeException( 'The private network pool is busy.' );

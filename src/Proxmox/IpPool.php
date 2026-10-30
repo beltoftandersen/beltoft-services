@@ -156,6 +156,7 @@ final class IpPool {
 		}
 
 		if ( $took ) { // A resource that already held an address takes nothing from the pool.
+			IpHistory::start( 'public', (string) $row['address'], $resource_id );
 			self::changed();
 		}
 
@@ -207,6 +208,7 @@ final class IpPool {
 		$freed = (int) $wpdb->query( $wpdb->prepare( "UPDATE %i SET state = 'free', resource_id = NULL, updated_at = %s WHERE resource_id = %d AND state IN ('held', 'assigned')", Schema::tables()['ips'], gmdate( 'Y-m-d H:i:s' ), $resource_id ) );
 
 		if ( $freed > 0 ) {
+			IpHistory::end( 'public', $resource_id );
 			self::changed();
 		}
 
@@ -239,6 +241,7 @@ final class IpPool {
 		}
 
 		if ( 1 === $taken ) {
+			IpHistory::start( 'public', $address, $resource_id );
 			self::changed();
 		}
 
