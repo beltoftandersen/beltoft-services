@@ -601,6 +601,7 @@ final class Servers {
 			'state'   => $text,
 			'tone'    => $tone,
 			'renews'  => self::renewal( $license ),
+			'note'    => \BeltoftServices\Proxmox\Quarantine::active( $resource ) ? __( 'Outgoing internet traffic is blocked', 'beltoft-services' ) : '',
 			'bars'    => $bars,
 		);
 	}

@@ -30,6 +30,7 @@ final class Quarantine {
 	public const META  = 'fw_quarantine';
 	public const LOG   = 'fw_quarantine_log';
 	public const EMAIL = 'beltoft_services_quarantine';
+	public const EMAIL_LIFTED = 'beltoft_services_quarantine_lifted';
 
 	public const REPEAT_DAYS = 7;
 
@@ -138,6 +139,22 @@ final class Quarantine {
 		$flag['notified'] = true;
 
 		return $flag;
+	}
+
+	/**
+	 * The customer is told that outgoing traffic is open again.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function notify_lifted( Resource $r ): void {
+		Emails::send( self::EMAIL_LIFTED, $r );
+	}
+
+	/**
+	 * The notice on the customer's server page.
+	 */
+	public static function notice(): string {
+		return __( 'Outgoing internet traffic from this server is blocked because it showed signs of an attack. The server keeps running and you can still reach it. Contact support.', 'beltoft-services' );
 	}
 
 	/**

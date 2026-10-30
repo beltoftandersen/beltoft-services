@@ -1379,7 +1379,7 @@ final class Firewall {
 		}
 
 		// A quarantined server keeps its quarantine through every reconcile.
-		return Quarantine::active( $this->r ) ? $this->add_quarantine_rules( $base, $rules ) : true;
+		return Quarantine::active( $this->r ) ? $this->add_quarantine_rules( $base, $rules, $v ) : true;
 	}
 
 	/**
@@ -1483,10 +1483,16 @@ final class Firewall {
 	 * The outgoing rules of a quarantine, by comment: DNS (udp and tcp 53) to each name server of the cluster. Answers
 	 * to incoming connections need no rule: the firewall accepts established and related packets before its rules.
 	 *
+	 * @param array<string, mixed> $v Verified VM.
 	 * @return array<string, array<string, mixed>>
 	 */
-	private function quarantine_rules(): array {
+	private function quarantine_rules( array $v ): array {
 		$rules = array();
+
+		// The private network stays open: the quarantine is about the internet.
+		if ( self::has_private_nic( $v ) ) {
+			$rules[ self::QUARANTINE_TAG . '-private' ] = array( 'action' => 'ACCEPT', 'type' => 'out', 'iface' => 'net1' );
+		}
 
 		foreach ( array_values( array_unique( (array) ( $this->cluster['nameservers'] ?? array() ) ) ) as $ns ) {
 			foreach ( array( 'udp', 'tcp' ) as $proto ) {
@@ -1502,10 +1508,11 @@ final class Firewall {
 	 *
 	 * @param string            $base  Firewall path.
 	 * @param array<int, mixed> $rules Listing.
+	 * @param array<string, mixed> $v Verified VM.
 	 * @return true|StepResult
 	 */
-	private function add_quarantine_rules( string $base, array $rules ) {
-		foreach ( $this->quarantine_rules() as $comment => $params ) {
+	private function add_quarantine_rules( string $base, array $rules, array $v ) {
+		foreach ( $this->quarantine_rules( $v ) as $comment => $params ) {
 			$done = $this->add_rule_once( $base, $rules, $comment, $params );
 
 			if ( $done instanceof StepResult ) {
@@ -1538,7 +1545,7 @@ final class Firewall {
 			return $this->stop( is_wp_error( $options ) ? $options : $rules );
 		}
 
-		$done = $this->add_quarantine_rules( $base, $rules );
+		$done = $this->add_quarantine_rules( $base, $rules, $v );
 
 		if ( $done instanceof StepResult ) {
 			return $done;
@@ -1574,7 +1581,7 @@ final class Firewall {
 		}
 
 		$comments = array_map( static fn( $rule ) => (string) ( is_array( $rule ) ? ( $rule['comment'] ?? '' ) : '' ), $rules );
-		$missing  = array_diff( array_keys( $this->quarantine_rules() ), $comments );
+		$missing  = array_diff( array_keys( $this->quarantine_rules( $v ) ), $comments );
 
 		if ( 1 !== (int) ( $options['enable'] ?? 0 ) || 'DROP' !== (string) ( $options['policy_out'] ?? '' ) || $missing ) {
 			return StepResult::retry( 0, 'firewall: the quarantine read back from Proxmox differs from the one written' );
@@ -1637,6 +1644,10 @@ final class Firewall {
 
 		if ( 'ACCEPT' !== (string) ( $options['policy_out'] ?? 'ACCEPT' ) || self::tagged( $rules, self::QUARANTINE_TAG ) ) {
 			return StepResult::retry( 0, 'firewall: the lifted quarantine read back from Proxmox is not gone' );
+		}
+
+		if ( Quarantine::active( $this->r ) ) {
+			Quarantine::notify_lifted( $this->r );
 		}
 
 		return StepResult::done( array( Quarantine::META => null ), 'Network quarantine lifted: outgoing traffic allowed again' );
@@ -1712,7 +1723,7 @@ final class Firewall {
 		}
 
 		if ( Quarantine::active( $this->r ) ) {
-			foreach ( array_keys( $this->quarantine_rules() ) as $comment ) {
+			foreach ( array_keys( $this->quarantine_rules( $v ) ) as $comment ) {
 				if ( ! in_array( $comment, $comments, true ) ) {
 					return false;
 				}

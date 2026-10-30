@@ -20,6 +20,7 @@ defined( 'ABSPATH' ) || exit;
 			</span>
 			<span class="beltoft-services-srv__state">
 				<span class="beltoft-services-state is-<?php echo esc_attr( $beltoft_services_row['tone'] ); ?>"><?php echo esc_html( $beltoft_services_row['state'] ); ?></span>
+				<?php if ( ! empty( $beltoft_services_row['note'] ) ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['note'] ); ?></span><?php endif; ?>
 				<?php if ( '' !== $beltoft_services_row['renews'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['renews'] ); ?></span><?php endif; ?>
 			</span>
 			<span class="beltoft-services-srv__bars" data-usage-resource="<?php echo (int) $beltoft_services_row['id']; ?>">

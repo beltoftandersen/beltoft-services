@@ -383,6 +383,60 @@ class FlowsTest extends FirewallTestCase {
 		$this->assertContains( 'beltoft-services: block outgoing SMTP', $this->comments( $vmid ), 'The other plugin rules stay.' );
 	}
 
+	public function test_the_private_network_stays_open_and_the_rule_goes_with_the_lift(): void {
+		$r    = $this->server();
+		$vmid = (int) $r->get( 'vmid' );
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/' . $vmid . '/config', array( 'net1' => 'virtio,bridge=vmbr1,tag=1000,firewall=1' ) );
+
+		$fresh = $this->quarantine( $r );
+		$this->assertContains( 'bs-sys:quarantine-private', $this->comments( $vmid ) );
+		$rule = null;
+		foreach ( $this->fake->vm( $vmid )['firewall_rules'] as $listed ) {
+			if ( 'bs-sys:quarantine-private' === ( $listed['comment'] ?? '' ) ) { $rule = $listed; }
+		}
+		$this->assertSame( array( 'out', 'ACCEPT', 'net1', 1 ), array( $rule['type'], $rule['action'], $rule['iface'], (int) $rule['enable'] ) );
+		$this->assertSame( 'DROP', $this->options( $r )['policy_out'] );
+
+		$this->assertTrue( Panel::act( $fresh, 'quarantine_lift' ) );
+		$this->run_jobs();
+		$this->assertNotContains( 'bs-sys:quarantine-private', $this->comments( $vmid ) );
+		$this->assertFalse( Quarantine::active( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_the_customer_is_told_when_the_quarantine_is_lifted(): void {
+		$r     = $this->server();
+		$fresh = $this->quarantine( $r );
+		$this->mails = array();
+		$this->assertCount( 0, $this->mails_with( 'open again' ) );
+
+		$this->assertTrue( Panel::act( $fresh, 'quarantine_lift' ) );
+		$this->run_jobs();
+
+		$mails = $this->mails_with( 'Outgoing traffic from your server is open again' );
+		$this->assertCount( 1, $mails );
+		$this->assertSame( self::OWNER, $mails[0]['to'] );
+		$this->assertStringNotContainsString( '—', $mails[0]['message'] );
+	}
+
+	public function test_the_server_page_and_the_list_show_the_quarantine_while_it_lasts(): void {
+		$r = $this->server();
+		$row = new \ReflectionMethod( \BeltoftServices\Account\Servers::class, 'row' );
+		$row->setAccessible( true );
+		$view = array( 'product' => 'Server', 'license' => $r->license() );
+
+		$this->assertSame( '', $row->invoke( null, $view, $r->license(), $r )['note'] );
+
+		$fresh = $this->quarantine( $r );
+		$this->assertSame( 'Outgoing internet traffic is blocked', $row->invoke( null, $view, $fresh->license(), $fresh )['note'] );
+
+		$list = '';
+		ob_start();
+		include BELTOFT_SERVICES_PATH . 'templates/account/server.php';
+		$html = ob_get_clean();
+		$this->assertStringContainsString( Quarantine::notice(), html_entity_decode( $html ) );
+		$this->assertStringNotContainsString( '—', Quarantine::notice() );
+	}
+
 	public function test_lifting_a_server_that_is_not_quarantined_is_refused(): void {
 		$r = $this->server();
 		$this->assertWPError( Panel::act( $r, 'quarantine_lift' ) );

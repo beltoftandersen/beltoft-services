@@ -36,7 +36,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Emails {
 
-	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered', 'beltoft_services_domain_security', 'beltoft_services_snapshot_notice', 'beltoft_services_quarantine' );
+	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered', 'beltoft_services_domain_security', 'beltoft_services_snapshot_notice', 'beltoft_services_quarantine', 'beltoft_services_quarantine_lifted' );
 
 	public const USAGE_HOOK = 'beltoft_services_usage';
 	public const USAGE_CRON = '0 6 * * *';
@@ -59,6 +59,7 @@ final class Emails {
 		'BeltoftServices_DomainSecurity' => DomainSecurity::class,
 		'BeltoftServices_SnapshotNotice' => SnapshotNotice::class,
 		'BeltoftServices_Quarantine' => Quarantine::class,
+		'BeltoftServices_QuarantineLifted' => QuarantineLifted::class,
 	);
 
 	/**
