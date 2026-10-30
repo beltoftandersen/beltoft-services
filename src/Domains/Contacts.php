@@ -60,7 +60,7 @@ final class Contacts {
 	 * @param string               $domain  Domain name.
 	 * @param array<string, mixed> $details Result of details_of().
 	 */
-	public static function eligible( string $domain, array $details ): true|\WP_Error {
+	public static function eligible( string $domain, array $details ): bool|\WP_Error {
 		if ( array() === $details ) { return true; }
 		if ( str_ends_with( $domain, '.eu' ) && ! TldRules::eu_country( (string) ( $details['country'] ?? '' ) ) ) {
 			return new \WP_Error( 'eu_registrant', 'A .eu domain needs a registrant in the EU; the registrant on this order is outside it.' );

@@ -266,7 +266,7 @@ class RecordRoutesTest extends TestCase {
 				return $data;
 			}
 			public bool $done = false;
-			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error { return $this->inner->replace_rrsets( $zone, $rrsets ); }
+			public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error { return $this->inner->replace_rrsets( $zone, $rrsets ); }
 			public function calls(): array { return $this->inner->calls(); }
 		};
 		remove_all_filters( 'beltoft_services_domains_dns' );
@@ -322,7 +322,7 @@ class RecordRoutesTest extends TestCase {
 	public function test_a_dns_failure_is_502_without_the_servers_words(): void {
 		$r = $this->domain( $this->user, 'example.com' );
 		$failing = new class() extends FakeDns {
-			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error { return new \WP_Error( 'http_500', 'PowerDNS exploded at 127.0.0.1:8081' ); }
+			public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error { return new \WP_Error( 'http_500', 'PowerDNS exploded at 127.0.0.1:8081' ); }
 		};
 		$failing->create_zone( 'example.com', array( 'ns1.example.net', 'ns2.example.net' ) );
 		remove_all_filters( 'beltoft_services_domains_dns' );

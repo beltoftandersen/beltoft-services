@@ -113,6 +113,32 @@ class PluginTest extends TestCase {
 		$this->assertSame( '0.7.0', BELTOFT_SERVICES_VERSION );
 	}
 
+	public function test_no_code_needs_a_newer_php_than_the_header_says(): void {
+		$header = get_file_data( BELTOFT_SERVICES_FILE, array( 'php' => 'Requires PHP' ) );
+		$this->assertSame( '8.1', $header['php'] );
+
+		$found = array();
+		$files = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( BELTOFT_SERVICES_PATH . 'src', \FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $files as $file ) {
+			if ( 'php' !== $file->getExtension() ) {
+				continue;
+			}
+			$code = (string) file_get_contents( $file->getPathname() );
+			// PHP 8.2: true, null and false as a standalone return type, true in a union, readonly classes.
+			preg_match_all( '/function\s+&?\w+\s*\((?:[^()]|\([^()]*\))*\)\s*:\s*([^{;]+)/', $code, $types );
+			foreach ( $types[1] as $type ) {
+				$parts = array_map( 'trim', explode( '|', ltrim( trim( $type ), '?' ) ) );
+				if ( in_array( 'true', $parts, true ) || ( 1 === count( $parts ) && in_array( $parts[0], array( 'null', 'false' ), true ) ) ) {
+					$found[] = basename( $file->getPathname() ) . ': ' . trim( $type );
+				}
+			}
+			if ( preg_match( '/\breadonly\s+class\b/', $code ) ) {
+				$found[] = basename( $file->getPathname() ) . ': readonly class';
+			}
+		}
+		$this->assertSame( array(), $found, 'Types or syntax that need PHP 8.2 or later.' );
+	}
+
 	public function test_run_jobs_and_http_recorder_work(): void {
 		$this->respond_with(
 			static function () {

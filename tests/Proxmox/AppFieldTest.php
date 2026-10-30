@@ -735,7 +735,7 @@ class AppFieldTest extends TestCase {
 				return parent::zone( $name );
 			}
 
-			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+			public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error {
 				if ( $this->writes > 0 ) {
 					--$this->writes;
 					return new \WP_Error( 'down', 'down' );

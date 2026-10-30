@@ -198,7 +198,7 @@ final class RecordRoutes {
 	 * @param string $type  Type.
 	 * @param string $value Value of the record to remove.
 	 */
-	private static function delete_one( string $zone, string $name, string $type, string $value ): true|\WP_Error {
+	private static function delete_one( string $zone, string $name, string $type, string $value ): bool|\WP_Error {
 		$fqdn = Records::fqdn( $zone, $name, $type );
 
 		if ( is_wp_error( $fqdn ) ) {

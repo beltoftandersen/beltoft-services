@@ -27,7 +27,7 @@ class FakeDns implements Dns {
 	public function calls(): array { return $this->calls; }
 	public function zone( string $name ): array|\WP_Error|null { $this->load(); return $this->zones[ strtolower( rtrim( $name, '.' ) ) ] ?? null; }
 	public function zones(): array|\WP_Error { $this->load(); return array_values( $this->zones ); }
-	public function create_zone( string $name, array $nameservers ): true|\WP_Error {
+	public function create_zone( string $name, array $nameservers ): bool|\WP_Error {
 		$this->load();
 		$name = strtolower( rtrim( $name, '.' ) );
 		$this->calls[] = array( 'create_zone', $name, $nameservers );
@@ -36,7 +36,7 @@ class FakeDns implements Dns {
 		$this->save();
 		return true;
 	}
-	public function delete_zone( string $name ): true|\WP_Error {
+	public function delete_zone( string $name ): bool|\WP_Error {
 		$this->load();
 		$name = strtolower( rtrim( $name, '.' ) );
 		$this->calls[] = array( 'delete_zone', $name );
@@ -44,7 +44,7 @@ class FakeDns implements Dns {
 		$this->save();
 		return true;
 	}
-	public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+	public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error {
 		$this->load();
 		$zone = strtolower( rtrim( $zone, '.' ) );
 		$this->calls[] = array( 'replace_rrsets', $zone, $rrsets );

@@ -290,7 +290,7 @@ final class Records {
 	 * @param array|null $expect  The rows the customer saw for this name and type; a different RRset now gives `stale`.
 	 * @param array|null $to      Array with `name` and/or `type`: where the RRset goes. Needs at least one row.
 	 */
-	public static function change( string $zone, string $name, string $type, array $records, ?array $expect = null, ?array $to = null ): true|\WP_Error {
+	public static function change( string $zone, string $name, string $type, array $records, ?array $expect = null, ?array $to = null ): bool|\WP_Error {
 		$zone = Search::normalise( $zone );
 		if ( is_wp_error( $zone ) ) { return $zone; }
 		$type = strtoupper( $type );
@@ -351,7 +351,7 @@ final class Records {
 	}
 
 	/** Deletes the RRset at one name and type. */
-	public static function delete_set( string $zone, string $name, string $type, ?array $expect = null ): true|\WP_Error {
+	public static function delete_set( string $zone, string $name, string $type, ?array $expect = null ): bool|\WP_Error {
 		return self::change( $zone, $name, $type, array(), $expect );
 	}
 
@@ -377,7 +377,7 @@ final class Records {
 	 * Replaces the customer records of a zone with a list, writing only the RRsets that differ from the zone as it is
 	 * read under the lock. Each record keeps its disabled flag; types the editor does not know are never touched.
 	 */
-	public static function replace( string $zone, array $records ): true|\WP_Error {
+	public static function replace( string $zone, array $records ): bool|\WP_Error {
 		$rrsets = self::validate( $zone, $records );
 		if ( is_wp_error( $rrsets ) ) { return $rrsets; }
 		return self::locked( $zone, static function () use ( $zone, $rrsets ) {
@@ -409,7 +409,7 @@ final class Records {
 	 * Switches every customer record of a zone off or on, keeping the records. NS and SOA stay as they are.
 	 * A zone that does not exist gives the error zone_missing; a zone being changed right now gives zone_busy.
 	 */
-	public static function set_disabled( string $zone, bool $disabled ): true|\WP_Error {
+	public static function set_disabled( string $zone, bool $disabled ): bool|\WP_Error {
 		return self::locked( $zone, static function () use ( $zone, $disabled ) {
 			$current = self::read( $zone );
 			if ( is_wp_error( $current ) ) { return $current; }

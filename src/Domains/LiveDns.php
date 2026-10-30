@@ -51,17 +51,17 @@ class LiveDns implements Dns {
 
 	public function zones(): array|\WP_Error { return $this->call( 'GET', '' ); }
 
-	public function create_zone( string $name, array $nameservers ): true|\WP_Error {
+	public function create_zone( string $name, array $nameservers ): bool|\WP_Error {
 		$result = $this->call( 'POST', '', array( 'name' => strtolower( rtrim( $name, '.' ) ) . '.', 'kind' => 'Master', 'nameservers' => array_map( static fn( $host ) => rtrim( strtolower( (string) $host ), '.' ) . '.', $nameservers ) ) );
 		return is_wp_error( $result ) ? $result : true;
 	}
 
-	public function delete_zone( string $name ): true|\WP_Error {
+	public function delete_zone( string $name ): bool|\WP_Error {
 		$result = $this->call( 'DELETE', $this->path( $name ) );
 		return is_wp_error( $result ) ? $result : true;
 	}
 
-	public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+	public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error {
 		$result = $this->call( 'PATCH', $this->path( $zone ), array( 'rrsets' => $rrsets ) );
 		return is_wp_error( $result ) ? $result : true;
 	}

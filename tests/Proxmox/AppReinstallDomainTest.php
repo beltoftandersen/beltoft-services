@@ -301,7 +301,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->zone( (int) $r->license()['user_id'] );
 		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
 		$dns = new class(true) extends FakeDns {
-			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+			public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error {
 				return new \WP_Error( 'transport', 'Temporary DNS error' );
 			}
 		};
@@ -332,7 +332,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
 		$dns = new class(true) extends FakeDns {
 			public int $resource_id = 0;
-			public function replace_rrsets( string $zone, array $rrsets ): true|\WP_Error {
+			public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error {
 				if ( 'DELETE' === ( $rrsets[0]['changetype'] ?? '' ) ) {
 					Resource::find( $this->resource_id )->set( array( 'task' => 'provision-task', 'steps' => array( 'ip', 'vmid', 'clone' ) ) );
 				}

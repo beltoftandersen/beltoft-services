@@ -29,7 +29,7 @@ final class Actions {
 		return is_wp_error( $error ) ? $error : null;
 	}
 
-	private static function validate( Resource $r, string $action, array $args ): true|\WP_Error {
+	private static function validate( Resource $r, string $action, array $args ): bool|\WP_Error {
 		if ( 'set_records' === $action && $r->get( 'dns_external' ) ) { return new \WP_Error( 'dns_external', 'This domain\'s DNS is hosted elsewhere.' ); }
 		if ( 'set_records' === $action && $r->get( 'records_off' ) ) { return new \WP_Error( 'paused', 'DNS hosting is paused.' ); }
 		if ( ! isset( self::offered( $r )[ $action ] ) ) { return new \WP_Error( 'unavailable', 'This action is unavailable.' ); }
