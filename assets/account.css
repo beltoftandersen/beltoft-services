@@ -702,8 +702,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-db__form .button { justify-self: start; margin: 0; }
 
 /* Security: the API tokens box, like the two-factor box over it (880px, 24px padding, 18px heading). */
-.woocommerce-MyAccount-content section.beltoft-services-api { display: grid; gap: 12px; box-sizing: border-box; max-width: 880px; padding: 24px; background: var(--bg-card, #fff); border: 1px solid var(--rule, #d6d2c8); }
-.woocommerce-MyAccount-content section.beltoft-services-api > * { max-width: 100%; margin: 0; }
+.woocommerce-MyAccount-content section.beltoft-services-api { display: grid; min-width: 0; gap: 12px; box-sizing: border-box; max-width: 880px; padding: 24px; background: var(--bg-card, #fff); border: 1px solid var(--rule, #d6d2c8); }
+.woocommerce-MyAccount-content section.beltoft-services-api > * { min-width: 0; max-width: 100%; margin: 0; }
 .woocommerce-MyAccount-content section.beltoft-services-api h3 { margin: 0 0 -4px; }
 .woocommerce-MyAccount-content .beltoft-services-api .form-row { position: relative; width: 100%; max-width: 520px; margin: 0; padding: 0; }
 .woocommerce-MyAccount-content .beltoft-services-api .form-row label { position: absolute; top: 8px; left: 13px; z-index: 1; margin: 0; padding: 0; color: var(--ink-soft, #5e7080); font-size: 12px; line-height: 1.2; pointer-events: none; }
@@ -715,7 +715,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .woocommerce-MyAccount-content .beltoft-services-api table { width: 100%; max-width: 100%; margin: 0; }
 .woocommerce-MyAccount-content .beltoft-services-api td form { display: block; }
 .beltoft-services-api__docs summary { color: var(--navy, #0c1535); font-size: 15px; font-weight: 600; cursor: pointer; }
-.beltoft-services-api__docs[open] { display: grid; gap: 12px; }
+.beltoft-services-api__docs[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .beltoft-services-api__docs[open] > * { max-width: 100%; margin: 0; min-width: 0; }
 .beltoft-services-api__docs pre { box-sizing: border-box; padding: 10px 14px; background: var(--bg-warm, #eeece6); overflow-x: auto; }
 .woocommerce-MyAccount-content .beltoft-services-api code { padding: 0; border: 0; background: none; color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
