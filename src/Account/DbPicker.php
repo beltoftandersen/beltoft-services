@@ -102,7 +102,7 @@ final class DbPicker {
 			foreach ( $product->get_children() as $child ) {
 				$variation = wc_get_product( (int) $child );
 
-				if ( ! $variation instanceof \WC_Product_Variation || 'publish' !== $variation->get_status() || '' === (string) $variation->get_price() ) {
+				if ( ! $variation instanceof \WC_Product_Variation || 'publish' !== $variation->get_status() || '' === (string) $variation->get_price() || \BeltoftServices\Usage\Rates::is_usage( $variation ) ) {
 					continue;
 				}
 

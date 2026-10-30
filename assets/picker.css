@@ -26,6 +26,11 @@
 .beltoft-services-picker__backups { margin: 0; }
 .beltoft-services-picker__backups label { display: inline-flex; align-items: center; gap: 10px; margin: 0; cursor: pointer; }
 .beltoft-services-picker__backups input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--navy, #0c1535); }
+.beltoft-services-picker__billing { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 8px; }
+.beltoft-services-picker__billing label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; cursor: pointer; }
+.beltoft-services-picker__billing input[type="radio"] { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--navy, #0c1535); }
+.beltoft-services-picker__rate { color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-picker__billing .description { margin: 0; }
 .beltoft-services-picker [hidden] { display: none !important; }
 .beltoft-services-picker__soldout { margin: 0 0 8px; color: var(--ink-soft, #5e7080); }
 .beltoft-services-picker__more { display: grid; gap: 14px; }
