@@ -24,7 +24,7 @@ interface BuildProfile {
 	public function steps(): array;
 
 	/**
-	 * Does the machine hold a public IP address from the pool (so cleanup gives it back)?
+	 * Does the machine hold a public IP address from the pool (the build holds and records one); cleanup always gives back any address the resource holds?
 	 */
 	public function uses_public_ip(): bool;
 

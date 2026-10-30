@@ -374,9 +374,8 @@ final class Operations {
 		} catch ( \RuntimeException $e ) {
 			return StepResult::retry( 0, 'delete: the private network pool is busy' );
 		}
-		if ( Profiles::for_resource( $this->r )->uses_public_ip() ) {
-			IpPool::release( $this->r->id() );
-		}
+		// Always: a no-op when the resource holds no address, and an address is never leaked by a profile answering wrong.
+		IpPool::release( $this->r->id() );
 		VmRecords::remove( $this->r->id() );
 		Access::purge( $this->r );
 

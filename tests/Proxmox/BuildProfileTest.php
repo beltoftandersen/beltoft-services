@@ -281,18 +281,18 @@ class BuildProfileTest extends TestCase {
 		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
 	}
 
-	public function test_cleanup_leaves_the_pool_alone_when_the_profile_holds_no_public_ip(): void {
+	public function test_cleanup_frees_an_address_even_when_the_profile_says_it_holds_none(): void {
 		$resource = $this->resource();
 		$this->use_no_ip_profile();
 		$this->assertTrue( $this->run_provision( $resource )->is_done() );
 
-		// An address held for the resource by something else: a profile without a public IP must not free it.
+		// An address the resource holds anyway (a later add-on, a wrong answer): a delete never leaks it.
 		$this->assertNotNull( IpPool::hold( $resource->id() ) );
 
 		$result = Registry::get( 'proxmox' )->delete( Resource::find( $resource->id() ) );
 
 		$this->assertTrue( $result->is_done(), $result->error() );
-		$this->assertNotNull( IpPool::for_resource( $resource->id() ), 'IpPool::release was not called.' );
+		$this->assertNull( IpPool::for_resource( $resource->id() ), 'The address went back to the pool.' );
 		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
 	}
 
