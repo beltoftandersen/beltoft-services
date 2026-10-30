@@ -1,0 +1,118 @@
+<?php
+/**
+ * The files of the managed database server's guest protocol (db-v1), read and written through the guest agent.
+ *
+ * @package BeltoftServices
+ */
+
+namespace BeltoftServices\Proxmox;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Everything read from the guest is untrusted: it is matched against fixed lists and patterns here, and
+ * nothing else of it is used. Files: job.json (in), status.json, credentials.json and health.json (out).
+ */
+final class DbGuest {
+
+	public const DIR         = '/var/lib/beltoft-db';
+	public const JOB         = self::DIR . '/job.json';
+	public const STATUS      = self::DIR . '/status.json';
+	public const CREDENTIALS = self::DIR . '/credentials.json';
+	public const HEALTH      = self::DIR . '/health.json';
+
+	public const STATES = array( 'working', 'ready', 'failed' );
+	public const STEPS  = array( 'job', 'disk', 'cluster', 'tls', 'config', 'database', 'finish', 'allow', 'password', 'dump', 'complete', 'start' );
+
+	public const DATABASE = 'app';
+	public const ROLE     = 'app_user';
+	public const PORT     = 5432;
+
+	/** Largest file the plugin reads from a guest. */
+	private const LIMIT = 65536;
+
+	/**
+	 * Writes a JSON file into the guest.
+	 *
+	 * @param Client               $client Client.
+	 * @param string               $node   Node.
+	 * @param int                  $vmid   VMID.
+	 * @param string               $file   Guest path.
+	 * @param array<string, mixed> $data   Content.
+	 * @return true|\WP_Error
+	 */
+	public static function write( Client $client, string $node, int $vmid, string $file, array $data ) {
+		$reply = $client->request( 'POST', '/nodes/' . rawurlencode( $node ) . '/qemu/' . $vmid . '/agent/file-write', array( 'file' => $file, 'content' => array() === $data ? '{}' : wp_json_encode( $data ) ) );
+
+		return is_wp_error( $reply ) ? $reply : true;
+	}
+
+	/**
+	 * Reads a JSON object from the guest (bounded read), or null.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public static function read( Client $client, string $node, int $vmid, string $file ): ?array {
+		$raw  = Apps::read_file( $client, $node, $vmid, $file );
+		$data = null === $raw ? null : json_decode( $raw, true );
+
+		return is_array( $data ) ? $data : null;
+	}
+
+	/**
+	 * The status of one request: null unless it is this request's, with a known state and step and a date.
+	 *
+	 * @return array{state:string,step:string}|null
+	 */
+	public static function status( Client $client, string $node, int $vmid, string $request ): ?array {
+		$s = self::read( $client, $node, $vmid, self::STATUS );
+
+		if ( null === $s || '' === $request || ! is_string( $s['request'] ?? null ) || ! hash_equals( $request, $s['request'] )
+			|| ! in_array( $s['state'] ?? null, self::STATES, true ) || ! in_array( $s['step'] ?? null, self::STEPS, true )
+			|| ! is_string( $s['updated'] ?? null ) || false === strtotime( $s['updated'] ) ) {
+			return null;
+		}
+
+		return array( 'state' => $s['state'], 'step' => $s['step'] );
+	}
+
+	/**
+	 * The login of one request, checked against the patterns of the contract, or null.
+	 *
+	 * @return array{password:string,ca_pem:string,fingerprint:string}|null
+	 */
+	public static function credentials( Client $client, string $node, int $vmid, string $request ): ?array {
+		$c = self::read( $client, $node, $vmid, self::CREDENTIALS );
+
+		if ( null === $c || '' === $request || ! is_string( $c['request'] ?? null ) || ! hash_equals( $request, $c['request'] )
+			|| ! is_string( $c['password'] ?? null ) || 1 !== preg_match( '/^[A-Za-z0-9]{32}$/D', $c['password'] )
+			|| ! is_string( $c['ca_pem'] ?? null ) || ! self::pem( $c['ca_pem'] )
+			|| ! is_string( $c['fingerprint'] ?? null ) || 1 !== preg_match( '/^[0-9A-F:]{95}$/D', $c['fingerprint'] ) ) {
+			return null;
+		}
+
+		return array( 'password' => $c['password'], 'ca_pem' => trim( $c['ca_pem'] ) . "\n", 'fingerprint' => $c['fingerprint'] );
+	}
+
+	/**
+	 * One PEM certificate and nothing else.
+	 */
+	public static function pem( string $pem ): bool {
+		return strlen( $pem ) <= 8192 && 1 === preg_match( '/\A-----BEGIN CERTIFICATE-----\n[A-Za-z0-9+\/=\n]+\n-----END CERTIFICATE-----\n?\z/D', $pem );
+	}
+
+	/**
+	 * Does the guest's health file say the database answers (and was written at or after $since)?
+	 */
+	public static function healthy( Client $client, string $node, int $vmid, int $since ): bool {
+		$h = self::read( $client, $node, $vmid, self::HEALTH );
+
+		if ( null === $h || true !== ( $h['ok'] ?? null ) || ! is_string( $h['updated'] ?? null ) ) {
+			return false;
+		}
+
+		$at = strtotime( $h['updated'] );
+
+		return false !== $at && $at >= $since - 5;
+	}
+}

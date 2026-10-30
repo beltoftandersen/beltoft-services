@@ -1297,6 +1297,55 @@ final class Firewall {
 	}
 
 	/**
+	 * The firewall of a managed database server (plugin-owned, never edited by the customer): the firewall on,
+	 * inbound DROP, outgoing accepted, MAC filter on, and the rule that keeps the private NIC (net1) open. The
+	 * rule goes first, so the policy never closes the private side; the options are read back.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return array<string, mixed>|StepResult
+	 */
+	public function ensure_database( array $record, array $v ) {
+		$base  = self::base( $record, $v );
+		$rules = $this->read_list( $base . '/rules' );
+
+		if ( is_wp_error( $rules ) ) {
+			return $this->classify( $rules, 'configure' );
+		}
+
+		$done = $this->add_rule_once( $base, $rules, self::PRIVATE_RULE, array( 'action' => 'ACCEPT', 'type' => 'in', 'iface' => 'net1' ) );
+
+		if ( $done instanceof StepResult ) {
+			return $done;
+		}
+
+		$want    = array( 'enable' => 1, 'policy_in' => 'DROP', 'policy_out' => 'ACCEPT', 'macfilter' => 1 );
+		$options = $this->read_list( $base . '/options' );
+
+		if ( is_wp_error( $options ) ) {
+			return $this->classify( $options, 'configure' );
+		}
+
+		$change = array();
+
+		foreach ( $want as $key => $value ) {
+			if ( ! array_key_exists( $key, $options ) || (string) $options[ $key ] !== (string) $value ) {
+				$change[ $key ] = $value;
+			}
+		}
+
+		if ( $change ) {
+			$answer = $this->write( 'PUT', $base . '/options', $change );
+
+			if ( is_wp_error( $answer ) ) {
+				return $this->stop( $answer );
+			}
+		}
+
+		return array();
+	}
+
+	/**
 	 * Adds a plugin rule unless one with the same comment is there (the shared helper for the plugin's own rules:
 	 * `bs-sys:<name>` for the system, `bs-db:<name>` for the managed databases). Always enabled.
 	 *

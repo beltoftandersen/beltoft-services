@@ -56,6 +56,7 @@ final class Clusters {
 			'templates'         => array(),
 			'default_template'  => 0,
 			'vendor_snippet'    => '',
+			'db_vendor_snippet' => '',
 			'apps_ready'        => 0,
 			'apps_enabled'      => array(),
 			'template_families' => array(),
@@ -475,6 +476,14 @@ final class Clusters {
 		}
 
 		$clean['vendor_snippet'] = $snippet;
+
+		$db_snippet = trim( (string) ( $input['db_vendor_snippet'] ?? '' ) );
+
+		if ( '' !== $db_snippet && ( ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*:snippets\/[A-Za-z0-9._\/-]+$/D', $db_snippet ) || false !== strpos( $db_snippet, '..' ) ) ) {
+			return self::error( 'db_vendor_snippet', __( 'The database vendor snippet is a volume such as local:snippets/vm-vendor-cloudinit-db-v1.yaml.', 'beltoft-services' ) );
+		}
+
+		$clean['db_vendor_snippet'] = $db_snippet;
 
 		// The app controls. The settings form sends apps_form, so an unticked box means off; any other caller
 		// (a script, a test) that leaves the keys out keeps what the cluster has.

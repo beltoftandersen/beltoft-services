@@ -12,7 +12,7 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * VpsProfile unless the filter `beltoft_services_build_profile` returns another BuildProfile.
+ * VpsProfile (DbProfile for the database driver) unless the filter `beltoft_services_build_profile` returns another BuildProfile.
  */
 final class Profiles {
 
@@ -28,8 +28,9 @@ final class Profiles {
 		 * @param BuildProfile $profile The default (VpsProfile).
 		 * @param Resource     $r       The resource.
 		 */
-		$profile = apply_filters( 'beltoft_services_build_profile', new VpsProfile(), $r );
+		$default = DbDriver::ID === $r->get( 'driver' ) ? new DbProfile( $r ) : new VpsProfile();
+		$profile = apply_filters( 'beltoft_services_build_profile', $default, $r );
 
-		return $profile instanceof BuildProfile ? $profile : new VpsProfile();
+		return $profile instanceof BuildProfile ? $profile : $default;
 	}
 }

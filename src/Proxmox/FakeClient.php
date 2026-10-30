@@ -498,6 +498,7 @@ class FakeClient implements Client {
 			'net0'       => array( 'string' ),
 			'net1'       => array( 'string' ),
 			'ide2'       => array( 'string' ),
+			'agent'      => array( 'string' ),
 			'description' => array( 'string', false, array( 'max' => 8192 ) ),
 			'name'       => array( 'dnsname' ),
 			'digest'     => array( 'string', false, array( 'max' => 40 ) ),
@@ -978,6 +979,27 @@ class FakeClient implements Client {
 			if ( in_array( $key, array( 'digest', 'delete' ), true ) || in_array( $key, self::SENSITIVE, true ) ) {
 				continue;
 			}
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/D', $key ) && is_string( $value ) && false === strpos( $value, 'import-from=' ) && 1 === preg_match( '/^([A-Za-z0-9._\-]+):(\d+)((?:,.*)?)$/D', $value, $new ) ) {
+				// `<storage>:<GB>[,options]` allocates a new volume vm-<vmid>-disk-<n> of that size (modelled).
+				if ( isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+					return $this->error( 500, "drive '" . $key . "' already exists" );
+				}
+				$format = 'raw';
+				$rest   = array();
+				foreach ( array_filter( explode( ',', $new[3] ) ) as $part ) {
+					if ( 0 === strpos( $part, 'format=' ) ) {
+						$format = substr( $part, 7 );
+					} else {
+						$rest[] = $part;
+					}
+				}
+				for ( $n = 0; isset( $this->state['images'][ $new[1] ][ $new[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.' . $format ] ) || $this->drive_uses( $id, $new[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.' . $format ); $n++ ) {
+					continue;
+				}
+				$volid = $new[1] . ':' . $id . '/vm-' . $id . '-disk-' . $n . '.' . $format;
+				$this->state['images'][ $new[1] ][ $volid ] = array( 'volid' => $volid, 'vmid' => $id, 'format' => $format, 'size' => (int) $new[2] * 1073741824, 'content' => 'images' );
+				$value = implode( ',', array_merge( array( $volid ), $rest, array( 'size=' . (int) $new[2] . 'G' ) ) );
+			}
 			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/D', $key ) && is_string( $value ) && false !== strpos( $value, 'import-from=' ) ) {
 				// Importing a template volume into a free slot allocates a new volume (modelled on PVE 9.1.6).
 				$value = $this->import_drive( $id, $key, $value );
@@ -1018,6 +1040,19 @@ class FakeClient implements Client {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Does a drive of the VM already use this volume?
+	 */
+	private function drive_uses( int $id, string $volid ): bool {
+		foreach ( $this->state['vms'][ $id ]['config'] as $drive ) {
+			if ( is_string( $drive ) && explode( ',', $drive )[0] === $volid ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

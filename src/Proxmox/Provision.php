@@ -740,6 +740,39 @@ final class Provision {
 	}
 
 	/**
+	 * Step net (database): the private network and an address on it.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_net() {
+		$early = DbBuild::plan_error( $this->r );
+
+		return null !== $early ? StepResult::fail( $early ) : ( new DbBuild( $this->r, $this->client ) )->net( $this->cluster );
+	}
+
+	/**
+	 * Step db_init (database): the guest sets the database up and hands over its login.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_db_init() {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		return null === $record ? StepResult::fail( 'db_init: the VM record is missing' ) : ( new DbBuild( $this->r, $this->client ) )->init( $record );
+	}
+
+	/**
+	 * Step db_ready (database): the database answers.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_db_ready() {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		return null === $record ? StepResult::fail( 'db_ready: the VM record is missing' ) : ( new DbBuild( $this->r, $this->client ) )->ready( $record );
+	}
+
+	/**
 	 * Step 1: hold an address.
 	 *
 	 * @return array<string, mixed>|StepResult
@@ -1061,8 +1094,14 @@ final class Provision {
 
 		$done = (array) $this->r->get( 'configured' );
 		$disk = null;
+		$db   = $this->profile instanceof DbProfile;
 
-		foreach ( array( 'cloudinit', 'config', 'resize', 'firewall' ) as $part ) {
+		if ( $db && is_wp_error( $this->profile->nic( $this->cluster ) ) ) {
+			return StepResult::fail( 'configure: the private network of this database is not configured' );
+		}
+
+		// A database keeps the template's boot disk; its plan disk is the data disk.
+		foreach ( $db ? array( 'cloudinit', 'config', 'datadisk', 'firewall' ) : array( 'cloudinit', 'config', 'resize', 'firewall' ) as $part ) {
 			if ( in_array( $part, $done, true ) ) {
 				continue;
 			}
@@ -1146,7 +1185,10 @@ final class Provision {
 
 		$login = array();
 
-		if ( is_string( $key ) && '' !== $key ) {
+		if ( $this->profile instanceof DbProfile ) {
+			// No login on a database server: no SSH, no VM password.
+			$key = null;
+		} elseif ( is_string( $key ) && '' !== $key ) {
 			$clean = SshKeyField::normalise( $key );
 
 			if ( null === $clean ) {
@@ -1187,6 +1229,15 @@ final class Provision {
 
 			if ( null !== $cicustom ) {
 				$params['cicustom'] = $cicustom;
+			}
+
+			if ( $this->profile instanceof DbProfile ) {
+				// The guest agent carries the setup files; the database has the private NIC only.
+				$params['agent'] = '1';
+
+				if ( ! empty( $v['config']['net0'] ) ) {
+					$params['delete'] = 'net0';
+				}
 			}
 
 			$answer = $this->client->request( 'PUT', $path, $params + $login );
@@ -1265,6 +1316,49 @@ final class Provision {
 	}
 
 	/**
+	 * The data disk of a database: scsi1, the plan's size, in the backup. A disk already there must be exactly
+	 * that; anything else in the slot is never overwritten.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function configure_datadisk( array $record, array $v ) {
+		$slot = 'scsi1';
+		$want = (int) $this->plan['disk_gb'];
+		$have = $v['config'][ $slot ] ?? null;
+
+		if ( ! is_string( $have ) || '' === $have ) {
+			$base = '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/config';
+			$done = $this->run_task( 'configure', 'POST', $base, array( $slot => $this->cluster['storage'] . ':' . $want . ',format=' . self::disk_format() . ',backup=1', 'digest' => (string) ( $v['config']['digest'] ?? '' ) ) );
+
+			if ( $done instanceof StepResult ) {
+				return $done;
+			}
+
+			$again = $this->verified( $record, 'configure' );
+
+			if ( $again instanceof StepResult ) {
+				return $again;
+			}
+
+			$have = $again['config'][ $slot ] ?? null;
+
+			if ( ! is_string( $have ) || '' === $have ) {
+				return StepResult::retry( 0, 'configure: the data disk was not created' );
+			}
+		}
+
+		$size = self::gigabytes( $have );
+
+		if ( 0 !== strpos( $have, $this->cluster['storage'] . ':' ) || null === $size || (int) $size !== $want || false === strpos( ',' . $have . ',', ',backup=1,' ) ) {
+			return StepResult::fail( 'configure: ' . $slot . ' is not the data disk of ' . $want . ' GB with backup and is not changed' );
+		}
+
+		return array();
+	}
+
+	/**
 	 * The VM firewall: the switch and the SMTP block as always, and for a server the dashboard manages (or a new
 	 * server of a cluster with the standard default) the stored rules with an explicit inbound policy. All of it is
 	 * written by Firewall, the only writer of VM firewall rules.
@@ -1274,6 +1368,10 @@ final class Provision {
 	 * @return array<string, mixed>|StepResult
 	 */
 	private function configure_firewall( array $record, array $v ) {
+		if ( $this->profile instanceof DbProfile ) {
+			return ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_database( $record, $v );
+		}
+
 		return ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure( $record, $v );
 	}
 

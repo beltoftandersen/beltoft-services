@@ -9,6 +9,7 @@ namespace BeltoftServices;
 
 use BeltoftServices\Proxmox\AppProgress;
 use BeltoftServices\Proxmox\AppTab;
+use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\SshKeyField;
 
@@ -99,6 +100,16 @@ final class Progress {
 				'configure' => __( 'Apply your settings', 'beltoft-services' ),
 				'start'     => __( 'Start the server', 'beltoft-services' ),
 				'ready'     => __( 'Final checks', 'beltoft-services' ),
+			),
+			DbDriver::ID        => array(
+				'net'       => __( 'Reserve a private address', 'beltoft-services' ),
+				'vmid'      => __( 'Prepare the server', 'beltoft-services' ),
+				'clone'     => __( 'Create the server', 'beltoft-services' ),
+				'configure' => __( 'Apply your settings', 'beltoft-services' ),
+				'start'     => __( 'Start the server', 'beltoft-services' ),
+				'ready'     => __( 'Final checks', 'beltoft-services' ),
+				'db_init'   => __( 'Set up the database', 'beltoft-services' ),
+				'db_ready'  => __( 'Check the database', 'beltoft-services' ),
 			),
 			DiskDriver::ID      => array(
 				'server'   => __( 'Find the server', 'beltoft-services' ),

@@ -115,6 +115,8 @@ final class Plugin {
 		Proxmox\SnapshotCart::register();
 		Proxmox\DiskField::register();
 		Proxmox\Actions::register();
+		Proxmox\DbActions::register();
+		Proxmox\DbRoutes::register();
 		Proxmox\Panels::register();
 		Proxmox\EmailDetails::register();
 		Proxmox\ProxmoxJobs::register();

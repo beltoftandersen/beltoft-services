@@ -258,7 +258,7 @@ final class ClustersScreen {
 		}
 
 		echo '</td></tr>';
-		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04.', 'beltoft-services' ), 'textarea' );
+		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04. A managed database template has the family postgres-18.', 'beltoft-services' ), 'textarea' );
 	}
 
 	/**
@@ -329,6 +329,7 @@ final class ClustersScreen {
 		self::row( 'templates', __( 'Templates', 'beltoft-services' ), $templates, __( 'One per line: VMID = label. The label is what customers see as the operating system. A template must be outside the customer VMID range.', 'beltoft-services' ), 'textarea' );
 		self::row( 'default_template', __( 'Default template', 'beltoft-services' ), $c['default_template'] ? (string) $c['default_template'] : '', __( 'The VMID from the list above that customers get preselected at checkout and on reinstall. Empty: the first template of the list.', 'beltoft-services' ) );
 		self::row( 'vendor_snippet', __( 'Vendor snippet', 'beltoft-services' ), (string) $c['vendor_snippet'], __( 'Optional cloud-init snippet volume, such as local:snippets/vendor.yaml.', 'beltoft-services' ) );
+		self::row( 'db_vendor_snippet', __( 'Database vendor snippet', 'beltoft-services' ), (string) $c['db_vendor_snippet'], __( 'Optional cloud-init snippet volume for managed database servers, such as local:snippets/vm-vendor-cloudinit-db-v1.yaml.', 'beltoft-services' ) );
 		self::apps_rows( $c );
 		self::row( 'backup_storage', __( 'Backup storage', 'beltoft-services' ), (string) $c['backup_storage'], __( 'Optional storage id (a Proxmox Backup Server storage) for customer backups. Empty: no backups on this cluster.', 'beltoft-services' ) );
 
