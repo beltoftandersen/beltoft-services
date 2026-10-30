@@ -12,7 +12,8 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Phase 3: private network only. The address comes from PrivateNets, so the profile belongs to one resource.
+ * A private NIC (net1) always, and net0 with a public IPv4 address when the plan has the add-on (`public_ip` 1). The
+ * private address comes from PrivateNets, so the profile belongs to one resource.
  */
 final class DbProfile implements BuildProfile {
 
@@ -26,17 +27,21 @@ final class DbProfile implements BuildProfile {
 	}
 
 	public function steps(): array {
-		return array( 'net', 'vmid', 'clone', 'configure', 'start', 'ready', 'db_init', 'db_ready' );
+		$steps = array( 'net', 'vmid', 'clone', 'configure', 'start', 'ready', 'db_init', 'db_ready' );
+
+		return $this->uses_public_ip() ? array_merge( array( 'ip' ), $steps ) : $steps;
 	}
 
 	public function uses_public_ip(): bool {
-		return false;
+		return DbIp::plan_wants( (array) $this->r->get( 'plan' ) );
 	}
 
+	/**
+	 * The customer has paid for the address: it is taken even when only the ones kept for servers are left.
+	 * (The shop does not sell the add-on in that case, see IpPool::available_for_db().)
+	 */
 	public function hold_address( int $resource_id ): ?array {
-		unset( $resource_id );
-
-		return null;
+		return $this->uses_public_ip() ? IpPool::hold( $resource_id ) : null;
 	}
 
 	/**
@@ -55,10 +60,13 @@ final class DbProfile implements BuildProfile {
 	}
 
 	public function network_params( array $cluster, ?array $ip, string $net0 ): array {
-		unset( $ip, $net0 );
 		$nic = $this->nic( $cluster );
 
-		return is_wp_error( $nic ) ? array() : $nic;
+		if ( is_wp_error( $nic ) ) {
+			return array();
+		}
+
+		return null === $ip ? $nic : $nic + DbIp::public_params( $cluster, $ip, $net0 );
 	}
 
 	public function cicustom( array $cluster ): ?string {
@@ -66,11 +74,9 @@ final class DbProfile implements BuildProfile {
 	}
 
 	public function post_build_meta( array $record, ?array $ip ): array {
-		unset( $ip );
-
 		return array(
 			'disks_check' => null,
-			'ip'          => null,
+			'ip'          => $ip['address'] ?? null,
 			'node'        => $record['node'],
 			'vmid'        => $record['vmid'],
 			'vm'          => array(

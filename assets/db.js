@@ -191,13 +191,81 @@
 		} );
 	}
 
+	// Access tab: one change to the allow-list, then wait until it is applied.
+	function waitForAccess( box, panel, tries ) {
+		window.setTimeout( function () {
+			window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/db-access', { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
+				return response.ok ? response.json() : null;
+			} ).then( function ( data ) {
+				if ( data && 'applying' !== data.state ) {
+					say( box, 'failed' === data.state ? db.strings.notapplied : db.strings.applied );
+					window.setTimeout( function () {
+						window.location.reload();
+					}, 1200 );
+				} else if ( tries < 100 ) {
+					waitForAccess( box, panel, tries + 1 );
+				} else {
+					window.location.reload();
+				}
+			} ).catch( function () {
+				if ( tries < 100 ) {
+					waitForAccess( box, panel, tries + 1 );
+				}
+			} );
+		}, 3000 );
+	}
+
+	function access( box, panel, button, body ) {
+		button.disabled = true;
+		say( box, '' );
+		post( panel, '/db-access', JSON.stringify( body ) ).then( function ( response ) {
+			if ( response.status === 202 ) {
+				say( box, db.strings.applying );
+				waitForAccess( box, panel, 0 );
+
+				return null;
+			}
+
+			button.disabled = false;
+
+			return response.json().then( function ( data ) {
+				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
+			} );
+		} ).catch( function () {
+			button.disabled = false;
+			say( box, db.strings.failed );
+		} );
+	}
+
+	function accessClick( box, panel, button ) {
+		var cidr = box.querySelector( '[data-db-access-cidr]' );
+		var label = box.querySelector( '[data-db-access-label]' );
+		var confirm = box.querySelector( '[data-db-access-confirm]' );
+
+		if ( button.hasAttribute( 'data-db-access-mine' ) ) {
+			if ( cidr ) {
+				cidr.value = button.getAttribute( 'data-db-access-mine' ) || '';
+			} else {
+				say( box, db.strings.noip );
+			}
+		} else if ( button.hasAttribute( 'data-db-access-add' ) ) {
+			access( box, panel, button, { op: 'add', cidr: cidr ? cidr.value : '', label: label ? label.value : '' } );
+		} else if ( button.hasAttribute( 'data-db-access-remove' ) ) {
+			if ( window.confirm( db.strings.confirmremove ) ) {
+				access( box, panel, button, { op: 'remove', cidr: button.getAttribute( 'data-db-access-remove' ) } );
+			}
+		} else {
+			access( box, panel, button, { op: button.getAttribute( 'data-db-access-world' ), confirm: confirm ? confirm.value : '' } );
+		}
+	}
+
 	// The buttons are hidden until the script runs: without it there is nothing to copy with.
 	Array.prototype.forEach.call( document.querySelectorAll( '[data-db-copy]' ), function ( button ) {
 		button.hidden = false;
 	} );
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore], [data-db-copy]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
 		var box = button ? button.closest( '[data-db-card]' ) : null;
 		var panel = box ? box.closest( '[data-resource]' ) : null;
 
@@ -211,6 +279,8 @@
 			reveal( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-restore' ) ) {
 			restore( box, panel, button );
+		} else if ( button.hasAttribute( 'data-db-access-mine' ) || button.hasAttribute( 'data-db-access-add' ) || button.hasAttribute( 'data-db-access-remove' ) || button.hasAttribute( 'data-db-access-world' ) ) {
+			accessClick( box, panel, button );
 		} else {
 			reset( box, panel, button );
 		}

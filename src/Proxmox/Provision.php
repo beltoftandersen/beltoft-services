@@ -1249,10 +1249,10 @@ final class Provision {
 			}
 
 			if ( $this->profile instanceof DbProfile ) {
-				// The guest agent carries the setup files; the database has the private NIC only.
+				// The guest agent carries the setup files; the database has the private NIC only, and net0 with the public IP add-on.
 				$params['agent'] = '1';
 
-				if ( ! empty( $v['config']['net0'] ) ) {
+				if ( null === $ip && ! empty( $v['config']['net0'] ) ) {
 					$params['delete'] = 'net0';
 				}
 			}

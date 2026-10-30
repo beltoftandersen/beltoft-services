@@ -61,15 +61,15 @@ final class DbNeedsServer {
 	 * @param bool $html With the link (a notice) or plain text (the Store API strips markup).
 	 */
 	public static function message( bool $html ): string {
-		$first = __( 'A database is reachable over a private network from your servers with us. Without a server with us, you need a public IP address for the database to reach it from elsewhere.', 'beltoft-services' );
-		$soon  = __( 'Public IP addresses for databases are coming soon.', 'beltoft-services' );
-		$link  = __( 'Contact us if you need one now.', 'beltoft-services' );
+		$first = __( 'A database is reachable over a private network from your servers with us. Without a server with us, you need the public IP address add-on to reach the database from elsewhere.', 'beltoft-services' );
+		$then  = __( 'Choose the plan with a public IP address.', 'beltoft-services' );
+		$link  = __( 'Contact us if you have a question.', 'beltoft-services' );
 
 		if ( ! $html ) {
-			return $first . ' ' . $soon . ' ' . $link;
+			return $first . ' ' . $then . ' ' . $link;
 		}
 
-		return esc_html( $first . ' ' . $soon ) . ' <a href="' . esc_url( self::url() ) . '">' . esc_html( $link ) . '</a>';
+		return esc_html( $first . ' ' . $then ) . ' <a href="' . esc_url( self::url() ) . '">' . esc_html( $link ) . '</a>';
 	}
 
 	/**
@@ -86,6 +86,11 @@ final class DbNeedsServer {
 		}
 
 		$plan = Product::plan( $product_id, $variation_id > 0 ? $variation_id : null );
+
+		// A database with a public IP address is reached from anywhere: it needs no server with us, so no notice.
+		if ( DbIp::plan_wants( $plan ) ) {
+			return null;
+		}
 
 		return (string) ( $plan['cluster'] ?? '' );
 	}

@@ -188,7 +188,7 @@ class ServiceAreasTest extends TestCase {
 
 		$this->assertStringContainsString( 'aria-current="page">New password', $html );
 		$this->assertStringNotContainsString( 'Reachable from your servers', $html );
-		$this->assertSame( array( 'overview', 'backups', 'password' ), array_keys( $this->db_area()->nav() ) );
+		$this->assertSame( array( 'overview', 'access', 'backups', 'password' ), array_keys( $this->db_area()->nav() ) );
 	}
 
 	public function test_a_database_in_progress_shows_the_progress_list_on_its_page(): void {

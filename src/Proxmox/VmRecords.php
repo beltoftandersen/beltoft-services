@@ -279,6 +279,15 @@ final class VmRecords {
 	}
 
 	/**
+	 * Forgets the pool address of a resource's record (the machine no longer has one).
+	 *
+	 * @param int $resource_id Activation id.
+	 */
+	public static function clear_ip( int $resource_id ): bool {
+		return self::update( $resource_id, array( 'ip_id' => null ), array( '%s' ) );
+	}
+
+	/**
 	 * Updates fields of a resource's record.
 	 *
 	 * @param int                  $resource_id Activation id.

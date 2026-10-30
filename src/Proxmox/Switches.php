@@ -72,6 +72,10 @@ final class Switches {
 				return $found ? $message : __( 'The disk for this subscription could not be found.', 'beltoft-services' );
 			}
 
+			if ( $target_driver && DbDriver::ID === $target_driver->id() ) {
+				return DbIp::switch_error( (int) $subscription->get_id(), (int) $product_id, $target, $item );
+			}
+
 			if ( 'proxmox' !== ( Product::driver_for( (int) $product_id ) ? Product::driver_for( (int) $product_id )->id() : '' ) ) {
 				return $message;
 			}

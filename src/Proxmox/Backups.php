@@ -641,6 +641,19 @@ final class Backups {
 	 * @param bool                  $new_purchase Whether a new server is bought (stock and capacity count).
 	 */
 	public static function sibling( \WC_Product_Variation $v, bool $with, bool $new_purchase = false ): ?\WC_Product_Variation {
+		return self::sibling_by( $v, 'backup_days', $with, $new_purchase );
+	}
+
+	/**
+	 * The same, for any plan field that is 0 or above 0 (the public IP add-on of a database is `public_ip`): the
+	 * variation of the same product whose attributes differ in exactly one place and whose plan differs only in that field.
+	 *
+	 * @param \WC_Product_Variation $v            Variation.
+	 * @param string                $field        Plan field.
+	 * @param bool                  $with         Whether the sibling has the field above zero.
+	 * @param bool                  $new_purchase Whether a new machine is bought (stock and capacity count).
+	 */
+	public static function sibling_by( \WC_Product_Variation $v, string $field, bool $with, bool $new_purchase = false ): ?\WC_Product_Variation {
 		$parent = wc_get_product( $v->get_parent_id() );
 
 		if ( ! $parent instanceof \WC_Product_Variable ) {
@@ -650,7 +663,7 @@ final class Backups {
 		// A sibling is the other state of the same plan: asking for one with backups of a variation that has them gets nothing.
 		$own = \BeltoftServices\Product::plan( $parent->get_id(), $v->get_id() );
 
-		if ( ( (int) ( $own['backup_days'] ?? 0 ) > 0 ) === $with ) {
+		if ( ( (int) ( $own[ $field ] ?? 0 ) > 0 ) === $with ) {
 			return null;
 		}
 
@@ -680,7 +693,7 @@ final class Backups {
 			$plan = \BeltoftServices\Product::plan( $parent->get_id(), $other->get_id() );
 
 			// The same server, only the backups differ: never a silent plan change, never one that cannot be bought.
-			if ( ( (int) ( $plan['backup_days'] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( 'backup_days' => 1 ) ) === array_diff_key( $own, array( 'backup_days' => 1 ) ) && ( $new_purchase ? $other->is_purchasable() && $other->is_in_stock() : '' !== (string) $other->get_price() ) ) {
+			if ( ( (int) ( $plan[ $field ] ?? 0 ) > 0 ) === $with && array_diff_key( $plan, array( $field => 1 ) ) === array_diff_key( $own, array( $field => 1 ) ) && ( $new_purchase ? $other->is_purchasable() && $other->is_in_stock() : '' !== (string) $other->get_price() ) ) {
 				return $other;
 			}
 		}

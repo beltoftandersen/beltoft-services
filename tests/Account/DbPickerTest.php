@@ -173,7 +173,8 @@ class DbPickerTest extends BackupTestCase {
 
 	public function test_the_notice_shows_for_a_customer_without_a_server_and_not_with_one(): void {
 		$this->assertStringContainsString( 'public IP address', $this->page() );
-		$this->assertStringContainsString( 'coming soon', $this->page() );
+		$this->assertStringNotContainsString( 'coming soon', $this->page() );
+		$this->assertStringContainsString( 'public IP address add-on', $this->page() );
 		$this->assertStringNotContainsString( "\u{2014}", $this->page() );
 
 		$vm       = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000 ), array( 'slug' => 'vm-' . wp_generate_password( 5, false ) ) );

@@ -775,7 +775,7 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 
 	public function test_stock_has_one_list_of_add_on_drivers(): void {
 		$this->assertSame( array( 'proxmox-disk', 'proxmox-snapshots' ), Stock::addon_drivers() );
-		$this->assertSame( array( 'proxmox', 'proxmox-disk', 'proxmox-snapshots' ), Stock::drivers() );
+		$this->assertSame( array( 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots' ), Stock::drivers() );
 	}
 
 	public function test_a_pack_is_never_out_of_stock_for_lack_of_capacity(): void {
