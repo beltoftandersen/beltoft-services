@@ -10,7 +10,7 @@
 .beltoft-services-console__screen.is-demo { box-sizing: border-box; padding: 18px; font: 15px/1.5 monospace; white-space: pre-wrap; }
 .beltoft-services-console__status { min-height: 1.5em; margin: 10px 0; color: var(--ink-muted, #66717a); }
 .beltoft-services-console__status:empty { margin: 0; min-height: 0; }
-.beltoft-services-console__keyboard { position: fixed; left: -10000px; width: 1px; height: 1px; opacity: .01; }
+.beltoft-services-console__keyboard { display: block; box-sizing: border-box; width: 100%; max-width: 520px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--rule, #d6d2c8); border-radius: 0; background: #fff; font: 15px/1.4 monospace; }
 .beltoft-services-console [hidden] { display: none !important; }
 @media (max-width: 600px) { .beltoft-services-console__screen { min-height: 220px; } }
 .beltoft-services-console__screen:fullscreen { aspect-ratio: auto; min-height: 100vh; }

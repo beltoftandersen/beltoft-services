@@ -105,6 +105,18 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'box-shadow: inset 0 0 0 1px', $css );
 	}
 
+	public function test_keyboard_field_is_visible_and_paste_types_the_clipboard(): void {
+		ob_start();
+		ConsoleTab::pane( 'console', $this->server()->id() );
+		$html = (string) ob_get_clean();
+		$this->assertMatchesRegularExpression( '#data-console-paste hidden>Paste</button>#', $html, 'Paste is shown by the script only where the clipboard can be read.' );
+		$this->assertStringContainsString( 'placeholder="Type or paste text here, then press Enter"', $html );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.css' );
+		$this->assertStringNotContainsString( 'left: -10000px', $css, 'The keyboard field is not hidden off screen any more.' );
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.js' );
+		$this->assertStringContainsString( 'navigator.clipboard.readText().then( typeText', $js );
+	}
+
 	public function test_open_failure_is_mapped_by_route_code_and_busy_differs_from_stopped(): void {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.js' );
 		foreach ( array( 'beltoft_services_console_busy', 'beltoft_services_console_stopped', 'beltoft_services_console_unavailable', 'beltoft_services_rate_limited' ) as $code ) {
