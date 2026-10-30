@@ -89,6 +89,7 @@ final class Threshold {
 
 		// A scheduled renewal sets the payment method the same way (WC_Subscriptions_Manager::process_renewal()).
 		$order->set_payment_method( $account->get_payment_method() );
+		$order->update_meta_data( Renewal::META_EARLY, 'yes' );
 		$order->save();
 		$order->add_order_note( __( 'Usage billed early: the unbilled usage reached the threshold.', 'beltoft-services' ) );
 

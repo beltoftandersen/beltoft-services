@@ -23,6 +23,8 @@ final class Renewal {
 
 	public const META_LINES  = '_beltoft_services_usage_lines';
 	public const META_BILLED = '_beltoft_services_usage_billed';
+	public const META_PERIOD = '_beltoft_services_usage_period';
+	public const META_EARLY  = '_beltoft_services_usage_early';
 
 	/**
 	 * Hooks.
@@ -182,6 +184,8 @@ final class Renewal {
 
 		$order->update_meta_data( self::META_LINES, 'yes' );
 		$order->update_meta_data( self::META_BILLED, (string) $statement['total'] );
+		// The latest month among the lines (Unix time of its first hour), for the emails.
+		$order->update_meta_data( self::META_PERIOD, (string) max( array_column( $statement['lines'], 'month' ) ) );
 		$order->calculate_totals( true );
 		$order->save();
 

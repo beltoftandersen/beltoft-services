@@ -137,6 +137,7 @@ final class Plugin {
 		Usage\Account::register();
 		Usage\Cart::register();
 		Usage\Renewal::register();
+		Usage\Emails::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
