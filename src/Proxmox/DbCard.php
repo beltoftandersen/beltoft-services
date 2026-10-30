@@ -59,6 +59,7 @@ final class DbCard {
 
 		return array(
 			'kind'        => $kind,
+			'cost'        => \BeltoftServices\Usage\Estimate::cost_line( $r->id() ),
 			'host'        => $ready ? $address : '',
 			'port'        => DbGuest::PORT,
 			'database'    => DbGuest::DATABASE,

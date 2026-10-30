@@ -256,7 +256,23 @@ final class Overview {
 				) : '';
 			case 'next_payment':
 				// Nothing is due when the total is 0 (a free trial, a credit), so there is no card.
-				return $data['next_payment'] && $data['next_payment']['total'] > 0 ? self::template( 'overview/next-payment.php', array( 'payment' => $data['next_payment'] ) ) : '';
+				// A pay-as-you-go customer's account is 0 a month, so the card also shows when there is usage to pay.
+				$usage = \BeltoftServices\Usage\Estimate::for_user( get_current_user_id() );
+				$due   = $data['next_payment'] && $data['next_payment']['total'] > 0;
+
+				if ( ! $due && ( ! $usage || ! $usage['resources'] ) ) {
+					return '';
+				}
+
+				return self::template(
+					'overview/next-payment.php',
+					array(
+						'payment' => $data['next_payment'],
+						'due'     => $due,
+						'usage'   => $usage && $usage['resources'] ? \BeltoftServices\Usage\Estimate::so_far( get_current_user_id() ) : '',
+						'next'    => $usage ? (int) $usage['next'] : 0,
+					)
+				);
 			case 'activity':
 				return $data['activity'] ? self::template( 'overview/activity.php', array( 'items' => $data['activity'] ) ) : '';
 			default:

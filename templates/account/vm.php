@@ -13,6 +13,7 @@
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
  * $snapshots (null when the block is absent, or slots, used, included, added, packs (the packs the server has: slots, days, paused), buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
+ * $cost ("Cost so far this month: EUR X" for a pay-as-you-go server, else empty),
  * $resource_id (the resource id, for ids that must be unique on a page),
  * $server_name (the name now set, or empty), $can_rename (whether the rename form is shown), $hostname_pending (a name the server has not taken yet, or empty),
  * $snapshot_warnings (reinstall and restore: the text to show when snapshots exist, else empty),
@@ -193,6 +194,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		</dl>
 		<?php $beltoft_services_note(); ?>
 	<?php endif; ?>
+	<?php if ( '' !== (string) ( $cost ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $cost ); ?></p><?php endif; ?>
 
 	<?php if ( $beltoft_services_rename ) : ?>
 		<details class="beltoft-services-vm__more">
