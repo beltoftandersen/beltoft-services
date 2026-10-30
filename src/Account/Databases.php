@@ -145,7 +145,7 @@ final class Databases extends ServiceArea {
 			'id'      => $resource->id(),
 			'url'     => $this->url( $view['license'] ),
 			'name'    => (string) ( $view['product'] ?? '' ),
-			'details' => $card['version'] > 0 ? 'PostgreSQL ' . $card['version'] : 'PostgreSQL',
+			'details' => $card['engine'],
 			'state'   => $state,
 			'tone'    => $tone,
 			'extra'   => (string) $card['host'],
@@ -161,6 +161,6 @@ final class Databases extends ServiceArea {
 	public function label_of( Resource $resource ): string {
 		$card = DbCard::view( $resource );
 
-		return $card['version'] > 0 ? 'PostgreSQL ' . $card['version'] : 'PostgreSQL';
+		return $card['engine'];
 	}
 }

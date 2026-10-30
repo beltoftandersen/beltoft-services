@@ -40,7 +40,7 @@ $beltoft_services_db_wait = array(
 	<?php if ( $beltoft_services_all || 'overview' === $active ) : ?>
 	<dl class="beltoft-services-facts">
 		<div><dt><?php esc_html_e( 'Status', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $beltoft_services_db_status[ $view['kind'] ] ); ?></dd></div>
-		<div><dt><?php esc_html_e( 'Engine', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $view['version'] > 0 ? 'PostgreSQL ' . $view['version'] : 'PostgreSQL' ); ?></dd></div>
+		<div><dt><?php esc_html_e( 'Engine', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( (string) $view['engine'] ); ?></dd></div>
 		<div><dt><?php esc_html_e( 'Size', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( (string) $view['size'] ); ?></dd></div>
 		<?php if ( $view['backups']['enabled'] ) : ?>
 			<div><dt><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( sprintf( /* translators: %d: number of days */ _n( 'Daily, kept %d day', 'Daily, kept %d days', (int) $view['backups']['days'], 'beltoft-services' ), (int) $view['backups']['days'] ) ); ?></dd></div>
@@ -53,6 +53,7 @@ $beltoft_services_db_wait = array(
 			<div><dt><?php esc_html_e( 'User', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['user'] ); ?></code></dd></div>
 		<?php endif; ?>
 	</dl>
+	<?php if ( '' !== (string) ( $view['limits'] ?? '' ) ) : ?><p class="description"><?php echo esc_html( (string) $view['limits'] ); ?></p><?php endif; ?>
 	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
 
 	<?php if ( isset( $beltoft_services_db_wait[ $view['kind'] ] ) ) : ?>
@@ -80,6 +81,9 @@ $beltoft_services_db_wait = array(
 
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Certificate', 'beltoft-services' ); ?></h4>
+			<?php if ( '' !== (string) ( $view['ca_hint'] ?? '' ) ) : ?>
+				<p class="description"><?php echo esc_html( (string) $view['ca_hint'] ); ?></p>
+			<?php endif; ?>
 			<?php if ( '' !== $view['ca_url'] ) : ?>
 				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $view['ca_url'] ); ?>"><?php esc_html_e( 'Download CA certificate', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>

@@ -1476,14 +1476,14 @@ final class Firewall {
 			}
 		}
 
-		// The public NIC (net0, with the public IP add-on): port 5432 from the allow-list, nothing else.
+		// The public NIC (net0, with the public IP add-on): the engine's port from the allow-list, nothing else.
 		$access = $this->sync_database_access( $record, $v, 'both' );
 
 		return $access instanceof StepResult ? $access : array();
 	}
 
 	/**
-	 * The rules of the allow-list on a database's public NIC: `ACCEPT tcp 5432` on net0 from each allowed source (or
+	 * The rules of the allow-list on a database's public NIC: `ACCEPT tcp <engine port>` on net0 from each allowed source (or
 	 * from anywhere when the database is open to everyone), tagged `bs-db:`. Rules of other tags are never touched.
 	 * A VM without net0 wants none. `close` removes the rules that are no longer wanted, `open` adds the missing ones,
 	 * `both` does the two in that order (a port is never opened before the old rules are gone).
@@ -1516,7 +1516,7 @@ final class Firewall {
 		}
 
 		foreach ( $desired as $tag => $source ) {
-			$params = self::database_rule( $tag, $source );
+			$params = self::database_rule( $tag, $source, DbEngines::for_resource( $this->r )->port() );
 			$found  = false;
 
 			foreach ( self::tagged( $rules, $tag ) as $listed ) {
@@ -1545,14 +1545,15 @@ final class Firewall {
 	 *
 	 * @param string      $tag    Comment.
 	 * @param string|null $source Source address or range; null for anywhere.
+	 * @param int         $port   The engine's port.
 	 * @return array<string, mixed>
 	 */
-	private static function database_rule( string $tag, ?string $source ): array {
+	private static function database_rule( string $tag, ?string $source, int $port ): array {
 		$rule = array(
 			'type'    => 'in',
 			'action'  => 'ACCEPT',
 			'proto'   => 'tcp',
-			'dport'   => (string) DbGuest::PORT,
+			'dport'   => (string) $port,
 			'iface'   => 'net0',
 			'enable'  => 1,
 			'comment' => $tag,
@@ -1575,7 +1576,7 @@ final class Firewall {
 		$source = static fn( $value ): string => preg_replace( '#/32$#D', '', (string) $value );
 
 		return 'in' === ( $remote['type'] ?? '' ) && 'ACCEPT' === ( $remote['action'] ?? '' ) && 'tcp' === ( $remote['proto'] ?? '' ) && 'net0' === ( $remote['iface'] ?? '' )
-			&& (string) DbGuest::PORT === (string) ( $remote['dport'] ?? '' ) && 1 === (int) ( $remote['enable'] ?? 0 )
+			&& (string) ( $rule['dport'] ?? '' ) === (string) ( $remote['dport'] ?? '' ) && 1 === (int) ( $remote['enable'] ?? 0 )
 			&& $source( $remote['source'] ?? '' ) === $source( $rule['source'] ?? '' );
 	}
 

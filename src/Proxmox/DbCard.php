@@ -56,23 +56,27 @@ final class DbCard {
 		$address = (string) $r->get( 'db_address' );
 		$ready   = 'ready' === $state && 'ready' === $db && false !== filter_var( $address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
 		$plan    = (array) $r->get( 'plan' );
-		$base    = DbGuest::ROLE . ':PASSWORD@' . $address . ':' . DbGuest::PORT . '/' . DbGuest::DATABASE;
+		$engine  = DbEngines::for_resource( $r );
 		$restore = 'ready' === $state && ( is_array( $r->get( 'restore' ) ) || DbRestore::waiting( $r ) );
 		$kind    = $restore ? 'restoring' : ( $ready ? 'ready' : ( 'paused' === $state ? 'paused' : ( 'failed' === $state ? 'failed' : 'building' ) ) );
 		$offered = DbActions::offered( $r );
 		$backups = self::backups( $r, $ready && ! $restore && $r->accepts_actions() && array_key_exists( DbActions::RESTORE, $offered ) );
 		$access  = DbAccess::view( $r );
-		$public  = $ready && '' !== $access['address'] ? DbGuest::ROLE . ':PASSWORD@' . $access['address'] . ':' . DbGuest::PORT . '/' . DbGuest::DATABASE : '';
+		$private = $ready ? $engine->connection( $address ) : array( 'verify' => '', 'require' => '' );
+		$public  = $ready && '' !== $access['address'] ? $engine->connection( $access['address'] ) : array( 'verify' => '', 'require' => '' );
 
 		return array(
 			'kind'        => $kind,
 			'cost'        => \BeltoftServices\Usage\Estimate::cost_line( $r->id() ),
 			'host'        => $ready ? $address : '',
-			'port'        => DbGuest::PORT,
-			'database'    => DbGuest::DATABASE,
-			'user'        => DbGuest::ROLE,
-			'conn_verify' => $ready ? 'postgresql://' . $base . '?sslmode=verify-full&sslrootcert=ca.crt' : '',
-			'conn_require' => $ready ? 'postgresql://' . $base . '?sslmode=require' : '',
+			'engine'      => $engine->label( $plan ),
+			'limits'      => $engine->limits(),
+			'ca_hint'     => $engine->ca_hint(),
+			'port'        => $engine->port(),
+			'database'    => $engine->database(),
+			'user'        => $engine->login(),
+			'conn_verify' => $private['verify'],
+			'conn_require' => $private['require'],
 			'fingerprint' => $ready && 1 === preg_match( '/^[0-9A-F:]{95}$/D', (string) $r->get( 'db_fingerprint' ) ) ? (string) $r->get( 'db_fingerprint' ) : '',
 			'ca_url'      => $ready && DbGuest::pem( (string) $r->get( 'db_ca_pem' ) ) ? DbRoutes::ca_url( $r->id() ) : '',
 			'can_reveal'  => $ready && DbRoutes::revealable( $r ),
@@ -81,8 +85,8 @@ final class DbCard {
 			'confirm'     => DbActions::CONFIRM,
 			'backups'     => $backups,
 			'access'      => $access,
-			'public_verify'  => '' !== $public ? 'postgresql://' . $public . '?sslmode=verify-full&sslrootcert=ca.crt' : '',
-			'public_require' => '' !== $public ? 'postgresql://' . $public . '?sslmode=require' : '',
+			'public_verify'  => $public['verify'],
+			'public_require' => $public['require'],
 			'version'     => (int) ( $plan['major'] ?? 0 ),
 			'size'        => sprintf(
 				/* translators: 1: number of vCPUs, 2: memory in GB, 3: disk in GB */
