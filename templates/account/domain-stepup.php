@@ -19,7 +19,7 @@ $beltoft_id  = 'beltoft-domain-stepup-' . $r->id();
 	<p class="beltoft-services-domain__note"><?php echo esc_html( 'code' === $beltoft_ask['kind'] ? __( 'To show the transfer code, enter the code from your authenticator app.', 'beltoft-services' ) : __( 'To show the transfer code, enter your account password.', 'beltoft-services' ) ); ?></p>
 	<label for="<?php echo esc_attr( $beltoft_id ); ?>"><?php echo esc_html( $beltoft_ask['label'] ); ?></label>
 	<span class="beltoft-services-domain-stepup__row">
-		<input id="<?php echo esc_attr( $beltoft_id ); ?>" name="secret" required autocomplete="<?php echo esc_attr( $beltoft_ask['autocomplete'] ); ?>" spellcheck="false"<?php echo 'code' === $beltoft_ask['kind'] ? ' type="text" inputmode="numeric" maxlength="12"' : ' type="password"'; ?>>
+		<span class="beltoft-services-domain-stepup__field"><input id="<?php echo esc_attr( $beltoft_id ); ?>" name="secret" required autocomplete="<?php echo esc_attr( $beltoft_ask['autocomplete'] ); ?>" spellcheck="false"<?php echo 'code' === $beltoft_ask['kind'] ? ' type="text" inputmode="numeric" maxlength="12"' : ' type="password"'; ?>></span>
 		<button type="submit" class="button"><?php esc_html_e( 'Show code', 'beltoft-services' ); ?></button>
 	</span>
 	<p class="beltoft-services-domain-stepup__error" role="alert" hidden></p>
