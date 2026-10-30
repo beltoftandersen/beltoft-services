@@ -284,8 +284,13 @@ final class Provision {
 			$this->plan['template'] = Clusters::default_template( $this->cluster_id );
 		}
 
-		if ( ! array_key_exists( $this->plan['template'], Clusters::templates( $this->cluster_id ) ) ) {
-			return StepResult::fail( 'Template ' . $this->plan['template'] . ' is not in the template list of this cluster' );
+		// A database is built from its engine's template (family postgres-<major>), never from an operating system one.
+		$allowed = $this->profile instanceof DbProfile
+			? Clusters::service_templates( $this->cluster_id, 'postgres-' . (int) ( $plan['major'] ?? 0 ) )
+			: Clusters::templates( $this->cluster_id );
+
+		if ( ! array_key_exists( $this->plan['template'], $allowed ) ) {
+			return StepResult::fail( 'Template ' . $this->plan['template'] . ' is not in the template list of this cluster' . ( $this->profile instanceof DbProfile ? ' with the family postgres-' . (int) ( $plan['major'] ?? 0 ) : '' ) );
 		}
 
 		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {

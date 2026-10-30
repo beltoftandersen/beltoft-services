@@ -211,6 +211,20 @@ class DbBuildTest extends TestCase {
 		return Resource::find( $r->id() );
 	}
 
+	public function test_database_templates_are_hidden_from_operating_system_lists(): void {
+		$this->assertSame( array(), Clusters::templates( 'lab' ), 'A postgres-18 template is never an operating system choice.' );
+		$this->assertSame( array( 9100 => 'PostgreSQL 18' ), Clusters::service_templates( 'lab', 'postgres-18' ) );
+		$this->assertSame( array(), Clusters::service_templates( 'lab', 'postgres-17' ) );
+	}
+
+	public function test_database_build_needs_a_template_of_its_major(): void {
+		$r      = $this->resource( array( 'major' => 17 ) );
+		$result = $this->run_provision( $r );
+
+		$this->assertTrue( $result->is_failed() );
+		$this->assertStringContainsString( 'with the family postgres-17', $result->error() );
+	}
+
 	public function test_profile_is_chosen_by_driver_and_vps_is_unchanged(): void {
 		$this->assertInstanceOf( DbProfile::class, Profiles::for_resource( $this->resource() ) );
 		$this->assertSame( array( 'net', 'vmid', 'clone', 'configure', 'start', 'ready', 'db_init', 'db_ready' ), ( new DbProfile( $this->resource() ) )->steps() );

@@ -176,15 +176,68 @@ final class Clusters {
 	}
 
 	/**
-	 * The templates of a cluster: VMID => label.
+	 * Template families of managed services (a database server is built from them, a customer never picks them as
+	 * an operating system), by prefix: postgres-18.
+	 */
+	public const SERVICE_FAMILIES = array( 'postgres-' );
+
+	/**
+	 * The operating system templates of a cluster, the ones customers choose from: VMID => label. Templates whose
+	 * family is a managed service family are left out (see service_templates()).
 	 *
 	 * @param string $cluster Cluster id.
 	 * @return array<int, string>
 	 */
 	public static function templates( string $cluster ): array {
-		$all = self::all();
+		$all  = self::all();
+		$list = isset( $all[ $cluster ] ) && is_array( $all[ $cluster ]['templates'] ) ? $all[ $cluster ]['templates'] : array();
 
-		return isset( $all[ $cluster ] ) && is_array( $all[ $cluster ]['templates'] ) ? $all[ $cluster ]['templates'] : array();
+		foreach ( array_keys( $list ) as $vmid ) {
+			if ( null !== self::service_family( $all[ $cluster ], (int) $vmid ) ) {
+				unset( $list[ $vmid ] );
+			}
+		}
+
+		return $list;
+	}
+
+	/**
+	 * The cluster's templates of one managed service family (for example postgres-18): VMID => label.
+	 *
+	 * @param string $cluster Cluster id.
+	 * @param string $family  Family, for example postgres-18.
+	 * @return array<int, string>
+	 */
+	public static function service_templates( string $cluster, string $family ): array {
+		$all  = self::all();
+		$list = isset( $all[ $cluster ] ) && is_array( $all[ $cluster ]['templates'] ) ? $all[ $cluster ]['templates'] : array();
+		$out  = array();
+
+		foreach ( $list as $vmid => $label ) {
+			if ( $family === self::service_family( $all[ $cluster ], (int) $vmid ) ) {
+				$out[ $vmid ] = $label;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * A template's family when it is a managed service family, otherwise null.
+	 *
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param int                  $vmid    Template VMID.
+	 */
+	private static function service_family( array $cluster, int $vmid ): ?string {
+		$family = (string) ( ( (array) ( $cluster['template_families'] ?? array() ) )[ $vmid ] ?? '' );
+
+		foreach ( self::SERVICE_FAMILIES as $prefix ) {
+			if ( 0 === strpos( $family, $prefix ) ) {
+				return $family;
+			}
+		}
+
+		return null;
 	}
 
 	/**
