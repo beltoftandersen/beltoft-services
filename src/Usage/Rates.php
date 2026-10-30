@@ -81,11 +81,68 @@ final class Rates {
 	}
 
 	/**
+	 * An amount for people: the shop's currency code, then the number ("EUR 16.50", "EUR 0.0226").
+	 *
+	 * @param float $amount   Amount.
+	 * @param int   $decimals Decimals.
+	 */
+	public static function money( float $amount, int $decimals = 2 ): string {
+		return get_woocommerce_currency() . ' ' . number_format( $amount, $decimals, wc_get_price_decimal_separator(), wc_get_price_thousand_separator() );
+	}
+
+	/**
+	 * The pay-as-you-go offer next to a monthly plan: the usage sibling that can be bought, and what it costs
+	 * (hourly and the monthly cap, excluding tax). Null for a pay-as-you-go variation, a plan with no usage
+	 * sibling, one that cannot be bought, or a monthly price of 0.
+	 *
+	 * @param \WC_Product_Variation $monthly Monthly variation.
+	 * @return array{variation_id: int, monthly: float, hourly: float, cap: float, premium: float}|null
+	 */
+	public static function for_plan( \WC_Product_Variation $monthly ): ?array {
+		if ( self::is_usage( $monthly ) ) {
+			return null;
+		}
+
+		$usage = self::sibling( $monthly, true );
+		$price = (float) wc_get_price_excluding_tax( $monthly );
+
+		if ( ! $usage || ! $usage->is_purchasable() || $price <= 0 ) {
+			return null;
+		}
+
+		$premium = self::premium( $monthly->get_parent_id() );
+
+		return array(
+			'variation_id' => $usage->get_id(),
+			'monthly'      => $price,
+			'hourly'       => self::hourly( $price, $premium ),
+			'cap'          => self::cap( $price, $premium ),
+			'premium'      => $premium,
+		);
+	}
+
+	/**
+	 * "or EUR 0.0226/hour, max EUR 16.50/month pay as you go" for a monthly variation, or '' when there is no offer.
+	 *
+	 * @param \WC_Product_Variation $monthly Monthly variation.
+	 */
+	public static function line( \WC_Product_Variation $monthly ): string {
+		$rates = self::for_plan( $monthly );
+
+		if ( null === $rates ) {
+			return '';
+		}
+
+		/* translators: 1: hourly price such as EUR 0.0226, 2: monthly cap such as EUR 16.50 */
+		return sprintf( __( 'or %1$s/hour, max %2$s/month pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4 ), self::money( $rates['cap'] ) );
+	}
+
+	/**
 	 * The name of the Billing attribute key of a variation, or null.
 	 *
 	 * @param array<string, mixed> $attributes Variation attributes.
 	 */
-	private static function billing_key( array $attributes ): ?string {
+	public static function billing_key( array $attributes ): ?string {
 		foreach ( array_keys( $attributes ) as $key ) {
 			if ( 1 === preg_match( '/^(attribute_)?(pa_)?billing$/D', (string) $key ) ) {
 				return (string) $key;

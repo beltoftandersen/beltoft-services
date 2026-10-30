@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -163,6 +164,11 @@ final class Offers {
 			return null;
 		}
 
+		// A pay-as-you-go variation is the billing choice of its plan, never a plan (its price is 0).
+		if ( Rates::is_usage( $variation ) ) {
+			return null;
+		}
+
 		$numbers = Product::plan( $product->get_id(), $id );
 
 		// A variation with backups is the option of its plan, not a plan.
@@ -182,6 +188,7 @@ final class Offers {
 		}
 
 		return array(
+			'usage'        => self::usage( $variation, $sibling ),
 			'product_id'   => $product->get_id(),
 			'variation_id' => $id,
 			'name'         => self::label( $product, $variation ),
@@ -196,6 +203,39 @@ final class Offers {
 			'backups'      => $backups,
 			'note'         => self::note( $product, $variation ),
 		);
+	}
+
+	/**
+	 * The pay-as-you-go option of a plan: the variation to buy and what it costs, also with backups. Null when the plan has none.
+	 *
+	 * @param \WC_Product_Variation      $variation Monthly plan.
+	 * @param \WC_Product_Variation|null $with      Its monthly variation with backups.
+	 * @return array{variation_id: int, hourly: float, cap: float, backups_variation_id: int, backups_hourly: float, backups_cap: float}|null
+	 */
+	private static function usage( \WC_Product_Variation $variation, ?\WC_Product_Variation $with ): ?array {
+		$rates = Rates::for_plan( $variation );
+
+		if ( null === $rates ) {
+			return null;
+		}
+
+		$out   = array(
+			'variation_id'         => $rates['variation_id'],
+			'hourly'               => $rates['hourly'],
+			'cap'                  => $rates['cap'],
+			'backups_variation_id' => 0,
+			'backups_hourly'       => 0.0,
+			'backups_cap'          => 0.0,
+		);
+		$extra = $with ? Rates::for_plan( $with ) : null;
+
+		if ( null !== $extra ) {
+			$out['backups_variation_id'] = $extra['variation_id'];
+			$out['backups_hourly']       = $extra['hourly'];
+			$out['backups_cap']          = $extra['cap'];
+		}
+
+		return $out;
 	}
 
 	/**
@@ -263,8 +303,10 @@ final class Offers {
 
 		$words = array();
 
+		$billing = Rates::billing_key( $mine );
+
 		foreach ( $mine as $key => $value ) {
-			if ( isset( $skip[ $key ] ) || '' === (string) $value ) {
+			if ( isset( $skip[ $key ] ) || (string) $key === $billing || '' === (string) $value ) {
 				continue;
 			}
 

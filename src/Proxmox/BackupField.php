@@ -311,7 +311,7 @@ final class BackupField {
 	}
 
 	/** Keep the server above its extra disk after replacing the variation. */
-	private static function server_first( \WC_Cart $cart, string $key ): void {
+	public static function server_first( \WC_Cart $cart, string $key ): void {
 		$contents = $cart->get_cart();
 		if ( ! isset( $contents[ $key ] ) ) {
 			return;

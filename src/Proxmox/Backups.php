@@ -782,6 +782,16 @@ final class Backups {
 	 * @param \WC_Product_Variation $to   To.
 	 */
 	public static function price_difference( \WC_Product_Variation $from, \WC_Product_Variation $to ): string {
+		// Pay as you go variations cost 0 at checkout: the difference is the hourly price of the extra monthly amount.
+		if ( \BeltoftServices\Usage\Rates::is_usage( $to ) ) {
+			$was  = \BeltoftServices\Usage\Rates::monthly( $from );
+			$now  = \BeltoftServices\Usage\Rates::monthly( $to );
+			$rate = null === $was || null === $now ? 0.0 : \BeltoftServices\Usage\Rates::hourly( $now - $was, \BeltoftServices\Usage\Rates::premium( $to->get_parent_id() ) );
+
+			/* translators: %s: price per hour such as EUR 0.0041 */
+			return sprintf( __( '%s / hour', 'beltoft-services' ), ( $rate < 0 ? '-' : '+' ) . \BeltoftServices\Usage\Rates::money( abs( $rate ), 4 ) );
+		}
+
 		$diff = (float) wc_get_price_excluding_tax( $to ) - (float) wc_get_price_excluding_tax( $from );
 		$text = ( $diff < 0 ? '-' : '+' ) . html_entity_decode( wp_strip_all_tags( wc_price( abs( $diff ) ) ), ENT_QUOTES, 'UTF-8' );
 

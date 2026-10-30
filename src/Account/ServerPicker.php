@@ -19,6 +19,7 @@ use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\Proxmox\Tiles;
 use BeltoftServices\RateLimit;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -36,7 +37,8 @@ final class ServerPicker {
 	public const NONCE  = 'beltoft-services-picker';
 	public const FIELD  = 'beltoft_services_picker_nonce';
 	public const PLAN   = 'beltoft_services_picker_plan';
-	public const BACKUP = 'beltoft_services_picker_backups';
+	public const BACKUP  = 'beltoft_services_picker_backups';
+	public const BILLING = 'beltoft_services_picker_billing';
 	public const HANDLE = 'beltoft-services-picker';
 
 	/**
@@ -180,6 +182,7 @@ final class ServerPicker {
 		return array(
 			'plan'      => (string) absint( $get( self::PLAN ) ),
 			'backups'   => '' !== $get( self::BACKUP ) ? '1' : '',
+			'billing'   => 'usage' === $get( self::BILLING ) ? 'usage' : '',
 			'os'        => $get( OsField::POST_KEY ),
 			'app'       => $get( AppField::POST_APP ),
 			'version'   => $get( AppField::POST_VERSION ),
@@ -240,6 +243,20 @@ final class ServerPicker {
 				$out['errors']['backups'] = __( 'Backups are not offered for this plan.', 'beltoft-services' );
 			} else {
 				$out['variation_id'] = (int) $plan['backups']['variation_id'];
+			}
+		}
+
+		if ( 'usage' === ( $values['billing'] ?? '' ) ) {
+			$usage   = (array) ( $plan['usage'] ?? array() );
+			$backups = '' !== $values['backups'] && ! empty( $plan['backups'] );
+			$target  = array() === $usage ? 0 : (int) ( $backups ? $usage['backups_variation_id'] : $usage['variation_id'] );
+
+			if ( array() === $usage ) {
+				$out['errors']['billing'] = __( 'Pay as you go is not offered for this plan.', 'beltoft-services' );
+			} elseif ( $target < 1 ) {
+				$out['errors']['billing'] = __( 'Pay as you go is not offered with daily backups for this plan.', 'beltoft-services' );
+			} else {
+				$out['variation_id'] = $target;
 			}
 		}
 
@@ -438,7 +455,7 @@ final class ServerPicker {
 	public static function render(): void {
 		$products = Offers::products();
 		$plans    = Offers::plans();
-		$values   = array_merge( Picked::clean( array() ), array( 'plan' => '', 'backups' => '' ), self::$state['values'] );
+		$values   = array_merge( Picked::clean( array() ), array( 'plan' => '', 'backups' => '', 'billing' => '' ), self::$state['values'] );
 		$errors   = self::$state['errors'];
 		$selected = self::selected( $plans, (int) $values['plan'] );
 
@@ -491,6 +508,9 @@ final class ServerPicker {
 		self::backups( $plans, $selected, '' !== $values['backups'] );
 		self::error( $errors, 'backups' );
 
+		self::billing( $plans, $selected, 'usage' === $values['billing'], '' !== $values['backups'] );
+		self::error( $errors, 'billing' );
+
 		$chosen = $plans[ $selected ] ?? reset( $plans );
 
 		if ( $chosen ) {
@@ -498,7 +518,7 @@ final class ServerPicker {
 		}
 
 		echo '<div class="beltoft-services-picker__go">';
-		echo '<p class="beltoft-services-picker__summary" data-picker-summary aria-live="polite">' . esc_html( isset( $plans[ $selected ] ) ? self::summary( $plans[ $selected ], '' !== $values['backups'] ) : '' ) . '</p>';
+		echo '<p class="beltoft-services-picker__summary" data-picker-summary aria-live="polite">' . esc_html( isset( $plans[ $selected ] ) ? self::summary( $plans[ $selected ], '' !== $values['backups'], 'usage' === $values['billing'] ) : '' ) . '</p>';
 		echo '<button type="submit" class="beltoft-services-picker__button" data-picker-submit' . ( isset( $plans[ $selected ] ) ? '' : ' disabled' ) . '>' . esc_html__( 'Continue to checkout', 'beltoft-services' ) . '</button>';
 		echo '</div>';
 
@@ -547,7 +567,20 @@ final class ServerPicker {
 			'data-has-backups'      => $extra ? '1' : '0',
 			'data-backups-label'    => $extra ? self::backups_label( $plan ) : '',
 			'data-summary-backups'  => $extra ? self::summary( $plan, true ) : '',
+			'data-has-usage'        => $plan['usage'] ? '1' : '0',
+			'data-has-usage-backups' => $plan['usage'] && $plan['usage']['backups_variation_id'] ? '1' : '0',
 		);
+
+		if ( $plan['usage'] ) {
+			$attrs += array(
+				'data-usage-label'          => self::usage_label( $plan, false ),
+				'data-usage-label-backups'  => self::usage_label( $plan, true ),
+				'data-usage-note'           => self::usage_note( $plan, false ),
+				'data-usage-note-backups'   => self::usage_note( $plan, true ),
+				'data-summary-usage'        => self::summary( $plan, false, true ),
+				'data-summary-usage-backups' => self::summary( $plan, true, true ),
+			);
+		}
 
 		echo '<label class="beltoft-services-plan' . ( $stock ? '' : ' is-disabled' ) . '">';
 		echo '<input class="beltoft-services-plan__input" type="radio" name="' . esc_attr( self::PLAN ) . '" value="' . esc_attr( (string) $plan['variation_id'] ) . '"';
@@ -623,18 +656,100 @@ final class ServerPicker {
 	 *
 	 * @param array<string, mixed> $plan    Plan.
 	 * @param bool                 $backups With backups.
+	 * @param bool                 $usage   Pay as you go.
 	 */
-	private static function summary( array $plan, bool $backups ): string {
-		$extra = $backups && $plan['backups'] ? (float) $plan['backups']['extra'] : 0.0;
+	private static function summary( array $plan, bool $backups, bool $usage = false ): string {
+		$backups = $backups && $plan['backups'];
+
+		if ( $usage && $plan['usage'] ) {
+			$price = self::usage_label( $plan, $backups );
+
+			if ( $backups ) {
+				/* translators: 1: plan name, 2: price */
+				return sprintf( __( '%1$s with daily backups, pay as you go: %2$s', 'beltoft-services' ), (string) $plan['name'], $price );
+			}
+
+			/* translators: 1: plan name, 2: price */
+			return sprintf( __( '%1$s, pay as you go: %2$s', 'beltoft-services' ), (string) $plan['name'], $price );
+		}
+
+		$extra = $backups ? (float) $plan['backups']['extra'] : 0.0;
 		$price = self::price_text( (float) $plan['price'] + $extra, (string) $plan['period'] );
 
-		if ( $backups && $plan['backups'] ) {
+		if ( $backups ) {
 			/* translators: 1: plan name, 2: price */
 			return sprintf( __( '%1$s with daily backups: %2$s', 'beltoft-services' ), (string) $plan['name'], $price );
 		}
 
 		/* translators: 1: plan name, 2: price */
 		return sprintf( __( '%1$s: %2$s', 'beltoft-services' ), (string) $plan['name'], $price );
+	}
+
+	/**
+	 * The hourly price and the cap of a plan's pay-as-you-go option.
+	 *
+	 * @param array<string, mixed> $plan    Plan.
+	 * @param bool                 $backups With backups.
+	 * @return array{hourly: float, cap: float}
+	 */
+	private static function usage_rates( array $plan, bool $backups ): array {
+		$usage = (array) $plan['usage'];
+
+		return $backups && ! empty( $usage['backups_variation_id'] )
+			? array( 'hourly' => (float) $usage['backups_hourly'], 'cap' => (float) $usage['backups_cap'] )
+			: array( 'hourly' => (float) $usage['hourly'], 'cap' => (float) $usage['cap'] );
+	}
+
+	/**
+	 * "EUR 0.0226 per hour, max EUR 16.50 per month excluding VAT".
+	 *
+	 * @param array<string, mixed> $plan    Plan.
+	 * @param bool                 $backups With backups.
+	 */
+	private static function usage_label( array $plan, bool $backups ): string {
+		$rates = self::usage_rates( $plan, $backups );
+
+		/* translators: 1: price per hour such as EUR 0.0226, 2: monthly cap such as EUR 16.50 */
+		return sprintf( __( '%1$s per hour, max %2$s per month excluding VAT', 'beltoft-services' ), Rates::money( $rates['hourly'], 4 ), Rates::money( $rates['cap'] ) );
+	}
+
+	/**
+	 * The explanation under the billing choice.
+	 *
+	 * @param array<string, mixed> $plan    Plan.
+	 * @param bool                 $backups With backups.
+	 */
+	private static function usage_note( array $plan, bool $backups ): string {
+		/* translators: %s: monthly cap such as EUR 16.50 */
+		return sprintf( __( 'Pay as you go: billed per hour each month, never more than %s. A card is required.', 'beltoft-services' ), Rates::money( self::usage_rates( $plan, $backups )['cap'] ) );
+	}
+
+	/**
+	 * The billing choice under the backups box: Monthly or Pay as you go. The script shows it for plans that have the option.
+	 *
+	 * @param array<int, array<string, mixed>> $plans    Plans.
+	 * @param int                              $selected Selected plan.
+	 * @param bool                             $usage    Pay as you go chosen.
+	 * @param bool                             $backups  Backups ticked.
+	 */
+	private static function billing( array $plans, int $selected, bool $usage, bool $backups ): void {
+		if ( array() === array_filter( $plans, static fn( $plan ) => ! empty( $plan['usage'] ) ) ) {
+			return;
+		}
+
+		$plan  = $plans[ $selected ] ?? null;
+		$shown = $plan && ! empty( $plan['usage'] );
+		$with  = $shown && $backups && ! empty( $plan['backups'] ) && ! empty( $plan['usage']['backups_variation_id'] );
+
+		echo '<fieldset class="beltoft-services-picker__billing" data-picker-billing' . ( $shown ? '' : ' hidden' ) . '><legend class="beltoft-services-picker__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
+		echo '<label><input type="radio" name="' . esc_attr( self::BILLING ) . '" value="monthly"';
+		checked( ! ( $usage && $shown ), true );
+		echo '> <span>' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span></label>';
+		echo '<label><input type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
+		checked( $usage && $shown, true );
+		echo '> <span>' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></label>';
+		echo '<p class="description" data-picker-usage-note>' . esc_html( $shown ? self::usage_note( $plan, $with ) : '' ) . '</p>';
+		echo '</fieldset>';
 	}
 
 	/**

@@ -17,6 +17,11 @@
 	var row = form.querySelector( '[data-picker-backups]' );
 	var box = row ? row.querySelector( 'input[type="checkbox"]' ) : null;
 	var label = row ? row.querySelector( '[data-picker-backups-label]' ) : null;
+	var billing = form.querySelector( '[data-picker-billing]' );
+	var usage = billing ? billing.querySelector( 'input[value="usage"]' ) : null;
+	var monthly = billing ? billing.querySelector( 'input[value="monthly"]' ) : null;
+	var usageLabel = billing ? billing.querySelector( '[data-picker-usage-label]' ) : null;
+	var usageNote = billing ? billing.querySelector( '[data-picker-usage-note]' ) : null;
 	var summary = form.querySelector( '[data-picker-summary]' );
 	var submit = form.querySelector( '[data-picker-submit]' );
 
@@ -89,6 +94,9 @@
 		var radio = chosen();
 		var plan;
 		var has;
+		var withBackups;
+		var hasUsage;
+		var suffix;
 
 		if ( ! radio ) {
 			if ( submit ) {
@@ -117,8 +125,33 @@
 			}
 		}
 
+		withBackups = has && box && box.checked;
+		hasUsage = '1' === radio.getAttribute( 'data-has-usage' );
+
+		if ( billing ) {
+			billing.hidden = ! hasUsage;
+
+			if ( ! hasUsage && monthly ) {
+				monthly.checked = true;
+			}
+
+			suffix = withBackups && '1' === radio.getAttribute( 'data-has-usage-backups' ) ? '-backups' : '';
+
+			if ( hasUsage && usageLabel ) {
+				usageLabel.textContent = radio.getAttribute( 'data-usage-label' + suffix ) || '';
+			}
+
+			if ( hasUsage && usageNote ) {
+				usageNote.textContent = radio.getAttribute( 'data-usage-note' + suffix ) || '';
+			}
+		}
+
 		if ( summary ) {
-			summary.textContent = ( has && box && box.checked ? radio.getAttribute( 'data-summary-backups' ) : radio.getAttribute( 'data-summary' ) ) || '';
+			if ( hasUsage && usage && usage.checked ) {
+				summary.textContent = radio.getAttribute( 'data-summary-usage' + ( withBackups ? '-backups' : '' ) ) || '';
+			} else {
+				summary.textContent = ( withBackups ? radio.getAttribute( 'data-summary-backups' ) : radio.getAttribute( 'data-summary' ) ) || '';
+			}
 		}
 
 		if ( submit ) {
@@ -135,6 +168,10 @@
 	if ( box ) {
 		box.addEventListener( 'change', update );
 	}
+
+	each( billing ? billing.querySelectorAll( 'input[type="radio"]' ) : [], function ( radio ) {
+		radio.addEventListener( 'change', update );
+	} );
 
 	// The tile script handles the app's own change; the summary needs nothing from it.
 	update();
