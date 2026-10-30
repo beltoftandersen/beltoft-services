@@ -46,6 +46,7 @@ $beltoft_services_all = ! $nav;
 			<div><dt><?php esc_html_e( 'User', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['user'] ); ?></code></dd></div>
 		<?php endif; ?>
 	</dl>
+	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
 
 	<?php if ( 'building' === $view['kind'] ) : ?>
 		<p><?php esc_html_e( 'Your database is being set up. The connection details appear here when it is ready. You can leave this page.', 'beltoft-services' ); ?></p>
