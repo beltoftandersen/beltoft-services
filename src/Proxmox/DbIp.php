@@ -20,9 +20,11 @@ defined( 'ABSPATH' ) || exit;
  * subscription changes the plan, and DbDriver::update_plan hands the change to this class, which makes the VM match:
  *
  * - add: take an address from the pool (IpPool::hold), shut the VM down, write net0 and ipconfig0 and read them back,
- *   start it, apply an empty allow-list (nothing is allowed until the customer adds an address), then the firewall.
+ *   start it, tell the guest to listen on the new address and to put it in its certificate (the `listen` job), apply an
+ *   empty allow-list (nothing is allowed until the customer adds an address), then the firewall.
  * - remove: clear the allow-list in the firewall and the guest, shut the VM down, delete net0 and ipconfig0 and read
- *   the config back, give the address back only after that, start the VM.
+ *   the config back, give the address back only after that, start the VM, tell the guest to listen on the private
+ *   address only. A guest that cannot be told is reported to the admin (the address is gone anyway).
  *
  * The VM restarts once, and the customer is told before they confirm. Each phase is idempotent and the stored
  * operation (`db_ip_op`) remembers where it was; Proxmox is read before anything is believed.
@@ -34,6 +36,9 @@ final class DbIp {
 
 	/** Meta: the operation in progress (action, phase, flags). */
 	public const OP = 'db_ip_op';
+
+	/** Seconds the guest has for a listen job. */
+	private const LISTEN_BUDGET = 600;
 
 	/** @var array<string, mixed> */
 	private $cluster = array();
@@ -262,7 +267,7 @@ final class DbIp {
 			return StepResult::fail( (string) $op['abort'] );
 		}
 
-		$order = 'add' === $op['action'] ? array( 'hold', 'stop', 'nic', 'start', 'access', 'firewall' ) : array( 'clear', 'stop', 'nic', 'start', 'firewall' );
+		$order = 'add' === $op['action'] ? array( 'hold', 'stop', 'nic', 'start', 'listen', 'access', 'firewall' ) : array( 'clear', 'stop', 'nic', 'start', 'listen', 'firewall' );
 		$at    = array_search( (string) $op['phase'], $order, true );
 		$at    = false === $at ? 0 : $at;
 
@@ -368,6 +373,106 @@ final class DbIp {
 		unset( $record );
 
 		return $this->apply_empty_list( true );
+	}
+
+	/**
+	 * The listen job: the addresses the server listens on and has in its certificate (the private one first, then the
+	 * public one when the database has it).
+	 *
+	 * @param Resource $r       Resource.
+	 * @param string   $request Request id.
+	 * @return array<string, mixed>
+	 */
+	public static function listen_job( Resource $r, string $request ): array {
+		$listen = array( (string) $r->get( 'db_address' ) );
+		$public = DbAccess::public_address( $r );
+
+		if ( '' !== $public ) {
+			$listen[] = $public;
+		}
+
+		return array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
+	}
+
+	/**
+	 * Phase listen: the guest listens on, and has in its certificate, the addresses the VM has now. Sent once, then its
+	 * status is waited for. An add that cannot be done stops here, before anything is opened; a remove that cannot be
+	 * done is reported (the address is gone anyway) and the change goes on.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @return StepResult|null
+	 */
+	private function phase_listen( array $record ) {
+		$v = $this->verified( $record, 'db_ip' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		$record['node'] = $v['node'];
+		$op             = $this->op();
+
+		if ( empty( $op['listen_request'] ) ) {
+			$op['listen_request'] = wp_generate_uuid4();
+			$op['listen_sent']    = false;
+			$op['listen_at']      = time();
+
+			if ( ! $this->r->set( array( self::OP => $op ) ) ) {
+				return StepResult::retry( 0, 'db_ip: progress could not be stored' );
+			}
+		}
+
+		$request = (string) $op['listen_request'];
+		$waited  = time() - (int) ( $op['listen_at'] ?? time() ) > self::LISTEN_BUDGET;
+
+		if ( empty( $op['listen_sent'] ) ) {
+			$sent = DbJob::send( $this->client, $record, self::listen_job( $this->r, $request ) );
+
+			if ( is_wp_error( $sent ) ) {
+				return $waited ? $this->listen_failed( $op, 'The guest agent did not accept the listen job' ) : StepResult::poll( 10, 'db_ip: waiting for the guest agent', self::LISTEN_BUDGET );
+			}
+
+			$op['listen_sent'] = true;
+			$op['listen_at']   = time();
+
+			return $this->r->set( array( self::OP => $op ) ) ? StepResult::poll( 5, 'db_ip: the listen addresses were sent', self::LISTEN_BUDGET ) : StepResult::retry( 0, 'db_ip: progress could not be stored' );
+		}
+
+		$status = DbGuest::status( $this->client, (string) $record['node'], (int) $record['vmid'], $request );
+
+		if ( null !== $status && 'failed' === $status['state'] ) {
+			// A guest from before the job existed refuses the job itself (step "job").
+			return $this->listen_failed( $op, 'job' === $status['step']
+				? 'The database server does not know the listen job: its template is older than the guest script that supports it. Rebuild the database template'
+				: 'The database server did not apply the listen addresses (step ' . $status['step'] . ')' );
+		}
+
+		if ( null === $status || 'ready' !== $status['state'] ) {
+			return $waited ? $this->listen_failed( $op, 'The database server did not apply the listen addresses within 10 minutes' ) : StepResult::poll( 10, 'db_ip: waiting for the database server', self::LISTEN_BUDGET );
+		}
+
+		return null;
+	}
+
+	/**
+	 * The listen job did not work. An add fails (the job is forgotten so that a retry sends it again); a remove tells the
+	 * admin and goes on.
+	 *
+	 * @param array<string, mixed> $op  Stored operation.
+	 * @param string               $why Reason.
+	 * @return StepResult|null
+	 */
+	private function listen_failed( array $op, string $why ) {
+		if ( 'remove' === ( $op['action'] ?? '' ) ) {
+			\BeltoftServices\Alerts::admin( $this->r, $why . '. The public address was taken away, but the server may still list it in listen_addresses and its certificate.' );
+
+			return null;
+		}
+
+		unset( $op['listen_request'], $op['listen_sent'], $op['listen_at'] );
+		$this->r->set( array( self::OP => $op ) );
+
+		return StepResult::fail( $why . '. The public address is attached to the VM, but nothing is open to it.' );
 	}
 
 	/**
