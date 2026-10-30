@@ -87,7 +87,9 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 
 	public function test_domain_form_is_offered_only_for_supported_apps_and_owned_zones(): void {
 		$r = $this->server( 'wordpress', array( 'app_domain' => 'shop.mine.example', 'app_zone' => 'mine.example' ) );
-		$this->assertStringNotContainsString( 'name="app_domain_mode"', $this->html( $r ) );
+		$without = $this->html( $r );
+		$this->assertStringNotContainsString( 'name="app_domain_mode" value="change"', $without, 'No zone of ours: only keep, own domain and none.' );
+		$this->assertStringContainsString( 'name="app_domain_mode" value="own"', $without );
 		$this->zone( (int) $r->license()['user_id'] );
 		$html = $this->html( $r );
 		$this->assertStringContainsString( 'data-domain="1"', $html );
@@ -99,7 +101,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'name="app_domain_mode" value="none"', $html );
 
 		$coolify = $this->server( 'coolify', array(), 5001 );
-		$this->assertStringNotContainsString( 'name="app_domain_mode"', $this->html( $coolify ) );
+		$this->assertStringContainsString( 'data-app-domain data-current-domain="" hidden', $this->html( $coolify ), 'The block stays hidden for an app without a domain.' );
 	}
 
 	public function test_plain_server_offers_a_domain_only_for_wordpress_and_loads_controls(): void {

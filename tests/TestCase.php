@@ -55,6 +55,9 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 		add_filter( 'pre_http_request', array( $this, 'record_http' ), 10, 3 );
 
+		// A public DNS lookup (an app on the customer's own domain) answers "nothing there" and never reaches the network; a test sets its own answers.
+		add_filter( 'beltoft_services_dns_resolve', static fn( $answer ) => null === $answer ? array() : $answer );
+
 		// Re-reads of a lagging Proxmox status never sleep in tests; the pauses are counted.
 		$this->pauses = array();
 		add_filter(

@@ -97,6 +97,11 @@ final class AppInstall {
 		if ( ! $r || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || '' === (string) $r->get( 'app_id' ) || in_array( $r->get( 'app_state' ), array( 'ready', 'installing', 'failed' ), true ) ) {
 			return;
 		}
+		// A name on the customer's own DNS: the install waits until it points at the server (AppOwnDomain queues it again).
+		if ( AppOwnDomain::waiting( $r ) ) {
+			AppOwnDomain::start( $r );
+			return;
+		}
 		$locked = $r->locked( static function () use ( $r ) {
 			$plan = (array) $r->get( 'plan' );
 			$record = VmRecords::for_resource( $r->id() );

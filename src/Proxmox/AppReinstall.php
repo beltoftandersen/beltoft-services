@@ -370,7 +370,7 @@ final class AppReinstall {
 		foreach ( (array) ( $options['apps'] ?? array() ) as $entry ) {
 			$supports = $supports || ! empty( $entry['def']['domain'] );
 		}
-		if ( ! $zones || ! $supports ) {
+		if ( ! $supports ) {
 			return;
 		}
 
@@ -378,23 +378,30 @@ final class AppReinstall {
 		$default = '' === $current ? 'none' : 'keep';
 		$id = 'beltoft-app-domain-' . $r->id();
 		$made = '' !== (string) $r->get( 'app_domain' ) && true === $r->get( 'app_domain_made' );
-		echo '<fieldset class="beltoft-services-app-reinstall__domain" data-app-domain data-current-domain="' . esc_attr( $current ) . '"' . ( $made ? ' data-domain-made="1"' : '' ) . ( $options['plain'] || self::NONE === $options['selected'] ? ' hidden' : '' ) . '><legend>' . esc_html__( 'Domain', 'beltoft-services' ) . '</legend>';
+		echo '<fieldset class="beltoft-services-app-reinstall__domain" data-app-domain data-current-domain="' . esc_attr( $current ) . '"' . ( $made ? ' data-domain-made="1"' : '' ) . ( $options['plain'] || self::NONE === $options['selected'] || empty( $options['app']['domain'] ) ? ' hidden' : '' ) . '><legend>' . esc_html__( 'Domain', 'beltoft-services' ) . '</legend>';
 		if ( '' !== $current ) {
 			echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="keep" checked> ';
 			/* translators: %s: existing app domain. */
 			echo esc_html( sprintf( __( 'Keep %s', 'beltoft-services' ), $current ) );
 			echo '<span class="description">' . esc_html__( 'The record stays as it is.', 'beltoft-services' ) . '</span></label>';
 		}
-		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="change"> ' . esc_html__( 'Use another domain', 'beltoft-services' );
-		echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) . '</span></label>';
-		echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-fields hidden>';
-		echo '<label for="' . esc_attr( $id . '-zone' ) . '">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><select id="' . esc_attr( $id . '-zone' ) . '" name="app_zone">';
-		foreach ( $zones as $zone ) {
-			echo '<option value="' . esc_attr( $zone ) . '">' . esc_html( $zone ) . '</option>';
+		if ( $zones ) {
+			echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="change"> ' . esc_html__( 'Use another domain', 'beltoft-services' );
+			echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) . '</span></label>';
+			echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-fields hidden>';
+			echo '<label for="' . esc_attr( $id . '-zone' ) . '">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><select id="' . esc_attr( $id . '-zone' ) . '" name="app_zone">';
+			foreach ( $zones as $zone ) {
+				echo '<option value="' . esc_attr( $zone ) . '">' . esc_html( $zone ) . '</option>';
+			}
+			echo '</select><label for="' . esc_attr( $id . '-sub' ) . '">' . esc_html__( 'Subdomain', 'beltoft-services' ) . '</label>';
+			echo '<input type="text" id="' . esc_attr( $id . '-sub' ) . '" name="app_sub" maxlength="120" placeholder="www" autocomplete="off">';
+			echo '<span class="description">' . esc_html__( 'Leave empty to use the domain itself.', 'beltoft-services' ) . '</span></div>';
 		}
-		echo '</select><label for="' . esc_attr( $id . '-sub' ) . '">' . esc_html__( 'Subdomain', 'beltoft-services' ) . '</label>';
-		echo '<input type="text" id="' . esc_attr( $id . '-sub' ) . '" name="app_sub" maxlength="120" placeholder="www" autocomplete="off">';
-		echo '<span class="description">' . esc_html__( 'Leave empty to use the domain itself.', 'beltoft-services' ) . '</span></div>';
+		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="own"> ' . esc_html__( 'Use my own domain', 'beltoft-services' );
+		echo '<span class="description">' . esc_html__( 'For a domain registered or hosted elsewhere. We change no DNS records. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server.', 'beltoft-services' ) . '</span></label>';
+		echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-own-fields hidden>';
+		echo '<label for="' . esc_attr( $id . '-own' ) . '">' . esc_html__( 'Your domain name', 'beltoft-services' ) . '</label>';
+		echo '<input type="text" id="' . esc_attr( $id . '-own' ) . '" name="app_own" maxlength="253" placeholder="shop.example.com" autocomplete="off" spellcheck="false"></div>';
 		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="none"' . checked( $default, 'none', false ) . '> ' . esc_html__( 'No domain', 'beltoft-services' );
 		echo '<span class="description">' . esc_html__( 'The app uses the server address.', 'beltoft-services' ) . '</span></label>';
 		echo '</fieldset>';
@@ -431,7 +438,8 @@ final class AppReinstall {
 	/** A published name takes precedence over a requested name. */
 	private static function current_domain( Resource $r ): string {
 		$published = (string) $r->get( 'app_domain' );
-		return '' !== $published ? $published : (string) $r->get( 'app_domain_want' );
+		$wanted    = '' !== $published ? $published : (string) $r->get( 'app_domain_want' );
+		return '' !== $wanted ? $wanted : (string) $r->get( 'app_domain_own' );
 	}
 
 	/**
@@ -464,7 +472,7 @@ final class AppReinstall {
 			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
 		}
 		if ( empty( $app['domain'] ) ) {
-			if ( in_array( $raw, array( 'change', 'keep' ), true ) ) {
+			if ( in_array( $raw, array( 'change', 'keep', 'own' ), true ) ) {
 				return __( 'This app does not use a domain at install. You can add one later.', 'beltoft-services' );
 			}
 			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
@@ -474,6 +482,13 @@ final class AppReinstall {
 		}
 		if ( 'keep' === $mode ) {
 			return '' === $current ? __( 'This server has no domain to keep.', 'beltoft-services' ) : array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current );
+		}
+		if ( 'own' === $mode ) {
+			$own = AppOwnDomain::choose( $app, $args['app_own'] ?? '' );
+			if ( is_string( $own ) ) {
+				return $own;
+			}
+			return $current === $own['fqdn'] ? array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current ) : array( 'mode' => 'own', 'zone' => '', 'fqdn' => $own['fqdn'] );
 		}
 		if ( 'change' !== $mode ) {
 			return __( 'Choose a domain option.', 'beltoft-services' );
@@ -627,7 +642,12 @@ final class AppReinstall {
 
 		$meta = array( 'app_domain_error' => null, 'app_domain_tries' => null );
 		$published = (string) $r->get( 'app_domain' );
+		$own       = (string) $r->get( 'app_domain_own' );
 		if ( 'keep' === $choice['mode'] ) {
+			if ( '' !== $own && 'live' !== (string) $r->get( 'app_domain_dns' ) ) {
+				// The name was never confirmed, or the wait ran out: the wait starts again with the new install.
+				return array_merge( $meta, AppOwnDomain::fresh_wait( $own ) );
+			}
 			if ( '' !== (string) $r->get( 'app_domain_error' ) ) {
 				$meta['app_domain'] = null;
 				$meta['app_domain_want'] = $choice['fqdn'];
@@ -639,8 +659,10 @@ final class AppReinstall {
 		$meta['app_domain_made'] = null;
 		$meta['app_domain_want'] = 'change' === $choice['mode'] ? $choice['fqdn'] : null;
 		$meta['app_zone'] = 'change' === $choice['mode'] ? $choice['zone'] : null;
+		$meta = array_merge( $meta, 'own' === $choice['mode'] ? AppOwnDomain::fresh_wait( $choice['fqdn'] ) : AppOwnDomain::cleared() );
 
-		if ( '' !== $published && true !== $r->get( 'app_domain_made' ) ) {
+		// A name on the customer's own DNS never had a record of ours, so there is nothing to say was left behind.
+		if ( '' !== $published && '' === $own && true !== $r->get( 'app_domain_made' ) ) {
 			$meta['app_domain_left'] = array( 'zone' => (string) $r->get( 'app_zone' ), 'name' => $published );
 		} else {
 			$meta['app_domain_left'] = null;

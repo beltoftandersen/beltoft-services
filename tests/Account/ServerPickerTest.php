@@ -503,6 +503,22 @@ class ServerPickerTest extends BackupTestCase {
 		$this->assertNotSame( '', $carried['version'] );
 	}
 
+	public function test_an_own_domain_is_checked_and_carried_to_checkout(): void {
+		$result = $this->send( array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => AppField::MODE_OWN, AppField::POST_OWN => 'Shop.Elsewhere.Test' ) );
+
+		$this->assertSame( array(), $result['errors'] );
+		$carried = $this->server_lines()[0][ Picked::KEY ];
+		$this->assertSame( 'shop.elsewhere.test', $carried['own'] );
+		$this->assertSame( '', $carried['domain_on'], 'It is not a domain on our name servers.' );
+		$this->assertSame( '', $carried['zone'] );
+		WC()->cart->empty_cart();
+
+		$bad = $this->send( array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => AppField::MODE_OWN, AppField::POST_OWN => 'not a domain' ) );
+		$this->assertStringContainsString( 'not a domain name we can use', $bad['errors']['app'] );
+		$none = $this->send( array( AppField::POST_APP => 'wordpress', AppField::POST_DOMAIN => AppField::MODE_OWN, AppField::POST_OWN => '' ) );
+		$this->assertSame( 'Enter the domain name you want to use.', $none['errors']['app'] );
+	}
+
 	public function test_a_second_post_replaces_the_first_server_line(): void {
 		$this->send( array( ServerName::POST_KEY => 'first' ) );
 		$this->send( array( ServerPicker::PLAN => (string) $this->v['b-None']->get_id(), ServerName::POST_KEY => 'second' ) );
@@ -623,7 +639,7 @@ class ServerPickerTest extends BackupTestCase {
 	private function checkout( array $post ): array {
 		do_action( 'woocommerce_checkout_process' );
 
-		foreach ( array( OsField::POST_KEY, AppField::POST_APP, AppField::POST_VERSION, AppField::POST_DOMAIN, AppField::POST_ZONE, AppField::POST_SUB, ServerName::POST_KEY, SshKeyField::POST_KEY ) as $key ) {
+		foreach ( array( OsField::POST_KEY, AppField::POST_APP, AppField::POST_VERSION, AppField::POST_DOMAIN, AppField::POST_ZONE, AppField::POST_SUB, AppField::POST_OWN, ServerName::POST_KEY, SshKeyField::POST_KEY ) as $key ) {
 			unset( $_POST[ $key ] );
 		}
 
@@ -738,11 +754,11 @@ class ServerPickerTest extends BackupTestCase {
 
 		$this->assertMatchesRegularExpression( '#name="' . OsField::POST_KEY . '" value="9000"[^>]*checked#', $html, 'The cluster default.' );
 		$this->assertStringNotContainsString( 'value="carried', $html );
-		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'domain_on', 'zone', 'sub', 'name', 'ssh_key' ), '' ), Picked::for_cart() );
+		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'domain_on', 'zone', 'sub', 'own', 'name', 'ssh_key' ), '' ), Picked::for_cart() );
 	}
 
 	public function test_the_carried_data_is_cleaned(): void {
-		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'domain_on', 'zone', 'sub', 'name', 'ssh_key' ), '' ), Picked::clean( 'junk' ) );
+		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'domain_on', 'zone', 'sub', 'own', 'name', 'ssh_key' ), '' ), Picked::clean( 'junk' ) );
 
 		$clean = Picked::clean( array( 'os' => 9000, 'app' => array( 'x' ), 'evil' => 'x', 'name' => str_repeat( 'a', 500 ), 'domain_on' => '11' ) );
 		$this->assertSame( '9000', $clean['os'] );

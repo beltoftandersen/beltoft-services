@@ -69,6 +69,36 @@ final class DnsQuery {
 	}
 
 	/**
+	 * The addresses a public name resolves to, as any visitor would see them (not an authoritative read of our own
+	 * zones): the A records (type 'A') or AAAA records (type 'AAAA') of a name, following an alias. An empty list means
+	 * the name has none yet. A resolver that cannot be reached is an error, so a caller does not take it for "no record".
+	 * Tests answer through the filter beltoft_services_dns_resolve; nothing in a test run reaches the network.
+	 *
+	 * @param string $name Host name.
+	 * @param string $type A or AAAA.
+	 * @return array<int, string>|\WP_Error
+	 */
+	public static function addresses( string $name, string $type = 'A' ) {
+		$type = 'AAAA' === $type ? 'AAAA' : 'A';
+		$test = apply_filters( 'beltoft_services_dns_resolve', null, $name, $type );
+		if ( null !== $test ) {
+			if ( is_wp_error( $test ) ) { return $test; }
+			return is_array( $test ) ? array_values( array_map( 'strval', $test ) ) : new \WP_Error( 'bad_query', 'Invalid DNS query result.' );
+		}
+		$records = @dns_get_record( rtrim( $name, '.' ) . '.', 'AAAA' === $type ? DNS_AAAA : DNS_A ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
+		if ( false === $records ) {
+			// The system resolver reports "no such name" and "cannot reach a resolver" the same way; both mean not yet.
+			return new \WP_Error( 'dns_transport', 'The name did not resolve.' );
+		}
+		$out = array();
+		foreach ( $records as $record ) {
+			$value = 'AAAA' === $type ? ( $record['ipv6'] ?? '' ) : ( $record['ip'] ?? '' );
+			if ( is_string( $value ) && '' !== $value && $type === ( $record['type'] ?? '' ) ) { $out[] = strtolower( $value ); }
+		}
+		return array_values( array_unique( $out ) );
+	}
+
+	/**
 	 * The question sent to a name server. A name server refuses a direct question for the record
 	 * type RRSIG, so the signature check (type 46) asks for the zone's SOA with signatures
 	 * requested (EDNS0, DO bit) and reads the RRSIG that comes back with it.

@@ -210,6 +210,16 @@ final class AppTab {
 			$kind = 'waiting';
 		}
 
+		// A name on the customer's own DNS holds the install until it points at the server.
+		$own_name  = (string) $r->get( 'app_domain_own' );
+		$own_state = '' === $own_name ? '' : (string) $r->get( 'app_domain_dns' );
+		$own_wait  = AppOwnDomain::waiting( $r );
+
+		if ( $own_wait && 'waiting' === $kind && 'ready' === $server ) {
+			$kind = 'dns';
+		}
+
+		$own_since = AppOwnDomain::deadline( $r );
 		$installed = (int) $r->get( 'app_installed_at' );
 		$domain    = (string) $r->get( 'app_domain' );
 		$reveal    = is_string( $r->get( 'app_reveal' ) ) && '' !== $r->get( 'app_reveal' ) && (int) $r->get( 'app_reveal_until' ) > time();
@@ -251,6 +261,14 @@ final class AppTab {
 			'url'             => 'ready' === $kind ? self::url( $r, $app ) : '',
 			'secure'          => '' !== $domain,
 			'domain'          => $domain,
+			'own'             => array(
+				'name'     => $own_name,
+				'state'    => $own_state,
+				'ip'       => AppOwnDomain::address( $r ),
+				'reason'   => (string) $r->get( 'app_domain_dns_reason' ),
+				'deadline' => $own_since > 0 ? wp_date( get_option( 'date_format' ), $own_since ) : '',
+				'days'     => AppOwnDomain::WAIT_DAYS,
+			),
 			'domain_wanted'   => (string) $r->get( 'app_domain_want' ),
 			'domain_failed'   => '' !== (string) $r->get( 'app_domain_error' ),
 			'domain_reason'   => $domain_reason,

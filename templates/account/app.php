@@ -3,7 +3,7 @@
  * The App tab of a server page. Printed by BeltoftServices\Proxmox\AppTab::pane().
  *
  * Variables: $view (see AppTab::view()): name, version, installed, kind (waiting, installing, slow, ready,
- * failed), steps (label and status), position and total, step_label, url, secure, domain, domain_wanted,
+ * failed, dns), steps (label and status), position and total, step_label, url, secure, domain, domain_wanted,
  * domain_failed, can_retry, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
  * The login is never part of this template: the button asks the server for it once.
  *
@@ -17,6 +17,7 @@ $beltoft_services_status_text = array(
 	'waiting'    => __( 'Waiting for the server', 'beltoft-services' ),
 	'installing' => __( 'Installing', 'beltoft-services' ),
 	'slow'       => __( 'Taking longer than usual', 'beltoft-services' ),
+	'dns'        => __( 'Waiting for your DNS record', 'beltoft-services' ),
 	'ready'      => __( 'Ready', 'beltoft-services' ),
 	'failed'     => __( 'Not installed', 'beltoft-services' ),
 );
@@ -58,6 +59,45 @@ $beltoft_services_status_text = array(
 				</p>
 			<?php endif; ?>
 			<p class="description"><?php esc_html_e( 'You can leave this page. The login appears here when the app is ready.', 'beltoft-services' ); ?></p>
+		</div>
+	<?php elseif ( 'dns' === $beltoft_services_kind ) : ?>
+		<div class="beltoft-services-vm__more" data-app-own-domain>
+			<h4><?php esc_html_e( 'Point your domain at this server', 'beltoft-services' ); ?></h4>
+			<?php if ( '' !== $view['own']['ip'] ) : ?>
+				<p><?php
+				printf(
+					/* translators: 1: domain name, 2: server IPv4 address */
+					esc_html__( 'Point an A record for %1$s to %2$s.', 'beltoft-services' ),
+					'<strong>' . esc_html( (string) $view['own']['name'] ) . '</strong>',
+					'<strong>' . esc_html( (string) $view['own']['ip'] ) . '</strong>'
+				);
+				?></p>
+			<?php endif; ?>
+			<p data-app-own-status role="status">
+				<?php
+				echo esc_html(
+					match ( (string) $view['own']['reason'] ) {
+						'none'        => __( 'The name has no A record yet.', 'beltoft-services' ),
+						'other'       => __( 'The name has an A record, but it does not point to this server only. Remove the other addresses.', 'beltoft-services' ),
+						'aaaa'        => __( 'The name points to this server, but it also has an AAAA record. Remove the AAAA record, because this server has no IPv6 address.', 'beltoft-services' ),
+						'unreachable' => __( 'The name could not be looked up. We will try again.', 'beltoft-services' ),
+						default       => __( 'We have not looked yet. We check soon.', 'beltoft-services' ),
+					}
+				);
+				?>
+			</p>
+			<p class="description">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: 1: number of days, 2: date */
+						__( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', 'beltoft-services' ),
+						(int) $view['own']['days'],
+						(string) $view['own']['deadline']
+					)
+				);
+				?>
+			</p>
 		</div>
 	<?php elseif ( 'slow' === $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">
@@ -110,6 +150,46 @@ $beltoft_services_status_text = array(
 					echo ' ' . esc_html( $view['domain_reason'] );
 				}
 				echo ' ' . ( 'failed' === $beltoft_services_kind ? '' : esc_html__( 'The app uses the server address instead.', 'beltoft-services' ) );
+			?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( '' !== $view['own']['name'] && 'waiting' === $view['own']['state'] && 'dns' !== $beltoft_services_kind ) : ?>
+		<p class="description" data-app-own-domain-before>
+			<?php
+			if ( '' !== $view['own']['ip'] ) {
+				echo esc_html(
+					sprintf(
+						/* translators: 1: domain name, 2: server IPv4 address */
+						__( 'Point an A record for %1$s to %2$s. We check it once the server is ready, and the app is installed with HTTPS when the name points to the server.', 'beltoft-services' ),
+						(string) $view['own']['name'],
+						(string) $view['own']['ip']
+					)
+				);
+			} else {
+				echo esc_html(
+					sprintf(
+						/* translators: %s: domain name */
+						__( 'When the server has its address you can point an A record for %s to it here. The app is installed with HTTPS when the name points to the server.', 'beltoft-services' ),
+						(string) $view['own']['name']
+					)
+				);
+			}
+			?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( 'timeout' === $view['own']['state'] ) : ?>
+		<p class="description" data-app-own-domain-timeout>
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: 1: domain name, 2: number of days */
+					__( 'The name %1$s did not point to this server within %2$d days, so the app was installed on the server address, without HTTPS. You can reinstall the server and choose the domain again.', 'beltoft-services' ),
+					(string) $view['own']['name'],
+					(int) $view['own']['days']
+				)
+			);
 			?>
 		</p>
 	<?php endif; ?>

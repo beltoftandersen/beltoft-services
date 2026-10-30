@@ -32,6 +32,7 @@ final class Picked {
 		'domain_on' => 1,
 		'zone'      => 253,
 		'sub'       => 120,
+		'own'       => 253,
 		'name'      => 120,
 		'ssh_key'   => 8192,
 	);

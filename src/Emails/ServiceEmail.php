@@ -107,6 +107,8 @@ abstract class ServiceEmail extends \WC_Email {
 				'quarantine_signal' => in_array( $data['quarantine_signal'] ?? '', array( 'scan', 'syn', 'udp' ), true ) ? $data['quarantine_signal'] : 'scan',
 				'quarantine_counts' => is_array( $data['quarantine_counts'] ?? null ) ? array_map( 'intval', $data['quarantine_counts'] ) : array(),
 				'quarantine_at' => isset( $data['quarantine_at'] ) ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $data['quarantine_at'] ) : '',
+				'app_domain'    => isset( $data['app_domain'] ) && is_string( $data['app_domain'] ) ? $data['app_domain'] : '',
+				'app_name'      => (string) ( \BeltoftServices\Proxmox\Apps::definition( (string) $r->get( 'app_id' ) )['name'] ?? '' ),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);
 
@@ -160,7 +162,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$tab    = \BeltoftServices\Proxmox\DiskDriver::ID === $driver ? 'disks' : 'snapshots';
 		} elseif ( \BeltoftServices\Proxmox\SshKeyField::DRIVER === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			$server = $r;
-			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : '';
+			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : ( isset( $data['app_domain'] ) ? 'app' : '' );
 		}
 
 		$server_license = $server ? $server->license() : null;

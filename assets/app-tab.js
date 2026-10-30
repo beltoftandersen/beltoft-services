@@ -161,11 +161,12 @@
 	var pane = document.querySelector( '[data-app-pane]' );
 	var state = pane ? pane.getAttribute( 'data-app-state' ) : '';
 
-	if ( 'installing' === state || 'waiting' === state ) {
+	if ( 'installing' === state || 'waiting' === state || 'dns' === state ) {
+		// Waiting for DNS changes state at most every few minutes, so that page asks less often.
 		window.setInterval( function () {
 			if ( ! document.hidden && ! document.querySelector( 'dialog[open]' ) && ! pane.closest( '[hidden]' ) ) {
 				window.location.reload();
 			}
-		}, 20000 );
+		}, 'dns' === state ? 60000 : 20000 );
 	}
 }() );

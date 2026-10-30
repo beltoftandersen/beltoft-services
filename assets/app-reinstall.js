@@ -6,6 +6,7 @@
 		var apps = scope.querySelector( '[data-tiles="app"]' );
 		var domain = scope.querySelector( '[data-app-domain]' );
 		var fields = scope.querySelector( '[data-app-domain-fields]' );
+		var ownFields = scope.querySelector( '[data-app-domain-own-fields]' );
 		var none = domain ? domain.querySelector( 'input[name="app_domain_mode"][value="none"]' ) : null;
 		var removal = scope.querySelector( '[data-app-domain-removal]' );
 		var confirm = scope.closest( 'form' ).querySelector( '[data-app-domain-confirm]' );
@@ -38,7 +39,7 @@
 			say();
 		}
 
-		if ( ! apps || ! domain || ! fields || ! none ) {
+		if ( ! apps || ! domain || ! none ) {
 			return;
 		}
 
@@ -46,6 +47,7 @@
 			var app = apps.querySelector( 'input[name="app_version"]:checked' );
 			var supported = !! app && app.hasAttribute( 'data-domain' );
 			var change = domain.querySelector( 'input[name="app_domain_mode"][value="change"]' );
+			var own = domain.querySelector( 'input[name="app_domain_mode"][value="own"]' );
 			var mode = domain.querySelector( 'input[name="app_domain_mode"]:checked' );
 			var zone = domain.querySelector( 'select[name="app_zone"]' );
 			var sub = domain.querySelector( 'input[name="app_sub"]' );
@@ -58,7 +60,12 @@
 				none.checked = true;
 			}
 			domain.hidden = ! supported;
-			fields.hidden = ! supported || ! change.checked;
+			if ( fields ) {
+				fields.hidden = ! supported || ! change || ! change.checked;
+			}
+			if ( ownFields ) {
+				ownFields.hidden = ! supported || ! own || ! own.checked;
+			}
 			if ( removal ) {
 				removal.hidden = ! removing;
 			}
