@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION        = '3';
+	public const DB_VERSION        = '4';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -42,6 +42,9 @@ final class Schema {
 			'resource_id' => array( 'resource_id' ),
 			'net_address' => array( 'net_id', 'address' ),
 		),
+		'ip_log' => array(
+			'PRIMARY' => array( 'id' ),
+		),
 		'usage' => array(
 			'resource_item_hour' => array( 'resource_id', 'item', 'hour_bucket' ),
 		),
@@ -61,6 +64,7 @@ final class Schema {
 			'private_nets' => $wpdb->prefix . 'beltoft_services_private_nets',
 			'private_ips' => $wpdb->prefix . 'beltoft_services_private_ips',
 			'usage' => $wpdb->prefix . 'bs_usage',
+			'ip_log' => $wpdb->prefix . 'beltoft_services_ip_log',
 		);
 	}
 
@@ -195,6 +199,21 @@ final class Schema {
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_id (resource_id),
 				UNIQUE KEY net_address (net_id,address)
+			) $collate;"
+		);
+
+		// Who held which address and when (public and private), for abuse reports. Rows are only added and closed.
+		dbDelta(
+			"CREATE TABLE {$t['ip_log']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				kind varchar(7) NOT NULL,
+				address varchar(45) NOT NULL,
+				resource_id bigint(20) unsigned NOT NULL,
+				started_at datetime NOT NULL,
+				ended_at datetime NULL DEFAULT NULL,
+				PRIMARY KEY  (id),
+				KEY address (address,started_at),
+				KEY resource_open (resource_id,kind,ended_at)
 			) $collate;"
 		);
 
