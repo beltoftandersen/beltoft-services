@@ -142,7 +142,7 @@ final class DiskField {
 		}
 	}
 
-	/** Checkout's one-item cart rule must leave the attached disk during this replacement. */
+	/** Checkout's one-item cart rule must leave the attached disk during this replacement. Public for a theme's own cart rule: no caller in this plugin. */
 	public static function server_swap_in_progress(): bool {
 		return self::$server_swap_depth > 0;
 	}

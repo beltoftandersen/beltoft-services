@@ -60,6 +60,10 @@ tests_add_filter(
 	static function () {
 		if ( class_exists( 'WC_Install' ) ) {
 			WC_Install::install();
+			// On a new database the install can skip its work (its lock) and the shop roles come later, so admin
+			// capability checks would fail on the first run only. Make them now; it is idempotent.
+			WC_Install::create_roles();
+			wp_roles()->for_site();
 		}
 
 		\BeltoftLicenses\Install::create_tables();
