@@ -206,6 +206,10 @@ final class Overview {
 			case 'attention':
 				return $data['attention'] ? self::template( 'overview/attention.php', array( 'items' => $data['attention'] ) ) : '';
 			case 'servers':
+				if ( $data['servers'] ) {
+					\BeltoftServices\Proxmox\LiveUsage::enqueue();
+				}
+
 				return $data['servers'] ? self::template(
 					'overview/servers.php',
 					array(

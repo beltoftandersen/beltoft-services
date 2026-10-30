@@ -172,10 +172,13 @@
 		var serial = 0;
 		var range = 'hour';
 		var started = false;
-		function load() {
+		var inflight = false;
+		// background: a refresh of the same range; it does not show the loading text, so the charts do not flicker.
+		function load( background ) {
 			var current = ++serial;
 			var asked = range;
-			notice.textContent = labels.loading;
+			inflight = true;
+			if ( ! background ) { notice.textContent = labels.loading; }
 			window.fetch( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/metrics?range=' + encodeURIComponent( asked ), {
 				credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce }
 			} ).then( function ( response ) {
@@ -185,26 +188,47 @@
 				return response.json();
 			} ).then( function ( body ) {
 				if ( current !== serial ) { return; }
+				inflight = false;
 				var points = body && Array.isArray( body.points ) ? body.points : [];
 				notice.textContent = points.length ? '' : labels.empty;
 				block.classList.toggle( 'is-empty', ! points.length );
 				block.querySelectorAll( '[data-chart]' ).forEach( function ( chart ) { render( chart, points, specs[ chart.getAttribute( 'data-chart' ) ], asked ); } );
-			} ).catch( function () { if ( current === serial ) { notice.textContent = labels.unavailable; block.classList.add( 'is-empty' ); } } );
+			} ).catch( function () {
+				if ( current !== serial ) { return; }
+				inflight = false;
+				if ( background && ! block.classList.contains( 'is-empty' ) ) { return; }
+				notice.textContent = labels.unavailable;
+				block.classList.add( 'is-empty' );
+			} );
+		}
+		// Live: every 60 seconds while the page is visible and the charts are not in a hidden tab; one request at a time.
+		var timer = null;
+		function visible() { return 'visible' === document.visibilityState && ! block.closest( '[hidden]' ); }
+		function tick() { if ( started && ! inflight && visible() ) { load( true ); } }
+		function schedule() {
+			if ( timer ) { window.clearInterval( timer ); timer = null; }
+			if ( started && visible() ) { timer = window.setInterval( tick, 60000 ); }
 		}
 		// The charts are asked for when they can be seen: a tab that is not shown at load asks when it first is.
 		function start() {
 			if ( started || block.closest( '[hidden]' ) ) { return; }
 			started = true;
-			load();
+			load( false );
+			schedule();
 		}
 		block.querySelectorAll( '[data-range]' ).forEach( function ( button ) {
 			button.addEventListener( 'click', function () {
 				block.querySelectorAll( '[data-range]' ).forEach( function ( other ) { other.setAttribute( 'aria-pressed', other === button ? 'true' : 'false' ); } );
 				range = button.getAttribute( 'data-range' );
-				load();
+				load( false );
+				schedule();
 			} );
 		} );
-		panel.addEventListener( 'beltoft-services:tab', start );
+		panel.addEventListener( 'beltoft-services:tab', function () { start(); schedule(); } );
+		document.addEventListener( 'visibilitychange', function () {
+			schedule();
+			if ( started && visible() ) { if ( inflight ) { return; } load( true ); }
+		} );
 		start();
 	} );
 }() );

@@ -198,6 +198,8 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		$views  = $this->views( $server );
 		$known  = array( (int) $views[0]['id'] => $this->fresh( $server ) );
 
+		// One warm-up, so the one-time lookups (the kept readings) are not counted against the first call.
+		Servers::rows( $views, $known );
 		$before = $wpdb->num_queries;
 		Servers::rows( $views, $known );
 		$with = $wpdb->num_queries - $before;

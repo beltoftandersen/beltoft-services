@@ -396,15 +396,7 @@ final class ProxmoxJobs {
 
 				$before = Operations::cached_status( (int) $ours[ $vmid ] );
 
-				set_transient(
-					Operations::STATUS_PREFIX . $ours[ $vmid ],
-					array(
-						'power' => $power,
-						'cpu'   => (float) ( $vm['cpu'] ?? 0 ),
-						'mem'   => (int) ( $vm['mem'] ?? 0 ),
-					),
-					HOUR_IN_SECONDS
-				);
+				self::remember_status( (int) $ours[ $vmid ], $vm );
 				$resource = Resource::find( (int) $ours[ $vmid ] );
 				if ( $resource ) { Monitor::power( $resource, $power ); }
 				if ( $resource ) { self::hostname_applied( $resource, $vm, $power, $before ); }
@@ -424,6 +416,31 @@ final class ProxmoxJobs {
 
 			set_transient( self::RUNNING_PREFIX . $id, $running, 2 * HOUR_IN_SECONDS );
 		}
+	}
+
+	/**
+	 * Keeps one /cluster/resources row (power, CPU fraction, memory bytes) as the resource's status
+	 * transient. Shared by the power job and the live usage route. A row without a status is ignored.
+	 *
+	 * @param int                  $resource_id Resource id.
+	 * @param array<string, mixed> $vm          Row of /cluster/resources?type=vm.
+	 */
+	public static function remember_status( int $resource_id, array $vm ): void {
+		$power = (string) ( $vm['status'] ?? '' );
+
+		if ( '' === $power ) {
+			return;
+		}
+
+		set_transient(
+			Operations::STATUS_PREFIX . $resource_id,
+			array(
+				'power' => $power,
+				'cpu'   => (float) ( $vm['cpu'] ?? 0 ),
+				'mem'   => (int) ( $vm['mem'] ?? 0 ),
+			),
+			HOUR_IN_SECONDS
+		);
 	}
 
 	/**

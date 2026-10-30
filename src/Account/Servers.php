@@ -368,6 +368,7 @@ final class Servers {
 		$rows = self::rows( $servers, $resources );
 
 		if ( $rows ) {
+			\BeltoftServices\Proxmox\LiveUsage::enqueue();
 			include self::file( 'servers-list.php' );
 		}
 
@@ -542,14 +543,24 @@ final class Servers {
 
 		if ( 'ready' === $group && ! $busy && null !== $status && 'running' === $power ) {
 			$bars[] = array(
+				'key'     => 'cpu',
 				'label'   => __( 'CPU', 'beltoft-services' ),
 				'percent' => max( 0, min( 100, (int) round( (float) $status['cpu'] * 100 ) ) ),
 			);
 
 			$memory = (int) ( $plan['memory_mb'] ?? 0 ) * 1048576;
+			// The guest's own figure (MemAvailable) when a fresh reading is kept: PVE counts page cache as used.
+			$guest = \BeltoftServices\Proxmox\LiveUsage::cached_memory( $resource->id() );
 
-			if ( $memory > 0 ) {
+			if ( null !== $guest ) {
 				$bars[] = array(
+					'key'     => 'mem',
+					'label'   => __( 'Memory', 'beltoft-services' ),
+					'percent' => $guest,
+				);
+			} elseif ( $memory > 0 ) {
+				$bars[] = array(
+					'key'     => 'mem',
 					'label'   => __( 'Memory', 'beltoft-services' ),
 					'percent' => max( 0, min( 100, (int) round( (int) $status['mem'] / $memory * 100 ) ) ),
 				);
@@ -559,6 +570,7 @@ final class Servers {
 
 			if ( null !== $disk ) {
 				$bars[] = array(
+					'key'     => 'disk',
 					'label'   => __( 'Disk', 'beltoft-services' ),
 					'percent' => max( 0, min( 100, (int) round( $disk['used'] / $disk['total'] * 100 ) ) ),
 				);

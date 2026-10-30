@@ -294,12 +294,10 @@ final class Routes {
 	 */
 	public static function guard( \WP_REST_Request $request, bool $ready, int $limit ) {
 		$user_id = get_current_user_id();
+		$limited = self::limited( $request, $limit );
 
-		if ( self::exceeded( $user_id, (string) $request->get_route(), $limit ) ) {
-			$response = self::error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ), 429 );
-			$response->header( 'Retry-After', (string) ( self::WINDOW - ( time() % self::WINDOW ) ) );
-
-			return $response;
+		if ( $limited ) {
+			return $limited;
 		}
 
 		$resource = Resource::find( (int) $request['id'] );
@@ -313,6 +311,23 @@ final class Routes {
 		}
 
 		return $resource;
+	}
+
+	/**
+	 * Counts this request against the route's limit: the 429 response when it is over, else null.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @param int              $limit   Default requests per minute for this route.
+	 */
+	public static function limited( \WP_REST_Request $request, int $limit ): ?\WP_REST_Response {
+		if ( ! self::exceeded( get_current_user_id(), (string) $request->get_route(), $limit ) ) {
+			return null;
+		}
+
+		$response = self::error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ), 429 );
+		$response->header( 'Retry-After', (string) ( self::WINDOW - ( time() % self::WINDOW ) ) );
+
+		return $response;
 	}
 
 	/**

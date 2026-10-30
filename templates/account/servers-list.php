@@ -22,12 +22,12 @@ defined( 'ABSPATH' ) || exit;
 				<span class="beltoft-services-state is-<?php echo esc_attr( $beltoft_services_row['tone'] ); ?>"><?php echo esc_html( $beltoft_services_row['state'] ); ?></span>
 				<?php if ( '' !== $beltoft_services_row['renews'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['renews'] ); ?></span><?php endif; ?>
 			</span>
-			<span class="beltoft-services-srv__bars">
+			<span class="beltoft-services-srv__bars" data-usage-resource="<?php echo (int) $beltoft_services_row['id']; ?>">
 				<?php foreach ( $beltoft_services_row['bars'] as $beltoft_services_bar ) : ?>
-					<span class="beltoft-services-bar">
+					<span class="beltoft-services-bar"<?php echo isset( $beltoft_services_bar['key'] ) ? ' data-usage-bar="' . esc_attr( $beltoft_services_bar['key'] ) . '"' : ''; ?>>
 						<span><?php echo esc_html( $beltoft_services_bar['label'] ); ?></span>
-						<span class="beltoft-services-bar__track"><i style="width:<?php echo (int) $beltoft_services_bar['percent']; ?>%"></i></span>
-						<span><?php echo (int) $beltoft_services_bar['percent']; ?>%</span>
+						<span class="beltoft-services-bar__track"><i data-usage-fill style="width:<?php echo (int) $beltoft_services_bar['percent']; ?>%"></i></span>
+						<span data-usage-text><?php echo (int) $beltoft_services_bar['percent']; ?>%</span>
 					</span>
 				<?php endforeach; ?>
 			</span>

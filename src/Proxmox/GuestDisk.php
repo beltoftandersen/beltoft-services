@@ -50,13 +50,14 @@ final class GuestDisk {
 
 	/**
 	 * Read a running VM at most once in six hours. A failed agent read waits one hour.
-	 * The customer route only reads the stored meta and never calls this method.
+	 * The customer route only reads the stored meta and never calls this method. $force (the live usage route,
+	 * which limits itself to one read in ten minutes per VM) skips the age and failure waits.
 	 *
 	 * @return array{used:int,total:int}|null
 	 */
-	public static function read( Resource $r ): ?array {
+	public static function read( Resource $r, bool $force = false ): ?array {
 		$disk = null;
-		$r->locked( static function () use ( $r, &$disk ): bool {
+		$r->locked( static function () use ( $r, &$disk, $force ): bool {
 			if ( 'proxmox' !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || $r->get( 'task' ) ) {
 				return false;
 			}
@@ -67,11 +68,11 @@ final class GuestDisk {
 				return false;
 			}
 			$disk = self::cached( $r );
-			if ( null !== $disk && ! self::due( $r ) ) {
+			if ( ! $force && null !== $disk && ! self::due( $r ) ) {
 				return false;
 			}
 			$disk = null;
-			if ( $now - (int) $r->get( 'disk_fail_at' ) < self::FAILURE_TTL ) {
+			if ( ! $force && $now - (int) $r->get( 'disk_fail_at' ) < self::FAILURE_TTL ) {
 				return false;
 			}
 
