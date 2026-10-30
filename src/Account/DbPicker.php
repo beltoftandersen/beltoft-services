@@ -298,8 +298,10 @@ final class DbPicker {
 			return;
 		}
 
-		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
-		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
+		// The engine tiles are the tiles of the server picker (tiles.css), so those load first.
+		\BeltoftServices\Proxmox\Tiles::enqueue();
+		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
+		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
 	}
 
 	// -- The page ----------------------------------------------------------------------------------
@@ -320,8 +322,14 @@ final class DbPicker {
 	 * Prints the page.
 	 */
 	public static function render(): void {
-		$plans    = self::plans();
-		$selected = self::selected( $plans );
+		$plans   = self::plans();
+		$engines = self::engines( $plans );
+		$asked   = self::asked_engine( $engines );
+		$pool    = '' === $asked ? $plans : array_filter( $plans, static fn( $plan ) => self::engine_id( $plan ) === $asked );
+
+		// ?engine= chooses the engine and with it the starting plan; without it the starting plan chooses the engine.
+		$selected = self::selected( $pool );
+		$engine   = '' !== $asked ? $asked : ( isset( $plans[ $selected ] ) ? self::engine_id( $plans[ $selected ] ) : (string) array_key_first( $engines ) );
 
 		echo '<div class="beltoft-services-picker">';
 		echo '<p class="beltoft-services-server__back"><a href="' . esc_url( ServiceArea::get( Databases::class )->url_list() ) . '">&lsaquo; ' . esc_html( ServiceArea::get( Databases::class )->all_label() ) . '</a></p>';
@@ -335,8 +343,13 @@ final class DbPicker {
 
 		echo '<p class="beltoft-services-picker__intro">' . esc_html__( 'Choose a plan. You pay on the next page.', 'beltoft-services' ) . '</p>';
 
-		if ( self::needs_notice( $plans, get_current_user_id() ) ) {
-			echo '<p class="beltoft-services-notice" role="status">' . wp_kses( DbNeedsServer::message( true ), array( 'a' => array( 'href' => array() ) ) ) . '</p>';
+		// The private network notice, for the engines whose plans need it (one engine: one notice, as before).
+		foreach ( $engines as $id => $one ) {
+			$mine = array_filter( $plans, static fn( $plan ) => self::engine_id( $plan ) === $id );
+
+			if ( self::needs_notice( $mine, get_current_user_id() ) ) {
+				echo '<p class="beltoft-services-notice" role="status" data-picker-notice="' . esc_attr( $id ) . '"' . ( $id === $engine ? '' : ' hidden' ) . '>' . wp_kses( DbNeedsServer::message( true ), array( 'a' => array( 'href' => array() ) ) ) . '</p>';
+			}
 		}
 
 		self::error( 'form' );
@@ -344,7 +357,13 @@ final class DbPicker {
 		echo '<form class="beltoft-services-picker__form" method="post" action="' . esc_url( self::url() ) . '">';
 		wp_nonce_field( self::NONCE, self::FIELD );
 
-		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) );
+		if ( count( $engines ) > 1 ) {
+			// Without script the engine row cannot filter: every plan stays visible and choosable.
+			echo '<noscript><style>.beltoft-services-picker .beltoft-services-plan[hidden]{display:block !important}</style></noscript>';
+			self::engine_tiles( $engines, $engine );
+		}
+
+		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) && self::engine_id( $plan ) === $engine );
 
 		echo '<fieldset class="beltoft-services-picker__plans"><legend class="beltoft-services-picker__legend">' . esc_html__( 'Plan', 'beltoft-services' ) . '</legend>';
 
@@ -355,7 +374,7 @@ final class DbPicker {
 		echo '<div class="beltoft-services-picker__grid">';
 
 		foreach ( $plans as $plan ) {
-			self::card( $plan, (int) $plan['variation_id'] === $selected );
+			self::card( $plan, (int) $plan['variation_id'] === $selected, self::engine_id( $plan ) !== $engine );
 		}
 
 		echo '</div>';
@@ -366,6 +385,36 @@ final class DbPicker {
 		echo '<p class="beltoft-services-picker__summary" data-picker-summary aria-live="polite">' . esc_html( isset( $plans[ $selected ] ) ? self::summary( $plans[ $selected ] ) : '' ) . '</p>';
 		echo '<button type="submit" class="beltoft-services-picker__button" data-picker-submit' . ( isset( $plans[ $selected ] ) ? '' : ' disabled' ) . '>' . esc_html__( 'Continue to checkout', 'beltoft-services' ) . '</button>';
 		echo '</div></form></div>';
+	}
+
+	/**
+	 * The engine row: one tile per engine with a plan on offer, the tiles of the system choice of the server picker.
+	 * The tiles only show the plans of the engine (picker.js); the posted plan alone decides what is bought.
+	 *
+	 * @param array<string, array<string, string>> $engines Engines on offer.
+	 * @param string                               $chosen  The engine that starts chosen.
+	 */
+	private static function engine_tiles( array $engines, string $chosen ): void {
+		echo '<fieldset class="beltoft-services-tiles beltoft-services-tiles--engine" data-picker-engines>';
+		echo '<legend class="beltoft-services-tiles__legend">' . esc_html__( 'Database', 'beltoft-services' ) . '</legend>';
+		echo '<div class="beltoft-services-tiles__grid">';
+
+		foreach ( $engines as $id => $engine ) {
+			echo '<label class="beltoft-services-tile">';
+			echo '<input class="beltoft-services-tile__input" type="radio" name="beltoft_services_db_engine" value="' . esc_attr( (string) $id ) . '"';
+			checked( (string) $id === $chosen, true );
+			echo '>';
+			echo '<span class="beltoft-services-tile__face">';
+			echo '<span class="beltoft-services-tile__name">' . esc_html( $engine['name'] ) . '</span>';
+
+			if ( '' !== $engine['line'] ) {
+				echo '<span class="beltoft-services-tile__line">' . esc_html( $engine['line'] ) . '</span>';
+			}
+
+			echo '</span></label>';
+		}
+
+		echo '</div></fieldset>';
 	}
 
 	/**
@@ -402,6 +451,56 @@ final class DbPicker {
 	}
 
 	/**
+	 * The engine id of a plan ("postgres", "valkey", "mssql"); a plan without one, or with one that does not exist, is PostgreSQL.
+	 *
+	 * @param array<string, mixed> $plan Plan.
+	 */
+	private static function engine_id( array $plan ): string {
+		$engine = DbEngines::for_plan( '' === (string) $plan['engine'] ? array() : array( 'engine' => $plan['engine'] ) );
+
+		return ( $engine ?? new PostgresEngine() )->id();
+	}
+
+	/**
+	 * The engines the plans on offer belong to, in the order the plans come: id => name and one line. An engine
+	 * appears as soon as one purchasable plan of it is offered, so a new engine needs no change here.
+	 *
+	 * @param array<int, array<string, mixed>> $plans Plans.
+	 * @return array<string, array{id: string, name: string, line: string}>
+	 */
+	public static function engines( array $plans ): array {
+		$out = array();
+
+		foreach ( $plans as $plan ) {
+			$id = self::engine_id( $plan );
+
+			if ( isset( $out[ $id ] ) ) {
+				continue;
+			}
+
+			$out[ $id ] = array(
+				'id'   => $id,
+				'name' => DbEngines::name( $id ),
+				'line' => DbEngines::description( $id ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The engine ?engine= asks for when it is offered, else ''.
+	 *
+	 * @param array<string, array<string, string>> $engines Engines on offer.
+	 */
+	private static function asked_engine( array $engines ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a starting choice that only selects among the offered engines.
+		$asked = isset( $_GET['engine'] ) && is_string( $_GET['engine'] ) ? sanitize_key( wp_unslash( $_GET['engine'] ) ) : '';
+
+		return isset( $engines[ $asked ] ) ? $asked : '';
+	}
+
+	/**
 	 * One line for the chosen plan: "Starter: €25.00 per month excluding VAT".
 	 *
 	 * @param array<string, mixed> $plan Plan.
@@ -423,8 +522,9 @@ final class DbPicker {
 	 *
 	 * @param array<string, mixed> $plan     Plan.
 	 * @param bool                 $selected Checked.
+	 * @param bool                 $hidden   Of another engine than the one chosen (picker.js shows it with its engine).
 	 */
-	private static function card( array $plan, bool $selected ): void {
+	private static function card( array $plan, bool $selected, bool $hidden = false ): void {
 		$stock = ! empty( $plan['in_stock'] );
 		$attrs = array(
 			'data-cores'       => (string) $plan['cores'],
@@ -432,9 +532,10 @@ final class DbPicker {
 			'data-disk'        => (string) $plan['disk_gb'],
 			'data-summary'     => self::summary( $plan ),
 			'data-has-backups' => '0',
+			'data-engine'      => self::engine_id( $plan ),
 		);
 
-		echo '<label class="beltoft-services-plan' . ( $stock ? '' : ' is-disabled' ) . '">';
+		echo '<label class="beltoft-services-plan' . ( $stock ? '' : ' is-disabled' ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
 		echo '<input class="beltoft-services-plan__input" type="radio" name="' . esc_attr( ServerPicker::PLAN ) . '" value="' . esc_attr( (string) $plan['variation_id'] ) . '"';
 		checked( $selected, true );
 		disabled( ! $stock, true );

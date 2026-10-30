@@ -29,6 +29,54 @@
 		Array.prototype.forEach.call( list, run );
 	}
 
+	// New database: the engine tiles show the plans of one engine and its notice, and choose the first plan on offer.
+	function engines() {
+		var tiles = form.querySelector( '[data-picker-engines]' );
+
+		if ( ! tiles ) {
+			return;
+		}
+
+		function show( id ) {
+			var first = null;
+			var current = form.querySelector( 'input[name="beltoft_services_picker_plan"]:checked' );
+
+			each( form.querySelectorAll( 'input[name="beltoft_services_picker_plan"]' ), function ( radio ) {
+				var mine = id === radio.getAttribute( 'data-engine' );
+				var card = radio.closest( '.beltoft-services-plan' );
+
+				if ( card ) {
+					card.hidden = ! mine;
+				}
+
+				if ( mine && ! first && ! radio.disabled ) {
+					first = radio;
+				}
+			} );
+
+			each( document.querySelectorAll( '[data-picker-notice]' ), function ( note ) {
+				note.hidden = id !== note.getAttribute( 'data-picker-notice' );
+			} );
+
+			if ( ( ! current || id !== current.getAttribute( 'data-engine' ) ) && first ) {
+				first.checked = true;
+				first.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			} else if ( ! first && current && id !== current.getAttribute( 'data-engine' ) ) {
+				// Nothing of this engine can be bought: leave no plan of another engine chosen.
+				current.checked = false;
+				current.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			}
+		}
+
+		each( tiles.querySelectorAll( 'input[type="radio"]' ), function ( radio ) {
+			radio.addEventListener( 'change', function () {
+				if ( radio.checked ) {
+					show( radio.value );
+				}
+			} );
+		} );
+	}
+
 	function chosen() {
 		return form.querySelector( 'input[name="beltoft_services_picker_plan"]:checked' );
 	}
@@ -174,5 +222,6 @@
 	} );
 
 	// The tile script handles the app's own change; the summary needs nothing from it.
+	engines();
 	update();
 }() );
