@@ -3,6 +3,9 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 <section class="beltoft-services-console" data-console>
+	<?php if ( ! empty( $r ) && $r->get( 'display_pending_at' ) ) : ?>
+		<p><?php esc_html_e( 'The console shows the server screen after the next restart.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
 	<p><?php esc_html_e( 'Use the console when you cannot log in with SSH. It shows the same screen as a monitor on the server.', 'beltoft-services' ); ?></p>
 	<div class="beltoft-services-console__toolbar" data-console-toolbar hidden>
 		<button type="button" class="beltoft-services-btn beltoft-services-console__action" data-console-fullscreen><?php esc_html_e( 'Full screen', 'beltoft-services' ); ?></button>

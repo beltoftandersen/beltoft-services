@@ -513,6 +513,7 @@ class FakeClient implements Client {
 			'net1'       => array( 'string' ),
 			'ide2'       => array( 'string' ),
 			'agent'      => array( 'string' ),
+			'vga'        => array( 'string' ),
 			'description' => array( 'string', false, array( 'max' => 8192 ) ),
 			'name'       => array( 'dnsname' ),
 			'digest'     => array( 'string', false, array( 'max' => 40 ) ),
@@ -1051,8 +1052,8 @@ class FakeClient implements Client {
 				$value = sprintf( 'virtio=BC:24:11:%02X:%02X:%02X', ( $id >> 8 ) & 255, $id & 255, 16 + (int) $nic[1] ) . substr( $value, 6 );
 			}
 
-			if ( 1 === preg_match( '/^net\d+$/D', (string) $key ) && is_string( $value ) && ! empty( $this->state['hold_net_rate'][ $id ] ) && 'running' === $this->state['vms'][ $id ]['status'] && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
-				// A rate change on a running NIC waits for the next restart (modelled).
+			if ( ( 'vga' === $key || 1 === preg_match( '/^net\d+$/D', (string) $key ) ) && is_string( $value ) && ! empty( $this->state['hold_net_rate'][ $id ] ) && 'running' === $this->state['vms'][ $id ]['status'] && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+				// A rate change on a running NIC, or a display change, waits for the next restart (modelled).
 				$this->state['net_pending'][ $id ][ $key ] = $value;
 				continue;
 			}
