@@ -227,9 +227,19 @@ final class LiveUsage {
 			return isset( $kept['percent'] ) ? (int) $kept['percent'] : self::pve_memory( $resource, $vm );
 		}
 
-		$percent = self::guest_memory( $client, (string) ( $vm['node'] ?? '' ), (int) $vm['vmid'] );
+		$node    = (string) ( $vm['node'] ?? '' );
+		$percent = null;
 
-		// A failed read is kept as well, so an absent agent is asked once a minute, not every poll.
+		// The agent is only asked on a VM that carries this resource's tag (the same proof as every other VM access).
+		if ( '' !== $node ) {
+			$config = Ownership::config( $client, $node, (int) $vm['vmid'] );
+
+			if ( ! is_wp_error( $config ) && Ownership::has_tag( (string) ( $config['description'] ?? '' ), Ownership::tag( $resource ) ) ) {
+				$percent = self::guest_memory( $client, $node, (int) $vm['vmid'] );
+			}
+		}
+
+		// A failed read or a missing tag is kept as well, so an absent agent is asked once a minute, not every poll.
 		set_transient( $key, null === $percent ? array( 'failed' => true ) : array( 'percent' => $percent ), self::MEM_TTL );
 
 		return $percent ?? self::pve_memory( $resource, $vm );

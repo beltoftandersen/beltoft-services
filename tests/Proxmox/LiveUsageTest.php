@@ -136,6 +136,21 @@ class LiveUsageTest extends MonitoringTestCase {
 		$this->assertSame( 25, $bars['cpu'] );
 	}
 
+	public function test_a_vm_without_our_tag_is_not_read_through_the_agent(): void {
+		$r = $this->ready_vm();
+		$this->owner( $r );
+		$this->fake->set_guest_file( 5000, '/proc/meminfo', self::MEMINFO );
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'description' => 'someone else' ) );
+		$entry = ( (array) $this->route()->get_data()['resources'] )[ $r->id() ];
+		$this->assertSame( 0, $this->calls( '/agent/file-read' ) );
+		$this->assertNull( LiveUsage::cached_memory( $r->id() ) );
+		$config_calls = $this->calls( '/qemu/5000/config' );
+		delete_transient( LiveUsage::ROWS_PREFIX . 'lab' );
+		$this->route();
+		$this->assertSame( $config_calls, $this->calls( '/qemu/5000/config' ), 'The outcome is kept a minute: the config is not read again.' );
+		$this->assertSame( 0, $this->calls( '/agent/file-read' ) );
+	}
+
 	public function test_meminfo_parser(): void {
 		$this->assertSame( 50, LiveUsage::meminfo( self::MEMINFO ) );
 		$this->assertNull( LiveUsage::meminfo( "MemTotal: 100 kB\n" ) );
