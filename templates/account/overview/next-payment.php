@@ -11,7 +11,12 @@
 
 defined( 'ABSPATH' ) || exit;
 ?>
-<section class="beltoft-services-ov__money">
+<section class="beltoft-services-ov__section beltoft-services-ov__billing">
+	<div class="beltoft-services-ov__head">
+		<h2><?php esc_html_e( 'Billing', 'beltoft-services' ); ?></h2>
+		<?php if ( '' !== $payment['url'] ) : ?><a href="<?php echo esc_url( $payment['url'] ); ?>"><?php esc_html_e( 'Go to Billing', 'beltoft-services' ); ?></a><?php endif; ?>
+	</div>
+	<div class="beltoft-services-ov__money">
 	<div class="beltoft-services-ov__moneyhead">
 		<span class="beltoft-services-ov__label"><?php esc_html_e( 'Next payment', 'beltoft-services' ); ?></span>
 		<span class="beltoft-services-ov__big"><?php echo wp_kses_post( $payment['amount'] ); ?></span>
@@ -28,5 +33,5 @@ defined( 'ABSPATH' ) || exit;
 			<dd><?php echo esc_html( $payment['card'] ); ?></dd>
 		<?php endif; ?>
 	</dl>
-	<?php if ( '' !== $payment['url'] ) : ?><a href="<?php echo esc_url( $payment['url'] ); ?>"><?php esc_html_e( 'Go to Billing', 'beltoft-services' ); ?></a><?php endif; ?>
+	</div>
 </section>

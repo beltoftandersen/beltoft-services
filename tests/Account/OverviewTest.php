@@ -409,6 +409,8 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'Server, Snapshots', $html );
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ), time() + 10 * DAY_IN_SECONDS ), $html );
 		$this->assertStringContainsString( 'Go to Billing', $html );
+		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-ov__head">\s*<h2>Billing</h2>#', $html, 'The payment has its own Billing heading, like the other sections.' );
+		$this->assertStringContainsString( 'beltoft-services-ov__label">Next payment', $html );
 	}
 
 	public function test_the_next_payment_names_the_default_card(): void {
