@@ -96,6 +96,7 @@ final class Plugin {
 		Proxmox\AppDomainRelease::register();
 		Proxmox\AppStatus::register();
 		Proxmox\MetricsRoute::register();
+		Proxmox\Flows::register();
 		Proxmox\LiveUsage::register();
 		Proxmox\FirewallRoute::register();
 		Proxmox\FirewallTab::register();

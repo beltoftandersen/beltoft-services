@@ -47,6 +47,13 @@ final class Firewall {
 
 	public const ACTIONS = array( 'fw_apply', 'fw_reset' );
 
+	/**
+	 * Jobs only the plugin queues (network quarantine and its lift), never offered to the customer.
+	 */
+	public const INTERNAL = array( 'fw_quarantine', 'fw_quarantine_lift' );
+
+	public const QUARANTINE_TAG = 'bs-sys:quarantine';
+
 	public const TAG_CUSTOMER = 'bs-fw:';
 	public const TAG_SYSTEM   = 'bs-sys:';
 	public const TAG_DB       = 'bs-db:';
@@ -715,6 +722,10 @@ final class Firewall {
 			return $v;
 		}
 
+		if ( in_array( $action, self::INTERNAL, true ) ) {
+			return 'fw_quarantine' === $action ? $this->quarantine( $record, $v ) : $this->lift( $record, $v );
+		}
+
 		if ( ! self::editable( $this->r ) || ( 'fw_apply' === $action && ! self::managed( $this->r ) ) ) {
 			return StepResult::done( array(), 'Firewall refused: not available for this server' );
 		}
@@ -1123,7 +1134,7 @@ final class Firewall {
 	private function base_options( string $base, array $options, array $v ) {
 		$want = array(
 			'enable'     => 1,
-			'policy_out' => 'ACCEPT',
+			'policy_out' => $this->policy_out(),
 			'macfilter'  => 1,
 		);
 
@@ -1367,7 +1378,8 @@ final class Firewall {
 			}
 		}
 
-		return true;
+		// A quarantined server keeps its quarantine through every reconcile.
+		return Quarantine::active( $this->r ) ? $this->add_quarantine_rules( $base, $rules ) : true;
 	}
 
 	/**
@@ -1418,7 +1430,7 @@ final class Firewall {
 			return $done;
 		}
 
-		$want = array( 'enable' => 1, 'policy_in' => 'DROP', 'policy_out' => 'ACCEPT', 'macfilter' => 1 );
+		$want = array( 'enable' => 1, 'policy_in' => 'DROP', 'policy_out' => $this->policy_out(), 'macfilter' => 1 );
 
 		if ( ! empty( $this->cluster['fw_ipfilter'] ) ) {
 			$ready = $this->ipfilter_sets( $base, $v );
@@ -1455,6 +1467,179 @@ final class Firewall {
 		}
 
 		return array();
+	}
+
+	// -- Network quarantine --------------------------------------------------------------------------
+
+	/**
+	 * The outgoing policy this server should have: DROP while it is quarantined, otherwise ACCEPT. Every reconcile
+	 * path takes it from here, so none of them can undo a quarantine.
+	 */
+	private function policy_out(): string {
+		return Quarantine::active( $this->r ) ? 'DROP' : 'ACCEPT';
+	}
+
+	/**
+	 * The outgoing rules of a quarantine, by comment: DNS (udp and tcp 53) to each name server of the cluster. Answers
+	 * to incoming connections need no rule: the firewall accepts established and related packets before its rules.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function quarantine_rules(): array {
+		$rules = array();
+
+		foreach ( array_values( array_unique( (array) ( $this->cluster['nameservers'] ?? array() ) ) ) as $ns ) {
+			foreach ( array( 'udp', 'tcp' ) as $proto ) {
+				$rules[ self::QUARANTINE_TAG . '-dns-' . $proto . '-' . $ns ] = array( 'action' => 'ACCEPT', 'type' => 'out', 'proto' => $proto, 'dport' => '53', 'dest' => (string) $ns, 'iface' => 'net0' );
+			}
+		}
+
+		return $rules;
+	}
+
+	/**
+	 * Adds the quarantine rules that are missing.
+	 *
+	 * @param string            $base  Firewall path.
+	 * @param array<int, mixed> $rules Listing.
+	 * @return true|StepResult
+	 */
+	private function add_quarantine_rules( string $base, array $rules ) {
+		foreach ( $this->quarantine_rules() as $comment => $params ) {
+			$done = $this->add_rule_once( $base, $rules, $comment, $params );
+
+			if ( $done instanceof StepResult ) {
+				return $done;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Blocks the server's outgoing traffic: the DNS rules first, then `policy_out` DROP (so DNS is never cut), read back.
+	 * Inbound is not changed; a firewall that was off is switched on with an explicit inbound ACCEPT, so nothing new closes.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 */
+	private function quarantine( array $record, array $v ): StepResult {
+		$flag = $this->r->get( Quarantine::META );
+
+		if ( ! is_array( $flag ) ) {
+			return StepResult::done( array(), 'Network quarantine refused: the server is not quarantined any more' );
+		}
+
+		$base    = self::base( $record, $v );
+		$options = $this->read_list( $base . '/options' );
+		$rules   = is_wp_error( $options ) ? $options : $this->read_list( $base . '/rules' );
+
+		if ( is_wp_error( $options ) || is_wp_error( $rules ) ) {
+			return $this->stop( is_wp_error( $options ) ? $options : $rules );
+		}
+
+		$done = $this->add_quarantine_rules( $base, $rules );
+
+		if ( $done instanceof StepResult ) {
+			return $done;
+		}
+
+		$change = array();
+
+		if ( 1 !== (int) ( $options['enable'] ?? 0 ) ) {
+			$change['enable'] = 1;
+
+			if ( '' === (string) ( $options['policy_in'] ?? '' ) ) {
+				$change['policy_in'] = 'ACCEPT';
+			}
+		}
+
+		if ( 'DROP' !== (string) ( $options['policy_out'] ?? '' ) ) {
+			$change['policy_out'] = 'DROP';
+		}
+
+		if ( $change ) {
+			$answer = $this->write( 'PUT', $base . '/options', $change );
+
+			if ( is_wp_error( $answer ) ) {
+				return $this->stop( $answer );
+			}
+		}
+
+		$options = $this->read_list( $base . '/options' );
+		$rules   = is_wp_error( $options ) ? $options : $this->read_list( $base . '/rules' );
+
+		if ( is_wp_error( $options ) || is_wp_error( $rules ) ) {
+			return $this->stop( is_wp_error( $options ) ? $options : $rules );
+		}
+
+		$comments = array_map( static fn( $rule ) => (string) ( is_array( $rule ) ? ( $rule['comment'] ?? '' ) : '' ), $rules );
+		$missing  = array_diff( array_keys( $this->quarantine_rules() ), $comments );
+
+		if ( 1 !== (int) ( $options['enable'] ?? 0 ) || 'DROP' !== (string) ( $options['policy_out'] ?? '' ) || $missing ) {
+			return StepResult::retry( 0, 'firewall: the quarantine read back from Proxmox differs from the one written' );
+		}
+
+		return StepResult::done( array( Quarantine::META => Quarantine::notify( $this->r ) ), 'Network quarantine applied: outgoing traffic blocked' );
+	}
+
+	/**
+	 * Lifts a quarantine: `policy_out` ACCEPT first, then the quarantine rules are removed, read back; the flag goes
+	 * only when Proxmox shows it (until then every reconcile keeps the quarantine).
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 */
+	private function lift( array $record, array $v ): StepResult {
+		$base    = self::base( $record, $v );
+		$options = $this->read_list( $base . '/options' );
+
+		if ( is_wp_error( $options ) ) {
+			return $this->stop( $options );
+		}
+
+		if ( 'ACCEPT' !== (string) ( $options['policy_out'] ?? 'ACCEPT' ) ) {
+			$answer = $this->write( 'PUT', $base . '/options', array( 'policy_out' => 'ACCEPT' ) );
+
+			if ( is_wp_error( $answer ) ) {
+				return $this->stop( $answer );
+			}
+		}
+
+		for ( $guard = 0; $guard < self::MAX_CEILING; $guard++ ) {
+			$rules = $this->read_list( $base . '/rules' );
+
+			if ( is_wp_error( $rules ) ) {
+				return $this->stop( $rules );
+			}
+
+			$listed = self::tagged( $rules, self::QUARANTINE_TAG );
+
+			if ( ! $listed ) {
+				break;
+			}
+
+			$target = $listed[0];
+			$digest = (string) ( $target['digest'] ?? '' );
+			$answer = $this->write( 'DELETE', $base . '/rules/' . (int) ( $target['pos'] ?? 0 ), '' !== $digest ? array( 'digest' => $digest ) : array() );
+
+			if ( is_wp_error( $answer ) ) {
+				return $this->stop( $answer );
+			}
+		}
+
+		$options = $this->read_list( $base . '/options' );
+		$rules   = is_wp_error( $options ) ? $options : $this->read_list( $base . '/rules' );
+
+		if ( is_wp_error( $options ) || is_wp_error( $rules ) ) {
+			return $this->stop( is_wp_error( $options ) ? $options : $rules );
+		}
+
+		if ( 'ACCEPT' !== (string) ( $options['policy_out'] ?? 'ACCEPT' ) || self::tagged( $rules, self::QUARANTINE_TAG ) ) {
+			return StepResult::retry( 0, 'firewall: the lifted quarantine read back from Proxmox is not gone' );
+		}
+
+		return StepResult::done( array( Quarantine::META => null ), 'Network quarantine lifted: outgoing traffic allowed again' );
 	}
 
 	/**
@@ -1496,7 +1681,7 @@ final class Firewall {
 			return $this->stop( is_wp_error( $options ) ? $options : $rules );
 		}
 
-		if ( 1 !== (int) ( $options['enable'] ?? 0 ) || (string) ( $options['policy_in'] ?? '' ) !== ( $on ? 'DROP' : 'ACCEPT' ) || 'ACCEPT' !== (string) ( $options['policy_out'] ?? 'ACCEPT' ) || 1 !== (int) ( $options['macfilter'] ?? 1 ) ) {
+		if ( 1 !== (int) ( $options['enable'] ?? 0 ) || (string) ( $options['policy_in'] ?? '' ) !== ( $on ? 'DROP' : 'ACCEPT' ) || $this->policy_out() !== (string) ( $options['policy_out'] ?? 'ACCEPT' ) || 1 !== (int) ( $options['macfilter'] ?? 1 ) ) {
 			return false;
 		}
 
@@ -1524,6 +1709,14 @@ final class Firewall {
 
 		if ( ! empty( $this->cluster['block_smtp'] ) && ! in_array( Provision::SMTP_COMMENT, $comments, true ) ) {
 			return false;
+		}
+
+		if ( Quarantine::active( $this->r ) ) {
+			foreach ( array_keys( $this->quarantine_rules() ) as $comment ) {
+				if ( ! in_array( $comment, $comments, true ) ) {
+					return false;
+				}
+			}
 		}
 
 		return ! self::has_private_nic( $v ) || in_array( self::PRIVATE_RULE, $comments, true );
@@ -1615,7 +1808,7 @@ final class Firewall {
 
 		// The policies are written, never left unset: Proxmox drops inbound traffic for a VM firewall without a
 		// policy_in, so an unset one would close a new server the moment the host enforces VM rules.
-		$answer = $this->write( 'PUT', $base . '/options', array( 'enable' => 1, 'policy_in' => 'ACCEPT', 'policy_out' => 'ACCEPT' ) );
+		$answer = $this->write( 'PUT', $base . '/options', array( 'enable' => 1, 'policy_in' => 'ACCEPT', 'policy_out' => $this->policy_out() ) );
 
 		if ( is_wp_error( $answer ) ) {
 			return $this->classify( $answer, 'configure' );

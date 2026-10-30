@@ -30,7 +30,7 @@ final class Panel {
 
 	public const CAPABILITY      = 'manage_woocommerce';
 	public const ACTION          = 'beltoft_services_resource';
-	public const ACTIONS         = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect', 'suspend', 'lift_hold' );
+	public const ACTIONS         = array( 'retry', 'pause', 'resume', 'delete', 'mark_deleted', 'protect', 'unprotect', 'suspend', 'lift_hold', 'quarantine_lift' );
 	public const CONFIRM         = 'DELETE';
 	public const CONFIRM_MARK    = 'MARK DELETED';
 	public const CONFIRM_SUSPEND = 'SUSPEND';
@@ -265,6 +265,10 @@ final class Panel {
 
 				return self::mark_deleted( $r, $who );
 
+			case 'quarantine_lift':
+				// Queued: the firewall job restores the outgoing policy and clears the flag when Proxmox shows it.
+				return \BeltoftServices\Proxmox\Quarantine::request_lift( $r, $who ) ? true : self::error( 'no_quarantine' );
+
 			default:
 				$protect = 'protect' === $action;
 				$stored  = $r->locked(
@@ -420,6 +424,7 @@ final class Panel {
 			'confirm_breach' => sprintf( __( 'This license is marked for a breach of the terms. Type %s to create a service anyway.', 'beltoft-services' ), \BeltoftServices\Breach::CONFIRM ),
 			'hold'         => __( 'This service is on breach hold. Lift the hold first.', 'beltoft-services' ),
 			'held'         => __( 'This service is on breach hold already.', 'beltoft-services' ),
+			'no_quarantine' => __( 'This server has no network quarantine.', 'beltoft-services' ),
 			'no_hold'      => __( 'This service is not on breach hold.', 'beltoft-services' ),
 			'protected'    => __( 'This service is protected. Unprotect it first.', 'beltoft-services' ),
 			'busy'         => __( 'The service is busy right now. Try again in a moment.', 'beltoft-services' ),
@@ -520,6 +525,7 @@ final class Panel {
 			'unprotect'    => __( 'The service is no longer protected.', 'beltoft-services' ),
 			'suspend'      => __( 'The service is suspended for breach.', 'beltoft-services' ),
 			'lift_hold'    => __( 'The breach hold was lifted.', 'beltoft-services' ),
+			'quarantine_lift' => __( 'The network quarantine will be lifted.', 'beltoft-services' ),
 		);
 
 		if ( isset( $messages[ $notice ] ) ) {
@@ -648,6 +654,12 @@ final class Panel {
 			__( 'Deletion warned', 'beltoft-services' ) => $warned ? wp_date( $format, $warned ) : '',
 		);
 
+		$quarantine = $r->get( \BeltoftServices\Proxmox\Quarantine::META );
+
+		if ( is_array( $quarantine ) ) {
+			$rows[ __( 'Network quarantine', 'beltoft-services' ) ] = \BeltoftServices\Proxmox\Quarantine::describe( $quarantine );
+		}
+
 		if ( $r->on_hold() ) {
 			$rows[ __( 'Breach hold since', 'beltoft-services' ) ] = wp_date( $format, (int) $r->get( 'breach_at' ) );
 			$rows[ __( 'Breach reason', 'beltoft-services' ) ]     = (string) $r->get( 'breach_reason' );
@@ -676,6 +688,10 @@ final class Panel {
 			} else {
 				self::button( $r, 'pause', __( 'Pause', 'beltoft-services' ) );
 			}
+		}
+
+		if ( \BeltoftServices\Proxmox\Quarantine::active( $r ) ) {
+			self::button( $r, 'quarantine_lift', __( 'Lift network quarantine', 'beltoft-services' ) );
 		}
 
 		if ( $r->get( 'protected' ) ) {

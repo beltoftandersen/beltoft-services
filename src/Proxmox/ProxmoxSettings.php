@@ -39,6 +39,11 @@ final class ProxmoxSettings {
 		'traffic_jump_factor' => array( 2, 1000 ),
 		'traffic_jump_floor_mbit' => array( 1, 100000 ),
 		'monitor_db_bans'  => array( 1, 100000 ),
+		'flow_minutes' => array( 1, 60 ),
+		'flow_scan_dsts' => array( 1, 1000000 ),
+		'flow_scan_dports' => array( 1, 65535 ),
+		'flow_syn_unreplied' => array( 1, 10000000 ),
+		'flow_udp_dsts' => array( 1, 10000000 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
 		'disk_reserve_gb' => array( 0, 10000 ),
 		'disk_promise_percent' => array( 1, 100 ),
@@ -355,6 +360,53 @@ final class ProxmoxSettings {
 			'label' => __( 'Database ban alert, banned addresses', 'beltoft-services' ),
 			'desc' => __( 'The admin is told when a database server has this many addresses banned for failed logins. It re-arms when the count falls below it.', 'beltoft-services' ),
 		);
+		$fields['traffic_quarantine'] = $base + array(
+			'type' => 'select',
+			'default' => 'report',
+			'options' => array(
+				'off' => __( 'Off', 'beltoft-services' ),
+				'report' => __( 'Report only: alert, change nothing', 'beltoft-services' ),
+				'on' => __( 'Quarantine the network', 'beltoft-services' ),
+			),
+			'label' => __( 'Connection flood and scan detection', 'beltoft-services' ),
+			'desc' => __( 'Reads the per-server connection counts the host sends every minute (route flows, signed with BELTOFT_SERVICES_FLOW_SECRET). Report only emails the alert address. Quarantine also blocks the server\'s outgoing traffic except DNS to the cluster name servers and answers to incoming connections, tells the customer, and stays until an admin lifts it.', 'beltoft-services' ),
+		);
+		$fields['flow_sources'] = $base + array(
+			'type' => 'textarea',
+			'default' => '10.10.10.1',
+			'label' => __( 'Addresses the host sends the counts from', 'beltoft-services' ),
+			'desc' => __( 'IPv4 addresses, separated by commas. A request from any other address is refused.', 'beltoft-services' ),
+		);
+		$fields['flow_minutes'] = $base + array(
+			'type' => 'number',
+			'default' => 5,
+			'min' => self::RANGES['flow_minutes'][0],
+			'label' => __( 'A signal counts after this many minutes in a row', 'beltoft-services' ),
+		);
+		$fields['flow_scan_dsts'] = $base + array(
+			'type' => 'number',
+			'default' => 500,
+			'min' => self::RANGES['flow_scan_dsts'][0],
+			'label' => __( 'Scanning: more than this many different destination addresses', 'beltoft-services' ),
+		);
+		$fields['flow_scan_dports'] = $base + array(
+			'type' => 'number',
+			'default' => 200,
+			'min' => self::RANGES['flow_scan_dports'][0],
+			'label' => __( 'Scanning: or more than this many different destination ports', 'beltoft-services' ),
+		);
+		$fields['flow_syn_unreplied'] = $base + array(
+			'type' => 'number',
+			'default' => 2000,
+			'min' => self::RANGES['flow_syn_unreplied'][0],
+			'label' => __( 'SYN flood: more than this many connection attempts never answered', 'beltoft-services' ),
+		);
+		$fields['flow_udp_dsts'] = $base + array(
+			'type' => 'number',
+			'default' => 5000,
+			'min' => self::RANGES['flow_udp_dsts'][0],
+			'label' => __( 'UDP flood: more than this many different UDP destinations', 'beltoft-services' ),
+		);
 
 		return $fields;
 	}
@@ -386,6 +438,13 @@ final class ProxmoxSettings {
 			$value['traffic_alerts'] = 'off';
 		}
 
+		if ( array_key_exists( 'traffic_quarantine', $value ) && ! in_array( $value['traffic_quarantine'], array( 'off', 'report', 'on' ), true ) ) {
+			$value['traffic_quarantine'] = 'report';
+		}
+		if ( array_key_exists( 'flow_sources', $value ) ) {
+			$value['flow_sources'] = self::clean_addresses( (string) $value['flow_sources'] );
+		}
+
 		// Not usable means not set: it is never replaced by a guess.
 		if ( array_key_exists( 'site_tag', $value ) && ! self::valid_tag( (string) $value['site_tag'] ) ) {
 			$value['site_tag'] = '';
@@ -403,5 +462,22 @@ final class ProxmoxSettings {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * The valid IPv4 addresses of a comma or space separated list, as one comma separated text; the default when none is left.
+	 *
+	 * @param string $text List.
+	 */
+	public static function clean_addresses( string $text ): string {
+		$out = array();
+
+		foreach ( preg_split( '/[\s,]+/', $text, -1, PREG_SPLIT_NO_EMPTY ) as $address ) {
+			if ( false !== filter_var( $address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+				$out[] = $address;
+			}
+		}
+
+		return $out ? implode( ',', array_values( array_unique( $out ) ) ) : '10.10.10.1';
 	}
 }

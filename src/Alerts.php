@@ -160,6 +160,75 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin about a connection signal (scanning, SYN flood or UDP flood) of one server. The caller keeps
+	 * the episode state (once per episode, re-armed after six quiet hours).
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $kind     Signal: scan, syn or udp.
+	 * @param string   $measured What was measured.
+	 * @param string   $mode     report or on (the quarantine mode).
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function flow( Resource $r, string $kind, string $measured, string $mode ): bool {
+		return self::admin_note(
+			$r,
+			sprintf( 'Connection signal: %s', $kind ),
+			array(
+				sprintf( 'Signal: %s', $kind ),
+				sprintf( 'Measured: %s', $measured ),
+				'on' === $mode ? 'Mode: quarantine. The outgoing traffic of the server is being blocked (a second mail confirms it).' : 'Report only. Nothing was changed and the customer was not told.',
+			)
+		);
+	}
+
+	/**
+	 * Tells the admin that a server's outgoing traffic was blocked (the network quarantine), or that it was again
+	 * within the repeat window.
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $measured What was seen.
+	 * @param bool     $repeat   A second quarantine within the repeat window.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function quarantine( Resource $r, string $measured, bool $repeat = false ): bool {
+		return self::admin_note(
+			$r,
+			$repeat ? 'Network quarantine, repeat' : 'Network quarantine',
+			array(
+				sprintf( 'Seen: %s', $measured ),
+				'Outgoing traffic of the server is blocked, except DNS to the cluster name servers and answers to incoming connections. Inbound is unchanged and the customer was told.',
+				$repeat ? 'This server was quarantined before within the last 7 days. No breach hold is set: you decide (Breach of terms on the license screen).' : 'It stays until you lift it: wp beltoft-services quarantine-lift <license id>, or the button on the license screen.',
+			)
+		);
+	}
+
+	/**
+	 * One mail to the alert address about a server.
+	 *
+	 * @param Resource           $r       Resource.
+	 * @param string             $subject Subject, after the site name.
+	 * @param array<int, string> $lines   Lines after the license and resource.
+	 */
+	private static function admin_note( Resource $r, string $subject, array $lines ): bool {
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) ) {
+			return false;
+		}
+
+		$license = $r->license();
+		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key     = (string) ( $license['license_key'] ?? '' );
+		$head    = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Resource: %d', $r->id() ),
+			sprintf( 'Driver: %s', $r->get( 'driver' ) ),
+		);
+
+		return (bool) wp_mail( $to, sprintf( '[%s] %s: %s', $site, $subject, self::mask( $key ) ), implode( "\n", array_merge( $head, $lines ) ) . "\n" );
+	}
+
+	/**
 	 * Alerts the admin once per hold that a service on breach hold has passed its days and was
 	 * not deleted (deletion is off or report only). The hold's date is stored in meta
 	 * `breach_alerted` under the resource lock, after the mail is attempted.

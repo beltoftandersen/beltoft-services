@@ -253,7 +253,7 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * {@inheritDoc}
 	 */
 	public function internal_actions(): array {
-		return Snapshots::INTERNAL;
+		return array_merge( Snapshots::INTERNAL, Firewall::INTERNAL );
 	}
 
 	/**

@@ -28,6 +28,7 @@ use BeltoftServices\Proxmox\DiskMeta;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\Clients;
 use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Quarantine;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
@@ -150,6 +151,30 @@ final class Commands {
 		}
 		$rows = IpfilterReport::rows( (string) $args[0], $client );
 		\WP_CLI\Utils\format_items( (string) ( $assoc_args['format'] ?? 'table' ), $rows, array( 'vmid', 'license', 'expected', 'actual', 'ipfilter', 'status' ) );
+	}
+
+	/**
+	 * Lifts the network quarantine of a server: outgoing traffic is allowed again (policy_out ACCEPT), the quarantine
+	 * rules are removed, the flag is cleared. Never automatic. Runs the firewall job now and reports what Proxmox shows.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <license>
+	 * : The license id of the server.
+	 *
+	 * @subcommand quarantine-lift
+	 */
+	public function quarantine_lift( array $args, array $assoc_args ): void {
+		unset( $assoc_args );
+		$resource = Resource::for_license( (int) ( $args[0] ?? 0 ) );
+		if ( ! $resource ) { \WP_CLI::error( 'The license has no live resource.' ); }
+		if ( ! Quarantine::request_lift( $resource, 'wp-cli' ) ) { \WP_CLI::error( 'This server has no network quarantine.' ); }
+		Jobs::act( $resource->id(), 'fw_quarantine_lift' );
+		$fresh = Resource::find( $resource->id() );
+		if ( $fresh && Quarantine::active( $fresh ) ) {
+			\WP_CLI::error( 'The quarantine is still on; the lift will be tried again. See the license history.' );
+		}
+		\WP_CLI::success( 'Network quarantine lifted.' );
 	}
 
 	/**

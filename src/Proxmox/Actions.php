@@ -457,8 +457,9 @@ final class Actions {
 	 */
 	public function run( string $action, array $args ): StepResult {
 		$internal = in_array( $action, Snapshots::INTERNAL, true );
+		$plugin   = $internal || in_array( $action, Firewall::INTERNAL, true );
 
-		if ( ! $internal && ! isset( self::FLOORS[ $action ] ) ) {
+		if ( ! $plugin && ! isset( self::FLOORS[ $action ] ) ) {
 			return StepResult::fail( 'This action is not available' );
 		}
 
@@ -468,7 +469,7 @@ final class Actions {
 			return StepResult::fail( 'VM record missing; check Proxmox manually' );
 		}
 
-		$why = $internal ? null : self::check( $this->r, $action, $args );
+		$why = $plugin ? null : self::check( $this->r, $action, $args );
 
 		// A refusal is an answer, not an error: no alert for a stray click.
 		if ( null !== $why ) {
@@ -481,7 +482,7 @@ final class Actions {
 		}
 
 		// The firewall has its own steps (read, add, remove, policy, read back).
-		if ( in_array( $action, Firewall::ACTIONS, true ) ) {
+		if ( in_array( $action, Firewall::ACTIONS, true ) || in_array( $action, Firewall::INTERNAL, true ) ) {
 			return ( new Firewall( $this->r ) )->run( $action, $args );
 		}
 
