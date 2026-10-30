@@ -88,6 +88,9 @@ final class Plugin {
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
+		Proxmox\ConsoleRoute::register();
+		Proxmox\ConsoleAuth::register();
+		Proxmox\ConsoleTab::register();
 		Proxmox\AppReveal::register();
 		Proxmox\AppInstall::register();
 		Proxmox\AppDomainRelease::register();

@@ -134,7 +134,7 @@ class AppTabTest extends MonitoringTestCase {
 			$this->assertStringContainsString( 'data-tab-link="' . $tab . '"', $html );
 		}
 
-		$this->assertSame( array( 'snapshots', 'backups', 'disks', 'access', 'reinstall', 'firewall', 'network', 'app' ), Servers::tabs() );
+		$this->assertSame( array( 'snapshots', 'backups', 'disks', 'access', 'reinstall', 'console', 'firewall', 'network', 'app' ), Servers::tabs() );
 	}
 
 	// -- The states ----------------------------------------------------------------------------

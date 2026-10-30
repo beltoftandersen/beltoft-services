@@ -575,6 +575,7 @@ class FakeClient implements Client {
 			),
 			array( 'POST', $node . '/status/(reboot)$#', 'h_power', array( 'timeout' => array( 'int', false, array( 'min' => 0 ) ) ) ),
 			array( 'GET', $node . '/status/current$#', 'h_status', $none ),
+			array( 'POST', $node . '/vncproxy$#', 'h_vncproxy', array( 'websocket' => array( 'bool', true ), 'generate-password' => array( 'bool', true ) ) ),
 			array( 'GET', $node . '/agent/get-fsinfo$#', 'h_fsinfo', $none ),
 			array( 'GET', $node . '/agent/get-osinfo$#', 'h_osinfo', $none ),
 			array(
@@ -1351,6 +1352,25 @@ class FakeClient implements Client {
 	 * @param array<int, string>   $a Captures.
 	 * @param array<string, mixed> $p Parameters.
 	 */
+	private function h_vncproxy( array $a, array $p ) {
+		$vm = $this->find( $a );
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+		if ( 'running' !== $vm['status'] || empty( $p['websocket'] ) || empty( $p['generate-password'] ) ) {
+			return $this->error( 500, 'console unavailable' );
+		}
+		$password = 'fake-vnc-' . bin2hex( random_bytes( 12 ) );
+		return array(
+			'port' => '5900',
+			'ticket' => $password . ':PVEVNC:fake-' . bin2hex( random_bytes( 12 ) ),
+			'password' => $password,
+			'cert' => 'fake-certificate',
+			'upid' => 'UPID:fake:console',
+			'user' => 'fake@pve',
+		);
+	}
+
 	private function h_status( array $a, array $p ) {
 		unset( $p );
 		$vm = $this->find( $a );
