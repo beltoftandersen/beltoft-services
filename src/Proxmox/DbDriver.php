@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Builds, pauses, resumes and deletes like a VM (Provision with DbProfile, Operations); what differs is the
- * build profile, the card and the one customer action. Phase 3: no public IP, no allow-list, no backups UI.
+ * build profile, the card and the one customer action. Backups are daily (Backups), restored with the server's own restore (Actions) and finished by DbRestore.
  */
 class DbDriver extends ProxmoxDriver {
 
@@ -72,15 +72,22 @@ class DbDriver extends ProxmoxDriver {
 	}
 
 	public function act( Resource $r, string $action, array $args ): StepResult {
-		unset( $args );
+		if ( DbActions::RESTORE === $action ) {
+			return ( new Actions( $r ) )->run( 'restore', $args );
+		}
 
 		return DbActions::RESET === $action ? ( new DbActions( $r ) )->run() : StepResult::fail( 'This database action is not available.' );
 	}
 
 	/**
-	 * The plan's disk is the data disk, and growing it is not built yet: nothing is changed, the admin is told.
+	 * A restore queues this change to start the server (DbRestore). Otherwise the plan's disk is the data disk,
+	 * and growing it is not built yet: nothing is changed, the admin is told.
 	 */
 	public function update_plan( Resource $r ): StepResult {
+		if ( DbRestore::waiting( $r ) ) {
+			return ( new DbRestore( $r ) )->finish();
+		}
+
 		Alerts::admin( $r, 'The plan of this database changed. Resizing a database is not automatic yet: nothing was changed.' );
 
 		return StepResult::done( array(), 'Plan change on a database was not applied' );

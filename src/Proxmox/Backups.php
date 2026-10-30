@@ -78,6 +78,11 @@ final class Backups {
 	public const ORPHANS = 'beltoft_services_orphaned_backups';
 
 	/**
+	 * Days a managed database's backups are kept when its plan names none: a database is always backed up.
+	 */
+	public const DB_DEFAULT_DAYS = 7;
+
+	/**
 	 * Cluster settings (token secret decrypted).
 	 *
 	 * @var array<string, mixed>
@@ -94,8 +99,8 @@ final class Backups {
 	// -- Rules -----------------------------------------------------------------------------------
 
 	/**
-	 * Does this server get backups? The plan asks for them, its cluster has a backup storage, and
-	 * it is not an adopted machine.
+	 * Does this server get backups? The plan asks for them (a managed database always does), its cluster
+	 * has a backup storage, and it is not an adopted machine.
 	 *
 	 * @param Resource $r Resource.
 	 */
@@ -157,14 +162,16 @@ final class Backups {
 	}
 
 	/**
-	 * Days the plan keeps backups.
+	 * Days the plan keeps backups. A managed database whose plan names none keeps DB_DEFAULT_DAYS: its backups
+	 * do not depend on a backup variation.
 	 *
 	 * @param Resource $r Resource.
 	 */
 	public static function days( Resource $r ): int {
 		$plan = (array) $r->get( 'plan' );
+		$days = max( 0, (int) ( $plan['backup_days'] ?? 0 ) );
 
-		return max( 0, (int) ( $plan['backup_days'] ?? 0 ) );
+		return 0 === $days && DbDriver::ID === $r->get( 'driver' ) ? self::DB_DEFAULT_DAYS : $days;
 	}
 
 	/**
@@ -703,11 +710,33 @@ final class Backups {
 			return null;
 		}
 
+		$view = self::listing( $r );
+		$list = $view['list'];
+
+		return array(
+			'enabled'     => $enabled,
+			'days'        => self::days( $r ),
+			'list'        => $list,
+			'last_ok'     => $view['last_ok'],
+			'add_url'     => $add,
+			'add_price'   => '' === $add ? '' : self::price_label( $r, true ),
+			'remove_url'  => $remove,
+			'can_restore' => $enabled && array() !== $list,
+		);
+	}
+
+	/**
+	 * The stored backup list and the time of the last good run, ready to print (no Proxmox call).
+	 *
+	 * @param Resource $r Resource.
+	 * @return array{list: array<int, array{volid: string, when: string, size: string}>, last_ok: string, last_ok_at: int}
+	 */
+	public static function listing( Resource $r ): array {
 		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 		$list   = array();
 		$stored = $r->get( 'backup_list' );
 
-		foreach ( $enabled && is_array( $stored ) ? $stored : array() as $item ) {
+		foreach ( self::enabled( $r ) && is_array( $stored ) ? $stored : array() as $item ) {
 			if ( is_array( $item ) && isset( $item['volid'], $item['ctime'] ) ) {
 				$list[] = array(
 					'volid' => (string) $item['volid'],
@@ -720,14 +749,9 @@ final class Backups {
 		$ok = (int) $r->get( 'backup_ok_at' );
 
 		return array(
-			'enabled'     => $enabled,
-			'days'        => self::days( $r ),
-			'list'        => $list,
-			'last_ok'     => $ok > 0 ? wp_date( $format, $ok ) : '',
-			'add_url'     => $add,
-			'add_price'   => '' === $add ? '' : self::price_label( $r, true ),
-			'remove_url'  => $remove,
-			'can_restore' => $enabled && array() !== $list,
+			'list'       => $list,
+			'last_ok'    => $ok > 0 ? wp_date( $format, $ok ) : '',
+			'last_ok_at' => $ok,
 		);
 	}
 

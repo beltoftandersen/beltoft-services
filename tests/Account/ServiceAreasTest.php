@@ -169,7 +169,7 @@ class ServiceAreasTest extends TestCase {
 		$this->assertSame( 'busy', $row['tone'] );
 	}
 
-	public function test_a_database_page_has_overview_and_new_password_tabs_with_real_links(): void {
+	public function test_a_database_page_has_overview_backups_and_new_password_tabs_with_real_links(): void {
 		$db    = $this->database( $this->user );
 		$views = $this->views( $db );
 		$id    = (int) $db->license()['id'];
@@ -188,7 +188,7 @@ class ServiceAreasTest extends TestCase {
 
 		$this->assertStringContainsString( 'aria-current="page">New password', $html );
 		$this->assertStringNotContainsString( 'Reachable from your servers', $html );
-		$this->assertSame( array( 'overview', 'password' ), array_keys( $this->db_area()->nav() ) );
+		$this->assertSame( array( 'overview', 'backups', 'password' ), array_keys( $this->db_area()->nav() ) );
 	}
 
 	public function test_a_database_in_progress_shows_the_progress_list_on_its_page(): void {

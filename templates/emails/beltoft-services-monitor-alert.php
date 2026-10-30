@@ -5,7 +5,19 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore
 $beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your server', 'beltoft-services' );
 $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu' ), true );
 ?>
-<?php if ( 'disk' === $monitor_reason || 'disk_urgent' === $monitor_reason ) : ?>
+<?php if ( 'db_disk' === $monitor_reason ) : ?>
+	<p><?php
+	/* translators: 1: database name, 2: percent used. */
+	echo esc_html( sprintf( __( '%1$s: the data disk is %2$d percent full.', 'beltoft-services' ), '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' ), $monitor_disk_percent ) );
+	?> <?php esc_html_e( 'When the disk is full, the database stops accepting changes.', 'beltoft-services' ); ?></p>
+	<p><?php esc_html_e( 'Delete data you do not need, or contact support to get a larger disk.', 'beltoft-services' ); ?></p>
+<?php elseif ( 'db_down' === $monitor_reason ) : ?>
+	<p><?php
+	/* translators: %s: database name. */
+	echo esc_html( sprintf( __( '%s has not answered its health check for about 10 minutes. We have been told.', 'beltoft-services' ), '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' ) ) );
+	?></p>
+	<p><?php esc_html_e( 'You do not need to do anything. If your applications still cannot connect after some time, contact support.', 'beltoft-services' ); ?></p>
+<?php elseif ( 'disk' === $monitor_reason || 'disk_urgent' === $monitor_reason ) : ?>
 	<?php $beltoft_services_pct = $monitor_disk_total > 0 ? (int) floor( 100 * $monitor_disk_used / $monitor_disk_total ) : 0; ?>
 	<p><?php
 	/* translators: 1: server name, 2: used disk space in GB, 3: total disk space in GB, 4: percent used. */
@@ -33,7 +45,7 @@ $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent
 	<p><?php esc_html_e( 'Your server has not been running for about 30 minutes. This alert was sent only if you did not shut it down from your account.', 'beltoft-services' ); ?></p>
 	<p><?php esc_html_e( 'Check the server in your account and start it if needed. Contact support if it does not start.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
-<p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'View your server in your account', 'beltoft-services' ); ?></a></p>
+<p><a href="<?php echo esc_url( $account_url ); ?>"><?php echo esc_html( in_array( $monitor_reason, array( 'db_down', 'db_disk' ), true ) ? __( 'View your database in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' ) ); ?></a></p>
 <?php if ( $beltoft_services_usage ) : ?>
 	<p><?php esc_html_e( 'You can turn these emails off for this server in your account, under Monitoring.', 'beltoft-services' ); ?></p>
 <?php endif; ?>

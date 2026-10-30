@@ -130,6 +130,15 @@ trait RestoreSteps {
 			}
 		}
 
+		// A managed database keeps its private address and its plugin-owned firewall, whatever the backup held.
+		if ( DbActions::is_db( $this->r ) ) {
+			$db = $this->reapply_database( $record, $v );
+
+			if ( null !== $db ) {
+				return $db;
+			}
+		}
+
 		// A restored or rolled back VM may come back without its firewall file: the dashboard's rules are written again from the stored ones.
 		if ( Firewall::managed( $this->r ) && true !== $this->r->get( Firewall::LOCKED ) ) {
 			$done = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure( $record, $v );
@@ -146,7 +155,10 @@ trait RestoreSteps {
 			return $named;
 		}
 
-		if ( ! $this->r->set( array( 'disk_gb' => (int) ceil( $size ), 'was_running' => $was_running ? true : null ) + ( 'rollback' === $what ? array( 'snapshot_rolled_at' => time() ) : array() ) ) ) {
+		// A database's plan disk is its data disk: the boot disk's size is not recorded as the plan's.
+		$sized = DbActions::is_db( $this->r ) ? array() : array( 'disk_gb' => (int) ceil( $size ) );
+
+		if ( ! $this->r->set( $sized + array( 'was_running' => $was_running ? true : null ) + ( 'rollback' === $what ? array( 'snapshot_rolled_at' => time() ) : array() ) ) ) {
 			return StepResult::retry( 0, $what . ': progress could not be stored' );
 		}
 
@@ -159,6 +171,48 @@ trait RestoreSteps {
 		Jobs::enqueue( $this->r->id() );
 
 		return null;
+	}
+
+	/**
+	 * A restored managed database: its private network card and address are the ones the service holds (a backup of
+	 * the same server has them; a mismatch is written back and the step goes round again), and the plugin-owned
+	 * firewall is written again (idempotent). Null: done.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 */
+	private function reapply_database( array $record, array $v ): ?StepResult {
+		$net = PrivateNets::for_resource( $this->r->id() );
+
+		if ( null === $net ) {
+			return StepResult::fail( 'Restore: the private network of this database is not recorded', array( 'restore' => null ) );
+		}
+
+		$wanted = PrivateNic::params( $net, $net['address'], (string) ( $this->cluster['private_bridge'] ?? '' ) );
+
+		if ( is_wp_error( $wanted ) ) {
+			return StepResult::fail( 'Restore: ' . $wanted->get_error_message(), array( 'restore' => null ) );
+		}
+
+		if ( ! PrivateNic::matches( (array) $v['config'], $wanted ) ) {
+			$params = $wanted;
+
+			if ( ! empty( $v['config']['digest'] ) ) {
+				$params['digest'] = (string) $v['config']['digest'];
+			}
+
+			$put = $this->client->request( 'PUT', '/nodes/' . rawurlencode( (string) $v['node'] ) . '/qemu/' . (int) $record['vmid'] . '/config', $params );
+
+			if ( is_wp_error( $put ) ) {
+				return $this->classify( $put, 'restore' );
+			}
+
+			return StepResult::retry( 0, 'restore: the private network card was put back' );
+		}
+
+		$done = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_database( $record, $v );
+
+		return $done instanceof StepResult ? $done : null;
 	}
 
 	/**

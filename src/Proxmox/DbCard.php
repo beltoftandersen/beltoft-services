@@ -34,6 +34,8 @@ final class DbCard {
 				'working' => __( 'Making a new password. This can take a minute.', 'beltoft-services' ),
 				'limit'   => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 				'once'    => __( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ),
+				'restoring' => __( 'Restoring the database. This can take several minutes.', 'beltoft-services' ),
+				'nobackup'  => __( 'Choose a backup.', 'beltoft-services' ),
 			),
 		) );
 	}
@@ -50,7 +52,10 @@ final class DbCard {
 		$ready   = 'ready' === $state && 'ready' === $db && false !== filter_var( $address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
 		$plan    = (array) $r->get( 'plan' );
 		$base    = DbGuest::ROLE . ':PASSWORD@' . $address . ':' . DbGuest::PORT . '/' . DbGuest::DATABASE;
-		$kind    = $ready ? 'ready' : ( 'paused' === $state ? 'paused' : ( 'failed' === $state ? 'failed' : 'building' ) );
+		$restore = 'ready' === $state && ( is_array( $r->get( 'restore' ) ) || DbRestore::waiting( $r ) );
+		$kind    = $restore ? 'restoring' : ( $ready ? 'ready' : ( 'paused' === $state ? 'paused' : ( 'failed' === $state ? 'failed' : 'building' ) ) );
+		$offered = DbActions::offered( $r );
+		$backups = self::backups( $r, $ready && ! $restore && $r->accepts_actions() && array_key_exists( DbActions::RESTORE, $offered ) );
 
 		return array(
 			'kind'        => $kind,
@@ -63,9 +68,10 @@ final class DbCard {
 			'fingerprint' => $ready && 1 === preg_match( '/^[0-9A-F:]{95}$/D', (string) $r->get( 'db_fingerprint' ) ) ? (string) $r->get( 'db_fingerprint' ) : '',
 			'ca_url'      => $ready && DbGuest::pem( (string) $r->get( 'db_ca_pem' ) ) ? DbRoutes::ca_url( $r->id() ) : '',
 			'can_reveal'  => $ready && DbRoutes::revealable( $r ),
-			'can_reset'   => $ready && $r->accepts_actions() && array() !== DbActions::offered( $r ),
+			'can_reset'   => $ready && $r->accepts_actions() && array_key_exists( DbActions::RESET, $offered ),
 			'resetting'   => '' !== (string) $r->get( 'db_reset_request' ),
 			'confirm'     => DbActions::CONFIRM,
+			'backups'     => $backups,
 			'version'     => (int) ( $plan['major'] ?? 0 ),
 			'size'        => sprintf(
 				/* translators: 1: number of vCPUs, 2: memory in GB, 3: disk in GB */
@@ -74,6 +80,31 @@ final class DbCard {
 				(string) round( (int) ( $plan['memory_mb'] ?? 0 ) / 1024, 1 ),
 				(int) ( $plan['disk_gb'] ?? 0 )
 			),
+		);
+	}
+
+	/**
+	 * The backups and the nightly dump, from stored data only (no Proxmox call): whether backups run, the days kept,
+	 * the list, the last good backup, the last nightly dump (from the guest's health file) and whether a restore may start.
+	 *
+	 * @param Resource $r       Database.
+	 * @param bool     $offered Whether a restore may be started now.
+	 * @return array<string, mixed>
+	 */
+	public static function backups( Resource $r, bool $offered ): array {
+		$enabled = Backups::enabled( $r );
+		$view    = Backups::listing( $r );
+		$dump    = (int) $r->get( 'db_last_dump' );
+		$format  = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+
+		return array(
+			'enabled'     => $enabled,
+			'days'        => Backups::days( $r ),
+			'list'        => $view['list'],
+			'last_ok'     => $view['last_ok'],
+			'last_dump'   => $dump > 0 ? wp_date( $format, $dump ) : '',
+			'can_restore' => $enabled && $offered && array() !== $view['list'],
+			'confirm'     => Actions::CONFIRM_RESTORE,
 		);
 	}
 

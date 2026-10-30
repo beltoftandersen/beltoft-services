@@ -401,6 +401,7 @@ final class ProxmoxJobs {
 				$resource = Resource::find( (int) $ours[ $vmid ] );
 				if ( $resource ) { Monitor::power( $resource, $power ); }
 				if ( $resource ) { self::hostname_applied( $resource, $vm, $power, $before ); }
+				if ( $resource && DbActions::is_db( $resource ) ) { DbMonitor::check( $resource, $one['client'], (string) ( $vm['node'] ?? '' ), $vmid, $power ); }
 
 				if ( 'running' === $power ) {
 					if ( $resource ) {
@@ -989,20 +990,26 @@ final class ProxmoxJobs {
 
 		$skip   = get_transient( self::BACKUP_RUN );
 		$skip   = is_array( $skip ) ? array_map( 'intval', $skip ) : array();
-		$driver = Registry::get( SshKeyField::DRIVER );
 		$picked = null;
 
-		if ( $driver ) {
+		// Servers first, then managed databases (their backups do not depend on a plan variation).
+		foreach ( array( SshKeyField::DRIVER, DbDriver::ID ) as $driver_id ) {
+			$driver = Registry::get( $driver_id );
+
+			if ( ! $driver ) {
+				continue;
+			}
+
 			foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
 				$resource = Resource::find( $id );
 
-				if ( ! $resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || in_array( $id, $skip, true ) ) {
+				if ( ! $resource || $driver_id !== $resource->get( 'driver' ) || in_array( $id, $skip, true ) ) {
 					continue;
 				}
 
 				if ( Backups::purge_due( $resource ) || Backups::due( $resource, time() ) ) {
 					$picked = $resource;
-					break;
+					break 2;
 				}
 			}
 		}

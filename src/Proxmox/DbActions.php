@@ -27,6 +27,12 @@ final class DbActions {
 	public const RESET   = 'db_reset_password';
 	public const CONFIRM = 'NEW PASSWORD';
 
+	/** The restore is the server's own action (Actions::run), with a database's wording. */
+	public const RESTORE = 'restore';
+
+	/** Restores per user, database and hour. */
+	private const RESTORE_LIMIT = 3;
+
 	/** Resets per user and hour. */
 	private const LIMIT = 5;
 
@@ -58,7 +64,14 @@ final class DbActions {
 	 * @return array<string, string>
 	 */
 	public static function offered( Resource $r ): array {
-		return 'ready' === $r->get( 'db_state' ) && Crypto::available() ? array( self::RESET => __( 'New password', 'beltoft-services' ) ) : array();
+		$out = 'ready' === $r->get( 'db_state' ) && Crypto::available() ? array( self::RESET => __( 'New password', 'beltoft-services' ) ) : array();
+
+		// A restore that has begun is finished even when the plan lost its backups meanwhile.
+		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
+			$out[ self::RESTORE ] = __( 'Restore from a backup', 'beltoft-services' );
+		}
+
+		return $out;
 	}
 
 	/**
@@ -70,7 +83,7 @@ final class DbActions {
 	 */
 	public static function buttons( $actions, $r ) {
 		if ( is_array( $actions ) && self::is_db( $r ) ) {
-			unset( $actions[ self::RESET ] );
+			unset( $actions[ self::RESET ], $actions[ self::RESTORE ] );
 		}
 
 		return $actions;
@@ -86,6 +99,10 @@ final class DbActions {
 	 * @return mixed
 	 */
 	public static function refusal( $refusal, $r, $action = '', $args = array() ) {
+		if ( self::is_db( $r ) && self::RESTORE === $action ) {
+			return self::restore_refusal( $refusal, $r, is_array( $args ) ? $args : array() );
+		}
+
 		if ( ! self::is_db( $r ) || self::RESET !== $action ) {
 			return $refusal;
 		}
@@ -101,6 +118,44 @@ final class DbActions {
 
 		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:db-reset', self::LIMIT, HOUR_IN_SECONDS ) ) {
 			return new \WP_Error( 'beltoft_services_rate_limited', __( 'The password can be changed five times an hour. Please try again later.', 'beltoft-services' ), array( 'status' => 429 ) );
+		}
+
+		return $refusal;
+	}
+
+	/**
+	 * The early refusal of a restore: the typed word, a restore or a new password already under way, the backup
+	 * (the server's own check), and the fixed floor.
+	 *
+	 * @param mixed                $refusal Refusal so far.
+	 * @param Resource             $r       Database.
+	 * @param array<string, mixed> $args    Arguments.
+	 * @return mixed
+	 */
+	private static function restore_refusal( $refusal, Resource $r, array $args ) {
+		if ( null !== $refusal ) {
+			return $refusal;
+		}
+
+		if ( Actions::CONFIRM_RESTORE !== ( $args['confirm'] ?? '' ) ) {
+			/* translators: %s: the word to type, RESTORE. */
+			return new \WP_Error( 'beltoft_services_confirm', sprintf( __( 'Type %s to confirm. Everything after this backup is lost.', 'beltoft-services' ), Actions::CONFIRM_RESTORE ), array( 'status' => 422 ) );
+		}
+
+		$state = $r->get( 'restore' );
+
+		if ( ( is_array( $state ) && ( $state['volid'] ?? '' ) !== ( $args['volid'] ?? '' ) ) || '' !== (string) $r->get( 'db_reset_request' ) || DbRestore::waiting( $r ) ) {
+			return new \WP_Error( 'beltoft_services_busy', __( 'The database is busy. Please try again when it is ready.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
+
+		$why = Actions::check( $r, self::RESTORE, $args );
+
+		if ( null !== $why ) {
+			return new \WP_Error( 'beltoft_services_refused', $why, array( 'status' => 422 ) );
+		}
+
+		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:db-restore:' . $r->id(), self::RESTORE_LIMIT, HOUR_IN_SECONDS ) ) {
+			return new \WP_Error( 'beltoft_services_rate_limited', __( 'A database can be restored three times an hour. Please try again later.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 
 		return $refusal;

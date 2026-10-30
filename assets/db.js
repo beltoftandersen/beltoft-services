@@ -1,6 +1,6 @@
 /**
  * My Account, managed database card: shows the password once (it replaces PASSWORD in the connection strings
- * while the customer looks at the page) and asks for a new password. No dependencies.
+ * while the customer looks at the page), asks for a new password and restores a backup. No dependencies.
  */
 ( function () {
 	'use strict';
@@ -63,23 +63,23 @@
 		} );
 	}
 
-	function waitForReset( box, panel, since, tries ) {
+	function waitForAction( box, panel, action, since, tries ) {
 		window.setTimeout( function () {
 			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
 				return response.ok ? response.json() : null;
 			} ).then( function ( data ) {
 				var last = data && data.last_result;
 
-				if ( last && 'db_reset_password' === last.action && last.at >= since ) {
+				if ( last && action === last.action && last.at >= since ) {
 					window.location.reload();
 				} else if ( tries < 60 ) {
-					waitForReset( box, panel, since, tries + 1 );
+					waitForAction( box, panel, action, since, tries + 1 );
 				} else {
 					window.location.reload();
 				}
 			} ).catch( function () {
 				if ( tries < 60 ) {
-					waitForReset( box, panel, since, tries + 1 );
+					waitForAction( box, panel, action, since, tries + 1 );
 				}
 			} );
 		}, 5000 );
@@ -94,7 +94,39 @@
 		post( panel, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
 				say( box, db.strings.working );
-				waitForReset( box, panel, since, 0 );
+				waitForAction( box, panel, 'db_reset_password', since, 0 );
+
+				return null;
+			}
+
+			button.disabled = false;
+
+			return response.json().then( function ( data ) {
+				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
+			} );
+		} ).catch( function () {
+			button.disabled = false;
+			say( box, db.strings.failed );
+		} );
+	}
+
+	function restore( box, panel, button ) {
+		var input = box.querySelector( '[data-db-restore-confirm]' );
+		var choice = box.querySelector( '[data-db-backup]' );
+		var since = Math.floor( Date.now() / 1000 ) - 5;
+
+		if ( ! choice || ! choice.value ) {
+			say( box, db.strings.nobackup );
+
+			return;
+		}
+
+		button.disabled = true;
+		say( box, '' );
+		post( panel, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ) ).then( function ( response ) {
+			if ( response.status === 202 ) {
+				say( box, db.strings.restoring );
+				waitForAction( box, panel, 'restore', since, 0 );
 
 				return null;
 			}
@@ -111,7 +143,7 @@
 	}
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore]' );
 		var box = button ? button.closest( '[data-db-card]' ) : null;
 		var panel = box ? box.closest( '[data-resource]' ) : null;
 
@@ -121,6 +153,8 @@
 
 		if ( button.hasAttribute( 'data-db-reveal' ) ) {
 			reveal( box, panel, button );
+		} else if ( button.hasAttribute( 'data-db-restore' ) ) {
+			restore( box, panel, button );
 		} else {
 			reset( box, panel, button );
 		}

@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Managed databases (driver kind `db`): a row per database (name, engine and major version, state, private host
- * address) and a page with an Overview tab (the connection details of DbCard) and a New password tab.
+ * address) and a page with an Overview tab (the connection details of DbCard), a Backups tab and a New password tab.
  */
 final class Databases extends ServiceArea {
 
@@ -71,7 +71,10 @@ final class Databases extends ServiceArea {
 	 * {@inheritDoc}
 	 */
 	protected function page_tabs(): array {
-		return array( 'password' => __( 'New password', 'beltoft-services' ) );
+		return array(
+			'backups'  => __( 'Backups', 'beltoft-services' ),
+			'password' => __( 'New password', 'beltoft-services' ),
+		);
 	}
 
 	/**

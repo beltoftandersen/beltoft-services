@@ -95,7 +95,8 @@ abstract class ServiceEmail extends \WC_Email {
 				'nameservers_shown' => 'domain' === $r->get( 'driver' ) && 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
 				'dns_only'      => 'dns' === $r->get( 'driver' ),
 				'nameservers'   => 'dns' === $r->get( 'driver' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
-				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk', 'disk_urgent', 'cpu' ), true ) ? $data['reason'] : 'down',
+				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk', 'disk_urgent', 'cpu', 'db_down', 'db_disk' ), true ) ? $data['reason'] : 'down',
+				'monitor_disk_percent' => max( 0, min( 100, (int) ( $data['disk_percent'] ?? 0 ) ) ),
 				'monitor_cpu_percent' => max( 0, min( 100, (int) ( $data['cpu_percent'] ?? 0 ) ) ),
 				'monitor_cpu_hours' => max( 0, (int) ( $data['cpu_hours'] ?? 0 ) ),
 				'monitor_upgrade_url' => 'proxmox' === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
@@ -163,6 +164,10 @@ abstract class ServiceEmail extends \WC_Email {
 
 		if ( in_array( $driver, array( 'domain', 'dns' ), true ) ) {
 			return self::domains_url( $r, $license );
+		}
+
+		if ( \BeltoftServices\Proxmox\DbDriver::ID === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( $license );
 		}
 
 		return $server_license ? \BeltoftServices\Account\Servers::url( $server_license, $tab ) : Endpoint::url_for_license( $license );

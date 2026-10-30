@@ -38,6 +38,7 @@ final class ProxmoxSettings {
 		'traffic_alert_mbit' => array( 1, 100000 ),
 		'traffic_jump_factor' => array( 2, 1000 ),
 		'traffic_jump_floor_mbit' => array( 1, 100000 ),
+		'monitor_db_bans'  => array( 1, 100000 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
 		'disk_reserve_gb' => array( 0, 10000 ),
 		'disk_promise_percent' => array( 1, 100 ),
@@ -346,6 +347,13 @@ final class ProxmoxSettings {
 			'min' => self::RANGES['traffic_jump_floor_mbit'][0],
 			'label' => __( 'Traffic jump floor, Mbit/s', 'beltoft-services' ),
 			'desc' => __( 'A jump under this hourly average is never alerted, so a quiet server going from 0.1 to 2 Mbit/s stays silent.', 'beltoft-services' ),
+		);
+		$fields['monitor_db_bans'] = $base + array(
+			'type' => 'number',
+			'default' => 50,
+			'min' => self::RANGES['monitor_db_bans'][0],
+			'label' => __( 'Database ban alert, banned addresses', 'beltoft-services' ),
+			'desc' => __( 'The admin is told when a database server has this many addresses banned for failed logins. It re-arms when the count falls below it.', 'beltoft-services' ),
 		);
 
 		return $fields;

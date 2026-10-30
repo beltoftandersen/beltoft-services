@@ -102,6 +102,49 @@ final class DbGuest {
 	}
 
 	/**
+	 * The guest's health file, checked: a bounded read, valid JSON, `ok` a boolean, `updated` a date, and each number
+	 * (connections, disk_percent, last_dump, cert_expires, bans) absent, null or a plain non-negative number. Anything
+	 * else rejects the whole file. Times are unix times (0 or null: not known yet).
+	 *
+	 * @return array{ok:bool,updated:int,connections:int|null,disk_percent:float|null,last_dump:int|null,cert_expires:int|null,bans:int|null}|null
+	 */
+	public static function health( Client $client, string $node, int $vmid ): ?array {
+		$h = self::read( $client, $node, $vmid, self::HEALTH );
+
+		if ( null === $h || ! is_bool( $h['ok'] ?? null ) || ! is_string( $h['updated'] ?? null ) ) {
+			return null;
+		}
+
+		$at = strtotime( $h['updated'] );
+
+		if ( false === $at ) {
+			return null;
+		}
+
+		$out = array( 'ok' => $h['ok'], 'updated' => $at );
+
+		foreach ( array( 'connections', 'last_dump', 'cert_expires', 'bans' ) as $key ) {
+			$value = $h[ $key ] ?? null;
+
+			if ( null !== $value && ( ! is_int( $value ) || $value < 0 || $value > 4294967295 ) ) {
+				return null;
+			}
+
+			$out[ $key ] = $value;
+		}
+
+		$percent = $h['disk_percent'] ?? null;
+
+		if ( null !== $percent && ( ! ( is_int( $percent ) || is_float( $percent ) ) || $percent < 0 || $percent > 100 ) ) {
+			return null;
+		}
+
+		$out['disk_percent'] = null === $percent ? null : (float) $percent;
+
+		return $out;
+	}
+
+	/**
 	 * Does the guest's health file say the database answers (and was written at or after $since)?
 	 */
 	public static function healthy( Client $client, string $node, int $vmid, int $since ): bool {

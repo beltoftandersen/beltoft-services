@@ -1,5 +1,5 @@
 <?php
-/** Customer email for server down or disk nearly full. @package BeltoftServices */
+/** Customer email for server down, disk nearly full or CPU high, and for a database that does not answer or whose disk is nearly full. @package BeltoftServices */
 namespace BeltoftServices\Emails;
 
 defined( 'ABSPATH' ) || exit;
@@ -8,7 +8,7 @@ final class MonitorAlert extends ServiceEmail {
 	public function __construct() {
 		$this->id = 'beltoft_services_monitor_alert';
 		$this->title = __( 'Server monitoring alert', 'beltoft-services' );
-		$this->description = __( 'Sent when a server is down unexpectedly, its disk is nearly full or its CPU stays high.', 'beltoft-services' );
+		$this->description = __( 'Sent when a server is down unexpectedly, its disk is nearly full or its CPU stays high, or when a database does not answer or its disk is nearly full.', 'beltoft-services' );
 		$this->template_html = 'emails/beltoft-services-monitor-alert.php';
 		$this->template_plain = 'emails/plain/beltoft-services-monitor-alert.php';
 		parent::__construct();
@@ -34,7 +34,14 @@ final class MonitorAlert extends ServiceEmail {
 			/* translators: %d: number of hours. */
 			return sprintf( _n( 'Your server has used almost all of its CPU for %d hour', 'Your server has used almost all of its CPU for %d hours', (int) ( $this->values['monitor_cpu_hours'] ?? 0 ), 'beltoft-services' ), (int) ( $this->values['monitor_cpu_hours'] ?? 0 ) );
 		}
+		if ( 'db_disk' === $reason ) {
+			/* translators: %d: percent of the disk in use. */
+			return sprintf( __( 'Your database disk is %d percent full', 'beltoft-services' ), (int) ( $this->values['monitor_disk_percent'] ?? 0 ) );
+		}
+		if ( 'db_down' === $reason ) { return __( 'Your database is not answering', 'beltoft-services' ); }
 		return __( 'Check your server', 'beltoft-services' );
 	}
-	public function get_default_heading() { return __( 'Your server needs attention', 'beltoft-services' ); }
+	public function get_default_heading() {
+		return in_array( (string) ( $this->values['monitor_reason'] ?? '' ), array( 'db_down', 'db_disk' ), true ) ? __( 'Your database needs attention', 'beltoft-services' ) : __( 'Your server needs attention', 'beltoft-services' );
+	}
 }
