@@ -72,6 +72,7 @@ final class ConsoleTab {
 				'connected' => __( 'Connected', 'beltoft-services' ),
 				'disconnected' => __( 'The console has closed. Open it again to continue.', 'beltoft-services' ),
 				'stopped' => __( 'The console is not available while the server is stopped or paused.', 'beltoft-services' ),
+				'busy' => __( 'A console is already being opened. Please wait a moment.', 'beltoft-services' ),
 				'limit' => __( 'Too many attempts. Please wait a few minutes and try again.', 'beltoft-services' ),
 				'failed' => __( 'The console is not available right now.', 'beltoft-services' ),
 				'help' => __( 'Use the console when you cannot log in with SSH. It shows the same screen as a monitor on the server.', 'beltoft-services' ),

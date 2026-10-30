@@ -50,8 +50,9 @@
 					rfb.addEventListener( 'credentialsrequired', function () { close( 'failed' ); } );
 				} );
 			} ).catch( function ( error ) {
-				var key = error && error.status === 429 ? 'limit' : ( error && error.status === 409 ? 'stopped' : 'failed' );
-				close( key );
+				var codes = { beltoft_services_console_busy: 'busy', beltoft_services_console_stopped: 'stopped', beltoft_services_console_unavailable: 'failed', beltoft_services_rate_limited: 'limit' };
+				if ( ! error || ! error.json ) { close( 'failed' ); return; }
+				error.json().then( function ( body ) { close( codes[ body && body.code ] || 'failed' ); }, function () { close( 'failed' ); } );
 			} );
 	}
 	button.addEventListener( 'click', open );

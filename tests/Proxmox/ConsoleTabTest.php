@@ -91,4 +91,31 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'sendCtrlAltDel()', $js );
 		$this->assertStringNotContainsString( 'https://', $js );
 	}
+
+	public function test_toolbar_buttons_use_the_action_style_and_status_stays_live(): void {
+		ob_start();
+		ConsoleTab::pane( 'console', $this->server()->id() );
+		$html = (string) ob_get_clean();
+		foreach ( array( 'fullscreen', 'cad', 'keyboard', 'disconnect' ) as $key ) {
+			$this->assertMatchesRegularExpression( '#<button type="button" class="beltoft-services-btn beltoft-services-console__action" data-console-' . $key . '>#', $html );
+		}
+		$this->assertMatchesRegularExpression( '#<p[^>]*role="status"[^>]*aria-live="polite"[^>]*data-console-status></p>#', $html );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.css' );
+		$this->assertStringContainsString( '__status:empty { margin: 0; min-height: 0; }', $css );
+		$this->assertStringContainsString( 'box-shadow: inset 0 0 0 1px', $css );
+	}
+
+	public function test_open_failure_is_mapped_by_route_code_and_busy_differs_from_stopped(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.js' );
+		foreach ( array( 'beltoft_services_console_busy', 'beltoft_services_console_stopped', 'beltoft_services_console_unavailable', 'beltoft_services_rate_limited' ) as $code ) {
+			$this->assertStringContainsString( $code, $js );
+		}
+		$this->assertStringNotContainsString( 'status === 409', $js );
+		$r = $this->server();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
+		ConsoleTab::assets( 'account', Servers::slug() );
+		$data = wp_scripts()->get_data( ConsoleTab::HANDLE, 'data' );
+		$this->assertStringContainsString( 'A console is already being opened', (string) $data );
+	}
 }
