@@ -26,7 +26,9 @@ final class DbNeedsServer {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'add_to_cart' ), 20, 4 );
+		// Not refused at add to cart: a visitor has no session yet, so the message would be lost on the way to
+		// checkout. The checkout shows it (check_cart_items) and refuses the order (validation, Store API).
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'cart_notice' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
 	}
@@ -186,6 +188,24 @@ final class DbNeedsServer {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Shows the rule on the cart and checkout pages: an error for a customer without a server (the order is refused
+	 * at checkout anyway), a notice for a visitor who still has to sign in.
+	 */
+	public static function cart_notice(): void {
+		$clusters = self::clusters_in_cart();
+
+		if ( array() === $clusters || ! self::enabled() ) {
+			return;
+		}
+
+		if ( ! is_user_logged_in() ) {
+			wc_add_notice( self::message( true ), 'notice' );
+		} elseif ( self::refused( get_current_user_id(), $clusters ) ) {
+			wc_add_notice( self::message( true ), 'error' );
+		}
 	}
 
 	/**

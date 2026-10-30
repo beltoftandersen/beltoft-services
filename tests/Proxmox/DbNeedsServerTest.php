@@ -78,9 +78,24 @@ class DbNeedsServerTest extends BackupTestCase {
 		$this->assertStringNotContainsString( "\u{2014}", $errors->get_error_message() );
 	}
 
-	public function test_a_logged_out_visitor_is_refused(): void {
+	public function test_a_logged_out_visitor_gets_the_rule_at_checkout_and_is_refused_there(): void {
 		$db = $this->db_product();
-		$this->assertFalse( apply_filters( 'woocommerce_add_to_cart_validation', true, $db->get_id(), 1 ), 'Nothing is added.' );
+		// Added (a visitor has no session yet; a refusal here would lose its message on the way to checkout).
+		$this->assertTrue( apply_filters( 'woocommerce_add_to_cart_validation', true, $db->get_id(), 1 ) );
+		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
+		do_action( 'woocommerce_check_cart_items' );
+		$this->assertSame( 0, wc_notice_count( 'error' ) );
+		$this->assertStringContainsString( 'Order a server first', wc_get_notices( 'notice' )[0]['notice'] );
+		$errors = new \WP_Error();
+		DbNeedsServer::validate( array(), $errors );
+		$this->assertSame( array( 'beltoft_services_db_needs_server' ), $errors->get_error_codes(), 'The order is still refused.' );
+	}
+
+	public function test_a_customer_without_a_server_sees_the_error_on_the_checkout_page(): void {
+		$this->customer();
+		$db = $this->db_product();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
+		do_action( 'woocommerce_check_cart_items' );
 		$this->assertSame( 1, wc_notice_count( 'error' ) );
 		$this->assertStringContainsString( 'Order a server first', wc_get_notices( 'error' )[0]['notice'] );
 	}
