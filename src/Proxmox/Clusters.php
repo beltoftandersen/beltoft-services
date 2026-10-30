@@ -634,6 +634,11 @@ final class Clusters {
 		}
 
 		$clean['token_secret'] = $secret;
+		// A Proxmox token secret is a UUID: anything else (a pasted table row, the token id) is refused, not saved.
+		$console_new = trim( (string) ( $input['console_token_secret'] ?? '' ) );
+		if ( '' !== $console_new && ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iD', $console_new ) ) {
+			return self::error( 'console_token_secret', __( 'The console token secret is the value Proxmox shows once, like 0a1b2c3d-1111-2222-3333-444455556666. Paste only that value.', 'beltoft-services' ) );
+		}
 		$console_secret = self::clean_secret( $input, (string) ( $existing['console_token_secret'] ?? '' ), 'console_token_secret' );
 		if ( is_wp_error( $console_secret ) ) {
 			return $console_secret;

@@ -134,17 +134,20 @@ class ClustersTest extends TestCase {
 		$this->assertTrue( Clusters::save( 'lab', $this->input() ) );
 		$this->assertSame( '', Clusters::get( 'lab' )['console_token_secret'] );
 		$this->assertFalse( Clusters::has_console_secret( 'lab' ) );
-		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'token_secret' => '', 'console_token_id' => 'viewer@pve!console', 'console_token_secret' => 'console-only-test-secret' ) ) ) );
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'token_secret' => '', 'console_token_id' => 'viewer@pve!console', 'console_token_secret' => '0a1b2c3d-1111-2222-3333-444455556666' ) ) ) );
 		$this->assertSame( 'viewer@pve!console', Clusters::get( 'lab' )['console_token_id'] );
-		$this->assertSame( 'console-only-test-secret', Clusters::get( 'lab' )['console_token_secret'] );
+		$this->assertSame( '0a1b2c3d-1111-2222-3333-444455556666', Clusters::get( 'lab' )['console_token_secret'] );
 		$this->assertStringStartsWith( 'bs1:', Clusters::all()['lab']['console_token_secret'] );
-		$this->assertStringNotContainsString( 'console-only-test-secret', $this->stored_raw() );
+		$this->assertStringNotContainsString( '0a1b2c3d-1111-2222-3333-444455556666', $this->stored_raw() );
 		$this->assertTrue( Clusters::has_console_secret( 'lab' ) );
 		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'token_secret' => '', 'console_token_id' => 'viewer@pve!console', 'console_token_secret' => '' ) ) ) );
-		$this->assertSame( 'console-only-test-secret', Clusters::get( 'lab' )['console_token_secret'] );
+		$this->assertSame( '0a1b2c3d-1111-2222-3333-444455556666', Clusters::get( 'lab' )['console_token_secret'] );
 		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'console_token_id' => 'bad-id' ) ) ) );
 		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'console_token_id' => 'svc@pve!beltoft' ) ) ) );
 		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'console_token_secret' => 'too-short' ) ) ) );
+		// A whole table row pasted from `pveum user token add` is refused and the saved secret stays.
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'token_secret' => '', 'console_token_id' => 'viewer@pve!console', 'console_token_secret' => '│ value │ 0a1b2c3d-1111-2222-3333-444455556666 │' ) ) ) );
+		$this->assertSame( '0a1b2c3d-1111-2222-3333-444455556666', Clusters::get( 'lab' )['console_token_secret'] );
 	}
 
 	public function test_a_new_cluster_needs_a_secret(): void {
