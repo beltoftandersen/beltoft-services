@@ -483,6 +483,20 @@ final class Product {
 			)
 		);
 
+		if ( '' !== $driver_id ) {
+			woocommerce_wp_text_input(
+				array(
+					'id'                => \BeltoftServices\Usage\Rates::META_PREMIUM,
+					'label'             => __( 'Pay as you go premium (%)', 'beltoft-services' ),
+					'description'       => __( 'Added to the monthly price for the hourly rate and the monthly cap of pay as you go variations. Empty means 10.', 'beltoft-services' ),
+					'desc_tip'          => true,
+					'type'              => 'number',
+					'custom_attributes' => array( 'min' => '0', 'step' => '0.1' ),
+					'value'             => $product ? $product->get_meta( \BeltoftServices\Usage\Rates::META_PREMIUM ) : '',
+				)
+			);
+		}
+
 		$driver = '' === $driver_id ? null : Registry::get( $driver_id );
 		if ( $driver ) {
 			// Tells save() which driver's fields were on the form.
@@ -582,6 +596,11 @@ final class Product {
 		$retention = isset( $_POST[ self::META_RETENTION ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::META_RETENTION ] ) ) ) : '';
 		$product->update_meta_data( self::META_RETENTION, '' === $retention ? '' : (string) absint( $retention ) );
 		$product->update_meta_data( self::META_TRIAL_PAID, isset( $_POST[ self::META_TRIAL_PAID ] ) ? 'yes' : 'no' );
+
+		if ( '' !== $driver_id && isset( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) {
+			$premium = trim( sanitize_text_field( wp_unslash( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) );
+			$product->update_meta_data( \BeltoftServices\Usage\Rates::META_PREMIUM, is_numeric( $premium ) ? (string) max( 0, (float) $premium ) : '' );
+		}
 
 		// Only when the panel printed the box (a product that just became a server shows it after this save).
 		if ( isset( $_POST[ self::FIELD_PICKER ] ) ) {

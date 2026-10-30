@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION        = '2';
+	public const DB_VERSION        = '3';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -42,6 +42,9 @@ final class Schema {
 			'resource_id' => array( 'resource_id' ),
 			'net_address' => array( 'net_id', 'address' ),
 		),
+		'usage' => array(
+			'resource_item_hour' => array( 'resource_id', 'item', 'hour_bucket' ),
+		),
 	);
 
 	/**
@@ -57,6 +60,7 @@ final class Schema {
 			'vms' => $wpdb->prefix . 'beltoft_services_vms',
 			'private_nets' => $wpdb->prefix . 'beltoft_services_private_nets',
 			'private_ips' => $wpdb->prefix . 'beltoft_services_private_ips',
+			'usage' => $wpdb->prefix . 'bs_usage',
 		);
 	}
 
@@ -191,6 +195,26 @@ final class Schema {
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_id (resource_id),
 				UNIQUE KEY net_address (net_id,address)
+			) $collate;"
+		);
+
+		// The pay-as-you-go ledger: one row per resource, item and UTC hour (the unique key keeps the meter idempotent).
+		dbDelta(
+			"CREATE TABLE {$t['usage']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				resource_id bigint(20) unsigned NOT NULL,
+				user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+				item varchar(20) NOT NULL,
+				quantity decimal(12,4) NOT NULL DEFAULT 1,
+				unit varchar(10) NOT NULL DEFAULT 'hour',
+				rate decimal(14,8) NOT NULL DEFAULT 0,
+				hour_bucket datetime NOT NULL,
+				order_id bigint(20) unsigned NULL DEFAULT NULL,
+				created datetime NOT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY resource_item_hour (resource_id,item,hour_bucket),
+				KEY user_open (user_id,order_id,hour_bucket),
+				KEY order_id (order_id)
 			) $collate;"
 		);
 

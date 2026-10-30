@@ -62,6 +62,7 @@ register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\Renewals::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Proxmox\ProxmoxJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Emails\Emails::class, 'unschedule' ) );
+register_deactivation_hook( __FILE__, array( \BeltoftServices\Usage\Meter::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsClaimJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsReleaseJob::class, 'unschedule' ) );
 

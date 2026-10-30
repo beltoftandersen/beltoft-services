@@ -114,6 +114,32 @@ final class Settings {
 				'default' => '',
 				'label'   => __( 'Welcome block: plugins link', 'beltoft-services' ),
 			),
+			'usage_threshold_new' => array(
+				'tab'     => 'general',
+				'section' => 'usage',
+				'type'    => 'number',
+				'default' => 50,
+				'min'     => 1,
+				'label'   => __( 'Bill pay as you go early at this amount: new accounts', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency, for an account with no paid usage invoice yet. When the unbilled usage reaches it, the usage is charged at once, without waiting for the monthly renewal.', 'beltoft-services' ),
+			),
+			'usage_threshold' => array(
+				'tab'     => 'general',
+				'section' => 'usage',
+				'type'    => 'number',
+				'default' => 250,
+				'min'     => 1,
+				'label'   => __( 'Bill pay as you go early at this amount: other accounts', 'beltoft-services' ),
+			),
+			'usage_new_limit' => array(
+				'tab'     => 'general',
+				'section' => 'usage',
+				'type'    => 'number',
+				'default' => 2,
+				'min'     => 0,
+				'label'   => __( 'Pay as you go services before the first paid usage invoice', 'beltoft-services' ),
+				'desc'    => __( 'The most services an account may run until a usage invoice has been paid. 0 means no limit.', 'beltoft-services' ),
+			),
 		);
 
 		/**
@@ -153,6 +179,7 @@ final class Settings {
 		$sections = array(
 			'general' => __( 'General', 'beltoft-services' ),
 			'account' => __( 'My Account', 'beltoft-services' ),
+			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
 		);
 
 		/**

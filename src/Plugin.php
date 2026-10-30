@@ -131,6 +131,11 @@ final class Plugin {
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Emails\Emails::register();
+		Usage\Meter::register();
+		Usage\Threshold::register();
+		Usage\Account::register();
+		Usage\Cart::register();
+		Usage\Renewal::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
