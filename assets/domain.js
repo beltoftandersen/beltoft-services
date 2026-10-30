@@ -203,19 +203,47 @@
 		}
 		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form ); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
 	} );
+	// The transfer code is shown after a second check: the account password, or the code from the authenticator app.
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest( '.beltoft-services-domain-auth' );
 		if ( ! button ) { return; }
 		var panel = button.closest( '[data-domain-resource]' );
-		button.disabled = true;
-		request( 'GET', panel.dataset.domainResource + '/domain-authcode' ).then( function ( body ) {
+		var form = panel.querySelector( '.beltoft-services-domain-stepup' );
+		if ( ! form ) { return; }
+		form.hidden = false;
+		form.querySelector( 'input[name="secret"]' ).focus();
+	} );
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target.closest( '.beltoft-services-domain-stepup' );
+		if ( ! form ) { return; }
+		event.preventDefault();
+		var panel = form.closest( '[data-domain-resource]' );
+		var input = form.querySelector( 'input[name="secret"]' );
+		var submit = form.querySelector( 'button[type="submit"]' );
+		var error = form.querySelector( '.beltoft-services-domain-stepup__error' );
+		if ( ! input.value ) { input.focus(); return; }
+		submit.disabled = true;
+		error.hidden = true;
+		window.fetch( config.root + panel.dataset.domainResource + '/domain-authcode', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { secret: input.value } ) } ).then( function ( response ) {
+			var nonce = response.headers.get( 'X-WP-Nonce' );
+			if ( nonce ) { config.nonce = nonce; }
+			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
+		} ).then( function ( body ) {
 			var code = panel.querySelector( '.beltoft-services-domain-code' );
+			input.value = '';
+			form.hidden = true;
 			code.value = body.auth_code;
 			code.closest( '.beltoft-services-domain__code' ).hidden = false;
 			code.focus();
 			code.select();
-			button.disabled = false;
-		} ).catch( function ( error ) { window.alert( error.message ); button.disabled = false; } );
+			submit.disabled = false;
+		} ).catch( function ( failure ) {
+			input.value = '';
+			error.textContent = failure.message;
+			error.hidden = false;
+			input.focus();
+			submit.disabled = false;
+		} );
 	} );
 	document.addEventListener( 'click', function ( event ) {
 		var copy = event.target.closest( '.beltoft-services-domain__copy' );
@@ -237,7 +265,7 @@
 			fallback();
 		}
 	} );
-	// After unlocking, the transfer code is what the customer came for: show it once the page is back.
+	// After unlocking, the transfer code is what the customer came for: open its check once the page is back.
 	( function () {
 		var id = null;
 		try { id = window.sessionStorage.getItem( 'beltoftShowCode' ); window.sessionStorage.removeItem( 'beltoftShowCode' ); } catch ( e ) {}

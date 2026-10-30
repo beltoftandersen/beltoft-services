@@ -153,6 +153,7 @@ if ( $beltoft_time ) {
 					<form class="beltoft-services-domain-form" data-domain-action="lock"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Lock again', 'beltoft-services' ); ?></button></form>
 				<?php endif; ?>
 			</div>
+			<?php include \BeltoftServices\Account\Domains::file( 'domain-stepup.php' ); ?>
 			<div class="beltoft-services-domain__code" hidden>
 				<label class="screen-reader-text" for="beltoft-domain-code-<?php echo esc_attr( (string) $r->id() ); ?>"><?php esc_html_e( 'Transfer code', 'beltoft-services' ); ?></label>
 				<input type="text" readonly class="beltoft-services-domain-code" id="beltoft-domain-code-<?php echo esc_attr( (string) $r->id() ); ?>" value="" autocomplete="off" spellcheck="false">

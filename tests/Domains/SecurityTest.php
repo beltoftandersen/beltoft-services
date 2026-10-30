@@ -31,7 +31,7 @@ class SecurityTest extends TestCase {
 
 	private function domain( array $meta = array() ): Resource {
 		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-security-test' ) );
-		$user    = self::factory()->user->create( array( 'first_name' => 'Dana' ) );
+		$user    = self::factory()->user->create( array( 'first_name' => 'Dana', 'user_pass' => 'right-password' ) );
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
 		$r       = Resource::create( $license, new DomainDriver(), array(), array_merge( array( 'state' => 'ready', 'domain' => 'secure-example.net', 'mode' => 'register', 'remote_id' => '321', 'is_locked' => true, 'auth' => 'AUTH-CODE-NEVER-IN-MAIL' ), $meta ) );
 		$this->assertInstanceOf( Resource::class, $r );
@@ -95,7 +95,7 @@ class SecurityTest extends TestCase {
 		$op = $this->registrar();
 		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		$response = rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$response = $this->code_request( $r );
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( 'REGISTRAR-SECRET-CODE', $response->get_data()['auth_code'] );
 		$this->assertOneNotice( 'transfer code for your domain' );
@@ -107,7 +107,7 @@ class SecurityTest extends TestCase {
 		$op = $this->registrar();
 		$op->reply( 'GET', '/domains/321/authcode', new \WP_Error( 'http_404', 'No.' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		$response = rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$response = $this->code_request( $r );
 		$this->assertSame( 503, $response->get_status() );
 		$this->assertSame( array(), $this->mails );
 	}
@@ -213,7 +213,7 @@ class SecurityTest extends TestCase {
 		$op = $this->registrar();
 		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$this->code_request( $r );
 		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5 );
 		$this->mails = array();
 		Security::relock();
@@ -226,7 +226,52 @@ class SecurityTest extends TestCase {
 		$op = $this->registrar();
 		$op->reply( 'GET', '/domains/321/authcode', new \WP_Error( 'http_404', 'No.' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$this->code_request( $r );
 		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5 );
+	}
+
+	/** The transfer code route as the page calls it: a POST with the password or code in the body. */
+	private function code_request( Resource $r, string $secret = 'right-password' ): \WP_REST_Response {
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' );
+		$request->set_header( 'Content-Type', 'application/json' );
+		$request->set_body( (string) wp_json_encode( array( 'secret' => $secret ) ) );
+		return rest_do_request( $request );
+	}
+
+	public function test_the_transfer_code_needs_the_account_password(): void {
+		$r  = $this->domain();
+		$op = $this->registrar();
+		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+
+		$wrong = $this->code_request( $r, 'wrong-password' );
+		$this->assertSame( 403, $wrong->get_status() );
+		$this->assertStringNotContainsString( 'REGISTRAR-SECRET-CODE', (string) wp_json_encode( $wrong->get_data() ) );
+		$this->assertSame( array(), $op->calls(), 'The registrar is not asked.' );
+		$this->assertSame( array(), $this->mails );
+
+		$get = rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
+		$this->assertNotSame( 200, $get->get_status(), 'The old GET without a secret is gone.' );
+
+		$this->assertSame( 200, $this->code_request( $r )->get_status() );
+	}
+
+	public function test_a_site_can_ask_for_an_app_code_instead_and_without_a_check_for_it_nothing_is_shown(): void {
+		$r  = $this->domain();
+		$op = $this->registrar();
+		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$ask = static fn() => array( 'kind' => 'code', 'label' => 'Code from your app' );
+		add_filter( 'beltoft_services_step_up_ask', $ask );
+
+		$this->assertSame( 'one-time-code', \BeltoftServices\StepUp::ask( (int) $r->license()['user_id'] )['autocomplete'] );
+		$this->assertSame( 403, $this->code_request( $r )->get_status(), 'Asking for a code, the password is not accepted.' );
+
+		$check = static fn( $ok, $user, $secret ) => '123456' === $secret;
+		add_filter( 'beltoft_services_step_up_verify', $check, 10, 3 );
+		$this->assertSame( 403, $this->code_request( $r, '000000' )->get_status() );
+		$this->assertSame( 200, $this->code_request( $r, '123456' )->get_status() );
+		remove_filter( 'beltoft_services_step_up_verify', $check, 10 );
+		remove_filter( 'beltoft_services_step_up_ask', $ask );
 	}
 }
