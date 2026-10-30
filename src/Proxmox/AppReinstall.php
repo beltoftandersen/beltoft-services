@@ -124,6 +124,13 @@ final class AppReinstall {
 		$offered = Apps::offered( $cluster );
 		unset( $offered[ $skip ] );
 
+		// A paid app is bought with its tier when a server is ordered; a reinstall has no cart line for it.
+		foreach ( array_keys( $offered ) as $id ) {
+			if ( AppLicence::paid( (string) $id ) ) {
+				unset( $offered[ $id ] );
+			}
+		}
+
 		if ( array() === $offered ) {
 			return null;
 		}

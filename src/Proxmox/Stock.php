@@ -133,7 +133,7 @@ final class Stock {
 	 * @return string[]
 	 */
 	public static function addon_drivers(): array {
-		return array( DiskDriver::ID, SnapshotDriver::ID );
+		return array( DiskDriver::ID, SnapshotDriver::ID, AppLicenceDriver::ID );
 	}
 
 	/**
@@ -279,8 +279,8 @@ final class Stock {
 	 */
 	private static function availability( \WC_Product $product ): ?bool {
 		$driver = Product::driver_for( $product->get_id() );
-		if ( $driver && SnapshotDriver::ID === $driver->id() ) {
-			return true; // Slots are an entitlement: nothing is built, so nothing runs out.
+		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID ), true ) ) {
+			return true; // Slots and app licences are an entitlement: nothing is built, so nothing runs out.
 		}
 		if ( $driver && DiskDriver::ID === $driver->id() ) {
 			$size = (int) ( Product::plan( $product->get_id() )['disk_gb'] ?? 0 );

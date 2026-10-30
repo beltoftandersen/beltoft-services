@@ -46,6 +46,14 @@ final class EmailDetails {
 			$details[ __( 'Backups', 'beltoft-services' ) ] = __( 'Extra disks are not included in nightly backups.', 'beltoft-services' );
 			return $details;
 		}
+		if ( AppLicenceDriver::ID === $r->get( 'driver' ) ) {
+			$server = AppLicence::server_of( $r );
+			$details[ __( 'App licence', 'beltoft-services' ) ] = AppLicence::tier_label( $r );
+			if ( $server ) {
+				$details[ __( 'Server', 'beltoft-services' ) ] = (string) $server->get( 'ip' );
+			}
+			return $details;
+		}
 		if ( SnapshotDriver::ID === $r->get( 'driver' ) ) {
 			$server = SnapshotMeta::server_of( $r );
 			$days   = SnapshotMeta::days_of( $r );

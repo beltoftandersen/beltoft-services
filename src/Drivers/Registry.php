@@ -33,6 +33,7 @@ final class Registry {
 				'proxmox-db' => new \BeltoftServices\Proxmox\DbDriver(),
 				'proxmox-disk' => new \BeltoftServices\Proxmox\DiskDriver(),
 				'proxmox-snapshots' => new \BeltoftServices\Proxmox\SnapshotDriver(),
+				'proxmox-app' => new \BeltoftServices\Proxmox\AppLicenceDriver(),
 				'domain'  => new \BeltoftServices\Domains\DomainDriver(),
 				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
 			)

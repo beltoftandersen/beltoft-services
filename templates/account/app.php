@@ -4,7 +4,7 @@
  *
  * Variables: $view (see AppTab::view()): name, version, installed, kind (waiting, installing, slow, ready,
  * failed, dns), steps (label and status), position and total, step_label, url, secure, domain, domain_wanted,
- * domain_failed, can_retry, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
+ * domain_failed, licence (a paid app: state, tier, tiers to switch to), can_retry, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
  * The login is never part of this template: the button asks the server for it once.
  *
  * @package BeltoftServices
@@ -34,6 +34,30 @@ $beltoft_services_status_text = array(
 			<div class="beltoft-services-facts__wide"><dt><?php esc_html_e( 'Address', 'beltoft-services' ); ?></dt><dd><a href="<?php echo esc_url( (string) $view['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( (string) $view['url'] ); ?></a></dd></div>
 		<?php endif; ?>
 	</dl>
+
+	<?php if ( ! empty( $view['licence'] ) ) : ?>
+		<?php $beltoft_services_licence = (array) $view['licence']; ?>
+		<div class="beltoft-services-vm__more" data-app-licence="<?php echo esc_attr( (string) $beltoft_services_licence['state'] ); ?>">
+			<h4><?php esc_html_e( 'Licence', 'beltoft-services' ); ?></h4>
+			<?php if ( 'none' === $beltoft_services_licence['state'] ) : ?>
+				<p><?php esc_html_e( 'This server has no licence for the app. Contact support.', 'beltoft-services' ); ?></p>
+			<?php else : ?>
+				<p><?php /* translators: %s: tier name */ echo esc_html( sprintf( __( 'Tier: %s', 'beltoft-services' ), (string) $beltoft_services_licence['tier'] ) ); ?></p>
+				<?php if ( 'ended' === $beltoft_services_licence['state'] ) : ?>
+					<p><?php esc_html_e( 'The licence for this app has ended. Your server keeps running and the app stays installed, but it may stop working without a licence. Nothing is removed from your server.', 'beltoft-services' ); ?></p>
+				<?php elseif ( 'paused' === $beltoft_services_licence['state'] ) : ?>
+					<p><?php esc_html_e( 'The licence for this app is on hold because its subscription is not active. Your server keeps running.', 'beltoft-services' ); ?></p>
+				<?php elseif ( ! empty( $beltoft_services_licence['tiers'] ) ) : ?>
+					<p><?php esc_html_e( 'Change tier. The change is billed through your subscription.', 'beltoft-services' ); ?></p>
+					<ul class="beltoft-services-add" data-app-tiers-switch>
+						<?php foreach ( $beltoft_services_licence['tiers'] as $beltoft_services_other ) : ?>
+							<li><a href="<?php echo esc_url( (string) $beltoft_services_other['url'] ); ?>"><?php echo esc_html( (string) $beltoft_services_other['label'] ); ?></a> <span class="description"><?php echo esc_html( (string) $beltoft_services_other['price'] ); ?></span></li>
+						<?php endforeach; ?>
+					</ul>
+				<?php endif; ?>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 
 	<?php if ( 'waiting' === $beltoft_services_kind || 'installing' === $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">

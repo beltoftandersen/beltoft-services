@@ -27,7 +27,7 @@ final class DiskCascade {
 
 	/** Add-on resources linked to a server: its extra disks and its snapshot packs, live, whatever their state. */
 	public static function addons( Resource $server ): array {
-		return array_merge( DiskMeta::for_server( $server ), SnapshotMeta::for_server( $server ) );
+		return array_merge( DiskMeta::for_server( $server ), SnapshotMeta::for_server( $server ), AppLicence::for_server( $server ) );
 	}
 
 	/**
@@ -128,13 +128,7 @@ final class DiskCascade {
 					Alerts::admin( $disk, $text );
 					continue;
 				}
-				$subscription->add_order_note(
-					SnapshotDriver::ID === $disk->get( 'driver' )
-						/* translators: %d: add-on subscription number. */
-						? sprintf( __( 'Snapshot slots subscription #%d is active again with this server.', 'beltoft-services' ), $id )
-						/* translators: %d: disk subscription number. */
-						: sprintf( __( 'Extra disk subscription #%d is active again with this server.', 'beltoft-services' ), $id )
-				);
+				$subscription->add_order_note( self::note( $disk, $id, true ) );
 			}
 		}
 	}
@@ -170,14 +164,32 @@ final class DiskCascade {
 			} else {
 				$disk_subscription->update_status( 'cancelled', __( 'Cancelled with its server.', 'beltoft-services' ) );
 			}
-			$server_subscription->add_order_note(
-				SnapshotDriver::ID === $disks[0]->get( 'driver' )
-					/* translators: %d: add-on subscription number. */
-					? sprintf( __( 'Snapshot slots subscription #%d ends with this server.', 'beltoft-services' ), $id )
-					/* translators: %d: disk subscription number. */
-					: sprintf( __( 'Extra disk subscription #%d ends with this server.', 'beltoft-services' ), $id )
-			);
+			$server_subscription->add_order_note( self::note( $disks[0], $id, false ) );
 		}
+	}
+
+	/**
+	 * The note on the server's subscription about an add-on subscription: "... ends with this server" or "... is active again ...".
+	 *
+	 * @param Resource $addon Add-on resource.
+	 * @param int      $id    Its subscription id.
+	 * @param bool     $again True for the reactivation note.
+	 */
+	private static function note( Resource $addon, int $id, bool $again ): string {
+		$driver = (string) $addon->get( 'driver' );
+
+		if ( SnapshotDriver::ID === $driver ) {
+			/* translators: %d: add-on subscription number. */
+			return sprintf( $again ? __( 'Snapshot slots subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'Snapshot slots subscription #%d ends with this server.', 'beltoft-services' ), $id );
+		}
+
+		if ( AppLicenceDriver::ID === $driver ) {
+			/* translators: %d: add-on subscription number. */
+			return sprintf( $again ? __( 'App licence subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'App licence subscription #%d ends with this server.', 'beltoft-services' ), $id );
+		}
+
+		/* translators: %d: disk subscription number. */
+		return sprintf( $again ? __( 'Extra disk subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'Extra disk subscription #%d ends with this server.', 'beltoft-services' ), $id );
 	}
 
 	/** Every line is an add-on product and every license on the subscription belongs to an add-on of this server. */

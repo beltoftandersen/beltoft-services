@@ -274,6 +274,7 @@ final class AppTab {
 			'domain_reason'   => $domain_reason,
 			'domain_left'     => (string) ( $left['name'] ?? '' ),
 			'domain_left_url' => $left_url,
+			'licence'         => AppLicence::view( $r ),
 			'can_retry'       => AppInstall::can_retry( $r ),
 			'can_reveal'      => 'ready' === $kind && $reveal && $r->accepts_actions(),
 			'getting_started' => (string) ( $app['getting_started'] ?? '' ),

@@ -206,6 +206,7 @@ final class ThankYou {
 			'vm'     => __( 'Open your server', 'beltoft-services' ),
 			'disk'   => __( 'Open your disk', 'beltoft-services' ),
 			'snapshot' => __( 'Open your server', 'beltoft-services' ),
+			'applic' => __( 'Open your server', 'beltoft-services' ),
 			'domain' => __( 'Open your domain', 'beltoft-services' ),
 			'dns'    => __( 'Open your DNS hosting', 'beltoft-services' ),
 		);
