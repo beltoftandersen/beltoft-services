@@ -434,6 +434,15 @@ final class Operations {
 			return $v;
 		}
 
+		// The plan's speed limit on net0, whatever else changes (a hot change, or pending until the next restart).
+		$rate = $this->sync_rate( $record, $v );
+
+		if ( $rate instanceof StepResult ) {
+			return $rate;
+		}
+
+		$v = $rate;
+
 		$was_running = (bool) $this->r->get( 'was_running' );
 		$result      = $this->change( $record, $v, $want, $was_running );
 
@@ -443,6 +452,83 @@ final class Operations {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * The speed a server should have: the stored plan's `net_mbit` when the plan has the key, otherwise the current
+	 * product plan's value (a server built before the field; product edits never reach stored plans). Null when
+	 * neither knows a speed.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function effective_mbit( Resource $r ): ?float {
+		$plan = (array) $r->get( 'plan' );
+
+		if ( array_key_exists( 'net_mbit', $plan ) ) {
+			return max( 0.0, (float) $plan['net_mbit'] );
+		}
+
+		$license = $r->license();
+		$product = (int) ( $license['product_id'] ?? 0 );
+
+		if ( $product <= 0 ) {
+			return null;
+		}
+
+		$variation = (int) ( $license['variation_id'] ?? 0 );
+		$current   = \BeltoftServices\Product::plan( $product, $variation > 0 ? $variation : null );
+
+		return array_key_exists( 'net_mbit', $current ) ? max( 0.0, (float) $current['net_mbit'] ) : null;
+	}
+
+	/**
+	 * The job's version of sync_rate(): the VM is read and verified here, and nothing else is touched. The caller holds the resource lock.
+	 *
+	 * @return bool Whether the NIC now matches the plan.
+	 */
+	public function reconcile_rate(): bool {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record || null !== $this->prepare( $record ) ) {
+			return false;
+		}
+
+		$v = Ownership::verify( $this->client, $record, $this->r );
+
+		return ! is_wp_error( $v ) && ! ( $this->sync_rate( $record, $v ) instanceof StepResult );
+	}
+
+	/**
+	 * Brings net0's `rate=` to the plan's speed: only `rate=` changes in the string. Nothing is sent when it already
+	 * matches, when the VM has no net0 (a database) or when the stored plan has no speed (a service from before the
+	 * field: its NIC is left as it is). A running VM is never restarted for it: Proxmox applies the change at once or
+	 * keeps it pending until the next restart.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return array<string, mixed>|StepResult The VM as it is now.
+	 */
+	public function sync_rate( array $record, array $v ) {
+		$mbit = self::effective_mbit( $this->r );
+		$net0 = (string) ( $v['config']['net0'] ?? '' );
+
+		if ( null === $mbit || '' === $net0 || NetConfig::has_rate( $net0, $mbit ) ) {
+			return $v;
+		}
+
+		$params = array( 'net0' => NetConfig::with_rate( $net0, $mbit ) );
+
+		if ( ! empty( $v['config']['digest'] ) ) {
+			$params['digest'] = (string) $v['config']['digest'];
+		}
+
+		$answer = $this->client->request( 'PUT', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $record['vmid'] . '/config', $params );
+
+		if ( is_wp_error( $answer ) ) {
+			return $this->classify( $answer, 'update' );
+		}
+
+		return $this->verified( $record, 'update' );
 	}
 
 	/**

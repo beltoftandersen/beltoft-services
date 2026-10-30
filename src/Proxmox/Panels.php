@@ -209,7 +209,22 @@ final class Panels {
 	}
 
 	/**
-	 * The customer's part of the panel.
+	 * A network speed for the customer: "500 Mbit/s", "1 Gbit/s".
+	 *
+	 * @param float $mbit Speed in Mbit/s.
+	 */
+	public static function speed_label( float $mbit ): string {
+		if ( $mbit >= 1000 ) {
+			/* translators: %s: speed in Gbit/s, for example 1 or 2.5. */
+			return sprintf( __( '%s Gbit/s', 'beltoft-services' ), number_format_i18n( $mbit / 1000, fmod( $mbit, 1000 ) > 0 ? 1 : 0 ) );
+		}
+
+		/* translators: %s: speed in Mbit/s. */
+		return sprintf( __( '%s Mbit/s', 'beltoft-services' ), number_format_i18n( $mbit, fmod( $mbit, 1 ) > 0 ? 1 : 0 ) );
+	}
+
+	/**
+	 * The account panel.
 	 *
 	 * @param Resource $r Resource.
 	 */
@@ -234,6 +249,7 @@ final class Panels {
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),
 				'disk_gb'   => self::disk_gb( $r ),
+				'net_mbit'  => max( 0, (float) ( $plan['net_mbit'] ?? 0 ) ),
 			),
 			'busy'       => (bool) \BeltoftServices\Progress::build( $r )['active'],
 			'power'      => null === $status ? '' : (string) $status['power'],

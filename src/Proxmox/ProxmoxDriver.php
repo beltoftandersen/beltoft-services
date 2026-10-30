@@ -119,6 +119,13 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 				30,
 				true,
 			),
+			'net_mbit'  => array(
+				'number',
+				__( 'Network speed (Mbit/s)', 'beltoft-services' ),
+				__( 'Speed limit on the public network card, in Mbit/s. 0 or empty means no limit. The private network is never limited.', 'beltoft-services' ),
+				0,
+				true,
+			),
 			'backup_days' => array(
 				'number',
 				__( 'Backup days', 'beltoft-services' ),

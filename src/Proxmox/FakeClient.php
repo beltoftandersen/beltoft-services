@@ -197,6 +197,20 @@ class FakeClient implements Client {
 	}
 
 	/**
+	 * A running VM whose NIC `rate=` change is not applied hot (UNVERIFIED on a real host, so both are modelled): the
+	 * new net string becomes a pending change, the running configuration (config?current=1) keeps the old one, the
+	 * default view shows the new one, and the next start or reboot applies it.
+	 *
+	 * @param int  $vmid VM id.
+	 * @param bool $hold Whether a rate change stays pending on a running VM.
+	 */
+	public function hold_net_rate( int $vmid, bool $hold = true ): void {
+		$this->load();
+		$this->state['hold_net_rate'][ $vmid ] = $hold;
+		$this->save();
+	}
+
+	/**
 	 * A status that lags: after the next power task of this VM (start, stop, shutdown) has ended OK and changed
 	 * the VM, the next $reads status reads (cluster resources and status/current) still show the old status, as
 	 * a VM that is still shutting down or a start that is not listed yet does. Writes and the task itself use the
@@ -897,6 +911,10 @@ class FakeClient implements Client {
 			}
 		}
 
+		if ( empty( $p['current'] ) ) {
+			$config = array_merge( $config, $this->state['net_pending'][ (int) $a[1] ] ?? array() );
+		}
+
 		return ! empty( $this->state['no_digest'] ) ? $config : array_merge( $config, array( 'digest' => $this->digest( $vm ) ) );
 	}
 
@@ -1030,6 +1048,12 @@ class FakeClient implements Client {
 			if ( 1 === preg_match( '/^net(\d+)$/D', (string) $key, $nic ) && is_string( $value ) && 0 === strpos( $value, 'virtio,' ) ) {
 				// PVE generates the MAC of a VirtIO NIC given without one (modelled, deterministic).
 				$value = sprintf( 'virtio=BC:24:11:%02X:%02X:%02X', ( $id >> 8 ) & 255, $id & 255, 16 + (int) $nic[1] ) . substr( $value, 6 );
+			}
+
+			if ( 1 === preg_match( '/^net\d+$/D', (string) $key ) && is_string( $value ) && ! empty( $this->state['hold_net_rate'][ $id ] ) && 'running' === $this->state['vms'][ $id ]['status'] && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+				// A rate change on a running NIC waits for the next restart (modelled).
+				$this->state['net_pending'][ $id ][ $key ] = $value;
+				continue;
 			}
 
 			$this->state['vms'][ $id ]['config'][ $key ] = $value;
@@ -1305,6 +1329,11 @@ class FakeClient implements Client {
 						'shows' => $this->state['vms'][ $id ]['status'],
 					);
 					unset( $this->state['lag_next'][ $id ] );
+				}
+
+				if ( in_array( $action, array( 'start', 'reboot' ), true ) && ! empty( $this->state['net_pending'][ (int) $a[1] ] ) ) {
+					$this->state['vms'][ (int) $a[1] ]['config'] = array_merge( $this->state['vms'][ (int) $a[1] ]['config'], $this->state['net_pending'][ (int) $a[1] ] );
+					unset( $this->state['net_pending'][ (int) $a[1] ] );
 				}
 
 				if ( 'start' === $action ) {

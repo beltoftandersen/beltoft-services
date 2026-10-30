@@ -115,6 +115,7 @@ final class ProxmoxJobs {
 		// After the sweep itself (priority 10): one password purge a day.
 		add_action( Jobs::SWEEP, array( __CLASS__, 'purge_passwords' ), 20 );
 		add_action( Jobs::SWEEP, array( PrivateNets::class, 'reclaim' ), 21 );
+		add_action( Jobs::SWEEP, array( __CLASS__, 'net_rates' ), 22 );
 	}
 
 	/**
@@ -467,6 +468,77 @@ final class ProxmoxJobs {
 		if ( $booted ) {
 			$r->set( array( ServerName::PENDING => null, ServerName::PENDING_AT => null ) );
 		}
+	}
+
+	/**
+	 * From the sweep: brings every server's public NIC to its plan's speed limit (see net_rate()). One cluster listing
+	 * per cluster; a VM is read only when it is due.
+	 */
+	public static function net_rates(): void {
+		foreach ( self::clusters() as $id => $one ) {
+			$rows = self::vm_rows( $one['client'] );
+
+			if ( null === $rows ) {
+				continue;
+			}
+
+			$ours = VmRecords::for_cluster( $id );
+
+			foreach ( $rows as $vm ) {
+				$vmid = (int) ( $vm['vmid'] ?? 0 );
+
+				if ( ! empty( $vm['template'] ) || ! isset( $ours[ $vmid ] ) || '' !== (string) ( $vm['lock'] ?? '' ) ) {
+					continue;
+				}
+
+				$resource = Resource::find( (int) $ours[ $vmid ] );
+
+				if ( $resource ) {
+					self::net_rate( $resource, $vm );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Brings one server's public NIC to its plan's speed limit (servers built before the limit existed, or a limit
+	 * changed on the NIC by hand): the same rewrite as a plan change, with no restart. Left alone: a server that is
+	 * not ready, adopted (linked), on hold, locked by a running operation, or with no known speed (stored plan or product). A checked
+	 * server is looked at again after a day, or at once when the plan's speed changed.
+	 *
+	 * @param Resource             $r  Server resource.
+	 * @param array<string, mixed> $vm Cluster row.
+	 */
+	private static function net_rate( Resource $r, array $vm ): void {
+		if ( 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold() || '' === (string) ( $vm['node'] ?? '' ) ) {
+			return;
+		}
+
+		// The stored plan's speed, or the product's current one for a server built before the field.
+		$mbit = Operations::effective_mbit( $r );
+
+		if ( null === $mbit ) {
+			return;
+		}
+
+		if ( null !== $r->get( 'net_rate_mbit' ) && (float) $r->get( 'net_rate_mbit' ) === $mbit && (int) $r->get( 'net_rate_at' ) > time() - DAY_IN_SECONDS ) {
+			return;
+		}
+
+		$r->locked(
+			static function () use ( $r, $mbit ): bool {
+				// Fresh under the lock: an operation may have started since the cluster row was read.
+				if ( 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || true === $r->get( 'linked' ) ) {
+					return false;
+				}
+
+				if ( ! ( new Operations( $r ) )->reconcile_rate() ) {
+					return false;
+				}
+
+				return $r->set( array( 'net_rate_mbit' => $mbit, 'net_rate_at' => time() ) );
+			}
+		);
 	}
 
 	/**

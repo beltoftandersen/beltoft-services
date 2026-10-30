@@ -9,7 +9,7 @@
  * the sections follow each other with no tabs.
  *
  * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
- * disk_gb), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_cluster, $os_options
+ * disk_gb, net_mbit), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_cluster, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
  * $snapshots (null when the block is absent, or slots, used, included, added, packs (the packs the server has: slots, days, paused), buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
@@ -146,6 +146,9 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					?>
 				</dd>
 			</div>
+			<?php if ( ! empty( $plan['net_mbit'] ) ) : ?>
+				<div><dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( \BeltoftServices\Proxmox\Panels::speed_label( (float) $plan['net_mbit'] ) ); ?></dd></div>
+			<?php endif; ?>
 			<?php if ( '' !== $os_label ) : ?>
 				<div><dt><?php esc_html_e( 'System', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $os_label ); ?></dd></div>
 			<?php endif; ?>
@@ -172,6 +175,10 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				);
 				?>
 			</dd>
+			<?php if ( ! empty( $plan['net_mbit'] ) ) : ?>
+				<dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt>
+				<dd><?php echo esc_html( \BeltoftServices\Proxmox\Panels::speed_label( (float) $plan['net_mbit'] ) ); ?></dd>
+			<?php endif; ?>
 			<?php if ( '' !== $os_label ) : ?>
 				<dt><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></dt>
 				<dd><?php echo esc_html( $os_label ); ?></dd>
