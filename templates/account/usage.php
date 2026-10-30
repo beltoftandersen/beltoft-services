@@ -41,7 +41,7 @@ use BeltoftServices\Usage\Estimate;
 					<dd>
 						<?php echo esc_html( Estimate::money( $beltoft_services_usage_line['charge'], $estimate['currency'] ) ); ?>
 						<?php if ( $beltoft_services_usage_line['capped'] ) : ?>
-							<?php esc_html_e( '(monthly maximum reached)', 'beltoft-services' ); ?>
+							<small class="beltoft-services-usage__cap"><?php esc_html_e( '(monthly maximum reached)', 'beltoft-services' ); ?></small>
 						<?php endif; ?>
 					</dd>
 				<?php endforeach; ?>

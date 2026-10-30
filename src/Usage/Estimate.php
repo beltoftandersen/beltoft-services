@@ -99,17 +99,17 @@ final class Estimate {
 	}
 
 	/**
-	 * An amount with its currency code ("EUR 3.21").
+	 * An amount as the shop shows prices ("€3.21"), in plain text.
 	 *
 	 * @param float  $amount   Amount.
 	 * @param string $currency Currency code.
 	 */
 	public static function money( float $amount, string $currency ): string {
-		return trim( $currency . ' ' . number_format( $amount, 2, '.', '' ) );
+		return Rates::money( $amount, 2, $currency );
 	}
 
 	/**
-	 * "Usage so far: EUR X (estimate)" for the customer, or '' without a usage account.
+	 * "Usage so far: €X (estimate)" for the customer, or '' without a usage account.
 	 *
 	 * @param int $user_id Customer.
 	 */
@@ -120,7 +120,7 @@ final class Estimate {
 	}
 
 	/**
-	 * "Cost so far this month: EUR X" for a pay-as-you-go resource, '' for any other (a monthly one, or none).
+	 * "Cost so far this month: €X" for a pay-as-you-go resource, '' for any other (a monthly one, or none).
 	 *
 	 * @param int $resource_id Activation id.
 	 */

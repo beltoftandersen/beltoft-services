@@ -59,17 +59,17 @@ class CatalogTest extends UsageTestCase {
 	public function test_the_tags_say_the_hourly_price_and_the_cap(): void {
 		$id = $this->v['m-None']->get_id();
 
-		$this->assertSame( 'EUR 0.0226', Catalog::value( 'beltoft_usage_hourly', $id ) );
-		$this->assertSame( 'EUR 16.50', Catalog::value( 'beltoft_usage_cap', $id ) );
-		$this->assertSame( 'or EUR 0.0226/hour, max EUR 16.50/month pay as you go', Catalog::value( 'beltoft_usage_line', $id ) );
+		$this->assertSame( "\u{20AC}0.0226", Catalog::value( 'beltoft_usage_hourly', $id ) );
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
+		$this->assertSame( "Or \u{20AC}0.0226/\u{2060}hour, max \u{20AC}16.50/\u{2060}month, pay as you go", Catalog::value( 'beltoft_usage_line', $id ) );
 		$this->assertStringNotContainsString( "\u{2014}", Catalog::value( 'beltoft_usage_line', $id ) );
 	}
 
 	public function test_the_tags_render_in_content_for_the_post_and_for_an_id(): void {
 		$post = (object) array( 'ID' => $this->v['m-Daily']->get_id() );
 
-		$this->assertSame( 'EUR 19.80', Catalog::render( '{beltoft_usage_cap}', $post ), 'The current post is the variation (18 x 1.1).' );
-		$this->assertSame( 'a EUR 16.50 b', Catalog::render( 'a {beltoft_usage_cap:' . $this->v['m-None']->get_id() . '} b', $post ) );
+		$this->assertSame( "\u{20AC}19.80", Catalog::render( '{beltoft_usage_cap}', $post ), 'The current post is the variation (18 x 1.1).' );
+		$this->assertSame( "a \u{20AC}16.50 b", Catalog::render( 'a {beltoft_usage_cap:' . $this->v['m-None']->get_id() . '} b', $post ) );
 		$this->assertSame( 'no tag', Catalog::render( 'no tag', $post ) );
 	}
 
@@ -146,8 +146,8 @@ class CatalogTest extends UsageTestCase {
 		$html = $this->page();
 
 		$this->assertStringContainsString( 'name="' . ServerPicker::BILLING . '"', $html );
-		$this->assertStringContainsString( 'Pay as you go: billed per hour each month, never more than EUR 16.50. A card is required.', $html );
-		$this->assertStringContainsString( 'EUR 0.0226 per hour, max EUR 16.50 per month excluding VAT', $html );
+		$this->assertStringContainsString( 'A card is required.', $html );
+		$this->assertStringContainsString( "\u{20AC}0.0226 per hour, max \u{20AC}16.50 per month excluding VAT", $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( 'value="' . $this->v['u-None']->get_id() . '"', $html, 'No pay as you go card.' );
 	}
@@ -262,8 +262,9 @@ class CatalogTest extends UsageTestCase {
 
 		$this->assertStringContainsString( 'name="beltoft_services_billing"', $html );
 		$this->assertStringContainsString( 'value="usage"', $html );
-		$this->assertStringContainsString( 'Pay as you go: billed per hour each month, never more than EUR 16.50. A card is required.', $html );
-		$this->assertStringContainsString( 'data-note-backups="Pay as you go: billed per hour each month, never more than EUR 19.80. A card is required."', $html );
+		$this->assertStringContainsString( 'A card is required.', $html );
+		$this->assertStringContainsString( "data-terms-backups=\"\u{20AC}0.0271 per hour, max \u{20AC}19.80 per month excluding VAT\"", $html );
+		$this->assertStringContainsString( "data-terms=\"\u{20AC}0.0226 per hour, max \u{20AC}16.50 per month excluding VAT\"", $html );
 	}
 
 	public function test_the_checkout_field_is_not_shown_without_a_sibling_or_for_an_existing_server(): void {
@@ -305,6 +306,6 @@ class CatalogTest extends UsageTestCase {
 	}
 
 	public function test_the_backups_price_in_pay_as_you_go_is_per_hour(): void {
-		$this->assertSame( '+EUR 0.0045 / hour', \BeltoftServices\Proxmox\Backups::price_difference( $this->v['u-None'], $this->v['u-Daily'] ) );
+		$this->assertSame( "+\u{20AC}0.0045 / hour", \BeltoftServices\Proxmox\Backups::price_difference( $this->v['u-None'], $this->v['u-Daily'] ) );
 	}
 }

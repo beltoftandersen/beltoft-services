@@ -1,0 +1,5 @@
+/* Checkout: the Billing choice. The label is bold like "Operating system", the options normal weight. */
+.checkout-page .beltoft-services-billing .beltoft-services-billing__legend, .beltoft-services-billing .beltoft-services-billing__legend { display: block; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
+.checkout-page .beltoft-services-billing label.woocommerce-form__label, .beltoft-services-billing label.woocommerce-form__label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-weight: 400; }
+.checkout-page .beltoft-services-billing label.woocommerce-form__label span, .beltoft-services-billing label.woocommerce-form__label span { font-weight: 400; }
+.checkout-page .beltoft-services-billing .beltoft-services-billing__rate { color: var(--ink-soft, #5e7080); font-size: 14px; }

@@ -92,32 +92,29 @@ final class BillingField {
 	}
 
 	/**
-	 * The monthly cap of the plan, without and with daily backups ('' when that state does not exist).
+	 * The terms of the plan, without and with daily backups ('' when that state does not exist).
 	 *
 	 * @param \WC_Product_Variation $monthly A monthly variation of the plan.
 	 * @return array{0: string, 1: string}
 	 */
-	private static function caps( \WC_Product_Variation $monthly ): array {
+	private static function terms( \WC_Product_Variation $monthly ): array {
 		$has     = (int) ( Product::plan( $monthly->get_parent_id(), $monthly->get_id() )['backup_days'] ?? 0 ) > 0;
 		$without = $has ? Backups::sibling( $monthly, false, true ) : $monthly;
 		$with    = $has ? $monthly : Backups::sibling( $monthly, true, true );
-		$cap     = static function ( ?\WC_Product_Variation $v ): string {
+		$terms   = static function ( ?\WC_Product_Variation $v ): string {
 			$rates = $v ? Rates::for_plan( $v ) : null;
 
-			return null === $rates ? '' : self::note( Rates::money( $rates['cap'] ) );
+			return null === $rates ? '' : Rates::terms( $rates['hourly'], $rates['cap'] );
 		};
 
-		return array( $cap( $without ), $cap( $with ) );
+		return array( $terms( $without ), $terms( $with ) );
 	}
 
 	/**
-	 * The explanation under the choice.
-	 *
-	 * @param string $cap Monthly cap such as EUR 16.50.
+	 * The explanation under the choice (the price and the cap are next to the choice).
 	 */
-	public static function note( string $cap ): string {
-		/* translators: %s: monthly cap such as EUR 16.50 */
-		return sprintf( __( 'Pay as you go: billed per hour each month, never more than %s. A card is required.', 'beltoft-services' ), $cap );
+	public static function note(): string {
+		return __( 'A card is required.', 'beltoft-services' );
 	}
 
 	/**
@@ -136,10 +133,11 @@ final class BillingField {
 			return;
 		}
 
-		$caps = self::caps( $server['monthly'] );
-		$has  = (int) ( Product::plan( $server['monthly']->get_parent_id(), $server['variation']->get_id() )['backup_days'] ?? 0 ) > 0;
+		$terms = self::terms( $server['monthly'] );
+		$has   = (int) ( Product::plan( $server['monthly']->get_parent_id(), $server['variation']->get_id() )['backup_days'] ?? 0 ) > 0;
+		$now   = $has && '' !== $terms[1] ? $terms[1] : $terms[0];
 
-		echo '<div class="beltoft-services-billing" data-note="' . esc_attr( $caps[0] ) . '" data-note-backups="' . esc_attr( $caps[1] ) . '">';
+		echo '<div class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-note="' . esc_attr( self::note() ) . '">';
 		echo '<p class="form-row"><span class="beltoft-services-billing__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</span></p>';
 
 		foreach ( array(
@@ -147,15 +145,16 @@ final class BillingField {
 			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
 		) as $value => $label ) {
 			printf(
-				'<p class="form-row"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox"><input type="radio" class="woocommerce-form__input input-radio" name="beltoft_services_billing" value="%1$s" data-nonce="%2$s" %3$s> <span>%4$s</span></label></p>',
+				'<p class="form-row"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox"><input type="radio" class="woocommerce-form__input input-radio" name="beltoft_services_billing" value="%1$s" data-nonce="%2$s" %3$s> <span>%4$s</span>%5$s</label></p>',
 				esc_attr( $value ),
 				esc_attr( wp_create_nonce( self::NONCE ) ),
 				checked( $server['usage'] === ( 'usage' === $value ), true, false ),
-				esc_html( $label )
+				esc_html( $label ),
+				'usage' === $value ? ' <span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span>' : ''
 			);
 		}
 
-		echo '<p class="description" data-billing-note>' . esc_html( $server['usage'] ? ( $has && '' !== $caps[1] ? $caps[1] : $caps[0] ) : '' ) . '</p>';
+		echo '<p class="description" data-billing-note>' . esc_html( $server['usage'] ? self::note() : '' ) . '</p>';
 		echo '</div>';
 	}
 
@@ -167,6 +166,7 @@ final class BillingField {
 			return;
 		}
 
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/billing-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/billing-field.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/billing-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/billing-field.js' ), true );
 		wp_localize_script(
 			self::HANDLE,

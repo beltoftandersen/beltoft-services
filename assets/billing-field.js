@@ -1,7 +1,7 @@
 /**
  * Checkout: the Billing choice (Monthly or Pay as you go) swaps the cart's server for the variation with the other
- * billing model, then asks WooCommerce to refresh the order review. The explanation follows the choice and the
- * backups box. The server's own text is never shown: a fixed message is.
+ * billing model, then asks WooCommerce to refresh the order review. The price and the cap next to Pay as you go follow the
+ * backups box, and the card note follows the choice. The server's own text is never shown: a fixed message is.
  */
 ( function ( $ ) {
 	'use strict';
@@ -10,6 +10,7 @@
 	var wrap = $( '.beltoft-services-billing' );
 	var radios = wrap.find( 'input[name="beltoft_services_billing"]' );
 	var note = wrap.find( '[data-billing-note]' );
+	var rate = wrap.find( '[data-billing-rate]' );
 	var backups = $( '#beltoft_services_backups' );
 
 	if ( ! config || ! radios.length ) {
@@ -20,14 +21,15 @@
 		return 'usage' === radios.filter( ':checked' ).val();
 	}
 
-	function words() {
-		var text = backups.length && backups.is( ':checked' ) ? wrap.attr( 'data-note-backups' ) : '';
+	function terms() {
+		var text = backups.length && backups.is( ':checked' ) ? wrap.attr( 'data-terms-backups' ) : '';
 
-		return text || wrap.attr( 'data-note' ) || '';
+		return text || wrap.attr( 'data-terms' ) || '';
 	}
 
 	function show() {
-		note.text( usage() ? words() : '' );
+		rate.text( terms() );
+		note.text( usage() ? wrap.attr( 'data-note' ) || '' : '' );
 	}
 
 	radios.on( 'change', function () {

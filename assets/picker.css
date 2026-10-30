@@ -1,5 +1,5 @@
 /* My account → Servers → New server. Square corners, few borders, the palette variables of the dashboard. The selected plan is navy as with the tiles. */
-.beltoft-services-picker { max-width: 920px; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
+.beltoft-services-picker { max-width: 880px; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
 .beltoft-services-picker__title { margin: 0; color: var(--navy, #0c1535); font-size: 24px; font-weight: 700; line-height: 1.2; letter-spacing: -0.015em; }
 .beltoft-services-picker__intro { margin: 4px 0 20px; color: var(--ink-soft, #5e7080); }
 .beltoft-services-picker__form { display: grid; gap: 22px; }
@@ -36,7 +36,7 @@
 .beltoft-services-picker__more { display: grid; gap: 14px; }
 .beltoft-services-picker__more .form-row { margin: 0; padding: 0; }
 .beltoft-services-picker__more label { display: block; margin: 0 0 4px; font-weight: 500; }
-.beltoft-services-picker input[type="text"], .beltoft-services-picker textarea, .beltoft-services-picker select { box-sizing: border-box; width: 100%; max-width: 560px; margin: 0; padding: 9px 12px; border: 1px solid var(--rule, #d6d2c8); border-radius: 0; background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; font-size: 15px; box-shadow: none; }
+.beltoft-services-picker input[type="text"], .beltoft-services-picker textarea, .beltoft-services-picker select { box-sizing: border-box; width: 100%; max-width: 520px; margin: 0; padding: 9px 12px; border: 1px solid var(--rule, #d6d2c8); border-radius: 0; background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; font-size: 15px; box-shadow: none; }
 .beltoft-services-picker input[type="text"] { height: 43px; }
 .beltoft-services-picker .description { display: block; margin-top: 4px; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.5; }
 .beltoft-services-picker .woocommerce-input-wrapper { display: block; }
