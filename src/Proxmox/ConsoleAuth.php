@@ -31,7 +31,7 @@ final class ConsoleAuth {
 		if ( null === $entry ) {
 			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
 		}
-		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? (string) wp_unslash( $_SERVER['HTTP_ORIGIN'] ) : '';
+		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
 		if ( ! self::same_origin( $origin ) ) {
 			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
 		}
@@ -95,13 +95,14 @@ final class ConsoleAuth {
 			return;
 		}
 		nocache_headers();
-		$provided = isset( $_SERVER['HTTP_X_CONSOLE_INTERNAL'] ) ? (string) wp_unslash( $_SERVER['HTTP_X_CONSOLE_INTERNAL'] ) : '';
-		if ( 'GET' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || ! self::internal( $provided ) ) {
+		$provided = isset( $_SERVER['HTTP_X_CONSOLE_INTERNAL'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_CONSOLE_INTERNAL'] ) ) : '';
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : '';
+		if ( 'GET' !== $method || ! self::internal( $provided ) ) {
 			status_header( 403 );
 			exit;
 		}
-		$token = isset( $_SERVER['HTTP_X_CONSOLE_TICKET'] ) ? (string) wp_unslash( $_SERVER['HTTP_X_CONSOLE_TICKET'] ) : '';
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ) : '';
+		$token = isset( $_SERVER['HTTP_X_CONSOLE_TICKET'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_CONSOLE_TICKET'] ) ) : '';
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		$reply = self::authorize( $token, get_current_user_id(), $ip );
 		if ( is_wp_error( $reply ) ) {
 			status_header( (int) ( $reply->get_error_data()['status'] ?? 403 ) );
