@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Microsoft's Linux container image, edition Express (free for production use), on the engine's own template.
- * The customer accepts Microsoft's terms at checkout (DbTermsField). The plan's `major` is the SQL Server version (2022). Express limits: 10 GB per database, about 1.4 GB of memory for
+ * The customer accepts Microsoft's terms at checkout (DbTermsField). The plan's `major` is the SQL Server version (2025). Express limits (Microsoft, "Editions and supported features of SQL Server 2025"): 50 GB per database, about 1.4 GB of memory for
  * the database cache, up to 4 cores; the plans start at 4 GB of memory because SQL Server needs 2 GB to start.
  */
 final class MssqlEngine implements DbEngine, DbEngineTerms {
@@ -21,9 +21,9 @@ final class MssqlEngine implements DbEngine, DbEngineTerms {
 	use SqlEngine;
 
 	/** SQL Server versions the guest and the template carry. */
-	public const SUPPORTED_VERSIONS = array( 2022 );
+	public const SUPPORTED_VERSIONS = array( 2025 );
 
-	public const DEFAULT_VERSION = 2022;
+	public const DEFAULT_VERSION = 2025;
 
 	public const PORT = 1433;
 
@@ -125,7 +125,7 @@ final class MssqlEngine implements DbEngine, DbEngineTerms {
 	}
 
 	public function limits(): string {
-		return __( 'SQL Server Express edition: up to 10 GB per database, about 1.4 GB of memory for the database cache and up to 4 cores.', 'beltoft-services' );
+		return __( 'SQL Server Express edition: up to 50 GB per database, about 1.4 GB of memory for the database cache and up to 4 cores.', 'beltoft-services' );
 	}
 
 	public function ca_hint(): string {

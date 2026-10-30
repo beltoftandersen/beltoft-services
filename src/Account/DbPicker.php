@@ -391,7 +391,7 @@ final class DbPicker {
 	}
 
 	/**
-	 * "PostgreSQL 18", or "PostgreSQL" when the plan names no major; "SQL Server 2022 Express", "Valkey" for those engines.
+	 * "PostgreSQL 18", or "PostgreSQL" when the plan names no major; "SQL Server 2025 Express", "Valkey" for those engines.
 	 *
 	 * @param array<string, mixed> $plan Plan.
 	 */
