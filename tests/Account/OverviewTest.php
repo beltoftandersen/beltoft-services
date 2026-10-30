@@ -581,21 +581,26 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertSame( 0.0, Overview::data()['next_payment']['total'] );
 	}
 
-	public function test_only_the_payment_and_activity_row_is_a_pair_and_a_license_alone_is_a_plain_section(): void {
+	public function test_sections_stack_in_two_columns_and_one_column_when_the_other_is_empty(): void {
 		$user = self::factory()->user->create();
 		$this->plugin_license( $user );
 		$this->as_user( $user );
 		$html = Overview::all();
 
+		// Only a license: one column, no empty half.
 		$this->assertStringContainsString( 'beltoft-services-ov__licenses', $html );
-		$this->assertStringNotContainsString( 'beltoft-services-ov__two', $html );
+		$this->assertStringContainsString( 'beltoft-services-ov__cols is-single', $html );
+		$this->assertSame( 1, substr_count( $html, 'class="beltoft-services-ov__col"' ) );
 
 		$this->subscription( $user, 'active', 10, 'Server', '15.00' );
 		Overview::reset();
 		$html = Overview::all();
 
-		$this->assertStringContainsString( 'beltoft-services-ov__two is-single', $html );
+		// License and billing on the left; nothing on the right: still one column, licenses before billing.
 		$this->assertStringContainsString( 'beltoft-services-ov__money', $html );
+		$this->assertLessThan( strpos( $html, 'beltoft-services-ov__money' ), strpos( $html, 'beltoft-services-ov__licenses' ) );
+		$this->assertStringContainsString( 'style="order:3"', $html );
+		$this->assertStringContainsString( 'style="order:5"', $html );
 	}
 
 	// -- Activity ------------------------------------------------------------------------------

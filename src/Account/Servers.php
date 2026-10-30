@@ -375,7 +375,9 @@ final class Servers {
 		$rest   = array();
 
 		foreach ( $others as $other ) {
-			$card = self::addon_card( $other );
+			// An add-on whose server is gone (an ended disk or snapshot pack) is a compact row like the others, not a
+			// full license box: its state, and the subscription link.
+			$card = self::addon_card( $other ) ?? self::ended_card( $other );
 
 			if ( $card ) {
 				$addons[] = $card;
@@ -621,6 +623,30 @@ final class Servers {
 			'name'  => (string) ( $view['product'] ?? '' ),
 			'state' => Panel::label( (string) $resource->get( 'state' ), $resource ),
 			'body'  => $body,
+		);
+	}
+
+	/**
+	 * A compact row for a license on this tab that has no server to sit under (an ended add-on): its name, its
+	 * state (with the date when the license gives one) and the subscription link.
+	 *
+	 * @param mixed $view License view.
+	 * @return array{name: string, state: string, body: string}|null
+	 */
+	private static function ended_card( $view ): ?array {
+		if ( ! is_array( $view ) || '' === (string) ( $view['product'] ?? '' ) ) {
+			return null;
+		}
+
+		$label  = (string) ( $view['status_label'] ?? '' );
+		$expiry = trim( (string) ( $view['expiry'] ?? '' ) );
+		$state  = '' !== $label && 0 === strpos( $expiry, $label ) ? $expiry : $label;
+		$url    = (string) ( $view['subscription'] ?? '' );
+
+		return array(
+			'name'  => (string) $view['product'],
+			'state' => $state,
+			'body'  => '' !== $url ? '<p><a href="' . esc_url( $url ) . '">' . esc_html__( 'Manage subscription', 'beltoft-services' ) . '</a></p>' : '',
 		);
 	}
 
