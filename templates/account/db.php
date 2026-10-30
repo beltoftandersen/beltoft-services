@@ -60,9 +60,9 @@ $beltoft_services_all = ! $nav;
 			<h4><?php esc_html_e( 'Connection', 'beltoft-services' ); ?></h4>
 			<p class="description"><?php esc_html_e( 'Reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
 			<p><?php esc_html_e( 'With certificate check (recommended):', 'beltoft-services' ); ?></p>
-			<p><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_verify'] ); ?></code></p>
+			<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_verify'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
 			<p><?php esc_html_e( 'Encrypted, without certificate check:', 'beltoft-services' ); ?></p>
-			<p><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_require'] ); ?></code></p>
+			<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_require'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
 
 			<?php if ( $view['can_reveal'] ) : ?>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-db-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button></p>
@@ -77,7 +77,7 @@ $beltoft_services_all = ! $nav;
 			<?php endif; ?>
 			<?php if ( '' !== $view['fingerprint'] ) : ?>
 				<p><?php esc_html_e( 'SHA-256 fingerprint:', 'beltoft-services' ); ?></p>
-				<p><code class="beltoft-services-db__conn"><?php echo esc_html( (string) $view['fingerprint'] ); ?></code></p>
+				<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn"><?php echo esc_html( (string) $view['fingerprint'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
 			<?php endif; ?>
 		</div>
 	<?php endif; // Kind of state. ?>
@@ -114,6 +114,7 @@ $beltoft_services_all = ! $nav;
 					<details class="beltoft-services-vm__more">
 						<summary><?php esc_html_e( 'Restore from a backup', 'beltoft-services' ); ?></summary>
 						<p class="description"><?php esc_html_e( 'Restoring puts the whole database server back to the backup. Everything after this backup is lost. The database is not available while it is restored. The password goes back to the one the backup had. The address stays.', 'beltoft-services' ); ?></p>
+						<div class="beltoft-services-db__form">
 						<p>
 							<label for="beltoft-db-backup"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></label>
 							<select id="beltoft-db-backup" data-db-backup>
@@ -125,8 +126,9 @@ $beltoft_services_all = ! $nav;
 						<p>
 							<label for="beltoft-db-restore-confirm"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $beltoft_services_backups['confirm'] ) ); ?></label>
 							<input type="text" id="beltoft-db-restore-confirm" autocomplete="off" data-db-restore-confirm>
-							<button type="button" class="button woocommerce-button" data-db-restore><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button>
 						</p>
+						<p><button type="button" class="button woocommerce-button" data-db-restore><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
+						</div>
 						<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 					</details>
 				<?php endif; ?>
@@ -139,11 +141,13 @@ $beltoft_services_all = ! $nav;
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
 				<p><?php esc_html_e( 'The old password stops working at once. Applications that use it must be changed.', 'beltoft-services' ); ?></p>
+				<div class="beltoft-services-db__form">
 				<p>
 					<label for="beltoft-db-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $view['confirm'] ) ); ?></label>
 					<input type="text" id="beltoft-db-confirm" autocomplete="off" data-db-confirm>
-					<button type="button" class="button woocommerce-button" data-db-reset><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button>
 				</p>
+				<p><button type="button" class="button woocommerce-button" data-db-reset><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
+				</div>
 			</div>
 		<?php elseif ( $view['resetting'] ) : ?>
 			<p><?php esc_html_e( 'A new password is being made. This can take a minute.', 'beltoft-services' ); ?></p>

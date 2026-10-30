@@ -551,6 +551,30 @@ class DbBuildTest extends TestCase {
 		$this->assertStringContainsString( 'data-db-reset', $after );
 	}
 
+	public function test_card_prints_each_connection_string_in_a_block_with_a_copy_button(): void {
+		$r = $this->ready_card_resource();
+		ob_start();
+		$this->driver->render_account( $r );
+		$html = (string) ob_get_clean();
+
+		// Two connection strings and the fingerprint, each a code block with its own Copy button; only the strings are filled with the password.
+		$this->assertSame( 3, substr_count( $html, 'class="beltoft-services-db__block"' ) );
+		$this->assertSame( 3, substr_count( $html, 'data-db-copy' ) );
+		$this->assertSame( 2, substr_count( $html, 'data-db-conn' ) );
+		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn>postgresql://[^<]+</code><button type="button"[^>]* data-db-copy [^>]*hidden>Copy</button></div>#', $html );
+		$this->assertStringNotContainsString( '<p><code class="beltoft-services-db__conn"', $html );
+	}
+
+	public function test_confirmation_form_of_a_new_password_is_a_column_with_the_button_in_its_own_row(): void {
+		$r = $this->ready_card_resource();
+		DbRoutes::take( Resource::find( $r->id() ), $this->owner( $r ) );
+		ob_start();
+		$this->driver->render_account( Resource::find( $r->id() ) );
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-db__form">\s*<p>\s*<label for="beltoft-db-confirm">.*?</p>\s*<p><button type="button" class="button woocommerce-button" data-db-reset>#s', $html );
+	}
+
 	public function test_card_of_a_database_still_being_built_has_no_connection(): void {
 		$r = $this->resource();
 		ob_start();

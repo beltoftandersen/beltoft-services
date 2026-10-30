@@ -142,8 +142,62 @@
 		} );
 	}
 
+	function copyText( text ) {
+		var area;
+
+		if ( window.navigator.clipboard && window.navigator.clipboard.writeText ) {
+			return window.navigator.clipboard.writeText( text );
+		}
+
+		return new Promise( function ( resolve, reject ) {
+			area = document.createElement( 'textarea' );
+			area.value = text;
+			area.setAttribute( 'readonly', '' );
+			area.style.position = 'fixed';
+			area.style.opacity = '0';
+			document.body.appendChild( area );
+			area.select();
+
+			try {
+				if ( document.execCommand( 'copy' ) ) {
+					resolve();
+				} else {
+					reject( new Error( 'copy' ) );
+				}
+			} catch ( e ) {
+				reject( e );
+			}
+
+			document.body.removeChild( area );
+		} );
+	}
+
+	// Copy: the text of the code block next to the button, read when it is clicked (it holds the password once that is shown).
+	function copy( box, button ) {
+		var code = button.parentNode ? button.parentNode.querySelector( 'code' ) : null;
+		var label = button.textContent;
+
+		if ( ! code ) {
+			return;
+		}
+
+		copyText( code.textContent ).then( function () {
+			button.textContent = button.getAttribute( 'data-copied' ) || label;
+			window.setTimeout( function () {
+				button.textContent = label;
+			}, 2000 );
+		}, function () {
+			say( box, db.strings.failed );
+		} );
+	}
+
+	// The buttons are hidden until the script runs: without it there is nothing to copy with.
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-db-copy]' ), function ( button ) {
+		button.hidden = false;
+	} );
+
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore], [data-db-copy]' );
 		var box = button ? button.closest( '[data-db-card]' ) : null;
 		var panel = box ? box.closest( '[data-resource]' ) : null;
 
@@ -151,7 +205,9 @@
 			return;
 		}
 
-		if ( button.hasAttribute( 'data-db-reveal' ) ) {
+		if ( button.hasAttribute( 'data-db-copy' ) ) {
+			copy( box, button );
+		} else if ( button.hasAttribute( 'data-db-reveal' ) ) {
 			reveal( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-restore' ) ) {
 			restore( box, panel, button );

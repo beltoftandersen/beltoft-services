@@ -668,9 +668,26 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-vm__reveal { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .beltoft-services-vm__reveal .button { margin: 0; }
 .beltoft-services-vm__password { padding: 8px 12px; background: var(--bg-warm, #eeece6); font-size: 15px; overflow-wrap: anywhere; user-select: all; }
-.beltoft-services-vm .beltoft-services-vm__copy { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
-.beltoft-services-vm .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-vm .beltoft-services-vm__copy, .beltoft-services-db .beltoft-services-vm__copy { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
+.beltoft-services-vm .beltoft-services-vm__copy:hover, .beltoft-services-db .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-vm__copy[hidden] { display: none !important; }
 
 /* Room between the database facts and the text under them. */
 .beltoft-services-db .beltoft-services-facts { margin-bottom: 16px; }
+
+/* The database page. It may shrink inside the page grid, so a long connection string wraps instead of widening the facts. */
+.beltoft-services-db { min-width: 0; }
+.beltoft-services-db .beltoft-services-facts { max-width: 100%; }
+/* The tab bar's underline is the only line above a tab's first section. */
+.beltoft-services-db .beltoft-services-tabs + .beltoft-services-vm__more { margin-top: 0; border-top: 0; }
+.beltoft-services-db .beltoft-services-tabs + .beltoft-services-vm__more > h4 { margin-top: 0; }
+/* A connection string or fingerprint: a code block in the warm background, flush left, with its Copy button. */
+.beltoft-services-db__block { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 0 0 16px; }
+.beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { box-sizing: border-box; flex: 1 1 16em; min-width: 0; margin: 0; padding: 10px 12px; border: 0; border-radius: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; word-break: normal; }
+.beltoft-services-db__block .beltoft-services-vm__copy { flex: none; margin: 0; }
+/* A typed-confirmation form: the fields and the button are a column with the same gap as the server page's forms. */
+.beltoft-services-db__form { display: grid; gap: 12px; max-width: 520px; margin: 12px 0 0; }
+.beltoft-services-db__form p { margin: 0; }
+.beltoft-services-db__form label { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--navy, #0c1535); }
+.beltoft-services-db__form input[type="text"], .beltoft-services-db__form select { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; border-radius: 0; }
+.beltoft-services-db__form .button { justify-self: start; margin: 0; }
