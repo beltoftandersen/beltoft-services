@@ -187,9 +187,9 @@ final class Clusters {
 	/**
 	 * Template families of managed services (a database server is built from them, a customer never picks them as
 	 * an operating system), by prefix: postgres-18. A template that carries several versions lists several families, comma separated:
-	 * postgres-17,postgres-18.
+	 * postgres-17,postgres-18. The Valkey template's family is valkey.
 	 */
-	public const SERVICE_FAMILIES = array( 'postgres-' );
+	public const SERVICE_FAMILIES = array( 'postgres-', 'valkey' );
 
 	/**
 	 * The operating system templates of a cluster, the ones customers choose from: VMID => label. Templates whose

@@ -1205,7 +1205,7 @@ class DbPhase4Test extends TestCase {
 	public function test_a_database_without_an_address_shows_only_the_private_connection(): void {
 		$r = $this->ready_db();
 		$view = DbCard::view( $r );
-		$this->assertSame( '', $view['public_verify'] );
+		$this->assertSame( array(), $view['public_connections'] );
 		$this->assertSame( '', $view['access']['address'] );
 		$this->assertStringNotContainsString( '@192.0.2', $this->card( $r, 'overview' ) );
 	}

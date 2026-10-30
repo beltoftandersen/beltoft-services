@@ -14,8 +14,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The list lives in the resource's meta (`db_allow`, `db_world`): the single source. Two layers enforce it and both
- * must allow a connection: the VM firewall (rules on net0 for port 5432, tagged `bs-db:`, written by Firewall) and
- * `pg_hba.conf` in the guest (the `allow` job of the db-v1 protocol). The private network is not part of it: the
+ * must allow a connection: the VM firewall (rules on net0 for the engine's port, tagged `bs-db:`, written by Firewall) and
+ * the guest (`pg_hba.conf` for PostgreSQL, an nftables set for Valkey: the `allow` job of the db-v1 protocol). The private network is not part of it: the
  * customer's own /28 is always open on net1.
  *
  * A change is stored under the resource lock with a new revision (DbAccessRoute) and one internal job, `db_access_apply`,
