@@ -625,8 +625,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-add { margin: 16px 0; }
 .beltoft-services-add__title { margin: 0 0 8px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
 .beltoft-services-add__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-width: 720px; }
-.beltoft-services-add a.beltoft-services-add__tile { display: flex; flex-direction: column; gap: 3px; padding: 14px; border: 0; border-radius: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); text-decoration: none; transition: background-color 0.12s ease, color 0.12s ease; }
-.beltoft-services-add a.beltoft-services-add__tile:hover { background: var(--navy, #0c1535); color: var(--bg-card, #fff); }
+.beltoft-services-add a.beltoft-services-add__tile { display: flex; flex-direction: column; gap: 3px; padding: 14px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; transition: background-color 0.12s ease, color 0.12s ease; }
+.beltoft-services-add a.beltoft-services-add__tile:hover { background: var(--navy, #0c1535); color: var(--bg-card, #fff) !important; }
 .beltoft-services-add a.beltoft-services-add__tile:focus-visible { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
 .beltoft-services-add__name { font-size: 18px; font-weight: 700; line-height: 1.25; }
 .beltoft-services-add__price { font-size: 13px; line-height: 1.4; opacity: 0.8; }
