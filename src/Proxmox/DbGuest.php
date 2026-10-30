@@ -22,7 +22,7 @@ final class DbGuest {
 	public const HEALTH      = self::DIR . '/health.json';
 
 	public const STATES = array( 'working', 'ready', 'failed' );
-	public const STEPS  = array( 'job', 'disk', 'cluster', 'container', 'tls', 'config', 'database', 'finish', 'allow', 'listen', 'password', 'dump', 'complete', 'start' );
+	public const STEPS  = array( 'job', 'disk', 'cluster', 'tls', 'config', 'database', 'finish', 'allow', 'listen', 'password', 'dump', 'complete', 'start' );
 
 	public const DATABASE = 'app';
 	public const ROLE     = 'app_user';
