@@ -212,6 +212,20 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				</div>
 			</div>
 			<p class="beltoft-vm-usage__notice" data-metrics-notice role="status" aria-live="polite"><?php esc_html_e( 'Loading usage…', 'beltoft-services' ); ?></p>
+			<?php if ( ! empty( $usage_states ) || ! empty( $usage_alerts_shown ) ) : ?>
+				<div class="beltoft-vm-usage__alerts">
+					<?php foreach ( (array) ( $usage_states ?? array() ) as $beltoft_services_state ) : ?>
+						<p class="beltoft-vm-usage__state"><?php echo esc_html( (string) $beltoft_services_state ); ?></p>
+					<?php endforeach; ?>
+					<?php if ( ! empty( $usage_alerts_shown ) ) : ?>
+						<label class="beltoft-vm-usage__switch">
+							<input type="checkbox" data-usage-alerts<?php echo ! empty( $usage_alerts_on ) ? ' checked' : ''; ?>>
+							<span><?php esc_html_e( 'Email me when this server is short of disk or CPU', 'beltoft-services' ); ?></span>
+						</label>
+						<p class="beltoft-vm-usage__switch-note" data-usage-alerts-note role="status" aria-live="polite"></p>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
 			<div class="beltoft-vm-usage__grid">
 				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ), 'mem' => __( 'Memory', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
 					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">

@@ -339,6 +339,27 @@ final class ClustersScreen {
 			esc_html__( 'Block outgoing mail from new machines', 'beltoft-services' )
 		);
 
+		printf(
+			'<tr><th scope="row">%1$s</th><td><input type="hidden" name="fw_enabled" value="0"><label><input type="checkbox" name="fw_enabled" value="1" %2$s> %3$s</label><br><input type="hidden" name="fw_ipfilter" value="0"><label><input type="checkbox" name="fw_ipfilter" value="1" %4$s> %5$s</label><p class="description">%6$s</p></td></tr>',
+			esc_html__( 'Firewall', 'beltoft-services' ),
+			checked( (int) $c['fw_enabled'], 1, false ),
+			esc_html__( 'Customers manage the firewall of their servers from the dashboard', 'beltoft-services' ),
+			checked( (int) $c['fw_ipfilter'], 1, false ),
+			esc_html__( 'Anti-spoofing IP filter (the server\'s own address)', 'beltoft-services' ),
+			esc_html__( 'Leave both off until the live checks of the firewall have passed.', 'beltoft-services' )
+		);
+		printf(
+			'<tr><th scope="row"><label for="fw_default_mode">%1$s</label></th><td><select id="fw_default_mode" name="fw_default_mode"><option value="standard" %2$s>%3$s</option><option value="open" %4$s>%5$s</option></select> <label>%6$s <input type="number" name="fw_max_rules" min="1" max="%7$d" value="%8$d" class="small-text"></label></td></tr>',
+			esc_html__( 'New servers', 'beltoft-services' ),
+			selected( (string) $c['fw_default_mode'], 'standard', false ),
+			esc_html__( 'Start with SSH, web and ping open', 'beltoft-services' ),
+			selected( (string) $c['fw_default_mode'], 'open', false ),
+			esc_html__( 'Start as today (nothing set)', 'beltoft-services' ),
+			esc_html__( 'Most rules per server', 'beltoft-services' ),
+			(int) Firewall::MAX_CEILING,
+			(int) $c['fw_max_rules']
+		);
+
 		echo '</table>';
 		submit_button( __( 'Save cluster', 'beltoft-services' ) );
 		echo ' <a href="' . esc_url( self::url() ) . '">' . esc_html__( 'Back to the list', 'beltoft-services' ) . '</a></form>';

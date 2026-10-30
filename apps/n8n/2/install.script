@@ -128,18 +128,36 @@ YAML
 fi
 if [ ! -e "$state/stage.4" ]; then
   # Create the owner on localhost before the web server and the firewall let anyone else in.
+  # /healthz answers before n8n has finished its database setup, and an owner made then is not kept,
+  # so wait for /healthz/readiness and then prove the owner exists by logging in with it.
   ready=0
-  for _ in $(seq 1 60); do
-    if curl --fail --silent --max-time 5 http://127.0.0.1:5678/healthz -o /dev/null; then
+  for _ in $(seq 1 90); do
+    if curl --fail --silent --max-time 5 http://127.0.0.1:5678/healthz/readiness -o /dev/null; then
       ready=1
       break
     fi
     sleep 2
   done
   [ "$ready" = 1 ]
-  # The password goes to curl on stdin, never in process arguments.
-  jq -n --arg email "$(jq -er '.root_email' "$secrets/n8n.json")" --arg password "$(jq -er '.root_password' "$secrets/n8n.json")" '{email:$email,firstName:"Owner",lastName:"Account",password:$password}' \
-    | curl --fail --silent --show-error --max-time 30 -X POST -H 'Content-Type: application/json' --data @- http://127.0.0.1:5678/rest/owner/setup -o /dev/null
+  owner_ok() {
+    # The password goes to curl on stdin, never in process arguments.
+    jq -n --arg email "$(jq -er '.root_email' "$secrets/n8n.json")" --arg password "$(jq -er '.root_password' "$secrets/n8n.json")" '{emailOrLdapLoginId:$email,password:$password}' \
+      | curl --fail --silent --max-time 15 -X POST -H 'Content-Type: application/json' --data @- http://127.0.0.1:5678/rest/login -o /dev/null
+  }
+  made=0
+  for _ in $(seq 1 10); do
+    if owner_ok; then
+      made=1
+      break
+    fi
+    if curl --fail --silent --max-time 5 http://127.0.0.1:5678/rest/settings | jq -e '.data.userManagement.showSetupOnFirstLoad == true' >/dev/null; then
+      jq -n --arg email "$(jq -er '.root_email' "$secrets/n8n.json")" --arg password "$(jq -er '.root_password' "$secrets/n8n.json")" '{email:$email,firstName:"Owner",lastName:"Account",password:$password}' \
+        | curl --silent --max-time 30 -X POST -H 'Content-Type: application/json' --data @- http://127.0.0.1:5678/rest/owner/setup -o /dev/null || true
+    fi
+    sleep 3
+  done
+  # Without a working owner the install stops here: the web server and the firewall ports are never opened.
+  [ "$made" = 1 ]
   touch "$state/stage.4"
 fi
 step=web

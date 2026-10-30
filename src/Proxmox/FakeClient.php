@@ -571,21 +571,47 @@ class FakeClient implements Client {
 				),
 			),
 			array( 'GET', $node . '/firewall/rules$#', 'h_rules_get', $none ),
+			array( 'POST', $node . '/firewall/rules$#', 'h_rules_add', self::rule_schema( true ) ),
+			array( 'GET', $node . '/firewall/rules/(\d+)$#', 'h_rule_get', $none ),
+			array( 'PUT', $node . '/firewall/rules/(\d+)$#', 'h_rule_put', self::rule_schema( false ) ),
+			array( 'DELETE', $node . '/firewall/rules/(\d+)$#', 'h_rule_delete', array( 'digest' => array( 'string', false, array( 'max' => 40 ) ) ) ),
+			array( 'GET', $node . '/firewall/options$#', 'h_fw_options_get', $none ),
 			array(
-				'POST',
-				$node . '/firewall/rules$#',
-				'h_rules_add',
+				'PUT',
+				$node . '/firewall/options$#',
+				'h_fw_options',
 				array(
-					'action'  => array( 'string', true ),
-					'type'    => array( 'enum', true, array( 'values' => array( 'in', 'out', 'group' ) ) ),
-					'proto'   => array( 'string' ),
-					'dport'   => array( 'string' ),
-					'iface'   => array( 'string' ),
-					'enable'  => array( 'bool' ),
-					'comment' => array( 'string' ),
+					'enable'     => array( 'bool' ),
+					'policy_in'  => array( 'enum', false, array( 'values' => array( 'ACCEPT', 'REJECT', 'DROP' ) ) ),
+					'policy_out' => array( 'enum', false, array( 'values' => array( 'ACCEPT', 'REJECT', 'DROP' ) ) ),
+					'macfilter'  => array( 'bool' ),
+					'ipfilter'   => array( 'bool' ),
+					'digest'     => array( 'string', false, array( 'max' => 40 ) ),
 				),
 			),
-			array( 'PUT', $node . '/firewall/options$#', 'h_fw_options', array( 'enable' => array( 'bool' ) ) ),
+			array( 'GET', $node . '/firewall/ipset$#', 'h_ipset_list', $none ),
+			array(
+				'POST',
+				$node . '/firewall/ipset$#',
+				'h_ipset_create',
+				array(
+					'name'    => array( 'string', true ),
+					'comment' => array( 'string' ),
+				)
+			),
+			array( 'GET', $node . '/firewall/ipset/([A-Za-z0-9_\-]+)$#', 'h_ipset_get', $none ),
+			array( 'DELETE', $node . '/firewall/ipset/([A-Za-z0-9_\-]+)$#', 'h_ipset_delete', $none ),
+			array(
+				'POST',
+				$node . '/firewall/ipset/([A-Za-z0-9_\-]+)$#',
+				'h_ipset_add',
+				array(
+					'cidr'    => array( 'string', true ),
+					'comment' => array( 'string' ),
+					'nomatch' => array( 'bool' ),
+				)
+			),
+			array( 'DELETE', $node . '/firewall/ipset/([A-Za-z0-9_\-]+)/([0-9a-fA-F.:/]+)$#', 'h_ipset_remove', array( 'digest' => array( 'string', false, array( 'max' => 40 ) ) ) ),
 			array( 'POST', $node . '/agent/ping$#', 'h_agent_ping', $none ),
 			array(
 				'POST',
@@ -1315,7 +1341,49 @@ class FakeClient implements Client {
 	}
 
 	/**
-	 * GET firewall/rules.
+	 * The schema of a firewall rule: for a new rule `action` and `type` are required (modelled on the API
+	 * viewer, #/nodes/{node}/qemu/{vmid}/firewall/rules). `enable` is optional and a rule made without it is
+	 * stored disabled, as pve-firewall does.
+	 *
+	 * @param bool $create Whether the rule is new.
+	 * @return array<string, array>
+	 */
+	private static function rule_schema( bool $create ): array {
+		return array(
+			'action'  => array( 'string', $create ),
+			'type'    => array( 'enum', $create, array( 'values' => array( 'in', 'out', 'group' ) ) ),
+			'proto'   => array( 'string' ),
+			'dport'   => array( 'string' ),
+			'sport'   => array( 'string' ),
+			'source'  => array( 'string' ),
+			'dest'    => array( 'string' ),
+			'iface'   => array( 'string' ),
+			'enable'  => array( 'bool' ),
+			'comment' => array( 'string', false, array( 'max' => 255 ) ),
+			'digest'  => array( 'string', false, array( 'max' => 40 ) ),
+			'delete'  => array( 'string' ),
+			'moveto'  => array( 'int', false, array( 'min' => 0 ) ),
+		);
+	}
+
+	/**
+	 * The digest of the rule list of a VM (the stale-write guard; modelled as one digest for the whole file).
+	 *
+	 * @param array<string, mixed> $vm VM.
+	 */
+	private function rules_digest( array $vm ): string {
+		return sha1( (string) wp_json_encode( $vm['firewall_rules'] ) );
+	}
+
+	/**
+	 * The error of a stale digest (pve-firewall dies with this text, HTTP 500).
+	 */
+	private function stale(): \WP_Error {
+		return $this->error( 500, 'detected modified configuration - file changed by other user? Try again.' );
+	}
+
+	/**
+	 * GET firewall/rules: every rule with its position and the digest.
 	 *
 	 * @param array<int, string>   $a Captures.
 	 * @param array<string, mixed> $p Parameters.
@@ -1324,11 +1392,23 @@ class FakeClient implements Client {
 		unset( $p );
 		$vm = $this->find( $a );
 
-		return is_wp_error( $vm ) ? $vm : $vm['firewall_rules'];
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$digest = $this->rules_digest( $vm );
+
+		return array_map(
+			static function ( $rule ) use ( $digest ) {
+				$rule['digest'] = $digest;
+				return $rule;
+			},
+			$vm['firewall_rules']
+		);
 	}
 
 	/**
-	 * POST firewall/rules.
+	 * POST firewall/rules. A comment may not contain a line feed; a rule without `enable` is created disabled.
 	 *
 	 * @param array<int, string>   $a Captures.
 	 * @param array<string, mixed> $p Parameters.
@@ -1340,11 +1420,147 @@ class FakeClient implements Client {
 			return $vm;
 		}
 
+		if ( isset( $p['comment'] ) && 1 === preg_match( '/[\r\n]/', $p['comment'] ) ) {
+			return $this->error( 400, 'Parameter verification failed: comment: value contains a line feed' );
+		}
+
+		unset( $p['digest'], $p['delete'], $p['moveto'] );
+
 		$id           = (int) $a[1];
+		$p['enable']  = isset( $p['enable'] ) ? (int) $p['enable'] : 0;
 		$p['pos']     = count( $vm['firewall_rules'] );
 		$this->state['vms'][ $id ]['firewall_rules'][] = $p;
 
 		return null;
+	}
+
+	/**
+	 * The rule at a position, or the error of a position without a rule.
+	 *
+	 * @param array<string, mixed> $vm  VM.
+	 * @param int                  $pos Position.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function rule_at( array $vm, int $pos ) {
+		return $vm['firewall_rules'][ $pos ] ?? $this->error( 500, 'no rule at position ' . $pos );
+	}
+
+	/**
+	 * GET firewall/rules/{pos}.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_rule_get( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$rule = $this->rule_at( $vm, (int) $a[2] );
+
+		if ( is_wp_error( $rule ) ) {
+			return $rule;
+		}
+
+		$rule['digest'] = $this->rules_digest( $vm );
+
+		return $rule;
+	}
+
+	/**
+	 * PUT firewall/rules/{pos}.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_rule_put( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$rule = $this->rule_at( $vm, (int) $a[2] );
+
+		if ( is_wp_error( $rule ) ) {
+			return $rule;
+		}
+
+		if ( isset( $p['digest'] ) && $p['digest'] !== $this->rules_digest( $vm ) ) {
+			return $this->stale();
+		}
+
+		if ( isset( $p['comment'] ) && 1 === preg_match( '/[\r\n]/', $p['comment'] ) ) {
+			return $this->error( 400, 'Parameter verification failed: comment: value contains a line feed' );
+		}
+
+		foreach ( array_filter( explode( ',', (string) ( $p['delete'] ?? '' ) ) ) as $key ) {
+			unset( $rule[ trim( $key ) ] );
+		}
+
+		unset( $p['digest'], $p['delete'], $p['moveto'] );
+		$this->state['vms'][ (int) $a[1] ]['firewall_rules'][ (int) $a[2] ] = array_merge( $rule, $p );
+
+		return null;
+	}
+
+	/**
+	 * DELETE firewall/rules/{pos}: the positions after it move up.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_rule_delete( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$rule = $this->rule_at( $vm, (int) $a[2] );
+
+		if ( is_wp_error( $rule ) ) {
+			return $rule;
+		}
+
+		if ( isset( $p['digest'] ) && $p['digest'] !== $this->rules_digest( $vm ) ) {
+			return $this->stale();
+		}
+
+		$rules = $vm['firewall_rules'];
+		unset( $rules[ (int) $a[2] ] );
+		$rules = array_values( $rules );
+
+		foreach ( $rules as $i => $rule ) {
+			$rules[ $i ]['pos'] = $i;
+		}
+
+		$this->state['vms'][ (int) $a[1] ]['firewall_rules'] = $rules;
+
+		return null;
+	}
+
+	/**
+	 * GET firewall/options. An option that was never set is absent (the daemon applies its default).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_fw_options_get( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$options           = $vm['firewall_options'];
+		$options['digest'] = sha1( (string) wp_json_encode( $vm['firewall_options'] ) );
+
+		return $options;
 	}
 
 	/**
@@ -1360,9 +1576,293 @@ class FakeClient implements Client {
 			return $vm;
 		}
 
+		if ( isset( $p['digest'] ) && $p['digest'] !== sha1( (string) wp_json_encode( $vm['firewall_options'] ) ) ) {
+			return $this->stale();
+		}
+
+		unset( $p['digest'] );
 		$this->state['vms'][ (int) $a[1] ]['firewall_options'] = array_merge( $vm['firewall_options'], $p );
 
 		return null;
+	}
+
+	/**
+	 * GET firewall/ipset.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_ipset_list( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$out = array();
+
+		foreach ( (array) ( $vm['firewall_ipsets'] ?? array() ) as $name => $entries ) {
+			$out[] = array( 'name' => (string) $name, 'comment' => '' );
+			unset( $entries );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * POST firewall/ipset.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_ipset_create( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( isset( $vm['firewall_ipsets'][ $p['name'] ] ) ) {
+			return $this->error( 400, 'IPSet ' . $p['name'] . ' already exists' );
+		}
+
+		$this->state['vms'][ (int) $a[1] ]['firewall_ipsets'][ $p['name'] ] = array();
+
+		return null;
+	}
+
+	/**
+	 * GET firewall/ipset/{name}.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_ipset_get( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( ! isset( $vm['firewall_ipsets'][ $a[2] ] ) ) {
+			return $this->error( 500, 'no such IPSet ' . $a[2] );
+		}
+
+		return $vm['firewall_ipsets'][ $a[2] ];
+	}
+
+	/**
+	 * DELETE firewall/ipset/{name}: only an empty set can be deleted.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_ipset_delete( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( ! isset( $vm['firewall_ipsets'][ $a[2] ] ) ) {
+			return $this->error( 500, 'no such IPSet ' . $a[2] );
+		}
+
+		if ( $vm['firewall_ipsets'][ $a[2] ] ) {
+			return $this->error( 400, 'IPSet ' . $a[2] . ' is not empty' );
+		}
+
+		unset( $this->state['vms'][ (int) $a[1] ]['firewall_ipsets'][ $a[2] ] );
+
+		return null;
+	}
+
+	/**
+	 * POST firewall/ipset/{name}.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_ipset_add( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( ! isset( $vm['firewall_ipsets'][ $a[2] ] ) ) {
+			return $this->error( 500, 'no such IPSet ' . $a[2] );
+		}
+
+		foreach ( $vm['firewall_ipsets'][ $a[2] ] as $entry ) {
+			if ( $entry['cidr'] === $p['cidr'] ) {
+				return $this->error( 400, 'address ' . $p['cidr'] . ' already exists' );
+			}
+		}
+
+		$this->state['vms'][ (int) $a[1] ]['firewall_ipsets'][ $a[2] ][] = array(
+			'cidr'    => $p['cidr'],
+			'comment' => $p['comment'] ?? '',
+			'nomatch' => (int) ( $p['nomatch'] ?? 0 ),
+		);
+
+		return null;
+	}
+
+	/**
+	 * DELETE firewall/ipset/{name}/{cidr}.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_ipset_remove( array $a, array $p ) {
+		unset( $p );
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$kept = array_values( array_filter( (array) ( $vm['firewall_ipsets'][ $a[2] ] ?? array() ), static fn( $e ) => $e['cidr'] !== $a[3] ) );
+		$this->state['vms'][ (int) $a[1] ]['firewall_ipsets'][ $a[2] ] = $kept;
+
+		return null;
+	}
+
+	/**
+	 * Would pve-firewall let this packet in? Evaluates the stored rules the way the daemon does, so tests assert
+	 * behaviour and not only calls: a VM without `enable=1` has no filtering; otherwise the first enabled `in` rule
+	 * of the interface that matches decides (a rule without `iface` applies to every NIC), and no match gives the
+	 * policy. An unset `policy_in` reads as the daemon's code does (DROP) unless set_default_policy_in() says what
+	 * the real host does (the owner saw an unset policy accept on 2026-10-29).
+	 *
+	 * @param int         $vmid  VMID.
+	 * @param string      $proto tcp, udp or icmp.
+	 * @param int         $port  Destination port (ignored for icmp).
+	 * @param string      $src   Source IPv4 address.
+	 * @param string      $iface Interface the packet arrives on.
+	 */
+	public function fake_inbound_allowed( int $vmid, string $proto, int $port, string $src, string $iface = 'net0' ): bool {
+		$this->load();
+		$vm = $this->state['vms'][ $vmid ] ?? null;
+
+		if ( null === $vm || 1 !== (int) ( $vm['firewall_options']['enable'] ?? 0 ) ) {
+			return true;
+		}
+
+		foreach ( $vm['firewall_rules'] as $rule ) {
+			if ( 'in' !== ( $rule['type'] ?? '' ) || 1 !== (int) ( $rule['enable'] ?? 0 ) ) {
+				continue;
+			}
+
+			if ( '' !== (string) ( $rule['iface'] ?? '' ) && $rule['iface'] !== $iface ) {
+				continue;
+			}
+
+			if ( '' !== (string) ( $rule['proto'] ?? '' ) && $rule['proto'] !== $proto ) {
+				continue;
+			}
+
+			if ( 'icmp' !== $proto && ! self::port_in( (string) ( $rule['dport'] ?? '' ), $port ) ) {
+				continue;
+			}
+
+			if ( ! self::source_in( (string) ( $rule['source'] ?? '' ), $src ) ) {
+				continue;
+			}
+
+			return 'ACCEPT' === $rule['action'];
+		}
+
+		$policy = (string) ( $vm['firewall_options']['policy_in'] ?? '' );
+
+		if ( '' === $policy ) {
+			$policy = (string) ( $this->state['default_policy_in'] ?? 'DROP' );
+		}
+
+		return 'ACCEPT' === $policy;
+	}
+
+	/**
+	 * Would the firewall let this packet leave? (policy_out defaults to ACCEPT.)
+	 *
+	 * @param int    $vmid  VMID.
+	 * @param string $proto Protocol.
+	 * @param int    $port  Destination port.
+	 */
+	public function fake_outbound_allowed( int $vmid, string $proto, int $port ): bool {
+		$this->load();
+		$vm = $this->state['vms'][ $vmid ] ?? null;
+
+		if ( null === $vm || 1 !== (int) ( $vm['firewall_options']['enable'] ?? 0 ) ) {
+			return true;
+		}
+
+		foreach ( $vm['firewall_rules'] as $rule ) {
+			if ( 'out' !== ( $rule['type'] ?? '' ) || 1 !== (int) ( $rule['enable'] ?? 0 ) ) {
+				continue;
+			}
+
+			if ( ( '' === (string) ( $rule['proto'] ?? '' ) || $rule['proto'] === $proto ) && self::port_in( (string) ( $rule['dport'] ?? '' ), $port ) ) {
+				return 'ACCEPT' === $rule['action'];
+			}
+		}
+
+		return 'ACCEPT' === (string) ( $vm['firewall_options']['policy_out'] ?? 'ACCEPT' );
+	}
+
+	/**
+	 * What an unset `policy_in` does on this cluster (ACCEPT or DROP). Modelled: the real value is a live check.
+	 *
+	 * @param string $policy ACCEPT or DROP.
+	 */
+	public function set_default_policy_in( string $policy ): void {
+		$this->load();
+		$this->state['default_policy_in'] = $policy;
+		$this->save();
+	}
+
+	/**
+	 * Is the port in a rule's port spec (empty, `80` or `8000:8100`)?
+	 *
+	 * @param string $spec Spec.
+	 * @param int    $port Port.
+	 */
+	private static function port_in( string $spec, int $port ): bool {
+		if ( '' === $spec ) {
+			return true;
+		}
+
+		$parts = explode( ':', $spec );
+
+		return $port >= (int) $parts[0] && $port <= (int) end( $parts );
+	}
+
+	/**
+	 * Is the address in a rule's source (empty, an address, a network, or a comma list of them)?
+	 *
+	 * @param string $spec Spec.
+	 * @param string $addr IPv4 address.
+	 */
+	private static function source_in( string $spec, string $addr ): bool {
+		if ( '' === $spec ) {
+			return true;
+		}
+
+		foreach ( explode( ',', $spec ) as $item ) {
+			$bits = explode( '/', trim( $item ) );
+			$len  = isset( $bits[1] ) ? (int) $bits[1] : 32;
+			$mask = 0 === $len ? 0 : ( -1 << ( 32 - $len ) ) & 0xFFFFFFFF;
+
+			if ( ( ip2long( $addr ) & $mask ) === ( ip2long( $bits[0] ) & $mask ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

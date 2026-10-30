@@ -121,6 +121,9 @@ final class Panels {
 			/* translators: %s: the total, such as 2 GB */
 			'of' => __( 'of %s GB', 'beltoft-services' ),
 			'noReading' => __( 'No reading', 'beltoft-services' ),
+			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),
+			'alertsOff' => __( 'Usage emails are off for this server.', 'beltoft-services' ),
+			'alertsFailed' => __( 'Could not save. Please try again.', 'beltoft-services' ),
 		) ) );
 		wp_localize_script(
 			self::HANDLE,
@@ -181,6 +184,31 @@ final class Panels {
 	}
 
 	/**
+	 * Plain lines for what the usage emails told the customer and is still the case: disk and CPU. Cleared when
+	 * the alert re-arms.
+	 *
+	 * @param Resource $r Resource.
+	 * @return string[]
+	 */
+	public static function usage_states( Resource $r ): array {
+		$lines = array();
+		$date  = (string) get_option( 'date_format' );
+		$total = (int) $r->get( 'disk_total' );
+
+		if ( $r->get( 'monitor_disk_notified' ) && $total > 0 ) {
+			/* translators: 1: percent of the disk in use, 2: date. */
+			$lines[] = sprintf( __( 'Disk %1$d percent full since %2$s', 'beltoft-services' ), (int) floor( 100 * (int) $r->get( 'disk_used' ) / $total ), wp_date( $date, (int) $r->get( 'monitor_disk_notified' ) ) );
+		}
+
+		if ( $r->get( 'monitor_cpu_notified' ) && $r->get( 'monitor_cpu_since' ) ) {
+			/* translators: %s: date and time. */
+			$lines[] = sprintf( __( 'CPU high since %s', 'beltoft-services' ), wp_date( $date . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_cpu_since' ) ) );
+		}
+
+		return $lines;
+	}
+
+	/**
 	 * The customer's part of the panel.
 	 *
 	 * @param Resource $r Resource.
@@ -219,6 +247,9 @@ final class Panels {
 			'ssh_user'   => Provision::LOGIN_USER,
 			'backups'    => Backups::panel( $r ),
 			'metrics'    => 'ready' === $r->get( 'state' ) && $r->shows_status(),
+			'usage_alerts_shown' => 'on' === \BeltoftServices\Settings::get( 'monitor_alerts' ) && true !== $r->get( 'linked' ),
+			'usage_alerts_on'    => Monitor::usage_wanted( $r ),
+			'usage_states'       => self::usage_states( $r ),
 			'disk_used'  => $disk['used'] ?? null,
 			'disk_total' => $disk['total'] ?? null,
 			'extra_disks' => DiskPanels::server( $r ),
@@ -447,6 +478,41 @@ final class Panels {
 	}
 
 	/**
+	 * The firewall of the server for the admin: who manages it, on or off, how many rules, whether the last change was
+	 * confirmed, and the last change from the customer. Empty for a server nobody took over.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function firewall_line( Resource $r ): string {
+		if ( true === $r->get( Firewall::LOCKED ) ) {
+			return __( 'Managed with the databases (the customer cannot edit it)', 'beltoft-services' );
+		}
+
+		if ( ! Firewall::managed( $r ) ) {
+			return '';
+		}
+
+		$history = is_array( $r->get( Firewall::HISTORY ) ) ? $r->get( Firewall::HISTORY ) : array();
+		$last    = $history ? end( $history ) : array();
+		$text    = sprintf(
+			/* translators: 1: on or off, 2: number of rules, 3: state (idle, applying, failed), 4: revision applied, 5: revision asked for */
+			__( '%1$s, %2$d rules, %3$s (applied %4$d of %5$d)', 'beltoft-services' ),
+			false === $r->get( Firewall::ON ) ? __( 'off', 'beltoft-services' ) : __( 'on', 'beltoft-services' ),
+			count( Firewall::rules_of( $r ) ),
+			'' === (string) $r->get( Firewall::STATE ) ? 'idle' : (string) $r->get( Firewall::STATE ),
+			(int) $r->get( Firewall::APPLIED ),
+			(int) $r->get( Firewall::REV )
+		);
+
+		if ( is_array( $last ) && ! empty( $last['at'] ) ) {
+			/* translators: 1: date and time, 2: user id */
+			$text .= ' ' . sprintf( __( 'Last change %1$s by user %2$d', 'beltoft-services' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $last['at'] ), (int) ( $last['user'] ?? 0 ) );
+		}
+
+		return $text;
+	}
+
+	/**
 	 * The admin's part: where the VM is and what it is doing. No password, no Proxmox call.
 	 *
 	 * @param Resource $r Resource.
@@ -471,10 +537,15 @@ final class Panels {
 			),
 			__( 'Template', 'beltoft-services' )      => (string) ( (int) $r->get( OsField::META ) > 0 ? $r->get( OsField::META ) : ( (array) $r->get( 'plan' ) )['template'] ?? '' ),
 			__( 'Backups', 'beltoft-services' )       => self::backups_line( $r ),
+			__( 'Firewall', 'beltoft-services' )      => self::firewall_line( $r ),
+			__( 'Firewall error', 'beltoft-services' ) => (string) $r->get( Firewall::ERROR ),
 			__( 'Disk reading', 'beltoft-services' ) => $r->get( 'disk_read_at' ) ? sprintf( '%s / %s bytes at %s', (string) $r->get( 'disk_used' ), (string) $r->get( 'disk_total' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'disk_read_at' ) ) ) : '',
 			__( 'Down since', 'beltoft-services' ) => $r->get( 'monitor_down_since' ) ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_down_since' ) ) : '',
 			__( 'Down alert sent', 'beltoft-services' ) => $r->get( 'monitor_down_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'Disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
+			__( 'Urgent disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_urgent_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
+			__( 'CPU alert', 'beltoft-services' ) => $r->get( 'monitor_cpu_notified' ) ? sprintf( /* translators: %s: date and time. */ __( 'Sent, high since %s', 'beltoft-services' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_cpu_since' ) ) ) : __( 'No', 'beltoft-services' ),
+			__( 'Usage emails', 'beltoft-services' ) => Monitor::usage_wanted( $r ) ? __( 'On', 'beltoft-services' ) : __( 'Turned off by the customer', 'beltoft-services' ),
 			__( 'Waiting', 'beltoft-services' )       => '' !== (string) $r->get( 'waiting' ) ? sprintf( /* translators: %s: what the server waits for. */ __( 'Waiting: %s', 'beltoft-services' ), (string) $r->get( 'waiting' ) ) : '',
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),
 		);

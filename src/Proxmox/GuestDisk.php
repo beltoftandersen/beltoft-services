@@ -14,6 +14,28 @@ defined( 'ABSPATH' ) || exit;
 final class GuestDisk {
 	private const SUCCESS_TTL = 6 * HOUR_IN_SECONDS;
 	private const FAILURE_TTL = HOUR_IN_SECONDS;
+	/** A normal server is read when its reading is this old (a little under six hours, so the six hourly run finds it due). */
+	private const READ_TTL = 6 * HOUR_IN_SECONDS - 600;
+	/** A server at or above this percent is read every hour (a little under, so the hourly run finds it due). */
+	public const WATCH_PERCENT = 85;
+	private const WATCH_TTL = HOUR_IN_SECONDS - 300;
+
+	/**
+	 * Whether the disk job should read this server now: no reading, an old one, or a high one that is an hour old.
+	 * A failed read counts as a reading for this (a server with no agent is tried about every six hours).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function due( Resource $r ): bool {
+		$total = (int) $r->get( 'disk_total' );
+		$last  = max( (int) $r->get( 'disk_read_at' ), (int) $r->get( 'disk_fail_at' ) );
+		if ( $last <= 0 ) {
+			return true;
+		}
+		$high = $total > 0 && 100 * (int) $r->get( 'disk_used' ) / $total >= self::WATCH_PERCENT;
+
+		return time() - $last >= ( $high ? self::WATCH_TTL : self::READ_TTL );
+	}
 
 	/** The last successful reading, while its six-hour cache is valid. */
 	public static function cached( Resource $r ): ?array {
@@ -45,9 +67,10 @@ final class GuestDisk {
 				return false;
 			}
 			$disk = self::cached( $r );
-			if ( null !== $disk ) {
+			if ( null !== $disk && ! self::due( $r ) ) {
 				return false;
 			}
+			$disk = null;
 			if ( $now - (int) $r->get( 'disk_fail_at' ) < self::FAILURE_TTL ) {
 				return false;
 			}

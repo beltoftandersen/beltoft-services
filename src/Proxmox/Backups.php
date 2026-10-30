@@ -784,6 +784,28 @@ final class Backups {
 	 * @param bool     $with Whether the target has backups.
 	 */
 	public static function switch_url( Resource $r, bool $with ): string {
+		$license      = $r->license();
+		$variation_id = (int) ( $license['variation_id'] ?? 0 );
+		$variation    = $variation_id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : null;
+
+		if ( ! $variation instanceof \WC_Product_Variation ) {
+			return '';
+		}
+
+		$sibling = self::sibling( $variation, $with );
+
+		return null === $sibling ? '' : self::switch_to( $r, $sibling );
+	}
+
+	/**
+	 * The WooCommerce Subscriptions switch link of the server's subscription item to another variation of the same
+	 * product (the shared part of the backups and the upgrade links). Empty when WCS is inactive, the item cannot be
+	 * switched by this customer, or the server has no subscription item.
+	 *
+	 * @param Resource              $r      Resource.
+	 * @param \WC_Product_Variation $target The variation to switch to.
+	 */
+	public static function switch_to( Resource $r, \WC_Product_Variation $target ): string {
 		if ( ! class_exists( '\WC_Subscriptions_Switcher' ) || ! function_exists( 'wcs_get_subscription' ) ) {
 			return '';
 		}
@@ -791,16 +813,14 @@ final class Backups {
 		$license      = $r->license();
 		$variation_id = (int) ( $license['variation_id'] ?? 0 );
 		$sub_id       = (int) ( $license['subscription_id'] ?? 0 );
-		$variation    = $variation_id > 0 ? wc_get_product( $variation_id ) : null;
 
-		if ( $sub_id < 1 || ! $variation instanceof \WC_Product_Variation ) {
+		if ( $sub_id < 1 || $variation_id < 1 ) {
 			return '';
 		}
 
-		$sibling      = self::sibling( $variation, $with );
 		$subscription = wcs_get_subscription( $sub_id );
 
-		if ( null === $sibling || ! $subscription instanceof \WC_Subscription ) {
+		if ( ! $subscription instanceof \WC_Subscription ) {
 			return '';
 		}
 
@@ -822,10 +842,10 @@ final class Backups {
 				return '';
 			}
 
-			$args['add-to-cart'] = $sibling->get_parent_id();
-			$args['variation_id'] = $sibling->get_id();
+			$args['add-to-cart'] = $target->get_parent_id();
+			$args['variation_id'] = $target->get_id();
 
-			foreach ( $sibling->get_attributes() as $name => $value ) {
+			foreach ( $target->get_attributes() as $name => $value ) {
 				$args[ 'attribute_' . $name ] = $value;
 			}
 

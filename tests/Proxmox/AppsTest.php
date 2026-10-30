@@ -18,7 +18,7 @@ final class AppsTest extends TestCase {
 
 	public function test_docker_getting_started_warns_about_published_ports(): void {
 		$text = (string) Apps::current( 'docker' )['getting_started'];
-		$this->assertStringContainsString( 'Ports you publish with Docker are open to the internet even though the firewall is on', $text );
+		$this->assertStringContainsString( 'Ports you publish with Docker bypass the firewall inside the server. Open or close them in the Firewall tab', $text );
 		$this->assertStringContainsString( '127.0.0.1', $text );
 	}
 
@@ -102,11 +102,15 @@ final class AppsTest extends TestCase {
 		$app = Apps::current( 'n8n' );
 		$this->assertNotNull( $app );
 		$this->assertSame( '2', $app['version_id'] );
-		$this->assertSame( 1, $app['recipe'] );
+		$this->assertSame( 2, $app['recipe'] );
 		$file = BELTOFT_SERVICES_PATH . 'apps/n8n/2/install.script';
 		$this->assertSame( hash_file( 'sha256', $file ), $app['sha256'] );
 		$this->assertStringContainsString( 'n8nio/n8n:' . $app['upstream'] . '@sha256:', $this->n8n_script() );
 		$this->assertTrue( ! empty( $app['needs_email'] ) );
+		$script = $this->n8n_script();
+		$this->assertStringContainsString( '/healthz/readiness', $script, 'The owner is made only once n8n is fully ready.' );
+		$this->assertStringContainsString( 'http://127.0.0.1:5678/rest/login', $script, 'The owner is proven by logging in with it.' );
+		$this->assertLessThan( strpos( $script, 'step=web' ), strpos( $script, '[ "$made" = 1 ]' ), 'Without a working owner the install stops before the web server and the firewall open.' );
 		$check = array();
 		$code  = 1;
 		exec( 'bash -n ' . escapeshellarg( $file ), $check, $code );

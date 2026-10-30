@@ -68,6 +68,7 @@ class ProxmoxJobsTest extends TestCase {
 				'abuse_mode'      => 'report',
 				'abuse_cpu'       => 90,
 				'abuse_hours'     => 1,
+				'monitor_alerts'  => 'off',
 				'host_reserve_gb' => 4,
 				'admin_email'     => 'admin@example.com',
 			)
@@ -483,6 +484,57 @@ class ProxmoxJobsTest extends TestCase {
 
 		$this->assertSame( 0, $this->paths( 'GET', '#rrddata$#' ) );
 		$this->assertCount( 0, $this->mails );
+	}
+
+	public function test_customer_alerts_alone_read_the_usage_once_and_abuse_is_not_run(): void {
+		$this->settings( array( 'abuse_mode' => 'off', 'monitor_alerts' => 'on' ) );
+		$r = $this->vm( 5000 );
+		$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97 ) );
+
+		$this->abuse_run();
+
+		$this->assertSame( 1, $this->paths( 'GET', '#rrddata$#' ) );
+		$this->assertCount( 0, $this->mails, 'No abuse report with abuse mode off, and one hour is not sustained.' );
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'desired' ) );
+	}
+
+	public function test_abuse_and_customer_alerts_share_one_read_and_abuse_is_unchanged(): void {
+		$this->settings( array( 'abuse_mode' => 'report', 'monitor_alerts' => 'on' ) );
+		$this->vm( 5000 );
+		$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97 ) );
+
+		$this->abuse_run();
+
+		$this->assertSame( 1, $this->paths( 'GET', '#rrddata$#' ), 'One read for both.' );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( '] Abuse suspected: ', $this->mails[0]['subject'] );
+	}
+
+	public function test_a_failed_usage_read_changes_nothing_for_the_customer(): void {
+		$this->settings( array( 'abuse_mode' => 'off', 'monitor_alerts' => 'on', 'monitor_cpu_hours' => 1 ) );
+		$r = $this->vm( 5000 );
+		$this->fake->fail_next( 'GET', '#rrddata$#', new \WP_Error( 'down', 'No.' ) );
+
+		$this->abuse_run();
+
+		$this->assertCount( 0, $this->mails );
+		$this->assertNull( Resource::find( $r->id() )->get( 'monitor_cpu_notified' ) );
+	}
+
+	public function test_customer_cpu_email_goes_to_the_owner_through_the_job(): void {
+		$this->settings( array( 'abuse_mode' => 'off', 'monitor_alerts' => 'on', 'monitor_cpu_hours' => 2 ) );
+		$r   = $this->vm( 5000 );
+		$end = 1700000000;
+		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'email' => 'christian.beltoft+usage-job@gmail.com' ) ) );
+
+		foreach ( array( 0, 3600 ) as $step ) {
+			$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97, $end + $step ) );
+			ProxmoxJobs::power();
+			ProxmoxJobs::abuse();
+		}
+
+		$this->assertCount( 1, $this->mails );
+		$this->assertSame( 'christian.beltoft+usage-job@gmail.com', $this->mails[0]['to'] );
 	}
 
 	public function test_abuse_skips_samples_without_cpu_or_time(): void {

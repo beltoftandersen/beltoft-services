@@ -78,6 +78,8 @@ final class Actions {
 		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
 		'snapshot_delete'   => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
+		'fw_apply'          => array( 20, HOUR_IN_SECONDS ),
+		'fw_reset'          => array( 5, HOUR_IN_SECONDS ),
 	);
 
 	/**
@@ -157,7 +159,7 @@ final class Actions {
 		}
 
 		$out[ ServerName::ACTION ] = __( 'Rename', 'beltoft-services' );
-		$out = array_merge( $out, Snapshots::offered( $r ) );
+		$out = array_merge( $out, Snapshots::offered( $r ), Firewall::offered( $r ) );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -200,7 +202,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
-			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -289,6 +291,10 @@ final class Actions {
 	public static function check( Resource $r, string $action, array $args ): ?string {
 		if ( in_array( $action, Snapshots::ACTIONS, true ) ) {
 			return Snapshots::check( $r, $action, $args );
+		}
+
+		if ( in_array( $action, Firewall::ACTIONS, true ) ) {
+			return Firewall::check( $r, $action, $args );
 		}
 
 		if ( 'reinstall' === $action ) {
@@ -466,6 +472,11 @@ final class Actions {
 		// Snapshots have their own steps (verification, task polling and all).
 		if ( $internal || in_array( $action, Snapshots::ACTIONS, true ) ) {
 			return ( new Snapshots( $this->r ) )->run( $action, $args );
+		}
+
+		// The firewall has its own steps (read, add, remove, policy, read back).
+		if ( in_array( $action, Firewall::ACTIONS, true ) ) {
+			return ( new Firewall( $this->r ) )->run( $action, $args );
 		}
 
 		// No Proxmox call and no reinstall: the install job is queued again, so REINSTALL_GAP does not apply.

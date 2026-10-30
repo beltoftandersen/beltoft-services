@@ -95,7 +95,12 @@ abstract class ServiceEmail extends \WC_Email {
 				'nameservers_shown' => 'domain' === $r->get( 'driver' ) && 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
 				'dns_only'      => 'dns' === $r->get( 'driver' ),
 				'nameservers'   => 'dns' === $r->get( 'driver' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
-				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk' ), true ) ? $data['reason'] : 'down',
+				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk', 'disk_urgent', 'cpu' ), true ) ? $data['reason'] : 'down',
+				'monitor_cpu_percent' => max( 0, min( 100, (int) ( $data['cpu_percent'] ?? 0 ) ) ),
+				'monitor_cpu_hours' => max( 0, (int) ( $data['cpu_hours'] ?? 0 ) ),
+				'monitor_upgrade_url' => 'proxmox' === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
+				'monitor_disks_url' => 'proxmox' === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::card_url( $r ) : '',
+				'monitor_cpu_since' => isset( $data['cpu_since'] ) ? wp_date( (string) get_option( 'time_format' ), (int) $data['cpu_since'] ) : '',
 				'monitor_disk_used' => max( 0, (int) ( $data['disk_used'] ?? 0 ) ),
 				'monitor_disk_total' => max( 0, (int) ( $data['disk_total'] ?? 0 ) ),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
@@ -114,6 +119,18 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		return $sent;
+	}
+
+	/**
+	 * The upgrade link of a usage email: the larger plan for what ran short, '' when there is none.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $reason Monitoring reason.
+	 */
+	private static function upgrade_link( Resource $r, string $reason ): string {
+		$need = array( 'disk' => 'disk', 'disk_urgent' => 'disk', 'cpu' => 'cpu' )[ $reason ] ?? '';
+
+		return '' === $need ? '' : \BeltoftServices\Proxmox\Upgrades::link( $r, $need );
 	}
 
 	/**

@@ -134,7 +134,7 @@ class AppTabTest extends MonitoringTestCase {
 			$this->assertStringContainsString( 'data-tab-link="' . $tab . '"', $html );
 		}
 
-		$this->assertSame( array( 'snapshots', 'backups', 'disks', 'access', 'reinstall', 'app' ), Servers::tabs() );
+		$this->assertSame( array( 'snapshots', 'backups', 'disks', 'access', 'reinstall', 'firewall', 'app' ), Servers::tabs() );
 	}
 
 	// -- The states ----------------------------------------------------------------------------
@@ -226,7 +226,7 @@ class AppTabTest extends MonitoringTestCase {
 
 		$docker = $this->pane( $this->page( $this->with_app( array( 'app_id' => 'docker', 'app_version' => '29', 'app_state' => 'ready', 'app_step' => 'complete' ), 5002 ), 'app' ) );
 		$this->assertStringNotContainsString( 'Address', $docker, 'Docker has no web address.' );
-		$this->assertStringContainsString( 'Ports you publish with Docker are open to the internet', $docker );
+		$this->assertStringContainsString( 'Ports you publish with Docker bypass the firewall inside the server', $docker );
 	}
 
 	public function test_an_expired_login_has_no_button(): void {

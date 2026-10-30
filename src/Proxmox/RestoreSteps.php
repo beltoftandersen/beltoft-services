@@ -130,6 +130,15 @@ trait RestoreSteps {
 			}
 		}
 
+		// A restored or rolled back VM may come back without its firewall file: the dashboard's rules are written again from the stored ones.
+		if ( Firewall::managed( $this->r ) && true !== $this->r->get( Firewall::LOCKED ) ) {
+			$done = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure( $record, $v );
+
+			if ( $done instanceof StepResult ) {
+				return $done;
+			}
+		}
+
 		// The backup or snapshot carries the VM name it had then: the server's own name is written back, in one call.
 		$named = $this->reapply_name( $record );
 
