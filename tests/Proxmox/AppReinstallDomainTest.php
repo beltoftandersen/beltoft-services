@@ -366,7 +366,112 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'data-app-domain-removal', $this->html( $r ) );
 		ob_start();
 		AppReinstall::confirm( $r->id() );
-		$this->assertSame( '', ob_get_clean() );
+		$this->assertSame( '', preg_replace( '#<p data-app-reinstall-summary.*?</p>#s', '', (string) ob_get_clean() ) );
+	}
+
+	private function n8n_server( int $vmid = 5000, array $plan = array(), array $meta = array() ): Resource {
+		$this->assertTrue( Clusters::save( 'lab', array(
+			'label' => 'Lab', 'api_url' => 'https://pve.example.invalid:8006',
+			'token_id' => 'svc@pve!beltoft', 'token_secret' => 'secret-secret-secret-1',
+			'client' => 'fake', 'nodes' => 'node-a', 'storage' => 'disk-store',
+			'cloudinit_storage' => 'ci-store', 'bridge' => 'vmbr9',
+			'gateway' => '192.0.2.1', 'nameservers' => '192.0.2.53', 'prefix' => '24',
+			'vmid_min' => '5000', 'vmid_max' => '5099',
+			'templates' => "9000 = Debian 12\n9001 = Ubuntu 24.04",
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1, 'apps_enabled' => array( 'docker', 'wordpress', 'coolify', 'n8n' ),
+			'template_families_text' => "9001 = ubuntu-24.04\n9000 = debian-12",
+		) ) );
+		$r = $this->server( 'n8n', array_merge( array( 'app_version' => '2', 'app_state' => 'ready', 'app_request' => 'old', 'app_reveal' => 'x' ), $meta ), $vmid );
+		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), $plan ) ) );
+		return Resource::find( $r->id() );
+	}
+
+	public function test_a_server_with_an_app_is_offered_the_other_apps_with_its_own_preselected(): void {
+		$r    = $this->n8n_server();
+		$html = $this->html( $r );
+		$this->assertMatchesRegularExpression( '#name="app_version" value="keep" checked#', $html );
+		foreach ( array( 'docker/29', 'wordpress/7.1.4' ) as $value ) {
+			$this->assertMatchesRegularExpression( '#name="app_version" value="' . preg_quote( $value, '#' ) . '"(?![^>]*disabled=)#', $html, $value );
+		}
+		$this->assertMatchesRegularExpression( '#name="app_version" value="coolify/4.5.1" disabled#', $html, 'Too small for Coolify.' );
+		$this->assertStringContainsString( 'needs the Performance plan or larger', $html );
+		$this->assertMatchesRegularExpression( '#name="app_version" value="none"#', $html );
+		$this->assertStringNotContainsString( 'value="n8n/', $html, 'The own app has its own tile.' );
+		$this->assertStringContainsString( 'data-os="9001"', $html );
+
+		$big = $this->n8n_server( 5001, array( 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 100 ) );
+		$this->assertMatchesRegularExpression( '#name="app_version" value="coolify/4.5.1"(?![^>]*disabled=)#', $this->html( $big ) );
+
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		ob_start();
+		AppReinstall::confirm( $r->id() );
+		$this->assertStringContainsString( 'n8n 2 is installed.', (string) ob_get_clean() );
+	}
+
+	public function test_a_retired_version_is_not_offered_and_a_server_without_an_app_is_unchanged(): void {
+		$r = $this->n8n_server();
+		$this->assertStringNotContainsString( 'n8n/', $this->html( $r ) );
+		$options = AppReinstall::options( $r );
+		$this->assertSame( array( 'keep', 'none' ), array_map( 'strval', array_keys( $options['choices'] ) ) );
+		$this->assertSame( array( 'docker', 'wordpress', 'coolify' ), array_keys( $options['apps'] ) );
+		foreach ( $options['apps'] as $entry ) {
+			foreach ( $entry['versions'] as $version ) {
+				$this->assertNotSame( 'retired', (string) ( $version['version']['status'] ?? '' ) );
+			}
+		}
+
+		$plain = $this->server( '', array(), 5002 );
+		$this->assertSame( 'none', AppReinstall::options( $plain )['selected'] );
+		$this->assertArrayHasKey( 'wordpress/7.1.4', AppReinstall::options( $plain )['choices'] );
+	}
+
+	public function test_picking_another_app_is_a_fresh_install_on_ubuntu(): void {
+		$r    = $this->n8n_server();
+		$args = array( 'app_version' => 'docker/29', 'os' => '9000' );
+		$this->assertStringContainsString( 'needs Ubuntu 24.04', (string) AppReinstall::check( null, $r, $args ) );
+		$args = array( 'app_version' => 'docker/29', 'app_domain_mode' => 'none' );
+		$this->assertNull( AppReinstall::check( null, $r, $args ) );
+		$meta = AppReinstall::meta( array( 'wipe' => true ), $r, $args );
+		$this->assertTrue( $meta['wipe'] );
+		$this->assertSame( 'docker', $meta['app_id'] );
+		$this->assertSame( '29', $meta['app_version'] );
+		$this->assertSame( 9001, $meta[ OsField::META ] );
+		foreach ( array( 'app_state', 'app_request', 'app_step', 'app_installed_at' ) as $key ) {
+			$this->assertArrayHasKey( $key, $meta );
+			$this->assertNull( $meta[ $key ], $key );
+		}
+		$this->assertSame( '', $meta['app_reveal'] );
+
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => 'n8n/2' ) ), 'Its own app is chosen by keep.' );
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $r, array( 'app_version' => 'docker/0.1' ) ) );
+		$this->assertSame( 'Coolify needs the Performance plan or larger. Choose a larger plan or no app.', AppReinstall::check( null, $r, array( 'app_version' => 'coolify/4.5.1' ) ) );
+		$this->assertSame( array( 'wipe' => true ), AppReinstall::meta( array( 'wipe' => true ), $r, array( 'app_version' => 'nope/1' ) ) );
+	}
+
+	public function test_the_old_domain_is_released_with_another_app_that_has_no_domain_and_kept_by_default_for_one_that_has(): void {
+		$r = $this->n8n_server( 5000, array(), array( 'app_domain' => 'flows.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+
+		$none  = AppReinstall::meta( array(), $r, array( 'app_version' => 'none' ) );
+		$other = AppReinstall::meta( array(), $r, array( 'app_version' => 'docker/29' ) );
+		foreach ( array( 'app_domain', 'app_domain_made', 'app_domain_want', 'app_zone' ) as $key ) {
+			$this->assertArrayHasKey( $key, $other, $key );
+			$this->assertSame( $none[ $key ], $other[ $key ], $key );
+		}
+		$this->assertSame( $none['app_domain_old'], $other['app_domain_old'] );
+		$this->assertSame( 'flows.mine.example', $other['app_domain_old'][0]['name'] );
+
+		$this->assertNull( AppReinstall::check( null, $r, array( 'app_version' => 'wordpress/7.1.4' ) ) );
+		$keep = AppReinstall::meta( array(), $r, array( 'app_version' => 'wordpress/7.1.4' ) );
+		$this->assertSame( 'wordpress', $keep['app_id'] );
+		$this->assertArrayNotHasKey( 'app_domain_old', $keep, 'The record stays and the new app takes it over.' );
+		$this->assertArrayNotHasKey( 'app_domain', $keep );
+
+		$change = array( 'app_version' => 'wordpress/7.1.4', 'app_domain_mode' => 'change', 'app_zone' => 'mine.example', 'app_sub' => 'blog' );
+		$this->assertNull( AppReinstall::check( null, $r, $change ) );
+		$this->assertSame( 'blog.mine.example', AppReinstall::meta( array(), $r, $change )['app_domain_want'] );
+		$this->assertSame( 'This app does not use a domain at install. You can add one later.', AppReinstall::check( null, $r, array( 'app_version' => 'docker/29', 'app_domain_mode' => 'keep' ) ) );
 	}
 
 	public function test_junk_release_queue_is_cleared_and_sweep_does_not_reschedule_it(): void {

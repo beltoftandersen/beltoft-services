@@ -10,6 +10,34 @@
 		var removal = scope.querySelector( '[data-app-domain-removal]' );
 		var confirm = scope.closest( 'form' ).querySelector( '[data-app-domain-confirm]' );
 
+		var summary = scope.closest( 'form' ).querySelector( '[data-app-reinstall-summary]' );
+		var versions = scope.querySelector( '[data-tiles-version]' );
+		var versionRow = scope.querySelector( '[data-tiles-version-row]' );
+
+		// The confirmation says which app is installed: the version when one is shown, else the app's name.
+		function say() {
+			var app = apps ? apps.querySelector( 'input[name="app_version"]:checked' ) : null;
+			var name = app ? app.closest( 'label' ) : null;
+			var text = '';
+
+			if ( ! summary || ! app ) {
+				return;
+			}
+			name = name ? name.querySelector( '.beltoft-services-tile__name' ) : null;
+			if ( app.hasAttribute( 'data-none' ) ) {
+				text = summary.getAttribute( 'data-text-none' );
+			} else {
+				var option = versions && versionRow && ! versionRow.hidden ? versions.options[ versions.selectedIndex ] : null;
+				text = ( summary.getAttribute( 'data-text-app' ) || '%s' ).replace( '%s', ( option ? option.textContent.replace( /^Current: /, '' ) : '' ) || ( name ? name.textContent : '' ) );
+			}
+			summary.textContent = text;
+		}
+
+		if ( apps ) {
+			scope.addEventListener( 'change', say );
+			say();
+		}
+
 		if ( ! apps || ! domain || ! fields || ! none ) {
 			return;
 		}

@@ -10,9 +10,11 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * A server with an app is reinstalled with the same app and version (the default), another version
- * that can still be ordered, or no app. A server without an app is offered the apps that checkout
- * would offer on its cluster and plan (default: no app, as it is); an app picked there is posted as
- * `app/version`, sets Ubuntu 24.04 as at checkout, and may choose a domain for supported apps.
+ * that can still be ordered, another app that checkout would offer on its cluster and plan, or no app.
+ * A server without an app is offered the apps that checkout would offer (default: no app, as it is).
+ * An app picked from the offered list is posted as `app/version`, is a fresh install, sets Ubuntu 24.04
+ * as at checkout, and may choose a domain for supported apps (an old domain is kept, changed or released
+ * as with the same app).
  * A version that has been retired is never offered; if the server
  * has one, the current version is preselected and the form says why. The field is posted as
  * `app_version`: `keep`, a version id, or `none`.
@@ -84,6 +86,7 @@ final class AppReinstall {
 		}
 
 		$choices[ self::NONE ] = __( 'No app, just the operating system', 'beltoft-services' );
+		$others                = self::offers( $r, $id );
 
 		return array(
 			'plain'    => false,
@@ -91,6 +94,7 @@ final class AppReinstall {
 			'choices'  => $choices,
 			'selected' => $retired ? ( $current ? $current['version_id'] : self::NONE ) : self::KEEP,
 			'retired'  => $retired,
+			'apps'     => null === $others ? array() : $others['apps'],
 		);
 	}
 
@@ -101,6 +105,15 @@ final class AppReinstall {
 	 * @return array{plain: bool, app: array<string, mixed>, choices: array<string, string>, selected: string, retired: bool, groups: array<string, array<string, array{label: string, disabled: bool}>>, cluster: array<string, mixed>, plan: array<string, mixed>}|null
 	 */
 	private static function plain_options( Resource $r ): ?array {
+		return self::offers( $r, '' );
+	}
+
+	/**
+	 * The apps checkout would offer for this server, without the app `$skip` (the server's own, which has its own tile).
+	 *
+	 * @return array<string, mixed>|null Null when none is offered.
+	 */
+	private static function offers( Resource $r, string $skip ): ?array {
 		$record  = VmRecords::for_resource( $r->id() );
 		$cluster = $record ? Clusters::get( $record['cluster'] ) : null;
 
@@ -109,6 +122,7 @@ final class AppReinstall {
 		}
 
 		$offered = Apps::offered( $cluster );
+		unset( $offered[ $skip ] );
 
 		if ( array() === $offered ) {
 			return null;
@@ -169,13 +183,20 @@ final class AppReinstall {
 			return null;
 		}
 
-		$options = self::plain_options( $r );
+		$options = self::offers( $r, (string) $r->get( 'app_id' ) );
 
 		if ( null === $options || ! isset( $options['choices'][ $raw ] ) || 1 !== preg_match( '#^([a-z0-9-]+)/([a-zA-Z0-9.-]+)$#D', $raw, $m ) ) {
 			return false;
 		}
 
 		return array( $m[1], $m[2] );
+	}
+
+	/** Is another app picked on a server that has one? Such a pick is posted as `app/version`. */
+	private static function is_switch( Resource $r, array $args ): bool {
+		$raw = $args['app_version'] ?? '';
+
+		return '' !== (string) $r->get( 'app_id' ) && is_string( $raw ) && false !== strpos( $raw, '/' );
 	}
 
 	/** What a fresh install of an app starts from: a new request, no old status, no old login. */
@@ -228,33 +249,7 @@ final class AppReinstall {
 				'attrs'   => array( 'data-none' => '1' ),
 			);
 
-			foreach ( (array) $options['apps'] as $app_id => $entry ) {
-				$versions = array();
-				$first    = '';
-
-				foreach ( $entry['versions'] as $value => $version ) {
-					$versions[] = array( 'value' => (string) $value, 'label' => $version['label'], 'disabled' => $version['disabled'] );
-					$first      = '' === $first && ! $version['disabled'] ? (string) $value : $first;
-				}
-
-				$usable   = '' !== $first;
-				$current  = reset( $entry['versions'] );
-				$families = Apps::families( array_column( $entry['versions'], 'version' ) );
-				$items[]  = array(
-					'value'    => $usable ? $first : (string) array_key_first( $entry['versions'] ),
-					'name'     => (string) ( $entry['def']['name'] ?? $app_id ),
-					'line'     => (string) ( $entry['def']['summary'] ?? '' ),
-					'runs'     => Apps::runs_on( $cluster, $families ),
-					'logo'     => Tiles::app_logo( (array) $entry['def'] ),
-					'disabled' => ! $usable,
-					'why'      => $usable ? '' : AppField::needs( (array) $current['version'] ),
-					'attrs'    => array(
-						'data-versions' => (string) wp_json_encode( $versions ),
-						'data-families' => implode( ',', $families ),
-						'data-dropped'  => Apps::dropped_text( $cluster, $families, (string) ( $entry['def']['name'] ?? $app_id ) ),
-					) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
-				);
-			}
+			$items = array_merge( $items, self::app_items( (array) $options['apps'], $cluster ) );
 		} else {
 			$versions = array();
 			$value    = '';
@@ -286,6 +281,8 @@ final class AppReinstall {
 					) + ( ! empty( $options['app']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
+
+			$items = array_merge( $items, self::app_items( (array) $options['apps'], $cluster ) );
 
 			$items[] = array(
 				'value'   => self::NONE,
@@ -322,6 +319,47 @@ final class AppReinstall {
 			echo '<p class="description">' . esc_html__( 'The version on this server can no longer be installed. The current version is selected instead.', 'beltoft-services' ) . '</p>';
 		}
 
+	}
+
+	/**
+	 * The tiles of offered apps: one per app, its versions in the select under the tiles.
+	 *
+	 * @param array<string, mixed> $apps    From offers().
+	 * @param array<string, mixed> $cluster Cluster.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function app_items( array $apps, array $cluster ): array {
+		$items = array();
+
+		foreach ( $apps as $app_id => $entry ) {
+			$versions = array();
+			$first    = '';
+
+			foreach ( $entry['versions'] as $value => $version ) {
+				$versions[] = array( 'value' => (string) $value, 'label' => $version['label'], 'disabled' => $version['disabled'] );
+				$first      = '' === $first && ! $version['disabled'] ? (string) $value : $first;
+			}
+
+			$usable   = '' !== $first;
+			$current  = reset( $entry['versions'] );
+			$families = Apps::families( array_column( $entry['versions'], 'version' ) );
+			$items[]  = array(
+				'value'    => $usable ? $first : (string) array_key_first( $entry['versions'] ),
+				'name'     => (string) ( $entry['def']['name'] ?? $app_id ),
+				'line'     => (string) ( $entry['def']['summary'] ?? '' ),
+				'runs'     => Apps::runs_on( $cluster, $families ),
+				'logo'     => Tiles::app_logo( (array) $entry['def'] ),
+				'disabled' => ! $usable,
+				'why'      => $usable ? '' : AppField::needs( (array) $current['version'] ),
+				'attrs'    => array(
+					'data-versions' => (string) wp_json_encode( $versions ),
+					'data-families' => implode( ',', $families ),
+					'data-dropped'  => Apps::dropped_text( $cluster, $families, (string) ( $entry['def']['name'] ?? $app_id ) ),
+				) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
+			);
+		}
+
+		return $items;
 	}
 
 	/** Domain controls shared by same-app and plain-server reinstall choices. */
@@ -366,10 +404,24 @@ final class AppReinstall {
 		}
 	}
 
-	/** Adds the old-record consequence to the existing reinstall confirmation dialog. */
+	/**
+	 * Adds to the reinstall confirmation dialog which app is installed (the script keeps it in step with the choice)
+	 * and the old-record consequence.
+	 */
 	public static function confirm( int $resource_id ): void {
 		$r = $resource_id > 0 ? Resource::find( $resource_id ) : null;
-		if ( ! $r || (int) ( $r->license()['user_id'] ?? 0 ) !== get_current_user_id() || true !== $r->get( 'app_domain_made' ) || '' === (string) $r->get( 'app_domain' ) ) {
+		if ( ! $r || (int) ( $r->license()['user_id'] ?? 0 ) !== get_current_user_id() ) {
+			return;
+		}
+		$options = self::options( $r );
+		if ( null !== $options ) {
+			$none   = __( 'No app is installed, only the operating system.', 'beltoft-services' );
+			$full   = '' === (string) $r->get( 'app_id' ) || self::NONE === $options['selected'] ? null : Apps::version( (string) $r->get( 'app_id' ), self::KEEP === $options['selected'] ? (string) $r->get( 'app_version' ) : $options['selected'] );
+			/* translators: %s: app and version, such as WordPress 7.1.4 */
+			$format = __( '%s is installed.', 'beltoft-services' );
+			echo '<p data-app-reinstall-summary data-text-none="' . esc_attr( $none ) . '" data-text-app="' . esc_attr( $format ) . '">' . esc_html( null === $full ? $none : sprintf( $format, Apps::version_label( $full ) ) ) . '</p>';
+		}
+		if ( true !== $r->get( 'app_domain_made' ) || '' === (string) $r->get( 'app_domain' ) ) {
 			return;
 		}
 		/* translators: %s: the old app domain. */
@@ -458,7 +510,7 @@ final class AppReinstall {
 	 * @return mixed
 	 */
 	public static function check( $why, $r, $args ) {
-		if ( $r instanceof Resource && '' === (string) $r->get( 'app_id' ) ) {
+		if ( $r instanceof Resource && ( '' === (string) $r->get( 'app_id' ) || self::is_switch( $r, (array) $args ) ) ) {
 			$why = self::plain_check( $why, $r, $args );
 			if ( null !== $why ) {
 				return $why;
@@ -539,7 +591,7 @@ final class AppReinstall {
 			return __( 'Choose one of the listed app versions.', 'beltoft-services' );
 		}
 
-		$options = self::plain_options( $r );
+		$options = self::offers( $r, (string) $r->get( 'app_id' ) );
 		$full    = Apps::version( $pick[0], $pick[1] );
 		$cluster = $options['cluster'];
 		$plan    = $options['plan'];
@@ -616,7 +668,7 @@ final class AppReinstall {
 	 * @return mixed
 	 */
 	public static function meta( $meta, $r, $args ) {
-		if ( is_array( $meta ) && $r instanceof Resource && '' === (string) $r->get( 'app_id' ) ) {
+		if ( is_array( $meta ) && $r instanceof Resource && ( '' === (string) $r->get( 'app_id' ) || self::is_switch( $r, (array) $args ) ) ) {
 			$pick   = self::plain_pick( $r, $args['app_version'] ?? '' );
 			$record = VmRecords::for_resource( $r->id() );
 			$os     = $record ? Apps::os_template( (array) Clusters::get( $record['cluster'] ) ) : 0;
