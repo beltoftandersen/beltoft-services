@@ -456,12 +456,14 @@ class DbBuildTest extends TestCase {
 		$this->assertNull( VmRecords::for_resource( $r->id() ), 'Nothing was built.' );
 	}
 
-	public function test_public_ip_is_refused_in_phase_three(): void {
-		$r      = $this->resource( array( 'public_ip' => 1 ) );
-		$result = $this->run_provision( $r );
-		$this->assertTrue( $result->is_failed() );
-		$this->assertStringContainsString( 'public IP', $result->error() );
-		$this->assertNull( VmRecords::for_resource( $r->id() ) );
+	public function test_a_public_ip_other_than_zero_or_one_is_refused(): void {
+		foreach ( array( 2, -1 ) as $value ) {
+			$r      = $this->resource( array( 'public_ip' => $value ) );
+			$result = $this->run_provision( $r );
+			$this->assertTrue( $result->is_failed(), (string) $value );
+			$this->assertStringContainsString( 'public IP', $result->error() );
+			$this->assertNull( VmRecords::for_resource( $r->id() ) );
+		}
 	}
 
 	public function test_cluster_without_a_private_bridge_fails(): void {

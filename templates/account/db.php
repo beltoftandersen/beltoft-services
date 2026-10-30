@@ -64,6 +64,12 @@ $beltoft_services_all = ! $nav;
 			<p><?php esc_html_e( 'Encrypted, without certificate check:', 'beltoft-services' ); ?></p>
 			<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['conn_require'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
 
+			<?php if ( '' !== $view['public_verify'] ) : ?>
+				<p class="description"><?php esc_html_e( 'From anywhere on the internet, for the addresses on your access list (see the Access tab):', 'beltoft-services' ); ?></p>
+				<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['public_verify'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+				<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn><?php echo esc_html( (string) $view['public_require'] ); ?></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+			<?php endif; ?>
+
 			<?php if ( $view['can_reveal'] ) : ?>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-db-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>
@@ -82,6 +88,95 @@ $beltoft_services_all = ! $nav;
 		</div>
 	<?php endif; // Kind of state. ?>
 	<?php endif; // Overview pane. ?>
+
+	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'access' === $active ) ) : ?>
+		<?php $beltoft_services_access = $view['access']; ?>
+		<div class="beltoft-services-vm__more beltoft-services-db__access" data-db-access data-confirm-remove="<?php esc_attr_e( 'Remove this address from the list?', 'beltoft-services' ); ?>">
+			<h4><?php esc_html_e( 'Public IP address', 'beltoft-services' ); ?></h4>
+			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
+				<p><?php esc_html_e( 'Address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address'] ); ?></code> <?php esc_html_e( 'Port:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $view['port'] ); ?></code></p>
+				<?php if ( $beltoft_services_access['removing'] ) : ?>
+					<p><?php esc_html_e( 'The public IP address is being removed. Your database restarts once.', 'beltoft-services' ); ?></p>
+				<?php elseif ( '' !== $beltoft_services_access['remove_url'] ) : ?>
+					<p class="description"><?php esc_html_e( 'Applications that connect through this address will stop working when it is removed. Your database restarts once, which takes about a minute.', 'beltoft-services' ); ?></p>
+					<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['remove_url'] ); ?>"><?php esc_html_e( 'Remove the public IP address', 'beltoft-services' ); ?></a></p>
+				<?php endif; ?>
+			<?php elseif ( $beltoft_services_access['adding'] ) : ?>
+				<p><?php esc_html_e( 'Your public IP address is being added. Your database restarts once, which takes about a minute. The address appears here when it is ready. You can leave this page.', 'beltoft-services' ); ?></p>
+			<?php elseif ( $beltoft_services_access['sold_out'] ) : ?>
+				<p><?php esc_html_e( 'No public IP address is available right now. Please try again later.', 'beltoft-services' ); ?></p>
+			<?php elseif ( '' !== $beltoft_services_access['add_url'] ) : ?>
+				<p><?php esc_html_e( 'Your database is reachable from your servers on the private network. A public IP address makes it reachable from elsewhere too, for the addresses you allow.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php echo esc_html( '' !== $beltoft_services_access['add_price'] ? sprintf( /* translators: %s: the price per period, such as +€4.00 / month */ __( 'Price: %s. Your database restarts once, which takes about a minute.', 'beltoft-services' ), $beltoft_services_access['add_price'] ) : __( 'Your database restarts once, which takes about a minute.', 'beltoft-services' ) ); ?></p>
+				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['add_url'] ); ?>"><?php esc_html_e( 'Add a public IP address', 'beltoft-services' ); ?></a></p>
+			<?php else : ?>
+				<p><?php esc_html_e( 'This database has no public IP address. It is reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
+
+			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
+				<h4><?php esc_html_e( 'Who may connect', 'beltoft-services' ); ?></h4>
+				<p class="description"><?php esc_html_e( 'Only these addresses can reach the database over its public IP address. Everything else is refused.', 'beltoft-services' ); ?></p>
+				<?php if ( $beltoft_services_access['world'] ) : ?>
+					<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'The database is open to everyone. Anyone on the internet can try to log in. The list below is not used while this is on.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
+				<?php if ( array() === $beltoft_services_access['entries'] ) : ?>
+					<p><?php esc_html_e( 'No address is allowed yet.', 'beltoft-services' ); ?></p>
+				<?php else : ?>
+					<table class="beltoft-services-vm__backup-list">
+						<thead>
+							<tr><th scope="col"><?php esc_html_e( 'Address', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Label', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Added', 'beltoft-services' ); ?></th><th scope="col"></th></tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $beltoft_services_access['entries'] as $beltoft_services_entry ) : ?>
+								<tr>
+									<td><code><?php echo esc_html( $beltoft_services_entry['cidr'] ); ?></code></td>
+									<td><?php echo esc_html( $beltoft_services_entry['label'] ); ?></td>
+									<td><?php echo esc_html( $beltoft_services_entry['added'] ); ?></td>
+									<td><?php if ( $beltoft_services_access['editable'] ) : ?><button type="button" class="button woocommerce-button" data-db-access-remove="<?php echo esc_attr( $beltoft_services_entry['cidr'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?></td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+
+				<?php if ( $beltoft_services_access['editable'] ) : ?>
+					<div class="beltoft-services-db__form">
+						<p>
+							<label for="beltoft-db-cidr"><?php esc_html_e( 'Address or range', 'beltoft-services' ); ?></label>
+							<input type="text" id="beltoft-db-cidr" autocomplete="off" placeholder="203.0.113.7" data-db-access-cidr>
+							<?php if ( '' !== $beltoft_services_access['my_ip'] ) : ?>
+								<button type="button" class="button woocommerce-button" data-db-access-mine="<?php echo esc_attr( (string) $beltoft_services_access['my_ip'] ); ?>"><?php esc_html_e( 'Use my current IP', 'beltoft-services' ); ?></button>
+							<?php endif; ?>
+						</p>
+						<p>
+							<label for="beltoft-db-label"><?php esc_html_e( 'Label (optional)', 'beltoft-services' ); ?></label>
+							<input type="text" id="beltoft-db-label" maxlength="40" autocomplete="off" data-db-access-label>
+						</p>
+						<p><button type="button" class="button woocommerce-button" data-db-access-add><?php esc_html_e( 'Add address', 'beltoft-services' ); ?></button></p>
+					</div>
+
+					<?php if ( $beltoft_services_access['world'] ) : ?>
+						<p><button type="button" class="button woocommerce-button" data-db-access-world="world_off"><?php esc_html_e( 'Limit access to the list', 'beltoft-services' ); ?></button></p>
+					<?php else : ?>
+						<details class="beltoft-services-vm__more">
+							<summary><?php esc_html_e( 'Open to everyone', 'beltoft-services' ); ?></summary>
+							<p class="description"><?php esc_html_e( 'Use this only when your application has no fixed address. Anyone on the internet can then try to log in to your database. The password and the encrypted connection still protect it. We email you when it is turned on.', 'beltoft-services' ); ?></p>
+							<div class="beltoft-services-db__form">
+								<p>
+									<label for="beltoft-db-world-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $beltoft_services_access['confirm'] ) ); ?></label>
+									<input type="text" id="beltoft-db-world-confirm" autocomplete="off" data-db-access-confirm>
+								</p>
+								<p><button type="button" class="button woocommerce-button" data-db-access-world="world_on"><?php esc_html_e( 'Open to everyone', 'beltoft-services' ); ?></button></p>
+							</div>
+						</details>
+					<?php endif; ?>
+				<?php elseif ( 'applying' === $beltoft_services_access['state'] ) : ?>
+					<p data-db-access-pending><?php esc_html_e( 'A change is being applied. This can take a minute.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
+				<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 
 	<?php if ( in_array( $view['kind'], array( 'ready', 'restoring' ), true ) && ( $beltoft_services_all || 'backups' === $active ) ) : ?>
 		<?php $beltoft_services_backups = $view['backups']; ?>

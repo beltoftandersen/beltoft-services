@@ -35,6 +35,11 @@ final class DbCard {
 				'limit'   => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 				'once'    => __( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ),
 				'restoring' => __( 'Restoring the database. This can take several minutes.', 'beltoft-services' ),
+				'applying'  => __( 'Applying the change. This can take a minute.', 'beltoft-services' ),
+				'applied'   => __( 'The change is applied.', 'beltoft-services' ),
+				'notapplied' => __( 'The change could not be applied. We have been told. Please try again later.', 'beltoft-services' ),
+				'noip'      => __( 'Your current address could not be read.', 'beltoft-services' ),
+				'confirmremove' => __( 'Remove this address from the list?', 'beltoft-services' ),
 				'nobackup'  => __( 'Choose a backup.', 'beltoft-services' ),
 			),
 		) );
@@ -56,6 +61,8 @@ final class DbCard {
 		$kind    = $restore ? 'restoring' : ( $ready ? 'ready' : ( 'paused' === $state ? 'paused' : ( 'failed' === $state ? 'failed' : 'building' ) ) );
 		$offered = DbActions::offered( $r );
 		$backups = self::backups( $r, $ready && ! $restore && $r->accepts_actions() && array_key_exists( DbActions::RESTORE, $offered ) );
+		$access  = DbAccess::view( $r );
+		$public  = $ready && '' !== $access['address'] ? DbGuest::ROLE . ':PASSWORD@' . $access['address'] . ':' . DbGuest::PORT . '/' . DbGuest::DATABASE : '';
 
 		return array(
 			'kind'        => $kind,
@@ -72,6 +79,9 @@ final class DbCard {
 			'resetting'   => '' !== (string) $r->get( 'db_reset_request' ),
 			'confirm'     => DbActions::CONFIRM,
 			'backups'     => $backups,
+			'access'      => $access,
+			'public_verify'  => '' !== $public ? 'postgresql://' . $public . '?sslmode=verify-full&sslrootcert=ca.crt' : '',
+			'public_require' => '' !== $public ? 'postgresql://' . $public . '?sslmode=require' : '',
 			'version'     => (int) ( $plan['major'] ?? 0 ),
 			'size'        => sprintf(
 				/* translators: 1: number of vCPUs, 2: memory in GB, 3: disk in GB */

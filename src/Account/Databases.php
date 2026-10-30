@@ -124,6 +124,7 @@ final class Databases extends ServiceArea {
 	 */
 	protected function page_tabs(): array {
 		return array(
+			'access'   => __( 'Access', 'beltoft-services' ),
 			'backups'  => __( 'Backups', 'beltoft-services' ),
 			'password' => __( 'New password', 'beltoft-services' ),
 		);

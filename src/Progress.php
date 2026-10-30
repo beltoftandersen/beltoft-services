@@ -102,6 +102,7 @@ final class Progress {
 				'ready'     => __( 'Final checks', 'beltoft-services' ),
 			),
 			DbDriver::ID        => array(
+				'ip'        => __( 'Reserve a public IP address', 'beltoft-services' ),
 				'net'       => __( 'Reserve a private address', 'beltoft-services' ),
 				'vmid'      => __( 'Prepare the server', 'beltoft-services' ),
 				'clone'     => __( 'Create the server', 'beltoft-services' ),

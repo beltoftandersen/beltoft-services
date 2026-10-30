@@ -47,8 +47,10 @@ final class DbBuild {
 	public static function plan_error( Resource $r ): ?string {
 		$plan = (array) $r->get( 'plan' );
 
-		if ( ! empty( $plan['public_ip'] ) ) {
-			return 'A database with a public IP address is not available yet (public_ip must be 0)';
+		$public = $plan['public_ip'] ?? 0;
+
+		if ( ! ( is_int( $public ) || ( is_string( $public ) && ctype_digit( $public ) ) ) || ! in_array( (int) $public, array( 0, 1 ), true ) ) {
+			return 'The public IP of this plan must be 0 or 1';
 		}
 
 		if ( 'postgres' !== ( $plan['engine'] ?? 'postgres' ) ) {
@@ -205,9 +207,11 @@ final class DbBuild {
 			}
 		}
 
-		$op  = $this->r->get( 'db_inited' ) ? 'reset_password' : 'init';
-		$job = 'init' === $op
-			? array( 'v' => 1, 'request' => $request, 'op' => 'init', 'db' => DbGuest::DATABASE, 'role' => DbGuest::ROLE, 'listen' => array( $address ), 'private_cidr' => $cidr, 'allow' => array(), 'world' => false, 'max_connections' => DbProfile::max_connections( $this->r ), 'major' => self::major( (array) $this->r->get( 'plan' ) ) )
+		$op     = $this->r->get( 'db_inited' ) ? 'reset_password' : 'init';
+		$public = IpPool::for_resource( $this->r->id() );
+		$listen = null === $public ? array( $address ) : array( $address, $public['address'] );
+		$job    = 'init' === $op
+			? array( 'v' => 1, 'request' => $request, 'op' => 'init', 'db' => DbGuest::DATABASE, 'role' => DbGuest::ROLE, 'listen' => $listen, 'private_cidr' => $cidr, 'allow' => array(), 'world' => false, 'max_connections' => DbProfile::max_connections( $this->r ), 'major' => self::major( (array) $this->r->get( 'plan' ) ) )
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
 
 		$sent = DbJob::send( $this->client, $record, $job );

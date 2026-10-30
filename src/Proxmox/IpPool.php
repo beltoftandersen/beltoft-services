@@ -124,9 +124,11 @@ final class IpPool {
 	 * The address a resource holds, or the lowest free one, which it now holds.
 	 *
 	 * @param int $resource_id Activation id of the resource.
-	 * @return ?array{id: int, address: string, prefix: int, gateway: ?string, state: string, resource_id: ?int} Null when the pool has no free address.
+	 * @param int $keep        Addresses that must stay free: nothing is taken while the pool has no more than this
+	 *                         many free (a resource that already holds one keeps it). 0 takes the last one.
+	 * @return ?array{id: int, address: string, prefix: int, gateway: ?string, state: string, resource_id: ?int} Null when the pool has no free address (or no more than $keep).
 	 */
-	public static function hold( int $resource_id ): ?array {
+	public static function hold( int $resource_id, int $keep = 0 ): ?array {
 		global $wpdb;
 
 		$took = false;
@@ -134,11 +136,16 @@ final class IpPool {
 		list( $locked, $row ) = Locks::with(
 			Locks::name( 'ippool', 0 ),
 			Locks::allocation_wait(),
-			static function () use ( $wpdb, $resource_id, &$took ) {
+			static function () use ( $wpdb, $resource_id, $keep, &$took ) {
 				$existing = self::for_resource( $resource_id );
 
 				if ( $existing ) {
 					return $existing;
+				}
+
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- read fresh, under the pool lock.
+				if ( $keep > 0 && (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE state = 'free'", Schema::tables()['ips'] ) ) <= $keep ) {
+					return null;
 				}
 
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one statement picks and takes the address.
@@ -411,6 +418,21 @@ final class IpPool {
 		set_transient( self::FREE_TRANSIENT, $count, MINUTE_IN_SECONDS );
 
 		return $count;
+	}
+
+	/**
+	 * Addresses kept for new servers (setting `ip_reserve_for_vps`, default 1): a database with a public IP is not
+	 * sold while no more than this many are free, so the last address always stays available to a server.
+	 */
+	public static function reserve_for_vps(): int {
+		return max( 0, (int) \BeltoftServices\Settings::get( 'ip_reserve_for_vps' ) );
+	}
+
+	/**
+	 * How many addresses a database may still take: the free ones minus the reserve for servers.
+	 */
+	public static function available_for_db(): int {
+		return max( 0, self::free_count() - self::reserve_for_vps() );
 	}
 
 	/**

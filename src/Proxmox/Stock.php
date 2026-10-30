@@ -142,7 +142,7 @@ final class Stock {
 	 * @return string[]
 	 */
 	public static function drivers(): array {
-		return array_merge( array( 'proxmox' ), self::addon_drivers() );
+		return array_merge( array( 'proxmox', DbDriver::ID ), self::addon_drivers() );
 	}
 
 	/**
@@ -296,11 +296,18 @@ final class Stock {
 			}
 			return false;
 		}
-		if ( 0 === IpPool::free_count() ) {
+
+		$plan = Product::plan( $product->get_id() );
+
+		if ( $driver && DbDriver::ID === $driver->id() ) {
+			// A database needs an address only with the public IP add-on, and never the one kept for servers.
+			if ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() ) {
+				return false;
+			}
+		} elseif ( 0 === IpPool::free_count() ) {
 			return false;
 		}
 
-		$plan    = Product::plan( $product->get_id() );
 		$cluster = (string) ( $plan['cluster'] ?? '' );
 		$free    = Capacity::free_by_node( $cluster ); // One read of the cluster list and one of the cache; no secret is decrypted.
 

@@ -53,6 +53,7 @@ final class ProxmoxSettings {
 		'snapshot_paid_days' => array( 1, 365 ),
 		'snapshot_max_slots' => array( 1, 50 ),
 		'snapshot_reserve_gb' => array( 0, 10000 ),
+		'ip_reserve_for_vps' => array( 0, 100 ),
 	);
 
 	/**
@@ -229,6 +230,13 @@ final class ProxmoxSettings {
 			'min'     => self::RANGES['host_reserve_gb'][0],
 			'label'   => __( 'Memory kept free on each node, in GB', 'beltoft-services' ),
 			'desc'    => __( 'A node counts as full when the memory promised to the virtual machines of this site, plus this reserve, reaches the memory of the node. It leaves room for Proxmox itself and for machines this site did not create.', 'beltoft-services' ),
+		);
+		$fields['ip_reserve_for_vps'] = $base + array(
+			'type'    => 'number',
+			'default' => 1,
+			'min'     => self::RANGES['ip_reserve_for_vps'][0],
+			'label'   => __( 'Public IP addresses kept for servers', 'beltoft-services' ),
+			'desc'    => __( 'A database with a public IP address is sold out while no more than this many addresses are free, so the last address always stays available to a new server. 0 lets databases take the last one.', 'beltoft-services' ),
 		);
 		$fields['disk_reserve_gb'] = $base + array( 'type' => 'number', 'default' => 200, 'min' => 0, 'label' => __( 'Storage kept free on each node (GB)', 'beltoft-services' ) );
 		$fields['disk_promise_percent'] = $base + array( 'type' => 'number', 'default' => 100, 'min' => 1, 'label' => __( 'Maximum promised storage (%)', 'beltoft-services' ) );

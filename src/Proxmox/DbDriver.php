@@ -54,7 +54,7 @@ class DbDriver extends ProxmoxDriver {
 			'memory_mb'   => $fields['memory_mb'],
 			'disk_gb'     => array( 'number', __( 'Data disk (GB)', 'beltoft-services' ), __( 'The disk the database lives on. It is part of the backup.', 'beltoft-services' ), 20, true ),
 			'backup_days' => $fields['backup_days'],
-			'public_ip'   => array( 'number', __( 'Public IP', 'beltoft-services' ), __( 'Must be 0: a database is reachable on the private network only.', 'beltoft-services' ), 0, true ),
+			'public_ip'   => array( 'number', __( 'Public IP', 'beltoft-services' ), __( '0 or 1. 1 gives the database a public IPv4 address (an add-on: make a variation pair that differs only in this field). Access is closed until the customer adds addresses to the allow-list.', 'beltoft-services' ), 0, true ),
 		);
 
 		return $out;
@@ -76,16 +76,25 @@ class DbDriver extends ProxmoxDriver {
 			return ( new Actions( $r ) )->run( 'restore', $args );
 		}
 
+		if ( DbAccess::APPLY === $action ) {
+			return ( new DbAccess( $r ) )->run();
+		}
+
 		return DbActions::RESET === $action ? ( new DbActions( $r ) )->run() : StepResult::fail( 'This database action is not available.' );
 	}
 
 	/**
-	 * A restore queues this change to start the server (DbRestore). Otherwise the plan's disk is the data disk,
-	 * and growing it is not built yet: nothing is changed, the admin is told.
+	 * A restore queues this change to start the server (DbRestore). A change of the public IP add-on is made to the VM
+	 * (DbIp). Otherwise the plan's disk is the data disk, and growing it is not built yet: nothing is changed, the
+	 * admin is told.
 	 */
 	public function update_plan( Resource $r ): StepResult {
 		if ( DbRestore::waiting( $r ) ) {
 			return ( new DbRestore( $r ) )->finish();
+		}
+
+		if ( '' !== DbIp::wanted( $r ) ) {
+			return ( new DbIp( $r ) )->run();
 		}
 
 		Alerts::admin( $r, 'The plan of this database changed. Resizing a database is not automatic yet: nothing was changed.' );
@@ -93,8 +102,11 @@ class DbDriver extends ProxmoxDriver {
 		return StepResult::done( array(), 'Plan change on a database was not applied' );
 	}
 
+	/**
+	 * The job that brings the firewall and the guest to the stored allow-list. Queued by the route that stored it.
+	 */
 	public function internal_actions(): array {
-		return array();
+		return array( DbAccess::APPLY );
 	}
 
 	public function render_account( Resource $r ): void {
