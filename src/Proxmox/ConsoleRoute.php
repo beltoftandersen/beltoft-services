@@ -87,7 +87,7 @@ final class ConsoleRoute {
 		if ( ! is_string( $password ) || '' === $password ) {
 			return self::error( 'beltoft_services_console_unavailable', __( 'The console is not available right now.', 'beltoft-services' ), 503 );
 		}
-		$ip = (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ) : '';
 		$token = ConsoleSessions::create( $user_id, $r->id(), $ip, (string) $record['cluster'], (string) $verified['node'], (int) $record['vmid'], $port, $reply['ticket'] );
 		if ( is_wp_error( $token ) ) {
 			return self::error( 'beltoft_services_console_busy', __( 'A console is already being opened. Please wait a moment.', 'beltoft-services' ), 409 );
