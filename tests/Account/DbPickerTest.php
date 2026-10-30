@@ -15,6 +15,7 @@ use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\BackupTestCase;
 
@@ -86,7 +87,7 @@ class DbPickerTest extends BackupTestCase {
 		remove_all_filters( 'beltoft_services_db_needs_server_url' );
 		remove_all_filters( 'beltoft_services_db_picker_products' );
 		remove_all_filters( 'beltoft_services_picker_rate_limit' );
-		unset( $GLOBALS['wp']->query_vars['databases'], $GLOBALS['wp']->query_vars['vps'], $_GET['plan'] );
+		unset( $GLOBALS['wp']->query_vars['databases'], $GLOBALS['wp']->query_vars['vps'], $_GET['plan'], $_GET['engine'] );
 		wp_dequeue_style( ServerPicker::HANDLE );
 		wp_dequeue_script( ServerPicker::HANDLE );
 		wp_set_current_user( 0 );
@@ -320,5 +321,120 @@ class DbPickerTest extends BackupTestCase {
 		$html = (string) ob_get_clean();
 		$this->assertStringNotContainsString( 'beltoft-services-list-actions', $html );
 		unset( $GLOBALS['wp']->query_vars['apps'] );
+	}
+
+	/**
+	 * A second managed database product of an engine, one plan.
+	 *
+	 * @param string $engine Engine id.
+	 * @param string $status Product status.
+	 * @return \WC_Product_Variation
+	 */
+	private function engine_product( string $engine, string $status = 'publish' ): \WC_Product_Variation {
+		$product = new \WC_Product_Variable();
+		$product->set_name( 'Zz engine ' . $engine );
+		$product->set_status( $status );
+		$attr = new \WC_Product_Attribute();
+		$attr->set_name( 'Plan' );
+		$attr->set_options( array( 'Only' ) );
+		$attr->set_visible( true );
+		$attr->set_variation( true );
+		$product->set_attributes( array( $attr ) );
+		$product->update_meta_data( Product::META_DRIVER, 'proxmox-db' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'db-' . wp_generate_password( 5, false ) );
+
+		foreach ( array( 'cluster' => 'lab', 'template' => '9200', 'engine' => $engine, 'cores' => '1', 'memory_mb' => '4096', 'disk_gb' => '20' ) as $key => $value ) {
+			$product->update_meta_data( Product::META_PLAN . $key, $value );
+		}
+
+		$product->save();
+		Product::remember_slug( (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ) );
+
+		$v = new \WC_Product_Variation();
+		$v->set_parent_id( $product->get_id() );
+		$v->set_attributes( array( 'plan' => 'Only' ) );
+		$v->set_regular_price( '30' );
+		$v->set_status( 'publish' );
+		$v->save();
+
+		return $v;
+	}
+
+	/**
+	 * @param string[] $list List.
+	 * @return string[]
+	 */
+	private function sorted( array $list ): array {
+		sort( $list );
+
+		return $list;
+	}
+
+	public function test_one_engine_shows_no_engine_row(): void {
+		$html = $this->page();
+
+		$this->assertStringNotContainsString( 'data-picker-engines', $html );
+		$this->assertStringNotContainsString( 'beltoft_services_db_engine', $html );
+		$this->assertCount( 1, DbPicker::engines( DbPicker::plans() ) );
+	}
+
+	public function test_two_engines_show_a_tile_each_and_only_the_chosen_engines_plans(): void {
+		$valkey = $this->engine_product( 'valkey' );
+		$html   = $this->page();
+
+		$this->assertStringContainsString( 'data-picker-engines', $html );
+		$this->assertSame( 2, substr_count( $html, 'name="beltoft_services_db_engine"' ) );
+		$this->assertStringContainsString( 'Relational database', $html );
+		$this->assertStringContainsString( 'In-memory key-value store, Redis compatible', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+
+		// PostgreSQL starts chosen: its two plans show, the Valkey plan is hidden but present.
+		$this->assertSame( 2, substr_count( $html, 'data-engine="postgres"' ) );
+		$this->assertSame( 1, preg_match( '#<label class="beltoft-services-plan" hidden><input[^>]*value="' . $valkey->get_id() . '"[^>]*data-engine="valkey"#', $html ) );
+		$this->assertSame( 0, preg_match( '#<label class="beltoft-services-plan" hidden><input[^>]*value="' . $this->v['Small']->get_id() . '"#', $html ) );
+		$this->assertSame( 1, preg_match( '#value="postgres"[^>]* checked#', $html ) );
+		$this->assertSame( 1, preg_match( '#value="' . $this->v['Small']->get_id() . '"[^>]* checked#', $html ) );
+	}
+
+	public function test_the_engine_in_the_address_preselects_it_and_its_first_plan(): void {
+		$valkey          = $this->engine_product( 'valkey' );
+		$_GET['engine'] = 'valkey';
+		$html            = $this->page();
+
+		$this->assertSame( 1, preg_match( '#value="valkey"[^>]* checked#', $html ) );
+		$this->assertSame( 1, preg_match( '#<label class="beltoft-services-plan"><input[^>]*value="' . $valkey->get_id() . '"[^>]* checked#', $html ) );
+		$this->assertSame( 2, preg_match_all( '#<label class="beltoft-services-plan" hidden>#', $html ), 'The two PostgreSQL plans are hidden.' );
+
+		// An engine that is not offered is ignored.
+		$_GET['engine'] = 'mssql';
+		$this->assertSame( 1, preg_match( '#value="postgres"[^>]* checked#', $this->page() ) );
+	}
+
+	public function test_an_engine_whose_product_is_private_is_never_shown(): void {
+		$this->engine_product( 'valkey', 'private' );
+		$_GET['engine'] = 'valkey';
+		$html           = $this->page();
+
+		$this->assertSame( array( 'postgres' ), array_keys( DbPicker::engines( DbPicker::plans() ) ) );
+		$this->assertStringNotContainsString( 'data-picker-engines', $html );
+		$this->assertStringNotContainsString( 'Valkey', $html );
+		$this->assertStringNotContainsString( 'In-memory', $html );
+	}
+
+	public function test_a_third_engine_joins_without_code_and_a_plan_of_any_engine_can_be_posted(): void {
+		$valkey = $this->engine_product( 'valkey' );
+		$mssql  = $this->engine_product( 'mssql' );
+
+		$this->assertSame( array( 'mssql', 'postgres', 'valkey' ), $this->sorted( array_keys( DbPicker::engines( DbPicker::plans() ) ) ) );
+		$this->assertStringContainsString( 'Microsoft SQL Server, Express edition', $this->page() );
+
+		$result = DbPicker::process( $this->post( array( ServerPicker::PLAN => (string) $valkey->get_id() ) ), $this->user );
+		$this->assertSame( array(), $result['errors'] );
+		$this->assertSame( $valkey->get_id(), (int) array_values( WC()->cart->get_cart() )[0]['variation_id'] );
+		$this->assertSame( 'Valkey', DbEngines::name( 'valkey' ) );
+		$this->assertSame( 'SQL Server 2025 Express', DbEngines::name( 'mssql' ) );
+		$this->assertSame( 'PostgreSQL', DbEngines::name( 'postgres' ) );
+		unset( $mssql );
 	}
 }

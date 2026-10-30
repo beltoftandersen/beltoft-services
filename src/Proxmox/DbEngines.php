@@ -53,6 +53,38 @@ final class DbEngines {
 	}
 
 	/**
+	 * The name of an engine without a version, for a choice between engines: "PostgreSQL", "Valkey", "SQL Server Express".
+	 *
+	 * @param string $id Engine id.
+	 */
+	public static function name( string $id ): string {
+		$engine = self::for_plan( array( 'engine' => $id ) );
+
+		return null === $engine ? $id : $engine->label( array() );
+	}
+
+	/**
+	 * One plain line about an engine for the engine choice. A site or a later engine can set its own.
+	 *
+	 * @param string $id Engine id.
+	 */
+	public static function description( string $id ): string {
+		$lines = array(
+			PostgresEngine::ID => __( 'Relational database', 'beltoft-services' ),
+			ValkeyEngine::ID   => __( 'In-memory key-value store, Redis compatible', 'beltoft-services' ),
+			'mssql'            => __( 'Microsoft SQL Server, Express edition', 'beltoft-services' ),
+		);
+
+		/**
+		 * The line under an engine's name on the New database page.
+		 *
+		 * @param string $line Line ('' for none).
+		 * @param string $id   Engine id.
+		 */
+		return (string) apply_filters( 'beltoft_services_db_engine_description', $lines[ $id ] ?? '', $id );
+	}
+
+	/**
 	 * The prefixes of the template families of all engines (Clusters::SERVICE_FAMILIES): postgres-, mssql-, valkey.
 	 *
 	 * @return string[]
