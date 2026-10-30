@@ -156,7 +156,9 @@ div.beltoft-services-domain [hidden] { display: none; }
 .beltoft-services-domain-stepup p { margin: 0; }
 .beltoft-services-domain-stepup label { font-size: 14px; font-weight: 500; color: var(--navy, #0c1535); }
 .beltoft-services-domain-stepup__row { display: flex; gap: 8px; }
-.beltoft-services-domain-stepup__row input { flex: 1; min-width: 0; }
+.beltoft-services-domain-stepup__row input, .beltoft-services-domain-stepup__row .password-input { flex: 1 1 auto; min-width: 0; }
+.beltoft-services-domain-stepup__row .password-input input { width: 100%; }
+.beltoft-services-domain-stepup__row { align-items: center; }
 .beltoft-services-domain-stepup__row .button { flex: none; }
 .beltoft-services-domain-stepup__error { color: #b42318; font-size: 14px; }
 div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; background: var(--bsd-warm); font-size: 17px; font-weight: 500; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
@@ -372,7 +374,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 /* Servers: the list, and one server's page (templates/account/servers-list.php, vm-head.php, vm.php). Palette variables come from the theme; the fallbacks keep the layout when they are missing. */
 .beltoft-services-notice { margin: 0 0 12px; padding: 8px 14px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
-.beltoft-services-servers { max-width: 880px; background: var(--bg-card, #fff); container-type: inline-size; }
+.beltoft-services-servers { background: var(--bg-card, #fff); container-type: inline-size; }
 .beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
 .beltoft-services-servers a.beltoft-services-srv:first-child { border-top: 0; }
 .beltoft-services-servers a.beltoft-services-srv:hover, .beltoft-services-servers a.beltoft-services-srv:focus-visible { background: #fcfbf8; }
@@ -542,7 +544,7 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
 @container (max-width: 620px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
 @media (max-width: 700px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
-.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; max-width: 880px; margin: 0 0 12px; }
+.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin: 0 0 12px; }
 .beltoft-services-list-actions a.beltoft-services-list-btn { display: inline-block; padding: 7px 14px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; line-height: 1.3; text-decoration: none !important; white-space: nowrap; }
 .beltoft-services-list-actions a.beltoft-services-list-btn.is-ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
 .beltoft-services-list-actions a.beltoft-services-list-btn:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }
