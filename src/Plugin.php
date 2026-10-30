@@ -123,6 +123,7 @@ final class Plugin {
 		Proxmox\Actions::register();
 		Proxmox\DbActions::register();
 		Proxmox\DbRoutes::register();
+		Proxmox\DbNeedsServer::register();
 		Proxmox\Panels::register();
 		Proxmox\EmailDetails::register();
 		Proxmox\ProxmoxJobs::register();
