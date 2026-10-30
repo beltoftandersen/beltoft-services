@@ -1025,6 +1025,11 @@ class DbPhase4Test extends TestCase {
 	// -- The checkout notice ---------------------------------------------------------------------
 
 	public function test_the_cart_notice_drops_coming_soon_and_a_public_ip_database_gets_none(): void {
+		// Nothing with a public IP for sale: the add-on is not promised.
+		$this->assertStringContainsString( 'coming soon', DbNeedsServer::message( false ) );
+		$this->assertStringNotContainsString( 'add-on', DbNeedsServer::message( false ) );
+
+		$this->database_on_pair();
 		$this->assertStringNotContainsString( 'coming soon', DbNeedsServer::message( true ) );
 		$this->assertStringNotContainsString( 'coming soon', DbNeedsServer::message( false ) );
 		$this->assertStringContainsString( 'add-on', DbNeedsServer::message( false ) );
