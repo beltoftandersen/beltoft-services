@@ -177,7 +177,8 @@ final class Clusters {
 
 	/**
 	 * Template families of managed services (a database server is built from them, a customer never picks them as
-	 * an operating system), by prefix: postgres-18.
+	 * an operating system), by prefix: postgres-18. A template that carries several versions lists several families, comma separated:
+	 * postgres-17,postgres-18.
 	 */
 	public const SERVICE_FAMILIES = array( 'postgres-' );
 
@@ -193,7 +194,7 @@ final class Clusters {
 		$list = isset( $all[ $cluster ] ) && is_array( $all[ $cluster ]['templates'] ) ? $all[ $cluster ]['templates'] : array();
 
 		foreach ( array_keys( $list ) as $vmid ) {
-			if ( null !== self::service_family( $all[ $cluster ], (int) $vmid ) ) {
+			if ( array() !== self::service_families( $all[ $cluster ], (int) $vmid ) ) {
 				unset( $list[ $vmid ] );
 			}
 		}
@@ -214,7 +215,7 @@ final class Clusters {
 		$out  = array();
 
 		foreach ( $list as $vmid => $label ) {
-			if ( $family === self::service_family( $all[ $cluster ], (int) $vmid ) ) {
+			if ( in_array( $family, self::service_families( $all[ $cluster ], (int) $vmid ), true ) ) {
 				$out[ $vmid ] = $label;
 			}
 		}
@@ -223,21 +224,26 @@ final class Clusters {
 	}
 
 	/**
-	 * A template's family when it is a managed service family, otherwise null.
+	 * The managed service families of a template (one, or several for a template that carries more than one
+	 * version, as postgres-17,postgres-18); empty when it is an operating system template.
 	 *
 	 * @param array<string, mixed> $cluster Cluster settings.
 	 * @param int                  $vmid    Template VMID.
+	 * @return array<int, string>
 	 */
-	private static function service_family( array $cluster, int $vmid ): ?string {
-		$family = (string) ( ( (array) ( $cluster['template_families'] ?? array() ) )[ $vmid ] ?? '' );
+	private static function service_families( array $cluster, int $vmid ): array {
+		$value = (string) ( ( (array) ( $cluster['template_families'] ?? array() ) )[ $vmid ] ?? '' );
+		$out   = array();
 
-		foreach ( self::SERVICE_FAMILIES as $prefix ) {
-			if ( 0 === strpos( $family, $prefix ) ) {
-				return $family;
+		foreach ( explode( ',', $value ) as $family ) {
+			foreach ( self::SERVICE_FAMILIES as $prefix ) {
+				if ( 0 === strpos( $family, $prefix ) ) {
+					$out[] = $family;
+				}
 			}
 		}
 
-		return null;
+		return $out;
 	}
 
 	/**
@@ -560,7 +566,7 @@ final class Clusters {
 		if ( array_key_exists( 'template_families', $input ) && is_array( $input['template_families'] ) ) {
 			$families = array();
 			foreach ( array_intersect_key( $input['template_families'], $templates ) as $vmid => $family ) {
-				if ( is_string( $family ) && preg_match( '/^[a-z0-9]+(?:[-.][a-z0-9]+)*$/D', $family ) ) {
+				if ( is_string( $family ) && preg_match( '/^[a-z0-9]+(?:[-.][a-z0-9]+)*(?:,[a-z0-9]+(?:[-.][a-z0-9]+)*)*$/D', $family ) ) {
 					$families[ (int) $vmid ] = $family;
 				}
 			}
