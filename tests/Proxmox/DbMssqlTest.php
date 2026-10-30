@@ -103,8 +103,8 @@ class DbMssqlTest extends TestCase {
 					'prefix'                 => '24',
 					'vmid_min'               => '5000',
 					'vmid_max'               => '5099',
-					'templates'              => "9100 = PostgreSQL 18\n9120 = SQL Server 2022",
-					'template_families_text' => "9100 = postgres-18\n9120 = mssql-2022",
+					'templates'              => "9100 = PostgreSQL 18\n9120 = SQL Server 2025",
+					'template_families_text' => "9100 = postgres-18\n9120 = mssql-2025",
 					'vendor_snippet'         => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
 					'db_vendor_snippet'      => 'local:snippets/vm-vendor-cloudinit-db-v1.yaml',
 					'block_smtp'             => '1',
@@ -160,7 +160,7 @@ class DbMssqlTest extends TestCase {
 	private function resource( array $plan = array(), array $meta = array( 'db_terms_accepted' => 1761800000 ) ): Resource {
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2022, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
@@ -217,23 +217,24 @@ class DbMssqlTest extends TestCase {
 		$ms = new MssqlEngine();
 
 		$this->assertSame( array( 5432, 'PostgreSQL 17', 'postgres-17' ), array( $pg->port(), $pg->label( array( 'major' => 17 ) ), $pg->family( array( 'major' => 17 ) ) ) );
-		$this->assertSame( array( 1433, 'SQL Server 2022 Express', 'mssql-2022' ), array( $ms->port(), $ms->label( array( 'major' => 2022 ) ), $ms->family( array( 'major' => 2022 ) ) ) );
-		$this->assertSame( 'SQL Server 2022 Express', $ms->label( array() ), 'No version named: the default one.' );
+		$this->assertSame( array( 1433, 'SQL Server 2025 Express', 'mssql-2025' ), array( $ms->port(), $ms->label( array( 'major' => 2025 ) ), $ms->family( array( 'major' => 2025 ) ) ) );
+		$this->assertSame( 'SQL Server 2025 Express', $ms->label( array() ), 'No version named: the default one.' );
 		$this->assertSame( array( 'app', 'app_user' ), array( $ms->database(), $ms->login() ) );
 		$this->assertSame( '', $pg->limits() );
-		$this->assertStringContainsString( '10 GB per database', $ms->limits() );
+		$this->assertStringContainsString( '50 GB per database', $ms->limits() );
 		$this->assertStringNotContainsString( "\u{2014}", $ms->limits() . $ms->ca_hint() . $ms->terms_label() );
 	}
 
 	public function test_the_sql_server_plan_check(): void {
 		$ms = new MssqlEngine();
 
-		$this->assertNull( $ms->plan_error( array( 'major' => 2022, 'memory_mb' => 4096 ) ) );
+		$this->assertNull( $ms->plan_error( array( 'major' => 2025, 'memory_mb' => 4096 ) ) );
+		$this->assertStringContainsString( 'is not supported. Supported: 2025', (string) $ms->plan_error( array( 'major' => 2022, 'memory_mb' => 4096 ) ), '2022 is no longer offered.' );
 		$this->assertNull( $ms->plan_error( array( 'memory_mb' => '8192' ) ) );
-		$this->assertStringContainsString( 'is not supported. Supported: 2022', (string) $ms->plan_error( array( 'major' => 2019, 'memory_mb' => 4096 ) ) );
+		$this->assertStringContainsString( 'is not supported. Supported: 2025', (string) $ms->plan_error( array( 'major' => 2019, 'memory_mb' => 4096 ) ) );
 		$this->assertStringContainsString( 'is not supported', (string) $ms->plan_error( array( 'major' => 'x', 'memory_mb' => 4096 ) ) );
-		$this->assertStringContainsString( 'at least 4 GB', (string) $ms->plan_error( array( 'major' => 2022, 'memory_mb' => 2048 ) ) );
-		$this->assertStringContainsString( 'at least 4 GB', (string) $ms->plan_error( array( 'major' => 2022 ) ) );
+		$this->assertStringContainsString( 'at least 4 GB', (string) $ms->plan_error( array( 'major' => 2025, 'memory_mb' => 2048 ) ) );
+		$this->assertStringContainsString( 'at least 4 GB', (string) $ms->plan_error( array( 'major' => 2025 ) ) );
 	}
 
 	public function test_the_memory_limit_is_three_quarters_of_the_plan_and_a_filter_may_change_it(): void {
@@ -247,7 +248,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_the_engine_templates_are_kept_apart_and_hidden_from_operating_system_lists(): void {
-		$this->assertSame( array( 9120 => 'SQL Server 2022' ), Clusters::service_templates( 'lab', 'mssql-2022' ) );
+		$this->assertSame( array( 9120 => 'SQL Server 2025' ), Clusters::service_templates( 'lab', 'mssql-2025' ) );
 		$this->assertSame( array( 9100 => 'PostgreSQL 18' ), Clusters::service_templates( 'lab', 'postgres-18' ) );
 		$this->assertSame( array(), Clusters::templates( 'lab' ) );
 	}
@@ -275,7 +276,7 @@ class DbMssqlTest extends TestCase {
 		$result = Registry::get( 'proxmox-db' )->provision( Resource::find( $r->id() ) );
 
 		$this->assertTrue( $result->is_failed() );
-		$this->assertStringContainsString( 'with the family mssql-2022', $result->error() );
+		$this->assertStringContainsString( 'with the family mssql-2025', $result->error() );
 		$this->assertNull( \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() ) );
 	}
 
@@ -334,12 +335,12 @@ class DbMssqlTest extends TestCase {
 		Registry::get( 'proxmox-db' )->render_account( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'SQL Server 2022 Express', $html );
+		$this->assertStringContainsString( 'SQL Server 2025 Express', $html );
 		$this->assertStringContainsString( '<code>1433</code>', $html );
 		$this->assertStringContainsString( '<code>app_user</code>', $html );
 		$this->assertStringContainsString( 'Server=10.64.0.2,1433;Database=app;User Id=app_user;Password=PASSWORD;Encrypt=True;TrustServerCertificate=False;', $html );
 		$this->assertStringContainsString( 'Server=10.64.0.2,1433;Database=app;User Id=app_user;Password=PASSWORD;Encrypt=True;TrustServerCertificate=True;', $html );
-		$this->assertStringContainsString( '10 GB per database', $html );
+		$this->assertStringContainsString( '50 GB per database', $html );
 		$this->assertStringContainsString( 'add the CA certificate to the trusted certificates', $html );
 		$this->assertStringContainsString( 'Download CA certificate', $html );
 		$this->assertStringContainsString( 'data-db-reveal', $html );
@@ -357,12 +358,12 @@ class DbMssqlTest extends TestCase {
 
 	public function test_the_list_row_and_the_picker_name_the_engine(): void {
 		$view = DbCard::view( $this->resource() );
-		$this->assertSame( 'SQL Server 2022 Express', $view['engine'] );
+		$this->assertSame( 'SQL Server 2025 Express', $view['engine'] );
 		$this->assertSame( 1433, $view['port'] );
 
 		$ref = new \ReflectionMethod( \BeltoftServices\Account\DbPicker::class, 'engine' );
 		$ref->setAccessible( true );
-		$this->assertSame( 'SQL Server 2022 Express', $ref->invoke( null, array( 'engine' => 'mssql', 'major' => 2022 ) ) );
+		$this->assertSame( 'SQL Server 2025 Express', $ref->invoke( null, array( 'engine' => 'mssql', 'major' => 2025 ) ) );
 		$this->assertSame( 'PostgreSQL 18', $ref->invoke( null, array( 'engine' => '', 'major' => 18 ) ) );
 		$this->assertSame( 'PostgreSQL 17', $ref->invoke( null, array( 'engine' => 'postgres', 'major' => 17 ) ) );
 	}
@@ -418,7 +419,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_a_database_starts_with_the_time_of_the_acceptance_on_the_order_line(): void {
-		$product   = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2022, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
+		$product   = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
 		$order     = wc_create_order();
 		$item      = new \WC_Order_Item_Product();
 		$item->set_product_id( $product->get_id() );
@@ -434,7 +435,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_checkout_without_the_box_is_refused_and_with_it_the_line_carries_the_time(): void {
-		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2022, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
+		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
 		$item    = new \WC_Order_Item_Product();
 		$item->set_product_id( $product->get_id() );
 
@@ -447,7 +448,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_the_cart_with_such_a_database_asks_for_the_box(): void {
-		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2022, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
+		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
 		WC()->cart->empty_cart();
 		WC()->cart->add_to_cart( $product->get_id() );
 
