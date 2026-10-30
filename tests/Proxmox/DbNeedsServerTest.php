@@ -73,8 +73,8 @@ class DbNeedsServerTest extends BackupTestCase {
 		$errors = $this->errors_for( $this->db_product() );
 
 		$this->assertSame( array( 'beltoft_services_db_needs_server' ), $errors->get_error_codes() );
-		$this->assertStringContainsString( 'Order a server first', $errors->get_error_message() );
-		$this->assertStringContainsString( '/vps-hosting/', $errors->get_error_message() );
+		$this->assertStringContainsString( 'public IP address', $errors->get_error_message() );
+		$this->assertStringContainsString( '/contact/', $errors->get_error_message() );
 		$this->assertStringNotContainsString( "\u{2014}", $errors->get_error_message() );
 	}
 
@@ -85,10 +85,10 @@ class DbNeedsServerTest extends BackupTestCase {
 		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
 		do_action( 'woocommerce_check_cart_items' );
 		$this->assertSame( 0, wc_notice_count( 'error' ) );
-		$this->assertStringContainsString( 'Order a server first', wc_get_notices( 'notice' )[0]['notice'] );
+		$this->assertStringContainsString( 'public IP address', wc_get_notices( 'notice' )[0]['notice'] );
 		$errors = new \WP_Error();
-		DbNeedsServer::validate( array(), $errors );
-		$this->assertSame( array( 'beltoft_services_db_needs_server' ), $errors->get_error_codes(), 'The order is still refused.' );
+		do_action( 'woocommerce_after_checkout_validation', array(), $errors );
+		$this->assertSame( array(), $errors->get_error_codes(), 'Never refused, only told (owner 2026-10-30).' );
 	}
 
 	public function test_a_customer_without_a_server_sees_the_error_on_the_checkout_page(): void {
@@ -97,8 +97,9 @@ class DbNeedsServerTest extends BackupTestCase {
 		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
 		do_action( 'woocommerce_check_cart_items' );
 		do_action( 'woocommerce_check_cart_items' );
-		$this->assertSame( 1, wc_notice_count( 'error' ), 'Once, however often the check runs.' );
-		$this->assertStringContainsString( 'Order a server first', wc_get_notices( 'error' )[0]['notice'] );
+		$this->assertSame( 0, wc_notice_count( 'error' ) );
+		$this->assertSame( 1, wc_notice_count( 'notice' ), 'Once, however often the check runs.' );
+		$this->assertStringContainsString( 'public IP address', wc_get_notices( 'notice' )[0]['notice'] );
 	}
 
 	public function test_a_server_on_another_cluster_is_refused(): void {
@@ -184,12 +185,6 @@ class DbNeedsServerTest extends BackupTestCase {
 
 		$errors = new \WP_Error();
 		do_action( 'woocommerce_store_api_cart_errors', $errors, WC()->cart );
-		$this->assertSame( array( 'beltoft_services_db_needs_server' ), $errors->get_error_codes() );
-		$this->assertStringNotContainsString( '<a', $errors->get_error_message(), 'The Store API gets plain text.' );
-
-		$this->server( $user, 'lab' );
-		$errors = new \WP_Error();
-		do_action( 'woocommerce_store_api_cart_errors', $errors, WC()->cart );
-		$this->assertSame( array(), $errors->get_error_codes() );
+		$this->assertSame( array(), $errors->get_error_codes(), 'The Store API is not refused either.' );
 	}
 }

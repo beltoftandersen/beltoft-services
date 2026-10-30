@@ -26,11 +26,9 @@ final class DbNeedsServer {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		// Not refused at add to cart: a visitor has no session yet, so the message would be lost on the way to
-		// checkout. The checkout shows it (check_cart_items) and refuses the order (validation, Store API).
+		// Owner 2026-10-30: never refused, only told. The checkout says how the database is reached when the
+		// customer has no server with us (validate() and store_api_errors() remain for a site that wants a refusal).
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'cart_notice' ) );
-		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
-		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
 	}
 
 	/**
@@ -54,7 +52,7 @@ final class DbNeedsServer {
 		 *
 		 * @param string $url Address.
 		 */
-		return (string) apply_filters( 'beltoft_services_db_needs_server_url', home_url( '/vps-hosting/' ) );
+		return (string) apply_filters( 'beltoft_services_db_needs_server_url', home_url( '/contact/' ) );
 	}
 
 	/**
@@ -63,15 +61,15 @@ final class DbNeedsServer {
 	 * @param bool $html With the link (a notice) or plain text (the Store API strips markup).
 	 */
 	public static function message( bool $html ): string {
-		$first = __( 'A database is reachable from your servers with us over a private network.', 'beltoft-services' );
-		$link  = __( 'Order a server first', 'beltoft-services' );
-		$last  = __( 'then add the database to your account.', 'beltoft-services' );
+		$first = __( 'A database is reachable over a private network from your servers with us. Without a server with us, you need a public IP address for the database to reach it from elsewhere.', 'beltoft-services' );
+		$soon  = __( 'Public IP addresses for databases are coming soon.', 'beltoft-services' );
+		$link  = __( 'Contact us if you need one now.', 'beltoft-services' );
 
 		if ( ! $html ) {
-			return $first . ' ' . $link . ', ' . $last;
+			return $first . ' ' . $soon . ' ' . $link;
 		}
 
-		return esc_html( $first ) . ' <a href="' . esc_url( self::url() ) . '">' . esc_html( $link ) . '</a>, ' . esc_html( $last );
+		return esc_html( $first . ' ' . $soon ) . ' <a href="' . esc_url( self::url() ) . '">' . esc_html( $link ) . '</a>';
 	}
 
 	/**
@@ -201,11 +199,9 @@ final class DbNeedsServer {
 			return;
 		}
 
-		// WooCommerce runs the cart check more than once per page: the message is added once.
-		$type = ! is_user_logged_in() ? 'notice' : ( self::refused( get_current_user_id(), $clusters ) ? 'error' : '' );
-
-		if ( '' !== $type && ! wc_has_notice( self::message( true ), $type ) ) {
-			wc_add_notice( self::message( true ), $type );
+		// WooCommerce runs the cart check more than once per page: the notice is added once.
+		if ( self::refused( get_current_user_id(), $clusters ) && ! wc_has_notice( self::message( true ), 'notice' ) ) {
+			wc_add_notice( self::message( true ), 'notice' );
 		}
 	}
 
