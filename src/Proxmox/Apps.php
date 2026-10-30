@@ -66,12 +66,37 @@ final class Apps {
 	}
 
 	/**
-	 * "Runs on Ubuntu 24.04", or "Runs on Ubuntu 24.04 or Debian 12": names from the cluster's template labels.
+	 * "Runs on Ubuntu 24.04", or "Runs on Ubuntu 24.04 or Debian 12".
 	 *
 	 * @param array<string, mixed> $cluster  Cluster.
 	 * @param array<int, string>   $families Families.
 	 */
 	public static function runs_on( array $cluster, array $families ): string {
+		$list = self::os_names( $cluster, $families );
+		/* translators: %s: operating systems such as Ubuntu 24.04 */
+		return '' === $list ? '' : sprintf( __( 'Runs on %s', 'beltoft-services' ), $list );
+	}
+
+	/**
+	 * What the app tile's script says when a chosen system drops the app: "WordPress runs on Ubuntu 24.04, so no app is selected now."
+	 *
+	 * @param array<string, mixed> $cluster  Cluster.
+	 * @param array<int, string>   $families Families.
+	 * @param string               $name     App name.
+	 */
+	public static function dropped_text( array $cluster, array $families, string $name ): string {
+		$list = self::os_names( $cluster, $families );
+		/* translators: 1: app name, 2: operating systems such as Ubuntu 24.04 */
+		return '' === $list ? '' : sprintf( __( '%1$s runs on %2$s, so no app is selected now.', 'beltoft-services' ), $name, $list );
+	}
+
+	/**
+	 * "Ubuntu 24.04" or "Ubuntu 24.04 or Debian 12": names from the cluster's template labels.
+	 *
+	 * @param array<string, mixed> $cluster  Cluster.
+	 * @param array<int, string>   $families Families.
+	 */
+	private static function os_names( array $cluster, array $families ): string {
 		$labels = (array) ( $cluster['templates'] ?? array() );
 		$names  = array();
 		foreach ( $families as $family ) {
@@ -89,9 +114,7 @@ final class Apps {
 		}
 		$last = array_pop( $names );
 		/* translators: 1: operating systems separated by commas, 2: the last one */
-		$list = array() === $names ? $last : sprintf( __( '%1$s or %2$s', 'beltoft-services' ), implode( ', ', $names ), $last );
-		/* translators: %s: operating systems such as Ubuntu 24.04 */
-		return sprintf( __( 'Runs on %s', 'beltoft-services' ), $list );
+		return array() === $names ? $last : sprintf( __( '%1$s or %2$s', 'beltoft-services' ), implode( ', ', $names ), $last );
 	}
 
 	/** Are apps on offer at all on this cluster: the flag, the v2 snippet and an Ubuntu 24.04 template. */

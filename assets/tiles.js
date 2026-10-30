@@ -98,8 +98,7 @@
 			var wanted = families( app );
 			var system = checked( os );
 			var none = apps.querySelector( 'input[type="radio"][data-none]' );
-			var name = app ? app.closest( '.beltoft-services-tile' ).querySelector( '.beltoft-services-tile__name' ) : null;
-			var runs = app ? app.closest( '.beltoft-services-tile' ).querySelector( '.beltoft-services-tile__runs' ) : null;
+			var text = app ? app.getAttribute( 'data-dropped' ) || '' : '';
 
 			if ( ! wanted.length || ! system || -1 !== wanted.indexOf( family( system ) ) || ! none ) {
 				return;
@@ -108,7 +107,7 @@
 			none.checked = true;
 			update();
 			changed( none );
-			say( name && runs ? name.textContent + ': ' + runs.textContent + '. ' + ( apps.getAttribute( 'data-dropped' ) || '' ) : '' );
+			say( text );
 		}
 
 		function fill() {

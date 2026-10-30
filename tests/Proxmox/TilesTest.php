@@ -137,6 +137,7 @@ class TilesTest extends TestCase {
 		$this->assertSame( 'Runs on Ubuntu 24.04 or Debian 13', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'ubuntu-24.04', 'debian-13' ) ) );
 		$this->assertSame( 'Runs on Rocky 9', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'rocky-9' ) ), 'A family without a template still gets a name.' );
 		$this->assertSame( '', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array() ) );
+		$this->assertSame( 'WordPress runs on Ubuntu 24.04, so no app is selected now.', \BeltoftServices\Proxmox\Apps::dropped_text( $cluster, array( 'ubuntu-24.04' ), 'WordPress' ) );
 
 		ob_start();
 		Tiles::print_group(

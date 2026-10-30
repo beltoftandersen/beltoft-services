@@ -251,6 +251,7 @@ final class AppReinstall {
 					'attrs'    => array(
 						'data-versions' => (string) wp_json_encode( $versions ),
 						'data-families' => implode( ',', $families ),
+						'data-dropped'  => Apps::dropped_text( $cluster, $families, (string) ( $entry['def']['name'] ?? $app_id ) ),
 					) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
@@ -281,6 +282,7 @@ final class AppReinstall {
 					'attrs'   => array(
 						'data-versions' => (string) wp_json_encode( $versions ),
 						'data-families' => implode( ',', $families ),
+						'data-dropped'  => Apps::dropped_text( $cluster, $families, (string) $options['app']['name'] ),
 					) + ( ! empty( $options['app']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
 				);
 			}
@@ -306,8 +308,7 @@ final class AppReinstall {
 				'legend' => __( 'App', 'beltoft-services' ),
 				'items'  => $items,
 				'attrs'  => array(
-					'data-os'      => (string) $os,
-					'data-dropped' => __( 'No app is selected now.', 'beltoft-services' ),
+					'data-os' => (string) $os,
 				),
 			)
 		);

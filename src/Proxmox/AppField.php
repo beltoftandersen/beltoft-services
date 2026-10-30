@@ -278,6 +278,7 @@ final class AppField {
 					'data-min'      => (string) wp_json_encode( self::minimum( $current ) ),
 					'data-why'      => self::needs( $current ),
 					'data-families' => implode( ',', $families ),
+					'data-dropped'  => Apps::dropped_text( $cluster, $families, (string) $app['name'] ),
 				),
 			);
 		}
@@ -290,8 +291,7 @@ final class AppField {
 				'legend' => __( 'App (optional)', 'beltoft-services' ),
 				'items'  => $items,
 				'attrs'  => array(
-					'data-os'      => (string) $offer['os'],
-					'data-dropped' => __( 'No app is selected now.', 'beltoft-services' ),
+					'data-os' => (string) $offer['os'],
 				),
 			)
 		);
