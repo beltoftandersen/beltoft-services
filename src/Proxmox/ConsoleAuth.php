@@ -31,6 +31,9 @@ final class ConsoleAuth {
 		if ( null === $entry ) {
 			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
 		}
+		if ( ! self::same_origin( (string) ( $_SERVER['HTTP_ORIGIN'] ?? '' ) ) ) {
+			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
+		}
 		$r = Resource::find( (int) $entry['resource'] );
 		$license = $r ? $r->license() : array();
 		$record = $r ? VmRecords::for_resource( $r->id() ) : null;
@@ -42,6 +45,9 @@ final class ConsoleAuth {
 			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
 		}
 		$live = 'live' === ( $cluster['client'] ?? 'fake' );
+		if ( $live && ! ConsoleClient::configured( $cluster ) ) {
+			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
+		}
 		if ( $live && ( '' === (string) ( $cluster['ca_file'] ?? '' ) && '' === (string) ( $cluster['pin_sha256'] ?? '' ) ) ) {
 			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
 		}
@@ -53,7 +59,7 @@ final class ConsoleAuth {
 		if ( ( $live && 'https' !== ( $url['scheme'] ?? '' ) ) || ( ! $dns_host && ! $ipv6_host ) || $port < 1 || $port > 65535 || isset( $url['user'] ) || isset( $url['pass'] ) || isset( $url['query'] ) || isset( $url['fragment'] ) || ( isset( $url['path'] ) && ! in_array( $url['path'], array( '', '/' ), true ) ) ) {
 			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
 		}
-		if ( $live && ( '' === (string) ( $cluster['token_id'] ?? '' ) || '' === (string) ( $cluster['token_secret'] ?? '' ) || preg_match( '/[\r\n]/', (string) $cluster['token_id'] . (string) $cluster['token_secret'] ) ) ) {
+		if ( $live && preg_match( '/[\r\n]/', (string) $cluster['console_token_id'] . (string) $cluster['console_token_secret'] ) ) {
 			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
 		}
 		$ticket = ConsoleSessions::consume( $entry );
@@ -64,8 +70,22 @@ final class ConsoleAuth {
 		return array(
 			'X-Console-Target' => $host . ':' . $port,
 			'X-Console-Uri' => $uri,
-			'X-Console-Auth' => $live ? 'PVEAPIToken=' . $cluster['token_id'] . '=' . $cluster['token_secret'] : '',
+			'X-Console-Auth' => $live ? 'PVEAPIToken=' . $cluster['console_token_id'] . '=' . $cluster['console_token_secret'] : '',
+			'X-Console-Resource' => (string) $r->id(),
+			'X-Console-User' => (string) $user_id,
 		);
+	}
+
+	/** Reject websocket handshakes initiated from another site or without an Origin. */
+	private static function same_origin( string $origin ): bool {
+		$site = wp_parse_url( home_url() );
+		$sent = wp_parse_url( $origin );
+		if ( ! is_array( $site ) || ! is_array( $sent ) || ! isset( $site['scheme'], $site['host'], $sent['scheme'], $sent['host'] ) || isset( $sent['user'] ) || isset( $sent['pass'] ) || isset( $sent['path'] ) || isset( $sent['query'] ) || isset( $sent['fragment'] ) ) {
+			return false;
+		}
+		$site_port = (int) ( $site['port'] ?? ( 'https' === $site['scheme'] ? 443 : 80 ) );
+		$sent_port = (int) ( $sent['port'] ?? ( 'https' === $sent['scheme'] ? 443 : 80 ) );
+		return in_array( $sent['scheme'], array( 'http', 'https' ), true ) && strtolower( $site['scheme'] ) === strtolower( $sent['scheme'] ) && strtolower( $site['host'] ) === strtolower( $sent['host'] ) && $site_port === $sent_port;
 	}
 
 	/** The public path always refuses unless nginx's internal location provided the marker. */

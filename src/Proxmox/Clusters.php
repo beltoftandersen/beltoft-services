@@ -32,12 +32,14 @@ final class Clusters {
 	 */
 	public static function defaults(): array {
 		return array(
-			'label'             => '',
-			'api_url'           => '',
-			'token_id'          => '',
-			'token_secret'      => '',
-			'ca_file'           => '',
-			'pin_sha256'        => '',
+			'label'                => '',
+			'api_url'              => '',
+			'token_id'             => '',
+			'token_secret'         => '',
+			'console_token_id'     => '',
+			'console_token_secret' => '',
+			'ca_file'              => '',
+			'pin_sha256'           => '',
 			'client'            => 'fake',
 			'pool_api'          => 'pools',
 			'nodes'             => array(),
@@ -158,6 +160,7 @@ final class Clusters {
 
 		$cluster                 = $all[ $id ];
 		$cluster['token_secret'] = '' === (string) $cluster['token_secret'] ? '' : (string) Crypto::decrypt( (string) $cluster['token_secret'] );
+		$cluster['console_token_secret'] = '' === (string) $cluster['console_token_secret'] ? '' : (string) Crypto::decrypt( (string) $cluster['console_token_secret'] );
 
 		return $cluster;
 	}
@@ -171,6 +174,12 @@ final class Clusters {
 		$all = self::all();
 
 		return isset( $all[ $id ] ) && '' !== (string) $all[ $id ]['token_secret'];
+	}
+
+	/** Whether a separate console token secret is saved for the cluster. */
+	public static function has_console_secret( string $id ): bool {
+		$all = self::all();
+		return isset( $all[ $id ] ) && '' !== (string) $all[ $id ]['console_token_secret'];
 	}
 
 	/**
@@ -287,6 +296,14 @@ final class Clusters {
 		}
 
 		$clean['token_id'] = $token_id;
+		$console_token_id = trim( (string) ( $input['console_token_id'] ?? $clean['console_token_id'] ) );
+		if ( '' !== $console_token_id && ! preg_match( '/^[^\s@!]{1,64}@[A-Za-z0-9._-]{1,64}![A-Za-z0-9._-]{1,64}$/D', $console_token_id ) ) {
+			return self::error( 'console_token_id', __( 'The console token id looks like user@realm!tokenname.', 'beltoft-services' ) );
+		}
+		if ( '' !== $console_token_id && $console_token_id === $token_id ) {
+			return self::error( 'console_token_id', __( 'Use a separate token for the console.', 'beltoft-services' ) );
+		}
+		$clean['console_token_id'] = $console_token_id;
 
 		$ca = trim( (string) ( $input['ca_file'] ?? '' ) );
 
@@ -542,6 +559,11 @@ final class Clusters {
 		}
 
 		$clean['token_secret'] = $secret;
+		$console_secret = self::clean_secret( $input, (string) ( $existing['console_token_secret'] ?? '' ), 'console_token_secret' );
+		if ( is_wp_error( $console_secret ) ) {
+			return $console_secret;
+		}
+		$clean['console_token_secret'] = $console_secret;
 
 		$all[ $id ] = $clean;
 		update_option( self::OPTION, $all, false );
@@ -619,8 +641,8 @@ final class Clusters {
 	 * @param string               $saved The stored (encrypted) secret.
 	 * @return string|\WP_Error
 	 */
-	private static function clean_secret( array $input, string $saved ) {
-		$new = trim( (string) ( $input['token_secret'] ?? '' ) );
+	private static function clean_secret( array $input, string $saved, string $field = 'token_secret' ) {
+		$new = trim( (string) ( $input[ $field ] ?? '' ) );
 
 		if ( '' === $new ) {
 			return $saved;

@@ -62,7 +62,7 @@ final class ConsoleRoute {
 			return self::error( 'beltoft_services_console_unavailable', __( 'The console is not available right now.', 'beltoft-services' ), 503 );
 		}
 		try {
-			$client = Clients::for( $cluster );
+			$client = ConsoleClient::for( $cluster );
 		} catch ( \Throwable $e ) {
 			return self::error( 'beltoft_services_console_unavailable', __( 'The console is not available right now.', 'beltoft-services' ), 503 );
 		}
@@ -83,8 +83,7 @@ final class ConsoleRoute {
 		if ( $port < 1 || $port > 65535 ) {
 			return self::error( 'beltoft_services_console_unavailable', __( 'The console is not available right now.', 'beltoft-services' ), 503 );
 		}
-		// Current PVE returns a separate RFB password; older releases used the ticket for both.
-		$password = isset( $reply['password'] ) ? $reply['password'] : $reply['ticket'];
+		$password = $reply['password'] ?? null;
 		if ( ! is_string( $password ) || '' === $password ) {
 			return self::error( 'beltoft_services_console_unavailable', __( 'The console is not available right now.', 'beltoft-services' ), 503 );
 		}

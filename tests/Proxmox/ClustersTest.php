@@ -130,6 +130,23 @@ class ClustersTest extends TestCase {
 		$this->assertTrue( Clusters::save( 'ok16', $this->input( array( 'token_secret' => str_repeat( 'x', 16 ) ) ) ) );
 	}
 
+	public function test_separate_console_token_is_encrypted_and_optional(): void {
+		$this->assertTrue( Clusters::save( 'lab', $this->input() ) );
+		$this->assertSame( '', Clusters::get( 'lab' )['console_token_secret'] );
+		$this->assertFalse( Clusters::has_console_secret( 'lab' ) );
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'token_secret' => '', 'console_token_id' => 'viewer@pve!console', 'console_token_secret' => 'console-only-test-secret' ) ) ) );
+		$this->assertSame( 'viewer@pve!console', Clusters::get( 'lab' )['console_token_id'] );
+		$this->assertSame( 'console-only-test-secret', Clusters::get( 'lab' )['console_token_secret'] );
+		$this->assertStringStartsWith( 'bs1:', Clusters::all()['lab']['console_token_secret'] );
+		$this->assertStringNotContainsString( 'console-only-test-secret', $this->stored_raw() );
+		$this->assertTrue( Clusters::has_console_secret( 'lab' ) );
+		$this->assertTrue( Clusters::save( 'lab', $this->input( array( 'token_secret' => '', 'console_token_id' => 'viewer@pve!console', 'console_token_secret' => '' ) ) ) );
+		$this->assertSame( 'console-only-test-secret', Clusters::get( 'lab' )['console_token_secret'] );
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'console_token_id' => 'bad-id' ) ) ) );
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'console_token_id' => 'svc@pve!beltoft' ) ) ) );
+		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'console_token_secret' => 'too-short' ) ) ) );
+	}
+
 	public function test_a_new_cluster_needs_a_secret(): void {
 		$this->assertWPError( Clusters::save( 'lab', $this->input( array( 'token_secret' => '' ) ) ) );
 	}

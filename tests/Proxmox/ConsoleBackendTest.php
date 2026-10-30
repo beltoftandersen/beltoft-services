@@ -7,6 +7,7 @@ use BeltoftServices\Proxmox\Console;
 use BeltoftServices\Proxmox\ConsoleAuth;
 use BeltoftServices\Proxmox\ConsoleRoute;
 use BeltoftServices\Proxmox\ConsoleSessions;
+use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\VmRecords;
@@ -20,6 +21,7 @@ class ConsoleBackendTest extends MonitoringTestCase {
 		parent::set_up();
 		$this->settings( array( 'console' => 1 ) );
 		$_SERVER['REMOTE_ADDR'] = '192.0.2.30';
+		$_SERVER['HTTP_ORIGIN'] = home_url();
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();
 		do_action( 'rest_api_init', $wp_rest_server );
@@ -29,6 +31,7 @@ class ConsoleBackendTest extends MonitoringTestCase {
 		global $wp_rest_server, $wpdb;
 		$wp_rest_server = null;
 		unset( $_SERVER['REMOTE_ADDR'] );
+		unset( $_SERVER['HTTP_ORIGIN'] );
 		wp_set_current_user( 0 );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test-only cleanup of the one-use option namespace.
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE option_name LIKE %s', $wpdb->options, $wpdb->esc_like( ConsoleSessions::PREFIX ) . '%' ) );
@@ -89,6 +92,31 @@ class ConsoleBackendTest extends MonitoringTestCase {
 		$this->assertSame( 409, $this->open( $r, $owner )->get_status(), 'Only one pending ticket per server.' );
 	}
 
+	public function test_open_refuses_an_upstream_reply_without_a_separate_password(): void {
+		$r = $this->server();
+		$without_password = new class( $this->fake ) extends FakeClient {
+			private FakeClient $source;
+			public function __construct( FakeClient $source ) {
+				$this->source = $source;
+			}
+			public function request( string $method, string $path, array $params = array() ) {
+				$reply = $this->source->request( $method, $path, $params );
+				if ( str_ends_with( $path, '/vncproxy' ) && is_array( $reply ) ) {
+					unset( $reply['password'] );
+				}
+				return $reply;
+			}
+		};
+		add_filter( 'beltoft_services_proxmox_client', static fn() => $without_password, 20 );
+		try {
+			$reply = $this->open( $r, (int) $r->license()['user_id'] );
+			$this->assertSame( 503, $reply->get_status() );
+			$this->assertStringNotContainsString( 'PVEVNC:', wp_json_encode( $reply->get_data() ) );
+		} finally {
+			remove_all_filters( 'beltoft_services_proxmox_client', 20 );
+		}
+	}
+
 	public function test_ticket_checks_user_ip_expiry_and_atomic_single_use(): void {
 		$r = $this->server();
 		$owner = (int) $r->license()['user_id'];
@@ -128,7 +156,24 @@ class ConsoleBackendTest extends MonitoringTestCase {
 		$this->assertSame( 'pve.example.invalid:8006', $headers['X-Console-Target'] );
 		$this->assertStringContainsString( 'nodes/node-a/qemu/5000/vncwebsocket?port=5900&vncticket=', $headers['X-Console-Uri'] );
 		$this->assertSame( '', $headers['X-Console-Auth'], 'A fake cluster has no proxy credential.' );
+		$this->assertSame( (string) $r->id(), $headers['X-Console-Resource'] );
+		$this->assertSame( (string) $owner, $headers['X-Console-User'] );
 		$this->assertWPError( ConsoleAuth::authorize( $token, $owner, '192.0.2.30' ) );
+	}
+
+	public function test_auth_rejects_missing_or_foreign_origin_without_consuming_ticket(): void {
+		$r = $this->server();
+		$owner = (int) $r->license()['user_id'];
+		$token = basename( $this->open( $r, $owner )->get_data()['path'] );
+		$_SERVER['HTTP_ORIGIN'] = '';
+		$this->assertWPError( ConsoleAuth::authorize( $token, $owner, '192.0.2.30' ) );
+		$_SERVER['HTTP_ORIGIN'] = 'https://elsewhere.example';
+		$this->assertWPError( ConsoleAuth::authorize( $token, $owner, '192.0.2.30' ) );
+		$_SERVER['HTTP_ORIGIN'] = home_url() . '/path';
+		$this->assertWPError( ConsoleAuth::authorize( $token, $owner, '192.0.2.30' ) );
+		$this->assertNotNull( ConsoleSessions::peek( $token, $owner, '192.0.2.30' ) );
+		$_SERVER['HTTP_ORIGIN'] = home_url();
+		$this->assertIsArray( ConsoleAuth::authorize( $token, $owner, '192.0.2.30' ) );
 	}
 
 	public function test_state_change_purges_pending_ticket_and_feature_is_off_by_default(): void {

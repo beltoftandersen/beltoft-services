@@ -301,6 +301,13 @@ final class ClustersScreen {
 			esc_attr( '' !== $id && Clusters::has_secret( $id ) ? __( 'Saved', 'beltoft-services' ) : '' ),
 			esc_html__( 'At least 16 characters. Leave empty to keep the saved secret.', 'beltoft-services' )
 		);
+		self::row( 'console_token_id', __( 'Console token id', 'beltoft-services' ), (string) $c['console_token_id'], __( 'Optional separate token with VM.Console and VM.Audit permissions. The main API token cannot be used for the console.', 'beltoft-services' ) );
+		printf(
+			'<tr><th scope="row"><label for="bs_console_token_secret">%1$s</label></th><td><input type="password" id="bs_console_token_secret" name="console_token_secret" value="" class="regular-text" autocomplete="new-password" placeholder="%2$s"><p class="description">%3$s</p></td></tr>',
+			esc_html__( 'Console token secret', 'beltoft-services' ),
+			esc_attr( '' !== $id && Clusters::has_console_secret( $id ) ? __( 'Saved', 'beltoft-services' ) : '' ),
+			esc_html__( 'At least 16 characters. Leave empty to keep the saved secret.', 'beltoft-services' )
+		);
 
 		self::row( 'ca_file', __( 'CA file', 'beltoft-services' ), (string) $c['ca_file'], __( 'Optional absolute path to the certificate authority file that signed the Proxmox certificate.', 'beltoft-services' ) );
 		self::row( 'pin_sha256', __( 'Public key pin', 'beltoft-services' ), (string) $c['pin_sha256'], __( 'Optional: base64 of the SHA-256 hash of the server public key.', 'beltoft-services' ) );
