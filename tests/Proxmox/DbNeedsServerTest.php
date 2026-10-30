@@ -102,6 +102,15 @@ class DbNeedsServerTest extends BackupTestCase {
 		$this->assertStringContainsString( 'public IP address', wc_get_notices( 'notice' )[0]['notice'] );
 	}
 
+	public function test_a_checkout_refresh_does_not_add_the_notice_again(): void {
+		$this->customer();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $this->db_product()->get_id() ) );
+		add_filter( 'wp_doing_ajax', '__return_true' );
+		do_action( 'woocommerce_check_cart_items' );
+		remove_filter( 'wp_doing_ajax', '__return_true' );
+		$this->assertSame( 0, wc_notice_count( 'notice' ), 'The page shows it; the AJAX refresh does not add it again.' );
+	}
+
 	public function test_a_server_on_another_cluster_is_refused(): void {
 		$user = $this->customer();
 		$this->server( $user, 'elsewhere' );

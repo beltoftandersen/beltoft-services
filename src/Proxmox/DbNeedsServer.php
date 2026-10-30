@@ -247,7 +247,12 @@ final class DbNeedsServer {
 			return;
 		}
 
-		// WooCommerce runs the cart check more than once per page: the notice is added once.
+		// WooCommerce runs the cart check more than once per page, and again on every checkout refresh (AJAX): the
+		// notice is added once, on the page itself, so it does not pile up in the session.
+		if ( wp_doing_ajax() ) {
+			return;
+		}
+
 		if ( self::refused( get_current_user_id(), $clusters ) && ! wc_has_notice( self::message( true ), 'notice' ) ) {
 			wc_add_notice( self::message( true ), 'notice' );
 		}
