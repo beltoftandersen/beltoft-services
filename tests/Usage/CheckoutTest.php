@@ -47,6 +47,13 @@ class CheckoutTest extends UsageTestCase {
 		return $n;
 	}
 
+	public function test_the_billing_attribute_reads_with_a_capital_in_the_cart(): void {
+		$this->assertSame( 'Billing', wc_attribute_label( 'billing' ) );
+		$this->assertSame( 'Billing', wc_attribute_label( 'Billing' ) );
+		$this->assertSame( 'plan', wc_attribute_label( 'plan' ), 'Other attributes are not touched.' );
+		$this->assertSame( 'billing', Cart::attribute_label( 'billing', 'colour' ), 'Only the billing attribute.' );
+	}
+
 	public function test_a_usage_variation_of_a_subscription_product_is_not_a_subscription(): void {
 		$parent = new \WC_Product_Variable_Subscription();
 		$parent->set_name( 'Sub VPS' );

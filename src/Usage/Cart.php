@@ -27,6 +27,7 @@ final class Cart {
 	 */
 	public static function register(): void {
 		add_filter( 'woocommerce_is_subscription', array( __CLASS__, 'is_subscription' ), 20, 3 );
+		add_filter( 'woocommerce_attribute_label', array( __CLASS__, 'attribute_label' ), 10, 2 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'sync_account_line' ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'sync_account_line' ) );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'sync_account_line' ) );
@@ -44,6 +45,19 @@ final class Cart {
 	 */
 	public static function is_subscription( $is, $product_id = 0, $product = null ): bool {
 		return $is && ! ( $product instanceof \WC_Product && Rates::is_usage( $product ) );
+	}
+
+	/**
+	 * A custom attribute shows its slug when WooCommerce cannot find its name on the variation: the Billing
+	 * attribute of a pay-as-you-go plan reads "billing" in the cart next to "Plan". It gets its capital back.
+	 *
+	 * @param mixed $label Label.
+	 * @param mixed $name  Attribute name as stored.
+	 */
+	public static function attribute_label( $label, $name = '' ): string {
+		$label = (string) $label;
+
+		return 'billing' === $label && 'billing' === sanitize_title( (string) $name ) ? __( 'Billing', 'beltoft-services' ) : $label;
 	}
 
 	/**
@@ -87,7 +101,7 @@ final class Cart {
 
 	/**
 	 * A cart with pay-as-you-go units and no account for the customer holds the hidden account line; a cart
-	 * without units does not.
+	 * without units does not, except the account's own renewal cart.
 	 */
 	public static function sync_account_line(): void {
 		static $busy = false;
@@ -101,7 +115,13 @@ final class Cart {
 		$busy = true;
 
 		try {
-			$key  = self::account_key( $cart );
+			$key = self::account_key( $cart );
+
+			// The account's own renewal (a usage invoice paid from the order-pay page) holds the line: it is not ours to drop.
+			if ( '' !== $key && isset( $cart->get_cart()[ $key ]['subscription_renewal'] ) ) {
+				return;
+			}
+
 			$need = self::usage_units( $cart ) > 0 && null === Account::for_user( get_current_user_id(), Account::ESTABLISHED );
 
 			if ( $need && '' === $key ) {

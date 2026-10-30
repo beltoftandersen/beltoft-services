@@ -63,7 +63,7 @@ class RenewalTest extends UsageTestCase {
 
 		$fees = $this->fees( $order );
 		$this->assertCount( 3, $fees );
-		$this->assertCount( 0, $order->get_items( 'line_item' ), 'The 0 line is replaced.' );
+		$this->assertCount( 1, $order->get_items( 'line_item' ), 'The 0 account line stays, so the order-pay cart is built from it.' );
 		// Sorted by resource, then item.
 		$this->assertStringContainsString( 'backups', $fees[0]->get_name() );
 		$this->assertStringContainsString( '100 hours', $fees[1]->get_name() );
@@ -74,6 +74,29 @@ class RenewalTest extends UsageTestCase {
 		$this->assertSame( '2.99', $order->get_total() );
 		$this->assertSame( '2.99', $order->get_meta( Renewal::META_BILLED ) );
 		$this->assertStringNotContainsString( "\u{2014}", $fees[0]->get_name() );
+	}
+
+	public function test_the_order_pay_cart_of_a_usage_invoice_holds_the_account_line_and_the_fees(): void {
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		$sub = $this->usage_account( $user );
+		$this->hours( 501, $user, 100 );
+
+		$order = wcs_create_renewal_order( $sub );
+		$sub->update_status( 'on-hold' );
+		$order->update_status( 'failed' );
+
+		$renewal = \WCS_Cart_Renewal::class;
+		$object  = \WC_Subscriptions_Core_Plugin::instance()->get_cart_handler( 'WCS_Cart_Renewal' );
+		$method  = new \ReflectionMethod( $renewal, 'setup_cart' );
+		$method->setAccessible( true );
+		$method->invoke( $object, $order, array( 'subscription_id' => $sub->get_id(), 'renewal_order_id' => $order->get_id() ), 'all_items_required' );
+
+		WC()->cart->calculate_totals();
+
+		$this->assertNotEmpty( WC()->cart->get_cart(), 'Your checkout is empty' );
+		$this->assertCount( 1, WC()->cart->get_fees() );
+		$this->assertEquals( 2.26, (float) WC()->cart->get_total( 'edit' ) );
 	}
 
 	public function test_vat_is_added_to_the_usage_lines(): void {

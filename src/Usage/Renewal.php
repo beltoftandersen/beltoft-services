@@ -13,8 +13,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * WooCommerce Subscriptions creates the renewal order of the usage account (wcs_create_renewal_order()) and
- * runs the filter `wcs_renewal_order_created`. This class replaces the account's 0 line with one fee line
- * per resource, item and month (name, hours x rate, capped at the monthly cap), recalculates taxes and
+ * runs the filter `wcs_renewal_order_created`. This class adds one fee line per resource, item and month to
+ * the order, next to the account's 0 line (name, hours x rate, capped at the monthly cap), recalculates taxes and
  * totals and claims the ledger rows for the order. WooCommerce Subscriptions then charges get_total()
  * through the gateway. With no unbilled rows the 0 renewal stays as it is. Rows an order holds are never
  * billed again; a cancelled order gives them back.
@@ -148,14 +148,9 @@ final class Renewal {
 		}
 
 		$statement  = self::statement( $claimed, (int) $order->get_id() );
-		$product_id = (int) get_option( Account::OPTION_PRODUCT );
-
-		foreach ( $order->get_items() as $item_id => $item ) {
-			if ( $item instanceof \WC_Order_Item_Product && (int) $item->get_product_id() === $product_id ) {
-				$order->remove_item( $item_id );
-			}
-		}
-
+		// The account's 0 product line stays: WooCommerce Subscriptions builds the order-pay cart of a renewal from
+		// the order's product lines, so without it a failed usage invoice cannot be paid ("Your checkout is empty").
+		// The fee lines below travel into that cart with it (WCS_Cart_Renewal::maybe_add_fees()).
 		$currency = $order->get_currency();
 
 		foreach ( $statement['lines'] as $line ) {
