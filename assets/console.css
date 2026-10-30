@@ -1,0 +1,14 @@
+.beltoft-services-console { margin-top: 16px; }
+.beltoft-services-console__toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.beltoft-services-console button { border-radius: 0; }
+.beltoft-services-console__toolbar button { padding: 8px 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); cursor: pointer; }
+.beltoft-services-console__toolbar button:disabled, .beltoft-services-console__open:disabled { cursor: wait; opacity: .6; }
+.beltoft-services-console__open { padding: 10px 16px; border: 1px solid var(--navy, #0c1535); background: var(--navy, #0c1535); color: white; cursor: pointer; }
+.beltoft-services-console__screen { width: 100%; min-height: 280px; aspect-ratio: 16 / 9; overflow: hidden; background: #111; color: #eee; }
+.beltoft-services-console__screen canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+.beltoft-services-console__screen.is-demo { box-sizing: border-box; padding: 18px; font: 15px/1.5 monospace; white-space: pre-wrap; }
+.beltoft-services-console__status { min-height: 1.5em; margin: 10px 0; color: var(--ink-muted, #66717a); }
+.beltoft-services-console__keyboard { position: fixed; left: -10000px; width: 1px; height: 1px; opacity: .01; }
+.beltoft-services-console [hidden] { display: none !important; }
+@media (max-width: 600px) { .beltoft-services-console__screen { min-height: 220px; } }
+.beltoft-services-console__screen:fullscreen { aspect-ratio: auto; min-height: 100vh; }

@@ -89,6 +89,7 @@ final class Plugin {
 		Proxmox\RevealRoute::register();
 		Proxmox\ConsoleRoute::register();
 		Proxmox\ConsoleAuth::register();
+		Proxmox\ConsoleTab::register();
 		Proxmox\AppReveal::register();
 		Proxmox\AppInstall::register();
 		Proxmox\AppDomainRelease::register();

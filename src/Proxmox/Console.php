@@ -42,4 +42,13 @@ final class Console {
 		$power = Operations::cached_status( $r->id() );
 		return null !== $record && is_array( $power ) && 'running' === ( $power['power'] ?? '' );
 	}
+
+	public static function eligible( Resource $r ): bool {
+		if ( ! self::available( $r ) ) {
+			return false;
+		}
+		$record = VmRecords::for_resource( $r->id() );
+		$cluster = $record ? Clusters::get( (string) $record['cluster'] ) : null;
+		return $cluster && null === Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() );
+	}
 }
