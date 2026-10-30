@@ -50,6 +50,9 @@ class DbPhase4Test extends TestCase {
 	/** @var FakeClient */
 	private $fake;
 
+	/** @var string How the guest treats the listen job: new, old (refuses it) or silent. */
+	private $listen_guest = 'new';
+
 	/** @var array<int, array<string, mixed>> */
 	private $mails = array();
 
@@ -274,11 +277,26 @@ class DbPhase4Test extends TestCase {
 	 * Answers the guest's allow job of the stored operation, like the guest would.
 	 */
 	private function answer_guest( Resource $r ): void {
-		$op = Resource::find( $r->id() )->get( DbAccess::OP );
+		unset( $r );
+		$job = json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true );
 
-		if ( is_array( $op ) && ! empty( $op['request'] ) && ! empty( $op['sent'] ) ) {
-			$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $op['request'], 'state' => 'ready', 'step' => 'allow', 'updated' => gmdate( 'c' ) ) ) );
+		if ( ! is_array( $job ) || empty( $job['request'] ) || ! in_array( $job['op'] ?? '', array( 'allow', 'listen' ), true ) ) {
+			return;
 		}
+
+		// The listen job: a guest that knows it applies it; one that does not refuses the job (step "job"); a silent one says nothing.
+		if ( 'listen' === $job['op'] ) {
+			if ( 'silent' === $this->listen_guest ) {
+				return;
+			}
+
+			$old = 'old' === $this->listen_guest;
+			$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => $old ? 'failed' : 'ready', 'step' => $old ? 'job' : 'listen', 'updated' => gmdate( 'c' ) ) ) );
+
+			return;
+		}
+
+		$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'ready', 'step' => 'allow', 'updated' => gmdate( 'c' ) ) ) );
 	}
 
 	/**
@@ -504,6 +522,165 @@ class DbPhase4Test extends TestCase {
 		$this->assertCount( 1, $shutdown, 'One restart, announced on the page.' );
 	}
 
+	/**
+	 * The jobs written to the guest so far, in order (the job file is replaced each time).
+	 *
+	 * @return array<int, array{at:int, job:array<string, mixed>}>
+	 */
+	private function guest_jobs(): array {
+		$out = array();
+
+		foreach ( $this->fake->calls() as $i => $c ) {
+			if ( 'POST' === $c['method'] && '/agent/file-write' === substr( $c['path'], -17 ) && DbGuest::JOB === ( $c['params']['file'] ?? '' ) ) {
+				$out[] = array( 'at' => $i, 'job' => (array) json_decode( (string) $c['params']['content'], true ) );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Index of the first call that matches, or null.
+	 */
+	private function first_call( callable $match ): ?int {
+		foreach ( $this->fake->calls() as $i => $c ) {
+			if ( $match( $c ) ) {
+				return $i;
+			}
+		}
+
+		return null;
+	}
+
+	public function test_adding_the_add_on_sends_the_listen_job_after_the_nic_and_before_anything_is_opened(): void {
+		$this->pool( 3 );
+		$r = $this->ready_db();
+		$this->assertTrue( $this->add_ip( $r )->is_done() );
+
+		$private = (string) Resource::find( $r->id() )->get( 'db_address' );
+		$this->assertNotSame( '', $private );
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$this->assertCount( 1, $listen );
+		$this->assertSame( array( $private, '192.0.2.10' ), $listen[0]['job']['listen'] );
+		$this->assertSame( 1, $listen[0]['job']['v'] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9-]{36}$/D', $listen[0]['job']['request'] );
+
+		$nic = $this->first_call( static fn( $c ) => 'PUT' === $c['method'] && isset( $c['params']['net0'] ) );
+		$this->assertNotNull( $nic );
+		$this->assertGreaterThan( $nic, $listen[0]['at'], 'The guest is told after the network card exists.' );
+
+		$allow = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'allow' === $j['job']['op'] ) );
+		$this->assertNotEmpty( $allow );
+		$this->assertLessThan( $allow[0]['at'], $listen[0]['at'], 'Before the access list is applied.' );
+
+		$rule = $this->first_call( static fn( $c ) => in_array( $c['method'], array( 'POST', 'PUT' ), true ) && false !== strpos( $c['path'], '/firewall/' ) && '/firewall/options' !== substr( $c['path'], -17 ) && false !== strpos( wp_json_encode( $c['params'] ), 'bs-db' ) );
+		$this->assertTrue( null === $rule || $rule > $listen[0]['at'], 'No firewall rule was written before the guest listened.' );
+		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
+	}
+
+	public function test_removing_the_add_on_sends_the_private_address_only_after_the_nic_is_gone(): void {
+		$r = $this->db_with_ip();
+		$this->assertTrue( $this->remove_ip( $r )->is_done() );
+
+		$private = (string) Resource::find( $r->id() )->get( 'db_address' );
+		$listen  = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$this->assertCount( 2, $listen, 'One job for the add and one for the removal.' );
+		$this->assertSame( array( $private ), $listen[1]['job']['listen'] );
+
+		$gone = null;
+
+		foreach ( $this->fake->calls() as $i => $c ) {
+			if ( 'PUT' === $c['method'] && false !== strpos( (string) ( $c['params']['delete'] ?? '' ), 'net0' ) ) {
+				$gone = $i; // The last one: the removal (the build deleted a template NIC earlier).
+			}
+		}
+
+		$allow = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'allow' === $j['job']['op'] && $j['at'] < ( $gone ?? 0 ) ) );
+		$this->assertNotNull( $gone );
+		$this->assertGreaterThan( $gone, $listen[1]['at'] );
+		$this->assertNotEmpty( $allow, 'The list was emptied in the guest before the card went.' );
+	}
+
+	public function test_a_guest_that_does_not_know_the_listen_job_fails_an_add_before_anything_is_opened_and_a_retry_works(): void {
+		$this->pool( 3 );
+		$r = $this->ready_db();
+		$this->listen_guest = 'old';
+
+		$res = $this->add_ip( $r );
+		$this->assertTrue( $res->is_failed() );
+		$this->assertStringContainsString( 'does not know the listen job', $res->error() );
+		$this->assertStringContainsString( 'Rebuild the database template', $res->error() );
+		$this->assertStringContainsString( 'nothing is open', $res->error() );
+		$this->assertSame( array(), $this->net0_rules() );
+
+		$fresh = Resource::find( $r->id() );
+		$op    = $fresh->get( DbIp::OP );
+		$this->assertIsArray( $op );
+		$this->assertArrayNotHasKey( 'listen_request', $op, 'A retry sends the job again.' );
+		$this->assertSame( 'listen', $op['phase'] );
+
+		$this->listen_guest = 'new';
+		$res                = $this->drive( $r );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
+		$this->assertCount( 2, array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+	}
+
+	public function test_a_guest_that_never_answers_the_listen_job_fails_an_add_after_ten_minutes(): void {
+		$this->pool( 3 );
+		$r = $this->ready_db();
+		$this->listen_guest = 'silent';
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertTrue( true === $fresh->change_plan( array_merge( (array) $fresh->get( 'plan' ), array( 'public_ip' => 1 ) ), 'Plan changed' ) );
+
+		for ( $i = 0; $i < 40; $i++ ) {
+			$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
+			$this->assertFalse( $res->is_failed(), $res->error() );
+			$op = Resource::find( $r->id() )->get( DbIp::OP );
+
+			if ( is_array( $op ) && ! empty( $op['listen_sent'] ) ) {
+				break;
+			}
+
+			$this->answer_guest( $r );
+			$this->fake->elapse( 30 );
+		}
+
+		$this->assertTrue( $res->is_poll(), 'The job was sent and nothing answers.' );
+		$op                = Resource::find( $r->id() )->get( DbIp::OP );
+		$op['listen_at']   = time() - 700;
+		$this->assertTrue( Resource::find( $r->id() )->set( array( DbIp::OP => $op ) ) );
+
+		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
+		$this->assertTrue( $res->is_failed() );
+		$this->assertStringContainsString( 'did not apply the listen addresses within 10 minutes', $res->error() );
+	}
+
+	public function test_a_remove_on_a_guest_without_the_listen_job_tells_the_admin_and_goes_on(): void {
+		$r = $this->db_with_ip();
+		$this->settings( array( 'admin_email' => self::OWNER ) );
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->listen_guest = 'old';
+
+		$res = $this->remove_ip( $r );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertNull( IpPool::for_resource( $r->id() ), 'The address is given back all the same.' );
+		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
+		$this->assertNotEmpty( $mails );
+		$this->assertStringContainsString( 'does not know the listen job', implode( "\n", array_column( $mails, 'message' ) ) );
+	}
+
 	public function test_a_running_vm_is_never_written_while_the_shutdown_is_pending(): void {
 		$this->pool( 2 );
 		$r = $this->ready_db();
@@ -543,7 +720,8 @@ class DbPhase4Test extends TestCase {
 		$this->assertNull( $fresh->get( 'ip' ) );
 		$this->assertSame( array(), DbAccess::entries( $fresh ), 'The list goes with the address.' );
 		$this->assertFalse( DbAccess::world( $fresh ) );
-		$this->assertSame( array(), json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true )['allow'] );
+		$allow_jobs = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'allow' === $j['job']['op'] ) );
+		$this->assertSame( array(), end( $allow_jobs )['job']['allow'] );
 
 		// The firewall rule went before the NIC did.
 		$calls   = $this->fake->calls();
