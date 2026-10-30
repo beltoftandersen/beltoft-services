@@ -210,11 +210,60 @@ class BandwidthTest extends BackupTestCase {
 		$this->assertSame( $plain, $this->net0(), 'Not wanted ready.' );
 		$r->set( array( 'desired' => 'ready' ) );
 
+	}
+
+	private function make_legacy( Resource $r ): void {
 		$plan = (array) Resource::find( $r->id() )->get( 'plan' );
 		unset( $plan['net_mbit'] );
-		Resource::find( $r->id() )->set( array( 'plan' => $plan ) );
+		$this->assertTrue( Resource::find( $r->id() )->set( array( 'plan' => $plan, 'net_rate_mbit' => null, 'net_rate_at' => null ) ) );
+	}
+
+	private function product_of( Resource $r ): \WC_Product {
+		return wc_get_product( (int) $r->license()['product_id'] );
+	}
+
+	public function test_an_old_server_without_the_key_gets_the_products_limit_from_the_sweep(): void {
+		$r = $this->ready_vm( array( 'net_mbit' => 1000 ) );
+		$this->make_legacy( $r );
+		$plain = NetConfig::with_rate( $this->net0(), 0 );
+		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'net0' => $plain ) ) );
+
 		ProxmoxJobs::net_rates();
-		$this->assertSame( $plain, $this->net0(), 'A plan from before the field is left as it is.' );
+
+		$this->assertSame( $plain . ',rate=125', $this->net0() );
+		$this->assertSame( 1000.0, (float) Resource::find( $r->id() )->get( 'net_rate_mbit' ) );
+	}
+
+	public function test_a_later_product_change_reaches_the_old_server_at_the_next_sweep(): void {
+		$r = $this->ready_vm( array( 'net_mbit' => 1000 ) );
+		$this->make_legacy( $r );
+		ProxmoxJobs::net_rates();
+		$this->assertStringEndsWith( ',rate=125', $this->net0() );
+
+		// Within the day, an unchanged product means no read at all.
+		$seen = count( $this->calls( 'GET', '/config' ) );
+		ProxmoxJobs::net_rates();
+		$this->assertCount( $seen, $this->calls( 'GET', '/config' ) );
+
+		// The product's value changes: the stored speed differs from the effective one, so it is applied now, not after a day.
+		$product = $this->product_of( $r );
+		$product->update_meta_data( \BeltoftServices\Product::META_PLAN . 'net_mbit', '200' );
+		$product->save();
+		ProxmoxJobs::net_rates();
+
+		$this->assertStringEndsWith( ',rate=25', $this->net0() );
+		$this->assertSame( 200.0, (float) Resource::find( $r->id() )->get( 'net_rate_mbit' ) );
+	}
+
+	public function test_a_linked_old_server_keeps_its_hand_set_rate(): void {
+		$r = $this->ready_vm( array( 'net_mbit' => 1000 ) );
+		$this->make_legacy( $r );
+		Resource::find( $r->id() )->set( array( 'linked' => true ) );
+		$before = $this->net0();
+
+		ProxmoxJobs::net_rates();
+
+		$this->assertSame( $before, $this->net0() );
 	}
 
 	public function test_a_server_without_net0_gets_no_write(): void {

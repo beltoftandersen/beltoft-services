@@ -503,22 +503,25 @@ final class ProxmoxJobs {
 	/**
 	 * Brings one server's public NIC to its plan's speed limit (servers built before the limit existed, or a limit
 	 * changed on the NIC by hand): the same rewrite as a plan change, with no restart. Left alone: a server that is
-	 * not ready, adopted (linked), on hold, locked by a running operation, or whose plan has no speed. A checked
+	 * not ready, adopted (linked), on hold, locked by a running operation, or with no known speed (stored plan or product). A checked
 	 * server is looked at again after a day, or at once when the plan's speed changed.
 	 *
 	 * @param Resource             $r  Server resource.
 	 * @param array<string, mixed> $vm Cluster row.
 	 */
 	private static function net_rate( Resource $r, array $vm ): void {
-		$plan = (array) $r->get( 'plan' );
-
-		if ( 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold() || ! array_key_exists( 'net_mbit', $plan ) || '' === (string) ( $vm['node'] ?? '' ) ) {
+		if ( 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold() || '' === (string) ( $vm['node'] ?? '' ) ) {
 			return;
 		}
 
-		$mbit = (float) $plan['net_mbit'];
+		// The stored plan's speed, or the product's current one for a server built before the field.
+		$mbit = Operations::effective_mbit( $r );
 
-		if ( (float) $r->get( 'net_rate_mbit' ) === $mbit && null !== $r->get( 'net_rate_mbit' ) && (int) $r->get( 'net_rate_at' ) > time() - DAY_IN_SECONDS ) {
+		if ( null === $mbit ) {
+			return;
+		}
+
+		if ( null !== $r->get( 'net_rate_mbit' ) && (float) $r->get( 'net_rate_mbit' ) === $mbit && (int) $r->get( 'net_rate_at' ) > time() - DAY_IN_SECONDS ) {
 			return;
 		}
 

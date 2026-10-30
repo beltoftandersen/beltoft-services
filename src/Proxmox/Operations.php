@@ -455,6 +455,33 @@ final class Operations {
 	}
 
 	/**
+	 * The speed a server should have: the stored plan's `net_mbit` when the plan has the key, otherwise the current
+	 * product plan's value (a server built before the field; product edits never reach stored plans). Null when
+	 * neither knows a speed.
+	 *
+	 * @param Resource $r Server resource.
+	 */
+	public static function effective_mbit( Resource $r ): ?float {
+		$plan = (array) $r->get( 'plan' );
+
+		if ( array_key_exists( 'net_mbit', $plan ) ) {
+			return max( 0.0, (float) $plan['net_mbit'] );
+		}
+
+		$license = $r->license();
+		$product = (int) ( $license['product_id'] ?? 0 );
+
+		if ( $product <= 0 ) {
+			return null;
+		}
+
+		$variation = (int) ( $license['variation_id'] ?? 0 );
+		$current   = \BeltoftServices\Product::plan( $product, $variation > 0 ? $variation : null );
+
+		return array_key_exists( 'net_mbit', $current ) ? max( 0.0, (float) $current['net_mbit'] ) : null;
+	}
+
+	/**
 	 * The job's version of sync_rate(): the VM is read and verified here, and nothing else is touched. The caller holds the resource lock.
 	 *
 	 * @return bool Whether the NIC now matches the plan.
@@ -482,14 +509,14 @@ final class Operations {
 	 * @return array<string, mixed>|StepResult The VM as it is now.
 	 */
 	public function sync_rate( array $record, array $v ) {
-		$plan = (array) $this->r->get( 'plan' );
+		$mbit = self::effective_mbit( $this->r );
 		$net0 = (string) ( $v['config']['net0'] ?? '' );
 
-		if ( ! array_key_exists( 'net_mbit', $plan ) || '' === $net0 || NetConfig::has_rate( $net0, $plan['net_mbit'] ) ) {
+		if ( null === $mbit || '' === $net0 || NetConfig::has_rate( $net0, $mbit ) ) {
 			return $v;
 		}
 
-		$params = array( 'net0' => NetConfig::with_rate( $net0, $plan['net_mbit'] ) );
+		$params = array( 'net0' => NetConfig::with_rate( $net0, $mbit ) );
 
 		if ( ! empty( $v['config']['digest'] ) ) {
 			$params['digest'] = (string) $v['config']['digest'];
