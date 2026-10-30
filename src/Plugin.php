@@ -91,6 +91,7 @@ final class Plugin {
 		Account\ApiTokens::register();
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );
+		add_filter( 'beltoft_services_default_retention', array( Proxmox\AppLicenceDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
 		Proxmox\ConsoleRoute::register();
 		Proxmox\ConsoleAuth::register();
@@ -116,6 +117,8 @@ final class Plugin {
 		Proxmox\DbTermsField::register();
 		Proxmox\Tiles::register();
 		Proxmox\AppField::register();
+		Proxmox\AppLicence::register();
+		Proxmox\AppLicenceCart::register();
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
 		Proxmox\BackupField::register();

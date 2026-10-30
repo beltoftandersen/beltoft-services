@@ -157,9 +157,9 @@ abstract class ServiceEmail extends \WC_Email {
 		$tab    = '';
 		$server = null;
 
-		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $driver || \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver ) {
+		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $driver || \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver || \BeltoftServices\Proxmox\AppLicenceDriver::ID === $driver ) {
 			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
-			$tab    = \BeltoftServices\Proxmox\DiskDriver::ID === $driver ? 'disks' : 'snapshots';
+			$tab    = \BeltoftServices\Proxmox\DiskDriver::ID === $driver ? 'disks' : ( \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver ? 'snapshots' : 'app' );
 		} elseif ( \BeltoftServices\Proxmox\SshKeyField::DRIVER === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			$server = $r;
 			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : ( isset( $data['app_domain'] ) ? 'app' : '' );

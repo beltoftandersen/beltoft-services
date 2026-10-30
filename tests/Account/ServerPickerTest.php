@@ -754,11 +754,11 @@ class ServerPickerTest extends BackupTestCase {
 
 		$this->assertMatchesRegularExpression( '#name="' . OsField::POST_KEY . '" value="9000"[^>]*checked#', $html, 'The cluster default.' );
 		$this->assertStringNotContainsString( 'value="carried', $html );
-		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'domain_on', 'zone', 'sub', 'own', 'name', 'ssh_key' ), '' ), Picked::for_cart() );
+		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'tier', 'domain_on', 'zone', 'sub', 'own', 'name', 'ssh_key' ), '' ), Picked::for_cart() );
 	}
 
 	public function test_the_carried_data_is_cleaned(): void {
-		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'domain_on', 'zone', 'sub', 'own', 'name', 'ssh_key' ), '' ), Picked::clean( 'junk' ) );
+		$this->assertSame( array_fill_keys( array( 'os', 'app', 'version', 'tier', 'domain_on', 'zone', 'sub', 'own', 'name', 'ssh_key' ), '' ), Picked::clean( 'junk' ) );
 
 		$clean = Picked::clean( array( 'os' => 9000, 'app' => array( 'x' ), 'evil' => 'x', 'name' => str_repeat( 'a', 500 ), 'domain_on' => '11' ) );
 		$this->assertSame( '9000', $clean['os'] );

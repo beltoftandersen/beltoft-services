@@ -31,6 +31,7 @@ final class AppField {
 
 	public const POST_APP     = 'beltoft_services_app';
 	public const POST_VERSION = 'beltoft_services_app_version';
+	public const POST_TIER    = 'beltoft_services_app_tier';
 	public const POST_DOMAIN  = 'beltoft_services_app_domain_on';
 	public const POST_ZONE    = 'beltoft_services_app_zone';
 	public const POST_SUB     = 'beltoft_services_app_sub';
@@ -40,6 +41,7 @@ final class AppField {
 
 	public const ITEM_APP     = '_beltoft_services_app';
 	public const ITEM_VERSION = '_beltoft_services_app_version';
+	public const ITEM_TIER    = '_beltoft_services_app_tier';
 	public const ITEM_ZONE    = '_beltoft_services_app_zone';
 	public const ITEM_DOMAIN  = '_beltoft_services_app_domain';
 	public const ITEM_OWN     = '_beltoft_services_app_own';
@@ -94,6 +96,13 @@ final class AppField {
 		$os     = Apps::os_template( $cluster );
 		$choice = OsField::choice_for( $product_id, $variation_id );
 
+		// A paid app nobody can buy a tier of is not offered.
+		foreach ( array_keys( $apps ) as $id ) {
+			if ( AppLicence::paid( (string) $id ) && array() === AppLicence::tiers( (string) $id ) ) {
+				unset( $apps[ $id ] );
+			}
+		}
+
 		if ( array() === $apps || $os <= 0 || null === $choice || ! isset( $choice['options'][ $os ] ) ) {
 			return null;
 		}
@@ -110,13 +119,13 @@ final class AppField {
 	 * The choice a customer made, checked against what is offered.
 	 *
 	 * @param array<string, mixed> $offer  The offer.
-	 * @param array<string, mixed> $input  app, version, domain_on, zone, sub, own_on, own (a domain registered elsewhere).
+	 * @param array<string, mixed> $input  app, version, tier (a paid app), domain_on, zone, sub, own_on, own (a domain registered elsewhere).
 	 * @param int                  $user   The customer.
-	 * @param bool                 $check_dns Whether to read the zone for a free name.
-	 * @return array{app: string, version: string, zone: string, domain: string, own: string}|string An empty app when none is wanted; else the refusal text.
+	 * @param bool                 $check_dns Whether to read the zone for a free name, and whether a paid app's tier must be on sale now (an order already paid is built even if the tier is out of stock).
+	 * @return array{app: string, version: string, tier: string, zone: string, domain: string, own: string}|string An empty app when none is wanted; else the refusal text.
 	 */
 	public static function resolve( array $offer, array $input, int $user, bool $check_dns = true ) {
-		$none = array( 'app' => '', 'version' => '', 'zone' => '', 'domain' => '', 'own' => '' );
+		$none = array( 'app' => '', 'version' => '', 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
 		$id   = (string) ( $input['app'] ?? '' );
 
 		if ( '' === $id ) {
@@ -141,7 +150,26 @@ final class AppField {
 			return $why;
 		}
 
-		$out = array( 'app' => $id, 'version' => $version, 'zone' => '', 'domain' => '', 'own' => '' );
+		$out = array( 'app' => $id, 'version' => $version, 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
+
+		if ( AppLicence::paid( $id ) ) {
+			$tier = (string) ( $input['tier'] ?? '' );
+
+			if ( '' === $tier ) {
+				/* translators: %s: app name */
+				return sprintf( __( '%s has a monthly licence. Choose a tier, or no app.', 'beltoft-services' ), (string) $app['name'] );
+			}
+
+			if ( null === AppLicence::tier( $id, $tier, false ) ) {
+				return __( 'Choose one of the listed tiers.', 'beltoft-services' );
+			}
+
+			if ( $check_dns && null === AppLicence::tier( $id, $tier ) ) {
+				return __( 'This tier cannot be bought now. Choose another tier or no app.', 'beltoft-services' );
+			}
+
+			$out['tier'] = $tier;
+		}
 
 		if ( ! empty( $input['own_on'] ) ) {
 			if ( ! empty( $input['domain_on'] ) ) {
@@ -202,6 +230,7 @@ final class AppField {
 			return array(
 				'app'       => $picked['app'],
 				'version'   => $picked['version'],
+				'tier'      => $picked['tier'],
 				'domain_on' => '' !== $picked['domain_on'],
 				'zone'      => $picked['zone'],
 				'sub'       => $picked['sub'],
@@ -215,6 +244,7 @@ final class AppField {
 		return array(
 			'app'       => $get( self::POST_APP ),
 			'version'   => $get( self::POST_VERSION ),
+			'tier'      => $get( self::POST_TIER ),
 			'domain_on' => '' !== $mode && self::MODE_OWN !== $mode,
 			'zone'      => $get( self::POST_ZONE ),
 			'sub'       => $get( self::POST_SUB ),
@@ -330,6 +360,13 @@ final class AppField {
 		echo '<p class="form-row form-row-wide" data-tiles-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
 		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version data-selected="' . esc_attr( $picked['version'] ) . '"></select></span></p>';
 
+		// A paid app's tiers, shown when that app is chosen. The tier line joins the cart when one is picked (checkout) or when the server is added (picker).
+		foreach ( $offer['apps'] as $id => $app ) {
+			if ( AppLicence::paid( (string) $id ) ) {
+				self::print_tiers( (string) $id, (string) $app['name'], (string) $id === $start, $picked['tier'] );
+			}
+		}
+
 		// The domain choice: none, a domain on our name servers (only when the customer has one), or a domain registered elsewhere.
 		echo '<fieldset class="beltoft-services-app__domain" data-app-domain hidden><legend>' . esc_html__( 'Domain (optional)', 'beltoft-services' ) . '</legend>';
 		$choices = array(
@@ -369,6 +406,26 @@ final class AppField {
 	}
 
 	/**
+	 * The tiers of a paid app as radio choices with their price (hidden unless the app is the chosen one; the script shows and hides them).
+	 *
+	 * @param string $id       App id.
+	 * @param string $name     App name.
+	 * @param bool   $shown    Whether the app is the chosen one.
+	 * @param string $selected The tier to start from, or ''.
+	 */
+	private static function print_tiers( string $id, string $name, bool $shown, string $selected ): void {
+		echo '<fieldset class="beltoft-services-app__domain beltoft-services-app__tiers" data-app-tiers="' . esc_attr( $id ) . '"' . ( $shown ? '' : ' hidden' ) . '>';
+		/* translators: %s: app name */
+		echo '<legend>' . esc_html( sprintf( __( '%s tier', 'beltoft-services' ), $name ) ) . '</legend>';
+
+		foreach ( AppLicence::tiers( $id ) as $key => $tier ) {
+			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span><span class="description">' . esc_html( $tier['price'] ) . '</span></label>';
+		}
+
+		echo '</fieldset>';
+	}
+
+	/**
 	 * The smallest plan an app version runs on: what the picker's script compares a plan card to.
 	 *
 	 * @param array<string, mixed> $version Version.
@@ -404,7 +461,16 @@ final class AppField {
 		$offer  = self::offer();
 		$posted = self::posted();
 
-		if ( ! $errors instanceof \WP_Error || array() === $posted || '' === $posted['app'] ) {
+		if ( ! $errors instanceof \WP_Error || array() === $posted ) {
+			return;
+		}
+
+		if ( '' === $posted['app'] ) {
+			// A tier line without an app (the app was dropped after the tier was chosen) is not paid for by mistake.
+			if ( AppLicenceCart::lines() > 0 ) {
+				$errors->add( 'beltoft_services_app', __( 'An app licence is in your cart but no app is chosen. Remove the licence or choose the app.', 'beltoft-services' ) );
+			}
+
 			return;
 		}
 
@@ -413,6 +479,21 @@ final class AppField {
 
 		if ( is_string( $why ) ) {
 			$errors->add( 'beltoft_services_app', $why );
+
+			return;
+		}
+
+		$line = AppLicenceCart::line();
+
+		if ( AppLicence::paid( $why['app'] ) ) {
+			$tier = AppLicence::tier( $why['app'], $why['tier'] );
+
+			// The tier is its own cart line: it must be there once, and be the tier chosen.
+			if ( null === $tier || 1 !== AppLicenceCart::lines() || (int) ( $line['item']['variation_id'] ?? 0 ) !== $tier['variation_id'] ) {
+				$errors->add( 'beltoft_services_app', __( 'The tier is not in your cart. Reload the page and choose the tier again.', 'beltoft-services' ) );
+			}
+		} elseif ( AppLicenceCart::lines() > 0 ) {
+			$errors->add( 'beltoft_services_app', __( 'An app licence is in your cart for another app. Remove it or choose that app.', 'beltoft-services' ) );
 		}
 	}
 
@@ -440,6 +521,11 @@ final class AppField {
 
 		$item->add_meta_data( self::ITEM_APP, $choice['app'], true );
 		$item->add_meta_data( self::ITEM_VERSION, $choice['version'], true );
+
+		if ( '' !== $choice['tier'] ) {
+			$item->add_meta_data( self::ITEM_TIER, $choice['tier'], true );
+		}
+
 		$item->update_meta_data( OsField::ITEM_META, (string) $offer['os'] );
 
 		if ( '' !== $choice['domain'] ) {
@@ -471,6 +557,20 @@ final class AppField {
 	public static function enqueue(): void {
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/app-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-field.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-field.js' ), true );
+		wp_enqueue_script( 'beltoft-services-app-tier', plugins_url( 'assets/app-tier.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/app-tier.js' ), true );
+
+		// Only checkout keeps a cart line in step; the picker has no cart line to change before the server is added.
+		if ( function_exists( 'is_checkout' ) && is_checkout() && function_exists( 'wp_create_nonce' ) ) {
+			wp_localize_script(
+				'beltoft-services-app-tier',
+				'beltoftServicesAppTier',
+				array(
+					'url'    => \WC_AJAX::get_endpoint( AppLicenceCart::AJAX ),
+					'nonce'  => wp_create_nonce( AppLicenceCart::NONCE ),
+					'failed' => __( 'The tier could not be changed. Reload checkout and try again.', 'beltoft-services' ),
+				)
+			);
+		}
 	}
 
 	// -- Hand-over to the resource ---------------------------------------------------------------
@@ -523,6 +623,7 @@ final class AppField {
 				array(
 					'app'       => $id,
 					'version'   => (string) $item->get_meta( self::ITEM_VERSION, true ),
+					'tier'      => (string) $item->get_meta( self::ITEM_TIER, true ),
 					'domain_on' => '' !== (string) $item->get_meta( self::ITEM_DOMAIN, true ),
 					'zone'      => (string) $item->get_meta( self::ITEM_ZONE, true ),
 					'sub'       => self::sub_of( (string) $item->get_meta( self::ITEM_DOMAIN, true ), (string) $item->get_meta( self::ITEM_ZONE, true ) ),
@@ -539,6 +640,11 @@ final class AppField {
 
 			$meta['app_id']          = $choice['app'];
 			$meta['app_version']     = $choice['version'];
+
+			if ( '' !== $choice['tier'] ) {
+				$meta['app_tier'] = $choice['tier'];
+			}
+
 			$meta[ OsField::META ]   = $offer['os'];
 
 			if ( '' !== $choice['domain'] ) {

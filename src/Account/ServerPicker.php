@@ -9,6 +9,8 @@ namespace BeltoftServices\Account;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
+use BeltoftServices\Proxmox\AppLicence;
+use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Proxmox\DiskCart;
 use BeltoftServices\Proxmox\DiskField;
@@ -187,6 +189,7 @@ final class ServerPicker {
 			'os'        => $get( OsField::POST_KEY ),
 			'app'       => $get( AppField::POST_APP ),
 			'version'   => $get( AppField::POST_VERSION ),
+			'tier'      => $get( AppField::POST_TIER ),
 			'domain_on' => '' !== $get( AppField::POST_DOMAIN ) && AppField::MODE_OWN !== $get( AppField::POST_DOMAIN ) ? '1' : '',
 			'own_on'    => AppField::MODE_OWN === $get( AppField::POST_DOMAIN ) ? '1' : '',
 			'own'       => $get( AppField::POST_OWN ),
@@ -272,6 +275,7 @@ final class ServerPicker {
 				array(
 					'app'       => $values['app'],
 					'version'   => $values['version'],
+					'tier'      => $values['tier'],
 					'domain_on' => '' !== $values['domain_on'],
 					'zone'      => $values['zone'],
 					'sub'       => $values['sub'],
@@ -286,6 +290,7 @@ final class ServerPicker {
 			} else {
 				$choices['app']       = $app['app'];
 				$choices['version']   = $app['version'];
+				$choices['tier']      = $app['tier'];
 				$choices['zone']      = $app['zone'];
 				$choices['sub']       = '' !== $app['domain'] ? $values['sub'] : '';
 				$choices['domain_on'] = '' !== $app['domain'] ? '1' : '';
@@ -355,8 +360,8 @@ final class ServerPicker {
 
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			// The earlier try's server, and the extra disk that was tied to it.
-			if ( ( $driver && SshKeyField::DRIVER === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) ) {
+			// The earlier try's server, and the extra disk or app licence that was tied to it.
+			if ( ( $driver && SshKeyField::DRIVER === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) || isset( $item[ AppLicence::CART_UID ] ) ) {
 				$old[] = (string) $key;
 			}
 		}
@@ -381,6 +386,12 @@ final class ServerPicker {
 					return true;
 				}
 			);
+
+			// The tier of a paid app is its own line, tied to the server that is in the cart now.
+			if ( '' !== $checked['choices']['app'] && AppLicence::paid( $checked['choices']['app'] ) && ! AppLicenceCart::choose( $checked['choices']['app'], $checked['choices']['tier'] ) ) {
+				return __( 'The app licence could not be added. Please try again.', 'beltoft-services' );
+			}
+
 			$cart->calculate_totals();
 
 			return null;

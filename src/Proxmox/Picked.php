@@ -29,6 +29,7 @@ final class Picked {
 		'os'        => 12,
 		'app'       => 64,
 		'version'   => 64,
+		'tier'      => 64,
 		'domain_on' => 1,
 		'zone'      => 253,
 		'sub'       => 120,

@@ -211,6 +211,11 @@ final class AppInstall {
 		if ( ! empty( $app['needs_email'] ) && ! is_email( $email ) ) {
 			return StepResult::fail( 'The account email is unavailable for app setup' );
 		}
+		// A paid app needs its licence: the job carries the tier and the tier's limits so the recipe can register it with the vendor.
+		$licence = AppLicence::paid( $id ) ? AppLicence::for_install( $resource ) : null;
+		if ( $licence instanceof StepResult ) {
+			return $licence;
+		}
 		$request = (string) $resource->get( 'app_request' );
 		if ( '' === $request ) {
 			$request = wp_generate_uuid4();
@@ -239,6 +244,10 @@ final class AppInstall {
 		if ( ! empty( $app['needs_email'] ) ) {
 			$job['email'] = $email;
 		}
+		if ( is_array( $licence ) ) {
+			$job['tier'] = $licence['tier'];
+			$job['licence'] = $licence['licence'];
+		}
 		$base = '/nodes/' . rawurlencode( $record['node'] ) . '/qemu/' . $record['vmid'];
 		$reply = $client->request( 'POST', $base . '/agent/file-write', array( 'file' => Apps::JOB, 'content' => wp_json_encode( $job ) ) );
 		if ( is_wp_error( $reply ) ) {
@@ -256,6 +265,8 @@ final class AppInstall {
 		}
 		return StepResult::done( array(
 			'app_state' => 'installing',
+			'app_tier' => is_array( $licence ) ? $licence['tier'] : null,
+			'app_licence_wait_until' => null,
 			'app_recipe' => (int) $app['recipe'],
 			'app_upstream' => (string) $app['upstream'],
 			'app_started_at' => time(),
