@@ -778,7 +778,7 @@ final class ProxmoxJobs {
 			return;
 		}
 
-		// One read feeds both the abuse check (operator) and the customer usage alerts.
+		// One read feeds the abuse check (operator), the customer usage alerts and the traffic alerts.
 		if ( 'off' !== (string) Settings::get( 'abuse_mode' ) ) {
 			self::check_abuse( $resource, $samples );
 		}
@@ -786,11 +786,13 @@ final class ProxmoxJobs {
 		if ( 'on' === Settings::get( 'monitor_alerts' ) ) {
 			Monitor::usage( $resource, $samples );
 		}
+
+		Traffic::check( $resource, $samples );
 	}
 
-	/** Whether the hourly usage read is needed: the abuse check or the customer alerts use it. */
+	/** Whether the hourly usage read is needed: the abuse check, the customer alerts or the traffic alerts use it. */
 	private static function reads_usage(): bool {
-		return 'off' !== (string) Settings::get( 'abuse_mode' ) || 'on' === Settings::get( 'monitor_alerts' );
+		return 'off' !== (string) Settings::get( 'abuse_mode' ) || 'on' === Settings::get( 'monitor_alerts' ) || 'on' === Settings::get( 'traffic_alerts' );
 	}
 
 	/**

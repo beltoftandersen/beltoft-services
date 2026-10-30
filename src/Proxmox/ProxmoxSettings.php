@@ -34,6 +34,10 @@ final class ProxmoxSettings {
 		'monitor_cpu_percent' => array( 50, 100 ),
 		'monitor_cpu_hours' => array( 1, 24 ),
 		'monitor_cooldown_days' => array( 1, 90 ),
+		'traffic_alert_percent' => array( 1, 100 ),
+		'traffic_alert_mbit' => array( 1, 100000 ),
+		'traffic_jump_factor' => array( 2, 1000 ),
+		'traffic_jump_floor_mbit' => array( 1, 100000 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
 		'disk_reserve_gb' => array( 0, 10000 ),
 		'disk_promise_percent' => array( 1, 100 ),
@@ -308,6 +312,41 @@ final class ProxmoxSettings {
 			'min' => self::RANGES['monitor_cooldown_days'][0],
 			'label' => __( 'Days between two CPU emails for one server', 'beltoft-services' ),
 		);
+		$fields['traffic_alerts'] = $base + array(
+			'type' => 'select',
+			'default' => 'on',
+			'options' => array( 'off' => __( 'Off', 'beltoft-services' ), 'on' => __( 'On', 'beltoft-services' ) ),
+			'label' => __( 'Outgoing traffic alerts', 'beltoft-services' ),
+			'desc' => __( 'Email the alert address when a server sends a lot of traffic for 30 minutes, or ten times its usual hour. The customer is not told and nothing is restricted. Uses the hourly usage reading: no extra call to Proxmox. An alert comes once and re-arms after six quiet hours.', 'beltoft-services' ),
+		);
+		$fields['traffic_alert_percent'] = $base + array(
+			'type' => 'number',
+			'default' => 70,
+			'min' => self::RANGES['traffic_alert_percent'][0],
+			'label' => __( 'Sustained traffic, percent of the plan speed', 'beltoft-services' ),
+			'desc' => __( 'Alert when the outgoing traffic averages above this share of the plan speed limit for 30 minutes.', 'beltoft-services' ),
+		);
+		$fields['traffic_alert_mbit'] = $base + array(
+			'type' => 'number',
+			'default' => 300,
+			'min' => self::RANGES['traffic_alert_mbit'][0],
+			'label' => __( 'Sustained traffic without a plan speed, Mbit/s', 'beltoft-services' ),
+			'desc' => __( 'Used for servers whose plan has no speed limit.', 'beltoft-services' ),
+		);
+		$fields['traffic_jump_factor'] = $base + array(
+			'type' => 'number',
+			'default' => 10,
+			'min' => self::RANGES['traffic_jump_factor'][0],
+			'label' => __( 'Traffic jump, times the usual hour', 'beltoft-services' ),
+			'desc' => __( 'Alert when the last hour is this many times the median hour of the last 7 days. Judged once a day of hours is known.', 'beltoft-services' ),
+		);
+		$fields['traffic_jump_floor_mbit'] = $base + array(
+			'type' => 'number',
+			'default' => 20,
+			'min' => self::RANGES['traffic_jump_floor_mbit'][0],
+			'label' => __( 'Traffic jump floor, Mbit/s', 'beltoft-services' ),
+			'desc' => __( 'A jump under this hourly average is never alerted, so a quiet server going from 0.1 to 2 Mbit/s stays silent.', 'beltoft-services' ),
+		);
 
 		return $fields;
 	}
@@ -334,6 +373,9 @@ final class ProxmoxSettings {
 		}
 		if ( array_key_exists( 'monitor_alerts', $value ) && ! in_array( $value['monitor_alerts'], array( 'off', 'on' ), true ) ) {
 			$value['monitor_alerts'] = 'off';
+		}
+		if ( array_key_exists( 'traffic_alerts', $value ) && ! in_array( $value['traffic_alerts'], array( 'off', 'on' ), true ) ) {
+			$value['traffic_alerts'] = 'off';
 		}
 
 		// Not usable means not set: it is never replaced by a guess.

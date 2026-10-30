@@ -129,6 +129,37 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin about outgoing traffic volume (sustained or a jump). Information only: nothing was changed.
+	 * The caller keeps the episode state (once per episode, re-armed after six quiet hours).
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $kind     sustained or jump.
+	 * @param string   $measured What was measured.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function traffic( Resource $r, string $kind, string $measured ): bool {
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) ) {
+			return false;
+		}
+
+		$license = $r->license();
+		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$key     = (string) ( $license['license_key'] ?? '' );
+		$lines   = array(
+			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
+			sprintf( 'Resource: %d', $r->id() ),
+			sprintf( 'Driver: %s', $r->get( 'driver' ) ),
+			sprintf( 'Signal: %s', 'jump' === $kind ? 'sudden jump in outgoing traffic' : 'sustained outgoing traffic' ),
+			sprintf( 'Measured: %s', $measured ),
+			'Report only. Nothing was changed and the customer was not told. Volume alone is often legitimate (backups, downloads, a busy site).',
+		);
+
+		return (bool) wp_mail( $to, sprintf( '[%s] High outgoing traffic: %s', $site, self::mask( $key ) ), implode( "\n", $lines ) . "\n" );
+	}
+
+	/**
 	 * Alerts the admin once per hold that a service on breach hold has passed its days and was
 	 * not deleted (deletion is off or report only). The hold's date is stored in meta
 	 * `breach_alerted` under the resource lock, after the mail is attempted.

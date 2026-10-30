@@ -69,6 +69,7 @@ class ProxmoxJobsTest extends TestCase {
 				'abuse_cpu'       => 90,
 				'abuse_hours'     => 1,
 				'monitor_alerts'  => 'off',
+				'traffic_alerts'  => 'off',
 				'host_reserve_gb' => 4,
 				'admin_email'     => 'admin@example.com',
 			)
@@ -437,6 +438,28 @@ class ProxmoxJobsTest extends TestCase {
 		$this->abuse_run();
 		$this->assertCount( 1, $this->mails, 'The same day is not mailed twice.' );
 		$this->assertSame( 2, $this->paths( 'GET', '#rrddata$#' ) );
+	}
+
+	public function test_traffic_alerts_alone_read_a_running_vm_once_and_skip_stopped_ones(): void {
+		$this->settings( array( 'abuse_mode' => 'off', 'monitor_alerts' => 'off', 'traffic_alerts' => 'on' ) );
+		$running = $this->vm( 5000 );
+		$stopped = $this->vm( 5001, 'node-a', 'stopped' );
+		$rows    = array();
+
+		for ( $m = 0; $m < 70; $m++ ) {
+			$rows[] = array( 'time' => 1700000000 - ( 69 - $m ) * 60, 'cpu' => 0.01, 'netout' => 400 * 1000000 / 8 );
+		}
+
+		$this->fake->set_rrd( 5000, $rows );
+		$this->fake->set_rrd( 5001, $rows );
+
+		$this->abuse_run();
+
+		$this->assertSame( 1, $this->paths( 'GET', '#rrddata$#' ), 'One read, for the running VM only.' );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( '] High outgoing traffic: ', $this->mails[0]['subject'] );
+		$this->assertSame( 'ready', Resource::find( $running->id() )->get( 'desired' ), 'Nothing is restricted.' );
+		$this->assertSame( 'ready', Resource::find( $stopped->id() )->get( 'desired' ) );
 	}
 
 	public function test_abuse_pause_mode_desires_paused(): void {
