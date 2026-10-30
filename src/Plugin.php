@@ -86,6 +86,8 @@ final class Plugin {
 
 		Account\Panel::register();
 		Api\Routes::register();
+		Api\Tokens::register();
+		Account\ApiTokens::register();
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );
 		Proxmox\RevealRoute::register();
