@@ -414,6 +414,13 @@ final class PrivateAttach {
 				return StepResult::retry( 0, 'private: the network card has no MAC address yet' );
 			}
 
+			// A server with the dashboard firewall drops everything inbound it does not allow: open the private side.
+			$open = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_private( $record, $again );
+
+			if ( $open instanceof StepResult ) {
+				return $open;
+			}
+
 			$op = array( 'action' => 'attach', 'phase' => 'file', 'rebuild' => false, 'family' => self::family( (string) ( $info['id'] ?? '' ) ) );
 
 			if ( ! $this->r->set( array( self::STATE => 'attaching', self::OP => $op, self::MAC => $mac, self::FAMILY => $op['family'], self::NOTICE => null ) ) ) {
@@ -554,6 +561,12 @@ final class PrivateAttach {
 
 		if ( '' === $mac ) {
 			return StepResult::retry( 0, 'private: the network card has no MAC address yet' );
+		}
+
+		$open = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_private( $record, $v );
+
+		if ( $open instanceof StepResult ) {
+			return $open;
 		}
 
 		// Stored here, not returned: the build keeps what its steps return until it ends.

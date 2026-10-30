@@ -1278,6 +1278,25 @@ final class Firewall {
 	}
 
 	/**
+	 * The rule that keeps the private NIC (net1) open under a DROP inbound policy, added once. Called right after a
+	 * private NIC is attached or put back, so the private network works without waiting for the next apply.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return true|StepResult
+	 */
+	public function ensure_private( array $record, array $v ) {
+		$base  = self::base( $record, $v );
+		$rules = $this->read_list( $base . '/rules' );
+
+		if ( is_wp_error( $rules ) ) {
+			return $this->classify( $rules, 'private' );
+		}
+
+		return $this->add_rule_once( $base, $rules, self::PRIVATE_RULE, array( 'action' => 'ACCEPT', 'type' => 'in', 'iface' => 'net1' ) );
+	}
+
+	/**
 	 * Adds a plugin rule unless one with the same comment is there (the shared helper for the plugin's own rules:
 	 * `bs-sys:<name>` for the system, `bs-db:<name>` for the managed databases). Always enabled.
 	 *

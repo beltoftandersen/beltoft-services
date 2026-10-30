@@ -136,6 +136,12 @@ class PrivateAttachTest extends TestCase {
 		$this->assertStringNotContainsString( 'gateway', $file );
 		$this->assertStringNotContainsString( 'nameservers', $file );
 		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+
+		// The private side is open under a DROP policy (a server with the dashboard firewall).
+		$private = array_values( array_filter( $this->fake->vm( $vmid )['firewall_rules'], static fn( $rule ) => \BeltoftServices\Proxmox\Firewall::PRIVATE_RULE === (string) ( $rule['comment'] ?? '' ) ) );
+		$this->assertCount( 1, $private, 'One bs-sys:private rule.' );
+		$this->assertSame( 'net1', $private[0]['iface'] );
+		$this->assertSame( 'ACCEPT', $private[0]['action'] );
 		$this->assertSame( '10.64.0.2', PrivateNets::address_for_resource( $r->id() ) );
 	}
 
@@ -382,6 +388,8 @@ class PrivateAttachTest extends TestCase {
 		$this->assertSame( PrivateAttach::mac_of( $config['net1'] ), (string) Resource::find( $r->id() )->get( 'private_mac' ) );
 		unset( $mac );
 		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+		$comments = array_map( static fn( $rule ) => (string) ( $rule['comment'] ?? '' ), $this->fake->vm( (int) Resource::find( $r->id() )->get( 'vmid' ) )['firewall_rules'] );
+		$this->assertContains( \BeltoftServices\Proxmox\Firewall::PRIVATE_RULE, $comments, 'The rebuilt server keeps its private side open.' );
 	}
 
 	public function test_a_reinstall_whose_agent_never_answers_still_ends_ready_and_asks_for_attention(): void {
