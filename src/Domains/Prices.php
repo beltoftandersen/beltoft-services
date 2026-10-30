@@ -67,7 +67,7 @@ final class Prices {
 		if ( ! is_string( $raw ) ) { return array(); }
 		$result = array();
 		foreach ( preg_split( '/\r?\n/', $raw ) as $line ) {
-			if ( preg_match( '/^\s*([a-z0-9.-]+)\s*=\s*([1-9][0-9]*)\s*$/i', $line, $match ) ) {
+			if ( preg_match( '/^\s*([a-z0-9.-]+)\s*=\s*([1-9][0-9]*)\s*$/iD', $line, $match ) ) {
 				$result[ strtolower( $match[1] ) ] = (int) $match[2];
 			}
 		}
@@ -102,7 +102,7 @@ final class Prices {
 		if ( ! is_array( $entry ) || empty( $entry['name'] ) ) { return new \WP_Error( 'bad_response', 'A registrar TLD entry has no name.' ); }
 		if ( ( isset( $entry['is_active'] ) && ! $entry['is_active'] ) || ( isset( $entry['status'] ) && 'ACT' !== $entry['status'] ) ) { return null; }
 		$tld = strtolower( ltrim( (string) $entry['name'], '.' ) );
-		if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]*$/', $tld ) ) { return new \WP_Error( 'bad_response', 'A registrar TLD name is invalid.' ); }
+		if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]*$/D', $tld ) ) { return new \WP_Error( 'bad_response', 'A registrar TLD name is invalid.' ); }
 		$prices = $entry['prices'] ?? array();
 		$values = array();
 		foreach ( array( 'create' => 'create_price', 'renew' => 'renew_price', 'transfer' => 'transfer_price' ) as $key => $field ) {

@@ -154,7 +154,7 @@ final class ProxmoxSettings {
 	 * @param string $tag Candidate.
 	 */
 	private static function valid_tag( string $tag ): bool {
-		return 1 === preg_match( '/^[A-Za-z0-9._-]{1,100}$/', $tag );
+		return 1 === preg_match( '/^[A-Za-z0-9._-]{1,100}$/D', $tag );
 	}
 
 	/**

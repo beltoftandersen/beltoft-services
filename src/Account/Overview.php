@@ -907,12 +907,12 @@ final class Overview {
 			return '';
 		}
 
-		if ( 1 === preg_match( '/^Customer took the snapshot "(.*)"$/s', $message, $m ) ) {
+		if ( 1 === preg_match( '/^Customer took the snapshot "(.*)"$/sD', $message, $m ) ) {
 			/* translators: 1: server name, 2: snapshot name */
 			return sprintf( __( '%1$s: snapshot "%2$s" taken', 'beltoft-services' ), $name, $m[1] );
 		}
 
-		if ( 1 === preg_match( '/^Snapshot "(.*)" deleted$/s', $message, $m ) ) {
+		if ( 1 === preg_match( '/^Snapshot "(.*)" deleted$/sD', $message, $m ) ) {
 			/* translators: 1: server name, 2: snapshot name */
 			return sprintf( __( '%1$s: snapshot "%2$s" deleted', 'beltoft-services' ), $name, $m[1] );
 		}

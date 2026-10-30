@@ -86,7 +86,7 @@ final class LinkVm {
 			return self::error( sprintf( 'The product builds on cluster "%1$s", not "%2$s".', (string) ( $plan['cluster'] ?? '' ), $cluster_id ) );
 		}
 
-		if ( '' === $node || ! preg_match( '/^[A-Za-z0-9.\-]+$/', $node ) ) {
+		if ( '' === $node || ! preg_match( '/^[A-Za-z0-9.\-]+$/D', $node ) ) {
 			return self::error( '--node is not a valid node name.' );
 		}
 

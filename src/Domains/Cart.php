@@ -119,7 +119,7 @@ final class Cart {
 
 	/** Registrar transfer codes are short printable ASCII text; anything else is a typing or paste mistake, and the length is bounded. */
 	public static function auth_code_valid( string $code ): bool {
-		return 1 === preg_match( '/^[\x20-\x7E]{6,64}$/', $code );
+		return 1 === preg_match( '/^[\x20-\x7E]{6,64}$/D', $code );
 	}
 
 	/** Is this a renewal, resubscribe or switch line, which carries no new ownership proof? */

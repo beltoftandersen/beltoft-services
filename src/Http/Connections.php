@@ -205,7 +205,7 @@ final class Connections {
 			$name = trim( (string) ( $input[ $key ] ?? '' ) );
 			$name = '' === $name ? $defaults[ $key ] : $name;
 
-			if ( ! preg_match( '/^[A-Za-z0-9-]+$/', $name ) ) {
+			if ( ! preg_match( '/^[A-Za-z0-9-]+$/D', $name ) ) {
 				return new \WP_Error( 'beltoft_services_connection_header', __( 'Header names may contain letters, numbers and dashes only.', 'beltoft-services' ) );
 			}
 
@@ -214,7 +214,7 @@ final class Connections {
 
 		$static = trim( (string) ( $input['header_static'] ?? '' ) );
 
-		if ( '' !== $static && ! preg_match( '/^[A-Za-z0-9-]{1,64}$/', $static ) ) {
+		if ( '' !== $static && ! preg_match( '/^[A-Za-z0-9-]{1,64}$/D', $static ) ) {
 			return new \WP_Error( 'beltoft_services_connection_header', __( 'The header name may contain letters, numbers and dashes only.', 'beltoft-services' ) );
 		}
 
@@ -266,7 +266,7 @@ final class Connections {
 				$value = 'id';
 			}
 
-			if ( '' !== $value && ! preg_match( '/^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/', $value ) ) {
+			if ( '' !== $value && ! preg_match( '/^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/D', $value ) ) {
 				return new \WP_Error( 'beltoft_services_connection_field', __( 'Response fields are dot paths such as data.id.', 'beltoft-services' ) );
 			}
 
@@ -404,7 +404,7 @@ final class Connections {
 			&& isset( $parts['scheme'], $parts['host'] )
 			&& in_array( strtolower( $parts['scheme'] ), array( 'http', 'https' ), true )
 			&& ! isset( $parts['user'] )
-			&& 1 === preg_match( '/^[A-Za-z0-9.:\[\]-]+$/', $parts['host'] )
+			&& 1 === preg_match( '/^[A-Za-z0-9.:\[\]-]+$/D', $parts['host'] )
 			&& 1 !== preg_match( '/[\s\\\\]/', $url );
 	}
 

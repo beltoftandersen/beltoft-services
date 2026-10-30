@@ -772,13 +772,13 @@ class FakeClient implements Client {
 					$value = (string) $value;
 					break;
 				case 'dnsname':
-					if ( 1 !== preg_match( '/^[A-Za-z0-9]([A-Za-z0-9\-.]*[A-Za-z0-9])?$/', (string) $value ) ) {
+					if ( 1 !== preg_match( '/^[A-Za-z0-9]([A-Za-z0-9\-.]*[A-Za-z0-9])?$/D', (string) $value ) ) {
 						return $this->error( 400, 'Parameter verification failed: ' . $name . ': value does not look like a valid DNS name' );
 					}
 					$value = (string) $value;
 					break;
 				case 'size':
-					if ( 1 !== preg_match( '/^\+?\d+(\.\d+)?[KMGT]?$/', (string) $value ) ) {
+					if ( 1 !== preg_match( '/^\+?\d+(\.\d+)?[KMGT]?$/D', (string) $value ) ) {
 						return $this->error( 400, 'Parameter verification failed: ' . $name . ': value does not match the format' );
 					}
 					$value = (string) $value;
@@ -948,19 +948,19 @@ class FakeClient implements Client {
 		$id = (int) $a[1];
 
 		foreach ( array_filter( array_map( 'trim', explode( ',', (string) ( $p['delete'] ?? '' ) ) ) ) as $key ) {
-			if ( isset( $this->state['hold_detach'][ $id ] ) && 1 === preg_match( '/^scsi\d+$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+			if ( isset( $this->state['hold_detach'][ $id ] ) && 1 === preg_match( '/^scsi\d+$/D', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
 				// Hot detach without disk hotplug (modelled): a pending change, the drive stays in the running configuration.
 				$this->state['pending'][ $id ][ $key ] = true;
 				continue;
 			}
-			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/D', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
 				$unused = 0;
 				while ( isset( $this->state['vms'][ $id ]['config'][ 'unused' . $unused ] ) ) {
 					++$unused;
 				}
 				$this->state['vms'][ $id ]['config'][ 'unused' . $unused ] = explode( ',', (string) $this->state['vms'][ $id ]['config'][ $key ] )[0];
 			}
-			if ( 1 === preg_match( '/^unused\d+$/', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
+			if ( 1 === preg_match( '/^unused\d+$/D', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
 				$volid = (string) $this->state['vms'][ $id ]['config'][ $key ];
 				if ( $this->snapshot_references( $id, $volid ) ) {
 					// Modelled, not yet seen live: a volume a snapshot still holds is not destroyed.
@@ -977,7 +977,7 @@ class FakeClient implements Client {
 			if ( in_array( $key, array( 'digest', 'delete' ), true ) || in_array( $key, self::SENSITIVE, true ) ) {
 				continue;
 			}
-			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) && false !== strpos( $value, 'import-from=' ) ) {
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/D', $key ) && is_string( $value ) && false !== strpos( $value, 'import-from=' ) ) {
 				// Importing a template volume into a free slot allocates a new volume (modelled on PVE 9.1.6).
 				$value = $this->import_drive( $id, $key, $value );
 
@@ -985,7 +985,7 @@ class FakeClient implements Client {
 					return $value;
 				}
 			}
-			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) && false === strpos( $value, 'size=' ) ) {
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/D', $key ) && is_string( $value ) && false === strpos( $value, 'size=' ) ) {
 				$volid = explode( ',', $value )[0];
 				foreach ( $this->state['images'] as $images ) {
 					if ( isset( $images[ $volid ] ) ) {
@@ -995,10 +995,10 @@ class FakeClient implements Client {
 				}
 			}
 
-			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/', $key ) && is_string( $value ) ) {
+			if ( 1 === preg_match( '/^scsi(?:[0-9]|[12][0-9]|30)$/D', $key ) && is_string( $value ) ) {
 				// Attaching a volume that sits in an unusedN entry takes it out of that entry (modelled).
 				foreach ( $this->state['vms'][ $id ]['config'] as $other => $held ) {
-					if ( 1 === preg_match( '/^unused\d+$/', (string) $other ) && $held === explode( ',', $value )[0] ) {
+					if ( 1 === preg_match( '/^unused\d+$/D', (string) $other ) && $held === explode( ',', $value )[0] ) {
 						unset( $this->state['vms'][ $id ]['config'][ $other ] );
 					}
 				}
@@ -1041,7 +1041,7 @@ class FakeClient implements Client {
 			}
 		}
 
-		if ( 1 !== preg_match( '/^([A-Za-z0-9._\-]+):0$/', $target, $m ) ) {
+		if ( 1 !== preg_match( '/^([A-Za-z0-9._\-]+):0$/D', $target, $m ) ) {
 			return $this->error( 400, 'Parameter verification failed: ' . $slot . ': invalid format' );
 		}
 
@@ -1193,7 +1193,7 @@ class FakeClient implements Client {
 			return $this->error( 500, 'Modelled: this fake takes absolute sizes only.' );
 		}
 
-		preg_match( '/^(\d+(?:\.\d+)?)([KMGT]?)$/', $p['size'], $n );
+		preg_match( '/^(\d+(?:\.\d+)?)([KMGT]?)$/D', $p['size'], $n );
 		$old = (float) $m[1] * $unit[ $m[2] ];
 		$new = (float) $n[1] * $unit[ $n[2] ];
 
@@ -2081,7 +2081,7 @@ class FakeClient implements Client {
 		if ( isset( $this->state['images'][ $a[1] ][ $volid ] ) ) {
 			return $this->error( 500, 'volume already exists' );
 		}
-		if ( 1 !== preg_match( '/^(\d+)G$/', (string) $p['size'], $size ) ) {
+		if ( 1 !== preg_match( '/^(\d+)G$/D', (string) $p['size'], $size ) ) {
 			return $this->error( 400, 'size must be in GB' );
 		}
 		$this->state['images'][ $a[1] ][ $volid ] = array(
@@ -2151,7 +2151,7 @@ class FakeClient implements Client {
 	 * @param array<string, mixed> $p Parameters.
 	 */
 	private function h_prune( array $a, array $p ) {
-		if ( 1 !== preg_match( '/^keep-daily=(\d+)$/', $p['prune-backups'], $m ) || (int) $m[1] < 1 ) {
+		if ( 1 !== preg_match( '/^keep-daily=(\d+)$/D', $p['prune-backups'], $m ) || (int) $m[1] < 1 ) {
 			return $this->error( 400, 'Parameter verification failed: prune-backups: value does not match the format' );
 		}
 
@@ -2311,19 +2311,19 @@ class FakeClient implements Client {
 		$extra      = array();
 
 		foreach ( $old as $key => $value ) {
-			if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/', (string) $key ) && is_string( $value ) ) {
+			if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/D', (string) $key ) && is_string( $value ) ) {
 				$referenced[ explode( ',', $value )[0] ] = true;
 			}
 		}
 
 		// A drive with backup=0 is not part of the backup: its entry is not restored.
 		foreach ( $new as $key => $value ) {
-			if ( 1 === preg_match( '/^scsi\d+$/', (string) $key ) && is_string( $value ) && false !== strpos( ',' . $value . ',', ',backup=0,' ) ) {
+			if ( 1 === preg_match( '/^scsi\d+$/D', (string) $key ) && is_string( $value ) && false !== strpos( ',' . $value . ',', ',backup=0,' ) ) {
 				unset( $new[ $key ] );
 			}
 		}
 		foreach ( $new as $key => $value ) {
-			if ( 1 === preg_match( '/^(?:scsi\d+|unused\d+)$/', (string) $key ) && is_string( $value ) ) {
+			if ( 1 === preg_match( '/^(?:scsi\d+|unused\d+)$/D', (string) $key ) && is_string( $value ) ) {
 				$referenced[ explode( ',', $value )[0] ] = true;
 			}
 		}
@@ -2336,14 +2336,14 @@ class FakeClient implements Client {
 			}
 		}
 		foreach ( $old as $key => $value ) {
-			if ( 1 === preg_match( '/^unused\d+$/', (string) $key ) ) {
+			if ( 1 === preg_match( '/^unused\d+$/D', (string) $key ) ) {
 				$extra[] = (string) $value;
 			}
 		}
 
 		$slots = array_filter(
 			array_keys( $old ),
-			static fn( $key ) => 1 === preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', (string) $key ) && is_string( $old[ $key ] ) && false !== strpos( ',' . $old[ $key ] . ',', ',backup=0,' )
+			static fn( $key ) => 1 === preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/D', (string) $key ) && is_string( $old[ $key ] ) && false !== strpos( ',' . $old[ $key ] . ',', ',backup=0,' )
 		);
 		natsort( $slots );
 		foreach ( $slots as $key ) {
@@ -2744,7 +2744,7 @@ class FakeClient implements Client {
 		$out = array();
 
 		foreach ( $config as $key => $value ) {
-			if ( 1 !== preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0)$/', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || false !== strpos( explode( ',', $value )[0], 'cloudinit' ) || 'none' === $value ) {
+			if ( 1 !== preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0)$/D', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || false !== strpos( explode( ',', $value )[0], 'cloudinit' ) || 'none' === $value ) {
 				continue;
 			}
 
@@ -2828,7 +2828,7 @@ class FakeClient implements Client {
 
 		$id = (int) $a[1];
 
-		if ( 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9_\-]{0,39}$/', $p['snapname'] ) || 'current' === $p['snapname'] ) {
+		if ( 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9_\-]{0,39}$/D', $p['snapname'] ) || 'current' === $p['snapname'] ) {
 			return $this->error( 400, 'Parameter verification failed: snapname: value does not match the format' );
 		}
 
@@ -2950,7 +2950,7 @@ class FakeClient implements Client {
 				$held   = array();
 
 				foreach ( $config as $key => $value ) {
-					if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/', (string) $key ) && is_string( $value ) ) {
+					if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/D', (string) $key ) && is_string( $value ) ) {
 						$held[ explode( ',', $value )[0] ] = true;
 
 						// The old size comes back (modelled on the live result).
@@ -2967,7 +2967,7 @@ class FakeClient implements Client {
 				$later = array();
 
 				foreach ( $this->state['vms'][ $id ]['config'] as $key => $value ) {
-					if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/', (string) $key ) && is_string( $value ) && false === strpos( ',' . $value . ',', ',media=cdrom,' ) ) {
+					if ( 1 === preg_match( '/^(?:scsi\d+|virtio\d+|sata\d+|ide\d+|efidisk0|tpmstate0|unused\d+)$/D', (string) $key ) && is_string( $value ) && false === strpos( ',' . $value . ',', ',media=cdrom,' ) ) {
 						$volid = explode( ',', $value )[0];
 
 						if ( ! isset( $held[ $volid ] ) ) {

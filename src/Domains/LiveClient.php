@@ -35,7 +35,7 @@ class LiveClient implements Client {
 		if ( in_array( $code, array( 'transport', 'bad_response' ), true ) ) { return true; }
 		$data = $error->get_error_data();
 		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
-		if ( 0 === $status && 1 === preg_match( '/^http_(\d{3})$/', $code, $match ) ) { $status = (int) $match[1]; }
+		if ( 0 === $status && 1 === preg_match( '/^http_(\d{3})$/D', $code, $match ) ) { $status = (int) $match[1]; }
 		return 408 === $status || 429 === $status || $status >= 500;
 	}
 
@@ -45,7 +45,7 @@ class LiveClient implements Client {
 
 	public function request( string $method, string $path, array $body = array(), array $query = array() ): array|\WP_Error {
 		$method = strtoupper( $method );
-		if ( ! in_array( $method, array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ), true ) || ! preg_match( '#^/[A-Za-z0-9/_.,-]+$#', $path ) ) {
+		if ( ! in_array( $method, array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ), true ) || ! preg_match( '#^/[A-Za-z0-9/_.,-]+$#D', $path ) ) {
 			return new \WP_Error( 'bad_request', 'Invalid registrar method or path.' );
 		}
 		$token = $this->token();

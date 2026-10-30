@@ -108,7 +108,7 @@ final class DiskSteps {
 			}
 			$occupied = array();
 			foreach ( array_keys( $config ) as $key ) {
-				if ( preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', (string) $key ) ) {
+				if ( preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/D', (string) $key ) ) {
 					$occupied[ $key ] = true;
 				}
 			}
@@ -158,7 +158,7 @@ final class DiskSteps {
 	/** The scsi1..30 entry of a VM configuration that refers to a volume, or null. */
 	public static function holds( array $config, string $volid ): ?array {
 		foreach ( $config as $slot => $value ) {
-			if ( preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', (string) $slot ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
+			if ( preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/D', (string) $slot ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
 				return array( 'slot' => $slot, 'value' => $value );
 			}
 		}
@@ -491,7 +491,7 @@ final class DiskSteps {
 			}
 			$marker = (array) $this->r->get( 'detached' );
 			$slot   = (string) ( $marker['slot'] ?? $this->r->get( 'slot' ) );
-			if ( 1 !== preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', $slot ) ) {
+			if ( 1 !== preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/D', $slot ) ) {
 				return StepResult::fail( 'The disk slot is not known.' );
 			}
 			if ( isset( $config[ $slot ] ) ) {
@@ -546,7 +546,7 @@ final class DiskSteps {
 		if ( ! $attached ) {
 			$held = false;
 			foreach ( $config as $key => $value ) {
-				if ( 1 === preg_match( '/^unused\d+$/', (string) $key ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
+				if ( 1 === preg_match( '/^unused\d+$/D', (string) $key ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
 					$held = true;
 				}
 			}
@@ -554,7 +554,7 @@ final class DiskSteps {
 				return StepResult::fail( 'The disk volume ' . $volid . ' is not in the restored server configuration.' );
 			}
 			$slot = (string) $this->r->get( 'slot' );
-			if ( 1 !== preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', $slot ) ) {
+			if ( 1 !== preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/D', $slot ) ) {
 				return StepResult::fail( 'The disk slot is not known.' );
 			}
 			if ( isset( $config[ $slot ] ) ) {
@@ -708,7 +708,7 @@ final class DiskSteps {
 		}
 		$unused = null;
 		foreach ( $config as $slot => $value ) {
-			if ( preg_match( '/^unused\d+$/', (string) $slot ) && $value === $volid ) {
+			if ( preg_match( '/^unused\d+$/D', (string) $slot ) && $value === $volid ) {
 				$unused = $slot;
 			}
 		}
@@ -723,7 +723,7 @@ final class DiskSteps {
 			return $this->classify( $config, 'disk removal verify' );
 		}
 		foreach ( $config as $slot => $value ) {
-			if ( preg_match( '/^(?:scsi(?:[1-9]|[12][0-9]|30)|unused\d+)$/', (string) $slot ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
+			if ( preg_match( '/^(?:scsi(?:[1-9]|[12][0-9]|30)|unused\d+)$/D', (string) $slot ) && is_string( $value ) && explode( ',', $value )[0] === $volid ) {
 				return StepResult::retry( 60, 'The named disk volume is still in the server configuration.' );
 			}
 		}

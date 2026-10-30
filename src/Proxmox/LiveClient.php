@@ -109,7 +109,7 @@ class LiveClient implements Client {
 
 		$token_id = isset( $cluster['token_id'] ) ? (string) $cluster['token_id'] : '';
 
-		if ( 1 !== preg_match( '/^[^@!\s=]+@[^@!\s=]+![^@!\s=]+$/', $token_id ) ) {
+		if ( 1 !== preg_match( '/^[^@!\s=]+@[^@!\s=]+![^@!\s=]+$/D', $token_id ) ) {
 			throw new \InvalidArgumentException( 'The Proxmox token id must look like USER@REALM!TOKENID.' );
 		}
 

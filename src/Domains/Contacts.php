@@ -94,7 +94,7 @@ final class Contacts {
 		}
 		$full_street = $street;
 		$number = '';
-		if ( preg_match( '/^(.*?)[,\s]+(\d+\S*)$/u', $street, $match ) ) { $street = trim( $match[1] ); $number = $match[2]; }
+		if ( preg_match( '/^(.*?)[,\s]+(\d+\S*)$/uD', $street, $match ) ) { $street = trim( $match[1] ); $number = $match[2]; }
 		$calling = WC()->countries->get_country_calling_code( $country );
 		$calling = is_array( $calling ) ? (string) reset( $calling ) : (string) $calling;
 		$calling = '+' . ltrim( $calling, '+' );

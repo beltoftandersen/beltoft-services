@@ -349,7 +349,7 @@ final class PrivateNets {
 
 	/** A strict private /28, aligned to 16 addresses. */
 	private static function network( string $cidr ): ?array {
-		if ( ! preg_match( '#^([0-9.]+)/28$#', $cidr, $m ) || false === filter_var( $m[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+		if ( ! preg_match( '#^([0-9.]+)/28$#D', $cidr, $m ) || false === filter_var( $m[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			return null;
 		}
 		$ip = (int) sprintf( '%u', ip2long( $m[1] ) );

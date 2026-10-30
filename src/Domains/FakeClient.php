@@ -59,7 +59,7 @@ class FakeClient implements Client {
 			update_option( self::OPTION, $state, false );
 			return $domain;
 		}
-		if ( preg_match( '#^/domains/(\d+)(/renew|/authcode)?$#', $path, $match ) ) {
+		if ( preg_match( '#^/domains/(\d+)(/renew|/authcode)?$#D', $path, $match ) ) {
 			foreach ( $state['domains'] as $name => $domain ) {
 				if ( (int) $domain['id'] !== (int) $match[1] ) { continue; }
 				if ( 'GET' === $method && '/authcode' === ( $match[2] ?? '' ) ) { return array( 'auth_code' => 'FAKE-CODE-' . $domain['id'] ); }

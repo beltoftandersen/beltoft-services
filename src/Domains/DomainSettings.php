@@ -85,7 +85,7 @@ final class DomainSettings {
 	}
 
 	public static function save_account(): void {
-		if ( ! current_user_can( 'manage_woocommerce' ) ) { wp_die( esc_html__( 'Not allowed.', 'beltoft-services' ), '', array( 'response' => 403 ) ); }
+		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Not allowed.', 'beltoft-services' ), '', array( 'response' => 403 ) ); }
 		check_admin_referer( 'beltoft_services_save_domains_account' );
 		$input = array();
 		foreach ( array( 'username', 'password', 'handle', 'dns_key' ) as $key ) {

@@ -44,7 +44,7 @@ final class PostgresProfile {
 	 * through the existing encrypted credential flow after the guest has been initialized.
 	 */
 	public static function connection( string $address, string $database, string $role ): ?string {
-		if ( false === filter_var( $address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! preg_match( '/^[a-z][a-z0-9_]{0,62}$/', $database ) || ! preg_match( '/^[a-z][a-z0-9_]{0,62}$/', $role ) ) {
+		if ( false === filter_var( $address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! preg_match( '/^[a-z][a-z0-9_]{0,62}$/D', $database ) || ! preg_match( '/^[a-z][a-z0-9_]{0,62}$/D', $role ) ) {
 			return null;
 		}
 		return 'postgresql://' . $role . ':PASSWORD@' . $address . ':5432/' . $database . '?sslmode=require';

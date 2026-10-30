@@ -63,7 +63,7 @@ final class Resource {
 
 		$uuid = isset( $meta['uuid'] ) ? (string) $meta['uuid'] : wp_generate_uuid4();
 
-		if ( ! preg_match( '/^[A-Za-z0-9._:-]{1,180}$/', $uuid ) ) {
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{1,180}$/D', $uuid ) ) {
 			return new \WP_Error( 'invalid', 'Invalid resource identifier' );
 		}
 

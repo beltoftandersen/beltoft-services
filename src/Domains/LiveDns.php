@@ -11,7 +11,7 @@ class LiveDns implements Dns {
 
 	public function __construct( string $url, string $key, bool $allowed = false ) {
 		if ( ! $allowed ) { throw new \RuntimeException( 'Live DNS client is disabled.' ); }
-		if ( ! preg_match( '#^http://127\.0\.0\.1:[1-9][0-9]{0,4}/?$#', $url ) || (int) wp_parse_url( $url, PHP_URL_PORT ) > 65535 ) {
+		if ( ! preg_match( '#^http://127\.0\.0\.1:[1-9][0-9]{0,4}/?$#D', $url ) || (int) wp_parse_url( $url, PHP_URL_PORT ) > 65535 ) {
 			throw new \InvalidArgumentException( 'DNS API must use an IPv4 loopback address and port.' );
 		}
 		$this->base = rtrim( $url, '/' ) . '/api/v1/servers/localhost/zones';

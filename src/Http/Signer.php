@@ -117,7 +117,7 @@ final class Signer {
 		$secret = (string) ( $connection['secret'] ?? '' );
 		$parts  = explode( '.', $token );
 
-		if ( '' === $secret || 2 !== count( $parts ) || ! preg_match( '/^[A-Za-z0-9_-]+$/', $parts[0] ) ) {
+		if ( '' === $secret || 2 !== count( $parts ) || ! preg_match( '/^[A-Za-z0-9_-]+$/D', $parts[0] ) ) {
 			return null;
 		}
 

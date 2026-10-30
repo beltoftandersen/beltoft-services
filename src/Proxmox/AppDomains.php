@@ -82,7 +82,7 @@ final class AppDomains {
 			return null;
 		}
 		foreach ( explode( '.', $sub ) as $label ) {
-			if ( 1 !== preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $label ) ) {
+			if ( 1 !== preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) {
 				return null;
 			}
 		}

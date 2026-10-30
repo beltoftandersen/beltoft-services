@@ -258,7 +258,7 @@ final class Clusters {
 	 * @return true|\WP_Error
 	 */
 	public static function save( string $id, array $input ) {
-		if ( ! preg_match( '/^[a-z0-9_-]{1,40}$/', $id ) ) {
+		if ( ! preg_match( '/^[a-z0-9_-]{1,40}$/D', $id ) ) {
 			return self::error( 'id', __( 'A cluster id is 1 to 40 characters: lowercase letters, numbers, dashes and underscores.', 'beltoft-services' ) );
 		}
 
@@ -282,7 +282,7 @@ final class Clusters {
 
 		$token_id = trim( (string) ( $input['token_id'] ?? '' ) );
 
-		if ( ! preg_match( '/^[^\s@!]{1,64}@[A-Za-z0-9._-]{1,64}![A-Za-z0-9._-]{1,64}$/', $token_id ) ) {
+		if ( ! preg_match( '/^[^\s@!]{1,64}@[A-Za-z0-9._-]{1,64}![A-Za-z0-9._-]{1,64}$/D', $token_id ) ) {
 			return self::error( 'token_id', __( 'The token id looks like user@realm!tokenname.', 'beltoft-services' ) );
 		}
 
@@ -333,7 +333,7 @@ final class Clusters {
 		$nodes = array();
 
 		foreach ( preg_split( '/[\s,]+/', (string) ( $input['nodes'] ?? '' ), -1, PREG_SPLIT_NO_EMPTY ) as $node ) {
-			if ( ! preg_match( '/^[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?$/', $node ) ) {
+			if ( ! preg_match( '/^[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?$/D', $node ) ) {
 				return self::error( 'nodes', __( 'Node names contain letters, numbers and dashes only.', 'beltoft-services' ) );
 			}
 
@@ -352,7 +352,7 @@ final class Clusters {
 		) as $key => $name ) {
 			$value = trim( (string) ( $input[ $key ] ?? '' ) );
 
-			if ( ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/', $value ) ) {
+			if ( ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/D', $value ) ) {
 				/* translators: %s: field name, such as "The disk storage". */
 				return self::error( $key, sprintf( __( '%s must be a storage id (letters, numbers, dots, dashes, underscores).', 'beltoft-services' ), $name ) );
 			}
@@ -390,7 +390,7 @@ final class Clusters {
 
 		$pool = trim( (string) ( $input['pool'] ?? '' ) );
 
-		if ( '' !== $pool && ! preg_match( '/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/', $pool ) ) {
+		if ( '' !== $pool && ! preg_match( '/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/D', $pool ) ) {
 			return self::error( 'pool', __( 'The pool id contains letters, numbers, dots, dashes and underscores only.', 'beltoft-services' ) );
 		}
 
@@ -399,7 +399,7 @@ final class Clusters {
 		$boot = trim( (string) ( $input['boot_disk'] ?? '' ) );
 		$boot = '' === $boot ? 'scsi0' : $boot;
 
-		if ( ! preg_match( '/^(scsi|virtio|sata|ide)\d{1,2}$/', $boot ) ) {
+		if ( ! preg_match( '/^(scsi|virtio|sata|ide)\d{1,2}$/D', $boot ) ) {
 			return self::error( 'boot_disk', __( 'The boot disk is a disk slot such as scsi0 or virtio0.', 'beltoft-services' ) );
 		}
 
@@ -469,7 +469,7 @@ final class Clusters {
 
 		$snippet = trim( (string) ( $input['vendor_snippet'] ?? '' ) );
 
-		if ( '' !== $snippet && ( ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*:snippets\/[A-Za-z0-9._\/-]+$/', $snippet ) || false !== strpos( $snippet, '..' ) ) ) {
+		if ( '' !== $snippet && ( ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*:snippets\/[A-Za-z0-9._\/-]+$/D', $snippet ) || false !== strpos( $snippet, '..' ) ) ) {
 			return self::error( 'vendor_snippet', __( 'The vendor snippet is a volume such as local:snippets/vendor.yaml.', 'beltoft-services' ) );
 		}
 
@@ -484,12 +484,12 @@ final class Clusters {
 		}
 		if ( $apps_form || array_key_exists( 'apps_enabled', $input ) ) {
 			$ids = is_array( $input['apps_enabled'] ?? null ) ? $input['apps_enabled'] : array();
-			$clean['apps_enabled'] = array_values( array_unique( array_filter( array_map( 'strval', $ids ), static fn( $v ) => (bool) preg_match( '/^[a-z0-9-]+$/', $v ) ) ) );
+			$clean['apps_enabled'] = array_values( array_unique( array_filter( array_map( 'strval', $ids ), static fn( $v ) => (bool) preg_match( '/^[a-z0-9-]+$/D', $v ) ) ) );
 		}
 		if ( isset( $input['template_families_text'] ) && is_string( $input['template_families_text'] ) ) {
 			$input['template_families'] = array();
 			foreach ( preg_split( '/\R/', $input['template_families_text'] ) as $line ) {
-				if ( 1 === preg_match( '/^\s*(\d+)\s*=\s*(\S+)\s*$/', $line, $m ) ) {
+				if ( 1 === preg_match( '/^\s*(\d+)\s*=\s*(\S+)\s*$/D', $line, $m ) ) {
 					$input['template_families'][ (int) $m[1] ] = strtolower( $m[2] );
 				}
 			}
@@ -497,7 +497,7 @@ final class Clusters {
 		if ( array_key_exists( 'template_families', $input ) && is_array( $input['template_families'] ) ) {
 			$families = array();
 			foreach ( array_intersect_key( $input['template_families'], $templates ) as $vmid => $family ) {
-				if ( is_string( $family ) && preg_match( '/^[a-z0-9]+(?:[-.][a-z0-9]+)*$/', $family ) ) {
+				if ( is_string( $family ) && preg_match( '/^[a-z0-9]+(?:[-.][a-z0-9]+)*$/D', $family ) ) {
 					$families[ (int) $vmid ] = $family;
 				}
 			}
@@ -506,7 +506,7 @@ final class Clusters {
 
 		$backup = trim( (string) ( $input['backup_storage'] ?? '' ) );
 
-		if ( '' !== $backup && ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/', $backup ) ) {
+		if ( '' !== $backup && ! preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/D', $backup ) ) {
 			return self::error( 'backup_storage', __( 'The backup storage must be a storage id (letters, numbers, dots, dashes, underscores), or empty to turn backups off.', 'beltoft-services' ) );
 		}
 
@@ -603,7 +603,7 @@ final class Clusters {
 			&& ! isset( $parts['query'] )
 			&& ! isset( $parts['fragment'] )
 			&& in_array( $parts['path'] ?? '', array( '', '/' ), true )
-			&& 1 === preg_match( '/^[A-Za-z0-9.\-\[\]:]+$/', $parts['host'] );
+			&& 1 === preg_match( '/^[A-Za-z0-9.\-\[\]:]+$/D', $parts['host'] );
 
 		if ( ! $ok ) {
 			return self::error( 'api_url', __( 'The API address must be https, such as https://pve.example.invalid:8006, with no path.', 'beltoft-services' ) );

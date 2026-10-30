@@ -291,7 +291,7 @@ final class ZoneFile {
 	 * @param string $word Word.
 	 */
 	private static function seconds( string $word ): ?int {
-		if ( ! preg_match( '/^(\d+[smhdw]?)+$/i', $word ) ) {
+		if ( ! preg_match( '/^(\d+[smhdw]?)+$/iD', $word ) ) {
 			return null;
 		}
 

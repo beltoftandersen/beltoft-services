@@ -18,7 +18,7 @@ final class Apps {
 		$ids = array();
 		foreach ( (array) glob( BELTOFT_SERVICES_PATH . 'apps/*/app.json' ) as $file ) {
 			$id = basename( dirname( $file ) );
-			if ( preg_match( '/^[a-z0-9-]+$/', $id ) ) {
+			if ( preg_match( '/^[a-z0-9-]+$/D', $id ) ) {
 				$ids[] = $id;
 			}
 		}
@@ -28,7 +28,7 @@ final class Apps {
 
 	/** The app's definition, without choosing a version. */
 	public static function definition( string $id ): ?array {
-		if ( ! preg_match( '/^[a-z0-9-]+$/', $id ) ) {
+		if ( ! preg_match( '/^[a-z0-9-]+$/D', $id ) ) {
 			return null;
 		}
 		$file = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json';
@@ -192,14 +192,14 @@ final class Apps {
 		if ( '' === $eol ) {
 			return $label;
 		}
-		$time = strtotime( $eol . ( 1 === preg_match( '/^\d{4}-\d{2}$/', $eol ) ? '-01' : '' ) );
+		$time = strtotime( $eol . ( 1 === preg_match( '/^\d{4}-\d{2}$/D', $eol ) ? '-01' : '' ) );
 		/* translators: 1: version label, 2: end of support month and year */
 		return false === $time ? $label : sprintf( __( '%1$s (supported until %2$s)', 'beltoft-services' ), $label, wp_date( 'F Y', $time ) );
 	}
 
 	/** A definition and its exact script checksum, or null when invalid. */
 	public static function version( string $id, string $version_id, bool $existing = false ): ?array {
-		if ( ! preg_match( '/^[a-z0-9-]+$/', $id ) || ! preg_match( '/^[a-zA-Z0-9.-]+$/', $version_id ) ) {
+		if ( ! preg_match( '/^[a-z0-9-]+$/D', $id ) || ! preg_match( '/^[a-zA-Z0-9.-]+$/D', $version_id ) ) {
 			return null;
 		}
 		$file = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json';
@@ -216,7 +216,7 @@ final class Apps {
 				return null;
 			}
 			$script = (string) ( $version['install'] ?? '' );
-			if ( ! preg_match( '/^[a-zA-Z0-9.-]+\.script$/', $script ) || ! is_array( $version['os'] ?? null ) || ! is_array( $data['min'] ?? null ) ) {
+			if ( ! preg_match( '/^[a-zA-Z0-9.-]+\.script$/D', $script ) || ! is_array( $version['os'] ?? null ) || ! is_array( $data['min'] ?? null ) ) {
 				return null;
 			}
 			$path = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $version_id . '/' . $script;

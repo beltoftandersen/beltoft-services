@@ -171,7 +171,7 @@ final class AppReinstall {
 
 		$options = self::plain_options( $r );
 
-		if ( null === $options || ! isset( $options['choices'][ $raw ] ) || 1 !== preg_match( '#^([a-z0-9-]+)/([a-zA-Z0-9.-]+)$#', $raw, $m ) ) {
+		if ( null === $options || ! isset( $options['choices'][ $raw ] ) || 1 !== preg_match( '#^([a-z0-9-]+)/([a-zA-Z0-9.-]+)$#D', $raw, $m ) ) {
 			return false;
 		}
 

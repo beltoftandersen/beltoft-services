@@ -155,7 +155,7 @@ final class AppStatus {
 		}
 		$out = array();
 		foreach ( $keys as $key ) {
-			if ( ! is_string( $key ) || ! preg_match( '/^[a-z_]+$/', $key ) || ! is_string( $data[ $key ] ?? null ) || strlen( $data[ $key ] ) > 256 || preg_match( '/[\x00-\x1f\x7f]/', $data[ $key ] ) ) {
+			if ( ! is_string( $key ) || ! preg_match( '/^[a-z_]+$/D', $key ) || ! is_string( $data[ $key ] ?? null ) || strlen( $data[ $key ] ) > 256 || preg_match( '/[\x00-\x1f\x7f]/', $data[ $key ] ) ) {
 				return null;
 			}
 			$out[ $key ] = $data[ $key ];

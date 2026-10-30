@@ -450,7 +450,7 @@ final class Provision {
 
 		$boot = (string) $this->cluster['boot_disk'];
 
-		if ( 1 !== preg_match( '/^(?:scsi|virtio|sata|ide)\\d+$/', $boot ) ) {
+		if ( 1 !== preg_match( '/^(?:scsi|virtio|sata|ide)\\d+$/D', $boot ) ) {
 			return StepResult::fail( 'wipe: the cluster boot disk "' . mb_substr( sanitize_text_field( $boot ), 0, 20 ) . '" is not a drive name' );
 		}
 
@@ -536,7 +536,7 @@ final class Provision {
 				$unused = '';
 
 				foreach ( self::NO_BOOT === $old ? array() : $config as $key => $value ) {
-					if ( 1 === preg_match( '/^unused\d+$/', (string) $key ) && is_string( $value ) && explode( ',', $value, 2 )[0] === $old ) {
+					if ( 1 === preg_match( '/^unused\d+$/D', (string) $key ) && is_string( $value ) && explode( ',', $value, 2 )[0] === $old ) {
 						$unused = (string) $key;
 						break;
 					}
@@ -623,7 +623,7 @@ final class Provision {
 
 		$drive = is_array( $config ) && isset( $config[ $boot ] ) && is_string( $config[ $boot ] ) ? explode( ',', $config[ $boot ], 2 )[0] : '';
 
-		if ( 1 !== preg_match( '#^[A-Za-z0-9._\\-]+:[A-Za-z0-9._\\-/]+$#', $drive ) ) {
+		if ( 1 !== preg_match( '#^[A-Za-z0-9._\\-]+:[A-Za-z0-9._\\-/]+$#D', $drive ) ) {
 			return StepResult::fail( sprintf( 'wipe: template %1$d has no boot disk %2$s to import', $this->plan['template'], $boot ) );
 		}
 

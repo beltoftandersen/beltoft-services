@@ -299,7 +299,7 @@ final class Firewall {
 	private static function clean_source( $source ): ?string {
 		$source = is_string( $source ) ? trim( $source ) : '';
 
-		if ( 1 !== preg_match( '#^(\d{1,3}(?:\.\d{1,3}){3})(?:/(\d{1,2}))?$#', $source, $m ) ) {
+		if ( 1 !== preg_match( '#^(\d{1,3}(?:\.\d{1,3}){3})(?:/(\d{1,2}))?$#D', $source, $m ) ) {
 			return null;
 		}
 
@@ -463,7 +463,7 @@ final class Firewall {
 	 * @param mixed $value Raw value.
 	 */
 	private static function port( $value ): ?int {
-		if ( ( ! is_int( $value ) && ! ( is_string( $value ) && 1 === preg_match( '/^\d{1,5}$/', trim( $value ) ) ) ) ) {
+		if ( ( ! is_int( $value ) && ! ( is_string( $value ) && 1 === preg_match( '/^\d{1,5}$/D', trim( $value ) ) ) ) ) {
 			return null;
 		}
 

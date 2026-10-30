@@ -125,7 +125,7 @@ final class Tiles {
 		 * @param string $family Family, or empty.
 		 */
 		$slug = apply_filters( 'beltoft_services_os_logo', $slug, $vmid, $label, $family );
-		$slug = is_string( $slug ) && 1 === preg_match( '/^[a-z0-9-]+$/', $slug ) ? $slug : '';
+		$slug = is_string( $slug ) && 1 === preg_match( '/^[a-z0-9-]+$/D', $slug ) ? $slug : '';
 		$svg  = '' === $slug ? '' : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/' . $slug . '.svg' );
 
 		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
@@ -140,7 +140,7 @@ final class Tiles {
 	public static function app_logo( array $app ): string {
 		$id   = (string) ( $app['id'] ?? '' );
 		$name = (string) ( $app['logo'] ?? '' );
-		$svg  = 1 === preg_match( '/^[a-z0-9-]+$/', $id ) && 1 === preg_match( '/^[a-zA-Z0-9._-]+\.svg$/', $name ) ? self::svg( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $name ) : '';
+		$svg  = 1 === preg_match( '/^[a-z0-9-]+$/D', $id ) && 1 === preg_match( '/^[a-zA-Z0-9._-]+\.svg$/D', $name ) ? self::svg( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $name ) : '';
 
 		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
 	}
@@ -156,7 +156,7 @@ final class Tiles {
 	public static function os_parts( string $label ): array {
 		$label = trim( $label );
 
-		if ( 1 === preg_match( '/^(.+?)\s+(\d[\w.]*(?:\s+LTS)?)$/i', $label, $m ) ) {
+		if ( 1 === preg_match( '/^(.+?)\s+(\d[\w.]*(?:\s+LTS)?)$/iD', $label, $m ) ) {
 			/* translators: %s: version of an operating system, such as 24.04 */
 			return array( $m[1], sprintf( __( 'Version %s', 'beltoft-services' ), $m[2] ) );
 		}
@@ -277,7 +277,7 @@ final class Tiles {
 	 */
 	private static function print_attributes( array $attrs ): void {
 		foreach ( $attrs as $name => $value ) {
-			if ( 1 === preg_match( '/^data-[a-z0-9-]+$/', (string) $name ) ) {
+			if ( 1 === preg_match( '/^data-[a-z0-9-]+$/D', (string) $name ) ) {
 				echo ' ' . esc_attr( (string) $name ) . '="' . esc_attr( (string) $value ) . '"';
 			}
 		}

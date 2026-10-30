@@ -761,7 +761,7 @@ final class HttpDriver implements Driver, Opens {
 				$literal = substr( $template, $i, $end - $i + 1 );
 				$inner   = substr( $template, $i + 1, $end - $i - 1 );
 
-				if ( preg_match( '/^\{([a-z_]+)\}$/', $inner, $m ) && array_key_exists( $m[1], $values ) ) {
+				if ( preg_match( '/^\{([a-z_]+)\}$/D', $inner, $m ) && array_key_exists( $m[1], $values ) ) {
 					$out .= self::json( $values[ $m[1] ] );
 				} else {
 					$out .= preg_replace_callback(

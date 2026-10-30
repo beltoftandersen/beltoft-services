@@ -53,7 +53,7 @@ final class Commands {
 		$disk_license = Licenses::find( (int) ( $args[0] ?? 0 ) );
 		$server_license = Licenses::find( (int) ( $args[1] ?? 0 ) );
 		$slot = (string) ( $args[2] ?? '' );
-		if ( ! $disk_license || ! $server_license || ! preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/', $slot ) ) {
+		if ( ! $disk_license || ! $server_license || ! preg_match( '/^scsi(?:[1-9]|[12][0-9]|30)$/D', $slot ) ) {
 			\WP_CLI::error( 'Give a disk license, a server license and scsi1 through scsi30.' );
 		}
 		$driver = Product::driver_for( (int) $disk_license['product_id'] );

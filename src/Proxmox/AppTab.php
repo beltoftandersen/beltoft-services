@@ -161,7 +161,7 @@ final class AppTab {
 			return '';
 		}
 
-		$path = isset( $open['path'] ) && is_string( $open['path'] ) && 1 === preg_match( '#^/[A-Za-z0-9/_.-]*$#', $open['path'] ) ? $open['path'] : '/';
+		$path = isset( $open['path'] ) && is_string( $open['path'] ) && 1 === preg_match( '#^/[A-Za-z0-9/_.-]*$#D', $open['path'] ) ? $open['path'] : '/';
 		$port = isset( $open['port'] ) ? (int) $open['port'] : 0;
 
 		return ( '' !== $domain && 0 === $port ? 'https://' : 'http://' ) . $host . ( $port > 0 ? ':' . $port : '' ) . $path;

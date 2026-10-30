@@ -139,6 +139,27 @@ class PluginTest extends TestCase {
 		$this->assertSame( array(), $found, 'Types or syntax that need PHP 8.2 or later.' );
 	}
 
+	public function test_anchored_checks_do_not_let_a_trailing_newline_through(): void {
+		$this->assertNull( \BeltoftServices\Proxmox\AppDomains::sub( "a\n.b" ) );
+		$this->assertSame( 'shop', \BeltoftServices\Proxmox\AppDomains::sub( 'shop' ) );
+
+		$found = array();
+		$files = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( BELTOFT_SERVICES_PATH . 'src', \FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $files as $file ) {
+			if ( 'php' !== $file->getExtension() ) {
+				continue;
+			}
+			// A check like '/^[a-z]+$/' also passes "abc\n": the D modifier makes $ the very end.
+			preg_match_all( "/preg_match\\(\\s*'([#\\/~])\\^[^']*\\$\\1([a-zA-Z]*)'/", (string) file_get_contents( $file->getPathname() ), $m, PREG_SET_ORDER );
+			foreach ( $m as $one ) {
+				if ( false === strpos( $one[2], 'D' ) ) {
+					$found[] = basename( $file->getPathname() ) . ': ' . $one[0];
+				}
+			}
+		}
+		$this->assertSame( array(), $found );
+	}
+
 	public function test_run_jobs_and_http_recorder_work(): void {
 		$this->respond_with(
 			static function () {

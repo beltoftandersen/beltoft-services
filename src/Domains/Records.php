@@ -26,15 +26,15 @@ final class Records {
 				if ( 'TXT' === $type ) {
 					preg_match_all( '/"((?:[^"\\\\]|\\\\.)*)"/', $content, $m );
 					$row['value'] = stripcslashes( implode( '', $m[1] ) );
-				} elseif ( 'MX' === $type && preg_match( '/^(\d+)\s+(\S+)$/', $content, $m ) ) {
+				} elseif ( 'MX' === $type && preg_match( '/^(\d+)\s+(\S+)$/D', $content, $m ) ) {
 					$row['priority'] = (int) $m[1];
 					$row['value'] = rtrim( $m[2], '.' );
-				} elseif ( 'SRV' === $type && preg_match( '/^(\d+)\s+(\d+)\s+(\d+)\s+(\S+)$/', $content, $m ) ) {
+				} elseif ( 'SRV' === $type && preg_match( '/^(\d+)\s+(\d+)\s+(\d+)\s+(\S+)$/D', $content, $m ) ) {
 					$row['priority'] = (int) $m[1];
 					$row['weight'] = (int) $m[2];
 					$row['port'] = (int) $m[3];
 					$row['value'] = rtrim( $m[4], '.' );
-				} elseif ( 'CAA' === $type && preg_match( '/^(\d+)\s+(\S+)\s+"((?:[^"\\\\]|\\\\.)*)"$/', $content, $m ) ) {
+				} elseif ( 'CAA' === $type && preg_match( '/^(\d+)\s+(\S+)\s+"((?:[^"\\\\]|\\\\.)*)"$/D', $content, $m ) ) {
 					$row['flag'] = (int) $m[1];
 					$row['tag'] = strtolower( $m[2] );
 					$row['value'] = stripcslashes( $m[3] );
@@ -98,7 +98,7 @@ final class Records {
 			array_shift( $labels );
 		}
 		foreach ( $labels as $label ) {
-			if ( ! preg_match( '/^_?[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?$/', $label ) ) { return new \WP_Error( 'bad_name', __( 'A record name is invalid.', 'beltoft-services' ) ); }
+			if ( ! preg_match( '/^_?[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_name', __( 'A record name is invalid.', 'beltoft-services' ) ); }
 		}
 		return $name . '.';
 	}
@@ -249,7 +249,7 @@ final class Records {
 				if ( preg_match_all( '/"((?:[^"\\\\]|\\\\.)*)"/', $content, $m ) ) { return stripcslashes( implode( '', $m[1] ) ); }
 				return $content;
 			case 'CAA':
-				if ( preg_match( '/^(\d+)\s+(\S+)\s+"((?:[^"\\\\]|\\\\.)*)"$/', $content, $m ) ) { return (int) $m[1] . ' ' . strtolower( $m[2] ) . ' ' . stripcslashes( $m[3] ); }
+				if ( preg_match( '/^(\d+)\s+(\S+)\s+"((?:[^"\\\\]|\\\\.)*)"$/D', $content, $m ) ) { return (int) $m[1] . ' ' . strtolower( $m[2] ) . ' ' . stripcslashes( $m[3] ); }
 				return $content;
 		}
 		return $content;

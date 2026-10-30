@@ -64,7 +64,7 @@ final class Search {
 		$ascii = strtolower( $ascii );
 		if ( strlen( $ascii ) > 253 || ! str_contains( $ascii, '.' ) ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
 		foreach ( explode( '.', $ascii ) as $label ) {
-			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $label ) ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
+			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
 		}
 		return $ascii;
 	}
@@ -143,7 +143,7 @@ final class Search {
 		} else {
 			$ascii = function_exists( 'idn_to_ascii' ) ? idn_to_ascii( $input, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) : false;
 			$label = false === $ascii ? '' : strtolower( $ascii );
-			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $label ) ) { return new \WP_Error( 'bad_domain', 'A valid domain label is required.' ); }
+			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', 'A valid domain label is required.' ); }
 		}
 		$domains = array();
 		$check = array();

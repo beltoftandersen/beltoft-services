@@ -2,6 +2,8 @@
 /** Customer domain and DNS actions. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Alerts;
+
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
@@ -82,7 +84,17 @@ final class Actions {
 				if ( is_wp_error( $cleared ) ) { return StepResult::retry( 60, 'DNSSEC could not be removed.' ); }
 				$r->set( array( 'dnssec_keys' => array() ) );
 			}
+			$made = false;
 			if ( 'ours' === $mode ) {
+				// As at registration (Zone::prepare): a zone that is already on our name servers and was not made for
+				// this domain is never taken over without staff review.
+				$existing = Clients::dns()->zone( $name );
+				if ( is_wp_error( $existing ) ) { return StepResult::retry( 60, 'DNS zone could not be checked.' ); }
+				if ( null !== $existing && ! $r->get( 'zone_claimed' ) && 'dns' !== Zone::owner( $r ) ) {
+					if ( ! $r->get( 'zone_conflict_alerted' ) ) { Alerts::admin( $r, 'Name servers were not switched: an existing DNS zone needs staff review.' ); $r->set( array( 'zone_conflict_alerted' => true ) ); }
+					return StepResult::fail( 'An existing zone needs staff review.' );
+				}
+				$made = null === $existing;
 				$zone = Zone::ensure( $r, true, false );
 				if ( ! $zone->is_done() ) { return $zone; }
 				$keys = (array) ( $zone->meta()['dnssec_keys'] ?? array() );
@@ -97,7 +109,7 @@ final class Actions {
 				if ( is_wp_error( $ds ) ) { return StepResult::retry( 60, 'DNSSEC could not be published.' ); }
 			}
 			Security::notify( $r, 'ns_changed' );
-			return StepResult::done( array( 'ns_mode' => $mode, 'nameservers' => $hosts, 'dnssec_keys' => $keys ) );
+			return StepResult::done( array( 'ns_mode' => $mode, 'nameservers' => $hosts, 'dnssec_keys' => $keys ) + ( $made ? array( 'zone_claimed' => true ) : array() ) );
 		}
 		$locked = 'lock' === $action;
 		$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'is_locked' => $locked ) );

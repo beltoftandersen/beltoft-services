@@ -119,7 +119,7 @@ final class ServerName {
 		$name = strtolower( (string) preg_replace( '/[ _]/', '-', $name ) );
 
 		// A host name label: also refuses control characters, line breaks, tags, dots and non-ASCII letters.
-		return 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $name ) ? $name : null;
+		return 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $name ) ? $name : null;
 	}
 
 	/**

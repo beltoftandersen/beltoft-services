@@ -107,7 +107,7 @@ final class SshKeyField {
 
 		$known = array_merge( array( 'ssh-ed25519', 'ssh-rsa' ), array_map( static fn( $curve ) => 'ecdsa-sha2-' . $curve, array_keys( self::ECDSA ) ) );
 
-		if ( ! in_array( $type, $known, true ) || ! preg_match( '#^[A-Za-z0-9+/]+={0,2}$#', $encoded ) ) {
+		if ( ! in_array( $type, $known, true ) || ! preg_match( '#^[A-Za-z0-9+/]+={0,2}$#D', $encoded ) ) {
 			return null;
 		}
 

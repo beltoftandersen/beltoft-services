@@ -342,7 +342,7 @@ final class Snapshots {
 	 * @return array<string, mixed>|null
 	 */
 	public static function entry( Resource $r, $id ): ?array {
-		if ( ! is_string( $id ) || 1 !== preg_match( '/^[a-f0-9]{8}$/', $id ) ) {
+		if ( ! is_string( $id ) || 1 !== preg_match( '/^[a-f0-9]{8}$/D', $id ) ) {
 			return null;
 		}
 
@@ -509,7 +509,7 @@ final class Snapshots {
 		$out = array();
 
 		foreach ( $config as $key => $value ) {
-			if ( 1 !== preg_match( '/^(?:scsi|virtio|sata|ide)\d+$|^(?:efidisk0|tpmstate0)$/', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || false !== strpos( explode( ',', $value )[0], 'cloudinit' ) || 'none' === $value ) {
+			if ( 1 !== preg_match( '/^(?:scsi|virtio|sata|ide)\d+$|^(?:efidisk0|tpmstate0)$/D', (string) $key ) || ! is_string( $value ) || false !== strpos( ',' . $value . ',', ',media=cdrom,' ) || false !== strpos( explode( ',', $value )[0], 'cloudinit' ) || 'none' === $value ) {
 				continue;
 			}
 
@@ -1383,7 +1383,7 @@ final class Snapshots {
 		}
 
 		foreach ( array_keys( $remote ) as $name ) {
-			if ( 1 === preg_match( '/^bs[a-f0-9]{10}$/', (string) $name ) && ! isset( $known[ $name ] ) ) {
+			if ( 1 === preg_match( '/^bs[a-f0-9]{10}$/D', (string) $name ) && ! isset( $known[ $name ] ) ) {
 				Alerts::admin( $this->r, 'The server has a snapshot named ' . $name . ' that is not in the plugin\'s list. It was left alone.' );
 			}
 		}

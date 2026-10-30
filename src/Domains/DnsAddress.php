@@ -46,7 +46,7 @@ final class DnsAddress {
 	/** Every public address of a host, canonical and not capped: what a comparison against our own addresses must see. */
 	public static function all_public_ips( string $host ): array {
 		$host = strtolower( rtrim( trim( $host ), '.' ) );
-		if ( '' === $host || strlen( $host ) > 253 || ! preg_match( '/^[a-z0-9_]([a-z0-9_-]{0,62})(\.[a-z0-9_]([a-z0-9_-]{0,62}))*$/', $host ) ) { return array(); }
+		if ( '' === $host || strlen( $host ) > 253 || ! preg_match( '/^[a-z0-9_]([a-z0-9_-]{0,62})(\.[a-z0-9_]([a-z0-9_-]{0,62}))*$/D', $host ) ) { return array(); }
 		/** Tests: a non-null array of IPs replaces the system lookup for this host. */
 		$found = apply_filters( 'beltoft_services_dns_resolve', null, $host );
 		if ( ! is_array( $found ) ) {
