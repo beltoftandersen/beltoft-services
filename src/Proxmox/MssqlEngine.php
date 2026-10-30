@@ -12,7 +12,7 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Microsoft's Linux container image, edition Express (free for production use), on the engine's own template.
+ * Microsoft's mssql-server package (Linux), edition Express (free for production use), installed natively in the engine's own template.
  * The customer accepts Microsoft's terms at checkout (DbTermsField). The plan's `major` is the SQL Server version (2025). Express limits (Microsoft, "Editions and supported features of SQL Server 2025"): 50 GB per database, about 1.4 GB of memory for
  * the database cache, up to 4 cores; the plans start at 4 GB of memory because SQL Server needs 2 GB to start.
  */
@@ -82,7 +82,7 @@ final class MssqlEngine implements DbEngine, DbEngineTerms {
 	}
 
 	/**
-	 * The memory SQL Server may use in all (the container's `MSSQL_MEMORY_LIMIT_MB`): three quarters of the plan.
+	 * The memory SQL Server may use in all (`memory.memorylimitmb` of mssql-conf): three quarters of the plan.
 	 */
 	public function init_fields( Resource $r ): array {
 		$mb = (int) ( ( (array) $r->get( 'plan' ) )['memory_mb'] ?? 0 );
