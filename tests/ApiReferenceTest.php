@@ -219,6 +219,131 @@ final class ApiReferenceTest extends TestCase {
 		}
 	}
 
+	private function full(): string {
+		return do_shortcode( '[' . Reference::SHORTCODE . ' layout="full"]' );
+	}
+
+	public function test_the_default_layout_is_unchanged_and_full_is_opt_in(): void {
+		$default = do_shortcode( '[' . Reference::SHORTCODE . ']' );
+		$full    = $this->full();
+
+		$this->assertStringContainsString( 'class="beltoft-services-apiref"', $default );
+		$this->assertStringNotContainsString( 'bsdocs', $default );
+		$this->assertStringContainsString( 'class="bsdocs"', $full );
+		$this->assertStringNotContainsString( 'class="beltoft-services-apiref"', $full );
+		$this->assertTrue( wp_style_is( Reference::HANDLE . '-full', 'enqueued' ) );
+		$this->assertTrue( wp_script_is( Reference::HANDLE . '-full', 'enqueued' ) );
+		$this->assertStringContainsString( 'class="bsdocs"', Reference::html( 'full' ) );
+		$this->assertStringNotContainsString( 'bsdocs', do_shortcode( '[' . Reference::SHORTCODE . ' layout="nonsense"]' ) );
+	}
+
+	public function test_full_layout_has_a_breakout_root_and_the_band(): void {
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/api-reference-full.css' );
+
+		$this->assertStringContainsString( 'width: 100vw', $css );
+		$this->assertStringContainsString( 'margin-left: calc(50% - 50vw)', $css );
+		$this->assertStringContainsString( 'overflow-x: clip', $css );
+		$this->assertStringContainsString( '--bsdocs-offset: var(--apiref-offset, 72px)', $css );
+		$this->assertStringContainsString( 'grid-template-columns: 260px', $css );
+		$this->assertStringContainsString( '.bsdocs__content::before', $css );
+		$this->assertStringContainsString( 'prefers-reduced-motion', $css );
+		$this->assertStringContainsString( 'font-family: ui-monospace', $css );
+		$this->assertStringContainsString( '!important', $css );
+	}
+
+	public function test_full_layout_has_a_sidebar_with_search_and_every_path_in_the_nav(): void {
+		$html = $this->full();
+		$doc  = json_decode( (string) wp_json_encode( OpenApi::document() ), true );
+
+		$this->assertStringContainsString( 'data-bsdocs-search', $html );
+		$this->assertStringContainsString( 'data-bsdocs-empty', $html );
+		$this->assertStringContainsString( 'data-bsdocs-jump', $html );
+		$this->assertStringContainsString( 'href="#api-intro"', $html );
+		$this->assertStringContainsString( 'href="#api-authentication"', $html );
+		$this->assertStringContainsString( 'href="#api-errors"', $html );
+		$this->assertStringContainsString( 'href="#use-with-claude"', $html );
+		$this->assertStringContainsString( '<h2>API reference</h2>', $html );
+		$this->assertStringNotContainsString( '<h1', $html );
+
+		foreach ( $doc['paths'] as $path => $methods ) {
+			foreach ( array_keys( $methods ) as $method ) {
+				$this->assertStringContainsString( 'title="' . esc_attr( strtoupper( $method ) . ' ' . $path ) . '"', $html, $path );
+				$this->assertStringContainsString( 'data-path="' . esc_attr( $path ) . '"', $html, $path );
+			}
+		}
+
+		$this->assertMatchesRegularExpression( '/data-search="get \/resources [^"]*list_services/', $html, 'Search text has method, path, summary and tools.' );
+	}
+
+	public function test_full_layout_has_four_languages_for_every_endpoint(): void {
+		$html = $this->full();
+		$ops  = Reference::operations();
+
+		$this->assertSame( array( 'curl', 'php', 'python', 'js' ), array_keys( Reference::languages() ) );
+
+		foreach ( array( 'curl', 'php', 'python', 'js' ) as $lang ) {
+			$this->assertGreaterThanOrEqual( count( $ops ), substr_count( $html, 'data-lang="' . $lang . '"' ), $lang );
+			$this->assertStringContainsString( 'data-bsdocs-lang="' . $lang . '"', $html );
+		}
+
+		foreach ( Reference::groups( $ops ) as $group ) {
+			foreach ( $group['ops'] as $op ) {
+				$this->assertSame( array( 'curl', 'php', 'python', 'js' ), array_keys( $op['samples'] ), $op['path'] );
+				$this->assertStringContainsString( 'curl_init( ', $op['samples']['php'] );
+				$this->assertStringContainsString( 'requests.' . strtolower( $op['method'] ) . '(', $op['samples']['python'] );
+				$this->assertStringContainsString( 'await fetch(', $op['samples']['js'] );
+				$this->assertStringNotContainsString( '{id}', $op['samples']['js'], $op['path'] );
+			}
+		}
+
+		$this->assertStringContainsString( 'CURLOPT_USERPWD', $html );
+		$this->assertStringContainsString( 'auth=(&quot;USERNAME&quot;, &quot;TOKEN&quot;)', $html );
+		$this->assertStringContainsString( 'btoa(&quot;USERNAME:TOKEN&quot;)', $html );
+		$this->assertStringContainsString( '200 OK', $html );
+		$this->assertStringContainsString( 'aria-label="Copy the PHP example for GET /resources"', $html );
+	}
+
+	public function test_samples_send_the_json_body_when_needed(): void {
+		$put = null;
+
+		foreach ( Reference::groups( Reference::operations() )['dns']['ops'] as $op ) {
+			if ( 'PUT' === $op['method'] ) {
+				$put = $op;
+			}
+		}
+
+		$this->assertStringContainsString( "CURLOPT_CUSTOMREQUEST => 'PUT'", $put['samples']['php'] );
+		$this->assertStringContainsString( 'Content-Type: application/json', $put['samples']['php'] );
+		$this->assertStringContainsString( "'records' => array(", $put['samples']['php'] );
+		$this->assertStringContainsString( 'json={', $put['samples']['python'] );
+		$this->assertStringContainsString( '"records": [', $put['samples']['python'] );
+		$this->assertStringNotContainsString( 'true', $put['samples']['python'] );
+		$this->assertStringContainsString( 'body: JSON.stringify({', $put['samples']['js'] );
+		$this->assertStringContainsString( 'method: "PUT"', $put['samples']['js'] );
+	}
+
+	public function test_full_layout_leaves_out_mcp_when_off_and_keeps_rules(): void {
+		$this->settings( array( 'mcp_enabled' => 0 ) );
+
+		$html = $this->full();
+
+		$this->assertStringNotContainsString( 'Add custom connector', $html );
+		$this->assertStringNotContainsString( 'use-with-claude', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+
+		foreach ( array( 'templates/api-reference-full.php', 'assets/api-reference-full.js', 'assets/api-reference-full.css' ) as $file ) {
+			$text = (string) file_get_contents( BELTOFT_SERVICES_PATH . $file );
+			$this->assertStringNotContainsString( "\u{2014}", $text, $file );
+			$this->assertStringNotContainsString( 'border-radius', $text, $file );
+		}
+
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/api-reference-full.css' );
+
+		foreach ( array( 'box-shadow', 'gradient', 'animation', 'transition' ) as $needle ) {
+			$this->assertStringNotContainsString( $needle, $css, $needle );
+		}
+	}
+
 	public function test_the_setting_exists_and_keeps_only_a_url(): void {
 		$this->assertArrayHasKey( 'api_docs_url', \BeltoftServices\Settings::fields() );
 
