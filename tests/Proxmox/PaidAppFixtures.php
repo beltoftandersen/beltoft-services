@@ -79,4 +79,36 @@ trait PaidAppFixtures {
 
 		return array_map( static fn( $v ) => wc_get_product( $v->get_id() ), $out );
 	}
+
+	/**
+	 * The pay-as-you-go siblings of tiers: same parent, same tier key, Billing "Pay as you go", price 0, meta billing = usage
+	 * (the way the shop sells a pay-as-you-go plan). A tier left out of $keys has none.
+	 *
+	 * @param array<string, \WC_Product_Variation> $tiers From tier_product().
+	 * @param string[]                              $keys  Tier keys that get one (all when empty).
+	 * @return array<string, \WC_Product_Variation> By tier key.
+	 */
+	protected function usage_siblings( array $tiers, array $keys = array() ): array {
+		$out = array();
+
+		foreach ( $tiers as $key => $monthly ) {
+			if ( array() !== $keys && ! in_array( $key, $keys, true ) ) {
+				continue;
+			}
+
+			$v = new \WC_Product_Variation();
+			$v->set_parent_id( $monthly->get_parent_id() );
+			$v->set_attributes( array( 'tier' => ucfirst( $key ), 'billing' => 'Pay as you go' ) );
+			$v->set_regular_price( '0' );
+			$v->set_status( 'publish' );
+			$v->update_meta_data( \BeltoftServices\Usage\Rates::META_BILLING, 'usage' );
+			$v->update_meta_data( Product::META_PLAN . 'tier', $key );
+			$v->save();
+			$out[ $key ] = wc_get_product( $v->get_id() );
+		}
+
+		\WC_Product_Variable::sync( (int) reset( $tiers )->get_parent_id() );
+
+		return $out;
+	}
 }

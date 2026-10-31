@@ -188,6 +188,34 @@ final class Routes {
 		$args = self::clean_args( $request['args'] );
 
 		/**
+		 * An action that needs something bought first (a reinstall to a paid app) answers with the checkout address
+		 * instead of being queued. Asked before the refusal filter, which refuses the action until the purchase is made.
+		 *
+		 * @param string|\WP_Error     $url      '' to carry on; an address to send the customer to; an error to refuse (its message is for the customer).
+		 * @param Resource             $resource Resource.
+		 * @param string               $action   Action name.
+		 * @param array<string, string> $args     Cleaned arguments.
+		 */
+		$redirect = apply_filters( 'beltoft_services_action_redirect', '', $resource, $action, $args );
+
+		if ( $redirect instanceof \WP_Error ) {
+			$data   = $redirect->get_error_data();
+			$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422;
+
+			return self::error( $redirect->get_error_code(), $redirect->get_error_message(), $status );
+		}
+
+		if ( is_string( $redirect ) && '' !== $redirect ) {
+			return new \WP_REST_Response(
+				array(
+					'redirect' => $redirect,
+					'message'  => __( 'This app has a licence. Taking you to checkout; the server is reinstalled when the licence is paid.', 'beltoft-services' ),
+				),
+				200
+			);
+		}
+
+		/**
 		 * A driver's refusal of an action that is offered but whose arguments are not acceptable
 		 * (a missing confirmation, an invalid key), answered at once instead of by a background job.
 		 *
