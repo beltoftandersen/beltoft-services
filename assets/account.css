@@ -748,8 +748,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-oauth__choice strong { display: block; margin-bottom: 2px; color: var(--navy, #1d2327); font-size: 16px; }
 .beltoft-services-oauth__secret { font-size: 14px; color: var(--ink-soft, #50575e); }
 .beltoft-services-oauth__buttons { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 16px; }
-.beltoft-services-oauth .beltoft-services-oauth__allow { background: var(--navy, #1d2327); color: #fff; border: 0; border-radius: 0; padding: 12px 28px; font-weight: 600; cursor: pointer; }
-.beltoft-services-oauth .beltoft-services-oauth__cancel { background: transparent; color: var(--navy, #1d2327); border: 1px solid var(--navy, #1d2327); border-radius: 0; padding: 11px 24px; font-weight: 600; cursor: pointer; }
+.beltoft-services-oauth .beltoft-services-oauth__allow { background: var(--navy, #1d2327); color: #fff; border: 0; padding: 12px 28px; font-weight: 600; cursor: pointer; }
+.beltoft-services-oauth .beltoft-services-oauth__cancel { background: transparent; color: var(--navy, #1d2327); border: 1px solid var(--navy, #1d2327); padding: 11px 24px; font-weight: 600; cursor: pointer; }
 .beltoft-services-oauth__foot { margin: 0; font-size: 14px; color: var(--ink-soft, #50575e); }
 @media (max-width: 600px) {
 	.beltoft-services-oauth { margin: 32px auto 64px; }
