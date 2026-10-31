@@ -57,7 +57,9 @@ final class AppOdooTest extends TestCase {
 		$this->assertStringContainsString( 'list_db = False', $script );
 		$this->assertStringContainsString( 'dbfilter = ^odoo$', $script );
 		$this->assertStringContainsString( '127.0.0.1:8069:8069', $script );
-		$this->assertStringNotContainsString( '0.0.0.0', $script );
+		// The port is published on the VM's own 127.0.0.1 only; 0.0.0.0 may only appear as Odoo's address inside its container.
+		$this->assertStringNotContainsString( '"0.0.0.0:', $script );
+		$this->assertDoesNotMatchRegularExpression( '/^\s*-\s*"?8069:8069/m', $script );
 		$this->assertDoesNotMatchRegularExpression( '/\becho\b[^\n]*(key|password)/i', $script );
 		$this->assertDoesNotMatchRegularExpression( '/docker (?:compose )?run[^\n]* -e /', $script );
 		$this->assertStringNotContainsString( '5678', $script );
@@ -83,5 +85,11 @@ final class AppOdooTest extends TestCase {
 			$this->assertStringContainsString( $needle, $text, $needle );
 		}
 		$this->assertStringContainsString( 'odoo.com/documentation/20.0/administration/on_premise/deploy.html', Apps::current( 'odoo' )['docs_url'] );
+	}
+
+	public function test_odoo_listens_on_every_address_inside_its_container(): void {
+		// Odoo 20 binds to 127.0.0.1 by default, which Docker's port mapping cannot reach; the port is published on the VM's 127.0.0.1 only.
+		$this->assertStringContainsString( 'http_interface = 0.0.0.0', $this->script() );
+		$this->assertStringContainsString( '"127.0.0.1:8069:8069"', $this->script() );
 	}
 }

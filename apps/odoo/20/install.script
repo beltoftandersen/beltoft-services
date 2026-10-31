@@ -120,7 +120,7 @@ YAML
   gid=$(cd "$app" && docker compose run --rm --no-deps -T --entrypoint id odoo -g)
   [[ "$uid" =~ ^[0-9]+$ ]]
   [[ "$gid" =~ ^[0-9]+$ ]]
-  printf '[options]\nadmin_passwd = %s\ndb_name = odoo\ndbfilter = ^odoo$\nlist_db = False\nproxy_mode = True\nworkers = 0\n' "$(jq -er '.master_password' "$secrets/odoo.json")" > "$app/config/odoo.conf"
+  printf '[options]\nadmin_passwd = %s\ndb_name = odoo\ndbfilter = ^odoo$\nlist_db = False\nproxy_mode = True\nworkers = 0\nhttp_interface = 0.0.0.0\n' "$(jq -er '.master_password' "$secrets/odoo.json")" > "$app/config/odoo.conf"
   chown "$uid:$gid" "$app/config/odoo.conf"
   chmod 0400 "$app/config/odoo.conf"
   (cd "$app" && timeout 300 docker compose up -d postgres)
