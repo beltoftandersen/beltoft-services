@@ -258,9 +258,38 @@ final class BackupField {
 		}
 
 		$target = $with ? $server['with'] : $server['without'];
-		$item   = $server['item'];
-		$qty    = max( 1, (int) ( $item['quantity'] ?? 1 ) );
-		$data   = array_diff_key( $item, array_flip( self::CART_KEYS ) );
+		$added  = self::replace_line( $cart, $server, $target );
+
+		if ( ! $added ) {
+
+			return array(
+				'ok'           => false,
+				'with'         => $server['has'],
+				'variation_id' => $server['variation']->get_id(),
+			);
+		}
+
+		return array(
+			'ok'           => true,
+			'with'         => $with,
+			'variation_id' => $target->get_id(),
+		);
+	}
+
+	/**
+	 * Replaces the cart line of $server (cart_server() shape: key, item, variation) with $target, the same product's
+	 * other variation. Quantity and other item data are kept. When the add is refused (stock, say) the first item is
+	 * put back. Totals are recalculated.
+	 *
+	 * @param \WC_Cart             $cart   Cart.
+	 * @param array<string, mixed> $server Key, item and variation of the line.
+	 * @param \WC_Product_Variation $target Variation to swap to.
+	 * @return bool Whether the target is in the cart.
+	 */
+	public static function replace_line( \WC_Cart $cart, array $server, \WC_Product_Variation $target ): bool {
+		$item = $server['item'];
+		$qty  = max( 1, (int) ( $item['quantity'] ?? 1 ) );
+		$data = array_diff_key( $item, array_flip( self::CART_KEYS ) );
 
 		$added = DiskField::during_server_swap( static function () use ( $cart, $server, $item, $qty, $target, $data ): bool {
 			$cart->remove_cart_item( $server['key'] );
@@ -278,20 +307,7 @@ final class BackupField {
 		} );
 		$cart->calculate_totals();
 
-		if ( ! $added ) {
-
-			return array(
-				'ok'           => false,
-				'with'         => $server['has'],
-				'variation_id' => $server['variation']->get_id(),
-			);
-		}
-
-		return array(
-			'ok'           => true,
-			'with'         => $with,
-			'variation_id' => $target->get_id(),
-		);
+		return $added;
 	}
 
 	/**

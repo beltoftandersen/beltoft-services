@@ -109,6 +109,12 @@ final class DbPicker {
 				}
 
 				$numbers = Product::plan( $product->get_id(), $variation->get_id() );
+
+				// The public IP twin of a plan is chosen at checkout: each plan is listed once.
+				if ( \BeltoftServices\Proxmox\DbIp::plan_wants( $numbers ) ) {
+					continue;
+				}
+
 				$days    = max( 0, (int) ( $numbers['backup_days'] ?? 0 ) );
 
 				$plans[ $variation->get_id() ] = array(
