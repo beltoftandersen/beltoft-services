@@ -70,7 +70,7 @@ final class Tokens {
 	/**
 	 * Actions a token can never run.
 	 */
-	private const BLOCKED_ACTION = '#(delete|remove|destroy|restore|rollback|reinstall|transfer|reveal|ssh_key|cancel|password)#';
+	private const BLOCKED_ACTION = '#(delete|remove|destroy|restore|rollback|reinstall|transfer|reveal|ssh_key|cancel|password|fw_reset|policy)#';
 
 	/**
 	 * Can a token reach this route (after the host, as WP_REST_Request::get_route() gives it)?
