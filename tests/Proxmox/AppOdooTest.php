@@ -22,12 +22,12 @@ final class AppOdooTest extends TestCase {
 		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'apps/odoo/logo.svg' );
 	}
 
-	public function test_the_minimum_plan_is_performance_and_a_starter_plan_is_refused(): void {
+	public function test_the_minimum_is_the_smallest_plan_and_more_is_recommended_in_the_text(): void {
 		$app = Apps::current( 'odoo' );
-		$this->assertSame( array( 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 40 ), $app['min'] );
-		$this->assertSame( 'performance', $app['min_plan'] );
-		$this->assertNull( Apps::plan_refusal( $app, array( 'cores' => 2, 'memory_mb' => 8192, 'disk_gb' => 60 ) ) );
-		$this->assertSame( 'Odoo needs the Performance plan or larger. Choose a larger plan or no app.', Apps::plan_refusal( $app, array( 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 40 ) ) );
+		$this->assertSame( array( 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 40 ), $app['min'] );
+		$this->assertSame( 'starter', $app['min_plan'] );
+		$this->assertNull( Apps::plan_refusal( $app, array( 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 40 ) ) );
+		$this->assertStringContainsString( 'choose 2 cores and 4 GB of memory or more', $app['getting_started'] );
 	}
 
 	public function test_it_declares_a_domain_www_the_steps_and_the_credential_keys(): void {

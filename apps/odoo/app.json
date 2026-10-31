@@ -3,9 +3,9 @@
   "name": "Odoo",
   "logo": "logo.svg",
   "summary": "Odoo Community 20 with Caddy and PostgreSQL. Optional domain with HTTPS.",
-  "getting_started": "Open your server address and sign in with the email and password shown once. The login and the master password are also stored on the server in /root/.beltoft-app/credentials.json. The master password protects database management; Odoo's database manager is turned off for safety, so it is only needed if you turn it on again in /opt/odoo/config/odoo.conf. Add a domain for HTTPS before real use; without a domain the address is not encrypted. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465 in Odoo's outgoing mail server settings. Backups are your job: because the database manager is off, back up the database with docker compose exec postgres pg_dump from /opt/odoo, and copy the filestore volume (docker volume odoo_odoo-data). Updates are manual: pull a newer image of the same major version and restart. This is Odoo Community, licensed under the LGPL-3.0; Enterprise apps need an Odoo subscription.",
+  "getting_started": "Open your server address and sign in with the email and password shown once. The login and the master password are also stored on the server in /root/.beltoft-app/credentials.json. The master password protects database management; Odoo's database manager is turned off for safety, so it is only needed if you turn it on again in /opt/odoo/config/odoo.conf. Add a domain for HTTPS before real use; without a domain the address is not encrypted. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465 in Odoo's outgoing mail server settings. Backups are your job: because the database manager is off, back up the database with docker compose exec postgres pg_dump from /opt/odoo, and copy the filestore volume (docker volume odoo_odoo-data). Updates are manual: pull a newer image of the same major version and restart. This is Odoo Community, licensed under the LGPL-3.0; Enterprise apps need an Odoo subscription. The smallest plan runs Odoo for one or two users; for more users or several apps, choose 2 cores and 4 GB of memory or more.",
   "needs_email": true,
-  "min": {"cores": 2, "memory_mb": 4096, "disk_gb": 40},
+  "min": {"cores": 1, "memory_mb": 2048, "disk_gb": 40},
   "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}, {"port": 80, "proto": "tcp", "label": "HTTP"}, {"port": 443, "proto": "tcp", "label": "HTTPS"}],
   "minutes": 10,
   "credentials": ["root_email", "root_password", "master_password"],
@@ -15,6 +15,6 @@
   "open": {"path": "/"},
   "docs_url": "https://www.odoo.com/documentation/20.0/administration/on_premise/deploy.html",
   "versions": [
-    {"id": "20", "label": "Odoo 20", "upstream": "20.0", "recipe": 1, "status": "current", "min_plan": "performance", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "95fcdf6e0f37cd8a05da0bf296c432d38c6dfca3dbec749e2b157d757530b6a5", "eol": ""}
+    {"id": "20", "label": "Odoo 20", "upstream": "20.0", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "95fcdf6e0f37cd8a05da0bf296c432d38c6dfca3dbec749e2b157d757530b6a5", "eol": ""}
   ]
 }

@@ -37,7 +37,8 @@ if ( '' !== $customer_name ) {
 }
 
 /* translators: %s: domain name. */
-echo wp_strip_all_tags( sprintf( __( 'Your email domain %s is set up.', 'beltoft-services' ), $mail_domain ) ) . "\n\n";
+echo wp_strip_all_tags( sprintf( __( 'Your email domain %s is set up.', 'beltoft-services' ), $mail_domain ) );
+echo $mail_records ? "\n\n" : ' ' . __( 'The DNS records are in place.', 'beltoft-services' ) . "\n\n";
 
 if ( $mail_records ) {
 	echo __( 'Add these DNS records where the DNS of your domain is hosted. Email works once they are in place, and we check for them every ten minutes.', 'beltoft-services' ) . "\n\n";
@@ -45,20 +46,23 @@ if ( $mail_records ) {
 		echo wp_strip_all_tags( $beltoft_services_row['type'] . ' ' . $beltoft_services_row['name'] . ' ' . ( ! empty( $beltoft_services_row['priority'] ) ? $beltoft_services_row['priority'] . ' ' : '' ) . $beltoft_services_row['value'] ) . "\n";
 	}
 	echo "\n";
-} else {
-	echo __( 'The DNS records are in place. You can add your mailboxes now.', 'beltoft-services' ) . "\n\n";
 }
 
-echo __( 'Add your mailboxes in the Email area. Passwords are never sent by email.', 'beltoft-services' ) . "\n\n";
+echo __( 'Next steps', 'beltoft-services' ) . "\n\n";
+echo '1. ' . __( 'Create your mailboxes in your Email area:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n";
+echo '2. ' . __( 'Show each mailbox password once there and copy it. Passwords are never sent by email.', 'beltoft-services' ) . "\n";
+echo '3. ' . __( 'Add the mailbox to your mail app. Most apps find the settings from the email address.', 'beltoft-services' );
+echo '' !== $mail_guide_url ? ' ' . __( 'Setup guide:', 'beltoft-services' ) . ' ' . esc_url_raw( $mail_guide_url ) . "\n\n" : "\n\n";
+
 if ( '' !== $mail_host ) {
-	/* translators: 1: mail host, 2: IMAP port, 3: mail host, 4: SMTP port. */
-	echo wp_strip_all_tags( sprintf( __( 'If your mail app does not find the settings by itself, enter them by hand. Incoming: IMAP, server %1$s, port %2$d, SSL/TLS. Outgoing: SMTP, server %3$s, port %4$d, SSL/TLS. The user name is the full email address.', 'beltoft-services' ), $mail_host, $mail_imap, $mail_host, $mail_smtp ) ) . "\n\n";
-}
-
-echo __( 'Open your Email area:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
-
-if ( '' !== $mail_guide_url ) {
-	echo __( 'Setup guide for mail programs:', 'beltoft-services' ) . ' ' . esc_url_raw( $mail_guide_url ) . "\n\n";
+	echo __( 'Settings to enter by hand, if your mail app does not find them:', 'beltoft-services' ) . "\n\n";
+	/* translators: 1: mail host, 2: IMAP port. */
+	$beltoft_services_in = sprintf( __( '%1$s, port %2$d, SSL/TLS', 'beltoft-services' ), $mail_host, $mail_imap );
+	/* translators: 1: mail host, 2: SMTP port. */
+	$beltoft_services_out = sprintf( __( '%1$s, port %2$d, SSL/TLS', 'beltoft-services' ), $mail_host, $mail_smtp );
+	echo '- ' . __( 'Incoming mail (IMAP):', 'beltoft-services' ) . ' ' . wp_strip_all_tags( $beltoft_services_in ) . "\n";
+	echo '- ' . __( 'Outgoing mail (SMTP):', 'beltoft-services' ) . ' ' . wp_strip_all_tags( $beltoft_services_out ) . "\n";
+	echo '- ' . __( 'User name:', 'beltoft-services' ) . ' ' . __( 'The full email address', 'beltoft-services' ) . "\n\n";
 }
 
 if ( $additional_content ) {

@@ -85,6 +85,25 @@ final class MailEmailsTest extends MailTestCase {
 		$this->assertStringNotContainsString( "\u{2014}", $plain );
 	}
 
+	public function test_the_ready_email_lists_the_next_steps_and_the_settings_as_a_table(): void {
+		$this->settings( array( 'mail_host' => 'mail.example.net', 'mail_guide_url' => 'https://example.net/email-setup/' ) );
+		$r = $this->mine( 'listed.example' );
+		$email = Emails::get( 'beltoft_services_mail_ready' );
+		$email->trigger( $r );
+		$html  = $email->get_content_html();
+		$plain = $email->get_content_plain();
+
+		$this->assertStringContainsString( '<ol', $html );
+		$this->assertSame( 3, substr_count( $html, '<li' ) );
+		$this->assertStringContainsString( 'Incoming mail (IMAP)', $html );
+		$this->assertStringContainsString( 'mail.example.net, port 993, SSL/TLS', $html );
+		$this->assertStringContainsString( 'mail.example.net, port 465, SSL/TLS', $html );
+		$this->assertStringContainsString( 'https://example.net/email-setup/', $html );
+		$this->assertStringContainsString( "1. Create your mailboxes", $plain );
+		$this->assertStringContainsString( '- Incoming mail (IMAP): mail.example.net, port 993, SSL/TLS', $plain );
+		$this->assertStringNotContainsString( "\u{2014}", $html . $plain );
+	}
+
 	public function test_reminder_after_a_day_once_for_a_domain_hosted_elsewhere(): void {
 		$r = $this->mine( 'late.example' );
 		$id = $r->id();

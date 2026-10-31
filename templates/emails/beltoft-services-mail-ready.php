@@ -35,7 +35,11 @@ if ( '' !== $customer_name ) {
 }
 ?>
 </p>
-<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your email domain %s is set up.', 'beltoft-services' ), $mail_domain ) ); ?></p>
+<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your email domain %s is set up.', 'beltoft-services' ), $mail_domain ) ); ?>
+<?php if ( ! $mail_records ) : ?>
+<?php esc_html_e( 'The DNS records are in place.', 'beltoft-services' ); ?>
+<?php endif; ?>
+</p>
 <?php if ( $mail_records ) : ?>
 <p><?php esc_html_e( 'Add these DNS records where the DNS of your domain is hosted. Email works once they are in place, and we check for them every ten minutes.', 'beltoft-services' ); ?></p>
 <table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
@@ -52,16 +56,34 @@ if ( '' !== $customer_name ) {
 	</tr>
 	<?php endforeach; ?>
 </table>
-<?php else : ?>
-<p><?php esc_html_e( 'The DNS records are in place. You can add your mailboxes now.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
-<p><?php esc_html_e( 'Add your mailboxes in the Email area. Passwords are never sent by email.', 'beltoft-services' ); ?></p>
+<h2><?php esc_html_e( 'Next steps', 'beltoft-services' ); ?></h2>
+<ol style="margin:0 0 16px;padding-left:20px">
+	<li style="margin-bottom:6px"><?php esc_html_e( 'Create your mailboxes in your Email area.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your Email area', 'beltoft-services' ); ?></a></li>
+	<li style="margin-bottom:6px"><?php esc_html_e( 'Show each mailbox password once there and copy it. Passwords are never sent by email.', 'beltoft-services' ); ?></li>
+	<li style="margin-bottom:6px"><?php esc_html_e( 'Add the mailbox to your mail app. Most apps find the settings from the email address.', 'beltoft-services' ); ?>
+	<?php if ( '' !== $mail_guide_url ) : ?>
+		<a href="<?php echo esc_url( $mail_guide_url ); ?>"><?php esc_html_e( 'Setup guide for mail apps', 'beltoft-services' ); ?></a>
+	<?php endif; ?>
+	</li>
+</ol>
 <?php if ( '' !== $mail_host ) : ?>
-<p><?php echo esc_html( sprintf( /* translators: 1: mail host, 2: IMAP port, 3: mail host, 4: SMTP port. */ __( 'If your mail app does not find the settings by itself, enter them by hand. Incoming: IMAP, server %1$s, port %2$d, SSL/TLS. Outgoing: SMTP, server %3$s, port %4$d, SSL/TLS. The user name is the full email address.', 'beltoft-services' ), $mail_host, $mail_imap, $mail_host, $mail_smtp ) ); ?></p>
-<?php endif; ?>
-<p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your Email area', 'beltoft-services' ); ?></a></p>
-<?php if ( '' !== $mail_guide_url ) : ?>
-<p><a href="<?php echo esc_url( $mail_guide_url ); ?>"><?php esc_html_e( 'Read the setup guide for mail programs', 'beltoft-services' ); ?></a></p>
+<h2><?php esc_html_e( 'Settings to enter by hand', 'beltoft-services' ); ?></h2>
+<p><?php esc_html_e( 'If your mail app does not find the settings by itself:', 'beltoft-services' ); ?></p>
+<table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
+	<tr>
+		<th scope="row" style="text-align:left"><?php esc_html_e( 'Incoming mail (IMAP)', 'beltoft-services' ); ?></th>
+		<td><?php echo esc_html( sprintf( /* translators: 1: mail host, 2: IMAP port. */ __( '%1$s, port %2$d, SSL/TLS', 'beltoft-services' ), $mail_host, $mail_imap ) ); ?></td>
+	</tr>
+	<tr>
+		<th scope="row" style="text-align:left"><?php esc_html_e( 'Outgoing mail (SMTP)', 'beltoft-services' ); ?></th>
+		<td><?php echo esc_html( sprintf( /* translators: 1: mail host, 2: SMTP port. */ __( '%1$s, port %2$d, SSL/TLS', 'beltoft-services' ), $mail_host, $mail_smtp ) ); ?></td>
+	</tr>
+	<tr>
+		<th scope="row" style="text-align:left"><?php esc_html_e( 'User name', 'beltoft-services' ); ?></th>
+		<td><?php esc_html_e( 'The full email address', 'beltoft-services' ); ?></td>
+	</tr>
+</table>
 <?php endif; ?>
 <?php
 
