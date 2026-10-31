@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 		<h2 class="beltoft-services-page__name"><?php echo esc_html( $title ); ?></h2>
 		<p class="beltoft-services-page__meta">
 			<span class="beltoft-services-badge beltoft-services-badge--<?php echo esc_attr( $group ); ?>" data-badge><?php echo esc_html( $badge ); ?></span>
-			<span class="beltoft-services-page__plan"><?php echo esc_html( $kind ); ?></span>
+			<?php if ( '' !== (string) $kind ) : ?><span class="beltoft-services-page__plan"><?php echo esc_html( $kind ); ?></span><?php endif; ?>
 			<?php if ( '' !== $renews ) : ?><span class="beltoft-services-page__renews"><?php echo esc_html( $renews ); ?></span><?php endif; ?>
 		</p>
 		<p class="beltoft-services-panel__message" data-message<?php echo ! empty( $show_message ) ? '' : ' hidden'; ?>><?php echo esc_html( $message ); ?></p>

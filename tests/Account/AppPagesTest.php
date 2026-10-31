@@ -279,4 +279,16 @@ class AppPagesTest extends TestCase {
 		$this->assertStringContainsString( 'aria-current="page">Two &lt;b&gt;</a>', $html );
 		$this->assertStringContainsString( 'href="https://example.org/one/">One</a>', $html );
 	}
+
+	public function test_an_app_page_shows_no_driver_name(): void {
+		$app = $this->app( $this->user );
+		Slugs::for_license( $app->license() );
+		$this->go( 'odoowoo' );
+		$html = $this->render( $app );
+
+		$this->assertStringContainsString( 'beltoft-services-page__name', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-page__plan', $html );
+		$this->assertStringNotContainsString( Registry::get( 'http' )->label(), $html );
+		$this->assertSame( '', $this->area()->label_of( $app ) );
+	}
 }
