@@ -326,6 +326,7 @@ final class Acts {
 		}
 
 		$changes = array();
+		$shown   = array();
 		$after   = new \WC_Customer( $user_id );
 
 		foreach ( $values as $key => $unused ) {
@@ -333,6 +334,7 @@ final class Acts {
 
 			if ( $new !== $old[ $key ] ) {
 				$changes[] = $key . ': "' . $old[ $key ] . '" to "' . $new . '"';
+				$shown[]   = array( 'label' => self::address_label( $key ), 'old' => $old[ $key ], 'new' => $new );
 			}
 		}
 
@@ -341,17 +343,50 @@ final class Acts {
 		}
 
 		Audit::add( $user_id, 'billing address changed (' . implode( '; ', $changes ) . ')' );
-		self::tell_customer( $user_id, $changes );
+		self::tell_customer( $user_id, $shown );
 
 		return array( 'changed' => array_keys( $values ), 'message' => 'The billing address was changed. The customer was told by e-mail.' );
+	}
+
+	/**
+	 * What a billing address field is called for the customer.
+	 *
+	 * @param string $key Field key, such as address_1.
+	 */
+	private static function address_label( string $key ): string {
+		$labels = array(
+			'first_name' => __( 'First name', 'beltoft-services' ),
+			'last_name'  => __( 'Last name', 'beltoft-services' ),
+			'company'    => __( 'Company', 'beltoft-services' ),
+			'address_1'  => __( 'Street address', 'beltoft-services' ),
+			'address_2'  => __( 'Apartment, suite, etc.', 'beltoft-services' ),
+			'city'       => __( 'Town or city', 'beltoft-services' ),
+			'postcode'   => __( 'Postcode', 'beltoft-services' ),
+			'state'      => __( 'State or region', 'beltoft-services' ),
+			'phone'      => __( 'Phone', 'beltoft-services' ),
+			'email'      => __( 'Email address', 'beltoft-services' ),
+		);
+
+		return $labels[ $key ] ?? ucfirst( str_replace( '_', ' ', $key ) );
+	}
+
+	/**
+	 * The name of the app that is making this request (from its grant), or ''.
+	 */
+	private static function app_name(): string {
+		$current = \BeltoftServices\Api\Tokens::current();
+		$client  = is_array( $current ) ? (string) ( $current['client'] ?? '' ) : '';
+		$found   = '' !== $client ? \BeltoftServices\Oauth\Clients::find( $client ) : null;
+
+		return $found ? trim( wp_strip_all_tags( (string) $found['name'] ) ) : '';
 	}
 
 	/**
 	 * Tells the customer by e-mail that a connected app changed their billing address, through the WooCommerce mailer
 	 * (its header and footer, the site's From address). A plain note, no new kind of e-mail.
 	 *
-	 * @param int      $user_id Customer.
-	 * @param string[] $changes What changed, from and to.
+	 * @param int                                              $user_id Customer.
+	 * @param array<int, array{label: string, old: string, new: string}> $changes What changed, with the field's name for the customer.
 	 */
 	private static function tell_customer( int $user_id, array $changes ): void {
 		$user = get_userdata( $user_id );
@@ -361,10 +396,17 @@ final class Acts {
 		}
 
 		$mailer = WC()->mailer();
-		$body   = '<p>' . esc_html__( 'An app you connected to your account (Claude) changed your billing address at your request:', 'beltoft-services' ) . '</p><ul>';
+		$first  = (string) ( $user->first_name ? $user->first_name : $user->display_name );
+		$app    = self::app_name();
+		$body   = '<p>' . ( '' !== $first ? esc_html( sprintf( /* translators: %s: first name. */ __( 'Hi %s,', 'beltoft-services' ), $first ) ) : esc_html__( 'Hi,', 'beltoft-services' ) ) . '</p>';
+		$body  .= '<p>' . ( '' !== $app
+			? esc_html( sprintf( /* translators: %s: name of the connected app. */ __( 'An app you connected to your account (%s) changed your billing address at your request:', 'beltoft-services' ), $app ) )
+			: esc_html__( 'An app you connected to your account changed your billing address at your request:', 'beltoft-services' ) ) . '</p><ul>';
 
 		foreach ( $changes as $line ) {
-			$body .= '<li>' . esc_html( $line ) . '</li>';
+			$old   = '' !== $line['old'] ? '"' . $line['old'] . '"' : __( '(empty)', 'beltoft-services' );
+			$new   = '' !== $line['new'] ? '"' . $line['new'] . '"' : __( '(empty)', 'beltoft-services' );
+			$body .= '<li>' . esc_html( sprintf( /* translators: 1: field name, 2: old value, 3: new value. */ __( '%1$s: from %2$s to %3$s', 'beltoft-services' ), $line['label'], $old, $new ) ) . '</li>';
 		}
 
 		$body .= '</ul><p>' . esc_html__( 'If this was not you, disconnect the app under Account details, Security, and change your password.', 'beltoft-services' ) . '</p>';

@@ -32,8 +32,13 @@ if ( '' !== $customer_name ) {
 	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
 }
 
-/* translators: 1: product name, 2: usage, such as "6 of 5". */
-echo wp_strip_all_tags( sprintf( __( 'Your %1$s is over its limit: %2$s. Please upgrade your plan or reduce your usage.', 'beltoft-services' ), $product_name, $usage ) ) . "\n\n";
+/* translators: %s: product name. */
+echo wp_strip_all_tags( sprintf( __( 'Your %s is over the limit of your plan.', 'beltoft-services' ), $product_name ) ) . "\n\n";
+
+/* translators: %s: usage, such as "6 of 5". */
+echo wp_strip_all_tags( sprintf( __( 'Usage: %s.', 'beltoft-services' ), $usage ) ) . "\n\n";
+
+echo __( 'Nothing has been stopped. To stay within the limit, change to a larger plan in your account, or reduce your usage.', 'beltoft-services' ) . "\n\n";
 
 echo __( 'View your services in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 
@@ -42,5 +47,5 @@ if ( $additional_content ) {
 	echo "\n\n----------------------------------------\n\n";
 }
 
-echo wp_kses_post( apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
+echo wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", (string) apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
 // phpcs:enable

@@ -3,6 +3,12 @@
 defined( 'ABSPATH' ) || exit;
 $beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your server', 'beltoft-services' );
 echo wp_strip_all_tags( $email_heading ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+if ( '' !== (string) ( $customer_name ?? '' ) ) {
+	/* translators: %s: customer's first name. */
+	echo wp_strip_all_tags( sprintf( __( 'Hi %s,', 'beltoft-services' ), $customer_name ) ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+} else {
+	echo __( 'Hi,', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+}
 if ( 'db_disk' === $monitor_reason ) {
 	$beltoft_services_db = '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' );
 	/* translators: 1: database name, 2: percent used. */
@@ -42,3 +48,4 @@ echo ( in_array( $monitor_reason, array( 'db_down', 'db_disk' ), true ) ? __( 'V
 if ( in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu' ), true ) ) {
 	echo "\n" . __( 'You can turn these emails off for this server in your account, under Monitoring.', 'beltoft-services' ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }
+echo "\n" . wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", (string) apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound, WordPress.Security.EscapeOutput.OutputNotEscaped -- WooCommerce's own filter; plain text email.

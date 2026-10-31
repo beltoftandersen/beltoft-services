@@ -57,7 +57,7 @@ class DomainEmailsTest extends TestCase {
 		$mail = $this->mails[0];
 		$this->assertSame( 'Your domain mail-example.net is now with us', $mail['subject'] );
 		$this->assertStringContainsString( 'Dana', $mail['message'] );
-		$this->assertStringContainsString( date_i18n( get_option( 'date_format' ), strtotime( '2027-10-26 UTC' ) ), $mail['message'], 'The renewal date.' );
+		$this->assertStringContainsString( wp_date( \BeltoftServices\Emails\ServiceEmail::DATE, strtotime( '2027-10-26 UTC' ) ), $mail['message'], 'The renewal date.' );
 		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Domains::url( $r->license() ) ), $mail['message'], 'It links to the domain\'s own page in My Account.' );
 		$this->assertStringContainsString( 'Your DNS stays where it is now. Your name servers do not change.', $mail['message'] );
 		$this->assertStringNotContainsString( 'uses our name servers', $mail['message'] );

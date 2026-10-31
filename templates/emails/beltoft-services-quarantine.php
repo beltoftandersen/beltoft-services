@@ -3,6 +3,18 @@
 defined( 'ABSPATH' ) || exit;
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce email hook.
 ?>
+<p>
+<?php
+if ( '' !== (string) ( $customer_name ?? '' ) ) {
+	/* translators: %s: customer's first name. */
+	printf( esc_html__( 'Hi %s,', 'beltoft-services' ), esc_html( $customer_name ) );
+} else {
+	esc_html_e( 'Hi,', 'beltoft-services' );
+}
+?>
+</p>
+<?php
+?>
 <p><?php
 /* translators: 1: server name, 2: date and time. */
 echo esc_html( sprintf( __( 'On %2$s we saw traffic from your server %1$s that looks like scanning other servers or a flood of connections:', 'beltoft-services' ), $product_name, $quarantine_at ) );

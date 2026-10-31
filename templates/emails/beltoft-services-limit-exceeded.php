@@ -33,10 +33,17 @@ if ( '' !== $customer_name ) {
 </p>
 <p>
 <?php
-/* translators: 1: product name, 2: usage, such as "6 of 5". */
-echo esc_html( sprintf( __( 'Your %1$s is over its limit: %2$s. Please upgrade your plan or reduce your usage.', 'beltoft-services' ), $product_name, $usage ) );
+/* translators: %s: product name. */
+echo esc_html( sprintf( __( 'Your %s is over the limit of your plan.', 'beltoft-services' ), $product_name ) );
 ?>
 </p>
+<p>
+<?php
+/* translators: %s: usage, such as "6 of 5". */
+echo esc_html( sprintf( __( 'Usage: %s.', 'beltoft-services' ), $usage ) );
+?>
+</p>
+<p><?php esc_html_e( 'Nothing has been stopped. To stay within the limit, change to a larger plan in your account, or reduce your usage.', 'beltoft-services' ); ?></p>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'View your services in your account', 'beltoft-services' ); ?></a></p>
 <?php
 

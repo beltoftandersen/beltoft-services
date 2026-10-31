@@ -249,30 +249,6 @@ trait RestoreSteps {
 	 * @param string $what restore or rollback.
 	 */
 	private function tell_customer( string $what = 'restore' ): void {
-		$to = is_email( (string) ( $this->r->license()['email'] ?? '' ) ) ? (string) $this->r->license()['email'] : '';
-
-		if ( '' === $to ) {
-			return;
-		}
-
-		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
-
-		if ( 'rollback' === $what ) {
-			wp_mail(
-				$to,
-				/* translators: %s: site name */
-				sprintf( __( '[%s] Your server rollback did not finish', 'beltoft-services' ), $site ),
-				__( 'The rollback of your server to a snapshot did not finish. We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support.', 'beltoft-services' )
-			);
-
-			return;
-		}
-
-		wp_mail(
-			$to,
-			/* translators: %s: site name */
-			sprintf( __( '[%s] Your server restore did not finish', 'beltoft-services' ), $site ),
-			__( 'The restore of your server did not finish. We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support.', 'beltoft-services' )
-		);
+		\BeltoftServices\Emails\Emails::send( 'beltoft_services_notice', $this->r, array( 'notice_kind' => 'rollback' === $what ? 'rollback_failed' : 'restore_failed' ) );
 	}
 }

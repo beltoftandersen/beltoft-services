@@ -11,7 +11,8 @@ final class EmailDetails {
 	public static function details( $details, $email_id, $r ) {
 		if ( ! is_array( $details ) || 'beltoft_services_ready' !== $email_id || ! $r instanceof Resource || ! in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) { return $details; }
 		$details[ __( 'Domain', 'beltoft-services' ) ] = (string) $r->get( 'domain' );
-		$details[ __( 'Name servers', 'beltoft-services' ) ] = implode( ', ', Zone::nameservers() );
+		// DNS hosting: the email's own text lists the name servers with what to do with them.
+		if ( 'domain' === $r->get( 'driver' ) ) { $details[ __( 'Name servers', 'beltoft-services' ) ] = implode( ', ', Zone::nameservers() ); }
 		return $details;
 	}
 }

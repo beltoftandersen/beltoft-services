@@ -140,7 +140,7 @@ final class EmailsTest extends TestCase {
 		$this->assertCount( 1, $mail );
 		$this->assertStringContainsString( 'Your subscription is on hold', (string) $mail[0]['message'], 'A fixed text for the cause is in the email.' );
 		$this->assertStringNotContainsString( 'License suspended', (string) $mail[0]['message'], 'Never the history text.' );
-		$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), (int) Resource::for_license( (int) $license['id'] )->get( 'paused_at' ) + 30 * DAY_IN_SECONDS ), (string) $mail[0]['message'], 'The deletion date is given.' );
+		$this->assertStringContainsString( wp_date( \BeltoftServices\Emails\ServiceEmail::DATE, (int) Resource::for_license( (int) $license['id'] )->get( 'paused_at' ) + 30 * DAY_IN_SECONDS ), (string) $mail[0]['message'], 'The deletion date is given.' );
 
 		// Retention off: the reason is there, no period is promised.
 		$this->mails = array();
@@ -212,7 +212,7 @@ final class EmailsTest extends TestCase {
 
 		$warning = $this->customer_mails( 'will be deleted' );
 		$this->assertCount( 1, $warning );
-		$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), $when ), (string) $warning[0]['subject'] . $warning[0]['message'] );
+		$this->assertStringContainsString( wp_date( \BeltoftServices\Emails\ServiceEmail::DATE, $when ), (string) $warning[0]['subject'] . $warning[0]['message'] );
 
 		Resource::find( $resource->id() )->desire( 'deleted', 'Retention over' );
 		Jobs::run( $resource->id() );
@@ -550,7 +550,7 @@ final class EmailsTest extends TestCase {
 				$this->assertSame( 'About your server snapshots', $mail['subject'] );
 
 				if ( 'slots_reduced' === $reason ) {
-					$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), time() + 3 * DAY_IN_SECONDS ), $body );
+					$this->assertStringContainsString( wp_date( \BeltoftServices\Emails\ServiceEmail::DATE, time() + 3 * DAY_IN_SECONDS ), $body );
 				}
 			}
 		}

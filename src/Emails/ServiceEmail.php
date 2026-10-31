@@ -34,6 +34,16 @@ abstract class ServiceEmail extends \WC_Email {
 	protected array $values = array();
 
 	/**
+	 * Date format of the emails: the month is spelled out, so "3/4/2026" is never read two ways.
+	 */
+	public const DATE = 'j F Y';
+
+	/**
+	 * Date and time format of the emails.
+	 */
+	public const DATE_TIME = 'j F Y, H:i';
+
+	/**
 	 * Set up.
 	 */
 	public function __construct() {
@@ -65,12 +75,12 @@ abstract class ServiceEmail extends \WC_Email {
 			$driver  = Registry::get( $r->get( 'driver' ) );
 			$used    = (int) ( $data['used'] ?? 0 );
 			$limit   = (int) ( $data['limit'] ?? 0 );
-			$date    = isset( $data['deletes_at'] ) ? wp_date( (string) get_option( 'date_format' ), (int) $data['deletes_at'] ) : '';
+			$date    = isset( $data['deletes_at'] ) ? wp_date( self::DATE, (int) $data['deletes_at'] ) : '';
 
 			$this->object    = $r;
 			$this->recipient = (string) ( $license['email'] ?? '' );
 			$this->values    = array(
-				'product_name'  => $license ? ServerName::display( $r, $license ) : '',
+				'product_name'  => $license ? ServerName::email_label( $r, $license ) : '',
 				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
 				'account_url'   => self::account_url( $r, $license, $data ),
 				'deletion_date' => (string) $date,
@@ -102,12 +112,13 @@ abstract class ServiceEmail extends \WC_Email {
 				'monitor_upgrade_url' => 'proxmox' === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
 				'monitor_grow_url' => 'proxmox-db' === $r->get( 'driver' ) && 'db_disk' === ( $data['reason'] ?? '' ) ? \BeltoftServices\Proxmox\DbDisk::grow_url( $r ) : '',
 				'monitor_disks_url' => 'proxmox' === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::card_url( $r ) : '',
-				'monitor_cpu_since' => isset( $data['cpu_since'] ) ? wp_date( (string) get_option( 'time_format' ), (int) $data['cpu_since'] ) : '',
+				'monitor_cpu_since' => isset( $data['cpu_since'] ) ? wp_date( 'H:i', (int) $data['cpu_since'] ) : '',
 				'monitor_disk_used' => max( 0, (int) ( $data['disk_used'] ?? 0 ) ),
 				'monitor_disk_total' => max( 0, (int) ( $data['disk_total'] ?? 0 ) ),
 				'quarantine_signal' => in_array( $data['quarantine_signal'] ?? '', array( 'scan', 'syn', 'udp' ), true ) ? $data['quarantine_signal'] : 'scan',
 				'quarantine_counts' => is_array( $data['quarantine_counts'] ?? null ) ? array_map( 'intval', $data['quarantine_counts'] ) : array(),
-				'quarantine_at' => isset( $data['quarantine_at'] ) ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $data['quarantine_at'] ) : '',
+				'quarantine_at' => isset( $data['quarantine_at'] ) ? wp_date( self::DATE_TIME, (int) $data['quarantine_at'] ) : '',
+				'notice_kind'   => in_array( $data['notice_kind'] ?? '', Notice::KINDS, true ) ? $data['notice_kind'] : 'db_access',
 				'app_domain'    => isset( $data['app_domain'] ) && is_string( $data['app_domain'] ) ? $data['app_domain'] : '',
 				'app_name'      => (string) ( \BeltoftServices\Proxmox\Apps::definition( (string) $r->get( 'app_id' ) )['name'] ?? '' ),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
@@ -180,13 +191,14 @@ abstract class ServiceEmail extends \WC_Email {
 	}
 
 	/**
-	 * Where a domain email sends the customer: the domain's own page, or the list when there is no license.
+	 * Where a domain email sends the customer: the domain's own page, or the list when there is no license or the service is deleted.
 	 *
 	 * @param Resource                  $r       Resource.
 	 * @param array<string, mixed>|null $license License row.
 	 */
 	private static function domains_url( Resource $r, $license ): string {
-		if ( is_array( $license ) && ! empty( $license['id'] ) && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
+		// A deleted service has no page: its email sends to the list.
+		if ( is_array( $license ) && ! empty( $license['id'] ) && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			return \BeltoftServices\Account\Domains::url( $license );
 		}
 
@@ -207,7 +219,7 @@ abstract class ServiceEmail extends \WC_Email {
 		$expiry = (string) ( $r->get( 'prepaid_expiry' ) ?: $r->get( 'expires_at' ) );
 		$time   = '' !== $expiry ? strtotime( $expiry . ' UTC' ) : false;
 
-		return $time ? wp_date( (string) get_option( 'date_format' ), $time ) : '';
+		return $time ? wp_date( self::DATE, $time ) : '';
 	}
 
 	/**
@@ -328,7 +340,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$at     = $notice > 0 ? max( $paused_at + $days * DAY_IN_SECONDS, $warned + $notice ) : $paused_at + $days * DAY_IN_SECONDS;
 		}
 
-		return wp_date( (string) get_option( 'date_format' ), $at );
+		return wp_date( self::DATE, $at );
 	}
 
 	/**

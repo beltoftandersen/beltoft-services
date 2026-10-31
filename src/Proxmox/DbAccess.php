@@ -513,29 +513,12 @@ final class DbAccess {
 	}
 
 	/**
-	 * Tells the account owner that the list changed or opened to everyone. Plain text; never a secret.
+	 * Tells the account owner that the list changed or opened to everyone, with the plugin's own service email. Never a secret.
 	 *
 	 * @param Resource $r    Resource.
 	 * @param string   $what Which change: world_on, world_off, add or remove.
 	 */
 	public static function notify( Resource $r, string $what ): void {
-		$license = $r->license();
-		$to      = (string) ( $license['email'] ?? '' );
-
-		if ( ! is_email( $to ) ) {
-			return;
-		}
-
-		$site = wp_specialchars_decode( (string) get_bloginfo( 'name' ), ENT_QUOTES );
-
-		if ( 'world_on' === $what ) {
-			$subject = __( 'Your database is open to everyone', 'beltoft-services' );
-			$text    = __( 'You opened your database to everyone. Anyone on the internet can now try to log in to it. Open it only for as long as you need to. You can limit access to a list of addresses again in your account, under Databases, on the Access tab.', 'beltoft-services' );
-		} else {
-			$subject = __( 'The access list of your database changed', 'beltoft-services' );
-			$text    = __( 'The list of addresses that may connect to your database over its public IP address was changed in your account. If you did not do this, change your password and contact us.', 'beltoft-services' );
-		}
-
-		wp_mail( $to, sprintf( '[%s] %s', $site, $subject ), $text . "\n" );
+		\BeltoftServices\Emails\Emails::send( 'beltoft_services_notice', $r, array( 'notice_kind' => 'world_on' === $what ? 'db_world' : 'db_access' ) );
 	}
 }

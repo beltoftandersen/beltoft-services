@@ -167,7 +167,9 @@ final class ReviewFixesTest extends McpTestCase {
 
 		$this->assertCount( 1, $this->mails );
 		$this->assertSame( array( 'christian.beltoft@gmail.com' ), (array) $this->mails[0]['to'] );
-		$this->assertStringContainsString( 'city: "Odense" to "Aarhus"', $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'Town or city: from "Odense" to "Aarhus"', $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'changed your billing address at your request', $this->mails[0]['message'] );
+		$this->assertStringNotContainsString( '(Claude)', $this->mails[0]['message'], 'No hard-coded app name.' );
 		$this->assertStringContainsString( 'disconnect the app', $this->mails[0]['message'] );
 		$this->assertStringNotContainsString( '—', $this->mails[0]['message'] . $this->mails[0]['subject'] );
 

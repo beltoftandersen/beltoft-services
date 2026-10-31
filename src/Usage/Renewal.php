@@ -135,6 +135,29 @@ final class Renewal {
 	}
 
 	/**
+	 * What a usage fee line is about, in words for the customer: "Server web1", "Backups for web1".
+	 *
+	 * @param string $item  Item.
+	 * @param string $label Server or app name (label()).
+	 */
+	public static function line_subject( string $item, string $label ): string {
+		if ( 'server' === $item ) {
+			/* translators: %s: server name. */
+			return sprintf( __( 'Server %s', 'beltoft-services' ), $label );
+		}
+
+		$words = array(
+			'backups'   => __( 'Backups', 'beltoft-services' ),
+			'disk'      => __( 'Extra disk', 'beltoft-services' ),
+			'snapshots' => __( 'Snapshot slots', 'beltoft-services' ),
+			'app'       => __( 'App licence', 'beltoft-services' ),
+		);
+
+		/* translators: 1: item (Backups, Extra disk), 2: server name. */
+		return sprintf( __( '%1$s for %2$s', 'beltoft-services' ), $words[ $item ] ?? $item, $label );
+	}
+
+	/**
 	 * The renewal order of a usage account gets its usage lines.
 	 *
 	 * @param mixed $order        Renewal order.
@@ -170,16 +193,15 @@ final class Renewal {
 			$qty = 'hour' === $line['unit'] ? '' : sprintf( ' (%s %s)', rtrim( rtrim( number_format( $line['quantity'], 4, '.', '' ), '0' ), '.' ), $line['unit'] );
 			$fee->set_name(
 				sprintf(
-					/* translators: 1: server name, 2: item, 3: month (2026-10), 4: hours, 5: quantity note, 6: rate with currency, 7: unit, 8: cap note. */
-					__( '%1$s, %2$s, %3$s: %4$s hours%5$s at %6$s per %7$s%8$s', 'beltoft-services' ),
-					self::label( $line['resource_id'] ),
-					self::item_label( $line['item'] ),
-					gmdate( 'Y-m', $line['month'] ),
+					/* translators: 1: what is billed ("Server web1"), 2: month and year, 3: hours, 4: quantity note, 5: rate with currency, 6: unit, 7: cap note. */
+					__( '%1$s, %2$s: %3$s hours%4$s at %5$s per %6$s (excl. VAT)%7$s', 'beltoft-services' ),
+					self::line_subject( (string) $line['item'], self::label( $line['resource_id'] ) ),
+					wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) ),
 					(string) $line['hours'],
 					$qty,
-					$currency . ' ' . rtrim( rtrim( number_format( $line['rate'], 8, '.', '' ), '0' ), '.' ),
+					Rates::money( (float) $line['rate'], 4, $currency ),
 					$per,
-					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), $currency . ' ' . number_format( $line['cap'], 2, '.', '' ) ) : ''
+					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
 				)
 			);
 			$fee->set_total( (string) $line['charge'] );
