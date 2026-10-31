@@ -14,6 +14,7 @@
  * @var string                                          $base     Base address of the API, with a trailing slash.
  * @var string                                          $username The customer's username.
  * @var int                                             $max      Tokens allowed.
+ * @var array{on: bool, allowed: bool, url: string, apps: array<int, array<string, mixed>>} $mcp Use with Claude (MCP).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -115,4 +116,66 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 		<pre><code><?php echo esc_html( 'curl -u "' . $username . ':YOUR TOKEN" -X POST ' . $base . 'resources/123/actions/reboot' ); ?></code></pre>
 		<p><?php esc_html_e( 'Every change made with a token is written to the history of the service. Passwords, console access and actions that destroy something, such as reinstall, restore and delete, are only available in your dashboard. Requests are limited per token; a reply of 429 means wait a minute.', 'beltoft-services' ); ?></p>
 	</details>
+	<?php if ( $mcp['on'] ) : ?>
+		<h3 id="use-with-claude"><?php esc_html_e( 'Use with Claude (MCP)', 'beltoft-services' ); ?></h3>
+		<p><?php esc_html_e( 'Connect Claude to your account to ask about your servers, databases, domains and DNS in a chat. You choose what Claude may do when you connect, and you can disconnect it here at any time.', 'beltoft-services' ); ?></p>
+
+		<form method="post" class="beltoft-services-api__switch">
+			<input type="hidden" name="<?php echo esc_attr( $field ); ?>" value="mcp_switch">
+			<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
+			<input type="hidden" name="mcp_allow" value="<?php echo $mcp['allowed'] ? '0' : '1'; ?>">
+			<p>
+				<?php echo esc_html( $mcp['allowed'] ? __( 'Allow Claude (MCP) access: on.', 'beltoft-services' ) : __( 'Allow Claude (MCP) access: off.', 'beltoft-services' ) ); ?>
+				<button type="submit" class="button"><?php echo esc_html( $mcp['allowed'] ? __( 'Turn off', 'beltoft-services' ) : __( 'Turn on', 'beltoft-services' ) ); ?></button>
+			</p>
+		</form>
+
+		<?php if ( $mcp['apps'] ) : ?>
+			<table class="beltoft-services-api__tokens shop_table shop_table_responsive">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Connected app', 'beltoft-services' ); ?></th>
+						<th><?php esc_html_e( 'Access', 'beltoft-services' ); ?></th>
+						<th><?php esc_html_e( 'Connected', 'beltoft-services' ); ?></th>
+						<th><?php esc_html_e( 'Last used', 'beltoft-services' ); ?></th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $mcp['apps'] as $beltoft_services_app ) : ?>
+					<tr>
+						<td data-title="<?php esc_attr_e( 'Connected app', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_app['name'] ); ?></td>
+						<td data-title="<?php esc_attr_e( 'Access', 'beltoft-services' ); ?>"><?php echo esc_html( $scopes[ $beltoft_services_app['scope'] ] ?? '' ); ?></td>
+						<td data-title="<?php esc_attr_e( 'Connected', 'beltoft-services' ); ?>"><?php echo esc_html( wp_date( $beltoft_services_fmt, $beltoft_services_app['connected'] ) ); ?></td>
+						<td data-title="<?php esc_attr_e( 'Last used', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_app['last_used'] ? wp_date( $beltoft_services_fmt, $beltoft_services_app['last_used'] ) : __( 'Never', 'beltoft-services' ) ); ?></td>
+						<td>
+							<form method="post">
+								<input type="hidden" name="<?php echo esc_attr( $field ); ?>" value="disconnect">
+								<input type="hidden" name="app_family" value="<?php echo esc_attr( $beltoft_services_app['family'] ); ?>">
+								<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
+								<button type="submit" class="button"><?php esc_html_e( 'Disconnect', 'beltoft-services' ); ?></button>
+							</form>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php else : ?>
+			<p><?php esc_html_e( 'No app is connected.', 'beltoft-services' ); ?></p>
+		<?php endif; ?>
+
+		<details class="beltoft-services-api__docs">
+			<summary><?php esc_html_e( 'How to connect Claude', 'beltoft-services' ); ?></summary>
+			<ol>
+				<li><?php esc_html_e( 'In Claude, open Settings, then Connectors, then Add custom connector.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Paste this address as the connector URL:', 'beltoft-services' ); ?>
+					<pre><code><?php echo esc_html( $mcp['url'] ); ?></code></pre>
+				</li>
+				<li><?php esc_html_e( 'Claude opens this site. Sign in if you are asked to, then choose what Claude may do: read only, or also run actions such as restart, snapshots and DNS changes.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Ask Claude about your services, for example which of your servers is busiest.', 'beltoft-services' ); ?></li>
+			</ol>
+			<p><?php esc_html_e( 'Claude can read your servers, databases, domains and DNS, and with actions allowed restart or stop a server, take a snapshot and change DNS records. It never sees passwords. Restoring, reinstalling and deleting are only possible in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
+			<p><?php esc_html_e( 'A personal token from above also works with any tool that speaks MCP over HTTP: send it as HTTP Basic authentication to the same address.', 'beltoft-services' ); ?></p>
+		</details>
+	<?php endif; ?>
 </section>

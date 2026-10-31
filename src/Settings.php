@@ -84,6 +84,22 @@ final class Settings {
 				'label'   => __( 'Delete the settings when the plugin is deleted', 'beltoft-services' ),
 				'desc'    => __( 'This also deletes the IP pool and the virtual machine records. Machines that exist can then no longer be matched to their services.', 'beltoft-services' ),
 			),
+			'mcp_enabled' => array(
+				'tab'     => 'general',
+				'section' => 'api',
+				'type'    => 'checkbox',
+				'default' => 1,
+				'label'   => __( 'Let customers connect apps (Use with Claude)', 'beltoft-services' ),
+				'desc'    => __( 'Turns the OAuth server and the MCP endpoint on or off for the whole site. Off, connected apps stop working at once. Personal API tokens are not affected.', 'beltoft-services' ),
+			),
+			'mcp_redirect_uris' => array(
+				'tab'     => 'general',
+				'section' => 'api',
+				'type'    => 'textarea',
+				'default' => \BeltoftServices\Mcp\Access::DEFAULT_REDIRECTS,
+				'label'   => __( 'Redirect addresses apps may use', 'beltoft-services' ),
+				'desc'    => __( 'One address per line, matched exactly. An app can only register and sign in with an address on this list. Empty means the Claude addresses.', 'beltoft-services' ),
+			),
 			'account_billing' => array(
 				'tab'     => 'general',
 				'section' => 'account',
@@ -180,6 +196,7 @@ final class Settings {
 			'general' => __( 'General', 'beltoft-services' ),
 			'account' => __( 'My Account', 'beltoft-services' ),
 			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
+			'api'     => __( 'Use with Claude (MCP)', 'beltoft-services' ),
 		);
 
 		/**

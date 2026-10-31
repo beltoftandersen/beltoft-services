@@ -725,3 +725,35 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 @media (max-width: 700px) {
 	.woocommerce-MyAccount-content section.beltoft-services-api { padding: 16px; }
 }
+
+/* App connection consent page (Oauth\Server): a centred panel on the site's page. */
+.beltoft-services-oauth { box-sizing: border-box; width: calc(100% - 40px); max-width: 640px; margin: 64px auto 96px; }
+.beltoft-services-oauth__panel { padding: 32px; background: var(--bg-card, #fff); color: var(--navy, #1d2327); font-size: 16px; line-height: 1.55; }
+.beltoft-services-oauth h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.25; }
+.beltoft-services-oauth p { margin: 0 0 16px; }
+.beltoft-services-oauth__lead { color: var(--ink-soft, #50575e); }
+.beltoft-services-oauth__facts { margin: 24px 0; padding: 0; border-top: 1px solid var(--rule, #dcdcde); }
+.beltoft-services-oauth__facts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule, #dcdcde); }
+.beltoft-services-oauth__facts dt { margin: 0; color: var(--ink-soft, #50575e); }
+.beltoft-services-oauth__facts dd { margin: 0; overflow-wrap: anywhere; }
+.beltoft-services-oauth__verified, .beltoft-services-oauth__unverified { display: block; font-size: 14px; }
+.beltoft-services-oauth__verified { color: var(--green, #00a32a); }
+.beltoft-services-oauth__unverified { color: #b32d2e; }
+.beltoft-services-oauth__choices { margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
+.beltoft-services-oauth__choices legend { margin: 0 0 12px; padding: 0; font-weight: 600; }
+.beltoft-services-oauth__note { padding: 12px 16px; border-left: 3px solid var(--navy, #1d2327); background: var(--bg-warm, #f6f7f7); }
+.beltoft-services-oauth .beltoft-services-oauth__choice { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 8px; padding: 14px 16px; background: var(--bg-warm, #f6f7f7); color: var(--ink-soft, #50575e); opacity: 1; cursor: pointer; font-size: 15px; font-weight: 400; line-height: 1.5; }
+.beltoft-services-oauth__choice:has(input:checked) { box-shadow: inset 3px 0 0 var(--navy, #1d2327); }
+.beltoft-services-oauth__choice input { flex: none; margin: 4px 0 0; }
+.beltoft-services-oauth__choice strong { display: block; margin-bottom: 2px; color: var(--navy, #1d2327); font-size: 16px; }
+.beltoft-services-oauth__secret { font-size: 14px; color: var(--ink-soft, #50575e); }
+.beltoft-services-oauth__buttons { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 16px; }
+.beltoft-services-oauth .beltoft-services-oauth__allow { background: var(--navy, #1d2327); color: #fff; border: 0; padding: 12px 28px; font-weight: 600; cursor: pointer; }
+.beltoft-services-oauth .beltoft-services-oauth__cancel { background: transparent; color: var(--navy, #1d2327); border: 1px solid var(--navy, #1d2327); padding: 11px 24px; font-weight: 600; cursor: pointer; }
+.beltoft-services-oauth__foot { margin: 0; font-size: 14px; color: var(--ink-soft, #50575e); }
+@media (max-width: 600px) {
+	.beltoft-services-oauth { margin: 32px auto 64px; }
+	.beltoft-services-oauth__panel { padding: 20px; }
+	.beltoft-services-oauth h1 { font-size: 24px; }
+	.beltoft-services-oauth__facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}

@@ -138,6 +138,14 @@ Answers: 2xx is done (provision needs the id in the remote id field); 409 on pro
 
 WooCommerce, WooCommerce Subscriptions and the gateways bundled with them fire no dispute or chargeback action (checked against WooCommerce 11.2.1 and Subscriptions 9.3.0: the only mention is a render hook, `woocommerce_admin_order_data_after_payment_info`, that extensions may print a notice in). Beltoft Services therefore does not react to a dispute by itself. When a gateway tells you about one: cancel or put the subscription on hold in WooCommerce Subscriptions (the service pauses), or use "Suspend for breach" on the license screen to hold the service paused whatever billing does. The bundled PayPal IPN handler does react to a reversal, but only by setting the order on hold (`class-wc-gateway-paypal-ipn-handler.php:316-320`): the subscription and license follow the normal path and the service is paused as for any on-hold payment, not held for breach. A gateway plugin that does fire a dispute action can be wired up with a few lines on the `beltoft_services_*` API.
 
+## Use with Claude (MCP)
+
+Customers can connect Claude (or any MCP client) to their own services. The plugin is its own OAuth 2.1 server (discovery, dynamic client registration, authorization code with PKCE S256 only, refresh tokens that rotate, revocation) and serves the MCP endpoint at `/wp-json/beltoft-mcp/v1/mcp`. Settings, General, "Use with Claude (MCP)" has the on/off switch and the list of redirect addresses apps may use (default: Claude's). A customer connects under Account details, Security, and can disconnect there.
+
+- Discovery is answered from `parse_request`, with no rewrite rules: `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` must reach WordPress at the root of the site. If the web server answers them itself (nginx often blocks dot paths), allow them: `location ^~ /.well-known/oauth- { try_files $uri /index.php?$args; }`. A site in a subdirectory needs those two paths forwarded from the domain root.
+- The authorization page is `/beltoft-oauth/authorize` and needs pretty permalinks.
+- `GET /wp-json/beltoft-services/v1/openapi.json` describes the customer REST API (OpenAPI 3.1).
+
 ## Developer API
 
 - `BeltoftServices\RateLimit::exceeded( int $user_id, string $key, int $limit, int $window = MINUTE_IN_SECONDS ): bool`: counts one call for a user and key in a fixed window; true when over the limit (0 or less turns it off). Persistent object cache when there is one, otherwise transients. Best-effort without a persistent object cache (transient path is read-then-write); the window is fixed, not sliding; namespace `$key` with your plugin slug, e.g. `odoowoo-portal:verify`.

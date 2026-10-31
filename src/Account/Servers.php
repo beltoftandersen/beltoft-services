@@ -676,7 +676,7 @@ final class Servers {
 	 *
 	 * @param Resource $r Resource.
 	 */
-	private static function os_label( Resource $r ): string {
+	public static function os_label( Resource $r ): string {
 		$record = VmRecords::for_resource( $r->id() );
 
 		if ( null === $record ) {
