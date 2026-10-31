@@ -18,7 +18,9 @@ defined( 'ABSPATH' ) || exit;
  * switch). The time of the acceptance is saved on the order line and becomes the database's `db_terms_accepted`; the
  * build refuses a database without it (DbBuild::plan_error()) and the guest refuses an init job without it. An admin
  * who makes a database by hand accepts the terms for the customer with the filter `beltoft_services_db_terms_accepted`.
- * The block checkout is not covered, so such a database cannot be bought through it.
+ * The box sits above the Place order button, where WooCommerce puts its own terms box: that part of the checkout is
+ * always shown, whatever steps a theme hides. WooCommerce redraws it on every checkout refresh, so a small script
+ * keeps the tick. The block checkout is not covered, so such a database cannot be bought through it.
  */
 final class DbTermsField {
 
@@ -27,7 +29,8 @@ final class DbTermsField {
 	public const META      = 'db_terms_accepted';
 
 	public static function register(): void {
-		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( __CLASS__, 'render' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'keep_tick' ), 20 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 10, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
@@ -95,6 +98,21 @@ final class DbTermsField {
 		echo '<p class="form-row validate-required beltoft-services-db-terms" id="' . esc_attr( self::POST_KEY ) . '_field"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox">';
 		echo '<input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" name="' . esc_attr( self::POST_KEY ) . '" value="1" required /> ';
 		echo '<span>' . $label . '</span>&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '">*</abbr></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
+	}
+
+	/**
+	 * The checkout refresh redraws the box unticked: tick it again when the customer had ticked it.
+	 */
+	public static function keep_tick(): void {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || ! wp_script_is( 'wc-checkout', 'enqueued' ) ) {
+			return;
+		}
+
+		$name = wp_json_encode( self::POST_KEY );
+		wp_add_inline_script(
+			'wc-checkout',
+			'jQuery(function($){var n=' . $name . ',on=false;$(document.body).on("change","input[name="+n+"]",function(){on=this.checked;}).on("updated_checkout",function(){$("input[name="+n+"]").prop("checked",on);});});'
+		);
 	}
 
 	/**
