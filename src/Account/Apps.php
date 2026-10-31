@@ -70,6 +70,17 @@ final class Apps extends ServiceArea {
 	}
 
 	/**
+	 * An app's page shows no technical driver name ("HTTP API"): the app's own name is its title.
+	 *
+	 * @param Resource $resource Resource.
+	 */
+	public function label_of( Resource $resource ): string {
+		unset( $resource );
+
+		return '';
+	}
+
+	/**
 	 * {@inheritDoc}
 	 *
 	 * @param array<string, mixed> $view     License view.
