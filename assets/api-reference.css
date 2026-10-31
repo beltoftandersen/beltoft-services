@@ -117,3 +117,12 @@
 .beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__navmethod,
 .beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__method,
 .beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__tool { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* Page builders often set `font-family: inherit` on pre/code under an id selector (stronger than any class), so code
+   in the reference would show in the page's sans. !important here is scoped to the reference's own code elements. */
+.beltoft-services-apiref pre,
+.beltoft-services-apiref code,
+.beltoft-services-apiref .beltoft-services-apiref__path,
+.beltoft-services-apiref .beltoft-services-apiref__navpath {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+}
