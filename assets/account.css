@@ -742,10 +742,10 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-oauth__choices { margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
 .beltoft-services-oauth__choices legend { margin: 0 0 12px; padding: 0; font-weight: 600; }
 .beltoft-services-oauth__note { padding: 12px 16px; border-left: 3px solid var(--navy, #1d2327); background: var(--bg-warm, #f6f7f7); }
-.beltoft-services-oauth__choice { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 8px; padding: 14px 16px; background: var(--bg-warm, #f6f7f7); cursor: pointer; font-weight: 400; }
+.beltoft-services-oauth .beltoft-services-oauth__choice { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 8px; padding: 14px 16px; background: var(--bg-warm, #f6f7f7); color: var(--ink-soft, #50575e); opacity: 1; cursor: pointer; font-size: 15px; font-weight: 400; line-height: 1.5; }
 .beltoft-services-oauth__choice:has(input:checked) { box-shadow: inset 3px 0 0 var(--navy, #1d2327); }
 .beltoft-services-oauth__choice input { flex: none; margin: 4px 0 0; }
-.beltoft-services-oauth__choice strong { display: block; margin-bottom: 2px; }
+.beltoft-services-oauth__choice strong { display: block; margin-bottom: 2px; color: var(--navy, #1d2327); font-size: 16px; }
 .beltoft-services-oauth__secret { font-size: 14px; color: var(--ink-soft, #50575e); }
 .beltoft-services-oauth__buttons { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 16px; }
 .beltoft-services-oauth .beltoft-services-oauth__allow { background: var(--navy, #1d2327); color: #fff; border: 0; border-radius: 0; padding: 12px 28px; font-weight: 600; cursor: pointer; }
