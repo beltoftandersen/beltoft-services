@@ -371,17 +371,20 @@ final class Reference {
 
 		$url  = $base . $path . ( $query ? ( false === strpos( $base, '?' ) ? '?' : '&' ) . http_build_query( $query ) : '' );
 		$auth = 'none' === $op['scope'] ? '' : ' -u "USERNAME:TOKEN"';
-		$out  = 'curl' . $auth;
+		$lines = array( 'curl' . $auth );
 
 		if ( 'GET' !== $op['method'] ) {
-			$out .= ' -X ' . $op['method'];
+			$lines[] = '-X ' . $op['method'];
 		}
 
 		if ( $body ) {
-			$out .= " \\\n  -H \"Content-Type: application/json\" \\\n  -d '" . wp_json_encode( $body, JSON_UNESCAPED_SLASHES ) . "' \\\n  " . "'" . $url . "'";
-		} else {
-			$out .= " '" . $url . "'";
+			$lines[] = '-H "Content-Type: application/json"';
+			$lines[] = "-d '" . wp_json_encode( $body, JSON_UNESCAPED_SLASHES ) . "'";
 		}
+
+		$lines[] = "'" . $url . "'";
+
+		$out = implode( " \\\n  ", $lines );
 
 		return $out;
 	}

@@ -109,6 +109,25 @@ final class ApiReferenceTest extends TestCase {
 		$this->assertStringContainsString( '<span class="beltoft-services-apiref__tool">list_services</span>', Reference::html() );
 	}
 
+	public function test_curl_is_split_over_lines_and_empty_columns_are_left_out(): void {
+		$groups = Reference::groups( Reference::operations() );
+		$put    = null;
+
+		foreach ( $groups['dns']['ops'] as $op ) {
+			if ( 'PUT' === $op['method'] ) {
+				$put = $op;
+			}
+		}
+
+		$this->assertStringContainsString( " \\\n  -X PUT \\\n  -H ", $put['curl'] );
+		$this->assertMatchesRegularExpression( "/ \\\\\n  -d '/", $put['curl'] );
+		$this->assertMatchesRegularExpression( "/ \\\\\n  'http/", $put['curl'] );
+
+		$html = Reference::html();
+		$this->assertStringContainsString( 'title="GET /resources"', $html, 'Full path in the navigation.' );
+		$this->assertStringContainsString( 'font-family: ui-monospace', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/api-reference.css' ) );
+	}
+
 	public function test_the_tools_are_grouped_by_level(): void {
 		$html = Reference::html();
 

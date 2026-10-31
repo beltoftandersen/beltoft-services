@@ -58,20 +58,20 @@ $beltoft_services_methods = array(
 <div class="beltoft-services-apiref" data-apiref>
 	<nav class="beltoft-services-apiref__nav" aria-label="<?php esc_attr_e( 'API reference sections', 'beltoft-services' ); ?>">
 		<ul>
-			<li><a href="#api-authentication"><?php esc_html_e( 'Authentication', 'beltoft-services' ); ?></a></li>
+			<li class="beltoft-services-apiref__navgroup"><a href="#api-authentication"><?php esc_html_e( 'Authentication', 'beltoft-services' ); ?></a></li>
 			<?php foreach ( $groups as $beltoft_services_group ) : ?>
 				<li class="beltoft-services-apiref__navgroup">
 					<a href="#<?php echo esc_attr( $beltoft_services_group['id'] ); ?>"><?php echo esc_html( $beltoft_services_group['title'] ); ?></a>
 					<ul>
 						<?php foreach ( $beltoft_services_group['ops'] as $beltoft_services_op ) : ?>
-							<li><a href="#<?php echo esc_attr( $beltoft_services_op['id'] ); ?>"><span class="beltoft-services-apiref__navmethod beltoft-services-apiref__navmethod--<?php echo esc_attr( $beltoft_services_methods[ $beltoft_services_op['method'] ] ?? 'get' ); ?>"><?php echo esc_html( $beltoft_services_op['method'] ); ?></span> <span class="beltoft-services-apiref__navpath"><?php echo esc_html( $beltoft_services_op['short'] ); ?></span></a></li>
+							<li><a href="#<?php echo esc_attr( $beltoft_services_op['id'] ); ?>" title="<?php echo esc_attr( $beltoft_services_op['method'] . ' ' . $beltoft_services_op['path'] ); ?>"><span class="beltoft-services-apiref__navmethod beltoft-services-apiref__navmethod--<?php echo esc_attr( $beltoft_services_methods[ $beltoft_services_op['method'] ] ?? 'get' ); ?>"><?php echo esc_html( $beltoft_services_op['method'] ); ?></span> <span class="beltoft-services-apiref__navpath"><?php echo esc_html( $beltoft_services_op['short'] ); ?></span></a></li>
 						<?php endforeach; ?>
 					</ul>
 				</li>
 			<?php endforeach; ?>
-			<li><a href="#api-errors"><?php esc_html_e( 'Errors and limits', 'beltoft-services' ); ?></a></li>
+			<li class="beltoft-services-apiref__navgroup"><a href="#api-errors"><?php esc_html_e( 'Errors and limits', 'beltoft-services' ); ?></a></li>
 			<?php if ( $mcp['on'] ) : ?>
-				<li><a href="#use-with-claude"><?php esc_html_e( 'Use with Claude (MCP)', 'beltoft-services' ); ?></a></li>
+				<li class="beltoft-services-apiref__navgroup"><a href="#use-with-claude"><?php esc_html_e( 'Use with Claude (MCP)', 'beltoft-services' ); ?></a></li>
 			<?php endif; ?>
 		</ul>
 	</nav>
@@ -79,7 +79,7 @@ $beltoft_services_methods = array(
 	<div class="beltoft-services-apiref__main">
 	<section id="api-authentication" data-apiref-section>
 		<h2><?php esc_html_e( 'Authentication', 'beltoft-services' ); ?></h2>
-		<p><?php esc_html_e( 'The API works on your own services only. All requests use HTTPS and all replies are JSON.', 'beltoft-services' ); ?></p>
+		<p class="beltoft-services-apiref__intro"><?php esc_html_e( 'The API works on your own services only. All requests use HTTPS and all replies are JSON.', 'beltoft-services' ); ?></p>
 		<div class="beltoft-services-apiref__split">
 			<div>
 				<h3><?php esc_html_e( 'Personal token', 'beltoft-services' ); ?></h3>
@@ -134,13 +134,14 @@ $beltoft_services_methods = array(
 							?>
 						</p>
 						<?php if ( $beltoft_services_op['params'] ) : ?>
+							<?php $beltoft_services_desc = '' !== implode( '', array_column( $beltoft_services_op['params'], 'desc' ) ); ?>
 							<table class="beltoft-services-apiref__table">
 								<caption><?php esc_html_e( 'Parameters', 'beltoft-services' ); ?></caption>
 								<thead><tr>
 									<th scope="col"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'Required', 'beltoft-services' ); ?></th>
-									<th scope="col"><?php esc_html_e( 'Description', 'beltoft-services' ); ?></th>
+									<?php if ( $beltoft_services_desc ) : ?><th scope="col"><?php esc_html_e( 'Description', 'beltoft-services' ); ?></th><?php endif; ?>
 								</tr></thead>
 								<tbody>
 								<?php foreach ( $beltoft_services_op['params'] as $beltoft_services_param ) : ?>
@@ -148,26 +149,27 @@ $beltoft_services_methods = array(
 										<td data-label="<?php esc_attr_e( 'Name', 'beltoft-services' ); ?>"><code<?php echo 'path' === $beltoft_services_param['in'] ? ' class="beltoft-services-apiref__param"' : ''; ?>><?php echo esc_html( $beltoft_services_param['name'] ); ?></code></td>
 										<td data-label="<?php esc_attr_e( 'Type', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['type'] . ', ' . $beltoft_services_param['in'] ); ?></td>
 										<td data-label="<?php esc_attr_e( 'Required', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['required'] ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ) ); ?></td>
-										<td data-label="<?php esc_attr_e( 'Description', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['desc'] ); ?></td>
+										<?php if ( $beltoft_services_desc ) : ?><td data-label="<?php esc_attr_e( 'Description', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['desc'] ); ?></td><?php endif; ?>
 									</tr>
 								<?php endforeach; ?>
 								</tbody>
 							</table>
 						<?php endif; ?>
 						<?php if ( $beltoft_services_op['reply'] ) : ?>
+							<?php $beltoft_services_desc = '' !== implode( '', array_column( $beltoft_services_op['reply'], 'desc' ) ); ?>
 							<table class="beltoft-services-apiref__table">
 								<caption><?php esc_html_e( 'Reply fields', 'beltoft-services' ); ?></caption>
 								<thead><tr>
 									<th scope="col"><?php esc_html_e( 'Field', 'beltoft-services' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th>
-									<th scope="col"><?php esc_html_e( 'Description', 'beltoft-services' ); ?></th>
+									<?php if ( $beltoft_services_desc ) : ?><th scope="col"><?php esc_html_e( 'Description', 'beltoft-services' ); ?></th><?php endif; ?>
 								</tr></thead>
 								<tbody>
 								<?php foreach ( $beltoft_services_op['reply'] as $beltoft_services_field ) : ?>
 									<tr>
 										<td data-label="<?php esc_attr_e( 'Field', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_field['name'] ); ?></code></td>
 										<td data-label="<?php esc_attr_e( 'Type', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_field['type'] ); ?></td>
-										<td data-label="<?php esc_attr_e( 'Description', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_field['desc'] ); ?></td>
+										<?php if ( $beltoft_services_desc ) : ?><td data-label="<?php esc_attr_e( 'Description', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_field['desc'] ); ?></td><?php endif; ?>
 									</tr>
 								<?php endforeach; ?>
 								</tbody>

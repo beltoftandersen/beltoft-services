@@ -5,7 +5,7 @@
 	--apiref-rule: var(--rule, #d6d2c8);
 	--apiref-warm: var(--bg-warm, #eeece6);
 	--apiref-danger: #b32d2e;
-	--apiref-offset: 96px;
+	--apiref-offset: 88px;
 	--apiref-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	box-sizing: border-box;
 	max-width: 100%;
@@ -35,12 +35,11 @@
 .beltoft-services-apiref__nav a:hover { color: var(--apiref-navy); text-decoration: underline; }
 .beltoft-services-apiref__nav a.is-current { color: var(--apiref-navy); font-weight: 700; }
 .beltoft-services-apiref__navgroup > a { margin-top: 14px; color: var(--apiref-navy); font-weight: 600; }
-.beltoft-services-apiref__navgroup ul a { padding: 2px 0; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.beltoft-services-apiref__navgroup ul a { padding: 2px 0; overflow: hidden; font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .beltoft-services-apiref__navmethod { display: inline-block; min-width: 3.6em; font-size: 11px; font-weight: 700; }
 .beltoft-services-apiref__navmethod--get { color: var(--apiref-green); }
 .beltoft-services-apiref__navmethod--post, .beltoft-services-apiref__navmethod--put { color: var(--apiref-navy); }
 .beltoft-services-apiref__navmethod--delete { color: var(--apiref-danger); }
-.beltoft-services-apiref__navpath { font-family: var(--apiref-mono); }
 
 /* Endpoint and two-column blocks */
 .beltoft-services-apiref__op { min-width: 0; margin: 0; padding: 32px 0; border-top: 1px solid var(--apiref-rule); }
@@ -55,6 +54,7 @@
 .beltoft-services-apiref__path { font-size: 1em; font-weight: 600; overflow-wrap: anywhere; }
 .beltoft-services-apiref__param { color: var(--apiref-green); }
 .beltoft-services-apiref__summary { margin: 0 0 4px; }
+.beltoft-services-apiref__intro { margin: 0 0 24px; }
 .beltoft-services-apiref__codes { display: flex; flex-direction: column; gap: 16px; min-width: 0; margin-top: 16px; }
 
 /* Code panels */
@@ -85,6 +85,7 @@
 	.beltoft-services-apiref__split { align-items: start; }
 	.beltoft-services-apiref__split > .beltoft-services-apiref__codes { grid-row: auto; }
 	.beltoft-services-apiref__split h3:first-child { margin-top: 0; }
+	.beltoft-services-apiref__split > .beltoft-services-apiref__codes { margin-top: 0; }
 }
 
 /* Tablet and phone: the navigation is a jump list */
@@ -107,3 +108,12 @@
 	.beltoft-services-apiref__table td { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; padding: 2px 0; border: 0; }
 	.beltoft-services-apiref__table td::before { content: attr(data-label); color: var(--apiref-soft); }
 }
+
+/* The theme styles pre and code with its sans stack: a doubled class wins. */
+.beltoft-services-apiref.beltoft-services-apiref pre,
+.beltoft-services-apiref.beltoft-services-apiref code,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__path,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__navpath,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__navmethod,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__method,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__tool { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
