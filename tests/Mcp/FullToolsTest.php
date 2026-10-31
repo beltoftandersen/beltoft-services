@@ -154,7 +154,7 @@ final class FullToolsTest extends McpTestCase {
 		$this->assertStringNotContainsString( 'confirm', $this->text( $bad ), 'No token for a key that would be refused.' );
 
 		list( $sum, $done ) = $this->confirmed( 'replace_ssh_key', array( 'id' => $r->id(), 'key' => self::KEY ), $token );
-		$this->assertStringContainsString( 'ssh-ed25519 key ending', $sum['summary'] );
+		$this->assertStringContainsString( 'ssh-ed25519 key, fingerprint SHA256:', $sum['summary'] );
 		$this->assertStringContainsString( 'cannot log in over SSH', $sum['summary'] );
 		$this->assertStringNotContainsString( self::KEY, wp_json_encode( $sum ), 'Only the end of the key is shown.' );
 		$this->assertTrue( $this->json( $done )['requested'] );
@@ -334,7 +334,7 @@ final class FullToolsTest extends McpTestCase {
 		$args   = array( 'id' => $domain->id(), 'action' => 'set_nameservers', 'mode' => 'custom', 'hosts' => array( 'ns1.other.example', 'ns2.other.example' ) );
 
 		$first = $this->json( $this->tool( 'domain_settings', $args, $tok ) );
-		$this->assertStringContainsString( 'ns1.other.example, ns2.other.example', $first['summary'] );
+		$this->assertStringContainsString( "- ns1.other.example\n- ns2.other.example", $first['summary'] );
 		$this->assertStringContainsString( 'go offline', $first['summary'] );
 		$this->assertFalse( Jobs::acting( $domain->id() ) );
 

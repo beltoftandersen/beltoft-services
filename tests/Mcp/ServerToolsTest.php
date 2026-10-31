@@ -140,8 +140,8 @@ final class ServerToolsTest extends FirewallTestCase {
 
 		$this->assertFalse( Jobs::acting( $r->id() ), 'Only summaries so far.' );
 
-		// A wide range from named addresses, or 100 ports, is an ordinary rule.
-		$ok = $this->tool( 'set_firewall', array( 'id' => $r->id(), 'on' => true, 'rules' => array( array( 'proto' => 'tcp', 'from' => 22 ), array( 'proto' => 'tcp', 'from' => 1, 'to' => 65535, 'sources' => array( '203.0.113.0/24' ) ), array( 'proto' => 'tcp', 'from' => 3000, 'to' => 3099 ) ) ), $actions );
+		// A wide range from named addresses, or 100 ports to anyone in all, is an ordinary rule.
+		$ok = $this->tool( 'set_firewall', array( 'id' => $r->id(), 'on' => true, 'rules' => array( array( 'proto' => 'tcp', 'from' => 22 ), array( 'proto' => 'tcp', 'from' => 1, 'to' => 65535, 'sources' => array( '203.0.113.0/24' ) ), array( 'proto' => 'tcp', 'from' => 3000, 'to' => 3098 ) ) ), $actions );
 		$this->assertFalse( $ok['isError'], $this->text( $ok ) );
 		$this->assertNotSame( $before, $this->history( $r ) );
 	}

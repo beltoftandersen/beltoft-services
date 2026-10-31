@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Emails\Emails;
 use BeltoftServices\Proxmox\Access;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbGuest;
@@ -147,7 +146,7 @@ final class Secrets {
 		$r = Resource::find( $id );
 
 		if ( $r ) {
-			Emails::send( 'beltoft_services_notice', $r, array( 'notice_kind' => $kind, 'notice_app' => Acts::app_name() ) );
+			Told::send( get_current_user_id(), $r, $kind, '' );
 		}
 
 		$change = 'reveal_database_password' === $name

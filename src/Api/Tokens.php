@@ -73,6 +73,26 @@ final class Tokens {
 	private const BLOCKED_ACTION = '#(delete|remove|destroy|restore|rollback|reinstall|transfer|reveal|ssh_key|cancel|password)#';
 
 	/**
+	 * The actions whose MCP tool is for Full access: derived from the one table of the tools, so a new one is blocked on the
+	 * REST routes without anyone remembering to add a word to BLOCKED_ACTION. A token reaches them only through the tool,
+	 * with the customer's confirmation.
+	 *
+	 * @return string[]
+	 */
+	public static function full_only_actions(): array {
+		$tools = \BeltoftServices\Mcp\Definitions::all();
+		$out   = array();
+
+		foreach ( \BeltoftServices\Mcp\ActionMap::ACTIONS as $action => $tool ) {
+			if ( self::FULL === ( $tools[ $tool ]['level'] ?? self::FULL ) ) {
+				$out[] = $action;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Can a token reach this route (after the host, as WP_REST_Request::get_route() gives it)?
 	 *
 	 * @param string $route Route.
@@ -366,7 +386,7 @@ final class Tokens {
 			return self::refuse( 'beltoft_services_token_scope', __( 'This token can only read. Make a token with actions to change something.', 'beltoft-services' ), 403 );
 		}
 
-		if ( preg_match( '#/actions/([a-z0-9_-]+)$#D', $route, $m ) && ( 1 === preg_match( self::BLOCKED_ACTION, $m[1] ) || in_array( $m[1], (array) apply_filters( 'beltoft_services_token_blocked_actions', array() ), true ) ) ) {
+		if ( preg_match( '#/actions/([a-z0-9_-]+)$#D', $route, $m ) && ( 1 === preg_match( self::BLOCKED_ACTION, $m[1] ) || in_array( $m[1], self::full_only_actions(), true ) || in_array( $m[1], (array) apply_filters( 'beltoft_services_token_blocked_actions', array() ), true ) ) ) {
 			return self::refuse( 'beltoft_services_token_action', __( 'This action is only available in your dashboard.', 'beltoft-services' ), 403 );
 		}
 

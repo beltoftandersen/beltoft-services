@@ -117,20 +117,80 @@ final class Tools {
 	}
 
 	/**
-	 * Does a rule list open more than 100 ports in one rule (all of tcp or udp included) to anyone?
+	 * Does a rule list open more than 100 ports, all rules together, to anyone?
 	 *
 	 * @param mixed $rules Rules as sent.
 	 */
 	private static function wide_open( $rules ): bool {
+		return self::open_ports( $rules )['total'] > 100;
+	}
+
+	/**
+	 * The ports a rule list opens to anyone, with the rules put together: a port opened by several rules counts once, and
+	 * many small rules count as much as one big one. "Anyone" is no source at all, or a source broader than /8 (IPv4) or
+	 * /32 (IPv6), in any of the rule's sources.
+	 *
+	 * @param mixed $rules Rules as sent.
+	 * @return array{total: int, ranges: string[]} The number of ports and the merged ranges, such as "tcp 1-65535".
+	 */
+	public static function open_ports( $rules ): array {
+		$by_proto = array();
+
 		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
-			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! empty( $rule['sources'] ) ) {
+			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! self::open_to_anyone( $rule['sources'] ?? array() ) ) {
 				continue;
 			}
 
 			$from = is_int( $rule['from'] ?? null ) ? $rule['from'] : 0;
 			$to   = is_int( $rule['to'] ?? null ) ? $rule['to'] : $from;
 
-			if ( $to - $from + 1 > 100 ) {
+			if ( $from > 0 && $to >= $from ) {
+				$by_proto[ $rule['proto'] ][] = array( $from, $to );
+			}
+		}
+
+		$total  = 0;
+		$ranges = array();
+
+		foreach ( $by_proto as $proto => $list ) {
+			usort( $list, static fn( $a, $b ) => $a[0] <=> $b[0] );
+			$merged = array();
+
+			foreach ( $list as $range ) {
+				$last = count( $merged ) - 1;
+
+				if ( $last >= 0 && $range[0] <= $merged[ $last ][1] + 1 ) {
+					$merged[ $last ][1] = max( $merged[ $last ][1], $range[1] );
+				} else {
+					$merged[] = $range;
+				}
+			}
+
+			foreach ( $merged as $range ) {
+				$total   += $range[1] - $range[0] + 1;
+				$ranges[] = $proto . ' ' . $range[0] . '-' . $range[1];
+			}
+		}
+
+		return array( 'total' => $total, 'ranges' => $ranges );
+	}
+
+	/**
+	 * Is a rule's list of sources "anyone": empty, or with an address range broader than /8 (IPv4) or /32 (IPv6)?
+	 *
+	 * @param mixed $sources Sources as sent.
+	 */
+	private static function open_to_anyone( $sources ): bool {
+		if ( ! is_array( $sources ) || ! $sources ) {
+			return true;
+		}
+
+		foreach ( $sources as $source ) {
+			$parts  = explode( '/', trim( (string) $source ), 2 );
+			$v6     = str_contains( $parts[0], ':' );
+			$prefix = isset( $parts[1] ) && ctype_digit( $parts[1] ) ? (int) $parts[1] : ( $v6 ? 128 : 32 );
+
+			if ( $prefix < ( $v6 ? 32 : 8 ) ) {
 				return true;
 			}
 		}
@@ -204,12 +264,16 @@ final class Tools {
 		$given = (string) ( $args[ Definitions::CONFIRM_ARG ] ?? '' );
 		unset( $args[ Definitions::CONFIRM_ARG ] );
 
+		$confirmed = false;
+
 		if ( self::confirmation_needed( $name, $args ) ) {
 			$step = self::confirm( $name, $tool, $args, $given );
 
 			if ( null !== $step ) {
 				return $step;
 			}
+
+			$confirmed = true;
 		}
 
 		self::$running = $name;
@@ -218,6 +282,12 @@ final class Tools {
 			$done = Endpoint::nested( fn() => self::run( $name, $args ) );
 		} finally {
 			self::$running = '';
+		}
+
+		// A confirmed change is told to the customer by e-mail (a shown secret tells it itself, in Secrets). Not when nothing was
+		// done: a failed call, or a reinstall that only said where to buy a licence.
+		if ( $confirmed && ! $done instanceof \WP_Error && ! in_array( $name, Secrets::NAMES, true ) && false !== ( $done['requested'] ?? true ) ) {
+			Told::done( $name, $args, get_current_user_id() );
 		}
 
 		return $done instanceof \WP_Error ? self::failure( $done->get_error_message() ) : self::text( $done );
@@ -244,6 +314,12 @@ final class Tools {
 			return self::failure( $prepare->get_error_message() );
 		}
 
+		// Everything here is told to the customer by e-mail when it is done (the certificate is public and is not): with no
+		// address at all there is no way to, so it is not done.
+		if ( 'get_database_ca_certificate' !== $name && ! Told::can_tell( get_current_user_id(), $args ) ) {
+			return self::failure( __( 'There is no e-mail address to tell the customer at, so this cannot be done through Claude. The customer adds an e-mail address to their account first, or does it in the dashboard.', 'beltoft-services' ) );
+		}
+
 		if ( '' === $given ) {
 			$issued = Confirmations::issue( $name, $args, $prepare['state'], ! empty( $tool['secret'] ) );
 
@@ -251,7 +327,7 @@ final class Tools {
 				return self::failure( $issued->get_error_message() );
 			}
 
-			Irreversible::trail( $args, 'asked to ' . $words . ' (waiting for confirmation)' );
+			Irreversible::trail( $args, 'asked to ' . $words . ' (waiting for confirmation)', true );
 
 			return self::text(
 				array(
@@ -267,7 +343,7 @@ final class Tools {
 		$ok = Confirmations::consume( $given, $name, $args, $prepare['state'] );
 
 		if ( true !== $ok ) {
-			Irreversible::trail( $args, $words . ' refused (' . ( 'expired' === $ok ? 'the confirmation expired' : ( 'used' === $ok ? 'the confirmation was used already' : 'the confirmation was not valid' ) ) . ')' );
+			Irreversible::trail( $args, $words . ' refused (' . ( 'expired' === $ok ? 'the confirmation expired' : ( 'used' === $ok ? 'the confirmation was used already' : ( 'soon' === $ok ? 'the confirmation came before the customer could answer' : 'the confirmation was not valid' ) ) ) . ')' );
 
 			return self::failure( Confirmations::refusal( $ok ) );
 		}

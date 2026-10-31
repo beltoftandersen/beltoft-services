@@ -38,7 +38,13 @@ final class Confirmations {
 	public const SECRET_TTL = 120;
 
 	/**
-	 * Tokens one customer may hold open at the same time.
+	 * Seconds that must pass between the summary and the confirmation: a model that confirms in the same breath, without
+	 * asking, is refused. Filter beltoft_services_mcp_confirm_delay.
+	 */
+	public const MIN_DELAY = 5;
+
+	/**
+	 * Tokens one connection (grant) may hold open at the same time.
 	 */
 	public const MAX_OPEN = 10;
 
@@ -86,13 +92,6 @@ final class Confirmations {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE expires_at < %d', $t, $now - self::KEEP ) );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		$open = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE user_id = %d AND used_at IS NULL AND expires_at >= %d', $t, $user_id, $now ) );
-
-		if ( $open >= self::MAX_OPEN ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'There are too many confirmations waiting. Ask the customer to answer them, or wait a few minutes.', 'beltoft-services' ) );
-		}
-
 		$ttl   = $secret ? self::SECRET_TTL : self::TTL;
 		$given = self::PREFIX . rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- A random token, not obfuscation.
 
@@ -113,6 +112,17 @@ final class Confirmations {
 
 		if ( 1 !== $stored ) {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This did not work. Try again in a moment.', 'beltoft-services' ) );
+		}
+
+		// Insert first, then count: two calls at once cannot both slip in under the limit, the one that goes over takes its row back.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$open = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE grant_id = %s AND used_at IS NULL AND expires_at >= %d', $t, (string) $token['uuid'], $now ) );
+
+		if ( $open > self::MAX_OPEN ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+			$wpdb->delete( $t, array( 'token_hash' => hash( 'sha256', $given ) ) );
+
+			return new \WP_Error( 'beltoft_services_tool', __( 'There are too many confirmations waiting. Ask the customer to answer them, or wait a few minutes.', 'beltoft-services' ) );
 		}
 
 		return array( 'token' => $given, 'expires_in' => $ttl );
@@ -163,6 +173,17 @@ final class Confirmations {
 			return 'changed';
 		}
 
+		/**
+		 * Seconds a confirmation must wait after its summary (0 turns the wait off).
+		 *
+		 * @param int $seconds Seconds.
+		 */
+		$delay = (int) apply_filters( 'beltoft_services_mcp_confirm_delay', self::MIN_DELAY );
+
+		if ( time() - (int) $row['created_at'] < $delay ) {
+			return 'soon';
+		}
+
 		// The one atomic step: whoever changes the row from unused to used runs the tool, the other caller does not.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 		$won = 1 === (int) $wpdb->query( $wpdb->prepare( 'UPDATE %i SET used_at = %d WHERE id = %d AND used_at IS NULL AND expires_at >= %d', $t, time(), (int) $row['id'], time() ) );
@@ -190,6 +211,9 @@ final class Confirmations {
 
 			case 'changed':
 				return __( 'The confirmation is for other arguments or another tool. Call the tool again without the confirm argument to get a summary of what you want to do now, and show it to the customer.', 'beltoft-services' );
+
+			case 'soon':
+				return __( 'Too soon. The customer has not had time to read the summary. Show the summary to the customer, ask whether to go ahead, and call the tool again with the confirm value only after they answer yes. The confirm value stays valid for a few minutes.', 'beltoft-services' );
 
 			case 'state':
 				return __( 'Things changed since the summary was made, so nothing was done. Call the tool again without the confirm argument to get a new summary, and show it to the customer.', 'beltoft-services' );

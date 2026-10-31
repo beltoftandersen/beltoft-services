@@ -23,6 +23,7 @@ use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;
@@ -189,8 +190,15 @@ final class Irreversible {
 	 *
 	 * @param array<string, mixed> $args Arguments.
 	 * @param string               $text What happened, after "Claude: ".
+	 * @param bool                 $asked The line only says a summary was made (limited, kept apart).
 	 */
-	public static function trail( array $args, string $text ): void {
+	public static function trail( array $args, string $text, bool $asked = false ): void {
+		// A summary is cheap to ask for: its line is written once a minute for the same words, and a customer gets at most ten
+		// such lines an hour, so asking can not grow the history, the notes or the log without limit.
+		if ( $asked && ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:mcp-asked:' . md5( wp_json_encode( $args ) . $text ), 1, MINUTE_IN_SECONDS ) || RateLimit::exceeded( get_current_user_id(), 'beltoft-services:mcp-asked-cap', 10, HOUR_IN_SECONDS ) ) ) {
+			return;
+		}
+
 		if ( isset( $args['id'] ) && is_int( $args['id'] ) ) {
 			Tools::log( $args['id'], $text, true );
 
@@ -207,7 +215,7 @@ final class Irreversible {
 			}
 		}
 
-		Audit::add( get_current_user_id(), $text );
+		Audit::add( get_current_user_id(), $text, $asked );
 	}
 
 	/**
@@ -219,8 +227,12 @@ final class Irreversible {
 		$license = $r->license();
 		$name    = $license ? trim( wp_strip_all_tags( ServerName::email_label( $r, $license ) ) ) : '';
 
-		/* translators: %d: service id. */
-		return '' !== $name ? $name : sprintf( __( 'service %d', 'beltoft-services' ), $r->id() );
+		/* translators: 1: name of the service, 2: its id. */
+		return '' !== $name ? sprintf( __( '%1$s (service #%2$d)', 'beltoft-services' ), $name, $r->id() ) : sprintf(
+			/* translators: %d: service id. */
+			__( 'service #%d', 'beltoft-services' ),
+			$r->id()
+		);
 	}
 
 	/**
@@ -423,6 +435,12 @@ final class Irreversible {
 			$text .= ' ' . sprintf( __( 'App choice: %s.', 'beltoft-services' ), $send['app_version'] );
 		}
 
+		if ( isset( $send['app_domain_mode'] ) ) {
+			$name = 'own' === $send['app_domain_mode'] ? (string) ( $send['app_own'] ?? '' ) : trim( ( isset( $send['app_sub'] ) ? $send['app_sub'] . '.' : '' ) . ( $send['app_zone'] ?? '' ), '.' );
+			/* translators: 1: domain choice (none, keep, change or own), 2: the domain name, or a dash when there is none. */
+			$text .= ' ' . sprintf( __( 'Domain for the app: %1$s, %2$s.', 'beltoft-services' ), $send['app_domain_mode'], '' !== $name ? $name : '-' );
+		}
+
 		$text .= ' ' . __( 'Everything on the server is lost: files, databases, installed software and settings. A new password is made, and the server is down while it is reinstalled. A server can be reinstalled once an hour.', 'beltoft-services' );
 
 		if ( $paid ) {
@@ -483,8 +501,12 @@ final class Irreversible {
 		}
 
 		$parts = preg_split( '/[ \t]+/', $clean, 3 ) ?: array( '', '' );
-		/* translators: 1: key type, for example ssh-ed25519, 2: the last characters of the key. */
-		$shown = sprintf( __( '%1$s key ending %2$s', 'beltoft-services' ), (string) $parts[0], substr( (string) $parts[1], -12 ) );
+		$raw   = preg_split( '/[ \t]+/', trim( $key ), 3 ) ?: array();
+		$note  = isset( $raw[2] ) ? trim( sanitize_text_field( substr( (string) $raw[2], 0, 60 ) ) ) : '';
+		$blob  = (string) base64_decode( (string) $parts[1], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Reading a public key to show its fingerprint.
+		$print = 'SHA256:' . rtrim( base64_encode( hash( 'sha256', $blob, true ) ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- The fingerprint of a public key.
+		/* translators: 1: key type, for example ssh-ed25519, 2: the fingerprint, 3: the comment the key carries. */
+		$shown = sprintf( __( '%1$s key, fingerprint %2$s, comment "%3$s"', 'beltoft-services' ), (string) $parts[0], $print, '' !== $note ? $note : '-' );
 
 		return self::checked(
 			$r,
@@ -562,18 +584,7 @@ final class Irreversible {
 			);
 		}
 
-		$wide = array();
-
-		foreach ( (array) $args['rules'] as $rule ) {
-			if ( is_array( $rule ) && in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) && empty( $rule['sources'] ) ) {
-				$from = (int) ( $rule['from'] ?? 0 );
-				$to   = (int) ( $rule['to'] ?? $from );
-
-				if ( $to - $from + 1 > 100 ) {
-					$wide[] = (string) $rule['proto'] . ' ' . $from . '-' . $to;
-				}
-			}
-		}
+		$wide = Tools::open_ports( $args['rules'] )['ranges'];
 
 		return array(
 			'text'  => sprintf(
@@ -632,16 +643,28 @@ final class Irreversible {
 			return $bad;
 		}
 
-		$hosts = implode( ', ', array_map( 'strval', (array) ( $args['hosts'] ?? array() ) ) );
+		$list = array_map( static fn( $h ) => strtolower( trim( (string) $h, ". \t" ) ), (array) ( $args['hosts'] ?? array() ) );
+
+		foreach ( $list as $host ) {
+			if ( 1 !== preg_match( '/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/D', $host ) ) {
+				return new \WP_Error( 'beltoft_services_tool', __( 'Each name server must be a host name such as ns1.example.net.', 'beltoft-services' ) );
+			}
+		}
+
+		if ( count( $list ) < 2 || count( $list ) > 6 || count( array_unique( $list ) ) !== count( $list ) ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'Give two to six different name servers.', 'beltoft-services' ) );
+		}
+
+		$hosts = "\n- " . implode( "\n- ", $list ) . "\n";
 
 		return array(
 			'text'  => sprintf(
-				/* translators: 1: domain name, 2: the name servers. */
-				__( 'Move the domain %1$s to these name servers: %2$s. Our DNS records for it stop being used. If these name servers do not answer for the domain, its website and e-mail go offline until it is changed back.', 'beltoft-services' ),
+				/* translators: 1: domain name, 2: the name servers, one per line. */
+				__( 'Move the domain %1$s to these name servers:%2$s Our DNS records for it stop being used. If these name servers do not answer for the domain, its website and e-mail go offline until it is changed back.', 'beltoft-services' ),
 				self::name( $r ),
-				'' !== $hosts ? $hosts : __( '(none given)', 'beltoft-services' )
+				$hosts
 			),
-			'state' => $r->id() . '|ns|' . $hosts,
+			'state' => $r->id() . '|ns|' . implode( ',', $list ),
 		);
 	}
 
@@ -812,7 +835,10 @@ final class Irreversible {
 			$text .= ' ' . __( 'The app licence ends, and the app on the server may stop working without it.', 'beltoft-services' );
 		}
 
-		return array( 'text' => $text, 'state' => $s->get_id() . '|' . $s->get_status() . '|' . $end );
+		$ids = array_map( static fn( $r ) => $r->id(), $services );
+		sort( $ids );
+
+		return array( 'text' => $text, 'state' => $s->get_id() . '|' . $s->get_status() . '|' . $end . '|' . implode( ',', $ids ) );
 	}
 
 	/**

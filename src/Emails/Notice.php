@@ -5,7 +5,20 @@ namespace BeltoftServices\Emails;
 defined( 'ABSPATH' ) || exit;
 
 final class Notice extends ServiceEmail {
-	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app' );
+	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app', 'app_action' );
+
+	/**
+	 * Kinds that are about what a connected app did: sent whatever the shop's switch for this e-mail says, because they are the
+	 * customer's way to learn that something was done in their name.
+	 */
+	public const ALWAYS = array( 'reveal_server', 'reveal_database', 'reveal_app', 'app_action' );
+
+	/**
+	 * Is it sent? The kinds about a connected app are, always.
+	 */
+	public function is_enabled() {
+		return in_array( (string) ( $this->values['notice_kind'] ?? '' ), self::ALWAYS, true ) || parent::is_enabled();
+	}
 
 	public function __construct() {
 		$this->id = 'beltoft_services_notice';
@@ -24,6 +37,7 @@ final class Notice extends ServiceEmail {
 	 */
 	public static function titles( string $kind ): array {
 		$titles = array(
+			'app_action'      => array( __( 'A connected app changed one of your services', 'beltoft-services' ), __( 'A connected app changed one of your services', 'beltoft-services' ) ),
 			'reveal_server'   => array( __( 'A connected app showed your server password', 'beltoft-services' ), __( 'A connected app showed your server password', 'beltoft-services' ) ),
 			'reveal_database' => array( __( 'A connected app showed your database password', 'beltoft-services' ), __( 'A connected app showed your database password', 'beltoft-services' ) ),
 			'reveal_app'      => array( __( 'A connected app showed your app login', 'beltoft-services' ), __( 'A connected app showed your app login', 'beltoft-services' ) ),
@@ -64,6 +78,19 @@ final class Notice extends ServiceEmail {
 	}
 
 	/**
+	 * The words of the link at the end of the mail.
+	 *
+	 * @param string $kind One of KINDS.
+	 */
+	public static function link_text( string $kind ): string {
+		if ( 'app_action' === $kind ) {
+			return __( 'View your services in your account', 'beltoft-services' );
+		}
+
+		return self::is_database( $kind ) ? __( 'View your database in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' );
+	}
+
+	/**
 	 * The paragraphs of a kind.
 	 *
 	 * @param string $kind Kind.
@@ -71,8 +98,18 @@ final class Notice extends ServiceEmail {
 	 * @param string $app  The connected app that did it, when the kind is about one.
 	 * @return string[]
 	 */
-	public static function lines( string $kind, string $name, string $app = '' ): array {
+	public static function lines( string $kind, string $name, string $app = '', string $what = '' ): array {
 		switch ( $kind ) {
+			case 'app_action':
+				return array(
+					'' !== $app
+						/* translators: 1: name of the connected app, 2: name of the service, 3: what it did, for example reinstalled the server. */
+						? sprintf( __( 'An app you connected to your account (%1$s) changed %2$s at your request: it %3$s.', 'beltoft-services' ), $app, $name, $what )
+						/* translators: 1: name of the service, 2: what it did, for example reinstalled the server. */
+						: sprintf( __( 'An app you connected to your account changed %1$s at your request: it %2$s.', 'beltoft-services' ), $name, $what ),
+					__( 'If this was not you, disconnect the app under Account details, Security, and change your account password.', 'beltoft-services' ),
+				);
+
 			case 'reveal_server':
 			case 'reveal_database':
 			case 'reveal_app':

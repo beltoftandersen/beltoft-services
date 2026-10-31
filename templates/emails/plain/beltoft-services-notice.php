@@ -8,10 +8,10 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 } else {
 	echo __( 'Hi,', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }
-foreach ( \BeltoftServices\Emails\Notice::lines( (string) $notice_kind, (string) $product_name, (string) ( $notice_app ?? '' ) ) as $beltoft_services_line ) {
+foreach ( \BeltoftServices\Emails\Notice::lines( (string) $notice_kind, (string) $product_name, (string) ( $notice_app ?? '' ), (string) ( $notice_what ?? '' ) ) as $beltoft_services_line ) {
 	echo wp_strip_all_tags( $beltoft_services_line ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }
-echo ( \BeltoftServices\Emails\Notice::is_database( (string) $notice_kind ) ? __( 'View your database in your account:', 'beltoft-services' ) : __( 'View your server in your account:', 'beltoft-services' ) ) . ' ' . esc_url_raw( $account_url ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+echo \BeltoftServices\Emails\Notice::link_text( (string) $notice_kind ) . ':' . ' ' . esc_url_raw( $account_url ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 if ( $additional_content ) {
 	echo "\n" . wp_strip_all_tags( wptexturize( $additional_content ) ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }

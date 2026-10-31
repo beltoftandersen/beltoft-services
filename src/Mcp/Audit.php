@@ -23,18 +23,28 @@ final class Audit {
 	public const KEEP = 100;
 
 	/**
+	 * The lines of "asked, waiting for confirmation" are kept apart, with a quota of their own, so a flood of summaries can
+	 * never push out the lines of what was done.
+	 */
+	public const ASKED      = 'beltoft_services_mcp_audit_asked';
+	public const KEEP_ASKED = 20;
+
+	/**
 	 * Adds a line.
 	 *
 	 * @param int    $user_id Customer.
 	 * @param string $text    What happened, after "Claude: ".
+	 * @param bool   $asked   A summary that waits for the customer's yes (kept apart, with a smaller quota).
 	 */
-	public static function add( int $user_id, string $text ): void {
-		add_user_meta( $user_id, self::META, array( 'at' => time(), 'text' => 'Claude: ' . $text ) );
+	public static function add( int $user_id, string $text, bool $asked = false ): void {
+		$key = $asked ? self::ASKED : self::META;
 
-		$lines = self::lines( $user_id );
+		add_user_meta( $user_id, $key, array( 'at' => time(), 'text' => 'Claude: ' . $text ) );
 
-		foreach ( array_slice( $lines, 0, max( 0, count( $lines ) - self::KEEP ) ) as $old ) {
-			delete_user_meta( $user_id, self::META, $old );
+		$lines = self::stored( $user_id, $key );
+
+		foreach ( array_slice( $lines, 0, max( 0, count( $lines ) - ( $asked ? self::KEEP_ASKED : self::KEEP ) ) ) as $old ) {
+			delete_user_meta( $user_id, $key, $old );
 		}
 	}
 
@@ -45,7 +55,22 @@ final class Audit {
 	 * @return array<int, array{at: int, text: string}>
 	 */
 	public static function lines( int $user_id ): array {
-		$lines = array_values( array_filter( (array) get_user_meta( $user_id, self::META, false ), 'is_array' ) );
+		$lines = array_merge( self::stored( $user_id, self::META ), self::stored( $user_id, self::ASKED ) );
+
+		usort( $lines, static fn( $a, $b ) => (int) $a['at'] <=> (int) $b['at'] );
+
+		return $lines;
+	}
+
+	/**
+	 * The lines of one key, oldest first.
+	 *
+	 * @param int    $user_id Customer.
+	 * @param string $key     Meta key.
+	 * @return array<int, array{at: int, text: string}>
+	 */
+	private static function stored( int $user_id, string $key ): array {
+		$lines = array_values( array_filter( (array) get_user_meta( $user_id, $key, false ), 'is_array' ) );
 
 		usort( $lines, static fn( $a, $b ) => (int) $a['at'] <=> (int) $b['at'] );
 
