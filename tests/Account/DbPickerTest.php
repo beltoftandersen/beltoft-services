@@ -289,6 +289,7 @@ class DbPickerTest extends BackupTestCase {
 
 	public function test_the_servers_list_has_the_action_bar_empty_and_with_rows(): void {
 		$GLOBALS['wp']->query_vars['vps'] = '';
+		$this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000 ), array( 'slug' => 'vmbuy-' . wp_generate_password( 5, false ) ) );
 		ob_start();
 		Servers::render( array() );
 		$empty = (string) ob_get_clean();

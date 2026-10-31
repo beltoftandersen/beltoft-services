@@ -23,6 +23,56 @@ final class Tabs {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_licenses_account_groups', array( __CLASS__, 'groups' ) );
+		// After Beltoft Licenses (10) and the DNS claim item (20), before the Billing grouping and the Email position (99, 100).
+		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'always' ), 50 );
+	}
+
+	/**
+	 * Every logged-in customer sees Servers, Databases, Domains and Email in the menu, with or without a service of
+	 * the kind (Beltoft Licenses leaves a tab out when the customer has nothing on it). Each page then shows its
+	 * empty state and a create button. Apps stay as they were: only for customers who have one. The items are
+	 * put before Licenses and Log out; the site's menu order (beltoft_services_account_menu_order) places them.
+	 *
+	 * @param mixed $items Menu items.
+	 * @return mixed
+	 */
+	public static function always( $items ) {
+		if ( ! is_array( $items ) || ! is_user_logged_in() ) {
+			return $items;
+		}
+
+		$labels = array();
+
+		foreach ( self::groups( array() ) as $group ) {
+			$labels[ (string) $group['slug'] ] = (string) $group['label'];
+		}
+
+		$missing = array();
+
+		foreach ( array( Servers::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug() ) as $slug ) {
+			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
+				$missing[ $slug ] = $labels[ $slug ];
+			}
+		}
+
+		if ( ! $missing ) {
+			return $items;
+		}
+
+		$before = array( \BeltoftLicenses\Account\Endpoint::slug(), 'customer-logout' );
+		$out    = array();
+		$placed = false;
+
+		foreach ( $items as $key => $label ) {
+			if ( ! $placed && in_array( $key, $before, true ) ) {
+				$out    += $missing;
+				$placed  = true;
+			}
+
+			$out[ $key ] = $label;
+		}
+
+		return $placed ? $out : $out + $missing;
 	}
 
 	/**

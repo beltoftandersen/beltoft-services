@@ -155,17 +155,25 @@ final class Domains {
 	}
 
 	/**
-	 * The site's page for registering a new domain (setting domain_search_url), or '' when none is set.
+	 * The site's page for registering a new domain (setting domain_search_url), else the first domain product, or '' when there is none.
 	 */
 	public static function url_register(): string {
 		$url = trim( (string) Settings::get( 'domain_search_url' ) );
 
 		// A path on this site, or a full address; a scheme-less //host is neither.
-		if ( '' === $url || 0 === strpos( $url, '//' ) ) {
-			return '';
+		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+
+		if ( '' === $url ) {
+			$url = ServiceArea::product_url( array( 'domain' ) );
 		}
 
-		return esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+		/**
+		 * The address of the "Register a domain" button: the domain search page setting, else the first domain
+		 * product. Return '' for no button.
+		 *
+		 * @param string $url Address, or ''.
+		 */
+		return (string) apply_filters( 'beltoft_services_domains_add_url', $url );
 	}
 
 	/**

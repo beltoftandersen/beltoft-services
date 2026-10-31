@@ -346,7 +346,8 @@ final class MailAccountTest extends MailTestCase {
 
 		wp_set_current_user( self::factory()->user->create() );
 		Overview::reset();
-		$this->assertSame( '', Overview::section( 'mail' ) );
+		$this->assertStringNotContainsString( 'dash.example', Overview::section( 'mail' ) );
+		$this->assertStringContainsString( 'You have no email domains yet.', Overview::section( 'mail' ) );
 	}
 
 	public function test_the_mail_notice_points_to_the_email_page(): void {
@@ -411,14 +412,14 @@ final class MailAccountTest extends MailTestCase {
 		$ref = new \ReflectionMethod( Email::class, 'buttons' );
 		$ref->setAccessible( true );
 		$this->assertSame( array(), $ref->invoke( $this->area() ), 'No product, no button.' );
-		$this->assertStringNotContainsString( 'Add an email domain', $this->render( array() ) );
+		$this->assertStringNotContainsString( 'Create an email domain', $this->render( array() ) );
 
 		$product = $this->service_product( 'mail', self::PLAN, array( 'slug' => 'mail-buy' ) );
 		$url     = get_permalink( $product->get_id() );
 		$buttons = $ref->invoke( $this->area() );
-		$this->assertSame( 'Add an email domain', $buttons[0]['label'] );
+		$this->assertSame( 'Create an email domain', $buttons[0]['label'] );
 		$this->assertSame( $url, $buttons[0]['url'] );
-		$this->assertStringContainsString( 'Add an email domain', $this->render( array() ) );
+		$this->assertStringContainsString( 'Create an email domain', $this->render( array() ) );
 
 		add_filter( 'beltoft_services_email_add_url', static fn() => 'https://example.org/buy/' );
 		$this->assertSame( 'https://example.org/buy/', $ref->invoke( $this->area() )[0]['url'] );
