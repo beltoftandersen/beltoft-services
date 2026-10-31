@@ -291,4 +291,48 @@ class AppPagesTest extends TestCase {
 		$this->assertStringNotContainsString( Registry::get( 'http' )->label(), $html );
 		$this->assertSame( '', $this->area()->label_of( $app ) );
 	}
+
+	public function test_a_plugin_can_drop_the_back_link_and_the_head_of_a_page_below_the_service(): void {
+		$app = $this->app( $this->user );
+		Slugs::for_license( $app->license() );
+		$seen = array();
+		add_filter(
+			'beltoft_services_account_page_chrome',
+			static function ( $chrome, $page ) use ( &$seen ) {
+				$seen = $page;
+
+				return array() === $page['path'];
+			},
+			10,
+			2
+		);
+		add_filter(
+			'beltoft_services_account_page_body',
+			static function () {
+				echo '<p class="own-page">x</p>';
+
+				return true;
+			}
+		);
+
+		$this->go( 'odoowoo' );
+		$list = $this->render( $app );
+		$this->assertStringContainsString( 'All apps', $list );
+		$this->assertStringContainsString( 'beltoft-services-page__name', $list );
+		$this->assertStringNotContainsString( 'beltoft-services-area-page--bare', $list );
+
+		$this->go( 'odoowoo/shop' );
+		$sub = $this->render( $app );
+		$this->assertSame( array( 'shop' ), $seen['path'] );
+		$this->assertStringContainsString( 'own-page', $sub );
+		$this->assertStringNotContainsString( 'All apps', $sub );
+		$this->assertStringNotContainsString( 'beltoft-services-page__name', $sub );
+		$this->assertStringContainsString( 'beltoft-services-area-page--bare', $sub );
+		$this->assertStringContainsString( 'beltoft-services-panel__head" hidden', $sub, 'The status script keeps its elements.' );
+		$this->assertStringContainsString( 'data-badge', $sub );
+
+		remove_all_filters( 'beltoft_services_account_page_chrome' );
+		$this->go( 'odoowoo/shop' );
+		$this->assertStringContainsString( 'All apps', $this->render( $app ) );
+	}
 }
