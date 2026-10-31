@@ -95,9 +95,10 @@ final class DbTermsField {
 		$link  = '<a href="' . esc_url( $terms->terms_url() ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'terms', 'beltoft-services' ) . '</a>';
 		$label = wp_kses( sprintf( $terms->terms_label(), $link ), array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) ) );
 
-		echo '<p class="form-row validate-required beltoft-services-db-terms" id="' . esc_attr( self::POST_KEY ) . '_field"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox">';
-		echo '<input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" name="' . esc_attr( self::POST_KEY ) . '" value="1" required /> ';
-		echo '<span>' . $label . '</span>&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '">*</abbr></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
+		// Inline styles: next to WooCommerce's own terms row, whatever the theme does to a bold form label.
+		echo '<p class="form-row validate-required beltoft-services-db-terms" id="' . esc_attr( self::POST_KEY ) . '_field"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox" style="display:flex;align-items:baseline;gap:8px;font-weight:400">';
+		echo '<input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" name="' . esc_attr( self::POST_KEY ) . '" value="1" required style="margin:0;flex:none" />';
+		echo '<span class="woocommerce-terms-and-conditions-checkbox-text">' . $label . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></span></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
 	}
 
 	/**
