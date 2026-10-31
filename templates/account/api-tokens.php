@@ -14,6 +14,7 @@
  * @var string                                          $base     Base address of the API, with a trailing slash.
  * @var string                                          $username The customer's username.
  * @var int                                             $max      Tokens allowed.
+ * @var string                                          $docs_url Address of the public API documentation page, empty when not set.
  * @var array{on: bool, allowed: bool, url: string, apps: array<int, array<string, mixed>>} $mcp Use with Claude (MCP).
  */
 
@@ -91,6 +92,13 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 		</form>
 	<?php endif; ?>
 
+	<?php if ( '' !== (string) ( $docs_url ?? '' ) ) : ?>
+		<p class="beltoft-services-api__docs-link">
+			<?php esc_html_e( 'Send your username and the token as HTTP Basic authentication over HTTPS. All replies are JSON.', 'beltoft-services' ); ?>
+			<?php esc_html_e( 'Every request, parameter and reply is described in the API documentation.', 'beltoft-services' ); ?>
+			<a href="<?php echo esc_url( $docs_url ); ?>"><?php esc_html_e( 'Read the API documentation', 'beltoft-services' ); ?></a>
+		</p>
+	<?php else : ?>
 	<details class="beltoft-services-api__docs">
 		<summary><?php esc_html_e( 'How to use the API', 'beltoft-services' ); ?></summary>
 		<p><?php esc_html_e( 'Send your username and token as HTTP Basic authentication over HTTPS. All replies are JSON. The examples use 123 for the id of a service; the ids are in the address of each service page.', 'beltoft-services' ); ?></p>
@@ -116,6 +124,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 		<pre><code><?php echo esc_html( 'curl -u "' . $username . ':YOUR TOKEN" -X POST ' . $base . 'resources/123/actions/reboot' ); ?></code></pre>
 		<p><?php esc_html_e( 'Every change made with a token is written to the history of the service. Passwords, console access and actions that destroy something, such as reinstall, restore and delete, are only available in your dashboard. Requests are limited per token; a reply of 429 means wait a minute.', 'beltoft-services' ); ?></p>
 	</details>
+	<?php endif; ?>
 	<?php if ( $mcp['on'] ) : ?>
 		<h3 id="use-with-claude"><?php esc_html_e( 'Use with Claude (MCP)', 'beltoft-services' ); ?></h3>
 		<p><?php esc_html_e( 'Connect Claude to your account to ask about your servers, databases, domains and DNS in a chat. You choose what Claude may do when you connect, and you can disconnect it here at any time.', 'beltoft-services' ); ?></p>

@@ -1,0 +1,19 @@
+.beltoft-services-apiref { max-width: 100%; min-width: 0; color: var(--navy, #0c1535); line-height: 1.6; }
+.beltoft-services-apiref > section { margin: 0 0 40px; min-width: 0; }
+.beltoft-services-apiref h2 { margin: 0 0 12px; }
+.beltoft-services-apiref h3 { margin: 24px 0 8px; overflow-wrap: anywhere; }
+.beltoft-services-apiref p, .beltoft-services-apiref ol, .beltoft-services-apiref ul { max-width: 70ch; }
+.beltoft-services-apiref code { padding: 0; border: 0; background: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; overflow-wrap: anywhere; }
+.beltoft-services-apiref__code { box-sizing: border-box; max-width: 100%; margin: 8px 0 16px; padding: 12px 16px; background: var(--bg-warm, #eeece6); overflow-x: auto; }
+.beltoft-services-apiref__code code { overflow-wrap: normal; white-space: pre; }
+.beltoft-services-apiref__op { margin: 0 0 28px; padding: 0 0 20px; border-bottom: 1px solid var(--rule, #d6d2c8); min-width: 0; }
+.beltoft-services-apiref__method { display: inline-block; min-width: 4.5em; font-weight: 700; }
+.beltoft-services-apiref__meta { color: var(--ink-soft, #5e7080); font-size: 0.9em; }
+.beltoft-services-apiref__scroll { max-width: 100%; margin: 8px 0 16px; overflow-x: auto; }
+.beltoft-services-apiref table { width: 100%; min-width: 520px; border-collapse: collapse; }
+.beltoft-services-apiref caption { padding: 0 0 6px; font-weight: 600; text-align: left; }
+.beltoft-services-apiref th, .beltoft-services-apiref td { padding: 8px 16px 8px 0; text-align: left; vertical-align: top; }
+.beltoft-services-apiref th { font-weight: 600; }
+@media (max-width: 600px) {
+	.beltoft-services-apiref table { min-width: 480px; }
+}
