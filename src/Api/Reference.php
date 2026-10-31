@@ -42,8 +42,10 @@ final class Reference {
 	/**
 	 * Handler of the shortcode.
 	 */
-	public static function shortcode(): string {
-		return self::html();
+	public static function shortcode( $atts = array() ): string {
+		$atts = shortcode_atts( array( 'layout' => 'default' ), (array) $atts, self::SHORTCODE );
+
+		return self::html( 'full' === sanitize_key( (string) $atts['layout'] ) ? 'full' : 'default' );
 	}
 
 	/**
@@ -55,8 +57,14 @@ final class Reference {
 
 	/**
 	 * The reference as HTML.
+	 *
+	 * @param string $layout default (the page column) or full (a docs app that uses the full width of the browser).
 	 */
-	public static function html(): string {
+	public static function html( string $layout = 'default' ): string {
+		if ( 'full' === $layout ) {
+			return self::html_full();
+		}
+
 		/**
 		 * Whether to load the API reference stylesheet.
 		 *
@@ -79,6 +87,43 @@ final class Reference {
 		wc_get_template( 'api-reference.php', self::data(), 'beltoft-services/', BELTOFT_SERVICES_PATH . 'templates/' );
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * The full width layout: its own stylesheet, script and template.
+	 */
+	private static function html_full(): string {
+		/** This filter is documented in html(). */
+		if ( apply_filters( 'beltoft_services_api_reference_css', true ) ) {
+			wp_enqueue_style( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference-full.css' ) );
+		}
+
+		/** This filter is documented in html(). */
+		if ( apply_filters( 'beltoft_services_api_reference_js', true ) ) {
+			wp_enqueue_script( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference-full.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
+		}
+
+		$data              = self::data();
+		$data['languages'] = self::languages();
+
+		ob_start();
+		wc_get_template( 'api-reference-full.php', $data, 'beltoft-services/', BELTOFT_SERVICES_PATH . 'templates/' );
+
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * The languages of the code samples: key => label.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function languages(): array {
+		return array(
+			'curl'   => 'curl',
+			'php'    => 'PHP',
+			'python' => 'Python',
+			'js'     => 'JavaScript',
+		);
 	}
 
 	/**
@@ -197,6 +242,8 @@ final class Reference {
 			$op['short'] = 1 === preg_match( '#^/resources/\{id\}(/.+)$#D', $op['path'], $m ) ? '...' . $m[1] : $op['path'];
 			$op['tools'] = self::tools_for( $op['method'], $op['path'] );
 			$op['curl']  = self::curl( $op );
+			$op['samples'] = self::samples( $op );
+			$op['status_label'] = $op['status'] . ' ' . get_status_header_desc( (int) $op['status'] );
 			$op['sample'] = self::sample_reply( $op );
 
 			$groups[ $key ]['ops'][] = $op;
@@ -343,11 +390,12 @@ final class Reference {
 	}
 
 	/**
-	 * A curl request that works with a personal token.
+	 * The request of an example: method, URL with example values, whether it needs the token, the JSON body.
 	 *
 	 * @param array<string, mixed> $op Operation.
+	 * @return array{method: string, url: string, auth: bool, body: array<string, mixed>}
 	 */
-	private static function curl( array $op ): string {
+	private static function request( array $op ): array {
 		$base  = untrailingslashit( rest_url( Routes::NAMESPACE ) );
 		$path  = $op['path'];
 		$query = array();
@@ -369,24 +417,182 @@ final class Reference {
 			}
 		}
 
-		$url  = $base . $path . ( $query ? ( false === strpos( $base, '?' ) ? '?' : '&' ) . http_build_query( $query ) : '' );
-		$auth = 'none' === $op['scope'] ? '' : ' -u "USERNAME:TOKEN"';
+		return array(
+			'method' => (string) $op['method'],
+			'url'    => $base . $path . ( $query ? ( false === strpos( $base, '?' ) ? '?' : '&' ) . http_build_query( $query ) : '' ),
+			'auth'   => 'none' !== $op['scope'],
+			'body'   => $body,
+		);
+	}
+
+	/**
+	 * A curl request that works with a personal token.
+	 *
+	 * @param array<string, mixed> $op Operation.
+	 */
+	private static function curl( array $op ): string {
+		$req   = self::request( $op );
+		$auth  = $req['auth'] ? ' -u "USERNAME:TOKEN"' : '';
 		$lines = array( 'curl' . $auth );
 
-		if ( 'GET' !== $op['method'] ) {
-			$lines[] = '-X ' . $op['method'];
+		if ( 'GET' !== $req['method'] ) {
+			$lines[] = '-X ' . $req['method'];
 		}
 
-		if ( $body ) {
+		if ( $req['body'] ) {
 			$lines[] = '-H "Content-Type: application/json"';
-			$lines[] = "-d '" . wp_json_encode( $body, JSON_UNESCAPED_SLASHES ) . "'";
+			$lines[] = "-d '" . wp_json_encode( $req['body'], JSON_UNESCAPED_SLASHES ) . "'";
 		}
 
-		$lines[] = "'" . $url . "'";
+		$lines[] = "'" . $req['url'] . "'";
 
-		$out = implode( " \\\n  ", $lines );
+		return implode( " \\\n  ", $lines );
+	}
 
-		return $out;
+	/**
+	 * The example of an operation in every language, with a personal token.
+	 *
+	 * @param array<string, mixed> $op Operation.
+	 * @return array<string, string> Language key => code.
+	 */
+	public static function samples( array $op ): array {
+		$req = self::request( $op );
+
+		return array(
+			'curl'   => self::curl( $op ),
+			'php'    => self::php_sample( $req ),
+			'python' => self::python_sample( $req ),
+			'js'     => self::js_sample( $req ),
+		);
+	}
+
+	/**
+	 * A value as a literal: PHP array syntax or Python syntax.
+	 *
+	 * @param mixed  $value  Value.
+	 * @param string $style  php or python.
+	 * @param int    $depth  Nesting depth, for the indent.
+	 */
+	private static function literal( $value, string $style, int $depth = 0 ): string {
+		$py  = 'python' === $style;
+		$pad = str_repeat( '    ', $depth + 1 );
+		$end = str_repeat( '    ', $depth );
+
+		if ( $value instanceof \stdClass ) {
+			$value = array();
+		}
+
+		if ( is_array( $value ) ) {
+			if ( ! $value ) {
+				return $py ? '{}' : 'array()';
+			}
+
+			$list  = array_keys( $value ) === range( 0, count( $value ) - 1 );
+			$lines = array();
+
+			foreach ( $value as $key => $item ) {
+				$lines[] = $pad . ( $list ? '' : ( $py ? wp_json_encode( (string) $key, JSON_UNESCAPED_SLASHES ) : "'" . addcslashes( (string) $key, "'\\" ) . "'" ) . ( $py ? ': ' : ' => ' ) ) . self::literal( $item, $style, $depth + 1 ) . ',';
+			}
+
+			$open  = $py ? ( $list ? '[' : '{' ) : 'array(';
+			$close = $py ? ( $list ? ']' : '}' ) : ')';
+
+			return $open . "\n" . implode( "\n", $lines ) . "\n" . $end . $close;
+		}
+
+		if ( is_bool( $value ) ) {
+			return $py ? ( $value ? 'True' : 'False' ) : ( $value ? 'true' : 'false' );
+		}
+
+		if ( null === $value ) {
+			return $py ? 'None' : 'null';
+		}
+
+		if ( is_int( $value ) || is_float( $value ) ) {
+			return (string) $value;
+		}
+
+		return $py ? (string) wp_json_encode( (string) $value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) : "'" . addcslashes( (string) $value, "'\\" ) . "'";
+	}
+
+	/**
+	 * Plain PHP with the curl functions.
+	 *
+	 * @param array{method: string, url: string, auth: bool, body: array<string, mixed>} $req Request.
+	 */
+	private static function php_sample( array $req ): string {
+		$opts = array();
+
+		if ( $req['auth'] ) {
+			$opts[] = "\tCURLOPT_USERPWD => 'USERNAME:TOKEN',";
+		}
+
+		if ( 'GET' !== $req['method'] ) {
+			$opts[] = "\tCURLOPT_CUSTOMREQUEST => '" . $req['method'] . "',";
+		}
+
+		if ( $req['body'] ) {
+			$opts[] = "\tCURLOPT_HTTPHEADER => array( 'Content-Type: application/json' ),";
+			$opts[] = "\tCURLOPT_POSTFIELDS => json_encode(\n\t\t" . str_replace( "\n", "\n\t", self::literal( $req['body'], 'php' ) ) . "\n\t),";
+		}
+
+		$opts[] = "\tCURLOPT_RETURNTRANSFER => true,";
+
+		return "<?php\n\$ch = curl_init( '" . addcslashes( $req['url'], "'\\" ) . "' );\ncurl_setopt_array(\n\t\$ch,\n\tarray(\n" . implode( "\n", array_map( static fn( $l ) => "\t" . $l, $opts ) ) . "\n\t)\n);\n\$response = curl_exec( \$ch );\ncurl_close( \$ch );\n\n\$data = json_decode( \$response, true );";
+	}
+
+	/**
+	 * Python with the requests library.
+	 *
+	 * @param array{method: string, url: string, auth: bool, body: array<string, mixed>} $req Request.
+	 */
+	private static function python_sample( array $req ): string {
+		$args = array( '    ' . wp_json_encode( $req['url'], JSON_UNESCAPED_SLASHES ) . ',' );
+
+		if ( $req['auth'] ) {
+			$args[] = '    auth=("USERNAME", "TOKEN"),';
+		}
+
+		if ( $req['body'] ) {
+			$args[] = '    json=' . self::literal( $req['body'], 'python', 1 ) . ',';
+		}
+
+		return "import requests\n\nresponse = requests." . strtolower( $req['method'] ) . "(\n" . implode( "\n", $args ) . "\n)\nprint(response.json())";
+	}
+
+	/**
+	 * JavaScript with fetch.
+	 *
+	 * @param array{method: string, url: string, auth: bool, body: array<string, mixed>} $req Request.
+	 */
+	private static function js_sample( array $req ): string {
+		$headers = array();
+		$opts    = array();
+
+		if ( 'GET' !== $req['method'] ) {
+			$opts[] = '  method: "' . $req['method'] . '",';
+		}
+
+		if ( $req['auth'] ) {
+			$headers[] = '    "Authorization": "Basic " + btoa("USERNAME:TOKEN"),';
+		}
+
+		if ( $req['body'] ) {
+			$headers[] = '    "Content-Type": "application/json",';
+		}
+
+		if ( $headers ) {
+			$opts[] = "  headers: {\n" . implode( "\n", $headers ) . "\n  },";
+		}
+
+		if ( $req['body'] ) {
+			$json   = (string) wp_json_encode( $req['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			$opts[] = '  body: JSON.stringify(' . str_replace( "\n", "\n  ", $json ) . '),';
+		}
+
+		$call = 'fetch(' . wp_json_encode( $req['url'], JSON_UNESCAPED_SLASHES ) . ( $opts ? ", {\n" . implode( "\n", $opts ) . "\n}" : '' ) . ')';
+
+		return 'const response = await ' . $call . ";\nconst data = await response.json();";
 	}
 
 	/**
