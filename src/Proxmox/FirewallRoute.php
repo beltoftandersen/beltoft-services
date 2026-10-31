@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;
+use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Progress;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -68,10 +69,13 @@ final class FirewallRoute {
 	}
 
 	/**
-	 * The address the customer is using (IPv4 only), or ''.
+	 * The address the customer is using (IPv4 only), or ''. In a call from a connected app the visitor is the app's
+	 * server, not the customer, so only an address the call names (body my_ip) counts there.
+	 *
+	 * @param array<string, mixed> $body Request body.
 	 */
-	private static function my_ip(): string {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
+	private static function my_ip( array $body = array() ): string {
+		$ip = Endpoint::inside() ? ( is_string( $body['my_ip'] ?? null ) ? trim( $body['my_ip'] ) : '' ) : ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '' );
 
 		return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '';
 	}
@@ -179,7 +183,7 @@ final class FirewallRoute {
 			return self::error( $rules->get_error_code(), $rules->get_error_message(), 422, is_array( $data ) && isset( $data['rule'] ) ? array( 'rule' => (int) $data['rule'] ) : array() );
 		}
 
-		if ( $on && ! $ack && Firewall::blocks_ssh( $rules, self::my_ip() ) ) {
+		if ( $on && ! $ack && Firewall::blocks_ssh( $rules, self::my_ip( $body ) ) ) {
 			return self::error( 'beltoft_services_ssh_closed', __( 'No rule lets you in over SSH from where you are now. Add an SSH rule, or tick the box to confirm that you do not need SSH.', 'beltoft-services' ), 409 );
 		}
 
