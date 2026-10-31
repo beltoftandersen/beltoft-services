@@ -182,14 +182,16 @@ final class Panel {
 		 * @param array<string, mixed> $view     Display values of the license.
 		 * @param array<string, mixed> $page     The page being printed: license and requested tab.
 		 */
-		$handled = $owner && null !== $page && (bool) apply_filters( 'beltoft_services_account_page_head', false, $resource, $license, is_array( $view ) ? $view : array(), $page );
+		$bare    = null !== $page && isset( $page['chrome'] ) && false === $page['chrome'];
+		$handled = ! $bare && $owner && null !== $page && (bool) apply_filters( 'beltoft_services_account_page_head', false, $resource, $license, is_array( $view ) ? $view : array(), $page );
 
 		if ( ! $handled ) {
 			printf(
-				'<p class="beltoft-services-panel__head"><span class="beltoft-services-badge beltoft-services-badge--%1$s" data-badge>%2$s</span> <span class="beltoft-services-panel__message" data-message>%3$s</span></p>',
+				'<p class="beltoft-services-panel__head"%4$s><span class="beltoft-services-badge beltoft-services-badge--%1$s" data-badge>%2$s</span> <span class="beltoft-services-panel__message" data-message>%3$s</span></p>',
 				esc_attr( $group ),
 				esc_html( self::label( $state, $resource ) ),
-				esc_html( self::message( $state, $resource ) )
+				esc_html( self::message( $state, $resource ) ),
+				$bare ? ' hidden' : ''
 			);
 		}
 
