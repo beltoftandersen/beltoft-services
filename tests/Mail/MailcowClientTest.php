@@ -60,6 +60,7 @@ final class MailcowClientTest extends TestCase {
 		$c->edit_mailbox( 'x@a.example', array( 'quota' => '100' ) );
 		$c->delete_mailbox( 'x@a.example' );
 		$c->set_mailbox_rate_limit( 'x@a.example', 500, 'd' );
+		$c->set_domain_rate_limit( 'a.example', 30, 'm' );
 		$c->delete_alias( 6 );
 
 		$seen = array_map( static fn( $call ) => array( str_replace( 'https://mail.example.net/api/v1/', '', $call['url'] ), json_decode( $call['args']['body'], true ) ), $this->http_calls() );
@@ -72,6 +73,7 @@ final class MailcowClientTest extends TestCase {
 				array( 'edit/mailbox', array( 'items' => array( 'x@a.example' ), 'attr' => array( 'quota' => '100' ) ) ),
 				array( 'delete/mailbox', array( 'x@a.example' ) ),
 				array( 'edit/rl-mbox', array( 'items' => array( 'x@a.example' ), 'attr' => array( 'rl_value' => '500', 'rl_frame' => 'd' ) ) ),
+				array( 'edit/rl-domain', array( 'items' => array( 'a.example' ), 'attr' => array( 'rl_value' => '30', 'rl_frame' => 'm' ) ) ),
 				array( 'delete/alias', array( '6' ) ),
 			),
 			$seen

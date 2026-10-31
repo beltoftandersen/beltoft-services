@@ -140,19 +140,18 @@ final class MailboxesTest extends MailTestCase {
 		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( MailAccess::META ) );
 	}
 
-	public function test_send_limits_follow_the_settings(): void {
-		$this->settings( array( 'mail_rl_day' => 0, 'mail_rl_minute' => 30 ) );
+	public function test_the_mailbox_limit_is_the_daily_setting_only(): void {
 		$r = $this->ready_mail( 'rl2.example' );
 		Mailboxes::create( $r, 'a' );
-		$this->assertSame( array( 'value' => 30, 'frame' => 'm' ), $this->mailcow->mailbox( 'a@rl2.example' )['rl'] );
+		$this->assertSame( array( 'value' => 500, 'frame' => 'd' ), $this->mailcow->mailbox( 'a@rl2.example' )['rl'] );
 
-		$this->settings( array( 'mail_rl_day' => 0, 'mail_rl_minute' => 0 ) );
+		$this->settings( array( 'mail_rl_day' => 0, 'mail_rl_minute' => 30 ) );
 		Mailboxes::create( $r, 'b' );
-		$this->assertFalse( $this->mailcow->mailbox( 'b@rl2.example' )['rl'] );
+		$this->assertFalse( $this->mailcow->mailbox( 'b@rl2.example' )['rl'], 'The minute limit belongs to the domain.' );
 
-		$this->settings( array( 'mail_rl_day' => 100000, 'mail_rl_minute' => 30 ) );
+		$this->settings( array( 'mail_rl_day' => 100, 'mail_rl_minute' => 0 ) );
 		Mailboxes::create( $r, 'c' );
-		$this->assertSame( 'm', $this->mailcow->mailbox( 'c@rl2.example' )['rl']['frame'], 'The minute limit is the stricter one.' );
+		$this->assertSame( array( 'value' => 100, 'frame' => 'd' ), $this->mailcow->mailbox( 'c@rl2.example' )['rl'] );
 	}
 
 	public function test_delete_forgets_the_password_and_stays_inside_the_domain(): void {

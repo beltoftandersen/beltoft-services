@@ -96,6 +96,10 @@ final class LiveMailcowClient implements MailcowClient {
 		return $this->post( 'edit/rl-mbox', array( 'items' => array( $email ), 'attr' => array( 'rl_value' => (string) $value, 'rl_frame' => $frame ) ) );
 	}
 
+	public function set_domain_rate_limit( string $domain, int $value, string $frame ) {
+		return $this->post( 'edit/rl-domain', array( 'items' => array( $domain ), 'attr' => array( 'rl_value' => (string) $value, 'rl_frame' => $frame ) ) );
+	}
+
 	public function add_alias( string $address, string $goto ) {
 		$reply = $this->post( 'add/alias', array( 'address' => $address, 'goto' => $goto, 'active' => '1' ) );
 
