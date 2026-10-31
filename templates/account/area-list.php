@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array<int, array<string, mixed>> $rows  Rows from BeltoftServices\Account\ServiceArea::row(): id, url, name, details, state, tone (ok, busy, off, bad), extra, action (label and url, or empty).
+ * @var array<int, array<string, mixed>> $rows  Rows from BeltoftServices\Account\ServiceArea::row(): id, url, name, details, state, tone (ok, busy, off, bad), extra, action (label and url, 'internal' true for a page inside My Account, or empty).
  * @var string                           $empty Text when there are no rows.
  * @var array<int, array<string, string>> $buttons Action bar buttons (label, url), from ServiceArea::buttons().
  */
@@ -42,7 +42,7 @@ if ( ! $rows ) {
 			</span>
 			<span class="beltoft-services-srv__extra"><?php echo esc_html( $beltoft_services_row['extra'] ); ?></span>
 			<?php if ( $beltoft_services_row['action'] ) : ?>
-				<a class="button woocommerce-button beltoft-services-http-open" href="<?php echo esc_url( $beltoft_services_row['action']['url'] ); ?>" data-beltoft-services-open target="_blank" rel="noopener noreferrer"><?php echo esc_html( $beltoft_services_row['action']['label'] ); ?></a>
+				<a class="button woocommerce-button beltoft-services-http-open" href="<?php echo esc_url( $beltoft_services_row['action']['url'] ); ?>"<?php echo empty( $beltoft_services_row['action']['internal'] ) ? ' data-beltoft-services-open target="_blank" rel="noopener noreferrer"' : ''; ?>><?php echo esc_html( $beltoft_services_row['action']['label'] ); ?></a>
 			<?php else : ?>
 				<span class="beltoft-services-srv__go" aria-hidden="true">&rsaquo;</span>
 			<?php endif; ?>

@@ -354,13 +354,13 @@ final class Slugs {
 	 *
 	 * @param string $endpoint My Account endpoint.
 	 * @param string $type     Type of service.
-	 * @return array{first: string, second: string, id: int, numeric: bool}
+	 * @return array{first: string, second: string, rest: array<int, string>, id: int, numeric: bool}
 	 */
 	public static function parse( string $endpoint, string $type ): array {
 		global $wp;
 
 		$value = is_object( $wp ) && isset( $wp->query_vars[ $endpoint ] ) ? (string) $wp->query_vars[ $endpoint ] : '';
-		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ), 3 );
+		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
 		$first = strtolower( $parts[0] );
 
 		$numeric = ctype_digit( $first );
@@ -373,9 +373,31 @@ final class Slugs {
 		return array(
 			'first'   => $first,
 			'second'  => isset( $parts[1] ) ? sanitize_key( $parts[1] ) : '',
+			'rest'    => self::segments( array_slice( $parts, 1 ) ),
 			'id'      => $id,
 			'numeric' => $numeric,
 		);
+	}
+
+	/**
+	 * The parts of an address after the service, cleaned: lowercase letters, digits, dots, underscores and hyphens, no empty part.
+	 * A plugin that draws pages below a service page (see ServiceArea::page_body hook) reads them.
+	 *
+	 * @param array<int, string> $parts Raw parts.
+	 * @return array<int, string>
+	 */
+	public static function segments( array $parts ): array {
+		$out = array();
+
+		foreach ( $parts as $part ) {
+			$part = (string) preg_replace( '/[^a-z0-9._-]/', '', strtolower( (string) $part ) );
+
+			if ( '' !== $part && '.' !== $part && '..' !== $part ) {
+				$out[] = $part;
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -405,7 +427,7 @@ final class Slugs {
 	 *
 	 * @param string   $endpoint My Account endpoint.
 	 * @param string   $type     Type of service.
-	 * @param callable $url      Builds an address: fn( array $license, string $tab ): string.
+	 * @param callable $url      Builds an address: fn( array $license, string $tab, array $rest ): string (rest: every part after the service).
 	 */
 	public static function redirect_target( string $endpoint, string $type, callable $url ): string {
 		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( $endpoint ) || ! is_user_logged_in() ) {
@@ -424,7 +446,7 @@ final class Slugs {
 			return '';
 		}
 
-		$target = (string) $url( $license, $asked['second'] );
+		$target = (string) $url( $license, $asked['second'], $asked['rest'] );
 		$query  = isset( $_SERVER['QUERY_STRING'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['QUERY_STRING'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only copied to the new address.
 
 		if ( '' !== $query ) {
