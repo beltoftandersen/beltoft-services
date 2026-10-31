@@ -53,6 +53,8 @@ final class Plugin {
 		Mail\MailDns::register();
 		Mail\MailJobs::register();
 		Mail\MailRoutes::register();
+		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
+		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
 		Domains\Search::register();
 		Domains\Cart::register();
 		Domains\TldRules::register();

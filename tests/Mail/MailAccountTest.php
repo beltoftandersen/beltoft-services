@@ -349,4 +349,58 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'localStorage', $js, 'A password is not stored in the browser.' );
 		$this->assertStringNotContainsString( 'sessionStorage', $js );
 	}
+
+	public function test_the_assets_are_enqueued_by_the_panel_hook_on_the_email_endpoint_only(): void {
+		do_action( 'beltoft_services_account_assets', 'beltoft-services-account', 'databases' );
+		$this->assertFalse( wp_style_is( 'beltoft-services-mail', 'enqueued' ) );
+		$this->assertFalse( wp_script_is( 'beltoft-services-mail', 'enqueued' ) );
+
+		do_action( 'beltoft_services_account_assets', 'beltoft-services-account', $this->area()->slug() );
+		$this->assertTrue( wp_style_is( 'beltoft-services-mail', 'enqueued' ) );
+		$this->assertTrue( wp_script_is( 'beltoft-services-mail', 'enqueued' ) );
+		$this->assertContains( 'beltoft-services-account', wp_scripts()->registered['beltoft-services-mail']->deps );
+	}
+
+	public function test_the_menu_item_sits_right_after_domains(): void {
+		$items = array( 'dashboard' => 'Dashboard', 'orders' => 'Orders', 'domains' => 'Domains & DNS', 'vps' => 'VPS', 'billing' => 'Billing', 'support' => 'Support', 'email' => 'Email', 'customer-logout' => 'Log out' );
+
+		$this->assertSame( array( 'dashboard', 'orders', 'domains', 'email', 'vps', 'billing', 'support', 'customer-logout' ), array_keys( Email::menu( $items ) ) );
+
+		unset( $items['domains'] );
+		$this->assertSame( array_keys( $items ), array_keys( Email::menu( $items ) ), 'No Domains item: left alone.' );
+		$this->assertSame( array( 'a' => 'A' ), Email::menu( array( 'a' => 'A' ) ) );
+	}
+
+	public function test_the_counts_follow_create_and_delete_not_only_the_routes(): void {
+		$r = $this->ready_mail( 'count.example', array(), $this->user );
+
+		Mailboxes::create( $r, 'a' );
+		Mailboxes::create( Resource::find( $r->id() ), 'b' );
+		Mailboxes::create( Resource::find( $r->id() ), 'c' );
+		$this->assertSame( 3, (int) Resource::find( $r->id() )->get( 'mail_boxes' ) );
+		$this->assertSame( '3 of 5 mailboxes', $this->area()->row( $this->views( Resource::find( $r->id() ) )[0], Resource::find( $r->id() ) )['details'] );
+
+		Mailboxes::delete( Resource::find( $r->id() ), 'b@count.example' );
+		$this->assertSame( 2, (int) Resource::find( $r->id() )->get( 'mail_boxes' ) );
+	}
+
+	public function test_the_add_button_shows_only_when_an_email_product_exists_and_the_address_can_be_changed(): void {
+		$ref = new \ReflectionMethod( Email::class, 'buttons' );
+		$ref->setAccessible( true );
+		$this->assertSame( array(), $ref->invoke( $this->area() ), 'No product, no button.' );
+		$this->assertStringNotContainsString( 'Add an email domain', $this->render( array() ) );
+
+		$product = $this->service_product( 'mail', self::PLAN, array( 'slug' => 'mail-buy' ) );
+		$url     = get_permalink( $product->get_id() );
+		$buttons = $ref->invoke( $this->area() );
+		$this->assertSame( 'Add an email domain', $buttons[0]['label'] );
+		$this->assertSame( $url, $buttons[0]['url'] );
+		$this->assertStringContainsString( 'Add an email domain', $this->render( array() ) );
+
+		add_filter( 'beltoft_services_email_add_url', static fn() => 'https://example.org/buy/' );
+		$this->assertSame( 'https://example.org/buy/', $ref->invoke( $this->area() )[0]['url'] );
+		add_filter( 'beltoft_services_email_add_url', '__return_empty_string', 20 );
+		$this->assertSame( array(), $ref->invoke( $this->area() ) );
+		remove_all_filters( 'beltoft_services_email_add_url' );
+	}
 }

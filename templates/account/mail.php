@@ -83,9 +83,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 									<td><?php echo esc_html( sprintf( /* translators: 1: storage used, 2: storage of the mailbox, 3: percent used */ __( '%1$s of %2$s (%3$d%%)', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_box['used_mb'] ), $beltoft_services_size( (int) $beltoft_services_box['quota_mb'] ), $beltoft_services_percent ) ); ?></td>
 									<td class="beltoft-services-mail__actions">
 										<?php if ( $beltoft_services_box['reveal'] ) : ?>
-											<button type="button" class="button woocommerce-button" data-mail-reveal="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
+											<button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-reveal="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
 										<?php endif; ?>
-										<button type="button" class="button woocommerce-button" data-mail-reset="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button>
+										<button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-reset="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button>
 										<details class="beltoft-services-vm__more">
 											<summary><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></summary>
 											<p class="description"><?php esc_html_e( 'Every message in the mailbox is deleted for good. This cannot be undone.', 'beltoft-services' ); ?></p>
@@ -162,7 +162,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 								<tr>
 									<td><code><?php echo esc_html( $beltoft_services_alias['address'] ); ?></code></td>
 									<td><?php echo esc_html( implode( ', ', $beltoft_services_alias['goto'] ) ); ?></td>
-									<td><button type="button" class="button woocommerce-button" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
+									<td class="beltoft-services-mail__actions"><button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>
@@ -205,7 +205,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<tr><th scope="col"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th></tr>
 					</thead>
 					<tbody>
-						<tr><td><code><?php echo esc_html( $beltoft_services_dns['proof']['name'] ); ?></code></td><td><?php echo esc_html( $beltoft_services_dns['proof']['type'] ); ?></td><td><code><?php echo esc_html( $beltoft_services_dns['proof']['value'] ); ?></code></td></tr>
+						<tr><td><code><?php echo esc_html( $beltoft_services_dns['proof']['name'] ); ?></code></td><td><?php echo esc_html( $beltoft_services_dns['proof']['type'] ); ?></td><td class="beltoft-services-mail__value"><code><?php echo esc_html( $beltoft_services_dns['proof']['value'] ); ?></code></td></tr>
 					</tbody>
 				</table>
 			<?php elseif ( array() === $beltoft_services_dns['rows'] ) : ?>
@@ -230,7 +230,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							<tr>
 								<td><code><?php echo esc_html( $beltoft_services_rec['name'] ); ?></code></td>
 								<td><?php echo esc_html( $beltoft_services_rec['type'] ); ?></td>
-								<td><code><?php echo esc_html( ( null !== $beltoft_services_rec['priority'] ? $beltoft_services_rec['priority'] . ' ' : '' ) . $beltoft_services_rec['value'] ); ?></code></td>
+								<td class="beltoft-services-mail__value"><code><?php echo esc_html( ( null !== $beltoft_services_rec['priority'] ? $beltoft_services_rec['priority'] . ' ' : '' ) . $beltoft_services_rec['value'] ); ?></code></td>
 								<td>
 									<?php
 									$beltoft_services_words = array(
