@@ -172,8 +172,8 @@ final class MailField {
 
 		$zones = self::zones( get_current_user_id() );
 
-		echo '<div class="beltoft-services-mail-field">';
-		echo '<h3>' . esc_html__( 'Email domain', 'beltoft-services' ) . '</h3>';
+		echo '<div class="beltoft-services-mail-field" style="margin:40px 0 0">';
+		echo '<h3 style="margin:0 0 16px">' . esc_html__( 'Email domain', 'beltoft-services' ) . '</h3>';
 
 		foreach ( $lines as $key => $item ) {
 			$product = $item['data'] ?? null;
