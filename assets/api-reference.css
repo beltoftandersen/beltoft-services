@@ -1,19 +1,137 @@
-.beltoft-services-apiref { max-width: 100%; min-width: 0; color: var(--navy, #0c1535); line-height: 1.6; }
-.beltoft-services-apiref > section { margin: 0 0 40px; min-width: 0; }
-.beltoft-services-apiref h2 { margin: 0 0 12px; font-size: clamp(20px, 2.2vw, 28px); line-height: 1.25; }
-.beltoft-services-apiref h3 { margin: 24px 0 8px; font-size: 18px; line-height: 1.35; overflow-wrap: anywhere; }
+.beltoft-services-apiref {
+	--apiref-navy: var(--navy, #0c1535);
+	--apiref-green: var(--green, #004400);
+	--apiref-soft: var(--ink-soft, #5e7080);
+	--apiref-rule: var(--rule, #d6d2c8);
+	--apiref-warm: var(--bg-warm, #eeece6);
+	--apiref-danger: #b32d2e;
+	--apiref-offset: 88px;
+	--apiref-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	box-sizing: border-box;
+	max-width: 100%;
+	min-width: 0;
+	color: var(--apiref-navy);
+	line-height: 1.6;
+}
+.beltoft-services-apiref *, .beltoft-services-apiref *::before, .beltoft-services-apiref *::after { box-sizing: border-box; }
+.beltoft-services-apiref a { color: var(--apiref-navy); text-decoration: underline; text-underline-offset: 3px; }
+.beltoft-services-apiref a:focus-visible, .beltoft-services-apiref button:focus-visible, .beltoft-services-apiref pre:focus-visible { outline: 2px solid var(--apiref-green); outline-offset: 2px; }
+.beltoft-services-apiref__main { min-width: 0; }
+.beltoft-services-apiref__main > section { margin: 0 0 56px; min-width: 0; }
+.beltoft-services-apiref h2 { margin: 0 0 12px; font-size: clamp(20px, calc(16px + 1.4vw), 28px); line-height: 1.25; color: var(--apiref-navy); }
+.beltoft-services-apiref h3 { margin: 24px 0 8px; font-size: 18px; line-height: 1.35; color: var(--apiref-navy); overflow-wrap: anywhere; }
 .beltoft-services-apiref p, .beltoft-services-apiref ol, .beltoft-services-apiref ul { max-width: 70ch; }
-.beltoft-services-apiref code { padding: 0; border: 0; background: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; overflow-wrap: anywhere; }
-.beltoft-services-apiref__code { box-sizing: border-box; max-width: 100%; margin: 8px 0 16px; padding: 12px 16px; background: var(--bg-warm, #eeece6); overflow-x: auto; }
-.beltoft-services-apiref__code code { overflow-wrap: normal; white-space: pre; }
-.beltoft-services-apiref__op { margin: 0 0 28px; padding: 0 0 20px; border-bottom: 1px solid var(--rule, #d6d2c8); min-width: 0; }
-.beltoft-services-apiref__method { display: inline-block; min-width: 4.5em; font-weight: 700; }
-.beltoft-services-apiref__meta { color: var(--ink-soft, #5e7080); font-size: 0.9em; }
-.beltoft-services-apiref__scroll { max-width: 100%; margin: 8px 0 16px; overflow-x: auto; }
-.beltoft-services-apiref table { width: 100%; min-width: 520px; border-collapse: collapse; }
-.beltoft-services-apiref caption { padding: 0 0 6px; font-weight: 600; text-align: left; }
-.beltoft-services-apiref th, .beltoft-services-apiref td { padding: 8px 16px 8px 0; text-align: left; vertical-align: top; }
-.beltoft-services-apiref th { font-weight: 600; }
-@media (max-width: 600px) {
-	.beltoft-services-apiref table { min-width: 480px; }
+.beltoft-services-apiref code { padding: 0; border: 0; background: none; color: inherit; font-family: var(--apiref-mono); font-size: 0.9em; overflow-wrap: anywhere; }
+.beltoft-services-apiref [data-apiref-section] { scroll-margin-top: calc(var(--apiref-offset) + 8px); }
+.beltoft-services-apiref__lead, .beltoft-services-apiref__meta { color: var(--apiref-soft); }
+.beltoft-services-apiref__meta { margin: 0 0 8px; font-size: 0.9em; }
+.beltoft-services-apiref__note { margin: -24px 0 56px; color: var(--apiref-soft); }
+.beltoft-services-apiref__tool { font-family: var(--apiref-mono); font-size: 0.95em; }
+
+/* Navigation */
+.beltoft-services-apiref__nav { margin: 0 0 32px; }
+.beltoft-services-apiref__nav ul { max-width: none; margin: 0; padding: 0; list-style: none; }
+.beltoft-services-apiref__nav a { display: block; color: var(--apiref-soft); text-decoration: none; }
+.beltoft-services-apiref__nav a:hover { color: var(--apiref-navy); text-decoration: underline; }
+.beltoft-services-apiref__nav a.is-current { color: var(--apiref-navy); font-weight: 700; }
+.beltoft-services-apiref__navgroup > a { margin-top: 14px; color: var(--apiref-navy); font-weight: 600; }
+.beltoft-services-apiref__navgroup ul a { padding: 2px 0; overflow: hidden; font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.beltoft-services-apiref__navmethod { display: inline-block; min-width: 3.6em; font-size: 11px; font-weight: 700; }
+.beltoft-services-apiref__navmethod--get { color: var(--apiref-green); }
+.beltoft-services-apiref__navmethod--post, .beltoft-services-apiref__navmethod--put { color: var(--apiref-navy); }
+.beltoft-services-apiref__navmethod--delete { color: var(--apiref-danger); }
+
+/* Endpoint and two-column blocks */
+.beltoft-services-apiref__op { min-width: 0; margin: 0; padding: 32px 0; border-top: 1px solid var(--apiref-rule); }
+.beltoft-services-apiref__group > .beltoft-services-apiref__lead { margin: 0 0 24px; }
+.beltoft-services-apiref__head, .beltoft-services-apiref__text, .beltoft-services-apiref__split > div { min-width: 0; }
+.beltoft-services-apiref__head h3 { margin: 0 0 8px; font-size: clamp(17px, calc(12px + 1.6vw), 24px); line-height: 1.3; }
+.beltoft-services-apiref__method { display: inline-block; margin-right: 8px; padding: 2px 8px; border: 2px solid transparent; color: #fff; font-family: var(--apiref-mono); font-size: 13px; font-weight: 700; line-height: 1.4; vertical-align: 0.2em; }
+.beltoft-services-apiref__method--get { background: var(--apiref-green); }
+.beltoft-services-apiref__method--post { background: var(--apiref-navy); }
+.beltoft-services-apiref__method--put { border-color: var(--apiref-navy); background: transparent; color: var(--apiref-navy); }
+.beltoft-services-apiref__method--delete { background: var(--apiref-danger); }
+.beltoft-services-apiref__path { font-size: 1em; font-weight: 600; overflow-wrap: anywhere; }
+.beltoft-services-apiref__param { color: var(--apiref-green); }
+.beltoft-services-apiref__summary { margin: 0 0 4px; }
+.beltoft-services-apiref__intro { margin: 0 0 24px; }
+.beltoft-services-apiref__codes { display: flex; flex-direction: column; gap: 16px; min-width: 0; margin-top: 16px; }
+
+/* Code panels */
+.beltoft-services-apiref__panel { min-width: 0; max-width: 100%; background: var(--apiref-navy); color: #e8ebf2; }
+.beltoft-services-apiref__panelbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 0 16px; color: #b4bdd0; font-size: 13px; }
+.beltoft-services-apiref__copy { display: none; margin: 0; padding: 4px 12px; border: 0; background: #1d2a55; color: #e8ebf2; font: inherit; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.beltoft-services-apiref.is-js .beltoft-services-apiref__copy { display: inline-block; }
+.beltoft-services-apiref__copy:hover { background: #2a3a70; }
+.beltoft-services-apiref__panel :focus-visible { outline-color: #fff; }
+.beltoft-services-apiref__panel pre { max-width: 100%; margin: 0; padding: 8px 16px 16px; border: 0; background: none; color: #e8ebf2; font-family: var(--apiref-mono); font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre; }
+.beltoft-services-apiref__panel code { display: block; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+
+/* Tables */
+.beltoft-services-apiref__table { width: 100%; margin: 16px 0; border-collapse: collapse; font-size: 15px; }
+.beltoft-services-apiref__table caption { padding: 0 0 6px; font-weight: 600; text-align: left; }
+.beltoft-services-apiref__table th, .beltoft-services-apiref__table td { padding: 8px 16px 8px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--apiref-rule); }
+.beltoft-services-apiref__table th { color: var(--apiref-soft); font-weight: 600; }
+.beltoft-services-apiref__table td:first-child code { white-space: nowrap; overflow-wrap: normal; }
+
+/* Desktop */
+@media (min-width: 1100px) {
+	.beltoft-services-apiref { display: grid; grid-template-columns: 210px minmax(0, 1fr); column-gap: 48px; align-items: start; }
+	.beltoft-services-apiref__nav { position: sticky; top: var(--apiref-offset); max-height: calc(100vh - var(--apiref-offset) - 16px); margin: 0; overflow-y: auto; }
+	.beltoft-services-apiref__op, .beltoft-services-apiref__split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); column-gap: 40px; }
+	.beltoft-services-apiref__head { grid-column: 1 / -1; }
+	.beltoft-services-apiref__text { grid-column: 1; }
+	.beltoft-services-apiref__codes { grid-column: 2; grid-row: 2; align-self: start; position: sticky; top: var(--apiref-offset); max-height: calc(100vh - var(--apiref-offset) - 16px); margin-top: 0; overflow-y: auto; }
+	.beltoft-services-apiref__split { align-items: start; }
+	.beltoft-services-apiref__split > .beltoft-services-apiref__codes { grid-row: auto; }
+	.beltoft-services-apiref__split h3:first-child { margin-top: 0; }
+	.beltoft-services-apiref__split > .beltoft-services-apiref__codes { margin-top: 0; }
+}
+
+/* Tablet and phone: the navigation is a jump list */
+@media (max-width: 1099px) {
+	.beltoft-services-apiref [data-apiref-section] { scroll-margin-top: calc(var(--apiref-offset) + 64px); }
+	.beltoft-services-apiref__nav { position: sticky; top: var(--apiref-offset); z-index: 5; margin: 0 0 24px; padding: 8px 0; background: var(--apiref-warm); overflow-x: auto; }
+	.beltoft-services-apiref__nav > ul { display: flex; gap: 20px; white-space: nowrap; }
+	.beltoft-services-apiref__nav a { padding: 6px 0; }
+	.beltoft-services-apiref__navgroup > a { margin-top: 0; }
+	.beltoft-services-apiref__navgroup ul { display: none; }
+}
+
+/* Phone: stacked rows */
+@media (max-width: 767px) {
+	.beltoft-services-apiref__main > section { margin-bottom: 40px; }
+	.beltoft-services-apiref__op { padding: 24px 0; }
+	.beltoft-services-apiref__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+	.beltoft-services-apiref__table, .beltoft-services-apiref__table tbody, .beltoft-services-apiref__table tr, .beltoft-services-apiref__table td { display: block; width: 100%; }
+	.beltoft-services-apiref__table tr { padding: 8px 0; border-bottom: 1px solid var(--apiref-rule); }
+	.beltoft-services-apiref__table td { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; padding: 2px 0; border: 0; }
+	.beltoft-services-apiref__table td::before { content: attr(data-label); color: var(--apiref-soft); }
+}
+
+/* The theme styles pre and code with its sans stack: a doubled class wins. */
+.beltoft-services-apiref.beltoft-services-apiref pre,
+.beltoft-services-apiref.beltoft-services-apiref code,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__path,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__navpath,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__navmethod,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__method,
+.beltoft-services-apiref.beltoft-services-apiref .beltoft-services-apiref__tool { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* Page builders often set `font-family: inherit` on pre/code under an id selector (stronger than any class), so code
+   in the reference would show in the page's sans. !important here is scoped to the reference's own code elements. */
+.beltoft-services-apiref pre,
+.beltoft-services-apiref code,
+.beltoft-services-apiref .beltoft-services-apiref__path,
+.beltoft-services-apiref .beltoft-services-apiref__navpath {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+}
+
+/* Phone: stacked tables keep their caption ("Parameters", "Reply fields") on one full-width line. */
+@media (max-width: 767px) {
+	.beltoft-services-apiref table caption {
+		display: block;
+		width: 100%;
+		text-align: left;
+	}
 }
