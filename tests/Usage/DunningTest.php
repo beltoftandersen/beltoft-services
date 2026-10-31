@@ -113,14 +113,18 @@ class DunningTest extends UsageTestCase {
 	public function test_the_threshold_bills_early_once(): void {
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );
-		// 3000 hours at 0.02 is 59.44 after the monthly caps: over the 50 of a new account.
+		// 3000 hours at 0.02 is at most 60, a little less after the monthly caps (how much depends on how the hours fall
+		// across months, so on today's date): over the 50 of a new account either way.
 		$this->hours( 501, $user, 3000, 0.02 );
 
 		$this->assertSame( 50.0, Threshold::for_account( $sub ) );
 		$this->assertTrue( Threshold::check( $sub ) );
 
 		$this->assertCount( 1, $this->charges, 'The gateway hook of a scheduled payment ran.' );
-		$this->assertEquals( 59.44, (float) $this->charges[0][0] );
+		$charged = (float) $this->charges[0][0];
+		$this->assertGreaterThan( 50.0, $charged, 'Over the threshold.' );
+		$this->assertLessThanOrEqual( 60.0, $charged, 'Never more than the uncapped hours.' );
+		$this->assertEqualsWithDelta( (float) $this->charges[0][1]->get_total(), $charged, 0.001, 'The charge is the early invoice\'s own total.' );
 		$this->assertSame( 'fakecard', $this->charges[0][1]->get_payment_method() );
 		$this->assertGreaterThan( 0, count( $this->charges[0][1]->get_items( 'fee' ) ), 'One line per month.' );
 
