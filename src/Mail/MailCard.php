@@ -35,7 +35,9 @@ final class MailCard {
 					'limit'     => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 					'gone'      => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),
 					'once'      => __( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ),
+					/* translators: %s: mailbox address. */
 					'created'   => __( 'Mailbox %s is ready.', 'beltoft-services' ),
+					/* translators: %s: mailbox address. */
 					'reset'     => __( 'New password for %s.', 'beltoft-services' ),
 					'copied'    => __( 'Copied', 'beltoft-services' ),
 					'confirm'   => __( 'Delete this alias?', 'beltoft-services' ),
