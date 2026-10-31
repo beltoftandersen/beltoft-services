@@ -111,10 +111,11 @@ final class BillingField {
 	}
 
 	/**
-	 * The explanation under the choice (the price and the cap are next to the choice).
+	 * The explanation under the choice (the price and the cap are next to the choice). Empty: every order needs a
+	 * payment method anyway (card, Google Pay or Apple Pay), so there is nothing to add for pay as you go.
 	 */
 	public static function note(): string {
-		return __( 'A card is required.', 'beltoft-services' );
+		return '';
 	}
 
 	/**
@@ -154,7 +155,7 @@ final class BillingField {
 			);
 		}
 
-		echo '<p class="description" data-billing-note>' . esc_html( $server['usage'] ? self::note() : '' ) . '</p>';
+		echo '<p class="description" data-billing-note' . ( '' === self::note() ? ' hidden' : '' ) . '>' . esc_html( $server['usage'] ? self::note() : '' ) . '</p>';
 		echo '</div>';
 	}
 
