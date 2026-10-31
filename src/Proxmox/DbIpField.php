@@ -79,11 +79,11 @@ final class DbIpField {
 
 	/**
 	 * The one new database in the cart: not a renewal, a switch or a resubscribe. Null when the cart holds none or
-	 * more than one.
+	 * more than one. (DbDiskField uses it too.)
 	 *
 	 * @return array{key: string, item: array<string, mixed>}|null
 	 */
-	private static function new_database(): ?array {
+	public static function new_database(): ?array {
 		$cart = function_exists( 'WC' ) ? WC()->cart : null;
 
 		if ( ! $cart || OsField::cart_is_existing_server() ) {

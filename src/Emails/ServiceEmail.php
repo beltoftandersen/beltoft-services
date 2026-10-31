@@ -100,6 +100,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'monitor_cpu_percent' => max( 0, min( 100, (int) ( $data['cpu_percent'] ?? 0 ) ) ),
 				'monitor_cpu_hours' => max( 0, (int) ( $data['cpu_hours'] ?? 0 ) ),
 				'monitor_upgrade_url' => 'proxmox' === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
+				'monitor_grow_url' => 'proxmox-db' === $r->get( 'driver' ) && 'db_disk' === ( $data['reason'] ?? '' ) ? \BeltoftServices\Proxmox\DbDisk::grow_url( $r ) : '',
 				'monitor_disks_url' => 'proxmox' === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::card_url( $r ) : '',
 				'monitor_cpu_since' => isset( $data['cpu_since'] ) ? wp_date( (string) get_option( 'time_format' ), (int) $data['cpu_since'] ) : '',
 				'monitor_disk_used' => max( 0, (int) ( $data['disk_used'] ?? 0 ) ),

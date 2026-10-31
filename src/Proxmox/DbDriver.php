@@ -52,9 +52,10 @@ class DbDriver extends ProxmoxDriver {
 			'major'       => array( 'number', __( 'Major version', 'beltoft-services' ), __( 'PostgreSQL: the major version, 17 or 18. SQL Server: the version, 2025. Valkey ignores it.', 'beltoft-services' ), 18, true ),
 			'cores'       => $fields['cores'],
 			'memory_mb'   => $fields['memory_mb'],
-			'disk_gb'     => array( 'number', __( 'Data disk (GB)', 'beltoft-services' ), __( 'The disk the database lives on. It is part of the backup.', 'beltoft-services' ), 20, true ),
+			'disk_gb'     => array( 'number', __( 'Data disk (GB)', 'beltoft-services' ), __( 'The disk the database lives on. It is part of the backup. Extra storage is added to it.', 'beltoft-services' ), 20, true ),
 			'backup_days' => $fields['backup_days'],
 			'public_ip'   => array( 'number', __( 'Public IP', 'beltoft-services' ), __( '0 or 1. 1 gives the database a public IPv4 address (an add-on: make a variation pair that differs only in this field). Access is closed until the customer adds addresses to the allow-list.', 'beltoft-services' ), 0, true ),
+			DbDisk::FIELD => array( 'number', __( 'Extra storage (GB)', 'beltoft-services' ), __( 'Storage added to the data disk (an add-on: variations of one plan that differ only in this field and in the attribute "Extra storage", slug extra-storage). The data disk is the data disk above plus this. It can only grow.', 'beltoft-services' ), 0, true ),
 		);
 
 		return $out;
@@ -84,22 +85,97 @@ class DbDriver extends ProxmoxDriver {
 	}
 
 	/**
-	 * A restore queues this change to start the server (DbRestore). A change of the public IP add-on is made to the VM
-	 * (DbIp). Otherwise the plan's disk is the data disk, and growing it is not built yet: nothing is changed, the
-	 * admin is told.
+	 * A restore queues this change to start the server (DbRestore). Then, in one call: a change of the public IP add-on
+	 * is made to the VM (DbIp), and a data disk that is smaller than the plan's (the plan's disk and its extra storage) is
+	 * made larger (DbGrow, which reads the real disk: a restore can put back a smaller one). Any other plan difference
+	 * (cores, memory) is not applied: nothing is changed and the admin is told.
 	 */
 	public function update_plan( Resource $r ): StepResult {
+		$meta   = array();
+		$events = array();
+		$did    = false;
+
+		$restored = false;
+
 		if ( DbRestore::waiting( $r ) ) {
-			return ( new DbRestore( $r ) )->finish();
+			$res = ( new DbRestore( $r ) )->finish();
+
+			if ( ! $res->is_done() ) {
+				return $res;
+			}
+
+			$restored = true;
+			$did      = true;
+			$meta     = $res->meta();
+
+			if ( '' !== $res->event() ) {
+				$events[] = $res->event();
+			}
 		}
 
 		if ( '' !== DbIp::wanted( $r ) ) {
-			return ( new DbIp( $r ) )->run();
+			if ( array() !== $meta ) {
+				$r->set( $meta );
+			}
+
+			$res = ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
+
+			if ( ! $res->is_done() ) {
+				return $this->settle( $r, $res, $events );
+			}
+
+			$did  = true;
+			$meta = array_merge( $meta, $res->meta() );
+
+			if ( '' !== $res->event() ) {
+				$events[] = $res->event();
+			}
 		}
 
-		Alerts::admin( $r, 'The plan of this database changed. Resizing a database is not automatic yet: nothing was changed.' );
+		$fresh = Resource::find( $r->id() ) ?? $r;
 
-		return StepResult::done( array(), 'Plan change on a database was not applied' );
+		if ( $restored || DbGrow::wanted( $fresh ) ) {
+			if ( array() !== $meta ) {
+				$r->set( $meta );
+			}
+
+			$res = ( new DbGrow( Resource::find( $r->id() ) ?? $r ) )->run( $restored );
+
+			if ( ! $res->is_done() ) {
+				return $this->settle( $r, $res, $events );
+			}
+
+			$did  = true;
+			$meta = array_merge( $meta, $res->meta() );
+
+			if ( '' !== $res->event() && 'No data disk change was needed' !== $res->event() ) {
+				$events[] = $res->event();
+			}
+		}
+
+		if ( ! $did ) {
+			Alerts::admin( $r, 'The plan of this database changed. Only the public IP address and the storage are applied automatically (cores and memory are not): nothing was changed.' );
+
+			return StepResult::done( array(), 'Plan change on a database was not applied' );
+		}
+
+		return StepResult::done( $meta, array() === $events ? '' : implode( '; ', array_unique( $events ) ) );
+	}
+
+	/**
+	 * A step after the first did not finish: what the earlier ones did is kept (stored, and noted for the license), so a
+	 * later call does not repeat it.
+	 *
+	 * @param Resource           $r      Resource.
+	 * @param StepResult         $res    The unfinished result.
+	 * @param array<int, string> $events What the earlier steps did.
+	 */
+	private function settle( Resource $r, StepResult $res, array $events ): StepResult {
+		foreach ( $events as $event ) {
+			\BeltoftLicenses\Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', $event );
+		}
+
+		return $res;
 	}
 
 	/**

@@ -264,7 +264,7 @@ final class Provision {
 			'template'  => (int) ( $plan['template'] ?? 0 ),
 			'cores'     => (int) ( $plan['cores'] ?? 0 ),
 			'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),
-			'disk_gb'   => (int) ( $plan['disk_gb'] ?? 0 ),
+			'disk_gb'   => DbDisk::total( $plan ), // A database's data disk includes its extra storage; other plans have none.
 			'net_mbit'  => max( 0, (float) ( $plan['net_mbit'] ?? 0 ) ),
 		);
 
@@ -1333,7 +1333,7 @@ final class Provision {
 	}
 
 	/**
-	 * The data disk of a database: scsi1, the plan's size, in the backup. A disk already there must be exactly
+	 * The data disk of a database: scsi1, the plan's size (with its extra storage), in the backup. A disk already there must be exactly
 	 * that; anything else in the slot is never overwritten.
 	 *
 	 * @param array<string, mixed> $record VM record.

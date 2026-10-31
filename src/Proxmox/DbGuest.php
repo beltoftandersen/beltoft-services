@@ -22,7 +22,7 @@ final class DbGuest {
 	public const HEALTH      = self::DIR . '/health.json';
 
 	public const STATES = array( 'working', 'ready', 'failed' );
-	public const STEPS  = array( 'job', 'disk', 'cluster', 'tls', 'config', 'database', 'finish', 'allow', 'listen', 'password', 'dump', 'complete', 'start' );
+	public const STEPS  = array( 'job', 'disk', 'cluster', 'tls', 'config', 'database', 'finish', 'allow', 'listen', 'password', 'dump', 'complete', 'start', 'grow' );
 
 	public const DATABASE = 'app';
 	public const ROLE     = 'app_user';
@@ -62,7 +62,9 @@ final class DbGuest {
 	/**
 	 * The status of one request: null unless it is this request's, with a known state and step and a date.
 	 *
-	 * @return array{state:string,step:string}|null
+	 * `size_bytes` (a whole number, as the `grow` job reports the size of the data disk) is there only when the guest sent a valid one.
+	 *
+	 * @return array{state:string,step:string,size_bytes?:int}|null
 	 */
 	public static function status( Client $client, string $node, int $vmid, string $request ): ?array {
 		$s = self::read( $client, $node, $vmid, self::STATUS );
@@ -73,7 +75,13 @@ final class DbGuest {
 			return null;
 		}
 
-		return array( 'state' => $s['state'], 'step' => $s['step'] );
+		$out = array( 'state' => $s['state'], 'step' => $s['step'] );
+
+		if ( isset( $s['size_bytes'] ) && is_int( $s['size_bytes'] ) && $s['size_bytes'] > 0 && $s['size_bytes'] <= 70368744177664 ) {
+			$out['size_bytes'] = $s['size_bytes'];
+		}
+
+		return $out;
 	}
 
 	/**

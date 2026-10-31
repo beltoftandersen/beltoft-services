@@ -123,6 +123,7 @@ final class Plugin {
 		Proxmox\AppTab::register();
 		Proxmox\BackupField::register();
 		Proxmox\DbIpField::register();
+		Proxmox\DbDiskField::register();
 		Proxmox\DiskMeta::register();
 		Proxmox\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );

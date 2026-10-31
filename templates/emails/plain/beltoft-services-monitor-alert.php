@@ -8,7 +8,8 @@ if ( 'db_disk' === $monitor_reason ) {
 	/* translators: 1: database name, 2: percent used. */
 	echo wp_strip_all_tags( sprintf( __( '%1$s: the data disk is %2$d percent full.', 'beltoft-services' ), $beltoft_services_db, $monitor_disk_percent ) ) . ' '; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 	echo __( 'When the disk is full, the database stops accepting changes.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
-	echo __( 'Delete data you do not need, or contact support to get a larger disk.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	echo __( 'Delete data you do not need, or make the storage larger.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	if ( '' !== (string) ( $monitor_grow_url ?? '' ) ) { echo __( 'Make your storage larger:', 'beltoft-services' ) . ' ' . esc_url_raw( $monitor_grow_url ) . "\n\n"; } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 } elseif ( 'db_down' === $monitor_reason ) {
 	$beltoft_services_db = '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' );
 	/* translators: %s: database name. */
