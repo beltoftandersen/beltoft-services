@@ -433,7 +433,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-panel--page .beltoft-services-page__actions .beltoft-services-btn:hover { background: var(--bg-warm, #eeece6) !important; color: var(--navy, #0c1535) !important; }
 .beltoft-services-panel--page .beltoft-services-page__actions .beltoft-services-btn[disabled] { opacity: 0.6; cursor: progress; }
 .beltoft-services-panel--page .beltoft-services-btn:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }
-.beltoft-services-badge[hidden], .beltoft-services-panel__message[hidden], .beltoft-services-btn[hidden], .beltoft-services-tab[hidden] { display: none !important; }
+.beltoft-services-panel__head[hidden], .beltoft-services-badge[hidden], .beltoft-services-panel__message[hidden], .beltoft-services-btn[hidden], .beltoft-services-tab[hidden] { display: none !important; }
 .beltoft-services-panel--page > .beltoft-services-panel__notice { margin: 12px 0 0; }
 .beltoft-services-panel--page .beltoft-services-progress, .beltoft-services-panel--page .beltoft-services-vm__flash { margin-top: 16px; }
 

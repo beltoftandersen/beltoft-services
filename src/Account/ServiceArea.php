@@ -563,9 +563,23 @@ abstract class ServiceArea {
 	private function detail( array $view, string $tab, Resource $resource, array $path = array() ): void {
 		self::$page = $this->page_values( $view['license'], $resource, $tab, $path ) + array( 'view' => $view );
 
+		/**
+		 * Whether a service page keeps its own chrome: the "back to the list" link and the service's head (name, state,
+		 * renewal). A plugin that draws a page below the service (a path after it) can return false to print its own
+		 * back link and head. The head's state elements stay in the page, hidden, for the status script.
+		 *
+		 * @param bool                 $chrome Keep the link and the head, default true.
+		 * @param array<string, mixed> $page   The page: license (row), resource, area, view, path, base, tab.
+		 */
+		self::$page['chrome'] = (bool) apply_filters( 'beltoft_services_account_page_chrome', true, self::$page );
+
 		try {
-			echo '<div class="beltoft-services-server beltoft-services-area-page beltoft-services-area-page--' . esc_attr( $this->key() ) . '">';
-			echo '<p class="beltoft-services-server__back"><a href="' . esc_url( $this->url_list() ) . '">&lsaquo; ' . esc_html( $this->all_label() ) . '</a></p>';
+			echo '<div class="beltoft-services-server beltoft-services-area-page beltoft-services-area-page--' . esc_attr( $this->key() ) . ( self::$page['chrome'] ? '' : ' beltoft-services-area-page--bare' ) . '">';
+
+			if ( self::$page['chrome'] ) {
+				echo '<p class="beltoft-services-server__back"><a href="' . esc_url( $this->url_list() ) . '">&lsaquo; ' . esc_html( $this->all_label() ) . '</a></p>';
+			}
+
 			Panel::render( $view['license'], $view );
 			echo '</div>';
 		} finally {
