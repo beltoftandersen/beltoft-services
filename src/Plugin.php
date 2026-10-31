@@ -122,6 +122,7 @@ final class Plugin {
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
 		Proxmox\BackupField::register();
+		Proxmox\DbIpField::register();
 		Proxmox\DiskMeta::register();
 		Proxmox\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );
