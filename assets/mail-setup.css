@@ -1,0 +1,32 @@
+/* Mail setup guide: [beltoft_services_mail_setup]. */
+.beltoft-services-mailsetup {
+	--bsms-navy: var(--navy, #0c1535);
+	--bsms-soft: var(--ink-soft, #5e7080);
+	--bsms-rule: var(--rule, #d6d2c8);
+	--bsms-card: var(--bg-card, #fff);
+	box-sizing: border-box;
+	max-width: 100%;
+	color: var(--bsms-navy);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+.beltoft-services-mailsetup *, .beltoft-services-mailsetup *::before, .beltoft-services-mailsetup *::after { box-sizing: border-box; }
+.beltoft-services-mailsetup h2 { margin: 40px 0 12px; font-size: clamp(22px, calc(18px + 1vw), 30px); line-height: 1.25; color: var(--bsms-navy); scroll-margin-top: 88px; }
+.beltoft-services-mailsetup h2:first-child { margin-top: 0; }
+.beltoft-services-mailsetup h3 { margin: 24px 0 8px; font-size: 18px; line-height: 1.35; color: var(--bsms-navy); }
+.beltoft-services-mailsetup p, .beltoft-services-mailsetup ul, .beltoft-services-mailsetup ol { margin: 0 0 12px; }
+.beltoft-services-mailsetup ol, .beltoft-services-mailsetup ul { padding-left: 1.4em; }
+.beltoft-services-mailsetup li { margin: 0 0 6px; }
+.beltoft-services-mailsetup a { color: var(--bsms-navy); text-decoration: underline; text-underline-offset: 3px; }
+.beltoft-services-mailsetup a:focus-visible { outline: 2px solid var(--bsms-navy); outline-offset: 2px; }
+.beltoft-services-mailsetup code { padding: 0; border: 0; background: none; color: inherit; font-size: 0.95em; }
+.beltoft-services-mailsetup section { scroll-margin-top: 88px; }
+.beltoft-services-mailsetup nav p { margin-bottom: 6px; color: var(--bsms-soft); }
+
+.beltoft-services-mailsetup__jump { display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 0 !important; list-style: none; }
+.beltoft-services-mailsetup__jump li { margin: 0; }
+
+.beltoft-services-mailsetup__scroll { max-width: 100%; margin: 0 0 16px; overflow-x: auto; }
+.beltoft-services-mailsetup table { width: 100%; min-width: 440px; border-collapse: collapse; background: var(--bsms-card); }
+.beltoft-services-mailsetup th, .beltoft-services-mailsetup td { padding: 10px 12px; border: 0; border-bottom: 1px solid var(--bsms-rule); text-align: left; vertical-align: top; }
+.beltoft-services-mailsetup th { color: var(--bsms-soft); font-weight: 600; }

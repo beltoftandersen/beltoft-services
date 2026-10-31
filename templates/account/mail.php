@@ -279,6 +279,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 					</tbody>
 				</table>
 			<?php endif; ?>
+			<?php if ( '' !== $beltoft_services_connect['guide'] ) : ?>
+				<p><a href="<?php echo esc_url( $beltoft_services_connect['guide'] ); ?>"><?php esc_html_e( 'Setup guide for your mail app', 'beltoft-services' ); ?></a></p>
+			<?php endif; ?>
 			<?php if ( '' !== $beltoft_services_connect['webmail'] ) : ?>
 				<p><a class="button woocommerce-button" href="<?php echo esc_url( $beltoft_services_connect['webmail'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open webmail', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>

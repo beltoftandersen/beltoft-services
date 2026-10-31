@@ -170,6 +170,7 @@ final class MailView {
 			'smtp'    => array( self::SMTP_SSL, self::SMTP_TLS ),
 			'pop'     => self::POP_PORT,
 			'webmail' => $webmail,
+			'guide'   => MailSetup::page_url(),
 			'domain'  => $domain,
 		);
 	}
