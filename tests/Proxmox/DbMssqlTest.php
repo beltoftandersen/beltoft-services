@@ -470,4 +470,23 @@ class DbMssqlTest extends TestCase {
 		$this->assertSame( array( 'beltoft_services_db_terms' ), $errors->get_error_codes() );
 		WC()->cart->empty_cart();
 	}
+
+	public function test_the_box_sits_by_the_place_order_button_not_in_a_step_a_theme_may_hide(): void {
+		$this->assertNotFalse( has_action( 'woocommerce_review_order_before_submit', array( DbTermsField::class, 'render' ) ) );
+		$this->assertFalse( has_action( 'woocommerce_after_order_notes', array( DbTermsField::class, 'render' ) ), 'A theme may hide the order notes step for a cart without a server.' );
+	}
+
+	public function test_the_tick_is_kept_across_a_checkout_refresh(): void {
+		wp_register_script( 'wc-checkout', 'https://example.com/checkout.js', array( 'jquery' ), '1', true );
+		wp_enqueue_script( 'wc-checkout' );
+		add_filter( 'woocommerce_is_checkout', '__return_true' );
+		DbTermsField::keep_tick();
+		remove_filter( 'woocommerce_is_checkout', '__return_true' );
+		$inline = implode( '', (array) wp_scripts()->get_data( 'wc-checkout', 'after' ) );
+		wp_dequeue_script( 'wc-checkout' );
+		wp_deregister_script( 'wc-checkout' );
+
+		$this->assertStringContainsString( 'updated_checkout', $inline );
+		$this->assertStringContainsString( DbTermsField::POST_KEY, $inline );
+	}
 }
