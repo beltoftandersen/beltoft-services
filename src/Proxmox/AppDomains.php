@@ -156,10 +156,11 @@ final class AppDomains {
 	 * Adds the A record as one RRset of its own: nothing else in the zone is read back and rewritten. A name
 	 * that has an address record already is refused; a zone that is not the customer's is refused.
 	 *
+	 * @param bool $strict A record of any type at the name refuses the write (the www name: a customer's own records there are never touched).
 	 * @return true|string|\WP_Error True when the record is there, the reason in plain words when it can never work,
 	 *                               or a WP_Error when the DNS layer failed and a later try may succeed.
 	 */
-	public static function publish( int $user_id, string $zone, string $fqdn, string $ip, ?bool &$wrote = null ) {
+	public static function publish( int $user_id, string $zone, string $fqdn, string $ip, ?bool &$wrote = null, bool $strict = false ) {
 		$wrote = false;
 		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			return 'The server address is not known yet.';
@@ -174,7 +175,7 @@ final class AppDomains {
 		// The zone lock covers the read and the write, so an editor save or a pause cannot slip in between.
 		$locked = Records::locked(
 			$zone,
-			static function () use ( $zone, $fqdn, $ip, $set, &$wrote ) {
+			static function () use ( $zone, $fqdn, $ip, $set, &$wrote, $strict ) {
 				// Read immediately before the write: what is at the name now decides.
 				$zone_data = DnsClients::dns()->zone( $zone );
 				if ( is_wp_error( $zone_data ) ) {
@@ -192,8 +193,12 @@ final class AppDomains {
 				if ( Records::paused( $zone, $zone_data ) ) {
 					return 'DNS hosting is paused for this domain.';
 				}
-				if ( array( 'A' => array( $ip ) ) === $have ) {
+				$sets = self::types_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
+				if ( array( 'A' => array( $ip ) ) === $have && ( ! $strict || 1 === $sets ) ) {
 					return true;
+				}
+				if ( $strict && 0 !== $sets ) {
+					return 'The name already has a DNS record.';
 				}
 				if ( array() !== $have ) {
 					return 'The name already has a DNS record.';
@@ -207,6 +212,17 @@ final class AppDomains {
 			}
 		);
 		return is_wp_error( $locked ) ? new \WP_Error( 'transient', 'The DNS zone is being changed.' ) : $locked;
+	}
+
+	/** How many record sets of any type a name has in the raw rrsets of a zone. */
+	private static function types_at( string $zone, string $fqdn, array $rrsets ): int {
+		$n = 0;
+		foreach ( $rrsets as $set ) {
+			if ( is_array( $set ) && self::row_name( $zone, (string) ( $set['name'] ?? '' ) ) === $fqdn ) {
+				++$n;
+			}
+		}
+		return $n;
 	}
 
 	/**

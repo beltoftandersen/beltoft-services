@@ -11,9 +11,10 @@
   "credentials": ["root_email", "root_password", "encryption_key"],
   "steps": ["download", "os", "packages", "docker", "credentials", "n8n", "web", "firewall", "verify", "install", "complete"],
   "domain": true,
+  "www": {"since_recipe": 3},
   "open": {"path": "/"},
   "docs_url": "https://docs.n8n.io/hosting/",
   "versions": [
-    {"id": "2", "label": "n8n 2", "upstream": "2.45.6", "recipe": 2, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "3893f0c5858625ee3f6b247df0e1627695e4bacaaec3cfda4ba6b62b3e0c975a", "eol": ""}
+    {"id": "2", "label": "n8n 2", "upstream": "2.45.6", "recipe": 3, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "b39b838522d9bd973d2710d8f231bbe9e0e08c754bc9e01c275e861217406957", "eol": ""}
   ]
 }

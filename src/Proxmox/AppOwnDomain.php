@@ -291,7 +291,8 @@ final class AppOwnDomain {
 			}
 		);
 		if ( true === $stored ) {
-			Emails::send( 'beltoft_services_app_domain_live', $r, array( 'app_domain' => (string) $r->get( 'app_domain_own' ) ) );
+			$www = AppWww::view( $r );
+			Emails::send( 'beltoft_services_app_domain_live', $r, array( 'app_domain' => (string) $r->get( 'app_domain_own' ), 'app_www' => $www['name'], 'app_www_state' => $www['state'], 'app_ip' => $www['ip'] ) );
 		}
 	}
 }

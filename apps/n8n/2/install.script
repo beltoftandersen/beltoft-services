@@ -19,12 +19,15 @@ grep -qx 'VERSION_ID="24.04"' /etc/os-release
 domain=$(jq -er '.domain // ""' "$job")
 ip=$(jq -er '.ip' "$job")
 email=$(jq -er '.email' "$job")
+www=$(jq -er '.www // ""' "$job")
 [[ "$ip" =~ ^[0-9.]+$ ]]
 [[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
 if [ -n "$domain" ]; then
   [[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
   [[ "$domain" == *.* ]]
 fi
+# A www name is only ever served together with its domain.
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
 step=packages
 status installing
 if [ ! -e "$state/stage.1" ]; then
@@ -163,9 +166,74 @@ fi
 step=web
 status installing
 if [ ! -e "$state/stage.5" ]; then
-  address="http://$ip"
-  [ -z "$domain" ] || address="$domain"
-  printf '%s {\n  encode zstd gzip\n  reverse_proxy 127.0.0.1:5678\n}\n' "$address" > /etc/caddy/Caddyfile
+  # One generator writes the Caddyfile: the site, and with a www name a certified www site that redirects to the domain.
+  # The same generator is run again when the www name starts to point at this server (the plugin writes www.json).
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-caddy <<'CADDY'
+#!/bin/bash
+set -Eeuo pipefail
+domain=${1:?}
+www=${2:-}
+[[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+[[ "$domain" == *.* ]]
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+tmp=$(mktemp /etc/caddy/Caddyfile.XXXXXX)
+{
+  printf '%s {\n' "$domain"
+  cat /etc/caddy/beltoft-site.body
+  printf '}\n'
+  if [ -n "$www" ]; then
+    printf '%s {\n  redir https://%s{uri} permanent\n}\n' "$www" "$domain"
+  fi
+} > "$tmp"
+caddy validate --config "$tmp" --adapter caddyfile >/dev/null 2>&1
+chmod 0644 "$tmp"
+mv -f "$tmp" /etc/caddy/Caddyfile
+CADDY
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-www-apply <<'APPLY'
+#!/bin/bash
+set -Eeuo pipefail
+state=/var/lib/beltoft-app
+f="$state/www.json"
+www=
+report() {
+  printf '{"www":"%s","state":"%s","updated":"%s"}\n' "$www" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/www.status.tmp"
+  mv -f "$state/www.status.tmp" "$state/www.status.json"
+}
+[ -f "$f" ] || exit 0
+trap 'report failed; mv -f "$f" "$state/www.failed" 2>/dev/null || true' ERR
+# The guest agent creates the file before it writes the content: wait until it is complete JSON.
+for _ in $(seq 1 30); do jq -e '.domain and .www' "$f" >/dev/null 2>&1 && break; sleep 1; done
+domain=$(jq -er '.domain' "$f")
+www=$(jq -er '.www' "$f")
+/usr/local/sbin/beltoft-caddy "$domain" "$www"
+systemctl reload caddy
+report ready
+mv -f "$f" "$state/www.done"
+APPLY
+  cat > /etc/systemd/system/beltoft-www.service <<'UNIT'
+[Unit]
+Description=Serve the www name of the app domain
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/beltoft-www-apply
+UNIT
+  cat > /etc/systemd/system/beltoft-www.path <<'UNIT'
+[Unit]
+Description=Watch for a www name to add
+[Path]
+PathExists=/var/lib/beltoft-app/www.json
+Unit=beltoft-www.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now beltoft-www.path
+  printf '  encode zstd gzip\n  reverse_proxy 127.0.0.1:5678\n' > /etc/caddy/beltoft-site.body
+  if [ -n "$domain" ]; then
+    /usr/local/sbin/beltoft-caddy "$domain" "$www"
+  else
+    { printf 'http://%s {\n' "$ip"; cat /etc/caddy/beltoft-site.body; printf '}\n'; } > /etc/caddy/Caddyfile
+  fi
   if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
     fallocate -l 2G /swapfile
     chmod 0600 /swapfile

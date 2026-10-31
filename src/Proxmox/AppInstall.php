@@ -237,6 +237,8 @@ final class AppInstall {
 			'url' => $app['url'],
 			'sha256' => $app['sha256'],
 			'domain' => $domain,
+			// The www name of a bare domain, once it points at the server; otherwise '' and AppWww adds it later.
+			'www' => '' === $domain ? '' : AppWww::at_install( $resource, $domain, (string) $ip['address'], (int) ( $license['user_id'] ?? 0 ) ),
 			'ip' => $ip['address'],
 			'params' => array(),
 			'key_only' => '' !== (string) $resource->get( 'ssh_key' ),

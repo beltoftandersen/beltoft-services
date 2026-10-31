@@ -57,7 +57,7 @@ final class AppsTest extends TestCase {
 			$this->assertNotNull( $app );
 			$this->assertSame( $version, $app['version_id'] );
 			$this->assertSame( $version, $app['upstream'] );
-			$this->assertSame( 1, $app['recipe'] );
+			$this->assertSame( 'wordpress' === $id ? 2 : 1, $app['recipe'] );
 			$this->assertNotEmpty( $app['credentials'] );
 			$file = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $version . '/install.script';
 			$this->assertSame( hash_file( 'sha256', $file ), $app['sha256'] );
@@ -102,7 +102,7 @@ final class AppsTest extends TestCase {
 		$app = Apps::current( 'n8n' );
 		$this->assertNotNull( $app );
 		$this->assertSame( '2', $app['version_id'] );
-		$this->assertSame( 2, $app['recipe'] );
+		$this->assertSame( 3, $app['recipe'] );
 		$file = BELTOFT_SERVICES_PATH . 'apps/n8n/2/install.script';
 		$this->assertSame( hash_file( 'sha256', $file ), $app['sha256'] );
 		$this->assertStringContainsString( 'n8nio/n8n:' . $app['upstream'] . '@sha256:', $this->n8n_script() );

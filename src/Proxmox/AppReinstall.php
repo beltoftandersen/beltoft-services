@@ -220,6 +220,10 @@ final class AppReinstall {
 			'app_domain_tries'   => null,
 			'app_domain_error'   => null,
 			'app_domain_alerted' => null,
+			'app_www'            => null,
+			'app_www_reason'     => null,
+			'app_www_checked'    => null,
+			'app_www_at'         => null,
 			'app_installed_at'   => null,
 			'app_queue_until'    => null,
 			'app_recipe'         => null,
@@ -463,7 +467,7 @@ final class AppReinstall {
 		}
 		if ( $zones ) {
 			echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="change"> ' . esc_html__( 'Use another domain', 'beltoft-services' );
-			echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) . '</span></label>';
+			echo '<span class="description">' . esc_html__( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed. On the domain itself, www is added too when it has no record yet, and redirects to the domain.', 'beltoft-services' ) . '</span></label>';
 			echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-fields hidden>';
 			echo '<label for="' . esc_attr( $id . '-zone' ) . '">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><select id="' . esc_attr( $id . '-zone' ) . '" name="app_zone">';
 			foreach ( $zones as $zone ) {
@@ -471,10 +475,10 @@ final class AppReinstall {
 			}
 			echo '</select><label for="' . esc_attr( $id . '-sub' ) . '">' . esc_html__( 'Subdomain', 'beltoft-services' ) . '</label>';
 			echo '<input type="text" id="' . esc_attr( $id . '-sub' ) . '" name="app_sub" maxlength="120" placeholder="www" autocomplete="off">';
-			echo '<span class="description">' . esc_html__( 'Leave empty to use the domain itself.', 'beltoft-services' ) . '</span></div>';
+			echo '<span class="description">' . esc_html__( 'Leave empty to use the domain itself; www is then added too when it has no record yet.', 'beltoft-services' ) . '</span></div>';
 		}
 		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="own"> ' . esc_html__( 'Use my own domain', 'beltoft-services' );
-		echo '<span class="description">' . esc_html__( 'For a domain registered or hosted elsewhere. We change no DNS records. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server.', 'beltoft-services' ) . '</span></label>';
+		echo '<span class="description">' . esc_html__( 'For a domain registered or hosted elsewhere. We change no DNS records. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server. For a bare domain such as example.com, point A records for both example.com and www.example.com at the address; www redirects to example.com.', 'beltoft-services' ) . '</span></label>';
 		echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-own-fields hidden>';
 		echo '<label for="' . esc_attr( $id . '-own' ) . '">' . esc_html__( 'Your domain name', 'beltoft-services' ) . '</label>';
 		echo '<input type="text" id="' . esc_attr( $id . '-own' ) . '" name="app_own" maxlength="253" placeholder="shop.example.com" autocomplete="off" spellcheck="false"></div>';
@@ -778,16 +782,33 @@ final class AppReinstall {
 		} else {
 			$meta['app_domain_left'] = null;
 		}
+		$old    = (array) $r->get( 'app_domain_old' );
+		$queued = false;
 		if ( '' !== $published && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_zone' ) ) {
 			$ip = IpPool::for_resource( $r->id() );
-			$old = (array) $r->get( 'app_domain_old' );
 			$old[] = array(
 				'zone' => (string) $r->get( 'app_zone' ),
 				'name' => $published,
 				'ip' => (string) ( $ip['address'] ?? $r->get( 'ip' ) ),
 				'tries' => 0,
 			);
-			$meta['app_domain_old'] = array_slice( $old, 0, 3 );
+			$queued = true;
+		}
+		// The www record we wrote next to the domain's goes the same way: removed only while it is still the record we wrote.
+		$www_ip = (string) $r->get( 'app_www_ip' );
+		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_zone' ) && '' !== $www_ip ) {
+			$old[] = array(
+				'zone' => (string) $r->get( 'app_zone' ),
+				'name' => 'www.' . (string) $r->get( 'app_zone' ),
+				'ip' => $www_ip,
+				'tries' => 0,
+			);
+			$queued = true;
+		}
+		$meta['app_www_made'] = null;
+		$meta['app_www_ip']   = null;
+		if ( $queued ) {
+			$meta['app_domain_old'] = array_slice( $old, 0, 4 );
 		}
 		return $meta;
 	}
