@@ -17,16 +17,16 @@ use BeltoftServices\Http\HttpDriver;
 class RegistryTest extends TestCase {
 
 	public function test_registry_uses_the_filter(): void {
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail' ), array_keys( Registry::all() ) );
 		$this->assertInstanceOf( HttpDriver::class, Registry::get( 'http' ) );
 		$this->assertSame( 'vm', Registry::get( 'proxmox' )->kind() );
 		$this->assertSame( 'disk', Registry::get( 'proxmox-disk' )->kind() );
 
 		$fake = $this->fake_driver();
 
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'fake' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'fake' ), array_keys( Registry::all() ) );
 		$this->assertSame( $fake, Registry::get( 'fake' ) );
-		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'applic', 'domain', 'dns', 'fake' ), Registry::kinds() );
+		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'applic', 'domain', 'dns', 'mail', 'fake' ), Registry::kinds() );
 	}
 
 	public function test_unknown_driver_is_null(): void {
