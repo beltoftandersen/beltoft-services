@@ -49,6 +49,7 @@ abstract class McpTestCase extends TestCase {
 		remove_all_filters( 'beltoft_services_domains_dns' );
 		remove_all_filters( 'beltoft_services_zone_lock_wait' );
 		remove_all_filters( 'beltoft_services_domains_client' );
+		remove_all_filters( 'woocommerce_subscription_is_manual' );
 
 		parent::tear_down();
 	}
@@ -96,4 +97,52 @@ abstract class McpTestCase extends TestCase {
 		return Resource::find( $r->id() );
 	}
 
+	/**
+	 * A subscription of a customer.
+	 *
+	 * @param int    $user   Customer.
+	 * @param string $price  Price.
+	 * @param bool   $manual Renews by invoice.
+	 * @param string $status Status.
+	 */
+	protected function subscription( int $user, string $price = '12.00', bool $manual = false, string $status = 'active' ): \WC_Subscription {
+		// The test site has no gateway that takes subscription payments: manual is what the subscription says it is.
+		add_filter( 'woocommerce_subscription_is_manual', static fn( $m, $sub ) => true === $sub->get_requires_manual_renewal(), 10, 2 );
+
+		$sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1, 'status' => $status ) );
+		$this->assertInstanceOf( \WC_Subscription::class, $sub );
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Domain' );
+		$product->set_regular_price( $price );
+		$product->save();
+		$sub->add_product( $product, 1 );
+
+		if ( ! $manual ) {
+			$sub->set_payment_method( 'bacs' );
+		}
+
+		$sub->set_requires_manual_renewal( $manual );
+		$sub->calculate_totals();
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + 200 * DAY_IN_SECONDS ) ) );
+		$sub->save();
+
+		return $sub;
+	}
+
+	/**
+	 * A domain of a customer that is paid by a subscription.
+	 *
+	 * @param int               $user Customer.
+	 * @param \WC_Subscription $sub  Subscription.
+	 * @param string            $name Domain.
+	 */
+	protected function domain_paid_by( int $user, \WC_Subscription $sub, string $name = 'example.com' ): Resource {
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
+		$r       = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => $name, 'mode' => 'register', 'zone_ready' => true, 'is_locked' => true, 'nameservers' => array( 'ns1.example.net', 'ns2.example.net' ), 'ns_mode' => 'ours', 'expires_at' => '2027-03-01 00:00:00' ) );
+		$r->set( array( 'state' => 'ready' ) );
+		$this->dns->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) );
+
+		return Resource::find( $r->id() );
+	}
 }

@@ -106,6 +106,16 @@ final class Acts {
 	}
 
 	/**
+	 * The error notices as one text, or the fallback when there were none.
+	 *
+	 * @param string[] $errors   Error notices.
+	 * @param string   $fallback Words for no notice.
+	 */
+	private static function said( array $errors, string $fallback ): string {
+		return $errors ? implode( ' ', $errors ) : $fallback;
+	}
+
+	/**
 	 * A setting of a domain: name servers, transfer lock, a check of the name servers. Never the unlock.
 	 *
 	 * @param array<string, mixed> $args Arguments.
@@ -218,7 +228,7 @@ final class Acts {
 
 		return $ok
 			? array( 'subscription_id' => $id, 'status' => 'active', 'message' => implode( ' ', $said['messages'] ) )
-			: new \WP_Error( 'beltoft_services_tool', implode( ' ', $said['errors'] ) ?: __( 'The subscription could not be reactivated.', 'beltoft-services' ) ); // phpcs:ignore Universal.Operators.DisallowShortTernary.Found -- the fallback is for an empty list of notices.
+			: new \WP_Error( 'beltoft_services_tool', self::said( $said['errors'], __( 'The subscription could not be reactivated.', 'beltoft-services' ) ) );
 	}
 
 	/**
@@ -241,7 +251,7 @@ final class Acts {
 		$said = Notices::capture( static fn() => LicenseAccount::free_site( $license_id, $domain, $user_id ) );
 
 		if ( ! $said['result'] ) {
-			return new \WP_Error( 'beltoft_services_tool', implode( ' ', $said['errors'] ) ?: __( 'That site was not active on this license.', 'beltoft-services' ) ); // phpcs:ignore Universal.Operators.DisallowShortTernary.Found -- the fallback is for an empty list of notices.
+			return new \WP_Error( 'beltoft_services_tool', self::said( $said['errors'], __( 'That site was not active on this license.', 'beltoft-services' ) ) );
 		}
 
 		Events::add( $license_id, 'api', 'Claude: site removed (' . $domain . ')' );
@@ -294,7 +304,7 @@ final class Acts {
 		$said = Notices::capture( static fn() => AddressService::save( $user_id, 'billing', $values ) );
 
 		if ( ! $said['result'] || ! $said['ok'] ) {
-			return new \WP_Error( 'beltoft_services_tool', implode( ' ', $said['errors'] ) ?: __( 'The address was not changed.', 'beltoft-services' ) ); // phpcs:ignore Universal.Operators.DisallowShortTernary.Found -- the fallback is for an empty list of notices.
+			return new \WP_Error( 'beltoft_services_tool', self::said( $said['errors'], __( 'The address was not changed.', 'beltoft-services' ) ) );
 		}
 
 		Audit::add( $user_id, 'billing address changed (' . implode( ', ', array_keys( $values ) ) . ')' );

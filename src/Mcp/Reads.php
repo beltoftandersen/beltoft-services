@@ -339,7 +339,7 @@ final class Reads {
 
 		$subs = function_exists( 'wcs_get_subscriptions_for_order' ) ? array_keys( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'any' ) ) ) : array();
 
-		return self::order_row( $order ) + array(
+		return array_diff_key( self::order_row( $order ), array( 'items' => 1 ) ) + array(
 			'items'          => $items,
 			'tax'            => Rates::money( (float) $order->get_total_tax(), 2, $currency ),
 			'payment_method' => wp_strip_all_tags( (string) $order->get_payment_method_title() ),

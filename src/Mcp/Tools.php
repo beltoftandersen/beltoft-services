@@ -592,8 +592,10 @@ final class Tools {
 
 				if ( $ok && isset( $schema['items'] ) ) {
 					foreach ( $value as $i => $item ) {
-						if ( null !== self::check( (array) $schema['items'], $item, $path . '[' . $i . ']' ) ) {
-							return $path;
+						$bad = self::check( (array) $schema['items'], $item, $path . '[' . $i . ']' );
+
+						if ( null !== $bad ) {
+							return $bad;
 						}
 					}
 				}

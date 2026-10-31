@@ -135,7 +135,8 @@ final class Details {
 		}
 
 		if ( PrivateAttach::eligible( $r ) ) {
-			$out['private_network'] = (string) $r->get( PrivateAttach::STATE ) ?: 'detached'; // phpcs:ignore Universal.Operators.DisallowShortTernary.Found -- an empty state is detached.
+			$state                  = (string) $r->get( PrivateAttach::STATE );
+			$out['private_network'] = '' === $state ? 'detached' : $state;
 		}
 
 		$snapshots = Snapshots::panel( $r );
