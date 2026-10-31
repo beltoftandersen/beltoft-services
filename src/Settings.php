@@ -100,6 +100,14 @@ final class Settings {
 				'label'   => __( 'Redirect addresses apps may use', 'beltoft-services' ),
 				'desc'    => __( 'One address per line, matched exactly. An app can only register and sign in with an address on this list. Empty means the Claude addresses.', 'beltoft-services' ),
 			),
+			'api_docs_url' => array(
+				'tab'     => 'general',
+				'section' => 'api',
+				'type'    => 'url',
+				'default' => '',
+				'label'   => __( 'API documentation page', 'beltoft-services' ),
+				'desc'    => __( 'Address of a public page that holds the shortcode [beltoft_services_api_reference]. When set, the Security section in My Account links to it instead of printing its own short guide.', 'beltoft-services' ),
+			),
 			'account_billing' => array(
 				'tab'     => 'general',
 				'section' => 'account',

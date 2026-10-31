@@ -90,6 +90,7 @@ final class Plugin {
 		Api\Routes::register();
 		Api\Services::register();
 		Api\OpenApi::register();
+		Api\Reference::register();
 		Api\Tokens::register();
 		Oauth\Server::register();
 		Mcp\Endpoint::register();

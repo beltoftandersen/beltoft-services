@@ -173,6 +173,7 @@ final class ApiTokens {
 				'base'     => rest_url( Routes::NAMESPACE . '/' ),
 				'username' => $user->user_login,
 				'max'      => Tokens::MAX,
+				'docs_url' => \BeltoftServices\Api\Reference::page_url(),
 				'mcp'      => array(
 					'on'      => Access::enabled(),
 					'allowed' => Access::user_allowed( $user->ID ),
