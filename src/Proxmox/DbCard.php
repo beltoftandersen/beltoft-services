@@ -40,6 +40,7 @@ final class DbCard {
 				'notapplied' => __( 'The change could not be applied. We have been told. Please try again later.', 'beltoft-services' ),
 				'noip'      => __( 'Your current address could not be read.', 'beltoft-services' ),
 				'confirmremove' => __( 'Remove this address from the list?', 'beltoft-services' ),
+				'policyworking' => __( 'Applying the setting. This can take a minute.', 'beltoft-services' ),
 				'nobackup'  => __( 'Choose a backup.', 'beltoft-services' ),
 			),
 		) );
@@ -83,6 +84,7 @@ final class DbCard {
 			'can_reset'   => $ready && $r->accepts_actions() && array_key_exists( DbActions::RESET, $offered ),
 			'resetting'   => '' !== (string) $r->get( 'db_reset_request' ),
 			'confirm'     => DbActions::CONFIRM,
+			'policy'      => DbPolicy::view( $r, $ready && $r->accepts_actions() && array_key_exists( DbPolicy::ACTION, $offered ) ),
 			'backups'     => $backups,
 			'access'      => $access,
 			'public_connections' => $public,
