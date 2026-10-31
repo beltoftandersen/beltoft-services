@@ -423,9 +423,8 @@ final class AppField {
 		foreach ( AppLicence::tiers( $id ) as $key => $tier ) {
 			// Both prices are printed: the script shows the one that fits the billing choice (a pay-as-you-go server is billed by the hour, and only a tier with an hourly price can be bought there).
 			$hourly = AppLicence::usage_price( $tier );
-			$mark   = '' === $hourly ? ' data-no-usage' : '';
 
-			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . $mark . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span>';
+			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . ( '' === $hourly ? ' data-no-usage' : '' ) . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span>';
 			echo '<span class="description" data-price-monthly' . ( $usage ? ' hidden' : '' ) . '>' . esc_html( $tier['price'] ) . '</span>';
 			echo '<span class="description" data-price-usage' . ( $usage ? '' : ' hidden' ) . '>' . esc_html( '' === $hourly ? __( 'Not available with pay as you go', 'beltoft-services' ) : $hourly ) . '</span></label>';
 		}
