@@ -121,6 +121,38 @@ $beltoft_services_db_wait = array(
 	<?php endif; // Kind of state. ?>
 	<?php endif; // Overview pane. ?>
 
+	<?php if ( 'ready' === $view['kind'] && is_array( $view['policy'] ?? null ) && ( $beltoft_services_all || 'overview' === $active ) ) : ?>
+		<?php $beltoft_services_policy = $view['policy']; ?>
+		<div class="beltoft-services-vm__more" data-db-policy-box>
+			<h4><?php esc_html_e( 'When memory is full', 'beltoft-services' ); ?></h4>
+			<p class="description"><?php esc_html_e( 'The database keeps its data in memory. This decides what it does when the memory limit is reached. The change applies at once and stays after a restart.', 'beltoft-services' ); ?></p>
+			<?php if ( $beltoft_services_policy['old'] ) : ?>
+				<p><?php echo esc_html( (string) $beltoft_services_policy['old_text'] ); ?></p>
+			<?php endif; ?>
+			<?php if ( $beltoft_services_policy['can_set'] && ! $beltoft_services_policy['working'] ) : ?>
+				<div class="beltoft-services-db__form">
+					<p>
+						<label for="beltoft-db-policy"><?php esc_html_e( 'Setting', 'beltoft-services' ); ?></label>
+						<select id="beltoft-db-policy" data-db-policy>
+							<?php foreach ( $beltoft_services_policy['choices'] as $beltoft_services_value => $beltoft_services_choice ) : ?>
+								<option value="<?php echo esc_attr( (string) $beltoft_services_value ); ?>"<?php selected( $beltoft_services_value, $beltoft_services_policy['current'] ); ?>><?php echo esc_html( $beltoft_services_choice[0] . ' (' . $beltoft_services_value . ')' ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</p>
+					<p><button type="button" class="button woocommerce-button" data-db-policy-save><?php esc_html_e( 'Save', 'beltoft-services' ); ?></button></p>
+				</div>
+				<ul class="beltoft-services-db__policies">
+					<?php foreach ( $beltoft_services_policy['choices'] as $beltoft_services_value => $beltoft_services_choice ) : ?>
+						<li><strong><code><?php echo esc_html( (string) $beltoft_services_value ); ?></code></strong> <?php echo esc_html( $beltoft_services_choice[1] ); ?></li>
+					<?php endforeach; ?>
+				</ul>
+			<?php else : ?>
+				<p><?php echo esc_html( $beltoft_services_policy['working'] ? __( 'A change is being applied. This can take a minute.', 'beltoft-services' ) : sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?></p>
+			<?php endif; ?>
+			<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( ! $beltoft_services_all && 'overview' !== $active && isset( $beltoft_services_db_wait[ $view['kind'] ] ) ) : ?>
 		<p><?php echo esc_html( $beltoft_services_db_wait[ $view['kind'] ] ); ?></p>
 	<?php endif; ?>

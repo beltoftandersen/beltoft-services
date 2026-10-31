@@ -81,6 +81,10 @@ class DbDriver extends ProxmoxDriver {
 			return ( new DbAccess( $r ) )->run();
 		}
 
+		if ( DbPolicy::ACTION === $action ) {
+			return ( new DbPolicy( $r ) )->run( $args );
+		}
+
 		return DbActions::RESET === $action ? ( new DbActions( $r ) )->run() : StepResult::fail( 'This database action is not available.' );
 	}
 

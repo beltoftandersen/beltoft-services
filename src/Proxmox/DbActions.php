@@ -71,6 +71,10 @@ final class DbActions {
 			$out[ self::RESTORE ] = __( 'Restore from a backup', 'beltoft-services' );
 		}
 
+		if ( DbPolicy::offered( $r ) ) {
+			$out[ DbPolicy::ACTION ] = __( 'When memory is full', 'beltoft-services' );
+		}
+
 		return $out;
 	}
 
@@ -83,7 +87,7 @@ final class DbActions {
 	 */
 	public static function buttons( $actions, $r ) {
 		if ( is_array( $actions ) && self::is_db( $r ) ) {
-			unset( $actions[ self::RESET ], $actions[ self::RESTORE ] );
+			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ DbPolicy::ACTION ] );
 		}
 
 		return $actions;
@@ -101,6 +105,10 @@ final class DbActions {
 	public static function refusal( $refusal, $r, $action = '', $args = array() ) {
 		if ( self::is_db( $r ) && self::RESTORE === $action ) {
 			return self::restore_refusal( $refusal, $r, is_array( $args ) ? $args : array() );
+		}
+
+		if ( self::is_db( $r ) && DbPolicy::ACTION === $action ) {
+			return null !== $refusal ? $refusal : DbPolicy::refusal( $refusal, $r, is_array( $args ) ? $args : array() );
 		}
 
 		if ( ! self::is_db( $r ) || self::RESET !== $action ) {

@@ -110,6 +110,35 @@
 		} );
 	}
 
+	function policy( box, panel, button ) {
+		var choice = box.querySelector( '[data-db-policy]' );
+		var since = Math.floor( Date.now() / 1000 ) - 5;
+
+		if ( ! choice || ! choice.value ) {
+			return;
+		}
+
+		button.disabled = true;
+		say( box, '' );
+		post( panel, '/actions/db_set_policy', JSON.stringify( { args: { policy: choice.value } } ) ).then( function ( response ) {
+			if ( response.status === 202 ) {
+				say( box, db.strings.policyworking );
+				waitForAction( box, panel, 'db_set_policy', since, 0 );
+
+				return null;
+			}
+
+			button.disabled = false;
+
+			return response.json().then( function ( data ) {
+				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
+			} );
+		} ).catch( function () {
+			button.disabled = false;
+			say( box, db.strings.failed );
+		} );
+	}
+
 	function restore( box, panel, button ) {
 		var input = box.querySelector( '[data-db-restore-confirm]' );
 		var choice = box.querySelector( '[data-db-backup]' );
@@ -265,7 +294,7 @@
 	} );
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
 		var box = button ? button.closest( '[data-db-card]' ) : null;
 		var panel = box ? box.closest( '[data-resource]' ) : null;
 
@@ -277,6 +306,8 @@
 			copy( box, button );
 		} else if ( button.hasAttribute( 'data-db-reveal' ) ) {
 			reveal( box, panel, button );
+		} else if ( button.hasAttribute( 'data-db-policy-save' ) ) {
+			policy( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-restore' ) ) {
 			restore( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-access-mine' ) || button.hasAttribute( 'data-db-access-add' ) || button.hasAttribute( 'data-db-access-remove' ) || button.hasAttribute( 'data-db-access-world' ) ) {
