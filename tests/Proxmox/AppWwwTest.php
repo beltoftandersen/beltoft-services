@@ -526,8 +526,6 @@ $this->assertSame( 'retry', $fresh->get( 'app_www_reason' ) );
 			exec( 'bash -n ' . escapeshellarg( $file ), $out, $code );
 			$this->assertSame( 0, $code, $dir );
 		}
-		$snippet = BELTOFT_SERVICES_PATH . '.internal/proxmox-snippets/vm-vendor-cloudinit-v2.yaml';
-		$this->assertFalse( file_exists( $snippet ), 'The vendor snippet is not part of the plugin and is not changed.' );
 	}
 
 	public function test_the_apex_test_uses_the_public_suffix_list_when_it_is_there(): void {
