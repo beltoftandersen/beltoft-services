@@ -21,7 +21,7 @@ final class Registry {
 	 */
 	public static function all(): array {
 		/**
-		 * Filters the registered drivers. The HTTP and Proxmox drivers are built in.
+		 * Filters the registered drivers. The HTTP, Proxmox, domain, DNS and mail drivers are built in.
 		 *
 		 * @param array<string, Driver> $drivers Drivers keyed by id.
 		 */
@@ -36,6 +36,7 @@ final class Registry {
 				'proxmox-app' => new \BeltoftServices\Proxmox\AppLicenceDriver(),
 				'domain'  => new \BeltoftServices\Domains\DomainDriver(),
 				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
+				'mail'    => new \BeltoftServices\Mail\MailDriver(),
 			)
 		);
 

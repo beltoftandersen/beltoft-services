@@ -203,6 +203,22 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that mailboxes of an email domain are nearly full. The caller keeps the list of mailboxes it has
+	 * already reported (meta mail_usage_alerted), so each one is reported once until it drops below the threshold.
+	 *
+	 * @param Resource           $r     Resource.
+	 * @param array<int, string> $lines One line per mailbox, for example "a@example.com: 91 percent of 5120 MB".
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function mail_usage( Resource $r, array $lines ): bool {
+		return self::admin_note(
+			$r,
+			'Mailboxes nearly full',
+			array_merge( array( sprintf( 'Domain: %s', (string) $r->get( 'mail_domain' ) ) ), $lines, array( 'Nothing was changed. The customer can delete mail or move to a larger plan.' ) )
+		);
+	}
+
+	/**
 	 * One mail to the alert address about a server.
 	 *
 	 * @param Resource           $r       Resource.
