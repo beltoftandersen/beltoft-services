@@ -283,7 +283,7 @@ final class AppLicenceTest extends PaidAppCase {
 		$this->assertSame( 'ready', $this->fresh( $o['server'] )->get( 'state' ) );
 	}
 
-	public function test_a_reinstall_cannot_pick_a_paid_app(): void {
+	public function test_a_reinstall_offers_a_paid_app_that_has_a_tier(): void {
 		$o = $this->with_licence();
 		$this->assertTrue( $o['server']->set( array( 'app_id' => '', 'app_version' => '', 'plan' => array( 'cluster' => 'lab', 'template' => 9001, 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 100 ) ) ) );
 		$method  = new \ReflectionMethod( AppReinstall::class, 'offers' );
@@ -291,7 +291,7 @@ final class AppLicenceTest extends PaidAppCase {
 
 		$this->assertIsArray( $offers );
 		$this->assertArrayHasKey( 'wordpress', $offers['apps'], 'A free app is still offered.' );
-		$this->assertArrayNotHasKey( 'docker', $offers['apps'], 'A paid app is bought with the server, not at a reinstall.' );
+		$this->assertArrayHasKey( 'docker', $offers['apps'], 'A paid app with a tier is offered; its licence is bought on the way (AppReinstallPaid).' );
 	}
 
 	public function test_the_licence_drivers_plan_fields_and_the_service_slug(): void {

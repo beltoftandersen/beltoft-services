@@ -98,13 +98,21 @@ final class Renewal {
 			return '#' . $resource_id;
 		}
 
-		$name = (string) $resource->get( 'server_name' );
+		$name    = (string) $resource->get( 'server_name' );
+		$product = wc_get_product( (int) ( $resource->license()['product_id'] ?? 0 ) );
+
+		// The licence of an app is shown with its server: "web1 (Plesk)".
+		if ( \BeltoftServices\Proxmox\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
+			$server = \BeltoftServices\Proxmox\AppLicence::server_of( $resource );
+			$name   = $server ? (string) $server->get( 'server_name' ) : '';
+			$label  = $product ? $product->get_name() : '#' . $resource_id;
+
+			return '' !== $name ? sprintf( '%1$s (%2$s)', $name, $label ) : $label;
+		}
 
 		if ( '' !== $name ) {
 			return $name;
 		}
-
-		$product = wc_get_product( (int) ( $resource->license()['product_id'] ?? 0 ) );
 
 		return $product ? $product->get_name() : '#' . $resource_id;
 	}
@@ -120,6 +128,7 @@ final class Renewal {
 			'backups'   => __( 'backups', 'beltoft-services' ),
 			'disk'      => __( 'extra disk', 'beltoft-services' ),
 			'snapshots' => __( 'snapshot slots', 'beltoft-services' ),
+			'app'       => __( 'app licence', 'beltoft-services' ),
 		);
 
 		return $labels[ $item ] ?? $item;

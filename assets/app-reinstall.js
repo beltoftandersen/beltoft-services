@@ -34,9 +34,35 @@
 			summary.textContent = text;
 		}
 
+		// A paid app: its tiers are shown (and posted) only while its tile is the checked one; the first is chosen when none is.
+		function tiers() {
+			var app = apps ? apps.querySelector( 'input[name="app_version"]:checked' ) : null;
+			var chosen = app && ! app.hasAttribute( 'data-none' ) ? String( app.value ).split( '/' )[ 0 ] : '';
+			var paid = !! app && app.hasAttribute( 'data-paid' );
+			var note = scope.querySelector( '[data-reinstall-paid-note]' );
+
+			Array.prototype.forEach.call( scope.querySelectorAll( '[data-reinstall-tiers]' ), function ( group ) {
+				var on = paid && group.getAttribute( 'data-reinstall-tiers' ) === chosen;
+
+				group.hidden = ! on;
+				Array.prototype.forEach.call( group.querySelectorAll( 'input' ), function ( input ) {
+					input.disabled = ! on;
+					input.required = on;
+				} );
+				if ( on && ! group.querySelector( 'input:checked' ) ) {
+					group.querySelector( 'input' ).checked = true;
+				}
+			} );
+			if ( note ) {
+				note.hidden = ! paid;
+			}
+		}
+
 		if ( apps ) {
 			scope.addEventListener( 'change', say );
+			scope.addEventListener( 'change', tiers );
 			say();
+			tiers();
 		}
 
 		if ( ! apps || ! domain || ! none ) {

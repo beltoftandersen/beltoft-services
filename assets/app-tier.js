@@ -53,6 +53,31 @@
       });
   }
 
+  // The billing choice of the server (pay as you go or monthly) changes which price a tier shows. The server's cart
+  // line has been swapped by then and its tier line follows (the server side matches it), so the cart is refreshed.
+  function prices() {
+    var billing = document.querySelector('input[name="beltoft_services_billing"]:checked');
+    var usage = !!billing && billing.value === 'usage';
+    root.querySelectorAll('[data-price-monthly]').forEach(function (el) {
+      el.hidden = usage;
+    });
+    root.querySelectorAll('[data-price-usage]').forEach(function (el) {
+      el.hidden = !usage;
+    });
+    root.querySelectorAll('input[data-no-usage]').forEach(function (input) {
+      input.disabled = usage || input.closest('[data-app-tiers]').hidden;
+      if (usage) {
+        input.checked = false;
+      }
+    });
+  }
+
+  $(document.body).on('change', 'input[name="beltoft_services_billing"]', function () {
+    prices();
+    // Wait for the billing swap (its own request) before the cart is read again.
+    window.setTimeout(sync, 800);
+  });
+
   root.addEventListener('change', function (event) {
     var target = event.target;
     if (!target || !target.name) {
@@ -68,4 +93,5 @@
   });
 
   show();
+  prices();
 })(jQuery);

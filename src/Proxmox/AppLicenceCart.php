@@ -12,6 +12,14 @@ defined( 'ABSPATH' ) || exit;
  * `beltoft_services_applic_for => cart_server`, so it is bought together with the new server of the cart and
  * nowhere else. A renewal, a resubscribe and a WooCommerce Subscriptions switch of a tier line pass (the line
  * was bought before). The app field's script keeps the line in step with the chosen tier (AJAX).
+ *
+ * Billing follows the server. A pay-as-you-go server gets the tier's usage sibling (price 0 at checkout, billed by
+ * the hour from the usage ledger, see Rates::items) and never the monthly variation: a tier with no usage sibling is
+ * not offered there, so a pay-as-you-go customer never gets a fixed monthly subscription they did not see. When the
+ * billing choice of the cart's server changes, rematch() puts the matching variation in the cart.
+ *
+ * A reinstall of an existing server to a paid app uses the same line, linked to that server's license id instead of
+ * `cart_server` (AppReinstallPaid: URL, nonce and the pending reinstall request it needs).
  */
 final class AppLicenceCart {
 
@@ -50,7 +58,7 @@ final class AppLicenceCart {
 	 */
 	public static function line(): ?array {
 		foreach ( function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart() : array() as $key => $item ) {
-			if ( isset( $item[ AppLicence::CART_UID ] ) ) {
+			if ( isset( $item[ AppLicence::CART_UID ] ) && 'cart_server' === ( $item[ AppLicence::CART_FOR ] ?? null ) ) {
 				return array( 'key' => (string) $key, 'item' => (array) $item );
 			}
 		}
@@ -59,13 +67,13 @@ final class AppLicenceCart {
 	}
 
 	/**
-	 * Every tier line of the cart (one is allowed; the checkout check counts them).
+	 * Every tier line of the cart for its new server (one is allowed; the checkout check counts them).
 	 */
 	public static function lines(): int {
 		$count = 0;
 
 		foreach ( function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart() : array() as $item ) {
-			$count += isset( $item[ AppLicence::CART_UID ] ) ? 1 : 0;
+			$count += isset( $item[ AppLicence::CART_UID ] ) && 'cart_server' === ( $item[ AppLicence::CART_FOR ] ?? null ) ? 1 : 0;
 		}
 
 		return $count;
@@ -95,29 +103,76 @@ final class AppLicenceCart {
 			return true;
 		}
 
-		$wanted = AppLicence::tier( $app_id, $tier );
+		$wanted    = AppLicence::tier( $app_id, $tier );
+		$variation = null === $wanted ? null : AppLicence::line_variation( $wanted, self::server_usage() );
 
-		if ( null === $wanted ) {
+		if ( null === $variation ) {
 			return false;
 		}
 
-		if ( $line && (int) ( $line['item']['variation_id'] ?? 0 ) === $wanted['variation_id'] ) {
+		if ( $line && (int) ( $line['item']['variation_id'] ?? 0 ) === $variation->get_id() ) {
 			return true;
 		}
 
 		$attributes = array();
 
-		foreach ( $wanted['variation']->get_attributes() as $name => $value ) {
+		foreach ( $variation->get_attributes() as $name => $value ) {
 			$attributes[ 'attribute_' . $name ] = $value;
 		}
 
-		$added = $cart->add_to_cart( $wanted['product_id'], 1, $wanted['variation_id'], $attributes, array( AppLicence::CART_FOR => 'cart_server' ) );
+		$added = $cart->add_to_cart( $wanted['product_id'], 1, $variation->get_id(), $attributes, array( AppLicence::CART_FOR => 'cart_server' ) );
 
 		if ( $added && $line && $line['key'] !== (string) $added ) {
 			$cart->remove_cart_item( $line['key'] );
 		}
 
 		return (bool) $added;
+	}
+
+	/**
+	 * Is the cart's new server billed pay as you go?
+	 */
+	public static function server_usage(): bool {
+		$server = DiskField::cart_server();
+
+		return null !== $server && \BeltoftServices\Usage\Rates::is_usage( (int) ( $server['item']['variation_id'] ?? 0 ) );
+	}
+
+	/**
+	 * After the billing choice of the cart's server changed: the tier line gets the variation that matches (monthly, or
+	 * its usage sibling), or leaves the cart when the tier has none for that billing (the app field then asks again).
+	 *
+	 * @return bool Whether the cart is in step (no line, or a matching one).
+	 */
+	public static function rematch(): bool {
+		$line = self::line();
+
+		if ( ! $line ) {
+			return true;
+		}
+
+		$item = $line['item'];
+		$app  = AppLicence::app_of( (int) ( $item['variation_id'] ?? 0 ) );
+		$plan = Product::plan( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) );
+
+		if ( null === $app ) {
+			return true;
+		}
+
+		$wanted    = AppLicence::tier( $app, (string) ( $plan['tier'] ?? '' ) );
+		$variation = null === $wanted ? null : AppLicence::line_variation( $wanted, self::server_usage() );
+
+		if ( null !== $variation && (int) ( $item['variation_id'] ?? 0 ) === $variation->get_id() ) {
+			return true;
+		}
+
+		if ( null === $variation ) {
+			WC()->cart->remove_cart_item( $line['key'] );
+
+			return false;
+		}
+
+		return self::choose( $app, (string) $wanted['key'] );
 	}
 
 	/**
@@ -150,11 +205,15 @@ final class AppLicenceCart {
 
 		$data = is_array( $data ) ? $data : array();
 		$app  = AppLicence::app_of( (int) $variation_id );
-		$ok   = 'cart_server' === ( $data[ AppLicence::CART_FOR ] ?? null ) && 1 === (int) $quantity && null !== DiskField::cart_server() && null !== $app;
+		$link = AppReinstallPaid::link( $data );
+		$ok   = 1 === (int) $quantity && null !== $app && ( ( null !== DiskField::cart_server() && 'cart_server' === $link ) || is_int( $link ) );
 
 		if ( $ok ) {
-			$plan = Product::plan( (int) $product_id, (int) $variation_id );
-			$ok   = null !== AppLicence::tier( (string) $app, (string) ( $plan['tier'] ?? '' ) );
+			$plan  = Product::plan( (int) $product_id, (int) $variation_id );
+			$tier  = AppLicence::tier( (string) $app, (string) ( $plan['tier'] ?? '' ) );
+			$usage = is_int( $link ) ? AppReinstallPaid::server_usage( $link ) : self::server_usage();
+			$want  = null === $tier ? null : AppLicence::line_variation( $tier, $usage );
+			$ok    = null !== $want && $want->get_id() === (int) $variation_id && ( ! is_int( $link ) || AppReinstallPaid::wants( $link, (string) $app, (string) $tier['key'] ) );
 		}
 
 		if ( ! $ok ) {
@@ -177,10 +236,13 @@ final class AppLicenceCart {
 			return $data;
 		}
 
-		if ( 'cart_server' !== ( $data[ AppLicence::CART_FOR ] ?? null ) || null === DiskField::cart_server() ) {
+		$link = AppReinstallPaid::link( $data );
+
+		if ( null === $link || ( 'cart_server' === $link && null === DiskField::cart_server() ) ) {
 			throw new \Exception( esc_html__( 'Choose the app on the server step first.', 'beltoft-services' ) );
 		}
 
+		$data[ AppLicence::CART_FOR ] = $link;
 		$data[ AppLicence::CART_UID ] = wp_generate_uuid4();
 
 		return $data;
@@ -241,7 +303,7 @@ final class AppLicenceCart {
 	 * A removed server must not leave a licence for nothing in the cart.
 	 */
 	public static function clean_orphan(): void {
-		if ( DiskField::server_swap_in_progress() || null !== DiskField::cart_server() ) {
+		if ( DiskField::server_swap_in_progress() || null !== DiskField::cart_server() || AppReinstallPaid::in_cart() ) {
 			return;
 		}
 

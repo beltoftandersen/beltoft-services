@@ -124,6 +124,7 @@ final class Plugin {
 		Proxmox\AppField::register();
 		Proxmox\AppLicence::register();
 		Proxmox\AppLicenceCart::register();
+		Proxmox\AppReinstallPaid::register();
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
 		Proxmox\BackupField::register();

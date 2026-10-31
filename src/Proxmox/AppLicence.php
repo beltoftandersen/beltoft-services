@@ -12,6 +12,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -184,6 +185,55 @@ final class AppLicence {
 	 */
 	public static function tier( string $app_id, string $key, bool $buyable = true ): ?array {
 		return self::tiers( $app_id, $buyable )[ $key ] ?? null;
+	}
+
+	/**
+	 * The pay-as-you-go variation of a tier: its usage sibling (same tier, Billing "pay as you go", price 0 at checkout),
+	 * when it can be bought and the tier has a monthly price to bill from. Null when there is none.
+	 *
+	 * @param array<string, mixed> $tier A tier from tiers().
+	 */
+	public static function usage_variation( array $tier ): ?\WC_Product_Variation {
+		$variation = $tier['variation'] ?? null;
+
+		if ( ! $variation instanceof \WC_Product_Variation || null === Rates::for_plan( $variation ) ) {
+			return null;
+		}
+
+		$usage = Rates::sibling( $variation, true );
+
+		return $usage && $usage->is_purchasable() && $usage->is_in_stock() ? $usage : null;
+	}
+
+	/**
+	 * The variation that goes in the cart for a tier: the tier's own (monthly) one, or for a pay-as-you-go server
+	 * its usage sibling. A pay-as-you-go server never gets the monthly one: null when the tier has no usage sibling.
+	 *
+	 * @param array<string, mixed> $tier  A tier from tiers().
+	 * @param bool                 $usage Whether the server is billed pay as you go.
+	 */
+	public static function line_variation( array $tier, bool $usage ): ?\WC_Product_Variation {
+		return $usage ? self::usage_variation( $tier ) : ( $tier['variation'] ?? null );
+	}
+
+	/**
+	 * What a tier costs on a pay-as-you-go server, "0.0226 per hour, max 16.50 per month excluding VAT", or ''.
+	 *
+	 * @param array<string, mixed> $tier A tier from tiers().
+	 */
+	public static function usage_price( array $tier ): string {
+		$rates = null !== self::usage_variation( $tier ) ? Rates::for_plan( $tier['variation'] ) : null;
+
+		return null === $rates ? '' : Rates::terms( $rates['hourly'], $rates['cap'] );
+	}
+
+	/**
+	 * Is this server (or licence) billed from the usage ledger, pay as you go?
+	 *
+	 * @param Resource $resource Server or licence resource.
+	 */
+	public static function usage_billed( Resource $resource ): bool {
+		return 'usage' === (string) ( $resource->license()['source'] ?? '' );
 	}
 
 	/**
@@ -374,6 +424,17 @@ final class AppLicence {
 	 */
 	public static function end( Resource $licence, string $reason ): void {
 		$licence->set( array( self::ENDED => $reason ) );
+
+		// A pay-as-you-go licence has no subscription of its own (the usage account bills it): closing it stops the meter.
+		if ( self::usage_billed( $licence ) ) {
+			if ( 'deleted' !== $licence->get( 'state' ) && $licence->transition( 'deleted', $reason ) ) {
+				self::announce( $licence, 'cancelled' );
+				$licence->close();
+			}
+
+			return;
+		}
+
 		DiskCascade::cancel_undelivered( $licence, $reason );
 	}
 
@@ -381,7 +442,7 @@ final class AppLicence {
 	 * What the App tab shows about the licence, or null for a free app.
 	 *
 	 * @param Resource $server Server.
-	 * @return array{state: string, tier: string, tiers: array<int, array{label: string, price: string, url: string}>}|null
+	 * @return array{state: string, tier: string, usage: string, tiers: array<int, array{label: string, price: string, url: string}>}|null
 	 */
 	public static function view( Resource $server ): ?array {
 		$app = (string) $server->get( 'app_id' );
@@ -393,14 +454,20 @@ final class AppLicence {
 		$licence = self::current( $server );
 
 		if ( ! $licence ) {
-			return array( 'state' => 'none', 'tier' => '', 'tiers' => array() );
+			return array( 'state' => 'none', 'tier' => '', 'usage' => '', 'tiers' => array() );
 		}
 
 		$state    = self::state( $licence );
 		$own      = (string) ( ( (array) $licence->get( 'plan' ) )['tier'] ?? '' );
 		$switches = array();
 
-		if ( 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
+		$usage = '';
+
+		if ( self::usage_billed( $licence ) ) {
+			// Billed by the hour with the server: no subscription of its own to switch.
+			$items = Rates::items( $licence );
+			$usage = $items ? Rates::terms( (float) $items[0]['rate'], round( (float) $items[0]['rate'] * Rates::HOURS, 2 ) ) : '';
+		} elseif ( 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
 			foreach ( self::tiers( $app ) as $key => $tier ) {
 				$url = $key === $own ? '' : Backups::switch_to( $licence, $tier['variation'] );
 
@@ -410,7 +477,7 @@ final class AppLicence {
 			}
 		}
 
-		return array( 'state' => $state, 'tier' => self::tier_label( $licence ), 'tiers' => $switches );
+		return array( 'state' => $state, 'tier' => self::tier_label( $licence ), 'usage' => $usage, 'tiers' => $switches );
 	}
 
 	// -- Hand-over to the server ----------------------------------------------------------------
@@ -498,8 +565,18 @@ final class AppLicence {
 			return $meta;
 		}
 
-		if ( 'cart_server' === $matches[0]->get_meta( self::ITEM_SERVER, true ) ) {
+		$link = $matches[0]->get_meta( self::ITEM_SERVER, true );
+
+		if ( 'cart_server' === $link ) {
 			$meta['server_order_id'] = $order_id;
+		} elseif ( is_numeric( $link ) && (int) $link > 0 ) {
+			// Bought for a server the customer already has (the reinstall form).
+			$server = Licenses::find( (int) $link );
+			$driver = $server ? Product::driver_for( (int) ( $server['product_id'] ?? 0 ) ) : null;
+
+			if ( $server && (int) ( $server['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && $driver && SshKeyField::DRIVER === $driver->id() ) {
+				$meta['server_license'] = (int) $link;
+			}
 		}
 
 		$meta['order_item_id'] = (int) $matches[0]->get_id();

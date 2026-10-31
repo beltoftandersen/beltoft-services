@@ -82,6 +82,15 @@ final class AppLicenceDriver implements Driver {
 		$app    = (string) ( ( (array) $r->get( 'plan' ) )['app'] ?? '' );
 		$why    = '';
 
+		// A paid app bought for a server that runs another app (the reinstall form): the kept request is queued now.
+		if ( $owner && $server && '' !== $app && (string) $server->get( 'app_id' ) !== $app && (int) ( $owner['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && SshKeyField::DRIVER === $server->get( 'driver' ) ) {
+			$claimed = AppReinstallPaid::claim( $server, $app, $r );
+
+			if ( null !== $claimed ) {
+				return $claimed;
+			}
+		}
+
 		if ( $owner && (int) ( $owner['user_id'] ?? 0 ) !== (int) ( $license['user_id'] ?? 0 ) ) {
 			$why = 'The server belongs to another customer.';
 		} elseif ( $server && SshKeyField::DRIVER !== $server->get( 'driver' ) ) {

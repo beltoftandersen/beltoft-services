@@ -43,6 +43,9 @@ $beltoft_services_status_text = array(
 				<p><?php esc_html_e( 'This server has no licence for the app. Contact support.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p><?php /* translators: %s: tier name */ echo esc_html( sprintf( __( 'Tier: %s', 'beltoft-services' ), (string) $beltoft_services_licence['tier'] ) ); ?></p>
+				<?php if ( ! empty( $beltoft_services_licence['usage'] ) ) : ?>
+					<p data-app-licence-usage><?php /* translators: %s: price such as 0.0226 per hour, max 16.50 per month excluding VAT */ echo esc_html( sprintf( __( 'Billed by the hour with your server: %s.', 'beltoft-services' ), (string) $beltoft_services_licence['usage'] ) ); ?></p>
+				<?php endif; ?>
 				<?php if ( 'ended' === $beltoft_services_licence['state'] ) : ?>
 					<p><?php esc_html_e( 'The licence for this app has ended. Your server keeps running and the app stays installed, but it may stop working without a licence. Nothing is removed from your server.', 'beltoft-services' ); ?></p>
 				<?php elseif ( 'paused' === $beltoft_services_licence['state'] ) : ?>

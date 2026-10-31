@@ -8,6 +8,7 @@
 namespace BeltoftServices\Usage;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DiskDriver;
@@ -240,7 +241,9 @@ final class Rates {
 	 * - a server (VM or database): one `server` item and, when its plan has backups and a variation without
 	 *   them exists, a `backups` item priced at the difference;
 	 * - an extra disk: `disk`, in GB;
-	 * - a snapshot pack: `snapshots`, one pack.
+	 * - a snapshot pack: `snapshots`, one pack;
+	 * - the licence of a paid app on the server: `app`, one licence, at the tier's monthly price (its monthly sibling's)
+	 *   x (1 + premium) / 730, capped like the others at that price x (1 + premium) a month.
 	 *
 	 * @param Resource $r Resource.
 	 * @return array<int, array{item: string, quantity: float, unit: string, rate: float}>
@@ -291,6 +294,8 @@ final class Rates {
 			}
 		} elseif ( SnapshotDriver::ID === $driver ) {
 			$out[] = array( 'item' => 'snapshots', 'quantity' => 1.0, 'unit' => 'pack', 'rate' => self::hourly( $monthly, $premium ) );
+		} elseif ( AppLicenceDriver::ID === $driver ) {
+			$out[] = array( 'item' => 'app', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
 		}
 
 		return $out;
