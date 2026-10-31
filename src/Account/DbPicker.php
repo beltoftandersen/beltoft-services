@@ -468,7 +468,7 @@ final class DbPicker {
 	}
 
 	/**
-	 * The engines the plans on offer belong to, in the order the plans come: id => name and one line. An engine
+	 * The engines the plans on offer belong to, in registry order (DbEngines::ids(), others after, in plan order): id => name and one line. An engine
 	 * appears as soon as one purchasable plan of it is offered, so a new engine needs no change here.
 	 *
 	 * @param array<int, array<string, mixed>> $plans Plans.
@@ -490,6 +490,13 @@ final class DbPicker {
 				'line' => DbEngines::description( $id ),
 			);
 		}
+
+		$order = array_flip( DbEngines::ids() );
+		$rank  = array_flip( array_keys( $out ) );
+		uksort(
+			$out,
+			static fn( $a, $b ) => ( $order[ $a ] ?? PHP_INT_MAX ) <=> ( $order[ $b ] ?? PHP_INT_MAX ) ?: $rank[ $a ] <=> $rank[ $b ]
+		);
 
 		return $out;
 	}

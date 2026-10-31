@@ -21,6 +21,8 @@ use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbMonitor;
+use BeltoftServices\Proxmox\DbPolicy;
+use BeltoftServices\Proxmox\DbEngineEviction;
 use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\PostgresEngine;
@@ -330,10 +332,129 @@ class DbValkeyTest extends TestCase {
 
 	public function test_a_new_password_is_the_same_job_as_for_postgres(): void {
 		$r = $this->built();
-		$this->assertSame( array( DbActions::RESET => 'New password' ), Registry::get( 'proxmox-db' )->customer_actions( $r ) );
+		$this->assertSame( array( DbActions::RESET => 'New password', DbPolicy::ACTION => 'When memory is full' ), Registry::get( 'proxmox-db' )->customer_actions( $r ) );
 		$this->assertTrue( Registry::get( 'proxmox-db' )->act( $r, DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ) )->is_poll() );
 		$request = (string) Resource::find( $r->id() )->get( 'db_reset_request' );
 		$this->assertSame( '{"v":1,"request":"' . $request . '","op":"reset_password"}', $this->guest( DbGuest::JOB ) );
+	}
+
+	// -- The memory policy -----------------------------------------------------------------------
+
+	private function policy_post( Resource $r, array $args, ?int $user = null ): \WP_REST_Response {
+		wp_set_current_user( null === $user ? (int) Resource::find( $r->id() )->license()['user_id'] : $user );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/' . DbPolicy::ACTION );
+		$request->set_header( 'content-type', 'application/json' );
+		$request->set_body( wp_json_encode( array( 'args' => $args ) ) );
+
+		return rest_do_request( $request );
+	}
+
+	public function test_only_valkey_offers_the_memory_policy(): void {
+		$this->assertInstanceOf( DbEngineEviction::class, DbEngines::for_plan( array( 'engine' => 'valkey' ) ) );
+		$this->assertNotInstanceOf( DbEngineEviction::class, DbEngines::for_plan( array( 'engine' => 'postgres' ) ) );
+		$this->assertNotInstanceOf( DbEngineEviction::class, DbEngines::for_plan( array() ) );
+
+		$valkey = $this->built();
+		$this->assertArrayHasKey( DbPolicy::ACTION, Registry::get( 'proxmox-db' )->customer_actions( $valkey ) );
+		$this->assertStringContainsString( 'When memory is full', $this->render( $valkey ) );
+		$this->assertStringContainsString( 'allkeys-lfu', $this->render( $valkey ) );
+		$this->assertStringContainsString( 'selected', $this->render( $valkey ) );
+
+		$choices = ( new ValkeyEngine() )->eviction_choices();
+		$this->assertEqualsCanonicalizing( ValkeyEngine::POLICIES, array_keys( $choices ) );
+		$this->assertSame( 'noeviction', ( new ValkeyEngine() )->eviction_default() );
+
+		$plain = $this->resource( array( 'engine' => 'postgres' ), array( 'db_state' => 'ready' ) );
+		$this->assertArrayNotHasKey( DbPolicy::ACTION, Registry::get( 'proxmox-db' )->customer_actions( $plain ) );
+		$this->assertNull( DbCard::view( $plain )['policy'] );
+		$this->assertSame( 403, $this->policy_post( $plain, array( 'policy' => 'allkeys-lru' ) )->get_status() );
+	}
+
+	public function test_a_policy_is_checked_before_a_job_is_queued(): void {
+		$r = $this->built();
+
+		foreach ( array( '', 'everything', 'allkeys-lru; reboot', 'ALLKEYS-LRU' ) as $bad ) {
+			$this->assertSame( 422, $this->policy_post( $r, array( 'policy' => $bad ) )->get_status(), $bad );
+		}
+
+		$this->assertSame( 422, $this->policy_post( $r, array() )->get_status() );
+	}
+
+	public function test_another_customer_cannot_change_the_policy(): void {
+		$r     = $this->built();
+		$other = self::factory()->user->create();
+
+		$this->assertSame( 403, $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ), $other )->get_status() );
+		$this->assertSame( 401, $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ), 0 )->get_status() );
+		$this->assertSame( 202, $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ) )->get_status() );
+	}
+
+	public function test_the_policy_job_is_sent_and_the_choice_is_stored_when_the_guest_says_ready(): void {
+		$r      = $this->built();
+		$driver = Registry::get( 'proxmox-db' );
+
+		$first = $driver->act( $r, DbPolicy::ACTION, array( 'policy' => 'allkeys-lfu' ) );
+		$this->assertTrue( $first->is_poll(), $first->error() );
+		$job = json_decode( (string) $this->guest( DbGuest::JOB ), true );
+		$this->assertSame( array( 'v' => 1, 'request' => $job['request'], 'op' => 'policy', 'policy' => 'allkeys-lfu' ), $job );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'noeviction', ValkeyEngine::policy( $fresh ), 'Not stored before the guest has it.' );
+		$this->assertTrue( $driver->act( $fresh, DbPolicy::ACTION, array( 'policy' => 'allkeys-lfu' ) )->is_poll(), 'Waits for the guest.' );
+
+		$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'ready', 'step' => 'policy', 'updated' => gmdate( 'c' ) ) ) );
+		$done = $driver->act( Resource::find( $r->id() ), DbPolicy::ACTION, array( 'policy' => 'allkeys-lfu' ) );
+		$this->assertTrue( $done->is_done(), $done->error() );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'allkeys-lfu', ValkeyEngine::policy( $fresh ) );
+		$this->assertSame( '', (string) $fresh->get( 'db_policy_request' ) );
+		$this->assertSame( 'allkeys-lfu', DbCard::view( $fresh )['policy']['current'] );
+		$this->assertStringNotContainsString( 'newer database server image', $this->render( $fresh ) );
+	}
+
+	public function test_a_guest_that_does_not_know_the_job_is_told_to_the_customer_and_the_admin_and_the_database_stays_up(): void {
+		$r      = $this->built();
+		$driver = Registry::get( 'proxmox-db' );
+
+		$this->assertTrue( $driver->act( $r, DbPolicy::ACTION, array( 'policy' => 'allkeys-lru' ) )->is_poll() );
+		$job = json_decode( (string) $this->guest( DbGuest::JOB ), true );
+		$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'failed', 'step' => 'job', 'updated' => gmdate( 'c' ) ) ) );
+
+		$done = $driver->act( Resource::find( $r->id() ), DbPolicy::ACTION, array( 'policy' => 'allkeys-lru' ) );
+		$this->assertTrue( $done->is_done(), 'The action does not fail the database.' );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'noeviction', ValkeyEngine::policy( $fresh ), 'The choice is not stored.' );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+		$this->assertSame( 'ready', $fresh->get( 'db_state' ) );
+		$this->assertStringContainsString( 'newer database server image', $this->render( $fresh ) );
+		$this->assertNotEmpty( $this->mails, 'The admin is told.' );
+		$this->assertStringContainsString( 'older than the guest script', (string) $this->mails[ count( $this->mails ) - 1 ]['message'] . (string) $this->mails[ count( $this->mails ) - 1 ]['subject'] );
+	}
+
+	public function test_a_guest_that_fails_the_policy_job_fails_the_action_only(): void {
+		$r      = $this->built();
+		$driver = Registry::get( 'proxmox-db' );
+
+		$driver->act( $r, DbPolicy::ACTION, array( 'policy' => 'volatile-ttl' ) );
+		$job = json_decode( (string) $this->guest( DbGuest::JOB ), true );
+		$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'failed', 'step' => 'policy', 'updated' => gmdate( 'c' ) ) ) );
+
+		$this->assertTrue( $driver->act( Resource::find( $r->id() ), DbPolicy::ACTION, array( 'policy' => 'volatile-ttl' ) )->is_failed() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'noeviction', ValkeyEngine::policy( $fresh ) );
+		$this->assertSame( '', (string) $fresh->get( 'db_policy_request' ) );
+	}
+
+	public function test_a_new_database_starts_with_the_chosen_policy_and_a_bad_stored_value_is_ignored(): void {
+		$r = $this->resource( array(), array( 'db_policy' => 'allkeys-random' ) );
+		$this->run_provision( $r );
+		$job = json_decode( (string) $this->guest( DbGuest::JOB ), true );
+		$this->assertSame( 'allkeys-random', $job['policy'] );
+		$this->assertSame( 'init', $job['op'] );
+
+		$this->assertSame( 'noeviction', ValkeyEngine::policy( $this->resource( array(), array( 'db_policy' => 'x; y' ) ) ) );
 	}
 
 	// -- The card ------------------------------------------------------------------------------

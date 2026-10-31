@@ -71,6 +71,7 @@ final class Plugin {
 		Checkout::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
+		Account\Slugs::register();
 		Account\Servers::register();
 		Account\Domains::register();
 		Account\DomainPage::register();
@@ -90,6 +91,7 @@ final class Plugin {
 		Api\Routes::register();
 		Api\Services::register();
 		Api\OpenApi::register();
+		Api\Reference::register();
 		Api\Tokens::register();
 		Oauth\Server::register();
 		Mcp\Endpoint::register();
@@ -124,6 +126,7 @@ final class Plugin {
 		Proxmox\AppField::register();
 		Proxmox\AppLicence::register();
 		Proxmox\AppLicenceCart::register();
+		Proxmox\AppReinstallPaid::register();
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
 		Proxmox\BackupField::register();

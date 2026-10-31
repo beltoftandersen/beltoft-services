@@ -232,7 +232,7 @@ class UsageAlertsUiTest extends BackupTestCase {
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched_by_user', '__return_false' );
 		$sent = $this->follow( $r, 'disk' );
 		$this->assertStringNotContainsString( 'switch-subscription', $sent );
-		$this->assertStringContainsString( (string) (int) $r->license()['id'], $sent );
+		$this->assertStringContainsString( \BeltoftServices\Account\Slugs::for_license( $r->license() ), $sent );
 	}
 
 	// -- The emails ------------------------------------------------------------------------------------

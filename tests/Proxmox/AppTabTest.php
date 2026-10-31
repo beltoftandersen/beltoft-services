@@ -117,8 +117,9 @@ class AppTabTest extends MonitoringTestCase {
 
 	public function test_the_tab_has_its_own_address_and_opens_from_it(): void {
 		$r = $this->with_app();
-		$this->assertStringContainsString( $r->license()['id'] . '/app', rawurldecode( Servers::url( $r->license(), 'app' ) ) );
-		$GLOBALS['wp']->query_vars['vps'] = $r->license()['id'] . '/app';
+		$slug = \BeltoftServices\Account\Slugs::for_license( $r->license() );
+		$this->assertStringContainsString( $slug . '/app', rawurldecode( Servers::url( $r->license(), 'app' ) ) );
+		$GLOBALS['wp']->query_vars['vps'] = $slug . '/app';
 		$this->assertSame( 'app', Servers::requested()['tab'] );
 
 		$html = $this->page( $r, 'app' );

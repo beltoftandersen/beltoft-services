@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
  * Valkey (the BSD-licensed continuation of Redis: same protocol, commands and client libraries) on its own VM, built
  * from a template of the family `valkey`. One login (an ACL user), no database name, TLS only on its own port.
  */
-final class ValkeyEngine implements DbEngine {
+final class ValkeyEngine implements DbEngine, DbEngineEviction {
 
 	public const ID = 'valkey';
 
@@ -32,6 +32,9 @@ final class ValkeyEngine implements DbEngine {
 	public const POLICIES = array( 'noeviction', 'allkeys-lru', 'allkeys-lfu', 'allkeys-random', 'volatile-lru', 'volatile-lfu', 'volatile-random', 'volatile-ttl' );
 
 	public const DEFAULT_POLICY = 'noeviction';
+
+	/** Meta: the policy the customer chose for this database. */
+	public const POLICY_META = 'db_policy';
 
 	public function id(): string {
 		return self::ID;
@@ -95,9 +98,16 @@ final class ValkeyEngine implements DbEngine {
 	}
 
 	/**
-	 * The eviction policy a new server starts with (a filter may change it; anything unknown is the default).
+	 * The eviction policy of the server: the customer's choice when there is one, else what a new server starts with
+	 * (a filter may change that; anything unknown is the default).
 	 */
 	public static function policy( Resource $r ): string {
+		$chosen = $r->get( self::POLICY_META );
+
+		if ( is_string( $chosen ) && in_array( $chosen, self::POLICIES, true ) ) {
+			return $chosen;
+		}
+
 		/**
 		 * Filters maxmemory-policy of a new Valkey server.
 		 *
@@ -119,6 +129,23 @@ final class ValkeyEngine implements DbEngine {
 
 	public function init_job( Resource $r, string $request, array $listen, string $cidr ): array {
 		return array( 'v' => 1, 'request' => $request, 'op' => 'init', 'role' => self::ROLE, 'listen' => $listen, 'private_cidr' => $cidr, 'allow' => array(), 'world' => false ) + $this->init_fields( $r );
+	}
+
+	public function eviction_default(): string {
+		return self::DEFAULT_POLICY;
+	}
+
+	public function eviction_choices(): array {
+		return array(
+			'noeviction'      => array( __( 'Refuse new writes', 'beltoft-services' ), __( 'Nothing is ever deleted. When memory is full, commands that add data fail with an error and reads keep working. The safest choice for data you cannot lose.', 'beltoft-services' ) ),
+			'allkeys-lru'     => array( __( 'Remove the least recently used keys', 'beltoft-services' ), __( 'Any key may be removed, starting with the one not used for the longest time. The usual choice for a cache.', 'beltoft-services' ) ),
+			'allkeys-lfu'     => array( __( 'Remove the least frequently used keys', 'beltoft-services' ), __( 'Any key may be removed, starting with the one used least often. Good for a cache with a few very popular keys.', 'beltoft-services' ) ),
+			'allkeys-random'  => array( __( 'Remove random keys', 'beltoft-services' ), __( 'Any key may be removed, picked at random.', 'beltoft-services' ) ),
+			'volatile-lru'    => array( __( 'Remove the least recently used keys that expire', 'beltoft-services' ), __( 'Only keys with an expiry time may be removed, the least recently used first. Keys without an expiry stay. When none are left to remove, new writes fail.', 'beltoft-services' ) ),
+			'volatile-lfu'    => array( __( 'Remove the least frequently used keys that expire', 'beltoft-services' ), __( 'Only keys with an expiry time may be removed, the least often used first. Keys without an expiry stay. When none are left to remove, new writes fail.', 'beltoft-services' ) ),
+			'volatile-random' => array( __( 'Remove random keys that expire', 'beltoft-services' ), __( 'Only keys with an expiry time may be removed, picked at random. Keys without an expiry stay. When none are left to remove, new writes fail.', 'beltoft-services' ) ),
+			'volatile-ttl'    => array( __( 'Remove the keys that expire soonest', 'beltoft-services' ), __( 'Only keys with an expiry time may be removed, the ones closest to expiring first. Keys without an expiry stay. When none are left to remove, new writes fail.', 'beltoft-services' ) ),
+		);
 	}
 
 	public function limits(): string {

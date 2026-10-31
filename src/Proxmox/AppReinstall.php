@@ -15,6 +15,8 @@ defined( 'ABSPATH' ) || exit;
  * An app picked from the offered list is posted as `app/version`, is a fresh install, sets Ubuntu 24.04
  * as at checkout, and may choose a domain for supported apps (an old domain is kept, changed or released
  * as with the same app).
+ * A paid app is offered with its tiers (field `app_tier`). The reinstall does not run at once: the customer is sent
+ * to checkout with the licence line for this server and the reinstall is queued when it is paid (AppReinstallPaid).
  * A version that has been retired is never offered; if the server
  * has one, the current version is preselected and the form says why. The field is posted as
  * `app_version`: `keep`, a version id, or `none`.
@@ -124,9 +126,9 @@ final class AppReinstall {
 		$offered = Apps::offered( $cluster );
 		unset( $offered[ $skip ] );
 
-		// A paid app is bought with its tier when a server is ordered; a reinstall has no cart line for it.
+		// A paid app is offered only when a tier of it exists; its licence is bought on the way (AppReinstallPaid).
 		foreach ( array_keys( $offered ) as $id ) {
-			if ( AppLicence::paid( (string) $id ) ) {
+			if ( AppLicence::paid( (string) $id ) && array() === AppLicence::tiers( (string) $id, false ) ) {
 				unset( $offered[ $id ] );
 			}
 		}
@@ -221,6 +223,7 @@ final class AppReinstall {
 			'app_installed_at'   => null,
 			'app_queue_until'    => null,
 			'app_recipe'         => null,
+			'app_tier'           => null,
 			'app_upstream'       => null,
 			'app_reveal'         => '',
 			'app_reveal_until'   => 0,
@@ -245,6 +248,7 @@ final class AppReinstall {
 		$os      = $record ? Apps::os_template( $cluster ) : 0;
 
 		$items = array();
+		$usage = AppLicence::usage_billed( $r );
 
 		if ( $options['plain'] ) {
 			$items[] = array(
@@ -256,7 +260,7 @@ final class AppReinstall {
 				'attrs'   => array( 'data-none' => '1' ),
 			);
 
-			$items = array_merge( $items, self::app_items( (array) $options['apps'], $cluster ) );
+			$items = array_merge( $items, self::app_items( (array) $options['apps'], $cluster, $usage ) );
 		} else {
 			$versions = array();
 			$value    = '';
@@ -289,7 +293,7 @@ final class AppReinstall {
 				);
 			}
 
-			$items = array_merge( $items, self::app_items( (array) $options['apps'], $cluster ) );
+			$items = array_merge( $items, self::app_items( (array) $options['apps'], $cluster, $usage ) );
 
 			$items[] = array(
 				'value'   => self::NONE,
@@ -319,6 +323,7 @@ final class AppReinstall {
 
 		echo '<p class="form-row" data-tiles-version-row hidden><label for="beltoft-vm-app-version-' . (int) $resource_id . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
 		echo '<select id="beltoft-vm-app-version-' . (int) $resource_id . '" data-tiles-version></select></p>';
+		self::tier_fields( (array) $options['apps'], $usage );
 		self::domain_fields( $r, $options );
 		echo '</div>';
 
@@ -335,10 +340,15 @@ final class AppReinstall {
 	 * @param array<string, mixed> $cluster Cluster.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private static function app_items( array $apps, array $cluster ): array {
+	private static function app_items( array $apps, array $cluster, bool $usage = false ): array {
 		$items = array();
 
 		foreach ( $apps as $app_id => $entry ) {
+			// A paid app with no tier that can be bought now (for a pay-as-you-go server: with an hourly price) is not offered.
+			if ( AppLicence::paid( (string) $app_id ) && array() === self::tiers( (string) $app_id, $usage ) ) {
+				continue;
+			}
+
 			$versions = array();
 			$first    = '';
 
@@ -362,11 +372,70 @@ final class AppReinstall {
 					'data-versions' => (string) wp_json_encode( $versions ),
 					'data-families' => implode( ',', $families ),
 					'data-dropped'  => Apps::dropped_text( $cluster, $families, (string) ( $entry['def']['name'] ?? $app_id ) ),
-				) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ),
+				) + ( ! empty( $entry['def']['domain'] ) ? array( 'data-domain' => '1' ) : array() ) + ( AppLicence::paid( (string) $app_id ) ? array( 'data-paid' => '1' ) : array() ),
 			);
 		}
 
 		return $items;
+	}
+
+	/**
+	 * The tiers of a paid app a server can be offered now: those that can be bought (for a pay-as-you-go server: those with
+	 * an hourly price), each with the price the customer reads.
+	 *
+	 * @param string $app_id App id.
+	 * @param bool   $usage  Whether the server is billed pay as you go.
+	 * @return array<string, array{label: string, price: string}>
+	 */
+	private static function tiers( string $app_id, bool $usage ): array {
+		$out = array();
+
+		foreach ( AppLicence::tiers( $app_id ) as $key => $tier ) {
+			$price = $usage ? AppLicence::usage_price( $tier ) : $tier['price'];
+
+			if ( null !== AppLicence::line_variation( $tier, $usage ) && '' !== $price ) {
+				$out[ $key ] = array( 'label' => $tier['label'], 'price' => $price );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The tier choice of every paid app on the form, shown by the script when that app's tile is checked, and the note
+	 * that the licence is paid first.
+	 *
+	 * @param array<string, mixed> $apps  From offers().
+	 * @param bool                 $usage Whether the server is billed pay as you go.
+	 */
+	private static function tier_fields( array $apps, bool $usage ): void {
+		$any = false;
+
+		foreach ( $apps as $app_id => $entry ) {
+			$tiers = AppLicence::paid( (string) $app_id ) ? self::tiers( (string) $app_id, $usage ) : array();
+
+			if ( array() === $tiers ) {
+				continue;
+			}
+
+			$any = true;
+			echo '<fieldset class="beltoft-services-app__domain beltoft-services-app__tiers" data-reinstall-tiers="' . esc_attr( (string) $app_id ) . '" hidden>';
+			/* translators: %s: app name */
+			echo '<legend>' . esc_html( sprintf( __( '%s tier', 'beltoft-services' ), (string) ( $entry['def']['name'] ?? $app_id ) ) ) . '</legend>';
+
+			foreach ( $tiers as $key => $tier ) {
+				echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="app_tier" value="' . esc_attr( (string) $key ) . '" disabled> <span>' . esc_html( $tier['label'] ) . '</span> <span class="description">' . esc_html( $tier['price'] ) . '</span></label>';
+			}
+
+			echo '</fieldset>';
+		}
+
+		if ( $any ) {
+			echo '<p class="description" data-reinstall-paid-note hidden>' . esc_html( $usage
+				? __( 'This app has a licence, billed by the hour with your server. You are asked to confirm it at checkout, and the server is reinstalled when the order is placed. The licence ends when you reinstall without this app.', 'beltoft-services' )
+				: __( 'This app has a monthly licence. You pay for it at checkout first, and the server is reinstalled when the licence is paid. The licence ends when you reinstall without this app.', 'beltoft-services' )
+			) . '</p>';
+		}
 	}
 
 	/** Domain controls shared by same-app and plain-server reinstall choices. */
@@ -637,7 +706,42 @@ final class AppReinstall {
 
 		$why = Apps::check( $cluster, array_merge( $plan, array( 'template' => Apps::os_template( $cluster ) ) ), $pick[0], $pick[1] );
 
-		return null === $why ? null : $why . '.';
+		if ( null !== $why ) {
+			return $why . '.';
+		}
+
+		return AppLicence::paid( $pick[0] ) ? self::paid_check( $r, $pick[0], (string) ( $args['app_tier'] ?? '' ) ) : null;
+	}
+
+	/**
+	 * The licence of a paid app: a tier is chosen, and (when the reinstall runs, not when checkout is asked for) the
+	 * server holds an active licence of the app, so nothing is reinstalled before it is paid.
+	 *
+	 * @param string $app_id App id.
+	 * @param string $tier   Tier key posted.
+	 */
+	private static function paid_check( Resource $r, string $app_id, string $tier ): ?string {
+		$def  = (array) Apps::definition( $app_id );
+		$tier = sanitize_key( $tier );
+
+		if ( '' === $tier ) {
+			/* translators: %s: app name */
+			return sprintf( __( '%s has a licence. Choose a tier, or no app.', 'beltoft-services' ), (string) ( $def['name'] ?? $app_id ) );
+		}
+
+		$found = AppLicence::tier( $app_id, $tier, false );
+
+		if ( null === $found ) {
+			return __( 'Choose one of the listed tiers.', 'beltoft-services' );
+		}
+
+		if ( AppReinstallPaid::quoting() ) {
+			return null === AppLicence::tier( $app_id, $tier ) || null === AppLicence::line_variation( $found, AppLicence::usage_billed( $r ) )
+				? __( 'This tier cannot be bought for this server now. Choose another tier or no app.', 'beltoft-services' )
+				: null;
+		}
+
+		return AppReinstallPaid::licensed( $r, $app_id ) ? null : __( 'This app needs its licence to be paid first. Choose the app on the Reinstall tab again.', 'beltoft-services' );
 	}
 
 	/** Domain target and an exact old A-record deletion request, stored without doing DNS work. */
@@ -710,7 +814,9 @@ final class AppReinstall {
 			}
 
 			// The app runs on Ubuntu 24.04, as at checkout, whatever system was posted.
-			return array_merge( $meta, self::fresh(), self::domain_meta( $r, $args, (array) Apps::definition( $pick[0] ) ), array( 'app_id' => $pick[0], 'app_version' => $pick[1], OsField::META => $os ) );
+			$paid = AppLicence::paid( $pick[0] ) ? array( 'app_tier' => sanitize_key( (string) ( $args['app_tier'] ?? '' ) ) ) : array();
+
+			return array_merge( $meta, self::fresh(), self::domain_meta( $r, $args, (array) Apps::definition( $pick[0] ) ), array( 'app_id' => $pick[0], 'app_version' => $pick[1], OsField::META => $os ), $paid );
 		}
 
 		$options = is_array( $meta ) && $r instanceof Resource ? self::options( $r ) : null;

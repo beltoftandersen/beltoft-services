@@ -346,6 +346,28 @@
 		}
 
 		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
+			// An action that needs a purchase first (a reinstall to a paid app) answers with the checkout address.
+			if ( 200 === response.status ) {
+				return response.json().catch( function () {
+					return null;
+				} ).then( function ( body ) {
+					if ( body && body.redirect ) {
+						notice( panel, body.message || '' );
+						window.location.href = body.redirect;
+
+						return;
+					}
+
+					panel.beltoftPending = false;
+
+					if ( button ) {
+						reset( button );
+					}
+
+					notice( panel, vm.strings.failed );
+				} );
+			}
+
 			if ( 202 === response.status ) {
 				return response.json().catch( function () {
 					return null;

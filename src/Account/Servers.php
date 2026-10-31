@@ -115,7 +115,7 @@ final class Servers {
 			return '';
 		}
 
-		$value = (string) (int) $license['id'] . ( in_array( $tab, self::tabs(), true ) ? '/' . $tab : '' );
+		$value = Slugs::value( $license, in_array( $tab, self::tabs(), true ) ? $tab : '' );
 
 		return wc_get_endpoint_url( self::slug(), $value, wc_get_page_permalink( 'myaccount' ) );
 	}
@@ -157,21 +157,16 @@ final class Servers {
 	}
 
 	/**
-	 * What the address after the endpoint says: the license id and the tab.
+	 * What the address after the endpoint says: the license id (from the server's slug, or the number itself) and the tab.
 	 *
 	 * @return array{id: int, tab: string}
 	 */
 	public static function requested(): array {
-		global $wp;
-
-		$value = is_object( $wp ) && isset( $wp->query_vars[ self::slug() ] ) ? (string) $wp->query_vars[ self::slug() ] : '';
-		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
-		$id    = isset( $parts[0] ) && ctype_digit( $parts[0] ) ? (int) $parts[0] : 0;
-		$tab   = isset( $parts[1] ) ? sanitize_key( $parts[1] ) : '';
+		$asked = Slugs::parse( self::slug(), 'servers' );
 
 		return array(
-			'id'  => $id,
-			'tab' => in_array( $tab, self::tabs(), true ) ? $tab : '',
+			'id'  => $asked['id'],
+			'tab' => in_array( $asked['second'], self::tabs(), true ) ? $asked['second'] : '',
 		);
 	}
 
@@ -247,7 +242,7 @@ final class Servers {
 			return;
 		}
 
-		if ( $asked['id'] > 0 ) {
+		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( self::slug(), 'servers' ) ) ) {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'That server was not found. Here are your servers.', 'beltoft-services' ) . '</p>';
 		}
 
@@ -304,6 +299,14 @@ final class Servers {
 
 		if ( '' !== $target ) {
 			wp_safe_redirect( $target );
+			exit;
+		}
+
+		// A server's page by license id goes to its slug address.
+		$target = Slugs::redirect_target( self::slug(), 'servers', array( __CLASS__, 'url' ) );
+
+		if ( '' !== $target ) {
+			wp_safe_redirect( $target, 301 );
 			exit;
 		}
 	}

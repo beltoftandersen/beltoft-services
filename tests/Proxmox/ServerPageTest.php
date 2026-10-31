@@ -34,8 +34,9 @@ class ServerPageTest extends MonitoringTestCase {
 
 	public function test_urls_carry_the_license_and_the_tab(): void {
 		$r = $this->ready_vm();
-		$id = (int) $r->license()['id'];
-		$this->assertMatchesRegularExpression( '#vps(/|=)' . $id . '/?$#', rawurldecode( Servers::url( $r->license() ) ) );
+		$id = \BeltoftServices\Account\Slugs::for_license( $r->license() );
+		$this->assertNotSame( '', $id );
+		$this->assertMatchesRegularExpression( '#vps(/|=)' . preg_quote( $id, '#' ) . '/?$#', rawurldecode( Servers::url( $r->license() ) ) );
 		$this->assertStringContainsString( $id . '/snapshots', rawurldecode( Servers::url( $r->license(), 'snapshots' ) ) );
 		$this->assertSame( Servers::url( $r->license() ), Servers::url( $r->license(), 'nonsense' ) );
 	}
@@ -108,7 +109,7 @@ class ServerPageTest extends MonitoringTestCase {
 		$this->assertNotEmpty( $m[1] );
 		foreach ( $m[1] as $i => $href ) {
 			$this->assertStringContainsString( 'vps', $href );
-			$this->assertStringContainsString( (string) $r->license()['id'], rawurldecode( $href ) );
+			$this->assertStringContainsString( \BeltoftServices\Account\Slugs::for_license( $r->license() ), rawurldecode( $href ) );
 		}
 		$this->assertMatchesRegularExpression( '/data-copy="[^"]+" data-copied="[^"]+" hidden/', $html );
 		// The command is printed in the facts, so nothing is lost without script.

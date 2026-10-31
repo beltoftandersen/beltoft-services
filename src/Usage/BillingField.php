@@ -247,6 +247,11 @@ final class BillingField {
 				return false;
 			}
 		);
+		// A paid app's tier follows the billing choice: its usage sibling for pay as you go, else the monthly one.
+		if ( $added ) {
+			\BeltoftServices\Proxmox\AppLicenceCart::rematch();
+		}
+
 		$cart->calculate_totals();
 
 		return $added

@@ -671,7 +671,7 @@ final class ProxmoxJobs {
 				}
 				// The job runs hourly: a server is read when its reading is old, or hourly while its disk is high.
 				$r = Resource::find( (int) ( $item['resource'] ?? 0 ) );
-				if ( ! $r || GuestDisk::due( $r ) ) {
+				if ( ! $r || GuestDisk::due( $r ) || DbGrow::manual( $r ) ) {
 					$queue[] = $item;
 				}
 			}
@@ -721,6 +721,8 @@ final class ProxmoxJobs {
 			if ( null !== $disk ) {
 				Monitor::disk( $r, $disk );
 			}
+			// A database waiting for its file system to be grown by hand: one more read, then the flag may go.
+			DbGrow::check_manual( $r );
 		}
 	}
 

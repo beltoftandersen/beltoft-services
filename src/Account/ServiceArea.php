@@ -76,6 +76,7 @@ abstract class ServiceArea {
 	public static function register(): void {
 		add_filter( 'wc_get_template', array( __CLASS__, 'template' ), 10, 3 );
 		add_filter( 'beltoft_services_account_page_head', array( __CLASS__, 'head' ), 10, 5 );
+		add_action( 'template_redirect', array( __CLASS__, 'redirect' ) );
 	}
 
 	/**
@@ -177,6 +178,13 @@ abstract class ServiceArea {
 	abstract protected function key(): string;
 
 	/**
+	 * The type of the area for addresses (databases, apps): its filter prefix.
+	 */
+	public function key_name(): string {
+		return $this->key();
+	}
+
+	/**
 	 * The endpoint the tab lives on.
 	 */
 	public function slug(): string {
@@ -268,7 +276,7 @@ abstract class ServiceArea {
 			return '';
 		}
 
-		$value = (string) (int) $license['id'] . ( in_array( $tab, $this->tabs(), true ) ? '/' . $tab : '' );
+		$value = Slugs::value( $license, in_array( $tab, $this->tabs(), true ) ? $tab : '' );
 
 		return wc_get_endpoint_url( $this->slug(), $value, wc_get_page_permalink( 'myaccount' ) );
 	}
@@ -281,22 +289,31 @@ abstract class ServiceArea {
 	}
 
 	/**
-	 * What the address after the endpoint says: the license id and the tab.
+	 * What the address after the endpoint says: the license id (from the service's slug, or the number itself) and the tab.
 	 *
 	 * @return array{id: int, tab: string}
 	 */
 	public function requested(): array {
-		global $wp;
-
-		$value = is_object( $wp ) && isset( $wp->query_vars[ $this->slug() ] ) ? (string) $wp->query_vars[ $this->slug() ] : '';
-		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
-		$id    = isset( $parts[0] ) && ctype_digit( $parts[0] ) ? (int) $parts[0] : 0;
-		$tab   = isset( $parts[1] ) ? sanitize_key( $parts[1] ) : '';
+		$asked = Slugs::parse( $this->slug(), $this->key() );
 
 		return array(
-			'id'  => $id,
-			'tab' => in_array( $tab, $this->tabs(), true ) ? $tab : '',
+			'id'  => $asked['id'],
+			'tab' => in_array( $asked['second'], $this->tabs(), true ) ? $asked['second'] : '',
 		);
+	}
+
+	/**
+	 * Early on a My Account address: a service's page by license id goes to its slug address (301).
+	 */
+	public static function redirect(): void {
+		foreach ( self::all() as $area ) {
+			$target = Slugs::redirect_target( $area->slug(), $area->key(), fn( array $license, string $tab ): string => $area->url( $license, $tab ) );
+
+			if ( '' !== $target ) {
+				wp_safe_redirect( $target, 301 );
+				exit;
+			}
+		}
 	}
 
 	/**
@@ -369,7 +386,7 @@ abstract class ServiceArea {
 			return;
 		}
 
-		if ( $asked['id'] > 0 ) {
+		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( $this->slug(), $this->key() ) ) ) {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html( $this->not_found_text() ) . '</p>';
 		}
 
