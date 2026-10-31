@@ -19,6 +19,80 @@ defined( 'ABSPATH' ) || exit;
 final class Email extends ServiceArea {
 
 	/**
+	 * The Email menu item goes right after Domains, with the other services, before Billing and Support. Without a
+	 * Domains item it stays where it is.
+	 *
+	 * @param mixed $items Menu items.
+	 * @return mixed
+	 */
+	public static function menu( $items ) {
+		$slug = ServiceArea::get( self::class )->slug();
+
+		if ( ! is_array( $items ) || ! isset( $items[ $slug ] ) || ! isset( $items[ Domains::slug() ] ) ) {
+			return $items;
+		}
+
+		$label = $items[ $slug ];
+		unset( $items[ $slug ] );
+		$out = array();
+
+		foreach ( $items as $key => $value ) {
+			$out[ $key ] = $value;
+
+			if ( Domains::slug() === $key ) {
+				$out[ $slug ] = $label;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The address a customer buys an email domain at: the first published product that uses the mail driver, or what the
+	 * filter beltoft_services_email_add_url says. '' when there is none (then there is no button).
+	 */
+	public function url_add(): string {
+		$url = '';
+		$ids = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'orderby'        => 'menu_order title',
+				'order'          => 'ASC',
+				'meta_key'       => \BeltoftServices\Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one product, one query.
+				'meta_value'     => 'mail', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		);
+
+		if ( $ids ) {
+			$url = (string) get_permalink( (int) $ids[0] );
+		}
+
+		/**
+		 * The address of the "Add an email domain" button. Return '' for no button.
+		 *
+		 * @param string $url Address of the first email product, or ''.
+		 */
+		return (string) apply_filters( 'beltoft_services_email_add_url', $url );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	protected function buttons(): array {
+		$url = $this->url_add();
+
+		return '' === $url ? array() : array(
+			array(
+				'label' => __( 'Add an email domain', 'beltoft-services' ),
+				'url'   => $url,
+			),
+		);
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function key(): string {

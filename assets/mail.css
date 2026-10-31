@@ -1,19 +1,29 @@
-/* Email domain page. It builds on the database page styles (tabs, facts, blocks, forms); square corners, no borders of its own. */
-.beltoft-services-mail .beltoft-services-mail__table { width: 100%; margin: 0 0 16px; }
-.beltoft-services-mail .beltoft-services-mail__table th, .beltoft-services-mail .beltoft-services-mail__table td { vertical-align: top; text-align: left; overflow-wrap: anywhere; }
-.beltoft-services-mail .beltoft-services-mail__table code { padding: 2px 6px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-size: 14px; }
-.beltoft-services-mail .beltoft-services-mail__actions { min-width: 12em; }
-.beltoft-services-mail .beltoft-services-mail__actions .button { margin: 0 8px 8px 0; }
-.beltoft-services-mail .beltoft-services-mail__actions details { margin: 4px 0 0; }
-.beltoft-services-mail .beltoft-services-mail__actions summary { color: var(--navy, #0c1535); cursor: pointer; }
+/* Email domain page. Builds on the database page styles (tabs, facts, forms) and the DNS table look of the Domains page. Square corners. */
+.beltoft-services-mail { --bsm-rule: var(--rule, #d6d2c8); --bsm-soft: var(--ink-soft, #5e7080); --bsm-navy: var(--navy, #0c1535); --bsm-warm: var(--bg-warm, #eeece6); }
+.beltoft-services-mail .beltoft-services-mail__table { width: 100%; margin: 0 0 16px; border-collapse: collapse; table-layout: auto; }
+.beltoft-services-mail .beltoft-services-mail__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bsm-rule); background: none; color: var(--bsm-soft); font-size: 13px; font-weight: 500; text-align: left; }
+.beltoft-services-mail .beltoft-services-mail__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--bsm-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.beltoft-services-mail .beltoft-services-mail__table tr:last-child td { border-bottom: 0; }
+.beltoft-services-mail .beltoft-services-mail__table code { padding: 0; border: 0; background: none; color: var(--bsm-navy); font: inherit; font-weight: 500; overflow-wrap: anywhere; word-break: normal; }
+.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__value code { font-weight: 400; word-break: break-all; }
+.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: 1%; white-space: nowrap; text-align: right; }
+.beltoft-services-mail .beltoft-services-mail__actions .button { margin: 0 0 0 8px; }
+.beltoft-services-mail .beltoft-services-mail__actions details { display: inline-block; margin: 0 0 0 8px; text-align: left; white-space: normal; vertical-align: middle; }
+.beltoft-services-mail .beltoft-services-mail__actions details[open] { display: block; margin: 8px 0 0; }
+.beltoft-services-mail .beltoft-services-mail__actions summary { display: inline-block; padding: 7px 14px; box-shadow: inset 0 0 0 1px #b32d2e; color: #b32d2e; font-size: 14px; font-weight: 500; cursor: pointer; list-style: none; }
+.beltoft-services-mail .beltoft-services-mail__actions summary::-webkit-details-marker { display: none; }
+.beltoft-services-mail .beltoft-services-mail__outline.button { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--bsm-navy); color: var(--bsm-navy); font-size: 14px; font-weight: 500; }
+.beltoft-services-mail .beltoft-services-mail__outline.button:hover { background: var(--bsm-warm); color: var(--bsm-navy); }
 .beltoft-services-mail .beltoft-services-mail__danger.button { background: #b32d2e; color: #fff; }
 .beltoft-services-mail .beltoft-services-mail__danger.button:hover { background: #8a2324; color: #fff; }
-.beltoft-services-mail .beltoft-services-mail__at { display: inline-block; margin-left: 6px; color: var(--ink-soft, #5e7080); overflow-wrap: anywhere; }
+.beltoft-services-mail .beltoft-services-mail__at { display: inline-block; margin-left: 6px; color: var(--bsm-soft); overflow-wrap: anywhere; }
 .beltoft-services-mail .beltoft-services-db__form textarea { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
-.beltoft-services-mail .beltoft-services-mail__secret { margin: 16px 0; padding: 16px; background: var(--bg-warm, #eeece6); }
+.beltoft-services-mail .beltoft-services-mail__secret { margin: 16px 0; padding: 16px; background: var(--bsm-warm); }
 .beltoft-services-mail .beltoft-services-mail__secret[hidden] { display: none; }
 .beltoft-services-mail .beltoft-services-mail__secret p { margin: 0 0 12px; }
 .beltoft-services-mail .beltoft-services-mail__secret .beltoft-services-db__block { margin: 0 0 12px; }
 @media (max-width: 700px) {
 	.beltoft-services-mail .beltoft-services-mail__table { display: block; overflow-x: auto; }
+	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { white-space: normal; text-align: left; }
+	.beltoft-services-mail .beltoft-services-mail__actions .button, .beltoft-services-mail .beltoft-services-mail__actions details { margin: 0 8px 8px 0; }
 }

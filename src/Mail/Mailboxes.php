@@ -147,6 +147,7 @@ final class Mailboxes {
 		}
 
 		MailAccess::finish( $r, $email );
+		MailView::remember( $r, count( $have ) + 1 );
 
 		return array( 'email' => $email, 'quota_mb' => $quota );
 	}
@@ -178,6 +179,11 @@ final class Mailboxes {
 		}
 
 		MailAccess::purge( $r, $email );
+		$left = MailClients::for()->list_mailboxes( MailGuard::domain( $r ) );
+
+		if ( ! is_wp_error( $left ) ) {
+			MailView::remember( $r, count( $left ) );
+		}
 
 		return true;
 	}

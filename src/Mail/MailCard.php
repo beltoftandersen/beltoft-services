@@ -23,9 +23,17 @@ final class MailCard {
 	/**
 	 * The script and style, loaded when the page is printed (no other page loads them).
 	 */
-	private static function assets(): void {
+	public static function assets(): void {
+		static $done = false;
+
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/mail.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/mail.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/mail.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE ), \BeltoftServices\Assets::version( 'assets/mail.js' ), true );
+
+		if ( $done && false !== wp_scripts()->get_data( self::HANDLE, 'data' ) ) {
+			return;
+		}
+
+		$done = true;
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesMail',
@@ -45,6 +53,19 @@ final class MailCard {
 				),
 			)
 		);
+	}
+
+	/**
+	 * Listener of beltoft_services_account_assets: the script and style are in the page head and footer on the Email
+	 * endpoint, not only when the card is printed.
+	 *
+	 * @param mixed $parent   Handle of the panel script.
+	 * @param mixed $endpoint The My Account endpoint being shown.
+	 */
+	public static function early( $parent = null, $endpoint = null ): void {
+		if ( is_string( $endpoint ) && ServiceArea::get( Email::class )->slug() === $endpoint && is_user_logged_in() ) {
+			self::assets();
+		}
 	}
 
 	/**
