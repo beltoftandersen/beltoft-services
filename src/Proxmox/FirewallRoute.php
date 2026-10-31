@@ -70,12 +70,10 @@ final class FirewallRoute {
 
 	/**
 	 * The address the customer is using (IPv4 only), or ''. In a call from a connected app the visitor is the app's
-	 * server, not the customer, so only an address the call names (body my_ip) counts there.
-	 *
-	 * @param array<string, mixed> $body Request body.
+	 * server, and the model's word for the customer's address is not trusted, so there is none there (see put()).
 	 */
-	private static function my_ip( array $body = array() ): string {
-		$ip = Endpoint::inside() ? ( is_string( $body['my_ip'] ?? null ) ? trim( $body['my_ip'] ) : '' ) : ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '' );
+	private static function my_ip(): string {
+		$ip = Endpoint::inside() ? '' : ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '' );
 
 		return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '';
 	}
@@ -183,7 +181,11 @@ final class FirewallRoute {
 			return self::error( $rules->get_error_code(), $rules->get_error_message(), 422, is_array( $data ) && isset( $data['rule'] ) ? array( 'rule' => (int) $data['rule'] ) : array() );
 		}
 
-		if ( $on && ! $ack && Firewall::blocks_ssh( $rules, self::my_ip( $body ) ) ) {
+		// A connected app has no address to check against: SSH must stay open to anyone, or the rules that let SSH in must
+		// be the ones already applied to a firewall that is on.
+		$app_keeps_ssh = Endpoint::inside() && Firewall::managed( $resource ) && true === $resource->get( Firewall::ON ) && Firewall::ssh_rules( $rules ) === Firewall::ssh_rules( Firewall::rules_of( $resource ) );
+
+		if ( $on && ! $ack && ! $app_keeps_ssh && Firewall::blocks_ssh( $rules, self::my_ip() ) ) {
 			return self::error( 'beltoft_services_ssh_closed', __( 'No rule lets you in over SSH from where you are now. Add an SSH rule, or tick the box to confirm that you do not need SSH.', 'beltoft-services' ), 409 );
 		}
 

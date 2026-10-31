@@ -499,7 +499,7 @@ final class Server {
 			);
 		}
 
-		$code  = Grants::issue_code( $client['client_id'], $user_id, $scope, $redirect, (string) $params['code_challenge'] );
+		$code  = Grants::issue_code( $client['client_id'], $user_id, Tokens::pack( $scope, true ), $redirect, (string) $params['code_challenge'] );
 		$args  = array( 'code' => $code, 'iss' => self::issuer() );
 
 		if ( '' !== $state ) {

@@ -8,6 +8,7 @@
  *
  * @var array<int, array<string, mixed>>                $tokens   The customer's tokens.
  * @var array<string, string>                           $scopes   Scope => label.
+ * @var array<int, array{at: int, text: string}>|null      $audit    The last actions of connected apps on things that have no service history.
  * @var array<string, string>                           $levels   Level => label of a connected app (read, actions, full).
  * @var array{ok: bool, message: string, password: string}|null $result What the last post did.
  * @var string                                          $nonce    Nonce of the forms.
@@ -155,7 +156,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<?php foreach ( $mcp['apps'] as $beltoft_services_app ) : ?>
 					<tr>
 						<td data-title="<?php esc_attr_e( 'Connected app', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_app['name'] ); ?></td>
-						<td data-title="<?php esc_attr_e( 'Access', 'beltoft-services' ); ?>"><?php echo esc_html( ( $levels ?? $scopes )[ $beltoft_services_app['scope'] ] ?? '' ); ?></td>
+						<td data-title="<?php esc_attr_e( 'Access', 'beltoft-services' ); ?>"><?php echo esc_html( ( $levels ?? $scopes )[ $beltoft_services_app['scope'] ] ?? '' ); ?><?php if ( ! empty( $beltoft_services_app['stale'] ) ) : ?> <?php esc_html_e( '(works as Read and actions: reconnect to use full access)', 'beltoft-services' ); ?><?php endif; ?></td>
 						<td data-title="<?php esc_attr_e( 'Connected', 'beltoft-services' ); ?>"><?php echo esc_html( wp_date( $beltoft_services_fmt, $beltoft_services_app['connected'] ) ); ?></td>
 						<td data-title="<?php esc_attr_e( 'Last used', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_app['last_used'] ? wp_date( $beltoft_services_fmt, $beltoft_services_app['last_used'] ) : __( 'Never', 'beltoft-services' ) ); ?></td>
 						<td>
@@ -173,6 +174,14 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			<p><?php esc_html_e( 'To change what an app may do, disconnect it and connect it again.', 'beltoft-services' ); ?></p>
 		<?php else : ?>
 			<p><?php esc_html_e( 'No app is connected.', 'beltoft-services' ); ?></p>
+		<?php endif; ?>
+		<?php if ( ! empty( $audit ) ) : ?>
+			<h4><?php esc_html_e( 'Recent actions by connected apps', 'beltoft-services' ); ?></h4>
+			<ul class="beltoft-services-api__audit">
+			<?php foreach ( $audit as $beltoft_services_line ) : ?>
+					<li><?php echo esc_html( wp_date( $beltoft_services_fmt, (int) $beltoft_services_line['at'] ) . ': ' . $beltoft_services_line['text'] ); ?></li>
+			<?php endforeach; ?>
+			</ul>
 		<?php endif; ?>
 
 		<details class="beltoft-services-api__docs">

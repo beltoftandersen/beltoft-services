@@ -512,6 +512,28 @@ final class Firewall {
 	}
 
 	/**
+	 * The rules that let tcp 22 in, reduced to what matters (ports and sorted sources), to compare two rule sets.
+	 *
+	 * @param array<int, array<string, mixed>> $rules Rules.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function ssh_rules( array $rules ): array {
+		$out = array();
+
+		foreach ( $rules as $rule ) {
+			if ( 'tcp' === ( $rule['proto'] ?? '' ) && (int) $rule['from'] <= 22 && (int) $rule['to'] >= 22 ) {
+				$sources = array_values( array_map( 'strval', (array) $rule['sources'] ) );
+				sort( $sources );
+				$out[] = array( (int) $rule['from'], (int) $rule['to'], $sources );
+			}
+		}
+
+		sort( $out );
+
+		return $out;
+	}
+
+	/**
 	 * The text of a port for the customer: 22, 8000-8100 or Ping.
 	 *
 	 * @param array<string, mixed> $rule Rule.

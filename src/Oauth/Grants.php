@@ -170,10 +170,11 @@ final class Grants {
 		}
 
 		return array(
-			'user'      => (int) $row['user_id'],
-			'scope'     => Tokens::level( (string) $row['scope'] ),
-			'family'    => (string) $row['family'],
-			'client_id' => (string) $row['client_id'],
+			'user'       => (int) $row['user_id'],
+			'scope'      => Tokens::stale( (string) $row['scope'] ) ? Tokens::ACTIONS : Tokens::level( (string) $row['scope'] ),
+			'stale_full' => Tokens::stale( (string) $row['scope'] ),
+			'family'     => (string) $row['family'],
+			'client_id'  => (string) $row['client_id'],
 		);
 	}
 
@@ -264,7 +265,8 @@ final class Grants {
 			$out[] = array(
 				'family'    => (string) $row['family'],
 				'name'      => '' !== (string) $row['name'] ? (string) $row['name'] : 'App',
-				'scope'     => (string) $row['scope'],
+				'scope'     => Tokens::level( (string) $row['scope'] ),
+				'stale'     => Tokens::stale( (string) $row['scope'] ),
 				'connected' => (int) $row['connected_at'],
 				'last_used' => (int) $row['last_used'],
 			);
@@ -344,7 +346,7 @@ final class Grants {
 			'token_type'    => 'Bearer',
 			'expires_in'    => self::ACCESS_TTL,
 			'refresh_token' => $refresh,
-			'scope'         => $scope,
+			'scope'         => Tokens::level( $scope ),
 		);
 	}
 
@@ -405,7 +407,7 @@ final class Grants {
 				'family'       => $family,
 				'client_id'    => $client_id,
 				'user_id'      => $user_id,
-				'scope'        => Tokens::level( $scope ),
+				'scope'        => Tokens::pack( $scope ),
 				'redirect_uri' => $redirect,
 				'challenge'    => $challenge,
 				'connected_at' => $connected,

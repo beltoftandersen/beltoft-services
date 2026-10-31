@@ -56,6 +56,7 @@ final class ActionMap {
 		'restore'           => 'later: irreversible, needs confirmation',
 		'reinstall'         => 'later: irreversible, needs confirmation',
 		'replace_ssh_key'   => 'later: lockout risk, needs confirmation',
+		'db_set_policy'     => 'later: decides whether writes fail or data is dropped when memory is full, needs confirmation',
 		'reset_password'    => 'later: makes a secret, needs confirmation and the reveal',
 	);
 

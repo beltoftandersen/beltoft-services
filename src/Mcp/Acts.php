@@ -13,6 +13,7 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Key;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\AddressService;
+use BeltoftServices\Account\Cards;
 use BeltoftServices\Account\DomainDanger;
 use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Resource;
@@ -48,10 +49,6 @@ final class Acts {
 			case 'set_firewall':
 				$id   = (int) $args['id'];
 				$body = array( 'on' => (bool) $args['on'], 'rules' => $args['rules'] );
-
-				if ( isset( $args['my_ip'] ) ) {
-					$body['my_ip'] = (string) $args['my_ip'];
-				}
 
 				$done = Tools::route( 'PUT', '/resources/' . $id . '/firewall', array(), $body, $id, 'firewall change requested' );
 
@@ -188,6 +185,11 @@ final class Acts {
 			return new \WP_Error( 'beltoft_services_tool', __( 'Auto-renew cannot be changed for this subscription.', 'beltoft-services' ) );
 		}
 
+		// Renewing by itself charges the saved card: there must be one that can be charged.
+		if ( $on && ! Cards::has_valid_default( $user_id ) ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'There is no valid default saved payment method. The customer adds a card in the dashboard first, then auto-renew can be turned on.', 'beltoft-services' ) );
+		}
+
 		$done = DomainDanger::set_auto_renew( $s, $on, true );
 
 		if ( ! $done['ok'] ) {
@@ -280,6 +282,15 @@ final class Acts {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This order can no longer be cancelled.', 'beltoft-services' ) );
 		}
 
+		// WooCommerce Subscriptions cancels the subscriptions of a parent order with it: that is cancelling a service.
+		if ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order, 'parent' ) ) {
+			foreach ( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) as $subscription ) {
+				if ( ! $subscription->has_status( array( 'cancelled', 'expired', 'trash' ) ) ) {
+					return new \WP_Error( 'beltoft_services_tool', __( 'This order started a subscription, so cancelling it would cancel the subscription. The customer does that in the dashboard.', 'beltoft-services' ) );
+				}
+			}
+		}
+
 		$order->update_status( 'cancelled', __( 'Order cancelled by the customer through Claude.', 'beltoft-services' ) );
 
 		do_action( 'woocommerce_cancelled_order', $order->get_id() );
@@ -301,14 +312,63 @@ final class Acts {
 			return new \WP_Error( 'beltoft_services_tool', __( 'Give at least one field to change.', 'beltoft-services' ) );
 		}
 
+		$customer = new \WC_Customer( $user_id );
+		$old      = array();
+
+		foreach ( array_keys( $values ) as $key ) {
+			$old[ $key ] = is_callable( array( $customer, 'get_billing_' . $key ) ) ? (string) $customer->{'get_billing_' . $key}() : '';
+		}
+
 		$said = Notices::capture( static fn() => AddressService::save( $user_id, 'billing', $values ) );
 
 		if ( ! $said['result'] || ! $said['ok'] ) {
 			return new \WP_Error( 'beltoft_services_tool', self::said( $said['errors'], __( 'The address was not changed.', 'beltoft-services' ) ) );
 		}
 
-		Audit::add( $user_id, 'billing address changed (' . implode( ', ', array_keys( $values ) ) . ')' );
+		$changes = array();
+		$after   = new \WC_Customer( $user_id );
 
-		return array( 'changed' => array_keys( $values ), 'message' => 'The billing address was changed.' );
+		foreach ( $values as $key => $unused ) {
+			$new = is_callable( array( $after, 'get_billing_' . $key ) ) ? (string) $after->{'get_billing_' . $key}() : '';
+
+			if ( $new !== $old[ $key ] ) {
+				$changes[] = $key . ': "' . $old[ $key ] . '" to "' . $new . '"';
+			}
+		}
+
+		if ( ! $changes ) {
+			return array( 'changed' => array(), 'message' => 'Nothing was different.' );
+		}
+
+		Audit::add( $user_id, 'billing address changed (' . implode( '; ', $changes ) . ')' );
+		self::tell_customer( $user_id, $changes );
+
+		return array( 'changed' => array_keys( $values ), 'message' => 'The billing address was changed. The customer was told by e-mail.' );
+	}
+
+	/**
+	 * Tells the customer by e-mail that a connected app changed their billing address, through the WooCommerce mailer
+	 * (its header and footer, the site's From address). A plain note, no new kind of e-mail.
+	 *
+	 * @param int      $user_id Customer.
+	 * @param string[] $changes What changed, from and to.
+	 */
+	private static function tell_customer( int $user_id, array $changes ): void {
+		$user = get_userdata( $user_id );
+
+		if ( ! $user || '' === (string) $user->user_email ) {
+			return;
+		}
+
+		$mailer = WC()->mailer();
+		$body   = '<p>' . esc_html__( 'An app you connected to your account (Claude) changed your billing address at your request:', 'beltoft-services' ) . '</p><ul>';
+
+		foreach ( $changes as $line ) {
+			$body .= '<li>' . esc_html( $line ) . '</li>';
+		}
+
+		$body .= '</ul><p>' . esc_html__( 'If this was not you, disconnect the app under Account details, Security, and change your password.', 'beltoft-services' ) . '</p>';
+
+		$mailer->send( (string) $user->user_email, __( 'Your billing address was changed', 'beltoft-services' ), $mailer->wrap_message( __( 'Your billing address was changed', 'beltoft-services' ), $body ) );
 	}
 }

@@ -83,7 +83,7 @@ final class ReadsTest extends McpTestCase {
 
 		$thief = $this->oauth( self::factory()->user->create() );
 		$this->assertTrue( $this->tool( 'service_details', array( 'id' => $db->id() ), $thief )['isError'] );
-		$this->assertContains( 'Claude: service details read', array_column( Events::for_license( (int) $db->license()['id'] ), 'message' ) );
+		$this->assertNotContains( 'Claude: service details read', array_column( Events::for_license( (int) $db->license()['id'] ), 'message' ) );
 	}
 
 	public function test_usage_summary_has_servers_and_the_pay_as_you_go_part(): void {
@@ -123,6 +123,28 @@ final class ReadsTest extends McpTestCase {
 		$this->assertFalse( $data['open_to_everyone'] );
 		$this->assertStringNotContainsString( '198.51.100.20', wp_json_encode( $data ) );
 		$this->assertTrue( $this->tool( 'get_database_access', array( 'id' => $db->id() ), $this->oauth( self::factory()->user->create() ) )['isError'] );
+	}
+
+	public function test_an_unpaid_order_points_to_its_page_in_the_dashboard_and_never_to_the_pay_link_with_its_key(): void {
+		list( $user, $tok ) = $this->reader();
+		$order = wc_create_order( array( 'customer_id' => $user, 'status' => 'pending' ) );
+		$item  = new \WC_Product_Simple();
+		$item->set_name( 'Thing' );
+		$item->set_regular_price( '9.00' );
+		$item->save();
+		$order->add_product( $item, 1 );
+		$order->calculate_totals();
+		$order->save();
+
+		foreach ( array( $this->tool( 'list_orders', array(), $tok ), $this->tool( 'get_order', array( 'order_id' => $order->get_id() ), $tok ) ) as $result ) {
+			$text = $this->text( $result );
+			$this->assertStringNotContainsString( $order->get_order_key(), $text );
+			$this->assertStringNotContainsString( 'pay_for_order', $text );
+		}
+
+		$row = $this->json( $this->tool( 'list_orders', array(), $tok ) )['orders'][0];
+		$this->assertTrue( $row['needs_payment'] );
+		$this->assertSame( $order->get_view_order_url(), $row['order_page'] );
 	}
 
 	public function test_orders_list_and_get_only_the_customers_own_shop_orders(): void {
@@ -294,8 +316,8 @@ final class ReadsTest extends McpTestCase {
 			$this->assertFalse( $this->tool( $name, array( 'id' => $db->id() ), $tok )['isError'], $name );
 		}
 
-		// Reads write "Claude: ... read" to the history and nothing else.
-		$this->assertSame( $before + 3, $this->count_events( $db ) );
+		// Reads leave no row in the history.
+		$this->assertSame( $before, $this->count_events( $db ) );
 		$this->assertFalse( \BeltoftServices\Jobs::acting( $db->id() ) );
 		$this->assertSame( Tokens::READ, Tokens::level( 'read' ) );
 	}

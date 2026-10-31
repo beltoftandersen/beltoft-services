@@ -35,4 +35,24 @@ final class Cards {
 		/* translators: 1: card brand, 2: last four digits */
 		return sprintf( __( '%1$s ending %2$s', 'beltoft-services' ), function_exists( 'wc_get_credit_card_type_label' ) ? wc_get_credit_card_type_label( $type ) : ucfirst( $type ), $token->get_last4() );
 	}
+
+	/**
+	 * Does the customer have a default saved payment method that can be charged: it exists, is theirs and, if it is a
+	 * card, has not expired?
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function has_valid_default( int $user_id ): bool {
+		$token = $user_id > 0 && class_exists( '\WC_Payment_Tokens' ) ? \WC_Payment_Tokens::get_customer_default_token( $user_id ) : null;
+
+		if ( ! $token instanceof \WC_Payment_Token || (int) $token->get_user_id() !== $user_id ) {
+			return false;
+		}
+
+		if ( self::is_card( $token ) && method_exists( $token, 'get_expiry_month' ) && method_exists( $token, 'get_expiry_year' ) ) {
+			return (int) $token->get_expiry_year() * 100 + (int) $token->get_expiry_month() >= (int) gmdate( 'Ym' );
+		}
+
+		return true;
+	}
 }

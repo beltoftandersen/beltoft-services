@@ -18,6 +18,18 @@ use BeltoftServices\Oauth\Server;
 trait CallsTools {
 
 	/**
+	 * The refresh token and client of the last oauth() call.
+	 *
+	 * @var string
+	 */
+	protected $last_refresh = '';
+
+	/**
+	 * @var string
+	 */
+	protected $last_client = '';
+
+	/**
 	 * Turns the connector on and sets up the REST server and Application Passwords the way the MCP tests need them.
 	 */
 	protected function mcp_set_up(): void {
@@ -72,6 +84,8 @@ trait CallsTools {
 		parse_str( (string) wp_parse_url( $result['url'], PHP_URL_QUERY ), $q );
 		$tokens = Grants::exchange_code( $q['code'], $done['client_id'], 'https://claude.ai/api/mcp/auth_callback', $verifier );
 		$this->assertIsArray( $tokens );
+		$this->last_refresh = $tokens['refresh_token'];
+		$this->last_client  = $done['client_id'];
 		wp_set_current_user( 0 );
 
 		return $tokens['access_token'];

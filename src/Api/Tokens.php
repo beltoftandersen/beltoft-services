@@ -42,6 +42,12 @@ final class Tokens {
 	public const FULL    = 'full';
 
 	/**
+	 * The version of what Full access means: bump it when the set of tools only Full may call changes. A grant made
+	 * under an older version works as actions until the customer connects again (see Oauth\Grants).
+	 */
+	public const FULL_CONSENT = 1;
+
+	/**
 	 * User meta: uuid => scope.
 	 */
 	public const META = 'beltoft_services_token_scopes';
@@ -113,7 +119,35 @@ final class Tokens {
 	 * @param string $scope Stored or requested value.
 	 */
 	public static function level( string $scope ): string {
+		$scope = explode( ':', $scope )[0];
+
 		return in_array( $scope, array( self::ACTIONS, self::FULL ), true ) ? $scope : self::READ;
+	}
+
+	/**
+	 * What is stored for a level: full carries the version of the consent it was given under ("full:1").
+	 *
+	 * @param string $scope Level, or an already stored value (kept as it is).
+	 * @param bool   $fresh A consent given now: full gets the current version. Otherwise a full without a version is
+	 *                      from before versions and stays stale.
+	 */
+	public static function pack( string $scope, bool $fresh = false ): string {
+		$level = self::level( $scope );
+
+		if ( self::FULL !== $level ) {
+			return $level;
+		}
+
+		return str_contains( $scope, ':' ) ? $scope : self::FULL . ':' . ( $fresh ? self::FULL_CONSENT : 0 );
+	}
+
+	/**
+	 * Is a stored full from before the last change of what Full means (a plain "full" has no version: stale)?
+	 *
+	 * @param string $stored Stored value.
+	 */
+	public static function stale( string $stored ): bool {
+		return self::FULL === self::level( $stored ) && (int) ( explode( ':', $stored )[1] ?? 0 ) !== self::FULL_CONSENT;
 	}
 
 	/**

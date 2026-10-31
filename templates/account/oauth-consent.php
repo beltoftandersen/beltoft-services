@@ -84,7 +84,7 @@ $beltoft_services_kind = (string) $result['kind'];
 					<input type="radio" name="level" value="full">
 					<span>
 						<strong><?php esc_html_e( 'Full access', 'beltoft-services' ); ?></strong>
-						<?php esc_html_e( 'Everything above, and also: buy and renew services with your saved card, cancel services, restore or reinstall servers, roll back or delete snapshots, delete data, and show you passwords once. Domain transfers, and the transfer code of a domain, are never possible through an app: they stay in your dashboard.', 'beltoft-services' ); ?>
+						<?php esc_html_e( 'Everything above, plus abilities that need your yes in the chat each time: buy and renew services with your saved card, cancel services, restore or reinstall servers, roll back or delete snapshots, delete data, and show you passwords once. None of these is available yet: today Full access can do the same as Read and actions. When they are added you connect again to use them. Domain transfers, and the transfer code of a domain, are never possible through an app: they stay in your dashboard.', 'beltoft-services' ); ?>
 					</span>
 				</label>
 				<label class="beltoft-services-oauth__choice beltoft-services-oauth__understand">

@@ -99,25 +99,33 @@ final class ActsTest extends McpTestCase {
 		$domain = $this->domain( $user );
 		$token  = $this->oauth( $user, Tokens::ACTIONS );
 
-		// The dashboard's own validation of the hosts.
-		$bad = $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'set_nameservers', 'mode' => 'custom', 'hosts' => array( 'only-one.example.net' ) ), $token );
-		$this->assertTrue( $bad['isError'] );
+		// Custom name servers are for Full access and a confirmation; our own stay at actions.
+		$custom = array( 'id' => $domain->id(), 'action' => 'set_nameservers', 'mode' => 'custom', 'hosts' => array( 'ns1.other.example', 'ns2.other.example' ) );
+		$this->assertStringContainsString( 'Full access', $this->text( $this->tool( 'domain_settings', $custom, $token ) ) );
+		$this->assertStringContainsString( 'confirmation', $this->text( $this->tool( 'domain_settings', $custom, $this->oauth( $user, Tokens::FULL ) ) ) );
+		$this->assertFalse( Jobs::acting( $domain->id() ) );
+
+		// The dashboard's own validation of the mode.
 		$this->assertTrue( $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'set_nameservers' ), $token )['isError'], 'No mode.' );
 		$this->assertFalse( Jobs::acting( $domain->id() ) );
 
-		$ok = $this->json( $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'set_nameservers', 'mode' => 'custom', 'hosts' => array( 'ns1.other.example', 'ns2.other.example' ) ), $token ) );
+		$ok = $this->json( $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'lock' ), $token ) );
 		$this->assertTrue( $ok['requested'] );
 		$this->assertTrue( Jobs::acting( $domain->id() ) );
-		$this->assertContains( 'Claude: set nameservers requested', $this->history( $domain ) );
+		$this->assertContains( 'Claude: lock requested', $this->history( $domain ) );
 
-		$lock = $this->domain( $user, 'other.example' );
-		$this->assertTrue( $this->json( $this->tool( 'domain_settings', array( 'id' => $lock->id(), 'action' => 'lock' ), $token ) )['requested'] );
-		$this->assertContains( 'Claude: lock requested', $this->history( $lock ) );
+		// Our own name servers stay an everyday action.
+		$ours = $this->domain( $user, 'other.example' );
+		$this->assertTrue( $this->json( $this->tool( 'domain_settings', array( 'id' => $ours->id(), 'action' => 'set_nameservers', 'mode' => 'ours' ), $token ) )['requested'] );
+		$this->assertContains( 'Claude: set nameservers requested', $this->history( $ours ) );
 	}
 
 	public function test_set_database_access_adds_and_removes_addresses_and_cannot_open_to_everyone(): void {
 		$db = $this->database();
-		IpPool::add( '192.0.2.10' );
+		foreach ( array( '192.0.2.10', '192.0.2.11', '192.0.2.12' ) as $address ) {
+			IpPool::add( $address );
+		}
+
 		$this->assertNotNull( IpPool::hold( $db->id() ) );
 		$this->assertTrue( IpPool::assign( $db->id() ) );
 		$plan = (array) Resource::find( $db->id() )->get( 'plan' );
@@ -258,7 +266,7 @@ final class ActsTest extends McpTestCase {
 		$this->assertSame( '8000', $fresh->get_billing_postcode() );
 		$this->assertSame( 'Ann', $fresh->get_billing_first_name(), 'Fields not named stay.' );
 		$this->assertSame( 'DK', $fresh->get_billing_country() );
-		$this->assertStringContainsString( 'Claude: billing address changed (city, postcode, address_1)', implode( ' ', array_column( Audit::lines( $user ), 'text' ) ) );
+		$this->assertStringContainsString( 'Claude: billing address changed (city: "Odense" to "Aarhus"; postcode: "5000" to "8000"; address_1: "" to "Main Street 1")', implode( ' ', array_column( Audit::lines( $user ), 'text' ) ) );
 
 		// A bad postcode: nothing is saved.
 		$bad = $this->tool( 'update_billing_address', array( 'city' => 'Elsewhere', 'postcode' => 'ZZZ-1' ), $token );

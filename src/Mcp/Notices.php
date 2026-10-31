@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * WooCommerce and WooCommerce Subscriptions report the result of an account action as a notice in the customer's
  * session (wc_add_notice) and need a session for it. WooCommerce leaves the session and cart unloaded on custom REST
- * routes, so this loads them as Domains\Cart does, runs the code, hands back the notices as plain text and puts the
+ * routes, so this loads them as Domains\Cart does and, if there is still no session, runs nothing and says so. Otherwise it runs the code, hands back the notices as plain text and puts the
  * customer's own pending notices back, so a tool call neither shows the customer a stranger's notice later nor eats one.
  */
 final class Notices {
@@ -29,19 +29,25 @@ final class Notices {
 		}
 
 		$session = WC()->session;
-		$before  = $session ? $session->get( 'wc_notices', array() ) : array();
 
-		if ( $session ) {
-			$session->set( 'wc_notices', array() );
+		// Without a session there would be no notices to read: the action is not run at all.
+		if ( ! $session ) {
+			return array(
+				'ok'       => false,
+				'messages' => array(),
+				'errors'   => array( __( 'This cannot be done right now. The customer can do it in the dashboard.', 'beltoft-services' ) ),
+				'result'   => false,
+			);
 		}
+
+		$before = $session->get( 'wc_notices', array() );
+		$session->set( 'wc_notices', array() );
 
 		try {
 			$result = $callback();
-			$made   = $session ? (array) $session->get( 'wc_notices', array() ) : array();
+			$made   = (array) $session->get( 'wc_notices', array() );
 		} finally {
-			if ( $session ) {
-				$session->set( 'wc_notices', $before );
-			}
+			$session->set( 'wc_notices', $before );
 		}
 
 		$text = static function ( array $list ): array {

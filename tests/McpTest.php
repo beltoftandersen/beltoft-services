@@ -401,7 +401,7 @@ final class McpTest extends McpTestCase {
 		$messages = array_column( Events::for_license( (int) $domain->license()['id'] ), 'message' );
 		$this->assertContains( 'Claude: DNS record set (A www)', $messages );
 		$this->assertContains( 'Claude: DNS record removed (A www)', $messages );
-		$this->assertContains( 'Claude: DNS records read', $messages );
+		$this->assertNotContains( 'Claude: DNS records read', $messages, 'Reads leave no row in the history.' );
 	}
 
 	public function test_domain_check_and_billing_summary(): void {

@@ -80,12 +80,7 @@ final class Tools {
 	public static function required_level( string $name, array $args ): string {
 		$level = (string) ( self::definitions()[ $name ]['level'] ?? Tokens::FULL );
 
-		// Turning the firewall off lets every port be reached.
-		if ( 'set_firewall' === $name && false === ( $args['on'] ?? null ) ) {
-			return Tokens::FULL;
-		}
-
-		return $level;
+		return self::risky( $name, $args ) ? Tokens::FULL : $level;
 	}
 
 	/**
@@ -96,7 +91,45 @@ final class Tools {
 	 * @param array<string, mixed> $args Arguments.
 	 */
 	public static function confirmation_needed( string $name, array $args ): bool {
-		return 'set_firewall' === $name && false === ( $args['on'] ?? null );
+		return self::risky( $name, $args );
+	}
+
+	/**
+	 * Does this call make things worse than the tool usually does, so that it needs Full access and a confirmation?
+	 * A firewall turned off, or one that opens a wide range of ports to anyone, is the same exposure; so is moving a
+	 * domain to name servers that are not ours.
+	 *
+	 * @param string               $name Tool.
+	 * @param array<string, mixed> $args Arguments (not yet validated).
+	 */
+	private static function risky( string $name, array $args ): bool {
+		if ( 'set_firewall' === $name ) {
+			return false === ( $args['on'] ?? null ) || self::wide_open( $args['rules'] ?? null );
+		}
+
+		return 'domain_settings' === $name && 'set_nameservers' === ( $args['action'] ?? null ) && 'custom' === ( $args['mode'] ?? null );
+	}
+
+	/**
+	 * Does a rule list open more than 100 ports in one rule (all of tcp or udp included) to anyone?
+	 *
+	 * @param mixed $rules Rules as sent.
+	 */
+	private static function wide_open( $rules ): bool {
+		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
+			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! empty( $rule['sources'] ) ) {
+				continue;
+			}
+
+			$from = is_int( $rule['from'] ?? null ) ? $rule['from'] : 0;
+			$to   = is_int( $rule['to'] ?? null ) ? $rule['to'] : $from;
+
+			if ( $to - $from + 1 > 100 ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -432,7 +465,8 @@ final class Tools {
 		$response = rest_do_request( $request );
 		$data     = $response->get_data();
 
-		if ( null !== $id && '' !== $history ) {
+		// Reads leave no row in the history: only changes, and refused changes, do.
+		if ( null !== $id && '' !== $history && 'GET' !== strtoupper( $method ) ) {
 			self::log( $id, $history, $response->get_status() < 400 );
 		}
 

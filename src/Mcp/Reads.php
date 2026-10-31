@@ -55,7 +55,6 @@ final class Reads {
 					return $r;
 				}
 
-				Tools::log( $r->id(), 'service details read', true );
 
 				return Details::of( $r );
 
@@ -126,8 +125,6 @@ final class Reads {
 
 				$driver = Registry::get( (string) $r->get( 'driver' ) );
 				$url    = $driver && 'vm' === $driver->kind() ? Details::page( $r, 'vm', $r->license(), 'console' ) : '';
-
-				Tools::log( $r->id(), 'console link read', '' !== $url );
 
 				return '' === $url
 					? new \WP_Error( 'beltoft_services_tool', __( 'This service has no console.', 'beltoft-services' ) )
@@ -254,8 +251,6 @@ final class Reads {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This service has no snapshots or backups.', 'beltoft-services' ) );
 		}
 
-		Tools::log( $id, 'recovery points read', true );
-
 		$backups = Backups::listing( $r );
 		$out     = array(
 			'backups' => array(
@@ -367,7 +362,7 @@ final class Reads {
 			'currency'      => $currency,
 			'items'         => array_values( array_map( static fn( $i ) => $i->get_name() . ' x ' . (int) $i->get_quantity(), $order->get_items() ) ),
 			'needs_payment' => $pay,
-			'pay_page'      => $pay ? $order->get_checkout_payment_url() : '',
+			'order_page'    => $pay ? $order->get_view_order_url() : '',
 		);
 	}
 

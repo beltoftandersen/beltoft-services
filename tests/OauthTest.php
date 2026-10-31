@@ -542,6 +542,8 @@ final class OauthTest extends TestCase {
 		$this->assertStringContainsString( 'never possible through an app', $html );
 		$this->assertStringContainsString( 'buy and renew services', $html );
 		$this->assertStringContainsString( 'show you passwords once', $html );
+		$this->assertStringContainsString( 'None of these is available yet: today Full access can do the same as Read and actions', $html );
+		$this->assertStringContainsString( 'you connect again to use them', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( '<strong>Read only</strong>', $html );
 		$this->assertStringContainsString( '<strong>Read and actions</strong>', $html );

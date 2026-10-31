@@ -78,7 +78,7 @@ final class Definitions {
 			'list_recovery_points' => self::read( 'Lists the snapshots (with free slots) and the backups of one server, or the backups of one database, with their ids and dates.' . self::DATA, $by_id, 30 ),
 			'get_firewall'     => self::read( 'Shows the firewall of one server: whether it is on, its rules (protocol, ports, allowed addresses, label) and whether a change is being applied.' . self::DATA, $by_id ),
 			'get_database_access' => self::read( 'Shows which addresses may connect to one managed database that has a public IP address, whether it is open to everyone, and whether a change is being applied.' . self::DATA, $by_id, 30 ),
-			'list_orders'      => self::read( 'Lists the customer\'s recent orders with date, status, total, items, and whether one is waiting for payment.' . self::DATA, self::obj( array( 'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 20, 'description' => 'How many, newest first. Default 10.' ) ) ), 30 ),
+			'list_orders'      => self::read( 'Lists the customer\'s recent orders with date, status, total, items, and whether one is waiting for payment (then the customer pays on the order page in the dashboard).' . self::DATA, self::obj( array( 'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 20, 'description' => 'How many, newest first. Default 10.' ) ) ), 30 ),
 			'get_order'        => self::read( 'Shows one of the customer\'s orders: status, dates, items with prices, tax, total, payment method and its subscriptions.' . self::DATA, self::obj( array( 'order_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The order id, from list_orders.' ) ), array( 'order_id' ) ), 30 ),
 			'list_subscriptions' => self::read( 'Lists the customer\'s subscriptions with status, price and period, next payment, whether it renews by itself, and what the dashboard offers on each (for example reactivate).' . self::DATA, self::obj( array( 'status' => array( 'type' => 'string', 'enum' => array( 'any', 'active', 'on-hold', 'pending', 'pending-cancel', 'cancelled', 'expired' ), 'description' => 'Only this status. Default any.' ) ) ), 30 ),
 			'list_payment_methods' => self::read( 'Lists the customer\'s saved payment methods: card brand, last four digits, expiry and which is the default. The card data itself is never shown. Adding a card is done in the dashboard.', $none, 30 ),
@@ -110,16 +110,16 @@ final class Definitions {
 								'type'       => 'object',
 								'properties' => array(
 									'value'    => array( 'type' => 'string', 'maxLength' => 500 ),
-									'priority' => array( 'type' => 'integer' ),
-									'weight'   => array( 'type' => 'integer' ),
-									'port'     => array( 'type' => 'integer' ),
-									'flag'     => array( 'type' => 'integer' ),
+									'priority' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 65535 ),
+									'weight'   => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 65535 ),
+									'port'     => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 65535 ),
+									'flag'     => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 255 ),
 									'tag'      => array( 'type' => 'string', 'maxLength' => 20 ),
 								),
 								'required'   => array( 'value' ),
 							),
 						),
-						'ttl'     => array( 'type' => 'integer', 'description' => 'Seconds. Optional.' ),
+						'ttl'     => array( 'type' => 'integer', 'minimum' => 60, 'maximum' => 86400, 'description' => 'Seconds, 60 to 86400. Optional.' ),
 					),
 					array( 'id', 'type', 'name', 'records' )
 				),
@@ -135,7 +135,7 @@ final class Definitions {
 			'reset_database_password' => self::act( 'Makes a new password for a managed database. The old one stops working. The new one is never shown here: the customer reveals it once in the dashboard. Ask the customer first.', $by_id, true ),
 			'rename_server'    => self::act( 'Gives a server a new name. The name is shown in the dashboard and used as its host name.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The new name: letters, numbers and dashes.' ) ), array( 'id', 'name' ) ), true, true ),
 			'set_firewall'     => self::act(
-				'Replaces the firewall rules of one server and turns the firewall on. Read get_firewall first and send the whole list you want. Ask the customer first. When SSH is limited to certain addresses, give the customer\'s current public IPv4 address as my_ip: without it, a rule list that does not let SSH in from anywhere is refused so the customer cannot lock themselves out. Turning the firewall off needs Full access and a confirmation.',
+				'Replaces the firewall rules of one server and turns the firewall on. Read get_firewall first and send the whole list you want. Ask the customer first. Through Claude, SSH (port 22) must stay open to anyone, or the rules that let SSH in must stay as they are, so the customer cannot lock themselves out. Turning the firewall off, or opening a wide range of ports to anyone, needs Full access and a confirmation.',
 				self::obj(
 					array(
 						'id'    => $id,
@@ -156,7 +156,6 @@ final class Definitions {
 								'required'   => array( 'proto' ),
 							),
 						),
-						'my_ip' => array( 'type' => 'string', 'maxLength' => 15, 'description' => 'The customer\'s current public IPv4 address. Only used for the SSH check.' ),
 					),
 					array( 'id', 'on', 'rules' )
 				),
@@ -180,7 +179,7 @@ final class Definitions {
 			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
 			'retry_app_install' => self::act( 'Tries again to install the app of a server whose installation failed or did not finish. It does not reinstall the server.', $by_id, false ),
 			'domain_settings'  => self::act(
-				'Changes a setting of one of the customer\'s domains: set_nameservers (mode ours, or custom with two to six hosts; the domain can go offline if the hosts are wrong), lock (the transfer lock on), or check_delegation (looks at the name servers now). Ask the customer first. Moving a domain away is not possible here.',
+				'Changes a setting of one of the customer\'s domains: set_nameservers (mode ours; mode custom, with two to six hosts, needs Full access and a confirmation because the domain can go offline if the hosts are wrong), lock (the transfer lock on), or check_delegation (looks at the name servers now). Ask the customer first. Moving a domain away is not possible here.',
 				self::obj(
 					array(
 						'id'     => $id,
