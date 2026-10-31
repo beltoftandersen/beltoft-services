@@ -76,28 +76,10 @@ final class GuestDisk {
 				return false;
 			}
 
-			$record = VmRecords::for_resource( $r->id() );
-			if ( null === $record ) {
+			$reply = self::reply( $r );
+			if ( false === $reply ) {
 				return false;
 			}
-			$cluster = Clusters::get( (string) $record['cluster'] );
-			if ( null === $cluster || null !== Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() ) ) {
-				return false;
-			}
-			try {
-				$client = Clients::for( $cluster );
-			} catch ( \Throwable $e ) {
-				return false;
-			}
-			$verified = Ownership::verify( $client, $record, $r );
-			if ( is_wp_error( $verified ) || 'running' !== $verified['status'] || '' !== $verified['lock'] ) {
-				return false;
-			}
-
-			$path = '/nodes/' . rawurlencode( $verified['node'] ) . '/qemu/' . (int) $record['vmid'] . '/agent/get-fsinfo';
-			$reply = $client instanceof LiveClient
-				? $client->request_with_timeout( 'GET', $path, array(), 5 )
-				: $client->request( 'GET', $path );
 			$disk = is_wp_error( $reply ) ? null : self::root( $reply );
 			if ( null === $disk ) {
 				return $r->set( array( 'disk_fail_at' => $now ) );
@@ -114,6 +96,73 @@ final class GuestDisk {
 			return $stored;
 		} );
 		return $disk;
+	}
+
+	/**
+	 * GET agent/get-fsinfo of a running VM of this site (record, cluster, ownership and lock checked), at most one call.
+	 *
+	 * @return array|\WP_Error|false False when the VM cannot be asked (no record, cluster not usable, not running, locked); no call is made then.
+	 */
+	private static function reply( Resource $r ) {
+		$record = VmRecords::for_resource( $r->id() );
+		if ( null === $record ) {
+			return false;
+		}
+		$cluster = Clusters::get( (string) $record['cluster'] );
+		if ( null === $cluster || null !== Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() ) ) {
+			return false;
+		}
+		try {
+			$client = Clients::for( $cluster );
+		} catch ( \Throwable $e ) {
+			return false;
+		}
+		$verified = Ownership::verify( $client, $record, $r );
+		if ( is_wp_error( $verified ) || 'running' !== $verified['status'] || '' !== $verified['lock'] ) {
+			return false;
+		}
+
+		$path = '/nodes/' . rawurlencode( $verified['node'] ) . '/qemu/' . (int) $record['vmid'] . '/agent/get-fsinfo';
+
+		return $client instanceof LiveClient
+			? $client->request_with_timeout( 'GET', $path, array(), 5 )
+			: $client->request( 'GET', $path );
+	}
+
+	/**
+	 * The size in bytes of the data file system of a database server, read now (one agent call, no cache, nothing stored).
+	 * Null when the VM cannot be asked, the agent fails or no data file system is listed.
+	 */
+	public static function data_total( Resource $r ): ?int {
+		$reply = self::reply( $r );
+
+		return false === $reply || is_wp_error( $reply ) ? null : self::data( $reply );
+	}
+
+	/**
+	 * The data file system in a get-fsinfo reply: a mount under /srv/, else the one on the second SCSI disk (serial
+	 * drive-scsi1). Returns its total bytes.
+	 */
+	public static function data( $reply ): ?int {
+		if ( ! is_array( $reply ) || ! isset( $reply['result'] ) || ! is_array( $reply['result'] ) ) {
+			return null;
+		}
+		foreach ( $reply['result'] as $row ) {
+			if ( ! is_array( $row ) || ! is_numeric( $row['total-bytes'] ?? null ) || (float) $row['total-bytes'] <= 0 ) {
+				continue;
+			}
+			$mount = (string) ( $row['mountpoint'] ?? '' );
+			$by_disk = false;
+			foreach ( (array) ( $row['disk'] ?? array() ) as $disk ) {
+				if ( is_array( $disk ) && str_contains( (string) ( $disk['serial'] ?? '' ), 'scsi1' ) ) {
+					$by_disk = true;
+				}
+			}
+			if ( str_starts_with( $mount, '/srv/' ) || $by_disk ) {
+				return (int) $row['total-bytes'];
+			}
+		}
+		return null;
 	}
 
 	/** Parse the observed Proxmox reply shape, using only the root mount. */

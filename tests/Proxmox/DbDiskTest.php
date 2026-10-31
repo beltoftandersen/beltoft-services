@@ -1028,4 +1028,67 @@ class DbDiskTest extends TestCase {
 		$this->assertStringContainsString( 'variation_id=', html_entity_decode( (string) $mail['message'] ) );
 		remove_all_filters( 'woocommerce_subscriptions_can_item_be_switched_by_user' );
 	}
+
+	// -- Manual grow flag ------------------------------------------------------------------------
+
+	/** A database flagged for a manual grow, 70 GB disk, running. */
+	private function manual_db(): Resource {
+		$r = $this->db_on_ladder( 'e0-0' );
+		$this->assertTrue( $r->set( array( DbGrow::FS => 'manual', 'disk_gb' => 70 ) ) );
+		$this->fake->set_fsinfo( 5000, $this->fsinfo( 70 ) );
+
+		return Resource::find( $r->id() );
+	}
+
+	private function fsinfo( float $data_gb ): array {
+		return array( 'result' => array(
+			array( 'mountpoint' => '/', 'total-bytes' => 2790285312, 'used-bytes' => 884944896, 'type' => 'ext4' ),
+			array( 'mountpoint' => '/srv/db', 'total-bytes' => (int) ( $data_gb * 1073741824 ), 'used-bytes' => 1000, 'type' => 'ext4' ),
+		) );
+	}
+
+	public function test_the_manual_flag_is_cleared_once_the_data_file_system_covers_the_disk(): void {
+		$r = $this->manual_db();
+		$this->fake->set_fsinfo( 5000, $this->fsinfo( 67 ) ); // 70 GB less a little overhead.
+
+		$this->assertTrue( DbGrow::check_manual( $r ) );
+		$this->assertNull( Resource::find( $r->id() )->get( DbGrow::FS ) );
+		$this->assertFalse( DbDisk::view( Resource::find( $r->id() ) )['manual'] );
+	}
+
+	public function test_the_manual_flag_stays_while_the_file_system_is_too_small(): void {
+		$r = $this->manual_db();
+		$this->fake->set_fsinfo( 5000, $this->fsinfo( 20 ) );
+
+		$this->assertFalse( DbGrow::check_manual( $r ) );
+		$this->assertSame( 'manual', Resource::find( $r->id() )->get( DbGrow::FS ) );
+	}
+
+	public function test_an_agent_error_leaves_the_manual_flag(): void {
+		$r = $this->manual_db();
+		$this->fake->fail_next( 'GET', '#/agent/get-fsinfo$#', new \WP_Error( 'agent_missing', 'Agent unavailable.' ) );
+
+		$this->assertFalse( DbGrow::check_manual( $r ) );
+		$this->assertSame( 'manual', Resource::find( $r->id() )->get( DbGrow::FS ) );
+	}
+
+	public function test_an_unflagged_database_makes_no_file_system_call(): void {
+		$r = $this->db_on_ladder( 'e0-0' );
+		$this->fake->set_fsinfo( 5000, $this->fsinfo( 70 ) );
+
+		$this->assertFalse( DbGrow::check_manual( $r ) );
+		$this->assertCount( 0, $this->calls( 'GET', '/agent/get-fsinfo' ) );
+	}
+
+	public function test_the_disk_job_clears_the_flag(): void {
+		$r = $this->manual_db();
+		set_transient( ProxmoxJobs::RUNNING_PREFIX . 'lab', array( array( 'resource' => $r->id(), 'cluster' => 'lab', 'vmid' => 5000 ) ), HOUR_IN_SECONDS );
+		// The root reading is fresh, so only the flagged database's data check is due.
+		$this->assertTrue( $r->set( array( 'disk_used' => 10, 'disk_total' => 100, 'disk_read_at' => time() ) ) );
+
+		ProxmoxJobs::disk();
+
+		$this->assertNull( Resource::find( $r->id() )->get( DbGrow::FS ) );
+		$this->assertCount( 1, $this->calls( 'GET', '/agent/get-fsinfo' ) );
+	}
 }

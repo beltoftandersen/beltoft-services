@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
@@ -67,6 +68,33 @@ final class DbGrow {
 	 */
 	public static function manual( Resource $r ): bool {
 		return 'manual' === $r->get( self::FS );
+	}
+
+	/**
+	 * For a database flagged for a manual grow: reads the guest's file systems and clears the flag once the data file
+	 * system covers the disk (5 percent for the file system's own overhead). One agent call; an error leaves the flag.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function check_manual( Resource $r ): bool {
+		if ( ! DbActions::is_db( $r ) || ! self::manual( $r ) || self::busy( $r ) ) {
+			return false;
+		}
+		$gb    = (int) $r->get( 'disk_gb' );
+		$total = GuestDisk::data_total( $r );
+		if ( $gb <= 0 || null === $total || $total < 0.95 * $gb * 1073741824 ) {
+			return false;
+		}
+		$done = $r->locked(
+			static function () use ( $r ): bool {
+				return self::manual( Resource::find( $r->id() ) ?? $r ) && $r->set( array( self::FS => null ) );
+			}
+		);
+		if ( $done ) {
+			Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', 'Data disk file system made larger' );
+		}
+
+		return (bool) $done;
 	}
 
 	/**
