@@ -529,16 +529,17 @@ final class OauthTest extends TestCase {
 		} )( $result );
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'wants to read your servers, databases, domains and DNS', $html );
-		$this->assertStringContainsString( 'and run actions (restart, snapshots, DNS changes)', $html );
+		$this->assertStringContainsString( 'Read your servers, databases, domains and DNS records', $html );
+		$this->assertStringContainsString( 'restart, start and stop a server, take a snapshot', $html );
 		$this->assertStringContainsString( 'claude.ai', $html );
 		$this->assertStringContainsString( 'Not verified', $html );
 		$this->assertStringContainsString( 'ann@example.org', $html );
 		$this->assertStringContainsString( 'asks to run actions too', $html );
-		$this->assertStringNotContainsString( 'checked', $html );
+		$this->assertMatchesRegularExpression( '/name="allow_actions" value="0" checked/', $html, 'Read only is the default.' );
+		$this->assertDoesNotMatchRegularExpression( '/name="allow_actions" value="1"[^>]*checked/', $html, 'Actions are never preselected.' );
 		$this->assertStringNotContainsString( '<b>', $html );
-		$this->assertStringContainsString( 'Read only:', $html );
-		$this->assertStringContainsString( 'Read and actions:', $html );
+		$this->assertStringContainsString( '<strong>Read only</strong>', $html );
+		$this->assertStringContainsString( '<strong>Read and actions</strong>', $html );
 		$this->assertStringNotContainsString( 'a"b', $html );
 		$this->assertStringNotContainsString( '—', $html );
 	}

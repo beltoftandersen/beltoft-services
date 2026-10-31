@@ -17,55 +17,69 @@ defined( 'ABSPATH' ) || exit;
 $beltoft_services_kind = (string) $result['kind'];
 ?>
 <main class="beltoft-services-oauth">
+	<div class="beltoft-services-oauth__panel">
 	<?php if ( 'consent' === $beltoft_services_kind ) : ?>
-		<h1><?php esc_html_e( 'Connect an app', 'beltoft-services' ); ?></h1>
-		<p>
+		<h1><?php
+			/* translators: %s: name of the app, as the app gave it */
+			echo esc_html( sprintf( __( 'Connect %s to your account', 'beltoft-services' ), (string) $result['client']['name'] ) );
+		?></h1>
+		<p class="beltoft-services-oauth__lead">
 			<?php
 			/* translators: 1: name of the app as the app gave it, 2: the website the app returns to */
-			echo esc_html( sprintf( __( 'An app called "%1$s" wants to connect to your account. After you choose, you are sent back to %2$s.', 'beltoft-services' ), (string) $result['client']['name'], (string) $result['host'] ) );
-			?>
-			<strong>
-				<?php echo esc_html( $result['verified'] ? __( 'Verified.', 'beltoft-services' ) : __( 'Not verified: the name is chosen by the app. Continue only if you started this connection.', 'beltoft-services' ) ); ?>
-			</strong>
-		</p>
-		<p>
-			<?php
-			/* translators: %s: name of the app, as the app gave it */
-			echo esc_html( sprintf( __( '%s wants to read your servers, databases, domains and DNS.', 'beltoft-services' ), (string) $result['client']['name'] ) );
+			echo esc_html( sprintf( __( '"%1$s" wants to connect to your account. After you choose, you are sent back to %2$s.', 'beltoft-services' ), (string) $result['client']['name'], (string) $result['host'] ) );
 			?>
 		</p>
-		<p>
-			<?php
-			/* translators: 1: name of the account, 2: email address */
-			echo esc_html( sprintf( __( 'You are signed in as %1$s (%2$s).', 'beltoft-services' ), (string) $result['account']['name'], (string) $result['account']['email'] ) );
-			?>
-		</p>
-		<p><?php esc_html_e( 'What each choice allows:', 'beltoft-services' ); ?></p>
-		<ul>
-			<li><?php esc_html_e( 'Read only: the app can read your servers, databases, domains and DNS records, their state and usage, and your next payment. It cannot change anything.', 'beltoft-services' ); ?></li>
-			<li><?php esc_html_e( 'Read and actions: also restart, start and stop a server, take a snapshot, set or remove DNS records and ask for a new database password. Restoring, reinstalling and deleting are never allowed.', 'beltoft-services' ); ?></li>
-		</ul>
-		<p><?php esc_html_e( 'The app never sees your password or any other secret.', 'beltoft-services' ); ?></p>
-		<?php if ( ! empty( $result['asks_actions'] ) ) : ?>
-			<p><?php esc_html_e( 'This app asks to run actions too. Tick the box below only if you want that.', 'beltoft-services' ); ?></p>
-		<?php endif; ?>
+		<dl class="beltoft-services-oauth__facts">
+			<div>
+				<dt><?php esc_html_e( 'App', 'beltoft-services' ); ?></dt>
+				<dd>
+					<?php echo esc_html( (string) $result['client']['name'] ); ?>
+					<span class="beltoft-services-oauth__<?php echo $result['verified'] ? 'verified' : 'unverified'; ?>">
+						<?php echo esc_html( $result['verified'] ? __( 'Verified', 'beltoft-services' ) : __( 'Not verified: the name is chosen by the app. Continue only if you started this connection.', 'beltoft-services' ) ); ?>
+					</span>
+				</dd>
+			</div>
+			<div>
+				<dt><?php esc_html_e( 'Returns to', 'beltoft-services' ); ?></dt>
+				<dd><?php echo esc_html( (string) $result['host'] ); ?></dd>
+			</div>
+			<div>
+				<dt><?php esc_html_e( 'Your account', 'beltoft-services' ); ?></dt>
+				<dd><?php echo esc_html( sprintf( '%1$s (%2$s)', (string) $result['account']['name'], (string) $result['account']['email'] ) ); ?></dd>
+			</div>
+		</dl>
 		<form method="post" action="<?php echo esc_url( $action ); ?>">
 			<?php foreach ( $fields as $beltoft_services_key => $beltoft_services_value ) : ?>
 				<input type="hidden" name="<?php echo esc_attr( $beltoft_services_key ); ?>" value="<?php echo esc_attr( $beltoft_services_value ); ?>">
 			<?php endforeach; ?>
 			<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
-			<p>
-				<label>
-					<input type="checkbox" name="allow_actions" value="1">
-					<?php esc_html_e( 'and run actions (restart, snapshots, DNS changes)', 'beltoft-services' ); ?>
+			<fieldset class="beltoft-services-oauth__choices">
+				<legend><?php esc_html_e( 'What the app may do', 'beltoft-services' ); ?></legend>
+				<?php if ( ! empty( $result['asks_actions'] ) ) : ?>
+					<p class="beltoft-services-oauth__note"><?php esc_html_e( 'This app asks to run actions too. Choose that only if you want it.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
+				<label class="beltoft-services-oauth__choice">
+					<input type="radio" name="allow_actions" value="0" checked>
+					<span>
+						<strong><?php esc_html_e( 'Read only', 'beltoft-services' ); ?></strong>
+						<?php esc_html_e( 'Read your servers, databases, domains and DNS records, their state and usage, and your next payment. It cannot change anything.', 'beltoft-services' ); ?>
+					</span>
 				</label>
-			</p>
-			<p>
-				<button type="submit" name="decision" value="approve" class="button"><?php esc_html_e( 'Allow', 'beltoft-services' ); ?></button>
-				<button type="submit" name="decision" value="deny" class="button"><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
+				<label class="beltoft-services-oauth__choice">
+					<input type="radio" name="allow_actions" value="1">
+					<span>
+						<strong><?php esc_html_e( 'Read and actions', 'beltoft-services' ); ?></strong>
+						<?php esc_html_e( 'Also restart, start and stop a server, take a snapshot, set or remove DNS records and ask for a new database password. Restoring, reinstalling and deleting are never allowed.', 'beltoft-services' ); ?>
+					</span>
+				</label>
+			</fieldset>
+			<p class="beltoft-services-oauth__secret"><?php esc_html_e( 'The app never sees your password or any other secret.', 'beltoft-services' ); ?></p>
+			<p class="beltoft-services-oauth__buttons">
+				<button type="submit" name="decision" value="approve" class="button beltoft-services-oauth__allow"><?php esc_html_e( 'Allow', 'beltoft-services' ); ?></button>
+				<button type="submit" name="decision" value="deny" class="button beltoft-services-oauth__cancel"><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
 			</p>
 		</form>
-		<p><?php esc_html_e( 'You can disconnect the app at any time under Account details, Security.', 'beltoft-services' ); ?></p>
+		<p class="beltoft-services-oauth__foot"><?php esc_html_e( 'You can disconnect the app at any time under Account details, Security.', 'beltoft-services' ); ?></p>
 	<?php elseif ( 'user_off' === $beltoft_services_kind ) : ?>
 		<h1><?php esc_html_e( 'Connecting apps is turned off', 'beltoft-services' ); ?></h1>
 		<p><?php esc_html_e( 'You turned off Allow Claude (MCP) access for your account. Turn it on under Account details, Security, then connect again.', 'beltoft-services' ); ?></p>
@@ -79,4 +93,5 @@ $beltoft_services_kind = (string) $result['kind'];
 		<h1><?php esc_html_e( 'The request is not valid', 'beltoft-services' ); ?></h1>
 		<p><?php esc_html_e( 'The app did not ask in the right way. Start the connection again from the app.', 'beltoft-services' ); ?></p>
 	<?php endif; ?>
+	</div>
 </main>
