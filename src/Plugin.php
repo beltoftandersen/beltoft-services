@@ -41,6 +41,7 @@ final class Plugin {
 		Settings::register();
 
 		Product::register();
+		LineNames::register();
 
 		Jobs::register();
 

@@ -65,9 +65,13 @@ class RenewalTest extends UsageTestCase {
 		$this->assertCount( 3, $fees );
 		$this->assertCount( 1, $order->get_items( 'line_item' ), 'The 0 account line stays, so the order-pay cart is built from it.' );
 		// Sorted by resource, then item.
-		$this->assertStringContainsString( 'backups', $fees[0]->get_name() );
+		$this->assertStringContainsString( 'Backups for ', $fees[0]->get_name() );
 		$this->assertStringContainsString( '100 hours', $fees[1]->get_name() );
-		$this->assertStringContainsString( '0.02260274', $fees[1]->get_name() );
+		$this->assertStringContainsString( '0.0226', $fees[1]->get_name() );
+		$this->assertStringNotContainsString( '0.02260274', $fees[1]->get_name() );
+		$this->assertStringContainsString( '(excl. VAT)', $fees[1]->get_name() );
+		$this->assertStringStartsWith( 'Server ', $fees[1]->get_name() );
+		$this->assertDoesNotMatchRegularExpression( '/\d{4}-\d{2}/', $fees[1]->get_name() );
 		$this->assertSame( '0.5', $fees[0]->get_total() );
 		$this->assertSame( '2.26', $fees[1]->get_total() );
 		$this->assertSame( '0.23', $fees[2]->get_total() );
