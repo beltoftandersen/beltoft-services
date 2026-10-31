@@ -269,6 +269,7 @@ final class AppTab {
 				'deadline' => $own_since > 0 ? wp_date( get_option( 'date_format' ), $own_since ) : '',
 				'days'     => AppOwnDomain::WAIT_DAYS,
 			),
+			'www'             => AppWww::view( $r ),
 			'domain_wanted'   => (string) $r->get( 'app_domain_want' ),
 			'domain_failed'   => '' !== (string) $r->get( 'app_domain_error' ),
 			'domain_reason'   => $domain_reason,

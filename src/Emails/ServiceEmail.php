@@ -124,6 +124,9 @@ abstract class ServiceEmail extends \WC_Email {
 				'notice_what'   => isset( $data['notice_what'] ) && is_string( $data['notice_what'] ) ? wp_strip_all_tags( $data['notice_what'] ) : '',
 				'notice_app'    => isset( $data['notice_app'] ) && is_string( $data['notice_app'] ) ? wp_strip_all_tags( $data['notice_app'] ) : '',
 				'app_domain'    => isset( $data['app_domain'] ) && is_string( $data['app_domain'] ) ? $data['app_domain'] : '',
+				'app_www'       => isset( $data['app_www'] ) && is_string( $data['app_www'] ) ? $data['app_www'] : '',
+				'app_www_state' => isset( $data['app_www_state'] ) && is_string( $data['app_www_state'] ) ? $data['app_www_state'] : '',
+				'app_ip'        => isset( $data['app_ip'] ) && is_string( $data['app_ip'] ) && false !== filter_var( $data['app_ip'], FILTER_VALIDATE_IP ) ? $data['app_ip'] : '',
 				'app_name'      => (string) ( \BeltoftServices\Proxmox\Apps::definition( (string) $r->get( 'app_id' ) )['name'] ?? '' ),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);

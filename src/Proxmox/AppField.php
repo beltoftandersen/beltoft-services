@@ -374,10 +374,10 @@ final class AppField {
 		);
 
 		if ( array() !== $zones ) {
-			$choices[] = array( '1', __( 'A domain on our name servers', 'beltoft-services' ), __( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed.', 'beltoft-services' ) );
+			$choices[] = array( '1', __( 'A domain on our name servers', 'beltoft-services' ), __( 'Adds an A record to one of your domains on our name servers, and the site is served with HTTPS. Your other records are not changed. On the domain itself, www is added too when it has no record yet, and redirects to the domain.', 'beltoft-services' ) );
 		}
 
-		$choices[] = array( self::MODE_OWN, __( 'Use my own domain', 'beltoft-services' ), __( 'For a domain registered or hosted elsewhere. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server.', 'beltoft-services' ) );
+		$choices[] = array( self::MODE_OWN, __( 'Use my own domain', 'beltoft-services' ), __( 'For a domain registered or hosted elsewhere. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server. For a bare domain such as example.com, point A records for both example.com and www.example.com at the address; www redirects to example.com.', 'beltoft-services' ) );
 
 		foreach ( $choices as $choice ) {
 			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_DOMAIN ) . '" value="' . esc_attr( $choice[0] ) . '" data-app-domain-mode' . checked( $mode, $choice[0], false ) . '> <span>' . esc_html( $choice[1] ) . '</span><span class="description">' . esc_html( $choice[2] ) . '</span></label>';
@@ -393,13 +393,13 @@ final class AppField {
 
 			echo '</select></span></p>';
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_SUB ) . '">' . esc_html__( 'Subdomain (optional)', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( self::POST_SUB ) . '" id="' . esc_attr( self::POST_SUB ) . '" maxlength="120" autocomplete="off" spellcheck="false" placeholder="www" value="' . esc_attr( $picked['sub'] ) . '"></span>';
-			echo '<span class="description">' . esc_html__( 'Leave it empty to use the domain itself. The name must not have an address record yet.', 'beltoft-services' ) . '</span></p>';
+			echo '<span class="description">' . esc_html__( 'Leave it empty to use the domain itself; www is then added too when it has no record yet. The name must not have an address record yet.', 'beltoft-services' ) . '</span></p>';
 			echo '</div>';
 		}
 
 		echo '<div class="beltoft-services-app__domain-fields" data-app-domain-own-fields="1"' . ( $own_on ? '' : ' hidden' ) . '>';
 		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( self::POST_OWN ) . '">' . esc_html__( 'Your domain name', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( self::POST_OWN ) . '" id="' . esc_attr( self::POST_OWN ) . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="shop.example.com" value="' . esc_attr( $picked['own'] ) . '"></span>';
-		echo '<span class="description">' . esc_html__( 'We do not change any DNS records for it. You add the A record where the domain is hosted.', 'beltoft-services' ) . '</span></p>';
+		echo '<span class="description">' . esc_html__( 'We do not change any DNS records for it. You add the A record where the domain is hosted. For a bare domain such as example.com, add one for www.example.com too.', 'beltoft-services' ) . '</span></p>';
 		echo '</div></fieldset>';
 
 		echo '</div>';

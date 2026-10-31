@@ -108,6 +108,7 @@ final class Plugin {
 		Proxmox\AppInstall::register();
 		Proxmox\AppDomainRelease::register();
 		Proxmox\AppOwnDomain::register();
+		Proxmox\AppWww::register();
 		Proxmox\AppStatus::register();
 		Proxmox\MetricsRoute::register();
 		Proxmox\Flows::register();

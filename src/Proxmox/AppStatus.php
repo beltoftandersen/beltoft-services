@@ -110,6 +110,7 @@ final class AppStatus {
 			$r->set( $meta );
 			if ( 'ready' === $r->get( 'app_state' ) ) {
 				AppOwnDomain::installed( $r );
+				AppWww::installed( $r );
 			}
 			if ( 'failed' === $state ) {
 				AppAlerts::failure( $r, 'Installation failed at ' . $status['step'] );

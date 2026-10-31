@@ -11,9 +11,10 @@
   "credentials": ["admin_user", "admin_password"],
   "steps": ["download", "os", "packages", "database", "wordpress", "web", "firewall", "verify", "install", "complete"],
   "domain": true,
+  "www": {"since_recipe": 2},
   "open": {"path": "/wp-admin/"},
   "docs_url": "https://wordpress.org/documentation/article/how-to-install-wordpress/",
   "versions": [
-    {"id": "7.1.4", "label": "WordPress 7.1.4", "upstream": "7.1.4", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "3dd922f2202689ee5f057470a40469551558f8fee2730370c68d80b89db1e971", "eol": ""}
+    {"id": "7.1.4", "label": "WordPress 7.1.4", "upstream": "7.1.4", "recipe": 2, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "c473b6d26c7659abc762fd91cb2823f3a4d2fc2973d5915503a0cc9f621f43d4", "eol": ""}
   ]
 }

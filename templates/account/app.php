@@ -4,7 +4,7 @@
  *
  * Variables: $view (see AppTab::view()): name, version, installed, kind (waiting, installing, slow, ready,
  * failed, dns), steps (label and status), position and total, step_label, url, secure, domain, domain_wanted,
- * domain_failed, licence (a paid app: state, tier, tiers to switch to), can_retry, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
+ * domain_failed, www (name, state, reason, ip of a bare domain's www name), licence (a paid app: state, tier, tiers to switch to), can_retry, can_reveal, getting_started, docs_url, newer, retired, support_url, resource_id.
  * The login is never part of this template: the button asks the server for it once.
  *
  * @package BeltoftServices
@@ -90,7 +90,18 @@ $beltoft_services_status_text = array(
 	<?php elseif ( 'dns' === $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more" data-app-own-domain>
 			<h4><?php esc_html_e( 'Point your domain at this server', 'beltoft-services' ); ?></h4>
-			<?php if ( '' !== $view['own']['ip'] ) : ?>
+			<?php if ( '' !== $view['own']['ip'] && '' !== $view['www']['name'] ) : ?>
+				<p data-app-own-www><?php
+				printf(
+					/* translators: 1: domain name, 2: www name, 3: server IPv4 address */
+					esc_html__( 'Point A records for %1$s and %2$s to %3$s.', 'beltoft-services' ),
+					'<strong>' . esc_html( (string) $view['own']['name'] ) . '</strong>',
+					'<strong>' . esc_html( (string) $view['www']['name'] ) . '</strong>',
+					'<strong>' . esc_html( (string) $view['own']['ip'] ) . '</strong>'
+				);
+				?></p>
+				<p class="description"><?php esc_html_e( 'The app goes live as soon as the first name points to this server. The www name is added when its record is there too, and it redirects to the first name.', 'beltoft-services' ); ?></p>
+			<?php elseif ( '' !== $view['own']['ip'] ) : ?>
 				<p><?php
 				printf(
 					/* translators: 1: domain name, 2: server IPv4 address */
@@ -184,7 +195,17 @@ $beltoft_services_status_text = array(
 	<?php if ( '' !== $view['own']['name'] && 'waiting' === $view['own']['state'] && 'dns' !== $beltoft_services_kind ) : ?>
 		<p class="description" data-app-own-domain-before>
 			<?php
-			if ( '' !== $view['own']['ip'] ) {
+			if ( '' !== $view['own']['ip'] && '' !== $view['www']['name'] ) {
+				echo esc_html(
+					sprintf(
+						/* translators: 1: domain name, 2: www name, 3: server IPv4 address */
+						__( 'Point A records for %1$s and %2$s to %3$s. We check them once the server is ready, and the app is installed with HTTPS when the first name points to the server. The www name is added when its record is there too.', 'beltoft-services' ),
+						(string) $view['own']['name'],
+						(string) $view['www']['name'],
+						(string) $view['own']['ip']
+					)
+				);
+			} elseif ( '' !== $view['own']['ip'] ) {
 				echo esc_html(
 					sprintf(
 						/* translators: 1: domain name, 2: server IPv4 address */
@@ -201,6 +222,45 @@ $beltoft_services_status_text = array(
 						(string) $view['own']['name']
 					)
 				);
+			}
+			?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( 'ready' === $beltoft_services_kind && '' !== $view['www']['name'] && in_array( $view['www']['state'], array( 'waiting', 'applying', 'live' ), true ) ) : ?>
+		<p class="description" data-app-www data-app-www-state="<?php echo esc_attr( (string) $view['www']['state'] ); ?>">
+			<?php
+			if ( 'live' === $view['www']['state'] ) {
+				echo esc_html( sprintf(
+					/* translators: 1: www name, 2: domain name */
+					__( '%1$s is served too and redirects to %2$s.', 'beltoft-services' ),
+					(string) $view['www']['name'],
+					(string) $view['domain']
+				) );
+			} elseif ( 'applying' === $view['www']['state'] ) {
+				echo esc_html( sprintf(
+					/* translators: %s: www name */
+					__( '%s: the A record was found, adding it to the server.', 'beltoft-services' ),
+					(string) $view['www']['name']
+				) );
+			} else {
+				echo esc_html( sprintf(
+					/* translators: %s: www name */
+					__( '%s: waiting for the A record', 'beltoft-services' ),
+					(string) $view['www']['name']
+				) );
+				if ( '' !== $view['www']['ip'] ) {
+					echo ' ' . esc_html( sprintf(
+						/* translators: %s: server IPv4 address */
+						__( 'Point an A record for it to %s and we add it within about ten minutes.', 'beltoft-services' ),
+						(string) $view['www']['ip']
+					) );
+				}
+				echo ' ' . esc_html( match ( (string) $view['www']['reason'] ) {
+					'other'  => __( 'It has an A record, but it does not point to this server only.', 'beltoft-services' ),
+					'aaaa'   => __( 'It also has an AAAA record, which this server cannot answer. Remove the AAAA record.', 'beltoft-services' ),
+					default  => '',
+				} );
 			}
 			?>
 		</p>
