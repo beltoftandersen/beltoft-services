@@ -191,10 +191,10 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<li><?php esc_html_e( 'Paste this address as the connector URL:', 'beltoft-services' ); ?>
 					<pre><code><?php echo esc_html( $mcp['url'] ); ?></code></pre>
 				</li>
-				<li><?php esc_html_e( 'Claude opens this site. Sign in if you are asked to, then choose what Claude may do: read only, or also run actions such as restart, snapshots and DNS changes.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Claude opens this site. Sign in if you are asked to, then choose what Claude may do: read only, also run actions such as restart, snapshots and DNS changes, or Full access.', 'beltoft-services' ); ?></li>
 				<li><?php esc_html_e( 'Ask Claude about your services, for example which of your servers is busiest.', 'beltoft-services' ); ?></li>
 			</ol>
-			<p><?php esc_html_e( 'Claude can read your servers, databases, domains and DNS, and with actions allowed restart or stop a server, take a snapshot and change DNS records. It never sees passwords. Restoring, reinstalling and deleting are only possible in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
+			<p><?php esc_html_e( 'Claude can read your servers, databases, domains and DNS, and with actions allowed restart or stop a server, take a snapshot and change DNS records. Only with Full access can it also restore, roll back, reinstall, delete or cancel, or show a password once, and then only after it has shown you what it is about to do and you have said yes in the chat. Domain transfers stay in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
 			<p><?php esc_html_e( 'A personal token from above also works with any tool that speaks MCP over HTTP: send it as HTTP Basic authentication to the same address.', 'beltoft-services' ); ?></p>
 		</details>
 	<?php endif; ?>

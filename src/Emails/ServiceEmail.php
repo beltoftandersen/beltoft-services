@@ -119,6 +119,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'quarantine_counts' => is_array( $data['quarantine_counts'] ?? null ) ? array_map( 'intval', $data['quarantine_counts'] ) : array(),
 				'quarantine_at' => isset( $data['quarantine_at'] ) ? wp_date( self::DATE_TIME, (int) $data['quarantine_at'] ) : '',
 				'notice_kind'   => in_array( $data['notice_kind'] ?? '', Notice::KINDS, true ) ? $data['notice_kind'] : 'db_access',
+				'notice_app'    => isset( $data['notice_app'] ) && is_string( $data['notice_app'] ) ? wp_strip_all_tags( $data['notice_app'] ) : '',
 				'app_domain'    => isset( $data['app_domain'] ) && is_string( $data['app_domain'] ) ? $data['app_domain'] : '',
 				'app_name'      => (string) ( \BeltoftServices\Proxmox\Apps::definition( (string) $r->get( 'app_id' ) )['name'] ?? '' ),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',

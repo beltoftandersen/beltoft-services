@@ -133,9 +133,12 @@ final class ServerToolsTest extends FirewallTestCase {
 			$args = array( 'id' => $r->id(), 'on' => true, 'rules' => $rules );
 			$low  = $this->tool( 'set_firewall', $args, $actions );
 			$this->assertStringContainsString( 'Full access', $this->text( $low ) );
-			$high = $this->tool( 'set_firewall', $args, $full );
-			$this->assertStringContainsString( 'confirmation', $this->text( $high ) );
+			$high = $this->json( $this->tool( 'set_firewall', $args, $full ) );
+			$this->assertTrue( $high['requires_confirmation'] );
+			$this->assertStringContainsString( 'many ports', $high['summary'] );
 		}
+
+		$this->assertFalse( Jobs::acting( $r->id() ), 'Only summaries so far.' );
 
 		// A wide range from named addresses, or 100 ports, is an ordinary rule.
 		$ok = $this->tool( 'set_firewall', array( 'id' => $r->id(), 'on' => true, 'rules' => array( array( 'proto' => 'tcp', 'from' => 22 ), array( 'proto' => 'tcp', 'from' => 1, 'to' => 65535, 'sources' => array( '203.0.113.0/24' ) ), array( 'proto' => 'tcp', 'from' => 3000, 'to' => 3099 ) ) ), $actions );
@@ -155,21 +158,33 @@ final class ServerToolsTest extends FirewallTestCase {
 		$this->assertCount( 2, Resource::find( $r->id() )->get( 'fw_rules' ) );
 	}
 
-	public function test_turning_the_firewall_off_needs_full_and_a_confirmation_that_does_not_exist_yet(): void {
+	public function test_turning_the_firewall_off_needs_full_and_the_customers_confirmation(): void {
 		list( $r, $actions, $full ) = $this->server_with_tokens();
 		$args   = array( 'id' => $r->id(), 'on' => false, 'rules' => array() );
-		$before = $this->history( $r );
 
 		$low = $this->tool( 'set_firewall', $args, $actions );
 		$this->assertTrue( $low['isError'] );
 		$this->assertStringContainsString( 'Full access', $this->text( $low ) );
-
-		$high = $this->tool( 'set_firewall', $args, $full );
-		$this->assertTrue( $high['isError'] );
-		$this->assertStringContainsString( 'confirmation', $this->text( $high ) );
-
 		$this->assertFalse( Jobs::acting( $r->id() ) );
-		$this->assertSame( $before, $this->history( $r ), 'A call that was stopped at the gate writes nothing.' );
+
+		// First call: a summary, nothing else.
+		$first = $this->json( $this->tool( 'set_firewall', $args, $full ) );
+		$this->assertTrue( $first['requires_confirmation'] );
+		$this->assertStringContainsString( 'off', $first['summary'] );
+		$this->assertFalse( Jobs::acting( $r->id() ) );
+		$this->assertNotContains( 'Claude: firewall change requested', $this->history( $r ) );
+
+		// Second call with the token: the dashboard's own "are you sure" is answered by the server.
+		$done = $this->tool( 'set_firewall', $args + array( 'confirm' => $first['confirm'] ), $full );
+		$this->assertFalse( $done['isError'], $this->text( $done ) );
+		$this->assertTrue( Jobs::acting( $r->id() ) );
+		$this->assertContains( 'Claude: firewall change requested', $this->history( $r ) );
+		$this->assertContains( 'Claude: set firewall confirmed by the customer', $this->history( $r ) );
+
+		// The same token does nothing a second time.
+		$again = $this->tool( 'set_firewall', $args + array( 'confirm' => $first['confirm'] ), $full );
+		$this->assertTrue( $again['isError'] );
+		$this->assertStringContainsString( 'used already', $this->text( $again ) );
 	}
 
 	public function test_usage_emails_console_link_status_and_recovery_points_of_a_server(): void {

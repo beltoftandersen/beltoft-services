@@ -77,22 +77,22 @@ $beltoft_services_kind = (string) $result['kind'];
 					<input type="radio" name="level" value="actions">
 					<span>
 						<strong><?php esc_html_e( 'Read and actions', 'beltoft-services' ); ?></strong>
-						<?php esc_html_e( 'Also everyday changes: restart, start and stop a server, rename it, take a snapshot, change its firewall and database access list, set or remove DNS records, change name servers, turn auto-renew on or off, and ask for a new database password. Restoring, reinstalling, deleting, buying and showing passwords need Full access.', 'beltoft-services' ); ?>
+						<?php esc_html_e( 'Also everyday changes: restart, start and stop a server, rename it, take a snapshot, change its firewall and database access list, set or remove DNS records, change name servers, turn auto-renew on or off, and ask for a new database password. Restoring, rolling back, reinstalling, deleting, cancelling, buying and showing passwords need Full access.', 'beltoft-services' ); ?>
 					</span>
 				</label>
 				<label class="beltoft-services-oauth__choice">
 					<input type="radio" name="level" value="full">
 					<span>
 						<strong><?php esc_html_e( 'Full access', 'beltoft-services' ); ?></strong>
-						<?php esc_html_e( 'Everything above, plus abilities that need your yes in the chat each time: buy and renew services with your saved card, cancel services, restore or reinstall servers, roll back or delete snapshots, delete data, and show you passwords once. None of these is available yet: today Full access can do the same as Read and actions. When they are added you connect again to use them. Domain transfers, and the transfer code of a domain, are never possible through an app: they stay in your dashboard.', 'beltoft-services' ); ?>
+						<?php esc_html_e( 'Everything above, plus abilities that need your yes in the chat each time, after the app has shown you what it is about to do: restore a server or database from a backup, roll a server back to a snapshot, delete a snapshot, reinstall a server, replace its SSH key or reset its password, restart its firewall from the defaults, cancel a subscription, remove an add-on, make another saved card your default, turn a firewall off, open a database to everyone, move a domain to other name servers, change what a Valkey database does when its memory is full, and show you a server, database or app password once (it is then in your conversation with the app, and we send you an e-mail about it). Buying and renewing services are not part of this yet. Domain transfers, the transfer code of a domain and the console are never possible through an app: they stay in your dashboard.', 'beltoft-services' ); ?>
 					</span>
 				</label>
 				<label class="beltoft-services-oauth__choice beltoft-services-oauth__understand">
 					<input type="checkbox" name="understand_full" value="1">
-					<span><?php esc_html_e( 'For Full access: I understand that the app can spend money and delete data once I agree in the chat.', 'beltoft-services' ); ?></span>
+					<span><?php esc_html_e( 'For Full access: I understand that the app can delete data and show passwords once I agree in the chat.', 'beltoft-services' ); ?></span>
 				</label>
 			</fieldset>
-			<p class="beltoft-services-oauth__secret"><?php esc_html_e( 'Your account password is never shared. Without Full access the app sees no password or other secret at all.', 'beltoft-services' ); ?></p>
+			<p class="beltoft-services-oauth__secret"><?php esc_html_e( 'Your account password is never shared. Only with Full access can the app show you a server, database or app password, once, after your yes in the chat.', 'beltoft-services' ); ?></p>
 			<p class="beltoft-services-oauth__buttons">
 				<button type="submit" name="decision" value="approve" class="button beltoft-services-oauth__allow"><?php esc_html_e( 'Allow', 'beltoft-services' ); ?></button>
 				<button type="submit" name="decision" value="deny" class="button beltoft-services-oauth__cancel"><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>

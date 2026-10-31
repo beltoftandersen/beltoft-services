@@ -540,10 +540,13 @@ final class OauthTest extends TestCase {
 		$this->assertStringContainsString( '<strong>Full access</strong>', $html );
 		$this->assertStringContainsString( 'name="understand_full"', $html );
 		$this->assertStringContainsString( 'never possible through an app', $html );
-		$this->assertStringContainsString( 'buy and renew services', $html );
-		$this->assertStringContainsString( 'show you passwords once', $html );
-		$this->assertStringContainsString( 'None of these is available yet: today Full access can do the same as Read and actions', $html );
-		$this->assertStringContainsString( 'you connect again to use them', $html );
+		$this->assertStringContainsString( 'restore a server or database from a backup', $html );
+		$this->assertStringContainsString( 'reinstall a server', $html );
+		$this->assertStringContainsString( 'cancel a subscription', $html );
+		$this->assertStringContainsString( 'show you a server, database or app password once', $html );
+		$this->assertStringContainsString( 'Buying and renewing services are not part of this yet', $html );
+		$this->assertStringContainsString( 'the transfer code of a domain and the console are never possible through an app', $html );
+		$this->assertStringNotContainsString( 'None of these is available yet', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( '<strong>Read only</strong>', $html );
 		$this->assertStringContainsString( '<strong>Read and actions</strong>', $html );

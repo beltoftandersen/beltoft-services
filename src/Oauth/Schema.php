@@ -1,6 +1,6 @@
 <?php
 /**
- * The OAuth server's two tables: registered clients and grants (codes, access tokens, refresh tokens).
+ * The OAuth server's tables: registered clients, grants (codes, access tokens, refresh tokens) and the confirmations of the MCP tools.
  *
  * @package BeltoftServices
  */
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION        = '1';
+	public const DB_VERSION        = '2';
 	public const OPTION_DB_VERSION = 'beltoft_services_oauth_db_version';
 
 	/**
@@ -30,6 +30,7 @@ final class Schema {
 		return array(
 			'clients' => $wpdb->prefix . 'beltoft_services_oauth_clients',
 			'grants'  => $wpdb->prefix . 'beltoft_services_oauth_grants',
+			'confirms' => $wpdb->prefix . 'beltoft_services_mcp_confirms',
 		);
 	}
 
@@ -95,6 +96,26 @@ final class Schema {
 			) $collate;"
 		);
 
+		// One row per confirmation token the MCP tools hand out (see Mcp\Confirmations): only the hash of the token is kept.
+		dbDelta(
+			"CREATE TABLE {$t['confirms']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				token_hash char(64) CHARACTER SET ascii NOT NULL,
+				user_id bigint(20) unsigned NOT NULL,
+				grant_id varchar(64) CHARACTER SET ascii NOT NULL,
+				tool varchar(40) CHARACTER SET ascii NOT NULL,
+				args_hash char(64) CHARACTER SET ascii NOT NULL,
+				state_hash char(64) CHARACTER SET ascii NOT NULL,
+				created_at int(10) unsigned NOT NULL,
+				expires_at int(10) unsigned NOT NULL,
+				used_at int(10) unsigned NULL DEFAULT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY token_hash (token_hash),
+				KEY user_open (user_id,used_at,expires_at),
+				KEY expires_at (expires_at)
+			) $collate;"
+		);
+
 		$wpdb->suppress_errors( $quiet );
 
 		$exists = static function ( string $table ) use ( $wpdb ): bool {
@@ -102,7 +123,7 @@ final class Schema {
 			return $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 		};
 
-		if ( $exists( $t['clients'] ) && $exists( $t['grants'] ) ) {
+		if ( $exists( $t['clients'] ) && $exists( $t['grants'] ) && $exists( $t['confirms'] ) ) {
 			update_option( self::OPTION_DB_VERSION, self::DB_VERSION );
 		}
 	}

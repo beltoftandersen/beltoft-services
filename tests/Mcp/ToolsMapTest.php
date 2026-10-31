@@ -11,6 +11,7 @@ namespace BeltoftServices\Tests\Mcp;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\ActionMap;
 use BeltoftServices\Mcp\Definitions;
+use BeltoftServices\Mcp\Secrets;
 use BeltoftServices\Mcp\Tools;
 
 require_once __DIR__ . '/McpTestCase.php';
@@ -100,10 +101,21 @@ final class ToolsMapTest extends McpTestCase {
 	}
 
 	public function test_no_tool_reaches_a_transfer_a_transfer_code_or_a_secret_route(): void {
-		$bad_tool = '/transfer|authcode|auth_code|epp|unlock|reveal|ticket|password_reveal/';
+		$bad_tool = '/transfer|authcode|auth_code|epp|unlock|ticket|password_reveal/';
 
 		foreach ( array_keys( Tools::definitions() ) as $name ) {
 			$this->assertSame( 0, preg_match( $bad_tool, $name ), $name );
+		}
+
+		// The only tools that show a secret are the four of Secrets, and they are Full access with a confirmation.
+		foreach ( Tools::definitions() as $name => $tool ) {
+			if ( in_array( $name, Secrets::NAMES, true ) ) {
+				$this->assertSame( Tokens::FULL, $tool['level'], $name );
+				$this->assertTrue( $tool['confirm'], $name );
+			} else {
+				$this->assertStringNotContainsString( 'reveal', $name );
+				$this->assertSame( 0, preg_match( '/transfer code|auth ?code|epp code/i', (string) wp_json_encode( $tool ) ), $name . ' mentions a transfer code.' );
+			}
 		}
 
 		$this->assertArrayNotHasKey( 'unlock', ActionMap::ACTIONS );
@@ -135,15 +147,35 @@ final class ToolsMapTest extends McpTestCase {
 		$this->assertNotEmpty( $permitted );
 
 		foreach ( array_keys( $permitted ) as $call ) {
-			foreach ( array( 'domain-authcode', 'db-reveal', 'app-reveal', 'console', 'db-ca', 'domains/cart', '/open', 'unlock', 'reset_password' ) as $word ) {
+			foreach ( array( 'domain-authcode', 'console', 'domains/cart', '/open', 'unlock' ) as $word ) {
 				$this->assertStringNotContainsString( $word, $call, 'A tool may call ' . $call );
 			}
 		}
 
-		// The generic action route is open to a tool only for its own actions.
-		foreach ( array( 'unlock', 'reset_password', 'restore', 'reinstall', 'snapshot_delete', 'snapshot_rollback', 'replace_ssh_key', 'fw_reset', 'domain-authcode' ) as $action ) {
+		// A secret route is open only to the tool that is named for it.
+		$secret_routes = array(
+			'reveal_server_password'      => array( 'POST', '/resources/1/reveal' ),
+			'reveal_database_password'    => array( 'POST', '/resources/1/db-reveal' ),
+			'reveal_app_login'            => array( 'POST', '/resources/1/app-reveal' ),
+			'get_database_ca_certificate' => array( 'GET', '/resources/1/db-ca' ),
+		);
+
+		foreach ( $secret_routes as $owner => $route ) {
+			foreach ( array_keys( Tools::definitions() ) as $tool ) {
+				$this->assertSame( $tool === $owner, ActionMap::permits( $tool, $route[0], $route[1] ), $tool . ' and ' . $route[1] );
+			}
+		}
+
+		// The generic action route is open to a tool only for its own actions, and never for these.
+		foreach ( array( 'unlock', 'domain-authcode', 'transfer', 'authcode' ) as $action ) {
 			foreach ( array_keys( Tools::definitions() ) as $tool ) {
 				$this->assertFalse( ActionMap::permits( $tool, 'POST', '/resources/1/actions/' . $action ), $tool . ' may post ' . $action );
+			}
+		}
+
+		foreach ( ActionMap::ACTIONS as $action => $owner ) {
+			foreach ( array_keys( Tools::definitions() ) as $tool ) {
+				$this->assertSame( $tool === $owner, ActionMap::permits( $tool, 'POST', '/resources/1/actions/' . $action ), $tool . ' and ' . $action );
 			}
 		}
 
@@ -207,18 +239,80 @@ final class ToolsMapTest extends McpTestCase {
 		}
 	}
 
-	public function test_levels_decide_what_is_listed_and_full_adds_nothing_yet(): void {
+	public function test_levels_decide_what_is_listed_and_full_adds_the_confirmed_tools(): void {
 		$read    = array_column( Tools::listing( Tokens::READ ), 'name' );
 		$actions = array_column( Tools::listing( Tokens::ACTIONS ), 'name' );
 		$full    = array_column( Tools::listing( Tokens::FULL ), 'name' );
 
 		$this->assertNotEmpty( $read );
 		$this->assertGreaterThan( count( $read ), count( $actions ) );
-		$this->assertSame( $actions, $full, 'Phase A: Full is stored and honoured but has no tools of its own yet.' );
+		$this->assertGreaterThan( count( $actions ), count( $full ) );
+		$this->assertSame( $actions, array_slice( $full, 0, count( $actions ) ), 'Full adds to the end of the list and removes nothing.' );
 		$this->assertSame( $read, array_column( Tools::listing( 'junk' ), 'name' ), 'An unknown level is read.' );
 		$this->assertSame( $read, array_column( Tools::listing( '' ), 'name' ) );
+
+		// What Full adds is exactly the tools that always need a confirmation: nothing at Full can run without one.
+		$added = array_diff( $full, $actions );
+
+		foreach ( $added as $name ) {
+			$this->assertTrue( Tools::definitions()[ $name ]['confirm'], $name . ' is Full access and needs a confirmation.' );
+		}
+
+		foreach ( $actions as $name ) {
+			$this->assertFalse( Tools::definitions()[ $name ]['confirm'], $name );
+		}
+
 		$this->assertSame( Tokens::FULL, Tools::required_level( 'set_firewall', array( 'id' => 1, 'on' => false, 'rules' => array() ) ) );
 		$this->assertSame( Tokens::ACTIONS, Tools::required_level( 'set_firewall', array( 'id' => 1, 'on' => true, 'rules' => array() ) ) );
+		$this->assertSame( Tokens::FULL, Tools::required_level( 'set_database_access', array( 'id' => 1, 'op' => 'world_on' ) ) );
+		$this->assertSame( Tokens::ACTIONS, Tools::required_level( 'set_database_access', array( 'id' => 1, 'op' => 'add' ) ) );
 		$this->assertSame( Tokens::FULL, Tools::required_level( 'no_such_tool', array() ), 'An unknown tool needs the highest level.' );
+		$this->assertTrue( Tools::confirmation_needed( 'domain_settings', array( 'id' => 1, 'action' => 'set_nameservers', 'mode' => 'custom' ) ) );
+		$this->assertFalse( Tools::confirmation_needed( 'domain_settings', array( 'id' => 1, 'action' => 'set_nameservers', 'mode' => 'ours' ) ) );
+	}
+
+	public function test_every_irreversible_and_secret_capability_has_a_tool_or_a_reason(): void {
+		$tools = array_keys( Tools::definitions() );
+
+		// The capabilities of the dashboard that destroy something, show a secret or change where money goes (plan 1.3 and 1.4).
+		$known = array(
+			'cancel_subscription', 'remove_extra_disk', 'remove_snapshot_slots', 'remove_app_licence', 'remove_backups_addon', 'remove_public_ip_addon', 'stop_dns_hosting', 'cancel_domain_registration',
+			'firewall_off', 'firewall_wide_open', 'custom_nameservers', 'database_open_to_everyone',
+			'set_default_card', 'set_subscription_payment_method', 'delete_saved_card', 'add_card',
+			'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'database_ca_certificate',
+			'domain_transfer_code', 'domain_unlock', 'console_ticket', 'account_password_and_email', 'connected_apps_and_limits',
+		);
+
+		foreach ( $known as $capability ) {
+			$tool   = ActionMap::CAPABILITIES[ $capability ] ?? null;
+			$reason = ActionMap::CAPABILITIES_EXCLUDED[ $capability ] ?? null;
+
+			$this->assertTrue( null !== $tool || null !== $reason, $capability . ' has no tool in ActionMap::CAPABILITIES and no reason in ActionMap::CAPABILITIES_EXCLUDED.' );
+			$this->assertFalse( null !== $tool && null !== $reason, $capability . ' is both mapped and excluded.' );
+
+			if ( null !== $tool ) {
+				$this->assertContains( $tool, $tools, $capability );
+			}
+		}
+
+		foreach ( array_merge( array_keys( ActionMap::CAPABILITIES ), array_keys( ActionMap::CAPABILITIES_EXCLUDED ) ) as $capability ) {
+			$this->assertContains( $capability, $known, $capability . ' is in ActionMap but not in the list of known capabilities of this test.' );
+		}
+
+		// Every tool of Full access is the answer to an action or a capability, or an escalation of an everyday tool: none is orphaned.
+		$mapped = array_merge( array_values( ActionMap::ACTIONS ), array_values( ActionMap::CAPABILITIES ) );
+
+		foreach ( Tools::definitions() as $name => $tool ) {
+			if ( Tokens::FULL === $tool['level'] ) {
+				$this->assertContains( $name, $mapped, $name . ' is Full access but belongs to no action or capability.' );
+			}
+		}
+
+		// "never" stays never: the transfer and the console have a reason that says so, and no tool.
+		foreach ( array( 'domain_transfer_code', 'domain_unlock', 'console_ticket' ) as $capability ) {
+			$this->assertStringStartsWith( 'never', ActionMap::CAPABILITIES_EXCLUDED[ $capability ] );
+		}
+
+		$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED['unlock'] );
 	}
 }

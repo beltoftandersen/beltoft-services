@@ -45,7 +45,7 @@ final class Tokens {
 	 * The version of what Full access means: bump it when the set of tools only Full may call changes. A grant made
 	 * under an older version works as actions until the customer connects again (see Oauth\Grants).
 	 */
-	public const FULL_CONSENT = 1;
+	public const FULL_CONSENT = 2;
 
 	/**
 	 * User meta: uuid => scope.

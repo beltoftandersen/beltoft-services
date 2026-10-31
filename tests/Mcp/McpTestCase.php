@@ -65,6 +65,13 @@ abstract class McpTestCase extends TestCase {
 		return Resource::create( $row, $driver, array(), array( 'state' => 'ready' ) );
 	}
 
+	/**
+	 * Gives a service's license an e-mail address (the customer's own; a test never mails a made-up one).
+	 */
+	protected function email_to( Resource $r, string $email = 'christian.beltoft@gmail.com' ): void {
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'email' => $email ) );
+	}
+
 	protected function owner( Resource $r ): int {
 		return (int) Resource::find( $r->id() )->license()['user_id'];
 	}

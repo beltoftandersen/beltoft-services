@@ -13,10 +13,10 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 }
 ?>
 </p>
-<?php foreach ( \BeltoftServices\Emails\Notice::lines( (string) $notice_kind, (string) $product_name ) as $beltoft_services_line ) : ?>
+<?php foreach ( \BeltoftServices\Emails\Notice::lines( (string) $notice_kind, (string) $product_name, (string) ( $notice_app ?? '' ) ) as $beltoft_services_line ) : ?>
 <p><?php echo esc_html( $beltoft_services_line ); ?></p>
 <?php endforeach; ?>
-<p><a href="<?php echo esc_url( $account_url ); ?>"><?php echo esc_html( in_array( $notice_kind, array( 'db_access', 'db_world' ), true ) ? __( 'View your database in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' ) ); ?></a></p>
+<p><a href="<?php echo esc_url( $account_url ); ?>"><?php echo esc_html( \BeltoftServices\Emails\Notice::is_database( (string) $notice_kind ) ? __( 'View your database in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' ) ); ?></a></p>
 <?php
 if ( $additional_content ) { echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) ); }
 do_action( 'woocommerce_email_footer', $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce email hook.

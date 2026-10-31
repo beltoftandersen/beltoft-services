@@ -15,6 +15,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Account\DomainDanger;
+use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Resource;
 
@@ -50,6 +51,11 @@ final class Acts {
 				$id   = (int) $args['id'];
 				$body = array( 'on' => (bool) $args['on'], 'rules' => $args['rules'] );
 
+				// Turning it off is a call that went through the confirmation (Tools::call): the dashboard's own "are you sure" is answered.
+				if ( ! $body['on'] ) {
+					$body['confirm_off'] = true;
+				}
+
 				$done = Tools::route( 'PUT', '/resources/' . $id . '/firewall', array(), $body, $id, 'firewall change requested' );
 
 				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_firewall to follow it.' );
@@ -57,6 +63,11 @@ final class Acts {
 			case 'set_database_access':
 				$id   = (int) $args['id'];
 				$body = array( 'op' => (string) $args['op'] );
+
+				// Opening to everyone went through the confirmation: the dashboard's typed phrase is supplied by the server.
+				if ( 'world_on' === $body['op'] ) {
+					$body['confirm'] = DbAccess::CONFIRM_WORLD;
+				}
 
 				foreach ( array( 'address' => 'cidr', 'label' => 'label' ) as $from => $to ) {
 					if ( isset( $args[ $from ] ) ) {
@@ -140,7 +151,7 @@ final class Acts {
 	 * @param int $id      Subscription id.
 	 * @return \WC_Subscription|\WP_Error
 	 */
-	private static function subscription( int $user_id, int $id ) {
+	public static function subscription( int $user_id, int $id ) {
 		$s = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : null;
 
 		if ( ! $s instanceof \WC_Subscription || $user_id <= 0 || (int) $s->get_user_id() !== $user_id ) {
@@ -156,7 +167,7 @@ final class Acts {
 	 * @param \WC_Subscription $s    Subscription.
 	 * @param string           $text What happened, after "Claude: ".
 	 */
-	private static function log_subscription( \WC_Subscription $s, string $text ): void {
+	public static function log_subscription( \WC_Subscription $s, string $text ): void {
 		$s->add_order_note( 'Claude: ' . $text );
 
 		foreach ( Licenses::where( 'subscription_id', $s->get_id() ) as $license ) {
@@ -373,7 +384,7 @@ final class Acts {
 	/**
 	 * The name of the app that is making this request (from its grant), or ''.
 	 */
-	private static function app_name(): string {
+	public static function app_name(): string {
 		$current = \BeltoftServices\Api\Tokens::current();
 		$client  = is_array( $current ) ? (string) ( $current['client'] ?? '' ) : '';
 		$found   = '' !== $client ? \BeltoftServices\Oauth\Clients::find( $client ) : null;

@@ -5,12 +5,12 @@ namespace BeltoftServices\Emails;
 defined( 'ABSPATH' ) || exit;
 
 final class Notice extends ServiceEmail {
-	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed' );
+	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app' );
 
 	public function __construct() {
 		$this->id = 'beltoft_services_notice';
 		$this->title = __( 'Service notice', 'beltoft-services' );
-		$this->description = __( 'Sent when the access list of a database changes, or when a restore of a server from a backup or a rollback to a snapshot did not finish.', 'beltoft-services' );
+		$this->description = __( 'Sent when the access list of a database changes, when a connected app showed a password, or when a restore of a server from a backup or a rollback to a snapshot did not finish.', 'beltoft-services' );
 		$this->template_html = 'emails/beltoft-services-notice.php';
 		$this->template_plain = 'emails/plain/beltoft-services-notice.php';
 		parent::__construct();
@@ -24,6 +24,9 @@ final class Notice extends ServiceEmail {
 	 */
 	public static function titles( string $kind ): array {
 		$titles = array(
+			'reveal_server'   => array( __( 'A connected app showed your server password', 'beltoft-services' ), __( 'A connected app showed your server password', 'beltoft-services' ) ),
+			'reveal_database' => array( __( 'A connected app showed your database password', 'beltoft-services' ), __( 'A connected app showed your database password', 'beltoft-services' ) ),
+			'reveal_app'      => array( __( 'A connected app showed your app login', 'beltoft-services' ), __( 'A connected app showed your app login', 'beltoft-services' ) ),
 			'db_access'       => array( __( 'The access list of your database changed', 'beltoft-services' ), __( 'Database access list changed', 'beltoft-services' ) ),
 			'db_world'        => array( __( 'Your database is open to everyone', 'beltoft-services' ), __( 'Your database is open to everyone', 'beltoft-services' ) ),
 			'restore_failed'  => array( __( 'Your server restore did not finish', 'beltoft-services' ), __( 'Your server restore did not finish', 'beltoft-services' ) ),
@@ -52,14 +55,47 @@ final class Notice extends ServiceEmail {
 	public function get_default_heading() { return self::titles( (string) ( $this->values['notice_kind'] ?? '' ) )[1]; }
 
 	/**
+	 * Is the notice about a database (else about a server)?
+	 *
+	 * @param string $kind One of KINDS.
+	 */
+	public static function is_database( string $kind ): bool {
+		return in_array( $kind, array( 'db_access', 'db_world', 'reveal_database' ), true );
+	}
+
+	/**
 	 * The paragraphs of a kind.
 	 *
 	 * @param string $kind Kind.
 	 * @param string $name What the customer calls the service.
+	 * @param string $app  The connected app that did it, when the kind is about one.
 	 * @return string[]
 	 */
-	public static function lines( string $kind, string $name ): array {
+	public static function lines( string $kind, string $name, string $app = '' ): array {
 		switch ( $kind ) {
+			case 'reveal_server':
+			case 'reveal_database':
+			case 'reveal_app':
+				$what = array(
+					/* translators: %s: server name. */
+					'reveal_server'   => __( 'the password of your server %s', 'beltoft-services' ),
+					/* translators: %s: database name. */
+					'reveal_database' => __( 'the password of your database %s', 'beltoft-services' ),
+					/* translators: %s: server name. */
+					'reveal_app'      => __( 'the first login of the app on your server %s', 'beltoft-services' ),
+				)[ $kind ];
+				$what = sprintf( $what, $name );
+
+				return array(
+					'' !== $app
+						/* translators: 1: name of the connected app, 2: what it showed, for example the password of your server web. */
+						? sprintf( __( 'An app you connected to your account (%1$s) showed %2$s, at your request. It is now in your conversation with the app.', 'beltoft-services' ), $app, $what )
+						/* translators: %s: what it showed, for example the password of your server web. */
+						: sprintf( __( 'An app you connected to your account showed %s, at your request. It is now in your conversation with the app.', 'beltoft-services' ), $what ),
+					'reveal_database' === $kind
+						? __( 'If this was not you, disconnect the app under Account details, Security, change your account password, and make a new database password in your account. You can also change the password whenever you like.', 'beltoft-services' )
+						: __( 'If this was not you, disconnect the app under Account details, Security, change your account password, and make a new password for the service in your account. You can also change the password whenever you like.', 'beltoft-services' ),
+				);
 			case 'db_world':
 				return array(
 					/* translators: %s: database name. */
