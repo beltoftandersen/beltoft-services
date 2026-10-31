@@ -175,6 +175,7 @@ final class Reference {
 			'servers'   => array( __( 'Servers', 'beltoft-services' ), __( 'Usage figures and the firewall of your servers.', 'beltoft-services' ) ),
 			'databases' => array( __( 'Databases', 'beltoft-services' ), __( 'Which addresses may connect to a database.', 'beltoft-services' ) ),
 			'dns'       => array( __( 'DNS', 'beltoft-services' ), __( 'Read and change the records of the domains and DNS services we host.', 'beltoft-services' ) ),
+			'email'     => array( __( 'Email', 'beltoft-services' ), __( 'Read an email domain, make mailboxes and aliases, and check its DNS records. Deleting a mailbox and everything to do with its secret are only possible in the dashboard, or through Claude with Full access.', 'beltoft-services' ) ),
 			'domains'   => array( __( 'Domains', 'beltoft-services' ), __( 'Check whether a domain name is available.', 'beltoft-services' ) ),
 			'usage'     => array( __( 'Usage', 'beltoft-services' ), __( 'Current use of CPU, memory and disk, and usage alerts.', 'beltoft-services' ) ),
 			'reference' => array( __( 'API document', 'beltoft-services' ), __( 'The machine readable description of this API.', 'beltoft-services' ) ),
@@ -197,6 +198,7 @@ final class Reference {
 				'firewall'     => 'servers',
 				'db-access'    => 'databases',
 				'usage-alerts' => 'usage',
+				'mail'         => 'email',
 			);
 
 			return $sub[ (string) ( $segs[2] ?? '' ) ] ?? 'services';

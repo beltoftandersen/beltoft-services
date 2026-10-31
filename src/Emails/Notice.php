@@ -5,13 +5,13 @@ namespace BeltoftServices\Emails;
 defined( 'ABSPATH' ) || exit;
 
 final class Notice extends ServiceEmail {
-	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app', 'app_action' );
+	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app', 'reveal_mailbox', 'app_action' );
 
 	/**
 	 * Kinds that are about what a connected app did: sent whatever the shop's switch for this e-mail says, because they are the
 	 * customer's way to learn that something was done in their name.
 	 */
-	public const ALWAYS = array( 'reveal_server', 'reveal_database', 'reveal_app', 'app_action' );
+	public const ALWAYS = array( 'reveal_server', 'reveal_database', 'reveal_app', 'reveal_mailbox', 'app_action' );
 
 	/**
 	 * Is it sent? The kinds about a connected app are, always.
@@ -41,6 +41,7 @@ final class Notice extends ServiceEmail {
 			'reveal_server'   => array( __( 'A connected app showed your server password', 'beltoft-services' ), __( 'A connected app showed your server password', 'beltoft-services' ) ),
 			'reveal_database' => array( __( 'A connected app showed your database password', 'beltoft-services' ), __( 'A connected app showed your database password', 'beltoft-services' ) ),
 			'reveal_app'      => array( __( 'A connected app showed your app login', 'beltoft-services' ), __( 'A connected app showed your app login', 'beltoft-services' ) ),
+			'reveal_mailbox'  => array( __( 'A connected app showed a mailbox password', 'beltoft-services' ), __( 'A connected app showed a mailbox password', 'beltoft-services' ) ),
 			'db_access'       => array( __( 'The access list of your database changed', 'beltoft-services' ), __( 'Database access list changed', 'beltoft-services' ) ),
 			'db_world'        => array( __( 'Your database is open to everyone', 'beltoft-services' ), __( 'Your database is open to everyone', 'beltoft-services' ) ),
 			'restore_failed'  => array( __( 'Your server restore did not finish', 'beltoft-services' ), __( 'Your server restore did not finish', 'beltoft-services' ) ),
@@ -87,6 +88,10 @@ final class Notice extends ServiceEmail {
 			return __( 'View your services in your account', 'beltoft-services' );
 		}
 
+		if ( 'reveal_mailbox' === $kind ) {
+			return __( 'View your email in your account', 'beltoft-services' );
+		}
+
 		return self::is_database( $kind ) ? __( 'View your database in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' );
 	}
 
@@ -113,6 +118,7 @@ final class Notice extends ServiceEmail {
 			case 'reveal_server':
 			case 'reveal_database':
 			case 'reveal_app':
+			case 'reveal_mailbox':
 				$what = array(
 					/* translators: %s: server name. */
 					'reveal_server'   => __( 'the password of your server %s', 'beltoft-services' ),
@@ -120,6 +126,8 @@ final class Notice extends ServiceEmail {
 					'reveal_database' => __( 'the password of your database %s', 'beltoft-services' ),
 					/* translators: %s: server name. */
 					'reveal_app'      => __( 'the first login of the app on your server %s', 'beltoft-services' ),
+					/* translators: %s: email domain. */
+					'reveal_mailbox'  => __( 'the password of a mailbox of your email domain %s', 'beltoft-services' ),
 				)[ $kind ];
 				$what = sprintf( $what, $name );
 
@@ -131,7 +139,9 @@ final class Notice extends ServiceEmail {
 						: sprintf( __( 'An app you connected to your account showed %s, at your request. It is now in your conversation with the app.', 'beltoft-services' ), $what ),
 					'reveal_database' === $kind
 						? __( 'If this was not you, disconnect the app under Account details, Security, change your account password, and make a new database password in your account. You can also change the password whenever you like.', 'beltoft-services' )
-						: __( 'If this was not you, disconnect the app under Account details, Security, change your account password, and make a new password for the service in your account. You can also change the password whenever you like.', 'beltoft-services' ),
+						: ( 'reveal_mailbox' === $kind
+							? __( 'If this was not you, disconnect the app under Account details, Security, change your account password, and make a new password for the mailbox in your account.', 'beltoft-services' )
+							: __( 'If this was not you, disconnect the app under Account details, Security, change your account password, and make a new password for the service in your account. You can also change the password whenever you like.', 'beltoft-services' ) ),
 				);
 			case 'db_world':
 				return array(

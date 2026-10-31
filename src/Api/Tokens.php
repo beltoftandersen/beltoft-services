@@ -63,9 +63,12 @@ final class Tokens {
 	public const RATE_LIMIT = 60;
 
 	/**
-	 * Customer routes a token may reach (after the namespace).
+	 * Customer routes a token may reach (after the namespace). Email: the overview, making a mailbox, making and deleting an
+	 * alias and the DNS check. Deleting a mailbox, a new mailbox password and showing a password (mail/mailboxes/<address>,
+	 * .../password, mail-reveal) are left out on purpose: only the MCP tools do these, with Full access and the customer's
+	 * confirmation.
 	 */
-	private const ALLOWED = '#^/beltoft-services/v1/(resources(/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+))?)?|usage|domains/check|openapi\.json)$#D';
+	private const ALLOWED = '#^/beltoft-services/v1/(resources(/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+|mail(/(mailboxes|aliases(/[^/]+)?|dns/check))?))?)?|usage|domains/check|openapi\.json)$#D';
 
 	/**
 	 * Actions a token can never run.

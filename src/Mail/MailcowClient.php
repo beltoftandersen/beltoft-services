@@ -144,4 +144,14 @@ interface MailcowClient {
 	 * @return array<int, mixed>|\WP_Error
 	 */
 	public function delete_alias( int $id );
+
+	/**
+	 * POST edit/rl-domain: the sending limit of a whole domain.
+	 *
+	 * @param string $domain Domain.
+	 * @param int    $value  Messages per frame.
+	 * @param string $frame  s, m, h or d.
+	 * @return array<int, mixed>|\WP_Error
+	 */
+	public function set_domain_rate_limit( string $domain, int $value, string $frame );
 }

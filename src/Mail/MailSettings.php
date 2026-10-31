@@ -132,8 +132,8 @@ final class MailSettings {
 			'default' => 30,
 			'min'     => 0,
 			'max'     => 100000,
-			'label'   => __( 'Messages per mailbox per minute', 'beltoft-services' ),
-			'desc'    => __( 'Mailcow keeps one limit and one time frame per mailbox: the stricter of this and the daily limit, measured per day, is the one set. 0 turns this one off.', 'beltoft-services' ),
+			'label'   => __( 'Messages per domain per minute', 'beltoft-services' ),
+			'desc'    => __( 'The limit for all mailboxes of one email domain together, set on the mail server when the domain is made and when its plan changes. 0 turns it off.', 'beltoft-services' ),
 		);
 		$fields['mail_rl_day'] = $limits + array(
 			'type'    => 'number',
@@ -141,7 +141,7 @@ final class MailSettings {
 			'min'     => 0,
 			'max'     => 1000000,
 			'label'   => __( 'Messages per mailbox per day', 'beltoft-services' ),
-			'desc'    => __( '0 turns it off. With both at 0 a new mailbox gets no limit of its own.', 'beltoft-services' ),
+			'desc'    => __( 'The limit of each mailbox, set when the mailbox is made. 0 turns it off. The mail server blocks sending at the limit; nothing is paused by this plugin.', 'beltoft-services' ),
 		);
 		$fields['mail_quota_alert_percent'] = $limits + array(
 			'type'    => 'number',
@@ -227,27 +227,24 @@ final class MailSettings {
 	}
 
 	/**
-	 * The one mailbox rate limit to send to mailcow: [ value, frame ], or null for none. Mailcow takes a single value
-	 * and frame, so the setting that allows fewer messages per day wins.
+	 * The sending limit of every mailbox: [ value, 'd' ] (messages per day), or null for none.
 	 *
 	 * @return array{0:int,1:string}|null
 	 */
 	public static function rate_limit(): ?array {
-		$per_day = array();
+		$day = (int) Settings::get( 'mail_rl_day' );
 
-		foreach ( array( array( (int) Settings::get( 'mail_rl_minute' ), 'm', 1440 ), array( (int) Settings::get( 'mail_rl_day' ), 'd', 1 ) ) as $row ) {
-			if ( $row[0] > 0 ) {
-				$per_day[ $row[1] ] = array( $row[0], $row[0] * $row[2] );
-			}
-		}
+		return $day > 0 ? array( $day, 'd' ) : null;
+	}
 
-		if ( array() === $per_day ) {
-			return null;
-		}
+	/**
+	 * The sending limit of a whole domain: [ value, 'm' ] (messages per minute), or null for none.
+	 *
+	 * @return array{0:int,1:string}|null
+	 */
+	public static function domain_rate_limit(): ?array {
+		$minute = (int) Settings::get( 'mail_rl_minute' );
 
-		uasort( $per_day, static fn( $a, $b ) => $a[1] <=> $b[1] );
-		$frame = (string) array_key_first( $per_day );
-
-		return array( $per_day[ $frame ][0], $frame );
+		return $minute > 0 ? array( $minute, 'm' ) : null;
 	}
 }

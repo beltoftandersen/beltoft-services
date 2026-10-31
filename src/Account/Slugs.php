@@ -155,6 +155,14 @@ final class Slugs {
 	 * @param string               $type     Type of service.
 	 */
 	public static function name_of( Resource $resource, array $license, string $type ): string {
+		if ( 'email' === $type ) {
+			$domain = strtolower( trim( (string) $resource->get( 'mail_domain' ) ) );
+
+			if ( '' !== $domain ) {
+				return $domain;
+			}
+		}
+
 		if ( 'domains' === $type ) {
 			$domain = strtolower( trim( (string) $resource->get( 'domain' ) ) );
 
@@ -180,7 +188,7 @@ final class Slugs {
 	public static function slugify( string $name, string $type ): string {
 		$name = strtolower( trim( $name ) );
 
-		if ( 'domains' === $type && 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/D', $name ) ) {
+		if ( in_array( $type, array( 'domains', 'email' ), true ) && 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/D', $name ) ) {
 			return substr( $name, 0, self::MAX );
 		}
 
@@ -208,6 +216,7 @@ final class Slugs {
 			'domains'   => 'domain',
 			'databases' => 'database',
 			'apps'      => 'app',
+			'email'     => 'email',
 		);
 
 		return $words[ $type ] ?? 'service';
@@ -465,7 +474,7 @@ final class Slugs {
 	public static function migrate(): int {
 		$made = 0;
 
-		foreach ( array( 'vm', 'domain', 'dns', 'db', 'http' ) as $kind ) {
+		foreach ( array( 'vm', 'domain', 'dns', 'db', 'http', 'mail' ) as $kind ) {
 			$made += self::migrate_kind( $kind );
 		}
 

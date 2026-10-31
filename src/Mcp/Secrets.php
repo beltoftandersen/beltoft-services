@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Mcp;
 
+use BeltoftServices\Mail\MailAccess;
+use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Proxmox\Access;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbGuest;
@@ -33,7 +35,7 @@ final class Secrets {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'get_database_ca_certificate' );
+	public const NAMES = array( 'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'reveal_mailbox_password', 'get_database_ca_certificate' );
 
 	/**
 	 * What each tool shows: the route, the key of the value in the route's answer, the e-mail kind and words for the history.
@@ -42,6 +44,7 @@ final class Secrets {
 		'reveal_server_password'      => array( '/reveal', 'password', 'reveal_server', 'server password' ),
 		'reveal_database_password'    => array( '/db-reveal', 'password', 'reveal_database', 'database password' ),
 		'reveal_app_login'            => array( '/app-reveal', 'credentials', 'reveal_app', 'app login' ),
+		'reveal_mailbox_password'     => array( '/mail-reveal', 'password', 'reveal_mailbox', 'mailbox password' ),
 		'get_database_ca_certificate' => array( '/db-ca', 'text', '', 'database CA certificate' ),
 	);
 
@@ -81,6 +84,23 @@ final class Secrets {
 				$text = sprintf( __( 'Show the password of database %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
 				break;
 
+			case 'reveal_mailbox_password':
+				$bad   = MailGuard::check( $r );
+				$email = $bad ? null : MailGuard::inside( $r, $args['email'] );
+
+				if ( $bad || null === $email ) {
+					return new \WP_Error( 'beltoft_services_tool', $bad ? $bad->get_error_message() : __( 'That mailbox is not part of this email domain.', 'beltoft-services' ) );
+				}
+
+				if ( ! MailAccess::revealable( $r, $email ) ) {
+					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. reset_mailbox_password makes a new one.', 'beltoft-services' ) );
+				}
+
+				/* translators: 1: mailbox address, 2: name of the service. */
+				$text  = sprintf( __( 'Show the password of the mailbox %1$s of %2$s. It is shown once, then we no longer have it.', 'beltoft-services' ), $email, $label );
+				$state = $id . '|' . $name . '|' . $email;
+				break;
+
 			case 'reveal_app_login':
 				$stored = $r->get( 'app_reveal' );
 
@@ -106,7 +126,7 @@ final class Secrets {
 
 		return array(
 			'text'  => $text . ' ' . __( 'The value will then be in this conversation, which the app keeps, so anyone who can read the conversation can read it. The customer gets an e-mail about it, and the history of the service notes it. Afterwards the customer can change the password in their account, or ask for a new one.', 'beltoft-services' ),
-			'state' => $id . '|' . $name,
+			'state' => $state ?? $id . '|' . $name,
 		);
 	}
 
@@ -121,7 +141,8 @@ final class Secrets {
 		$id                                = (int) $args['id'];
 		list( $path, $key, $kind, $words ) = self::KINDS[ $name ];
 		$method                            = 'get_database_ca_certificate' === $name ? 'GET' : 'POST';
-		$done                              = Tools::route( $method, '/resources/' . $id . $path, array(), 'POST' === $method ? array() : null, $id, $words . ' shown' );
+		$body                              = 'reveal_mailbox_password' === $name ? array( 'email' => (string) $args['email'] ) : array();
+		$done                              = Tools::route( $method, '/resources/' . $id . $path, array(), 'POST' === $method ? $body : null, $id, $words . ' shown' );
 
 		if ( $done instanceof \WP_Error ) {
 			return $done;
@@ -151,7 +172,7 @@ final class Secrets {
 
 		$change = 'reveal_database_password' === $name
 			? 'To change it, use reset_database_password, or the customer does it in the dashboard.'
-			: ( 'reveal_server_password' === $name ? 'To change it, use reset_server_password, or the customer does it in the dashboard.' : 'The customer can change it in the app itself after logging in.' );
+			: ( 'reveal_server_password' === $name ? 'To change it, use reset_server_password, or the customer does it in the dashboard.' : ( 'reveal_mailbox_password' === $name ? 'To change it, use reset_mailbox_password, or the customer does it in the dashboard.' : 'The customer can change it in the app itself after logging in.' ) );
 
 		if ( 'reveal_app_login' === $name ) {
 			return array( 'login' => $value, 'shown_once' => true, 'note' => 'This login is now in this conversation. We no longer have it. ' . $change );

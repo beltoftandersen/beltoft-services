@@ -52,6 +52,7 @@ final class Plugin {
 		Mail\MailSettings::register();
 		Mail\MailDns::register();
 		Mail\MailJobs::register();
+		Mail\MailRoutes::register();
 		Domains\Search::register();
 		Domains\Cart::register();
 		Domains\TldRules::register();

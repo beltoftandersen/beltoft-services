@@ -357,6 +357,23 @@ class FakeMailcowClient implements MailcowClient {
 		return $this->ok( 'rl_saved', $email );
 	}
 
+	public function set_domain_rate_limit( string $domain, int $value, string $frame ) {
+		$domain = strtolower( $domain );
+
+		if ( $err = $this->enter( 'set_domain_rate_limit', $domain, $value, $frame ) ) {
+			return $err;
+		}
+
+		if ( ! isset( $this->domains[ $domain ] ) ) {
+			return $this->error( 'domain_invalid', $domain );
+		}
+
+		$this->domains[ $domain ]['rl'] = array( 'value' => $value, 'frame' => $frame );
+		$this->save();
+
+		return $this->ok( 'rl_saved', $domain );
+	}
+
 	public function add_alias( string $address, string $goto ) {
 		$address = strtolower( $address );
 

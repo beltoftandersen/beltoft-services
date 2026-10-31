@@ -364,6 +364,30 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertSame( 'Email plan change was lower: limits kept', $down->event() );
 	}
 
+	public function test_the_domain_gets_its_minute_limit_when_made_and_when_the_plan_changes(): void {
+		$r = $this->ready_mail( 'rate.example' );
+		$this->assertSame( array( 'value' => 30, 'frame' => 'm' ), $this->mailcow->domain( 'rate.example' )['rl'] );
+		$this->assertContains( 'rl', (array) Resource::find( $r->id() )->get( 'steps' ) );
+
+		$this->settings( array( 'mail_rl_minute' => 45 ) );
+		$r->change_plan( array( 'mailboxes' => 5, 'quota_mb' => 10240, 'aliases' => 50, 'domains' => 3 ), 'Upgrade' );
+		$this->assertTrue( $this->driver()->update_plan( Resource::find( $r->id() ) )->is_done() );
+		$this->assertSame( array( 'value' => 45, 'frame' => 'm' ), $this->mailcow->domain( 'rate.example' )['rl'] );
+	}
+
+	public function test_no_domain_limit_is_sent_when_the_setting_is_zero_and_a_refusal_retries(): void {
+		$this->settings( array( 'mail_rl_minute' => 0 ) );
+		$this->ready_mail( 'norate.example' );
+		$this->assertSame( array(), $this->mailcow->calls_of( 'set_domain_rate_limit' ) );
+
+		$this->settings( array( 'mail_rl_minute' => 30 ) );
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		$r = $this->mail_resource( 'retry.example' );
+		$this->mailcow->fail_next( 'set_domain_rate_limit', new \WP_Error( 'mailcow_transport', 'x' ) );
+		$this->assertTrue( $this->driver()->provision( $r )->is_retry() );
+		$this->assertTrue( $this->driver()->provision( Resource::find( $r->id() ) )->is_done(), 'It goes on from the saved steps.' );
+	}
+
 	// -- Delete ------------------------------------------------------------------------------------
 
 	public function test_delete_removes_mailboxes_aliases_and_the_domain_and_wipes_passwords(): void {

@@ -91,4 +91,17 @@ final class MailSettingsTest extends TestCase {
 	public function test_the_reserved_text_has_no_em_dash(): void {
 		$this->assertStringNotContainsString( "\u{2014}", (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Mail/MailDomain.php' ) );
 	}
+
+	public function test_the_mailbox_limit_is_per_day_and_the_domain_limit_per_minute(): void {
+		$this->assertSame( array( 500, 'd' ), MailSettings::rate_limit() );
+		$this->assertSame( array( 30, 'm' ), MailSettings::domain_rate_limit() );
+
+		$this->settings( array( 'mail_rl_day' => 100, 'mail_rl_minute' => 10 ) );
+		$this->assertSame( array( 100, 'd' ), MailSettings::rate_limit() );
+		$this->assertSame( array( 10, 'm' ), MailSettings::domain_rate_limit() );
+
+		$this->settings( array( 'mail_rl_day' => 0, 'mail_rl_minute' => 0 ) );
+		$this->assertNull( MailSettings::rate_limit() );
+		$this->assertNull( MailSettings::domain_rate_limit() );
+	}
 }

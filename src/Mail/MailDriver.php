@@ -19,8 +19,8 @@ defined( 'ABSPATH' ) || exit;
  * or the _beltoft-verify TXT token), add the domain with the plan's limits, make its DKIM key, and place the DNS
  * records (MailDns). Pause and resume switch the domain and its mailboxes off and on. A plan change raises the limits
  * and never lowers them. Delete removes mailboxes, aliases and the domain, and runs only when Retention or an admin
- * asks for it (deletion_mode is off by default). Mailboxes and aliases are Mailboxes and Aliases; the driver has no
- * customer actions yet.
+ * asks for it (deletion_mode is off by default). Mailboxes and aliases are Mailboxes and Aliases, reached through MailRoutes and the account
+ * page (MailCard); the driver has no queued customer actions.
  */
 final class MailDriver implements Driver {
 
@@ -163,6 +163,20 @@ final class MailDriver implements Driver {
 			}
 		}
 
+		if ( ! in_array( 'rl', $steps, true ) ) {
+			$limited = $this->domain_rate( $client, $name );
+
+			if ( is_wp_error( $limited ) ) {
+				return $this->from_error( $limited );
+			}
+
+			$steps[] = 'rl';
+
+			if ( ! $r->set( array( 'steps' => $steps ) ) ) {
+				return StepResult::retry( 60, 'The domain send limit status could not be saved.' );
+			}
+		}
+
 		if ( ! in_array( 'dkim', $steps, true ) ) {
 			$key = $client->get_dkim( $name );
 
@@ -286,6 +300,25 @@ final class MailDriver implements Driver {
 	}
 
 	/**
+	 * Sets the sending limit of the whole domain (setting mail_rl_minute, per minute); nothing when it is 0.
+	 *
+	 * @param MailcowClient $client Client.
+	 * @param string        $domain Domain.
+	 * @return \WP_Error|null
+	 */
+	private function domain_rate( MailcowClient $client, string $domain ): ?\WP_Error {
+		$limit = MailSettings::domain_rate_limit();
+
+		if ( null === $limit ) {
+			return null;
+		}
+
+		$set = $client->set_domain_rate_limit( $domain, $limit[0], $limit[1] );
+
+		return is_wp_error( $set ) ? $set : null;
+	}
+
+	/**
 	 * A client error as a step result: no answer means try again, a refusal is final.
 	 *
 	 * @param \WP_Error $e Error.
@@ -390,6 +423,14 @@ final class MailDriver implements Driver {
 			return StepResult::done();
 		}
 
+		$client  = MailClients::for();
+		$domain  = (string) $r->get( MailDomain::META_DOMAIN );
+		$limited = $this->domain_rate( $client, $domain );
+
+		if ( is_wp_error( $limited ) ) {
+			return StepResult::retry( 300, $limited->get_error_message() );
+		}
+
 		$plan    = self::limits_from( (array) $r->get( 'plan' ) );
 		$applied = is_array( $r->get( 'mail_limits' ) ) && array() !== $r->get( 'mail_limits' ) ? self::limits_from( (array) $r->get( 'mail_limits' ) ) : $plan;
 		$next    = array();
@@ -402,9 +443,7 @@ final class MailDriver implements Driver {
 			return StepResult::done( array( 'mail_limits' => $applied ), $plan === $applied ? '' : 'Email plan change was lower: limits kept' );
 		}
 
-		$client = MailClients::for();
-		$domain = (string) $r->get( MailDomain::META_DOMAIN );
-		$edit   = $client->edit_domain( $domain, self::domain_attrs( $next ) );
+		$edit = $client->edit_domain( $domain, self::domain_attrs( $next ) );
 
 		if ( is_wp_error( $edit ) ) {
 			return StepResult::retry( 300, $edit->get_error_message() );
@@ -497,7 +536,7 @@ final class MailDriver implements Driver {
 	}
 
 	public function render_account( Resource $r ): void {
-		echo '<div class="beltoft-services-mail"><p>' . esc_html( (string) $r->get( MailDomain::META_DOMAIN ) ) . '</p></div>';
+		MailCard::render( $r );
 	}
 
 	public function render_admin( Resource $r ): void {
