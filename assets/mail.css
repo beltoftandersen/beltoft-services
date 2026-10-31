@@ -1,0 +1,19 @@
+/* Email domain page. It builds on the database page styles (tabs, facts, blocks, forms); square corners, no borders of its own. */
+.beltoft-services-mail .beltoft-services-mail__table { width: 100%; margin: 0 0 16px; }
+.beltoft-services-mail .beltoft-services-mail__table th, .beltoft-services-mail .beltoft-services-mail__table td { vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+.beltoft-services-mail .beltoft-services-mail__table code { padding: 2px 6px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-size: 14px; }
+.beltoft-services-mail .beltoft-services-mail__actions { min-width: 12em; }
+.beltoft-services-mail .beltoft-services-mail__actions .button { margin: 0 8px 8px 0; }
+.beltoft-services-mail .beltoft-services-mail__actions details { margin: 4px 0 0; }
+.beltoft-services-mail .beltoft-services-mail__actions summary { color: var(--navy, #0c1535); cursor: pointer; }
+.beltoft-services-mail .beltoft-services-mail__danger.button { background: #b32d2e; color: #fff; }
+.beltoft-services-mail .beltoft-services-mail__danger.button:hover { background: #8a2324; color: #fff; }
+.beltoft-services-mail .beltoft-services-mail__at { display: inline-block; margin-left: 6px; color: var(--ink-soft, #5e7080); overflow-wrap: anywhere; }
+.beltoft-services-mail .beltoft-services-db__form textarea { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
+.beltoft-services-mail .beltoft-services-mail__secret { margin: 16px 0; padding: 16px; background: var(--bg-warm, #eeece6); }
+.beltoft-services-mail .beltoft-services-mail__secret[hidden] { display: none; }
+.beltoft-services-mail .beltoft-services-mail__secret p { margin: 0 0 12px; }
+.beltoft-services-mail .beltoft-services-mail__secret .beltoft-services-db__block { margin: 0 0 12px; }
+@media (max-width: 700px) {
+	.beltoft-services-mail .beltoft-services-mail__table { display: block; overflow-x: auto; }
+}

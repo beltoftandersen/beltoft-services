@@ -80,6 +80,8 @@ final class ActionMap {
 		'reveal_database_password' => 'reveal_database_password',
 		'reveal_app_login'         => 'reveal_app_login',
 		'database_ca_certificate'  => 'get_database_ca_certificate',
+		'delete_mailbox'           => 'delete_mailbox',
+		'reveal_mailbox_password'  => 'reveal_mailbox_password',
 	);
 
 	/**
@@ -122,6 +124,14 @@ final class ActionMap {
 		'reveal_database_password' => array( 'POST #^/resources/\d+/db-reveal$#D' ),
 		'reveal_app_login'         => array( 'POST #^/resources/\d+/app-reveal$#D' ),
 		'get_database_ca_certificate' => array( 'GET #^/resources/\d+/db-ca$#D' ),
+		'email_domain_info'        => array( 'GET #^/resources/\d+/mail$#D' ),
+		'create_mailbox'           => array( 'POST #^/resources/\d+/mail/mailboxes$#D' ),
+		'reset_mailbox_password'   => array( 'POST #^/resources/\d+/mail/mailboxes/[^/]+/password$#D' ),
+		'delete_mailbox'           => array( 'DELETE #^/resources/\d+/mail/mailboxes/[^/]+$#D' ),
+		'add_email_alias'          => array( 'POST #^/resources/\d+/mail/aliases$#D' ),
+		'remove_email_alias'       => array( 'DELETE #^/resources/\d+/mail/aliases/[^/]+$#D' ),
+		'email_dns_check'          => array( 'POST #^/resources/\d+/mail/dns/check$#D' ),
+		'reveal_mailbox_password'  => array( 'POST #^/resources/\d+/mail-reveal$#D' ),
 	);
 
 	/**

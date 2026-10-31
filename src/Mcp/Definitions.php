@@ -69,7 +69,7 @@ final class Definitions {
 
 		$tools = array(
 			// -- Reads ------------------------------------------------------------------------------
-			'list_services'    => self::read( 'Lists the services of the customer: servers, databases, domains, DNS hosting, apps and add-ons, each with its id, name, state, renewal date, license id and subscription. Optional: only one type.' . self::DATA, self::obj( array( 'type' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'Only this type: vm, db, domain or dns.' ) ) ), 30 ),
+			'list_services'    => self::read( 'Lists the services of the customer: servers, databases, domains, DNS hosting, email domains, apps and add-ons, each with its id, name, state, renewal date, license id and subscription. Optional: only one type.' . self::DATA, self::obj( array( 'type' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'Only this type: vm, db, domain, dns or mail.' ) ) ), 30 ),
 			'server_status'    => self::read( 'Shows one server: whether it is running, CPU, memory and disk use as percent, its IP address, system and size, and what it is doing now.' . self::DATA, $by_id ),
 			'server_usage'     => self::read(
 				'Shows the load of one server over the last hour, day or month: average, highest and latest CPU, memory and network figures.',
@@ -98,6 +98,7 @@ final class Definitions {
 			'catalog'          => self::read( 'Shows what can be bought, with prices excluding tax: server plans, database plans, the systems and apps a server plan offers (variation_id), add-ons for one of the customer\'s servers (id: snapshot packs, extra disk, backups price), and domain prices per ending.', self::obj( array( 'kind' => array( 'type' => 'string', 'enum' => array( 'server_plans', 'database_plans', 'os_and_apps', 'addons', 'domain_prices' ), 'description' => 'What to list.' ), 'variation_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For os_and_apps: the server plan, from server_plans.' ), 'id' => $id ), array( 'kind' ) ), 20 ),
 			'list_dns_claims'  => self::read( 'Lists the domains the customer has asked us to host DNS for while the domain is registered elsewhere, with the state of each. Only when the site offers it.' . self::DATA, $none, 30 ),
 			'console_link'     => self::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
+			'email_domain_info' => self::read( 'Shows one email domain: its state, the plan limits (mailboxes, size of each, aliases), every mailbox with its storage use and whether a password can still be shown, every alias with where it delivers, the DNS records with ok, missing or conflict for each, and the settings for a mail program. No password is shown here.' . self::DATA, $by_id, 30 ),
 			'list_licenses'    => self::read( 'Lists the customer\'s licenses with product, status, how many sites are used of how many are allowed, and the sites. Use get_license_key for the key.' . self::DATA, $none, 30 ),
 			'get_license_key'  => self::read( 'Shows the key of one of the customer\'s licenses.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ) ), array( 'license_id' ) ), 20 ),
 
@@ -207,6 +208,11 @@ final class Definitions {
 				true,
 				true
 			),
+			'create_mailbox'   => self::act( 'Makes a mailbox in an email domain, with the size of the plan. It gets a password that is never shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer\'s yes. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @: letters, numbers, dots, dashes and underscores.' ), 'display_name' => array( 'type' => 'string', 'maxLength' => 100, 'description' => 'The name shown for the mailbox. Optional.' ) ), array( 'id', 'name' ) ), false ),
+			'reset_mailbox_password' => self::act( 'Makes a new password for a mailbox. The old one stops working at once. The new one is never shown here: the customer shows it once in the dashboard. Ask the customer first.', self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ) ), true ),
+			'add_email_alias'  => self::act( 'Makes an alias in an email domain: an address that delivers to one or more other addresses. There is no catch-all. Delivering to other domains is allowed only when the site allows it. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @.' ), 'deliver_to' => array( 'type' => 'array', 'maxItems' => 10, 'items' => array( 'type' => 'string', 'maxLength' => 254 ), 'description' => 'One to ten addresses.' ) ), array( 'id', 'name', 'deliver_to' ) ), false ),
+			'remove_email_alias' => self::act( 'Deletes an alias of an email domain. Mail sent to it afterwards bounces. Ask the customer first.', self::obj( array( 'id' => $id, 'address' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The alias address, from email_domain_info.' ) ), array( 'id', 'address' ) ), true, true ),
+			'email_dns_check'  => self::act( 'Looks at the DNS of an email domain now and says which records are in place, missing or in conflict. Nothing is changed in the DNS.', $by_id, false, true ),
 			'set_auto_renew'   => self::act( 'Turns automatic renewal of one subscription on or off, where the shop allows it. With it off the customer pays the renewal invoice by hand and the service ends if it is not paid. Ask the customer first.', self::obj( array( 'subscription_id' => $sub, 'on' => array( 'type' => 'boolean' ) ), array( 'subscription_id', 'on' ) ), true, true, 10 ),
 			'reactivate_subscription' => self::act( 'Reactivates a subscription that is on hold, when the dashboard offers reactivation for it (see list_subscriptions) and nothing is owed.', self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ) ), false, true, 10 ),
 			'free_license_site' => self::act( 'Removes a site from a license so the license can be used on another site.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The site, as listed.' ) ), array( 'license_id', 'domain' ) ), true, false, 10 ),
@@ -280,6 +286,10 @@ final class Definitions {
 				false,
 				true
 			),
+			'delete_mailbox'   => self::full(
+				'Deletes a mailbox and every message in it for good. Get the address from email_domain_info.',
+				self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ), true )
+			),
 			'cancel_subscription' => self::full(
 				'Cancels a subscription, and with it the services it pays for (a server, a database, an add-on or DNS hosting). A registered domain cannot be cancelled here. The summary says when the service ends and what happens to its data.',
 				self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ), true )
@@ -309,6 +319,11 @@ final class Definitions {
 			'reveal_app_login' => self::full(
 				'Shows the first login of the app on a server once. The value then is in this conversation and we no longer have it.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true ),
+				true
+			),
+			'reveal_mailbox_password' => self::full(
+				'Shows the password of a mailbox once. The value then is in this conversation and we no longer have it. Use reset_mailbox_password first if there is none to show.',
+				self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ), true ),
 				true
 			),
 			'get_database_ca_certificate' => self::full(

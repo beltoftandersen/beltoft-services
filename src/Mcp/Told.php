@@ -50,6 +50,10 @@ final class Told {
 			case 'reset_server_password':
 				return __( 'made a new password for the server', 'beltoft-services' );
 
+			case 'delete_mailbox':
+				/* translators: %s: mailbox address. */
+				return sprintf( __( 'deleted the mailbox %s and every message in it', 'beltoft-services' ), sanitize_email( (string) ( $args['email'] ?? '' ) ) );
+
 			case 'set_database_eviction_policy':
 				return __( 'changed what the database does when its memory is full', 'beltoft-services' );
 

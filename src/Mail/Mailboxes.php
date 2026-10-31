@@ -55,9 +55,10 @@ final class Mailboxes {
 	 * @param Resource $r     Resource.
 	 * @param mixed    $local Local part.
 	 * @param string   $name  Display name; the local part when empty.
+	 * @param int      $size  Size in MB, up to the plan's; 0 for the plan's size.
 	 * @return array{email:string,quota_mb:int}|\WP_Error
 	 */
-	public static function create( Resource $r, $local, string $name = '' ) {
+	public static function create( Resource $r, $local, string $name = '', int $size = 0 ) {
 		$bad = MailGuard::check( $r );
 
 		if ( $bad ) {
@@ -71,6 +72,12 @@ final class Mailboxes {
 		}
 
 		$limits = MailGuard::limits( $r );
+
+		if ( $size < 0 || $size > $limits['quota_mb'] ) {
+			return new \WP_Error( 'limit', __( 'That size is outside what your plan allows.', 'beltoft-services' ) );
+		}
+
+		$quota  = $size > 0 ? $size : $limits['quota_mb'];
 		$client = MailClients::for();
 		$have   = $client->list_mailboxes( MailGuard::domain( $r ) );
 
@@ -109,7 +116,7 @@ final class Mailboxes {
 				'local_part'      => (string) strstr( $email, '@', true ),
 				'domain'          => MailGuard::domain( $r ),
 				'name'            => '' !== trim( $name ) ? sanitize_text_field( $name ) : (string) strstr( $email, '@', true ),
-				'quota'           => (string) $limits['quota_mb'],
+				'quota'           => (string) $quota,
 				'password'        => $password,
 				'password2'       => $password,
 				'active'          => '1',
@@ -141,7 +148,7 @@ final class Mailboxes {
 
 		MailAccess::finish( $r, $email );
 
-		return array( 'email' => $email, 'quota_mb' => $limits['quota_mb'] );
+		return array( 'email' => $email, 'quota_mb' => $quota );
 	}
 
 	/**

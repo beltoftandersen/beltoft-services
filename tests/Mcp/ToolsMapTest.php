@@ -157,6 +157,7 @@ final class ToolsMapTest extends McpTestCase {
 			'reveal_server_password'      => array( 'POST', '/resources/1/reveal' ),
 			'reveal_database_password'    => array( 'POST', '/resources/1/db-reveal' ),
 			'reveal_app_login'            => array( 'POST', '/resources/1/app-reveal' ),
+			'reveal_mailbox_password'     => array( 'POST', '/resources/1/mail-reveal' ),
 			'get_database_ca_certificate' => array( 'GET', '/resources/1/db-ca' ),
 		);
 
@@ -279,7 +280,7 @@ final class ToolsMapTest extends McpTestCase {
 			'cancel_subscription', 'remove_extra_disk', 'remove_snapshot_slots', 'remove_app_licence', 'remove_backups_addon', 'remove_public_ip_addon', 'stop_dns_hosting', 'cancel_domain_registration',
 			'firewall_off', 'firewall_wide_open', 'custom_nameservers', 'database_open_to_everyone',
 			'set_default_card', 'set_subscription_payment_method', 'delete_saved_card', 'add_card',
-			'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'database_ca_certificate',
+			'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'database_ca_certificate', 'delete_mailbox', 'reveal_mailbox_password',
 			'domain_transfer_code', 'domain_unlock', 'console_ticket', 'account_password_and_email', 'connected_apps_and_limits',
 		);
 

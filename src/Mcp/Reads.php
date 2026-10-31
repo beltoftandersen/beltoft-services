@@ -116,6 +116,19 @@ final class Reads {
 
 				return array( 'claims' => array_map( static fn( $c ) => array_intersect_key( (array) $c, $keep ), array_values( $list ) ) );
 
+			case 'email_domain_info':
+				$id   = (int) $args['id'];
+				$view = Tools::route( 'GET', '/resources/' . $id . '/mail', array(), null, $id, 'email domain read' );
+
+				if ( $view instanceof \WP_Error ) {
+					return $view;
+				}
+
+				// The word the dashboard asks to be typed is not for a result.
+				unset( $view['delete_word'] );
+
+				return $view;
+
 			case 'console_link':
 				$r = Tools::owned( (int) $args['id'] );
 

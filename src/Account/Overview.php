@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * of that kind. Nothing here calls Proxmox or a registrar: it reads the license rows, the resource meta,
  * the status the power job already cached, the subscriptions and the license history.
  *
- * Shortcodes: beltoft_services_attention, _servers, _databases, _domains, _licenses, _apps, _next_payment, _activity, _welcome,
+ * Shortcodes: beltoft_services_attention, _servers, _databases, _domains, _licenses, _apps, _mail, _next_payment, _activity, _welcome,
  * and _overview (all of them). The templates are in templates/account/overview/ and can be copied to
  * yourtheme/beltoft-services/account/overview/. On the WooCommerce Dashboard endpoint the whole overview is
  * printed by woocommerce_account_dashboard, unless the beltoft_services_overview_auto filter says false (a site
@@ -39,10 +39,20 @@ final class Overview {
 		'databases'    => 'beltoft_services_databases',
 		'domains'      => 'beltoft_services_domains',
 		'apps'         => 'beltoft_services_apps',
+		'mail'         => 'beltoft_services_mail',
 		'licenses'     => 'beltoft_services_licenses',
 		'next_payment' => 'beltoft_services_next_payment',
 		'activity'     => 'beltoft_services_activity',
 		'welcome'      => 'beltoft_services_welcome',
+	);
+
+	/**
+	 * Section => the area (ServiceArea) that draws its rows.
+	 */
+	private const AREAS = array(
+		'databases' => Databases::class,
+		'apps'      => Apps::class,
+		'mail'      => Email::class,
 	);
 
 	/**
@@ -233,12 +243,13 @@ final class Overview {
 				) : '';
 			case 'databases':
 			case 'apps':
+			case 'mail':
 				return $data[ $section ] ? self::template(
 					'overview/rows.php',
 					array(
 						'class'   => $section,
-						'heading' => ServiceArea::get( 'databases' === $section ? Databases::class : Apps::class )->label(),
-						'more'    => ServiceArea::get( 'databases' === $section ? Databases::class : Apps::class )->all_label(),
+						'heading' => ServiceArea::get( self::AREAS[ $section ] )->label(),
+						'more'    => ServiceArea::get( self::AREAS[ $section ] )->all_label(),
 						'url'     => $data[ $section . '_url' ],
 						'rows'    => array_slice( $data[ $section ], 0, self::limit() ),
 					)
@@ -337,6 +348,8 @@ final class Overview {
 			'databases_url' => '',
 			'apps'         => array(),
 			'apps_url'     => '',
+			'mail'         => array(),
+			'mail_url'     => '',
 			'domains'      => array(),
 			'domains_url'  => '',
 			'licenses'     => array(),
@@ -394,9 +407,9 @@ final class Overview {
 			}
 		}
 
-		$area_views = array( 'databases' => array(), 'apps' => array() );
+		$area_views = array( 'databases' => array(), 'apps' => array(), 'mail' => array() );
 
-		foreach ( array( 'databases' => Databases::class, 'apps' => Apps::class ) as $key => $class ) {
+		foreach ( self::AREAS as $key => $class ) {
 			foreach ( array_slice( (array) ( $groups[ ServiceArea::get( $class )->slug() ] ?? array() ), 0, 50 ) as $license ) {
 				$view                          = View::license( $license );
 				$area_views[ $key ][]          = $view;
@@ -442,7 +455,7 @@ final class Overview {
 
 		$area_resources = array();
 
-		foreach ( array( 'databases' => Databases::class, 'apps' => Apps::class ) as $key => $class ) {
+		foreach ( self::AREAS as $key => $class ) {
 			$area = ServiceArea::get( $class );
 
 			foreach ( $area_views[ $key ] as $view ) {

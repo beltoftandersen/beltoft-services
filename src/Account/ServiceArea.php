@@ -55,7 +55,7 @@ abstract class ServiceArea {
 	 * @return array<int, ServiceArea>
 	 */
 	public static function all(): array {
-		return array( self::get( Databases::class ), self::get( Apps::class ) );
+		return array( self::get( Databases::class ), self::get( Apps::class ), self::get( Email::class ) );
 	}
 
 	/**
@@ -643,7 +643,7 @@ abstract class ServiceArea {
 		$state = (string) $resource->get( 'state' );
 		$group = Panel::group( $state, $resource );
 		$vars  = array(
-			'title'        => (string) ( $view['product'] ?? '' ),
+			'title'        => self::$page['area']->title_of( $resource, $view ),
 			'group'        => $group,
 			'badge'        => Panel::label( $state, $resource ),
 			'message'      => Panel::message( $state, $resource ),
@@ -659,6 +659,18 @@ abstract class ServiceArea {
 		} )( $vars );
 
 		return true;
+	}
+
+	/**
+	 * The title of a service page, default the name of the product.
+	 *
+	 * @param Resource             $resource Resource.
+	 * @param array<string, mixed> $view     Display values of the license.
+	 */
+	public function title_of( Resource $resource, array $view ): string {
+		unset( $resource );
+
+		return (string) ( $view['product'] ?? '' );
 	}
 
 	/**

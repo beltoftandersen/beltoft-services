@@ -19,8 +19,8 @@ defined( 'ABSPATH' ) || exit;
  * or the _beltoft-verify TXT token), add the domain with the plan's limits, make its DKIM key, and place the DNS
  * records (MailDns). Pause and resume switch the domain and its mailboxes off and on. A plan change raises the limits
  * and never lowers them. Delete removes mailboxes, aliases and the domain, and runs only when Retention or an admin
- * asks for it (deletion_mode is off by default). Mailboxes and aliases are Mailboxes and Aliases; the driver has no
- * customer actions yet.
+ * asks for it (deletion_mode is off by default). Mailboxes and aliases are Mailboxes and Aliases, reached through MailRoutes and the account
+ * page (MailCard); the driver has no queued customer actions.
  */
 final class MailDriver implements Driver {
 
@@ -536,7 +536,7 @@ final class MailDriver implements Driver {
 	}
 
 	public function render_account( Resource $r ): void {
-		echo '<div class="beltoft-services-mail"><p>' . esc_html( (string) $r->get( MailDomain::META_DOMAIN ) ) . '</p></div>';
+		MailCard::render( $r );
 	}
 
 	public function render_admin( Resource $r ): void {

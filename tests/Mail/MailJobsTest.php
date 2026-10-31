@@ -67,4 +67,17 @@ final class MailJobsTest extends MailTestCase {
 		MailJobs::schedule();
 		$this->assertTrue( as_has_scheduled_action( MailJobs::HOOK, array(), 'beltoft-services' ) );
 	}
+
+	public function test_nothing_is_paused_at_the_cap_the_mail_server_blocks_sending_itself(): void {
+		$r = $this->ready_mail( 'cap.example' );
+		Mailboxes::create( $r, 'a' );
+		$this->mailcow->set_usage( 'a@cap.example', 10240 * 1048576 );
+
+		MailJobs::check( Resource::find( $r->id() ) );
+
+		$this->assertSame( array(), $this->mailcow->calls_of( 'edit_mailbox' ) );
+		$this->assertSame( '1', (string) $this->mailcow->domain( 'cap.example' )['active'] );
+		$this->assertNotSame( '0', (string) ( $this->mailcow->mailbox( 'a@cap.example' )['active'] ?? '1' ) );
+		$this->assertSame( array( 500, 'd' ), array( $this->mailcow->mailbox( 'a@cap.example' )['rl']['value'], $this->mailcow->mailbox( 'a@cap.example' )['rl']['frame'] ) );
+	}
 }

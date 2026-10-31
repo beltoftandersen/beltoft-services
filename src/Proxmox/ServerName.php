@@ -194,6 +194,11 @@ final class ServerName {
 			return sprintf( __( 'DNS hosting for %s', 'beltoft-services' ), (string) $r->get( 'domain' ) );
 		}
 
+		// Business email: the email domain.
+		if ( 'mail' === $driver && '' !== (string) $r->get( 'mail_domain' ) ) {
+			return (string) $r->get( 'mail_domain' );
+		}
+
 		// An extra disk: its size and the server it belongs to.
 		if ( DiskDriver::ID === $driver && (int) $r->get( 'size_gb' ) > 0 ) {
 			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
