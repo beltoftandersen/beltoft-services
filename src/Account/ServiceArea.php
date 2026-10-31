@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
@@ -291,15 +292,71 @@ abstract class ServiceArea {
 	/**
 	 * What the address after the endpoint says: the license id (from the service's slug, or the number itself) and the tab.
 	 *
-	 * @return array{id: int, tab: string}
+	 * @return array{id: int, tab: string, path: array<int, string>}
 	 */
 	public function requested(): array {
 		$asked = Slugs::parse( $this->slug(), $this->key() );
 
 		return array(
-			'id'  => $asked['id'],
-			'tab' => in_array( $asked['second'], $this->tabs(), true ) ? $asked['second'] : '',
+			'id'   => $asked['id'],
+			'tab'  => in_array( $asked['second'], $this->tabs(), true ) ? $asked['second'] : '',
+			'path' => $asked['rest'],
 		);
+	}
+
+	/**
+	 * The address of a page below a service's page: the service's address and the path parts after it
+	 * (/my-account/apps/<service>/<part>/<part>/). With no parts it is the service's own page.
+	 *
+	 * @param array<string, mixed> $license License row.
+	 * @param array<int, string>   $path    Parts after the service.
+	 */
+	public function service_url( array $license, array $path = array() ): string {
+		$path = Slugs::segments( $path );
+
+		if ( array() === $path || ! function_exists( 'wc_get_endpoint_url' ) ) {
+			return $this->url( $license );
+		}
+
+		return wc_get_endpoint_url( $this->slug(), Slugs::value( $license ) . '/' . implode( '/', $path ), wc_get_page_permalink( 'myaccount' ) );
+	}
+
+	/**
+	 * The address of a page below the My Account page of whichever area the license belongs to, or '' when it is
+	 * no service of an area (or WooCommerce is missing). For a plugin that draws pages below a service page.
+	 *
+	 * @param array<string, mixed> $license License row.
+	 * @param array<int, string>   $path    Parts after the service.
+	 */
+	public static function url_for_license( array $license, array $path = array() ): string {
+		foreach ( self::all() as $area ) {
+			if ( $area->is_member( $license ) ) {
+				return $area->service_url( $license, $path );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Prints the tab strip of a service page: links in the strip the Databases pages use.
+	 *
+	 * @param array<string, array{title: string, url: string}> $tabs   Tab slug => title and address.
+	 * @param string                                           $active Slug of the tab shown.
+	 * @param string                                           $label  Accessible name of the strip.
+	 */
+	public static function tab_nav( array $tabs, string $active, string $label ): void {
+		if ( ! $tabs ) {
+			return;
+		}
+
+		echo '<nav class="beltoft-services-tabs" aria-label="' . esc_attr( $label ) . '">';
+
+		foreach ( $tabs as $slug => $tab ) {
+			echo '<a href="' . esc_url( $tab['url'] ) . '"' . ( (string) $slug === $active ? ' aria-current="page"' : '' ) . '>' . esc_html( $tab['title'] ) . '</a>';
+		}
+
+		echo '</nav>';
 	}
 
 	/**
@@ -307,13 +364,92 @@ abstract class ServiceArea {
 	 */
 	public static function redirect(): void {
 		foreach ( self::all() as $area ) {
-			$target = Slugs::redirect_target( $area->slug(), $area->key(), fn( array $license, string $tab ): string => $area->url( $license, $tab ) );
+			$target = Slugs::redirect_target(
+				$area->slug(),
+				$area->key(),
+				static fn( array $license, string $tab, array $rest = array() ): string => $area->tabs() ? $area->url( $license, $tab ) : $area->service_url( $license, $rest )
+			);
 
 			if ( '' !== $target ) {
 				wp_safe_redirect( $target, 301 );
 				exit;
 			}
 		}
+
+		$target = self::page_redirect();
+
+		if ( '' !== $target ) {
+			wp_safe_redirect( $target, 301 );
+			exit;
+		}
+	}
+
+	/**
+	 * Where a page below a service's page should go instead, according to the plugin that draws it (the filter
+	 * beltoft_services_account_page_redirect), or ''. Only for the customer's own service.
+	 */
+	private static function page_redirect(): string {
+		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_user_logged_in() ) {
+			return '';
+		}
+
+		foreach ( self::all() as $area ) {
+			if ( ! is_wc_endpoint_url( $area->slug() ) ) {
+				continue;
+			}
+
+			$asked = $area->requested();
+
+			if ( $asked['id'] < 1 || array() === $asked['path'] ) {
+				return '';
+			}
+
+			$license = Licenses::find( $asked['id'] );
+
+			if ( ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || ! $area->is_member( $license ) ) {
+				return '';
+			}
+
+			$resource = Resource::for_license( $asked['id'] );
+
+			if ( ! $resource ) {
+				return '';
+			}
+
+			/**
+			 * Lets the plugin that draws the pages below a service's page send a request elsewhere (301), for example
+			 * from an id to a readable name. Runs early on the request, before any output, and only for the logged-in
+			 * owner of the service; return the address or ''. Nothing is known about other customers' services here.
+			 *
+			 * @param string               $target Address, '' to stay.
+			 * @param array<string, mixed> $page   The page: license (row), resource, area, path (parts after the service), base (the service page's address), tab.
+			 */
+			$target = apply_filters( 'beltoft_services_account_page_redirect', '', $area->page_values( $license, $resource, $asked['tab'], $asked['path'] ) );
+
+			return is_string( $target ) ? $target : '';
+		}
+
+		return '';
+	}
+
+	/**
+	 * The values a page below a service's page is given (hooks beltoft_services_account_page_body and _redirect).
+	 *
+	 * @param array<string, mixed> $license  License row.
+	 * @param Resource             $resource Resource.
+	 * @param string               $tab      Requested tab.
+	 * @param array<int, string>   $path     Parts after the service.
+	 * @return array<string, mixed>
+	 */
+	private function page_values( array $license, Resource $resource, string $tab, array $path ): array {
+		return array(
+			'license'  => $license,
+			'tab'      => $tab,
+			'resource' => $resource,
+			'area'     => $this,
+			'path'     => $path,
+			'base'     => $this->service_url( $license ),
+		);
 	}
 
 	/**
@@ -381,7 +517,7 @@ abstract class ServiceArea {
 		$asked = $this->requested();
 
 		if ( $asked['id'] > 0 && isset( $members[ $asked['id'] ] ) ) {
-			$this->detail( $members[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ] );
+			$this->detail( $members[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ], $asked['path'] );
 
 			return;
 		}
@@ -422,14 +558,10 @@ abstract class ServiceArea {
 	 * @param array<string, mixed> $view     License view.
 	 * @param string               $tab      Requested tab.
 	 * @param Resource             $resource The service's resource.
+	 * @param array<int, string>   $path     Parts of the address after the service.
 	 */
-	private function detail( array $view, string $tab, Resource $resource ): void {
-		self::$page = array(
-			'license'  => $view['license'],
-			'tab'      => $tab,
-			'resource' => $resource,
-			'area'     => $this,
-		);
+	private function detail( array $view, string $tab, Resource $resource, array $path = array() ): void {
+		self::$page = $this->page_values( $view['license'], $resource, $tab, $path ) + array( 'view' => $view );
 
 		try {
 			echo '<div class="beltoft-services-server beltoft-services-area-page beltoft-services-area-page--' . esc_attr( $this->key() ) . '">';

@@ -200,7 +200,7 @@ final class Panel {
 			}
 
 			Progress::render( Progress::build( $resource ) );
-			self::owner_part( $resource, null !== $page );
+			self::owner_part( $resource, $page );
 		}
 
 		echo '</div>';
@@ -210,9 +210,9 @@ final class Panel {
 	 * The driver's part, the action buttons and the notice line for script feedback.
 	 *
 	 * @param Resource $resource Resource.
-	 * @param bool     $page     Whether this is a server page (its notice line is printed under the head).
+	 * @param array<string, mixed>|null $page The page being printed (its notice line is printed under the head), or null on a license card.
 	 */
-	private static function owner_part( Resource $resource, bool $page = false ): void {
+	private static function owner_part( Resource $resource, ?array $page = null ): void {
 		$driver = Registry::get( $resource->get( 'driver' ) );
 
 		if ( ! $driver ) {
@@ -220,7 +220,21 @@ final class Panel {
 		}
 
 		echo '<div class="beltoft-services-panel__driver">';
-		$driver->render_account( $resource );
+
+		/**
+		 * Lets another plugin print a service page of an area (Apps, Databases) in place of what the driver prints,
+		 * including pages below it (the path parts after the service). It prints and returns true. Only the
+		 * customer's own service, and never on a license card.
+		 *
+		 * @param bool                 $handled Whether a listener printed the page.
+		 * @param array<string, mixed> $page    The page: license (row), resource, area, view, path (parts after the service), base (the service page's address), tab.
+		 */
+		$handled = null !== $page && ( $page['area'] ?? null ) instanceof ServiceArea && (bool) apply_filters( 'beltoft_services_account_page_body', false, $page );
+
+		if ( ! $handled ) {
+			$driver->render_account( $resource );
+		}
+
 		echo '</div>';
 
 		$actions = $resource->accepts_actions() ? $driver->customer_actions( $resource ) : array();
@@ -234,7 +248,7 @@ final class Panel {
 		 * @param Resource              $resource Resource.
 		 * @param string                $context  card (a license card) or page (a server page, which prints the power buttons itself).
 		 */
-		$buttons = apply_filters( 'beltoft_services_account_buttons', $actions, $resource, $page ? 'page' : 'card' );
+		$buttons = apply_filters( 'beltoft_services_account_buttons', $actions, $resource, null !== $page ? 'page' : 'card' );
 		$actions = is_array( $buttons ) ? array_intersect_key( $buttons, $actions ) : $actions;
 
 		if ( $actions ) {
@@ -249,7 +263,7 @@ final class Panel {
 			echo '</p>';
 		}
 
-		if ( ! $page ) {
+		if ( null === $page ) {
 			echo '<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>';
 		}
 	}

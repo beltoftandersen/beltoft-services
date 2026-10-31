@@ -82,7 +82,23 @@ final class Apps extends ServiceArea {
 		$http   = $driver instanceof HttpDriver ? $driver : null;
 		$action = array();
 
-		if ( $http && $http->can_open_resource( $resource ) ) {
+		/**
+		 * The address of an app's own page inside My Account, for a plugin that draws the app there. When it gives one,
+		 * the Open button goes to it, in the same window, instead of leaving for the app's own site.
+		 *
+		 * @param string   $url      Address, '' for none.
+		 * @param Resource $resource The app's resource.
+		 * @param array<string, mixed> $license License row.
+		 */
+		$inside = (string) apply_filters( 'beltoft_services_account_app_url', '', $resource, $view['license'] );
+
+		if ( $http && '' !== $inside && 'ready' === (string) $resource->get( 'state' ) ) {
+			$action = array(
+				'label'    => $http->open_label( $resource ),
+				'url'      => $inside,
+				'internal' => true,
+			);
+		} elseif ( $http && $http->can_open_resource( $resource ) ) {
 			$action = array(
 				'label' => $http->open_label( $resource ),
 				'url'   => Routes::open_url( $resource->id() ),
