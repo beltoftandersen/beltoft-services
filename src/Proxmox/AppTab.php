@@ -139,6 +139,7 @@ final class AppTab {
 			'coolify'     => __( 'Installing Coolify', 'beltoft-services' ),
 			'n8n'         => __( 'Setting up n8n', 'beltoft-services' ),
 			'credentials' => __( 'Saving the login', 'beltoft-services' ),
+			'nextcloud'   => __( 'Setting up Nextcloud', 'beltoft-services' ),
 			'firewall'    => __( 'Setting up the firewall', 'beltoft-services' ),
 			'verify'      => __( 'Checking the install', 'beltoft-services' ),
 			'install'     => __( 'Finishing', 'beltoft-services' ),

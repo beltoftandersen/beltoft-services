@@ -1,0 +1,279 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+app=/opt/nextcloud
+job="$state/job.running"
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+domain=$(jq -er '.domain // ""' "$job")
+ip=$(jq -er '.ip' "$job")
+email=$(jq -er '.email' "$job")
+www=$(jq -er '.www // ""' "$job")
+[[ "$ip" =~ ^[0-9.]+$ ]]
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+if [ -n "$domain" ]; then
+  [[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+  [[ "$domain" == *.* ]]
+fi
+# A www name is only ever served together with its domain.
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates cron curl gnupg jq openssl ufw unattended-upgrades
+  install -m 0755 -d /etc/apt/keyrings
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key -o /etc/apt/keyrings/caddy.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/caddy.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '65760C51EDEA2017CEA2CA15155B6D79CA56EA34' ]
+  chmod a+r /etc/apt/keyrings/caddy.asc
+  printf 'deb [signed-by=/etc/apt/keyrings/caddy.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main\n' > /etc/apt/sources.list.d/caddy.list
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y 'caddy=2.11.7'
+  systemctl enable --now unattended-upgrades
+  touch "$state/stage.1"
+fi
+step=docker
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '9DC858229FC7DD38854AE2D88D81803C0EBFCD88' ]
+  chmod a+r /etc/apt/keyrings/docker.asc
+  printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/docker.sources
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y \
+    'docker-ce=5:29.9.2-1~ubuntu.24.04~noble' \
+    'docker-ce-cli=5:29.9.2-1~ubuntu.24.04~noble' \
+    'containerd.io=2.4.2-3~ubuntu.24.04~noble' \
+    'docker-buildx-plugin=0.38.1-1~ubuntu.24.04~noble' \
+    'docker-compose-plugin=5.6.1-1~ubuntu.24.04~noble'
+  install -m 0755 -d /etc/docker
+  printf '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}\n' > /etc/docker/daemon.json
+  systemctl enable --now docker
+  systemctl restart docker
+  touch "$state/stage.2"
+fi
+step=credentials
+status installing
+install -m 0700 -d "$secrets"
+if [ ! -e "$secrets/nextcloud.json" ]; then
+  # The generated values contain only letters and digits. The administrator's user id is fixed; the customer's email is set on the account.
+  jq -n --arg email "$email" --arg password "$(openssl rand -hex 16)Aa1" --arg db "$(openssl rand -hex 24)" --arg redis "$(openssl rand -hex 24)" '{admin_user:"admin",admin_password:$password,admin_email:$email,db_password:$db,redis_password:$redis}' > "$secrets/nextcloud.json"
+  chmod 0600 "$secrets/nextcloud.json"
+fi
+step=nextcloud
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  install -m 0700 -d "$app" "$app/postgres"
+  cat > "$app/compose.yaml" <<'YAML'
+name: nextcloud
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    restart: always
+    env_file: postgres.env
+    volumes:
+      - /opt/nextcloud/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextcloud -d nextcloud"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:8.10.3-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+    restart: always
+    env_file: redis.env
+    command: ["sh", "-c", "exec redis-server --save '' --appendonly no --requirepass \"$$REDIS_HOST_PASSWORD\""]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_HOST_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  app:
+    image: nextcloud:35.0.2-apache@sha256:e0b1a2af52c82c07b7a0e8e59878bd8769e704447734d5d238a836982f51b9c8
+    restart: always
+    env_file: nextcloud.env
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - nextcloud-data:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.80.0/24
+volumes:
+  nextcloud-data:
+YAML
+  dbpass=$(jq -er '.db_password' "$secrets/nextcloud.json")
+  redispass=$(jq -er '.redis_password' "$secrets/nextcloud.json")
+  printf 'POSTGRES_USER=nextcloud\nPOSTGRES_DB=nextcloud\nPOSTGRES_PASSWORD=%s\n' "$dbpass" > "$app/postgres.env"
+  printf 'REDIS_HOST_PASSWORD=%s\n' "$redispass" > "$app/redis.env"
+  # The image installs Nextcloud on its first start from these values. Caddy on this server is the only trusted proxy.
+  trusted="$ip"
+  [ -z "$domain" ] || trusted="$trusted $domain"
+  [ -z "$www" ] || trusted="$trusted $www"
+  {
+    printf 'POSTGRES_HOST=postgres\nPOSTGRES_DB=nextcloud\nPOSTGRES_USER=nextcloud\nPOSTGRES_PASSWORD=%s\n' "$dbpass"
+    printf 'REDIS_HOST=redis\nREDIS_HOST_PASSWORD=%s\n' "$redispass"
+    printf 'NEXTCLOUD_ADMIN_USER=%s\nNEXTCLOUD_ADMIN_PASSWORD=%s\n' "$(jq -er '.admin_user' "$secrets/nextcloud.json")" "$(jq -er '.admin_password' "$secrets/nextcloud.json")"
+    printf 'NEXTCLOUD_TRUSTED_DOMAINS=%s\nTRUSTED_PROXIES=172.29.80.0/24\n' "$trusted"
+    printf 'PHP_UPLOAD_LIMIT=2G\nPHP_MEMORY_LIMIT=1G\n'
+    if [ -n "$domain" ]; then
+      printf 'OVERWRITEPROTOCOL=https\nOVERWRITEHOST=%s\nOVERWRITECLIURL=https://%s\n' "$domain" "$domain"
+    else
+      printf 'OVERWRITECLIURL=http://%s\n' "$ip"
+    fi
+  } > "$app/nextcloud.env"
+  unset dbpass redispass
+  chmod 0600 "$app/compose.yaml" "$app/postgres.env" "$app/redis.env" "$app/nextcloud.env"
+  step=download
+  status installing
+  (cd "$app" && timeout 1800 docker compose pull)
+  step=nextcloud
+  status installing
+  (cd "$app" && timeout 300 docker compose up -d --wait postgres redis)
+  touch "$state/stage.3"
+fi
+if [ ! -e "$state/stage.4" ]; then
+  # The first start installs Nextcloud (database, administrator, redis). Nothing is reachable from outside until it has finished.
+  (cd "$app" && timeout 300 docker compose up -d app)
+  ready=0
+  for _ in $(seq 1 240); do
+    if curl --fail --silent --max-time 5 http://127.0.0.1:8080/status.php | jq -e '.installed == true' >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 3
+  done
+  [ "$ready" = 1 ]
+  touch "$state/stage.4"
+fi
+if [ ! -e "$state/stage.5" ]; then
+  occ() { (cd "$app" && timeout 300 docker compose exec -T -u www-data app php occ "$@"); }
+  occ user:setting admin settings email "$email"
+  occ background:cron
+  occ config:system:set maintenance_window_start --type=integer --value=1
+  occ config:system:get memcache.locking | grep -q Redis
+  occ config:system:get memcache.local | grep -q APCu
+  # Background jobs run from the system cron every five minutes; flock keeps two runs from overlapping.
+  printf '*/5 * * * * root /usr/bin/flock -n /run/beltoft-nextcloud-cron.lock docker compose --project-directory %s exec -T -u www-data app php -f cron.php\n' "$app" > /etc/cron.d/beltoft-nextcloud
+  chmod 0644 /etc/cron.d/beltoft-nextcloud
+  systemctl enable --now cron
+  touch "$state/stage.5"
+fi
+step=web
+status installing
+if [ ! -e "$state/stage.6" ]; then
+  # One generator writes the Caddyfile: the site, and with a www name a certified www site that redirects to the domain.
+  # The same generator is run again when the www name starts to point at this server (the plugin writes www.json).
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-caddy <<'CADDY'
+#!/bin/bash
+set -Eeuo pipefail
+domain=${1:?}
+www=${2:-}
+[[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+[[ "$domain" == *.* ]]
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+tmp=$(mktemp /etc/caddy/Caddyfile.XXXXXX)
+{
+  printf '%s {\n' "$domain"
+  cat /etc/caddy/beltoft-site.body
+  printf '}\n'
+  if [ -n "$www" ]; then
+    printf '%s {\n  redir https://%s{uri} permanent\n}\n' "$www" "$domain"
+  fi
+} > "$tmp"
+caddy validate --config "$tmp" --adapter caddyfile >/dev/null 2>&1
+chmod 0644 "$tmp"
+mv -f "$tmp" /etc/caddy/Caddyfile
+CADDY
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-www-apply <<'APPLY'
+#!/bin/bash
+set -Eeuo pipefail
+state=/var/lib/beltoft-app
+f="$state/www.json"
+www=
+report() {
+  printf '{"www":"%s","state":"%s","updated":"%s"}\n' "$www" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/www.status.tmp"
+  mv -f "$state/www.status.tmp" "$state/www.status.json"
+}
+[ -f "$f" ] || exit 0
+trap 'report failed; mv -f "$f" "$state/www.failed" 2>/dev/null || true' ERR
+# The guest agent creates the file before it writes the content: wait until it is complete JSON.
+for _ in $(seq 1 30); do jq -e '.domain and .www' "$f" >/dev/null 2>&1 && break; sleep 1; done
+domain=$(jq -er '.domain' "$f")
+www=$(jq -er '.www' "$f")
+/usr/local/sbin/beltoft-caddy "$domain" "$www"
+systemctl reload caddy
+report ready
+mv -f "$f" "$state/www.done"
+APPLY
+  cat > /etc/systemd/system/beltoft-www.service <<'UNIT'
+[Unit]
+Description=Serve the www name of the app domain
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/beltoft-www-apply
+UNIT
+  cat > /etc/systemd/system/beltoft-www.path <<'UNIT'
+[Unit]
+Description=Watch for a www name to add
+[Path]
+PathExists=/var/lib/beltoft-app/www.json
+Unit=beltoft-www.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now beltoft-www.path
+  printf '  encode zstd gzip\n  header Strict-Transport-Security "max-age=15552000; includeSubDomains"\n  redir /.well-known/carddav /remote.php/dav/ 301\n  redir /.well-known/caldav /remote.php/dav/ 301\n  reverse_proxy 127.0.0.1:8080\n' > /etc/caddy/beltoft-site.body
+  if [ -n "$domain" ]; then
+    /usr/local/sbin/beltoft-caddy "$domain" "$www"
+  else
+    { printf 'http://%s {\n' "$ip"; cat /etc/caddy/beltoft-site.body; printf '}\n'; } > /etc/caddy/Caddyfile
+  fi
+  if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+    fallocate -l 2G /swapfile
+    chmod 0600 /swapfile
+    mkswap /swapfile >/dev/null
+    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+    swapon /swapfile
+  fi
+  systemctl enable --now caddy
+  systemctl restart caddy
+  touch "$state/stage.6"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.7" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+  touch "$state/stage.7"
+fi
+step=verify
+status installing
+curl --fail --silent --show-error --max-time 15 --resolve "${domain:-$ip}:80:$ip" "http://${domain:-$ip}/status.php" -o /dev/null
+[ "$(docker inspect --format '{{.State.Health.Status}}' "$(cd "$app" && docker compose ps -q postgres)")" = healthy ]
+curl --fail --silent --max-time 15 http://127.0.0.1:8080/status.php | jq -e '.installed == true and .maintenance == false' >/dev/null
+jq '{admin_user,admin_password}' "$secrets/nextcloud.json" > "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"
