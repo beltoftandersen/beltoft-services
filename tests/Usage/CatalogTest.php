@@ -146,7 +146,7 @@ class CatalogTest extends UsageTestCase {
 		$html = $this->page();
 
 		$this->assertStringContainsString( 'name="' . ServerPicker::BILLING . '"', $html );
-		$this->assertStringContainsString( 'A card is required.', $html );
+		$this->assertStringNotContainsString( 'A card is required.', $html, 'Every order needs a payment method: nothing to say for pay as you go.' );
 		$this->assertStringContainsString( "\u{20AC}0.0226 per hour, max \u{20AC}16.50 per month excluding VAT", $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( 'value="' . $this->v['u-None']->get_id() . '"', $html, 'No pay as you go card.' );
@@ -262,7 +262,7 @@ class CatalogTest extends UsageTestCase {
 
 		$this->assertStringContainsString( 'name="beltoft_services_billing"', $html );
 		$this->assertStringContainsString( 'value="usage"', $html );
-		$this->assertStringContainsString( 'A card is required.', $html );
+		$this->assertStringNotContainsString( 'A card is required.', $html, 'Every order needs a payment method: nothing to say for pay as you go.' );
 		$this->assertStringContainsString( "data-terms-backups=\"\u{20AC}0.0271 per hour, max \u{20AC}19.80 per month excluding VAT\"", $html );
 		$this->assertStringContainsString( "data-terms=\"\u{20AC}0.0226 per hour, max \u{20AC}16.50 per month excluding VAT\"", $html );
 	}
