@@ -9,227 +9,22 @@ namespace BeltoftServices\Tests;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Crypto;
-use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeClient as FakeRegistrar;
-use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Domains\Prices;
-use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Mcp\Access;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Mcp\Tools;
-use BeltoftServices\Oauth\Clients;
 use BeltoftServices\Oauth\Grants;
 use BeltoftServices\Oauth\Server;
-use BeltoftServices\Product;
-use BeltoftServices\Resource;
+use BeltoftServices\Tests\Mcp\McpTestCase;
+
+require_once __DIR__ . '/Mcp/McpTestCase.php';
 
 /**
  * MCP tests.
  */
-final class McpTest extends TestCase {
-
-	private const REDIRECT = 'https://claude.ai/api/mcp/auth_callback';
-	private const PASSWORD = 'Abcdefghijklmnopqrstuvwxyz012345';
-	private const PEM      = "-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUQ2VydGlmaWNhdGVGb3JUZXN0aW5nMAoGCCqGSM49BAMC\n-----END CERTIFICATE-----\n";
-	private const FP       = '00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF';
-
-	/**
-	 * @var FakeDns
-	 */
-	private $dns;
-
-	public function set_up(): void {
-		parent::set_up();
-
-		$key = base64_encode( random_bytes( 32 ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test key.
-		add_filter( 'beltoft_services_key', fn() => $key );
-		$this->settings( array( 'mcp_enabled' => 1, 'mcp_redirect_uris' => '', 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
-		$this->dns = new FakeDns();
-		$dns       = $this->dns;
-		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
-		add_filter( 'beltoft_services_zone_lock_wait', '__return_zero' );
-		add_filter( 'wp_is_application_passwords_available', '__return_true' );
-		add_filter( 'application_password_is_api_request', '__return_true' );
-		delete_network_option( get_main_network_id(), 'using_application_passwords' );
-		as_unschedule_all_actions( Jobs::SWEEP, array(), Jobs::GROUP );
-
-		global $wp_rest_server;
-		$wp_rest_server = new \WP_REST_Server();
-		do_action( 'rest_api_init', $wp_rest_server );
-	}
-
-	public function tear_down(): void {
-		global $wp_rest_server;
-		$wp_rest_server = null;
-		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] );
-		wp_set_current_user( 0 );
-		Tokens::reset( false );
-		remove_all_filters( 'beltoft_services_mcp_rate_limit' );
-		remove_all_filters( 'beltoft_services_domains_dns' );
-		remove_all_filters( 'beltoft_services_zone_lock_wait' );
-		remove_all_filters( 'beltoft_services_domains_client' );
-
-		parent::tear_down();
-	}
-
-	/**
-	 * A VPS-like resource of the fake driver, ready, with reboot offered.
-	 */
-	private function server( int $user = 0 ): Resource {
-		$driver                   = $this->fake_driver();
-		$driver->customer_actions = array( 'reboot' => 'Reboot', 'start' => 'Start', 'shutdown' => 'Shut down', 'snapshot_take' => 'Snapshot', 'reinstall' => 'Reinstall' );
-		$row                      = $this->service_license( $this->service_product( 'fake', array(), array( 'max' => 3 ) ), array( 'fire' => false ) + ( $user ? array( 'user_id' => $user ) : array() ) );
-
-		return Resource::create( $row, $driver, array(), array( 'state' => 'ready' ) );
-	}
-
-	private function owner( Resource $r ): int {
-		return (int) Resource::find( $r->id() )->license()['user_id'];
-	}
-
-	private function database( int $user = 0 ): Resource {
-		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
-		$license = $this->service_license( $product, array( 'fire' => false ) + ( $user ? array( 'user_id' => $user ) : array() ) );
-		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ), array() );
-		$r->set( array(
-			'state'           => 'ready',
-			'desired'         => 'ready',
-			'db_state'        => 'ready',
-			'db_address'      => '10.64.0.2',
-			'db_ca_pem'       => self::PEM,
-			'db_fingerprint'  => self::FP,
-			'db_reveal'       => Crypto::encrypt( self::PASSWORD ),
-			'db_reveal_until' => time() + DAY_IN_SECONDS,
-		) );
-
-		return Resource::find( $r->id() );
-	}
-
-	private function domain( int $user, string $name = 'example.com' ): Resource {
-		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
-		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
-		$r       = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => $name, 'mode' => 'register', 'zone_ready' => true ) );
-		$r->set( array( 'state' => 'ready' ) );
-		$this->dns->create_zone( $name, array( 'ns1.example.net', 'ns2.example.net' ) );
-
-		return Resource::find( $r->id() );
-	}
-
-	/**
-	 * An OAuth access token for a customer.
-	 */
-	private function oauth( int $user, string $scope = Tokens::READ ): string {
-		$done   = Clients::register( array( 'redirect_uris' => array( self::REDIRECT ) ) );
-		$verifier = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
-		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
-		wp_set_current_user( $user );
-		$result = Server::authorize(
-			array(
-				'client_id'             => $done['client_id'],
-				'redirect_uri'          => self::REDIRECT,
-				'response_type'         => 'code',
-				'code_challenge'        => $challenge,
-				'code_challenge_method' => 'S256',
-				'decision'              => 'approve',
-				'_wpnonce'              => wp_create_nonce( Server::NONCE ),
-			) + ( Tokens::ACTIONS === $scope ? array( 'allow_actions' => '1' ) : array() ),
-			$user,
-			true
-		);
-		parse_str( (string) wp_parse_url( $result['url'], PHP_URL_QUERY ), $q );
-		$tokens = Grants::exchange_code( $q['code'], $done['client_id'], self::REDIRECT, $verifier );
-		$this->assertIsArray( $tokens );
-		wp_set_current_user( 0 );
-
-		return $tokens['access_token'];
-	}
-
-	/**
-	 * A personal token (Application Password) of a customer.
-	 *
-	 * @return array{0: int, 1: string}
-	 */
-	private function personal( int $user, string $scope ): array {
-		$made = Tokens::create( $user, 'Script', $scope );
-		$this->assertIsArray( $made );
-
-		return array( $user, $made['password'] );
-	}
-
-	/**
-	 * Sends a JSON-RPC body the way the web server would: authentication first, then dispatch and post-dispatch filters.
-	 *
-	 * @param array<mixed>|string                  $body Body.
-	 * @param string|array{0: int, 1: string}|null $who  A Bearer token, a personal token (user, secret) or nothing.
-	 */
-	private function post( $body, $who ): \WP_REST_Response {
-		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] );
-		wp_set_current_user( 0 );
-
-		if ( is_string( $who ) ) {
-			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $who;
-			Tokens::reset( false );
-			$error = Server::bearer( null );
-
-			if ( is_wp_error( $error ) ) {
-				$response = rest_convert_error_to_response( $error );
-				$request  = new \WP_REST_Request( 'POST', '/beltoft-mcp/v1/mcp' );
-
-				return apply_filters( 'rest_post_dispatch', $response, rest_get_server(), $request );
-			}
-		} elseif ( is_array( $who ) ) {
-			$_SERVER['PHP_AUTH_USER'] = (string) get_userdata( $who[0] )->user_login;
-			$_SERVER['PHP_AUTH_PW']   = $who[1];
-			wp_set_current_user( (int) apply_filters( 'determine_current_user', false ) );
-		}
-
-		$request = new \WP_REST_Request( 'POST', '/beltoft-mcp/v1/mcp' );
-		$request->set_header( 'content-type', 'application/json' );
-		$request->set_body( is_string( $body ) ? $body : (string) wp_json_encode( $body ) );
-
-		return apply_filters( 'rest_post_dispatch', rest_get_server()->dispatch( $request ), rest_get_server(), $request );
-	}
-
-	/**
-	 * @param array<string, mixed>                 $params Params.
-	 * @param string|array{0: int, 1: string}|null $who    Who.
-	 * @return array<string, mixed> The JSON-RPC reply.
-	 */
-	private function rpc( string $method, array $params, $who, int $id = 1 ): array {
-		$response = $this->post( array( 'jsonrpc' => '2.0', 'id' => $id, 'method' => $method, 'params' => $params ), $who );
-		$this->assertSame( 200, $response->get_status() );
-
-		return $response->get_data();
-	}
-
-	/**
-	 * Calls a tool and gives its result.
-	 *
-	 * @param array<string, mixed>                 $args Arguments.
-	 * @param string|array{0: int, 1: string}|null $who  Who.
-	 * @return array<string, mixed>
-	 */
-	private function tool( string $name, array $args, $who ): array {
-		$reply = $this->rpc( 'tools/call', array( 'name' => $name, 'arguments' => $args ), $who );
-		$this->assertArrayHasKey( 'result', $reply, wp_json_encode( $reply ) );
-
-		return $reply['result'];
-	}
-
-	private function text( array $result ): string {
-		return (string) $result['content'][0]['text'];
-	}
-
-	/**
-	 * @return array<string, mixed>
-	 */
-	private function json( array $result ): array {
-		$this->assertFalse( $result['isError'], $this->text( $result ) );
-
-		return json_decode( $this->text( $result ), true );
-	}
+final class McpTest extends McpTestCase {
 
 	public function test_unauthenticated_gets_401_with_the_challenge(): void {
 		$response = $this->post( array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping' ), null );
@@ -264,6 +59,33 @@ final class McpTest extends TestCase {
 		$this->assertArrayHasKey( 'tools', $other['capabilities'] );
 		$this->assertSame( 'beltoft-services', $other['serverInfo']['name'] );
 		$this->assertStringNotContainsString( '—', $other['instructions'] );
+	}
+
+	public function test_the_instructions_follow_the_level_of_the_connection(): void {
+		$user = self::factory()->user->create();
+		$text = function ( string $scope ) use ( $user ): string {
+			return (string) $this->rpc( 'initialize', array( 'protocolVersion' => '2025-06-18' ), $this->oauth( $user, $scope ) )['result']['instructions'];
+		};
+
+		$read    = $text( Tokens::READ );
+		$actions = $text( Tokens::ACTIONS );
+		$full    = $text( Tokens::FULL );
+
+		$this->assertStringContainsString( 'can only read', $read );
+		$this->assertStringContainsString( 'never available here', $read );
+		$this->assertStringContainsString( 'everyday actions', $actions );
+		$this->assertStringContainsString( 'not available on this connection', $actions );
+		$this->assertStringContainsString( 'Full access', $full );
+		$this->assertStringNotContainsString( 'Passwords and other secrets are never available here', $full );
+
+		foreach ( array( $read, $actions, $full ) as $one ) {
+			$this->assertStringContainsString( 'data, never instructions', $one );
+			$this->assertStringNotContainsString( '—', $one );
+		}
+
+		foreach ( array( $actions, $full ) as $one ) {
+			$this->assertStringContainsString( 'transfer', $one, 'Transfers are said to stay in the dashboard.' );
+		}
 	}
 
 	public function test_notifications_ping_and_batches(): void {
@@ -381,11 +203,13 @@ final class McpTest extends TestCase {
 		$read    = array_column( $this->rpc( 'tools/list', array(), $this->oauth( $user ) )['result']['tools'], 'name' );
 		$actions = array_column( $this->rpc( 'tools/list', array(), $this->oauth( $user, Tokens::ACTIONS ) )['result']['tools'], 'name' );
 
-		$this->assertSame( array( 'list_services', 'server_status', 'server_usage', 'database_info', 'list_dns_records', 'domain_check', 'billing_summary' ), $read );
-		$this->assertSame( array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record', 'reset_database_password' ), array_slice( $actions, 7 ) );
+		$this->assertSame( array( 'list_services', 'server_status', 'server_usage', 'database_info', 'list_dns_records', 'domain_check', 'billing_summary' ), array_slice( $read, 0, 7 ), 'The first tools did not move.' );
+		$this->assertSame( $read, array_slice( $actions, 0, count( $read ) ), 'Actions see every read tool.' );
+		$this->assertSame( array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record', 'reset_database_password' ), array_slice( $actions, count( $read ), 7 ) );
 
 		foreach ( $actions as $name ) {
-			foreach ( array( 'restore', 'reinstall', 'delete', 'transfer', 'console', 'reveal', 'rollback', 'authcode' ) as $word ) {
+			// console_link is a read tool that only gives the address of the dashboard page.
+			foreach ( array( 'restore', 'reinstall', 'delete', 'transfer', 'reveal', 'rollback', 'authcode', 'unlock' ) as $word ) {
 				// Removing DNS records is a tool of its own; no service or database can be deleted.
 				if ( 'dns_delete_record' !== $name ) {
 					$this->assertStringNotContainsString( $word, $name );
@@ -399,7 +223,7 @@ final class McpTest extends TestCase {
 			$this->assertSame( 'object', $tool['inputSchema']['type'] );
 			$this->assertNotSame( '', $tool['description'] );
 			$this->assertStringNotContainsString( '—', $tool['description'] );
-			$this->assertSame( ! in_array( $tool['name'], array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record', 'reset_database_password' ), true ), $tool['annotations']['readOnlyHint'] );
+			$this->assertSame( ! in_array( $tool['name'], array_diff( $actions, $read ), true ), $tool['annotations']['readOnlyHint'], $tool['name'] );
 		}
 	}
 
@@ -429,6 +253,7 @@ final class McpTest extends TestCase {
 	}
 
 	public function test_no_tool_gives_another_customers_resource(): void {
+		add_filter( 'beltoft_services_mcp_rate_limit', static fn() => 0 );
 		$server = $this->server();
 		$db     = $this->database();
 		$domain = $this->domain( self::factory()->user->create() );
@@ -437,14 +262,15 @@ final class McpTest extends TestCase {
 
 		foreach ( array( $server, $db, $domain ) as $r ) {
 			foreach ( Tools::definitions() as $name => $tool ) {
-				if ( ! isset( ( (array) $tool['schema']['properties'] )['id'] ) ) {
+				if ( ! in_array( 'id', (array) ( $tool['schema']['required'] ?? array() ), true ) ) {
 					continue;
 				}
 
-				$args   = array( 'id' => $r->id() ) + ( 'dns_upsert_record' === $name ? array( 'type' => 'A', 'name' => 'www', 'records' => array( array( 'value' => '192.0.2.1' ) ) ) : array() ) + ( in_array( $name, array( 'dns_delete_record' ), true ) ? array( 'type' => 'A', 'name' => 'www' ) : array() );
+				$args   = $this->dummy( $tool['schema'], $r->id() );
 				$result = $this->tool( $name, $args, $token );
 
 				$this->assertTrue( $result['isError'], $name );
+				$this->assertStringNotContainsString( 'required', $this->text( $result ), $name . ' was refused for its arguments, not for its owner.' );
 				$this->assertStringNotContainsString( self::PASSWORD, $this->text( $result ) );
 				$this->assertStringNotContainsString( self::FP, $this->text( $result ) );
 			}
@@ -575,7 +401,7 @@ final class McpTest extends TestCase {
 		$messages = array_column( Events::for_license( (int) $domain->license()['id'] ), 'message' );
 		$this->assertContains( 'Claude: DNS record set (A www)', $messages );
 		$this->assertContains( 'Claude: DNS record removed (A www)', $messages );
-		$this->assertContains( 'Claude: DNS records read', $messages );
+		$this->assertNotContains( 'Claude: DNS records read', $messages, 'Reads leave no row in the history.' );
 	}
 
 	public function test_domain_check_and_billing_summary(): void {
@@ -604,7 +430,8 @@ final class McpTest extends TestCase {
 
 		$this->assertSame( 'ready', $this->json( $this->tool( 'server_status', array( 'id' => $server->id() ), $read ) )['state'] );
 		$this->assertTrue( $this->tool( 'reboot', array( 'id' => $server->id() ), $read )['isError'] );
-		$this->assertCount( 7, $this->rpc( 'tools/list', array(), $read )['result']['tools'] );
+		$this->assertCount( count( Tools::listing( Tokens::READ ) ), $this->rpc( 'tools/list', array(), $read )['result']['tools'] );
+		$this->assertEquals( Tools::listing( Tokens::ACTIONS ), $this->rpc( 'tools/list', array(), $write )['result']['tools'], 'A personal token is never above actions.' );
 		$this->assertTrue( $this->json( $this->tool( 'reboot', array( 'id' => $server->id() ), $write ) )['requested'] );
 		$this->assertSame( 401, $this->post( array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping' ), array( $user, 'abcd efgh ijkl mnop qrst uvwx' ) )->get_status() );
 	}

@@ -252,30 +252,49 @@ final class DomainDanger {
 			return array( 'ok' => true, 'message' => '', 'redirect' => $list );
 		}
 
-		if ( 'auto_renew_on' === $what ) {
-			if ( ! $offer['manual'] ) {
-				return array( 'ok' => true, 'message' => '', 'redirect' => $back );
+		$done = self::set_auto_renew( $subscription, 'auto_renew_on' === $what );
+
+		return array( 'ok' => $done['ok'], 'message' => $done['message'], 'redirect' => $back );
+	}
+
+	/**
+	 * Turns automatic renewal of a subscription on or off and leaves a note on it. The caller has checked that the
+	 * customer owns the subscription and that WooCommerce Subscriptions lets them toggle it (offer(), or
+	 * WCS_My_Account_Auto_Renew_Toggle::can_user_toggle_auto_renewal).
+	 *
+	 * @param \WC_Subscription $subscription The subscription.
+	 * @param bool             $on           Renew by itself.
+	 * @param bool             $by_app       The customer asked a connected app (Claude) to do it, not the page.
+	 * @return array{ok: bool, message: string}
+	 */
+	public static function set_auto_renew( \WC_Subscription $subscription, bool $on, bool $by_app = false ): array {
+		$manual = (bool) $subscription->is_manual();
+
+		if ( $on ) {
+			if ( ! $manual ) {
+				return array( 'ok' => true, 'message' => '' );
 			}
 
-			if ( ! $offer['can_enable'] ) {
-				return array( 'ok' => false, 'message' => __( 'Add a payment method to your account first, then turn auto-renew back on.', 'beltoft-services' ), 'redirect' => $back );
+			// WooCommerce Subscriptions turns auto-renew on only when there is a payment method to charge.
+			if ( ! wc_get_payment_gateway_by_order( $subscription ) ) {
+				return array( 'ok' => false, 'message' => __( 'Add a payment method to your account first, then turn auto-renew back on.', 'beltoft-services' ) );
 			}
 
 			$subscription->set_requires_manual_renewal( false );
-			$subscription->add_order_note( __( 'Customer turned on automatic renewals on the domain page of their account.', 'beltoft-services' ) );
+			$subscription->add_order_note( $by_app ? __( 'Customer turned on automatic renewals through Claude.', 'beltoft-services' ) : __( 'Customer turned on automatic renewals on the domain page of their account.', 'beltoft-services' ) );
 			$subscription->save();
 
-			return array( 'ok' => true, 'message' => __( 'Auto-renew is on.', 'beltoft-services' ), 'redirect' => $back );
+			return array( 'ok' => true, 'message' => __( 'Auto-renew is on.', 'beltoft-services' ) );
 		}
 
-		if ( $offer['manual'] ) {
-			return array( 'ok' => true, 'message' => '', 'redirect' => $back );
+		if ( $manual ) {
+			return array( 'ok' => true, 'message' => '' );
 		}
 
 		$subscription->set_requires_manual_renewal( true );
-		$subscription->add_order_note( __( 'Customer turned off automatic renewals on the domain page of their account.', 'beltoft-services' ) );
+		$subscription->add_order_note( $by_app ? __( 'Customer turned off automatic renewals through Claude.', 'beltoft-services' ) : __( 'Customer turned off automatic renewals on the domain page of their account.', 'beltoft-services' ) );
 		$subscription->save();
 
-		return array( 'ok' => true, 'message' => __( 'Auto-renew is off.', 'beltoft-services' ), 'redirect' => $back );
+		return array( 'ok' => true, 'message' => __( 'Auto-renew is off.', 'beltoft-services' ) );
 	}
 }

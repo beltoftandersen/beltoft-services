@@ -530,13 +530,20 @@ final class OauthTest extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'Read your servers, databases, domains and DNS records', $html );
-		$this->assertStringContainsString( 'restart, start and stop a server, take a snapshot', $html );
+		$this->assertStringContainsString( 'restart, start and stop a server, rename it, take a snapshot', $html );
 		$this->assertStringContainsString( 'claude.ai', $html );
 		$this->assertStringContainsString( 'Not verified', $html );
 		$this->assertStringContainsString( 'ann@example.org', $html );
 		$this->assertStringContainsString( 'asks to run actions too', $html );
-		$this->assertMatchesRegularExpression( '/name="allow_actions" value="0" checked/', $html, 'Read only is the default.' );
-		$this->assertDoesNotMatchRegularExpression( '/name="allow_actions" value="1"[^>]*checked/', $html, 'Actions are never preselected.' );
+		$this->assertMatchesRegularExpression( '/name="level" value="read" checked/', $html, 'Read only is the default.' );
+		$this->assertDoesNotMatchRegularExpression( '/name="level" value="(actions|full)"[^>]*checked/', $html, 'Actions and Full are never preselected.' );
+		$this->assertStringContainsString( '<strong>Full access</strong>', $html );
+		$this->assertStringContainsString( 'name="understand_full"', $html );
+		$this->assertStringContainsString( 'never possible through an app', $html );
+		$this->assertStringContainsString( 'buy and renew services', $html );
+		$this->assertStringContainsString( 'show you passwords once', $html );
+		$this->assertStringContainsString( 'None of these is available yet: today Full access can do the same as Read and actions', $html );
+		$this->assertStringContainsString( 'you connect again to use them', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( '<strong>Read only</strong>', $html );
 		$this->assertStringContainsString( '<strong>Read and actions</strong>', $html );
@@ -571,6 +578,70 @@ final class OauthTest extends TestCase {
 		$this->assertFalse( Server::authorize( array( 'client_id' => $other['client_id'] ) + $base, $user, false )['verified'] );
 		$fake = Clients::register( array( 'redirect_uris' => array( self::REDIRECT ), 'client_name' => 'claude' ) );
 		$this->assertFalse( Server::authorize( array( 'client_id' => $fake['client_id'] ) + $base, $user, false )['verified'] );
+	}
+
+	public function test_full_access_is_a_third_level_that_needs_its_own_tick(): void {
+		$user   = self::factory()->user->create();
+		$client = $this->client();
+		list( $verifier, $challenge ) = $this->pkce();
+
+		// Full is never preselected, even when the app asks for it; the page says what was asked.
+		$page = Server::authorize( array( 'client_id' => $client, 'redirect_uri' => self::REDIRECT, 'response_type' => 'code', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256', 'scope' => 'read actions full' ), $user, false );
+		$this->assertSame( Tokens::FULL, $page['asks'] );
+		$this->assertSame( Tokens::READ, Server::authorize( array( 'client_id' => $client, 'redirect_uri' => self::REDIRECT, 'response_type' => 'code', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256' ), $user, false )['asks'] );
+
+		// Without the tick nothing is connected and the page is shown again.
+		$again = $this->approve( $client, $user, $challenge, false, array( 'level' => 'full' ) );
+		$this->assertSame( 'page', $again['type'] );
+		$this->assertSame( 'full_tick', $again['notice'] );
+
+		// With the tick the grant is full, through the code, the access token and the refresh.
+		$q      = $this->query( $this->approve( $client, $user, $challenge, false, array( 'level' => 'full', 'understand_full' => '1' ) ) );
+		$tokens = Grants::exchange_code( $q['code'], $client, self::REDIRECT, $verifier );
+		$this->assertSame( Tokens::FULL, $tokens['scope'] );
+		$this->assertSame( Tokens::FULL, Grants::authenticate( $tokens['access_token'] )['scope'] );
+		$again = Grants::refresh( $tokens['refresh_token'], $client );
+		$this->assertSame( Tokens::FULL, Grants::authenticate( $again['access_token'] )['scope'] );
+		$this->assertSame( Tokens::FULL, Grants::connections( $user )[0]['scope'] );
+	}
+
+	public function test_the_levels_are_ordered_and_unknown_values_are_read(): void {
+		$this->assertSame( array( 0, 1, 2, 3, 0 ), array_map( array( Tokens::class, 'rank' ), array( '', 'read', 'actions', 'full', 'root' ) ) );
+		$this->assertSame( array( 'read', 'read', 'actions', 'full' ), array_map( array( Tokens::class, 'level' ), array( '', 'root', 'actions', 'full' ) ) );
+		$this->assertSame( array( Tokens::READ, Tokens::ACTIONS, Tokens::FULL ), array_keys( Tokens::levels() ) );
+		$this->assertSame( array( Tokens::READ, Tokens::ACTIONS ), array_keys( Tokens::scopes() ), 'Personal tokens never get full.' );
+		$this->assertContains( 'full', Server::metadata()['scopes_supported'] );
+		$this->assertContains( 'full', Server::resource_metadata()['scopes_supported'] );
+
+		$made = Tokens::create( self::factory()->user->create(), 'Script', 'full' );
+		$this->assertWPError( $made );
+	}
+
+	public function test_a_legacy_actions_tick_still_means_actions_and_a_bad_level_means_read(): void {
+		$user   = self::factory()->user->create();
+		$client = $this->client();
+		list( $verifier, $challenge ) = $this->pkce();
+
+		$legacy = $this->query( $this->approve( $client, $user, $challenge, true ) );
+		$this->assertSame( Tokens::ACTIONS, Grants::exchange_code( $legacy['code'], $client, self::REDIRECT, $verifier )['scope'] );
+
+		list( $verifier, $challenge ) = $this->pkce();
+		$bad = $this->query( $this->approve( $client, $user, $challenge, false, array( 'level' => 'root' ) ) );
+		$this->assertSame( Tokens::READ, Grants::exchange_code( $bad['code'], $client, self::REDIRECT, $verifier )['scope'] );
+	}
+
+	public function test_a_full_grant_works_as_actions_on_the_rest_routes(): void {
+		$user   = self::factory()->user->create();
+		Tokens::use_grant( array( 'user' => $user, 'scope' => Tokens::FULL, 'family' => 'abc', 'client_id' => 'x' ) );
+		$this->assertSame( Tokens::FULL, Tokens::current()['scope'] );
+
+		$post = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/1/actions/reboot' );
+		$this->assertNull( Tokens::gate( null, null, $post ), 'Full may post an action, as actions may.' );
+
+		foreach ( array( 'restore', 'reinstall', 'reset_password', 'delete_snapshot' ) as $blocked ) {
+			$denied = Tokens::gate( null, null, new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/1/actions/' . $blocked ) );
+			$this->assertWPError( $denied, $blocked );
+		}
 	}
 
 	public function test_client_names_are_cleaned(): void {

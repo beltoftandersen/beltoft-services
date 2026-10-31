@@ -9,6 +9,7 @@ namespace BeltoftServices\Account;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Mcp\Access;
+use BeltoftServices\Mcp\Audit;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Oauth\Grants;
 use BeltoftServices\Api\Tokens;
@@ -167,6 +168,8 @@ final class ApiTokens {
 			array(
 				'tokens'   => Tokens::all( $user->ID ),
 				'scopes'   => Tokens::scopes(),
+				'levels'   => Tokens::levels(),
+				'audit'    => array_slice( array_reverse( Audit::lines( $user->ID ) ), 0, 20 ),
 				'result'   => self::$result,
 				'nonce'    => wp_create_nonce( self::NONCE ),
 				'field'    => self::FIELD,

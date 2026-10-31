@@ -92,7 +92,7 @@ final class Server {
 			'code_challenge_methods_supported'      => array( 'S256' ),
 			'token_endpoint_auth_methods_supported' => array( 'none' ),
 			'revocation_endpoint_auth_methods_supported' => array( 'none' ),
-			'scopes_supported'                      => array( Tokens::READ, Tokens::ACTIONS ),
+			'scopes_supported'                      => array( Tokens::READ, Tokens::ACTIONS, Tokens::FULL ),
 		);
 	}
 
@@ -106,7 +106,7 @@ final class Server {
 			'resource'                 => Endpoint::url(),
 			'authorization_servers'    => array( self::issuer() ),
 			'bearer_methods_supported' => array( 'header' ),
-			'scopes_supported'         => array( Tokens::READ, Tokens::ACTIONS ),
+			'scopes_supported'         => array( Tokens::READ, Tokens::ACTIONS, Tokens::FULL ),
 			'resource_name'            => (string) apply_filters( 'beltoft_services_mcp_resource_name', get_bloginfo( 'name' ) ),
 		);
 	}
@@ -346,7 +346,7 @@ final class Server {
 		// phpcs:enable WordPress.Security.NonceVerification
 		$params = array();
 
-		foreach ( array( 'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource', 'decision', 'allow_actions', '_wpnonce' ) as $key ) {
+		foreach ( array( 'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource', 'decision', 'allow_actions', 'level', 'understand_full', '_wpnonce' ) as $key ) {
 			if ( isset( $source[ $key ] ) && is_scalar( $source[ $key ] ) ) {
 				// Not run through a text sanitizer: state and the redirect address must come back exactly as sent.
 				// They are capped, refused when they hold control characters, and escaped where they are printed.
@@ -463,8 +463,9 @@ final class Server {
 				'kind'    => 'consent',
 				'client'  => $client,
 				'host'    => (string) wp_parse_url( $redirect, PHP_URL_HOST ),
-				// The tick for actions is never set from the request: the customer chooses. This only says what the app asked for.
-				'asks_actions' => false !== strpos( ' ' . (string) ( $params['scope'] ?? '' ) . ' ', ' ' . Tokens::ACTIONS . ' ' ),
+				// The choice is never set from the request: the customer chooses. This only says what the app asked for.
+				'asks'         => self::asked( (string) ( $params['scope'] ?? '' ) ),
+				'asks_actions' => Tokens::rank( self::asked( (string) ( $params['scope'] ?? '' ) ) ) >= Tokens::rank( Tokens::ACTIONS ),
 				// Verified: the redirect is on the owner's list and the app calls itself exactly Claude.
 				'verified' => 'Claude' === $client['name'] && in_array( $redirect, Access::redirect_allowlist(), true ),
 				'account'  => self::account( $user_id ),
@@ -479,8 +480,26 @@ final class Server {
 			return $back( 'access_denied', 'The customer did not allow access.' );
 		}
 
-		$scope = ! empty( $params['allow_actions'] ) ? Tokens::ACTIONS : Tokens::READ;
-		$code  = Grants::issue_code( $client['client_id'], $user_id, $scope, $redirect, (string) $params['code_challenge'] );
+		// The page posts level. A page that was open before the update posts allow_actions=1, which is actions.
+		$scope = Tokens::level( (string) ( $params['level'] ?? ( ! empty( $params['allow_actions'] ) ? Tokens::ACTIONS : '' ) ) );
+
+		// Full needs its own tick, checked here and not only in the page: without it the page is shown again.
+		if ( Tokens::FULL === $scope && empty( $params['understand_full'] ) ) {
+			return array(
+				'type'         => 'page',
+				'status'       => 200,
+				'kind'         => 'consent',
+				'client'       => $client,
+				'host'         => (string) wp_parse_url( $redirect, PHP_URL_HOST ),
+				'asks'         => self::asked( (string) ( $params['scope'] ?? '' ) ),
+				'asks_actions' => true,
+				'notice'       => 'full_tick',
+				'verified'     => 'Claude' === $client['name'] && in_array( $redirect, Access::redirect_allowlist(), true ),
+				'account'      => self::account( $user_id ),
+			);
+		}
+
+		$code  = Grants::issue_code( $client['client_id'], $user_id, Tokens::pack( $scope, true ), $redirect, (string) $params['code_challenge'] );
 		$args  = array( 'code' => $code, 'iss' => self::issuer() );
 
 		if ( '' !== $state ) {
@@ -488,6 +507,17 @@ final class Server {
 		}
 
 		return array( 'type' => 'redirect', 'url' => add_query_arg( rawurlencode_deep( $args ), $redirect ) );
+	}
+
+	/**
+	 * The highest level a scope parameter asks for.
+	 *
+	 * @param string $scope Space separated scope parameter.
+	 */
+	private static function asked( string $scope ): string {
+		$words = explode( ' ', ' ' . $scope . ' ' );
+
+		return in_array( Tokens::FULL, $words, true ) ? Tokens::FULL : ( in_array( Tokens::ACTIONS, $words, true ) ? Tokens::ACTIONS : Tokens::READ );
 	}
 
 	/**
