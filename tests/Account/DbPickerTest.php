@@ -422,6 +422,14 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringNotContainsString( 'In-memory', $html );
 	}
 
+	public function test_engines_come_in_registry_order_whatever_order_the_plans_arrive_in(): void {
+		$plans = array( array( 'engine' => 'mssql' ), array( 'engine' => 'valkey' ), array( 'engine' => 'postgres' ) );
+
+		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), \BeltoftServices\Proxmox\DbEngines::ids() );
+		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), array_keys( DbPicker::engines( $plans ) ) );
+		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), array_keys( DbPicker::engines( array_reverse( $plans ) ) ) );
+	}
+
 	public function test_a_third_engine_joins_without_code_and_a_plan_of_any_engine_can_be_posted(): void {
 		$valkey = $this->engine_product( 'valkey' );
 		$mssql  = $this->engine_product( 'mssql' );

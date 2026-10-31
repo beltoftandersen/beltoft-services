@@ -27,9 +27,18 @@ final class DbEngines {
 	private static function map(): array {
 		return array(
 			PostgresEngine::ID => PostgresEngine::class,
-			'mssql'    => MssqlEngine::class,
 			ValkeyEngine::ID => ValkeyEngine::class,
+			'mssql'    => MssqlEngine::class,
 		);
+	}
+
+	/**
+	 * The engine ids in registry order (PostgreSQL, Valkey, SQL Server), the order of the tabs and tiles.
+	 *
+	 * @return string[]
+	 */
+	public static function ids(): array {
+		return array_keys( self::map() );
 	}
 
 	/**
