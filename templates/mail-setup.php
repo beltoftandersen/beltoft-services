@@ -77,7 +77,7 @@ $beltoft_services_clients = array(
 	</ul>
 
 	<p>
-		<?php esc_html_e( 'Thunderbird, Thunderbird for Android and Outlook can usually find these settings themselves from your email address. Apple Mail, the Gmail app and Samsung Email cannot, so enter the settings above by hand. If an app does not find the settings, enter them by hand too.', 'beltoft-services' ); ?>
+		<?php esc_html_e( 'Thunderbird, Thunderbird for Android and Outlook can usually find these settings themselves from your email address. Apple Mail, the Gmail app and Samsung Email cannot, so enter the settings above by hand. For a new email domain this can take up to a day. If an app does not find the settings, enter them by hand too.', 'beltoft-services' ); ?>
 	</p>
 
 	<nav aria-label="<?php esc_attr_e( 'Mail apps', 'beltoft-services' ); ?>">
