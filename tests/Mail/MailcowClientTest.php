@@ -202,4 +202,12 @@ final class MailcowClientTest extends TestCase {
 		$this->assertSame( 'p.example', $b->get_domain( 'p.example' )['domain'] );
 		delete_option( FakeMailcowClient::OPTION );
 	}
+
+	public function test_the_dkim_private_key_never_leaves_the_client(): void {
+		$this->respond_with( fn() => $this->json( array( 'pubkey' => 'PUB', 'length' => '2048', 'dkim_txt' => 'v=DKIM1;k=rsa;t=s;s=email;p=PUB', 'dkim_selector' => 'dkim', 'privkey' => 'SECRET' ) ) );
+		$row = ( new LiveMailcowClient( 'https://mail.example', self::KEY ) )->get_dkim( 'a.example' );
+		$this->assertIsArray( $row );
+		$this->assertArrayNotHasKey( 'privkey', $row );
+		$this->assertSame( 'v=DKIM1;k=rsa;t=s;s=email;p=PUB', $row['dkim_txt'] );
+	}
 }

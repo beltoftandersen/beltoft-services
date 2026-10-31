@@ -67,6 +67,11 @@ final class LiveMailcowClient implements MailcowClient {
 	public function get_dkim( string $domain ) {
 		$row = $this->read_one( 'get/dkim/' . rawurlencode( $domain ) );
 
+		if ( is_array( $row ) ) {
+			// mailcow sends the private key along: it never leaves this method.
+			unset( $row['privkey'] );
+		}
+
 		return is_array( $row ) && empty( $row['dkim_txt'] ) ? null : $row;
 	}
 
