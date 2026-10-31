@@ -92,8 +92,9 @@ final class DbCard {
 				__( '%1$d vCPU, %2$s GB memory, %3$d GB disk', 'beltoft-services' ),
 				(int) ( $plan['cores'] ?? 0 ),
 				(string) round( (int) ( $plan['memory_mb'] ?? 0 ) / 1024, 1 ),
-				(int) ( $plan['disk_gb'] ?? 0 )
+				DbDisk::promised_gb( $r )
 			),
+			'storage'     => DbDisk::view( $r ),
 		);
 	}
 

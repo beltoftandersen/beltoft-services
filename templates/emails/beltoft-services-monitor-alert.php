@@ -10,7 +10,8 @@ $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent
 	/* translators: 1: database name, 2: percent used. */
 	echo esc_html( sprintf( __( '%1$s: the data disk is %2$d percent full.', 'beltoft-services' ), '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' ), $monitor_disk_percent ) );
 	?> <?php esc_html_e( 'When the disk is full, the database stops accepting changes.', 'beltoft-services' ); ?></p>
-	<p><?php esc_html_e( 'Delete data you do not need, or contact support to get a larger disk.', 'beltoft-services' ); ?></p>
+	<p><?php esc_html_e( 'Delete data you do not need, or make the storage larger.', 'beltoft-services' ); ?></p>
+	<?php if ( '' !== (string) ( $monitor_grow_url ?? '' ) ) : ?><p><a href="<?php echo esc_url( $monitor_grow_url ); ?>"><?php esc_html_e( 'Make your storage larger', 'beltoft-services' ); ?></a></p><?php endif; ?>
 <?php elseif ( 'db_down' === $monitor_reason ) : ?>
 	<p><?php
 	/* translators: %s: database name. */

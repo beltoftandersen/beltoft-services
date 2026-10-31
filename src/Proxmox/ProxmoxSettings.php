@@ -54,6 +54,8 @@ final class ProxmoxSettings {
 		'snapshot_max_slots' => array( 1, 50 ),
 		'snapshot_reserve_gb' => array( 0, 10000 ),
 		'ip_reserve_for_vps' => array( 0, 100 ),
+		'db_disk_max_gb'   => array( 1, 65536 ),
+		'db_disk_step_gb'  => array( 1, 1000 ),
 	);
 
 	/**
@@ -237,6 +239,20 @@ final class ProxmoxSettings {
 			'min'     => self::RANGES['ip_reserve_for_vps'][0],
 			'label'   => __( 'Public IP addresses kept for servers', 'beltoft-services' ),
 			'desc'    => __( 'A database with a public IP address is sold out while no more than this many addresses are free, so the last address always stays available to a new server. 0 lets databases take the last one.', 'beltoft-services' ),
+		);
+		$fields['db_disk_max_gb'] = $base + array(
+			'type'    => 'number',
+			'default' => 1000,
+			'min'     => self::RANGES['db_disk_max_gb'][0],
+			'label'   => __( 'Largest database data disk (GB)', 'beltoft-services' ),
+			'desc'    => __( 'A database variation with extra storage that would make the data disk larger than this is not offered and a switch to it is refused.', 'beltoft-services' ),
+		);
+		$fields['db_disk_step_gb'] = $base + array(
+			'type'    => 'number',
+			'default' => 10,
+			'min'     => self::RANGES['db_disk_step_gb'][0],
+			'label'   => __( 'Database extra storage step (GB)', 'beltoft-services' ),
+			'desc'    => __( 'The extra storage of a database variation must be a multiple of this, or it is not offered and a switch to it is refused.', 'beltoft-services' ),
 		);
 		$fields['disk_reserve_gb'] = $base + array( 'type' => 'number', 'default' => 200, 'min' => 0, 'label' => __( 'Storage kept free on each node (GB)', 'beltoft-services' ) );
 		$fields['disk_promise_percent'] = $base + array( 'type' => 'number', 'default' => 100, 'min' => 1, 'label' => __( 'Maximum promised storage (%)', 'beltoft-services' ) );

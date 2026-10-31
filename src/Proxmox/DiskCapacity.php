@@ -25,11 +25,11 @@ final class DiskCapacity {
 		$found = get_transient( 'beltoft_services_disk_products' );
 		if ( false === $found ) {
 			$ids   = get_posts( array( 'post_type' => 'product', 'post_status' => array( 'publish', 'private' ), 'meta_key' => \BeltoftServices\Product::META_DRIVER, 'meta_value' => 'proxmox-disk', 'fields' => 'ids', 'numberposts' => 1 ) ); // phpcs:ignore WordPress.DB.SlowDBQuery -- one row, once every ten minutes.
-			$found = $ids ? 'yes' : 'no';
+			$found = $ids || DbDisk::sold() ? 'yes' : 'no';
 			set_transient( 'beltoft_services_disk_products', $found, 10 * MINUTE_IN_SECONDS );
 		}
 
-		// Snapshots read the storage before each take too.
+		// Databases sold with extra storage and snapshots read the storage too.
 		return (bool) apply_filters( 'beltoft_services_disk_capacity_enabled', 'yes' === $found || (bool) Settings::get( 'snapshots_enabled' ) );
 	}
 
@@ -75,7 +75,7 @@ final class DiskCapacity {
 			$server = Resource::find( (int) $record['resource_id'] );
 			if ( $server && $server->is_live() ) {
 				$plan = (array) $server->get( 'plan' );
-				$promised += max( (int) ( $plan['disk_gb'] ?? 0 ), (int) $server->get( 'disk_gb' ) );
+				$promised += DbDriver::ID === $server->get( 'driver' ) ? DbDisk::promised_gb( $server ) : max( (int) ( $plan['disk_gb'] ?? 0 ), (int) $server->get( 'disk_gb' ) );
 				// Volumes left on the storage by deleted disks stay until the server goes.
 				$promised += (int) array_sum( array_map( 'intval', array_filter( (array) $server->get( 'left_volumes' ), 'is_numeric' ) ) );
 			}

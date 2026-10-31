@@ -304,6 +304,11 @@ final class Stock {
 			if ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() ) {
 				return false;
 			}
+
+			// Extra storage is sold out when the data disk does not fit on a node (a plan without it is not asked).
+			if ( DbDisk::extra( $plan ) > 0 && ! DbDisk::fits_new( $plan ) ) {
+				return false;
+			}
 		} elseif ( 0 === IpPool::free_count() ) {
 			return false;
 		}

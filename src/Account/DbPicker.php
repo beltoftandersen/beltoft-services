@@ -110,8 +110,8 @@ final class DbPicker {
 
 				$numbers = Product::plan( $product->get_id(), $variation->get_id() );
 
-				// The public IP twin of a plan is chosen at checkout: each plan is listed once.
-				if ( \BeltoftServices\Proxmox\DbIp::plan_wants( $numbers ) ) {
+				// The public IP twin and the extra storage steps of a plan are chosen at checkout: each plan is listed once.
+				if ( \BeltoftServices\Proxmox\DbIp::plan_wants( $numbers ) || \BeltoftServices\Proxmox\DbDisk::extra( $numbers ) > 0 ) {
 					continue;
 				}
 

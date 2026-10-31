@@ -58,6 +58,26 @@ $beltoft_services_db_wait = array(
 	<?php if ( '' !== (string) ( $view['limits'] ?? '' ) ) : ?><p class="description"><?php echo esc_html( (string) $view['limits'] ); ?></p><?php endif; ?>
 	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
 
+	<?php if ( 'ready' === $view['kind'] ) : ?>
+		<?php $beltoft_services_storage = $view['storage']; ?>
+		<div class="beltoft-services-vm__more beltoft-services-db__storage">
+			<h4><?php esc_html_e( 'Storage', 'beltoft-services' ); ?></h4>
+			<p><?php echo esc_html( sprintf( /* translators: %d: size of the data disk in GB */ __( 'Your database has %d GB of storage.', 'beltoft-services' ), (int) $beltoft_services_storage['gb'] ) ); ?></p>
+			<?php if ( $beltoft_services_storage['growing'] || $beltoft_services_storage['manual'] ) : ?>
+				<p><?php esc_html_e( 'Your storage is being made larger. The new size appears here when it is ready. Your database stays available. You can leave this page.', 'beltoft-services' ); ?></p>
+			<?php elseif ( array() !== $beltoft_services_storage['options'] ) : ?>
+				<p class="description"><?php esc_html_e( 'You can make the storage larger. It cannot be made smaller again, and the extra storage is part of your database plan until the database is deleted. Your database stays available.', 'beltoft-services' ); ?></p>
+				<ul class="beltoft-services-db__storage-options">
+					<?php foreach ( $beltoft_services_storage['options'] as $beltoft_services_option ) : ?>
+						<li><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_option['url'] ); ?>"><?php echo esc_html( sprintf( /* translators: 1: new size in GB, 2: price difference such as +€8.00 / month */ __( 'Make larger: %1$d GB (%2$s)', 'beltoft-services' ), (int) $beltoft_services_option['total'], (string) $beltoft_services_option['price'] ) ); ?></a></li>
+					<?php endforeach; ?>
+				</ul>
+			<?php elseif ( $beltoft_services_storage['full'] ) : ?>
+				<p><?php esc_html_e( 'No more storage available right now.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( isset( $beltoft_services_db_wait[ $view['kind'] ] ) ) : ?>
 		<p><?php echo esc_html( $beltoft_services_db_wait[ $view['kind'] ] ); ?></p>
 	<?php else : ?>
