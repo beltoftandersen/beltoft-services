@@ -97,8 +97,8 @@ final class Secrets {
 					return new \WP_Error( 'beltoft_services_tool', __( 'The certificate is not available.', 'beltoft-services' ) );
 				}
 
-				/* translators: %s: database name. */
 				return array(
+					/* translators: %s: database name. */
 					'text'  => sprintf( __( 'Show the CA certificate of database %s. It is a public certificate, not a password: it is the text to save as a file so a client can check the database over TLS.', 'beltoft-services' ), $label ),
 					'state' => $id . '|ca',
 				);
