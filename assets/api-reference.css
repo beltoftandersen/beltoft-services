@@ -126,3 +126,12 @@
 .beltoft-services-apiref .beltoft-services-apiref__navpath {
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
 }
+
+/* Phone: stacked tables keep their caption ("Parameters", "Reply fields") on one full-width line. */
+@media (max-width: 767px) {
+	.beltoft-services-apiref table caption {
+		display: block;
+		width: 100%;
+		text-align: left;
+	}
+}
