@@ -43,7 +43,7 @@ final class MailEmailsTest extends MailTestCase {
 		$this->assertStringContainsString( 'https://example.net/email-setup/', (string) $mail['message'] );
 		$this->assertStringContainsString( 'port 993', $text );
 		$this->assertStringContainsString( 'port 465', $text );
-		$this->assertStringContainsString( 'If your mail app does not find the settings by itself', $text );
+		$this->assertStringContainsString( 'Settings to enter by hand', $text );
 		$this->assertStringNotContainsString( "\u{2014}", (string) $mail['message'] );
 	}
 
@@ -66,7 +66,7 @@ final class MailEmailsTest extends MailTestCase {
 		Emails::on_state_changed( $r, 'provisioning', 'ready' );
 
 		$text = $this->text( $this->mails[0] );
-		$this->assertStringContainsString( 'The DNS records are in place', $text );
+		$this->assertStringContainsString( 'The DNS records are in place', (string) preg_replace( '/\s+/', ' ', $text ) );
 		$this->assertStringNotContainsString( 'dkim._domainkey', $text );
 	}
 
