@@ -38,7 +38,8 @@ final class MailField {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render' ), 16 );
+		// Under the billing details: the theme's checkout shows the order notes step only for server and database carts.
+		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'render' ), 20 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );

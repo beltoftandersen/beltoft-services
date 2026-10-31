@@ -236,7 +236,7 @@ final class LiveMailcowClient implements MailcowClient {
 			$name = is_array( $msg ) ? (string) ( $msg[0] ?? '' ) : (string) $msg;
 			$text = is_array( $msg ) ? implode( ' ', array_map( 'strval', array_filter( $msg, 'is_scalar' ) ) ) : (string) $msg;
 			$text = '' === $key ? $text : str_replace( $key, '***', $text );
-			$code = in_array( $name, self::EXISTS, true ) ? 'mailcow_exists' : 'mailcow_error';
+			$code = in_array( $name, self::EXISTS, true ) ? 'mailcow_exists' : ( 'domain_added_sogo_failed' === $name ? 'mailcow_sogo_failed' : 'mailcow_error' );
 
 			return new \WP_Error( $code, 'The mail server refused it: ' . $text, array( 'key' => $name, 'status' => $status ) );
 		}

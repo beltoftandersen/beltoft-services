@@ -126,6 +126,13 @@ final class MailSettings {
 			'label'   => __( 'Let aliases forward to other domains', 'beltoft-services' ),
 		);
 
+		$fields['mail_restart_sogo'] = $server + array(
+			'type'    => 'checkbox',
+			'default' => 1,
+			'label'   => __( 'Restart the calendar and contacts service after a new domain is added', 'beltoft-services' ),
+			'desc'    => __( 'Sends restart_sogo with each new domain, as the mail server\'s own Add domain and restart SOGo does. Without it, calendar and contacts of a new domain work only after the next SOGo restart.', 'beltoft-services' ),
+		);
+
 		$fields['mail_spf_include'] = $dns + array(
 			'type'    => 'text',
 			'default' => '',

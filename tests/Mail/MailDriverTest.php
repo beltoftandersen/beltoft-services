@@ -163,6 +163,28 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertSame( 'someone else', $this->mailcow->domain( 'foreign.example' )['description'] );
 	}
 
+	public function test_a_new_domain_asks_the_mail_server_to_restart_sogo_unless_the_setting_is_off(): void {
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		$this->assertTrue( $this->driver()->provision( $this->mail_resource( 'sogo-on.example' ) )->is_done() );
+		$this->assertSame( '1', $this->mailcow->domain( 'sogo-on.example' )['restart_sogo'] );
+
+		$this->settings( array( 'mail_restart_sogo' => 0 ) );
+		$this->assertTrue( $this->driver()->provision( $this->mail_resource( 'sogo-off.example' ) )->is_done() );
+		$this->assertSame( '0', $this->mailcow->domain( 'sogo-off.example' )['restart_sogo'] );
+	}
+
+	public function test_a_failed_sogo_restart_still_counts_as_added_and_tells_the_admin(): void {
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		$r = $this->mail_resource( 'sogo-fail.example' );
+		// The real server adds the domain and then reports that SOGo could not be restarted.
+		$this->mailcow->add_domain( array( 'domain' => 'sogo-fail.example', 'description' => 'beltoft-services:' . $r->get( 'uuid' ) ) );
+		$this->mailcow->fail_next( 'add_domain', new \WP_Error( 'mailcow_sogo_failed', 'The mail server refused it: domain_added_sogo_failed sogo-fail.example' ) );
+
+		$this->assertTrue( $this->driver()->provision( $r )->is_done() );
+		$this->assertCount( 1, $this->mails, 'The admin is told to restart SOGo.' );
+		$this->assertStringContainsString( 'SOGo', wp_json_encode( $this->mails[0] ) );
+	}
+
 	public function test_a_mail_server_that_does_not_answer_is_retried_and_a_refusal_is_final(): void {
 		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
 		$this->mailcow->fail_next( 'add_domain', new \WP_Error( 'mailcow_transport', 'timeout' ) );

@@ -260,4 +260,13 @@ final class MailCheckoutTest extends MailTestCase {
 		$same = $this->service_product( 'mail', array( 'mailboxes' => 1, 'quota_mb' => 5120, 'aliases' => 20, 'domains' => 1 ), array( 'slug' => 'mail-lim2' ) );
 		$this->assertNotSame( '', $this->switch_message( 7272, $same ), 'Applied limits were higher, so the switch is a downgrade.' );
 	}
+
+	public function test_the_field_is_hooked_under_the_billing_details_which_every_checkout_shows(): void {
+		$this->assertNotFalse( has_action( 'woocommerce_after_checkout_billing_form', array( \BeltoftServices\Mail\MailField::class, 'render' ) ) );
+		$this->assertFalse( has_action( 'woocommerce_after_order_notes', array( \BeltoftServices\Mail\MailField::class, 'render' ) ), 'The order notes step is not shown for an email cart.' );
+	}
+
+	public function test_an_email_cart_needs_the_full_billing_details_like_a_server(): void {
+		$this->assertInstanceOf( \BeltoftServices\Drivers\NeedsBilling::class, \BeltoftServices\Drivers\Registry::get( 'mail' ) );
+	}
 }

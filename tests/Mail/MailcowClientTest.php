@@ -212,4 +212,11 @@ final class MailcowClientTest extends TestCase {
 		$this->assertArrayNotHasKey( 'privkey', $row );
 		$this->assertSame( 'v=DKIM1;k=rsa;t=s;s=email;p=PUB', $row['dkim_txt'] );
 	}
+
+	public function test_a_failed_sogo_restart_has_its_own_error_code(): void {
+		$this->respond_with( fn() => $this->json( array( array( 'type' => 'danger', 'msg' => array( 'domain_added_sogo_failed', 'a.example' ) ) ) ) );
+		$res = ( new LiveMailcowClient( 'https://mail.example', self::KEY ) )->add_domain( array( 'domain' => 'a.example', 'restart_sogo' => '1' ) );
+		$this->assertInstanceOf( \WP_Error::class, $res );
+		$this->assertSame( 'mailcow_sogo_failed', $res->get_error_code() );
+	}
 }

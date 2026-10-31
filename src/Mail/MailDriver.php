@@ -9,6 +9,7 @@ namespace BeltoftServices\Mail;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
@@ -22,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * asks for it (deletion_mode is off by default). Mailboxes and aliases are Mailboxes and Aliases, reached through MailRoutes and the account
  * page (MailCard); the driver has no queued customer actions.
  */
-final class MailDriver implements Driver {
+final class MailDriver implements Driver, NeedsBilling {
 
 	public const ID   = 'mail';
 	public const KIND = 'mail';
@@ -146,7 +147,14 @@ final class MailDriver implements Driver {
 		$limits = self::limits_from( (array) $r->get( 'plan' ) );
 
 		if ( ! in_array( 'domain', $steps, true ) ) {
-			$added = $client->add_domain( array_merge( array( 'domain' => $name, 'active' => '1', 'backupmx' => '0', 'relay_all_recipients' => '0', 'description' => $this->marker( $r ) ), self::domain_attrs( $limits ) ) );
+			$restart = \BeltoftServices\Settings::get( 'mail_restart_sogo' ) ? '1' : '0';
+			$added   = $client->add_domain( array_merge( array( 'domain' => $name, 'active' => '1', 'backupmx' => '0', 'relay_all_recipients' => '0', 'description' => $this->marker( $r ), 'restart_sogo' => $restart ), self::domain_attrs( $limits ) ) );
+
+			// The domain was added, only the restart of the calendar and contacts service failed: go on, and tell the admin.
+			if ( is_wp_error( $added ) && 'mailcow_sogo_failed' === $added->get_error_code() ) {
+				Alerts::admin( $r, 'The domain was added, but the mail server could not restart SOGo. Restart it by hand so calendar and contacts work for this domain.' );
+				$added = true;
+			}
 
 			if ( is_wp_error( $added ) ) {
 				$known = $this->adopt( $r, $client, $name, $added );
