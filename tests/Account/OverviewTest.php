@@ -86,14 +86,17 @@ class OverviewTest extends MonitoringTestCase {
 
 	// -- Empty ---------------------------------------------------------------------------------
 
-	public function test_a_customer_with_nothing_and_no_links_sees_no_section(): void {
+	public function test_a_customer_with_nothing_and_no_links_sees_only_the_empty_service_sections(): void {
 		$this->as_user( self::factory()->user->create() );
 
-		foreach ( array_keys( Overview::SECTIONS ) as $section ) {
+		foreach ( array( 'attention', 'apps', 'licenses', 'next_payment', 'activity', 'welcome' ) as $section ) {
 			$this->assertSame( '', $this->html( $section ), $section );
 		}
 
-		$this->assertSame( '', Overview::all() );
+		foreach ( array( 'servers', 'databases', 'domains', 'mail' ) as $section ) {
+			$this->assertStringContainsString( 'ov__' . $section . ' is-empty', $this->html( $section ), $section );
+			$this->assertStringNotContainsString( 'list-btn', $this->html( $section ), 'No product, no button: ' . $section );
+		}
 	}
 
 	public function test_a_visitor_sees_nothing(): void {
@@ -109,8 +112,12 @@ class OverviewTest extends MonitoringTestCase {
 
 		$this->assertStringContainsString( 'Gift Cards Pro', $this->html( 'licenses' ) );
 
-		foreach ( array( 'attention', 'servers', 'domains', 'next_payment', 'welcome' ) as $section ) {
+		foreach ( array( 'attention', 'next_payment', 'welcome' ) as $section ) {
 			$this->assertSame( '', $this->html( $section ), $section );
+		}
+
+		foreach ( array( 'servers', 'domains' ) as $section ) {
+			$this->assertStringContainsString( 'is-empty', $this->html( $section ), $section );
 		}
 	}
 
@@ -227,7 +234,7 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'DNS with us', $html );
 		$this->assertStringContainsString( 'is-ok', $html );
 		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Domains::url( $dns->license() ) ), $html );
-		$this->assertSame( '', $this->html( 'servers' ) );
+		$this->assertStringContainsString( 'You have no servers yet.', $this->html( 'servers' ) );
 	}
 
 	public function test_a_domain_shows_its_registration_and_expiry(): void {
@@ -587,16 +594,15 @@ class OverviewTest extends MonitoringTestCase {
 		$this->as_user( $user );
 		$html = Overview::all();
 
-		// Only a license: one column, no empty half.
+		// A license and the empty service sections: two columns, the domains on the right.
 		$this->assertStringContainsString( 'beltoft-services-ov__licenses', $html );
-		$this->assertStringContainsString( 'beltoft-services-ov__cols is-single', $html );
-		$this->assertSame( 1, substr_count( $html, 'class="beltoft-services-ov__col"' ) );
+		$this->assertSame( 2, substr_count( $html, 'class="beltoft-services-ov__col"' ) );
 
 		$this->subscription( $user, 'active', 10, 'Server', '15.00' );
 		Overview::reset();
 		$html = Overview::all();
 
-		// License and billing on the left; nothing on the right: still one column, licenses before billing.
+		// License and billing on the left, licenses before billing.
 		$this->assertStringContainsString( 'beltoft-services-ov__money', $html );
 		$this->assertLessThan( strpos( $html, 'beltoft-services-ov__money' ), strpos( $html, 'beltoft-services-ov__licenses' ) );
 		$this->assertStringContainsString( 'style="order:3"', $html );

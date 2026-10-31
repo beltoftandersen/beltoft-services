@@ -297,15 +297,14 @@ class ServiceAreasTest extends TestCase {
 
 		$this->assertStringContainsString( 'beltoft-services-ov__cols', $all );
 		$this->assertStringContainsString( 'order:4', $all, 'Apps keep the reserved slot.' );
-		$this->assertStringContainsString( 'is-single', $all, 'Nothing on the right: one column, no empty half.' );
 		$this->assertLessThan( strpos( $all, 'beltoft-services-ov__apps' ), strpos( $all, 'beltoft-services-ov__databases' ) );
 		$this->assertSame( 'Managed database', Overview::data()['databases'][0]['name'] );
 		$this->assertSame( $app->license()['id'], Overview::data()['apps'] ? $app->license()['id'] : 0 );
 		$this->assertNotNull( $db );
 	}
 
-	public function test_the_overview_has_no_sections_without_databases_or_apps(): void {
-		$this->assertSame( '', Overview::section( 'databases' ) );
+	public function test_the_overview_has_an_empty_databases_section_but_no_apps_section_without_any(): void {
+		$this->assertStringContainsString( 'ov__databases is-empty', Overview::section( 'databases' ) );
 		$this->assertSame( '', Overview::section( 'apps' ) );
 	}
 

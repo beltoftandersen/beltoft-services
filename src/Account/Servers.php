@@ -136,6 +136,29 @@ final class Servers {
 	}
 
 	/**
+	 * The "Create a server" button: the New server page when a server product is published; none otherwise.
+	 *
+	 * @return array<int, array<string, string>>
+	 */
+	public static function buttons(): array {
+		$url = '' !== ServiceArea::product_url( array( 'proxmox' ) ) ? self::url_new() : '';
+
+		/**
+		 * The address of the "Create a server" button. Return '' for no button.
+		 *
+		 * @param string $url New server page, or ''.
+		 */
+		$url = (string) apply_filters( 'beltoft_services_servers_add_url', $url );
+
+		return '' === $url ? array() : array(
+			array(
+				'label' => __( 'Create a server', 'beltoft-services' ),
+				'url'   => $url,
+			),
+		);
+	}
+
+	/**
 	 * Is the address the New server page (the value after the endpoint is "new")?
 	 */
 	public static function is_new(): bool {
@@ -369,12 +392,7 @@ final class Servers {
 	 */
 	private static function list( array $servers, array $others, string $empty, array $resources = array() ): void {
 		$rows    = self::rows( $servers, $resources );
-		$buttons = array(
-			array(
-				'label' => __( 'Create a server', 'beltoft-services' ),
-				'url'   => self::url_new(),
-			),
-		);
+		$buttons = self::buttons();
 
 		if ( $rows ) {
 			ServiceArea::actions( $buttons, false );

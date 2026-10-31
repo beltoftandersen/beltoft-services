@@ -150,8 +150,43 @@ abstract class ServiceArea {
 	 *
 	 * @return array<int, array<string, string>>
 	 */
-	protected function buttons(): array {
+	public function buttons(): array {
 		return array();
+	}
+
+	/**
+	 * The address of the first published product that uses one of the drivers (the product page a customer buys at), or ''.
+	 *
+	 * @param array<int, string> $driver_ids Driver ids.
+	 */
+	public static function product_url( array $driver_ids ): string {
+		$ids = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'orderby'        => 'menu_order title',
+				'order'          => 'ASC',
+				'no_found_rows'  => true,
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- one product, one query.
+					array(
+						'key'     => Product::META_DRIVER,
+						'value'   => $driver_ids,
+						'compare' => 'IN',
+					),
+				),
+			)
+		);
+
+		return $ids ? (string) get_permalink( (int) $ids[0] ) : '';
+	}
+
+	/**
+	 * The text of the area's empty state (an empty list, an empty Overview section).
+	 */
+	public function empty_line(): string {
+		return $this->empty_text();
 	}
 
 	/**

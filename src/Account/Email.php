@@ -52,26 +52,10 @@ final class Email extends ServiceArea {
 	 * filter beltoft_services_email_add_url says. '' when there is none (then there is no button).
 	 */
 	public function url_add(): string {
-		$url = '';
-		$ids = get_posts(
-			array(
-				'post_type'      => 'product',
-				'post_status'    => 'publish',
-				'posts_per_page' => 1,
-				'fields'         => 'ids',
-				'orderby'        => 'menu_order title',
-				'order'          => 'ASC',
-				'meta_key'       => \BeltoftServices\Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one product, one query.
-				'meta_value'     => 'mail', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
-			)
-		);
-
-		if ( $ids ) {
-			$url = (string) get_permalink( (int) $ids[0] );
-		}
+		$url = self::product_url( array( 'mail' ) );
 
 		/**
-		 * The address of the "Add an email domain" button. Return '' for no button.
+		 * The address of the "Create an email domain" button. Return '' for no button.
 		 *
 		 * @param string $url Address of the first email product, or ''.
 		 */
@@ -81,12 +65,12 @@ final class Email extends ServiceArea {
 	/**
 	 * {@inheritDoc}
 	 */
-	protected function buttons(): array {
+	public function buttons(): array {
 		$url = $this->url_add();
 
 		return '' === $url ? array() : array(
 			array(
-				'label' => __( 'Add an email domain', 'beltoft-services' ),
+				'label' => __( 'Create an email domain', 'beltoft-services' ),
 				'url'   => $url,
 			),
 		);

@@ -222,6 +222,10 @@ final class Overview {
 					\BeltoftServices\Proxmox\LiveUsage::enqueue();
 				}
 
+				if ( ! $data['servers'] ) {
+					return self::empty_section( 'servers', __( 'Servers', 'beltoft-services' ), __( 'You have no servers yet.', 'beltoft-services' ), Servers::buttons() );
+				}
+
 				return $data['servers'] ? self::template(
 					'overview/servers.php',
 					array(
@@ -231,6 +235,10 @@ final class Overview {
 					)
 				) : '';
 			case 'domains':
+				if ( ! $data['domains'] ) {
+					return self::empty_section( 'domains', __( 'Domains & DNS', 'beltoft-services' ), __( 'You have no domains yet.', 'beltoft-services' ), Domains::buttons() );
+				}
+
 				return $data['domains'] ? self::template(
 					'overview/rows.php',
 					array(
@@ -244,6 +252,13 @@ final class Overview {
 			case 'databases':
 			case 'apps':
 			case 'mail':
+				// Apps stay out of the Overview until the customer has one; the other areas always show.
+				if ( ! $data[ $section ] && 'apps' !== $section ) {
+					$area = ServiceArea::get( self::AREAS[ $section ] );
+
+					return self::empty_section( $section, $area->label(), $area->empty_line(), $area->buttons() );
+				}
+
 				return $data[ $section ] ? self::template(
 					'overview/rows.php',
 					array(
@@ -289,6 +304,26 @@ final class Overview {
 			default:
 				return $data['welcome'] ? self::template( 'overview/welcome.php', $data['welcome'] ) : '';
 		}
+	}
+
+	/**
+	 * A section for a service area the customer has nothing in: the empty line and the create button.
+	 *
+	 * @param string                            $class   Section name.
+	 * @param string                            $heading Heading.
+	 * @param string                            $empty   Empty text.
+	 * @param array<int, array<string, string>> $buttons Buttons (none without an address).
+	 */
+	private static function empty_section( string $class, string $heading, string $empty, array $buttons ): string {
+		return self::template(
+			'overview/empty.php',
+			array(
+				'class'   => $class,
+				'heading' => $heading,
+				'empty'   => $empty,
+				'buttons' => $buttons,
+			)
+		);
 	}
 
 	/**
