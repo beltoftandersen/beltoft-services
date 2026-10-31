@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * POST /wp-json/beltoft-mcp/v1/mcp. Methods: initialize, notifications/initialized, ping, tools/list, tools/call.
- * Protocol versions 2025-06-18 and 2025-03-26 (a request for another version gets the newest we have, as the
+ * Protocol versions 2025-06-18 and 2025-03-26, without batches (a request for another version gets the newest we have, as the
  * specification says). No server push, so no SSE: GET answers 405.
  *
  * Who may call: a request with an OAuth access token of this site (Oauth\Server::bearer) or a personal token (M1), in
@@ -143,23 +143,14 @@ final class Endpoint {
 			return self::http( self::error( null, -32700, 'Parse error' ), 400 );
 		}
 
-		// A list is a batch (2025-03-26); an object is one message.
-		$batch   = array_is_list( $body ) && array() !== $body;
-		$replies = array();
-
-		foreach ( $batch ? $body : array( $body ) as $message ) {
-			$reply = self::message( is_array( $message ) ? $message : array(), $token );
-
-			if ( null !== $reply ) {
-				$replies[] = $reply;
-			}
+		// No batches (2025-06-18 removed them): one request is one message, so one unit of the rate limit.
+		if ( array() === $body || array_is_list( $body ) ) {
+			return self::http( self::error( null, -32600, 'Invalid Request: batches are not supported' ), 400 );
 		}
 
-		if ( ! $replies ) {
-			return self::http( null, 202 );
-		}
+		$reply = self::message( $body, $token );
 
-		return self::http( $batch ? $replies : $replies[0], 200 );
+		return null === $reply ? self::http( null, 202 ) : self::http( $reply, 200 );
 	}
 
 	/**

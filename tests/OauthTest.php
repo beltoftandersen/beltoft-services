@@ -109,6 +109,15 @@ final class OauthTest extends TestCase {
 	}
 
 	/**
+	 * Makes a used token look used a minute ago.
+	 */
+	private function age_used( string $secret ): void {
+		global $wpdb;
+
+		$wpdb->update( Schema::tables()['grants'], array( 'used_at' => time() - 60 ), array( 'hash' => Grants::hash( $secret ) ) );
+	}
+
+	/**
 	 * A connection made through the whole flow.
 	 *
 	 * @return array{0: array<string, mixed>, 1: string, 2: int} Token response, client, user.
@@ -395,7 +404,8 @@ final class OauthTest extends TestCase {
 		$this->assertNotSame( $first['access_token'], $new['access_token'] );
 		$this->assertNotNull( Grants::authenticate( $new['access_token'] ) );
 
-		// The old refresh token shown again: two parties hold it, so the whole connection ends.
+		// The old refresh token shown again after the retry window: two parties hold it, so the whole connection ends.
+		$this->age_used( $first['refresh_token'] );
 		$replay = $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => $first['refresh_token'], 'client_id' => $client ) );
 		$this->assertSame( 'invalid_grant', $replay->get_data()['error'] );
 		$this->assertNull( Grants::authenticate( $new['access_token'] ) );
@@ -509,7 +519,7 @@ final class OauthTest extends TestCase {
 		$found  = Clients::find( $client['client_id'] );
 		$this->assertStringNotContainsString( '<script>', $found['name'] );
 
-		$result = array( 'kind' => 'consent', 'status' => 200, 'client' => $found, 'host' => 'claude.ai', 'wants' => 'read' );
+		$result = array( 'kind' => 'consent', 'status' => 200, 'client' => $found, 'host' => 'claude.ai', 'verified' => false, 'asks_actions' => true, 'account' => array( 'name' => 'Ann <b>', 'email' => 'ann@example.org' ) );
 		ob_start();
 		( static function ( array $result ): void {
 			$fields = array( 'client_id' => 'a"b', 'state' => 's' );
@@ -522,7 +532,196 @@ final class OauthTest extends TestCase {
 		$this->assertStringContainsString( 'wants to read your servers, databases, domains and DNS', $html );
 		$this->assertStringContainsString( 'and run actions (restart, snapshots, DNS changes)', $html );
 		$this->assertStringContainsString( 'claude.ai', $html );
+		$this->assertStringContainsString( 'Not verified', $html );
+		$this->assertStringContainsString( 'ann@example.org', $html );
+		$this->assertStringContainsString( 'asks to run actions too', $html );
+		$this->assertStringNotContainsString( 'checked', $html );
+		$this->assertStringNotContainsString( '<b>', $html );
+		$this->assertStringContainsString( 'Read only:', $html );
+		$this->assertStringContainsString( 'Read and actions:', $html );
 		$this->assertStringNotContainsString( 'a"b', $html );
 		$this->assertStringNotContainsString( '—', $html );
+	}
+
+	public function test_the_consent_decision_never_preticks_actions_and_shows_the_account(): void {
+		$user   = self::factory()->user->create( array( 'display_name' => 'Ann Example', 'user_email' => 'ann@example.org' ) );
+		$client = $this->client();
+		$base   = array(
+			'client_id'             => $client,
+			'redirect_uri'          => self::REDIRECT,
+			'response_type'         => 'code',
+			'code_challenge'        => $this->pkce()[1],
+			'code_challenge_method' => 'S256',
+			'scope'                 => 'read actions',
+		);
+
+		$page = Server::authorize( $base, $user, false );
+		$this->assertTrue( $page['asks_actions'] );
+		$this->assertTrue( $page['verified'], 'Named exactly Claude, on the owner list.' );
+		$this->assertSame( 'ann@example.org', $page['account']['email'] );
+		$this->assertSame( 'claude.ai', $page['host'] );
+		$this->assertFalse( Server::authorize( array( 'scope' => 'read' ) + $base, $user, false )['asks_actions'] );
+
+		// Without the tick the grant is read only, whatever scope was asked for.
+		$q = $this->query( $this->approve( $client, $user, $base['code_challenge'], false, array( 'scope' => 'read actions' ) ) );
+		$this->assertSame( Tokens::READ, Grants::exchange_code( $q['code'], $client, self::REDIRECT, 'x' ) instanceof \WP_Error ? Tokens::READ : '' );
+
+		$other = Clients::register( array( 'redirect_uris' => array( self::REDIRECT ), 'client_name' => 'Claude Support' ) );
+		$this->assertFalse( Server::authorize( array( 'client_id' => $other['client_id'] ) + $base, $user, false )['verified'] );
+		$fake = Clients::register( array( 'redirect_uris' => array( self::REDIRECT ), 'client_name' => 'claude' ) );
+		$this->assertFalse( Server::authorize( array( 'client_id' => $fake['client_id'] ) + $base, $user, false )['verified'] );
+	}
+
+	public function test_client_names_are_cleaned(): void {
+		$done = Clients::register( array( 'redirect_uris' => array( self::REDIRECT ), 'client_name' => "Cl\x00au\x07de\n" . str_repeat( 'é', 200 ) ) );
+		$name = Clients::find( $done['client_id'] )['name'];
+
+		$this->assertSame( 100, mb_strlen( $name ) );
+		$this->assertDoesNotMatchRegularExpression( '/[\x00-\x1F\x7F]/', $name );
+		$this->assertStringStartsWith( 'Cl', $name );
+	}
+
+	public function test_registration_makes_room_and_idle_clients_are_pruned_after_an_hour(): void {
+		global $wpdb;
+		$t = Schema::tables();
+
+		$old = $this->client();
+		$wpdb->update( $t['clients'], array( 'created_at' => time() - 2 * HOUR_IN_SECONDS ), array( 'client_id' => $old ) );
+		$young = $this->client();
+		$wpdb->update( $t['clients'], array( 'created_at' => time() - 30 * MINUTE_IN_SECONDS ), array( 'client_id' => $young ) );
+		list( , $used ) = $this->connect();
+		$wpdb->update( $t['clients'], array( 'created_at' => time() - 3 * DAY_IN_SECONDS ), array( 'client_id' => $used ) );
+
+		Clients::prune();
+		$this->assertNull( Clients::find( $old ), 'Never used and over an hour old.' );
+		$this->assertNotNull( Clients::find( $young ) );
+		$this->assertNotNull( Clients::find( $used ), 'A client with a grant stays.' );
+
+		// A full table: the oldest idle clients make room instead of the registration being refused.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE client_id <> %s', $t['clients'], $used ) );
+		for ( $i = 0; $i < Clients::MAX; $i++ ) {
+			$wpdb->insert( $t['clients'], array( 'client_id' => 'bsc_' . str_pad( dechex( $i ), 32, '0', STR_PAD_LEFT ), 'name' => 'x', 'redirect_uris' => '[]', 'created_at' => time() - 600 + ( $i % 500 ) ) );
+		}
+		$this->assertIsArray( Clients::register( array( 'redirect_uris' => array( self::REDIRECT ) ) ) );
+		$this->assertNotNull( Clients::find( $used ) );
+		$this->assertLessThanOrEqual( Clients::MAX, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $t['clients'] ) ) );
+	}
+
+	public function test_the_limits_are_per_address_and_per_client(): void {
+		$this->assertSame( 60, (int) apply_filters( 'beltoft_services_oauth_register_limit', 60 ) );
+		$client = $this->client();
+		add_filter( 'beltoft_services_oauth_client_token_limit', static fn() => 2 );
+
+		for ( $i = 0; $i < 2; $i++ ) {
+			$this->assertSame( 400, $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => 'nope', 'client_id' => $client ) )->get_status() );
+		}
+
+		$this->assertSame( 429, $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => 'nope', 'client_id' => $client ) )->get_status() );
+		$this->assertSame( 400, $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => 'nope', 'client_id' => $this->client() ) )->get_status(), 'Another app is counted apart.' );
+		remove_all_filters( 'beltoft_services_oauth_client_token_limit' );
+	}
+
+	public function test_secrets_are_read_from_the_body_only(): void {
+		list( $data, $client ) = $this->connect();
+
+		$request = new \WP_REST_Request( 'POST', '/beltoft-oauth/v1/token' );
+		$request->set_query_params( array( 'refresh_token' => $data['refresh_token'] ) );
+		$request->set_body_params( array( 'grant_type' => 'refresh_token', 'client_id' => $client ) );
+		$response = rest_do_request( $request );
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( 'invalid_request', $response->get_data()['error'] );
+
+		$revoke = new \WP_REST_Request( 'POST', '/beltoft-oauth/v1/revoke' );
+		$revoke->set_query_params( array( 'token' => $data['access_token'], 'client_id' => $client ) );
+		$this->assertSame( 400, rest_do_request( $revoke )->get_status() );
+		$this->assertNotNull( Grants::authenticate( $data['access_token'] ) );
+
+		$only_query = new \WP_REST_Request( 'POST', '/beltoft-oauth/v1/token' );
+		$only_query->set_query_params( array( 'grant_type' => 'refresh_token', 'refresh_token' => $data['refresh_token'], 'client_id' => $client ) );
+		$this->assertSame( 400, rest_do_request( $only_query )->get_status() );
+	}
+
+	public function test_parameters_are_kept_exactly_and_capped(): void {
+		$user   = self::factory()->user->create();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+		$state = 'a b&c=d%20<e>"é+/?#';
+
+		$q = $this->query( $this->approve( $client, $user, $challenge, false, array( 'state' => $state ) ) );
+		$this->assertSame( $state, $q['state'], 'State comes back exactly as sent.' );
+
+		$this->assertSame( 'invalid', Server::authorize( array( '_invalid' => '1', 'client_id' => $client, 'redirect_uri' => self::REDIRECT ), $user, false )['kind'] );
+	}
+
+	public function test_authorization_responses_carry_the_issuer(): void {
+		$user   = self::factory()->user->create();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+
+		$this->assertSame( untrailingslashit( home_url() ), $this->query( $this->approve( $client, $user, $challenge ) )['iss'] );
+		$this->assertSame( untrailingslashit( home_url() ), $this->query( $this->approve( $client, $user, $challenge, false, array( 'decision' => 'deny' ) ) )['iss'] );
+		$this->assertTrue( Server::metadata()['authorization_response_iss_parameter_supported'] );
+	}
+
+	public function test_a_refresh_refresh_drops_the_old_access_token(): void {
+		list( $first, $client ) = $this->connect();
+
+		$second = $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => $first['refresh_token'], 'client_id' => $client ) )->get_data();
+
+		$this->assertNull( Grants::authenticate( $first['access_token'] ) );
+		$this->assertNotNull( Grants::authenticate( $second['access_token'] ) );
+	}
+
+	public function test_the_same_refresh_token_may_be_retried_within_ten_seconds(): void {
+		list( $first, $client ) = $this->connect();
+		$body = array( 'grant_type' => 'refresh_token', 'refresh_token' => $first['refresh_token'], 'client_id' => $client );
+
+		$one = $this->token( $body );
+		$two = $this->token( $body );
+
+		$this->assertSame( 200, $one->get_status() );
+		$this->assertSame( 200, $two->get_status(), 'A lost answer is retried.' );
+		$this->assertNotSame( $one->get_data()['refresh_token'], $two->get_data()['refresh_token'] );
+		$this->assertNull( Grants::authenticate( $one->get_data()['access_token'] ), 'Only the latest pair works.' );
+		$this->assertNotNull( Grants::authenticate( $two->get_data()['access_token'] ) );
+
+		// The newest pair still refreshes.
+		$this->assertSame( 200, $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => $two->get_data()['refresh_token'], 'client_id' => $client ) )->get_status() );
+
+		// After the window the same token ends the connection.
+		$this->age_used( $first['refresh_token'] );
+		$this->assertSame( 400, $this->token( $body )->get_status() );
+		$this->assertNull( Grants::authenticate( $two->get_data()['access_token'] ), 'The replay ended the connection.' );
+	}
+
+	public function test_a_new_password_or_a_deleted_user_revokes_every_connection(): void {
+		list( $data, , $user ) = $this->connect();
+		$this->assertNotNull( Grants::authenticate( $data['access_token'] ) );
+
+		wp_set_password( 'a-brand-new-Passw0rd!', $user );
+		$this->assertNull( Grants::authenticate( $data['access_token'] ) );
+		$this->assertSame( array(), Grants::connections( $user ) );
+
+		list( $data2, , $user2 ) = $this->connect();
+		wp_update_user( array( 'ID' => $user2, 'display_name' => 'Renamed' ) );
+		$this->assertNotNull( Grants::authenticate( $data2['access_token'] ), 'A profile change that is not the password keeps them.' );
+		wp_update_user( array( 'ID' => $user2, 'user_pass' => 'another-Passw0rd-here!' ) );
+		$this->assertNull( Grants::authenticate( $data2['access_token'] ) );
+
+		list( $data3, , $user3 ) = $this->connect();
+		wp_delete_user( $user3 );
+		$this->assertNull( Grants::authenticate( $data3['access_token'] ) );
+
+		list( $data4, , $user4 ) = $this->connect();
+		do_action( 'after_password_reset', get_userdata( $user4 ), 'x' );
+		$this->assertNull( Grants::authenticate( $data4['access_token'] ) );
+	}
+
+	public function test_the_redirect_allowlist_accepts_https_and_localhost_only(): void {
+		$this->settings( array( 'mcp_redirect_uris' => "http://claude.ai/cb\nhttps://ok.example/cb\nhttp://localhost:6274/cb\nhttp://127.0.0.1/cb\nftp://x.example/\njavascript:alert(1)\nhttps://frag.example/cb#x\nhttps://user@host.example/cb" ) );
+
+		$this->assertSame( array( 'https://ok.example/cb', 'http://localhost:6274/cb', 'http://127.0.0.1/cb' ), Access::redirect_allowlist() );
+		$this->assertWPError( Clients::register( array( 'redirect_uris' => array( 'http://claude.ai/cb' ) ) ) );
+		$this->assertIsArray( Clients::register( array( 'redirect_uris' => array( 'https://ok.example/cb' ) ) ) );
 	}
 }

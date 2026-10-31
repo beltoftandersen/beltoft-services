@@ -30,6 +30,11 @@ final class Grants {
 	public const REFRESH_TTL = 30 * DAY_IN_SECONDS;
 
 	/**
+	 * Seconds in which the same refresh token may be sent again (a lost answer) without ending the connection.
+	 */
+	public const RETRY_WINDOW = 10;
+
+	/**
 	 * Seconds between two "last used" writes of one connection.
 	 */
 	private const TOUCH_EVERY = 60;
@@ -111,10 +116,21 @@ final class Grants {
 			return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
 		}
 
-		if ( ! self::take( (int) $row['id'] ) ) {
-			self::revoke_family( (string) $row['family'] );
+		$retry = false;
 
-			return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
+		if ( ! self::take( (int) $row['id'] ) ) {
+			// The same token again within seconds is a client that did not get our answer: it gets a fresh pair, and
+			// the pair made for the first try is dropped. Later, it means two parties hold the token.
+			$again = self::find( 'refresh', $token );
+			$used  = null === $again ? 0 : (int) $again['used_at'];
+
+			if ( null === $again || $used <= 0 || time() - $used > self::RETRY_WINDOW ) {
+				self::revoke_family( (string) $row['family'] );
+
+				return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
+			}
+
+			$retry = true;
 		}
 
 		if ( (int) $row['expires_at'] < time() ) {
@@ -126,6 +142,8 @@ final class Grants {
 
 			return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
 		}
+
+		self::drop_live( (string) $row['family'], $retry );
 
 		return self::issue_tokens( (string) $row['family'], $client_id, (int) $row['user_id'], (string) $row['scope'], (int) $row['connected_at'], (int) $row['last_used'] );
 	}
@@ -190,6 +208,44 @@ final class Grants {
 	}
 
 	/**
+	 * Ends everything a customer has connected (a new password, a deleted account).
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function revoke_user( int $user_id ): void {
+		global $wpdb;
+
+		if ( $user_id > 0 && Schema::ready() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+			$wpdb->delete( Schema::tables()['grants'], array( 'user_id' => $user_id ) );
+		}
+	}
+
+	/**
+	 * Listener of after_password_reset and wp_set_password.
+	 *
+	 * @param mixed $first  User (after_password_reset) or the password (wp_set_password).
+	 * @param mixed $second Nothing, or the user id.
+	 */
+	public static function password_changed( $first, $second = null ): void {
+		self::revoke_user( $first instanceof \WP_User ? (int) $first->ID : (int) $second );
+	}
+
+	/**
+	 * Listener of profile_update: ends the connections when the password hash changed.
+	 *
+	 * @param mixed $user_id  User id.
+	 * @param mixed $old_user The user before the update.
+	 */
+	public static function profile_updated( $user_id, $old_user = null ): void {
+		$now = get_userdata( (int) $user_id );
+
+		if ( $now && $old_user instanceof \WP_User && $old_user->user_pass !== $now->user_pass ) {
+			self::revoke_user( (int) $user_id );
+		}
+	}
+
+	/**
 	 * The apps a customer has connected: one entry per live connection.
 	 *
 	 * @param int $user_id Customer.
@@ -242,6 +298,26 @@ final class Grants {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE expires_at < %d', Schema::tables()['grants'], time() - DAY_IN_SECONDS ) );
+	}
+
+	/**
+	 * Drops the access tokens of a family, and with $all the refresh tokens not used yet, before a new pair is made.
+	 *
+	 * @param string $family Family.
+	 * @param bool   $all    Also the unused refresh tokens.
+	 */
+	private static function drop_live( string $family, bool $all ): void {
+		global $wpdb;
+
+		$t = Schema::tables()['grants'];
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$wpdb->delete( $t, array( 'family' => $family, 'type' => 'access' ) );
+
+		if ( $all ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE family = %s AND type = %s AND used_at IS NULL', $t, $family, 'refresh' ) );
+		}
 	}
 
 	/**

@@ -61,12 +61,13 @@ final class Clients {
 		self::prune();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		if ( (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Schema::tables()['clients'] ) ) >= self::MAX ) {
+		if ( (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Schema::tables()['clients'] ) ) >= self::MAX && ! self::evict() ) {
 			return new \WP_Error( 'temporarily_unavailable', 'Too many registrations. Try again later.' );
 		}
 
-		$name = isset( $meta['client_name'] ) && is_string( $meta['client_name'] ) ? trim( sanitize_text_field( $meta['client_name'] ) ) : '';
-		$name = '' === $name ? 'App' : substr( $name, 0, 100 );
+		$name = isset( $meta['client_name'] ) && is_string( $meta['client_name'] ) ? $meta['client_name'] : '';
+		$name = trim( (string) preg_replace( '/[\x00-\x1F\x7F]+/u', ' ', sanitize_text_field( $name ) ) );
+		$name = '' === $name ? 'App' : mb_substr( $name, 0, 100 );
 		$id   = 'bsc_' . bin2hex( random_bytes( 16 ) );
 		$now  = time();
 
@@ -132,7 +133,7 @@ final class Clients {
 	}
 
 	/**
-	 * Removes clients that were registered over a day ago and never connected.
+	 * Removes clients that were registered over an hour ago and never connected.
 	 */
 	public static function prune(): void {
 		global $wpdb;
@@ -140,6 +141,28 @@ final class Clients {
 		$t = Schema::tables();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own tables.
-		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE created_at < %d AND client_id NOT IN (SELECT client_id FROM %i)', $t['clients'], time() - DAY_IN_SECONDS, $t['grants'] ) );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE created_at < %d AND client_id NOT IN (SELECT client_id FROM %i)', $t['clients'], time() - HOUR_IN_SECONDS, $t['grants'] ) );
+	}
+
+	/**
+	 * Makes room when the table is full: removes the oldest clients that never connected. A client that has a
+	 * grant is never removed here.
+	 *
+	 * @return bool Whether anything was removed.
+	 */
+	public static function evict(): bool {
+		global $wpdb;
+
+		$t = Schema::tables();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own tables.
+		$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT c.client_id FROM %i c LEFT JOIN %i g ON g.client_id = c.client_id WHERE g.id IS NULL ORDER BY c.created_at ASC LIMIT %d', $t['clients'], $t['grants'], max( 1, intdiv( self::MAX, 10 ) ) ) );
+
+		foreach ( (array) $ids as $id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+			$wpdb->delete( $t['clients'], array( 'client_id' => $id ) );
+		}
+
+		return array() !== $ids;
 	}
 }

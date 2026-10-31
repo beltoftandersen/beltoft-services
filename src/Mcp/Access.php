@@ -48,12 +48,27 @@ final class Access {
 		foreach ( preg_split( '/\R/', $text ) ?: array() as $line ) {
 			$line = trim( $line );
 
-			if ( '' !== $line ) {
+			if ( self::acceptable( $line ) ) {
 				$list[] = $line;
 			}
 		}
 
 		return $list;
+	}
+
+	/**
+	 * Only https addresses, and http for localhost or 127.0.0.1 (development), with no fragment.
+	 *
+	 * @param string $uri Address.
+	 */
+	public static function acceptable( string $uri ): bool {
+		$parts = wp_parse_url( $uri );
+
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) || isset( $parts['fragment'] ) || isset( $parts['user'] ) || str_contains( $uri, '#' ) || strlen( $uri ) > 512 ) {
+			return false;
+		}
+
+		return 'https' === ( $parts['scheme'] ?? '' ) || ( 'http' === ( $parts['scheme'] ?? '' ) && in_array( $parts['host'], array( 'localhost', '127.0.0.1' ), true ) );
 	}
 
 	/**

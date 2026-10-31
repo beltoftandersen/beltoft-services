@@ -40,6 +40,11 @@ final class Server {
 	public const NONCE = 'beltoft_oauth_consent';
 
 	/**
+	 * Longest value of an authorization parameter, in bytes.
+	 */
+	public const MAX_PARAM = 512;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -48,6 +53,11 @@ final class Server {
 		add_action( 'template_redirect', array( __CLASS__, 'authorize_page' ), 1 );
 		add_filter( 'rest_authentication_errors', array( __CLASS__, 'bearer' ), 5 );
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'challenge' ), 10, 3 );
+		// A new password, or a deleted account, ends every connected app.
+		add_action( 'after_password_reset', array( Grants::class, 'password_changed' ) );
+		add_action( 'wp_set_password', array( Grants::class, 'password_changed' ), 10, 2 );
+		add_action( 'profile_update', array( Grants::class, 'profile_updated' ), 10, 2 );
+		add_action( 'delete_user', array( Grants::class, 'revoke_user' ) );
 	}
 
 	/**
@@ -76,6 +86,7 @@ final class Server {
 			'token_endpoint'                        => rest_url( self::NAMESPACE . '/token' ),
 			'registration_endpoint'                 => rest_url( self::NAMESPACE . '/register' ),
 			'revocation_endpoint'                   => rest_url( self::NAMESPACE . '/revoke' ),
+			'authorization_response_iss_parameter_supported' => true,
 			'response_types_supported'              => array( 'code' ),
 			'grant_types_supported'                 => array( 'authorization_code', 'refresh_token' ),
 			'code_challenge_methods_supported'      => array( 'S256' ),
@@ -172,7 +183,7 @@ final class Server {
 			return self::oauth_error( 'temporarily_unavailable', 'This feature is turned off.', 503 );
 		}
 
-		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-oauth:register', (int) apply_filters( 'beltoft_services_oauth_register_limit', 10 ), HOUR_IN_SECONDS ) ) {
+		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-oauth:register', (int) apply_filters( 'beltoft_services_oauth_register_limit', 60 ), HOUR_IN_SECONDS ) ) {
 			return self::oauth_error( 'temporarily_unavailable', 'Too many requests.', 429 );
 		}
 
@@ -196,8 +207,12 @@ final class Server {
 			return self::oauth_error( 'temporarily_unavailable', 'This feature is turned off.', 503 );
 		}
 
-		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-oauth:token', (int) apply_filters( 'beltoft_services_oauth_token_limit', 60 ) ) ) {
+		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-oauth:token', (int) apply_filters( 'beltoft_services_oauth_token_limit', 600 ) ) ) {
 			return self::oauth_error( 'temporarily_unavailable', 'Too many requests.', 429 );
+		}
+
+		if ( self::secret_in_query( $request ) ) {
+			return self::oauth_error( 'invalid_request', 'Send secrets in the request body, not the address.', 400 );
 		}
 
 		$client = Clients::find( self::param( $request, 'client_id' ) );
@@ -206,12 +221,17 @@ final class Server {
 			return self::oauth_error( 'invalid_client', 'Unknown client.', 401 );
 		}
 
+		// Claude's requests all come from a few addresses, so each app is counted as well.
+		if ( RateLimit::exceeded( 'c_' . $client['client_id'], 'beltoft-oauth:token-client', (int) apply_filters( 'beltoft_services_oauth_client_token_limit', 60 ) ) ) {
+			return self::oauth_error( 'temporarily_unavailable', 'Too many requests.', 429 );
+		}
+
 		$type = self::param( $request, 'grant_type' );
 
 		if ( 'authorization_code' === $type ) {
-			$result = Grants::exchange_code( self::param( $request, 'code' ), $client['client_id'], self::param( $request, 'redirect_uri' ), self::param( $request, 'code_verifier' ) );
+			$result = Grants::exchange_code( self::secret( $request, 'code' ), $client['client_id'], self::param( $request, 'redirect_uri' ), self::secret( $request, 'code_verifier' ) );
 		} elseif ( 'refresh_token' === $type ) {
-			$result = Grants::refresh( self::param( $request, 'refresh_token' ), $client['client_id'] );
+			$result = Grants::refresh( self::secret( $request, 'refresh_token' ), $client['client_id'] );
 		} else {
 			return self::oauth_error( 'unsupported_grant_type', 'Use authorization_code or refresh_token.', 400 );
 		}
@@ -229,13 +249,17 @@ final class Server {
 			return self::oauth_error( 'temporarily_unavailable', 'Too many requests.', 429 );
 		}
 
+		if ( self::secret_in_query( $request ) ) {
+			return self::oauth_error( 'invalid_request', 'Send secrets in the request body, not the address.', 400 );
+		}
+
 		$client = Clients::find( self::param( $request, 'client_id' ) );
 
 		if ( null === $client ) {
 			return self::oauth_error( 'invalid_client', 'Unknown client.', 401 );
 		}
 
-		Grants::revoke_token( self::param( $request, 'token' ), $client['client_id'] );
+		Grants::revoke_token( self::secret( $request, 'token' ), $client['client_id'] );
 
 		return self::reply( new \stdClass(), 200 );
 	}
@@ -324,7 +348,16 @@ final class Server {
 
 		foreach ( array( 'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource', 'decision', 'allow_actions', '_wpnonce' ) as $key ) {
 			if ( isset( $source[ $key ] ) && is_scalar( $source[ $key ] ) ) {
-				$params[ $key ] = sanitize_text_field( wp_unslash( (string) $source[ $key ] ) );
+				// Not run through a text sanitizer: state and the redirect address must come back exactly as sent.
+				// They are capped, refused when they hold control characters, and escaped where they are printed.
+				$value = wp_unslash( (string) $source[ $key ] );
+
+				if ( strlen( $value ) > self::MAX_PARAM || 1 === preg_match( '/[\x00-\x1F\x7F]/', $value ) ) {
+					$params['_invalid'] = '1';
+					continue;
+				}
+
+				$params[ $key ] = $value;
 			}
 		}
 
@@ -341,7 +374,7 @@ final class Server {
 		}
 
 		if ( 'login' === $result['type'] ) {
-			wp_safe_redirect( wp_login_url( add_query_arg( self::query( $params ), self::authorize_url() ) ) );
+			wp_safe_redirect( wp_login_url( add_query_arg( rawurlencode_deep( self::query( $params ) ), self::authorize_url() ) ) );
 			exit;
 		}
 
@@ -380,6 +413,10 @@ final class Server {
 			return $fail( 'off', 404 );
 		}
 
+		if ( ! empty( $params['_invalid'] ) ) {
+			return $fail( 'invalid' );
+		}
+
 		$client   = Clients::find( (string) ( $params['client_id'] ?? '' ) );
 		$redirect = (string) ( $params['redirect_uri'] ?? '' );
 
@@ -390,7 +427,7 @@ final class Server {
 
 		$state = (string) ( $params['state'] ?? '' );
 		$back  = static function ( string $error, string $text ) use ( $redirect, $state ): array {
-			$args = array( 'error' => $error, 'error_description' => $text );
+			$args = array( 'error' => $error, 'error_description' => $text, 'iss' => self::issuer() );
 
 			if ( '' !== $state ) {
 				$args['state'] = $state;
@@ -426,7 +463,11 @@ final class Server {
 				'kind'    => 'consent',
 				'client'  => $client,
 				'host'    => (string) wp_parse_url( $redirect, PHP_URL_HOST ),
-				'wants'   => Tokens::ACTIONS === ( $params['scope'] ?? '' ) ? Tokens::ACTIONS : Tokens::READ,
+				// The tick for actions is never set from the request: the customer chooses. This only says what the app asked for.
+				'asks_actions' => false !== strpos( ' ' . (string) ( $params['scope'] ?? '' ) . ' ', ' ' . Tokens::ACTIONS . ' ' ),
+				// Verified: the redirect is on the owner's list and the app calls itself exactly Claude.
+				'verified' => 'Claude' === $client['name'] && in_array( $redirect, Access::redirect_allowlist(), true ),
+				'account'  => self::account( $user_id ),
 			);
 		}
 
@@ -440,13 +481,28 @@ final class Server {
 
 		$scope = ! empty( $params['allow_actions'] ) ? Tokens::ACTIONS : Tokens::READ;
 		$code  = Grants::issue_code( $client['client_id'], $user_id, $scope, $redirect, (string) $params['code_challenge'] );
-		$args  = array( 'code' => $code );
+		$args  = array( 'code' => $code, 'iss' => self::issuer() );
 
 		if ( '' !== $state ) {
 			$args['state'] = $state;
 		}
 
 		return array( 'type' => 'redirect', 'url' => add_query_arg( rawurlencode_deep( $args ), $redirect ) );
+	}
+
+	/**
+	 * The account the customer is signed in as, for the consent page.
+	 *
+	 * @param int $user_id Customer.
+	 * @return array{name: string, email: string}
+	 */
+	private static function account( int $user_id ): array {
+		$user = get_userdata( $user_id );
+
+		return array(
+			'name'  => $user ? (string) $user->display_name : '',
+			'email' => $user ? (string) $user->user_email : '',
+		);
 	}
 
 	/**
@@ -492,6 +548,28 @@ final class Server {
 		$value = $request->get_param( $key );
 
 		return is_string( $value ) ? trim( $value ) : '';
+	}
+
+	/**
+	 * A secret of the request body (a code, a token, a verifier). The address is never read for these: it ends up in logs.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @param string           $key     Name.
+	 */
+	private static function secret( \WP_REST_Request $request, string $key ): string {
+		$body  = array_merge( (array) $request->get_body_params(), is_array( $request->get_json_params() ) ? $request->get_json_params() : array() );
+		$value = $body[ $key ] ?? '';
+
+		return is_string( $value ) ? trim( $value ) : '';
+	}
+
+	/**
+	 * Did the request put a secret in its address?
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	private static function secret_in_query( \WP_REST_Request $request ): bool {
+		return (bool) array_intersect( array( 'code', 'refresh_token', 'token', 'code_verifier' ), array_keys( (array) $request->get_query_params() ) );
 	}
 
 	/**
