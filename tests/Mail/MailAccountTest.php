@@ -306,6 +306,19 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'Open webmail', $this->page( Resource::find( $r->id() ), 'settings' ), 'Webmail is https only.' );
 	}
 
+	public function test_the_connect_tab_links_to_the_setup_guide_only_when_the_setting_is_set(): void {
+		$r = $this->ready_mail( 'guide.example', array(), $this->user );
+
+		$this->assertStringNotContainsString( 'Setup guide for your mail app', $this->page( $r, 'settings' ) );
+
+		$this->settings( array( 'mail_guide_url' => 'https://example.net/mail-setup/' ) );
+		$html = $this->page( Resource::find( $r->id() ), 'settings' );
+		$this->assertStringContainsString( '<a href="https://example.net/mail-setup/">Setup guide for your mail app</a>', $html );
+
+		$this->settings( array( 'mail_guide_url' => '' ) );
+		$this->assertStringNotContainsString( 'Setup guide for your mail app', $this->page( Resource::find( $r->id() ), 'settings' ) );
+	}
+
 	public function test_the_overview_lists_email_domains_like_other_services(): void {
 		$r = $this->ready_mail( 'dash.example', array(), $this->user );
 		$this->assertContains( 'mail', array_keys( Overview::SECTIONS ) );

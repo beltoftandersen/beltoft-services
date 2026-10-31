@@ -50,6 +50,7 @@ final class Plugin {
 		Proxmox\ProxmoxSettings::register();
 		Domains\DomainSettings::register();
 		Mail\MailSettings::register();
+		Mail\MailSetup::register();
 		Mail\MailDns::register();
 		Mail\MailJobs::register();
 		Mail\MailRoutes::register();

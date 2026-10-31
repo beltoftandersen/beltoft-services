@@ -102,6 +102,12 @@ final class MailSettings {
 			'default' => '',
 			'label'   => __( 'Webmail address', 'beltoft-services' ),
 		);
+		$fields['mail_guide_url'] = $server + array(
+			'type'    => 'url',
+			'default' => '',
+			'label'   => __( 'Setup guide URL', 'beltoft-services' ),
+			'desc'    => __( 'Address of a public page that holds the shortcode [beltoft_services_mail_setup]. When set, the Connect tab links to it. Empty means no link.', 'beltoft-services' ),
+		);
 		$fields['mail_reserved_domains'] = $server + array(
 			'type'    => 'textarea',
 			'default' => '',
