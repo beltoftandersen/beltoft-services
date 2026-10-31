@@ -21,6 +21,8 @@ trait CallsTools {
 	 * Turns the connector on and sets up the REST server and Application Passwords the way the MCP tests need them.
 	 */
 	protected function mcp_set_up(): void {
+		// Application Passwords note the caller's address; a test before this one may have unset it.
+		$_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 		$key = base64_encode( random_bytes( 32 ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test key.
 		add_filter( 'beltoft_services_key', fn() => $key );
 		$this->settings( array( 'mcp_enabled' => 1, 'mcp_redirect_uris' => '' ) );
