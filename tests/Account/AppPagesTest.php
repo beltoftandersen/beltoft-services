@@ -90,7 +90,9 @@ class AppPagesTest extends TestCase {
 		$method = new \ReflectionMethod( ServiceArea::class, 'page_redirect' );
 		$method->setAccessible( true );
 
-		return (string) $method->invoke( null );
+		$result = $method->invoke( null );
+
+		return (string) $result[0];
 	}
 
 	public function test_the_parts_after_the_service_are_cleaned_and_kept(): void {
@@ -334,5 +336,36 @@ class AppPagesTest extends TestCase {
 		remove_all_filters( 'beltoft_services_account_page_chrome' );
 		$this->go( 'odoowoo/shop' );
 		$this->assertStringContainsString( 'All apps', $this->render( $app ) );
+	}
+
+	public function test_the_redirect_hook_may_ask_for_a_temporary_redirect(): void {
+		$app = $this->app( $this->user );
+		Slugs::for_license( $app->license() );
+		add_filter( 'beltoft_services_account_page_redirect', static fn() => array( 'url' => 'https://example.org/first/', 'status' => 302 ) );
+		$this->go( 'odoowoo/shop/tab' );
+
+		$method = new \ReflectionMethod( ServiceArea::class, 'page_redirect' );
+		$method->setAccessible( true );
+		$this->assertSame( array( 'https://example.org/first/', 302 ), $method->invoke( null ) );
+
+		remove_all_filters( 'beltoft_services_account_page_redirect' );
+		add_filter( 'beltoft_services_account_page_redirect', static fn() => array( 'url' => 'https://example.org/x/', 'status' => 999 ) );
+		$this->assertSame( array( 'https://example.org/x/', 301 ), $method->invoke( null ), 'Only 301, 302 and 303.' );
+	}
+
+	public function test_a_tab_can_carry_attributes_and_start_hidden(): void {
+		ob_start();
+		ServiceArea::tab_nav(
+			array(
+				'a' => array( 'title' => 'One', 'url' => 'https://example.org/one/' ),
+				'b' => array( 'title' => 'Two', 'url' => 'https://example.org/two/', 'attrs' => array( 'data-x' => 'y"z' ), 'hidden' => true ),
+			),
+			'a',
+			'Sections'
+		);
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<a href="https://example.org/two/" data-x="y&quot;z" hidden>Two</a>', $html );
+		$this->assertStringContainsString( '<a href="https://example.org/one/" aria-current="page">One</a>', $html );
 	}
 }
