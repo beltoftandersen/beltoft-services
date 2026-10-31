@@ -71,6 +71,7 @@ final class Plugin {
 		Checkout::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
+		Account\Slugs::register();
 		Account\Servers::register();
 		Account\Domains::register();
 		Account\DomainPage::register();

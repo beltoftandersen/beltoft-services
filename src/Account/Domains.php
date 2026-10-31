@@ -53,6 +53,19 @@ final class Domains {
 	 */
 	public static function register(): void {
 		add_filter( 'wc_get_template', array( __CLASS__, 'template' ), 10, 3 );
+		add_action( 'template_redirect', array( __CLASS__, 'redirect' ) );
+	}
+
+	/**
+	 * Early on a My Account address: a domain's page by license id goes to its slug address (301).
+	 */
+	public static function redirect(): void {
+		$target = Slugs::redirect_target( self::slug(), 'domains', array( __CLASS__, 'url' ) );
+
+		if ( '' !== $target ) {
+			wp_safe_redirect( $target, 301 );
+			exit;
+		}
 	}
 
 	/**
@@ -97,7 +110,7 @@ final class Domains {
 			return '';
 		}
 
-		$value = (string) (int) $license['id'] . ( in_array( $tab, self::tabs(), true ) ? '/' . $tab : '' );
+		$value = Slugs::value( $license, in_array( $tab, self::tabs(), true ) ? $tab : '' );
 
 		return wc_get_endpoint_url( self::slug(), $value, wc_get_page_permalink( 'myaccount' ) );
 	}
@@ -165,22 +178,17 @@ final class Domains {
 	}
 
 	/**
-	 * What the address after the endpoint says: the license id, the tab, and whether it is the add page.
+	 * What the address after the endpoint says: the license id (from the domain's slug, or the number itself), the tab, and whether it is the add page.
 	 *
 	 * @return array{id: int, tab: string, add: bool}
 	 */
 	public static function requested(): array {
-		global $wp;
-
-		$value = is_object( $wp ) && isset( $wp->query_vars[ self::slug() ] ) ? (string) $wp->query_vars[ self::slug() ] : '';
-		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
-		$id    = isset( $parts[0] ) && ctype_digit( $parts[0] ) ? (int) $parts[0] : 0;
-		$tab   = isset( $parts[1] ) ? sanitize_key( $parts[1] ) : '';
+		$asked = Slugs::parse( self::slug(), 'domains' );
 
 		return array(
-			'id'  => $id,
-			'tab' => in_array( $tab, self::tabs(), true ) ? $tab : '',
-			'add' => self::ADD_VALUE === $parts[0],
+			'id'  => $asked['id'],
+			'tab' => in_array( $asked['second'], self::tabs(), true ) ? $asked['second'] : '',
+			'add' => self::ADD_VALUE === $asked['first'],
 		);
 	}
 
@@ -255,7 +263,7 @@ final class Domains {
 			return;
 		}
 
-		if ( $asked['id'] > 0 ) {
+		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( self::slug(), 'domains' ) ) ) {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'That domain was not found. Here are your domains.', 'beltoft-services' ) . '</p>';
 		}
 
