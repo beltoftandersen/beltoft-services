@@ -92,8 +92,8 @@ final class DbTermsField {
 			return;
 		}
 
-		$link  = '<a href="' . esc_url( $terms->terms_url() ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'terms', 'beltoft-services' ) . '</a>';
-		$label = wp_kses( sprintf( $terms->terms_label(), $link ), array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) ) );
+		$link  = '<a href="' . esc_url( $terms->terms_url() ) . '" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">' . esc_html__( 'terms', 'beltoft-services' ) . '</a>';
+		$label = wp_kses( sprintf( $terms->terms_label(), $link ), array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true, 'style' => true ) ) );
 
 		// Inline styles: next to WooCommerce's own terms row, whatever the theme does to a bold form label.
 		echo '<p class="form-row validate-required beltoft-services-db-terms" id="' . esc_attr( self::POST_KEY ) . '_field"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox" style="display:flex;align-items:baseline;gap:8px;font-weight:400">';
