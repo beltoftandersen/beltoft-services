@@ -82,7 +82,7 @@ final class Tokens {
 	}
 
 	/**
-	 * The password of the current request: array(uuid, user, scope) or null.
+	 * The password of the current request: array(uuid, user, scope, and for an OAuth grant client) or null.
 	 *
 	 * @var array<string, mixed>|null
 	 */
@@ -110,6 +110,7 @@ final class Tokens {
 			'uuid'  => 'oauth_' . $grant['family'],
 			'user'  => (int) $grant['user'],
 			'scope' => self::level( (string) $grant['scope'] ),
+			'client' => (string) ( $grant['client_id'] ?? '' ),
 		);
 	}
 

@@ -169,6 +169,15 @@ final class Retention {
 	}
 
 	/**
+	 * Is this a domain registration (not DNS hosting)? Its deletion is never asked for or announced.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function is_registration( Resource $r ): bool {
+		return 'domain' === (string) $r->get( 'driver' );
+	}
+
+	/**
 	 * Warns, reports or requests the deletion of one resource, if it is due.
 	 *
 	 * @param Resource $r    Resource.
@@ -176,6 +185,11 @@ final class Retention {
 	 */
 	private static function check( Resource $r, string $mode ): void {
 		if ( ! $r->is_valid() || ! $r->is_live() || $r->get( 'protected' ) || 'paused' !== $r->get( 'desired' ) || $r->folded_into() > 0 ) {
+			return;
+		}
+
+		// A domain registration is never warned about or deleted here: it is never deleted. It runs out at the registrar.
+		if ( self::is_registration( $r ) ) {
 			return;
 		}
 

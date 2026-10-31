@@ -2,6 +2,18 @@
 /** HTML customer monitoring email. @package BeltoftServices */
 defined( 'ABSPATH' ) || exit;
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce email hook.
+?>
+<p>
+<?php
+if ( '' !== (string) ( $customer_name ?? '' ) ) {
+	/* translators: %s: customer's first name. */
+	printf( esc_html__( 'Hi %s,', 'beltoft-services' ), esc_html( $customer_name ) );
+} else {
+	esc_html_e( 'Hi,', 'beltoft-services' );
+}
+?>
+</p>
+<?php
 $beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your server', 'beltoft-services' );
 $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu' ), true );
 ?>

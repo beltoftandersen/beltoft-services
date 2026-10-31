@@ -174,6 +174,53 @@ final class ServerName {
 		return '' !== $name ? $name : View::product_name( $license );
 	}
 
+	/**
+	 * What a customer email calls this service: the domain name for a domain, the zone for DNS hosting, "Extra disk
+	 * 50 GB on web1" for a disk, the engine for a database, else display().
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $license License row.
+	 */
+	public static function email_label( Resource $r, array $license ): string {
+		$driver = (string) $r->get( 'driver' );
+
+		// A domain is named by its domain name (the registration), and DNS hosting by the zone it serves.
+		if ( 'domain' === $driver && '' !== (string) $r->get( 'domain' ) ) {
+			return (string) $r->get( 'domain' );
+		}
+
+		if ( 'dns' === $driver && '' !== (string) $r->get( 'domain' ) ) {
+			/* translators: %s: domain name. */
+			return sprintf( __( 'DNS hosting for %s', 'beltoft-services' ), (string) $r->get( 'domain' ) );
+		}
+
+		// An extra disk: its size and the server it belongs to.
+		if ( DiskDriver::ID === $driver && (int) $r->get( 'size_gb' ) > 0 ) {
+			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+			$on     = $server ? self::of( $server ) : '';
+
+			if ( '' !== $on ) {
+				/* translators: 1: size in GB, 2: server name. */
+				return sprintf( __( 'Extra disk %1$d GB on %2$s', 'beltoft-services' ), (int) $r->get( 'size_gb' ), $on );
+			}
+
+			/* translators: %d: size in GB. */
+			return sprintf( __( 'Extra disk %d GB', 'beltoft-services' ), (int) $r->get( 'size_gb' ) );
+		}
+
+		// A managed database: its engine and version.
+		if ( DbDriver::ID === $driver ) {
+			$label = DbEngines::for_resource( $r )->label( (array) $r->get( 'plan' ) );
+
+			if ( '' !== $label ) {
+				/* translators: %s: engine and version, such as "PostgreSQL 18". */
+				return sprintf( __( '%s database', 'beltoft-services' ), $label );
+			}
+		}
+
+		return self::display( $r, $license );
+	}
+
 	// -- Classic checkout ---------------------------------------------------------------------
 
 	/**

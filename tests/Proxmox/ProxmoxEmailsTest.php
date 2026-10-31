@@ -333,7 +333,7 @@ class ProxmoxEmailsTest extends TestCase {
 		$message = (string) $mail[0]['message'];
 		$paused  = (int) Resource::find( $r->id() )->get( 'paused_at' );
 		$this->assertStringContainsString( 'Your subscription is on hold', $message );
-		$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), $paused + 30 * DAY_IN_SECONDS ), $message );
+		$this->assertStringContainsString( wp_date( \BeltoftServices\Emails\ServiceEmail::DATE, $paused + 30 * DAY_IN_SECONDS ), $message );
 		$this->assertStringNotContainsString( 'License suspended', $message, 'Not the history text.' );
 		$this->assertSecretFree( $message, $r );
 	}
@@ -386,7 +386,7 @@ class ProxmoxEmailsTest extends TestCase {
 		$this->assertCount( 1, $mail );
 		$message = (string) $mail[0]['message'];
 		$this->assertStringContainsString( 'This server is suspended. Contact support.', $message );
-		$this->assertStringContainsString( wp_date( (string) get_option( 'date_format' ), time() + 14 * DAY_IN_SECONDS ), $message );
+		$this->assertStringContainsString( wp_date( \BeltoftServices\Emails\ServiceEmail::DATE, time() + 14 * DAY_IN_SECONDS ), $message );
 		$this->assertStringNotContainsString( 'Port scanning', $message );
 		$this->assertStringNotContainsString( 'boss', $message );
 		$this->assertStringNotContainsString( 'starts again', $message, 'A held service does not start again by itself.' );
