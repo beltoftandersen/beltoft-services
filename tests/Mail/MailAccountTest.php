@@ -408,6 +408,23 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertSame( 2, (int) Resource::find( $r->id() )->get( 'mail_boxes' ) );
 	}
 
+	public function test_the_add_button_goes_to_the_order_page_setting_instead_of_the_product_page(): void {
+		$ref = new \ReflectionMethod( Email::class, 'buttons' );
+		$ref->setAccessible( true );
+
+		$this->settings( array( 'mail_order_url' => '/business-email/#pricing' ) );
+		$this->assertSame( array(), $ref->invoke( $this->area() ), 'The setting alone makes no button: there is nothing to sell.' );
+
+		$this->service_product( 'mail', self::PLAN, array( 'slug' => 'mail-order' ) );
+		$this->assertSame( home_url( '/business-email/#pricing' ), $ref->invoke( $this->area() )[0]['url'] );
+
+		$this->settings( array( 'mail_order_url' => 'https://shop.example.org/email/' ) );
+		$this->assertSame( 'https://shop.example.org/email/', $ref->invoke( $this->area() )[0]['url'] );
+
+		$this->settings( array( 'mail_order_url' => '//evil.example/' ) );
+		$this->assertStringNotContainsString( 'evil.example', $ref->invoke( $this->area() )[0]['url'] );
+	}
+
 	public function test_the_add_button_shows_only_when_an_email_product_exists_and_the_address_can_be_changed(): void {
 		$ref = new \ReflectionMethod( Email::class, 'buttons' );
 		$ref->setAccessible( true );

@@ -9,6 +9,7 @@ namespace BeltoftServices\Account;
 
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -48,16 +49,27 @@ final class Email extends ServiceArea {
 	}
 
 	/**
-	 * The address a customer buys an email domain at: the first published product that uses the mail driver, or what the
-	 * filter beltoft_services_email_add_url says. '' when there is none (then there is no button).
+	 * The address a customer buys an email domain at: the "Email order page" setting (a path on this site or a full
+	 * address), else the first published product that uses the mail driver, or what the filter
+	 * beltoft_services_email_add_url says. '' when there is none (then there is no button).
 	 */
 	public function url_add(): string {
-		$url = self::product_url( array( 'mail' ) );
+		$url = trim( (string) Settings::get( 'mail_order_url' ) );
+
+		// A path on this site, or a full address; a scheme-less //host is neither.
+		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+
+		// Only when there is something to sell: the setting alone does not make a button.
+		if ( '' === self::product_url( array( 'mail' ) ) ) {
+			$url = '';
+		} elseif ( '' === $url ) {
+			$url = self::product_url( array( 'mail' ) );
+		}
 
 		/**
 		 * The address of the "Create an email domain" button. Return '' for no button.
 		 *
-		 * @param string $url Address of the first email product, or ''.
+		 * @param string $url The order page setting, else the first email product, or ''.
 		 */
 		return (string) apply_filters( 'beltoft_services_email_add_url', $url );
 	}
