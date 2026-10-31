@@ -499,7 +499,7 @@ $this->assertSame( 'retry', $fresh->get( 'app_www_reason' ) );
 	}
 
 	public function test_each_web_app_serves_and_certifies_both_names_and_redirects_www(): void {
-		foreach ( array( array( 'wordpress', '7.1.4', 'php_fastcgi' ), array( 'n8n', '2', 'reverse_proxy 127.0.0.1:5678' ) ) as list( $app, $version, $body ) ) {
+		foreach ( array( array( 'wordpress', '7.1.4', 'php_fastcgi' ), array( 'n8n', '2', 'reverse_proxy 127.0.0.1:5678' ), array( 'odoo', '20', 'reverse_proxy 127.0.0.1:8069' ) ) as list( $app, $version, $body ) ) {
 			$caddy = $this->generate( $app, $version, 'example.com', 'www.example.com' );
 			$this->assertStringContainsString( "example.com {\n", $caddy, $app );
 			$this->assertStringContainsString( $body, $caddy, $app );
@@ -514,7 +514,7 @@ $this->assertSame( 'retry', $fresh->get( 'app_www_reason' ) );
 	}
 
 	public function test_the_install_scripts_read_www_from_the_job_and_can_add_it_later_without_a_template_change(): void {
-		foreach ( array( 'wordpress/7.1.4', 'n8n/2' ) as $dir ) {
+		foreach ( array( 'wordpress/7.1.4', 'n8n/2', 'odoo/20' ) as $dir ) {
 			$file   = BELTOFT_SERVICES_PATH . 'apps/' . $dir . '/install.script';
 			$script = (string) file_get_contents( $file );
 			$this->assertStringContainsString( "www=\$(jq -er '.www // \"\"' \"\$job\")", $script, $dir );
