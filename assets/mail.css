@@ -1,6 +1,6 @@
 /* Email domain page. Builds on the database page styles (tabs, facts, forms) and the DNS table look of the Domains page. Square corners. */
 .beltoft-services-mail { --bsm-rule: var(--rule, #d6d2c8); --bsm-soft: var(--ink-soft, #5e7080); --bsm-navy: var(--navy, #0c1535); --bsm-warm: var(--bg-warm, #eeece6); }
-.beltoft-services-mail .beltoft-services-mail__table { width: 100%; margin: 0 0 16px; border-collapse: collapse; table-layout: auto; }
+.beltoft-services-mail .beltoft-services-mail__table { width: 100%; max-width: none; margin: 0 0 16px; border-collapse: collapse; table-layout: auto; }
 .beltoft-services-mail .beltoft-services-mail__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bsm-rule); background: none; color: var(--bsm-soft); font-size: 13px; font-weight: 500; text-align: left; }
 .beltoft-services-mail .beltoft-services-mail__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--bsm-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .beltoft-services-mail .beltoft-services-mail__table tr:last-child td { border-bottom: 0; }
