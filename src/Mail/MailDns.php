@@ -39,6 +39,9 @@ final class MailDns {
 	/** The least gap between two reads, whatever calls the job. */
 	public const MIN_GAP = 300;
 
+	/** Seconds after setup before the customer is reminded once of records still missing. */
+	public const REMIND_AFTER = DAY_IN_SECONDS;
+
 	/** Days the records are looked for. */
 	public const WAIT_DAYS = 14;
 
@@ -116,6 +119,34 @@ final class MailDns {
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * The records still to add, as the customer would type them: full name, type, value, priority. Nothing secret is
+	 * in them (the DKIM value is the public key).
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function missing_rows( Resource $r ): array {
+		$domain = (string) $r->get( MailDomain::META_DOMAIN );
+		$out    = array();
+
+		foreach ( (array) $r->get( 'mail_records' ) as $row ) {
+			if ( ! is_array( $row ) || 'ok' === ( $row['status'] ?? '' ) || ! isset( $row['name'], $row['type'], $row['value'] ) ) {
+				continue;
+			}
+
+			$out[] = array(
+				'name'     => '@' === $row['name'] ? $domain : $row['name'] . '.' . $domain,
+				'type'     => (string) $row['type'],
+				'value'    => (string) $row['value'],
+				'priority' => (int) ( $row['priority'] ?? 0 ),
+				'status'   => (string) $row['status'],
+			);
+		}
+
+		return $out;
 	}
 
 	/**
@@ -559,10 +590,43 @@ final class MailDns {
 		}
 
 		if ( self::store( $id, $meta, $done ? null : self::INTERVAL ) ) {
+			self::remind( $id );
 			return;
 		}
 
 		self::schedule( $id, 60 );
+	}
+
+	/**
+	 * One reminder, once, when records of a domain hosted elsewhere are still missing a day after the domain was set up.
+	 * The mark is stored under the resource lock before the mail is sent, so a retry never mails twice.
+	 *
+	 * @param int $id Resource id.
+	 */
+	public static function remind( int $id ): void {
+		$r = Resource::find( $id );
+
+		if ( ! $r || ! $r->is_live() || ! self::waiting( $r ) || 'external' !== (string) $r->get( 'mail_mode' ) || (int) $r->get( 'mail_dns_reminded' ) > 0 ) {
+			return;
+		}
+
+		$since = (int) $r->get( 'mail_dns_since' );
+
+		if ( $since <= 0 || time() < $since + self::REMIND_AFTER || array() === self::missing_rows( $r ) ) {
+			return;
+		}
+
+		$marked = $r->locked(
+			static function () use ( $id ): bool {
+				$fresh = Resource::find( $id );
+
+				return $fresh && self::waiting( $fresh ) && ! (int) $fresh->get( 'mail_dns_reminded' ) && $fresh->set( array( 'mail_dns_reminded' => time() ) );
+			}
+		);
+
+		if ( true === $marked ) {
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_reminder', Resource::find( $id ) ?? $r );
+		}
 	}
 
 	/**

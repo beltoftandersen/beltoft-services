@@ -78,6 +78,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$date    = isset( $data['deletes_at'] ) ? wp_date( self::DATE, (int) $data['deletes_at'] ) : '';
 
 			$this->object    = $r;
+			$mail            = 'mail' === $r->get( 'driver' ) ? ( Resource::find( $r->id() ) ?? $r ) : null;
 			// The licence's address, else the customer's own: a mail about what a connected app did must not go nowhere.
 			$this->recipient = (string) ( $license['email'] ?? '' );
 			$this->recipient = '' !== $this->recipient ? $this->recipient : ( $user ? (string) $user->user_email : '' );
@@ -97,7 +98,14 @@ abstract class ServiceEmail extends \WC_Email {
 				'used'          => $used,
 				'limit'         => $limit,
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
-				'domain_name'   => in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : '',
+				'domain_name'   => in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : ( $mail ? (string) $mail->get( 'mail_domain' ) : '' ),
+				'mail_domain'   => $mail ? (string) $mail->get( 'mail_domain' ) : '',
+				'mail_external' => $mail && 'external' === (string) $mail->get( 'mail_mode' ),
+				'mail_records'  => $mail ? \BeltoftServices\Mail\MailDns::missing_rows( $mail ) : array(),
+				'mail_host'     => $mail ? \BeltoftServices\Mail\MailSettings::host() : '',
+				'mail_imap'     => \BeltoftServices\Mail\MailView::IMAP_PORT,
+				'mail_smtp'     => \BeltoftServices\Mail\MailView::SMTP_SSL,
+				'mail_guide_url' => \BeltoftServices\Mail\MailSetup::page_url(),
 				'domain_action_reason' => in_array( $data['domain_action_reason'] ?? '', array( 'registrant_check', 'transfer_approval' ), true ) ? $data['domain_action_reason'] : 'transfer_approval',
 				'domain_security_event' => in_array( $data['domain_event'] ?? '', DomainSecurity::EVENTS, true ) ? $data['domain_event'] : 'unlocked',
 				'dns_stays'     => 'domain' === $r->get( 'driver' ) && \BeltoftServices\Domains\Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $license['user_id'] ?? 0 ) ),

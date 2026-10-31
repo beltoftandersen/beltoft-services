@@ -36,7 +36,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Emails {
 
-	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered', 'beltoft_services_domain_security', 'beltoft_services_snapshot_notice', 'beltoft_services_quarantine', 'beltoft_services_quarantine_lifted', 'beltoft_services_app_domain_live', 'beltoft_services_notice' );
+	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered', 'beltoft_services_domain_security', 'beltoft_services_snapshot_notice', 'beltoft_services_quarantine', 'beltoft_services_quarantine_lifted', 'beltoft_services_app_domain_live', 'beltoft_services_notice', 'beltoft_services_mail_ready', 'beltoft_services_mail_dns_reminder' );
 
 	public const USAGE_HOOK = 'beltoft_services_usage';
 	public const USAGE_CRON = '0 6 * * *';
@@ -62,6 +62,8 @@ final class Emails {
 		'BeltoftServices_QuarantineLifted' => QuarantineLifted::class,
 		'BeltoftServices_AppDomainLive' => AppDomainLive::class,
 		'BeltoftServices_Notice' => Notice::class,
+		'BeltoftServices_MailReady' => MailReady::class,
+		'BeltoftServices_MailDnsReminder' => MailDnsReminder::class,
 	);
 
 	/**
@@ -174,6 +176,10 @@ final class Emails {
 	 * @param Resource $r Resource.
 	 */
 	private static function ready_email_id( Resource $r ): string {
+		if ( 'mail' === $r->get( 'driver' ) ) {
+			return 'beltoft_services_mail_ready';
+		}
+
 		if ( 'domain' !== $r->get( 'driver' ) ) {
 			return 'beltoft_services_ready';
 		}

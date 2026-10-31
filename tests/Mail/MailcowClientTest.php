@@ -171,9 +171,11 @@ final class MailcowClientTest extends TestCase {
 		$f = new FakeMailcowClient();
 		$this->assertSame( 'success', $f->add_domain( array( 'domain' => 'A.example', 'mailboxes' => '1', 'aliases' => '1', 'maxquota' => '100' ) )[0]['type'] );
 		$this->assertSame( 'mailcow_exists', $f->add_domain( array( 'domain' => 'a.example' ) )->get_error_code() );
-		$this->assertNull( $f->get_dkim( 'a.example' ) );
-		$f->add_dkim( 'a.example', 'dkim', 2048 );
-		$this->assertStringStartsWith( 'v=DKIM1;k=rsa;t=s;s=email;p=', $f->get_dkim( 'a.example' )['dkim_txt'] );
+		$first = $f->get_dkim( 'a.example' );
+		$this->assertStringStartsWith( 'v=DKIM1;k=rsa;t=s;s=email;p=', $first['dkim_txt'], 'add/domain made the key.' );
+		$this->assertSame( 'success', $f->add_dkim( 'a.example', 'other', 4096 )[0]['type'], 'A later add/dkim is a no-op success.' );
+		$this->assertSame( $first, $f->get_dkim( 'a.example' ) );
+		$this->assertNull( $f->get_dkim( 'nothere.example' ) );
 
 		$box = array( 'local_part' => 'x', 'domain' => 'a.example', 'quota' => '50', 'password' => 'pw-secret', 'password2' => 'pw-secret' );
 		$this->assertIsArray( $f->add_mailbox( $box ) );
