@@ -319,6 +319,16 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'Setup guide for your mail app', $this->page( Resource::find( $r->id() ), 'settings' ) );
 	}
 
+	public function test_the_connect_tab_shows_calendar_and_contacts_only_when_the_address_is_set(): void {
+		$r = $this->ready_mail( 'dav.example', array(), $this->user );
+
+		$this->assertStringNotContainsString( 'CalDAV', $this->page( $r, 'settings' ) );
+
+		$this->settings( array( 'mail_dav_url' => 'https://mail.example.net/dav/' ) );
+		$html = $this->page( Resource::find( $r->id() ), 'settings' );
+		$this->assertStringContainsString( 'Calendar and contacts (CalDAV and CardDAV): https://mail.example.net/dav/', $html );
+	}
+
 	public function test_the_overview_lists_email_domains_like_other_services(): void {
 		$r = $this->ready_mail( 'dash.example', array(), $this->user );
 		$this->assertContains( 'mail', array_keys( Overview::SECTIONS ) );

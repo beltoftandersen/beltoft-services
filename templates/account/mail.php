@@ -279,6 +279,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 					</tbody>
 				</table>
 			<?php endif; ?>
+			<?php if ( '' !== (string) ( $beltoft_services_connect['dav'] ?? '' ) ) : ?>
+				<p><?php echo esc_html( sprintf( /* translators: %s: calendar and contacts address */ __( 'Calendar and contacts (CalDAV and CardDAV): %s, with your full email address and the mailbox password.', 'beltoft-services' ), (string) $beltoft_services_connect['dav'] ) ); ?></p>
+			<?php endif; ?>
 			<?php if ( '' !== $beltoft_services_connect['guide'] ) : ?>
 				<p><a href="<?php echo esc_url( $beltoft_services_connect['guide'] ); ?>"><?php esc_html_e( 'Setup guide for your mail app', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>

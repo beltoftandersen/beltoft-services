@@ -42,6 +42,25 @@ final class MailSetupTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'webmail.example.net', $html );
 	}
 
+	public function test_calendar_and_contacts_show_only_with_their_address(): void {
+		$this->settings( array( 'mail_host' => 'mail.example.net', 'mail_dav_url' => '' ) );
+		$html = do_shortcode( '[' . MailSetup::SHORTCODE . ']' );
+		$this->assertStringNotContainsString( 'bsms-dav', $html );
+		$this->assertStringNotContainsString( 'CalDAV', $html );
+
+		$this->settings( array( 'mail_host' => 'mail.example.net', 'mail_dav_url' => 'https://mail.example.net/dav/' ) );
+		$html = do_shortcode( '[' . MailSetup::SHORTCODE . ']' );
+		$this->assertStringContainsString( 'href="#bsms-dav"', $html );
+		$this->assertStringContainsString( 'id="bsms-dav"', $html );
+		$this->assertStringContainsString( 'https://mail.example.net/dav/', $html );
+		foreach ( array( 'Add CalDAV Account', 'Add CardDAV Address Book', 'DAVx5' ) as $needle ) {
+			$this->assertStringContainsString( $needle, $html, $needle );
+		}
+
+		$this->settings( array( 'mail_host' => 'mail.example.net', 'mail_dav_url' => 'http://mail.example.net/dav/' ) );
+		$this->assertStringNotContainsString( 'bsms-dav', do_shortcode( '[' . MailSetup::SHORTCODE . ']' ), 'The address is https only.' );
+	}
+
 	public function test_without_a_mail_host_nothing_is_printed_and_no_asset_loads(): void {
 		$this->settings( array( 'mail_host' => '' ) );
 

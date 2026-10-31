@@ -6,6 +6,7 @@
  *
  * @var string             $host    Mail host name.
  * @var string             $webmail Webmail address, '' when none.
+ * @var string             $dav     Calendar and contacts address, '' when none.
  * @var int                $imap    IMAP port.
  * @var int                $pop     POP3 port.
  * @var array<int, int>    $smtp    SMTP ports: SSL/TLS, STARTTLS.
@@ -86,6 +87,9 @@ $beltoft_services_clients = array(
 			<?php foreach ( $beltoft_services_clients as $beltoft_services_id => $beltoft_services_label ) : ?>
 				<li><a href="#bsms-<?php echo esc_attr( $beltoft_services_id ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></a></li>
 			<?php endforeach; ?>
+			<?php if ( '' !== $dav ) : ?>
+				<li><a href="#bsms-dav"><?php esc_html_e( 'Calendar and contacts', 'beltoft-services' ); ?></a></li>
+			<?php endif; ?>
 			<li><a href="#bsms-faq"><?php esc_html_e( 'Questions', 'beltoft-services' ); ?></a></li>
 		</ul>
 	</nav>
@@ -196,6 +200,53 @@ $beltoft_services_clients = array(
 		</ol>
 		<p><?php esc_html_e( 'Menu names can differ a little between Samsung devices and versions.', 'beltoft-services' ); ?></p>
 	</section>
+
+	<?php if ( '' !== $dav ) : ?>
+		<?php $beltoft_services_dav = '<strong>' . esc_html( $dav ) . '</strong>'; ?>
+		<section id="bsms-dav">
+			<h2><?php esc_html_e( 'Calendar and contacts', 'beltoft-services' ); ?></h2>
+			<p><?php esc_html_e( 'Every mailbox has its own calendar and address book. Add them in a calendar or contacts app that supports CalDAV and CardDAV, with your full email address as the user name and the mailbox password.', 'beltoft-services' ); ?></p>
+			<div class="beltoft-services-mailsetup__scroll">
+				<table>
+					<tbody>
+						<tr><th scope="row"><?php esc_html_e( 'Server address', 'beltoft-services' ); ?></th><td><?php echo esc_html( $dav ); ?></td></tr>
+						<tr><th scope="row"><?php esc_html_e( 'Server name, when an app asks for one', 'beltoft-services' ); ?></th><td><?php echo esc_html( $host ); ?></td></tr>
+						<tr><th scope="row"><?php esc_html_e( 'User name', 'beltoft-services' ); ?></th><td><?php esc_html_e( 'Your full email address', 'beltoft-services' ); ?></td></tr>
+						<tr><th scope="row"><?php esc_html_e( 'Password', 'beltoft-services' ); ?></th><td><?php esc_html_e( 'The mailbox password', 'beltoft-services' ); ?></td></tr>
+					</tbody>
+				</table>
+			</div>
+
+			<h3><?php esc_html_e( 'Thunderbird', 'beltoft-services' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'Calendar: open the calendar, choose New Calendar, then On the Network.', 'beltoft-services' ); ?></li>
+				<li><?php echo wp_kses( sprintf( /* translators: %s: calendar and contacts address */ __( 'Enter your full email address as the user name and %s as the location, then choose Find Calendars and enter the mailbox password.', 'beltoft-services' ), $beltoft_services_dav ), array( 'strong' => array() ) ); ?></li>
+				<li><?php esc_html_e( 'Contacts: open the address book, choose New Address Book, then Add CardDAV Address Book, and enter the same user name and location.', 'beltoft-services' ); ?></li>
+			</ol>
+
+			<h3><?php esc_html_e( 'iPhone and iPad', 'beltoft-services' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'Calendar: open Settings, then Apps, then Calendar, then Calendar Accounts, and tap Add Account. Choose Other, then Add CalDAV Account.', 'beltoft-services' ); ?></li>
+				<li><?php echo wp_kses( sprintf( /* translators: %s: mail host name */ __( 'Enter %s as the server, your full email address as the user name and the mailbox password, then tap Next.', 'beltoft-services' ), $beltoft_services_host ), array( 'strong' => array() ) ); ?></li>
+				<li><?php esc_html_e( 'Contacts: the same in Settings, then Apps, then Contacts, then Contacts Accounts, with Add CardDAV Account.', 'beltoft-services' ); ?></li>
+			</ol>
+
+			<h3><?php esc_html_e( 'Mac', 'beltoft-services' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'Calendar: open Calendar, then Settings, then Accounts, and add an account of the type Other CalDAV Account. Choose the manual account type if asked.', 'beltoft-services' ); ?></li>
+				<li><?php echo wp_kses( sprintf( /* translators: %s: mail host name */ __( 'Enter your full email address, the mailbox password and %s as the server address.', 'beltoft-services' ), $beltoft_services_host ), array( 'strong' => array() ) ); ?></li>
+				<li><?php esc_html_e( 'Contacts: open Contacts, then Settings, then Accounts, and add a CardDAV account with the same details.', 'beltoft-services' ); ?></li>
+			</ol>
+
+			<h3><?php esc_html_e( 'Android', 'beltoft-services' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'Android has no built-in CalDAV or CardDAV. Install a sync app such as DAVx5, then add an account with a URL and user name.', 'beltoft-services' ); ?></li>
+				<li><?php echo wp_kses( sprintf( /* translators: %s: calendar and contacts address */ __( 'Enter %s as the base URL, your full email address as the user name and the mailbox password. The calendar and the contacts then show in the phone\'s own apps.', 'beltoft-services' ), $beltoft_services_dav ), array( 'strong' => array() ) ); ?></li>
+			</ol>
+
+			<p><?php esc_html_e( 'Outlook and the Gmail app do not support CalDAV or CardDAV. With Outlook you can still use mail as above.', 'beltoft-services' ); ?></p>
+		</section>
+	<?php endif; ?>
 
 	<section id="bsms-faq">
 		<h2><?php esc_html_e( 'Questions', 'beltoft-services' ); ?></h2>

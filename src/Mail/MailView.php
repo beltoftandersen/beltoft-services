@@ -171,6 +171,7 @@ final class MailView {
 			'pop'     => self::POP_PORT,
 			'webmail' => $webmail,
 			'guide'   => MailSetup::page_url(),
+			'dav'     => MailSetup::dav_url(),
 			'domain'  => $domain,
 		);
 	}

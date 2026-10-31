@@ -108,6 +108,12 @@ final class MailSettings {
 			'label'   => __( 'Setup guide URL', 'beltoft-services' ),
 			'desc'    => __( 'Address of a public page that holds the shortcode [beltoft_services_mail_setup]. When set, the Connect tab links to it. Empty means no link.', 'beltoft-services' ),
 		);
+		$fields['mail_dav_url'] = $server + array(
+			'type'    => 'url',
+			'default' => '',
+			'label'   => __( 'Calendar and contacts address', 'beltoft-services' ),
+			'desc'    => __( 'The CalDAV and CardDAV address of the mail server, for example https://mail.example.com/dav/. When set, the setup guide and the Connect tab explain how to add the calendar and the contacts. Empty hides them.', 'beltoft-services' ),
+		);
 		$fields['mail_reserved_domains'] = $server + array(
 			'type'    => 'textarea',
 			'default' => '',
