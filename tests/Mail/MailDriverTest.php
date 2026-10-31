@@ -124,7 +124,8 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertSame( '10240', $domain['defquota'] );
 		$this->assertSame( '51200', $domain['quota'], 'Room for every mailbox at full size.' );
 		$this->assertSame( 'beltoft-services:' . $r->get( 'uuid' ), $domain['description'] );
-		$this->assertCount( 1, $this->mailcow->calls_of( 'add_dkim' ) );
+		$this->assertSame( array(), $this->mailcow->calls_of( 'add_dkim' ), 'add/domain made the DKIM key itself.' );
+		$this->assertCount( 1, $this->mailcow->calls_of( 'get_dkim' ) );
 
 		$meta = $res->meta();
 		$this->assertSame( 'external', Resource::find( $r->id() )->get( 'mail_mode' ) );

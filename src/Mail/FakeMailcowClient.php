@@ -135,9 +135,11 @@ class FakeMailcowClient implements MailcowClient {
 		}
 
 		$this->domains[ $domain ] = array_merge( array( 'active' => '1', 'mailboxes' => '10', 'aliases' => '400', 'defquota' => '3072', 'maxquota' => '10240', 'quota' => '10240' ), $attr, array( 'domain' => $domain ) );
+		// The real server makes the domain's DKIM key itself (its reply has two success items), so a later add_dkim is a no-op.
+		$this->make_dkim( $domain, MailDns::SELECTOR, MailDriver::DKIM_BITS );
 		$this->save();
 
-		return $this->ok( 'domain_added', $domain );
+		return array_merge( $this->ok( 'dkim_added', $domain ), $this->ok( 'domain_added', $domain ) );
 	}
 
 	public function edit_domain( string $domain, array $attr ) {
@@ -198,14 +200,23 @@ class FakeMailcowClient implements MailcowClient {
 			return $this->error( 'domain_invalid', $domain );
 		}
 
+		// Like the real server: a key that exists is kept, and asking again is a success.
+		$this->make_dkim( $domain, $selector, $size );
+		$this->save();
+
+		return $this->ok( 'dkim_added', $domain );
+	}
+
+	private function make_dkim( string $domain, string $selector, int $size ): void {
+		if ( isset( $this->dkim[ $domain ] ) ) {
+			return;
+		}
+
 		$this->dkim[ $domain ] = array(
 			'dkim_selector' => $selector,
 			'length'        => (string) $size,
 			'pubkey'        => 'FAKEPUBKEY' . substr( md5( $domain . $selector ), 0, 16 ),
 		);
-		$this->save();
-
-		return $this->ok( 'dkim_added', $domain );
 	}
 
 	public function get_dkim( string $domain ) {
