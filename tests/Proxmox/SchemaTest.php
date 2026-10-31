@@ -242,7 +242,7 @@ class SchemaTest extends TestCase {
 
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
-		$this->assertCount( 10, $drops );
+		$this->assertCount( 11, $drops );
 		$this->assertStringContainsString( $t['ips'], implode( ' ', $drops ) );
 		$this->assertStringContainsString( $t['vms'], implode( ' ', $drops ) );
 		wp_cache_flush(); // The uninstall script deletes straight from the database.

@@ -30,6 +30,25 @@ trait CallsTools {
 	protected $last_client = '';
 
 	/**
+	 * Mails the tools sent (caught, never sent).
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	protected $tool_mails = array();
+
+	/**
+	 * Catches a mail instead of sending it.
+	 *
+	 * @param mixed                $pre  Short-circuit.
+	 * @param array<string, mixed> $atts Mail.
+	 */
+	public function catch_tool_mail( $pre, $atts ) {
+		$this->tool_mails[] = $atts;
+
+		return true;
+	}
+
+	/**
 	 * Turns the connector on and sets up the REST server and Application Passwords the way the MCP tests need them.
 	 */
 	protected function mcp_set_up(): void {
@@ -37,6 +56,10 @@ trait CallsTools {
 		$_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 		$key = base64_encode( random_bytes( 32 ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test key.
 		add_filter( 'beltoft_services_key', fn() => $key );
+		$this->tool_mails = array();
+		add_filter( 'pre_wp_mail', array( $this, 'catch_tool_mail' ), 10, 2 );
+		// The wait between a summary and its confirmation is tested on its own (ConfirmationsTest).
+		add_filter( 'beltoft_services_mcp_confirm_delay', '__return_zero' );
 		$this->settings( array( 'mcp_enabled' => 1, 'mcp_redirect_uris' => '' ) );
 		add_filter( 'wp_is_application_passwords_available', '__return_true' );
 		add_filter( 'application_password_is_api_request', '__return_true' );
@@ -58,6 +81,8 @@ trait CallsTools {
 		wp_set_current_user( 0 );
 		Tokens::reset( false );
 		remove_all_filters( 'beltoft_services_mcp_rate_limit' );
+		remove_all_filters( 'beltoft_services_mcp_confirm_delay' );
+		remove_filter( 'pre_wp_mail', array( $this, 'catch_tool_mail' ), 10 );
 	}
 
 	/**

@@ -28,11 +28,13 @@ defined( 'ABSPATH' ) || exit;
  * Tools::call is the one gate. A tool reaches the REST routes from inside the request, which skips the token gate of the
  * REST API (Api\Tokens::gate), so every call goes through the same steps here, in order: the level of the connection
  * (read, actions or full) against the level the tool needs for these arguments, the arguments against the tool's
- * schema, whether the call needs a confirmation, the customer's limit, and then the tool. A route or action a tool
+ * schema, the customer's limit, whether the call needs a confirmation (Confirmations: a summary first, the tool only with the token
+ * of that summary), and then the tool. A route or action a tool
  * posts is checked against the table in ActionMap, so a tool can reach only what it is named for.
  *
- * Never in a result: a password, a CA certificate or key, a transfer code, a console ticket, a card number or payment
- * token, a link that logs in or carries a nonce. There is no tool for domain transfers or transfer codes at any level.
+ * Never in a result, except for the four tools that show a secret on purpose (Secrets: Full access, the customer's
+ * confirmation, shown once): a password, a transfer code, a console ticket, a card number or payment token, a link that
+ * logs in or carries a nonce. There is no tool for domain transfers, transfer codes or console tickets at any level.
  *
  * Every call on a service writes a line to that service's history ("Claude: reboot requested"), but only after the
  * service was found and is the customer's.
@@ -84,25 +86,29 @@ final class Tools {
 	}
 
 	/**
-	 * Does this call need the customer's confirmation first? The confirmation step is not built yet, so a call that
-	 * needs one is refused, and nothing that needs one runs without it.
+	 * Does this call need the customer's confirmation first? The tools of Full access that cannot be undone, show a
+	 * secret or change where money goes always do; an everyday tool does when its arguments make it worse than usual.
 	 *
 	 * @param string               $name Tool.
 	 * @param array<string, mixed> $args Arguments.
 	 */
 	public static function confirmation_needed( string $name, array $args ): bool {
-		return self::risky( $name, $args );
+		return ! empty( self::definitions()[ $name ]['confirm'] ) || self::risky( $name, $args );
 	}
 
 	/**
 	 * Does this call make things worse than the tool usually does, so that it needs Full access and a confirmation?
-	 * A firewall turned off, or one that opens a wide range of ports to anyone, is the same exposure; so is moving a
-	 * domain to name servers that are not ours.
+	 * A firewall turned off, or one that opens a wide range of ports to anyone, is the same exposure; so is a database
+	 * opened to everyone, and so is moving a domain to name servers that are not ours.
 	 *
 	 * @param string               $name Tool.
 	 * @param array<string, mixed> $args Arguments (not yet validated).
 	 */
 	private static function risky( string $name, array $args ): bool {
+		if ( 'set_database_access' === $name ) {
+			return 'world_on' === ( $args['op'] ?? null );
+		}
+
 		if ( 'set_firewall' === $name ) {
 			return false === ( $args['on'] ?? null ) || self::wide_open( $args['rules'] ?? null );
 		}
@@ -111,20 +117,80 @@ final class Tools {
 	}
 
 	/**
-	 * Does a rule list open more than 100 ports in one rule (all of tcp or udp included) to anyone?
+	 * Does a rule list open more than 100 ports, all rules together, to anyone?
 	 *
 	 * @param mixed $rules Rules as sent.
 	 */
 	private static function wide_open( $rules ): bool {
+		return self::open_ports( $rules )['total'] > 100;
+	}
+
+	/**
+	 * The ports a rule list opens to anyone, with the rules put together: a port opened by several rules counts once, and
+	 * many small rules count as much as one big one. "Anyone" is no source at all, or a source broader than /8 (IPv4) or
+	 * /32 (IPv6), in any of the rule's sources.
+	 *
+	 * @param mixed $rules Rules as sent.
+	 * @return array{total: int, ranges: string[]} The number of ports and the merged ranges, such as "tcp 1-65535".
+	 */
+	public static function open_ports( $rules ): array {
+		$by_proto = array();
+
 		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
-			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! empty( $rule['sources'] ) ) {
+			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! self::open_to_anyone( $rule['sources'] ?? array() ) ) {
 				continue;
 			}
 
 			$from = is_int( $rule['from'] ?? null ) ? $rule['from'] : 0;
 			$to   = is_int( $rule['to'] ?? null ) ? $rule['to'] : $from;
 
-			if ( $to - $from + 1 > 100 ) {
+			if ( $from > 0 && $to >= $from ) {
+				$by_proto[ $rule['proto'] ][] = array( $from, $to );
+			}
+		}
+
+		$total  = 0;
+		$ranges = array();
+
+		foreach ( $by_proto as $proto => $list ) {
+			usort( $list, static fn( $a, $b ) => $a[0] <=> $b[0] );
+			$merged = array();
+
+			foreach ( $list as $range ) {
+				$last = count( $merged ) - 1;
+
+				if ( $last >= 0 && $range[0] <= $merged[ $last ][1] + 1 ) {
+					$merged[ $last ][1] = max( $merged[ $last ][1], $range[1] );
+				} else {
+					$merged[] = $range;
+				}
+			}
+
+			foreach ( $merged as $range ) {
+				$total   += $range[1] - $range[0] + 1;
+				$ranges[] = $proto . ' ' . $range[0] . '-' . $range[1];
+			}
+		}
+
+		return array( 'total' => $total, 'ranges' => $ranges );
+	}
+
+	/**
+	 * Is a rule's list of sources "anyone": empty, or with an address range broader than /8 (IPv4) or /32 (IPv6)?
+	 *
+	 * @param mixed $sources Sources as sent.
+	 */
+	private static function open_to_anyone( $sources ): bool {
+		if ( ! is_array( $sources ) || ! $sources ) {
+			return true;
+		}
+
+		foreach ( $sources as $source ) {
+			$parts  = explode( '/', trim( (string) $source ), 2 );
+			$v6     = str_contains( $parts[0], ':' );
+			$prefix = isset( $parts[1] ) && ctype_digit( $parts[1] ) ? (int) $parts[1] : ( $v6 ? 128 : 32 );
+
+			if ( $prefix < ( $v6 ? 32 : 8 ) ) {
 				return true;
 			}
 		}
@@ -190,12 +256,24 @@ final class Tools {
 			return self::failure( $problem );
 		}
 
-		if ( self::confirmation_needed( $name, $args ) ) {
-			return self::failure( __( 'This change needs a confirmation step that is not available yet. The customer makes it in the dashboard.', 'beltoft-services' ) );
-		}
-
 		if ( $tool['limit'] > 0 && RateLimit::exceeded( get_current_user_id(), 'beltoft-services:mcp-' . $name, $tool['limit'], MINUTE_IN_SECONDS ) ) {
 			return self::failure( __( 'Too many requests. Please wait a minute.', 'beltoft-services' ) );
+		}
+
+		// The confirm value is not an argument of the tool: it is the answer to the summary, and it is left out of what runs.
+		$given = (string) ( $args[ Definitions::CONFIRM_ARG ] ?? '' );
+		unset( $args[ Definitions::CONFIRM_ARG ] );
+
+		$confirmed = false;
+
+		if ( self::confirmation_needed( $name, $args ) ) {
+			$step = self::confirm( $name, $tool, $args, $given );
+
+			if ( null !== $step ) {
+				return $step;
+			}
+
+			$confirmed = true;
 		}
 
 		self::$running = $name;
@@ -206,7 +284,73 @@ final class Tools {
 			self::$running = '';
 		}
 
+		// A confirmed change is told to the customer by e-mail (a shown secret tells it itself, in Secrets). Not when nothing was
+		// done: a failed call, or a reinstall that only said where to buy a licence.
+		if ( $confirmed && ! $done instanceof \WP_Error && ! in_array( $name, Secrets::NAMES, true ) && false !== ( $done['requested'] ?? true ) ) {
+			Told::done( $name, $args, get_current_user_id() );
+		}
+
 		return $done instanceof \WP_Error ? self::failure( $done->get_error_message() ) : self::text( $done );
+	}
+
+	/**
+	 * The two steps of a call that needs the customer's confirmation. Without a confirm value the call only describes
+	 * itself: a summary and a token, nothing runs. With one, the token is checked and burned, and the call runs.
+	 *
+	 * @param string               $name  Tool.
+	 * @param array<string, mixed> $tool  Its definition.
+	 * @param array<string, mixed> $args  Arguments without the confirm value, as validated.
+	 * @param string               $given The confirm value that came with the call, or ''.
+	 * @return array<string, mixed>|null The result to answer with, or null when the tool may run.
+	 */
+	private static function confirm( string $name, array $tool, array $args, string $given ): ?array {
+		$secret  = in_array( $name, Secrets::NAMES, true );
+		$prepare = $secret ? Secrets::summary( $name, $args ) : Irreversible::summary( $name, $args, get_current_user_id() );
+		$words   = Irreversible::label( $name );
+
+		// A service that is not the customer's, a state that does not allow it, a choice the dashboard would refuse: said at
+		// once, and no token is made for it.
+		if ( $prepare instanceof \WP_Error ) {
+			return self::failure( $prepare->get_error_message() );
+		}
+
+		// Everything here is told to the customer by e-mail when it is done (the certificate is public and is not): with no
+		// address at all there is no way to, so it is not done.
+		if ( 'get_database_ca_certificate' !== $name && ! Told::can_tell( get_current_user_id(), $args ) ) {
+			return self::failure( __( 'There is no e-mail address to tell the customer at, so this cannot be done through Claude. The customer adds an e-mail address to their account first, or does it in the dashboard.', 'beltoft-services' ) );
+		}
+
+		if ( '' === $given ) {
+			$issued = Confirmations::issue( $name, $args, $prepare['state'], ! empty( $tool['secret'] ) );
+
+			if ( $issued instanceof \WP_Error ) {
+				return self::failure( $issued->get_error_message() );
+			}
+
+			Irreversible::trail( $args, 'asked to ' . $words . ' (waiting for confirmation)', true );
+
+			return self::text(
+				array(
+					'requires_confirmation' => true,
+					'summary'               => $prepare['text'],
+					Definitions::CONFIRM_ARG => $issued['token'],
+					'expires_in_seconds'    => $issued['expires_in'],
+					'instruction'           => 'Nothing has been done yet. Show the summary to the customer exactly as written and ask whether to go ahead. Only if the customer clearly says yes, call this tool again with the same arguments and confirm set to the value above. If they say no or do not answer, do nothing.',
+				)
+			);
+		}
+
+		$ok = Confirmations::consume( $given, $name, $args, $prepare['state'] );
+
+		if ( true !== $ok ) {
+			Irreversible::trail( $args, $words . ' refused (' . ( 'expired' === $ok ? 'the confirmation expired' : ( 'used' === $ok ? 'the confirmation was used already' : ( 'soon' === $ok ? 'the confirmation came before the customer could answer' : 'the confirmation was not valid' ) ) ) . ')' );
+
+			return self::failure( Confirmations::refusal( $ok ) );
+		}
+
+		Irreversible::trail( $args, $words . ' confirmed by the customer' );
+
+		return null;
 	}
 
 	/**
@@ -234,6 +378,14 @@ final class Tools {
 
 		if ( in_array( $name, Acts::NAMES, true ) ) {
 			return Acts::run( $name, $args, $user_id );
+		}
+
+		if ( in_array( $name, Irreversible::NAMES, true ) ) {
+			return Irreversible::run( $name, $args, $user_id );
+		}
+
+		if ( in_array( $name, Secrets::NAMES, true ) ) {
+			return Secrets::run( $name, $args );
 		}
 
 		switch ( $name ) {
@@ -476,7 +628,8 @@ final class Tools {
 			return new \WP_Error( 'beltoft_services_tool', $text );
 		}
 
-		return is_array( $data ) ? $data : array();
+		// A reply that is text (the CA certificate) is handed on as it is.
+		return is_array( $data ) ? $data : ( is_string( $data ) ? array( 'text' => $data ) : array() );
 	}
 
 	/**

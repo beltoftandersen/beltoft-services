@@ -102,7 +102,9 @@ final class ActsTest extends McpTestCase {
 		// Custom name servers are for Full access and a confirmation; our own stay at actions.
 		$custom = array( 'id' => $domain->id(), 'action' => 'set_nameservers', 'mode' => 'custom', 'hosts' => array( 'ns1.other.example', 'ns2.other.example' ) );
 		$this->assertStringContainsString( 'Full access', $this->text( $this->tool( 'domain_settings', $custom, $token ) ) );
-		$this->assertStringContainsString( 'confirmation', $this->text( $this->tool( 'domain_settings', $custom, $this->oauth( $user, Tokens::FULL ) ) ) );
+		$summary = $this->json( $this->tool( 'domain_settings', $custom, $this->oauth( $user, Tokens::FULL ) ) );
+		$this->assertTrue( $summary['requires_confirmation'] );
+		$this->assertStringContainsString( 'ns1.other.example', $summary['summary'] );
 		$this->assertFalse( Jobs::acting( $domain->id() ) );
 
 		// The dashboard's own validation of the mode.
@@ -144,11 +146,10 @@ final class ActsTest extends McpTestCase {
 		$this->assertTrue( $this->tool( 'set_database_access', array( 'id' => $db->id(), 'op' => 'add', 'address' => '10.0.0.5' ), $token )['isError'] );
 		$this->assertTrue( $this->tool( 'set_database_access', array( 'id' => $db->id(), 'op' => 'add', 'address' => '203.0.113.7' ), $token )['isError'] );
 
-		// Opening to everyone is not a choice of the tool, at any level.
-		foreach ( array( Tokens::ACTIONS, Tokens::FULL ) as $level ) {
-			$result = $this->tool( 'set_database_access', array( 'id' => $db->id(), 'op' => 'world_on' ), $this->oauth( $this->owner( $db ), $level ) );
-			$this->assertTrue( $result['isError'] );
-		}
+		// Opening to everyone is for Full access and a confirmation: an actions connection is refused, a Full one gets a summary.
+		$world = array( 'id' => $db->id(), 'op' => 'world_on' );
+		$this->assertStringContainsString( 'Full access', $this->text( $this->tool( 'set_database_access', $world, $token ) ) );
+		$this->assertTrue( $this->json( $this->tool( 'set_database_access', $world, $this->oauth( $this->owner( $db ), Tokens::FULL ) ) )['requires_confirmation'] );
 
 		$this->assertFalse( $this->json( $this->tool( 'get_database_access', array( 'id' => $db->id() ), $token ) )['open_to_everyone'] );
 

@@ -229,11 +229,11 @@ final class Endpoint {
 
 		switch ( Tokens::level( $level ) ) {
 			case Tokens::FULL:
-				$what = __( 'This connection has Full access: everyday changes, and the tools that buy, delete or show a password as they become available, each after the customer has said yes in the chat. Ask the customer before every change. Domain transfers and transfer codes are never available here: the customer does those in the dashboard.', 'beltoft-services' );
+				$what = __( 'This connection has Full access: everyday changes, and tools that cannot be undone or show a password: restore, roll back, reinstall, delete, cancel, remove add-ons, a new default card, opening things to everyone, and showing a password once. Each of those first returns a summary and a confirm value and does nothing else. Show the summary to the customer exactly as written, and call the tool again with the confirm value only after the customer has clearly said yes in this chat. Never confirm on your own. A password you show is then in this conversation: say so, and tell the customer how to change it. Buying is not available yet. Domain transfers, transfer codes and the console are never available here: the customer does those in the dashboard.', 'beltoft-services' );
 				break;
 
 			case Tokens::ACTIONS:
-				$what = __( 'This connection can run everyday actions. Ask the customer before you change anything. Restoring, reinstalling, deleting, buying and passwords are not available on this connection: the customer connects again with Full access for that, and domain transfers always stay in the dashboard.', 'beltoft-services' );
+				$what = __( 'This connection can run everyday actions. Ask the customer before you change anything. Restoring, rolling back, reinstalling, deleting, cancelling, buying and passwords are not available on this connection: the customer connects again with Full access for that, and domain transfers always stay in the dashboard.', 'beltoft-services' );
 				break;
 
 			default:
