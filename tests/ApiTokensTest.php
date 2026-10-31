@@ -150,6 +150,18 @@ final class ApiTokensTest extends TestCase {
 		$this->assertSame( 'beltoft_services_token_action', $response->get_data()['code'] );
 	}
 
+	public function test_password_resets_stay_in_the_dashboard(): void {
+		list( $resource, $user ) = $this->resource();
+		$token                   = $this->token( $user, Tokens::ACTIONS );
+
+		foreach ( array( 'reset_password', 'db_reset_password' ) as $action ) {
+			$response = $this->call( 'POST', '/resources/' . $resource->id() . '/actions/' . $action, $user, $token );
+
+			$this->assertSame( 403, $response->get_status(), $action );
+			$this->assertSame( 'beltoft_services_token_action', $response->get_data()['code'], $action );
+		}
+	}
+
 	public function test_a_token_reaches_the_customer_routes_only(): void {
 		list( , $user ) = $this->resource();
 		$token          = $this->token( $user, Tokens::ACTIONS );
