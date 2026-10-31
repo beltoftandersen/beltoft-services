@@ -36,6 +36,7 @@ final class Plugin {
 
 		Proxmox\Schema::maybe_upgrade();
 		Domains\DnsSchema::maybe_upgrade();
+		Oauth\Schema::maybe_upgrade();
 
 		Settings::register();
 
@@ -87,7 +88,11 @@ final class Plugin {
 
 		Account\Panel::register();
 		Api\Routes::register();
+		Api\Services::register();
+		Api\OpenApi::register();
 		Api\Tokens::register();
+		Oauth\Server::register();
+		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );

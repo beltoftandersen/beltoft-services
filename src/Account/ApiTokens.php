@@ -8,6 +8,9 @@
 namespace BeltoftServices\Account;
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Mcp\Access;
+use BeltoftServices\Mcp\Endpoint;
+use BeltoftServices\Oauth\Grants;
 use BeltoftServices\Api\Tokens;
 
 defined( 'ABSPATH' ) || exit;
@@ -94,6 +97,8 @@ final class ApiTokens {
 			'name'   => isset( $_POST['token_name'] ) ? sanitize_text_field( wp_unslash( $_POST['token_name'] ) ) : '',
 			'scope'  => isset( $_POST['token_scope'] ) ? sanitize_key( wp_unslash( $_POST['token_scope'] ) ) : '',
 			'uuid'   => isset( $_POST['token_uuid'] ) ? sanitize_text_field( wp_unslash( $_POST['token_uuid'] ) ) : '',
+			'family' => isset( $_POST['app_family'] ) ? sanitize_key( wp_unslash( $_POST['app_family'] ) ) : '',
+			'allow'  => isset( $_POST['mcp_allow'] ) ? sanitize_key( wp_unslash( $_POST['mcp_allow'] ) ) : '',
 			'nonce'  => isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '',
 		);
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
@@ -119,6 +124,19 @@ final class ApiTokens {
 			return Tokens::revoke( $user_id, (string) ( $post['uuid'] ?? '' ) )
 				? array( 'ok' => true, 'message' => __( 'The token was revoked.', 'beltoft-services' ), 'password' => '' )
 				: array( 'ok' => false, 'message' => __( 'That token was not found.', 'beltoft-services' ), 'password' => '' );
+		}
+
+		if ( 'disconnect' === ( $post['action'] ?? '' ) ) {
+			return Grants::disconnect( $user_id, (string) ( $post['family'] ?? '' ) )
+				? array( 'ok' => true, 'message' => __( 'The app was disconnected.', 'beltoft-services' ), 'password' => '' )
+				: array( 'ok' => false, 'message' => __( 'That app was not found.', 'beltoft-services' ), 'password' => '' );
+		}
+
+		if ( 'mcp_switch' === ( $post['action'] ?? '' ) ) {
+			$allow = '1' === (string) ( $post['allow'] ?? '' );
+			Access::set_user( $user_id, $allow );
+
+			return array( 'ok' => true, 'message' => $allow ? __( 'Apps may connect to your account.', 'beltoft-services' ) : __( 'Apps can no longer use your account.', 'beltoft-services' ), 'password' => '' );
 		}
 
 		if ( 'create' !== ( $post['action'] ?? '' ) ) {
@@ -155,6 +173,12 @@ final class ApiTokens {
 				'base'     => rest_url( Routes::NAMESPACE . '/' ),
 				'username' => $user->user_login,
 				'max'      => Tokens::MAX,
+				'mcp'      => array(
+					'on'      => Access::enabled(),
+					'allowed' => Access::user_allowed( $user->ID ),
+					'url'     => Endpoint::url(),
+					'apps'    => Access::enabled() ? Grants::connections( $user->ID ) : array(),
+				),
 			),
 			'beltoft-services/account/',
 			BELTOFT_SERVICES_PATH . 'templates/account/'

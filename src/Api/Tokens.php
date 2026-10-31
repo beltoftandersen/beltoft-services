@@ -8,6 +8,7 @@
 namespace BeltoftServices\Api;
 
 use BeltoftLicenses\Events;
+use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -25,6 +26,7 @@ defined( 'ABSPATH' ) || exit;
  *   (core routes, other plugins) is refused, and so is XML-RPC;
  * - the read scope reaches GET routes only; the actions scope also reaches POST, PUT and DELETE, except for actions
  *   that destroy or reveal something (these stay in the dashboard behind its confirmations);
+ * - an access token of the OAuth server (Oauth\Grants) is a token request too, with the scope the customer ticked;
  * - requests are counted per token (filter beltoft_services_token_rate_limit, default 60 a minute), on top of the
  *   per-user, per-route limits the routes keep;
  * - a change that was accepted is written to the license history ("API: reboot requested").
@@ -54,12 +56,21 @@ final class Tokens {
 	/**
 	 * Customer routes a token may reach (after the namespace).
 	 */
-	private const ALLOWED = '#^/beltoft-services/v1/(resources/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+))?|usage|domains/check)$#D';
+	private const ALLOWED = '#^/beltoft-services/v1/(resources(/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+))?)?|usage|domains/check|openapi\.json)$#D';
 
 	/**
 	 * Actions a token can never run.
 	 */
-	private const BLOCKED_ACTION = '#(delete|remove|destroy|restore|reinstall|transfer|reveal|ssh_key|cancel)#';
+	private const BLOCKED_ACTION = '#(delete|remove|destroy|restore|rollback|reinstall|transfer|reveal|ssh_key|cancel)#';
+
+	/**
+	 * Can a token reach this route (after the host, as WP_REST_Request::get_route() gives it)?
+	 *
+	 * @param string $route Route.
+	 */
+	public static function reachable( string $route ): bool {
+		return 1 === preg_match( self::ALLOWED, $route );
+	}
 
 	/**
 	 * The password of the current request: array(uuid, user, scope) or null.
@@ -78,6 +89,19 @@ final class Tokens {
 		add_action( 'wp_delete_application_password', array( __CLASS__, 'deleted' ), 10, 2 );
 		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'gate' ), 10, 3 );
 		add_filter( 'rest_request_after_callbacks', array( __CLASS__, 'log' ), 10, 3 );
+	}
+
+	/**
+	 * Remembers the OAuth access token that logged this request in.
+	 *
+	 * @param array{user: int, scope: string, family: string} $grant Grant from Oauth\Grants::authenticate().
+	 */
+	public static function use_grant( array $grant ): void {
+		self::$current = array(
+			'uuid'  => 'oauth_' . $grant['family'],
+			'user'  => (int) $grant['user'],
+			'scope' => self::ACTIONS === $grant['scope'] ? self::ACTIONS : self::READ,
+		);
 	}
 
 	/**
@@ -255,7 +279,13 @@ final class Tokens {
 			return $result;
 		}
 
-		$route  = (string) $request->get_route();
+		$route = (string) $request->get_route();
+
+		// The MCP endpoint checks scope per tool and counts calls itself; what it calls inside is checked there.
+		if ( '/' . Endpoint::NAMESPACE . '/mcp' === $route || Endpoint::inside() ) {
+			return $result;
+		}
+
 		$method = strtoupper( $request->get_method() );
 		$scope  = (string) self::$current['scope'];
 		$read   = in_array( $method, array( 'GET', 'HEAD' ), true );
@@ -297,7 +327,7 @@ final class Tokens {
 	public static function log( $response, $handler, $request ) {
 		unset( $handler );
 
-		if ( null === self::$current || ! $request instanceof \WP_REST_Request || ! $response instanceof \WP_HTTP_Response || $response->get_status() >= 400 ) {
+		if ( null === self::$current || Endpoint::inside() || ! $request instanceof \WP_REST_Request || ! $response instanceof \WP_HTTP_Response || $response->get_status() >= 400 ) {
 			return $response;
 		}
 
