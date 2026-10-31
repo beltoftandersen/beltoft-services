@@ -53,7 +53,7 @@ final class Grants {
 	 *
 	 * @param string $client_id Client.
 	 * @param int    $user_id   Customer who agreed.
-	 * @param string $scope     read or actions.
+	 * @param string $scope     read, actions or full.
 	 * @param string $redirect  The redirect address of this request.
 	 * @param string $challenge PKCE S256 challenge.
 	 * @return string The code, shown once.
@@ -171,7 +171,7 @@ final class Grants {
 
 		return array(
 			'user'      => (int) $row['user_id'],
-			'scope'     => Tokens::ACTIONS === $row['scope'] ? Tokens::ACTIONS : Tokens::READ,
+			'scope'     => Tokens::level( (string) $row['scope'] ),
 			'family'    => (string) $row['family'],
 			'client_id' => (string) $row['client_id'],
 		);
@@ -405,7 +405,7 @@ final class Grants {
 				'family'       => $family,
 				'client_id'    => $client_id,
 				'user_id'      => $user_id,
-				'scope'        => Tokens::ACTIONS === $scope ? Tokens::ACTIONS : Tokens::READ,
+				'scope'        => Tokens::level( $scope ),
 				'redirect_uri' => $redirect,
 				'challenge'    => $challenge,
 				'connected_at' => $connected,

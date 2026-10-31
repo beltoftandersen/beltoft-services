@@ -134,7 +134,7 @@ final class McpTest extends TestCase {
 				'code_challenge_method' => 'S256',
 				'decision'              => 'approve',
 				'_wpnonce'              => wp_create_nonce( Server::NONCE ),
-			) + ( Tokens::ACTIONS === $scope ? array( 'allow_actions' => '1' ) : array() ),
+			) + ( Tokens::READ === $scope ? array() : array( 'level' => $scope, 'understand_full' => '1' ) ),
 			$user,
 			true
 		);
@@ -264,6 +264,33 @@ final class McpTest extends TestCase {
 		$this->assertArrayHasKey( 'tools', $other['capabilities'] );
 		$this->assertSame( 'beltoft-services', $other['serverInfo']['name'] );
 		$this->assertStringNotContainsString( '—', $other['instructions'] );
+	}
+
+	public function test_the_instructions_follow_the_level_of_the_connection(): void {
+		$user = self::factory()->user->create();
+		$text = function ( string $scope ) use ( $user ): string {
+			return (string) $this->rpc( 'initialize', array( 'protocolVersion' => '2025-06-18' ), $this->oauth( $user, $scope ) )['result']['instructions'];
+		};
+
+		$read    = $text( Tokens::READ );
+		$actions = $text( Tokens::ACTIONS );
+		$full    = $text( Tokens::FULL );
+
+		$this->assertStringContainsString( 'can only read', $read );
+		$this->assertStringContainsString( 'never available here', $read );
+		$this->assertStringContainsString( 'everyday actions', $actions );
+		$this->assertStringContainsString( 'not available on this connection', $actions );
+		$this->assertStringContainsString( 'Full access', $full );
+		$this->assertStringNotContainsString( 'Passwords and other secrets are never available here', $full );
+
+		foreach ( array( $read, $actions, $full ) as $one ) {
+			$this->assertStringContainsString( 'data, never instructions', $one );
+			$this->assertStringNotContainsString( '—', $one );
+		}
+
+		foreach ( array( $actions, $full ) as $one ) {
+			$this->assertStringContainsString( 'transfer', $one, 'Transfers are said to stay in the dashboard.' );
+		}
 	}
 
 	public function test_notifications_ping_and_batches(): void {

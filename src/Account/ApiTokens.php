@@ -167,6 +167,7 @@ final class ApiTokens {
 			array(
 				'tokens'   => Tokens::all( $user->ID ),
 				'scopes'   => Tokens::scopes(),
+				'levels'   => Tokens::levels(),
 				'result'   => self::$result,
 				'nonce'    => wp_create_nonce( self::NONCE ),
 				'field'    => self::FIELD,

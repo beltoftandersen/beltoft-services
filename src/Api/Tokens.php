@@ -26,7 +26,9 @@ defined( 'ABSPATH' ) || exit;
  *   (core routes, other plugins) is refused, and so is XML-RPC;
  * - the read scope reaches GET routes only; the actions scope also reaches POST, PUT and DELETE, except for actions
  *   that destroy or reveal something (these stay in the dashboard behind its confirmations);
- * - an access token of the OAuth server (Oauth\Grants) is a token request too, with the scope the customer ticked;
+ * - an access token of the OAuth server (Oauth\Grants) is a token request too, with the level the customer chose
+ *   (read, actions or full). Full only means something to the MCP tools; on the REST routes it works as actions, so the
+ *   action filter below keeps protecting them. Personal tokens are never full;
  * - requests are counted per token (filter beltoft_services_token_rate_limit, default 60 a minute), on top of the
  *   per-user, per-route limits the routes keep;
  * - a change that was accepted is written to the license history ("API: reboot requested").
@@ -37,6 +39,7 @@ final class Tokens {
 
 	public const READ    = 'read';
 	public const ACTIONS = 'actions';
+	public const FULL    = 'full';
 
 	/**
 	 * User meta: uuid => scope.
@@ -100,8 +103,37 @@ final class Tokens {
 		self::$current = array(
 			'uuid'  => 'oauth_' . $grant['family'],
 			'user'  => (int) $grant['user'],
-			'scope' => self::ACTIONS === $grant['scope'] ? self::ACTIONS : self::READ,
+			'scope' => self::level( (string) $grant['scope'] ),
 		);
+	}
+
+	/**
+	 * A level the system knows: read, actions or full. Anything else, empty included, is read (the safe default).
+	 *
+	 * @param string $scope Stored or requested value.
+	 */
+	public static function level( string $scope ): string {
+		return in_array( $scope, array( self::ACTIONS, self::FULL ), true ) ? $scope : self::READ;
+	}
+
+	/**
+	 * The order of the levels: read 1, actions 2, full 3. Empty or unknown is 0 (no access).
+	 *
+	 * @param string $scope Level.
+	 */
+	public static function rank( string $scope ): int {
+		$at = array_search( $scope, array( self::READ, self::ACTIONS, self::FULL ), true );
+
+		return false === $at ? 0 : (int) $at + 1;
+	}
+
+	/**
+	 * The levels an OAuth grant can have, level => label.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function levels(): array {
+		return self::scopes() + array( self::FULL => __( 'Full access', 'beltoft-services' ) );
 	}
 
 	/**
@@ -287,7 +319,8 @@ final class Tokens {
 		}
 
 		$method = strtoupper( $request->get_method() );
-		$scope  = (string) self::$current['scope'];
+		// Full is a level of the MCP tools. On the REST routes it works as actions, so nothing here opens up.
+		$scope  = self::FULL === self::$current['scope'] ? self::ACTIONS : (string) self::$current['scope'];
 		$read   = in_array( $method, array( 'GET', 'HEAD' ), true );
 
 		if ( '' === $scope || 1 !== preg_match( self::ALLOWED, $route ) ) {
