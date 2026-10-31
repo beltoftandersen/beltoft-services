@@ -7,6 +7,9 @@
 .beltoft-services-mail .beltoft-services-mail__table code { padding: 0; border: 0; background: none; color: var(--bsm-navy); font: inherit; font-weight: 500; overflow-wrap: anywhere; word-break: normal; }
 .beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__value code { font-weight: 400; word-break: break-all; }
 .beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: 1%; white-space: nowrap; text-align: right; }
+/* The theme's account buttons are filled navy with a stronger selector: the outline look is forced here, inside the email area only. */
+.beltoft-services-mail .beltoft-services-mail__outline.button.woocommerce-button { background: transparent !important; box-shadow: inset 0 0 0 1px var(--bsm-navy) !important; color: var(--bsm-navy) !important; }
+.beltoft-services-mail .beltoft-services-mail__outline.button.woocommerce-button:hover { background: var(--bsm-warm) !important; }
 .beltoft-services-mail .beltoft-services-mail__actions .button { margin: 0 0 0 8px; }
 .beltoft-services-mail .beltoft-services-mail__actions details { display: inline-block; margin: 0 0 0 8px; text-align: left; white-space: normal; vertical-align: middle; }
 .beltoft-services-mail .beltoft-services-mail__actions details[open] { display: block; margin: 8px 0 0; }
@@ -23,7 +26,12 @@
 .beltoft-services-mail .beltoft-services-mail__secret p { margin: 0 0 12px; }
 .beltoft-services-mail .beltoft-services-mail__secret .beltoft-services-db__block { margin: 0 0 12px; }
 @media (max-width: 700px) {
-	.beltoft-services-mail .beltoft-services-mail__table { display: block; overflow-x: auto; }
-	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { white-space: normal; text-align: left; }
+	/* On a phone each row is a block: the address and its details on top, the buttons below. */
+	.beltoft-services-mail .beltoft-services-mail__table, .beltoft-services-mail .beltoft-services-mail__table tbody, .beltoft-services-mail .beltoft-services-mail__table tr, .beltoft-services-mail .beltoft-services-mail__table td { display: block; width: auto; }
+	.beltoft-services-mail .beltoft-services-mail__table thead { display: none; }
+	.beltoft-services-mail .beltoft-services-mail__table tr { padding: 12px 0; border-bottom: 1px solid var(--bsm-rule); }
+	.beltoft-services-mail .beltoft-services-mail__table tr:last-child { border-bottom: 0; }
+	.beltoft-services-mail .beltoft-services-mail__table td { padding: 2px 0; border: 0; }
+	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: auto; padding-top: 8px; white-space: normal; text-align: left; }
 	.beltoft-services-mail .beltoft-services-mail__actions .button, .beltoft-services-mail .beltoft-services-mail__actions details { margin: 0 8px 8px 0; }
 }
