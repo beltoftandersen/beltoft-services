@@ -341,7 +341,7 @@ abstract class ServiceArea {
 	/**
 	 * Prints the tab strip of a service page: links in the strip the Databases pages use.
 	 *
-	 * @param array<string, array{title: string, url: string}> $tabs   Tab slug => title and address.
+	 * @param array<string, array{title: string, url: string, attrs?: array<string, string>, hidden?: bool}> $tabs Tab slug => title, address, and optionally extra attributes and a hidden flag (a script may show it later).
 	 * @param string                                           $active Slug of the tab shown.
 	 * @param string                                           $label  Accessible name of the strip.
 	 */
@@ -353,7 +353,13 @@ abstract class ServiceArea {
 		echo '<nav class="beltoft-services-tabs" aria-label="' . esc_attr( $label ) . '">';
 
 		foreach ( $tabs as $slug => $tab ) {
-			echo '<a href="' . esc_url( $tab['url'] ) . '"' . ( (string) $slug === $active ? ' aria-current="page"' : '' ) . '>' . esc_html( $tab['title'] ) . '</a>';
+			$attrs = '';
+
+			foreach ( isset( $tab['attrs'] ) && is_array( $tab['attrs'] ) ? $tab['attrs'] : array() as $name => $value ) {
+				$attrs .= ' ' . sanitize_key( (string) $name ) . '="' . esc_attr( (string) $value ) . '"';
+			}
+
+			echo '<a href="' . esc_url( $tab['url'] ) . '"' . $attrs . ( ! empty( $tab['hidden'] ) ? ' hidden' : '' ) . ( (string) $slug === $active ? ' aria-current="page"' : '' ) . '>' . esc_html( $tab['title'] ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the attributes are escaped above.
 		}
 
 		echo '</nav>';
@@ -378,19 +384,24 @@ abstract class ServiceArea {
 
 		$target = self::page_redirect();
 
-		if ( '' !== $target ) {
-			wp_safe_redirect( $target, 301 );
+		if ( '' !== $target[0] ) {
+			wp_safe_redirect( $target[0], $target[1] );
 			exit;
 		}
 	}
 
 	/**
 	 * Where a page below a service's page should go instead, according to the plugin that draws it (the filter
-	 * beltoft_services_account_page_redirect), or ''. Only for the customer's own service.
+	 * beltoft_services_account_page_redirect): the address and the status (301, or 302 and 303 when the answer may
+	 * change), or '' for none. Only for the customer's own service.
+	 *
+	 * @return array{0: string, 1: int}
 	 */
-	private static function page_redirect(): string {
+	private static function page_redirect(): array {
+		$none = array( '', 301 );
+
 		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_user_logged_in() ) {
-			return '';
+			return $none;
 		}
 
 		foreach ( self::all() as $area ) {
@@ -401,19 +412,19 @@ abstract class ServiceArea {
 			$asked = $area->requested();
 
 			if ( $asked['id'] < 1 || array() === $asked['path'] ) {
-				return '';
+				return $none;
 			}
 
 			$license = Licenses::find( $asked['id'] );
 
 			if ( ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || ! $area->is_member( $license ) ) {
-				return '';
+				return $none;
 			}
 
 			$resource = Resource::for_license( $asked['id'] );
 
 			if ( ! $resource ) {
-				return '';
+				return $none;
 			}
 
 			/**
@@ -421,15 +432,21 @@ abstract class ServiceArea {
 			 * from an id to a readable name. Runs early on the request, before any output, and only for the logged-in
 			 * owner of the service; return the address or ''. Nothing is known about other customers' services here.
 			 *
-			 * @param string               $target Address, '' to stay.
+			 * @param string|array{url: string, status?: int} $target Address, '' to stay; an array gives the status too (301 default, 302 for a temporary one).
 			 * @param array<string, mixed> $page   The page: license (row), resource, area, path (parts after the service), base (the service page's address), tab.
 			 */
 			$target = apply_filters( 'beltoft_services_account_page_redirect', '', $area->page_values( $license, $resource, $asked['tab'], $asked['path'] ) );
 
-			return is_string( $target ) ? $target : '';
+			if ( is_array( $target ) && isset( $target['url'] ) && is_string( $target['url'] ) ) {
+				$status = isset( $target['status'] ) && in_array( (int) $target['status'], array( 301, 302, 303 ), true ) ? (int) $target['status'] : 301;
+
+				return array( $target['url'], $status );
+			}
+
+			return array( is_string( $target ) ? $target : '', 301 );
 		}
 
-		return '';
+		return $none;
 	}
 
 	/**
