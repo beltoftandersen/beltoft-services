@@ -154,7 +154,7 @@ final class ApiTokensTest extends TestCase {
 		list( $resource, $user ) = $this->resource();
 		$token                   = $this->token( $user, Tokens::ACTIONS );
 
-		foreach ( array( 'reset_password', 'db_reset_password' ) as $action ) {
+		foreach ( array( 'reset_password', 'db_reset_password', 'fw_reset', 'db_set_policy' ) as $action ) {
 			$response = $this->call( 'POST', '/resources/' . $resource->id() . '/actions/' . $action, $user, $token );
 
 			$this->assertSame( 403, $response->get_status(), $action );

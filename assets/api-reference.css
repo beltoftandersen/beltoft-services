@@ -1,7 +1,7 @@
 .beltoft-services-apiref { max-width: 100%; min-width: 0; color: var(--navy, #0c1535); line-height: 1.6; }
 .beltoft-services-apiref > section { margin: 0 0 40px; min-width: 0; }
-.beltoft-services-apiref h2 { margin: 0 0 12px; }
-.beltoft-services-apiref h3 { margin: 24px 0 8px; overflow-wrap: anywhere; }
+.beltoft-services-apiref h2 { margin: 0 0 12px; font-size: clamp(20px, 2.2vw, 28px); line-height: 1.25; }
+.beltoft-services-apiref h3 { margin: 24px 0 8px; font-size: 18px; line-height: 1.35; overflow-wrap: anywhere; }
 .beltoft-services-apiref p, .beltoft-services-apiref ol, .beltoft-services-apiref ul { max-width: 70ch; }
 .beltoft-services-apiref code { padding: 0; border: 0; background: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; overflow-wrap: anywhere; }
 .beltoft-services-apiref__code { box-sizing: border-box; max-width: 100%; margin: 8px 0 16px; padding: 12px 16px; background: var(--bg-warm, #eeece6); overflow-x: auto; }

@@ -39,7 +39,7 @@ $beltoft_services_level = static function ( string $level ) use ( $scopes ): str
 
 	<section id="api-requests">
 		<h2><?php esc_html_e( 'Requests', 'beltoft-services' ); ?></h2>
-		<p><?php esc_html_e( 'The id of a service is in the address of its page in My Account. The access level is the lowest level that may make the request.', 'beltoft-services' ); ?></p>
+		<p><?php esc_html_e( 'Get the ids of your services with GET /resources (the first request below). The access level is the lowest level that may make the request.', 'beltoft-services' ); ?></p>
 		<?php foreach ( $ops as $beltoft_services_op ) : ?>
 			<article class="beltoft-services-apiref__op">
 				<h3><span class="beltoft-services-apiref__method"><?php echo esc_html( $beltoft_services_op['method'] ); ?></span> <code><?php echo esc_html( $beltoft_services_op['path'] ); ?></code></h3>

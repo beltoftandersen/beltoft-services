@@ -753,7 +753,7 @@ final class ServerPicker {
 		echo '<label><input type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
 		checked( $usage && $shown, true );
 		echo '> <span>' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></label>';
-		echo '<p class="description" data-picker-usage-note>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
+		echo '<p class="description" data-picker-usage-note' . ( '' === BillingField::note() ? ' hidden' : '' ) . '>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
 		echo '</fieldset>';
 	}
 
