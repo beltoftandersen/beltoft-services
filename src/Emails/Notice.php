@@ -61,26 +61,26 @@ final class Notice extends ServiceEmail {
 	public static function lines( string $kind, string $name ): array {
 		switch ( $kind ) {
 			case 'db_world':
-				/* translators: %s: database name. */
 				return array(
+					/* translators: %s: database name. */
 					sprintf( __( 'You opened your %s to everyone. Anyone on the internet can now try to log in to it. Open it only for as long as you need to.', 'beltoft-services' ), $name ),
 					__( 'You can limit access to a list of addresses again in your account, under Databases, on the Access tab.', 'beltoft-services' ),
 				);
 			case 'restore_failed':
-				/* translators: %s: server name. */
 				return array(
+					/* translators: %s: server name. */
 					sprintf( __( 'The restore of your server %s from a backup did not finish.', 'beltoft-services' ), $name ),
 					__( 'We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support.', 'beltoft-services' ),
 				);
 			case 'rollback_failed':
-				/* translators: %s: server name. */
 				return array(
+					/* translators: %s: server name. */
 					sprintf( __( 'The rollback of your server %s to a snapshot did not finish.', 'beltoft-services' ), $name ),
 					__( 'We have been told and will look into it. You do not need to do anything. If the server stays off, please contact support.', 'beltoft-services' ),
 				);
 			default:
-				/* translators: %s: database name. */
 				return array(
+					/* translators: %s: database name. */
 					sprintf( __( 'The list of addresses that may connect to your %s over its public IP address was changed in your account.', 'beltoft-services' ), $name ),
 					__( 'If you did not do this, change your password and contact us.', 'beltoft-services' ),
 				);
