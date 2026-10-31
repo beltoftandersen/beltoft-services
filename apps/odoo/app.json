@@ -15,6 +15,6 @@
   "open": {"path": "/"},
   "docs_url": "https://www.odoo.com/documentation/20.0/administration/on_premise/deploy.html",
   "versions": [
-    {"id": "20", "label": "Odoo 20", "upstream": "20.0", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "95fcdf6e0f37cd8a05da0bf296c432d38c6dfca3dbec749e2b157d757530b6a5", "eol": ""}
+    {"id": "20", "label": "Odoo 20", "upstream": "20.0", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "0b028fcdaf09908ad7699e8c747dc2f86d0977b589b14bae6518064cd8da9d25", "eol": ""}
   ]
 }

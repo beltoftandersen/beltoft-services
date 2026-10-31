@@ -143,14 +143,27 @@ if [ ! -e "$state/stage.5" ]; then
   (cd "$app" && timeout 300 docker compose up -d)
   # Odoo answers /web/health on localhost when it is ready. The web server and the firewall ports stay closed until it does.
   ready=0
-  for _ in $(seq 1 90); do
-    if curl --fail --silent --max-time 5 http://127.0.0.1:8069/web/health -o /dev/null; then
+  for _ in $(seq 1 150); do
+    # /web/health where Odoo has it; the login page answers on every version.
+    if curl --fail --silent --max-time 5 http://127.0.0.1:8069/web/health -o /dev/null \
+      || curl --fail --silent --max-time 5 http://127.0.0.1:8069/web/login -o /dev/null; then
       ready=1
       break
     fi
     sleep 2
   done
-  [ "$ready" = 1 ]
+  if [ "$ready" != 1 ]; then
+    # Leave what went wrong in the install log, where the plugin can read it.
+    {
+      echo "Odoo did not answer on 127.0.0.1:8069."
+      curl -s -o /dev/null -w 'health %{http_code}\n' --max-time 5 http://127.0.0.1:8069/web/health || true
+      curl -s -o /dev/null -w 'login %{http_code}\n' --max-time 5 http://127.0.0.1:8069/web/login || true
+      (cd "$app" && docker compose ps) || true
+      (cd "$app" && docker compose logs --tail 60 odoo) || true
+      free -m || true
+    } 2>&1 | sed -E 's/(admin_passwd|password)[ =:]+[^ ]+/\1=***/Ig' >&2
+    false
+  fi
   touch "$state/stage.5"
 fi
 step=web
