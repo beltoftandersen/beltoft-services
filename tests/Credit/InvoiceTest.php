@@ -41,6 +41,15 @@ class InvoiceTest extends CreditTestCase {
 		);
 	}
 
+	public function tear_down(): void {
+		// wcs_create_renewal_order() commits the test's transaction (WCS_SQL_Transaction), so the server records of a
+		// usage_vm() outlive the test. Tests of the Proxmox directory run after this one and expect an empty table.
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Schema::tables()['vms'] );
+		parent::tear_down();
+	}
+
 	private function hours( int $resource, int $user, int $hours, float $rate = 0.02, string $item = 'server' ): void {
 		// Early in a month the rows would reach into the month before and split into two lines.
 		$now   = Ledger::hour( time() );
@@ -231,5 +240,35 @@ class InvoiceTest extends CreditTestCase {
 		$box = \BeltoftServices\Account\UsageView::html();
 		$this->assertStringContainsString( 'Account credit: ', $box );
 		$this->assertStringContainsString( 'used first on your next usage invoice.', $box );
+	}
+
+	public function test_an_admin_recalculation_keeps_the_credit_and_the_vat(): void {
+		$this->vat( true );
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$this->hours( 501, $user, 100 ); // 2.50 due.
+		$this->top_up( $user, 100 );
+
+		$order = wcs_create_renewal_order( $sub );
+		$this->assertEqualsWithDelta( 1.5, (float) $order->get_total(), 0.001 );
+
+		$order = wc_get_order( $order->get_id() );
+		$order->calculate_totals( true );
+
+		$this->assertEqualsWithDelta( 1.5, (float) $order->get_total(), 0.001, 'Credit kept after Recalculate.' );
+		$this->assertEqualsWithDelta( 0.5, (float) $order->get_total_tax(), 0.001, 'VAT unchanged.' );
+		$credit = array_values( array_filter( $order->get_items( 'fee' ), static fn( $f ) => 'Paid from account credit' === $f->get_name() ) );
+		$this->assertEqualsWithDelta( -1.0, (float) $credit[0]->get_total(), 0.001 );
+
+		// Credit that covered the whole invoice, VAT part included.
+		$user2 = $this->new_user();
+		$sub2  = $this->usage_account( $user2 );
+		$this->hours( 502, $user2, 100 );
+		$this->top_up( $user2, 1000 );
+		$full = wcs_create_renewal_order( $sub2 );
+		$full = wc_get_order( $full->get_id() );
+		$full->calculate_totals( true );
+		$this->assertEqualsWithDelta( 0.0, (float) $full->get_total(), 0.001 );
+		$this->assertEqualsWithDelta( 0.5, (float) $full->get_total_tax(), 0.001 );
 	}
 }

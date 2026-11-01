@@ -38,6 +38,56 @@ final class Invoice {
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'give_back' ) );
 		add_action( 'woocommerce_order_status_refunded', array( __CLASS__, 'give_back' ) );
 		add_action( 'woocommerce_order_status_failed', array( __CLASS__, 'failed' ) );
+		add_action( 'woocommerce_order_before_calculate_totals', array( __CLASS__, 'before_recalculate' ), 10, 2 );
+		add_action( 'woocommerce_order_after_calculate_totals', array( __CLASS__, 'after_recalculate' ), 10, 2 );
+	}
+
+	/**
+	 * The credit fee of an order, if it has one.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	private static function fee_of( \WC_Order $order ): ?\WC_Order_Item_Fee {
+		foreach ( $order->get_items( 'fee' ) as $fee ) {
+			if ( $fee instanceof \WC_Order_Item_Fee && 'yes' === $fee->get_meta( self::META_FEE ) ) {
+				return $fee;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * An admin recalculation (Recalculate in the order screen) would treat the credit fee as a discount: take VAT off
+	 * and cap it at the net total. So the fee is set to 0 while WooCommerce calculates, and put back after.
+	 *
+	 * @param mixed $and_taxes Whether taxes are calculated.
+	 * @param mixed $order     Order.
+	 */
+	public static function before_recalculate( $and_taxes, $order ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		$fee = $order instanceof \WC_Order ? self::fee_of( $order ) : null;
+
+		if ( $fee && self::used( $order ) > 0 ) {
+			$fee->set_total( '0' );
+		}
+	}
+
+	/**
+	 * Puts the credit fee back and takes the credit off the recalculated total.
+	 *
+	 * @param mixed $and_taxes Whether taxes are calculated.
+	 * @param mixed $order     Order.
+	 */
+	public static function after_recalculate( $and_taxes, $order ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		$fee  = $order instanceof \WC_Order ? self::fee_of( $order ) : null;
+		$used = $order instanceof \WC_Order ? self::used( $order ) : 0;
+
+		if ( ! $fee || $used < 1 ) {
+			return;
+		}
+
+		$fee->set_total( number_format( -$used / 100, 2, '.', '' ) );
+		$order->set_total( number_format( max( 0, Balance::cents( $order->get_total() ) - $used ) / 100, 2, '.', '' ) );
 	}
 
 	/**
