@@ -354,12 +354,12 @@ final class Purchase {
 		$lines   = array();
 
 		$lines[] = 'direct' === $p['mode'] ? __( 'Order a pay as you go server.', 'beltoft-services' ) : __( 'A pay as you go server, ready to order in the browser.', 'beltoft-services' );
-		/* translators: 1: plan name, 2: cores and memory, 3: disk in GB. */
-		$lines[] = sprintf( __( 'Plan: %1$s (%2$d CPU cores, %3$s, %4$d GB disk).', 'beltoft-services' ), (string) $plan['name'], (int) $plan['cores'], ServerPicker::memory( (int) $plan['memory_mb'] ), (int) $plan['disk_gb'] );
+		/* translators: 1: plan name, 2: number of CPU cores, 3: memory such as 4 GB RAM, 4: disk in GB. */
+		$lines[] = sprintf( _n( 'Plan: %1$s (%2$d CPU core, %3$s, %4$d GB disk).', 'Plan: %1$s (%2$d CPU cores, %3$s, %4$d GB disk).', (int) $plan['cores'], 'beltoft-services' ), (string) $plan['name'], (int) $plan['cores'], ServerPicker::memory( (int) $plan['memory_mb'] ), (int) $plan['disk_gb'] );
 		$lines[] = self::choice_line( $plan, $choices );
 		/* translators: 1: server name or "chosen for you", 2: "yes" or "none". */
 		$lines[] = sprintf( __( 'Server name: %1$s. SSH key: %2$s.', 'beltoft-services' ), '' !== $choices['name'] ? $choices['name'] : __( 'chosen for you', 'beltoft-services' ), '' !== $choices['ssh_key'] ? __( 'yes', 'beltoft-services' ) : __( 'none (a password is made)', 'beltoft-services' ) );
-		$lines[] = ! empty( $p['checked']['plan'] ) && '' !== (string) ( $args['backups'] ?? '' ) && ! empty( $args['backups'] )
+		$lines[] = ! empty( $args['backups'] )
 			/* translators: %d: days backups are kept. */
 			? sprintf( __( 'Daily backups: yes, kept %d days. Included in the price below.', 'beltoft-services' ), (int) ( $plan['backups']['days'] ?? 0 ) )
 			: __( 'Daily backups: no.', 'beltoft-services' );
