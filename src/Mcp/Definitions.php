@@ -145,7 +145,6 @@ final class Definitions {
 				true,
 				true
 			),
-			'reset_database_password' => self::act( 'Makes a new password for a managed database. The old one stops working. The new one is never shown here: the customer reveals it once in the dashboard. Ask the customer first.', $by_id, true ),
 			'rename_server'    => self::act( 'Gives a server a new name. The name is shown in the dashboard and used as its host name.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The new name: letters, numbers and dashes.' ) ), array( 'id', 'name' ) ), true, true ),
 			'set_firewall'     => self::act(
 				'Replaces the firewall rules of one server and turns the firewall on. Read get_firewall first and send the whole list you want. Ask the customer first. Through Claude, SSH (port 22) must stay open to anyone, or the rules that let SSH in must stay as they are, so the customer cannot lock themselves out. Turning the firewall off, or opening a wide range of ports to anyone, needs Full access and a confirmation: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes.',
@@ -277,6 +276,10 @@ final class Definitions {
 			),
 			'reset_server_password' => self::full(
 				'Makes a new password for a server. The old password stops working. The new one is not shown here: reveal_server_password shows it once, when it is ready.',
+				self::obj( array( 'id' => $id ), array( 'id' ), true )
+			),
+			'reset_database_password' => self::full(
+				'Makes a new password for a managed database. The old one stops working. The new one is not shown here: reveal_database_password shows it once, when it is ready.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true )
 			),
 			'set_database_eviction_policy' => self::full(

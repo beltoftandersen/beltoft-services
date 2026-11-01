@@ -104,7 +104,7 @@ final class Tools {
 	 * @param string               $name Tool.
 	 * @param array<string, mixed> $args Arguments (not yet validated).
 	 */
-	private static function risky( string $name, array $args ): bool {
+	public static function risky( string $name, array $args ): bool {
 		if ( 'set_database_access' === $name ) {
 			return 'world_on' === ( $args['op'] ?? null );
 		}
@@ -435,9 +435,6 @@ final class Tools {
 
 			case 'create_snapshot':
 				return self::action( $id, 'snapshot_take', isset( $args['label'] ) ? array( 'label' => (string) $args['label'] ) : array(), 'snapshot requested' );
-
-			case 'reset_database_password':
-				return self::action( $id, DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ), 'new database password requested', true );
 
 			case 'dns_upsert_record':
 				$body = array( 'records' => $args['records'] );

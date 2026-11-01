@@ -139,6 +139,19 @@ final class MailcowClientTest extends TestCase {
 		$this->assertSame( 'mailcow_error', $this->live()->get_mailbox( 'x@a.example' )->get_error_code() );
 	}
 
+	public function test_the_passwords_of_a_request_never_come_back_in_errors(): void {
+		$password = 'Sup3rS3cretPw!';
+		$this->respond_with( fn() => $this->json( array( 'type' => 'error', 'msg' => 'bad password ' . $password ) ) );
+		$e = $this->live()->add_mailbox( array( 'local_part' => 'a', 'domain' => 'a.example', 'password' => $password, 'password2' => $password ) );
+		$this->assertSame( 'mailcow_error', $e->get_error_code() );
+		$this->assertStringNotContainsString( $password, $e->get_error_message() );
+
+		$this->respond_with( fn() => new \WP_Error( 'http_request_failed', 'cURL error for ' . $password ) );
+		$e = $this->live()->add_mailbox( array( 'local_part' => 'a', 'domain' => 'a.example', 'password' => $password, 'password2' => $password ) );
+		$this->assertSame( 'mailcow_transport', $e->get_error_code() );
+		$this->assertStringNotContainsString( $password, $e->get_error_message() );
+	}
+
 	public function test_the_factory_builds_a_live_client_only_when_everything_allows_it(): void {
 		$key = base64_encode( str_repeat( 'k', 32 ) );
 		add_filter( 'beltoft_services_key', static fn() => $key );

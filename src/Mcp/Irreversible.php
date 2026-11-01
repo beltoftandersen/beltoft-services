@@ -20,6 +20,7 @@ use BeltoftServices\Proxmox\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\DbAccess;
+use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbPolicy;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\ServerName;
@@ -50,7 +51,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'reset_mailbox_password' );
+	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'reset_database_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'reset_mailbox_password' );
 
 	/**
 	 * Add-on kinds (the driver's kind) that remove_addon may cancel.
@@ -112,6 +113,13 @@ final class Irreversible {
 
 			case 'restore_backup':
 				return self::summary_restore( $r, (string) $args['backup'], $label );
+
+			case 'reset_database_password':
+				return self::checked( $r, $action, array(), sprintf(
+					/* translators: %s: database name. */
+					__( 'Make a new password for database %s. The old password stops working at once, so every application that connects with it must be changed. The new password is not shown here: it can be shown once afterwards, with the customer\'s yes again.', 'beltoft-services' ),
+					$label
+				) );
 
 			case 'reinstall_server':
 				return self::summary_reinstall( $r, $args, $label );
@@ -195,6 +203,11 @@ final class Irreversible {
 				$done = Tools::action( (int) $args['id'], 'reset_password', array(), 'server password reset requested', true );
 
 				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Done. A new password is being made. It is not shown here. Once the server has it, reveal_server_password shows it once, after the customer\'s yes.' );
+
+			case 'reset_database_password':
+				$done = Tools::action( (int) $args['id'], DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ), 'new database password requested', true );
+
+				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Done. A new password is being made. It is not shown here. Once the database has it, reveal_database_password shows it once, after the customer\'s yes.' );
 
 			case 'set_database_eviction_policy':
 				return self::send( $args, DbPolicy::ACTION, array( 'policy' => (string) $args['policy'] ), 'memory-full policy change requested' );

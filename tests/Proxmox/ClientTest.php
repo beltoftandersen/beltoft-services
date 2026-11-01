@@ -843,6 +843,13 @@ class ClientTest extends TestCase {
 		$this->assertStringNotContainsString( 'xy7', $error->get_error_message() );
 	}
 
+	public function test_file_write_content_is_scrubbed_from_errors(): void {
+		$this->assertContains( 'content', \BeltoftServices\Proxmox\LiveClient::SENSITIVE );
+		$this->respond_with( fn() => new \WP_Error( 'http_request_failed', 'bad content=s3cret-file-body done' ) );
+		$error = $this->live()->request( 'POST', '/nodes/pve1/qemu/1/agent/file-write', array( 'file' => '/tmp/x', 'content' => 's3cret-file-body' ) );
+		$this->assertStringNotContainsString( 's3cret-file-body', $error->get_error_message() );
+	}
+
 	public function test_error_text_never_contains_the_secret_or_password(): void {
 		$leak = self::SECRET . ' and hunter2hunter2 and ' . rawurlencode( 'ssh-rsa AAAAB3 me@host' );
 

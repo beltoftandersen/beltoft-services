@@ -307,6 +307,30 @@ final class ReadsTest extends McpTestCase {
 		$this->assertTrue( $this->tool( 'get_license_key', array( 'license_id' => (int) $license['id'] ), $this->oauth( self::factory()->user->create() ) )['isError'] );
 	}
 
+
+	/**
+	 * A guest license (no user) whose email is the customer's.
+	 */
+	private function guest_license( string $email ): array {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Plugin' );
+		$product->set_regular_price( '10' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'plugin-' . wp_generate_password( 5, false ) );
+		$product->save();
+
+		return \BeltoftLicenses\Licenses::create( array( 'product_id' => $product->get_id(), 'product_slug' => (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ), 'email' => $email, 'user_id' => null, 'max_activations' => 2, 'source' => 'order' ) );
+	}
+
+	public function test_get_license_key_refuses_a_guest_license_that_only_matches_by_email(): void {
+		$user = self::factory()->user->create();
+		$lic  = $this->guest_license( (string) get_userdata( $user )->user_email );
+		$res  = $this->tool( 'get_license_key', array( 'license_id' => (int) $lic['id'] ), $this->oauth( $user ) );
+
+		$this->assertTrue( $res['isError'] );
+		$this->assertStringNotContainsString( (string) $lic['license_key'], $this->text( $res ) );
+	}
+
 	public function test_every_read_tool_works_with_a_read_connection_and_changes_nothing(): void {
 		$db  = $this->database();
 		$tok = $this->oauth( $this->owner( $db ) );

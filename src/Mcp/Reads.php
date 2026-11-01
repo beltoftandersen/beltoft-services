@@ -688,7 +688,7 @@ final class Reads {
 	private static function license_key( int $user_id, int $license_id ) {
 		$license = Licenses::find( $license_id );
 
-		if ( ! $license || ! LicenseAccount::owns( $license, $user_id ) ) {
+		if ( ! $license || (int) ( $license['user_id'] ?? 0 ) !== $user_id || ! LicenseAccount::owns( $license, $user_id ) ) {
 			return new \WP_Error( 'beltoft_services_forbidden', __( 'That license is not available.', 'beltoft-services' ) );
 		}
 

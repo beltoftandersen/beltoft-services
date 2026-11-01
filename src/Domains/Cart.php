@@ -10,12 +10,36 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 final class Cart {
+	/**
+	 * Wipes the encrypted transfer codes from the lines of an order that failed, was cancelled or refunded, or is removed:
+	 * such an order never provisions, so nothing else would ever delete them.
+	 *
+	 * @param mixed $order_id Order id (or a post id: only orders are touched).
+	 */
+	public static function wipe_transfer_codes( $order_id ): void {
+		$order = function_exists( 'wc_get_order' ) ? wc_get_order( (int) $order_id ) : null;
+
+		if ( ! $order instanceof \WC_Order ) {
+			return;
+		}
+
+		foreach ( $order->get_items( array( 'line_item', 'fee' ) ) as $item ) {
+			if ( '' !== (string) $item->get_meta( '_beltoft_services_domain_auth', true ) ) {
+				$item->delete_meta_data( '_beltoft_services_domain_auth' );
+				$item->save();
+			}
+		}
+	}
+
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'apply_prices' ) );
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate_direct_add' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'require_domain_selection' ), 20, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
+		foreach ( array( 'woocommerce_order_status_failed', 'woocommerce_order_status_cancelled', 'woocommerce_order_status_refunded', 'woocommerce_trash_order', 'woocommerce_before_delete_order', 'wp_trash_post', 'before_delete_post' ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'wipe_transfer_codes' ) );
+		}
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unverified_dns_items' ) );

@@ -354,4 +354,45 @@ class CartTest extends TestCase {
 		$this->assertSame( 3, WC()->cart->cart_contents['other']['quantity'] );
 		WC()->cart->empty_cart();
 	}
+
+	private function order_with_code(): \WC_Order {
+		$order = wc_create_order();
+		$item  = new \WC_Order_Item_Fee();
+		$item->set_name( 'Transfer' );
+		$item->add_meta_data( '_beltoft_services_domain_auth', 'bs1:ciphertext', true );
+		$order->add_item( $item );
+		$order->save();
+
+		return $order;
+	}
+
+	private function code_left( int $order_id ): bool {
+		foreach ( wc_get_order( $order_id )->get_items( 'fee' ) as $item ) {
+			if ( '' !== (string) $item->get_meta( '_beltoft_services_domain_auth', true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public function test_transfer_codes_are_wiped_from_orders_that_never_provision(): void {
+		foreach ( array( 'failed', 'cancelled', 'refunded' ) as $status ) {
+			$order = $this->order_with_code();
+			$this->assertTrue( $this->code_left( $order->get_id() ) );
+			$order->update_status( $status );
+			$this->assertFalse( $this->code_left( $order->get_id() ), $status );
+		}
+
+		global $wpdb;
+		$order = $this->order_with_code();
+		$ids   = array_keys( $order->get_items( 'fee' ) );
+		$order->delete( false );
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}woocommerce_order_itemmeta WHERE order_item_id = %d AND meta_key = '_beltoft_services_domain_auth'", $ids[0] ) ), 'trash' );
+
+		// An order in progress keeps its code for the provisioning job.
+		$live = $this->order_with_code();
+		$live->update_status( 'processing' );
+		$this->assertTrue( $this->code_left( $live->get_id() ) );
+	}
 }

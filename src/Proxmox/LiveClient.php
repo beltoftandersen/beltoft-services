@@ -87,7 +87,7 @@ class LiveClient implements Client {
 	/**
 	 * Parameters whose values never appear in errors.
 	 */
-	const SENSITIVE = array( 'cipassword', 'password', 'sshkeys' );
+	const SENSITIVE = array( 'cipassword', 'password', 'sshkeys', 'content' );
 
 	/**
 	 * @param array<string, mixed> $cluster      Cluster settings.

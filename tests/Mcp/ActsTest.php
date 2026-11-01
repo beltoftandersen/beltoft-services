@@ -231,6 +231,31 @@ final class ActsTest extends McpTestCase {
 		$this->assertCount( 1, \BeltoftLicenses\Licenses::live_activations( (int) $license['id'], 'site' ) );
 	}
 
+
+	/**
+	 * A guest license (no user) whose email is the customer's.
+	 */
+	private function guest_license( string $email ): array {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Plugin' );
+		$product->set_regular_price( '10' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'plugin-' . wp_generate_password( 5, false ) );
+		$product->save();
+
+		return \BeltoftLicenses\Licenses::create( array( 'product_id' => $product->get_id(), 'product_slug' => (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ), 'email' => $email, 'user_id' => null, 'max_activations' => 2, 'source' => 'order' ) );
+	}
+
+	public function test_free_license_site_refuses_a_guest_license_that_only_matches_by_email(): void {
+		$user = self::factory()->user->create();
+		$mail = (string) get_userdata( $user )->user_email;
+		$lic  = $this->guest_license( $mail );
+		\BeltoftLicenses\Licenses::activate( $lic, 'guest.example.org' );
+
+		$this->assertTrue( $this->tool( 'free_license_site', array( 'license_id' => (int) $lic['id'], 'domain' => 'guest.example.org' ), $this->oauth( $user, Tokens::ACTIONS ) )['isError'] );
+		$this->assertCount( 1, \BeltoftLicenses\Licenses::live_activations( (int) $lic['id'], 'site' ) );
+	}
+
 	public function test_cancel_unpaid_order_cancels_only_an_unpaid_order_of_the_customer(): void {
 		$user    = self::factory()->user->create();
 		$token   = $this->oauth( $user, Tokens::ACTIONS );

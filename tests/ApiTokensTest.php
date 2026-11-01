@@ -63,16 +63,27 @@ final class ApiTokensTest extends TestCase {
 	 * @param int    $user_id  The token's user.
 	 * @param string $password The token.
 	 */
-	private function call( string $method, string $route, int $user_id, string $password ): \WP_REST_Response {
+	private function call( string $method, string $route, int $user_id, string $password, array $params = array() ): \WP_REST_Response {
 		wp_set_current_user( 0 );
 		$_SERVER['PHP_AUTH_USER'] = (string) get_userdata( $user_id )->user_login;
 		$_SERVER['PHP_AUTH_PW']   = $password;
 		// What WordPress does at the start of a request.
 		wp_set_current_user( (int) apply_filters( 'determine_current_user', false ) );
 
+		if ( ! empty( $params['__full'] ) ) {
+			// Full access is an OAuth grant level.
+			Tokens::use_grant( array( 'user' => $user_id, 'scope' => 'full:2', 'family' => 'testfam', 'client_id' => 'c' ) );
+			unset( $params['__full'] );
+		}
+
 		$path = 0 === strpos( $route, '/wp/' ) ? $route : '/beltoft-services/v1' . $route;
 
-		return rest_get_server()->dispatch( new \WP_REST_Request( $method, $path ) );
+		$request = new \WP_REST_Request( $method, $path );
+		foreach ( $params as $key => $value ) {
+			$request->set_param( $key, $value );
+		}
+
+		return rest_get_server()->dispatch( $request );
 	}
 
 	private function token( int $user, string $scope ): string {
@@ -159,6 +170,29 @@ final class ApiTokensTest extends TestCase {
 
 			$this->assertSame( 403, $response->get_status(), $action );
 			$this->assertSame( 'beltoft_services_token_action', $response->get_data()['code'], $action );
+		}
+	}
+
+	public function test_risky_and_dashboard_only_actions_are_refused_for_actions_and_full_tokens(): void {
+		list( $resource, $user ) = $this->resource();
+
+		$this->assertTrue( Tokens::risky_action( 'set_nameservers', array( 'mode' => 'custom', 'hosts' => 'a.example.com b.example.com' ) ) );
+		$this->assertFalse( Tokens::risky_action( 'set_nameservers', array( 'mode' => 'ours' ) ) );
+		$this->assertContains( 'unlock', Tokens::dashboard_only_actions() );
+
+		foreach ( array( Tokens::ACTIONS, Tokens::FULL ) as $scope ) {
+			$token = $this->token( $user, Tokens::ACTIONS );
+
+			$route = '/resources/' . $resource->id() . '/actions/';
+
+			$full     = Tokens::FULL === $scope ? array( '__full' => 1 ) : array();
+			$response = $this->call( 'POST', $route . 'set_nameservers', $user, $token, $full + array( 'args' => array( 'mode' => 'custom', 'hosts' => 'a.example.com b.example.com' ) ) );
+			$this->assertSame( 403, $response->get_status(), $scope );
+			$this->assertSame( 'beltoft_services_token_action', $response->get_data()['code'], $scope );
+
+			$response = $this->call( 'POST', $route . 'unlock', $user, $token, $full );
+			$this->assertSame( 403, $response->get_status(), $scope );
+			$this->assertSame( 'beltoft_services_token_action', $response->get_data()['code'], $scope );
 		}
 	}
 
