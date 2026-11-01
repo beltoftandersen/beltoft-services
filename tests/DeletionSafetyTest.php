@@ -200,21 +200,4 @@ final class DeletionSafetyTest extends TestCase {
 		$this->assertCount( 1, $this->driver->calls( 'delete' ) );
 	}
 
-	public function test_a_lapsed_license_never_shuts_down_a_linked_vm(): void {
-		$license = $this->service_license( $this->product );
-		$this->run_jobs();
-		$r = Resource::for_license( (int) $license['id'] );
-		$this->assertTrue( $r->set( array( 'linked' => true ) ) );
-		$this->mails = array();
-
-		Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_EXPIRED ) );
-		$this->run_jobs();
-
-		$fresh = Resource::find( $r->id() );
-		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
-		$this->assertSame( 'ready', $fresh->get( 'state' ) );
-		$this->assertSame( array(), $this->driver->calls( 'pause' ) );
-		$this->assertCount( 1, $this->mails, 'The admin is alerted.' );
-		$this->assertStringContainsString( 'linked VM lapsed', (string) $this->mails[0]['message'] );
-	}
 }

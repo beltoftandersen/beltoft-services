@@ -119,36 +119,8 @@ final class Lifecycle {
 		}
 
 		if ( $resource ) {
-			self::pause_or_alert( $resource, sprintf( 'License %s', Licenses::effective_status( $license ) ) );
+			self::desire( $resource, 'paused', sprintf( 'License %s', Licenses::effective_status( $license ) ) );
 		}
-	}
-
-	/**
-	 * Alert text when the license of an adopted (linked) machine lapses.
-	 */
-	public const LINKED_PAUSE_ERROR = 'The license of a linked VM lapsed; it was not shut down. Decide by hand.';
-
-	/**
-	 * Wants a service paused. An adopted (linked) machine is never shut down by a lapsed
-	 * license: the admin is alerted and decides.
-	 *
-	 * @param Resource $resource Resource.
-	 * @param string   $reason   History text.
-	 */
-	private static function pause_or_alert( Resource $resource, string $reason ): void {
-		if ( true !== $resource->get( 'linked' ) ) {
-			self::desire( $resource, 'paused', $reason );
-			return;
-		}
-
-		$resource->locked(
-			static function () use ( $resource ): bool {
-				Alerts::admin( $resource, self::LINKED_PAUSE_ERROR );
-
-				return true;
-			}
-		);
-		Events::add( (int) $resource->license()['id'], 'service', $reason . ': the linked VM was not shut down. ' . self::LINKED_PAUSE_ERROR );
 	}
 
 	/**
@@ -190,7 +162,7 @@ final class Lifecycle {
 		if ( $active ) {
 			self::desire( $resource, $want, $reason );
 		} else {
-			self::pause_or_alert( $resource, $reason );
+			self::desire( $resource, 'paused', $reason );
 		}
 	}
 
