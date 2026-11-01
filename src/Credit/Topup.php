@@ -154,7 +154,7 @@ final class Topup {
 	public static function parse( $raw ): ?int {
 		$raw = trim( str_replace( ',', '.', (string) $raw ) );
 
-		if ( ! preg_match( '/^\d{1,7}(\.\d{1,2})?$/', $raw ) ) {
+		if ( ! preg_match( '/^\d{1,7}(\.\d{1,2})?$/D', $raw ) ) {
 			return null;
 		}
 
@@ -212,7 +212,7 @@ final class Topup {
 	 * The top-up form: validates on the server, fills the cart and goes to checkout.
 	 */
 	public static function handle(): void {
-		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || empty( $_POST[ self::ACTION ] ) || ! Config::enabled() ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified below.
+		if ( 'POST' !== strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) || empty( $_POST[ self::ACTION ] ) || ! Config::enabled() ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified below.
 			return;
 		}
 

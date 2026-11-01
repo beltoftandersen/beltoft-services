@@ -73,7 +73,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 				echo esc_html(
 					sprintf(
 						/* translators: 1: smallest amount, 2: largest amount, with currency. */
-						__( 'From %1$s to %2$s. You pay this amount, VAT included, and all of it is added to your balance. Usage is taken from the balance with VAT.', 'beltoft-services' ),
+						__( 'From %1$s to %2$s. You pay this amount, VAT included, and all of it is added to your balance.', 'beltoft-services' ),
 						Topup::label_amount( $credit['min'] * 100, $credit['currency'] ),
 						Topup::label_amount( $credit['max'] * 100, $credit['currency'] )
 					)
