@@ -590,14 +590,16 @@ final class ServerPicker {
 			'data-has-backups'      => $extra ? '1' : '0',
 			'data-backups-label'    => $extra ? self::backups_label( $plan ) : '',
 			'data-summary-backups'  => $extra ? self::summary( $plan, true ) : '',
+			'data-monthly-label'    => Rates::tile_monthly( (float) $plan['price'] ),
+			'data-monthly-label-backups' => $extra ? Rates::tile_monthly( (float) $plan['price'] + (float) $extra['extra'] ) : '',
 			'data-has-usage'        => $plan['usage'] ? '1' : '0',
 			'data-has-usage-backups' => $plan['usage'] && $plan['usage']['backups_variation_id'] ? '1' : '0',
 		);
 
 		if ( $plan['usage'] ) {
 			$attrs += array(
-				'data-usage-label'          => self::usage_label( $plan, false ),
-				'data-usage-label-backups'  => self::usage_label( $plan, true ),
+				'data-usage-label'          => self::tile_label( $plan, false ),
+				'data-usage-label-backups'  => self::tile_label( $plan, true ),
 				'data-usage-note'           => BillingField::note(),
 				'data-usage-note-backups'   => BillingField::note(),
 				'data-summary-usage'        => self::summary( $plan, false, true ),
@@ -736,6 +738,18 @@ final class ServerPicker {
 	}
 
 	/**
+	 * The first line of the Pay as you go tile: "€0.0829 per hour, max €55.00 per month".
+	 *
+	 * @param array<string, mixed> $plan    Plan.
+	 * @param bool                 $backups With backups.
+	 */
+	private static function tile_label( array $plan, bool $backups ): string {
+		$rates = self::usage_rates( $plan, $backups );
+
+		return Rates::tile_terms( $rates['hourly'], $rates['cap'] );
+	}
+
+	/**
 	 * The billing choice under the backups box: Monthly or Pay as you go. The script shows it for plans that have the option.
 	 *
 	 * @param array<int, array<string, mixed>> $plans    Plans.
@@ -757,11 +771,11 @@ final class ServerPicker {
 		echo '<div class="beltoft-services-picker__bills">';
 		echo '<label class="beltoft-services-bill"><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="monthly"';
 		checked( ! $on_usage, true );
-		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span></span></label>';
+		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span><span class="beltoft-services-picker__rate" data-picker-monthly-label>' . esc_html( $plan ? Rates::tile_monthly( (float) $plan['price'] + ( $backups && ! empty( $plan['backups'] ) ? (float) $plan['backups']['extra'] : 0.0 ) ) : '' ) . '</span></span></label>';
 		echo '<label class="beltoft-services-bill' . ( $shown ? '' : ' is-disabled' ) . '" data-picker-usage-tile><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
 		checked( $on_usage, true );
 		disabled( ! $shown, true );
-		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></span></label>';
+		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span><span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::tile_label( $plan, $with ) : '' ) . '</span><span class="beltoft-services-picker__rate" data-picker-usage-line' . ( $shown ? '' : ' hidden' ) . '>' . esc_html( BillingField::tile_note() ) . '</span></span></label>';
 		echo '</div>';
 		echo '<p class="description" data-picker-usage-note' . ( '' === BillingField::note() || ! $shown ? ' hidden' : '' ) . '>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
 		echo '</fieldset>';

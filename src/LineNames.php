@@ -326,7 +326,8 @@ final class LineNames {
 			);
 		}
 
-		if ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) {
+		// At checkout the note is said once under the items (Usage\Summary).
+		if ( ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) && ! \BeltoftServices\Usage\Summary::at_checkout() ) {
 			$data[] = array(
 				'key'   => __( 'Billing', 'beltoft-services' ),
 				'value' => self::usage_note(),

@@ -161,6 +161,27 @@ final class Rates {
 	}
 
 	/**
+	 * The two billing tiles' first line for pay as you go: "€0.0829 per hour, max €55.00 per month".
+	 *
+	 * @param float $hourly Price per hour.
+	 * @param float $cap    Monthly cap.
+	 */
+	public static function tile_terms( float $hourly, float $cap ): string {
+		/* translators: 1: price per hour such as €0.0829, 2: monthly cap such as €55.00 */
+		return sprintf( __( '%1$s per hour, max %2$s per month', 'beltoft-services' ), self::money( $hourly, 4 ), self::money( $cap ) );
+	}
+
+	/**
+	 * The monthly tile's line: "€55.00 per month, paid in advance".
+	 *
+	 * @param float $monthly Monthly price.
+	 */
+	public static function tile_monthly( float $monthly ): string {
+		/* translators: %s: monthly price such as €55.00 */
+		return sprintf( __( '%s per month, paid in advance', 'beltoft-services' ), self::money( $monthly ) );
+	}
+
+	/**
 	 * The name of the Billing attribute key of a variation, or null.
 	 *
 	 * @param array<string, mixed> $attributes Variation attributes.

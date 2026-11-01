@@ -105,22 +105,37 @@ final class BillingField {
 	}
 
 	/**
-	 * The terms of the plan, without and with daily backups ('' when that state does not exist).
+	 * The text of both tiles for the plan, without and with daily backups ('' when that state does not exist).
 	 *
 	 * @param \WC_Product_Variation $monthly A monthly variation of the plan.
-	 * @return array{0: string, 1: string}
+	 * @return array{usage: array{0: string, 1: string}, monthly: array{0: string, 1: string}}
 	 */
-	private static function terms( \WC_Product_Variation $monthly ): array {
+	public static function tiles( \WC_Product_Variation $monthly ): array {
 		$has     = (int) ( Product::plan( $monthly->get_parent_id(), $monthly->get_id() )['backup_days'] ?? 0 ) > 0;
 		$without = $has ? Backups::sibling( $monthly, false, true ) : $monthly;
 		$with    = $has ? $monthly : Backups::sibling( $monthly, true, true );
-		$terms   = static function ( ?\WC_Product_Variation $v ): string {
+		$usage   = static function ( ?\WC_Product_Variation $v ): string {
 			$rates = $v ? Rates::for_plan( $v ) : null;
 
-			return null === $rates ? '' : Rates::terms( $rates['hourly'], $rates['cap'] );
+			return null === $rates ? '' : Rates::tile_terms( $rates['hourly'], $rates['cap'] );
+		};
+		$month   = static function ( ?\WC_Product_Variation $v ): string {
+			$rates = $v ? Rates::for_plan( $v ) : null;
+
+			return null === $rates ? '' : Rates::tile_monthly( $rates['monthly'] );
 		};
 
-		return array( $terms( $without ), $terms( $with ) );
+		return array(
+			'usage'   => array( $usage( $without ), $usage( $with ) ),
+			'monthly' => array( $month( $without ), $month( $with ) ),
+		);
+	}
+
+	/**
+	 * The second line of the Pay as you go tile.
+	 */
+	public static function tile_note(): string {
+		return __( 'Billed monthly for the hours used', 'beltoft-services' );
 	}
 
 	/**
@@ -147,11 +162,13 @@ final class BillingField {
 			return;
 		}
 
-		$terms = self::terms( $server['monthly'] );
+		$tiles = self::tiles( $server['monthly'] );
+		$terms = $tiles['usage'];
 		$has   = (int) ( Product::plan( $server['monthly']->get_parent_id(), $server['variation']->get_id() )['backup_days'] ?? 0 ) > 0;
 		$now   = $has && '' !== $terms[1] ? $terms[1] : $terms[0];
+		$mnow  = $has && '' !== $tiles['monthly'][1] ? $tiles['monthly'][1] : $tiles['monthly'][0];
 
-		echo '<fieldset class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-note="' . esc_attr( self::note() ) . '">';
+		echo '<fieldset class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-monthly="' . esc_attr( $tiles['monthly'][0] ) . '" data-monthly-backups="' . esc_attr( $tiles['monthly'][1] ) . '" data-note="' . esc_attr( self::note() ) . '">';
 		echo '<legend class="beltoft-services-billing__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
 		echo '<div class="beltoft-services-billing__options">';
 
@@ -165,7 +182,9 @@ final class BillingField {
 				esc_attr( wp_create_nonce( self::NONCE ) ),
 				checked( $server['usage'] === ( 'usage' === $value ), true, false ),
 				esc_html( $label ),
-				'usage' === $value ? '<span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span>' : ''
+				'usage' === $value
+					? '<span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span><span class="beltoft-services-billing__rate">' . esc_html( self::tile_note() ) . '</span>'
+					: '<span class="beltoft-services-billing__rate" data-billing-monthly>' . esc_html( $mnow ) . '</span>'
 			);
 		}
 

@@ -21,6 +21,8 @@
 	var usage = billing ? billing.querySelector( 'input[value="usage"]' ) : null;
 	var monthly = billing ? billing.querySelector( 'input[value="monthly"]' ) : null;
 	var usageLabel = billing ? billing.querySelector( '[data-picker-usage-label]' ) : null;
+	var monthlyLabel = billing ? billing.querySelector( '[data-picker-monthly-label]' ) : null;
+	var usageLine = billing ? billing.querySelector( '[data-picker-usage-line]' ) : null;
 	var usageNote = billing ? billing.querySelector( '[data-picker-usage-note]' ) : null;
 	var summary = form.querySelector( '[data-picker-summary]' );
 	var submit = form.querySelector( '[data-picker-submit]' );
@@ -193,6 +195,14 @@
 				}
 			} else if ( ! hasUsage && monthly ) {
 				monthly.checked = true;
+			}
+
+			if ( monthlyLabel ) {
+				monthlyLabel.textContent = ( withBackups && radio.getAttribute( 'data-monthly-label-backups' ) ) || radio.getAttribute( 'data-monthly-label' ) || '';
+			}
+
+			if ( usageLine ) {
+				usageLine.hidden = ! hasUsage;
 			}
 
 			if ( usageNote ) {

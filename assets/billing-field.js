@@ -11,6 +11,7 @@
 	var radios = wrap.find( 'input[name="beltoft_services_billing"]' );
 	var note = wrap.find( '[data-billing-note]' );
 	var rate = wrap.find( '[data-billing-rate]' );
+	var monthly = wrap.find( '[data-billing-monthly]' );
 	var backups = $( '#beltoft_services_backups' );
 
 	if ( ! config || ! radios.length ) {
@@ -27,8 +28,15 @@
 		return text || wrap.attr( 'data-terms' ) || '';
 	}
 
+	function monthlyText() {
+		var text = backups.length && backups.is( ':checked' ) ? wrap.attr( 'data-monthly-backups' ) : '';
+
+		return text || wrap.attr( 'data-monthly' ) || '';
+	}
+
 	function show() {
 		rate.text( terms() );
+		monthly.text( monthlyText() );
 		note.text( usage() ? wrap.attr( 'data-note' ) || '' : '' );
 	}
 

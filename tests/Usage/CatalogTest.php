@@ -310,8 +310,11 @@ class CatalogTest extends UsageTestCase {
 		$this->assertStringContainsString( 'name="beltoft_services_billing"', $html );
 		$this->assertStringContainsString( 'value="usage"', $html );
 		$this->assertStringNotContainsString( 'A card is required.', $html, 'Every order needs a payment method: nothing to say for pay as you go.' );
-		$this->assertStringContainsString( "data-terms-backups=\"\u{20AC}0.0271 per hour, max \u{20AC}19.80 per month excluding VAT\"", $html );
-		$this->assertStringContainsString( "data-terms=\"\u{20AC}0.0226 per hour, max \u{20AC}16.50 per month excluding VAT\"", $html );
+		$this->assertStringContainsString( "data-terms-backups=\"\u{20AC}0.0271 per hour, max \u{20AC}19.80 per month\"", $html );
+		$this->assertStringContainsString( "data-terms=\"\u{20AC}0.0226 per hour, max \u{20AC}16.50 per month\"", $html );
+		$this->assertStringContainsString( "data-monthly=\"\u{20AC}15.00 per month, paid in advance\"", $html );
+		$this->assertStringContainsString( "data-monthly-backups=\"\u{20AC}18.00 per month, paid in advance\"", $html );
+		$this->assertStringContainsString( 'Billed monthly for the hours used', $html );
 	}
 
 	public function test_the_checkout_field_is_not_shown_without_a_sibling_or_for_an_existing_server(): void {
