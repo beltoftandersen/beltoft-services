@@ -67,6 +67,31 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertNotNull( $ready );
 	}
 
+	public function test_only_a_proven_live_service_holds_a_name(): void {
+		$failed = $this->mail_resource( 'claim.example', array( 'steps' => array( 'proof' ) ) );
+		$failed->set( array( 'state' => 'failed' ) );
+		$this->assertFalse( \BeltoftServices\Mail\MailDomain::taken( 'claim.example' ), 'A failed service holds nothing.' );
+
+		$this->mail_resource( 'claim.example' );
+		$this->assertFalse( \BeltoftServices\Mail\MailDomain::taken( 'claim.example' ), 'An unproven claim holds nothing.' );
+		$this->assertNull( \BeltoftServices\Mail\MailDomain::refusal( 'claim.example' ) );
+
+		$this->ready_mail( 'claim.example' );
+		$this->assertTrue( \BeltoftServices\Mail\MailDomain::taken( 'claim.example' ) );
+		$this->assertSame( 'That domain already has email here.', \BeltoftServices\Mail\MailDomain::refusal( 'claim.example' ) );
+	}
+
+	public function test_the_second_claim_fails_once_the_first_has_proved(): void {
+		$first  = $this->mail_resource( 'race.example' );
+		$second = $this->mail_resource( 'race.example' );
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+
+		$this->assertTrue( $this->driver()->provision( $first )->is_done() );
+		$res = $this->driver()->provision( Resource::find( $second->id() ) );
+		$this->assertTrue( $res->is_failed() );
+		$this->assertSame( 'This domain already has email here.', $res->error() );
+	}
+
 	public function test_nothing_is_provisioned_until_the_mail_host_is_set(): void {
 		$this->settings( array( 'mail_host' => '' ) );
 		$res = $this->driver()->provision( $this->mail_resource( 'a.example' ) );

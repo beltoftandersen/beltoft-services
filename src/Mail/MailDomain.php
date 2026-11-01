@@ -55,7 +55,9 @@ final class MailDomain {
 	}
 
 	/**
-	 * Another live mail service that already has the name.
+	 * Another live mail service that holds the name. Only a service that passed the ownership proof holds it
+	 * (the proof step is recorded in `steps`; the domain is added on the mail server after it). An order that
+	 * is still waiting for its proof, or that failed, holds nothing, so nobody can block a name by ordering it.
 	 *
 	 * @param string $name      Normalised domain.
 	 * @param int    $resource  The resource asking, left out of the search.
@@ -68,7 +70,11 @@ final class MailDomain {
 
 			$other = Resource::find( $id );
 
-			if ( $other && 'deleted' !== $other->get( 'state' ) && $name === (string) $other->get( self::META_DOMAIN ) ) {
+			if ( ! $other || in_array( $other->get( 'state' ), array( 'deleted', 'failed' ), true ) || $name !== (string) $other->get( self::META_DOMAIN ) ) {
+				continue;
+			}
+
+			if ( in_array( 'proof', (array) $other->get( 'steps' ), true ) ) {
 				return true;
 			}
 		}

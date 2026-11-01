@@ -32,7 +32,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'reset_mailbox_password', 'add_email_alias', 'remove_email_alias', 'email_dns_check' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check' );
 
 	/**
 	 * Runs one of the tools.
@@ -110,7 +110,6 @@ final class Acts {
 				return self::billing_address( $user_id, $args );
 
 			case 'create_mailbox':
-			case 'reset_mailbox_password':
 			case 'add_email_alias':
 			case 'remove_email_alias':
 			case 'email_dns_check':
@@ -143,11 +142,6 @@ final class Acts {
 				$done = Tools::route( 'POST', $base . '/mailboxes', array(), $body, $id, 'mailbox created' );
 
 				return $done instanceof \WP_Error ? $done : array( 'created' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => 'The mailbox is ready. Its password is not shown here. The customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
-
-			case 'reset_mailbox_password':
-				$done = Tools::route( 'POST', $base . '/mailboxes/' . rawurlencode( (string) $args['email'] ) . '/password', array(), array(), $id, 'new mailbox password made' );
-
-				return $done instanceof \WP_Error ? $done : array( 'done' => true, 'message' => 'The old password no longer works. The new one is not shown here. The customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
 
 			case 'add_email_alias':
 				$done = Tools::route( 'POST', $base . '/aliases', array(), array( 'address' => (string) $args['name'], 'goto' => array_values( array_map( 'strval', (array) $args['deliver_to'] ) ) ), $id, 'alias created' );

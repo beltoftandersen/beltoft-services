@@ -141,6 +141,11 @@ final class MailDriver implements Driver, NeedsBilling {
 			if ( ! $r->set( array( 'steps' => $steps, 'mail_mode' => $proof ) ) ) {
 				return StepResult::retry( 60, 'The proof could not be saved.' );
 			}
+
+			// Whoever proved the name first holds it: a second claim that proves later stops here.
+			if ( MailDomain::taken( $name, $r->id() ) ) {
+				return StepResult::fail( 'This domain already has email here.' );
+			}
 		}
 
 		$client = MailClients::for();
