@@ -34,6 +34,10 @@ final class Plugin {
 
 		remove_action( 'admin_notices', array( __CLASS__, 'notice_missing' ) );
 
+		// Ordering: schemas first (later registrations may read their tables), then Settings (the option and
+		// settings API the feature settings screens extend), then Product and Jobs (core), then the drivers'
+		// settings and connections, then the feature parts. Features add to core filters and actions; core
+		// never names a feature.
 		Proxmox\Schema::maybe_upgrade();
 		Domains\DnsSchema::maybe_upgrade();
 		Oauth\Schema::maybe_upgrade();
@@ -45,6 +49,7 @@ final class Plugin {
 
 		Jobs::register();
 
+		// Driver settings screens add their tabs to Settings::register()'s filters, so they come after it.
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
 		Proxmox\ProxmoxSettings::register();
@@ -57,6 +62,7 @@ final class Plugin {
 		Mail\MailRoutes::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
+		Mail\MailAccess::register();
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
 		Domains\Search::register();
@@ -108,9 +114,8 @@ final class Plugin {
 		Oauth\Server::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
-		add_filter( 'beltoft_services_default_retention', array( Proxmox\ProxmoxDriver::class, 'default_retention' ), 10, 2 );
-		add_filter( 'beltoft_services_default_retention', array( Proxmox\DiskDriver::class, 'default_retention' ), 10, 2 );
-		add_filter( 'beltoft_services_default_retention', array( Proxmox\AppLicenceDriver::class, 'default_retention' ), 10, 2 );
+		// Feature hooks into the core's extension points (retention, state_changed, parking, failure mail).
+		Proxmox\CoreHooks::register();
 		Proxmox\RevealRoute::register();
 		Proxmox\ConsoleRoute::register();
 		Proxmox\ConsoleAuth::register();
@@ -129,9 +134,6 @@ final class Plugin {
 		Proxmox\NetworkTab::register();
 		Proxmox\Switches::register();
 		Proxmox\Upgrades::register();
-		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );
-		add_action( 'beltoft_services_state_changed', array( Mail\MailAccess::class, 'on_state_changed' ), 10, 3 );
-		add_action( 'beltoft_services_state_changed', array( Proxmox\Operations::class, 'on_state_changed' ), 10, 3 );
 		Proxmox\Credentials::register();
 		Proxmox\ServerName::register();
 		Proxmox\SshKeyField::register();

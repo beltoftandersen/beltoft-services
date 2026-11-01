@@ -336,13 +336,21 @@ final class Jobs {
 	}
 
 	/**
-	 * The hooks the site runner claims: reconcile and customer actions, and the app install and status jobs (so an
-	 * app does not wait for the next Action Scheduler tick between pending, installing and the status reads).
+	 * The hooks the site runner claims: reconcile and customer actions, plus the hooks features add through the
+	 * beltoft_services_job_hooks filter (the app install and status jobs, so an app does not wait for the next
+	 * Action Scheduler tick between pending, installing and the status reads).
 	 *
 	 * @return string[]
 	 */
 	private static function runner_hooks(): array {
-		return array( self::HOOK, self::ACT, \BeltoftServices\Proxmox\AppInstall::HOOK, \BeltoftServices\Proxmox\AppStatus::HOOK );
+		/**
+		 * Filters the extra Action Scheduler hooks the site runner claims and runs at once.
+		 *
+		 * @param string[] $hooks Hook names, in claim order.
+		 */
+		$extra = apply_filters( 'beltoft_services_job_hooks', array() );
+
+		return array_merge( array( self::HOOK, self::ACT ), array_values( array_filter( is_array( $extra ) ? $extra : array(), 'is_string' ) ) );
 	}
 
 	/**
@@ -507,7 +515,15 @@ final class Jobs {
 	 * @return bool True when the action was parked, false when it is to be dropped.
 	 */
 	private static function park( Resource $r, string $action, array $args ): bool {
-		if ( ! in_array( $action, \BeltoftServices\Proxmox\PrivateAttach::ACTIONS, true ) || ! \BeltoftServices\Proxmox\PrivateAttach::in_flight( $r ) || ! $r->is_live() || 'deleted' === $r->get( 'desired' ) ) {
+		/**
+		 * Filters whether a customer action that cannot run now waits (true) instead of being dropped: its
+		 * work is half done, e.g. a private network attach or detach in flight.
+		 *
+		 * @param bool     $parkable Whether the action's work is half done.
+		 * @param string   $action   Action name.
+		 * @param Resource $r        Resource.
+		 */
+		if ( ! apply_filters( 'beltoft_services_park_action', false, $action, $r ) || ! $r->is_live() || 'deleted' === $r->get( 'desired' ) ) {
 			return false;
 		}
 

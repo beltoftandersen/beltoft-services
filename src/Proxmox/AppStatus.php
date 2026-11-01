@@ -15,8 +15,22 @@ final class AppStatus {
 	public const CREDENTIALS_WAIT = 600;
 
 	public static function register(): void {
+		add_filter( 'beltoft_services_job_hooks', array( __CLASS__, 'job_hooks' ) );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( \BeltoftServices\Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+	}
+
+	/**
+	 * Adds the status job to the hooks the site runner claims.
+	 *
+	 * @param mixed $hooks Hook names.
+	 * @return array<int, string>
+	 */
+	public static function job_hooks( $hooks ): array {
+		$hooks   = is_array( $hooks ) ? $hooks : array();
+		$hooks[] = self::HOOK;
+
+		return $hooks;
 	}
 
 	public static function schedule( int $id, int $delay ): void {
