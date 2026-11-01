@@ -8,6 +8,7 @@
 namespace BeltoftServices\Account;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -139,7 +140,7 @@ final class DomainDanger {
 		}
 
 		// DNS hosting is free: it ends at once when cancelled (DnsCancel).
-		if ( 'dns' === $driver && 0.0 === (float) $subscription->get_total() && $subscription->can_be_updated_to( 'cancelled' ) && user_can( $user_id, 'edit_shop_subscription_status', $subscription->get_id() ) ) {
+		if ( 'dns' === $driver && 0.0 === (float) $subscription->get_total() && Subscriptions::wcs_allows_cancel( $subscription, $user_id ) ) {
 			return array(
 				'kind'         => 'stop',
 				'subscription' => $subscription,
@@ -247,7 +248,7 @@ final class DomainDanger {
 			}
 
 			// What the Cancel button on the subscription page runs; it adds WooCommerce's own notice.
-			\WCS_User_Change_Status_Handler::change_users_subscription( $subscription, 'cancelled' );
+			Subscriptions::cancel( $subscription );
 
 			return array( 'ok' => true, 'message' => '', 'redirect' => $list );
 		}
