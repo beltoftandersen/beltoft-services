@@ -275,7 +275,7 @@ final class Card {
 		$expiry  = '';
 		$expired = false;
 
-		if ( ! empty( $details['cardExpiryDate'] ) && preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', (string) $details['cardExpiryDate'], $m ) ) {
+		if ( ! empty( $details['cardExpiryDate'] ) && preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/D', (string) $details['cardExpiryDate'], $m ) ) {
 			$expiry  = $m[2] . '/' . substr( $m[1], 2 );
 			$expired = gmdate( 'Y-m-d' ) > $m[0];
 		}
@@ -552,7 +552,7 @@ final class Card {
 	public static function webhook( \WP_REST_Request $request ): \WP_REST_Response {
 		$id = sanitize_text_field( (string) $request->get_param( 'id' ) );
 
-		if ( ! preg_match( '/^tr_[A-Za-z0-9]{4,40}$/', $id ) || RateLimit::exceeded( RateLimit::visitor(), 'beltoft-services:card-webhook', 120 ) ) {
+		if ( ! preg_match( '/^tr_[A-Za-z0-9]{4,40}$/D', $id ) || RateLimit::exceeded( RateLimit::visitor(), 'beltoft-services:card-webhook', 120 ) ) {
 			return new \WP_REST_Response( array( 'result' => 'ignored' ), 200 );
 		}
 
