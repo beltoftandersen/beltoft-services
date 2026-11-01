@@ -569,6 +569,16 @@ class ProxmoxCliTest extends TestCase {
 		$this->assertCount( 1, array_filter( $this->fake->calls(), static fn( $c ) => 'POST' === $c['method'] && false !== strpos( $c['path'], '/status/shutdown' ) ) );
 	}
 
+	public function test_a_lapsed_license_of_a_linked_vm_asks_for_a_pause_through_the_lifecycle(): void {
+		$resource = $this->linked_resource();
+		$license  = $resource->license();
+		$license['status'] = 'expired';
+
+		\BeltoftServices\Lifecycle::on_status( $license, 'active' );
+
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'desired' ), 'Ruling 2026-10-22: an adopted VM is paused like any other when the license lapses.' );
+	}
+
 	public function test_update_plan_refuses_a_linked_vm_itself_with_no_call_and_an_admin_alert(): void {
 		$mails = array();
 		add_filter(

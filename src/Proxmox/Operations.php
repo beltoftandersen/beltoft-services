@@ -189,6 +189,11 @@ final class Operations {
 		$record = VmRecords::for_resource( $this->r->id() );
 
 		if ( null === $record ) {
+			// The record was removed by an earlier cleanup that never reached "deleted": finish it.
+			if ( true === $this->r->get( 'delete_cleanup' ) ) {
+				return $this->cleanup( 'The virtual machine was deleted' );
+			}
+
 			return $this->record_gone() ?? $this->cleanup( 'No virtual machine was ever recorded' );
 		}
 
@@ -214,11 +219,10 @@ final class Operations {
 
 		// Fail-safe for an out-of-order end: the VM delete also destroys the disks that belong to it.
 		foreach ( DiskMeta::for_server( $this->r ) as $disk ) {
-			$disk_license = $disk->license();
-			if ( 'deleted' !== $disk->get( 'state' ) && \BeltoftServices\Lifecycle::is_active( $disk_license ) ) {
-				Alerts::admin( $this->r, 'A server with an active extra disk cannot be deleted; cancel the disk first.' );
+			if ( 'deleted' !== $disk->get( 'state' ) ) {
+				Alerts::admin( $this->r, 'A server with an extra disk that is not deleted cannot be deleted; delete the disk first.' );
 
-				return StepResult::retry( 3600, 'A server with an active extra disk cannot be deleted; cancel the disk first.' );
+				return StepResult::retry( 3600, 'A server with an extra disk that is not deleted cannot be deleted; delete the disk first.' );
 			}
 		}
 
@@ -370,6 +374,12 @@ final class Operations {
 	 * @param string $why Reason (admin text).
 	 */
 	private function cleanup( string $why ): StepResult {
+		// Written before the record goes: a request that dies after the removal and before the
+		// reconciler stores "deleted" must not fail the next run with "VM record missing".
+		if ( true !== $this->r->get( 'delete_cleanup' ) && ! $this->r->set( array( 'delete_cleanup' => true ) ) ) {
+			return StepResult::retry( 0, 'delete: progress could not be stored' );
+		}
+
 		try {
 			if ( ! PrivateNets::release_and_retire( $this->r->id() ) ) {
 				return StepResult::retry( 0, 'delete: the private address could not be released' );
@@ -582,11 +592,11 @@ final class Operations {
 		$queued = true === $this->r->get( 'backup_purge' );
 
 		if ( $days < 1 && ! $queued && $this->r->get( 'backup_ok_at' ) ) {
-			return $this->r->set( array( 'backup_purge' => true ) );
+			return $this->r->set( array( 'backup_purge' => true, 'backup_purge_at' => time() ) );
 		}
 
 		if ( $days >= 1 && $queued ) {
-			return $this->r->set( array( 'backup_purge' => null ) );
+			return $this->r->set( array( 'backup_purge' => null, 'backup_purge_at' => null ) );
 		}
 
 		return true;

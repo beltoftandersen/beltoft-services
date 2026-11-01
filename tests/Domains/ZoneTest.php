@@ -108,6 +108,37 @@ class ZoneTest extends TestCase {
 		$this->assertNull( $dns->zone( 'remove.example.com' ) );
 	}
 
+	public function test_remove_never_deletes_the_zone_of_a_domain_still_registered_with_us(): void {
+		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net', 'admin_email' => 'ops@example.com' ) );
+		$dns = new FakeDns();
+		$dns->create_zone( 'live.example.com', Zone::nameservers() );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		add_filter( 'beltoft_services_domains_client', static fn() => new FakeClient() );
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$r = $this->resource( 'live.example.com' );
+		$r->set( array( 'zone_claimed' => true, 'registrar_status' => 'ACT', 'mode' => 'register' ) );
+
+		$result = Zone::remove( Resource::find( $r->id() ) );
+
+		$this->assertTrue( $result->is_retry() );
+		$this->assertNotNull( $dns->zone( 'live.example.com' ), 'The zone is kept.' );
+		$this->assertCount( 1, $mails, 'Staff are alerted.' );
+
+		// A registration that is gone (or DNS hosting only) may lose its zone.
+		Resource::find( $r->id() )->set( array( 'registrar_status' => 'DEL' ) );
+		$this->assertTrue( Zone::remove( Resource::find( $r->id() ) )->is_done() );
+		$this->assertNull( $dns->zone( 'live.example.com' ) );
+	}
+
 	public function test_remove_waits_for_secondary_copy_to_be_cleared(): void {
 		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
 		$dns = new FakeDns();

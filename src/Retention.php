@@ -223,7 +223,7 @@ final class Retention {
 		}
 
 		$now     = time();
-		$notice  = max( 0, (int) Settings::get( 'warning_days' ) ) * DAY_IN_SECONDS;
+		$notice  = self::warning_days() * DAY_IN_SECONDS;
 		$ends_at = $paused_at + $days * DAY_IN_SECONDS;
 		$warned  = $r->get( 'warned_at' );
 
@@ -232,14 +232,15 @@ final class Retention {
 			$warned = null;
 		}
 
-		if ( $notice > 0 && null === $warned ) {
+		// Never deleted unannounced: only a warning that was actually sent (meta warned_at) counts.
+		if ( null === $warned ) {
 			if ( $now >= $ends_at - $notice ) {
 				self::warn( $r, $mode, $paused_at, max( $ends_at, $now + $notice ) );
 			}
 			return;
 		}
 
-		$deletes_at = null === $warned ? $ends_at : max( $ends_at, $warned + $notice );
+		$deletes_at = max( $ends_at, $warned + $notice );
 
 		if ( $now < $deletes_at ) {
 			return;
@@ -275,19 +276,21 @@ final class Retention {
 			return;
 		}
 
-		// Stored first: a warning whose record could not be written is not sent, so it is
-		// never sent twice.
-		if ( ! $r->record_retention( array( 'warned_at' => time() ), $paused_at ) ) {
+		// Stored first: a warning whose record could not be written is not sent, so a record that
+		// cannot be written never makes a second mail.
+		if ( ! $r->record_retention( array( 'warn_started_at' => time() ), $paused_at ) ) {
 			return;
 		}
 
-		Events::add( (int) $r->license()['id'], 'service', sprintf( 'Deletion warning: the service will be deleted on %s UTC.', $date ) );
+		unset( self::$confirmed[ $r->id() ] );
 
 		try {
 			/**
-			 * Fires once when a paused service will be deleted after its retention period.
-			 * Hook the customer's warning email here. The service is deleted at $deletes_at
-			 * at the earliest, unless the license is active again before then.
+			 * Fires when a paused service will be deleted after its retention period. Hook the
+			 * customer's warning email here and call Retention::confirm() once it was sent: only
+			 * a confirmed warning counts (meta warned_at), and a service is never deleted before
+			 * one was sent. Without a confirmation the warning is tried again at the next daily run.
+			 * The service is deleted at $deletes_at at the earliest, unless the license is active again.
 			 *
 			 * @param Resource $r          The resource.
 			 * @param int      $deletes_at Unix time of the deletion.
@@ -297,6 +300,45 @@ final class Retention {
 			// One broken listener must not stop the run for every other service.
 			Events::add( (int) $r->license()['id'], 'service', 'A deletion warning listener failed.' );
 		}
+
+		if ( empty( self::$confirmed[ $r->id() ] ) ) {
+			Events::add( (int) $r->license()['id'], 'service', 'Deletion warning could not be sent; it is tried again at the next run.' );
+
+			if ( null === $r->get( 'warn_alerted' ) ) {
+				Alerts::warning_unsent( $r );
+				$r->record_retention( array( 'warn_alerted' => time() ), $paused_at );
+			}
+			return;
+		}
+
+		unset( self::$confirmed[ $r->id() ] );
+
+		if ( $r->record_retention( array( 'warned_at' => time() ), $paused_at ) ) {
+			Events::add( (int) $r->license()['id'], 'service', sprintf( 'Deletion warning: the service will be deleted on %s UTC.', $date ) );
+		}
+	}
+
+	/**
+	 * Resource ids whose deletion warning was reported as sent during the current warn().
+	 *
+	 * @var array<int, bool>
+	 */
+	private static $confirmed = array();
+
+	/**
+	 * A listener of beltoft_services_deletion_warning reports that the customer's warning was sent.
+	 *
+	 * @param int $resource_id Resource (activation) id.
+	 */
+	public static function confirm( int $resource_id ): void {
+		self::$confirmed[ $resource_id ] = true;
+	}
+
+	/**
+	 * Days of notice before a deletion: the setting, never less than 1.
+	 */
+	public static function warning_days(): int {
+		return max( 1, (int) Settings::get( 'warning_days' ) );
 	}
 
 	/**

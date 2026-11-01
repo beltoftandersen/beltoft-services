@@ -501,10 +501,12 @@ final class Resource {
 	 * @param string $state   ready, paused or deleted.
 	 * @param string $reason  What happened, for the history.
 	 * @param bool   $replace For deleted: make a new service once the deletion completes.
+	 * @param string $origin  For deleted: retention or breach when that asked for it (such a deletion that has not
+	 *                        started can still be cancelled, see delete_cancellable()); empty for anyone else, which is terminal.
 	 * @return bool Whether it was stored now.
 	 */
-	public function desire( string $state, string $reason, bool $replace = false ): bool {
-		return $this->store_desire( $state, $reason, $replace, microtime( true ) );
+	public function desire( string $state, string $reason, bool $replace = false, string $origin = '' ): bool {
+		return $this->store_desire( $state, $reason, $replace, microtime( true ), $origin );
 	}
 
 	/**
@@ -514,9 +516,10 @@ final class Resource {
 	 * @param string $reason  What happened, for the history.
 	 * @param bool   $replace For deleted: make a new service once the deletion completes.
 	 * @param float  $at      When it was requested (microtime).
+	 * @param string $origin  For deleted: retention, breach or empty.
 	 * @return bool Whether it was stored now.
 	 */
-	private function store_desire( string $state, string $reason, bool $replace, float $at ): bool {
+	private function store_desire( string $state, string $reason, bool $replace, float $at, string $origin = '' ): bool {
 		if ( ! in_array( $state, self::DESIRED, true ) ) {
 			_doing_it_wrong( __CLASS__ . '::desire', esc_html( sprintf( 'Unknown desired state "%s".', $state ) ), '0.1.0' );
 			return false;
@@ -551,10 +554,18 @@ final class Resource {
 				return false;
 			}
 
+			$cancel = false;
+
 			if ( 'deleted' === $this->get( 'desired' ) && 'deleted' !== $state ) {
-				$this->forget_pending( $at );
-				Events::add( (int) $this->row['license_id'], 'service', $this->deletion_in_progress() );
-				return false;
+				// A renewal cancels a deletion that retention or a breach hold asked for, as long as
+				// nothing was deleted yet. Anything else is terminal.
+				if ( 'ready' === $state && $this->delete_cancellable() ) {
+					$cancel = true;
+				} else {
+					$this->forget_pending( $at );
+					Events::add( (int) $this->row['license_id'], 'service', $this->deletion_in_progress() );
+					return false;
+				}
 			}
 
 			// A breach hold is lifted by an admin only: nothing else may make the service ready.
@@ -581,17 +592,37 @@ final class Resource {
 			if ( 'deleted' === $state ) {
 				// Once a deletion is desired, "no replacement" wins: a later request (retention)
 				// cannot turn replacement back on after a deliberate deletion.
-				$meta['replace_after_delete'] = 'deleted' === $this->get( 'desired' ) ? ( $replace && $this->get( 'replace_after_delete' ) ) : $replace;
+				$already                      = 'deleted' === $this->get( 'desired' );
+				$meta['replace_after_delete'] = $already ? ( $replace && $this->get( 'replace_after_delete' ) ) : $replace;
+				// Whoever asks again for a deletion that was started by retention makes it their own: terminal.
+				$meta['delete_origin']        = $already ? ( '' === $origin ? '' : (string) $this->get( 'delete_origin' ) ) : $origin;
 			} elseif ( 'paused' === $state ) {
 				if ( null === $this->get( 'paused_at' ) ) {
 					$meta['paused_at']     = time();
 					$meta['paused_reason'] = $reason;
 				}
 			} else {
+				if ( $cancel ) {
+					$meta['delete_origin']        = '';
+					$meta['delete_started']       = false;
+					$meta['delete_held_alerted']  = null;
+					$meta['delete_paused']        = false;
+					$meta['replace_after_delete'] = false;
+
+					// Nothing was deleted: the service goes back to what it was before the deletion started.
+					if ( 'deleting' === $this->get( 'state' ) ) {
+						$meta['state'] = 'paused';
+					}
+
+					$event = $reason . ': the deletion was cancelled';
+				}
+
 				$meta['paused_at']     = null;
 				$meta['paused_reason'] = '';
-				$meta['warned_at']     = null;
-				$meta['reported']  = '';
+				$meta['warned_at']       = null;
+				$meta['warn_started_at'] = null;
+				$meta['warn_alerted']    = null;
+				$meta['reported']        = '';
 			}
 
 			if ( ! $this->set( $meta ) ) {
@@ -608,6 +639,26 @@ final class Resource {
 		Events::add( (int) $this->row['license_id'], 'service', $event );
 
 		return true;
+	}
+
+	/**
+	 * Can a pending deletion still be called off? Only one that retention or a breach hold asked
+	 * for (meta delete_origin), before the first driver delete call (meta delete_started), and, for
+	 * a retention deletion, only while the license is active again. A breach deletion needs the
+	 * hold lifted. An admin's deletion is terminal.
+	 */
+	public function delete_cancellable(): bool {
+		if ( 'deleted' !== $this->get( 'desired' ) || $this->get( 'delete_started' ) || ! in_array( $this->get( 'delete_origin' ), array( 'retention', 'breach' ), true ) ) {
+			return false;
+		}
+
+		if ( 'breach' === $this->get( 'delete_origin' ) && $this->on_hold() ) {
+			return false;
+		}
+
+		$license = $this->license();
+
+		return $license && Licenses::STATUS_ACTIVE === Licenses::effective_status( $license );
 	}
 
 	/**
@@ -817,7 +868,7 @@ final class Resource {
 	 * @return bool Whether it was stored.
 	 */
 	public function record_retention( array $meta, int $paused_at ): bool {
-		$meta = array_intersect_key( $meta, array_flip( array( 'warned_at', 'reported' ) ) );
+		$meta = array_intersect_key( $meta, array_flip( array( 'warned_at', 'reported', 'warn_started_at', 'warn_alerted' ) ) );
 
 		return true === $this->locked(
 			function () use ( $meta, $paused_at ): bool {
@@ -864,7 +915,7 @@ final class Resource {
 				}
 
 				// The lock is re-entrant within this connection: desire() takes it again at once.
-				return $this->desire( 'deleted', $reason, true );
+				return $this->desire( 'deleted', $reason, true, 'retention' );
 			}
 		);
 	}
@@ -886,7 +937,7 @@ final class Resource {
 					return false;
 				}
 
-				return $this->desire( 'deleted', $reason, false );
+				return $this->desire( 'deleted', $reason, false, 'breach' );
 			}
 		);
 	}

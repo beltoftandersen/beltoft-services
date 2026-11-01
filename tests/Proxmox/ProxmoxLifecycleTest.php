@@ -496,6 +496,24 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ) );
 	}
 
+	public function test_a_delete_that_died_after_the_cleanup_is_finished_by_the_next_run(): void {
+		$r = $this->built();
+		$this->assert_done( $this->op( 'delete', $r ) );
+		$this->assertTrue( Resource::find( $r->id() )->get( 'delete_cleanup' ), 'The marker is written before the record goes.' );
+
+		// The request died before the reconciler stored "deleted": the record is gone, the marker stays.
+		$seen   = count( $this->fake->calls() );
+		$result = $this->op( 'delete', Resource::find( $r->id() ) );
+
+		$this->assert_done( $result );
+		$this->assertCount( $seen, $this->fake->calls(), 'No call is made again.' );
+
+		// Without the marker a missing record is still a failure for an admin.
+		$other = $this->built();
+		VmRecords::remove( $other->id() );
+		$this->assertTrue( $this->op( 'delete', $other )->is_failed() );
+	}
+
 	public function test_delete_releases_private_address_and_quarantines_empty_network(): void {
 		$r = $this->built();
 		$owner = (int) $r->license()['user_id'];

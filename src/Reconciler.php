@@ -7,6 +7,7 @@
 
 namespace BeltoftServices;
 
+use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Registry;
@@ -65,7 +66,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'action_pending', 'waiting', 'wait_since', 'act_wait_since' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'delete_held_alerted', 'delete_origin', 'delete_started', 'warn_started_at', 'warn_alerted', 'backup_purge_at', 'delete_cleanup', 'action_pending', 'waiting', 'wait_since', 'act_wait_since' );
 
 	/**
 	 * How often one operation may restart its retry count because a run made progress. After
@@ -190,6 +191,12 @@ final class Reconciler {
 			return;
 		}
 
+		// A deletion that retention or a breach hold asked for is held while deletion is not on, and
+		// called off when the license is active again, as long as no delete call was made.
+		if ( 'delete' === $operation && self::guard_delete( $r ) ) {
+			return;
+		}
+
 		// Nothing exists yet, so there is nothing to pause.
 		if ( 'pause' === $operation && 'requested' === $r->get( 'state' ) && ! $r->get( 'steps' ) ) {
 			if ( ! $r->set( self::cleared() ) ) {
@@ -262,6 +269,15 @@ final class Reconciler {
 			}
 		}
 
+		// From here a delete call may reach the service: a deletion cannot be called off any more. The marker
+		// is stored first; without it nothing is deleted.
+		if ( 'delete' === $operation && ! $r->get( 'delete_started' ) ) {
+			if ( ! $r->set( array( 'delete_started' => true ) ) ) {
+				self::not_stored( $r );
+				return;
+			}
+		}
+
 		try {
 			$result = $driver->$operation( $r );
 		} catch ( \Throwable $e ) {
@@ -288,6 +304,40 @@ final class Reconciler {
 		} else {
 			self::fail( $fresh, $operation, $result->error(), $meta );
 		}
+	}
+
+	/**
+	 * Decides a delete that retention or a breach hold asked for and that has not started (no driver
+	 * delete call yet). The license active again (a breach deletion also needs the hold lifted) calls it
+	 * off. Otherwise, while deletion mode is not on, it is held: tried again in a day, the admin told once.
+	 * Admin deletions and deletions that have started are not touched.
+	 *
+	 * @param Resource $r Resource, read under its lock.
+	 * @return bool True when the delete must not run now.
+	 */
+	private static function guard_delete( Resource $r ): bool {
+		if ( $r->get( 'delete_started' ) || ! in_array( $r->get( 'delete_origin' ), array( 'retention', 'breach' ), true ) ) {
+			return false;
+		}
+
+		if ( $r->delete_cancellable() ) {
+			$r->desire( 'ready', 'License active' );
+			self::follow_up( Resource::find( $r->id() ) ?? $r );
+			return true;
+		}
+
+		if ( 'on' === (string) Settings::get( 'deletion_mode' ) ) {
+			return false;
+		}
+
+		if ( ! $r->get( 'delete_held_alerted' ) && $r->set( array( 'delete_held_alerted' => time() ) ) ) {
+			Alerts::deletion_held( $r );
+			Events::add( (int) $r->license()['id'], 'service', 'Deletion held: deletion mode is not on.' );
+		}
+
+		Jobs::enqueue( $r->id(), DAY_IN_SECONDS );
+
+		return true;
 	}
 
 	/**

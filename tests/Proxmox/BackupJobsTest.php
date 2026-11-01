@@ -144,7 +144,8 @@ class BackupJobsTest extends BackupTestCase {
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 
 		$r = Resource::find( $r->id() );
-		$r->set( array( 'plan' => array_merge( $r->get( 'plan' ), array( 'backup_days' => 0 ) ), 'backup_purge' => true ) );
+		$r->set( array( 'plan' => array_merge( $r->get( 'plan' ), array( 'backup_days' => 0 ) ), 'backup_purge' => true, 'backup_purge_at' => time() - 8 * DAY_IN_SECONDS ) );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
 
 		ProxmoxJobs::backup();
 

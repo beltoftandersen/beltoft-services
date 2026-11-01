@@ -62,6 +62,7 @@ final class RetentionTest extends TestCase {
 	 */
 	public function catch_warning( $r, $deletes_at ): void {
 		$this->warnings[] = array( $r->id(), $deletes_at );
+		Retention::confirm( $r->id() );
 	}
 
 	/**
@@ -194,7 +195,7 @@ final class RetentionTest extends TestCase {
 		$this->assertSame( 'deleted', $this->fresh( $unwarned )->get( 'desired' ) );
 	}
 
-	public function test_no_warning_days_deletes_on_the_date(): void {
+	public function test_zero_warning_days_still_warns_a_day_before_deleting(): void {
 		$this->settings(
 			array(
 				'deletion_mode' => 'on',
@@ -205,8 +206,51 @@ final class RetentionTest extends TestCase {
 
 		Retention::run();
 
+		$this->assertSame( 1, Retention::warning_days() );
+		$this->assertSame( 'paused', $this->fresh( $due )->get( 'desired' ), 'Warned first, not deleted today.' );
+		$this->assertCount( 1, $this->warnings );
+		$this->assertNotNull( $this->fresh( $due )->get( 'warned_at' ) );
+	}
+
+	public function test_a_warning_that_was_not_sent_does_not_count_and_is_tried_again(): void {
+		$this->settings( array( 'deletion_mode' => 'on', 'admin_email' => 'ops@example.com' ) );
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return $pre;
+			},
+			20,
+			2
+		);
+		// Nothing confirms the warning: the listener of this test is removed, the email fails.
+		remove_action( 'beltoft_services_deletion_warning', array( $this, 'catch_warning' ), 10 );
+		remove_all_actions( 'beltoft_services_deletion_warning' );
+
+		$due = $this->paused( 40, array() );
+		Retention::run();
+
+		$fresh = $this->fresh( $due );
+		$this->assertNull( $fresh->get( 'warned_at' ), 'No confirmation, no warning given.' );
+		$this->assertNotNull( $fresh->get( 'warn_started_at' ) );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ), 'Not deleted unannounced.' );
+		$this->assertCount( 1, $mails, 'The admin is alerted once.' );
+
+		Retention::run();
+		$this->assertSame( 'paused', $this->fresh( $due )->get( 'desired' ) );
+		$this->assertCount( 1, $mails, 'Alerted once only.' );
+
+		// The mail works again: the warning is sent and counts, deletion follows a day later.
+		add_action( 'beltoft_services_deletion_warning', array( $this, 'catch_warning' ), 10, 2 );
+		Retention::run();
+		$fresh = $this->fresh( $due );
+		$this->assertNotNull( $fresh->get( 'warned_at' ) );
+		$this->assertSame( 'paused', $fresh->get( 'desired' ), 'Deleted a day after the sent warning, not now.' );
+		$this->assertCount( 1, $this->warnings );
+		$fresh->set( array( 'warned_at' => time() - DAY_IN_SECONDS - 1 ) );
+		Retention::run();
 		$this->assertSame( 'deleted', $this->fresh( $due )->get( 'desired' ) );
-		$this->assertSame( array(), $this->warnings );
 	}
 
 	public function test_protected_is_never_deleted(): void {
@@ -282,7 +326,7 @@ final class RetentionTest extends TestCase {
 
 		Retention::run();
 
-		$this->assertNotNull( $this->fresh( $first )->get( 'warned_at' ), 'Warned once; never repeated.' );
+		$this->assertNull( $this->fresh( $first )->get( 'warned_at' ), 'A listener that failed gave no warning: tried again next run.' );
 		$this->assertNotNull( $this->fresh( $second )->get( 'warned_at' ) );
 		$this->assertCount( 1, $this->warnings );
 	}

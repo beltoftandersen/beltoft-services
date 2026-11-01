@@ -250,7 +250,10 @@ final class Emails {
 	public static function on_deletion_warning( $r, $deletes_at ): void {
 		// Never for a domain registration: it is not deleted.
 		if ( $r instanceof Resource && ! Retention::is_registration( $r ) ) {
-			self::send( 'beltoft_services_deletion_warning', $r, array( 'deletes_at' => (int) $deletes_at ) );
+			// Only a mail that was sent counts as the warning: Retention deletes nothing before one was.
+			if ( self::send( 'beltoft_services_deletion_warning', $r, array( 'deletes_at' => (int) $deletes_at ) ) ) {
+				Retention::confirm( $r->id() );
+			}
 		}
 	}
 

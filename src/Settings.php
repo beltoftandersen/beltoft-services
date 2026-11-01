@@ -56,7 +56,7 @@ final class Settings {
 				'section' => 'general',
 				'type'    => 'number',
 				'default' => 1,
-				'min'     => 0,
+				'min'     => 1,
 				'label'   => __( 'Warn customers this many days before deletion', 'beltoft-services' ),
 			),
 			'breach_retention_days' => array(
@@ -82,7 +82,7 @@ final class Settings {
 				'type'    => 'checkbox',
 				'default' => 0,
 				'label'   => __( 'Delete the settings when the plugin is deleted', 'beltoft-services' ),
-				'desc'    => __( 'This also deletes the IP pool and the virtual machine records. Machines that exist can then no longer be matched to their services.', 'beltoft-services' ),
+				'desc'    => __( 'This also deletes the IP pool and the virtual machine records, unless a service that is not deleted still exists: then those tables are kept. Machines whose records are deleted can no longer be matched to their services.', 'beltoft-services' ),
 			),
 			'mcp_enabled' => array(
 				'tab'     => 'general',

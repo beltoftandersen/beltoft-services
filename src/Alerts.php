@@ -219,6 +219,28 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a deletion warning could not be sent: the service is not deleted until
+	 * the customer has been warned. The caller sends this once.
+	 *
+	 * @param Resource $r Resource.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function warning_unsent( Resource $r ): bool {
+		return self::admin_note( $r, 'Deletion warning not sent', array( 'The customer could not be warned that the service will be deleted. It is not deleted until the warning has been sent; sending is tried again every day.' ) );
+	}
+
+	/**
+	 * Alerts the admin that a deletion that was asked for is held because deletion is not turned on.
+	 * The caller sends this once.
+	 *
+	 * @param Resource $r Resource.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function deletion_held( Resource $r ): bool {
+		return self::admin_note( $r, 'Deletion held', array( sprintf( 'A deletion was requested by retention or a breach hold, but deletion mode is "%s", so nothing was deleted. Turn deletion on, or leave it held.', (string) Settings::get( 'deletion_mode' ) ) ) );
+	}
+
+	/**
 	 * One mail to the alert address about a server.
 	 *
 	 * @param Resource           $r       Resource.

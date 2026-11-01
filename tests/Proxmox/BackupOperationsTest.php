@@ -173,11 +173,22 @@ class BackupOperationsTest extends BackupTestCase {
 		$fresh = Resource::find( $r->id() );
 		$this->assertTrue( $fresh->get( 'backup_purge' ) );
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'], 'Nothing is deleted before the nightly run.' );
+		$this->assertEqualsWithDelta( time(), (int) $fresh->get( 'backup_purge_at' ), 5, 'The time of the plan change is kept.' );
 
+		// Deletion off, and then too early: the backups stay.
+		ProxmoxJobs::backup();
+		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'], 'Deletion is off.' );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		ProxmoxJobs::backup();
+		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'], 'Not before 7 days.' );
+		$this->assertTrue( Resource::find( $r->id() )->get( 'backup_purge' ) );
+
+		Resource::find( $r->id() )->set( array( 'backup_purge_at' => time() - 7 * DAY_IN_SECONDS - 1 ) );
 		ProxmoxJobs::backup();
 
 		$this->assertSame( array(), $this->fake->state()['backups']['backup-store'] );
 		$this->assertNull( Resource::find( $r->id() )->get( 'backup_purge' ) );
+		$this->assertNull( Resource::find( $r->id() )->get( 'backup_purge_at' ) );
 		$this->assertCount( 1, $this->calls( 'POST', '/vzdump' ), 'No backup is taken for a plan without backups.' );
 	}
 

@@ -316,6 +316,20 @@ final class AdminPanelTest extends TestCase {
 		$this->assertWPError( Panel::act( Resource::find( $resource->id() ), 'retry' ) );
 	}
 
+	public function test_mark_deleted_refuses_a_protected_resource(): void {
+		list( $resource, $driver ) = $this->resource( array( 'state' => 'failed', 'protected' => true ) );
+		$this->admin();
+
+		$result = Panel::act( $resource, 'mark_deleted', 'MARK DELETED' );
+
+		$this->assertWPError( $result );
+		$fresh = Resource::find( $resource->id() );
+		$this->assertTrue( $fresh->is_live() );
+		$this->assertSame( 'failed', $fresh->get( 'state' ) );
+		$this->assertNotSame( 'deleted', $fresh->get( 'desired' ) );
+		$this->assertSame( array(), $driver->calls() );
+	}
+
 	public function test_actions_report_a_busy_resource(): void {
 		list( $resource ) = $this->resource( array( 'state' => 'ready' ) );
 		$this->admin();
