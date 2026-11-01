@@ -1,7 +1,7 @@
 /**
  * Checkout: the Billing choice (Monthly or Pay as you go) swaps the cart's server for the variation with the other
  * billing model, then asks WooCommerce to refresh the order review. The price and the cap next to Pay as you go follow the
- * backups box, and the card note follows the choice. The server's own text is never shown: a fixed message is.
+ * backups box. The server's own text is never shown: a fixed message is.
  */
 ( function ( $ ) {
 	'use strict';
@@ -9,8 +9,8 @@
 	var config = window.beltoftServicesBilling;
 	var wrap = $( '.beltoft-services-billing' );
 	var radios = wrap.find( 'input[name="beltoft_services_billing"]' );
-	var note = wrap.find( '[data-billing-note]' );
 	var rate = wrap.find( '[data-billing-rate]' );
+	var monthly = wrap.find( '[data-billing-monthly]' );
 	var backups = $( '#beltoft_services_backups' );
 
 	if ( ! config || ! radios.length ) {
@@ -27,9 +27,15 @@
 		return text || wrap.attr( 'data-terms' ) || '';
 	}
 
+	function monthlyText() {
+		var text = backups.length && backups.is( ':checked' ) ? wrap.attr( 'data-monthly-backups' ) : '';
+
+		return text || wrap.attr( 'data-monthly' ) || '';
+	}
+
 	function show() {
 		rate.text( terms() );
-		note.text( usage() ? wrap.attr( 'data-note' ) || '' : '' );
+		monthly.text( monthlyText() );
 	}
 
 	radios.on( 'change', function () {

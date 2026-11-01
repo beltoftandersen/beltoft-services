@@ -17,6 +17,7 @@
 .beltoft-services-plan__price { display: grid; gap: 1px; font-size: 13px; line-height: 1.35; }
 .beltoft-services-plan__price b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .beltoft-services-plan__price .woocommerce-Price-amount, .beltoft-services-plan__price bdi { color: inherit; }
+.beltoft-services-plan__hourly { font-size: 13px; line-height: 1.35; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .beltoft-services-plan__specs { display: grid; gap: 2px; margin-top: auto; font-size: 14px; }
 .beltoft-services-plan__stock { font-size: 14px; font-weight: 500; }
 .beltoft-services-plan .beltoft-services-plan__input:checked + .beltoft-services-plan__face, .beltoft-services-plan:hover .beltoft-services-plan__input:checked + .beltoft-services-plan__face { background: var(--navy, #0c1535); color: var(--bg-card, #fff); }
@@ -43,7 +44,6 @@
 .beltoft-services-bill .beltoft-services-bill__input:focus-visible + .beltoft-services-bill__face { outline: 2px solid var(--green, #28513e); outline-offset: 2px; }
 .beltoft-services-bill.is-disabled { cursor: not-allowed; }
 .beltoft-services-bill.is-disabled .beltoft-services-bill__face, .beltoft-services-bill.is-disabled:hover .beltoft-services-bill__face { background: var(--bg-warm, #eeece6); color: var(--ink-soft, #5e7080); }
-.beltoft-services-picker__billing .description { margin: 10px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
 @media (max-width: 478px) { .beltoft-services-picker__bills { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .beltoft-services-bill__face { transition: none; } }
 .beltoft-services-picker [hidden] { display: none !important; }

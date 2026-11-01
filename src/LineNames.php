@@ -37,7 +37,8 @@ final class LineNames {
 	 * The note under a pay-as-you-go line.
 	 */
 	public static function usage_note(): string {
-		return __( 'Billed monthly for the hours used, excl. VAT', 'beltoft-services' );
+		/* translators: %s: how pay as you go is billed */
+		return sprintf( __( '%s, excl. VAT', 'beltoft-services' ), Rates::billed_note() );
 	}
 
 	/**
@@ -303,6 +304,13 @@ final class LineNames {
 	}
 
 	/**
+	 * Is the checkout (also while WooCommerce refreshes it) showing the order summary? The note under the items says it there.
+	 */
+	private static function at_checkout(): bool {
+		return defined( 'WOOCOMMERCE_CHECKOUT' ) || ( function_exists( 'is_checkout' ) && is_checkout() );
+	}
+
+	/**
 	 * Cart lines: the attribute rows the name says are left out, and the pay-as-you-go note is added.
 	 *
 	 * @param mixed $data      Rows.
@@ -326,7 +334,8 @@ final class LineNames {
 			);
 		}
 
-		if ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) {
+		// At checkout the note is said once under the items (Usage\Summary).
+		if ( ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) && ! self::at_checkout() ) {
 			$data[] = array(
 				'key'   => __( 'Billing', 'beltoft-services' ),
 				'value' => self::usage_note(),

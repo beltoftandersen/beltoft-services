@@ -21,7 +21,9 @@
 	var usage = billing ? billing.querySelector( 'input[value="usage"]' ) : null;
 	var monthly = billing ? billing.querySelector( 'input[value="monthly"]' ) : null;
 	var usageLabel = billing ? billing.querySelector( '[data-picker-usage-label]' ) : null;
-	var usageNote = billing ? billing.querySelector( '[data-picker-usage-note]' ) : null;
+	var monthlyLabel = billing ? billing.querySelector( '[data-picker-monthly-label]' ) : null;
+	var usageLine = billing ? billing.querySelector( '[data-picker-usage-line]' ) : null;
+	var paygOnly = form.hasAttribute( 'data-picker-payg-only' );
 	var summary = form.querySelector( '[data-picker-summary]' );
 	var submit = form.querySelector( '[data-picker-submit]' );
 	// Whether the customer picked a billing tile (a posted form that failed counts as picked).
@@ -195,8 +197,12 @@
 				monthly.checked = true;
 			}
 
-			if ( usageNote ) {
-				usageNote.hidden = ! hasUsage || '' === ( usageNote.textContent || '' );
+			if ( monthlyLabel ) {
+				monthlyLabel.textContent = ( withBackups && radio.getAttribute( 'data-monthly-label-backups' ) ) || radio.getAttribute( 'data-monthly-label' ) || '';
+			}
+
+			if ( usageLine ) {
+				usageLine.hidden = ! hasUsage;
 			}
 
 			if ( ! hasUsage && usageLabel ) {
@@ -209,14 +215,22 @@
 				usageLabel.textContent = radio.getAttribute( 'data-usage-label' + suffix ) || '';
 			}
 
-			if ( hasUsage && usageNote ) {
-				usageNote.textContent = radio.getAttribute( 'data-usage-note' + suffix ) || '';
-				usageNote.hidden = '' === usageNote.textContent;
-			}
 		}
 
+		// Monthly not offered: the cards show the cap and the hourly rate, with or without backups.
+		each( plans, function ( card ) {
+			var cap = card.parentNode.querySelector( '.beltoft-services-plan__price b' );
+			var hourly = card.parentNode.querySelector( '.beltoft-services-plan__hourly' );
+			var suffix = withBackups && '1' === card.getAttribute( 'data-has-usage-backups' ) ? '-backups' : '';
+
+			if ( cap && hourly ) {
+				cap.textContent = card.getAttribute( 'data-card-cap' + suffix ) || cap.textContent;
+				hourly.textContent = card.getAttribute( 'data-card-hourly' + suffix ) || hourly.textContent;
+			}
+		} );
+
 		if ( summary ) {
-			if ( hasUsage && usage && usage.checked ) {
+			if ( hasUsage && ( paygOnly || ( usage && usage.checked ) ) && ! ( paygOnly && withBackups && '1' !== radio.getAttribute( 'data-has-usage-backups' ) ) ) {
 				summary.textContent = radio.getAttribute( 'data-summary-usage' + ( withBackups ? '-backups' : '' ) ) || '';
 			} else {
 				summary.textContent = ( withBackups ? radio.getAttribute( 'data-summary-backups' ) : radio.getAttribute( 'data-summary' ) ) || '';

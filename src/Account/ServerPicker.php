@@ -185,7 +185,8 @@ final class ServerPicker {
 		return array(
 			'plan'      => (string) absint( $get( self::PLAN ) ),
 			'backups'   => '' !== $get( self::BACKUP ) ? '1' : '',
-			'billing'   => 'usage' === $get( self::BILLING ) ? 'usage' : '',
+			// Monthly not offered: there are no tiles, every plan is bought pay as you go (resolve() falls back for one that cannot be).
+			'billing'   => 'usage' === $get( self::BILLING ) || ! Rates::monthly_offered() ? 'usage' : '',
 			'os'        => $get( OsField::POST_KEY ),
 			'app'       => $get( AppField::POST_APP ),
 			'version'   => $get( AppField::POST_VERSION ),
@@ -257,7 +258,9 @@ final class ServerPicker {
 			$backups = '' !== $values['backups'] && ! empty( $plan['backups'] );
 			$target  = array() === $usage ? 0 : (int) ( $backups ? $usage['backups_variation_id'] : $usage['variation_id'] );
 
-			if ( array() === $usage ) {
+			if ( ! Rates::monthly_offered() && ( array() === $usage || $target < 1 ) ) {
+				// Not offered monthly: a plan that cannot be bought pay as you go is bought as it is.
+			} elseif ( array() === $usage ) {
 				$out['errors']['billing'] = __( 'Pay as you go is not offered for this plan.', 'beltoft-services' );
 			} elseif ( $target < 1 ) {
 				$out['errors']['billing'] = __( 'Pay as you go is not offered with daily backups for this plan.', 'beltoft-services' );
@@ -494,7 +497,7 @@ final class ServerPicker {
 		echo '<p class="beltoft-services-picker__intro">' . esc_html__( 'Choose a plan and what the server starts with. You pay on the next page.', 'beltoft-services' ) . '</p>';
 		self::error( $errors, 'form' );
 
-		echo '<form class="beltoft-services-picker__form" method="post" action="' . esc_url( self::url() ) . '">';
+		echo '<form class="beltoft-services-picker__form" method="post" action="' . esc_url( self::url() ) . '"' . ( Rates::monthly_offered() ? '' : ' data-picker-payg-only' ) . '>';
 		wp_nonce_field( self::NONCE, self::FIELD );
 
 		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) );
@@ -588,18 +591,22 @@ final class ServerPicker {
 			'data-disk'             => (string) $plan['disk_gb'],
 			'data-summary'          => self::summary( $plan, false ),
 			'data-has-backups'      => $extra ? '1' : '0',
-			'data-backups-label'    => $extra ? self::backups_label( $plan ) : '',
+			'data-backups-label'    => $extra ? self::backups_label( $plan, self::payg_only( $plan ) ) : '',
 			'data-summary-backups'  => $extra ? self::summary( $plan, true ) : '',
+			'data-monthly-label'    => Rates::tile_monthly( (float) $plan['price'] ),
+			'data-monthly-label-backups' => $extra ? Rates::tile_monthly( (float) $plan['price'] + (float) $extra['extra'] ) : '',
 			'data-has-usage'        => $plan['usage'] ? '1' : '0',
 			'data-has-usage-backups' => $plan['usage'] && $plan['usage']['backups_variation_id'] ? '1' : '0',
 		);
 
 		if ( $plan['usage'] ) {
 			$attrs += array(
-				'data-usage-label'          => self::usage_label( $plan, false ),
-				'data-usage-label-backups'  => self::usage_label( $plan, true ),
-				'data-usage-note'           => BillingField::note(),
-				'data-usage-note-backups'   => BillingField::note(),
+				'data-usage-label'          => Rates::tile_terms( ...array_values( self::usage_rates( $plan, false ) ) ),
+				'data-usage-label-backups'  => Rates::tile_terms( ...array_values( self::usage_rates( $plan, true ) ) ),
+				'data-card-cap'             => Rates::cap_money( self::usage_rates( $plan, false )['cap'] ),
+				'data-card-cap-backups'     => Rates::cap_money( self::usage_rates( $plan, true )['cap'] ),
+				'data-card-hourly'          => Rates::per_hour( self::usage_rates( $plan, false )['hourly'] ),
+				'data-card-hourly-backups'  => Rates::per_hour( self::usage_rates( $plan, true )['hourly'] ),
 				'data-summary-usage'        => self::summary( $plan, false, true ),
 				'data-summary-usage-backups' => self::summary( $plan, true, true ),
 			);
@@ -622,7 +629,15 @@ final class ServerPicker {
 			echo '<span class="beltoft-services-plan__note">' . esc_html( (string) $plan['note'] ) . '</span>';
 		}
 
-		echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( (float) $plan['price'] ) ) . '</b> <span>' . esc_html( self::per( (string) $plan['period'] ) ) . '</span></span>';
+		if ( self::payg_only( $plan ) ) {
+			$rates = self::usage_rates( $plan, false );
+
+			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( $rates['cap'] ) ) . '</b> <span>' . esc_html__( 'max per month, excl. VAT', 'beltoft-services' ) . '</span></span>';
+			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( $rates['hourly'] ) ) . '</span>';
+		} else {
+			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( (float) $plan['price'] ) ) . '</b> <span>' . esc_html( self::per( (string) $plan['period'] ) ) . '</span></span>';
+		}
+
 		echo '<span class="beltoft-services-plan__specs">';
 		/* translators: %d: number of virtual CPU cores */
 		echo '<span>' . esc_html( sprintf( _n( '%d vCPU', '%d vCPU', (int) $plan['cores'], 'beltoft-services' ), (int) $plan['cores'] ) ) . '</span>';
@@ -636,6 +651,15 @@ final class ServerPicker {
 		}
 
 		echo '</span></label>';
+	}
+
+	/**
+	 * Is this plan shown by its hourly rate only: monthly is not offered and the plan has a pay as you go option.
+	 *
+	 * @param array<string, mixed> $plan Plan.
+	 */
+	private static function payg_only( array $plan ): bool {
+		return ! Rates::monthly_offered() && ! empty( $plan['usage'] );
 	}
 
 	/**
@@ -657,13 +681,22 @@ final class ServerPicker {
 	 *
 	 * @param array<string, mixed> $plan Plan.
 	 */
-	private static function backups_label( array $plan ): string {
+	private static function backups_label( array $plan, bool $hourly = false ): string {
 		$extra = (array) $plan['backups'];
-		$money = html_entity_decode( wp_strip_all_tags( wc_price( (float) $extra['extra'] ) ), ENT_QUOTES, 'UTF-8' );
-		$per   = '' === (string) $plan['period'] ? '' : ' ' . sprintf( /* translators: %s: period such as month */ __( 'per %s', 'beltoft-services' ), (string) $plan['period'] );
 
-		/* translators: 1: price difference such as €2.00, 2: " per month" or empty */
-		$price = sprintf( __( '+%1$s%2$s excluding VAT', 'beltoft-services' ), $money, $per );
+		if ( $hourly ) {
+			$rates = self::usage_rates( $plan, true );
+			$base  = self::usage_rates( $plan, false );
+
+			/* translators: %s: price difference per hour such as €0.0027 */
+			$price = sprintf( __( '+%s per hour excluding VAT', 'beltoft-services' ), Rates::money( $rates['hourly'] - $base['hourly'], 4 ) );
+		} else {
+			$money = html_entity_decode( wp_strip_all_tags( wc_price( (float) $extra['extra'] ) ), ENT_QUOTES, 'UTF-8' );
+			$per   = '' === (string) $plan['period'] ? '' : ' ' . sprintf( /* translators: %s: period such as month */ __( 'per %s', 'beltoft-services' ), (string) $plan['period'] );
+
+			/* translators: 1: price difference such as €2.00, 2: " per month" or empty */
+			$price = sprintf( __( '+%1$s%2$s excluding VAT', 'beltoft-services' ), $money, $per );
+		}
 
 		if ( (int) $extra['days'] > 0 ) {
 			/* translators: 1: number of days, 2: price */
@@ -744,7 +777,7 @@ final class ServerPicker {
 	 * @param bool                             $backups  Backups ticked.
 	 */
 	private static function billing( array $plans, int $selected, bool $usage, bool $backups, bool $touched = false ): void {
-		if ( array() === array_filter( $plans, static fn( $plan ) => ! empty( $plan['usage'] ) ) ) {
+		if ( ! Rates::monthly_offered() || array() === array_filter( $plans, static fn( $plan ) => ! empty( $plan['usage'] ) ) ) {
 			return;
 		}
 
@@ -757,13 +790,12 @@ final class ServerPicker {
 		echo '<div class="beltoft-services-picker__bills">';
 		echo '<label class="beltoft-services-bill"><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="monthly"';
 		checked( ! $on_usage, true );
-		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span></span></label>';
+		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span><span class="beltoft-services-picker__rate" data-picker-monthly-label>' . esc_html( $plan ? Rates::tile_monthly( (float) $plan['price'] + ( $backups && ! empty( $plan['backups'] ) ? (float) $plan['backups']['extra'] : 0.0 ) ) : '' ) . '</span></span></label>';
 		echo '<label class="beltoft-services-bill' . ( $shown ? '' : ' is-disabled' ) . '" data-picker-usage-tile><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
 		checked( $on_usage, true );
 		disabled( ! $shown, true );
-		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></span></label>';
+		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span><span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? Rates::tile_terms( ...array_values( self::usage_rates( $plan, $with ) ) ) : '' ) . '</span><span class="beltoft-services-picker__rate" data-picker-usage-line' . ( $shown ? '' : ' hidden' ) . '>' . esc_html( Rates::billed_note() ) . '</span></span></label>';
 		echo '</div>';
-		echo '<p class="description" data-picker-usage-note' . ( '' === BillingField::note() || ! $shown ? ' hidden' : '' ) . '>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
 		echo '</fieldset>';
 	}
 

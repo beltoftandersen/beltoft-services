@@ -173,6 +173,7 @@ final class Plugin {
 		Usage\Threshold::register();
 		Usage\Account::register();
 		Usage\Cart::register();
+		Usage\Summary::register();
 		Usage\BillingField::register();
 		Usage\Catalog::register();
 		Usage\Renewal::register();
