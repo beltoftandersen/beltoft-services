@@ -3,7 +3,7 @@
   "name": "Nextcloud",
   "logo": "logo.svg",
   "summary": "Nextcloud Server 35 (community) with PostgreSQL, Redis and Caddy. Optional domain with HTTPS.",
-  "getting_started": "Open your server address and sign in as admin with the password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json, and your email address is set on the admin account. Add a domain for HTTPS before you connect the desktop and phone apps; without a domain the address is not encrypted and the apps need HTTPS. Calendar and contacts work over CalDAV and CardDAV at your server address. Your files are stored on the server disk, so a plan with more disk, or an extra disk, gives you more space. Outgoing mail on port 25 is blocked on all servers; set an SMTP service on port 587 or 465 in Nextcloud's Basic settings. Backups are your job: turn on maintenance mode with docker compose exec -u www-data app php occ maintenance:mode --on from /opt/nextcloud, back up the database with docker compose exec postgres pg_dump, copy the data volume (docker volume nextcloud_nextcloud-data), then turn maintenance mode off. Updates are manual and one major version at a time: pull the image of the next major version only, because Nextcloud cannot skip a major version. Nextcloud Server is licensed under the AGPL-3.0.",
+  "getting_started": "Open your server address and sign in as admin with the password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json, and your email address is set on the admin account. Add a domain for HTTPS before you connect the desktop and phone apps; without a domain the address is not encrypted and the apps need HTTPS. Calendar and contacts work over CalDAV and CardDAV at your server address. Your files are stored on the server disk, so a plan with more disk, or an extra disk, gives you more space. Outgoing mail on port 25 is blocked on all servers; set an SMTP service on port 587 or 465 in Nextcloud's Basic settings. Backups are your job: turn on maintenance mode with docker compose exec -u www-data app php occ maintenance:mode --on from /opt/nextcloud, back up the database with docker compose exec postgres pg_dump, copy the data volume (docker volume nextcloud_nextcloud-data), then turn maintenance mode off. Updates are manual and one major version at a time: pull the image of the next major version only, because Nextcloud cannot skip a major version. If the server address or domain changes, list the allowed ones with docker compose exec -u www-data app php occ config:system:get trusted_domains from /opt/nextcloud and add the new one under the next free number with occ config:system:set trusted_domains NUMBER --value=NEW-ADDRESS. Nextcloud Server is licensed under the AGPL-3.0.",
   "needs_email": true,
   "min": {
     "cores": 2,
@@ -65,7 +65,7 @@
         "ubuntu-24.04"
       ],
       "install": "install.script",
-      "sha256": "1d1418b7326582f091d8838f619286d600bbd763b4fa5de991689c83f5637bf6",
+      "sha256": "787de472abc71b3c61794734f9452ec86b4ae65782ca3a239d3bb36d0cc12975",
       "eol": ""
     }
   ]

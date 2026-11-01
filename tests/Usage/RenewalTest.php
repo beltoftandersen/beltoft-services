@@ -41,10 +41,23 @@ class RenewalTest extends UsageTestCase {
 	 * Rows for hours hours of one item, as the meter writes them, ending an hour ago.
 	 */
 	private function hours( int $resource, int $user, int $hours, float $rate = 0.02260274, string $item = 'server', int $ago = 1 ): void {
-		$end = Ledger::hour( time() ) - $ago * HOUR_IN_SECONDS;
+		// Early in a month the rows would reach into the month before and split into two lines, so they end in the middle of last month then.
+		$now   = Ledger::hour( time() );
+		$month = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $now ) . ' UTC' );
+		$base  = $now - $month > 400 * HOUR_IN_SECONDS ? $now : $month - 15 * DAY_IN_SECONDS;
+		$end   = $base - $ago * HOUR_IN_SECONDS;
 		for ( $i = 0; $i < $hours; $i++ ) {
 			Ledger::record( $resource, $user, $item, 1.0, 'hour', $rate, $end - $i * HOUR_IN_SECONDS );
 		}
+	}
+
+	/** The first hour of the latest 31 day month that ended at least a month ago. */
+	private function long_month(): int {
+		$base = (int) strtotime( gmdate( 'Y-m-01 00:00:00', time() ) . ' UTC' );
+		do {
+			$base = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $base - DAY_IN_SECONDS ) . ' UTC' );
+		} while ( 31 !== (int) gmdate( 't', $base ) || $base > time() - 62 * DAY_IN_SECONDS );
+		return $base;
 	}
 
 	private function fees( \WC_Order $order ): array {
@@ -120,7 +133,7 @@ class RenewalTest extends UsageTestCase {
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );
 		// 800 hours at 15 x 1.1 / 730 would be 18.08: the cap is 16.50. The hours are all in the month before last, so they share one month.
-		$base = (int) strtotime( gmdate( 'Y-m-01 00:00:00', strtotime( '-2 months' ) ) . ' UTC' );
+		$base = $this->long_month();
 		for ( $i = 0; $i < 730; $i++ ) {
 			Ledger::record( 501, $user, 'server', 1.0, 'hour', 0.02260274, $base + $i * HOUR_IN_SECONDS );
 		}
@@ -141,7 +154,7 @@ class RenewalTest extends UsageTestCase {
 	public function test_an_early_bill_and_the_renewal_in_the_same_month_share_one_cap(): void {
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );
-		$base = (int) strtotime( gmdate( 'Y-m-01 00:00:00', strtotime( '-2 months' ) ) . ' UTC' );
+		$base = $this->long_month();
 
 		for ( $i = 0; $i < 600; $i++ ) {
 			Ledger::record( 501, $user, 'server', 1.0, 'hour', 0.02260274, $base + $i * HOUR_IN_SECONDS );

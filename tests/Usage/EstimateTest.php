@@ -45,7 +45,10 @@ class EstimateTest extends UsageTestCase {
 	}
 
 	private function hours( int $resource, int $user, int $hours, float $rate = 0.02260274, string $item = 'server' ): void {
-		$end = Ledger::hour( time() ) - HOUR_IN_SECONDS;
+		// Early in a month the rows would reach into the month before and split into two lines, so they end in the middle of last month then.
+		$now   = Ledger::hour( time() );
+		$month = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $now ) . ' UTC' );
+		$end   = ( $now - $month > 400 * HOUR_IN_SECONDS ? $now : $month - 15 * DAY_IN_SECONDS ) - HOUR_IN_SECONDS;
 		for ( $i = 0; $i < $hours; $i++ ) {
 			Ledger::record( $resource, $user, $item, 1.0, 'hour', $rate, $end - $i * HOUR_IN_SECONDS );
 		}
