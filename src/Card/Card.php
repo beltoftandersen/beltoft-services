@@ -42,6 +42,11 @@ final class Card {
 	public const META_DONE    = '_beltoft_services_card_done';
 
 	/**
+	 * Option name prefix of the row that says a payment was applied.
+	 */
+	public const CLAIM = 'beltoft_services_card_claim_';
+
+	/**
 	 * Seconds the mandate details are kept.
 	 */
 	public const CACHE_TTL = 600;
@@ -609,7 +614,9 @@ final class Card {
 				return 'ignored';
 			}
 
-			if ( in_array( $id, self::ids( $account, self::META_DONE ), true ) ) {
+			$claim = self::CLAIM . md5( $id );
+
+			if ( false !== get_option( $claim ) || in_array( $id, self::ids( $account, self::META_DONE ), true ) ) {
 				return 'done';
 			}
 
@@ -622,7 +629,17 @@ final class Card {
 				return 'waiting';
 			}
 
-			self::swap_mandate( $account, (string) $payment['mandateId'] );
+			// The claim is one row an option name can only have once: a payment is applied by one request, whatever the object cache holds.
+			if ( ! add_option( $claim, time(), '', false ) ) {
+				return 'done';
+			}
+
+			try {
+				self::swap_mandate( $account, (string) $payment['mandateId'] );
+			} catch ( \Throwable $e ) {
+				delete_option( $claim );
+				throw $e;
+			}
 
 			$done   = self::ids( $account, self::META_DONE );
 			$done[] = $id;

@@ -31,6 +31,9 @@ class CardTest extends UsageTestCase {
 		update_option( 'mollie-payments-for-woocommerce_test_mode_enabled', 'yes' );
 		update_option( 'mollie-payments-for-woocommerce_test_api_key', 'test_' . str_repeat( 'a', 30 ) );
 		update_option( 'woocommerce_currency', 'EUR' );
+		foreach ( array( 'tr_new1', 'tr_new2', 'tr_other1' ) as $id ) {
+			delete_option( Card::CLAIM . md5( $id ) );
+		}
 		delete_transient( 'beltoft_services_card_' . substr( md5( 'cst_1|mdt_old' ), 0, 24 ) );
 		delete_transient( 'beltoft_services_card_' . substr( md5( 'cst_1|mdt_new' ), 0, 24 ) );
 
@@ -336,6 +339,21 @@ class CardTest extends UsageTestCase {
 		$this->assertSame( 'mdt_new', wcs_get_subscription( $sub->get_id() )->get_meta( '_mollie_mandate_id' ) );
 
 		$this->assertSame( 'Mastercard ending 4444, expires 12/99', Card::describe( Card::details( wcs_get_subscription( $sub->get_id() ) ) ), 'The page shows the new card.' );
+	}
+
+	public function test_a_stale_read_cannot_apply_a_payment_twice(): void {
+		$user = $this->new_user();
+		$sub  = $this->card_account( $user );
+		Card::start_replace( $user );
+		$this->mollie['payments']['tr_new1']['status']    = 'paid';
+		$this->mollie['payments']['tr_new1']['mandateId'] = 'mdt_new';
+
+		// Another request already applied it, and this one still sees the old subscription data.
+		add_option( Card::CLAIM . md5( 'tr_new1' ), time(), '', false );
+
+		$this->assertSame( 'done', Card::apply_payment( 'tr_new1' ) );
+		$this->assertSame( array(), $this->mollie['revoked'] );
+		$this->assertSame( 'mdt_old', wcs_get_subscription( $sub->get_id() )->get_meta( '_mollie_mandate_id' ) );
 	}
 
 	public function test_a_payment_that_is_not_ours_is_ignored(): void {
