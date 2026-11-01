@@ -256,4 +256,36 @@ class SummaryTest extends UsageTestCase {
 		$this->assertStringContainsString( "\u{20AC}15 ", str_replace( '$', "\u{20AC}", str_replace( "\u{a0}", ' ', \BeltoftServices\Usage\Rates::max_per_month( 15.0 ) ) ) );
 		$this->assertStringContainsString( '0.0226', \BeltoftServices\Usage\Rates::money( 0.0226, 4 ) );
 	}
+
+	public function test_monthly_not_offered_never_touches_a_mail_plan_or_a_plugin_licence_in_the_cart(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$vps  = $this->usage_product( '0' );
+		$mail = $this->usage_product( '0' );
+		$mail['m-None']->get_parent_id();
+		update_post_meta( $mail['m-None']->get_parent_id(), \BeltoftServices\Product::META_DRIVER, 'http' );
+		wp_set_current_user( $this->new_user() );
+
+		$plugin = new \WC_Product_Simple();
+		$plugin->set_name( 'Plugin' );
+		$plugin->set_regular_price( '49' );
+		$plugin->save();
+
+		WC()->cart->add_to_cart( $mail['m-None']->get_parent_id(), 1, $mail['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
+		WC()->cart->add_to_cart( $plugin->get_id() );
+		WC()->cart->add_to_cart( $vps['m-None']->get_parent_id(), 1, $vps['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
+
+		$ids = array_map( static fn( $i ) => (int) ( $i['variation_id'] ?: $i['product_id'] ), WC()->cart->get_cart() );
+
+		$this->assertContains( $mail['m-None']->get_id(), $ids, 'The mail plan stays monthly.' );
+		$this->assertNotContains( $mail['u-None']->get_id(), $ids );
+		$this->assertContains( $plugin->get_id(), $ids, 'The plugin licence is untouched.' );
+		$this->assertContains( $vps['u-None']->get_id(), $ids, 'The server is swapped.' );
+		$this->assertNotContains( $vps['m-None']->get_id(), $ids );
+
+		foreach ( WC()->cart->get_cart() as $key => $item ) {
+			if ( (int) $item['product_id'] === $plugin->get_id() || (int) $item['variation_id'] === $mail['m-None']->get_id() ) {
+				$this->assertSame( $item['data']->get_price(), apply_filters( 'woocommerce_cart_item_price', $item['data']->get_price(), $item, $key ) );
+			}
+		}
+	}
 }

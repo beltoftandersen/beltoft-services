@@ -304,6 +304,13 @@ final class LineNames {
 	}
 
 	/**
+	 * Is the checkout (also while WooCommerce refreshes it) showing the order summary? The note under the items says it there.
+	 */
+	private static function at_checkout(): bool {
+		return defined( 'WOOCOMMERCE_CHECKOUT' ) || ( function_exists( 'is_checkout' ) && is_checkout() );
+	}
+
+	/**
 	 * Cart lines: the attribute rows the name says are left out, and the pay-as-you-go note is added.
 	 *
 	 * @param mixed $data      Rows.
@@ -328,7 +335,7 @@ final class LineNames {
 		}
 
 		// At checkout the note is said once under the items (Usage\Summary).
-		if ( ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) && ! \BeltoftServices\Usage\Summary::at_checkout() ) {
+		if ( ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) && ! self::at_checkout() ) {
 			$data[] = array(
 				'key'   => __( 'Billing', 'beltoft-services' ),
 				'value' => self::usage_note(),

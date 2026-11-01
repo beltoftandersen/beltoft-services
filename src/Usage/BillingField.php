@@ -31,6 +31,9 @@ final class BillingField {
 	public const NONCE  = 'beltoft-services-billing';
 	public const HANDLE = 'beltoft-services-billing-field';
 
+	/** Products of these drivers have the Billing choice (a pay as you go sibling variation, found from the Billing attribute). */
+	private const DRIVERS = array( SshKeyField::DRIVER, \BeltoftServices\Proxmox\DbDriver::ID );
+
 	/**
 	 * Hooks.
 	 */
@@ -99,7 +102,8 @@ final class BillingField {
 		foreach ( $cart->get_cart() as $key => $item ) {
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			if ( ! $driver || SshKeyField::DRIVER !== $driver->id() ) {
+			// Servers and databases only: an email plan or a plugin licence never has this choice, whatever its attributes.
+			if ( ! $driver || ! in_array( $driver->id(), self::DRIVERS, true ) ) {
 				continue;
 			}
 

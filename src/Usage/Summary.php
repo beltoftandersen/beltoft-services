@@ -135,13 +135,6 @@ final class Summary {
 	}
 
 	/**
-	 * Is the checkout (also while WooCommerce refreshes it) showing the order summary?
-	 */
-	public static function at_checkout(): bool {
-		return defined( 'WOOCOMMERCE_CHECKOUT' ) || ( function_exists( 'is_checkout' ) && is_checkout() );
-	}
-
-	/**
 	 * The Bricks order summary of a cart with a pay-as-you-go server: the note once under the items, and "Due today".
 	 *
 	 * @param mixed $content Rendered html.

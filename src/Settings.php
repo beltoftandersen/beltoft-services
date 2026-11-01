@@ -160,8 +160,8 @@ final class Settings {
 				'section' => 'usage',
 				'type'    => 'checkbox',
 				'default' => 0,
-				'label'   => __( 'Show the Monthly option to customers', 'beltoft-services' ),
-				'desc'    => __( 'Off: customers only see pay as you go, and a new server added to the cart as a monthly plan is changed to its pay as you go plan. Renewals, plan changes of existing subscriptions and orders made in the admin are not touched.', 'beltoft-services' ),
+				'label'   => __( 'Show the Monthly option for servers and databases', 'beltoft-services' ),
+				'desc'    => __( 'Off: customers only see pay as you go, and a new server or database added to the cart as a monthly plan is changed to its pay as you go plan when it has one. Email plans, plugin licences, renewals, plan changes of existing subscriptions and orders made in the admin are not touched.', 'beltoft-services' ),
 			),
 			'usage_new_limit' => array(
 				'tab'     => 'general',
