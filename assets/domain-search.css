@@ -9,6 +9,12 @@
   max-width: 42rem;
 }
 
+/* Form controls use the page's font, not the browser's. */
+.beltoft-domain-search input,
+.beltoft-domain-search button {
+  font-family: inherit;
+}
+
 :where(.beltoft-domain-search > label, .beltoft-domain-results) {
   grid-column: 1 / -1;
 }
