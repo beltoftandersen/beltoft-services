@@ -172,10 +172,48 @@ final class Search {
 		return array( 'results' => $results );
 	}
 
-	public static function shortcode(): string {
+	/** The default visible strings of the form: the shortcode prints these, the Bricks element offers them as editable content. */
+	public static function default_texts(): array {
+		return array(
+			'label'       => __( 'Find a domain', 'beltoft-services' ),
+			'placeholder' => '',
+			'button'      => __( 'Search', 'beltoft-services' ),
+		);
+	}
+
+	/** Loads the script and the stylesheet of the search (once, however many forms are on the page). */
+	public static function enqueue_assets(): void {
 		$asset_dir = plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'assets/';
 		wp_enqueue_script( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.js', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.js' ), true );
 		wp_enqueue_style( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.css' ) );
-		return '<div class="beltoft-domain-search" data-check="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/check' ) ) . '" data-cart="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/cart' ) ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'wc_store_api' ) ) . '" data-rest-nonce="' . esc_attr( wp_create_nonce( 'wp_rest' ) ) . '"><label for="beltoft-domain-name">' . esc_html__( 'Find a domain', 'beltoft-services' ) . '</label><input id="beltoft-domain-name" type="search" autocomplete="off"><button type="button">' . esc_html__( 'Search', 'beltoft-services' ) . '</button><div class="beltoft-domain-results" aria-live="polite"></div></div>';
+	}
+
+	/** The data-* attributes the script reads from the form's root element: the two endpoints and the two nonces. */
+	public static function root_data(): array {
+		return array(
+			'data-check'      => esc_url( rest_url( Routes::NAMESPACE . '/domains/check' ) ),
+			'data-cart'       => esc_url( rest_url( Routes::NAMESPACE . '/domains/cart' ) ),
+			'data-nonce'      => wp_create_nonce( 'wc_store_api' ),
+			'data-rest-nonce' => wp_create_nonce( 'wp_rest' ),
+		);
+	}
+
+	/**
+	 * What is inside the form's root element: label, input, button and the empty results list.
+	 *
+	 * @param array $texts Optional label, placeholder and button; an empty or missing one falls back to the default.
+	 *                     The placeholder has no default here (the script supplies example.com).
+	 */
+	public static function inner_markup( array $texts = array() ): string {
+		$texts       = array_merge( self::default_texts(), array_filter( array_map( 'strval', $texts ), 'strlen' ) );
+		$placeholder = '' !== $texts['placeholder'] ? ' placeholder="' . esc_attr( $texts['placeholder'] ) . '"' : '';
+		return '<label for="beltoft-domain-name">' . esc_html( $texts['label'] ) . '</label><input id="beltoft-domain-name" type="search" autocomplete="off"' . $placeholder . '><button type="button">' . esc_html( $texts['button'] ) . '</button><div class="beltoft-domain-results" aria-live="polite"></div>';
+	}
+
+	public static function shortcode(): string {
+		self::enqueue_assets();
+		$attributes = '';
+		foreach ( self::root_data() as $name => $value ) { $attributes .= ' ' . $name . '="' . esc_attr( $value ) . '"'; }
+		return '<div class="beltoft-domain-search"' . $attributes . '>' . self::inner_markup() . '</div>';
 	}
 }

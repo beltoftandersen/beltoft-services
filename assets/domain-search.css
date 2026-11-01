@@ -1,38 +1,57 @@
-.beltoft-domain-search {
+/*
+ * Domain search. Colours come from variables that fall back to the site's own and then to a neutral default:
+ *   --bds-accent, --bds-border, --bds-muted, --bds-bar, --bds-track.
+ * The layout is kept in :where() (no specificity), so the Bricks element's controls, a theme or custom CSS win.
+ */
+:where(.beltoft-domain-search) {
   display: grid;
   gap: .75rem;
   max-width: 42rem;
 }
 
-.beltoft-domain-search > input {
+:where(.beltoft-domain-search > label, .beltoft-domain-results) {
+  grid-column: 1 / -1;
+}
+
+:where(.beltoft-domain-search > input) {
   width: 100%;
 }
 
-.beltoft-domain-results {
+:where(.beltoft-domain-search > input:focus-visible, .beltoft-domain-search button:focus-visible) {
+  outline: 2px solid var(--bds-accent, var(--green, #28513e));
+  outline-offset: 2px;
+}
+
+:where(.beltoft-domain-results) {
   display: grid;
   gap: .75rem;
 }
 
-.beltoft-domain-result {
+:where(.beltoft-domain-result) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1.25rem;
   padding: 1rem;
-  border: 1px solid #d6d2c8;
+  border: 1px solid var(--bds-border, var(--rule, #d6d2c8));
 }
 
-.beltoft-domain-result__information {
+/* The transfer code form takes the whole row under the name and price. */
+:where(.beltoft-domain-result:has(.beltoft-domain-transfer)) > .beltoft-domain-result__actions {
+  grid-column: 1 / -1;
+}
+
+:where(.beltoft-domain-result__information) {
   display: grid;
   gap: .25rem;
   min-width: 0;
 }
 
-.beltoft-domain-result__name {
+:where(.beltoft-domain-result__name) {
   overflow-wrap: anywhere;
 }
 
-.beltoft-domain-result__price {
+:where(.beltoft-domain-result__price) {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -40,74 +59,75 @@
   margin-top: .25rem;
 }
 
-.beltoft-domain-result__actions {
+:where(.beltoft-domain-result__actions) {
   display: flex;
   flex-wrap: wrap;
   gap: .5rem;
 }
 
-.beltoft-domain-result__renewal {
+:where(.beltoft-domain-result__renewal) {
   flex-basis: 100%;
   font-size: .85em;
   font-weight: 400;
-  color: #59615c;
+  color: var(--bds-muted, var(--ink-grey, #59615c));
 }
 
-.beltoft-domain-result__note {
+:where(.beltoft-domain-result__note) {
   display: block;
   font-size: .85em;
-  color: #59615c;
+  color: var(--bds-muted, var(--ink-grey, #59615c));
 }
 
-.beltoft-domain-result__vat {
+:where(.beltoft-domain-result__vat) {
   font-size: .85em;
 }
 
-.beltoft-domain-error {
+:where(.beltoft-domain-error) {
   margin: 0;
   color: #9b2727;
 }
 
-@media (max-width: 767px) {
-  .beltoft-domain-result {
-    grid-template-columns: 1fr;
-  }
-}
-
-.beltoft-domain-note {
+:where(.beltoft-domain-note) {
   margin: 0;
 }
 
-.beltoft-domain-transfer {
+:where(.beltoft-domain-transfer) {
   display: grid;
   gap: .5rem;
 }
 
-.beltoft-domain-transfer__help {
+:where(.beltoft-domain-transfer__help) {
   margin: 0;
   max-width: 28rem;
 }
 
-.beltoft-domain-transfer input {
+:where(.beltoft-domain-transfer input) {
   width: 100%;
 }
 
-.beltoft-domain-loading {
+@media (max-width: 767px) {
+  :where(.beltoft-domain-result) {
+    grid-template-columns: 1fr;
+  }
+}
+
+:where(.beltoft-domain-loading) {
   display: grid;
   gap: 10px;
   padding: 28px 0;
 }
 
-.beltoft-domain-loading__bar {
+:where(.beltoft-domain-loading__bar) {
   position: relative;
   display: block;
   width: 100%;
   max-width: 360px;
   height: 4px;
   overflow: hidden;
-  background: #d6d2c8;
+  background: var(--bds-track, var(--bds-border, var(--rule, #d6d2c8)));
 }
 
+/* The moving part of the bar and the waiting state of a clicked button are set by the script's classes. */
 .beltoft-domain-loading__bar::before {
   content: "";
   position: absolute;
@@ -115,18 +135,18 @@
   bottom: 0;
   left: 0;
   width: 30%;
-  background: #28513e;
+  background: var(--bds-bar, var(--bds-accent, var(--green, #28513e)));
   animation: beltoft-domain-wait 1.1s ease-in-out infinite;
 }
 
-.beltoft-domain-loading__text {
+:where(.beltoft-domain-loading__text) {
   font-size: 1.15em;
   font-weight: 700;
 }
 
-.beltoft-domain-loading__note {
+:where(.beltoft-domain-loading__note) {
   font-size: .85em;
-  color: #59615c;
+  color: var(--bds-muted, var(--ink-grey, #59615c));
 }
 
 .beltoft-domain-action.is-working,
@@ -134,7 +154,7 @@
   position: relative;
   overflow: hidden;
   opacity: 1 !important;
-  background: #28513e;
+  background: var(--bds-accent, var(--green, #28513e));
   color: #fff;
   cursor: progress;
 }
