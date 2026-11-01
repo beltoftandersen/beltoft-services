@@ -9,6 +9,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
@@ -396,16 +397,16 @@ class ServerPickerTest extends BackupTestCase {
 
 	public function test_the_address_routes_to_the_picker_and_the_servers_list_is_unchanged(): void {
 		$GLOBALS['wp']->query_vars['vps'] = 'new';
-		$this->assertTrue( Servers::is_new() );
-		$this->assertSame( array( 'id' => 0, 'tab' => '' ), Servers::requested() );
+		$this->assertTrue( ServerLinks::is_new() );
+		$this->assertSame( array( 'id' => 0, 'tab' => '' ), ServerLinks::requested() );
 
 		foreach ( array( 'new/extra' => true, '12/snapshots' => false, '' => false, 'newer' => false, 'abc' => false ) as $value => $new ) {
 			$GLOBALS['wp']->query_vars['vps'] = (string) $value;
-			$this->assertSame( $new, Servers::is_new(), $value );
+			$this->assertSame( $new, ServerLinks::is_new(), $value );
 		}
 
-		$this->assertMatchesRegularExpression( '#vps(/|=)new/?(\?|$)#', rawurldecode( Servers::url_new() ) );
-		$this->assertStringContainsString( 'plan=' . $this->v['b-None']->get_id(), Servers::url_new( $this->v['b-None']->get_id() ) );
+		$this->assertMatchesRegularExpression( '#vps(/|=)new/?(\?|$)#', rawurldecode( ServerLinks::url_new() ) );
+		$this->assertStringContainsString( 'plan=' . $this->v['b-None']->get_id(), ServerLinks::url_new( $this->v['b-None']->get_id() ) );
 
 		$GLOBALS['wp']->query_vars['vps'] = '';
 		ob_start();
@@ -447,17 +448,17 @@ class ServerPickerTest extends BackupTestCase {
 		wp_dequeue_style( ServerPicker::HANDLE );
 		wp_dequeue_script( ServerPicker::HANDLE );
 		$GLOBALS['wp']->query_vars['vps'] = '';
-		ServerPicker::assets( 'beltoft-services-account', Servers::slug() );
+		ServerPicker::assets( 'beltoft-services-account', ServerLinks::slug() );
 		$this->assertFalse( wp_style_is( ServerPicker::HANDLE, 'enqueued' ), 'Not on the Servers list.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = '12';
-		ServerPicker::assets( 'beltoft-services-account', Servers::slug() );
+		ServerPicker::assets( 'beltoft-services-account', ServerLinks::slug() );
 		$this->assertFalse( wp_style_is( ServerPicker::HANDLE, 'enqueued' ), 'Not on a server page.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = 'new';
-		ServerPicker::assets( 'beltoft-services-account', Servers::slug() );
+		ServerPicker::assets( 'beltoft-services-account', ServerLinks::slug() );
 
-		if ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( Servers::slug() ) ) {
+		if ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( ServerLinks::slug() ) ) {
 			$this->assertTrue( wp_style_is( ServerPicker::HANDLE, 'enqueued' ) );
 			$this->assertTrue( wp_script_is( ServerPicker::HANDLE, 'enqueued' ) );
 		} else {

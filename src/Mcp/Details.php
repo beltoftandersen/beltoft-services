@@ -10,6 +10,7 @@ namespace BeltoftServices\Mcp;
 use BeltoftServices\Account\DomainRows;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\Panel;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Backups;
@@ -17,6 +18,7 @@ use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Proxmox\LiveUsage;
 use BeltoftServices\Proxmox\Operations;
@@ -52,7 +54,7 @@ final class Details {
 			'name'                => (string) apply_filters( 'beltoft_licenses_account_title', \BeltoftLicenses\Account\View::product_name( $license ), $license ),
 			'state'               => $state,
 			'status'              => Panel::label( $state, $r ),
-			'renews'              => Servers::renewal( $license ),
+			'renews'              => ServerLinks::renewal( $license ),
 			'subscription'        => Reads::subscription_summary( (int) ( $license['subscription_id'] ?? 0 ) ),
 			'dashboard_offers'    => $offered,
 			'dashboard_page'      => self::page( $r, $kind, $license ),
@@ -79,7 +81,7 @@ final class Details {
 	 */
 	public static function page( Resource $r, string $kind, array $license, string $tab = '' ): string {
 		if ( 'vm' === $kind ) {
-			return Servers::url( $license, $tab );
+			return ServerLinks::url( $license, $tab );
 		}
 
 		if ( in_array( $kind, array( 'domain', 'dns' ), true ) ) {
@@ -123,8 +125,8 @@ final class Details {
 	private static function vm_extras( Resource $r ): array {
 		$out = array( 'app_state' => (string) $r->get( 'app_state' ) );
 
-		if ( Firewall::editable( $r ) ) {
-			$view = Firewall::view( $r );
+		if ( FirewallRules::editable( $r ) ) {
+			$view = FirewallRules::view( $r );
 
 			$out['firewall'] = array(
 				'on'      => $view['on'],

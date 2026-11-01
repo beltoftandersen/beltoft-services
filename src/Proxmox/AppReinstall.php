@@ -3,8 +3,9 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,10 +41,10 @@ final class AppReinstall {
 
 	/** Load the reinstall domain controls only on a server page. */
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
 		}
-		$asked = Servers::requested();
+		$asked = ServerLinks::requested();
 		$r = $asked['id'] > 0 ? Resource::for_license( (int) $asked['id'] ) : null;
 		if ( ! $r || (int) ( $r->license()['user_id'] ?? 0 ) !== get_current_user_id() || null === self::options( $r ) ) {
 			return;
@@ -445,7 +446,7 @@ final class AppReinstall {
 	/** Domain controls shared by same-app and plain-server reinstall choices. */
 	private static function domain_fields( Resource $r, array $options ): void {
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
-		$zones = AppDomains::zones( $user );
+		$zones = ZoneAccess::zones( $user );
 		$supports = ! empty( $options['app']['domain'] );
 		foreach ( (array) ( $options['apps'] ?? array() ) as $entry ) {
 			$supports = $supports || ! empty( $entry['def']['domain'] );

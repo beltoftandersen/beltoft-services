@@ -30,7 +30,7 @@ final class RevealRoute {
 	 * Requests per user and window that no filter can lift: beltoft_services_rest_rate_limit
 	 * may return 0 (off) for the other routes, but this one guards a secret.
 	 */
-	public const FLOOR_LIMIT = 30;
+	public const FLOOR_LIMIT = RateLimit::REVEAL_FLOOR_LIMIT;
 
 	/**
 	 * Hooks.

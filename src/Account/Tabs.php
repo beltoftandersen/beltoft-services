@@ -49,7 +49,7 @@ final class Tabs {
 
 		$missing = array();
 
-		foreach ( array( Servers::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug() ) as $slug ) {
+		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug() ) as $slug ) {
 			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
 				$missing[ $slug ] = $labels[ $slug ];
 			}
@@ -91,7 +91,7 @@ final class Tabs {
 				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'domain', 'dns' ) ),
 			),
 			array(
-				'slug'  => Servers::slug(),
+				'slug'  => ServerLinks::slug(),
 				'label' => __( 'VPS', 'beltoft-services' ),
 				'empty' => __( 'You have no servers yet.', 'beltoft-services' ),
 				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot', 'applic' ) ),

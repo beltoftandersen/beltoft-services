@@ -12,6 +12,7 @@ use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\BackupJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -163,7 +164,7 @@ class BackupOperationsTest extends BackupTestCase {
 
 	public function test_removing_backups_queues_their_deletion_for_the_next_run(): void {
 		$r = $this->ready_vm();
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'] );
 
@@ -176,15 +177,15 @@ class BackupOperationsTest extends BackupTestCase {
 		$this->assertEqualsWithDelta( time(), (int) $fresh->get( 'backup_purge_at' ), 5, 'The time of the plan change is kept.' );
 
 		// Deletion off, and then too early: the backups stay.
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'], 'Deletion is off.' );
 		$this->settings( array( 'deletion_mode' => 'on' ) );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'], 'Not before 7 days.' );
 		$this->assertTrue( Resource::find( $r->id() )->get( 'backup_purge' ) );
 
 		Resource::find( $r->id() )->set( array( 'backup_purge_at' => time() - 7 * DAY_IN_SECONDS - 1 ) );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$this->assertSame( array(), $this->fake->state()['backups']['backup-store'] );
 		$this->assertNull( Resource::find( $r->id() )->get( 'backup_purge' ) );
@@ -194,7 +195,7 @@ class BackupOperationsTest extends BackupTestCase {
 
 	public function test_buying_backups_again_before_the_run_cancels_the_deletion(): void {
 		$r = $this->ready_vm();
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 
 		$this->change_plan( $r, array( 'backup_days' => 0 ) );
@@ -205,13 +206,13 @@ class BackupOperationsTest extends BackupTestCase {
 		Jobs::run( $r->id() );
 		$this->assertNull( Resource::find( $r->id() )->get( 'backup_purge' ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'], 'The backup is kept (and no new one is due yet).' );
 	}
 
 	public function test_the_vm_record_is_untouched_by_backup_bookkeeping(): void {
 		$r = $this->ready_vm();
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );

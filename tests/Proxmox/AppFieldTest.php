@@ -27,6 +27,7 @@ use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
+use BeltoftServices\Domains\ZoneAccess;
 
 /**
  * Documentation values only. Nothing here reaches a network: the DNS layer is FakeDns, Proxmox is FakeClient.
@@ -426,9 +427,9 @@ class AppFieldTest extends TestCase {
 		$this->domain( $me, 'custom-ns.example', array( 'ns_mode' => 'custom' ) );
 		$this->domain( $me, 'paused.example', array( 'records_off' => true ) );
 
-		$this->assertSame( array( 'mine.example' ), AppDomains::zones( $me ) );
-		$this->assertSame( array( 'theirs.example' ), AppDomains::zones( $other ) );
-		$this->assertSame( array(), AppDomains::zones( 0 ) );
+		$this->assertSame( array( 'mine.example' ), ZoneAccess::zones( $me ) );
+		$this->assertSame( array( 'theirs.example' ), ZoneAccess::zones( $other ) );
+		$this->assertSame( array(), ZoneAccess::zones( 0 ) );
 
 		WC()->cart->add_to_cart( $this->vm()->get_id() );
 		$html = $this->html();
@@ -770,7 +771,7 @@ class AppFieldTest extends TestCase {
 		$wpdb->update( $table, array( 'status' => 'active' ), array( 'domain' => 'served.example' ) );
 		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( $other, 12, 'taken.example' ) );
 
-		$this->assertSame( array( 'claimed.example', 'ready.example', 'served.example' ), AppDomains::zones( $me ), 'Not unproven, not assigned to someone else.' );
+		$this->assertSame( array( 'claimed.example', 'ready.example', 'served.example' ), ZoneAccess::zones( $me ), 'Not unproven, not assigned to someone else.' );
 		$this->assertSame( array( 'Choose one of your domains that uses our name servers.' ), $this->check_for( $me, 'taken.example' ) );
 	}
 

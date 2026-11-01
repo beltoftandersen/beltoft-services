@@ -8,7 +8,7 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Crypto;
-use BeltoftServices\Proxmox\Access;
+use BeltoftServices\Passwords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -36,7 +36,7 @@ final class MailAccess {
 	 * @throws \RuntimeException When it cannot be stored (nothing is sent then).
 	 */
 	public static function begin( Resource $r, string $email ): string {
-		$password = Access::generate_password();
+		$password = Passwords::generate();
 		$all      = self::all( $r );
 
 		$all[ strtolower( $email ) ] = array(

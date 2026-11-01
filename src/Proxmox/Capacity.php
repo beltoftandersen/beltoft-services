@@ -7,10 +7,12 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Jobs\CapacityJobs;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The one place that reads the capacity transient written by ProxmoxJobs::capacity() (rows with
+ * The one place that reads the capacity transient written by CapacityJobs::capacity() (rows with
  * node, status, maxmem and `mem`, the committed memory plus the host reserve). It never calls
  * Proxmox: with no cache there is no answer (Placement waits; Stock keeps the stored status and queues a run).
  *

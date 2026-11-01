@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Resource;
 
@@ -52,10 +52,10 @@ final class ConsoleTab {
 	}
 
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
 		}
-		$asked = Servers::requested();
+		$asked = ServerLinks::requested();
 		$r = $asked['id'] > 0 ? self::resource_for_license( $asked['id'] ) : null;
 		if ( ! $r || ! Console::eligible( $r ) ) {
 			return;

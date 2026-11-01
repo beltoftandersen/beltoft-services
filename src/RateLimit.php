@@ -20,6 +20,11 @@ final class RateLimit {
 	private const GROUP = 'beltoft_services_rl';
 
 	/**
+	 * Password reveals per minute and customer, across the server, database, app and mailbox reveal routes.
+	 */
+	public const REVEAL_FLOOR_LIMIT = 30;
+
+	/**
 	 * Counts this call. True when it is over the limit. A limit of 0 or less turns the check
 	 * off. Counters live in the persistent object cache when there is one, otherwise in
 	 * transients; if counting fails the call is let through. Best-effort without a persistent

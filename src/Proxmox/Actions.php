@@ -161,7 +161,7 @@ final class Actions {
 		}
 
 		$out[ ServerName::ACTION ] = __( 'Rename', 'beltoft-services' );
-		$out = array_merge( $out, Snapshots::offered( $r ), Firewall::offered( $r ), PrivateAttach::offered( $r ) );
+		$out = array_merge( $out, Snapshots::offered( $r ), FirewallRules::offered( $r ), PrivateAttach::offered( $r ) );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -296,7 +296,7 @@ final class Actions {
 		}
 
 		if ( in_array( $action, Firewall::ACTIONS, true ) ) {
-			return Firewall::check( $r, $action, $args );
+			return FirewallRules::check( $r, $action, $args );
 		}
 
 		if ( in_array( $action, PrivateAttach::ACTIONS, true ) ) {

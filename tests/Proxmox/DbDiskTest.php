@@ -35,6 +35,7 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbGrow;
 use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Jobs\DiskJobs;
 
 /**
  * A database driver that does not sleep.
@@ -1083,7 +1084,7 @@ class DbDiskTest extends TestCase {
 		// The root reading is fresh, so only the flagged database's data check is due.
 		$this->assertTrue( $r->set( array( 'disk_used' => 10, 'disk_total' => 100, 'disk_read_at' => time() ) ) );
 
-		ProxmoxJobs::disk();
+		DiskJobs::disk();
 
 		$this->assertNull( Resource::find( $r->id() )->get( DbGrow::FS ) );
 		$this->assertCount( 1, $this->calls( 'GET', '/agent/get-fsinfo' ) );

@@ -6,6 +6,7 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\Proxmox\Jobs\AbuseJobs;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -106,9 +107,9 @@ final class Monitor {
 		$hours = $hours >= 1 && $hours <= 24 ? $hours : 3;
 		$days = (int) Settings::get( 'monitor_cooldown_days' );
 		$days = $days >= 1 && $days <= 90 ? $days : 7;
-		$high = ProxmoxJobs::analyse( $samples, (float) $threshold );
+		$high = AbuseJobs::analyse( $samples, (float) $threshold );
 		if ( null === $high ) { return; }
-		$low = ProxmoxJobs::analyse( $samples, (float) max( 0, $threshold - 20 ) );
+		$low = AbuseJobs::analyse( $samples, (float) max( 0, $threshold - 20 ) );
 		$cleared = null !== $low && null === $low['trailing'];
 		$since = Usage::since( Usage::CPU_PREFIX, $r->id(), $high, $hours + 24 );
 		$duration = max( $high['longest'], null === $since ? 0 : $high['last'] - $since );

@@ -251,7 +251,7 @@ final class ThankYouTest extends TestCase {
 	public function test_the_dashboard_button_opens_the_new_servers_page_even_while_it_builds(): void {
 		$order = $this->order();
 		$vm    = $this->service( $order, 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'ip' ) ) );
-		$url   = \BeltoftServices\Account\Servers::url( $vm->license() );
+		$url   = \BeltoftServices\Account\ServerLinks::url( $vm->license() );
 
 		$html = $this->page( $order->get_id() );
 
@@ -267,7 +267,7 @@ final class ThankYouTest extends TestCase {
 
 		$html = $this->page( $order->get_id() );
 
-		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\Servers::url( $server->license() ) ) . '"', $html );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Account\ServerLinks::url( $server->license() ) ) . '"', $html );
 	}
 
 	public function test_the_dashboard_button_follows_a_domain_to_its_card(): void {

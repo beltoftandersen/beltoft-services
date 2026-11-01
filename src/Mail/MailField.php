@@ -10,8 +10,8 @@ namespace BeltoftServices\Mail;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppDomains;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -91,7 +91,7 @@ final class MailField {
 	 * @return string[]
 	 */
 	public static function zones( int $user_id ): array {
-		return $user_id > 0 ? AppDomains::zones( $user_id ) : array();
+		return $user_id > 0 ? ZoneAccess::zones( $user_id ) : array();
 	}
 
 	/**

@@ -12,6 +12,7 @@ use BeltoftServices\Account\Databases;
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
@@ -297,7 +298,7 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringContainsString( 'You have no servers yet.', $empty );
 		$this->assertStringContainsString( 'beltoft-services-list-actions is-start', $empty );
 		$this->assertStringContainsString( 'Create a server', $empty );
-		$this->assertStringContainsString( esc_url( Servers::url_new() ), $empty );
+		$this->assertStringContainsString( esc_url( ServerLinks::url_new() ), $empty );
 		$this->assertSame( 1, substr_count( $empty, 'beltoft-services-list-btn' ) );
 
 		$vm       = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000 ), array( 'slug' => 'vmx-' . wp_generate_password( 5, false ) ) );

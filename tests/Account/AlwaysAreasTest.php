@@ -6,6 +6,7 @@ use BeltoftServices\Account\Databases;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\Email;
 use BeltoftServices\Account\Overview;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Tests\TestCase;
@@ -92,7 +93,7 @@ class AlwaysAreasTest extends TestCase {
 
 	public function test_an_empty_page_shows_the_empty_text_and_one_button_to_the_first_product(): void {
 		$urls = array(
-			'servers'   => array( 'proxmox', 'Create a server', 'You have no servers yet.', Servers::url_new() ),
+			'servers'   => array( 'proxmox', 'Create a server', 'You have no servers yet.', ServerLinks::url_new() ),
 			'databases' => array( 'proxmox-db', 'Create a database', 'You have no databases yet.', ServiceArea::get( Databases::class )->url_new() ),
 			'email'     => array( 'mail', 'Create an email domain', 'You have no email domains yet.', null ),
 			'domains'   => array( 'domain', 'Register a domain', 'You have no domains yet.', null ),

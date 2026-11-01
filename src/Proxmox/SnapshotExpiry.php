@@ -11,11 +11,12 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\Proxmox\Jobs\SnapshotJobs;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Reads and writes meta only, never Proxmox: the hourly job (ProxmoxJobs::snapshots) uses it to pick the servers
+ * Reads and writes meta only, never Proxmox: the hourly job (SnapshotJobs::snapshots) uses it to pick the servers
  * whose snapshots need work and queues the internal actions for them.
  *
  * Meta `snapshot_notice` ({reason: key}) is the dedupe of the customer emails: a reason is sent once for a key

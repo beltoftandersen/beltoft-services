@@ -8,6 +8,8 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Jobs\AbuseJobs;
+
 defined( 'ABSPATH' ) || exit;
 
 final class Usage {
@@ -20,7 +22,7 @@ final class Usage {
 	 *
 	 * @param string                                                     $prefix      Transient prefix.
 	 * @param int                                                        $resource_id Resource id.
-	 * @param array{first: int, last: int, longest: int, trailing: ?int} $reading     From ProxmoxJobs::analyse().
+	 * @param array{first: int, last: int, longest: int, trailing: ?int} $reading     From AbuseJobs::analyse().
 	 * @param int                                                        $keep_hours  How long the state is kept.
 	 * @return int|null Timestamp, or null when the newest sample is below the threshold.
 	 */

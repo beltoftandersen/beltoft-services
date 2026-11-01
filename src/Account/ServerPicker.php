@@ -68,14 +68,14 @@ final class ServerPicker {
 	 * @param int $plan Variation id, 0 for none.
 	 */
 	public static function url( int $plan = 0 ): string {
-		return Servers::url_new( $plan );
+		return ServerLinks::url_new( $plan );
 	}
 
 	/**
 	 * Is the request for the New server page?
 	 */
 	private static function on_page(): bool {
-		return function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( Servers::slug() ) && Servers::is_new();
+		return function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( ServerLinks::slug() ) && ServerLinks::is_new();
 	}
 
 	// -- The post ----------------------------------------------------------------------------------
@@ -421,7 +421,7 @@ final class ServerPicker {
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
 	public static function assets( $parent = null, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) || ! self::on_page() || ! is_user_logged_in() ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) || ! self::on_page() || ! is_user_logged_in() ) {
 			return;
 		}
 

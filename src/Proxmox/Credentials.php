@@ -10,11 +10,12 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\Proxmox\Jobs\PasswordJobs;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The VM password has its own purge (ProxmoxJobs::purge_passwords, Access::on_state_changed); this does the same for the
+ * The VM password has its own purge (PasswordJobs::purge_passwords, Access::on_state_changed); this does the same for the
  * database login (db_reveal) and the app login (app_reveal), which are encrypted but would otherwise stay for ever.
  */
 final class Credentials {

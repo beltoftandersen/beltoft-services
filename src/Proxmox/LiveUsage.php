@@ -15,6 +15,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\PowerJobs;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -202,7 +203,7 @@ final class LiveUsage {
 			$rows[ $vmid ] = $vm;
 
 			if ( '' === (string) ( $vm['lock'] ?? '' ) ) {
-				ProxmoxJobs::remember_status( (int) $ours[ $vmid ], $vm );
+				PowerJobs::remember_status( (int) $ours[ $vmid ], $vm );
 			}
 		}
 

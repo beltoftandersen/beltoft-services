@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeDns;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppDomainRelease;
 use BeltoftServices\Proxmox\AppInstall;
@@ -120,7 +120,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 
 		wp_set_current_user( (int) $r->license()['user_id'] );
 		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
-		AppReinstall::assets( 'beltoft-services-account', Servers::slug() );
+		AppReinstall::assets( 'beltoft-services-account', ServerLinks::slug() );
 		$this->assertTrue( wp_script_is( AppReinstall::HANDLE, 'enqueued' ) );
 	}
 

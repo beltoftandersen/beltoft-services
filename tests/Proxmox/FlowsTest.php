@@ -13,6 +13,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Flows;
 use BeltoftServices\Proxmox\Quarantine;
 use BeltoftServices\Proxmox\VmRecords;
@@ -317,8 +318,8 @@ class FlowsTest extends FirewallTestCase {
 		$r = $this->server();
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
-		$rules = Firewall::normalise( array( $this->rule( 'tcp', 8080 ) ), $r );
-		$this->assertGreaterThan( 0, Firewall::store( $r, true, $rules, true, 1 ) );
+		$rules = FirewallRules::normalise( array( $this->rule( 'tcp', 8080 ) ), $r );
+		$this->assertGreaterThan( 0, FirewallRules::store( $r, true, $rules, true, 1 ) );
 		Jobs::act( $r->id(), 'fw_apply', array() );
 		$this->assertSame( 'ACCEPT', $this->options( $r )['policy_out'] );
 

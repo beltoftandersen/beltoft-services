@@ -14,8 +14,8 @@ use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\NetConfig;
 use BeltoftServices\Proxmox\Panels;
 use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\ServerSyncJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -146,7 +146,7 @@ class BandwidthTest extends BackupTestCase {
 		$right = $this->net0();
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'net0' => NetConfig::with_rate( $right, 0 ) ) ) );
 
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 
 		$this->assertSame( $right, $this->net0() );
 		$this->assertSame( array(), $this->calls( 'POST', '/status/stop' ) );
@@ -155,15 +155,15 @@ class BandwidthTest extends BackupTestCase {
 	}
 
 	public function test_the_reconcile_runs_from_the_existing_sweep(): void {
-		$this->assertSame( 22, has_action( \BeltoftServices\Jobs::SWEEP, array( ProxmoxJobs::class, 'net_rates' ) ) );
+		$this->assertSame( 22, has_action( \BeltoftServices\Jobs::SWEEP, array( ServerSyncJobs::class, 'net_rates' ) ) );
 	}
 
 	public function test_a_checked_server_is_not_read_again_within_a_day(): void {
 		$this->ready_vm( array( 'net_mbit' => 1000 ) );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$seen = count( $this->calls( 'GET', '/config' ) );
 
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 
 		$this->assertCount( $seen, $this->calls( 'GET', '/config' ) );
 	}
@@ -174,7 +174,7 @@ class BandwidthTest extends BackupTestCase {
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'net0' => $plain ) ) );
 		$this->fake->hold_net_rate( 5000 );
 
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 
 		$this->assertSame( $plain . ',rate=125', $this->net0(), 'The default view shows the pending value.' );
 		$this->assertSame( $plain, $this->net0( 5000, true ), 'The running NIC still has the old one.' );
@@ -183,7 +183,7 @@ class BandwidthTest extends BackupTestCase {
 
 		$writes = count( $this->puts_to_config() );
 		Resource::find( $r->id() )->set( array( 'net_rate_at' => 1 ) );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$this->assertCount( $writes, $this->puts_to_config(), 'A pending change is not written again.' );
 
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/reboot' );
@@ -196,17 +196,17 @@ class BandwidthTest extends BackupTestCase {
 		$plain = $this->net0();
 
 		$r->set( array( 'linked' => true ) );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$this->assertSame( $plain, $this->net0(), 'Adopted VM.' );
 		$r->set( array( 'linked' => null ) );
 
 		$this->fake->set_lock( 5000, 'backup' );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$this->assertSame( $plain, $this->net0(), 'A VM with a lock is left to that operation.' );
 		$this->fake->set_lock( 5000, '' );
 
 		$r->set( array( 'desired' => 'paused' ) );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$this->assertSame( $plain, $this->net0(), 'Not wanted ready.' );
 		$r->set( array( 'desired' => 'ready' ) );
 
@@ -228,7 +228,7 @@ class BandwidthTest extends BackupTestCase {
 		$plain = NetConfig::with_rate( $this->net0(), 0 );
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'net0' => $plain ) ) );
 
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 
 		$this->assertSame( $plain . ',rate=125', $this->net0() );
 		$this->assertSame( 1000.0, (float) Resource::find( $r->id() )->get( 'net_rate_mbit' ) );
@@ -237,19 +237,19 @@ class BandwidthTest extends BackupTestCase {
 	public function test_a_later_product_change_reaches_the_old_server_at_the_next_sweep(): void {
 		$r = $this->ready_vm( array( 'net_mbit' => 1000 ) );
 		$this->make_legacy( $r );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$this->assertStringEndsWith( ',rate=125', $this->net0() );
 
 		// Within the day, an unchanged product means no read at all.
 		$seen = count( $this->calls( 'GET', '/config' ) );
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 		$this->assertCount( $seen, $this->calls( 'GET', '/config' ) );
 
 		// The product's value changes: the stored speed differs from the effective one, so it is applied now, not after a day.
 		$product = $this->product_of( $r );
 		$product->update_meta_data( \BeltoftServices\Product::META_PLAN . 'net_mbit', '200' );
 		$product->save();
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 
 		$this->assertStringEndsWith( ',rate=25', $this->net0() );
 		$this->assertSame( 200.0, (float) Resource::find( $r->id() )->get( 'net_rate_mbit' ) );
@@ -261,7 +261,7 @@ class BandwidthTest extends BackupTestCase {
 		Resource::find( $r->id() )->set( array( 'linked' => true ) );
 		$before = $this->net0();
 
-		ProxmoxJobs::net_rates();
+		ServerSyncJobs::net_rates();
 
 		$this->assertSame( $before, $this->net0() );
 	}

@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Crypto;
+use BeltoftServices\Passwords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -41,28 +42,6 @@ final class Access {
 	 */
 	public const REVEAL_DAYS = 7;
 
-	private const LENGTH = 24;
-
-	/**
-	 * 62 alphanumerics and 11 symbols: no quote, backslash, backtick or space, so the value
-	 * survives a shell, JSON and a URL-encoded form unchanged.
-	 */
-	private const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!@#%^*+=';
-
-	/**
-	 * A new random password: 24 characters, each drawn with random_int.
-	 */
-	public static function generate_password(): string {
-		$max      = strlen( self::CHARSET ) - 1;
-		$password = '';
-
-		for ( $i = 0; $i < self::LENGTH; $i++ ) {
-			$password .= self::CHARSET[ random_int( 0, $max ) ];
-		}
-
-		return $password;
-	}
-
 	/**
 	 * The password this resource's VM gets: the one already stored (a retry reuses it), or a
 	 * new one, stored encrypted before the caller sends it to Proxmox. Call it from a driver
@@ -83,7 +62,7 @@ final class Access {
 			}
 		}
 
-		$password  = self::generate_password();
+		$password  = Passwords::generate();
 		$encrypted = Crypto::encrypt( $password );
 
 		if ( ! $r->set(
@@ -119,7 +98,7 @@ final class Access {
 			}
 		}
 
-		$password  = self::generate_password();
+		$password  = Passwords::generate();
 		$encrypted = Crypto::encrypt( $password );
 		$previous  = $r->get( self::META_REVEAL );
 

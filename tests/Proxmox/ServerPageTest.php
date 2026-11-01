@@ -4,6 +4,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Proxmox\Operations;
 
@@ -36,20 +37,20 @@ class ServerPageTest extends MonitoringTestCase {
 		$r = $this->ready_vm();
 		$id = \BeltoftServices\Account\Slugs::for_license( $r->license() );
 		$this->assertNotSame( '', $id );
-		$this->assertMatchesRegularExpression( '#vps(/|=)' . preg_quote( $id, '#' ) . '/?$#', rawurldecode( Servers::url( $r->license() ) ) );
-		$this->assertStringContainsString( $id . '/snapshots', rawurldecode( Servers::url( $r->license(), 'snapshots' ) ) );
-		$this->assertSame( Servers::url( $r->license() ), Servers::url( $r->license(), 'nonsense' ) );
+		$this->assertMatchesRegularExpression( '#vps(/|=)' . preg_quote( $id, '#' ) . '/?$#', rawurldecode( ServerLinks::url( $r->license() ) ) );
+		$this->assertStringContainsString( $id . '/snapshots', rawurldecode( ServerLinks::url( $r->license(), 'snapshots' ) ) );
+		$this->assertSame( ServerLinks::url( $r->license() ), ServerLinks::url( $r->license(), 'nonsense' ) );
 	}
 
 	public function test_the_address_value_is_read_safely(): void {
 		$this->route( '12/snapshots' );
-		$this->assertSame( array( 'id' => 12, 'tab' => 'snapshots' ), Servers::requested() );
+		$this->assertSame( array( 'id' => 12, 'tab' => 'snapshots' ), ServerLinks::requested() );
 		$this->route( '12/<b>x' );
-		$this->assertSame( array( 'id' => 12, 'tab' => '' ), Servers::requested() );
+		$this->assertSame( array( 'id' => 12, 'tab' => '' ), ServerLinks::requested() );
 		$this->route( 'abc/snapshots' );
-		$this->assertSame( 0, Servers::requested()['id'] );
+		$this->assertSame( 0, ServerLinks::requested()['id'] );
 		$this->route( '' );
-		$this->assertSame( array( 'id' => 0, 'tab' => '' ), Servers::requested() );
+		$this->assertSame( array( 'id' => 0, 'tab' => '' ), ServerLinks::requested() );
 	}
 
 	public function test_only_the_licenses_template_on_the_servers_endpoint_is_taken_over(): void {
@@ -141,7 +142,7 @@ class ServerPageTest extends MonitoringTestCase {
 		$r = $this->ready_vm();
 		$html = $this->page( $r, '' );
 		$this->assertStringContainsString( 'id="beltoft-service-' . $r->id() . '"', $html );
-		$this->assertStringContainsString( 'href="' . esc_url( Servers::url( $r->license() ) ) . '"', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( ServerLinks::url( $r->license() ) ) . '"', $html );
 	}
 
 	public function test_a_single_server_still_shows_the_list(): void {

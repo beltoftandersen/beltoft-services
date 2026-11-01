@@ -69,7 +69,7 @@ class AccessTest extends TestCase {
 		$seen    = array();
 
 		for ( $i = 0; $i < 200; $i++ ) {
-			$password = Access::generate_password();
+			$password = \BeltoftServices\Passwords::generate();
 
 			$this->assertSame( 24, strlen( $password ) );
 			$this->assertSame( array(), array_diff( str_split( $password ), $allowed ), 'Only the allowed characters.' );

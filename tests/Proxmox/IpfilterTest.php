@@ -11,6 +11,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Cli\Commands;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Resource;
 
@@ -65,9 +66,9 @@ class IpfilterTest extends FirewallTestCase {
 
 	private function apply_default( Resource $r ): Resource {
 		$r      = Resource::find( $r->id() );
-		$normal = Firewall::normalise( array( $this->rule( 'tcp', 22 ) ), $r );
+		$normal = FirewallRules::normalise( array( $this->rule( 'tcp', 22 ) ), $r );
 		$this->assertIsArray( $normal, is_wp_error( $normal ) ? $normal->get_error_message() : '' );
-		$this->assertGreaterThan( 0, Firewall::store( $r, true, $normal, true, 1 ) );
+		$this->assertGreaterThan( 0, FirewallRules::store( $r, true, $normal, true, 1 ) );
 		Jobs::act( $r->id(), 'fw_apply', array() );
 
 		return Resource::find( $r->id() );

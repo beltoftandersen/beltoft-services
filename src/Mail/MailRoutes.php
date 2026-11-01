@@ -8,7 +8,6 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Api\Routes;
-use BeltoftServices\Proxmox\RevealRoute;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -353,7 +352,7 @@ final class MailRoutes {
 	 * @param \WP_REST_Request $request Request.
 	 */
 	public static function reveal( \WP_REST_Request $request ): \WP_REST_Response {
-		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:mail-reveal-floor', RevealRoute::FLOOR_LIMIT, MINUTE_IN_SECONDS ) ) {
+		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:mail-reveal-floor', RateLimit::REVEAL_FLOOR_LIMIT, MINUTE_IN_SECONDS ) ) {
 			return self::error( 'rate_limited', __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ) );
 		}
 

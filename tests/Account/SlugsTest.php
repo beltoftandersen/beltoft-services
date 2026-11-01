@@ -8,6 +8,7 @@ use BeltoftServices\Account\DomainRows;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Account\Slugs;
 use BeltoftServices\Domains\DomainDriver;
@@ -114,7 +115,7 @@ class SlugsTest extends TestCase {
 
 		$server->set( array( ServerName::META => 'api' ) );
 		$this->assertSame( 'web1', $this->slug( Resource::find( $server->id() ) ), 'A renamed server keeps its address.' );
-		$this->assertMatchesRegularExpression( '#vps(/|=)web1/?$#', rawurldecode( Servers::url( $server->license() ) ) );
+		$this->assertMatchesRegularExpression( '#vps(/|=)web1/?$#', rawurldecode( ServerLinks::url( $server->license() ) ) );
 	}
 
 	public function test_slugs_are_unique_per_customer_and_type(): void {
@@ -184,22 +185,22 @@ class SlugsTest extends TestCase {
 		$this->slug( $server );
 
 		$this->go( 'vps', 'web1' );
-		$this->assertSame( array( 'id' => $id, 'tab' => '' ), Servers::requested() );
+		$this->assertSame( array( 'id' => $id, 'tab' => '' ), ServerLinks::requested() );
 		$this->go( 'vps', 'web1/snapshots/' );
-		$this->assertSame( array( 'id' => $id, 'tab' => 'snapshots' ), Servers::requested() );
+		$this->assertSame( array( 'id' => $id, 'tab' => 'snapshots' ), ServerLinks::requested() );
 		$this->go( 'vps', 'WEB1/nonsense' );
-		$this->assertSame( array( 'id' => $id, 'tab' => '' ), Servers::requested() );
+		$this->assertSame( array( 'id' => $id, 'tab' => '' ), ServerLinks::requested() );
 		$this->go( 'vps', $id . '/disks' );
-		$this->assertSame( array( 'id' => $id, 'tab' => 'disks' ), Servers::requested() );
+		$this->assertSame( array( 'id' => $id, 'tab' => 'disks' ), ServerLinks::requested() );
 		$this->go( 'vps', 'nobody' );
-		$this->assertSame( array( 'id' => 0, 'tab' => '' ), Servers::requested() );
+		$this->assertSame( array( 'id' => 0, 'tab' => '' ), ServerLinks::requested() );
 	}
 
 	public function test_the_new_pages_still_work(): void {
 		$this->server( $this->user, 'new' );
 		$this->go( 'vps', 'new' );
-		$this->assertTrue( Servers::is_new() );
-		$this->assertSame( 0, Servers::requested()['id'] );
+		$this->assertTrue( ServerLinks::is_new() );
+		$this->assertSame( 0, ServerLinks::requested()['id'] );
 		$this->go( 'databases', 'new' );
 		$this->assertTrue( ServiceArea::get( Databases::class )->is_new() );
 		$this->go( 'domains', 'add' );
@@ -213,7 +214,7 @@ class SlugsTest extends TestCase {
 		$this->slug( $theirs );
 
 		$this->go( 'vps', 'secret' );
-		$this->assertSame( 0, Servers::requested()['id'] );
+		$this->assertSame( 0, ServerLinks::requested()['id'] );
 
 		ob_start();
 		Servers::render( $this->views( $mine ) );
@@ -226,7 +227,7 @@ class SlugsTest extends TestCase {
 
 		$this->assertStringContainsString( 'That server was not found', $other_html );
 		$this->assertSame( $missing_html, $other_html, 'Exactly like a name that does not exist.' );
-		$this->assertSame( '', Slugs::redirect_target( 'vps', 'servers', array( Servers::class, 'url' ) ) );
+		$this->assertSame( '', Slugs::redirect_target( 'vps', 'servers', array( ServerLinks::class, 'url' ) ) );
 	}
 
 	public function test_another_customers_number_is_not_found_and_not_redirected(): void {
@@ -235,7 +236,7 @@ class SlugsTest extends TestCase {
 		$this->go( 'vps', (string) $theirs->license()['id'] );
 
 		$this->assertSame( '', Servers::redirect_target() );
-		$this->assertSame( '', Slugs::redirect_target( 'vps', 'servers', array( Servers::class, 'url' ) ) );
+		$this->assertSame( '', Slugs::redirect_target( 'vps', 'servers', array( ServerLinks::class, 'url' ) ) );
 		ob_start();
 		Servers::render( array() );
 		$this->assertStringContainsString( 'That server was not found', (string) ob_get_clean() );
@@ -268,17 +269,17 @@ class SlugsTest extends TestCase {
 		$id     = (string) $server->license()['id'];
 
 		$this->go( 'vps', $id );
-		$this->assertSame( Servers::url( $server->license() ), Slugs::redirect_target( 'vps', 'servers', array( Servers::class, 'url' ) ) );
+		$this->assertSame( ServerLinks::url( $server->license() ), Slugs::redirect_target( 'vps', 'servers', array( ServerLinks::class, 'url' ) ) );
 
 		$this->go( 'vps', $id . '/snapshots' );
-		$this->assertSame( Servers::url( $server->license(), 'snapshots' ), Slugs::redirect_target( 'vps', 'servers', array( Servers::class, 'url' ) ) );
+		$this->assertSame( ServerLinks::url( $server->license(), 'snapshots' ), Slugs::redirect_target( 'vps', 'servers', array( ServerLinks::class, 'url' ) ) );
 
 		$_SERVER['QUERY_STRING'] = 'plan=7';
-		$this->assertSame( add_query_arg( 'plan', '7', Servers::url( $server->license(), 'snapshots' ) ), Slugs::redirect_target( 'vps', 'servers', array( Servers::class, 'url' ) ) );
+		$this->assertSame( add_query_arg( 'plan', '7', ServerLinks::url( $server->license(), 'snapshots' ) ), Slugs::redirect_target( 'vps', 'servers', array( ServerLinks::class, 'url' ) ) );
 		unset( $_SERVER['QUERY_STRING'] );
 
 		$this->go( 'vps', 'web1' );
-		$this->assertSame( '', Slugs::redirect_target( 'vps', 'servers', array( Servers::class, 'url' ) ), 'A slug address stays.' );
+		$this->assertSame( '', Slugs::redirect_target( 'vps', 'servers', array( ServerLinks::class, 'url' ) ), 'A slug address stays.' );
 	}
 
 	public function test_the_redirect_for_a_database_and_a_domain(): void {
@@ -307,10 +308,10 @@ class SlugsTest extends TestCase {
 
 		$method = new \ReflectionMethod( ServiceEmail::class, 'account_url' );
 		$method->setAccessible( true );
-		$this->assertSame( Servers::url( $server->license() ), $method->invoke( null, $server, $server->license(), array() ) );
+		$this->assertSame( ServerLinks::url( $server->license() ), $method->invoke( null, $server, $server->license(), array() ) );
 		$this->assertSame( $area->url( $db->license() ), $method->invoke( null, $db, $db->license(), array() ) );
 		$this->assertSame( Domains::url( $domain->license() ), $method->invoke( null, $domain, $domain->license(), array() ) );
-		$this->assertStringNotContainsString( '/' . $server->license()['id'] . '/', Servers::url( $server->license() ) );
+		$this->assertStringNotContainsString( '/' . $server->license()['id'] . '/', ServerLinks::url( $server->license() ) );
 	}
 
 	// -- Migration -----------------------------------------------------------------------------

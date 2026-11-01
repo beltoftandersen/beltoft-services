@@ -3,6 +3,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftLicenses\Account\View;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Account\Tabs;
 use BeltoftServices\Drivers\Registry;
@@ -121,10 +122,10 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		$server = $this->server();
 		$disk   = $this->disk_for( $server );
 
-		$this->assertSame( Servers::url( $server->license(), 'disks' ) . '#' . DiskGuide::anchor( $disk->id() ), DiskGuide::guide_url( $disk ) );
-		$this->assertSame( Servers::url( $server->license(), 'disks' ) . '#beltoft-service-' . $server->id(), DiskGuide::server_url( $disk ) );
-		$this->assertSame( Servers::url( $server->license(), 'disks' ) . '#x', DiskGuide::card_url( $server, 'x' ) );
-		$this->assertSame( Servers::url( $server->license(), 'snapshots' ) . '#x', DiskGuide::card_url( $server, 'x', 'snapshots' ) );
+		$this->assertSame( ServerLinks::url( $server->license(), 'disks' ) . '#' . DiskGuide::anchor( $disk->id() ), DiskGuide::guide_url( $disk ) );
+		$this->assertSame( ServerLinks::url( $server->license(), 'disks' ) . '#beltoft-service-' . $server->id(), DiskGuide::server_url( $disk ) );
+		$this->assertSame( ServerLinks::url( $server->license(), 'disks' ) . '#x', DiskGuide::card_url( $server, 'x' ) );
+		$this->assertSame( ServerLinks::url( $server->license(), 'snapshots' ) . '#x', DiskGuide::card_url( $server, 'x', 'snapshots' ) );
 	}
 
 	public function test_a_disks_or_packs_own_address_goes_to_the_server_tab(): void {
@@ -134,9 +135,9 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		wp_set_current_user( (int) $server->license()['user_id'] );
 
 		$GLOBALS['wp']->query_vars['vps'] = (string) $disk->license()['id'];
-		$this->assertSame( Servers::url( $server->license(), 'disks' ) . '#' . DiskGuide::anchor( $disk->id() ), Servers::redirect_target() );
+		$this->assertSame( ServerLinks::url( $server->license(), 'disks' ) . '#' . DiskGuide::anchor( $disk->id() ), Servers::redirect_target() );
 		$GLOBALS['wp']->query_vars['vps'] = (string) $pack->license()['id'];
-		$this->assertSame( Servers::url( $server->license(), 'snapshots' ), Servers::redirect_target() );
+		$this->assertSame( ServerLinks::url( $server->license(), 'snapshots' ), Servers::redirect_target() );
 		$GLOBALS['wp']->query_vars['vps'] = (string) $server->license()['id'];
 		$this->assertSame( '', Servers::redirect_target(), 'A server stays.' );
 		$GLOBALS['wp']->query_vars['vps'] = '';
@@ -159,10 +160,10 @@ class ServerAddonsTest extends SnapshotsTestCase {
 
 		$this->assertContains( 'servers', $slugs );
 		$this->assertNotContains( 'vps', $slugs );
-		$this->assertStringContainsString( 'servers', Servers::url( $server->license(), 'disks' ) );
-		$this->assertStringNotContainsString( 'vps', Servers::url( $server->license() ) );
+		$this->assertStringContainsString( 'servers', ServerLinks::url( $server->license(), 'disks' ) );
+		$this->assertStringNotContainsString( 'vps', ServerLinks::url( $server->license() ) );
 		$GLOBALS['wp']->query_vars['servers'] = $server->license()['id'] . '/disks';
-		$this->assertSame( array( 'id' => (int) $server->license()['id'], 'tab' => 'disks' ), Servers::requested() );
+		$this->assertSame( array( 'id' => (int) $server->license()['id'], 'tab' => 'disks' ), ServerLinks::requested() );
 	}
 
 	private function mail_for( Resource $r, array $data = array(), string $email = 'beltoft_services_ready' ): string {
@@ -187,9 +188,9 @@ class ServerAddonsTest extends SnapshotsTestCase {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
 			$wpdb->update( \BeltoftLicenses\Install::tables()['licenses'], array( 'email' => 'customer@example.com' ), array( 'id' => $lic['id'] ) );
 		}
-		$this->assertStringContainsString( Servers::url( $server->license() ), $this->mail_for( $this->fresh( $server ) ) );
-		$this->assertStringContainsString( Servers::url( $server->license(), 'disks' ), $this->mail_for( $this->fresh( $disk ) ) );
-		$this->assertStringContainsString( Servers::url( $server->license(), 'snapshots' ), $this->mail_for( $this->fresh( $pack ) ) );
+		$this->assertStringContainsString( ServerLinks::url( $server->license() ), $this->mail_for( $this->fresh( $server ) ) );
+		$this->assertStringContainsString( ServerLinks::url( $server->license(), 'disks' ), $this->mail_for( $this->fresh( $disk ) ) );
+		$this->assertStringContainsString( ServerLinks::url( $server->license(), 'snapshots' ), $this->mail_for( $this->fresh( $pack ) ) );
 	}
 
 	public function test_the_pass_through_saves_a_lookup_per_server(): void {

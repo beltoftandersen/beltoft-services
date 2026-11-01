@@ -31,6 +31,7 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
+use BeltoftServices\Proxmox\Jobs\BackupJobs;
 
 /**
  * A database driver that does not sleep.
@@ -243,7 +244,7 @@ class DbPhase4Test extends TestCase {
 
 	private function follow_up(): void {
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
-		ProxmoxJobs::backup_next();
+		BackupJobs::backup_next();
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------

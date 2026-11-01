@@ -3,6 +3,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Overview;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
@@ -181,7 +182,7 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( '192.0.2.10', $html );
 		$this->assertStringContainsString( 'beltoft-services-srv', $html );
 		$this->assertStringContainsString( 'href="' . esc_url( Servers::url_list() ) . '"', $html );
-		$this->assertStringContainsString( 'href="' . esc_url( Servers::url( $r->license() ) ) . '"', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( ServerLinks::url( $r->license() ) ) . '"', $html );
 
 		$view = \BeltoftLicenses\Account\View::license( $r->license() );
 		$this->assertSame( Servers::rows( array( $view ), array( (int) $view['id'] => $r ) ), Overview::data()['servers'] );
@@ -344,7 +345,7 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'web-01', $html );
 		$this->assertStringContainsString( 'Restart', $html );
 		$this->assertStringContainsString( 'Follow it', $html );
-		$this->assertStringContainsString( 'href="' . esc_url( Servers::url( $r->license() ) ) . '"', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( ServerLinks::url( $r->license() ) ) . '"', $html );
 		$this->assertStringContainsString( 'Working', $this->html( 'servers' ) );
 	}
 

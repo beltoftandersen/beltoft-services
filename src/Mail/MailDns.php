@@ -10,8 +10,8 @@ namespace BeltoftServices\Mail;
 use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\AppDomains;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -175,7 +175,7 @@ final class MailDns {
 	 * @return array{0:string,1:string}|\WP_Error [ status (ok or conflict), reason ], or a transient error.
 	 */
 	public static function publish( int $user_id, string $zone, array $row ) {
-		if ( ! in_array( $zone, AppDomains::zones( $user_id ), true ) ) {
+		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) ) {
 			return array( 'conflict', 'The domain is not one of your domains on our name servers.' );
 		}
 

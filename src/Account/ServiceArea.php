@@ -669,7 +669,7 @@ abstract class ServiceArea {
 			'message'      => Panel::message( $state, $resource ),
 			'show_message' => 'ready' !== $group,
 			'kind'         => (string) self::$page['area']->label_of( $resource ),
-			'renews'       => Servers::renewal( self::$page['license'] ),
+			'renews'       => ServerLinks::renewal( self::$page['license'] ),
 		);
 
 		( static function ( array $vars ): void {

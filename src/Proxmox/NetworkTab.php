@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -99,11 +99,11 @@ final class NetworkTab {
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
 		}
 
-		$asked   = Servers::requested();
+		$asked   = ServerLinks::requested();
 		$license = $asked['id'] > 0 ? \BeltoftLicenses\Licenses::find( $asked['id'] ) : null;
 		$r       = is_array( $license ) && (int) ( $license['user_id'] ?? 0 ) === get_current_user_id() && get_current_user_id() > 0 ? Resource::for_license( (int) $license['id'] ) : null;
 

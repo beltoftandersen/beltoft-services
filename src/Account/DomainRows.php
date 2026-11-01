@@ -81,7 +81,7 @@ final class DomainRows {
 	 * @param string               $group    Panel group of the state.
 	 */
 	private static function renews( array $view, Resource $resource, string $group ): string {
-		$renews = Servers::renewal( $view['license'] );
+		$renews = ServerLinks::renewal( $view['license'] );
 
 		if ( '' === $renews && 'ready' === $group ) {
 			$expires = (string) $resource->get( 'expires_at' );

@@ -11,6 +11,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\BackupJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -21,7 +22,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 
 	private function follow_up(): void {
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
-		ProxmoxJobs::backup_next();
+		BackupJobs::backup_next();
 	}
 
 	/**
@@ -65,7 +66,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 		$two = $this->ready_vm();
 		$one->set( array( 'backup_last_at' => time(), 'backup_task' => array( 'upid' => 'UPID:node-a:00000001:00000001:5F000001:vzdump:1:fake@pve!fake:', 'node' => 'node-a', 'started' => time() ) ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->follow_up();
 
 		$dumps = $this->calls( 'POST', '/vzdump' );
@@ -78,7 +79,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 		$one = $this->ready_vm();
 		$one->set( array( 'backup_task' => array( 'upid' => 'UPID:node-a:00000001:00000001:5F000001:vzdump:1:fake@pve!fake:', 'node' => 'node-a', 'started' => time() - 7 * HOUR_IN_SECONDS ) ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$fresh = Resource::find( $one->id() );
 		$this->assertNull( $fresh->get( 'backup_task' ) );
@@ -161,7 +162,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 	public function test_i3_a_delete_waits_for_a_running_backup_before_it_purges_or_deletes(): void {
 		$r = $this->ready_vm();
 		$this->fake->next_task( array( 'polls' => 30 ) );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertIsArray( Resource::find( $r->id() )->get( 'backup_task' ) );
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 		$seen = count( $this->fake->calls() );
@@ -179,7 +180,7 @@ class BackupReviewFixesTest extends BackupTestCase {
 		$r     = $this->ready_vm();
 		$volid = $this->backup_of( $r );
 		$this->fake->next_task( array( 'polls' => 30 ) );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 		$seen = count( $this->fake->calls() );
 

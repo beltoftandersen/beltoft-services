@@ -24,6 +24,8 @@ use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
+use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Proxmox\Jobs\PowerJobs;
 
 /**
  * A database driver that does not sleep.
@@ -233,7 +235,7 @@ class DbPhase5Test extends TestCase {
 
 	private function follow_up(): void {
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
-		ProxmoxJobs::backup_next();
+		BackupJobs::backup_next();
 	}
 
 	// -- Backups on by default -------------------------------------------------------------------
@@ -272,7 +274,7 @@ class DbPhase5Test extends TestCase {
 	public function test_the_nightly_run_backs_up_a_database_and_stops(): void {
 		$r = $this->ready_db();
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$dumps = $this->calls( 'POST', '/vzdump' );
 		$this->assertCount( 1, $dumps );
@@ -295,7 +297,7 @@ class DbPhase5Test extends TestCase {
 			$this->fake->add_backup( 'backup-store', array( 'vmid' => 5000, 'ctime' => time() - $age * DAY_IN_SECONDS ) );
 		}
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$prune = $this->calls( 'DELETE', '/prunebackups' );
 		$this->assertCount( 1, $prune );
@@ -307,7 +309,7 @@ class DbPhase5Test extends TestCase {
 	public function test_the_default_days_prune_a_database_whose_plan_names_none(): void {
 		$this->ready_db();
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$this->assertSame( 'keep-daily=7', $this->calls( 'DELETE', '/prunebackups' )[0]['params']['prune-backups'] );
 	}
@@ -316,7 +318,7 @@ class DbPhase5Test extends TestCase {
 		$r = $this->ready_db();
 		$r->set( array( 'op' => 'update_plan' ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$this->assertCount( 0, $this->calls( 'POST', '/vzdump' ) );
 	}
@@ -353,7 +355,7 @@ class DbPhase5Test extends TestCase {
 	public function test_the_overview_shows_the_backup_facts_and_the_tab_the_list_the_dump_and_the_restore_form(): void {
 		$r = $this->ready_db( array( 'backup_days' => 4 ) );
 		$this->backup_of( $r );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->health( array( 'last_dump' => 1761800000 ) );
 		DbMonitor::check( Resource::find( $r->id() ), $this->fake, 'node-a', 5000, 'running' );
 		$fresh = Resource::find( $r->id() );
@@ -784,7 +786,7 @@ class DbPhase5Test extends TestCase {
 		$this->health( array( 'ok' => false ) );
 		$this->assertTrue( Resource::find( $r->id() )->set( array( 'state' => 'ready' ) ) );
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 
 		$this->assertGreaterThan( 0, (int) ( (array) Resource::find( $r->id() )->get( DbMonitor::META ) )['down_since'] );
 	}

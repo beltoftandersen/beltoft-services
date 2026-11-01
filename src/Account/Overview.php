@@ -423,7 +423,7 @@ final class Overview {
 
 		$groups  = Endpoint::split( $licenses );
 		$domains = array_slice( (array) ( $groups['domains'] ?? array() ), 0, 50 );
-		$tab     = array_slice( (array) ( $groups[ Servers::slug() ] ?? array() ), 0, 50 );
+		$tab     = array_slice( (array) ( $groups[ ServerLinks::slug() ] ?? array() ), 0, 50 );
 		$plain   = array_slice( (array) ( $groups[''] ?? array() ), 0, 50 );
 		$names   = array();
 		$servers = array();
@@ -580,7 +580,7 @@ final class Overview {
 	 * @return array<string, string>
 	 */
 	private static function license_row( array $view ): array {
-		$renews = Servers::renewal( $view['license'] );
+		$renews = ServerLinks::renewal( $view['license'] );
 
 		if ( '' === $renews ) {
 			$renews = (string) $view['expiry'];
@@ -660,7 +660,7 @@ final class Overview {
 	 */
 	private static function follow_url( array $license ): string {
 		if ( Servers::is_server( $license ) || self::in_servers_tab( $license ) ) {
-			return Servers::url( $license );
+			return ServerLinks::url( $license );
 		}
 
 		if ( Domains::is_domain( $license ) ) {
@@ -684,7 +684,7 @@ final class Overview {
 	private static function in_servers_tab( array $license ): bool {
 		$tab = Endpoint::split( array( $license ) );
 
-		return ! empty( $tab[ Servers::slug() ] );
+		return ! empty( $tab[ ServerLinks::slug() ] );
 	}
 
 	/**

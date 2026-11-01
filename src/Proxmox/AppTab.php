@@ -3,9 +3,10 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -74,11 +75,11 @@ final class AppTab {
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
 		}
 
-		$asked = Servers::requested();
+		$asked = ServerLinks::requested();
 		$r     = $asked['id'] > 0 ? self::resource_of_license( $asked['id'] ) : null;
 
 		if ( ! $r || '' === (string) $r->get( 'app_id' ) ) {
@@ -241,7 +242,7 @@ final class AppTab {
 		if ( '' !== (string) ( $left['zone'] ?? '' ) && $user > 0 ) {
 			foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 				$domain_resource = Resource::for_license( (int) $license['id'] );
-				if ( $domain_resource && strtolower( (string) $domain_resource->get( 'domain' ) ) === $left['zone'] && AppDomains::editable( $domain_resource, $user ) ) {
+				if ( $domain_resource && strtolower( (string) $domain_resource->get( 'domain' ) ) === $left['zone'] && ZoneAccess::editable( $domain_resource, $user ) ) {
 					$left_url = Domains::url( $license, 'dns' );
 					break;
 				}
@@ -309,7 +310,7 @@ final class AppTab {
 				$url = '';
 				foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 					$domain = Resource::for_license( (int) $license['id'] );
-					if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === (string) ( $left['zone'] ?? '' ) && AppDomains::editable( $domain, $user ) ) {
+					if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === (string) ( $left['zone'] ?? '' ) && ZoneAccess::editable( $domain, $user ) ) {
 						$url = Domains::url( $license, 'dns' );
 						break;
 					}

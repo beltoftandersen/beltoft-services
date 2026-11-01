@@ -4,6 +4,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftLicenses\Account\View;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Proxmox\Console;
 use BeltoftServices\Proxmox\ConsoleTab;
@@ -43,7 +44,7 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$this->assertTrue( Console::eligible( $r ) );
 		$html = $this->page( $r );
 		$this->assertMatchesRegularExpression( '#data-tab-link="overview"[^>]*>Overview</a>\s*<a[^>]*data-tab-link="console"[^>]*>Console</a>#', $html );
-		$this->assertContains( 'console', Servers::tabs() );
+		$this->assertContains( 'console', ServerLinks::tabs() );
 		$this->settings( array( 'console' => 0 ) );
 		$this->assertFalse( Console::eligible( $r ) );
 		$this->assertStringNotContainsString( 'data-tab-link="console"', $this->page( $r ) );
@@ -64,13 +65,13 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
 		ConsoleTab::assets( 'account', 'orders' );
 		$this->assertFalse( wp_script_is( ConsoleTab::HANDLE, 'enqueued' ) );
-		ConsoleTab::assets( 'account', Servers::slug() );
+		ConsoleTab::assets( 'account', ServerLinks::slug() );
 		$this->assertTrue( wp_script_is( ConsoleTab::HANDLE, 'enqueued' ) );
 		$this->assertTrue( wp_style_is( ConsoleTab::HANDLE, 'enqueued' ) );
 		wp_set_current_user( self::factory()->user->create() );
 		wp_dequeue_script( ConsoleTab::HANDLE );
 		wp_dequeue_style( ConsoleTab::HANDLE );
-		ConsoleTab::assets( 'account', Servers::slug() );
+		ConsoleTab::assets( 'account', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( ConsoleTab::HANDLE, 'enqueued' ) );
 	}
 
@@ -129,7 +130,7 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$r = $this->server();
 		wp_set_current_user( (int) $r->license()['user_id'] );
 		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
-		ConsoleTab::assets( 'account', Servers::slug() );
+		ConsoleTab::assets( 'account', ServerLinks::slug() );
 		$data = wp_scripts()->get_data( ConsoleTab::HANDLE, 'data' );
 		$this->assertStringContainsString( 'A console is already being opened', (string) $data );
 	}
