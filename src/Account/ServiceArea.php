@@ -90,21 +90,6 @@ abstract class ServiceArea {
 	}
 
 	/**
-	 * The area a My Account endpoint belongs to, or null.
-	 *
-	 * @param string $slug Endpoint.
-	 */
-	public static function for_slug( string $slug ): ?ServiceArea {
-		foreach ( self::all() as $area ) {
-			if ( $area->slug() === $slug ) {
-				return $area;
-			}
-		}
-
-		return null;
-	}
-
-	/**
 	 * The default endpoint.
 	 */
 	abstract protected function default_slug(): string;

@@ -906,15 +906,6 @@ final class Firewall {
 	}
 
 	/**
-	 * Is this comment one of the plugin's own system rules?
-	 *
-	 * @param string $comment Comment.
-	 */
-	private static function is_system( string $comment ): bool {
-		return Provision::SMTP_COMMENT === $comment || 0 === strpos( $comment, self::TAG_SYSTEM );
-	}
-
-	/**
 	 * The PVE parameters of a customer rule.
 	 *
 	 * @param array<string, mixed> $rule Rule.
