@@ -306,7 +306,7 @@ final class Offers {
 		$billing = Rates::billing_key( $mine );
 
 		foreach ( $mine as $key => $value ) {
-			if ( isset( $skip[ $key ] ) || DbDisk::is_attribute( (string) $key ) || (string) $key === $billing || '' === (string) $value ) {
+			if ( isset( $skip[ $key ] ) || DbDisk::is_attribute( (string) $key ) || 1 === preg_match( '/^(attribute_)?(pa_)?' . preg_quote( DbIpField::ATTRIBUTE, '/' ) . '$/Di', (string) $key ) || (string) $key === $billing || '' === (string) $value ) {
 				continue;
 			}
 

@@ -40,7 +40,7 @@ class DatabaseUsageTest extends UsageTestCase {
 		$product->set_status( 'publish' );
 		$attrs = array();
 
-		foreach ( array( 'Billing' => array( 'Monthly', 'Pay as you go' ), 'Public IP' => array( 'No', 'Yes' ), 'Extra storage' => array( 'None', '50 GB' ) ) as $name => $options ) {
+		foreach ( array( 'Plan' => array( 'Small' ), 'Billing' => array( 'Monthly', 'Pay as you go' ), 'Public IP' => array( 'No', 'Yes' ), 'Extra storage' => array( 'None', '50 GB' ) ) as $name => $options ) {
 			$a = new \WC_Product_Attribute();
 			$a->set_name( $name );
 			$a->set_options( $options );
@@ -69,7 +69,7 @@ class DatabaseUsageTest extends UsageTestCase {
 				foreach ( array( 0 => 'None', 50 => '50 GB' ) as $gb => $label ) {
 					$v = new \WC_Product_Variation();
 					$v->set_parent_id( $product->get_id() );
-					$v->set_attributes( array( 'billing' => $billing, 'public-ip' => $ip ? 'Yes' : 'No', 'extra-storage' => $label ) );
+					$v->set_attributes( array( 'plan' => 'Small', 'billing' => $billing, 'public-ip' => $ip ? 'Yes' : 'No', 'extra-storage' => $label ) );
 					$v->set_regular_price( 'm' === $short ? (string) ( 25 + 5 * $ip + ( $gb ? 8 : 0 ) ) : '0' );
 					$v->set_status( 'publish' );
 					$v->update_meta_data( Product::META_PLAN . 'public_ip', (string) $ip );
@@ -255,6 +255,7 @@ class DatabaseUsageTest extends UsageTestCase {
 		$html = $this->picker_page();
 
 		$this->assertStringContainsString( 'data-picker-payg-only', $html );
+		$this->assertStringContainsString( '<span class="beltoft-services-plan__name">Small</span>', $html, 'The public IP answer is not part of the plan name.' );
 		$this->assertStringContainsString( '<b>' . Rates::cap_money( 25.0 ) . '</b> <span>max per month, excl. VAT</span>', $html );
 		$this->assertStringContainsString( 'beltoft-services-plan__hourly">' . Rates::per_hour( 25 / 730 ), str_replace( "\n", '', $html ) );
 		$this->assertStringContainsString( 'data-card-cap="' . Rates::cap_money( 25.0 ) . '"', $html );
@@ -317,10 +318,10 @@ class DatabaseUsageTest extends UsageTestCase {
 		$v    = $this->db_product();
 		$rows = $this->line_meta( $v['u-0-0'] );
 
-		$this->assertSame( array( 'Server name: db1' ), $rows );
+		$this->assertSame( array( 'Plan: Small', 'Server name: db1' ), $rows );
 		$full = $this->line_meta( $v['u-1-50'] );
 		$this->assertContains( 'Server name: db1', $full );
-		$this->assertCount( 3, $full, 'The chosen public IP and extra storage stay.' );
+		$this->assertCount( 4, $full, 'The chosen public IP and extra storage stay.' );
 		foreach ( $full as $row ) {
 			$this->assertStringStartsNotWith( 'billing', strtolower( $row ) );
 		}
@@ -330,7 +331,7 @@ class DatabaseUsageTest extends UsageTestCase {
 		$v    = $this->db_product();
 		$rows = $this->line_meta( $v['m-0-0'] );
 
-		$this->assertCount( 4, $rows );
+		$this->assertCount( 5, $rows );
 	}
 
 	public function test_a_server_usage_line_loses_billing_and_backups_none_and_keeps_daily_backups(): void {
