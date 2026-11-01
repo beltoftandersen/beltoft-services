@@ -41,15 +41,6 @@ class InvoiceTest extends CreditTestCase {
 		);
 	}
 
-	public function tear_down(): void {
-		// wcs_create_renewal_order() commits the test's transaction (WCS_SQL_Transaction), so the server records of a
-		// usage_vm() outlive the test. Tests of the Proxmox directory run after this one and expect an empty table.
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
-		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Schema::tables()['vms'] );
-		parent::tear_down();
-	}
-
 	private function hours( int $resource, int $user, int $hours, float $rate = 0.02, string $item = 'server' ): void {
 		// Early in a month the rows would reach into the month before and split into two lines.
 		$now   = Ledger::hour( time() );
@@ -216,15 +207,18 @@ class InvoiceTest extends CreditTestCase {
 	}
 
 	public function test_the_credit_page_and_the_usage_box(): void {
-		$v    = $this->usage_product();
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );
-		$r    = $this->usage_vm( $v['u-None'], $user, 5, $sub->get_id() );
 		wp_set_current_user( $user );
 		$this->top_up( $user, 500 );
-		$this->hours( $r->id(), $user, 100 );
+		$this->hours( 501, $user, 100 );
+		// wcs_create_renewal_order() commits the test's transaction (WCS_SQL_Transaction), so it comes before anything
+		// that must not outlive the test: a server and its activation would stay behind and break tests that expect none.
 		$order = wcs_create_renewal_order( $sub );
 		$this->top_up( $user, 1000 );
+
+		$v = $this->usage_product();
+		$r = $this->usage_vm( $v['u-None'], $user, 5, $sub->get_id() );
 
 		$html = Page::html();
 		$this->assertStringContainsString( 'Used on invoice #' . $order->get_order_number(), $html );
@@ -233,7 +227,7 @@ class InvoiceTest extends CreditTestCase {
 		$this->assertStringNotContainsString( 'incl. VAT', $html );
 		$this->assertStringNotContainsString( 'excl. VAT', $html );
 
-		// More usage, so the box has something to show, and credit left.
+		// More usage on the server, so the box has something to show, and credit left.
 		$this->hours( $r->id(), $user, 50, 0.01, 'backups' );
 		\BeltoftServices\Usage\Estimate::reset();
 		\BeltoftServices\Account\UsageView::reset();

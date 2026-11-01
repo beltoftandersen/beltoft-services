@@ -194,6 +194,25 @@ final class Page {
 	}
 
 	/**
+	 * The words for one history row: "Credit added: Welcome credit", "Credit correction: ...", else the note or the kind.
+	 *
+	 * @param array<string, mixed> $row Ledger row.
+	 */
+	public static function row_label( array $row ): string {
+		$note = (string) $row['note'];
+
+		if ( Balance::PROMO === $row['kind'] ) {
+			return '' !== $note ? sprintf( /* translators: %s: reason. */ __( 'Credit added: %s', 'beltoft-services' ), $note ) : self::kind_label( Balance::PROMO );
+		}
+
+		if ( Balance::ADJUST === $row['kind'] && 'admin' === $row['ref_type'] ) {
+			return sprintf( /* translators: %s: reason. */ __( 'Credit correction: %s', 'beltoft-services' ), $note );
+		}
+
+		return '' !== $note ? $note : self::kind_label( (string) $row['kind'] );
+	}
+
+	/**
 	 * Words for a ledger kind.
 	 *
 	 * @param string $kind Kind.
@@ -202,6 +221,7 @@ final class Page {
 		$labels = array(
 			Balance::TOPUP      => __( 'Top-up', 'beltoft-services' ),
 			Balance::INVOICE    => __( 'Used on invoice', 'beltoft-services' ),
+			Balance::PROMO      => __( 'Credit added', 'beltoft-services' ),
 			Balance::REFUND     => __( 'Refund', 'beltoft-services' ),
 			Balance::CHARGEBACK => __( 'Chargeback', 'beltoft-services' ),
 			Balance::ADJUST     => __( 'Adjustment', 'beltoft-services' ),

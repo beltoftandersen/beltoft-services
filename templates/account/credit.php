@@ -81,7 +81,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 				<?php foreach ( $credit['history'] as $beltoft_services_credit_row ) : ?>
 					<tr>
 						<td><?php echo esc_html( wp_date( (string) get_option( 'date_format' ), (int) strtotime( $beltoft_services_credit_row['created'] . ' UTC' ) ) ); ?></td>
-						<td><?php echo esc_html( '' !== (string) $beltoft_services_credit_row['note'] ? (string) $beltoft_services_credit_row['note'] : Page::kind_label( (string) $beltoft_services_credit_row['kind'] ) ); ?></td>
+						<td><?php echo esc_html( Page::row_label( $beltoft_services_credit_row ) ); ?></td>
 						<td><?php echo esc_html( Page::money( (int) $beltoft_services_credit_row['amount_cents'], $credit['currency'], true ) ); ?></td>
 						<td><?php echo esc_html( Page::money( (int) $beltoft_services_credit_row['balance_after_cents'], $credit['currency'] ) ); ?></td>
 					</tr>

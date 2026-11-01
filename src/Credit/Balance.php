@@ -26,6 +26,7 @@ final class Balance {
 
 	public const TOPUP      = 'topup';
 	public const INVOICE    = 'invoice';
+	public const PROMO      = 'promo';
 	public const REFUND     = 'refund';
 	public const CHARGEBACK = 'chargeback';
 	public const ADJUST     = 'adjust';
