@@ -209,7 +209,6 @@ final class Definitions {
 				true
 			),
 			'create_mailbox'   => self::act( 'Makes a mailbox in an email domain, with the size of the plan. It gets a password that is never shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer\'s yes. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @: letters, numbers, dots, dashes and underscores.' ), 'display_name' => array( 'type' => 'string', 'maxLength' => 100, 'description' => 'The name shown for the mailbox. Optional.' ) ), array( 'id', 'name' ) ), false ),
-			'reset_mailbox_password' => self::act( 'Makes a new password for a mailbox. The old one stops working at once. The new one is never shown here: the customer shows it once in the dashboard. Ask the customer first.', self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ) ), true ),
 			'add_email_alias'  => self::act( 'Makes an alias in an email domain: an address that delivers to one or more other addresses. There is no catch-all. Delivering to other domains is allowed only when the site allows it. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @.' ), 'deliver_to' => array( 'type' => 'array', 'maxItems' => 10, 'items' => array( 'type' => 'string', 'maxLength' => 254 ), 'description' => 'One to ten addresses.' ) ), array( 'id', 'name', 'deliver_to' ) ), false ),
 			'remove_email_alias' => self::act( 'Deletes an alias of an email domain. Mail sent to it afterwards bounces. Ask the customer first.', self::obj( array( 'id' => $id, 'address' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The alias address, from email_domain_info.' ) ), array( 'id', 'address' ) ), true, true ),
 			'email_dns_check'  => self::act( 'Looks at the DNS of an email domain now and says which records are in place, missing or in conflict. Nothing is changed in the DNS.', $by_id, false, true ),
@@ -285,6 +284,10 @@ final class Definitions {
 				self::obj( array( 'id' => $id, 'policy' => array( 'type' => 'string', 'maxLength' => 40, 'description' => 'The policy, for example noeviction or allkeys-lru, as the database offers it.' ) ), array( 'id', 'policy' ), true ),
 				false,
 				true
+			),
+			'reset_mailbox_password' => self::full(
+				'Makes a new password for a mailbox. The old one stops working at once. The new one is never shown here: reveal_mailbox_password shows it once after the customer says yes, or the customer shows it once in the dashboard.',
+				self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ), true )
 			),
 			'delete_mailbox'   => self::full(
 				'Deletes a mailbox and every message in it for good. Get the address from email_domain_info.',

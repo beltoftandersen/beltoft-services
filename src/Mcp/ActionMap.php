@@ -81,6 +81,7 @@ final class ActionMap {
 		'reveal_app_login'         => 'reveal_app_login',
 		'database_ca_certificate'  => 'get_database_ca_certificate',
 		'delete_mailbox'           => 'delete_mailbox',
+		'reset_mailbox_password'   => 'reset_mailbox_password',
 		'reveal_mailbox_password'  => 'reveal_mailbox_password',
 	);
 

@@ -22,8 +22,8 @@ defined( 'ABSPATH' ) || exit;
  * not reserved, not already an email service) and the same name twice in one cart is refused. It is saved on the
  * order line and handed to the new resource as `mail_domain` through beltoft_services_initial_meta. Whether the
  * customer really holds the name is not decided here: the driver proves it before anything is made on the mail
- * server. A renewal or a switch pays for a service that exists and asks nothing. The block checkout is not covered:
- * a mail line bought there has no domain and the driver refuses it, so the order is reviewed by an admin.
+ * server. A renewal or a switch pays for a service that exists and asks nothing. The block checkout (Store API) has
+ * no domain field, so it is refused for a cart with a mail line, with a message that points to the classic checkout.
  */
 final class MailField {
 
@@ -41,6 +41,7 @@ final class MailField {
 		// Under the billing details: the theme's checkout shows the order notes step only for server and database carts.
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'render' ), 20 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
+		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
 	}
@@ -130,6 +131,19 @@ final class MailField {
 		}
 
 		return (string) MailDomain::normalise( $raw );
+	}
+
+	/**
+	 * The block checkout cannot ask for the domain, so a cart with a new email line is refused there.
+	 *
+	 * @param \WC_Order         $order   Order being made.
+	 * @param \WP_REST_Request $request Store API request.
+	 * @throws \Automattic\WooCommerce\StoreApi\Exceptions\RouteException When the cart has an email line.
+	 */
+	public static function block_store_api( \WC_Order $order, \WP_REST_Request $request ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		if ( array() !== self::cart_lines() ) {
+			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'beltoft_services_mail_checkout_required', esc_html__( 'Email plans are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website.', 'beltoft-services' ), 400 );
+		}
 	}
 
 	// -- Classic checkout --------------------------------------------------------------------

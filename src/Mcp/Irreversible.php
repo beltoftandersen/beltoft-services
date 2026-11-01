@@ -50,7 +50,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox' );
+	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'reset_mailbox_password' );
 
 	/**
 	 * Add-on kinds (the driver's kind) that remove_addon may cancel.
@@ -86,7 +86,8 @@ final class Irreversible {
 				return self::summary_card( $user_id, (int) $args['token_id'] );
 
 			case 'delete_mailbox':
-				return self::summary_mailbox( $args );
+			case 'reset_mailbox_password':
+				return self::summary_mailbox( $args, $name );
 		}
 
 		$r = Tools::owned( (int) $args['id'], true );
@@ -165,6 +166,12 @@ final class Irreversible {
 				$done = Tools::route( 'DELETE', '/resources/' . $id . '/mail/mailboxes/' . rawurlencode( (string) $args['email'] ), array( 'confirm' => MailRoutes::CONFIRM_DELETE ), null, $id, 'mailbox deleted' );
 
 				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'], 'message' => 'The mailbox and every message in it were deleted.' );
+
+			case 'reset_mailbox_password':
+				$id   = (int) $args['id'];
+				$done = Tools::route( 'POST', '/resources/' . $id . '/mail/mailboxes/' . rawurlencode( (string) $args['email'] ) . '/password', array(), array(), $id, 'new mailbox password made' );
+
+				return $done instanceof \WP_Error ? $done : array( 'done' => true, 'message' => 'The old password no longer works. The new one is not shown here. The customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
 
 			case 'delete_snapshot':
 				return self::send( $args, 'snapshot_delete', array( 'id' => (string) $args['snapshot'] ), 'delete snapshot requested' );
@@ -322,9 +329,10 @@ final class Irreversible {
 	 * The summary of a mailbox deletion: the dashboard's checks (a ready email domain, a mailbox of it that exists).
 	 *
 	 * @param array<string, mixed> $args Arguments (id, email).
+	 * @param string               $name Tool: delete_mailbox or reset_mailbox_password.
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
-	private static function summary_mailbox( array $args ) {
+	private static function summary_mailbox( array $args, string $name = 'delete_mailbox' ) {
 		$r = Tools::owned( (int) $args['id'], true );
 
 		if ( $r instanceof \WP_Error ) {
@@ -347,6 +355,18 @@ final class Irreversible {
 
 		if ( is_wp_error( $box ) || null === $box ) {
 			return new \WP_Error( 'beltoft_services_tool', is_wp_error( $box ) ? __( 'The mail server could not be reached. Try again in a moment.', 'beltoft-services' ) : __( 'That mailbox does not exist.', 'beltoft-services' ) );
+		}
+
+		if ( 'reset_mailbox_password' === $name ) {
+			return array(
+				'text'  => sprintf(
+					/* translators: 1: mailbox address, 2: name of the service. */
+					__( 'Make a new password for the mailbox %1$s of %2$s. The old password stops working at once, so every mail program and phone that uses it must be changed. The new password is not shown here: it can be shown once afterwards, with the customer\'s yes again.', 'beltoft-services' ),
+					$email,
+					self::name( $r )
+				),
+				'state' => $r->id() . '|reset_mailbox_password|' . $email,
+			);
 		}
 
 		return array(

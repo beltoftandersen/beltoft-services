@@ -57,6 +57,24 @@ final class MailCheckoutTest extends MailTestCase {
 		return $errors->get_error_messages();
 	}
 
+	public function test_the_store_api_checkout_is_refused_for_an_email_cart(): void {
+		$order = new \WC_Order();
+		$req   = new \WP_REST_Request( 'POST', '/wc/store/v1/checkout' );
+
+		WC()->cart->empty_cart();
+		MailField::block_store_api( $order, $req );
+		$this->assertTrue( true, 'An empty cart is not touched.' );
+
+		$this->in_cart( $this->product() );
+		try {
+			MailField::block_store_api( $order, $req );
+			$this->fail( 'The Store API checkout should be refused.' );
+		} catch ( \Automattic\WooCommerce\StoreApi\Exceptions\RouteException $e ) {
+			$this->assertSame( 'beltoft_services_mail_checkout_required', $e->error_code );
+			$this->assertStringNotContainsString( '—', $e->getMessage() );
+		}
+	}
+
 	public function test_only_mail_lines_are_offered_the_field(): void {
 		$this->assertSame( array(), MailField::cart_lines() );
 		$key = $this->in_cart( $this->product() );
@@ -114,7 +132,7 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertSame( 'mail_refused', MailField::resolve( array( 'mode' => 'own', 'own' => 'sub.reserved.example' ), $user )->get_error_code() );
 		$this->assertSame( 'mail_refused', MailField::resolve( array( 'mode' => 'own', 'own' => 'mail.example.net' ), $user )->get_error_code(), 'The mail host itself.' );
 
-		$this->mail_resource( 'taken.example' );
+		$this->ready_mail( 'taken.example' );
 		$taken = MailField::resolve( array( 'mode' => 'own', 'own' => 'taken.example' ), $user );
 		$this->assertSame( 'That domain already has email here.', $taken->get_error_message() );
 	}
