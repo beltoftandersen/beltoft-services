@@ -63,6 +63,7 @@ final class Card {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
 		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'swap_page' ), 1 );
+		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'bricks_methods' ), 10, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_filter( 'woocommerce_available_payment_gateways', array( __CLASS__, 'gateways' ), 30 );
 		add_filter( 'woocommerce_cart_item_name', array( __CLASS__, 'cart_name' ), 20, 2 );
@@ -103,6 +104,24 @@ final class Card {
 		remove_action( 'woocommerce_account_payment-methods_endpoint', 'woocommerce_account_payment_methods' );
 		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'render' ), 9 );
 		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'render_tokens' ), 10 );
+	}
+
+	/**
+	 * With Bricks the payment methods list is its own element: the card box goes in front of it, and the list
+	 * (which only says that nothing is saved) stays only when the customer has saved methods of its kind.
+	 *
+	 * @param mixed $html    The element's markup.
+	 * @param mixed $element The element.
+	 * @return mixed
+	 */
+	public static function bricks_methods( $html, $element ) {
+		if ( ! is_string( $html ) || ! is_object( $element ) || 'woocommerce-account-payment-methods' !== ( $element->name ?? '' ) || ! is_user_logged_in() ) {
+			return $html;
+		}
+
+		$has = function_exists( 'wc_get_customer_saved_methods_list' ) && wc_get_customer_saved_methods_list( get_current_user_id() );
+
+		return self::html() . ( $has ? $html : '' );
 	}
 
 	/**
