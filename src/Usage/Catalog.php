@@ -143,7 +143,7 @@ final class Catalog {
 			return '';
 		}
 
-		$rates = Rates::for_plan( $v );
+		$rates = Rates::for_plan( $v, false ); // A sold-out plan keeps its price on the page.
 
 		if ( null === $rates ) {
 			return '';

@@ -116,9 +116,10 @@ final class Rates {
 	 * sibling, one that cannot be bought, or a monthly price of 0.
 	 *
 	 * @param \WC_Product_Variation $monthly Monthly variation.
+	 * @param bool                  $buyable Whether the usage sibling must be purchasable (false: for showing prices, a sold-out plan keeps its price).
 	 * @return array{variation_id: int, monthly: float, hourly: float, cap: float, premium: float}|null
 	 */
-	public static function for_plan( \WC_Product_Variation $monthly ): ?array {
+	public static function for_plan( \WC_Product_Variation $monthly, bool $buyable = true ): ?array {
 		if ( self::is_usage( $monthly ) ) {
 			return null;
 		}
@@ -126,7 +127,7 @@ final class Rates {
 		$usage = self::sibling( $monthly, true );
 		$price = (float) wc_get_price_excluding_tax( $monthly );
 
-		if ( ! $usage || ! $usage->is_purchasable() || $price <= 0 ) {
+		if ( ! $usage || ( $buyable && ! $usage->is_purchasable() ) || $price <= 0 ) {
 			return null;
 		}
 
@@ -325,7 +326,8 @@ final class Rates {
 	 * What a pay-as-you-go resource is billed for each hour: a list of items with their quantity, unit and
 	 * rate per unit and hour.
 	 *
-	 * - a server (VM or database): one `server` item and, when its plan has backups and a variation without
+	 * - a database: one `database` item at the plan's variation price (public IP and extra storage included) / 730;
+	 * - a server (VM): one `server` item and, when its plan has backups and a variation without
 	 *   them exists, a `backups` item priced at the difference;
 	 * - an extra disk: `disk`, in GB;
 	 * - a snapshot pack: `snapshots`, one pack;
@@ -354,11 +356,15 @@ final class Rates {
 		$driver  = $r->get( 'driver' );
 		$out     = array();
 
-		if ( in_array( $driver, array( SshKeyField::DRIVER, DbDriver::ID ), true ) ) {
+		if ( DbDriver::ID === $driver ) {
+			// One item: the variation's price already holds the public IP and the extra storage the plan was bought with, so
+			// the hourly rate is that price / 730 and the cap that price (the add-ons are variation attributes, not products).
+			$out[] = array( 'item' => 'database', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
+		} elseif ( SshKeyField::DRIVER === $driver ) {
 			$server = $monthly;
 			$extra  = 0.0;
 
-			if ( SshKeyField::DRIVER === $driver && Backups::days( $r ) > 0 ) {
+			if ( Backups::days( $r ) > 0 ) {
 				$without = Backups::sibling( $v, false );
 				$base    = $without ? self::monthly( $without ) : null;
 

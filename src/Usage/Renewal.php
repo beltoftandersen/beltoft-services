@@ -125,6 +125,7 @@ final class Renewal {
 	public static function item_label( string $item ): string {
 		$labels = array(
 			'server'    => __( 'server', 'beltoft-services' ),
+			'database'  => __( 'database', 'beltoft-services' ),
 			'backups'   => __( 'backups', 'beltoft-services' ),
 			'disk'      => __( 'extra disk', 'beltoft-services' ),
 			'snapshots' => __( 'snapshot slots', 'beltoft-services' ),
@@ -144,6 +145,11 @@ final class Renewal {
 		if ( 'server' === $item ) {
 			/* translators: %s: server name. */
 			return sprintf( __( 'Server %s', 'beltoft-services' ), $label );
+		}
+
+		if ( 'database' === $item ) {
+			/* translators: %s: database name. */
+			return sprintf( __( 'Database %s', 'beltoft-services' ), $label );
 		}
 
 		$words = array(
