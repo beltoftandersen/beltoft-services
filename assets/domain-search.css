@@ -101,6 +101,10 @@
   max-width: 28rem;
 }
 
+:where(.beltoft-domain-transfer__help) {
+  grid-column: 1 / -1;
+}
+
 :where(.beltoft-domain-transfer input) {
   width: 100%;
 }

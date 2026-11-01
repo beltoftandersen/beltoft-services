@@ -44,6 +44,7 @@ class DomainSearchElement extends \Bricks\Element {
 			'buttons' => esc_html__( 'Buttons', 'beltoft-services' ),
 			'results' => esc_html__( 'Results', 'beltoft-services' ),
 			'text'    => esc_html__( 'Result text', 'beltoft-services' ),
+			'transfer' => esc_html__( 'Transfer form', 'beltoft-services' ),
 			'loading' => esc_html__( 'Loading', 'beltoft-services' ),
 		);
 		foreach ( $groups as $key => $title ) {
@@ -96,6 +97,8 @@ class DomainSearchElement extends \Bricks\Element {
 			$this->style( $id . 'ButtonBorder', 'buttons', esc_html__( 'Border', 'beltoft-services' ), 'border', array( self::rule( 'border', $selector ) ) );
 			$this->style( $id . 'ButtonPadding', 'buttons', esc_html__( 'Padding', 'beltoft-services' ), 'dimensions', array( self::rule( 'padding', $selector ) ) );
 			$this->style( $id . 'ButtonMinHeight', 'buttons', esc_html__( 'Minimum height', 'beltoft-services' ), 'number', array( self::rule( 'min-height', $selector ) ), array( 'units' => true ) );
+			$this->style( $id . 'ButtonMinWidth', 'buttons', esc_html__( 'Minimum width', 'beltoft-services' ), 'number', array( self::rule( 'min-width', $selector ) ), array( 'units' => true ) );
+			$this->style( $id . 'ButtonWidth', 'buttons', esc_html__( 'Width', 'beltoft-services' ), 'number', array( self::rule( 'width', $selector ) ), array( 'units' => true ) );
 			$this->style( $id . 'ButtonHoverBackground', 'buttons', esc_html__( 'Hover background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', $selector . ':hover' ) ) );
 			$this->style( $id . 'ButtonHoverColor', 'buttons', esc_html__( 'Hover text colour', 'beltoft-services' ), 'color', array( self::rule( 'color', $selector . ':hover' ) ) );
 		}
@@ -103,6 +106,7 @@ class DomainSearchElement extends \Bricks\Element {
 		// Results.
 		$row = '.beltoft-domain-result';
 		$this->style( 'resultsGap', 'results', esc_html__( 'Gap between results', 'beltoft-services' ), 'number', array( self::rule( 'gap', '.beltoft-domain-results' ) ), array( 'units' => true ) );
+		$this->style( 'resultsTypography', 'results', esc_html__( 'Results typography', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-results' ) ) );
 		$this->style( 'resultsMargin', 'results', esc_html__( 'Results margin', 'beltoft-services' ), 'dimensions', array( self::rule( 'margin', '.beltoft-domain-results' ) ) );
 		$this->style( 'rowColumns', 'results', esc_html__( 'Row columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns', $row ) ), array( 'placeholder' => 'minmax(0,1fr) auto auto', 'hasDynamicData' => false ) );
 		$this->style( 'rowGap', 'results', esc_html__( 'Row gap', 'beltoft-services' ), 'number', array( self::rule( 'gap', $row ) ), array( 'units' => true ) );
@@ -112,6 +116,7 @@ class DomainSearchElement extends \Bricks\Element {
 		$this->style( 'unavailableBackground', 'results', esc_html__( 'Unavailable and premium row background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', '.beltoft-domain-result--not_sold, .beltoft-domain-result--premium' ) ) );
 		$this->style( 'primaryBackground', 'results', esc_html__( 'Main result background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', '.beltoft-domain-result--primary' ) ) );
 		$this->style( 'primaryBorderColor', 'results', esc_html__( 'Main result border colour', 'beltoft-services' ), 'color', array( self::rule( 'border-color', '.beltoft-domain-result--primary' ) ) );
+		$this->style( 'actionsDirection', 'results', esc_html__( 'Buttons direction', 'beltoft-services' ), 'direction', array( self::rule( 'flex-direction', '.beltoft-domain-result__actions' ) ) );
 		$this->style( 'primaryPadding', 'results', esc_html__( 'Main result padding', 'beltoft-services' ), 'dimensions', array( self::rule( 'padding', '.beltoft-domain-result--primary' ) ) );
 
 		// Result text.
@@ -119,12 +124,22 @@ class DomainSearchElement extends \Bricks\Element {
 			'name'   => array( esc_html__( 'Domain name', 'beltoft-services' ), '.beltoft-domain-result__name' ),
 			'price'  => array( esc_html__( 'Price', 'beltoft-services' ), '.beltoft-domain-result__price' ),
 			'status' => array( esc_html__( 'Status', 'beltoft-services' ), '.beltoft-domain-result__status' ),
-			'note'   => array( esc_html__( 'Notes and renewal', 'beltoft-services' ), '.beltoft-domain-result__note, .beltoft-domain-result__renewal, .beltoft-domain-note' ),
+			'detail' => array( esc_html__( 'Details and renewal', 'beltoft-services' ), '.beltoft-domain-result__note, .beltoft-domain-result__renewal' ),
+			'note'   => array( esc_html__( 'Price note above the results', 'beltoft-services' ), '.beltoft-domain-note' ),
 			'error'  => array( esc_html__( 'Error message', 'beltoft-services' ), '.beltoft-domain-error' ),
 		);
 		foreach ( $texts as $id => list( $title, $selector ) ) {
 			$this->style( $id . 'Typography', 'text', $title, 'typography', array( self::rule( 'font', $selector ) ) );
 		}
+
+		// Transfer code form, shown in a row when the customer chooses to transfer a domain.
+		$this->style( 'transferColumns', 'transfer', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns', '.beltoft-domain-transfer' ) ), array( 'placeholder' => 'minmax(12rem,1fr) auto', 'hasDynamicData' => false ) );
+		$this->style( 'transferMaxWidth', 'transfer', esc_html__( 'Maximum width', 'beltoft-services' ), 'number', array( self::rule( 'max-width', '.beltoft-domain-transfer' ) ), array( 'units' => true ) );
+		$this->style( 'transferHelpTypography', 'transfer', esc_html__( 'Help text typography', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-transfer__help' ) ) );
+		$this->style( 'transferInputTypography', 'transfer', esc_html__( 'Code input typography', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-transfer input' ) ) );
+		$this->style( 'transferInputBorder', 'transfer', esc_html__( 'Code input border', 'beltoft-services' ), 'border', array( self::rule( 'border', '.beltoft-domain-transfer input' ) ) );
+		$this->style( 'transferInputHeight', 'transfer', esc_html__( 'Code input height', 'beltoft-services' ), 'number', array( self::rule( 'height', '.beltoft-domain-transfer input' ) ), array( 'units' => true ) );
+		$this->style( 'transferInputPadding', 'transfer', esc_html__( 'Code input padding', 'beltoft-services' ), 'dimensions', array( self::rule( 'padding', '.beltoft-domain-transfer input' ) ) );
 
 		// Loading: these set variables the stylesheet reads, so they reach the animated bar.
 		$this->style( 'loadingBar', 'loading', esc_html__( 'Bar colour', 'beltoft-services' ), 'color', array( self::rule( '--bds-bar' ) ) );
