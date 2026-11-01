@@ -122,7 +122,9 @@ final class Cart {
 				return;
 			}
 
-			$need = self::usage_units( $cart ) > 0 && null === Account::for_user( get_current_user_id(), Account::ESTABLISHED );
+			// An account line made by "Add a card" stays without a server, until the customer has an account.
+			$setup = '' !== $key && ! empty( $cart->get_cart()[ $key ][ \BeltoftServices\Card\Card::CART_KEY ] );
+			$need  = ( self::usage_units( $cart ) > 0 || $setup ) && null === Account::for_user( get_current_user_id(), Account::ESTABLISHED );
 
 			if ( $need && '' === $key ) {
 				$cart->add_to_cart( Account::product_id() );
@@ -147,7 +149,7 @@ final class Cart {
 
 		$cart = $cart instanceof \WC_Cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
 
-		return $cart instanceof \WC_Cart && '' !== self::account_key( $cart ) && self::usage_units( $cart ) > 0;
+		return $cart instanceof \WC_Cart && '' !== self::account_key( $cart ) && ( self::usage_units( $cart ) > 0 || \BeltoftServices\Card\Card::cart_has_setup( $cart ) );
 	}
 
 	/**

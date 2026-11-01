@@ -178,6 +178,7 @@ final class Plugin {
 		Usage\Catalog::register();
 		Usage\Renewal::register();
 		Usage\Emails::register();
+		Card\Card::register();
 		Credit\Topup::register();
 		Credit\Page::register();
 		Credit\Invoice::register();

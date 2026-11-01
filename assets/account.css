@@ -791,3 +791,15 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-credit__history tbody tr + tr td { border-top: 1px solid var(--rule, #d6d2c8); }
 .beltoft-services-credit__history th:nth-child(n+3), .beltoft-services-credit__history td:nth-child(n+3) { text-align: right; padding-right: 0; padding-left: 10px; }
 @media (max-width: 520px) { .beltoft-services-credit__history { font-size: 13px; } .beltoft-services-credit__history th:first-child, .beltoft-services-credit__history td:first-child { display: none; } }
+
+/* Card box on the payment methods page. Square corners, no borders, the dashboard palette variables. */
+.beltoft-services-card { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
+.beltoft-services-card__sub { margin: 0 0 12px; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-card__card { margin: 0 0 12px; padding: 12px 14px; background: var(--bg-card, #fff); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.beltoft-services-card__warn { margin: 0 0 12px; padding: 10px 14px; background: var(--bg-warm, #eeece6); color: var(--bad, #b42318); font-weight: 600; }
+.beltoft-services-card__notice { margin: 0 0 12px; padding: 10px 14px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-weight: 600; }
+.beltoft-services-card__notice.is-error { color: var(--bad, #b42318); }
+.beltoft-services-card__note { margin: 0 0 12px; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-card__form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; }
+.beltoft-services-card__form .beltoft-services-card__note { margin: 0; }
+@media (max-width: 520px) { .beltoft-services-card__form { display: grid; } .beltoft-services-card__btn { width: 100%; } }
