@@ -197,13 +197,14 @@ final class LiveMailcowClient implements MailcowClient {
 			$args['body'] = (string) wp_json_encode( $body );
 		}
 
+		$secrets  = self::secrets( $body );
 		$response = wp_remote_request( $this->base . '/api/v1/' . $path, $args );
 
 		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'mailcow_transport', $this->scrub( $response->get_error_message() ) );
+			return new \WP_Error( 'mailcow_transport', $this->scrub( $response->get_error_message(), $secrets ) );
 		}
 
-		return self::parse( (int) wp_remote_retrieve_response_code( $response ), (string) wp_remote_retrieve_body( $response ), $this->key );
+		return self::parse( (int) wp_remote_retrieve_response_code( $response ), (string) wp_remote_retrieve_body( $response ), $this->key, $secrets );
 	}
 
 	/**
@@ -212,9 +213,10 @@ final class LiveMailcowClient implements MailcowClient {
 	 * @param int    $status HTTP status.
 	 * @param string $body   Body.
 	 * @param string $key    Key to scrub from messages.
+	 * @param string[] $secrets Other values to scrub from messages (the passwords of the request).
 	 * @return array<mixed>|\WP_Error
 	 */
-	public static function parse( int $status, string $body, string $key = '' ) {
+	public static function parse( int $status, string $body, string $key = '', array $secrets = array() ) {
 		if ( $status < 200 || $status >= 300 ) {
 			return new \WP_Error( 'mailcow_http', sprintf( 'The mail server answered HTTP %d.', $status ), array( 'status' => $status ) );
 		}
@@ -236,6 +238,7 @@ final class LiveMailcowClient implements MailcowClient {
 			$name = is_array( $msg ) ? (string) ( $msg[0] ?? '' ) : (string) $msg;
 			$text = is_array( $msg ) ? implode( ' ', array_map( 'strval', array_filter( $msg, 'is_scalar' ) ) ) : (string) $msg;
 			$text = '' === $key ? $text : str_replace( $key, '***', $text );
+			$text = array() === $secrets ? $text : str_replace( $secrets, '***', $text );
 			$code = in_array( $name, self::EXISTS, true ) ? 'mailcow_exists' : ( 'domain_added_sogo_failed' === $name ? 'mailcow_sogo_failed' : 'mailcow_error' );
 
 			return new \WP_Error( $code, 'The mail server refused it: ' . $text, array( 'key' => $name, 'status' => $status ) );
@@ -247,9 +250,30 @@ final class LiveMailcowClient implements MailcowClient {
 	/**
 	 * Removes the key from a text.
 	 *
-	 * @param string $text Text.
+	 * @param string   $text    Text.
+	 * @param string[] $secrets Other values to remove.
 	 */
-	private function scrub( string $text ): string {
-		return str_replace( $this->key, '***', $text );
+	private function scrub( string $text, array $secrets = array() ): string {
+		return str_replace( array_merge( array( $this->key ), $secrets ), '***', $text );
+	}
+
+	/**
+	 * The password values of a request body (any field with "pass" in its name, however deep), to keep out of error text.
+	 *
+	 * @param mixed $body Body.
+	 * @return string[]
+	 */
+	private static function secrets( $body ): array {
+		$out = array();
+
+		foreach ( is_array( $body ) ? $body : array() as $name => $value ) {
+			if ( is_array( $value ) ) {
+				$out = array_merge( $out, self::secrets( $value ) );
+			} elseif ( is_string( $value ) && strlen( $value ) >= 4 && false !== stripos( (string) $name, 'pass' ) ) {
+				$out[] = $value;
+			}
+		}
+
+		return array_values( array_unique( $out ) );
 	}
 }

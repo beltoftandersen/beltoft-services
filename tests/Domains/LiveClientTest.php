@@ -96,6 +96,19 @@ class LiveClientTest extends TestCase {
 		$this->assertSame( 'Your account balance is insufficient [hidden]', $error->get_error_data()['desc'], 'Staff get the registrar\'s explanation; an echoed secret is hidden.' );
 	}
 
+	public function test_no_registrar_delete_call_is_possible(): void {
+		$client = new LiveClient( 'sandbox', 'u', 'top-secret' );
+		$calls  = 0;
+		$this->respond_with( function () use ( &$calls ) {
+			++$calls;
+			return $this->reply( array( 'data' => array( 'token' => 'token-one' ) ) );
+		} );
+		$error = $client->request( 'DELETE', '/domains/example.com' );
+		$this->assertWPError( $error );
+		$this->assertSame( 'bad_request', $error->get_error_code() );
+		$this->assertSame( 0, $calls, 'Nothing was sent, not even a login.' );
+	}
+
 	public function test_token_cache_is_per_mode(): void {
 		$this->assertNotSame( LiveClient::token_key( 'sandbox' ), LiveClient::token_key( 'live' ) );
 	}
