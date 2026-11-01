@@ -632,8 +632,8 @@ final class ServerPicker {
 		if ( self::payg_only( $plan ) ) {
 			$rates = self::usage_rates( $plan, false );
 
-			echo '<span class="beltoft-services-plan__price"><b data-card-cap>' . esc_html( Rates::money( $rates['cap'] ) ) . '</b> <span>' . esc_html__( 'max per month, excl. VAT', 'beltoft-services' ) . '</span></span>';
-			echo '<span class="beltoft-services-plan__hourly" data-card-hourly>' . esc_html( Rates::per_hour( $rates['hourly'] ) ) . '</span>';
+			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::money( $rates['cap'] ) ) . '</b> <span>' . esc_html__( 'max per month, excl. VAT', 'beltoft-services' ) . '</span></span>';
+			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( $rates['hourly'] ) ) . '</span>';
 		} else {
 			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( (float) $plan['price'] ) ) . '</b> <span>' . esc_html( self::per( (string) $plan['period'] ) ) . '</span></span>';
 		}

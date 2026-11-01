@@ -219,8 +219,8 @@
 
 		// Monthly not offered: the cards show the cap and the hourly rate, with or without backups.
 		each( plans, function ( card ) {
-			var cap = card.parentNode.querySelector( '[data-card-cap]' );
-			var hourly = card.parentNode.querySelector( '[data-card-hourly]' );
+			var cap = card.parentNode.querySelector( '.beltoft-services-plan__price b' );
+			var hourly = card.parentNode.querySelector( '.beltoft-services-plan__hourly' );
 			var suffix = withBackups && '1' === card.getAttribute( 'data-has-usage-backups' ) ? '-backups' : '';
 
 			if ( cap && hourly ) {
