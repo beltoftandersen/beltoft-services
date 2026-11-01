@@ -28,7 +28,10 @@
 .beltoft-services-picker__backups input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--navy, #0c1535); }
 .beltoft-services-picker__rate { color: var(--ink-soft, #5e7080); font-size: 14px; }
 /* Billing: its own box at the top, before the plans. Two tiles in the language of the plan tiles; the chosen one is navy. */
-.beltoft-services-picker .beltoft-services-picker__billing { min-width: 0; margin: 0; padding: 16px 20px 20px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #ffffff); }
+.beltoft-services-picker .beltoft-services-picker__form fieldset.beltoft-services-picker__billing { min-width: 0; margin: 0; padding: 16px 20px 20px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #ffffff); }
+/* The legend sits inside the box, not on its border. */
+.beltoft-services-picker .beltoft-services-picker__form fieldset.beltoft-services-picker__billing > legend.beltoft-services-picker__legend { float: left; width: 100%; margin: 0 0 12px; padding: 0; }
+.beltoft-services-picker__billing > legend + * { clear: both; }
 .beltoft-services-picker__bills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .beltoft-services-bill { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
 .beltoft-services-bill .beltoft-services-bill__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
