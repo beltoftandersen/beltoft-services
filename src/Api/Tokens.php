@@ -96,6 +96,42 @@ final class Tokens {
 	}
 
 	/**
+	 * The actions the dashboard alone may run (ActionMap::EXCLUDED with "never"), so a token never reaches them.
+	 *
+	 * @return string[]
+	 */
+	public static function dashboard_only_actions(): array {
+		$out = array();
+
+		foreach ( \BeltoftServices\Mcp\ActionMap::EXCLUDED as $action => $why ) {
+			if ( 0 === strpos( (string) $why, 'never' ) ) {
+				$out[] = $action;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Would the MCP tool of this action call it risky (needs Full access and a confirmation)? The REST routes have no
+	 * confirmation, so a token never runs such an action there.
+	 *
+	 * @param string $action Action name.
+	 * @param mixed  $args   The request's args.
+	 */
+	public static function risky_action( string $action, $args ): bool {
+		$tool = \BeltoftServices\Mcp\ActionMap::ACTIONS[ $action ] ?? null;
+
+		if ( null === $tool ) {
+			return false;
+		}
+
+		$args = is_array( $args ) ? $args : array();
+
+		return \BeltoftServices\Mcp\Tools::risky( $tool, $args + array( 'action' => $action ) );
+	}
+
+	/**
 	 * Can a token reach this route (after the host, as WP_REST_Request::get_route() gives it)?
 	 *
 	 * @param string $route Route.
@@ -389,7 +425,7 @@ final class Tokens {
 			return self::refuse( 'beltoft_services_token_scope', __( 'This token can only read. Make a token with actions to change something.', 'beltoft-services' ), 403 );
 		}
 
-		if ( preg_match( '#/actions/([a-z0-9_-]+)$#D', $route, $m ) && ( 1 === preg_match( self::BLOCKED_ACTION, $m[1] ) || in_array( $m[1], self::full_only_actions(), true ) || in_array( $m[1], (array) apply_filters( 'beltoft_services_token_blocked_actions', array() ), true ) ) ) {
+		if ( preg_match( '#/actions/([a-z0-9_-]+)$#D', $route, $m ) && ( 1 === preg_match( self::BLOCKED_ACTION, $m[1] ) || in_array( $m[1], self::full_only_actions(), true ) || in_array( $m[1], self::dashboard_only_actions(), true ) || self::risky_action( $m[1], $request->get_param( 'args' ) ) || in_array( $m[1], (array) apply_filters( 'beltoft_services_token_blocked_actions', array() ), true ) ) ) {
 			return self::refuse( 'beltoft_services_token_action', __( 'This action is only available in your dashboard.', 'beltoft-services' ), 403 );
 		}
 

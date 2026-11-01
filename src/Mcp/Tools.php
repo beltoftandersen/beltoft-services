@@ -104,7 +104,7 @@ final class Tools {
 	 * @param string               $name Tool.
 	 * @param array<string, mixed> $args Arguments (not yet validated).
 	 */
-	private static function risky( string $name, array $args ): bool {
+	public static function risky( string $name, array $args ): bool {
 		if ( 'set_database_access' === $name ) {
 			return 'world_on' === ( $args['op'] ?? null );
 		}
