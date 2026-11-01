@@ -71,6 +71,11 @@ final class PurchaseTest extends UsageTestCase {
 	}
 
 	public function tear_down(): void {
+		// A checkout run in a process of its own leaves its rows behind for the next test: take the orders (and their items) away.
+		foreach ( wc_get_orders( array( 'type' => 'shop_order', 'limit' => -1, 'status' => array_keys( wc_get_order_statuses() ) ) ) as $order ) {
+			$order->delete( true );
+		}
+
 		$this->mcp_tear_down();
 		remove_all_filters( 'beltoft_services_picker_can_buy' );
 		remove_all_filters( 'beltoft_services_mcp_order_limit' );
