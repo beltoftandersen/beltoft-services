@@ -356,6 +356,42 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 'ready', Resource::find( $resource->id() )->get( 'app_state' ) );
 	}
 
+	private function app_resource_ready(): Resource {
+		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		$resource = $this->resource( array( 'template' => 9001, 'disk_gb' => 40 ), array( 'app_id' => 'docker', 'app_version' => '29' ) );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$resource->set( array( 'state' => 'ready' ) );
+		return Resource::find( $resource->id() );
+	}
+
+	public function test_app_install_and_status_jobs_wait_while_everything_is_paused(): void {
+		$resource = $this->app_resource_ready();
+		$this->settings( array( 'pause_all' => 1 ) );
+		AppInstall::run( $resource->id() );
+		$this->assertSame( 'pending', Resource::find( $resource->id() )->get( 'app_state' ) );
+		$this->assertNull( $this->fake->guest_file( 5000, Apps::JOB ) );
+		Resource::find( $resource->id() )->set( array( 'app_state' => 'installing', 'app_request' => 'r1' ) );
+		AppStatus::run( $resource->id() );
+		$this->assertSame( 'installing', Resource::find( $resource->id() )->get( 'app_state' ) );
+	}
+
+	public function test_app_install_leaves_a_paused_held_or_deleted_server_alone_without_an_alert(): void {
+		$resource = $this->app_resource_ready();
+		foreach ( array( array( 'desired' => 'paused' ), array( 'desired' => 'deleted' ), array( 'desired' => 'ready', 'breach_at' => time() ) ) as $over ) {
+			Resource::find( $resource->id() )->set( $over );
+			AppInstall::run( $resource->id() );
+			$fresh = Resource::find( $resource->id() );
+			$this->assertSame( 'pending', $fresh->get( 'app_state' ), wp_json_encode( $over ) );
+			$this->assertNull( $this->fake->guest_file( 5000, Apps::JOB ) );
+		}
+	}
+
 	public function test_a_failed_guest_status_without_a_request_id_fails_the_app_at_once_when_it_is_newer_than_our_write(): void {
 		$this->template( array( 'vmid' => 9001, 'name' => 'ubuntu-template' ) );
 		$this->cluster( array(

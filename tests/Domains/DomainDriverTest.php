@@ -302,6 +302,45 @@ class DomainDriverTest extends TestCase {
 		$this->assertCount( 1, $mails, 'One admin alert.' );
 	}
 
+	public function test_resume_provisions_a_domain_paused_before_it_was_built(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'id' => 123, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource();
+		$this->assertTrue( ( new DomainDriver() )->pause( $r )->is_done() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+		$resumed = ( new DomainDriver() )->resume( Resource::find( $r->id() ) );
+		$this->assertTrue( $resumed->is_done(), $resumed->error() );
+		$this->assertSame( 1, $this->posts( $fake ), 'The domain is registered by the resume.' );
+		$this->assertSame( '123', $resumed->meta()['remote_id'] );
+	}
+
+	public function test_resume_continues_a_transfer_paused_mid_wait_and_leaves_a_finished_domain_alone(): void {
+		$name = 'resumewait-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
+		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains/777', array( 'id' => 777, 'status' => 'REQ' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$dns = new FakeDns();
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r = $this->resource( 'transfer', $name );
+		$r->set( array( 'steps' => array( 'contact', 'zone_prepared', 'order' ), 'contact_handle' => 'AA123-GB', 'remote_id' => '777' ) );
+		$result = ( new DomainDriver() )->resume( Resource::find( $r->id() ) );
+		$this->assertFalse( $result->is_done(), 'A transfer still waiting is not ready.' );
+		$this->assertSame( 0, $this->posts( $fake ) );
+
+		$done = $this->resource( 'register', 'finished-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com' );
+		$done->set( array( 'steps' => array( 'contact', 'order', 'active', 'zone', 'dates', 'lock' ) ) );
+		$calls = count( $fake->calls() );
+		$this->assertTrue( ( new DomainDriver() )->resume( Resource::find( $done->id() ) )->is_done() );
+		$this->assertCount( $calls, $fake->calls(), 'A built domain makes no registrar call.' );
+	}
+
 	public function test_a_crash_after_the_transfer_post_resumes_without_a_second_post(): void {
 		$name = 'postcrash-' . strtolower( wp_generate_password( 6, false, false ) ) . '.com';
 		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );

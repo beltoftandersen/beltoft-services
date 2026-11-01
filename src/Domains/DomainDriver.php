@@ -326,7 +326,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	}
 
 	public function pause( Resource $r ): StepResult { return StepResult::done(); }
-	public function resume( Resource $r ): StepResult { return StepResult::done(); }
+	public function resume( Resource $r ): StepResult {
+		// A domain paused before or during provisioning is not built yet: resuming continues the build instead of marking it ready.
+		$steps = (array) $r->get( 'steps' );
+		$built = in_array( 'dates', $steps, true ) && ( 'register' !== (string) $r->get( 'mode' ) || in_array( 'lock', $steps, true ) );
+		return $built ? StepResult::done() : $this->provision( $r );
+	}
 	public function update_plan( Resource $r ): StepResult { return StepResult::done(); }
 	public function delete( Resource $r ): StepResult {
 		$owner = Zone::owner( $r );
