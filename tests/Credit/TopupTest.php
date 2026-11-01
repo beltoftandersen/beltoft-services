@@ -8,7 +8,6 @@
 namespace BeltoftServices\Tests\Credit;
 
 use BeltoftServices\Credit\Balance;
-use BeltoftServices\Credit\Config;
 use BeltoftServices\Credit\Page;
 use BeltoftServices\Credit\Topup;
 
@@ -33,7 +32,7 @@ class TopupTest extends CreditTestCase {
 		$this->assertSame( $id, (int) get_option( Topup::OPTION_PRODUCT ) );
 		$this->assertSame( 'hidden', $p->get_catalog_visibility() );
 		$this->assertTrue( $p->is_virtual() );
-		$this->assertSame( 'taxable', $p->get_tax_status() );
+		$this->assertSame( 'none', $p->get_tax_status() );
 		$this->assertTrue( $p->is_sold_individually() );
 		$this->assertTrue( Topup::is_product( $id ) );
 		$this->assertFalse( Topup::is_product( $id + 1 ) );
@@ -100,7 +99,7 @@ class TopupTest extends CreditTestCase {
 		$this->assertCount( 1, $items );
 		$this->assertSame( 1, $items[0]['quantity'] );
 		$this->assertEqualsWithDelta( 25.0, (float) WC()->cart->get_cart_contents_total(), 0.001 );
-		$this->assertSame( 'Account credit, 25.00 EUR', wp_strip_all_tags( apply_filters( 'woocommerce_cart_item_name', 'x', $items[0], '' ) ) );
+		$this->assertSame( 'Account credit', wp_strip_all_tags( apply_filters( 'woocommerce_cart_item_name', 'x', $items[0], '' ) ) );
 
 		// A second top-up replaces the first.
 		$this->assertTrue( Topup::add_to_cart( 5000 ) );
@@ -144,17 +143,17 @@ class TopupTest extends CreditTestCase {
 		$this->assertFalse( apply_filters( 'woocommerce_coupon_is_valid_for_product', true, wc_get_product( Topup::product_id() ), new \WC_Coupon(), array() ) );
 	}
 
-	public function test_a_paid_order_credits_the_full_amount_paid_once(): void {
+	public function test_a_paid_order_credits_the_full_amount_paid_once_and_has_no_vat(): void {
 		$this->vat( true );
 		$u     = $this->new_user();
 		$order = $this->topup_order( $u, 2500 );
 
-		$this->assertEqualsWithDelta( 25.0, (float) $order->get_total(), 0.001, 'The customer pays the chosen amount, VAT inside.' );
-		$this->assertEqualsWithDelta( 5.0, (float) $order->get_total_tax(), 0.001 );
+		$this->assertEqualsWithDelta( 25.0, (float) $order->get_total(), 0.001, 'The customer pays the chosen amount.' );
+		$this->assertEqualsWithDelta( 0.0, (float) $order->get_total_tax(), 0.001, 'No VAT on a top-up.' );
 		$this->assertSame( 0, Balance::get( $u ), 'Nothing before payment.' );
 
 		$order->payment_complete();
-		$this->assertSame( 2500, Balance::get( $u ), 'The whole amount, VAT included.' );
+		$this->assertSame( 2500, Balance::get( $u ), 'The whole amount.' );
 
 		// Webhook retries and status flips do not credit again.
 		$order->payment_complete();
@@ -169,12 +168,31 @@ class TopupTest extends CreditTestCase {
 		$this->assertSame( $order->get_id() . '-' . $this->line_id( $order ), $rows[0]['ref_id'] );
 	}
 
-	public function test_an_odd_rate_still_credits_exactly_what_was_paid(): void {
+	public function test_the_cart_has_no_vat_whatever_the_tax_settings(): void {
 		$this->vat( true );
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
-		$wpdb->query( "UPDATE {$wpdb->prefix}woocommerce_tax_rates SET tax_rate = '21.0000'" );
-		\WC_Cache_Helper::invalidate_cache_group( 'taxes' );
+		wp_set_current_user( $this->new_user() );
+		WC()->customer->set_billing_country( 'DK' );
+
+		foreach ( array( 'no', 'yes' ) as $incl ) {
+			update_option( 'woocommerce_prices_include_tax', $incl );
+			WC()->cart->empty_cart();
+			$this->assertTrue( Topup::add_to_cart( 5000 ) );
+			WC()->cart->calculate_totals();
+			$this->assertEqualsWithDelta( 50.0, (float) WC()->cart->get_total( 'edit' ), 0.005, "Prices incl. tax: {$incl}" );
+			$this->assertEqualsWithDelta( 0.0, (float) WC()->cart->get_total_tax(), 0.005 );
+		}
+
+		update_option( 'woocommerce_prices_include_tax', 'no' );
+		WC()->customer->set_is_vat_exempt( true );
+		WC()->cart->empty_cart();
+		Topup::add_to_cart( 5000 );
+		WC()->cart->calculate_totals();
+		$this->assertEqualsWithDelta( 50.0, (float) WC()->cart->get_total( 'edit' ), 0.005, 'Reverse charge pays the same.' );
+		WC()->customer->set_is_vat_exempt( false );
+	}
+
+	public function test_an_odd_amount_credits_exactly_what_was_paid(): void {
+		$this->vat( true );
 		$u = $this->new_user();
 		wp_set_current_user( $u );
 
@@ -186,55 +204,37 @@ class TopupTest extends CreditTestCase {
 		}
 	}
 
-	public function test_the_cart_price_has_the_vat_inside_whatever_the_store_setting(): void {
-		$this->vat( true );
-		wp_set_current_user( $this->new_user() );
-		WC()->customer->set_billing_country( 'DK' );
+	public function test_the_product_has_tax_status_none_also_when_it_was_taxable_before(): void {
+		$id = Topup::product_id();
+		$this->assertSame( 'none', wc_get_product( $id )->get_tax_status() );
 
-		Topup::add_to_cart( 5000 );
-		WC()->cart->calculate_totals();
-		$this->assertEqualsWithDelta( 50.0, (float) WC()->cart->get_total( 'edit' ), 0.005 );
-		$this->assertEqualsWithDelta( 10.0, (float) WC()->cart->get_total_tax(), 0.005 );
-
-		update_option( 'woocommerce_prices_include_tax', 'yes' );
-		WC()->cart->empty_cart();
-		Topup::add_to_cart( 5000 );
-		WC()->cart->calculate_totals();
-		$this->assertEqualsWithDelta( 50.0, (float) WC()->cart->get_total( 'edit' ), 0.005 );
-		update_option( 'woocommerce_prices_include_tax', 'no' );
+		$product = wc_get_product( $id );
+		$product->set_tax_status( 'taxable' );
+		$product->save();
+		Topup::product_id();
+		$this->assertSame( 'none', wc_get_product( $id )->get_tax_status() );
 	}
 
-	public function test_an_exempt_customer_pays_the_amount_without_vat(): void {
-		$this->vat( true );
-		wp_set_current_user( $this->new_user() );
-		WC()->customer->set_is_vat_exempt( true );
-
-		Topup::add_to_cart( 5000 );
-		WC()->cart->calculate_totals();
-		$this->assertEqualsWithDelta( 50.0, (float) WC()->cart->get_total( 'edit' ), 0.005 );
-		$this->assertEqualsWithDelta( 0.0, (float) WC()->cart->get_total_tax(), 0.005 );
-		WC()->customer->set_is_vat_exempt( false );
-	}
-
-	public function test_a_reverse_charged_order_is_remembered_for_the_debit(): void {
+	public function test_the_receipt_says_prepayment_and_no_vat(): void {
 		$u     = $this->new_user();
 		$order = $this->topup_order( $u, 5000 );
-		$order->update_meta_data( 'is_vat_exempt', 'yes' );
-		$order->save();
-		$order->update_status( 'processing' );
+		$item  = Topup::items( $order )[ $this->line_id( $order ) ];
+		$text  = 'Prepayment for Pay as you go usage. No VAT is charged on a top-up; VAT is charged on your usage invoices.';
 
-		$this->assertSame( 5000, Balance::get( $u ) );
-		$this->assertSame( 'yes', get_user_meta( $u, Config::META_EXEMPT, true ) );
-		$this->assertSame( 0.0, Config::vat_rate( $u ) );
-	}
+		$this->assertSame( $text, Topup::receipt_text() );
+		$this->assertSame( 'Account credit', $item->get_name() );
 
-	public function test_reverse_charge_without_vat_credits_the_same(): void {
-		$u     = $this->new_user();
-		$order = $this->topup_order( $u, 5000 );
+		// The checkout line carries it too, and the order line gets it as visible meta from the cart item.
+		wp_set_current_user( $u );
+		Topup::add_to_cart( 5000 );
+		WC()->cart->calculate_totals();
+		$cart_item = array_values( WC()->cart->get_cart() )[0];
+		$data      = Topup::cart_note( array(), $cart_item );
+		$this->assertSame( $text, $data[0]['value'] );
 
-		$this->assertEqualsWithDelta( 50.0, (float) $order->get_total(), 0.001 );
-		$order->update_status( 'processing' );
-		$this->assertSame( 5000, Balance::get( $u ) );
+		$line = new \WC_Order_Item_Product();
+		Topup::order_line( $line, 'k', $cart_item );
+		$this->assertSame( $text, $line->get_meta( 'Note' ) );
 	}
 
 	public function test_an_unpaid_order_credits_nothing(): void {
@@ -257,19 +257,12 @@ class TopupTest extends CreditTestCase {
 	}
 
 	public function test_the_amount_can_be_changed_by_a_filter(): void {
-		$this->vat( true );
-		add_filter(
-			'beltoft_services_credit_amount_from_order',
-			static function ( int $cents, $item ) {
-				return Balance::cents( (float) $item->get_total() );
-			},
-			10,
-			2
-		);
+		add_filter( 'beltoft_services_credit_amount_from_order', $f = static fn( int $cents ) => $cents + 500 );
 		$u = $this->new_user();
 		$this->topup_order( $u, 2500, 'processing' );
+		remove_filter( 'beltoft_services_credit_amount_from_order', $f );
 
-		$this->assertSame( 2000, Balance::get( $u ), 'The net choice.' );
+		$this->assertSame( 3000, Balance::get( $u ) );
 	}
 
 	public function test_a_guest_order_cannot_be_credited(): void {
@@ -279,18 +272,16 @@ class TopupTest extends CreditTestCase {
 		$this->assertNotEmpty( array_filter( $notes, static fn( $n ) => str_contains( $n, 'no customer account' ) ) );
 	}
 
-	public function test_a_line_item_refund_takes_the_gross_amount_back(): void {
-		$this->vat( true );
+	public function test_a_line_item_refund_takes_the_refunded_amount_back(): void {
 		$u     = $this->new_user();
-		$order = $this->topup_order( $u, 5000, 'processing' ); // 40 net, 10 VAT.
+		$order = $this->topup_order( $u, 5000, 'processing' );
 		$item  = $this->line_id( $order );
-		$tax   = (int) array_key_first( $order->get_taxes() );
 
 		$refund = wc_create_refund(
 			array(
 				'order_id'   => $order->get_id(),
 				'amount'     => '10.00',
-				'line_items' => array( $item => array( 'qty' => 0, 'refund_total' => 8, 'refund_tax' => array( $tax => 2 ) ) ),
+				'line_items' => array( $item => array( 'qty' => 0, 'refund_total' => 10 ) ),
 			)
 		);
 		$this->assertNotWPError( $refund );
@@ -306,9 +297,8 @@ class TopupTest extends CreditTestCase {
 	}
 
 	public function test_an_amount_refund_takes_the_same_share(): void {
-		$this->vat( true );
 		$u     = $this->new_user();
-		$order = $this->topup_order( $u, 5000, 'processing' ); // 50.00 gross.
+		$order = $this->topup_order( $u, 5000, 'processing' );
 
 		$refund = wc_create_refund( array( 'order_id' => $order->get_id(), 'amount' => '25.00' ) );
 		$this->assertNotWPError( $refund );
@@ -337,7 +327,7 @@ class TopupTest extends CreditTestCase {
 	public function test_a_refund_after_the_credit_was_spent_makes_the_balance_negative_and_says_so(): void {
 		$u     = $this->new_user();
 		$order = $this->topup_order( $u, 2500, 'processing' );
-		Balance::debit( $u, 2000, Balance::USAGE, 'usage_day', 'x' );
+		Balance::debit( $u, 2000, Balance::INVOICE, 'order', 'x' );
 
 		wc_create_refund( array( 'order_id' => $order->get_id(), 'amount' => '25.00' ) );
 
@@ -439,14 +429,6 @@ class TopupTest extends CreditTestCase {
 		$this->assertSame( Page::url(), $redirected );
 	}
 
-	public function test_the_line_reads_account_credit_with_the_amount(): void {
-		$u     = $this->new_user();
-		$order = $this->topup_order( $u, 5000 );
-		$item  = Topup::items( $order )[ $this->line_id( $order ) ];
-
-		$this->assertSame( 'Account credit, 50.00 EUR', $item->get_name() );
-	}
-
 	public function test_the_page_shows_balance_history_form_and_nothing_when_off(): void {
 		$u = $this->new_user();
 		wp_set_current_user( $u );
@@ -455,7 +437,7 @@ class TopupTest extends CreditTestCase {
 		$html = Page::html();
 		$this->assertStringContainsString( 'beltoft-services-credit', $html );
 		$this->assertStringContainsString( '25.00', $html );
-		$this->assertStringContainsString( 'Top-up, order #', $html );
+		$this->assertStringContainsString( 'Top-up', $html );
 		foreach ( array( 10, 25, 50, 100, 250 ) as $amount ) {
 			$this->assertStringContainsString( 'name="beltoft_credit_amount" value="' . $amount . '"', $html );
 		}

@@ -54,8 +54,7 @@ abstract class CreditTestCase extends UsageTestCase {
 	}
 
 	/**
-	 * A top-up order whose customer pays $cents including VAT (the line is the net price that plus 25 percent VAT is
-	 * $cents when VAT is on), taxes calculated, in the given status.
+	 * A top-up order whose customer pays $cents (no VAT, whatever the tax settings), taxes calculated, in the given status.
 	 *
 	 * @param int    $user   Customer.
 	 * @param int    $cents  Amount the customer pays, in cents.
@@ -70,11 +69,10 @@ abstract class CreditTestCase extends UsageTestCase {
 		$item = new \WC_Order_Item_Product();
 		$item->set_product( wc_get_product( Topup::product_id() ) );
 		$item->set_quantity( 1 );
-		$item->set_name( Topup::line_name( $cents, 'EUR' ) );
+		$item->set_name( Topup::line_name() );
 		$amount = number_format( $cents / 100, 2, '.', '' );
-		$net    = 'yes' === get_option( 'woocommerce_calc_taxes' ) ? number_format( $cents / 100 / 1.25, 6, '.', '' ) : $amount;
-		$item->set_subtotal( $net );
-		$item->set_total( $net );
+		$item->set_subtotal( $amount );
+		$item->set_total( $amount );
 		$item->add_meta_data( Topup::META_AMOUNT, $amount, true );
 		$order->add_item( $item );
 		$order->calculate_totals( true );

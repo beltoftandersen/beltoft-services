@@ -55,14 +55,14 @@ class BalanceTest extends TestCase {
 
 		$this->assertSame( 0, Balance::get( $u ) );
 		$this->assertTrue( Balance::credit( $u, 2500, Balance::TOPUP, 'order_item', '1-1', 'Top-up' ) );
-		$this->assertTrue( Balance::debit( $u, 123, Balance::USAGE, 'usage_day', $u . ':20261101' ) );
+		$this->assertTrue( Balance::debit( $u, 123, Balance::INVOICE, 'order', $u . ':20261101' ) );
 
 		$this->assertSame( 2377, Balance::get( $u ) );
 		$this->assertSame( '2377', get_user_meta( $u, Balance::META, true ) );
 
 		$rows = Balance::history( $u );
 		$this->assertCount( 2, $rows );
-		$this->assertSame( 'usage', $rows[0]['kind'] );
+		$this->assertSame( 'invoice', $rows[0]['kind'] );
 		$this->assertSame( '-123', $rows[0]['amount_cents'] );
 		$this->assertSame( '2377', $rows[0]['balance_after_cents'] );
 		$this->assertSame( '2500', $rows[1]['balance_after_cents'] );
@@ -87,7 +87,7 @@ class BalanceTest extends TestCase {
 
 		$this->assertFalse( Balance::credit( $u, 0, Balance::TOPUP, 'x', '1' ) );
 		$this->assertFalse( Balance::credit( $u, -5, Balance::TOPUP, 'x', '2' ) );
-		$this->assertFalse( Balance::debit( $u, 0, Balance::USAGE, 'x', '3' ) );
+		$this->assertFalse( Balance::debit( $u, 0, Balance::INVOICE, 'x', '3' ) );
 		$this->assertFalse( Balance::credit( 0, 100, Balance::TOPUP, 'x', '4' ) );
 		$this->assertFalse( Balance::credit( $u, 100, Balance::TOPUP, 'x', '' ) );
 		$this->assertSame( array(), Balance::history( $u ) );
@@ -192,7 +192,7 @@ class BalanceTest extends TestCase {
 
 		for ( $i = 1; $i <= 25; $i++ ) {
 			Balance::credit( $u, 100, Balance::TOPUP, 'x', (string) $i );
-			Balance::debit( $u, 30, Balance::USAGE, 'x', (string) $i );
+			Balance::debit( $u, 30, Balance::INVOICE, 'x', (string) $i );
 		}
 
 		$this->assertSame( 25 * 70, Balance::get( $u ) );
@@ -210,7 +210,7 @@ class BalanceTest extends TestCase {
 		list( $locked, $result ) = Balance::locked(
 			$u,
 			static function () use ( $u ) {
-				return Balance::credit( $u, 100, Balance::TOPUP, 'x', '1' ) && Balance::debit( $u, 40, Balance::USAGE, 'x', '1' );
+				return Balance::credit( $u, 100, Balance::TOPUP, 'x', '1' ) && Balance::debit( $u, 40, Balance::INVOICE, 'x', '1' );
 			}
 		);
 

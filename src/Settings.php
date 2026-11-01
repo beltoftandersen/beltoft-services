@@ -170,7 +170,7 @@ final class Settings {
 				'type'    => 'checkbox',
 				'default' => 0,
 				'label'   => __( 'Prepaid credit for pay as you go', 'beltoft-services' ),
-				'desc'    => __( 'Customers top up a balance and pay as you go usage is taken from it every day. Off, nothing about credit shows and pay as you go is invoiced monthly as before. Turning it on does not change customers who already have a usage account subscription.', 'beltoft-services' ),
+				'desc'    => __( 'Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows.', 'beltoft-services' ),
 			),
 			'credit_min' => array(
 				'tab'     => 'general',
@@ -179,7 +179,7 @@ final class Settings {
 				'default' => 10,
 				'min'     => 1,
 				'label'   => __( 'Smallest top-up', 'beltoft-services' ),
-				'desc'    => __( 'In the store currency, VAT included: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
 			),
 			'credit_max' => array(
 				'tab'     => 'general',
@@ -188,7 +188,7 @@ final class Settings {
 				'default' => 1000,
 				'min'     => 1,
 				'label'   => __( 'Largest top-up', 'beltoft-services' ),
-				'desc'    => __( 'In the store currency, VAT included.', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency.', 'beltoft-services' ),
 			),
 		);
 

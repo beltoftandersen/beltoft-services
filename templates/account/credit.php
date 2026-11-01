@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array{vat_label: string, balance: int, history: array<int, array<string, mixed>>, amounts: int[], min: int, max: int, currency: string, burn: int, days: int|null} $credit The page data (see BeltoftServices\Credit\Page::data()).
+ * @var array{balance: int, history: array<int, array<string, mixed>>, amounts: int[], min: int, max: int, currency: string} $credit The page data (see BeltoftServices\Credit\Page::data()).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -22,31 +22,8 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 	</div>
 
 	<div class="beltoft-services-credit__balance">
-		<span class="beltoft-services-ov__label"><?php echo esc_html( sprintf( /* translators: %s: incl. VAT or excl. VAT. */ __( 'Balance, %s', 'beltoft-services' ), $credit['vat_label'] ) ); ?></span>
+		<span class="beltoft-services-ov__label"><?php esc_html_e( 'Balance', 'beltoft-services' ); ?></span>
 		<span class="beltoft-services-ov__big"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
-		<?php if ( $credit['burn'] > 0 ) : ?>
-			<span class="beltoft-services-credit__sub">
-				<?php
-				echo esc_html(
-					sprintf(
-						/* translators: %s: amount per day. */
-						__( 'Using about %s a day.', 'beltoft-services' ),
-						Page::money( $credit['burn'], $credit['currency'] ) . ' ' . $credit['vat_label']
-					)
-				);
-				if ( null !== $credit['days'] ) {
-					echo ' ';
-					echo esc_html(
-						sprintf(
-							/* translators: %d: days. */
-							_n( 'About %d day left.', 'About %d days left.', (int) $credit['days'], 'beltoft-services' ),
-							(int) $credit['days']
-						)
-					);
-				}
-				?>
-			</span>
-		<?php endif; ?>
 	</div>
 
 	<form class="beltoft-services-credit__form" method="post" action="<?php echo esc_url( Page::url() ); ?>">
@@ -73,13 +50,14 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 				echo esc_html(
 					sprintf(
 						/* translators: 1: smallest amount, 2: largest amount, with currency. */
-						__( 'From %1$s to %2$s. You pay this amount, VAT included, and all of it is added to your balance.', 'beltoft-services' ),
+						__( 'From %1$s to %2$s. You pay this amount and all of it is added to your balance.', 'beltoft-services' ),
 						Topup::label_amount( $credit['min'] * 100, $credit['currency'] ),
 						Topup::label_amount( $credit['max'] * 100, $credit['currency'] )
 					)
 				);
 				?>
 			</p>
+			<p class="beltoft-services-credit__note"><?php echo esc_html( Topup::receipt_text() ); ?></p>
 		</fieldset>
 		<?php wp_nonce_field( Topup::NONCE ); ?>
 		<input type="hidden" name="<?php echo esc_attr( Topup::ACTION ); ?>" value="1">
@@ -88,7 +66,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 
 	<h3><?php esc_html_e( 'History', 'beltoft-services' ); ?></h3>
 	<?php if ( ! $credit['history'] ) : ?>
-		<p class="beltoft-services-credit__empty"><?php esc_html_e( 'Nothing yet. Top-ups and usage show here.', 'beltoft-services' ); ?></p>
+		<p class="beltoft-services-credit__empty"><?php esc_html_e( 'Nothing yet. Top-ups and credit used on invoices show here.', 'beltoft-services' ); ?></p>
 	<?php else : ?>
 		<table class="beltoft-services-credit__history">
 			<thead>

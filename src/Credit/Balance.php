@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * a reference that says why. The unique key (kind, ref_type, ref_id) makes each write idempotent: the same
  * reference never counts twice, so a payment webhook that arrives again or a job that runs twice is harmless.
  * Writes hold the customer's named lock (Locks::balance()), read the balance from the ledger and keep the
- * cached user meta beltoft_services_credit_cents in step. Amounts are in the store currency, excl. VAT. Cents
+ * cached user meta beltoft_services_credit_cents in step. Amounts are in the store currency, as paid: a top-up carries no VAT. Cents
  * only: no float is ever stored.
  */
 final class Balance {
@@ -25,7 +25,7 @@ final class Balance {
 	public const META = 'beltoft_services_credit_cents';
 
 	public const TOPUP      = 'topup';
-	public const USAGE      = 'usage';
+	public const INVOICE    = 'invoice';
 	public const REFUND     = 'refund';
 	public const CHARGEBACK = 'chargeback';
 	public const ADJUST     = 'adjust';
@@ -92,7 +92,7 @@ final class Balance {
 	 *
 	 * @param int    $user_id  Customer.
 	 * @param int    $cents    Cents, more than 0.
-	 * @param string $kind     usage, refund, chargeback or adjust.
+	 * @param string $kind     invoice, refund, chargeback or adjust.
 	 * @param string $ref_type What the reference points at.
 	 * @param string $ref_id   Which one.
 	 * @param string $note     Short note.

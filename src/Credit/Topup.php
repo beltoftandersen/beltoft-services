@@ -12,18 +12,14 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A top-up is an ordinary taxable sale of the hidden virtual product "Account credit": VAT is charged on the order
- * like on any product (EU VAT, OSS, DK 25 percent, and B2B reverse charge through beltoft-eu-vat all apply by
- * themselves). The amount the customer chooses is INCLUDING VAT: the customer pays exactly that amount (the VAT is
- * inside it, at the customer's rate; a reverse-charge customer pays it without VAT) and the balance is credited with
- * the same gross line amount. Usage is then debited gross too. The choice is filterable
- * (beltoft_services_credit_amount_from_order); the accountant still has to confirm the single-purpose model.
- * The line price is set from the chosen amount: when the store lists prices excl. tax the net price is worked out
- * from the customer's rate so that net plus VAT is the chosen amount.
+ * A top-up is a prepayment: the hidden virtual product "Account credit" has tax status none, so no VAT is charged on
+ * it (also not for a reverse-charge customer); VAT is charged when usage is invoiced (Credit\Invoice). The customer
+ * pays exactly the chosen amount and all of it is credited. The credit amount is filterable
+ * (beltoft_services_credit_amount_from_order); its default is the line total.
  *
  * One line per top-up, quantity 1, price set from the validated amount in the cart item (never from the request at
  * checkout). Credited when the order is processing or completed, once per order item (ledger reference
- * order_item "<order>-<item>"). A refund debits the refunded net share back; a top-up order that leaves
+ * order_item "<order>-<item>"). A refund debits the refunded amount back; a top-up order that leaves
  * processing/completed for on-hold, failed, cancelled or refunded is a chargeback and debits the credit that is
  * left; going back to processing/completed gives it back once. The balance may go below 0, which is recorded and
  * noted on the order.
@@ -38,6 +34,13 @@ final class Topup {
 	public const META_PRODUCT = '_beltoft_services_credit_product';
 	public const CART_KEY     = 'beltoft_services_credit_cents';
 	public const META_AMOUNT  = '_beltoft_services_credit_amount';
+
+	/**
+	 * The receipt wording of a top-up.
+	 */
+	public static function receipt_text(): string {
+		return __( 'Prepayment for Pay as you go usage. No VAT is charged on a top-up; VAT is charged on your usage invoices.', 'beltoft-services' );
+	}
 
 	public const NONCE  = 'beltoft_services_credit';
 	public const ACTION = 'beltoft_services_credit_topup';
@@ -58,6 +61,7 @@ final class Topup {
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate_add' ), 10, 2 );
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'price_lines' ), 5 );
 		add_filter( 'woocommerce_cart_item_name', array( __CLASS__, 'cart_name' ), 20, 2 );
+		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'cart_note' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_line' ), 10, 3 );
 		add_filter( 'woocommerce_coupon_is_valid_for_product', array( __CLASS__, 'no_coupons' ), 10, 2 );
 		add_filter( 'woocommerce_is_purchasable', array( __CLASS__, 'purchasable' ), 10, 2 );
@@ -115,7 +119,15 @@ final class Topup {
 	public static function product_id(): int {
 		$id = (int) get_option( self::OPTION_PRODUCT );
 
-		if ( $id > 0 && wc_get_product( $id ) instanceof \WC_Product ) {
+		$existing = $id > 0 ? wc_get_product( $id ) : false;
+
+		if ( $existing instanceof \WC_Product ) {
+			// An older top-up product was taxable: a top-up carries no VAT.
+			if ( 'none' !== $existing->get_tax_status() ) {
+				$existing->set_tax_status( 'none' );
+				$existing->save();
+			}
+
 			return $id;
 		}
 
@@ -125,7 +137,7 @@ final class Topup {
 		$product->set_catalog_visibility( 'hidden' );
 		$product->set_virtual( true );
 		$product->set_sold_individually( true );
-		$product->set_tax_status( 'taxable' );
+		$product->set_tax_status( 'none' );
 		$product->set_regular_price( '0' );
 		$product->update_meta_data( self::META_PRODUCT, 'yes' );
 		$product->save();
@@ -175,13 +187,9 @@ final class Topup {
 
 	/**
 	 * The name of a top-up line.
-	 *
-	 * @param int    $cents    Cents.
-	 * @param string $currency Currency code.
 	 */
-	public static function line_name( int $cents, string $currency = '' ): string {
-		/* translators: %s: amount with currency code, such as "50.00 EUR". */
-		return sprintf( __( 'Account credit, %s', 'beltoft-services' ), self::label_amount( $cents, $currency ) );
+	public static function line_name(): string {
+		return __( 'Account credit', 'beltoft-services' );
 	}
 
 	/**
@@ -333,28 +341,10 @@ final class Topup {
 				continue;
 			}
 
-			$item['data']->set_price( self::line_price( $cents ) );
+			$item['data']->set_tax_status( 'none' );
+			$item['data']->set_price( number_format( $cents / 100, 2, '.', '' ) );
 			$cart->cart_contents[ $key ]['quantity'] = 1;
 		}
-	}
-
-	/**
-	 * The price to put on the cart line so that the customer pays exactly the chosen amount including VAT: the amount
-	 * itself when the store lists prices incl. tax, else the net price that plus the customer's VAT is the amount (no
-	 * VAT for an exempt customer, such as a reverse-charge business).
-	 *
-	 * @param int $cents Chosen amount in cents, incl. VAT.
-	 */
-	public static function line_price( int $cents ): string {
-		$gross = $cents / 100;
-
-		if ( ! wc_tax_enabled() || wc_prices_include_tax() || ! WC()->customer || WC()->customer->get_is_vat_exempt() ) {
-			return number_format( $gross, 2, '.', '' );
-		}
-
-		$percent = array_sum( array_column( \WC_Tax::get_rates( '', WC()->customer ), 'rate' ) );
-
-		return number_format( $gross / ( 1 + (float) $percent / 100 ), 6, '.', '' );
 	}
 
 	/**
@@ -366,10 +356,28 @@ final class Topup {
 	 */
 	public static function cart_name( $name, $item ) {
 		if ( is_array( $item ) && self::is_product( (int) ( $item['product_id'] ?? 0 ) ) && (int) ( $item[ self::CART_KEY ] ?? 0 ) > 0 ) {
-			return esc_html( self::line_name( (int) $item[ self::CART_KEY ] ) );
+			return esc_html( self::line_name() );
 		}
 
 		return $name;
+	}
+
+	/**
+	 * The receipt note on the cart and checkout line.
+	 *
+	 * @param mixed $data Item data.
+	 * @param mixed $item Cart item.
+	 * @return mixed
+	 */
+	public static function cart_note( $data, $item ) {
+		if ( is_array( $data ) && is_array( $item ) && self::is_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
+			$data[] = array(
+				'key'   => __( 'Note', 'beltoft-services' ),
+				'value' => self::receipt_text(),
+			);
+		}
+
+		return $data;
 	}
 
 	/**
@@ -385,8 +393,9 @@ final class Topup {
 		}
 
 		$cents = (int) ( $values[ self::CART_KEY ] ?? 0 );
-		$item->set_name( self::line_name( $cents ) );
+		$item->set_name( self::line_name() );
 		$item->add_meta_data( self::META_AMOUNT, number_format( $cents / 100, 2, '.', '' ), true );
+		$item->add_meta_data( __( 'Note', 'beltoft-services' ), self::receipt_text(), true );
 	}
 
 	/**
@@ -429,18 +438,16 @@ final class Topup {
 	}
 
 	/**
-	 * The credit an order line adds: what was paid for it, line total plus the VAT in it (a reverse-charge line has none), through the filter.
+	 * The credit an order line adds: the line total, what the customer paid for it (no VAT), through the filter.
 	 *
 	 * @param \WC_Order_Item_Product $item  Item.
 	 * @param \WC_Order              $order Order.
 	 */
 	public static function credit_cents( \WC_Order_Item_Product $item, \WC_Order $order ): int {
-		$cents = Balance::cents( (float) $item->get_total() + (float) $item->get_total_tax() );
+		$cents = Balance::cents( (float) $item->get_total() );
 
 		/**
-		 * Filters the credit a top-up order line adds to the balance, in cents. The default is the gross line amount
-		 * (what the customer paid for the line, VAT included); usage is debited gross too. Return the net line total
-		 * (item total without tax) here to credit excl. VAT, and filter beltoft_services_credit_vat_rate to 0 so usage is debited net.
+		 * Filters the credit a top-up order line adds to the balance, in cents. The default is the line total.
 		 *
 		 * @param int                    $cents Cents.
 		 * @param \WC_Order_Item_Product $item  Order line.
@@ -475,15 +482,12 @@ final class Topup {
 			return;
 		}
 
-		// Whether this customer was reverse charged on the latest paid top-up: the daily debit has no cart to ask.
-		update_user_meta( $user_id, Config::META_EXEMPT, 'yes' === $order->get_meta( 'is_vat_exempt' ) ? 'yes' : 'no' );
-
 		foreach ( $items as $item_id => $item ) {
 			$ref   = self::ref( (int) $order->get_id(), $item_id );
 			$cents = self::credit_cents( $item, $order );
 
-			if ( $cents > 0 && Balance::credit( $user_id, $cents, Balance::TOPUP, 'order_item', $ref, sprintf( /* translators: %s: order number. */ __( 'Top-up, order #%s', 'beltoft-services' ), $order->get_order_number() ) ) ) {
-				$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Account credit of %s added to the balance (VAT included).', 'beltoft-services' ), self::label_amount( $cents, $order->get_currency() ) ) );
+			if ( $cents > 0 && Balance::credit( $user_id, $cents, Balance::TOPUP, 'order_item', $ref, __( 'Top-up', 'beltoft-services' ) ) ) {
+				$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Account credit of %s added to the balance.', 'beltoft-services' ), self::label_amount( $cents, $order->get_currency() ) ) );
 			} elseif ( $cents > 0 && ! Balance::exists( Balance::TOPUP, 'order_item', $ref ) ) {
 				$order->add_order_note( __( 'Account credit could not be added now (balance busy). It is added when the order status is saved again.', 'beltoft-services' ) );
 			}
@@ -542,7 +546,7 @@ final class Topup {
 	}
 
 	/**
-	 * A refund of a top-up order takes the refunded gross share back.
+	 * A refund of a top-up order takes the refunded amount back.
 	 *
 	 * @param mixed $order_id  Order id.
 	 * @param mixed $refund_id Refund id.
@@ -578,7 +582,7 @@ final class Topup {
 			if ( $refund_lines ) {
 				foreach ( $refund_lines as $line ) {
 					if ( (int) $line->get_meta( '_refunded_item_id' ) === $item_id ) {
-						$want += Balance::cents( abs( (float) $line->get_total() ) + abs( (float) $line->get_total_tax() ) );
+						$want += Balance::cents( abs( (float) $line->get_total() ) );
 					}
 				}
 			} elseif ( $order_total > 0 ) {

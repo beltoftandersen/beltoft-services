@@ -179,6 +179,7 @@ final class Plugin {
 		Usage\Emails::register();
 		Credit\Topup::register();
 		Credit\Page::register();
+		Credit\Invoice::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;

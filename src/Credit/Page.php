@@ -145,8 +145,7 @@ final class Page {
 	 * @return array<string, mixed>
 	 */
 	public static function data(): array {
-		$user_id  = get_current_user_id();
-		$estimate = Estimate::for_user( $user_id );
+		$user_id = get_current_user_id();
 
 		return array(
 			'balance'  => Balance::get( $user_id ),
@@ -155,9 +154,6 @@ final class Page {
 			'min'      => Topup::min(),
 			'max'      => Topup::max(),
 			'currency' => get_woocommerce_currency(),
-			'vat_label' => Config::vat_label( Config::vat_rate( $user_id ) ),
-			'burn'     => (int) ( $estimate['burn_cents'] ?? 0 ),
-			'days'     => $estimate['days_left'] ?? null,
 		);
 	}
 
@@ -205,7 +201,7 @@ final class Page {
 	public static function kind_label( string $kind ): string {
 		$labels = array(
 			Balance::TOPUP      => __( 'Top-up', 'beltoft-services' ),
-			Balance::USAGE      => __( 'Usage', 'beltoft-services' ),
+			Balance::INVOICE    => __( 'Used on invoice', 'beltoft-services' ),
 			Balance::REFUND     => __( 'Refund', 'beltoft-services' ),
 			Balance::CHARGEBACK => __( 'Chargeback', 'beltoft-services' ),
 			Balance::ADJUST     => __( 'Adjustment', 'beltoft-services' ),
