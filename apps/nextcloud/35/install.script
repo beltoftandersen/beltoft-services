@@ -150,6 +150,14 @@ YAML
   (cd "$app" && timeout 300 docker compose up -d --wait postgres redis)
   touch "$state/stage.3"
 fi
+# Swap before the first heavy start, so the smallest plans do not run out of memory while the app installs.
+if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 0600 /swapfile
+  mkswap /swapfile >/dev/null
+  printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+  swapon /swapfile
+fi
 if [ ! -e "$state/stage.4" ]; then
   # The first start installs Nextcloud (database, administrator, redis). Nothing is reachable from outside until it has finished.
   (cd "$app" && timeout 300 docker compose up -d app)
@@ -161,7 +169,17 @@ if [ ! -e "$state/stage.4" ]; then
     fi
     sleep 3
   done
-  [ "$ready" = 1 ]
+  if [ "$ready" != 1 ]; then
+    # Leave what went wrong in the install log, where the plugin can read it.
+    {
+      echo "Nextcloud did not report installed on 127.0.0.1:8080."
+      curl -s -o /dev/null -w 'status %{http_code}\n' --max-time 5 http://127.0.0.1:8080/status.php || true
+      (cd "$app" && docker compose ps) || true
+      (cd "$app" && docker compose logs --tail 60 app) || true
+      free -m || true
+    } 2>&1 | sed -E 's/(pass(word)?|secret)[ =:]+[^ ]+/\1=***/Ig' >&2
+    false
+  fi
   touch "$state/stage.4"
 fi
 if [ ! -e "$state/stage.5" ]; then
@@ -242,18 +260,11 @@ WantedBy=multi-user.target
 UNIT
   systemctl daemon-reload
   systemctl enable --now beltoft-www.path
-  printf '  encode zstd gzip\n  header Strict-Transport-Security "max-age=15552000; includeSubDomains"\n  redir /.well-known/carddav /remote.php/dav/ 301\n  redir /.well-known/caldav /remote.php/dav/ 301\n  reverse_proxy 127.0.0.1:8080\n' > /etc/caddy/beltoft-site.body
+  printf '  encode zstd gzip\n  header Strict-Transport-Security "max-age=15552000"\n  redir /.well-known/carddav /remote.php/dav/ 301\n  redir /.well-known/caldav /remote.php/dav/ 301\n  reverse_proxy 127.0.0.1:8080\n' > /etc/caddy/beltoft-site.body
   if [ -n "$domain" ]; then
     /usr/local/sbin/beltoft-caddy "$domain" "$www"
   else
     { printf 'http://%s {\n' "$ip"; cat /etc/caddy/beltoft-site.body; printf '}\n'; } > /etc/caddy/Caddyfile
-  fi
-  if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
-    fallocate -l 2G /swapfile
-    chmod 0600 /swapfile
-    mkswap /swapfile >/dev/null
-    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
-    swapon /swapfile
   fi
   systemctl enable --now caddy
   systemctl restart caddy

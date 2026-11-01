@@ -126,6 +126,14 @@ YAML
   (cd "$app" && timeout 300 docker compose up -d postgres)
   touch "$state/stage.3"
 fi
+# Swap before the first heavy start, so the smallest plans do not run out of memory while the app installs.
+if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 0600 /swapfile
+  mkswap /swapfile >/dev/null
+  printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+  swapon /swapfile
+fi
 if [ ! -e "$state/stage.4" ]; then
   # Create the database and its first user on this server before Odoo is reachable from anywhere.
   # Odoo 20 has no database creation call over the network, so the command line is used: install the base module
@@ -236,13 +244,6 @@ UNIT
     /usr/local/sbin/beltoft-caddy "$domain" "$www"
   else
     { printf 'http://%s {\n' "$ip"; cat /etc/caddy/beltoft-site.body; printf '}\n'; } > /etc/caddy/Caddyfile
-  fi
-  if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
-    fallocate -l 2G /swapfile
-    chmod 0600 /swapfile
-    mkswap /swapfile >/dev/null
-    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
-    swapon /swapfile
   fi
   systemctl enable --now caddy
   systemctl restart caddy
