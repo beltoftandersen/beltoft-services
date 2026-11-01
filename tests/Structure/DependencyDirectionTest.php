@@ -72,7 +72,7 @@ class DependencyDirectionTest extends TestCase {
 					continue;
 				}
 
-				if ( T_NAMESPACE === $t[0] ) {
+				if ( T_NAMESPACE === $t[0] && '' === $ns ) { // The declaration only: `Routes::NAMESPACE` is the same token.
 					for ( $j = $i + 1; $j < $count; $j++ ) {
 						if ( is_array( $tokens[ $j ] ) && in_array( $tokens[ $j ][0], array( T_NAME_QUALIFIED, T_STRING ), true ) ) {
 							$ns = $tokens[ $j ][1];
