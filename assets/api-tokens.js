@@ -4,6 +4,13 @@
 ( function () {
 	'use strict';
 
+	// One polite live region, so a screen reader hears the confirmation.
+	var live = document.createElement( 'span' );
+	live.className = 'screen-reader-text';
+	live.setAttribute( 'role', 'status' );
+	live.setAttribute( 'aria-live', 'polite' );
+	document.body.appendChild( live );
+
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest ? event.target.closest( '[data-api-copy]' ) : null;
 		var label;
@@ -17,6 +24,10 @@
 
 		function done() {
 			button.textContent = button.getAttribute( 'data-copied' ) || label;
+			live.textContent = '';
+			window.setTimeout( function () {
+				live.textContent = button.getAttribute( 'data-copied' ) || label;
+			}, 50 );
 			window.setTimeout( function () {
 				button.textContent = label;
 			}, 2000 );
