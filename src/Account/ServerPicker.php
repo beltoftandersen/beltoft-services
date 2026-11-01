@@ -528,8 +528,13 @@ final class ServerPicker {
 	 * Prints the page.
 	 */
 	public static function render(): void {
-		if ( array() === self::$state['values'] ) {
-			self::$state['values'] = self::prefilled();
+		// A link with choices in it starts the page from them, unless a refused post is being printed again.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only tells a post from a plain visit.
+		if ( ! isset( $_POST[ self::FIELD ] ) && array() !== self::prefilled() ) {
+			self::$state = array(
+				'errors' => array(),
+				'values' => self::prefilled(),
+			);
 		}
 
 		$products = Offers::products();
