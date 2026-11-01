@@ -130,6 +130,17 @@ final class PrivateAttach {
 	}
 
 	/**
+	 * Is an attach or detach part way through (the server may be stopped or half attached)?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function in_flight( Resource $r ): bool {
+		$op = $r->get( self::OP );
+
+		return in_array( (string) $r->get( self::STATE ), array( 'attaching', 'detaching' ), true ) && is_array( $op ) && array() !== $op;
+	}
+
+	/**
 	 * Why an action cannot be accepted, in words for the customer, or null.
 	 *
 	 * @param Resource             $r      Resource.

@@ -105,6 +105,44 @@ class PrivateAttachTest extends TestCase {
 		return $fresh;
 	}
 
+	public function test_a_half_done_attach_is_parked_not_dropped_when_the_service_stops_accepting_actions(): void {
+		$r = $this->ready();
+		$r->set( array( 'private_state' => 'attaching', 'private_op' => array( 'action' => 'attach', 'phase' => 'file' ), 'breach_at' => time() ) );
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $atts ) use ( &$mails ) { $mails[] = $atts; return true; }, 10, 2 );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$now = time();
+		add_filter( 'beltoft_services_now', static function () use ( &$now ) { return $now; } );
+
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertNotEmpty( $fresh->get( 'act_parked_since' ) );
+		$this->assertStringNotContainsString( 'not changed', (string) ( $fresh->get( 'act_result' )['text'] ?? '' ) );
+		$this->assertSame( 'attaching', $fresh->get( 'private_state' ) );
+		$this->assertCount( 0, $mails );
+
+		$now += 2 * HOUR_IN_SECONDS;
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$this->assertCount( 1, $mails, 'Staff are told once after an hour.' );
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$this->assertCount( 1, $mails );
+
+		$now += 2 * DAY_IN_SECONDS;
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( 'act_parked_since' ) );
+		$this->assertStringNotContainsString( 'not changed', wp_json_encode( $fresh->get( Jobs::RESULT ) ) );
+	}
+
+	public function test_an_idle_attach_that_is_no_longer_accepted_is_still_dropped_as_before(): void {
+		$r = $this->ready();
+		$r->set( array( 'breach_at' => time() ) );
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( 'act_parked_since' ) );
+		$this->assertStringContainsString( 'not changed', wp_json_encode( $fresh->get( Jobs::RESULT ) ) );
+	}
+
 	public function test_attach_writes_net1_only_the_netplan_file_and_restarts_once(): void {
 		$r    = $this->ready();
 		$vmid = (int) $r->get( 'vmid' );
