@@ -129,7 +129,7 @@ final class McpTest extends McpTestCase {
 	public function test_annotations_and_data_notes(): void {
 		$tools = array_column( $this->rpc( 'tools/list', array(), $this->oauth( self::factory()->user->create(), Tokens::ACTIONS ) )['result']['tools'], null, 'name' );
 
-		foreach ( array( 'shutdown', 'reboot', 'dns_upsert_record', 'dns_delete_record', 'reset_database_password' ) as $name ) {
+		foreach ( array( 'shutdown', 'reboot', 'dns_upsert_record', 'dns_delete_record' ) as $name ) {
 			$this->assertTrue( $tools[ $name ]['annotations']['destructiveHint'], $name );
 		}
 
@@ -141,7 +141,7 @@ final class McpTest extends McpTestCase {
 			$this->assertTrue( $tools[ $name ]['annotations']['idempotentHint'], $name );
 		}
 
-		foreach ( array( 'reboot', 'create_snapshot', 'reset_database_password', 'list_services' ) as $name ) {
+		foreach ( array( 'reboot', 'create_snapshot', 'list_services' ) as $name ) {
 			$this->assertFalse( $tools[ $name ]['annotations']['idempotentHint'], $name );
 		}
 
@@ -205,7 +205,7 @@ final class McpTest extends McpTestCase {
 
 		$this->assertSame( array( 'list_services', 'server_status', 'server_usage', 'database_info', 'list_dns_records', 'domain_check', 'billing_summary' ), array_slice( $read, 0, 7 ), 'The first tools did not move.' );
 		$this->assertSame( $read, array_slice( $actions, 0, count( $read ) ), 'Actions see every read tool.' );
-		$this->assertSame( array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record', 'reset_database_password' ), array_slice( $actions, count( $read ), 7 ) );
+		$this->assertSame( array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record' ), array_slice( $actions, count( $read ), 6 ) );
 
 		foreach ( $actions as $name ) {
 			// console_link is a read tool that only gives the address of the dashboard page.
@@ -315,7 +315,7 @@ final class McpTest extends McpTestCase {
 		$results = array();
 
 		foreach ( array( $db, $server, $domain ) as $r ) {
-			foreach ( array( 'server_status', 'server_usage', 'database_info', 'list_dns_records', 'reboot', 'reset_database_password', 'create_snapshot' ) as $name ) {
+			foreach ( array( 'server_status', 'server_usage', 'database_info', 'list_dns_records', 'reboot', 'create_snapshot' ) as $name ) {
 				$results[] = $this->text( $this->tool( $name, array( 'id' => $r->id() ), $token ) );
 			}
 		}
@@ -332,13 +332,18 @@ final class McpTest extends McpTestCase {
 	public function test_reset_database_password_returns_no_password_and_is_written_to_the_history(): void {
 		$db    = $this->database();
 		$user  = $this->owner( $db );
-		$token = $this->oauth( $user, Tokens::ACTIONS );
+		$token = $this->oauth( $user, Tokens::FULL );
 
-		$result = $this->tool( 'reset_database_password', array( 'id' => $db->id() ), $token );
+		$this->assertTrue( $this->tool( 'reset_database_password', array( 'id' => $db->id() ), $this->oauth( $user, Tokens::ACTIONS ) )['isError'], 'Actions access is not enough.' );
+
+		$first = $this->json( $this->tool( 'reset_database_password', array( 'id' => $db->id() ), $token ) );
+		$this->assertTrue( $first['requires_confirmation'] );
+		$this->assertFalse( Jobs::acting( $db->id() ), 'Nothing runs before the confirmation.' );
+		$result = $this->tool( 'reset_database_password', array( 'id' => $db->id(), 'confirm' => $first['confirm'] ), $token );
 		$data   = $this->json( $result );
 
 		$this->assertTrue( $data['requested'] );
-		$this->assertStringContainsString( 'dashboard', $data['message'] );
+		$this->assertStringContainsString( 'not shown here', $data['message'] );
 		$this->assertStringNotContainsString( self::PASSWORD, $this->text( $result ) );
 		$this->assertTrue( Jobs::acting( $db->id() ), 'The reset was queued.' );
 		$this->assertNotEmpty( array_filter( Events::for_license( (int) $db->license()['id'] ), static fn( $e ) => str_contains( $e['message'], 'Claude: new database password requested' ) ) );
@@ -349,7 +354,7 @@ final class McpTest extends McpTestCase {
 		$user   = $this->owner( $server );
 		$read   = $this->oauth( $user );
 
-		foreach ( array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'reset_database_password', 'dns_upsert_record', 'dns_delete_record' ) as $name ) {
+		foreach ( array( 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record' ) as $name ) {
 			$result = $this->tool( $name, array( 'id' => $server->id(), 'type' => 'A', 'name' => 'www', 'records' => array( array( 'value' => '192.0.2.1' ) ) ), $read );
 			$this->assertTrue( $result['isError'], $name );
 			$this->assertStringContainsString( 'only read', $this->text( $result ) );
@@ -372,7 +377,7 @@ final class McpTest extends McpTestCase {
 		$this->assertContains( 'Claude: reboot requested', $messages );
 
 		// An action the server does not offer is refused by the same check as the dashboard.
-		$this->assertTrue( $this->tool( 'reset_database_password', array( 'id' => $server->id() ), $token )['isError'] );
+		$this->assertTrue( $this->tool( 'reset_database_password', array( 'id' => $server->id() ), $this->oauth( $user, Tokens::FULL ) )['isError'] );
 	}
 
 	public function test_dns_tools_read_write_and_delete_with_the_safe_write_rules(): void {

@@ -50,6 +50,9 @@ final class Told {
 			case 'reset_server_password':
 				return __( 'made a new password for the server', 'beltoft-services' );
 
+			case 'reset_database_password':
+				return __( 'made a new password for the database', 'beltoft-services' );
+
 			case 'reset_mailbox_password':
 				/* translators: %s: mailbox address. */
 				return sprintf( __( 'made a new password for the mailbox %s', 'beltoft-services' ), sanitize_email( (string) ( $args['email'] ?? '' ) ) );

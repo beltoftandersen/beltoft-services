@@ -436,9 +436,6 @@ final class Tools {
 			case 'create_snapshot':
 				return self::action( $id, 'snapshot_take', isset( $args['label'] ) ? array( 'label' => (string) $args['label'] ) : array(), 'snapshot requested' );
 
-			case 'reset_database_password':
-				return self::action( $id, DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ), 'new database password requested', true );
-
 			case 'dns_upsert_record':
 				$body = array( 'records' => $args['records'] );
 
