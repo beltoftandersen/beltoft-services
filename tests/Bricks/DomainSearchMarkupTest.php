@@ -45,6 +45,12 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertSame( array( 'data-check', 'data-cart', 'data-nonce', 'data-rest-nonce' ), array_keys( Search::root_data() ) );
 	}
 
+	/**
+	 * Own process: other tests load stand-in Bricks classes, and a class cannot be unloaded.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_nothing_is_registered_without_bricks(): void {
 		$this->assertFalse( class_exists( '\\Bricks\\Elements', false ) );
 		$this->assertSame( array(), Integration::register_elements() );
