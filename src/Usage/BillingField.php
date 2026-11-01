@@ -36,11 +36,19 @@ final class BillingField {
 	 */
 	public static function register(): void {
 		/**
-		 * Where the choice sits at checkout: by default at the top of the billing details, in its own box.
+		 * Where the choice sits at checkout: by default at the top of the "Your server" section, before the OS,
+		 * SSH key, backups, server name and disk fields (priority 10) and the apps (15).
 		 *
 		 * @param string $hook Checkout action.
 		 */
-		add_action( (string) apply_filters( 'beltoft_services_billing_field_hook', 'woocommerce_before_checkout_billing_form' ), array( __CLASS__, 'render' ), 5 );
+		$hook = (string) apply_filters( 'beltoft_services_billing_field_hook', 'woocommerce_after_order_notes' );
+
+		/**
+		 * Priority of the choice on that action.
+		 *
+		 * @param int $priority Default 1.
+		 */
+		add_action( $hook, array( __CLASS__, 'render' ), (int) apply_filters( 'beltoft_services_billing_field_priority', 1 ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 	}

@@ -476,6 +476,11 @@ final class ServerPicker {
 		$errors   = self::$state['errors'];
 		$selected = self::selected( $plans, (int) $values['plan'] );
 
+		// Pay as you go is the default for a plan that offers it; after a post the customer's own choice stays.
+		if ( array() === self::$state['values'] ) {
+			$values['billing'] = 'usage';
+		}
+
 		echo '<div class="beltoft-services-picker">';
 		echo '<p class="beltoft-services-server__back"><a href="' . esc_url( Servers::url_list() ) . '">&lsaquo; ' . esc_html__( 'All servers', 'beltoft-services' ) . '</a></p>';
 		echo '<h2 class="beltoft-services-picker__title">' . esc_html__( 'New server', 'beltoft-services' ) . '</h2>';
@@ -495,7 +500,7 @@ final class ServerPicker {
 		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) );
 		$unknown   = array() !== array_filter( $available, static fn( $plan ) => ! empty( $plan['unknown'] ) );
 
-		self::billing( $plans, $selected, 'usage' === $values['billing'], '' !== $values['backups'] );
+		self::billing( $plans, $selected, 'usage' === $values['billing'], '' !== $values['backups'], array() !== self::$state['values'] );
 		self::error( $errors, 'billing' );
 
 		echo '<fieldset class="beltoft-services-picker__plans"><legend class="beltoft-services-picker__legend">' . esc_html__( 'Plan', 'beltoft-services' ) . '</legend>';
@@ -738,7 +743,7 @@ final class ServerPicker {
 	 * @param bool                             $usage    Pay as you go chosen.
 	 * @param bool                             $backups  Backups ticked.
 	 */
-	private static function billing( array $plans, int $selected, bool $usage, bool $backups ): void {
+	private static function billing( array $plans, int $selected, bool $usage, bool $backups, bool $touched = false ): void {
 		if ( array() === array_filter( $plans, static fn( $plan ) => ! empty( $plan['usage'] ) ) ) {
 			return;
 		}
@@ -748,7 +753,7 @@ final class ServerPicker {
 		$with  = $shown && $backups && ! empty( $plan['backups'] ) && ! empty( $plan['usage']['backups_variation_id'] );
 
 		$on_usage = $usage && $shown;
-		echo '<fieldset class="beltoft-services-picker__billing" data-picker-billing><legend class="beltoft-services-picker__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
+		echo '<fieldset class="beltoft-services-picker__billing" data-picker-billing' . ( $touched ? ' data-picker-touched' : '' ) . '><legend class="beltoft-services-picker__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
 		echo '<div class="beltoft-services-picker__bills">';
 		echo '<label class="beltoft-services-bill"><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="monthly"';
 		checked( ! $on_usage, true );
