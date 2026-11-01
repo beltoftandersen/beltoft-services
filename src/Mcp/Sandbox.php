@@ -54,6 +54,7 @@ final class Sandbox {
 			throw new \RuntimeException( 'The cart is not available.' );
 		}
 
+		// phpcs:disable WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- the request is only kept and put back, never read for a value.
 		$saved = array(
 			'session'  => $wc->session,
 			'customer' => $wc->customer,
@@ -65,6 +66,7 @@ final class Sandbox {
 			'get'      => $_GET,
 			'method'   => $_SERVER['REQUEST_METHOD'] ?? null,
 		);
+		// phpcs:enable
 
 		$no_persist = '__return_false';
 		$ajax       = '__return_true';
