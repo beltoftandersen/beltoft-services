@@ -116,9 +116,10 @@ final class Rates {
 	 * sibling, one that cannot be bought, or a monthly price of 0.
 	 *
 	 * @param \WC_Product_Variation $monthly Monthly variation.
+	 * @param bool                  $buyable Whether the usage sibling must be purchasable (false: for showing prices, a sold-out plan keeps its price).
 	 * @return array{variation_id: int, monthly: float, hourly: float, cap: float, premium: float}|null
 	 */
-	public static function for_plan( \WC_Product_Variation $monthly ): ?array {
+	public static function for_plan( \WC_Product_Variation $monthly, bool $buyable = true ): ?array {
 		if ( self::is_usage( $monthly ) ) {
 			return null;
 		}
@@ -126,7 +127,7 @@ final class Rates {
 		$usage = self::sibling( $monthly, true );
 		$price = (float) wc_get_price_excluding_tax( $monthly );
 
-		if ( ! $usage || ! $usage->is_purchasable() || $price <= 0 ) {
+		if ( ! $usage || ( $buyable && ! $usage->is_purchasable() ) || $price <= 0 ) {
 			return null;
 		}
 

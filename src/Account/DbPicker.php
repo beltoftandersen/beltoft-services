@@ -132,7 +132,7 @@ final class DbPicker {
 					'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
 					'backup_days'  => 0 === $days ? Backups::DB_DEFAULT_DAYS : $days,
 					'in_stock'     => Offers::in_stock( $variation ),
-					'usage'        => Rates::for_plan( $variation ),
+					'usage'        => Rates::for_plan( $variation, false ), // A sold-out card keeps its price; process() refuses it.
 				);
 			}
 		}

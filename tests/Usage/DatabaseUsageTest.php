@@ -204,6 +204,16 @@ class DatabaseUsageTest extends UsageTestCase {
 		$this->assertCount( 4, $ids );
 	}
 
+	public function test_a_sold_out_plan_keeps_its_price_on_the_page(): void {
+		$v = $this->db_product();
+		$u = $v['u-0-0'];
+		$u->set_stock_status( 'outofstock' );
+		$u->save();
+
+		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['m-0-0']->get_id() ) );
+		$this->assertSame( 25.0, Rates::for_plan( $v['m-0-0'], false )['cap'] );
+	}
+
 	// -- Checkout -----------------------------------------------------------------------------------
 
 	public function test_monthly_not_offered_a_database_in_the_cart_becomes_pay_as_you_go_and_keeps_its_add_ons(): void {
