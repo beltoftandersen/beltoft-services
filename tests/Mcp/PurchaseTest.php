@@ -210,6 +210,12 @@ final class PurchaseTest extends UsageTestCase {
 
 	// -- The direct path -----------------------------------------------------------------------------
 
+	/**
+	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_a_customer_with_an_account_gets_the_server_with_no_payment(): void {
 		$token = $this->oauth( $this->user, Tokens::FULL );
 		wp_set_current_user( 0 );
@@ -252,6 +258,12 @@ final class PurchaseTest extends UsageTestCase {
 		$this->assertNotEmpty( $this->tool_mails, 'The customer is told by mail.' );
 	}
 
+	/**
+	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_the_order_has_the_same_meta_as_an_order_from_the_picker(): void {
 		// The dashboard's way: the picker fills the cart, WooCommerce's checkout places it, for another customer with an account.
 		$other = $this->new_user();
@@ -310,6 +322,12 @@ final class PurchaseTest extends UsageTestCase {
 		$this->assertSame( $meta( wc_get_order( $dash['order_id'] ) ), $meta( $this->orders( $this->user )[0] ) );
 	}
 
+	/**
+	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_backups_and_an_app_go_the_pickers_way(): void {
 		$this->save_cluster( array( 'templates' => "9000 = Debian 12\n9001 = Ubuntu 24.04", 'default_template' => '9000', 'apps_ready' => 1, 'apps_enabled' => array( 'docker' ), 'template_families_text' => "9001 = ubuntu-24.04\n9000 = debian-12", 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml' ) );
 		$token = $this->oauth( $this->user, Tokens::FULL );
@@ -320,6 +338,12 @@ final class PurchaseTest extends UsageTestCase {
 		$this->assertSame( (string) $this->v['u-Daily']->get_id(), (string) $item->get_variation_id() );
 	}
 
+	/**
+	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_the_customers_own_cart_is_untouched(): void {
 		$token = $this->oauth( $this->user, Tokens::FULL );
 		wp_set_current_user( $this->user );
@@ -476,6 +500,12 @@ final class PurchaseTest extends UsageTestCase {
 		Access::set_user( $this->user, true );
 	}
 
+	/**
+	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_the_hourly_limit_stops_a_run_of_orders(): void {
 		add_filter( 'beltoft_services_mcp_order_limit', static fn() => 1 );
 		$token = $this->oauth( $this->user, Tokens::FULL );
@@ -489,6 +519,12 @@ final class PurchaseTest extends UsageTestCase {
 
 	// -- The token --------------------------------------------------------------------------------------
 
+	/**
+	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_a_confirmation_works_once_and_only_for_these_arguments(): void {
 		$token   = $this->oauth( $this->user, Tokens::FULL );
 		$args    = $this->args();
