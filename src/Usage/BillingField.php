@@ -35,7 +35,12 @@ final class BillingField {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render' ), 11 );
+		/**
+		 * Where the choice sits at checkout: by default at the top of the billing details, in its own box.
+		 *
+		 * @param string $hook Checkout action.
+		 */
+		add_action( (string) apply_filters( 'beltoft_services_billing_field_hook', 'woocommerce_before_checkout_billing_form' ), array( __CLASS__, 'render' ), 5 );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 	}
@@ -138,25 +143,27 @@ final class BillingField {
 		$has   = (int) ( Product::plan( $server['monthly']->get_parent_id(), $server['variation']->get_id() )['backup_days'] ?? 0 ) > 0;
 		$now   = $has && '' !== $terms[1] ? $terms[1] : $terms[0];
 
-		echo '<div class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-note="' . esc_attr( self::note() ) . '">';
-		echo '<p class="form-row"><span class="beltoft-services-billing__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</span></p>';
+		echo '<fieldset class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-note="' . esc_attr( self::note() ) . '">';
+		echo '<legend class="beltoft-services-billing__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
+		echo '<div class="beltoft-services-billing__options">';
 
 		foreach ( array(
 			'monthly' => __( 'Monthly', 'beltoft-services' ),
 			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
 		) as $value => $label ) {
 			printf(
-				'<p class="form-row"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox"><input type="radio" class="woocommerce-form__input input-radio" name="beltoft_services_billing" value="%1$s" data-nonce="%2$s" %3$s> <span>%4$s</span>%5$s</label></p>',
+				'<label class="beltoft-services-billing__option"><input type="radio" class="beltoft-services-billing__input" name="beltoft_services_billing" value="%1$s" data-nonce="%2$s" %3$s><span class="beltoft-services-billing__face"><span class="beltoft-services-billing__name">%4$s</span>%5$s</span></label>',
 				esc_attr( $value ),
 				esc_attr( wp_create_nonce( self::NONCE ) ),
 				checked( $server['usage'] === ( 'usage' === $value ), true, false ),
 				esc_html( $label ),
-				'usage' === $value ? ' <span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span>' : ''
+				'usage' === $value ? '<span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span>' : ''
 			);
 		}
 
-		echo '<p class="description" data-billing-note' . ( '' === self::note() ? ' hidden' : '' ) . '>' . esc_html( $server['usage'] ? self::note() : '' ) . '</p>';
 		echo '</div>';
+		echo '<p class="description" data-billing-note' . ( '' === self::note() ? ' hidden' : '' ) . '>' . esc_html( $server['usage'] ? self::note() : '' ) . '</p>';
+		echo '</fieldset>';
 	}
 
 	/**
