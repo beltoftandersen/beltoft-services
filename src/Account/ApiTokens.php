@@ -154,6 +154,49 @@ final class ApiTokens {
 	}
 
 	/**
+	 * The Claude Code command that adds the server.
+	 *
+	 * With no token the command builds the header itself, from YOUR_TOKEN typed by hand (the pipe through tr works with
+	 * both GNU and macOS base64). With a token the header is filled in.
+	 *
+	 * @param string $url      MCP address.
+	 * @param string $username Login name.
+	 * @param string $token    The token, or empty for the template.
+	 */
+	public static function command( string $url, string $username, string $token ): string {
+		$start = 'claude mcp add --transport http beltoft ' . $url . ' --header ';
+
+		if ( '' !== $token ) {
+			return $start . '"Authorization: Basic ' . base64_encode( $username . ':' . $token ) . '"'; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- HTTP Basic header, not obfuscation.
+		}
+
+		return $start . '"Authorization: Basic $(printf \'%s\' ' . self::quote( $username . ':YOUR_TOKEN' ) . ' | base64 | tr -d \'\\n\')"';
+	}
+
+	/**
+	 * A word in single quotes for a POSIX shell.
+	 *
+	 * @param string $text Text.
+	 */
+	private static function quote( string $text ): string {
+		return "'" . str_replace( "'", "'\\''", $text ) . "'";
+	}
+
+	/**
+	 * The command with the token of this response filled in, empty when no token was just made. Built for the
+	 * reply to the post only: nothing keeps it.
+	 *
+	 * @param string $username Login name.
+	 */
+	private static function fresh_command( string $username ): string {
+		if ( ! is_array( self::$result ) || '' === self::$result['password'] ) {
+			return '';
+		}
+
+		return self::command( Endpoint::url(), $username, preg_replace( '/[^A-Za-z0-9]/', '', self::$result['password'] ) ?? '' );
+	}
+
+	/**
 	 * Prints the section.
 	 */
 	public static function render(): void {
@@ -181,6 +224,8 @@ final class ApiTokens {
 					'on'      => Access::enabled(),
 					'allowed' => Access::user_allowed( $user->ID ),
 					'url'     => Endpoint::url(),
+					'command' => self::command( Endpoint::url(), $user->user_login, '' ),
+					'fresh'   => self::fresh_command( $user->user_login ),
 					'apps'    => Access::enabled() ? Grants::connections( $user->ID ) : array(),
 				),
 			),

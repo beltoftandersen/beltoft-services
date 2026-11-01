@@ -365,4 +365,91 @@ final class ApiTokensTest extends TestCase {
 		$this->assertSame( 202, $response->get_status() );
 		$this->assertNotContains( 'API: reboot requested', array_column( Events::for_license( (int) $resource->license()['id'] ), 'message' ), 'The dashboard is not the API.' );
 	}
+	/**
+	 * The section HTML for the current user.
+	 */
+	private function section( bool $clear = false ): string {
+		if ( $clear ) {
+			$reflect = new \ReflectionProperty( Panel::class, 'result' );
+			$reflect->setAccessible( true );
+			$reflect->setValue( null, null );
+		}
+
+		ob_start();
+		Panel::render();
+
+		return (string) ob_get_clean();
+	}
+
+	public function test_the_claude_setup_is_hidden_when_the_site_switch_is_off(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+		$this->settings( array( 'mcp_enabled' => 0 ) );
+
+		$html = $this->section();
+
+		$this->assertStringNotContainsString( 'claude mcp add', $html );
+		$this->assertStringNotContainsString( 'use-with-claude', $html );
+	}
+
+	public function test_the_claude_setup_shows_the_command_and_copy_fields_when_on(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+		$this->settings( array( 'mcp_enabled' => 1 ) );
+		$login = (string) get_userdata( $user )->user_login;
+
+		$html = $this->section( true );
+
+		$this->assertStringContainsString( 'claude mcp add --transport http beltoft ' . \BeltoftServices\Mcp\Endpoint::url(), $html );
+		$this->assertStringContainsString( esc_html( "printf '%s' '" . $login . ":YOUR_TOKEN' | base64 | tr -d" ), $html );
+		$this->assertStringContainsString( 'data-api-copy="' . esc_attr( \BeltoftServices\Mcp\Endpoint::url() ) . '"', $html );
+		$this->assertStringContainsString( 'data-api-copy="' . esc_attr( $login ) . '"', $html );
+		$this->assertStringContainsString( 'claude mcp list', $html );
+		$this->assertStringContainsString( 'Add custom connector', $html );
+		$this->assertStringNotContainsString( 'Shown once. Copy it now.', $html );
+		$this->assertStringNotContainsString( 'switch on', $html );
+	}
+
+	public function test_the_claude_setup_tells_a_customer_who_switched_it_off(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+		$this->settings( array( 'mcp_enabled' => 1 ) );
+		\BeltoftServices\Mcp\Access::set_user( $user, false );
+
+		$this->assertStringContainsString( esc_html( 'switch on "Allow Claude (MCP) access" above' ), $this->section() );
+	}
+
+	public function test_a_new_token_fills_the_command_once_and_is_never_stored(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+		$this->settings( array( 'mcp_enabled' => 1 ) );
+		$login = (string) get_userdata( $user )->user_login;
+		$_POST = array( Panel::FIELD => 'create', 'token_name' => 'CC', 'token_scope' => Tokens::READ, '_wpnonce' => wp_create_nonce( Panel::NONCE ) );
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		Panel::handle();
+		$_POST = array();
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$secret = '';
+
+		$reflect = new \ReflectionProperty( Panel::class, 'result' );
+		$reflect->setAccessible( true );
+		$secret = str_replace( ' ', '', (string) $reflect->getValue()['password'] );
+		$header = base64_encode( $login . ':' . $secret ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+
+		$html = $this->section();
+
+		$this->assertStringContainsString( esc_html( '"Authorization: Basic ' . $header . '"' ), $html );
+		$this->assertStringContainsString( 'Shown once. Copy it now.', $html );
+
+		$reflect->setValue( null, null );
+		$later = $this->section();
+
+		$this->assertStringNotContainsString( $header, $later );
+		$this->assertStringNotContainsString( $secret, $later );
+
+		global $wpdb;
+		$stored = (string) wp_json_encode( array( get_user_meta( $user ), $wpdb->get_col( "SELECT option_value FROM {$wpdb->options}" ) ) );
+		$this->assertStringNotContainsString( $header, $stored );
+		$this->assertStringNotContainsString( $secret, $stored, 'WordPress keeps only a hash.' );
+	}
 }

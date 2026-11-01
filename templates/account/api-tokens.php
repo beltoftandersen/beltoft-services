@@ -17,7 +17,7 @@
  * @var string                                          $username The customer's username.
  * @var int                                             $max      Tokens allowed.
  * @var string                                          $docs_url Address of the public API documentation page, empty when not set.
- * @var array{on: bool, allowed: bool, url: string, apps: array<int, array<string, mixed>>} $mcp Use with Claude (MCP).
+ * @var array{on: bool, allowed: bool, url: string, command: string, fresh: string, apps: array<int, array<string, mixed>>} $mcp Use with Claude (MCP).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -184,18 +184,49 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			</ul>
 		<?php endif; ?>
 
-		<details class="beltoft-services-api__docs">
-			<summary><?php esc_html_e( 'How to connect Claude', 'beltoft-services' ); ?></summary>
+		<div class="beltoft-services-api__claude" id="use-with-claude-setup">
+			<h4><?php esc_html_e( 'Claude Code (terminal)', 'beltoft-services' ); ?></h4>
+			<?php if ( ! $mcp['allowed'] ) : ?>
+				<p class="beltoft-services-api__notice"><?php esc_html_e( 'Claude can only connect after you switch on "Allow Claude (MCP) access" above.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
 			<ol>
-				<li><?php esc_html_e( 'In Claude, open Settings, then Connectors, then Add custom connector.', 'beltoft-services' ); ?></li>
-				<li><?php esc_html_e( 'Paste this address as the connector URL:', 'beltoft-services' ); ?>
-					<pre><code><?php echo esc_html( $mcp['url'] ); ?></code></pre>
-				</li>
-				<li><?php esc_html_e( 'Claude opens this site. Sign in if you are asked to, then choose what Claude may do: read only, also run actions such as restart, snapshots and DNS changes, or Full access.', 'beltoft-services' ); ?></li>
-				<li><?php esc_html_e( 'Ask Claude about your services, for example which of your servers is busiest.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Create a token above and copy it. Give it the access you want Claude to have.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Copy the address and your username, or copy the command below and replace YOUR_TOKEN with the token.', 'beltoft-services' ); ?></li>
 			</ol>
+			<?php
+			$beltoft_services_copy = static function ( string $label, string $text, string $id ): void {
+				?>
+				<div class="beltoft-services-api__copyrow">
+					<span class="beltoft-services-api__copylabel" id="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $label ); ?></span>
+					<div class="beltoft-services-api__block">
+						<code class="beltoft-services-api__secret" aria-labelledby="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $text ); ?></code>
+						<button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-api-copy="<?php echo esc_attr( $text ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" aria-describedby="<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
+					</div>
+				</div>
+				<?php
+			};
+
+			$beltoft_services_copy( __( 'Address', 'beltoft-services' ), $mcp['url'], 'beltoft-mcp-url' );
+			$beltoft_services_copy( __( 'Username', 'beltoft-services' ), $username, 'beltoft-mcp-user' );
+			$beltoft_services_copy( __( 'Command', 'beltoft-services' ), $mcp['command'], 'beltoft-mcp-cmd' );
+			?>
+			<p><?php esc_html_e( 'The command works on Linux and macOS. Your username is the one shown above; your email address also works as the username.', 'beltoft-services' ); ?></p>
+			<?php if ( '' !== $mcp['fresh'] ) : ?>
+				<?php $beltoft_services_copy( __( 'Command with your new token', 'beltoft-services' ), $mcp['fresh'], 'beltoft-mcp-fresh' ); ?>
+				<p class="beltoft-services-api__notice"><?php esc_html_e( 'Shown once. Copy it now.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
+			<p><?php esc_html_e( 'To check it, run this and look for beltoft:', 'beltoft-services' ); ?></p>
+			<?php $beltoft_services_copy( __( 'Check', 'beltoft-services' ), 'claude mcp list', 'beltoft-mcp-check' ); ?>
+			<p><?php esc_html_e( 'Then start Claude Code and ask, for example: "List my servers on beltoft.net".', 'beltoft-services' ); ?></p>
+
+			<h4><?php esc_html_e( 'Claude.ai and Claude Desktop', 'beltoft-services' ); ?></h4>
+			<p><?php esc_html_e( 'In Claude, open Settings, then Connectors, then Add custom connector. Paste this address, then sign in here and choose what Claude may do. No token is needed.', 'beltoft-services' ); ?></p>
+			<?php $beltoft_services_copy( __( 'Connector address', 'beltoft-services' ), $mcp['url'], 'beltoft-mcp-url2' ); ?>
+		</div>
+
+		<details class="beltoft-services-api__docs">
+			<summary><?php esc_html_e( 'What Claude can do', 'beltoft-services' ); ?></summary>
 			<p><?php esc_html_e( 'Claude can read your servers, databases, domains and DNS, and with actions allowed restart or stop a server, take a snapshot and change DNS records. Only with Full access can it also restore, roll back, reinstall, delete or cancel, or show a password once, and then only after it has shown you what it is about to do and you have said yes in the chat. Domain transfers stay in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
-			<p><?php esc_html_e( 'A personal token from above also works with any tool that speaks MCP over HTTP: send it as HTTP Basic authentication to the same address.', 'beltoft-services' ); ?></p>
 		</details>
 	<?php endif; ?>
 </section>
