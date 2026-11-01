@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -332,7 +333,7 @@ final class Stock {
 	}
 
 	/**
-	 * Queues a capacity run for the cluster (ProxmoxJobs::queue_capacity(): async, one waiting run is
+	 * Queues a capacity run for the cluster (CapacityJobs::queue_capacity(): async, one waiting run is
 	 * enough). At most once in five minutes, so a cluster that cannot be read is not asked on every page view.
 	 *
 	 * @param string $cluster_id Cluster id.
@@ -347,7 +348,7 @@ final class Stock {
 		}
 
 		set_transient( self::QUEUED_PREFIX . $cluster_id, 1, 5 * MINUTE_IN_SECONDS );
-		ProxmoxJobs::queue_capacity( $cluster_id );
+		CapacityJobs::queue_capacity( $cluster_id );
 	}
 
 	/**

@@ -9,6 +9,7 @@ use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Proxmox\MetricsRoute;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Jobs\DiskJobs;
 
 require_once __DIR__ . '/MonitoringTestCase.php';
 
@@ -85,16 +86,16 @@ class GuestDiskTest extends MonitoringTestCase {
 			$list[] = array( 'resource' => 900000 + $i, 'cluster' => 'lab', 'vmid' => 5000 + $i, 'node' => 'node-a' );
 		}
 		set_transient( ProxmoxJobs::RUNNING_PREFIX . 'lab', $list, HOUR_IN_SECONDS );
-		ProxmoxJobs::disk();
+		DiskJobs::disk();
 		$this->assertSame( 25, get_transient( ProxmoxJobs::DISK_QUEUE )['cursor'] );
 		$this->assertCount( 1, $this->agent_calls() );
 		$this->assertTrue( (bool) as_has_scheduled_action( ProxmoxJobs::DISK_BATCH, array(), Jobs::GROUP ) );
 		as_unschedule_all_actions( ProxmoxJobs::DISK_BATCH, array(), Jobs::GROUP );
-		ProxmoxJobs::disk_batch();
+		DiskJobs::disk_batch();
 		$this->assertFalse( get_transient( ProxmoxJobs::DISK_QUEUE ) );
 		$this->assertCount( 1, $this->agent_calls() );
 		$r->set( array( 'state' => 'paused' ) );
-		ProxmoxJobs::disk();
+		DiskJobs::disk();
 		$this->assertCount( 1, $this->agent_calls(), 'A paused resource is not read.' );
 		delete_option( FakeClient::OPTION );
 	}

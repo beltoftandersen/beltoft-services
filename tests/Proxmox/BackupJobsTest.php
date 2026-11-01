@@ -11,6 +11,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\BackupJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -28,7 +29,7 @@ class BackupJobsTest extends BackupTestCase {
 	 */
 	private function follow_up(): void {
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
-		ProxmoxJobs::backup_next();
+		BackupJobs::backup_next();
 	}
 
 	public function test_the_cron_is_scheduled_at_half_past_three(): void {
@@ -48,7 +49,7 @@ class BackupJobsTest extends BackupTestCase {
 		$one = $this->ready_vm();
 		$two = $this->ready_vm();
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 1, $this->calls( 'POST', '/vzdump' ), 'One server per action.' );
 		$this->assertTrue( $this->next_scheduled() );
 
@@ -75,7 +76,7 @@ class BackupJobsTest extends BackupTestCase {
 		$done = $this->ready_vm();
 		$done->set( array( 'backup_last_at' => time() - HOUR_IN_SECONDS ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$this->assertCount( 0, $this->calls( 'POST', '/vzdump' ) );
 		$this->assertFalse( $this->next_scheduled() );
@@ -87,12 +88,12 @@ class BackupJobsTest extends BackupTestCase {
 		$this->ready_vm();
 
 		$this->settings( array( 'pause_all' => 1 ) );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 0, $this->calls( 'POST', '/vzdump' ) );
 		$this->assertFalse( $this->next_scheduled() );
 
 		$this->settings( array( 'pause_all' => 0 ) );
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 1, $this->calls( 'POST', '/vzdump' ) );
 
 		$this->settings( array( 'pause_all' => 1 ) );
@@ -106,7 +107,7 @@ class BackupJobsTest extends BackupTestCase {
 		$two = $this->ready_vm();
 		$this->fake->next_task( array( 'polls' => 8 ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertIsArray( Resource::find( $one->id() )->get( 'backup_task' ) );
 		$this->assertTrue( $this->next_scheduled() );
 
@@ -126,7 +127,7 @@ class BackupJobsTest extends BackupTestCase {
 		$one = $this->ready_vm();
 		$this->fake->fail_next( 'POST', '#/vzdump$#', array( 'message' => 'storage is not online' ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->follow_up();
 		$this->follow_up();
 
@@ -139,7 +140,7 @@ class BackupJobsTest extends BackupTestCase {
 		$r    = $this->ready_vm();
 		$vmid = (int) $r->get( 'vmid' );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'] );
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 
@@ -147,7 +148,7 @@ class BackupJobsTest extends BackupTestCase {
 		$r->set( array( 'plan' => array_merge( $r->get( 'plan' ), array( 'backup_days' => 0 ) ), 'backup_purge' => true, 'backup_purge_at' => time() - 8 * DAY_IN_SECONDS ) );
 		$this->settings( array( 'deletion_mode' => 'on' ) );
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 
 		$this->assertSame( array(), $this->fake->state()['backups']['backup-store'] );
 		$fresh = Resource::find( $r->id() );

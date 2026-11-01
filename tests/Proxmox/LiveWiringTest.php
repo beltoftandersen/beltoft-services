@@ -16,12 +16,15 @@ use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\LinkVm;
 use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
+use BeltoftServices\Proxmox\Jobs\AbuseJobs;
+use BeltoftServices\Proxmox\Jobs\CapacityJobs;
+use BeltoftServices\Proxmox\Jobs\PasswordJobs;
+use BeltoftServices\Proxmox\Jobs\PowerJobs;
 
 /**
  * A ProxmoxDriver that does not sleep.
@@ -188,10 +191,10 @@ class LiveWiringTest extends TestCase {
 		$this->assert_waits( $driver->delete( Resource::find( $ready->id() ) ) );
 
 		// 4. The jobs skip the cluster.
-		ProxmoxJobs::capacity();
-		ProxmoxJobs::power();
-		ProxmoxJobs::abuse();
-		ProxmoxJobs::purge_passwords();
+		CapacityJobs::capacity();
+		PowerJobs::power();
+		AbuseJobs::abuse();
+		PasswordJobs::purge_passwords();
 
 		// 5. The CLI refuses.
 		$linked = LinkVm::run(

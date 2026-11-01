@@ -14,6 +14,7 @@ use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\SnapshotJobs;
 
 require_once __DIR__ . '/SnapshotsTestCase.php';
 
@@ -86,7 +87,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		set_transient( ProxmoxJobs::SNAP_SYNCED, 1, DAY_IN_SECONDS );
 		$seen = count( $this->fake->calls() );
 
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 
 		$this->assertSame( array( array( $due->id(), 'snapshot_expire' ) ), array_map( static fn( $q ) => array( $q['id'], $q['action'] ), $this->queued() ) );
 		$this->assertCount( $seen, $this->fake->calls(), 'The job reads meta only.' );
@@ -101,7 +102,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->change( $a, 0, array( 'expires_at' => time() - 5 ) );
 		$this->change( $b, 0, array( 'expires_at' => time() - 5 ) );
 
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 
 		$queued = $this->queued();
 		$this->assertCount( 2, $queued );
@@ -114,12 +115,12 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->change( $r, 0, array( 'expires_at' => time() - 5 ) );
 
 		$this->settings( array( 'pause_all' => 1 ) );
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 		$this->assertSame( array(), $this->queued() );
 
 		$this->settings( array( 'pause_all' => 0, 'snapshots_enabled' => 0 ) );
 		$this->assertTrue( $this->fresh( $r )->transition( 'paused', 'test' ) );
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 		$this->assertCount( 1, $this->queued() );
 
 		$this->run_jobs();
@@ -132,19 +133,19 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$entry = $this->take( $r, 'lost' );
 		$this->fake->task( 'DELETE', '/nodes/node-a/qemu/5000/snapshot/' . $entry['snap'] );
 
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 		$this->assertSame( array( 'snapshot_sync' ), array_column( $this->queued(), 'action' ) );
 		$this->run_jobs();
 		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
 
 		$this->take( $r, 'again' );
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 		$this->assertSame( array(), $this->queued(), 'The next hour has no sync and nothing is due.' );
 	}
 
 	public function test_a_server_without_snapshots_is_not_queued(): void {
 		$this->server();
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 		$this->assertSame( array(), $this->queued() );
 	}
 
@@ -245,7 +246,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->paid( 0 );
 		set_transient( ProxmoxJobs::SNAP_SYNCED, 1, DAY_IN_SECONDS );
 
-		ProxmoxJobs::snapshots();
+		SnapshotJobs::snapshots();
 
 		$this->assertEqualsWithDelta( time() + 3 * DAY_IN_SECONDS, Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'], 5 );
 		$this->assertSame( array(), $this->queued(), 'Shortened, not due yet.' );

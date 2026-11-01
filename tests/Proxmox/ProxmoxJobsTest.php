@@ -22,6 +22,10 @@ use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
+use BeltoftServices\Proxmox\Jobs\AbuseJobs;
+use BeltoftServices\Proxmox\Jobs\CapacityJobs;
+use BeltoftServices\Proxmox\Jobs\PasswordJobs;
+use BeltoftServices\Proxmox\Jobs\PowerJobs;
 
 /**
  * Capacity cache, power state, abuse report and password purge.
@@ -214,7 +218,7 @@ class ProxmoxJobsTest extends TestCase {
 		$this->fake->add_vm( array( 'vmid' => 700, 'node' => 'node-a', 'status' => 'running', 'config' => array( 'memory' => 16384 ) ) ); // Not ours.
 		$this->fake->add_vm( array( 'vmid' => 9000, 'node' => 'node-b', 'template' => 1, 'config' => array( 'memory' => 2048 ) ) );
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 
 		$rows = get_transient( Placement::CAPACITY_PREFIX . 'lab' );
 		$this->assertIsArray( $rows );
@@ -240,7 +244,7 @@ class ProxmoxJobsTest extends TestCase {
 	public function test_capacity_is_not_cached_when_the_cluster_cannot_be_read(): void {
 		$this->fake->fail_next( 'GET', '#/nodes$#', array( 'status' => 500 ) );
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 
 		$this->assertFalse( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
 	}
@@ -269,7 +273,7 @@ class ProxmoxJobsTest extends TestCase {
 			2
 		);
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 
 		$this->assertSame( 'instock', $this->stock_of( $small->get_id() ) );
 		$this->assertSame( 'outofstock', $this->stock_of( $big->get_id() ), 'No node can hold 100 GB.' );
@@ -277,14 +281,14 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( array( $big->get_id() => 'outofstock' ), $seen, 'One change, one hook.' );
 
 		$seen = array();
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 		$this->assertSame( array(), $seen, 'The next run changes nothing and fires nothing.' );
 	}
 
 	public function test_the_on_demand_capacity_run_writes_the_stock_status(): void {
 		IpPool::add( '192.0.2.10' );
 		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ) );
 
 		// The cache is flushed (an object cache flush) while the product is closed by this plugin.
@@ -304,7 +308,7 @@ class ProxmoxJobsTest extends TestCase {
 		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
 		$this->fake->fail_next( 'GET', '#/nodes$#', array( 'status' => 500 ) );
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 
 		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ), 'No cache was written, so no status is.' );
 	}
@@ -314,8 +318,8 @@ class ProxmoxJobsTest extends TestCase {
 		unset( $stored['lab']['persist'] );
 		update_option( Clusters::OPTION, $stored, false );
 
-		ProxmoxJobs::capacity();
-		ProxmoxJobs::power();
+		CapacityJobs::capacity();
+		PowerJobs::power();
 
 		$this->assertCount( 0, $this->fake->calls() );
 	}
@@ -326,7 +330,7 @@ class ProxmoxJobsTest extends TestCase {
 		$new = $this->vm( 5001, 'node-a', 'running', 4096, array( 'uptime' => 10 ) );
 		$new->set( array( 'server_name_pending' => 'web-03', 'server_name_pending_at' => time() - 120 ) );
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 
 		$this->assertSame( 'web-02', Resource::find( $old->id() )->get( 'server_name_pending' ), 'Up since before the rename: still the old hostname.' );
 		$this->assertNull( Resource::find( $new->id() )->get( 'server_name_pending' ), 'Booted after the rename.' );
@@ -337,11 +341,11 @@ class ProxmoxJobsTest extends TestCase {
 		$r = $this->vm( 5000, 'node-a', 'running' );
 		$r->set( \BeltoftServices\Proxmox\ServerName::pending_meta( 'web-02' ) );
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->assertSame( 'web-02', Resource::find( $r->id() )->get( 'server_name_pending' ), 'No earlier stop seen.' );
 
 		Operations::remember_power( $r->id(), 'stopped' );
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->assertNull( Resource::find( $r->id() )->get( 'server_name_pending' ) );
 	}
 
@@ -356,7 +360,7 @@ class ProxmoxJobsTest extends TestCase {
 			$b->id() => $this->meta( $b ),
 		);
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 
 		$this->assertSame( 1, $this->paths( 'GET', '#^/cluster/resources$#' ) );
 		$this->assertCount( 1, $this->fake->calls(), 'One call for all the VMs.' );
@@ -383,17 +387,17 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertTrue( $up->set( array( 'agent' => 'unknown' ) ) );
 		$this->assertTrue( $down->set( array( 'agent' => 'unknown' ) ) );
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 
 		$this->assertSame( 'ok', Resource::find( $up->id() )->get( 'agent' ), 'The agent that answers is remembered.' );
 		$this->assertSame( 'unknown', Resource::find( $down->id() )->get( 'agent' ), 'A stopped server is not asked.' );
 		$this->assertSame( 1, $this->paths( 'POST', '#/agent/ping$#' ) );
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->assertSame( 1, $this->paths( 'POST', '#/agent/ping$#' ), 'An agent that answered is not asked again.' );
 
 		$this->assertTrue( $up->set( array( 'agent' => 'unknown', 'agent_checked_at' => time() - 60 ) ) );
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->assertSame( 1, $this->paths( 'POST', '#/agent/ping$#' ), 'At most once an hour.' );
 	}
 
@@ -413,8 +417,8 @@ class ProxmoxJobsTest extends TestCase {
 	 * Runs the power job, then the abuse job and its batches; returns the resource.
 	 */
 	private function abuse_run(): void {
-		ProxmoxJobs::power();
-		ProxmoxJobs::abuse();
+		PowerJobs::power();
+		AbuseJobs::abuse();
 	}
 
 	public function test_abuse_report_mode_never_pauses(): void {
@@ -552,8 +556,8 @@ class ProxmoxJobsTest extends TestCase {
 
 		foreach ( array( 0, 3600 ) as $step ) {
 			$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97, $end + $step ) );
-			ProxmoxJobs::power();
-			ProxmoxJobs::abuse();
+			PowerJobs::power();
+			AbuseJobs::abuse();
 		}
 
 		$this->assertCount( 1, $this->mails );
@@ -578,14 +582,14 @@ class ProxmoxJobsTest extends TestCase {
 	public function test_a_gap_ends_a_run_and_an_unfinished_newest_sample_does_not(): void {
 		// 30 low minutes, a gap, 38 high minutes, and an unfinished last sample: the run is under an hour.
 		$rows = $this->samples( fn( $m ) => $m < 30 ? 0.1 : ( 30 === $m ? null : ( 69 === $m ? null : 0.95 ) ) );
-		$out  = ProxmoxJobs::analyse( $rows, 90.0 );
+		$out  = AbuseJobs::analyse( $rows, 90.0 );
 
 		$this->assertSame( 37 * 60, $out['longest'], 'Minutes 31 to 68.' );
 		$this->assertNotNull( $out['trailing'], 'The newest unfinished sample is ignored: the run reaches the end.' );
 
-		$low = ProxmoxJobs::analyse( $this->samples( fn() => 0.2 ), 90.0 );
+		$low = AbuseJobs::analyse( $this->samples( fn() => 0.2 ), 90.0 );
 		$this->assertNull( $low['trailing'] );
-		$this->assertNull( ProxmoxJobs::analyse( array( array( 'cpu' => 0.9 ) ), 90.0 ) );
+		$this->assertNull( AbuseJobs::analyse( array( array( 'cpu' => 0.9 ) ), 90.0 ) );
 	}
 
 	public function test_abuse_high_since_spans_several_hourly_runs(): void {
@@ -594,8 +598,8 @@ class ProxmoxJobsTest extends TestCase {
 		$end = 1700000000;
 		$run = function ( int $at, callable $cpu ) use ( $r ) {
 			$this->fake->set_rrd( 5000, $this->samples( $cpu, $at ) );
-			ProxmoxJobs::power();
-			ProxmoxJobs::abuse();
+			PowerJobs::power();
+			AbuseJobs::abuse();
 		};
 
 		$run( $end, fn() => 0.97 );
@@ -624,8 +628,8 @@ class ProxmoxJobsTest extends TestCase {
 			$ids[] = $this->vm( 5000 + $i )->id();
 		}
 
-		ProxmoxJobs::power();
-		ProxmoxJobs::abuse();
+		PowerJobs::power();
+		AbuseJobs::abuse();
 
 		$this->assertSame( ProxmoxJobs::BATCH_SIZE, $this->paths( 'GET', '#rrddata$#' ), 'The first batch ran at once.' );
 
@@ -635,7 +639,7 @@ class ProxmoxJobsTest extends TestCase {
 
 		for ( $round = 0; $round < 10; $round++ ) {
 			as_unschedule_all_actions( ProxmoxJobs::ABUSE_BATCH, array(), Jobs::GROUP );
-			ProxmoxJobs::abuse_batch();
+			AbuseJobs::abuse_batch();
 		}
 
 		$this->assertSame( 60, $this->paths( 'GET', '#rrddata$#' ), 'Every VM is read exactly once, however often the batch hook runs.' );
@@ -651,7 +655,7 @@ class ProxmoxJobsTest extends TestCase {
 		}
 
 		set_transient( ProxmoxJobs::RUNNING_PREFIX . 'lab', $list, HOUR_IN_SECONDS );
-		ProxmoxJobs::abuse();
+		AbuseJobs::abuse();
 
 		$queue = get_transient( ProxmoxJobs::QUEUE );
 		$this->assertSame( ProxmoxJobs::BATCH_SIZE, $queue['cursor'] );
@@ -663,10 +667,10 @@ class ProxmoxJobsTest extends TestCase {
 		$this->fake->set_rrd( 5000, $this->samples( fn() => 0.97 ) );
 		$this->settings( array( 'pause_all' => 1, 'abuse_mode' => 'pause' ) );
 
-		ProxmoxJobs::capacity();
-		ProxmoxJobs::power();
-		ProxmoxJobs::abuse();
-		ProxmoxJobs::abuse_batch();
+		CapacityJobs::capacity();
+		PowerJobs::power();
+		AbuseJobs::abuse();
+		AbuseJobs::abuse_batch();
 
 		$this->assertCount( 0, $this->fake->calls() );
 		$this->assertFalse( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
@@ -687,7 +691,7 @@ class ProxmoxJobsTest extends TestCase {
 			$this->assertSame( $cron, reset( $actions )->get_schedule()->get_recurrence() );
 		}
 
-		$this->assertNotFalse( has_action( ProxmoxJobs::POWER, array( ProxmoxJobs::class, 'power' ) ) );
+		$this->assertNotFalse( has_action( ProxmoxJobs::POWER, array( PowerJobs::class, 'power' ) ) );
 		$this->assertNotFalse( has_action( 'action_scheduler_init', array( ProxmoxJobs::class, 'schedule' ) ) );
 		$this->assertNotFalse( has_action( 'deactivate_beltoft-services/beltoft-services.php' ) || has_action( 'deactivate_' . plugin_basename( BELTOFT_SERVICES_FILE ) ) );
 
@@ -723,7 +727,7 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertTrue( $fresh->set( array( Access::META_REVEAL => 'ciphertext-2', Access::META_UNTIL => $new ) ) );
 		$this->assertTrue( $resetting->set( array( Access::META_REVEAL => 'ciphertext-3', Access::META_UNTIL => $old, Access::META_RESET => 1 ) ) );
 
-		ProxmoxJobs::purge_passwords();
+		PasswordJobs::purge_passwords();
 
 		$e = Resource::find( $expired->id() );
 		$this->assertSame( '', (string) $e->get( Access::META_REVEAL ), 'Past its window: wiped.' );
@@ -733,11 +737,11 @@ class ProxmoxJobsTest extends TestCase {
 
 		// Once a day.
 		$this->assertTrue( $fresh->set( array( Access::META_UNTIL => $old ) ) );
-		ProxmoxJobs::purge_passwords();
+		PasswordJobs::purge_passwords();
 		$this->assertSame( 'ciphertext-2', Resource::find( $fresh->id() )->get( Access::META_REVEAL ), 'The next run is tomorrow.' );
 
 		delete_transient( ProxmoxJobs::PURGE_RAN );
-		ProxmoxJobs::purge_passwords();
+		PasswordJobs::purge_passwords();
 		$this->assertSame( '', (string) Resource::find( $fresh->id() )->get( Access::META_REVEAL ) );
 	}
 
@@ -757,7 +761,7 @@ class ProxmoxJobsTest extends TestCase {
 			)
 		);
 
-		ProxmoxJobs::purge_passwords();
+		PasswordJobs::purge_passwords();
 
 		$after = Resource::find( $held->id() );
 		$this->assertSame( '', (string) $after->get( Access::META_REVEAL ), 'The expired password is purged under a hold too.' );
@@ -777,7 +781,7 @@ class ProxmoxJobsTest extends TestCase {
 	public function test_the_sweep_runs_the_purge(): void {
 		$r = $this->vm( 5000 );
 		$this->assertTrue( $r->set( array( Access::META_REVEAL => 'ciphertext', Access::META_UNTIL => time() - 5 ) ) );
-		$this->assertNotFalse( has_action( Jobs::SWEEP, array( ProxmoxJobs::class, 'purge_passwords' ) ) );
+		$this->assertNotFalse( has_action( Jobs::SWEEP, array( PasswordJobs::class, 'purge_passwords' ) ) );
 
 		do_action( Jobs::SWEEP );
 
@@ -811,7 +815,7 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertNull( $this->fake->vm( 5001 ) );
 		$this->assertTrue( VmRecords::move( $placed->id(), 'node-a' ) );
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 
 		$by = array_column( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), null, 'node' );
 		$this->assertSame( 8192 * 1048576 + 4 * self::GB, $by['node-a']['mem'], 'The placed record counts at its plan memory; the unplaced one is not on a node yet.' );
@@ -835,15 +839,15 @@ class ProxmoxJobsTest extends TestCase {
 	}
 
 	public function test_activating_the_plugin_queues_a_capacity_run_for_each_saved_cluster(): void {
-		$this->assertNotFalse( has_action( 'activate_' . plugin_basename( BELTOFT_SERVICES_FILE ), array( ProxmoxJobs::class, 'activate' ) ) );
+		$this->assertNotFalse( has_action( 'activate_' . plugin_basename( BELTOFT_SERVICES_FILE ), array( CapacityJobs::class, 'activate' ) ) );
 
 		$this->fake->add_vm( array( 'vmid' => 9000, 'node' => 'node-a', 'template' => 1 ) );
 		$this->cluster();
 		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array(), Jobs::GROUP );
 		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
 
-		ProxmoxJobs::activate();
-		ProxmoxJobs::activate();
+		CapacityJobs::activate();
+		CapacityJobs::activate();
 
 		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => ProxmoxJobs::CAPACITY_NOW, 'args' => array( 'lab' ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ), 'One run, queued once.' );
 		$this->assertCount( 0, $this->fake->calls(), 'Queued, not run inline.' );
@@ -856,7 +860,7 @@ class ProxmoxJobsTest extends TestCase {
 		set_transient( Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'old', 'status' => 'online', 'maxmem' => 1, 'mem' => 0 ) ), HOUR_IN_SECONDS );
 		$this->fake->fail_next( 'GET', '#/cluster/resources$#', array( 'status' => 500 ) );
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 
 		$this->assertSame( 'old', get_transient( Placement::CAPACITY_PREFIX . 'lab' )[0]['node'] );
 	}
@@ -867,7 +871,7 @@ class ProxmoxJobsTest extends TestCase {
 		set_transient( ProxmoxJobs::RUNNING_PREFIX . 'lab', array( array( 'resource' => $r->id(), 'cluster' => 'lab', 'vmid' => 5000, 'node' => 'node-a' ) ), HOUR_IN_SECONDS );
 		Operations::remember_power( $r->id(), 'stopped' );
 
-		ProxmoxJobs::abuse();
+		AbuseJobs::abuse();
 
 		$this->assertSame( 0, $this->paths( 'GET', '#rrddata$#' ) );
 	}
@@ -900,7 +904,7 @@ class ProxmoxJobsTest extends TestCase {
 			set_transient( ProxmoxJobs::RUNNING_PREFIX . $id, $list, HOUR_IN_SECONDS );
 		}
 
-		ProxmoxJobs::abuse();
+		AbuseJobs::abuse();
 
 		$queue    = get_transient( ProxmoxJobs::QUEUE );
 		$clusters = array_count_values( array_column( $queue['items'], 'cluster' ) );
@@ -920,14 +924,14 @@ class ProxmoxJobsTest extends TestCase {
 		VmRecords::move( $failed->id(), 'node-a' );
 		VmRecords::move( $deleted->id(), 'node-a' );
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 		$by = array_column( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), null, 'node' );
 		$this->assertSame( ( 8192 + 4096 ) * 1048576 + 4 * self::GB, $by['node-a']['mem'] );
 
 		VmRecords::remove( $failed->id() ); // The failed clone's record is removed.
 		$deleted->close(); // The resource is deleted (its row stays).
 
-		ProxmoxJobs::capacity();
+		CapacityJobs::capacity();
 		$by = array_column( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), null, 'node' );
 		$this->assertSame( 4 * self::GB, $by['node-a']['mem'], 'Back to the reserve alone.' );
 	}

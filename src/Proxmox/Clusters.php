@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Http\Connections;
+use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -647,7 +648,7 @@ final class Clusters {
 
 		$all[ $id ] = $clean;
 		update_option( self::OPTION, $all, false );
-		ProxmoxJobs::queue_capacity( $id );
+		CapacityJobs::queue_capacity( $id );
 		Stock::sync( $id ); // A new node list or a new cluster changes what fits (the old cache stays until the run).
 
 		return true;

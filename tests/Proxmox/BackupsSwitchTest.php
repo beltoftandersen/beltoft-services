@@ -15,6 +15,7 @@ use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\BackupJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -124,7 +125,7 @@ class BackupsSwitchTest extends BackupTestCase {
 		list( $v, $r ) = $this->on_variation( 'a-Daily' );
 		$this->switchable();
 
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 		$r      = Resource::find( $r->id() );
 		$stored = $r->get( 'backup_list' );
@@ -224,7 +225,7 @@ class BackupsSwitchTest extends BackupTestCase {
 
 	public function test_the_admin_sees_the_backup_state(): void {
 		$r = $this->ready_vm();
-		ProxmoxJobs::backup();
+		BackupJobs::backup();
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 
 		$html = $this->admin_html( $r );

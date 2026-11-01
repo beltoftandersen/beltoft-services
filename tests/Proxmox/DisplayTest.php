@@ -11,8 +11,9 @@ use BeltoftServices\Proxmox\Clusters;
 use BeltoftServices\Proxmox\ConsoleTab;
 use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Jobs\PowerJobs;
+use BeltoftServices\Proxmox\Jobs\ServerSyncJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -57,7 +58,7 @@ class DisplayTest extends BackupTestCase {
 	}
 
 	public function test_the_reconcile_runs_from_the_sweep(): void {
-		$this->assertSame( 23, has_action( \BeltoftServices\Jobs::SWEEP, array( ProxmoxJobs::class, 'displays' ) ) );
+		$this->assertSame( 23, has_action( \BeltoftServices\Jobs::SWEEP, array( ServerSyncJobs::class, 'displays' ) ) );
 	}
 
 	public function test_a_server_with_the_serial_display_gets_std_once_and_is_never_restarted(): void {
@@ -65,7 +66,7 @@ class DisplayTest extends BackupTestCase {
 		$this->serial();
 		$this->fake->hold_net_rate( 5000 );
 
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 
 		$this->assertSame( 'std', $this->config()['vga'], 'The default view shows the pending value.' );
 		$this->assertSame( 'serial0', $this->config( 5000, true )['vga'], 'The running VM still has the serial display.' );
@@ -77,20 +78,20 @@ class DisplayTest extends BackupTestCase {
 		$this->assertNotNull( Resource::find( $r->id() )->get( 'display_pending_at' ) );
 
 		$writes = $this->vga_puts();
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( $writes, $this->vga_puts(), 'Written once.' );
 	}
 
 	public function test_a_server_without_a_vga_key_gets_std_and_another_display_is_left_alone(): void {
 		$r = $this->ready_vm();
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'vga' ) ) );
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'std', $this->config()['vga'] );
 
 		$other = $this->ready_vm();
 		$id    = (int) $other->get( 'vmid' );
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/' . $id . '/config', array( 'vga' => 'qxl' ) ) );
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'qxl', $this->config( $id )['vga'] );
 		$this->assertNotNull( Resource::find( $other->id() )->get( 'display_std' ), 'Checked, so not read again.' );
 		unset( $r );
@@ -101,26 +102,26 @@ class DisplayTest extends BackupTestCase {
 		$this->serial();
 
 		$r->set( array( 'linked' => true ) );
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'serial0', $this->config()['vga'], 'Adopted VM.' );
 		$r->set( array( 'linked' => null ) );
 
 		$this->fake->set_lock( 5000, 'backup' );
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'serial0', $this->config()['vga'], 'Locked VM.' );
 		$this->fake->set_lock( 5000, '' );
 
 		$r->set( array( 'desired' => 'paused' ) );
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'serial0', $this->config()['vga'], 'Not wanted ready.' );
 		$r->set( array( 'desired' => 'ready' ) );
 
 		$r->set( array( 'state' => 'provisioning' ) );
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'serial0', $this->config()['vga'], 'Not ready.' );
 		$r->set( array( 'state' => 'ready' ) );
 
-		ProxmoxJobs::displays();
+		ServerSyncJobs::displays();
 		$this->assertSame( 'std', $this->config()['vga'], 'Ready again: written.' );
 	}
 
@@ -128,15 +129,15 @@ class DisplayTest extends BackupTestCase {
 		$r = $this->ready_vm();
 		$r->set( array( 'display_std' => 1, 'display_pending_at' => time() - 100 ) );
 
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->assertNotNull( Resource::find( $r->id() )->get( 'display_pending_at' ), 'Running since before the change.' );
 
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
 		$this->fake->elapse( 5 );
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/start' );
 		$this->fake->elapse( 5 );
-		ProxmoxJobs::power();
+		PowerJobs::power();
 		$this->assertNull( Resource::find( $r->id() )->get( 'display_pending_at' ) );
 	}
 
