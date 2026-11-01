@@ -17,9 +17,23 @@ final class AppInstall {
 	public const RETRY = 'app_retry';
 
 	public static function register(): void {
+		add_filter( 'beltoft_services_job_hooks', array( __CLASS__, 'job_hooks' ) );
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 10, 3 );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+	}
+
+	/**
+	 * Adds the install job to the hooks the site runner claims.
+	 *
+	 * @param mixed $hooks Hook names.
+	 * @return array<int, string>
+	 */
+	public static function job_hooks( $hooks ): array {
+		$hooks   = is_array( $hooks ) ? $hooks : array();
+		$hooks[] = self::HOOK;
+
+		return $hooks;
 	}
 
 	/** Recover an install action lost after the server became ready. */

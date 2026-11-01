@@ -19,6 +19,33 @@ final class DiskDriver implements Driver {
 		return $driver && self::ID === $driver->id() ? ProxmoxDriver::DEFAULT_RETENTION_DAYS : $days;
 	}
 
+	/**
+	 * Adds the paid-disk lines to the failed-service admin mail when a paid disk was not delivered.
+	 *
+	 * @param mixed                $lines   Mail body lines.
+	 * @param Resource             $r       Failed resource.
+	 * @param array<string, mixed> $license License row.
+	 * @return array<int, string>
+	 */
+	public static function failure_alert_lines( $lines, $r, $license ): array {
+		$lines = is_array( $lines ) ? $lines : array();
+
+		if ( ! $r instanceof Resource || self::ID !== $r->get( 'driver' ) || 'provision' !== $r->get( 'failed_op' ) || (int) ( is_array( $license ) ? ( $license['order_id'] ?? 0 ) : 0 ) <= 0 ) {
+			return $lines;
+		}
+
+		$lines[] = sprintf( 'Paid disk not delivered: review and refund order #%d.', (int) $license['order_id'] );
+		$order   = wc_get_order( (int) $license['order_id'] );
+		$item_id = (int) $r->get( 'order_item_id' );
+		$item    = $order && $item_id ? $order->get_item( $item_id ) : null;
+
+		if ( $item instanceof \WC_Order_Item_Product ) {
+			$lines[] = sprintf( 'Disk line charged: %s %s including tax.', (string) $order->get_currency(), (string) ( (float) $item->get_total() + (float) $item->get_total_tax() ) );
+		}
+
+		return $lines;
+	}
+
 	public function id(): string {
 		return self::ID;
 	}

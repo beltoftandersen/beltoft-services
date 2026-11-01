@@ -3,10 +3,6 @@
  * Today's forbidden dependencies (see DependencyDirectionTest). Remove entries as leaks are fixed; never add.
  */
 return array(
-	'Alerts.php -> Proxmox\DiskDriver',
-	'Jobs.php -> Proxmox\AppInstall',
-	'Jobs.php -> Proxmox\AppStatus',
-	'Jobs.php -> Proxmox\PrivateAttach',
 	'LineNames.php -> Proxmox\DiskDriver',
 	'LineNames.php -> Proxmox\ServerName',
 	'LineNames.php -> Usage\Account',

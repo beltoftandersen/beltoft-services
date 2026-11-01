@@ -205,6 +205,13 @@ final class MailAccess {
 	}
 
 	/**
+	 * Listens to state changes: a deleted mail service keeps no password.
+	 */
+	public static function register(): void {
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
+	}
+
+	/**
 	 * Listener of beltoft_services_state_changed: a deleted mail service keeps no password.
 	 *
 	 * @param mixed  $r   Resource.
