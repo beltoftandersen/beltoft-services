@@ -172,6 +172,32 @@ final class Settings {
 				'label'   => __( 'Pay as you go services before the first paid usage invoice', 'beltoft-services' ),
 				'desc'    => __( 'The most services an account may run until a usage invoice has been paid. 0 means no limit.', 'beltoft-services' ),
 			),
+			'credit_enabled' => array(
+				'tab'     => 'general',
+				'section' => 'credit',
+				'type'    => 'checkbox',
+				'default' => 0,
+				'label'   => __( 'Account credit for pay as you go', 'beltoft-services' ),
+				'desc'    => __( 'Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows.', 'beltoft-services' ),
+			),
+			'credit_min' => array(
+				'tab'     => 'general',
+				'section' => 'credit',
+				'type'    => 'number',
+				'default' => 10,
+				'min'     => 1,
+				'label'   => __( 'Smallest top-up', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
+			),
+			'credit_max' => array(
+				'tab'     => 'general',
+				'section' => 'credit',
+				'type'    => 'number',
+				'default' => 1000,
+				'min'     => 1,
+				'label'   => __( 'Largest top-up', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency.', 'beltoft-services' ),
+			),
 		);
 
 		/**
@@ -212,6 +238,7 @@ final class Settings {
 			'general' => __( 'General', 'beltoft-services' ),
 			'account' => __( 'My Account', 'beltoft-services' ),
 			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
+			'credit'  => __( 'Account credit', 'beltoft-services' ),
 			'api'     => __( 'Use with Claude (MCP)', 'beltoft-services' ),
 		);
 

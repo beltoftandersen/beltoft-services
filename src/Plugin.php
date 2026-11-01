@@ -178,6 +178,10 @@ final class Plugin {
 		Usage\Catalog::register();
 		Usage\Renewal::register();
 		Usage\Emails::register();
+		Credit\Topup::register();
+		Credit\Page::register();
+		Credit\Invoice::register();
+		Credit\Grant::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;

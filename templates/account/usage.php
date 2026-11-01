@@ -7,6 +7,7 @@
  * @package BeltoftServices
  *
  * @var array{total: float, currency: string, next: int, resources: array<int, array{label: string, total: float, lines: array<int, array{item: string, label: string, hours: int, charge: float, capped: bool}>}>} $estimate The estimate (see BeltoftServices\Usage\Estimate).
+ * @var int $credit Account credit in cents (0: none).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -47,6 +48,19 @@ use BeltoftServices\Usage\Estimate;
 				<?php endforeach; ?>
 			</dl>
 		<?php endforeach; ?>
+		<?php if ( ! empty( $credit ) && $credit > 0 ) : ?>
+			<p class="beltoft-services-usage__credit">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %s: amount. */
+						__( 'Account credit: %s, used first on your next usage invoice.', 'beltoft-services' ),
+						Estimate::money( $credit / 100, $estimate['currency'] )
+					)
+				);
+				?>
+			</p>
+		<?php endif; ?>
 		<?php if ( $estimate['next'] > 0 ) : ?>
 			<p>
 				<?php

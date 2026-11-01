@@ -52,7 +52,7 @@ $wpdb->suppress_errors( $beltoft_services_quiet );
 $beltoft_services_no_live = ( '' === $beltoft_services_live_error && '0' === (string) $beltoft_services_live ) || ( '' !== $beltoft_services_live_error && false !== stripos( $beltoft_services_live_error, "doesn't exist" ) );
 
 // The IP pool, VM records and private network allocations. The warning is on the setting's description.
-$beltoft_services_tables = array( 'bs_usage', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' );
+$beltoft_services_tables = array( 'bs_usage', 'bs_credit', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' );
 if ( $beltoft_services_no_live ) {
 	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log' ), $beltoft_services_tables );
 }

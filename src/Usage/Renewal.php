@@ -218,6 +218,8 @@ final class Renewal {
 		// The latest month among the lines (Unix time of its first hour), for the emails.
 		$order->update_meta_data( self::META_PERIOD, (string) max( array_column( $statement['lines'], 'month' ) ) );
 		$order->calculate_totals( true );
+		// Credit pays after the usage lines and taxes are final.
+		\BeltoftServices\Credit\Invoice::apply( $order, (int) $subscription->get_customer_id() );
 		$order->save();
 
 		return $order;
