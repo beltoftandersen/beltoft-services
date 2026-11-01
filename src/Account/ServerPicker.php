@@ -495,6 +495,9 @@ final class ServerPicker {
 		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) );
 		$unknown   = array() !== array_filter( $available, static fn( $plan ) => ! empty( $plan['unknown'] ) );
 
+		self::billing( $plans, $selected, 'usage' === $values['billing'], '' !== $values['backups'] );
+		self::error( $errors, 'billing' );
+
 		echo '<fieldset class="beltoft-services-picker__plans"><legend class="beltoft-services-picker__legend">' . esc_html__( 'Plan', 'beltoft-services' ) . '</legend>';
 
 		if ( array() === $available ) {
@@ -525,8 +528,6 @@ final class ServerPicker {
 		self::backups( $plans, $selected, '' !== $values['backups'] );
 		self::error( $errors, 'backups' );
 
-		self::billing( $plans, $selected, 'usage' === $values['billing'], '' !== $values['backups'] );
-		self::error( $errors, 'billing' );
 
 		$chosen = $plans[ $selected ] ?? reset( $plans );
 
@@ -746,14 +747,18 @@ final class ServerPicker {
 		$shown = $plan && ! empty( $plan['usage'] );
 		$with  = $shown && $backups && ! empty( $plan['backups'] ) && ! empty( $plan['usage']['backups_variation_id'] );
 
-		echo '<fieldset class="beltoft-services-picker__billing" data-picker-billing' . ( $shown ? '' : ' hidden' ) . '><legend class="beltoft-services-picker__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
-		echo '<label><input type="radio" name="' . esc_attr( self::BILLING ) . '" value="monthly"';
-		checked( ! ( $usage && $shown ), true );
-		echo '> <span>' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span></label>';
-		echo '<label><input type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
-		checked( $usage && $shown, true );
-		echo '> <span>' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></label>';
-		echo '<p class="description" data-picker-usage-note' . ( '' === BillingField::note() ? ' hidden' : '' ) . '>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
+		$on_usage = $usage && $shown;
+		echo '<fieldset class="beltoft-services-picker__billing" data-picker-billing><legend class="beltoft-services-picker__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
+		echo '<div class="beltoft-services-picker__bills">';
+		echo '<label class="beltoft-services-bill"><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="monthly"';
+		checked( ! $on_usage, true );
+		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Monthly', 'beltoft-services' ) . '</span></span></label>';
+		echo '<label class="beltoft-services-bill' . ( $shown ? '' : ' is-disabled' ) . '" data-picker-usage-tile><input class="beltoft-services-bill__input" type="radio" name="' . esc_attr( self::BILLING ) . '" value="usage"';
+		checked( $on_usage, true );
+		disabled( ! $shown, true );
+		echo '><span class="beltoft-services-bill__face"><span class="beltoft-services-bill__name">' . esc_html__( 'Pay as you go', 'beltoft-services' ) . '</span> <span class="beltoft-services-picker__rate" data-picker-usage-label>' . esc_html( $shown ? self::usage_label( $plan, $with ) : '' ) . '</span></span></label>';
+		echo '</div>';
+		echo '<p class="description" data-picker-usage-note' . ( '' === BillingField::note() || ! $shown ? ' hidden' : '' ) . '>' . esc_html( $shown ? BillingField::note() : '' ) . '</p>';
 		echo '</fieldset>';
 	}
 

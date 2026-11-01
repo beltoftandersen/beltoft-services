@@ -215,6 +215,21 @@ class CatalogTest extends UsageTestCase {
 		$this->assertSame( $this->v['u-None']->get_id(), (int) $lines[0]['variation_id'] );
 	}
 
+	public function test_the_billing_box_comes_first_and_stays_when_a_plan_has_no_pay_as_you_go(): void {
+		Offers::reset();
+		ob_start();
+		ServerPicker::render();
+		$html = (string) ob_get_clean();
+
+		$billing = strpos( $html, 'beltoft-services-picker__billing' );
+		$plans   = strpos( $html, 'beltoft-services-picker__plans' );
+		$this->assertNotFalse( $billing );
+		$this->assertLessThan( $plans, $billing, 'The billing choice is above the plans.' );
+		$this->assertStringNotContainsString( 'data-picker-billing hidden', $html, 'The box is never hidden; a plan without it greys the tile out.' );
+		$this->assertMatchesRegularExpression( '#<input class="beltoft-services-bill__input" type="radio" name="' . ServerPicker::BILLING . '" value="monthly"#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#value="usage"[^>]*disabled#', $html, 'This plan offers pay as you go, so the tile can be chosen.' );
+	}
+
 	private function in_cart( \WC_Product_Variation $v ): void {
 		WC()->cart->empty_cart();
 		$this->assertNotFalse( WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), BackupField::attributes( $v ) ) );

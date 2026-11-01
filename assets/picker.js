@@ -177,10 +177,22 @@
 		hasUsage = '1' === radio.getAttribute( 'data-has-usage' );
 
 		if ( billing ) {
-			billing.hidden = ! hasUsage;
+			// The box stays put above the plans: a plan without Pay as you go greys that choice out instead of hiding the box.
+			if ( usage ) {
+				usage.disabled = ! hasUsage;
+				usage.closest( '[data-picker-usage-tile]' ).classList.toggle( 'is-disabled', ! hasUsage );
+			}
 
 			if ( ! hasUsage && monthly ) {
 				monthly.checked = true;
+			}
+
+			if ( usageNote ) {
+				usageNote.hidden = ! hasUsage || '' === ( usageNote.textContent || '' );
+			}
+
+			if ( ! hasUsage && usageLabel ) {
+				usageLabel.textContent = '';
 			}
 
 			suffix = withBackups && '1' === radio.getAttribute( 'data-has-usage-backups' ) ? '-backups' : '';
@@ -191,6 +203,7 @@
 
 			if ( hasUsage && usageNote ) {
 				usageNote.textContent = radio.getAttribute( 'data-usage-note' + suffix ) || '';
+				usageNote.hidden = '' === usageNote.textContent;
 			}
 		}
 
