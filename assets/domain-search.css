@@ -9,6 +9,11 @@
   max-width: 42rem;
 }
 
+/* As a block in a flex column (Bricks), the form still fills the row. */
+:where(.beltoft-domain-form) {
+  width: 100%;
+}
+
 /* Form controls use the page's font, not the browser's. */
 .beltoft-domain-search input,
 .beltoft-domain-search button,
