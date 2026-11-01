@@ -49,6 +49,11 @@ final class BillingRequirements {
 				continue;
 			}
 
+			// "Add a card" is billed like a server: the same full details.
+			if ( ! empty( $item[ \BeltoftServices\Card\Card::CART_KEY ] ) ) {
+				return true;
+			}
+
 			if ( Product::driver_for( (int) ( $item['product_id'] ?? 0 ) ) instanceof NeedsBilling ) {
 				return true;
 			}

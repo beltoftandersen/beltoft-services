@@ -154,6 +154,19 @@ final class Account {
 	}
 
 	/**
+	 * Does the customer have an active usage account whose saved card Mollie says can be charged (valid, not
+	 * expired)? Checks with Mollie (details cached for ten minutes). False when the account is on hold, has no
+	 * card, or Mollie cannot be asked: an order that relies on the card then goes the normal way.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function has_valid_mandate( int $user_id ): bool {
+		$account = self::for_user( $user_id, array( 'active' ) );
+
+		return $account && self::has_card( $account ) && \BeltoftServices\Card\Card::usable( \BeltoftServices\Card\Card::details( $account ) );
+	}
+
+	/**
 	 * Marks the subscription made at checkout from the hidden product as the customer's account.
 	 *
 	 * @param \WC_Subscription $subscription Subscription.
