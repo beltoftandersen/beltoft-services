@@ -40,8 +40,23 @@ delete_option( 'beltoft_services_oauth_db_version' );
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time cleanup of the plugin's own transients.
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_beltoft_services_' ) . '%', $wpdb->esc_like( '_transient_timeout_beltoft_services_' ) . '%' ) );
 
+// Live services: the IP pool, VM records and private network allocations are the only link between a machine
+// and its service, so they stay while any service that is not deleted exists (a live activation of a kind
+// other than "site"). Fail closed: any query error counts as "services exist"; only an absent activations
+// table (error 1146) means there are none.
+$beltoft_services_quiet = $wpdb->suppress_errors( true );
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the licenses plugin's table, read once.
+$beltoft_services_live = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE deactivated_at IS NULL AND kind <> %s', $wpdb->prefix . 'beltoft_licenses_activations', 'site' ) );
+$beltoft_services_live_error = (string) $wpdb->last_error;
+$wpdb->suppress_errors( $beltoft_services_quiet );
+$beltoft_services_no_live = ( '' === $beltoft_services_live_error && '0' === (string) $beltoft_services_live ) || ( '' !== $beltoft_services_live_error && false !== stripos( $beltoft_services_live_error, "doesn't exist" ) );
+
 // The IP pool, VM records and private network allocations. The warning is on the setting's description.
-foreach ( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log', 'bs_usage', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' ) as $beltoft_services_table ) {
+$beltoft_services_tables = array( 'bs_usage', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' );
+if ( $beltoft_services_no_live ) {
+	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log' ), $beltoft_services_tables );
+}
+foreach ( $beltoft_services_tables as $beltoft_services_table ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables.
 	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . $beltoft_services_table ) );
 }

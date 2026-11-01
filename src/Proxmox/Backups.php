@@ -158,8 +158,20 @@ final class Backups {
 	 * @param Resource $r Resource.
 	 */
 	public static function purge_due( Resource $r ): bool {
-		return true === $r->get( 'backup_purge' ) && in_array( $r->get( 'state' ), array( 'ready', 'paused' ), true );
+		if ( true !== $r->get( 'backup_purge' ) || ! in_array( $r->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
+			return false;
+		}
+
+		// Deleting backups is irreversible: only with deletion on, and a week after the plan change.
+		$queued = (int) $r->get( 'backup_purge_at' );
+
+		return 'on' === (string) Settings::get( 'deletion_mode' ) && $queued > 0 && time() >= $queued + self::PURGE_GRACE;
 	}
+
+	/**
+	 * Seconds between a plan change to one without backups and the removal of the backups.
+	 */
+	public const PURGE_GRACE = 7 * DAY_IN_SECONDS;
 
 	/**
 	 * Days the plan keeps backups. A managed database whose plan names none keeps DB_DEFAULT_DAYS: its backups
@@ -588,6 +600,7 @@ final class Backups {
 		$stored = $this->store(
 			array(
 				'backup_purge'   => null,
+				'backup_purge_at' => null,
 				'backup_list'    => null,
 				'backup_task'    => null,
 				'backup_ok_at'   => null,

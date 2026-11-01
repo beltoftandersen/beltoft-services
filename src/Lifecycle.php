@@ -119,8 +119,36 @@ final class Lifecycle {
 		}
 
 		if ( $resource ) {
-			self::desire( $resource, 'paused', sprintf( 'License %s', Licenses::effective_status( $license ) ) );
+			self::pause_or_alert( $resource, sprintf( 'License %s', Licenses::effective_status( $license ) ) );
 		}
+	}
+
+	/**
+	 * Alert text when the license of an adopted (linked) machine lapses.
+	 */
+	public const LINKED_PAUSE_ERROR = 'The license of a linked VM lapsed; it was not shut down. Decide by hand.';
+
+	/**
+	 * Wants a service paused. An adopted (linked) machine is never shut down by a lapsed
+	 * license: the admin is alerted and decides.
+	 *
+	 * @param Resource $resource Resource.
+	 * @param string   $reason   History text.
+	 */
+	private static function pause_or_alert( Resource $resource, string $reason ): void {
+		if ( true !== $resource->get( 'linked' ) ) {
+			self::desire( $resource, 'paused', $reason );
+			return;
+		}
+
+		$resource->locked(
+			static function () use ( $resource ): bool {
+				Alerts::admin( $resource, self::LINKED_PAUSE_ERROR );
+
+				return true;
+			}
+		);
+		Events::add( (int) $resource->license()['id'], 'service', $reason . ': the linked VM was not shut down. ' . self::LINKED_PAUSE_ERROR );
 	}
 
 	/**
@@ -153,11 +181,17 @@ final class Lifecycle {
 		$pending = $resource->pending_desire();
 		$desired = $pending ? $pending['state'] : $resource->get( 'desired' );
 
-		if ( 'deleted' === $desired || $want === $desired ) {
+		if ( $want === $desired || ( 'deleted' === $desired && ! ( 'ready' === $want && $resource->delete_cancellable() ) ) ) {
 			return;
 		}
 
-		self::desire( $resource, $want, $active ? 'License active' : sprintf( 'License %s', Licenses::effective_status( $license ) ) );
+		$reason = $active ? 'License active' : sprintf( 'License %s', Licenses::effective_status( $license ) );
+
+		if ( $active ) {
+			self::desire( $resource, $want, $reason );
+		} else {
+			self::pause_or_alert( $resource, $reason );
+		}
 	}
 
 	/**
@@ -210,9 +244,10 @@ final class Lifecycle {
 		// creates a new one with the product's driver and plan (replace = true). The old
 		// driver never gets the new product's plan.
 		if ( $driver && $driver->id() !== $resource->get( 'driver' ) ) {
-			// Only an unprotected service of an active license is replaced; anything else (a
-			// migrated tenant, a suspended license) is left for an admin to decide.
-			if ( ! $resource->get( 'protected' ) && self::is_active( $license ) ) {
+			// Only an unprotected service of an active license is replaced, and only while deletion
+			// is turned on; anything else (a migrated tenant, a suspended license, deletion off or
+			// report only) is left for an admin to decide.
+			if ( 'on' === (string) Settings::get( 'deletion_mode' ) && ! $resource->get( 'protected' ) && self::is_active( $license ) ) {
 				self::desire( $resource, 'deleted', sprintf( 'Product changed to another service driver (%s); the service is replaced', $driver->id() ), true );
 			} else {
 				self::driver_conflict( $license, $resource, $product_id );

@@ -260,6 +260,21 @@ class SchemaTest extends TestCase {
 		$this->assertEquals( 1, get_transient( 'someone_elses_transient' ), 'Other plugins\' transients are left alone.' );
 	}
 
+	public function test_uninstall_keeps_the_vm_tables_while_a_service_exists(): void {
+		$t       = Schema::tables();
+		$product = $this->service_product( 'fake' );
+		$this->fake_driver();
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, \BeltoftServices\Resource::create( $license, \BeltoftServices\Drivers\Registry::get( 'fake' ), array() ) );
+
+		$joined = implode( ' ', preg_grep( '/DROP TABLE/i', $this->uninstall( 1 ) ) );
+
+		$this->assertStringNotContainsString( $t['ips'], $joined );
+		$this->assertStringNotContainsString( $t['vms'], $joined );
+		$this->assertStringNotContainsString( 'beltoft_services_private_nets', $joined );
+		$this->assertStringContainsString( 'bs_usage', $joined, 'The rest still goes.' );
+	}
+
 	public function test_uninstall_drops_dns_claims_and_empty_assignments(): void {
 		global $wpdb;
 		$t = \BeltoftServices\Domains\DnsSchema::tables();

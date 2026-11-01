@@ -68,7 +68,7 @@ class SettingsTest extends TestCase {
 				'pause_all'    => '1',
 			)
 		);
-		$this->assertSame( 0, $clean['warning_days'] );
+		$this->assertSame( 1, $clean['warning_days'], 'At least one day of warning.' );
 		$this->assertSame( get_option( 'admin_email' ), $clean['admin_email'] );
 		$this->assertSame( 1, $clean['pause_all'] );
 	}

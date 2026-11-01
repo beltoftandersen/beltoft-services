@@ -528,6 +528,7 @@ final class LifecycleTest extends TestCase {
 	}
 
 	public function test_switch_to_another_driver_replaces_the_service(): void {
+		$this->settings( array( 'deletion_mode' => 'on' ) );
 		$other = $this->fake_driver( 'fake2' );
 
 		list( $license, $resource ) = $this->provisioned();
@@ -555,6 +556,26 @@ final class LifecycleTest extends TestCase {
 		$this->assertSame( 'ready', $new->get( 'state' ) );
 		$this->assertCount( 1, $other->calls( 'provision' ) );
 		$this->assertSame( array(), $other->calls( 'delete' ) );
+	}
+
+	public function test_switch_to_another_driver_is_left_to_the_admin_unless_deletion_is_on(): void {
+		foreach ( array( 'off', 'report' ) as $mode ) {
+			$this->settings( array( 'deletion_mode' => $mode ) );
+			$this->mails                = array();
+			$other                      = $this->fake_driver( 'fake2' );
+			list( $license, $resource ) = $this->provisioned();
+			$product                    = $this->service_product( 'fake2', array(), array( 'slug' => 'other-service-' . $mode ) );
+
+			Licenses::update( (int) $license['id'], array( 'product_id' => $product->get_id() ) );
+			$this->run_jobs();
+
+			$fresh = $this->fresh( $resource );
+			$this->assertSame( 'ready', $fresh->get( 'desired' ), $mode );
+			$this->assertTrue( $fresh->is_live(), $mode );
+			$this->assertSame( array(), $this->driver->calls( 'delete' ), $mode );
+			$this->assertSame( array(), $other->calls(), $mode );
+			$this->assertCount( 1, $this->mails, 'The admin is alerted: ' . $mode );
+		}
 	}
 
 	public function test_switch_to_a_product_with_the_same_driver_updates_the_plan(): void {

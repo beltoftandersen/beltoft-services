@@ -230,12 +230,19 @@ class DiskPolicyTest extends BackupTestCase {
 		$calls = count( $this->fake->calls() );
 		$result = Registry::get( 'proxmox' )->delete( $server );
 		$this->assertTrue( $result->is_retry() );
-		$this->assertStringContainsString( 'active extra disk cannot be deleted', $result->error() );
+		$this->assertStringContainsString( 'extra disk that is not deleted cannot be deleted', $result->error() );
 		$this->assertCount( 0, $this->calls( 'DELETE', '/qemu/5000' ), 'No VM delete.' );
 		$this->assertCount( 1, $this->mails, 'One admin alert.' );
 		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $disk->license()['id'], array( 'status' => 'revoked' ) ) );
+		// A lapsed license whose disk is only paused (still retained) keeps blocking the server delete.
+		$this->assertTrue( $disk->set( array( 'state' => 'paused' ) ) );
+		$paused = Registry::get( 'proxmox' )->delete( Resource::find( $server->id() ) );
+		$this->assertTrue( $paused->is_retry() );
+		$this->assertStringContainsString( 'extra disk that is not deleted', $paused->error() );
+		$this->assertCount( 0, $this->calls( 'DELETE', '/qemu/5000' ), 'No VM delete over a retained disk.' );
+		$this->assertTrue( Resource::find( $disk->id() )->set( array( 'state' => 'deleted' ) ) );
 		$next = Registry::get( 'proxmox' )->delete( Resource::find( $server->id() ) );
-		$this->assertStringNotContainsString( 'active extra disk', (string) $next->error() );
+		$this->assertStringNotContainsString( 'extra disk that is not deleted', (string) $next->error() );
 	}
 
 	public function test_pause_detaches_a_drive_that_holds_the_volume_even_without_an_attach_step(): void {

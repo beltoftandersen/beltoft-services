@@ -122,6 +122,11 @@ final class Zone {
 		if ( $r->folded_into() > 0 ) { return StepResult::done(); }
 		$name = (string) $r->get( 'domain' );
 		if ( ! $r->get( 'zone_claimed' ) && ! $r->get( 'zone_ready' ) ) { return StepResult::done(); }
+		// A name that is still registered with us keeps its zone: deleting it would take the live site and mail down. Staff decide.
+		if ( 'domain' === $r->get( 'driver' ) && 'dns' !== $r->get( 'mode' ) && 'ACT' === strtoupper( (string) $r->get( 'registrar_status' ) ) ) {
+			Alerts::admin( $r, 'The domain is still registered here; its DNS zone was not deleted. Review it by hand.' );
+			return StepResult::retry( 3600, 'The domain is still registered here; its DNS zone was not deleted.' );
+		}
 		$owner = self::owner( $r );
 		if ( 'other' === $owner ) { return StepResult::retry( 3600, 'DNS zone ownership needs staff review.' ); }
 		$remote_id = (string) $r->get( 'remote_id' );

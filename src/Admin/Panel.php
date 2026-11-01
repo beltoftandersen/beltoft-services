@@ -231,8 +231,10 @@ final class Panel {
 						// Still paused: the retention period starts now, never from the pause the hold began.
 						if ( ! $active ) {
 							$meta['paused_at'] = time();
-							$meta['warned_at'] = null;
-							$meta['reported']  = '';
+							$meta['warned_at']       = null;
+							$meta['warn_started_at'] = null;
+							$meta['warn_alerted']    = null;
+							$meta['reported']        = '';
 						}
 
 						if ( ! $r->set( $meta ) ) {
@@ -353,9 +355,15 @@ final class Panel {
 	 * @return true|\WP_Error
 	 */
 	private static function mark_deleted( Resource $r, string $who ) {
-		$old    = '';
-		$stored = $r->locked(
-			static function () use ( $r, $who, &$old ): bool {
+		$old     = '';
+		$refused = false;
+		$stored  = $r->locked(
+			static function () use ( $r, $who, &$old, &$refused ): bool {
+				if ( $r->get( 'protected' ) ) {
+					$refused = true;
+					return false;
+				}
+
 				$old = $r->get( 'state' );
 
 				$cleared = $r->set(
@@ -380,6 +388,10 @@ final class Panel {
 				return true;
 			}
 		);
+
+		if ( $refused ) {
+			return self::error( 'protected' );
+		}
 
 		if ( null === $stored ) {
 			return self::error( 'busy' );
