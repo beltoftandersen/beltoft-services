@@ -1,7 +1,11 @@
 (function () {
   'use strict';
 
+  // Sets up every search form that is not set up yet. Bricks calls this again when the element is rendered in the builder.
+  function init() {
   document.querySelectorAll('.beltoft-domain-search').forEach(function (root) {
+    if (root.dataset.bdsReady) return;
+    root.dataset.bdsReady = '1';
     const input = root.querySelector('input[type="search"]');
     const results = root.querySelector('.beltoft-domain-results');
     const searchButton = root.querySelector('button');
@@ -188,6 +192,10 @@
     restore();
     input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); search(); } });
   });
+  }
+
+  window.beltoftDomainSearchInit = init;
+  init();
 }());
 
 // Back from checkout or a login restores this page from the browser cache, with the nonces it had
