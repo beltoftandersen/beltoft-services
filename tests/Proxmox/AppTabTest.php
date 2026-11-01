@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftLicenses\Account\View;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Actions;
@@ -118,9 +119,9 @@ class AppTabTest extends MonitoringTestCase {
 	public function test_the_tab_has_its_own_address_and_opens_from_it(): void {
 		$r = $this->with_app();
 		$slug = \BeltoftServices\Account\Slugs::for_license( $r->license() );
-		$this->assertStringContainsString( $slug . '/app', rawurldecode( Servers::url( $r->license(), 'app' ) ) );
+		$this->assertStringContainsString( $slug . '/app', rawurldecode( ServerLinks::url( $r->license(), 'app' ) ) );
 		$GLOBALS['wp']->query_vars['vps'] = $slug . '/app';
-		$this->assertSame( 'app', Servers::requested()['tab'] );
+		$this->assertSame( 'app', ServerLinks::requested()['tab'] );
 
 		$html = $this->page( $r, 'app' );
 		$this->assertMatchesRegularExpression( '/data-tab-link="app" aria-current="page"/', $html );
@@ -135,7 +136,7 @@ class AppTabTest extends MonitoringTestCase {
 			$this->assertStringContainsString( 'data-tab-link="' . $tab . '"', $html );
 		}
 
-		$this->assertSame( array( 'snapshots', 'backups', 'disks', 'access', 'reinstall', 'console', 'firewall', 'network', 'app' ), Servers::tabs() );
+		$this->assertSame( array( 'snapshots', 'backups', 'disks', 'access', 'reinstall', 'console', 'firewall', 'network', 'app' ), ServerLinks::tabs() );
 	}
 
 	// -- The states ----------------------------------------------------------------------------
@@ -347,14 +348,14 @@ class AppTabTest extends MonitoringTestCase {
 		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
 
 		unset( $GLOBALS['wp']->query_vars['vps'] );
-		do_action( 'beltoft_services_account_assets', 'parent-handle', Servers::slug() );
+		do_action( 'beltoft_services_account_assets', 'parent-handle', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not on the list.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
 		do_action( 'beltoft_services_account_assets', 'parent-handle', 'licenses' );
 		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not on another endpoint.' );
 
-		do_action( 'beltoft_services_account_assets', 'parent-handle', Servers::slug() );
+		do_action( 'beltoft_services_account_assets', 'parent-handle', ServerLinks::slug() );
 		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
 		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
 	}
@@ -427,21 +428,21 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertFalse( wp_script_is( AppTab::HANDLE, 'enqueued' ), 'Another endpoint.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = '';
-		AppTab::assets( 'handle', Servers::slug() );
+		AppTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( AppTab::HANDLE, 'enqueued' ), 'The list of servers.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = (string) $plain->license()['id'];
 		wp_set_current_user( (int) $plain->license()['user_id'] );
-		AppTab::assets( 'handle', Servers::slug() );
+		AppTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( AppTab::HANDLE, 'enqueued' ), 'A server without an app.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = (string) $with->license()['id'];
 		wp_set_current_user( self::factory()->user->create() );
-		AppTab::assets( 'handle', Servers::slug() );
+		AppTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( AppTab::HANDLE, 'enqueued' ), 'Someone else\'s server.' );
 
 		wp_set_current_user( (int) $with->license()['user_id'] );
-		AppTab::assets( 'handle', Servers::slug() );
+		AppTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertTrue( wp_script_is( AppTab::HANDLE, 'enqueued' ) );
 		$this->assertTrue( wp_style_is( AppTab::HANDLE, 'enqueued' ) );
 	}

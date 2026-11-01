@@ -41,39 +41,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Servers {
 
-	/**
-	 * The tabs of a server page after the overview, by address part.
-	 */
-	public const TABS = array( 'snapshots', 'backups', 'disks', 'access', 'reinstall' );
 
-	/**
-	 * The value after the endpoint that is the New server page (the picker).
-	 */
-	public const NEW_VALUE = 'new';
-
-	/**
-	 * The tab addresses a server page accepts: the built-in ones, plus any an extension adds.
-	 *
-	 * @return array<int, string>
-	 */
-	public static function tabs(): array {
-		/**
-		 * Filters the tab addresses of a server page. An extension that adds a tab (see the filter
-		 * beltoft_services_server_tabs) adds its slug here so the tab has its own address.
-		 *
-		 * @param array<int, string> $slugs Slugs after the overview.
-		 */
-		$slugs = apply_filters( 'beltoft_services_server_page_tabs', self::TABS );
-
-		return array_values( array_filter( is_array( $slugs ) ? $slugs : self::TABS, 'is_string' ) );
-	}
-
-	/**
-	 * The page being printed (license row, requested tab), or null outside a server page.
-	 *
-	 * @var array<string, mixed>|null
-	 */
-	private static $page = null;
 
 	/**
 	 * The default licenses template, kept while this class prints the list.
@@ -91,57 +59,12 @@ final class Servers {
 	}
 
 	/**
-	 * The endpoint the tab lives on.
-	 */
-	public static function slug(): string {
-		/**
-		 * Filters the My Account endpoint of the Servers tab (the slug of the tab declared by Tabs).
-		 *
-		 * @param string $slug Endpoint, default vps.
-		 */
-		$slug = sanitize_key( (string) apply_filters( 'beltoft_services_servers_slug', 'vps' ) );
-
-		return '' !== $slug ? $slug : 'vps';
-	}
-
-	/**
-	 * The address of a server's page or of one of its tabs.
-	 *
-	 * @param array<string, mixed> $license License row.
-	 * @param string               $tab     Tab, or '' for the overview.
-	 */
-	public static function url( array $license, string $tab = '' ): string {
-		if ( ! function_exists( 'wc_get_endpoint_url' ) ) {
-			return '';
-		}
-
-		$value = Slugs::value( $license, in_array( $tab, self::tabs(), true ) ? $tab : '' );
-
-		return wc_get_endpoint_url( self::slug(), $value, wc_get_page_permalink( 'myaccount' ) );
-	}
-
-	/**
-	 * The address of the New server page (the picker).
-	 *
-	 * @param int $plan Variation id to start with, 0 for none.
-	 */
-	public static function url_new( int $plan = 0 ): string {
-		if ( ! function_exists( 'wc_get_endpoint_url' ) ) {
-			return '';
-		}
-
-		$url = wc_get_endpoint_url( self::slug(), self::NEW_VALUE, wc_get_page_permalink( 'myaccount' ) );
-
-		return $plan > 0 ? add_query_arg( 'plan', $plan, $url ) : $url;
-	}
-
-	/**
 	 * The "Create a server" button: the New server page when a server product is published; none otherwise.
 	 *
 	 * @return array<int, array<string, string>>
 	 */
 	public static function buttons(): array {
-		$url = '' !== ServiceArea::product_url( array( 'proxmox' ) ) ? self::url_new() : '';
+		$url = '' !== ServiceArea::product_url( array( 'proxmox' ) ) ? ServerLinks::url_new() : '';
 
 		/**
 		 * The address of the "Create a server" button. Return '' for no button.
@@ -159,41 +82,6 @@ final class Servers {
 	}
 
 	/**
-	 * Is the address the New server page (the value after the endpoint is "new")?
-	 */
-	public static function is_new(): bool {
-		global $wp;
-
-		$value = is_object( $wp ) && isset( $wp->query_vars[ self::slug() ] ) ? (string) $wp->query_vars[ self::slug() ] : '';
-		$parts = explode( '/', trim( sanitize_text_field( $value ), '/' ) );
-
-		return self::NEW_VALUE === $parts[0];
-	}
-
-	/**
-	 * The server page being printed, or null.
-	 *
-	 * @return array<string, mixed>|null
-	 */
-	public static function page(): ?array {
-		return self::$page;
-	}
-
-	/**
-	 * What the address after the endpoint says: the license id (from the server's slug, or the number itself) and the tab.
-	 *
-	 * @return array{id: int, tab: string}
-	 */
-	public static function requested(): array {
-		$asked = Slugs::parse( self::slug(), 'servers' );
-
-		return array(
-			'id'  => $asked['id'],
-			'tab' => in_array( $asked['second'], self::tabs(), true ) ? $asked['second'] : '',
-		);
-	}
-
-	/**
 	 * Listener of wc_get_template: the licenses template on the Servers tab becomes the list or the page.
 	 *
 	 * @param mixed $located  Path of the template WooCommerce found.
@@ -202,7 +90,7 @@ final class Servers {
 	 * @return mixed
 	 */
 	public static function template( $located, $name = '', $args = array() ) {
-		if ( 'myaccount/licenses.php' !== $name || ! is_array( $args ) || ! isset( $args['licenses'] ) || ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( self::slug() ) ) {
+		if ( 'myaccount/licenses.php' !== $name || ! is_array( $args ) || ! isset( $args['licenses'] ) || ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( ServerLinks::slug() ) ) {
 			return $located;
 		}
 
@@ -218,7 +106,7 @@ final class Servers {
 	 * @param string                           $empty     Text for an empty tab.
 	 */
 	public static function render( array $views, string $empty = '' ): void {
-		if ( self::is_new() ) {
+		if ( ServerLinks::is_new() ) {
 			ServerPicker::render();
 
 			return;
@@ -257,7 +145,7 @@ final class Servers {
 			)
 		);
 
-		$asked = self::requested();
+		$asked = ServerLinks::requested();
 
 		if ( $asked['id'] > 0 && isset( $servers[ $asked['id'] ] ) ) {
 			self::detail( $servers[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ] ?? null );
@@ -265,7 +153,7 @@ final class Servers {
 			return;
 		}
 
-		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( self::slug(), 'servers' ) ) ) {
+		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( ServerLinks::slug(), 'servers' ) ) ) {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'That server was not found. Here are your servers.', 'beltoft-services' ) . '</p>';
 		}
 
@@ -326,7 +214,7 @@ final class Servers {
 		}
 
 		// A server's page by license id goes to its slug address.
-		$target = Slugs::redirect_target( self::slug(), 'servers', array( __CLASS__, 'url' ) );
+		$target = Slugs::redirect_target( ServerLinks::slug(), 'servers', array( ServerLinks::class, 'url' ) );
 
 		if ( '' !== $target ) {
 			wp_safe_redirect( $target, 301 );
@@ -339,11 +227,11 @@ final class Servers {
 	 * server it is on.
 	 */
 	public static function redirect_target(): string {
-		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( self::slug() ) || ! is_user_logged_in() ) {
+		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( ServerLinks::slug() ) || ! is_user_logged_in() ) {
 			return '';
 		}
 
-		$asked = self::requested();
+		$asked = ServerLinks::requested();
 
 		if ( $asked['id'] < 1 ) {
 			return '';
@@ -364,7 +252,7 @@ final class Servers {
 
 		$anchor = 'disks' === $parent['tab'] ? '#' . \BeltoftServices\Proxmox\DiskGuide::anchor( $parent['resource']->id() ) : '';
 
-		return self::url( $server, $parent['tab'] ) . $anchor;
+		return ServerLinks::url( $server, $parent['tab'] ) . $anchor;
 	}
 
 	/**
@@ -423,7 +311,7 @@ final class Servers {
 
 		if ( $others && '' !== self::$default && is_readable( self::$default ) ) {
 			$licenses    = $others;
-			$account_url = wc_get_account_endpoint_url( self::slug() );
+			$account_url = wc_get_account_endpoint_url( ServerLinks::slug() );
 			$empty       = '';
 			include self::$default;
 		} elseif ( ! $rows && ! $others && ! $addons ) {
@@ -440,17 +328,17 @@ final class Servers {
 	 * @param Resource|null        $resource The server's resource, when already loaded.
 	 */
 	private static function detail( array $view, string $tab, ?Resource $resource = null ): void {
-		self::$page = array(
+		ServerLinks::set_page( array(
 			'license'  => $view['license'],
 			'tab'      => $tab,
 			'resource' => $resource,
-		);
+		) );
 
 		try {
 			$list = self::url_list();
 			include self::file( 'server.php' );
 		} finally {
-			self::$page = null;
+			ServerLinks::set_page( null );
 		}
 	}
 
@@ -458,7 +346,7 @@ final class Servers {
 	 * The address of the list.
 	 */
 	public static function url_list(): string {
-		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( self::slug() ) : '';
+		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( ServerLinks::slug() ) : '';
 	}
 
 	/**
@@ -468,40 +356,6 @@ final class Servers {
 	 */
 	private static function file( string $name ): string {
 		return wc_locate_template( $name, 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
-	}
-
-	/**
-	 * The renewal sentence of a license ("Renews 29/11/2026", "Ends 29/11/2026"), or '' when nothing is known.
-	 * From the subscription's own dates; one object load.
-	 *
-	 * @param array<string, mixed> $license License row.
-	 */
-	public static function renewal( array $license ): string {
-		$id = (int) ( $license['subscription_id'] ?? 0 );
-
-		if ( $id <= 0 || ! function_exists( 'wcs_get_subscription' ) ) {
-			return '';
-		}
-
-		$subscription = wcs_get_subscription( $id );
-
-		if ( ! $subscription instanceof \WC_Subscription ) {
-			return '';
-		}
-
-		$format = get_option( 'date_format' );
-
-		if ( $subscription->has_status( 'pending-cancel' ) ) {
-			$end = (int) $subscription->get_time( 'end', 'site' );
-
-			/* translators: %s: date the subscription ends */
-			return $end > 0 ? sprintf( __( 'Ends %s', 'beltoft-services' ), date_i18n( $format, $end ) ) : '';
-		}
-
-		$next = (int) $subscription->get_time( 'next_payment', 'site' );
-
-		/* translators: %s: date of the next payment */
-		return $next > 0 && $subscription->has_status( 'active' ) ? sprintf( __( 'Renews %s', 'beltoft-services' ), date_i18n( $format, $next ) ) : '';
 	}
 
 	/**
@@ -624,12 +478,12 @@ final class Servers {
 
 		return array(
 			'id'      => $resource->id(),
-			'url'     => self::url( $license ),
+			'url'     => ServerLinks::url( $license ),
 			'name'    => $title,
 			'details' => implode( ' · ', $parts ),
 			'state'   => $text,
 			'tone'    => $tone,
-			'renews'  => self::renewal( $license ),
+			'renews'  => ServerLinks::renewal( $license ),
 			'note'    => \BeltoftServices\Proxmox\Quarantine::active( $resource ) ? __( 'Outgoing internet traffic is blocked', 'beltoft-services' ) : '',
 			'bars'    => $bars,
 		);

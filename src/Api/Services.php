@@ -10,7 +10,7 @@ namespace BeltoftServices\Api;
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\Panel;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -102,7 +102,7 @@ final class Services {
 				'name'   => $name,
 				'state'  => $state,
 				'status' => Panel::label( $state, $resource ),
-				'renews' => Servers::renewal( $license ),
+				'renews' => ServerLinks::renewal( $license ),
 				'ip'     => 'vm' === ( $driver ? $driver->kind() : '' ) && $resource->shows_status() ? (string) $resource->get( 'ip' ) : '',
 			);
 		}

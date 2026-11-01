@@ -29,6 +29,13 @@ class DependencyDirectionTest extends TestCase {
 	);
 
 	/**
+	 * Layer => single classes it must not use (finer than FORBIDDEN): Proxmox shares ServerLinks with Account, never Servers.
+	 */
+	private const FORBIDDEN_CLASSES = array(
+		'Proxmox' => array( 'Account\\Servers' ),
+	);
+
+	/**
 	 * Today's violations, "relative/file.php -> Target\Class". Shrink only.
 	 *
 	 * @return string[]
@@ -128,14 +135,14 @@ class DependencyDirectionTest extends TestCase {
 
 			$from = $this->layer( $ns . '\\X' );
 
-			if ( ! isset( self::FORBIDDEN[ $from ] ) ) {
+			if ( ! isset( self::FORBIDDEN[ $from ] ) && ! isset( self::FORBIDDEN_CLASSES[ $from ] ) ) {
 				continue;
 			}
 
 			foreach ( array_unique( $names ) as $name ) {
 				$to = $this->layer( $name );
 
-				if ( in_array( $to, self::FORBIDDEN[ $from ], true ) ) {
+				if ( in_array( $to, self::FORBIDDEN[ $from ] ?? array(), true ) || in_array( $this->class_of( $name ), self::FORBIDDEN_CLASSES[ $from ] ?? array(), true ) ) {
 					$out[ $rel . ' -> ' . $this->class_of( $name ) ] = true;
 				}
 			}

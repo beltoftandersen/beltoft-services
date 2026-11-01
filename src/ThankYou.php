@@ -225,7 +225,7 @@ final class ThankYou {
 			$license = $resource->license();
 
 			if ( $license && SshKeyField::DRIVER === (string) $resource->get( 'driver' ) ) {
-				return Account\Servers::url( $license );
+				return Account\ServerLinks::url( $license );
 			}
 		}
 

@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftLicenses\Account\View;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Firewall;
@@ -233,7 +234,7 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$html = $this->page( Resource::find( $r->id() ) );
 		$this->assertMatchesRegularExpression( '#data-tab-link="access"[^>]*>Access</a>\s*<a[^>]*data-tab-link="firewall"[^>]*>Firewall</a>\s*<a[^>]*data-tab-link="reinstall"#', $html );
-		$this->assertContains( 'firewall', Servers::tabs() );
+		$this->assertContains( 'firewall', ServerLinks::tabs() );
 
 		Resource::find( $r->id() )->set( array( 'fw_locked' => true ) );
 		$this->assertStringNotContainsString( 'data-tab-link="firewall"', $this->page( Resource::find( $r->id() ) ), 'A database server is not editable here.' );
@@ -291,7 +292,7 @@ class FirewallRouteTest extends FirewallTestCase {
 		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
 		wp_dequeue_script( FirewallTab::HANDLE );
 
-		FirewallTab::assets( 'handle', Servers::slug() );
+		FirewallTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( FirewallTab::HANDLE, 'enqueued' ), 'The switch is off.' );
 
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
@@ -299,11 +300,11 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertFalse( wp_script_is( FirewallTab::HANDLE, 'enqueued' ), 'Another endpoint.' );
 
 		wp_set_current_user( self::factory()->user->create() );
-		FirewallTab::assets( 'handle', Servers::slug() );
+		FirewallTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertFalse( wp_script_is( FirewallTab::HANDLE, 'enqueued' ), 'Someone else\'s server.' );
 
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		FirewallTab::assets( 'handle', Servers::slug() );
+		FirewallTab::assets( 'handle', ServerLinks::slug() );
 		$this->assertTrue( wp_script_is( FirewallTab::HANDLE, 'enqueued' ) );
 		$this->assertTrue( wp_style_is( FirewallTab::HANDLE, 'enqueued' ) );
 	}

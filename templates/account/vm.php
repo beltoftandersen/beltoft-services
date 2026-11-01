@@ -91,7 +91,7 @@ $beltoft_services_close = static function () use ( $beltoft_services_page ): voi
 };
 // The address of a tab.
 $beltoft_services_link  = static function ( string $slug ) use ( $beltoft_services_page ): string {
-	return null === $beltoft_services_page ? '' : \BeltoftServices\Account\Servers::url( $beltoft_services_page['license'], 'overview' === $slug ? '' : $slug );
+	return null === $beltoft_services_page ? '' : \BeltoftServices\Account\ServerLinks::url( $beltoft_services_page['license'], 'overview' === $slug ? '' : $slug );
 };
 // A secondary block: a closed details on a card, a titled block on a page (the tab is already its own place).
 $beltoft_services_more_open  = static function ( string $title ) use ( $beltoft_services_page ): void {

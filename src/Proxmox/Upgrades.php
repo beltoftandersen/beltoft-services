@@ -11,7 +11,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -93,7 +93,7 @@ final class Upgrades {
 			return '';
 		}
 
-		return add_query_arg( self::QUERY, $need, Servers::url( $license ) );
+		return add_query_arg( self::QUERY, $need, ServerLinks::url( $license ) );
 	}
 
 	/**
@@ -117,7 +117,7 @@ final class Upgrades {
 			return;
 		}
 
-		$asked   = Servers::requested();
+		$asked   = ServerLinks::requested();
 		$r       = $asked['id'] > 0 ? Resource::for_license( $asked['id'] ) : null;
 		$license = $r ? $r->license() : null;
 
@@ -127,7 +127,7 @@ final class Upgrades {
 
 		$url = self::url( $r, $need );
 
-		wp_safe_redirect( '' !== $url ? $url : Servers::url( $license ) );
+		wp_safe_redirect( '' !== $url ? $url : ServerLinks::url( $license ) );
 		exit;
 	}
 }

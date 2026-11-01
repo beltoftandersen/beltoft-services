@@ -199,7 +199,7 @@ class UsageAlertsUiTest extends BackupTestCase {
 	private function follow( Resource $r, string $need ): string {
 		global $wp;
 		add_filter( 'woocommerce_is_account_page', '__return_true' );
-		$wp->query_vars[ \BeltoftServices\Account\Servers::slug() ] = (string) (int) $r->license()['id'];
+		$wp->query_vars[ \BeltoftServices\Account\ServerLinks::slug() ] = (string) (int) $r->license()['id'];
 		$_GET[ Upgrades::QUERY ] = $need;
 		$sent = '';
 		add_filter( 'wp_redirect', static function ( $location ) use ( &$sent ) { $sent = (string) $location; throw new \RuntimeException( 'redirected' ); } );
@@ -210,7 +210,7 @@ class UsageAlertsUiTest extends BackupTestCase {
 		} finally {
 			remove_all_filters( 'wp_redirect' );
 			remove_all_filters( 'woocommerce_is_account_page' );
-			unset( $_GET[ Upgrades::QUERY ], $wp->query_vars[ \BeltoftServices\Account\Servers::slug() ] );
+			unset( $_GET[ Upgrades::QUERY ], $wp->query_vars[ \BeltoftServices\Account\ServerLinks::slug() ] );
 		}
 		return $sent;
 	}

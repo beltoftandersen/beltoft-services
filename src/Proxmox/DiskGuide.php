@@ -8,7 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Account\Endpoint;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -177,7 +177,7 @@ final class DiskGuide {
 
 		$license = $target->license();
 		$base    = $license && SshKeyField::DRIVER === (string) $target->get( 'driver' )
-			? Servers::url( $license, $tab )
+			? ServerLinks::url( $license, $tab )
 			: Endpoint::url_for_license( $license ? $license : $r->license() );
 
 		return $base . '#' . ( '' !== $anchor ? $anchor : 'beltoft-service-' . $target->id() );

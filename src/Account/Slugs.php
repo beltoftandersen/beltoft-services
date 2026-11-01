@@ -229,7 +229,7 @@ final class Slugs {
 	 * @param string $type Type of service.
 	 */
 	public static function reserved( string $slug, string $type ): bool {
-		if ( '' === $slug || ctype_digit( $slug ) || in_array( $slug, array( Servers::NEW_VALUE, Domains::ADD_VALUE, Databases::NEW_VALUE ), true ) ) {
+		if ( '' === $slug || ctype_digit( $slug ) || in_array( $slug, array( ServerLinks::NEW_VALUE, Domains::ADD_VALUE, Databases::NEW_VALUE ), true ) ) {
 			return true;
 		}
 
@@ -244,7 +244,7 @@ final class Slugs {
 	 */
 	private static function tabs_of( string $type ): array {
 		if ( 'servers' === $type ) {
-			return array_merge( Servers::tabs(), array( 'overview' ) );
+			return array_merge( ServerLinks::tabs(), array( 'overview' ) );
 		}
 
 		if ( 'domains' === $type ) {
@@ -375,7 +375,7 @@ final class Slugs {
 		$numeric = ctype_digit( $first );
 		$id      = $numeric ? (int) $first : 0;
 
-		if ( ! $numeric && '' !== $first && ! in_array( $first, array( Servers::NEW_VALUE, Domains::ADD_VALUE ), true ) ) {
+		if ( ! $numeric && '' !== $first && ! in_array( $first, array( ServerLinks::NEW_VALUE, Domains::ADD_VALUE ), true ) ) {
 			$id = self::resolve( $first, $type );
 		}
 
@@ -415,7 +415,7 @@ final class Slugs {
 	 * @param array{first: string, id: int} $asked Result of parse().
 	 */
 	public static function unknown( array $asked ): bool {
-		return '' !== $asked['first'] && 0 === $asked['id'] && ! in_array( $asked['first'], array( Servers::NEW_VALUE, Domains::ADD_VALUE ), true );
+		return '' !== $asked['first'] && 0 === $asked['id'] && ! in_array( $asked['first'], array( ServerLinks::NEW_VALUE, Domains::ADD_VALUE ), true );
 	}
 
 	/**

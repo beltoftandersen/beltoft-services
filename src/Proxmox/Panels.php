@@ -75,7 +75,7 @@ final class Panels {
 			'show_message' => 'ready' !== $group || $app,
 			'power'      => $power,
 			'plan'       => $product !== $title ? $product : '',
-			'renews'     => \BeltoftServices\Account\Servers::renewal( $license ),
+			'renews'     => \BeltoftServices\Account\ServerLinks::renewal( $license ),
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'ssh_user'   => Provision::LOGIN_USER,
 			'actions'    => array_intersect_key( $offered, array_flip( array( 'start', 'reboot', 'shutdown' ) ) ),
@@ -97,7 +97,7 @@ final class Panels {
 	 * @param mixed $endpoint The My Account endpoint being shown; the scripts load on the Servers endpoint only.
 	 */
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( is_string( $endpoint ) && \BeltoftServices\Account\Servers::slug() !== $endpoint ) {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServerLinks::slug() !== $endpoint ) {
 			return;
 		}
 
@@ -239,7 +239,7 @@ final class Panels {
 		$chosen = $chosen > 0 ? $chosen : (int) ( $plan['template'] ?? 0 );
 		// A template that is no longer listed cannot be preselected: the cluster's default is.
 		$select = isset( $list[ $chosen ] ) || null === $record ? $chosen : Clusters::default_template( $record['cluster'] );
-		$page   = \BeltoftServices\Account\Servers::page();
+		$page   = \BeltoftServices\Account\ServerLinks::page();
 		$page   = $page && (int) $page['license']['id'] === (int) ( $r->license()['id'] ?? 0 ) ? $page : null;
 		$state  = array(
 			'page'       => $page,

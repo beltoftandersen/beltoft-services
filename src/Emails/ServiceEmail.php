@@ -206,7 +206,7 @@ abstract class ServiceEmail extends \WC_Email {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class )->url( $license );
 		}
 
-		return $server_license ? \BeltoftServices\Account\Servers::url( $server_license, $tab ) : Endpoint::url_for_license( $license );
+		return $server_license ? \BeltoftServices\Account\ServerLinks::url( $server_license, $tab ) : Endpoint::url_for_license( $license );
 	}
 
 	/**

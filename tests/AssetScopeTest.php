@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests;
 
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\Panel;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\ThankYou;
 
 /**
@@ -43,7 +43,7 @@ final class AssetScopeTest extends TestCase {
 		foreach ( array_keys( WC()->query->get_query_vars() ) as $key ) {
 			unset( $wp->query_vars[ $key ] );
 		}
-		unset( $wp->query_vars[ Servers::slug() ], $wp->query_vars['domains'], $wp->query_vars['licenses'] );
+		unset( $wp->query_vars[ ServerLinks::slug() ], $wp->query_vars['domains'], $wp->query_vars['licenses'] );
 	}
 
 	/** Pretends to be on My Account at this endpoint ('' = the dashboard), logged in or out. */
@@ -106,7 +106,7 @@ final class AssetScopeTest extends TestCase {
 	}
 
 	public function test_the_servers_endpoint_loads_the_server_scripts_and_not_the_domain_script(): void {
-		$this->on( Servers::slug() );
+		$this->on( ServerLinks::slug() );
 		$loaded = $this->load();
 
 		foreach ( array( 'beltoft-services-account.js', 'beltoft-services-progress.js', 'beltoft-services-vm.js', 'beltoft-services-metrics.js', 'beltoft-services-metrics.css', 'beltoft-services-account.css' ) as $asset ) {

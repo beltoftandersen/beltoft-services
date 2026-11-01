@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -48,7 +48,7 @@ final class Tiles {
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
 	public static function page_assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) || ( Servers::requested()['id'] <= 0 && ! Servers::is_new() ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) || ( ServerLinks::requested()['id'] <= 0 && ! ServerLinks::is_new() ) ) {
 			return;
 		}
 

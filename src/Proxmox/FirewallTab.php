@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -138,11 +138,11 @@ final class FirewallTab {
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
 		}
 
-		$asked = Servers::requested();
+		$asked = ServerLinks::requested();
 		$r     = $asked['id'] > 0 ? self::resource_of_license( $asked['id'] ) : null;
 
 		if ( ! $r || ! FirewallRules::editable( $r ) ) {

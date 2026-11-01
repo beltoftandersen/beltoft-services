@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -40,10 +40,10 @@ final class AppReinstall {
 
 	/** Load the reinstall domain controls only on a server page. */
 	public static function assets( $parent, $endpoint = null ): void {
-		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && Servers::slug() !== $endpoint ) ) {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
 		}
-		$asked = Servers::requested();
+		$asked = ServerLinks::requested();
 		$r = $asked['id'] > 0 ? Resource::for_license( (int) $asked['id'] ) : null;
 		if ( ! $r || (int) ( $r->license()['user_id'] ?? 0 ) !== get_current_user_id() || null === self::options( $r ) ) {
 			return;
