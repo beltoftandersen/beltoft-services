@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Plugs into the server page through its filters and actions (beltoft_services_server_page_tabs,
  * beltoft_services_server_tabs, beltoft_services_server_tab_pane, beltoft_services_account_assets), like AppTab. The
- * tab exists only for a server whose firewall the customer may manage (Firewall::editable()). The pane is a shell:
+ * tab exists only for a server whose firewall the customer may manage (FirewallRules::editable()). The pane is a shell:
  * the rules come from the firewall route, and every text the page prints is this plugin's own.
  */
 final class FirewallTab {
@@ -53,7 +53,7 @@ final class FirewallTab {
 	public static function tabs( $tabs, $resource_id = 0 ) {
 		$r = is_array( $tabs ) ? Resource::find( (int) $resource_id ) : null;
 
-		if ( ! $r || ! Firewall::editable( $r ) ) {
+		if ( ! $r || ! FirewallRules::editable( $r ) ) {
 			return $tabs;
 		}
 
@@ -145,7 +145,7 @@ final class FirewallTab {
 		$asked = Servers::requested();
 		$r     = $asked['id'] > 0 ? self::resource_of_license( $asked['id'] ) : null;
 
-		if ( ! $r || ! Firewall::editable( $r ) ) {
+		if ( ! $r || ! FirewallRules::editable( $r ) ) {
 			return;
 		}
 
@@ -182,12 +182,12 @@ final class FirewallTab {
 
 		$r = Resource::find( (int) $resource_id );
 
-		if ( ! $r || ! Firewall::editable( $r ) ) {
+		if ( ! $r || ! FirewallRules::editable( $r ) ) {
 			return;
 		}
 
 		( static function ( Resource $r ): void {
-			$view = Firewall::view( $r );
+			$view = FirewallRules::view( $r );
 			include BELTOFT_SERVICES_PATH . 'templates/account/firewall.php';
 		} )( $r );
 	}

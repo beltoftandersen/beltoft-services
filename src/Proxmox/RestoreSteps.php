@@ -140,7 +140,7 @@ trait RestoreSteps {
 		}
 
 		// A restored or rolled back VM may come back without its firewall file: the dashboard's rules are written again from the stored ones.
-		if ( Firewall::managed( $this->r ) && true !== $this->r->get( Firewall::LOCKED ) ) {
+		if ( FirewallRules::managed( $this->r ) && true !== $this->r->get( Firewall::LOCKED ) ) {
 			$done = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure( $record, $v );
 
 			if ( $done instanceof StepResult ) {

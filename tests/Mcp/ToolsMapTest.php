@@ -64,7 +64,7 @@ final class ToolsMapTest extends McpTestCase {
 		$classes = array(
 			'BeltoftServices\Proxmox\Actions',
 			'BeltoftServices\Proxmox\Snapshots',
-			'BeltoftServices\Proxmox\Firewall',
+			'BeltoftServices\Proxmox\FirewallRules',
 			'BeltoftServices\Proxmox\PrivateAttach',
 			'BeltoftServices\Proxmox\DbActions',
 			'BeltoftServices\Domains\Actions',

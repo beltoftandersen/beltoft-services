@@ -505,7 +505,7 @@ final class Panels {
 			return __( 'Managed with the databases (the customer cannot edit it)', 'beltoft-services' );
 		}
 
-		if ( ! Firewall::managed( $r ) ) {
+		if ( ! FirewallRules::managed( $r ) ) {
 			return '';
 		}
 
@@ -515,7 +515,7 @@ final class Panels {
 			/* translators: 1: on or off, 2: number of rules, 3: state (idle, applying, failed), 4: revision applied, 5: revision asked for */
 			__( '%1$s, %2$d rules, %3$s (applied %4$d of %5$d)', 'beltoft-services' ),
 			false === $r->get( Firewall::ON ) ? __( 'off', 'beltoft-services' ) : __( 'on', 'beltoft-services' ),
-			count( Firewall::rules_of( $r ) ),
+			count( FirewallRules::rules_of( $r ) ),
 			'' === (string) $r->get( Firewall::STATE ) ? 'idle' : (string) $r->get( Firewall::STATE ),
 			(int) $r->get( Firewall::APPLIED ),
 			(int) $r->get( Firewall::REV )

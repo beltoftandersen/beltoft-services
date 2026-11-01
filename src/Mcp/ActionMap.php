@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * here is derived from what a customer sends.
  *
  * ACTIONS: every customer action the dashboard offers and the tool that runs it. EXCLUDED: every action that has no
- * tool, with the reason. CAPABILITIES and CAPABILITIES_EXCLUDED do the same for what is not an action of a service. A test (ToolsMapTest) reads what Proxmox\Actions, Snapshots, Firewall, PrivateAttach,
+ * tool, with the reason. CAPABILITIES and CAPABILITIES_EXCLUDED do the same for what is not an action of a service. A test (ToolsMapTest) reads what Proxmox\Actions, Snapshots, FirewallRules, PrivateAttach,
  * DbActions and Domains\Actions offer and fails when an action is in neither list, so a new dashboard action cannot
  * be forgotten.
  *

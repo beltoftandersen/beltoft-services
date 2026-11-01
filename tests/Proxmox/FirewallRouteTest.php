@@ -11,6 +11,7 @@ use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\FirewallTab;
 use BeltoftServices\Resource;
 
@@ -97,9 +98,9 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertTrue( $response->get_data()['queued'] );
 
 		$fresh = Resource::find( $r->id() );
-		$this->assertTrue( Firewall::managed( $fresh ) );
+		$this->assertTrue( FirewallRules::managed( $fresh ) );
 		$this->assertSame( 'applying', $fresh->get( 'fw_state' ) );
-		$this->assertCount( 2, Firewall::rules_of( $fresh ) );
+		$this->assertCount( 2, FirewallRules::rules_of( $fresh ) );
 
 		$this->run_jobs();
 		$vmid = (int) $r->get( 'vmid' );
@@ -124,7 +125,7 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertSame( 422, $response->get_status() );
 		$this->assertSame( 1, $response->get_data()['data']['rule'] );
 		$this->assertStringContainsString( '1 to 65535', $response->get_data()['message'] );
-		$this->assertFalse( Firewall::managed( Resource::find( $r->id() ) ), 'Nothing was stored.' );
+		$this->assertFalse( FirewallRules::managed( Resource::find( $r->id() ) ), 'Nothing was stored.' );
 		$this->assertSame( 422, $this->route( 'PUT', $r->id(), $user, array( 'on' => true, 'rules' => 'x' ) )->get_status() );
 	}
 
@@ -207,7 +208,7 @@ class FirewallRouteTest extends FirewallTestCase {
 
 	public function test_a_change_that_no_job_works_on_reads_as_failed(): void {
 		list( $r, $user ) = $this->on();
-		Firewall::store( $r, true, Firewall::defaults( $r ), true, $user );
+		FirewallRules::store( $r, true, FirewallRules::defaults( $r ), true, $user );
 		as_unschedule_all_actions( Jobs::ACT, array(), Jobs::GROUP );
 
 		$this->assertSame( 'failed', $this->route( 'GET', $r->id(), $user )->get_data()['state'] );
@@ -264,15 +265,15 @@ class FirewallRouteTest extends FirewallTestCase {
 		list( $r ) = $this->ready( array( 'app_id' => 'wordpress' ) );
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
-		Firewall::store( $r, true, Firewall::normalise( array( $this->rule( 'tcp', 8080 ), $this->rule( 'tcp', 9000, 9010, array( '203.0.113.7' ) ), $this->rule( 'icmp', 0 ) ), $r ), true, 1 );
+		FirewallRules::store( $r, true, FirewallRules::normalise( array( $this->rule( 'tcp', 8080 ), $this->rule( 'tcp', 9000, 9010, array( '203.0.113.7' ) ), $this->rule( 'icmp', 0 ) ), $r ), true, 1 );
 
-		$rules = Firewall::view( Resource::find( $r->id() ) )['rules'];
+		$rules = FirewallRules::view( Resource::find( $r->id() ) )['rules'];
 		$this->assertSame( 'sudo ufw allow 8080/tcp', $rules[0]['ufw'] );
 		$this->assertSame( 'sudo ufw allow from 203.0.113.7 to any port 9000:9010 proto tcp', $rules[1]['ufw'] );
 		$this->assertSame( '', $rules[2]['ufw'] );
 
 		$r->set( array( 'app_id' => null ) );
-		$this->assertSame( '', Firewall::view( Resource::find( $r->id() ) )['rules'][0]['ufw'] );
+		$this->assertSame( '', FirewallRules::view( Resource::find( $r->id() ) )['rules'][0]['ufw'] );
 	}
 
 	public function test_the_account_buttons_do_not_draw_the_firewall_actions(): void {
@@ -320,8 +321,8 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->save_cluster( array( 'fw_enabled' => '0', 'fw_pilot' => ' ' . $pilot->license()['id'] . ', x, 0' ) );
 
 		$this->assertSame( array( (int) $pilot->license()['id'] ), \BeltoftServices\Proxmox\Clusters::get( 'lab' )['fw_pilot'], 'Only real license IDs are kept.' );
-		$this->assertTrue( \BeltoftServices\Proxmox\Firewall::editable( Resource::find( $pilot->id() ) ) );
-		$this->assertFalse( \BeltoftServices\Proxmox\Firewall::editable( Resource::find( $other->id() ) ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\FirewallRules::editable( Resource::find( $pilot->id() ) ) );
+		$this->assertFalse( \BeltoftServices\Proxmox\FirewallRules::editable( Resource::find( $other->id() ) ) );
 		$this->assertSame( 200, $this->route( 'GET', $pilot->id(), $user )->get_status() );
 		$this->assertNotSame( 200, $this->route( 'GET', $other->id(), $them )->get_status() );
 	}

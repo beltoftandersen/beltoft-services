@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Resource;
 
@@ -37,9 +38,9 @@ class FirewallTest extends FirewallTestCase {
 
 	private function apply( Resource $r, array $rules, bool $on = true ): Resource {
 		$r      = Resource::find( $r->id() );
-		$normal = Firewall::normalise( $rules, $r );
+		$normal = FirewallRules::normalise( $rules, $r );
 		$this->assertIsArray( $normal, is_wp_error( $normal ) ? $normal->get_error_message() : '' );
-		$this->assertGreaterThan( 0, Firewall::store( $r, $on, $normal, true, 1 ) );
+		$this->assertGreaterThan( 0, FirewallRules::store( $r, $on, $normal, true, 1 ) );
 		Jobs::act( $r->id(), 'fw_apply', array() );
 
 		return Resource::find( $r->id() );
@@ -120,7 +121,7 @@ class FirewallTest extends FirewallTestCase {
 		$this->save_cluster( array( 'fw_enabled' => '1', 'fw_max_rules' => '3' ) );
 		$r = Resource::find( $r->id() );
 
-		$ok = Firewall::normalise( array( $this->rule( 'tcp', 8000, 8100, array( '203.0.113.7', '198.51.100.0/24' ), "My app!<b>" ), $this->rule( 'icmp', 0 ) ), $r );
+		$ok = FirewallRules::normalise( array( $this->rule( 'tcp', 8000, 8100, array( '203.0.113.7', '198.51.100.0/24' ), "My app!<b>" ), $this->rule( 'icmp', 0 ) ), $r );
 		$this->assertCount( 2, $ok );
 		$this->assertSame( 'My appb', $ok[0]['label'] );
 		$this->assertSame( array( '198.51.100.0/24', '203.0.113.7' ), $ok[0]['sources'] );
@@ -144,21 +145,21 @@ class FirewallTest extends FirewallTestCase {
 		);
 
 		foreach ( $bad as $name => $rule ) {
-			$result = Firewall::normalise( array( $rule ), $r );
+			$result = FirewallRules::normalise( array( $rule ), $r );
 			$this->assertWPError( $result, $name );
 			$this->assertSame( 422, $result->get_error_data()['status'], $name );
 			$this->assertSame( 0, $result->get_error_data()['rule'], $name );
 		}
 
-		$this->assertWPError( Firewall::normalise( array( $this->rule( 'tcp', 80 ), $this->rule( 'tcp', 80 ) ), $r ), 'Duplicates.' );
-		$this->assertWPError( Firewall::normalise( array( $this->rule( 'tcp', 1 ), $this->rule( 'tcp', 2 ), $this->rule( 'tcp', 3 ), $this->rule( 'tcp', 4 ) ), $r ), 'Over the maximum of the cluster.' );
-		$this->assertWPError( Firewall::normalise( 'nope', $r ) );
+		$this->assertWPError( FirewallRules::normalise( array( $this->rule( 'tcp', 80 ), $this->rule( 'tcp', 80 ) ), $r ), 'Duplicates.' );
+		$this->assertWPError( FirewallRules::normalise( array( $this->rule( 'tcp', 1 ), $this->rule( 'tcp', 2 ), $this->rule( 'tcp', 3 ), $this->rule( 'tcp', 4 ) ), $r ), 'Over the maximum of the cluster.' );
+		$this->assertWPError( FirewallRules::normalise( 'nope', $r ) );
 	}
 
 	public function test_unknown_fields_are_dropped_and_origin_is_not_trusted(): void {
 		list( $r ) = $this->ready();
 		$rule      = $this->rule( 'tcp', 8080 ) + array( 'origin' => 'default', 'action' => 'DROP', 'iface' => 'net1', 'type' => 'out', 'comment' => 'x' );
-		$out       = Firewall::normalise( array( $rule ), $r );
+		$out       = FirewallRules::normalise( array( $rule ), $r );
 
 		$this->assertSame( 'customer', $out[0]['origin'] );
 		$this->assertSame( array( 'id', 'proto', 'from', 'to', 'sources', 'label', 'origin', 'created' ), array_keys( $out[0] ) );
@@ -166,24 +167,24 @@ class FirewallTest extends FirewallTestCase {
 
 	public function test_ssh_lock_out_rule(): void {
 		list( $r ) = $this->ready();
-		$rules     = static fn( array $input ) => Firewall::normalise( $input, $r );
+		$rules     = static fn( array $input ) => FirewallRules::normalise( $input, $r );
 
-		$this->assertTrue( Firewall::blocks_ssh( $rules( array( $this->rule( 'tcp', 80 ) ) ), '203.0.113.9' ) );
-		$this->assertFalse( Firewall::blocks_ssh( $rules( array( $this->rule( 'tcp', 22 ) ) ), '203.0.113.9' ) );
-		$this->assertFalse( Firewall::blocks_ssh( $rules( array( $this->rule( 'tcp', 20, 30 ) ) ), '' ), 'A range with 22 in it.' );
-		$this->assertTrue( Firewall::blocks_ssh( $rules( array( $this->rule( 'tcp', 22, 22, array( '198.51.100.7' ) ) ) ), '203.0.113.9' ) );
-		$this->assertFalse( Firewall::blocks_ssh( $rules( array( $this->rule( 'tcp', 22, 22, array( '203.0.113.0/24' ) ) ) ), '203.0.113.9' ) );
-		$this->assertTrue( Firewall::blocks_ssh( $rules( array( $this->rule( 'udp', 22 ) ) ), '203.0.113.9' ), 'UDP is not SSH.' );
+		$this->assertTrue( FirewallRules::blocks_ssh( $rules( array( $this->rule( 'tcp', 80 ) ) ), '203.0.113.9' ) );
+		$this->assertFalse( FirewallRules::blocks_ssh( $rules( array( $this->rule( 'tcp', 22 ) ) ), '203.0.113.9' ) );
+		$this->assertFalse( FirewallRules::blocks_ssh( $rules( array( $this->rule( 'tcp', 20, 30 ) ) ), '' ), 'A range with 22 in it.' );
+		$this->assertTrue( FirewallRules::blocks_ssh( $rules( array( $this->rule( 'tcp', 22, 22, array( '198.51.100.7' ) ) ) ), '203.0.113.9' ) );
+		$this->assertFalse( FirewallRules::blocks_ssh( $rules( array( $this->rule( 'tcp', 22, 22, array( '203.0.113.0/24' ) ) ) ), '203.0.113.9' ) );
+		$this->assertTrue( FirewallRules::blocks_ssh( $rules( array( $this->rule( 'udp', 22 ) ) ), '203.0.113.9' ), 'UDP is not SSH.' );
 	}
 
 	public function test_defaults_are_the_standard_set_plus_the_apps_ports(): void {
 		list( $r ) = $this->ready();
 		$ids       = static fn( array $rules ) => array_map( static fn( $x ) => $x['proto'] . ':' . $x['from'] . ':' . $x['origin'], $rules );
 
-		$this->assertSame( array( 'tcp:22:default', 'tcp:80:default', 'tcp:443:default', 'icmp:0:default' ), $ids( Firewall::defaults( $r ) ) );
+		$this->assertSame( array( 'tcp:22:default', 'tcp:80:default', 'tcp:443:default', 'icmp:0:default' ), $ids( FirewallRules::defaults( $r ) ) );
 
 		$r->set( array( 'app_id' => 'coolify' ) );
-		$with = $ids( Firewall::defaults( Resource::find( $r->id() ) ) );
+		$with = $ids( FirewallRules::defaults( Resource::find( $r->id() ) ) );
 		$this->assertContains( 'tcp:8000:app', $with );
 		$this->assertContains( 'tcp:6001:app', $with );
 		$this->assertCount( 1, array_keys( $with, 'tcp:22:default', true ) );
@@ -192,18 +193,18 @@ class FirewallTest extends FirewallTestCase {
 
 	public function test_editable_is_false_when_locked_linked_off_or_not_ready(): void {
 		list( $r ) = $this->ready();
-		$this->assertFalse( Firewall::editable( $r ), 'The cluster switch is off.' );
+		$this->assertFalse( FirewallRules::editable( $r ), 'The cluster switch is off.' );
 
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
-		$this->assertTrue( Firewall::editable( $r ) );
+		$this->assertTrue( FirewallRules::editable( $r ) );
 
 		$r->set( array( 'fw_locked' => true ) );
-		$this->assertFalse( Firewall::editable( Resource::find( $r->id() ) ), 'Locked by the database work.' );
+		$this->assertFalse( FirewallRules::editable( Resource::find( $r->id() ) ), 'Locked by the database work.' );
 		$r->set( array( 'fw_locked' => null, 'linked' => true ) );
-		$this->assertFalse( Firewall::editable( Resource::find( $r->id() ) ), 'Adopted.' );
+		$this->assertFalse( FirewallRules::editable( Resource::find( $r->id() ) ), 'Adopted.' );
 		$r->set( array( 'linked' => null ) );
-		$this->assertTrue( Firewall::editable( Resource::find( $r->id() ) ) );
+		$this->assertTrue( FirewallRules::editable( Resource::find( $r->id() ) ) );
 	}
 
 	// -- The apply job ---------------------------------------------------------------------------------
@@ -256,12 +257,12 @@ class FirewallTest extends FirewallTestCase {
 		$vm        = $this->fake->vm( (int) $r->get( 'vmid' ) );
 
 		$this->assertSame( 'ACCEPT', $vm['firewall_options']['policy_in'], 'The build writes an open inbound policy: Proxmox drops inbound for an unset one once the host enforces VM rules.' );
-		$this->assertFalse( Firewall::managed( $r ) );
+		$this->assertFalse( FirewallRules::managed( $r ) );
 
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$this->fake->writes = array();
 		$fresh              = Resource::find( $r->id() );
-		$this->assertTrue( Firewall::editable( $fresh ) );
+		$this->assertTrue( FirewallRules::editable( $fresh ) );
 		$this->assertSame( array(), $this->fake->writes, 'Switching the feature on writes nothing to any server.' );
 	}
 
@@ -273,7 +274,7 @@ class FirewallTest extends FirewallTestCase {
 		$this->assertSame( 'ACCEPT', $this->fake->vm( $vmid )['firewall_options']['policy_in'] );
 		$this->assertTrue( $this->fake->fake_inbound_allowed( $vmid, 'tcp', 3306, '198.51.100.1' ) );
 		$this->assertFalse( $this->fake->fake_outbound_allowed( $vmid, 'tcp', 25 ) );
-		$this->assertCount( 1, Firewall::rules_of( $r ), 'The rules are kept.' );
+		$this->assertCount( 1, FirewallRules::rules_of( $r ), 'The rules are kept.' );
 
 		$r = $this->apply( $r, array( $this->rule( 'tcp', 22 ) ), true );
 		$this->assertSame( 'DROP', $this->fake->vm( $vmid )['firewall_options']['policy_in'] );
@@ -349,7 +350,7 @@ class FirewallTest extends FirewallTestCase {
 		Jobs::act( $r->id(), 'fw_apply', array() );
 		$r = Resource::find( $r->id() );
 		$this->assertSame( 'idle', $r->get( 'fw_state' ) );
-		$this->assertSame( array(), array_filter( $this->comments( (int) $r->get( 'vmid' ) ), static fn( $c ) => 'bs-fw:' . Firewall::rule_id( 'tcp', 8080, 8080, array() ) === $c ) );
+		$this->assertSame( array(), array_filter( $this->comments( (int) $r->get( 'vmid' ) ), static fn( $c ) => 'bs-fw:' . FirewallRules::rule_id( 'tcp', 8080, 8080, array() ) === $c ) );
 	}
 
 	public function test_many_rules_continue_over_several_runs(): void {
@@ -362,7 +363,7 @@ class FirewallTest extends FirewallTestCase {
 		list( $r ) = $this->ready();
 		$this->save_cluster( array( 'fw_enabled' => '1', 'fw_max_rules' => '30' ) );
 		$r = Resource::find( $r->id() );
-		Firewall::store( $r, true, Firewall::normalise( $rules, $r ), true, 1 );
+		FirewallRules::store( $r, true, FirewallRules::normalise( $rules, $r ), true, 1 );
 
 		$this->fake->writes = array();
 		Jobs::act( $r->id(), 'fw_apply', array() );
@@ -383,7 +384,7 @@ class FirewallTest extends FirewallTestCase {
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$this->fake->drop_posts = true;
 		$r                      = Resource::find( $r->id() );
-		Firewall::store( $r, true, Firewall::normalise( array( $this->rule( 'tcp', 22 ) ), $r ), true, 1 );
+		FirewallRules::store( $r, true, FirewallRules::normalise( array( $this->rule( 'tcp', 22 ) ), $r ), true, 1 );
 		Jobs::act( $r->id(), 'fw_apply', array() );
 
 		$r = Resource::find( $r->id() );
@@ -440,7 +441,7 @@ class FirewallTest extends FirewallTestCase {
 		list( $r ) = $this->ready();
 		$vmid      = (int) $r->get( 'vmid' );
 
-		$this->assertTrue( Firewall::managed( $r ) );
+		$this->assertTrue( FirewallRules::managed( $r ) );
 		$this->assertSame( 'DROP', $this->fake->vm( $vmid )['firewall_options']['policy_in'] );
 		$this->assertTrue( $this->fake->fake_inbound_allowed( $vmid, 'tcp', 22, '198.51.100.1' ) );
 		$this->assertTrue( $this->fake->fake_inbound_allowed( $vmid, 'tcp', 443, '198.51.100.1' ) );
@@ -456,7 +457,7 @@ class FirewallTest extends FirewallTestCase {
 			list( $r ) = $this->ready();
 			$vm        = $this->fake->vm( (int) $r->get( 'vmid' ) );
 
-			$this->assertFalse( Firewall::managed( $r ) );
+			$this->assertFalse( FirewallRules::managed( $r ) );
 			$this->assertSame( 'ACCEPT', $vm['firewall_options']['policy_in'], 'Open, as such a server always was, but written.' );
 			$this->assertSame( 'ACCEPT', $vm['firewall_options']['policy_out'] );
 			$this->assertSame( 1, (int) $vm['firewall_options']['enable'] );
@@ -490,14 +491,14 @@ class FirewallTest extends FirewallTestCase {
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
 
-		$rules   = Firewall::defaults( $r );
-		$rules[] = Firewall::normalise( array( $this->rule( 'tcp', 7777 ) ), $r )[0];
-		Firewall::store( $r, true, $rules, true, 1 );
+		$rules   = FirewallRules::defaults( $r );
+		$rules[] = FirewallRules::normalise( array( $this->rule( 'tcp', 7777 ) ), $r )[0];
+		FirewallRules::store( $r, true, $rules, true, 1 );
 
 		$r->set( array( 'app_id' => 'docker' ) );
 		$method = new \ReflectionMethod( Firewall::class, 'with_app_ports' );
 		$method->setAccessible( true );
-		$out = $method->invoke( new Firewall( Resource::find( $r->id() ) ), Firewall::rules_of( Resource::find( $r->id() ) ) );
+		$out = $method->invoke( new Firewall( Resource::find( $r->id() ) ), FirewallRules::rules_of( Resource::find( $r->id() ) ) );
 
 		$ports = array_map( static fn( $x ) => $x['from'] . ':' . $x['origin'], $out );
 		$this->assertNotContains( '8000:app', $ports );
@@ -525,22 +526,22 @@ class FirewallTest extends FirewallTestCase {
 
 	public function test_the_actions_are_offered_only_when_editable_and_apply_needs_a_managed_server(): void {
 		list( $r ) = $this->ready();
-		$this->assertSame( array(), Firewall::offered( $r ) );
+		$this->assertSame( array(), FirewallRules::offered( $r ) );
 		$this->assertArrayNotHasKey( 'fw_apply', ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->customer_actions( $r ) );
 
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
-		$this->assertSame( array( 'fw_apply', 'fw_reset' ), array_keys( Firewall::offered( $r ) ) );
+		$this->assertSame( array( 'fw_apply', 'fw_reset' ), array_keys( FirewallRules::offered( $r ) ) );
 		$this->assertArrayHasKey( 'fw_reset', ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->customer_actions( $r ) );
-		$this->assertNotNull( Firewall::check( $r, 'fw_apply', array() ), 'Nothing to apply before the customer set it up.' );
-		$this->assertNull( Firewall::check( $r, 'fw_reset', array() ) );
+		$this->assertNotNull( FirewallRules::check( $r, 'fw_apply', array() ), 'Nothing to apply before the customer set it up.' );
+		$this->assertNull( FirewallRules::check( $r, 'fw_reset', array() ) );
 	}
 
 	public function test_a_job_for_a_server_that_is_not_editable_is_refused_without_a_write(): void {
 		list( $r ) = $this->ready();
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
-		Firewall::store( $r, true, array(), true, 1 );
+		FirewallRules::store( $r, true, array(), true, 1 );
 		$r->set( array( 'fw_locked' => true ) );
 
 		$this->fake->writes = array();

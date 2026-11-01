@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Resource;
 
@@ -18,7 +19,7 @@ class FirewallRestoreTest extends SnapshotsTestCase {
 	public function test_a_rollback_writes_the_managed_rules_again_and_keeps_the_smtp_block(): void {
 		$server = $this->server();
 		$a      = $this->take( $server, 'A' );
-		$server->set( array( Firewall::MANAGED => true, Firewall::ON => true, Firewall::RULES => Firewall::standard(), Firewall::REV => 1 ) );
+		$server->set( array( Firewall::MANAGED => true, Firewall::ON => true, Firewall::RULES => FirewallRules::standard(), Firewall::REV => 1 ) );
 
 		$this->act( $server, 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) );
 

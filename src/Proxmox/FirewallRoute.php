@@ -91,11 +91,11 @@ final class FirewallRoute {
 			return $resource;
 		}
 
-		if ( ! Firewall::editable( $resource ) ) {
+		if ( ! FirewallRules::editable( $resource ) ) {
 			return self::forbidden();
 		}
 
-		$view            = Firewall::view( $resource, self::my_ip() );
+		$view            = FirewallRules::view( $resource, self::my_ip() );
 		$view['working'] = Jobs::acting( $resource->id() );
 
 		// A customer waiting for the change should not wait for the next cron tick.
@@ -103,7 +103,7 @@ final class FirewallRoute {
 			Jobs::run_waiting( $resource->id() );
 			$view['working'] = Jobs::acting( $resource->id() );
 			$resource        = Resource::find( $resource->id() ) ?? $resource;
-			$view            = array_merge( Firewall::view( $resource, self::my_ip() ), array( 'working' => $view['working'] ) );
+			$view            = array_merge( FirewallRules::view( $resource, self::my_ip() ), array( 'working' => $view['working'] ) );
 		}
 
 		// A change that no job is working on any more and that was not confirmed did not finish.
@@ -159,7 +159,7 @@ final class FirewallRoute {
 			return $resource;
 		}
 
-		if ( ! Firewall::editable( $resource ) ) {
+		if ( ! FirewallRules::editable( $resource ) ) {
 			return self::forbidden();
 		}
 
@@ -169,11 +169,11 @@ final class FirewallRoute {
 		$ack  = ! empty( $body['ack_no_ssh'] );
 
 		// Turning a firewall that is on off lets every port be reached: say so and ask once.
-		if ( ! $on && Firewall::managed( $resource ) && true === $resource->get( Firewall::ON ) && empty( $body['confirm_off'] ) ) {
+		if ( ! $on && FirewallRules::managed( $resource ) && true === $resource->get( Firewall::ON ) && empty( $body['confirm_off'] ) ) {
 			return self::error( 'beltoft_services_confirm', __( 'Please confirm that you want to turn the firewall off.', 'beltoft-services' ), 422 );
 		}
 
-		$rules = Firewall::normalise( $body['rules'] ?? null, $resource );
+		$rules = FirewallRules::normalise( $body['rules'] ?? null, $resource );
 
 		if ( is_wp_error( $rules ) ) {
 			$data = $rules->get_error_data();
@@ -183,9 +183,9 @@ final class FirewallRoute {
 
 		// A connected app has no address to check against: SSH must stay open to anyone, or the rules that let SSH in must
 		// be the ones already applied to a firewall that is on.
-		$app_keeps_ssh = Endpoint::inside() && Firewall::managed( $resource ) && true === $resource->get( Firewall::ON ) && Firewall::ssh_rules( $rules ) === Firewall::ssh_rules( Firewall::rules_of( $resource ) );
+		$app_keeps_ssh = Endpoint::inside() && FirewallRules::managed( $resource ) && true === $resource->get( Firewall::ON ) && FirewallRules::ssh_rules( $rules ) === FirewallRules::ssh_rules( FirewallRules::rules_of( $resource ) );
 
-		if ( $on && ! $ack && ! $app_keeps_ssh && Firewall::blocks_ssh( $rules, self::my_ip() ) ) {
+		if ( $on && ! $ack && ! $app_keeps_ssh && FirewallRules::blocks_ssh( $rules, self::my_ip() ) ) {
 			return self::error( 'beltoft_services_ssh_closed', __( 'No rule lets you in over SSH from where you are now. Add an SSH rule, or tick the box to confirm that you do not need SSH.', 'beltoft-services' ), 409 );
 		}
 
@@ -196,7 +196,7 @@ final class FirewallRoute {
 		$rev   = 0;
 		$stored = $resource->locked(
 			static function () use ( $resource, $on, $rules, $ack, &$rev ): bool {
-				$rev = Firewall::store( $resource, $on, $rules, $ack, get_current_user_id() );
+				$rev = FirewallRules::store( $resource, $on, $rules, $ack, get_current_user_id() );
 
 				return $rev > 0;
 			}

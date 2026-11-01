@@ -17,6 +17,7 @@ use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Proxmox\LiveUsage;
 use BeltoftServices\Proxmox\Operations;
@@ -123,8 +124,8 @@ final class Details {
 	private static function vm_extras( Resource $r ): array {
 		$out = array( 'app_state' => (string) $r->get( 'app_state' ) );
 
-		if ( Firewall::editable( $r ) ) {
-			$view = Firewall::view( $r );
+		if ( FirewallRules::editable( $r ) ) {
+			$view = FirewallRules::view( $r );
 
 			$out['firewall'] = array(
 				'on'      => $view['on'],
