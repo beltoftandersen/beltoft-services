@@ -15,6 +15,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Account\DomainDanger;
+use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Resource;
@@ -198,13 +199,7 @@ final class Acts {
 	 * @return \WC_Subscription|\WP_Error
 	 */
 	public static function subscription( int $user_id, int $id ) {
-		$s = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : null;
-
-		if ( ! $s instanceof \WC_Subscription || $user_id <= 0 || (int) $s->get_user_id() !== $user_id ) {
-			return new \WP_Error( 'beltoft_services_forbidden', __( 'This subscription is not available.', 'beltoft-services' ) );
-		}
-
-		return $s;
+		return Subscriptions::owned( $user_id, $id );
 	}
 
 	/**
@@ -326,33 +321,7 @@ final class Acts {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function cancel_order( int $user_id, int $order_id ) {
-		$order = wc_get_order( $order_id );
-
-		if ( ! $order instanceof \WC_Order || 'shop_order' !== $order->get_type() || $user_id <= 0 || (int) $order->get_customer_id() !== $user_id ) {
-			return new \WP_Error( 'beltoft_services_forbidden', __( 'This order is not available.', 'beltoft-services' ) );
-		}
-
-		/** This filter is documented in WooCommerce, class-wc-form-handler.php. */
-		$valid = apply_filters( 'woocommerce_valid_order_statuses_for_cancel', array( 'pending', 'failed' ), $order );
-
-		if ( ! $order->has_status( $valid ) || ! current_user_can( 'cancel_order', $order_id ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'This order can no longer be cancelled.', 'beltoft-services' ) );
-		}
-
-		// WooCommerce Subscriptions cancels the subscriptions of a parent order with it: that is cancelling a service.
-		if ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order, 'parent' ) ) {
-			foreach ( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) as $subscription ) {
-				if ( ! $subscription->has_status( array( 'cancelled', 'expired', 'trash' ) ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'This order started a subscription, so cancelling it would cancel the subscription. The customer does that in the dashboard.', 'beltoft-services' ) );
-				}
-			}
-		}
-
-		$order->update_status( 'cancelled', __( 'Order cancelled by the customer through Claude.', 'beltoft-services' ) );
-
-		do_action( 'woocommerce_cancelled_order', $order->get_id() );
-
-		return array( 'order_id' => $order_id, 'status' => 'cancelled' );
+		return Subscriptions::cancel_order( $user_id, $order_id, __( 'Order cancelled by the customer through Claude.', 'beltoft-services' ) );
 	}
 
 	/**
