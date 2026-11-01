@@ -37,7 +37,7 @@ class SummaryTest extends UsageTestCase {
 		return array();
 	}
 
-	private const HTML = '<div id="bricks-woo-checkout-order-summary"><!--brx-loop-start-x--><div id="brxe-8c507f" class="brxe-text-basic">Total</div></div>';
+	private const HTML = '<div id="brxe-ob" class="x"><!--brx-loop-start-ob--></div><div id="bricks-woo-checkout-order-summary"><!--brx-loop-start-x--><div id="brxe-8c507f" class="brxe-text-basic">Total</div></div>';
 
 	public function test_the_account_line_is_hidden_but_stays_in_the_cart(): void {
 		$v = $this->usage_product( '0' );
@@ -86,6 +86,7 @@ class SummaryTest extends UsageTestCase {
 		$out = Summary::checkout_summary( self::HTML );
 
 		$this->assertSame( 1, substr_count( $out, 'Billed monthly for the hours used, excl. VAT.' ) );
+		$this->assertGreaterThan( strpos( $out, 'bricks-woo-checkout-order-summary' ), strpos( $out, 'payg-note' ), 'The note is in the summary, not in an order bar.' );
 		$this->assertStringContainsString( 'Your card is saved now and charged after each month.', $out );
 		$this->assertStringContainsString( '>Due today<', $out );
 		$this->assertStringNotContainsString( '>Total<', $out );
