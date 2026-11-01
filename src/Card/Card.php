@@ -44,6 +44,8 @@ final class Card {
 	/**
 	 * Option name prefix of the row that says a payment was applied.
 	 */
+	public const META_SETUP = '_beltoft_services_card_setup';
+	public const CLEANUP    = 'beltoft_services_card_cleanup';
 	public const CLAIM = 'beltoft_services_card_claim_';
 
 	/**
@@ -66,6 +68,9 @@ final class Card {
 		add_action( 'template_redirect', array( __CLASS__, 'handle' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'back_to_billing' ), 20 );
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+		add_action( 'woocommerce_checkout_subscription_created', array( __CLASS__, 'mark_setup' ), 20, 2 );
+		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		add_action( self::CLEANUP, array( __CLASS__, 'cleanup' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
 		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'swap_page' ), 1 );
 		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'bricks_methods' ), 10, 2 );
@@ -481,6 +486,15 @@ final class Card {
 			return self::url( array( self::QUERY => 'limit' ) );
 		}
 
+		// A replace page that was opened and left leaves a pending mandate at Mollie: it goes before the next one starts.
+		$list = Mollie::call( 'GET', '/customers/' . rawurlencode( self::customer_id( $account ) ) . '/mandates' );
+
+		foreach ( is_array( $list ) && isset( $list['_embedded']['mandates'] ) ? (array) $list['_embedded']['mandates'] : array() as $m ) {
+			if ( 'pending' === ( $m['status'] ?? '' ) && ! empty( $m['id'] ) && (string) $m['id'] !== self::mandate_id( $account ) ) {
+				Mollie::revoke( self::customer_id( $account ), (string) $m['id'] );
+			}
+		}
+
 		$payment = Mollie::create_payment(
 			array(
 				'amount'       => array(
@@ -689,6 +703,64 @@ final class Card {
 		}
 
 		$account->add_order_note( $note );
+	}
+
+	// ------------------------------------------------------------------ abandoned card setups.
+
+	/**
+	 * Marks the account made by a card-only order.
+	 *
+	 * @param mixed $subscription Subscription.
+	 * @param mixed $order        Order.
+	 */
+	public static function mark_setup( $subscription, $order = null ): void {
+		if ( $subscription instanceof \WC_Subscription && $order instanceof \WC_Order && self::is_card_order( $order ) ) {
+			$subscription->update_meta_data( self::META_SETUP, 'yes' );
+			$subscription->save();
+		}
+	}
+
+	/**
+	 * Daily job.
+	 */
+	public static function schedule(): void {
+		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::CLEANUP, array(), 'beltoft-services' ) ) {
+			as_schedule_recurring_action( time() + HOUR_IN_SECONDS, DAY_IN_SECONDS, self::CLEANUP, array(), 'beltoft-services' );
+		}
+	}
+
+	/**
+	 * Cancels card-setup accounts still pending after 24 hours (never an active one), and their unpaid first order.
+	 *
+	 * @return int Accounts cancelled.
+	 */
+	public static function cleanup(): int {
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return 0;
+		}
+
+		$n = 0;
+
+		foreach ( wcs_get_subscriptions( array( 'subscription_status' => 'pending', 'subscriptions_per_page' => -1 ) ) as $sub ) {
+			$created = $sub->get_date_created();
+
+			if ( 'yes' !== $sub->get_meta( self::META_SETUP ) || ! Account::is_account( $sub ) || ! $created || $created->getTimestamp() > time() - DAY_IN_SECONDS ) {
+				continue;
+			}
+
+			$parent = $sub->get_parent();
+
+			if ( $parent && $parent->has_status( array( 'pending', 'failed' ) ) ) {
+				$parent->update_status( 'cancelled', __( 'Card setup not completed.', 'beltoft-services' ) );
+			}
+
+			if ( $sub->has_status( 'pending' ) ) {
+				$sub->update_status( 'cancelled', __( 'Card setup not completed.', 'beltoft-services' ) );
+				++$n;
+			}
+		}
+
+		return $n;
 	}
 
 	// ------------------------------------------------------------------ the checkout of a card-only cart.

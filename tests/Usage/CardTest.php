@@ -72,6 +72,8 @@ class CardTest extends UsageTestCase {
 			isset( $this->mollie['payments'][ $m[1] ] ) ? $out = $this->mollie['payments'][ $m[1] ] : $code = 404;
 		} elseif ( 'GET' === $method && preg_match( '#^/customers/cst_1/mandates/(mdt_\w+)$#', $path, $m ) ) {
 			isset( $this->mollie['mandates'][ $m[1] ] ) ? $out = $this->mollie['mandates'][ $m[1] ] : $code = 404;
+		} elseif ( 'GET' === $method && '/customers/cst_1/mandates' === $path ) {
+			$out = array( '_embedded' => array( 'mandates' => array_values( $this->mollie['mandates'] ) ) );
 		} elseif ( 'DELETE' === $method && preg_match( '#^/customers/cst_1/mandates/(mdt_\w+)$#', $path, $m ) ) {
 			$this->mollie['revoked'][] = $m[1];
 			$code                      = 204;
@@ -457,5 +459,46 @@ class CardTest extends UsageTestCase {
 		$other->add_product( $this->usage_product()['m-None'], 1 );
 		$other->save();
 		$this->assertFalse( Card::is_card_order( $other ) );
+	}
+
+	public function test_the_card_setup_cart_needs_full_billing_details(): void {
+		wp_set_current_user( $this->new_user() );
+		$this->assertFalse( \BeltoftServices\BillingRequirements::cart_needs_billing() );
+		Card::start_add( get_current_user_id() );
+		$this->assertTrue( \BeltoftServices\BillingRequirements::cart_needs_billing() );
+		$fields = \BeltoftServices\BillingRequirements::require_fields( array( 'billing' => array( 'billing_address_1' => array( 'required' => false ), 'billing_phone' => array( 'required' => false ) ) ) );
+		$this->assertTrue( $fields['billing']['billing_address_1']['required'] );
+		$this->assertTrue( $fields['billing']['billing_phone']['required'] );
+	}
+
+	public function test_cleanup_cancels_old_pending_card_setups_only(): void {
+		$user = $this->new_user();
+		$mk   = function ( string $status, int $hours, bool $setup ) use ( $user ): \WC_Subscription {
+			$sub = $this->usage_account( $user, $status );
+			$sub->update_meta_data( Card::META_SETUP, $setup ? 'yes' : 'no' );
+			$sub->set_date_created( time() - $hours * HOUR_IN_SECONDS );
+			$sub->save();
+			return $sub;
+		};
+		$old    = $mk( 'pending', 30, true );
+		$fresh  = $mk( 'pending', 2, true );
+		$server = $mk( 'pending', 30, false );
+		$active = $mk( 'active', 30, true );
+
+		$this->assertSame( 1, Card::cleanup() );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $old->get_id() )->get_status() );
+		$this->assertSame( 'pending', wcs_get_subscription( $fresh->get_id() )->get_status() );
+		$this->assertSame( 'pending', wcs_get_subscription( $server->get_id() )->get_status() );
+		$this->assertSame( 'active', wcs_get_subscription( $active->get_id() )->get_status() );
+	}
+
+	public function test_replace_revokes_a_pending_mandate_left_by_an_abandoned_replace(): void {
+		$user = $this->new_user();
+		$this->card_account( $user );
+		$this->mollie['mandates']['mdt_stale'] = array( 'id' => 'mdt_stale', 'status' => 'pending', 'method' => 'creditcard' );
+
+		Card::start_replace( $user );
+
+		$this->assertSame( array( 'mdt_stale' ), $this->mollie['revoked'], 'Only the pending one, never the card in use.' );
 	}
 }
