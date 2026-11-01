@@ -554,7 +554,7 @@ final class Panel {
 
 		if ( $count > 0 ) {
 			printf(
-				'<div class="notice notice-error"><p>%1$s <a href="%2$s">%3$s</a> · <a href="%4$s">%5$s</a></p></div>',
+				'<div class="notice notice-error"><p>%1$s <a href="%2$s">%3$s</a>, <a href="%4$s">%5$s</a></p></div>',
 				esc_html(
 					sprintf(
 						/* translators: %d: number of services. */

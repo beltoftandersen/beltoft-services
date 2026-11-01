@@ -539,7 +539,7 @@ final class Servers {
 			'id'      => $resource->id(),
 			'url'     => ServerLinks::url( $license ),
 			'name'    => $title,
-			'details' => implode( ' · ', $parts ),
+			'details' => implode( ', ', $parts ),
 			'state'   => $text,
 			'tone'    => $tone,
 			'renews'  => ServerLinks::renewal( $license ),

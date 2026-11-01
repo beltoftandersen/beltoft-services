@@ -506,7 +506,7 @@ final class Overview {
 				$data[ $key ][]                      = array(
 					'url'    => $row['url'],
 					'name'   => $row['name'],
-					'sub'    => implode( ' · ', $sub ),
+					'sub'    => implode( ', ', $sub ),
 					'state'  => $row['state'],
 					'tone'   => $row['tone'],
 					'renews' => '',

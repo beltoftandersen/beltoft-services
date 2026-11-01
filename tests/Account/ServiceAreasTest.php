@@ -284,7 +284,7 @@ class ServiceAreasTest extends TestCase {
 
 		$this->assertStringContainsString( 'beltoft-services-ov__databases', $html );
 		$this->assertStringContainsString( 'Managed database', $html );
-		$this->assertStringContainsString( 'PostgreSQL 18 · 10.64.0.2', $html );
+		$this->assertStringContainsString( 'PostgreSQL 18, 10.64.0.2', $html );
 		$this->assertStringContainsString( 'All databases', $html );
 		$this->assertStringContainsString( esc_url( $this->db_area()->url_list() ), $html );
 
