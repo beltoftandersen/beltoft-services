@@ -96,6 +96,7 @@ final class Definitions {
 			'list_payment_methods' => self::read( 'Lists the customer\'s saved payment methods: card brand, last four digits, expiry and which is the default. The card data itself is never shown. Adding a card is done in the dashboard.', $none, 30 ),
 			'get_account'      => self::read( 'Shows the customer\'s name, e-mail address and billing and shipping address.' . self::DATA, $none, 30 ),
 			'catalog'          => self::read( 'Shows what can be bought, with prices excluding tax: server plans, database plans, the systems and apps a server plan offers (variation_id), add-ons for one of the customer\'s servers (id: snapshot packs, extra disk, backups price), and domain prices per ending.', self::obj( array( 'kind' => array( 'type' => 'string', 'enum' => array( 'server_plans', 'database_plans', 'os_and_apps', 'addons', 'domain_prices' ), 'description' => 'What to list.' ), 'variation_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For os_and_apps: the server plan, from server_plans.' ), 'id' => $id ), array( 'kind' ) ), 20 ),
+			'list_server_plans' => self::read( 'Lists the server plans that can be ordered through Claude, pay as you go: id, name, CPU, memory and disk, price per hour and monthly cap (excluding VAT), the price of daily backups, the systems and the apps each plan offers. Use it before order_server.', $none, 20 ),
 			'list_dns_claims'  => self::read( 'Lists the domains the customer has asked us to host DNS for while the domain is registered elsewhere, with the state of each. Only when the site offers it.' . self::DATA, $none, 30 ),
 			'console_link'     => self::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
 			'email_domain_info' => self::read( 'Shows one email domain: its state, the plan limits (mailboxes, size of each, aliases), every mailbox with its storage use and whether a password can still be shown, every alias with where it delivers, the DNS records with ok, missing or conflict for each, and the settings for a mail program. No password is shown here.' . self::DATA, $by_id, 30 ),
@@ -295,6 +296,24 @@ final class Definitions {
 			'delete_mailbox'   => self::full(
 				'Deletes a mailbox and every message in it for good. Get the address from email_domain_info.',
 				self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ), true )
+			),
+			'order_server'     => self::full(
+				'Orders a new pay as you go server. Choose the plan, system or app, name, backups and SSH key with the customer first (list_server_plans). Nothing is charged: the hours are billed monthly to the card saved on the customer\'s usage account. A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
+				self::obj(
+					array(
+						'plan'        => array( 'type' => 'string', 'maxLength' => 120, 'description' => 'The plan id or its exact name, from list_server_plans.' ),
+						'os'          => array( 'type' => 'string', 'maxLength' => 80, 'description' => 'The system: an id or exact name from list_server_plans. Not needed when an app is chosen.' ),
+						'app'         => array( 'type' => 'string', 'maxLength' => 80, 'description' => 'An app from list_server_plans: app_id, or app_id/version_id. Optional; the app runs on its own system.' ),
+						'server_name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The host name of the server: letters, digits and hyphens. Optional.' ),
+						'backups'     => array( 'type' => 'boolean', 'description' => 'Daily backups, if the plan offers them. Default false.' ),
+						'ssh_key'     => array( 'type' => 'string', 'maxLength' => 8192, 'description' => 'A public SSH key, one line. Optional.' ),
+					),
+					array( 'plan' ),
+					true
+				),
+				false,
+				false,
+				false
 			),
 			'cancel_subscription' => self::full(
 				'Cancels a subscription, and with it the services it pays for (a server, a database, an add-on or DNS hosting). A registered domain cannot be cancelled here. The summary says when the service ends and what happens to its data.',

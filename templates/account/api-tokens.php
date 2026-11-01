@@ -226,7 +226,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 
 		<details class="beltoft-services-api__docs">
 			<summary><?php esc_html_e( 'What Claude can do', 'beltoft-services' ); ?></summary>
-			<p><?php esc_html_e( 'Claude can read your servers, databases, domains and DNS, and with actions allowed restart or stop a server, take a snapshot and change DNS records. Only with Full access can it also restore, roll back, reinstall, delete or cancel, or show a password once, and then only after it has shown you what it is about to do and you have said yes in the chat. Domain transfers stay in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
+			<p><?php esc_html_e( 'Claude can read your servers, databases, domains and DNS, and with actions allowed restart or stop a server, take a snapshot and change DNS records. Only with Full access can it also order a pay as you go server (nothing is charged when you already have a usage account, otherwise it gives you a link to finish once in the browser), restore, roll back, reinstall, delete or cancel, or show a password once, and then only after it has shown you what it is about to do and you have said yes in the chat. Domain transfers stay in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
 		</details>
 	<?php endif; ?>
 </section>

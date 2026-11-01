@@ -154,6 +154,30 @@ final class Account {
 	}
 
 	/**
+	 * Can the account be charged without the customer present: it is active, its payment method is one WooCommerce Subscriptions
+	 * charges by itself, and a Mollie payment method has its customer and mandate on the account (the card saved at the first,
+	 * 0 payment). The filter lets a site with another gateway say what "a saved mandate" is.
+	 *
+	 * @param \WC_Subscription $subscription Account.
+	 */
+	public static function chargeable( \WC_Subscription $subscription ): bool {
+		$method = (string) $subscription->get_payment_method();
+		$ok     = $subscription->has_status( 'active' ) && self::has_card( $subscription );
+
+		if ( $ok && str_starts_with( $method, 'mollie_wc_gateway_' ) ) {
+			$ok = '' !== (string) $subscription->get_meta( '_mollie_customer_id' ) && '' !== (string) $subscription->get_meta( '_mollie_mandate_id' );
+		}
+
+		/**
+		 * Whether a usage account can be charged later without the customer.
+		 *
+		 * @param bool             $ok           Result of the built-in check.
+		 * @param \WC_Subscription $subscription The account.
+		 */
+		return (bool) apply_filters( 'beltoft_services_usage_account_chargeable', $ok, $subscription );
+	}
+
+	/**
 	 * Marks the subscription made at checkout from the hidden product as the customer's account.
 	 *
 	 * @param \WC_Subscription $subscription Subscription.

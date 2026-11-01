@@ -21,7 +21,7 @@ final class BillingRequirements {
 	/**
 	 * Billing fields a service order must have.
 	 */
-	private const FIELDS = array( 'billing_first_name', 'billing_last_name', 'billing_email', 'billing_phone', 'billing_address_1', 'billing_city', 'billing_postcode', 'billing_country' );
+	public const FIELDS = array( 'billing_first_name', 'billing_last_name', 'billing_email', 'billing_phone', 'billing_address_1', 'billing_city', 'billing_postcode', 'billing_country' );
 
 	/**
 	 * Hooks.

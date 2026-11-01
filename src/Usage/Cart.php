@@ -180,17 +180,35 @@ final class Cart {
 			}
 		}
 
+		$limit = self::limit_problem( $user_id, $account, $units );
+
+		if ( null !== $limit ) {
+			$problems[] = $limit;
+		}
+
+		return $problems;
+	}
+
+	/**
+	 * The refusal of a new account that would run more pay-as-you-go services than it may before its first usage invoice is paid
+	 * (setting usage_new_limit), or null.
+	 *
+	 * @param int                   $user_id Customer.
+	 * @param \WC_Subscription|null $account The customer's usage account, if any.
+	 * @param int                   $units   Pay-as-you-go units ordered now.
+	 */
+	public static function limit_problem( int $user_id, ?\WC_Subscription $account, int $units ): ?string {
 		$limit = (int) Settings::get( 'usage_new_limit' );
 
 		if ( $limit > 0 && ! Account::charged( $account ) && count( Account::resources( $user_id ) ) + $units > $limit ) {
-			$problems[] = sprintf(
+			return sprintf(
 				/* translators: %d: number of services. */
 				_n( 'A new account can run %d pay as you go service until its first usage invoice is paid.', 'A new account can run %d pay as you go services until its first usage invoice is paid.', $limit, 'beltoft-services' ),
 				$limit
 			);
 		}
 
-		return $problems;
+		return null;
 	}
 
 	/**
