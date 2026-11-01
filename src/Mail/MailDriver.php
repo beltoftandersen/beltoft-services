@@ -379,17 +379,17 @@ final class MailDriver implements Driver, NeedsBilling {
 				continue;
 			}
 
-			$set = $client->edit_mailbox( $email, array( 'active' => '0' ) );
-
-			if ( is_wp_error( $set ) ) {
-				return StepResult::retry( 300, $set->get_error_message() );
-			}
-
-			// Kept as it happens: a retry must not forget the mailboxes this pause already switched off.
+			// Recorded before the mailbox is switched off: a crash in between must not lose which mailboxes resume has to switch on again.
 			$paused[] = $email;
 
 			if ( ! $r->set( array( 'mail_paused_boxes' => array_values( array_unique( $paused ) ) ) ) ) {
 				return StepResult::retry( 60, 'The paused mailboxes could not be saved.' );
+			}
+
+			$set = $client->edit_mailbox( $email, array( 'active' => '0' ) );
+
+			if ( is_wp_error( $set ) ) {
+				return StepResult::retry( 300, $set->get_error_message() );
 			}
 		}
 
@@ -485,14 +485,43 @@ final class MailDriver implements Driver, NeedsBilling {
 
 	public function delete( Resource $r ): StepResult {
 		$domain = (string) $r->get( MailDomain::META_DOMAIN );
+		$steps  = (array) $r->get( 'steps' );
 
-		if ( ! $this->created( $r ) || '' === $domain ) {
+		// Before the proof nothing was sent to the mail server. After it, add/domain may have worked without the step being saved (a crash).
+		if ( '' === $domain || ( ! $this->created( $r ) && ! in_array( 'proof', $steps, true ) ) ) {
 			MailAccess::purge_all( $r );
 
 			return StepResult::done();
 		}
 
 		$client = MailClients::for();
+		$have   = $client->get_domain( $domain );
+
+		if ( is_wp_error( $have ) ) {
+			return StepResult::retry( 300, $have->get_error_message() );
+		}
+
+		if ( ! is_array( $have ) ) {
+			// Nothing of it is left on the mail server.
+			MailAccess::purge_all( $r );
+
+			return StepResult::done( array(), 'Email domain deleted' );
+		}
+
+		if ( $this->marker( $r ) !== (string) ( $have['description'] ?? '' ) ) {
+			// The domain on the mail server is not this service's: nothing of it is touched.
+			if ( ! $this->created( $r ) ) {
+				MailAccess::purge_all( $r );
+
+				return StepResult::done();
+			}
+
+			Alerts::admin( $r, 'The domain on the mail server is not marked as this service\'s. Nothing was deleted.' );
+
+			return StepResult::fail( 'The domain on the mail server does not belong to this service.' );
+		}
+
+		$suffix = '@' . strtolower( $domain );
 		$boxes  = $client->list_mailboxes( $domain );
 
 		if ( is_wp_error( $boxes ) ) {
@@ -500,6 +529,10 @@ final class MailDriver implements Driver, NeedsBilling {
 		}
 
 		foreach ( $boxes as $box ) {
+			if ( ! str_ends_with( strtolower( (string) ( $box['username'] ?? '' ) ), $suffix ) ) {
+				continue;
+			}
+
 			$gone = $client->delete_mailbox( (string) $box['username'] );
 
 			if ( is_wp_error( $gone ) ) {
@@ -514,6 +547,10 @@ final class MailDriver implements Driver, NeedsBilling {
 		}
 
 		foreach ( $aliases as $alias ) {
+			if ( ! str_ends_with( strtolower( (string) ( $alias['address'] ?? '' ) ), $suffix ) ) {
+				continue;
+			}
+
 			$gone = $client->delete_alias( (int) $alias['id'] );
 
 			if ( is_wp_error( $gone ) ) {
