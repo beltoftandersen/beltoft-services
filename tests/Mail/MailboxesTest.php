@@ -123,6 +123,21 @@ final class MailboxesTest extends MailTestCase {
 		$this->assertSame( 'not_ready', Mailboxes::create( Resource::find( $r->id() ), 'z' )->get_error_code() );
 	}
 
+	public function test_the_state_and_the_count_are_read_again_under_the_lock(): void {
+		$r = $this->ready_mail( 'race.example', array( 'mailboxes' => 2 ) );
+		$stale = Resource::find( $r->id() );
+		$this->mailcow->add_mailbox( array( 'local_part' => 'other', 'domain' => 'race.example', 'quota' => '100' ) );
+		$this->assertIsArray( Mailboxes::create( $stale, 'a' ), 'One place was left.' );
+		$this->assertSame( 'limit', Mailboxes::create( $stale, 'b' )->get_error_code(), 'The count is read at the add, not before.' );
+
+		// A request that checked the state earlier holds a copy that still says ready.
+		$other = $this->ready_mail( 'race2.example', array( 'mailboxes' => 5 ) );
+		$copy  = Resource::find( $other->id() );
+		$other->set( array( 'state' => 'paused' ) );
+		$this->assertSame( 'not_ready', Mailboxes::create( $copy, 'x' )->get_error_code() );
+		$this->assertSame( array(), array_filter( $this->mailcow->calls_of( 'add_mailbox' ), static fn( $c ) => 'x@race2.example' === $c[1] ) );
+	}
+
 	public function test_a_failed_send_limit_removes_the_mailbox_again(): void {
 		$r = $this->ready_mail( 'rl.example' );
 		$this->mailcow->fail_next( 'set_mailbox_rate_limit', new \WP_Error( 'mailcow_transport', 'x' ) );

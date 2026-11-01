@@ -77,29 +77,80 @@ final class Mailboxes {
 			return new \WP_Error( 'limit', __( 'That size is outside what your plan allows.', 'beltoft-services' ) );
 		}
 
-		$quota  = $size > 0 ? $size : $limits['quota_mb'];
-		$client = MailClients::for();
-		$have   = $client->list_mailboxes( MailGuard::domain( $r ) );
+		$quota   = $size > 0 ? $size : $limits['quota_mb'];
+		$client  = MailClients::for();
+		$outcome = null;
+		$count   = 0;
 
-		if ( is_wp_error( $have ) ) {
-			return MailGuard::failed( $have, __( 'create the mailbox', 'beltoft-services' ) );
-		}
+		// State, count, password and add are one step under the resource lock: parallel requests cannot pass the plan's limit together.
+		$ran = $r->locked(
+			static function () use ( $r, $client, $email, $name, $quota, &$outcome, &$count ): bool {
+				$bad = MailGuard::check( $r );
 
-		if ( count( $have ) >= $limits['mailboxes'] ) {
-			return new \WP_Error( 'limit', __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) );
-		}
+				if ( $bad ) {
+					$outcome = $bad;
+					return false;
+				}
 
-		$password = '';
-		$error    = null;
-		$ran      = $r->locked(
-			static function () use ( $r, $email, &$password, &$error ): bool {
+				$have = $client->list_mailboxes( MailGuard::domain( $r ) );
+
+				if ( is_wp_error( $have ) ) {
+					$outcome = MailGuard::failed( $have, __( 'create the mailbox', 'beltoft-services' ) );
+					return false;
+				}
+
+				if ( count( $have ) >= MailGuard::limits( $r )['mailboxes'] ) {
+					$outcome = new \WP_Error( 'limit', __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) );
+					return false;
+				}
+
 				try {
 					$password = MailAccess::begin( $r, $email );
 				} catch ( \Throwable $e ) {
-					$error = new \WP_Error( 'unavailable', __( 'The password could not be stored. Try again later.', 'beltoft-services' ) );
+					$outcome = new \WP_Error( 'unavailable', __( 'The password could not be stored. Try again later.', 'beltoft-services' ) );
+					return false;
 				}
 
-				return null === $error;
+				$added = $client->add_mailbox(
+					array(
+						'local_part'      => (string) strstr( $email, '@', true ),
+						'domain'          => MailGuard::domain( $r ),
+						'name'            => '' !== trim( $name ) ? sanitize_text_field( $name ) : (string) strstr( $email, '@', true ),
+						'quota'           => (string) $quota,
+						'password'        => $password,
+						'password2'       => $password,
+						'active'          => '1',
+						'force_pw_update' => '0',
+					)
+				);
+
+				$password = '';
+
+				if ( is_wp_error( $added ) ) {
+					MailAccess::abort( $r, $email );
+					$outcome = MailGuard::failed( $added, __( 'create the mailbox', 'beltoft-services' ) );
+					return false;
+				}
+
+				// The send limit is not optional on a mail server shared by everyone: without it the mailbox is removed again.
+				$limit = MailSettings::rate_limit();
+
+				if ( null !== $limit ) {
+					$set = $client->set_mailbox_rate_limit( $email, $limit[0], $limit[1] );
+
+					if ( is_wp_error( $set ) ) {
+						$client->delete_mailbox( $email );
+						MailAccess::abort( $r, $email );
+						$outcome = MailGuard::failed( $set, __( 'create the mailbox', 'beltoft-services' ) );
+						return false;
+					}
+				}
+
+				MailAccess::finish( $r, $email );
+				$count   = count( $have ) + 1;
+				$outcome = true;
+
+				return true;
 			}
 		);
 
@@ -107,47 +158,11 @@ final class Mailboxes {
 			return new \WP_Error( 'busy', __( 'Another change is running. Try again in a moment.', 'beltoft-services' ) );
 		}
 
-		if ( $error ) {
-			return $error;
+		if ( true !== $outcome ) {
+			return $outcome;
 		}
 
-		$added = $client->add_mailbox(
-			array(
-				'local_part'      => (string) strstr( $email, '@', true ),
-				'domain'          => MailGuard::domain( $r ),
-				'name'            => '' !== trim( $name ) ? sanitize_text_field( $name ) : (string) strstr( $email, '@', true ),
-				'quota'           => (string) $quota,
-				'password'        => $password,
-				'password2'       => $password,
-				'active'          => '1',
-				'force_pw_update' => '0',
-			)
-		);
-
-		$password = '';
-
-		if ( is_wp_error( $added ) ) {
-			MailAccess::abort( $r, $email );
-
-			return MailGuard::failed( $added, __( 'create the mailbox', 'beltoft-services' ) );
-		}
-
-		// The send limit is not optional on a mail server shared by everyone: without it the mailbox is removed again.
-		$limit = MailSettings::rate_limit();
-
-		if ( null !== $limit ) {
-			$set = $client->set_mailbox_rate_limit( $email, $limit[0], $limit[1] );
-
-			if ( is_wp_error( $set ) ) {
-				$client->delete_mailbox( $email );
-				MailAccess::abort( $r, $email );
-
-				return MailGuard::failed( $set, __( 'create the mailbox', 'beltoft-services' ) );
-			}
-		}
-
-		MailAccess::finish( $r, $email );
-		MailView::remember( $r, count( $have ) + 1 );
+		MailView::remember( $r, $count );
 
 		return array( 'email' => $email, 'quota_mb' => $quota );
 	}
