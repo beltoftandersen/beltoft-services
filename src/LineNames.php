@@ -31,6 +31,35 @@ final class LineNames {
 		add_filter( 'woocommerce_cart_item_name', array( __CLASS__, 'cart_item_name' ), 10, 2 );
 		add_filter( 'woocommerce_display_item_meta', array( __CLASS__, 'display_item_meta' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'cart_item_data' ), 30, 2 );
+		add_filter( 'woocommerce_order_item_get_formatted_meta_data', array( __CLASS__, 'usage_meta' ), 20, 2 );
+	}
+
+	/**
+	 * The attribute rows of a pay-as-you-go line that say nothing: "Billing" (the name says pay as you go) and the
+	 * add-ons that were not chosen ("Backups: None", "Public IP: No", "Extra storage: None"). The thank-you page
+	 * (the Bricks order details element), the order emails and My Account all read the formatted meta, so this one
+	 * filter covers them. Real choices (plan, OS, app, server name, an add-on that was chosen) stay, and so does
+	 * every row of a monthly line.
+	 *
+	 * @param mixed $meta Formatted meta rows (stdClass keyed by meta id).
+	 * @param mixed $item Order item.
+	 * @return mixed
+	 */
+	public static function usage_meta( $meta, $item = null ) {
+		if ( ! is_array( $meta ) || ! $item instanceof \WC_Order_Item_Product || ! Rates::is_usage( $item->get_product() ) ) {
+			return $meta;
+		}
+
+		foreach ( $meta as $id => $row ) {
+			$slug  = sanitize_title( (string) preg_replace( '/^(attribute_)?(pa_)?/', '', (string) ( $row->key ?? '' ) ) );
+			$value = strtolower( trim( wp_strip_all_tags( (string) ( $row->display_value ?? '' ) ) ) );
+
+			if ( 'billing' === $slug || ( in_array( $slug, array( 'backups', 'public-ip', 'extra-storage' ), true ) && in_array( $value, array( 'none', 'no', '' ), true ) ) ) {
+				unset( $meta[ $id ] );
+			}
+		}
+
+		return $meta;
 	}
 
 	/**
