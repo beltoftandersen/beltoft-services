@@ -113,7 +113,7 @@ class DnsAssignmentsTest extends TestCase {
 		$this->assertNotNull( DnsAssignments::get( 'fresh.example' ) );
 		$this->assertSame( 'active', DnsAssignments::get( 'active.example' )['status'] );
 		$this->assertSame( 'release_pending', DnsAssignments::get( 'rp.example' )['status'] );
-		$this->assertSame( 2, DnsAssignments::open_count() );
+		$this->assertCount( 1, DnsAssignments::for_status( 'active' ) );
 		$this->assertCount( 1, DnsAssignments::for_status( 'release_pending' ) );
 	}
 
