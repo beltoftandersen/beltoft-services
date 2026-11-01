@@ -130,6 +130,7 @@ final class Plugin {
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Access::class, 'on_state_changed' ), 10, 3 );
 		add_action( 'beltoft_services_state_changed', array( Mail\MailAccess::class, 'on_state_changed' ), 10, 3 );
 		add_action( 'beltoft_services_state_changed', array( Proxmox\Operations::class, 'on_state_changed' ), 10, 3 );
+		Proxmox\Credentials::register();
 		Proxmox\ServerName::register();
 		Proxmox\SshKeyField::register();
 		Proxmox\OsField::register();
