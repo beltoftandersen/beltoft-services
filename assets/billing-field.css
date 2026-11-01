@@ -11,8 +11,6 @@ fieldset.beltoft-services-billing > legend.beltoft-services-billing__legend, .ch
 .beltoft-services-billing .beltoft-services-billing__input:checked + .beltoft-services-billing__face, .beltoft-services-billing__option:hover .beltoft-services-billing__input:checked + .beltoft-services-billing__face { background: var(--navy, #0c1535); color: #ffffff; }
 .beltoft-services-billing .beltoft-services-billing__input:focus-visible + .beltoft-services-billing__face { outline: 2px solid var(--green, #28513e); outline-offset: 2px; }
 .beltoft-services-billing .beltoft-services-billing__input:disabled + .beltoft-services-billing__face { cursor: progress; }
-.beltoft-services-billing .description { margin: 10px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-billing [hidden] { display: none !important; }
 @media (max-width: 478px) { .beltoft-services-billing__options { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .beltoft-services-billing__face { transition: none; } }
 /* The theme puts the system tiles first inside the step (order: -1): the billing box goes above them. */

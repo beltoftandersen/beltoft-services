@@ -152,6 +152,30 @@ class CatalogTest extends UsageTestCase {
 		$this->assertStringNotContainsString( 'value="' . $this->v['u-None']->get_id() . '"', $html, 'No pay as you go card.' );
 	}
 
+	public function test_monthly_not_offered_prints_no_tiles_and_cards_with_the_cap_and_hourly_rate(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$html = $this->page();
+
+		$this->assertStringNotContainsString( 'name="' . ServerPicker::BILLING . '"', $html );
+		$this->assertStringContainsString( 'data-picker-payg-only', $html );
+		$this->assertStringContainsString( 'max per month, excl. VAT', $html );
+		$this->assertStringContainsString( '16.50</b>', $html );
+		$this->assertStringContainsString( '0.0226 per hour</span>', str_replace( "\u{a0}", ' ', $html ) );
+		$this->assertStringContainsString( 'data-card-cap-backups=', $html );
+	}
+
+	public function test_monthly_not_offered_posts_pay_as_you_go_and_falls_back_for_a_plan_without_it(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$this->assertSame( $this->v['u-None']->get_id(), $this->check( array( 'billing' => 'usage' ) )['variation_id'] );
+
+		$this->v['u-None']->set_status( 'private' );
+		$this->v['u-None']->save();
+		$result = $this->check( array( 'billing' => 'usage' ) );
+
+		$this->assertSame( $this->v['m-None']->get_id(), $result['variation_id'] );
+		$this->assertArrayNotHasKey( 'billing', $result['errors'] );
+	}
+
 	public function test_a_product_without_pay_as_you_go_prints_no_billing_choice(): void {
 		$this->v['u-None']->set_status( 'private' );
 		$this->v['u-None']->save();

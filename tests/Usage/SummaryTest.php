@@ -169,6 +169,82 @@ class SummaryTest extends UsageTestCase {
 		$this->assertStringContainsString( '18.00', $tiles['monthly'][1] );
 		$this->assertStringContainsString( '0.0205 per hour, max', $tiles['usage'][0] );
 		$this->assertStringContainsString( '18.00 per month', str_replace( "\u{a0}", ' ', $tiles['usage'][1] ) );
-		$this->assertSame( 'Billed monthly for the hours used', BillingField::tile_note() );
+		$this->assertSame( 'Billed monthly for the hours used', \BeltoftServices\Usage\Rates::billed_note() );
+	}
+
+	public function test_monthly_not_offered_swaps_a_new_monthly_server_to_pay_as_you_go(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		$key = WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
+		WC()->cart->calculate_totals();
+
+		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
+
+		$this->assertContains( $v['u-None']->get_id(), $ids );
+		$this->assertNotContains( $v['m-None']->get_id(), $ids );
+		$this->assertNotFalse( $key );
+		$this->assertSame( 1, \BeltoftServices\Usage\Cart::usage_units() );
+	}
+
+	public function test_monthly_not_offered_keeps_backups_in_the_swap(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		WC()->cart->add_to_cart( $v['m-Daily']->get_parent_id(), 1, $v['m-Daily']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'Daily' ) );
+
+		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
+
+		$this->assertContains( $v['u-Daily']->get_id(), $ids );
+	}
+
+	public function test_monthly_offered_leaves_a_monthly_server_alone(): void {
+		$this->settings( array( 'offer_monthly' => 1 ) );
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
+
+		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
+
+		$this->assertContains( $v['m-None']->get_id(), $ids );
+	}
+
+	public function test_monthly_not_offered_never_swaps_a_renewal_or_switch(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+
+		foreach ( array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe' ) as $flag ) {
+			$this->settings( array( 'offer_monthly' => 1 ) );
+			WC()->cart->empty_cart();
+			$key = WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
+			$contents                       = WC()->cart->get_cart_contents();
+			$contents[ $key ][ $flag ]      = array( 'subscription_id' => 1 );
+			WC()->cart->set_cart_contents( $contents );
+			$this->settings( array( 'offer_monthly' => 0 ) );
+			BillingField::enforce();
+			$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
+
+			$this->assertContains( $v['m-None']->get_id(), $ids, $flag );
+		}
+	}
+
+	public function test_monthly_not_offered_hides_the_checkout_box_and_leaves_admin_orders_alone(): void {
+		$this->settings( array( 'offer_monthly' => 0 ) );
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		$order = wc_create_order();
+		$order->add_product( $v['m-None'], 1 );
+		$order->save();
+		$items = array_values( $order->get_items() );
+
+		$this->assertSame( $v['m-None']->get_id(), (int) $items[0]->get_variation_id(), 'An order made outside the cart keeps its monthly plan.' );
+
+		$this->add( $v['u-None'] );
+		ob_start();
+		BillingField::render();
+
+		$this->assertSame( '', (string) ob_get_clean(), 'No billing box.' );
+		$this->assertFalse( \BeltoftServices\Usage\Rates::monthly_offered() );
 	}
 }

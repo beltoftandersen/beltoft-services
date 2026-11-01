@@ -34,6 +34,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		$this->settings( array( 'offer_monthly' => 1 ) );
 		global $wpdb;
 		$wpdb->query( 'DELETE FROM ' . Ledger::table() ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		AppReinstallPaid::register();

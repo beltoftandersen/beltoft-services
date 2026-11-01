@@ -37,7 +37,8 @@ final class LineNames {
 	 * The note under a pay-as-you-go line.
 	 */
 	public static function usage_note(): string {
-		return __( 'Billed monthly for the hours used, excl. VAT', 'beltoft-services' );
+		/* translators: %s: how pay as you go is billed */
+		return sprintf( __( '%s, excl. VAT', 'beltoft-services' ), Rates::billed_note() );
 	}
 
 	/**

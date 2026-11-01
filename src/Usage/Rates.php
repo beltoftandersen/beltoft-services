@@ -156,8 +156,65 @@ final class Rates {
 	 * @param float $cap    Monthly cap.
 	 */
 	public static function terms( float $hourly, float $cap ): string {
-		/* translators: 1: price per hour such as €0.0226, 2: monthly cap such as €16.50 */
-		return sprintf( __( '%1$s per hour, max %2$s per month excluding VAT', 'beltoft-services' ), self::money( $hourly, 4 ), self::money( $cap ) );
+		/* translators: %s: the terms, such as "€0.0226 per hour, max €16.50 per month" */
+		return sprintf( __( '%s excluding VAT', 'beltoft-services' ), self::tile_terms( $hourly, $cap ) );
+	}
+
+	/**
+	 * The rate and the cap of a pay-as-you-go variation (excluding tax): its monthly sibling's price and the
+	 * product's premium. Null when the variation is not pay as you go or has no monthly price.
+	 *
+	 * @param mixed $usage Product of a line.
+	 * @return array{hourly: float, cap: float}|null
+	 */
+	public static function for_usage( $usage ): ?array {
+		if ( ! $usage instanceof \WC_Product_Variation || ! self::is_usage( $usage ) ) {
+			return null;
+		}
+
+		$monthly = self::monthly( $usage );
+
+		if ( null === $monthly || $monthly <= 0 ) {
+			return null;
+		}
+
+		$premium = self::premium( $usage->get_parent_id() );
+
+		return array( 'hourly' => self::hourly( $monthly, $premium ), 'cap' => self::cap( $monthly, $premium ) );
+	}
+
+	/**
+	 * The one sentence that says how pay as you go is billed.
+	 */
+	public static function billed_note(): string {
+		return __( 'Billed monthly for the hours used', 'beltoft-services' );
+	}
+
+	/**
+	 * Is the Monthly option shown to customers (setting)? Off, new servers are sold pay as you go only.
+	 */
+	public static function monthly_offered(): bool {
+		return (bool) \BeltoftServices\Settings::get( 'offer_monthly' );
+	}
+
+	/**
+	 * "€0.0829 per hour".
+	 *
+	 * @param float $hourly Price per hour.
+	 */
+	public static function per_hour( float $hourly ): string {
+		/* translators: %s: price per hour such as €0.0829 */
+		return sprintf( __( '%s per hour', 'beltoft-services' ), self::money( $hourly, 4 ) );
+	}
+
+	/**
+	 * "max €55.00 per month".
+	 *
+	 * @param float $cap Monthly cap.
+	 */
+	public static function max_per_month( float $cap ): string {
+		/* translators: %s: monthly cap such as €55.00 */
+		return sprintf( __( 'max %s per month', 'beltoft-services' ), self::money( $cap ) );
 	}
 
 	/**
@@ -167,8 +224,8 @@ final class Rates {
 	 * @param float $cap    Monthly cap.
 	 */
 	public static function tile_terms( float $hourly, float $cap ): string {
-		/* translators: 1: price per hour such as €0.0829, 2: monthly cap such as €55.00 */
-		return sprintf( __( '%1$s per hour, max %2$s per month', 'beltoft-services' ), self::money( $hourly, 4 ), self::money( $cap ) );
+		/* translators: 1: "€0.0829 per hour", 2: "max €55.00 per month" */
+		return sprintf( __( '%1$s, %2$s', 'beltoft-services' ), self::per_hour( $hourly ), self::max_per_month( $cap ) );
 	}
 
 	/**

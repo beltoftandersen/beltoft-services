@@ -51,6 +51,35 @@ final class BillingField {
 		add_action( $hook, array( __CLASS__, 'render' ), (int) apply_filters( 'beltoft_services_billing_field_priority', 1 ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'enforce' ), 30 );
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'enforce' ), 30 );
+	}
+
+	/**
+	 * Monthly not offered: a new server in the cart that is a monthly plan becomes its pay as you go plan. Not for a
+	 * renewal, a switch or a resubscribe (cart_server() is null for those), and the cart is the only thing touched:
+	 * an order made in the admin or an existing subscription never goes through here.
+	 */
+	public static function enforce(): void {
+		static $busy = false;
+
+		if ( $busy || Rates::monthly_offered() ) {
+			return;
+		}
+
+		$server = self::cart_server();
+
+		if ( null === $server || $server['usage'] || isset( $server['item']['subscription_resubscribe'] ) ) {
+			return;
+		}
+
+		$busy = true;
+
+		try {
+			self::swap( true );
+		} finally {
+			$busy = false;
+		}
 	}
 
 	/**
@@ -132,27 +161,12 @@ final class BillingField {
 	}
 
 	/**
-	 * The second line of the Pay as you go tile.
-	 */
-	public static function tile_note(): string {
-		return __( 'Billed monthly for the hours used', 'beltoft-services' );
-	}
-
-	/**
-	 * The explanation under the choice (the price and the cap are next to the choice). Empty: every order needs a
-	 * payment method anyway (card, Google Pay or Apple Pay), so there is nothing to add for pay as you go.
-	 */
-	public static function note(): string {
-		return '';
-	}
-
-	/**
 	 * The radio buttons and the explanation.
 	 */
 	public static function render(): void {
 		$server = self::cart_server();
 
-		if ( null === $server ) {
+		if ( null === $server || ! Rates::monthly_offered() ) {
 			return;
 		}
 
@@ -168,7 +182,7 @@ final class BillingField {
 		$now   = $has && '' !== $terms[1] ? $terms[1] : $terms[0];
 		$mnow  = $has && '' !== $tiles['monthly'][1] ? $tiles['monthly'][1] : $tiles['monthly'][0];
 
-		echo '<fieldset class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-monthly="' . esc_attr( $tiles['monthly'][0] ) . '" data-monthly-backups="' . esc_attr( $tiles['monthly'][1] ) . '" data-note="' . esc_attr( self::note() ) . '">';
+		echo '<fieldset class="beltoft-services-billing" data-terms="' . esc_attr( $terms[0] ) . '" data-terms-backups="' . esc_attr( $terms[1] ) . '" data-monthly="' . esc_attr( $tiles['monthly'][0] ) . '" data-monthly-backups="' . esc_attr( $tiles['monthly'][1] ) . '">';
 		echo '<legend class="beltoft-services-billing__legend">' . esc_html__( 'Billing', 'beltoft-services' ) . '</legend>';
 		echo '<div class="beltoft-services-billing__options">';
 
@@ -183,13 +197,12 @@ final class BillingField {
 				checked( $server['usage'] === ( 'usage' === $value ), true, false ),
 				esc_html( $label ),
 				'usage' === $value
-					? '<span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span><span class="beltoft-services-billing__rate">' . esc_html( self::tile_note() ) . '</span>'
+					? '<span class="beltoft-services-billing__rate" data-billing-rate>' . esc_html( $now ) . '</span><span class="beltoft-services-billing__rate">' . esc_html( Rates::billed_note() ) . '</span>'
 					: '<span class="beltoft-services-billing__rate" data-billing-monthly>' . esc_html( $mnow ) . '</span>'
 			);
 		}
 
 		echo '</div>';
-		echo '<p class="description" data-billing-note' . ( '' === self::note() ? ' hidden' : '' ) . '>' . esc_html( $server['usage'] ? self::note() : '' ) . '</p>';
 		echo '</fieldset>';
 	}
 
@@ -197,7 +210,7 @@ final class BillingField {
 	 * The script, on the checkout page only, and only when the field is shown.
 	 */
 	public static function assets(): void {
-		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || null === self::cart_server() ) {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || ! Rates::monthly_offered() || null === self::cart_server() ) {
 			return;
 		}
 

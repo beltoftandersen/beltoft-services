@@ -42,28 +42,6 @@ final class Summary {
 	}
 
 	/**
-	 * The hourly rate and the monthly cap of a pay-as-you-go variation (excluding tax), or null.
-	 *
-	 * @param mixed $product Product of a line.
-	 * @return array{hourly: float, cap: float}|null
-	 */
-	public static function rates( $product ): ?array {
-		if ( ! $product instanceof \WC_Product_Variation || ! Rates::is_usage( $product ) ) {
-			return null;
-		}
-
-		$monthly = Rates::monthly( $product );
-
-		if ( null === $monthly || $monthly <= 0 ) {
-			return null;
-		}
-
-		$premium = Rates::premium( $product->get_parent_id() );
-
-		return array( 'hourly' => Rates::hourly( $monthly, $premium ), 'cap' => Rates::cap( $monthly, $premium ) );
-	}
-
-	/**
 	 * The account line is not listed.
 	 *
 	 * @param mixed $visible Whether the line is shown.
@@ -90,7 +68,7 @@ final class Summary {
 	 * @param mixed $item  Cart item.
 	 */
 	public static function cart_price( $price, $item = array() ) {
-		$rates = is_array( $item ) && ! isset( $item['subscription_renewal'] ) ? self::rates( $item['data'] ?? null ) : null;
+		$rates = is_array( $item ) && ! isset( $item['subscription_renewal'] ) ? Rates::for_usage( $item['data'] ?? null ) : null;
 
 		if ( null === $rates ) {
 			return $price;
@@ -107,7 +85,7 @@ final class Summary {
 	 * @param mixed $item     Cart item.
 	 */
 	public static function cart_subtotal( $subtotal, $item = array() ) {
-		$rates = is_array( $item ) && ! isset( $item['subscription_renewal'] ) ? self::rates( $item['data'] ?? null ) : null;
+		$rates = is_array( $item ) && ! isset( $item['subscription_renewal'] ) ? Rates::for_usage( $item['data'] ?? null ) : null;
 
 		return null === $rates ? $subtotal : self::cap_text( $rates['cap'] );
 	}
@@ -119,7 +97,7 @@ final class Summary {
 	 * @param mixed $item     Order item.
 	 */
 	public static function order_subtotal( $subtotal, $item = null ) {
-		$rates = $item instanceof \WC_Order_Item_Product ? self::rates( $item->get_product() ) : null;
+		$rates = $item instanceof \WC_Order_Item_Product ? Rates::for_usage( $item->get_product() ) : null;
 
 		return null === $rates ? $subtotal : self::rate_and_cap( $rates );
 	}
@@ -149,12 +127,11 @@ final class Summary {
 	 *
 	 * @param int $user_id Customer.
 	 */
-	public static function note( int $user_id ): string {
-		if ( $user_id > 0 && null !== Account::for_user( $user_id, Account::ESTABLISHED ) ) {
-			return __( 'Billed monthly for the hours used, excl. VAT. Your saved card is charged after each month.', 'beltoft-services' );
-		}
+	private static function note( int $user_id ): string {
+		$saved = $user_id > 0 && null !== Account::for_user( $user_id, Account::ESTABLISHED );
 
-		return __( 'Billed monthly for the hours used, excl. VAT. Your card is saved now and charged after each month.', 'beltoft-services' );
+		/* translators: 1: how pay as you go is billed, 2: what happens to the card */
+		return sprintf( __( '%1$s. %2$s', 'beltoft-services' ), \BeltoftServices\LineNames::usage_note(), $saved ? __( 'Your saved card is charged after each month.', 'beltoft-services' ) : __( 'Your card is saved now and charged after each month.', 'beltoft-services' ) );
 	}
 
 	/**
