@@ -16,6 +16,15 @@
 		Array.prototype.forEach.call( list, run );
 	}
 
+	// The order summary reads the choice from the posted form: every trusted tile click, whichever field it is in,
+	// asks the checkout for one refresh. WooCommerce's update_checkout aborts a refresh still running, so the
+	// last click always has the last response.
+	function refresh() {
+		if ( window.jQuery && window.jQuery( 'form.checkout' ).length ) {
+			window.jQuery( document.body ).trigger( 'update_checkout' );
+		}
+	}
+
 	function setup( apps ) {
 		var form = apps.closest( 'form' );
 		var os = form ? form.querySelector( '[data-tiles="os"]' ) : null;
@@ -49,12 +58,7 @@
 		}
 
 		function changed( radio ) {
-			// The order summary reads the choice from the session: tell the form it changed.
 			radio.dispatchEvent( new Event( 'change', { bubbles: true } ) );
-
-			if ( window.jQuery ) {
-				window.jQuery( document.body ).trigger( 'update_checkout' );
-			}
 		}
 
 		function say( text ) {
@@ -146,6 +150,7 @@
 			if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
 				update();
 				follow();
+				refresh();
 			}
 		} );
 
@@ -153,6 +158,7 @@
 			os.addEventListener( 'change', function ( event ) {
 				if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
 					drop();
+					refresh();
 				}
 			} );
 		}
@@ -177,4 +183,19 @@
 	}
 
 	each( document.querySelectorAll( '[data-tiles="app"]' ), setup );
+
+	// A checkout without an app field still has system tiles to refresh the summary for. With an app field, setup() does it.
+	each( document.querySelectorAll( '[data-tiles="os"]' ), function ( os ) {
+		var form = os.closest( 'form' );
+
+		if ( form && form.querySelector( '[data-tiles="app"]' ) ) {
+			return;
+		}
+
+		os.addEventListener( 'change', function ( event ) {
+			if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
+				refresh();
+			}
+		} );
+	} );
 }() );

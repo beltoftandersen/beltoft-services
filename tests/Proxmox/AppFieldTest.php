@@ -751,7 +751,15 @@ class AppFieldTest extends TestCase {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
 		$this->assertStringContainsString( "new Event( 'change', { bubbles: true } )", $js );
 		$this->assertStringContainsString( "window.jQuery( document.body ).trigger( 'update_checkout' )", $js );
-		$this->assertMatchesRegularExpression( '/if \( window\.jQuery \)/', $js );
+		$this->assertMatchesRegularExpression( '/if \( window\.jQuery && window\.jQuery\( \'form\.checkout\' \)\.length \)/', $js );
+	}
+
+	public function test_every_trusted_tile_click_refreshes_the_summary_with_or_without_an_app_field(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
+		// Apps listener and os listener inside setup(), plus the stand-alone one for a checkout with no app field.
+		$this->assertSame( 3, substr_count( $js, 'refresh();' ) );
+		$this->assertStringContainsString( "'radio' === event.target.type && event.isTrusted", $js );
+		$this->assertStringContainsString( 'A checkout without an app field', $js );
 	}
 
 	public function test_a_registered_domain_needs_proof_that_the_zone_is_ours_for_this_customer(): void {
