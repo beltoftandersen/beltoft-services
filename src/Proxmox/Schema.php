@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION        = '4';
+	public const DB_VERSION        = '5';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -48,6 +48,9 @@ final class Schema {
 		'usage' => array(
 			'resource_item_hour' => array( 'resource_id', 'item', 'hour_bucket' ),
 		),
+		'credit' => array(
+			'kind_ref' => array( 'kind', 'ref_type', 'ref_id' ),
+		),
 	);
 
 	/**
@@ -64,6 +67,7 @@ final class Schema {
 			'private_nets' => $wpdb->prefix . 'beltoft_services_private_nets',
 			'private_ips' => $wpdb->prefix . 'beltoft_services_private_ips',
 			'usage' => $wpdb->prefix . 'bs_usage',
+			'credit' => $wpdb->prefix . 'bs_credit',
 			'ip_log' => $wpdb->prefix . 'beltoft_services_ip_log',
 		);
 	}
@@ -229,11 +233,31 @@ final class Schema {
 				rate decimal(14,8) NOT NULL DEFAULT 0,
 				hour_bucket datetime NOT NULL,
 				order_id bigint(20) unsigned NULL DEFAULT NULL,
+				credit_id bigint(20) unsigned NULL DEFAULT NULL,
 				created datetime NOT NULL,
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_item_hour (resource_id,item,hour_bucket),
 				KEY user_open (user_id,order_id,hour_bucket),
-				KEY order_id (order_id)
+				KEY order_id (order_id),
+				KEY credit_id (credit_id)
+			) $collate;"
+		);
+
+		// The prepaid balance: an append-only ledger per customer. The unique key makes every write idempotent.
+		dbDelta(
+			"CREATE TABLE {$t['credit']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				user_id bigint(20) unsigned NOT NULL,
+				kind varchar(12) NOT NULL,
+				amount_cents bigint(20) NOT NULL,
+				balance_after_cents bigint(20) NOT NULL,
+				ref_type varchar(20) NOT NULL DEFAULT '',
+				ref_id varchar(64) NOT NULL DEFAULT '',
+				note varchar(255) NOT NULL DEFAULT '',
+				created datetime NOT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY kind_ref (kind,ref_type,ref_id),
+				KEY user_id (user_id,id)
 			) $collate;"
 		);
 

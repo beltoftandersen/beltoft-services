@@ -100,7 +100,7 @@ final class Ledger {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d AND order_id IS NULL AND hour_bucket < %s ORDER BY resource_id, item, hour_bucket', self::table(), $user_id, gmdate( 'Y-m-d H:i:s', $before ) ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d AND order_id IS NULL AND credit_id IS NULL AND hour_bucket < %s ORDER BY resource_id, item, hour_bucket', self::table(), $user_id, gmdate( 'Y-m-d H:i:s', $before ) ), ARRAY_A );
 
 		return is_array( $rows ) ? $rows : array();
 	}
@@ -114,7 +114,7 @@ final class Ledger {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		return array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT user_id FROM %i WHERE order_id IS NULL', self::table() ) ) );
+		return array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT user_id FROM %i WHERE order_id IS NULL AND credit_id IS NULL', self::table() ) ) );
 	}
 
 	/**
@@ -144,6 +144,85 @@ final class Ledger {
 	}
 
 	/**
+	 * Takes rows for a prepaid debit: only rows nobody holds are taken. They get credit_id 0 (taken, debit not written
+	 * yet), which counts as billed for every other reader, so a debit that stops half way undercharges and never
+	 * charges twice.
+	 *
+	 * @param int[] $ids Row ids.
+	 * @return int[] The ids that were taken.
+	 */
+	public static function take_for_credit( array $ids ): array {
+		global $wpdb;
+
+		$ids = array_values( array_filter( array_map( 'intval', $ids ) ) );
+
+		if ( ! $ids ) {
+			return array();
+		}
+
+		$taken = array();
+
+		foreach ( $ids as $id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+			if ( 1 === (int) $wpdb->query( $wpdb->prepare( 'UPDATE %i SET credit_id = 0 WHERE id = %d AND order_id IS NULL AND credit_id IS NULL', self::table(), $id ) ) ) {
+				$taken[] = $id;
+			}
+		}
+
+		return $taken;
+	}
+
+	/**
+	 * Points taken rows at the ledger row that debited them.
+	 *
+	 * @param int[] $ids       Row ids.
+	 * @param int   $credit_id Row of the balance ledger.
+	 */
+	public static function set_credit( array $ids, int $credit_id ): void {
+		global $wpdb;
+
+		$in = implode( ',', array_values( array_filter( array_map( 'intval', $ids ) ) ) );
+
+		if ( '' === $in ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $in holds integers only.
+		$wpdb->query( $wpdb->prepare( "UPDATE %i SET credit_id = %d WHERE credit_id = 0 AND id IN ($in)", self::table(), $credit_id ) );
+	}
+
+	/**
+	 * Gives taken rows back (the debit was not written), so the next run takes them.
+	 *
+	 * @param int[] $ids Row ids.
+	 */
+	public static function release_credit( array $ids ): void {
+		global $wpdb;
+
+		$in = implode( ',', array_values( array_filter( array_map( 'intval', $ids ) ) ) );
+
+		if ( '' === $in ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $in holds integers only.
+		$wpdb->query( $wpdb->prepare( "UPDATE %i SET credit_id = NULL WHERE credit_id = 0 AND id IN ($in)", self::table() ) );
+	}
+
+	/**
+	 * What a customer's rows of the last hours amount to (claimed or not), for the burn rate.
+	 *
+	 * @param int $user_id Customer.
+	 * @param int $from    Unix time.
+	 */
+	public static function amount_since( int $user_id, int $from ): float {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		return (float) $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(quantity * rate) FROM %i WHERE user_id = %d AND hour_bucket >= %s', self::table(), $user_id, gmdate( 'Y-m-d H:i:s', $from ) ) );
+	}
+
+	/**
 	 * Frees the rows of an order (it was cancelled), so the next renewal bills them.
 	 *
 	 * @param int $order_id Order.
@@ -168,7 +247,7 @@ final class Ledger {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		$sum = $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(quantity * rate) FROM %i WHERE resource_id = %d AND item = %s AND order_id IS NOT NULL AND order_id <> %d AND hour_bucket >= %s AND hour_bucket < %s', self::table(), $resource_id, $item, $except, gmdate( 'Y-m-d H:i:s', $month_start ), gmdate( 'Y-m-d H:i:s', $month_end ) ) );
+		$sum = $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(quantity * rate) FROM %i WHERE resource_id = %d AND item = %s AND ( ( order_id IS NOT NULL AND order_id <> %d ) OR credit_id IS NOT NULL ) AND hour_bucket >= %s AND hour_bucket < %s', self::table(), $resource_id, $item, $except, gmdate( 'Y-m-d H:i:s', $month_start ), gmdate( 'Y-m-d H:i:s', $month_end ) ) );
 
 		return (float) $sum;
 	}
