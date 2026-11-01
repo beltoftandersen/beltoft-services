@@ -179,7 +179,7 @@ final class Settings {
 				'default' => 10,
 				'min'     => 1,
 				'label'   => __( 'Smallest top-up', 'beltoft-services' ),
-				'desc'    => __( 'In the store currency, excl. VAT.', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency, VAT included: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
 			),
 			'credit_max' => array(
 				'tab'     => 'general',
@@ -188,7 +188,7 @@ final class Settings {
 				'default' => 1000,
 				'min'     => 1,
 				'label'   => __( 'Largest top-up', 'beltoft-services' ),
-				'desc'    => __( 'In the store currency, excl. VAT.', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency, VAT included.', 'beltoft-services' ),
 			),
 		);
 
