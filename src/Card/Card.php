@@ -170,6 +170,17 @@ final class Card {
 	}
 
 	/**
+	 * A list kept in subscription meta, without empty entries.
+	 *
+	 * @param \WC_Subscription $account Account.
+	 * @param string           $key     Meta key.
+	 * @return string[]
+	 */
+	private static function ids( \WC_Subscription $account, string $key ): array {
+		return array_values( array_filter( array_map( 'strval', (array) $account->get_meta( $key, true ) ), 'strlen' ) );
+	}
+
+	/**
 	 * What Mollie says about the account's mandate, cached for ten minutes (a failed look-up is not cached).
 	 *
 	 * @param \WC_Subscription $account Account.
@@ -350,38 +361,20 @@ final class Card {
 	// ------------------------------------------------------------------ add and replace.
 
 	/**
-	 * The two forms. Both need a login and the nonce.
+	 * The two forms: sends the customer on.
 	 */
 	public static function handle(): void {
 		if ( 'POST' !== strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) ) {
 			return;
 		}
 
-		$add     = ! empty( $_POST[ self::ACTION_ADD ] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified below.
-		$replace = ! empty( $_POST[ self::ACTION_REPLACE ] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified below.
+		$to = self::dispatch( get_current_user_id(), $_POST ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified in dispatch().
 
-		if ( ! $add && ! $replace ) {
+		if ( null === $to ) {
 			return;
 		}
 
-		if ( ! is_user_logged_in() ) {
-			wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) );
-			exit;
-		}
-
-		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), self::NONCE ) ) {
-			wc_add_notice( __( 'The page expired. Please try again.', 'beltoft-services' ), 'error' );
-			wp_safe_redirect( self::url() );
-			exit;
-		}
-
-		if ( $add ) {
-			$to = self::start_add( get_current_user_id() );
-		} else {
-			$to = self::start_replace( get_current_user_id() );
-		}
-
-		if ( preg_match( '#^https://#i', $to ) && ! str_starts_with( $to, home_url() ) ) {
+		if ( str_starts_with( $to, 'https://' ) && ! str_starts_with( $to, home_url() ) ) {
 			// Mollie's hosted page.
 			wp_redirect( $to ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- The address Mollie gave for this payment.
 		} else {
@@ -389,6 +382,36 @@ final class Card {
 		}
 
 		exit;
+	}
+
+	/**
+	 * What a posted form does. Both forms need a login and the nonce.
+	 *
+	 * @param int                  $user_id Current user (0 for a visitor).
+	 * @param array<string, mixed> $post    Posted fields.
+	 * @return string|null Where to send the customer, null when the post is not one of ours.
+	 */
+	public static function dispatch( int $user_id, array $post ): ?string {
+		$add     = ! empty( $post[ self::ACTION_ADD ] );
+		$replace = ! empty( $post[ self::ACTION_REPLACE ] );
+
+		if ( ! $add && ! $replace ) {
+			return null;
+		}
+
+		if ( $user_id < 1 ) {
+			return wc_get_page_permalink( 'myaccount' );
+		}
+
+		$nonce = isset( $post['_wpnonce'] ) ? sanitize_text_field( wp_unslash( (string) $post['_wpnonce'] ) ) : '';
+
+		if ( ! wp_verify_nonce( $nonce, self::NONCE ) ) {
+			wc_add_notice( __( 'The page expired. Please try again.', 'beltoft-services' ), 'error' );
+
+			return self::url();
+		}
+
+		return $add ? self::start_add( $user_id ) : self::start_replace( $user_id );
 	}
 
 	/**
@@ -459,7 +482,7 @@ final class Card {
 			return self::url( array( self::QUERY => 'failed' ) );
 		}
 
-		$pending   = (array) $account->get_meta( self::META_PENDING, true );
+		$pending   = self::ids( $account, self::META_PENDING );
 		$pending[] = (string) $payment['id'];
 		$account->update_meta_data( self::META_PENDING, array_values( array_slice( array_unique( $pending ), -5 ) ) );
 		$account->save();
@@ -521,7 +544,7 @@ final class Card {
 	 * @param \WC_Subscription $account Account.
 	 */
 	public static function sync_pending( \WC_Subscription $account ): void {
-		foreach ( (array) $account->get_meta( self::META_PENDING, true ) as $id ) {
+		foreach ( self::ids( $account, self::META_PENDING ) as $id ) {
 			if ( is_string( $id ) && '' !== $id ) {
 				self::apply_payment( $id );
 			}
@@ -567,12 +590,12 @@ final class Card {
 				return 'ignored';
 			}
 
-			if ( in_array( $id, (array) $account->get_meta( self::META_DONE, true ), true ) ) {
+			if ( in_array( $id, self::ids( $account, self::META_DONE ), true ) ) {
 				return 'done';
 			}
 
 			// Only a payment this site started for this account, for its Mollie customer, as a first payment.
-			if ( ! in_array( $id, (array) $account->get_meta( self::META_PENDING, true ), true ) || ( $payment['customerId'] ?? '' ) !== self::customer_id( $account ) || 'first' !== ( $payment['sequenceType'] ?? '' ) ) {
+			if ( ! in_array( $id, self::ids( $account, self::META_PENDING ), true ) || ( $payment['customerId'] ?? '' ) !== self::customer_id( $account ) || 'first' !== ( $payment['sequenceType'] ?? '' ) ) {
 				return 'ignored';
 			}
 
@@ -582,10 +605,10 @@ final class Card {
 
 			self::swap_mandate( $account, (string) $payment['mandateId'] );
 
-			$done   = (array) $account->get_meta( self::META_DONE, true );
+			$done   = self::ids( $account, self::META_DONE );
 			$done[] = $id;
 			$account->update_meta_data( self::META_DONE, array_values( array_slice( array_unique( $done ), -20 ) ) );
-			$account->update_meta_data( self::META_PENDING, array_values( array_diff( (array) $account->get_meta( self::META_PENDING, true ), array( $id ) ) ) );
+			$account->update_meta_data( self::META_PENDING, array_values( array_diff( self::ids( $account, self::META_PENDING ), array( $id ) ) ) );
 			$account->save();
 
 			return 'saved';
