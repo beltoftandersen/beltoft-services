@@ -164,12 +164,12 @@ final class Settings {
 				'label'   => __( 'Pay as you go services before the first paid usage invoice', 'beltoft-services' ),
 				'desc'    => __( 'The most services an account may run until a usage invoice has been paid. 0 means no limit.', 'beltoft-services' ),
 			),
-			'prepaid_enabled' => array(
+			'credit_enabled' => array(
 				'tab'     => 'general',
 				'section' => 'credit',
 				'type'    => 'checkbox',
 				'default' => 0,
-				'label'   => __( 'Prepaid credit for pay as you go', 'beltoft-services' ),
+				'label'   => __( 'Account credit for pay as you go', 'beltoft-services' ),
 				'desc'    => __( 'Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows.', 'beltoft-services' ),
 			),
 			'credit_min' => array(
@@ -230,7 +230,7 @@ final class Settings {
 			'general' => __( 'General', 'beltoft-services' ),
 			'account' => __( 'My Account', 'beltoft-services' ),
 			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
-			'credit'  => __( 'Prepaid credit', 'beltoft-services' ),
+			'credit'  => __( 'Account credit', 'beltoft-services' ),
 			'api'     => __( 'Use with Claude (MCP)', 'beltoft-services' ),
 		);
 

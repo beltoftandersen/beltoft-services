@@ -110,7 +110,7 @@ class InvoiceTest extends CreditTestCase {
 		$sub2  = $this->usage_account( $user2 );
 		$this->hours( 502, $user2, 100 );
 		$this->top_up( $user2, 1000 );
-		$this->settings( array( 'prepaid_enabled' => 0 ) );
+		$this->settings( array( 'credit_enabled' => 0 ) );
 		$order2 = wcs_create_renewal_order( $sub2 );
 		$this->assertCount( 1, $order2->get_items( 'fee' ) );
 		$this->assertSame( 1000, Balance::get( $user2 ) );

@@ -1,6 +1,6 @@
 <?php
 /**
- * The prepaid balance ledger.
+ * The account credit balance ledger.
  *
  * @package BeltoftServices
  */
@@ -28,14 +28,11 @@ class BalanceTest extends TestCase {
 		return (int) self::factory()->user->create( array( 'user_email' => 'christian.beltoft+credit' . wp_generate_password( 6, false ) . '@gmail.com' ) );
 	}
 
-	public function test_schema_has_table_unique_key_and_usage_column(): void {
+	public function test_schema_has_the_credit_table_and_unique_key(): void {
 		global $wpdb;
 
 		$this->assertSame( array(), Schema::missing_keys() );
 		$this->assertSame( '5', Schema::DB_VERSION );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check.
-		$cols = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', Schema::tables()['usage'] ) );
-		$this->assertContains( 'credit_id', $cols );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check.
 		$cols = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', Balance::table() ) );
 		$this->assertSame( array( 'id', 'user_id', 'kind', 'amount_cents', 'balance_after_cents', 'ref_type', 'ref_id', 'note', 'created' ), $cols );

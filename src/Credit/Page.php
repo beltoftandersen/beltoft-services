@@ -14,7 +14,7 @@ use BeltoftServices\Usage\Estimate;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A My Account endpoint, "credit", only while prepaid credit is on. With the Billing grouping on it is a tab of
+ * A My Account endpoint, "credit", only while account credit is on. With the Billing grouping on it is a tab of
  * Billing (Billing's filters), otherwise a menu item before "Log out". The template is templates/account/credit.php
  * (copy to yourtheme/beltoft-services/account/credit.php).
  */

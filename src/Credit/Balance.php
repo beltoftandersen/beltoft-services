@@ -1,6 +1,6 @@
 <?php
 /**
- * A customer's prepaid balance: the append-only ledger and its one writer.
+ * A customer's account credit balance: the append-only ledger and its one writer.
  *
  * @package BeltoftServices
  */

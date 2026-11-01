@@ -293,7 +293,7 @@ final class Topup {
 	}
 
 	/**
-	 * Only the form may add the product, and only while prepaid credit is on and a customer is logged in.
+	 * Only the form may add the product, and only while account credit is on and a customer is logged in.
 	 *
 	 * @param mixed $valid      Valid so far.
 	 * @param mixed $product_id Product id.

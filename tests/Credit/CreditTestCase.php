@@ -1,6 +1,6 @@
 <?php
 /**
- * Shared set-up of the prepaid credit tests.
+ * Shared set-up of the account credit tests.
  *
  * @package BeltoftServices
  */
@@ -15,7 +15,7 @@ use BeltoftServices\Usage\Estimate;
 require_once dirname( __DIR__ ) . '/Usage/UsageTestCase.php';
 
 /**
- * Base class: prepaid on, a clean ledger, and a top-up order builder.
+ * Base class: credit on, a clean ledger, and a top-up order builder.
  */
 abstract class CreditTestCase extends UsageTestCase {
 
@@ -26,7 +26,7 @@ abstract class CreditTestCase extends UsageTestCase {
 		$wpdb->query( 'DELETE FROM ' . Balance::table() );
 		delete_option( Topup::OPTION_PRODUCT );
 		update_option( 'woocommerce_currency', 'EUR' );
-		$this->settings( array( 'prepaid_enabled' => 1, 'admin_email' => self::MAIL ) );
+		$this->settings( array( 'credit_enabled' => 1, 'admin_email' => self::MAIL ) );
 		Estimate::reset();
 	}
 

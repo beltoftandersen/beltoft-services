@@ -233,17 +233,15 @@ final class Schema {
 				rate decimal(14,8) NOT NULL DEFAULT 0,
 				hour_bucket datetime NOT NULL,
 				order_id bigint(20) unsigned NULL DEFAULT NULL,
-				credit_id bigint(20) unsigned NULL DEFAULT NULL,
 				created datetime NOT NULL,
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_item_hour (resource_id,item,hour_bucket),
 				KEY user_open (user_id,order_id,hour_bucket),
-				KEY order_id (order_id),
-				KEY credit_id (credit_id)
+				KEY order_id (order_id)
 			) $collate;"
 		);
 
-		// The prepaid balance: an append-only ledger per customer. The unique key makes every write idempotent.
+		// The customer's account credit balance: an append-only ledger per customer. The unique key makes every write idempotent.
 		dbDelta(
 			"CREATE TABLE {$t['credit']} (
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

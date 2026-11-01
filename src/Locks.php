@@ -41,7 +41,7 @@ final class Locks {
 	}
 
 	/**
-	 * The lock name for one customer's prepaid balance (at most 64 chars). Every write to the balance ledger holds it.
+	 * The lock name for one customer's account credit balance (at most 64 chars). Every write to the balance ledger holds it.
 	 *
 	 * @param int $user_id Customer.
 	 */

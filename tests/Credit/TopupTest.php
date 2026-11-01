@@ -122,7 +122,7 @@ class TopupTest extends CreditTestCase {
 		wp_set_current_user( 0 );
 		$this->assertFalse( Topup::add_to_cart( 2500 ), 'A visitor has no balance to top up.' );
 
-		$this->settings( array( 'prepaid_enabled' => 0 ) );
+		$this->settings( array( 'credit_enabled' => 0 ) );
 		wp_set_current_user( $this->new_user() );
 		$this->assertFalse( Topup::add_to_cart( 2500 ), 'Switched off.' );
 	}
@@ -134,7 +134,7 @@ class TopupTest extends CreditTestCase {
 		$this->assertCount( 0, WC()->cart->get_cart(), 'Below the smallest top-up.' );
 
 		Topup::add_to_cart( 2500 );
-		$this->settings( array( 'prepaid_enabled' => 0 ) );
+		$this->settings( array( 'credit_enabled' => 0 ) );
 		WC()->cart->calculate_totals();
 		$this->assertCount( 0, WC()->cart->get_cart(), 'The switch went off.' );
 	}
@@ -448,7 +448,7 @@ class TopupTest extends CreditTestCase {
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
 		$this->assertStringNotContainsString( '&middot;', $html );
 
-		$this->settings( array( 'prepaid_enabled' => 0 ) );
+		$this->settings( array( 'credit_enabled' => 0 ) );
 		$this->assertSame( '', Page::html() );
 	}
 
@@ -456,7 +456,7 @@ class TopupTest extends CreditTestCase {
 		$items = Page::menu( array( 'orders' => 'Orders', 'customer-logout' => 'Log out' ) );
 		$this->assertSame( array( 'orders', 'credit', 'customer-logout' ), array_keys( $items ) );
 
-		$this->settings( array( 'prepaid_enabled' => 0 ) );
+		$this->settings( array( 'credit_enabled' => 0 ) );
 		$this->assertSame( array( 'orders', 'customer-logout' ), array_keys( Page::menu( array( 'orders' => 'Orders', 'customer-logout' => 'Log out' ) ) ) );
 		$this->assertArrayNotHasKey( 'credit', Page::billing_set( array() ) );
 	}
