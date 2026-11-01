@@ -37,7 +37,7 @@ class SummaryTest extends UsageTestCase {
 		return array();
 	}
 
-	private const HTML = '<div id="brxe-ob" class="x"><!--brx-loop-start-ob--></div><div id="bricks-woo-checkout-order-summary"><!--brx-loop-start-x--><div id="brxe-8c507f" class="brxe-text-basic">Total</div></div>';
+	private const HTML = '<div id="brxe-ob" class="x"><!--brx-loop-start-ob--></div><div id="bricks-woo-checkout-order-summary"><div id="brxe-i1" class="brxe-div">item</div><div id="brxe-7e1d8f" class="brxe-divider horizontal"><div class="line"></div></div><div id="brxe-8c507f" class="brxe-text-basic">Total</div></div>';
 
 	public function test_the_account_line_is_hidden_but_stays_in_the_cart(): void {
 		$v = $this->usage_product( '0' );

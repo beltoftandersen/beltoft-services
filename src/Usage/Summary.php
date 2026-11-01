@@ -176,7 +176,7 @@ final class Summary {
 
 		$note = '<p class="beltoft-services-payg-note" style="margin:12px 0 16px;font-size:14px;line-height:1.5">' . esc_html( self::note( get_current_user_id() ) ) . '</p>';
 		$from = (int) strpos( $content, 'bricks-woo-checkout-order-summary' );
-		$out  = substr( $content, 0, $from ) . (string) preg_replace( '/(<!--brx-loop-start-[^>]*-->)/', '$1' . $note, substr( $content, $from ), 1 );
+		$out  = substr( $content, 0, $from ) . (string) preg_replace( '/(<div id="brxe-[a-z0-9]+" class="brxe-divider horizontal">)/', $note . '$1', substr( $content, $from ), 1 );
 
 		if ( (float) WC()->cart->get_total( 'edit' ) <= 0 ) {
 			$out = substr( $out, 0, $from ) . (string) preg_replace( '/(<div id="brxe-[a-z0-9]+" class="brxe-text-basic">)Total(<\/div>)/', '${1}' . esc_html__( 'Due today', 'beltoft-services' ) . '${2}', substr( $out, $from ), 1 );
