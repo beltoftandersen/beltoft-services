@@ -1,10 +1,22 @@
 .beltoft-services-apiref {
-	--apiref-navy: var(--navy, #0c1535);
-	--apiref-green: var(--green, #004400);
-	--apiref-soft: var(--ink-soft, #5e7080);
-	--apiref-rule: var(--rule, #d6d2c8);
-	--apiref-warm: var(--bg-warm, #eeece6);
-	--apiref-danger: #b32d2e;
+	/* Looks: set --apiref-text, -accent, -soft, -rule, -nav-bg, -danger, -code-bg, -code-fg, -code-soft, -copy-bg,
+	   -copy-hover, -code-size, -get, -post, -put, -delete, -nav-active on this element or an ancestor (the Bricks
+	   element does). Each falls back to the theme variable and then to a plain default. */
+	--apiref-navy: var(--apiref-text, var(--navy, #0c1535));
+	--apiref-green: var(--apiref-accent, var(--green, #004400));
+	--apiref-soft: var(--apiref-soft-color, var(--ink-soft, #5e7080));
+	--apiref-rule: var(--apiref-rule-color, var(--rule, #d6d2c8));
+	--apiref-warm: var(--apiref-nav-bg, var(--bg-warm, #eeece6));
+	--apiref-danger: var(--apiref-delete, var(--red, #b32d2e));
+	--apiref-getc: var(--apiref-get, var(--apiref-green));
+	--apiref-postc: var(--apiref-post, var(--apiref-navy));
+	--apiref-putc: var(--apiref-put, var(--apiref-navy));
+	--apiref-panel: var(--apiref-code-bg, var(--apiref-navy));
+	--apiref-codefg: var(--apiref-code-fg, #e8ebf2);
+	--apiref-codesoft: var(--apiref-code-soft, #b4bdd0);
+	--apiref-copybg: var(--apiref-copy-bg, #1d2a55);
+	--apiref-copyhover: var(--apiref-copy-hover, #2a3a70);
+	--apiref-codesize: var(--apiref-code-size, 13px);
 	--apiref-offset: 88px;
 	--apiref-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	box-sizing: border-box;
@@ -33,12 +45,13 @@
 .beltoft-services-apiref__nav ul { max-width: none; margin: 0; padding: 0; list-style: none; }
 .beltoft-services-apiref__nav a { display: block; color: var(--apiref-soft); text-decoration: none; }
 .beltoft-services-apiref__nav a:hover { color: var(--apiref-navy); text-decoration: underline; }
-.beltoft-services-apiref__nav a.is-current { color: var(--apiref-navy); font-weight: 700; }
+.beltoft-services-apiref__nav a.is-current { color: var(--apiref-nav-active, var(--apiref-navy)); font-weight: 700; }
 .beltoft-services-apiref__navgroup > a { margin-top: 14px; color: var(--apiref-navy); font-weight: 600; }
 .beltoft-services-apiref__navgroup ul a { padding: 2px 0; overflow: hidden; font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .beltoft-services-apiref__navmethod { display: inline-block; min-width: 3.6em; font-size: 11px; font-weight: 700; }
-.beltoft-services-apiref__navmethod--get { color: var(--apiref-green); }
-.beltoft-services-apiref__navmethod--post, .beltoft-services-apiref__navmethod--put { color: var(--apiref-navy); }
+.beltoft-services-apiref__navmethod--get { color: var(--apiref-getc); }
+.beltoft-services-apiref__navmethod--post { color: var(--apiref-postc); }
+.beltoft-services-apiref__navmethod--put { color: var(--apiref-putc); }
 .beltoft-services-apiref__navmethod--delete { color: var(--apiref-danger); }
 
 /* Endpoint and two-column blocks */
@@ -47,9 +60,9 @@
 .beltoft-services-apiref__head, .beltoft-services-apiref__text, .beltoft-services-apiref__split > div { min-width: 0; }
 .beltoft-services-apiref__head h3 { margin: 0 0 8px; font-size: clamp(17px, calc(12px + 1.6vw), 24px); line-height: 1.3; }
 .beltoft-services-apiref__method { display: inline-block; margin-right: 8px; padding: 2px 8px; border: 2px solid transparent; color: #fff; font-family: var(--apiref-mono); font-size: 13px; font-weight: 700; line-height: 1.4; vertical-align: 0.2em; }
-.beltoft-services-apiref__method--get { background: var(--apiref-green); }
-.beltoft-services-apiref__method--post { background: var(--apiref-navy); }
-.beltoft-services-apiref__method--put { border-color: var(--apiref-navy); background: transparent; color: var(--apiref-navy); }
+.beltoft-services-apiref__method--get { background: var(--apiref-getc); }
+.beltoft-services-apiref__method--post { background: var(--apiref-postc); }
+.beltoft-services-apiref__method--put { border-color: var(--apiref-putc); background: transparent; color: var(--apiref-putc); }
 .beltoft-services-apiref__method--delete { background: var(--apiref-danger); }
 .beltoft-services-apiref__path { font-size: 1em; font-weight: 600; overflow-wrap: anywhere; }
 .beltoft-services-apiref__param { color: var(--apiref-green); }
@@ -58,13 +71,13 @@
 .beltoft-services-apiref__codes { display: flex; flex-direction: column; gap: 16px; min-width: 0; margin-top: 16px; }
 
 /* Code panels */
-.beltoft-services-apiref__panel { min-width: 0; max-width: 100%; background: var(--apiref-navy); color: #e8ebf2; }
-.beltoft-services-apiref__panelbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 0 16px; color: #b4bdd0; font-size: 13px; }
-.beltoft-services-apiref__copy { display: none; margin: 0; padding: 4px 12px; border: 0; background: #1d2a55; color: #e8ebf2; font: inherit; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.beltoft-services-apiref__panel { min-width: 0; max-width: 100%; background: var(--apiref-panel); color: var(--apiref-codefg); }
+.beltoft-services-apiref__panelbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 0 16px; color: var(--apiref-codesoft); font-size: 13px; }
+.beltoft-services-apiref__copy { display: none; margin: 0; padding: 4px 12px; border: 0; background: var(--apiref-copybg); color: var(--apiref-codefg); font: inherit; font-size: 13px; line-height: 1.5; cursor: pointer; }
 .beltoft-services-apiref.is-js .beltoft-services-apiref__copy { display: inline-block; }
-.beltoft-services-apiref__copy:hover { background: #2a3a70; }
+.beltoft-services-apiref__copy:hover { background: var(--apiref-copyhover); }
 .beltoft-services-apiref__panel :focus-visible { outline-color: #fff; }
-.beltoft-services-apiref__panel pre { max-width: 100%; margin: 0; padding: 8px 16px 16px; border: 0; background: none; color: #e8ebf2; font-family: var(--apiref-mono); font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre; }
+.beltoft-services-apiref__panel pre { max-width: 100%; margin: 0; padding: 8px 16px 16px; border: 0; background: none; color: var(--apiref-codefg); font-family: var(--apiref-mono); font-size: var(--apiref-codesize); line-height: 1.6; overflow-x: auto; white-space: pre; }
 .beltoft-services-apiref__panel code { display: block; font-size: inherit; overflow-wrap: normal; white-space: pre; }
 
 /* Tables */
