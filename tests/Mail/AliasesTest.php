@@ -68,6 +68,20 @@ final class AliasesTest extends MailTestCase {
 		$this->assertSame( 'limit', Aliases::create( $r, 'c', 'anna@cnt.example' )->get_error_code() );
 	}
 
+	public function test_the_alias_limit_and_state_are_read_again_under_the_lock(): void {
+		$r = $this->ready_mail( 'arace.example', array( 'aliases' => 2 ) );
+		$stale = Resource::find( $r->id() );
+		$this->mailcow->add_alias( 'first@arace.example', 'anna@arace.example' );
+		$this->assertIsArray( Aliases::create( $stale, 'a', 'anna@arace.example' ) );
+		$this->assertSame( 'limit', Aliases::create( $stale, 'b', 'anna@arace.example' )->get_error_code() );
+
+		$other = $this->ready_mail( 'arace2.example', array( 'aliases' => 5 ) );
+		$copy  = Resource::find( $other->id() );
+		$other->set( array( 'state' => 'paused' ) );
+		$this->assertSame( 'not_ready', Aliases::create( $copy, 'x', 'anna@arace2.example' )->get_error_code() );
+		$this->assertSame( array(), $this->mailcow->calls_of( 'add_alias' ) ? array_filter( $this->mailcow->calls_of( 'add_alias' ), static fn( $c ) => 'x@arace2.example' === $c[0] ) : array() );
+	}
+
 	public function test_an_address_that_is_taken_is_reported(): void {
 		$r = $this->ready_mail( 'tk.example' );
 		Mailboxes::create( $r, 'anna' );

@@ -112,20 +112,48 @@ final class Aliases {
 			}
 		}
 
-		$have = self::all( $r );
+		// State, count and add are one step under the resource lock: parallel requests cannot pass the plan's limit together.
+		$outcome = null;
+		$ran     = $r->locked(
+			static function () use ( $r, $address, $targets, &$outcome ): bool {
+				$bad = MailGuard::check( $r );
 
-		if ( is_wp_error( $have ) ) {
-			return $have;
+				if ( $bad ) {
+					$outcome = $bad;
+					return false;
+				}
+
+				$have = self::all( $r );
+
+				if ( is_wp_error( $have ) ) {
+					$outcome = $have;
+					return false;
+				}
+
+				if ( count( $have ) >= MailGuard::limits( $r )['aliases'] ) {
+					$outcome = new \WP_Error( 'limit', __( 'Your plan has no room for more aliases.', 'beltoft-services' ) );
+					return false;
+				}
+
+				$added = MailClients::for()->add_alias( $address, implode( ',', $targets ) );
+
+				if ( is_wp_error( $added ) ) {
+					$outcome = MailGuard::failed( $added, __( 'create the alias', 'beltoft-services' ) );
+					return false;
+				}
+
+				$outcome = true;
+
+				return true;
+			}
+		);
+
+		if ( null === $ran ) {
+			return new \WP_Error( 'busy', __( 'Another change is running. Try again in a moment.', 'beltoft-services' ) );
 		}
 
-		if ( count( $have ) >= MailGuard::limits( $r )['aliases'] ) {
-			return new \WP_Error( 'limit', __( 'Your plan has no room for more aliases.', 'beltoft-services' ) );
-		}
-
-		$added = MailClients::for()->add_alias( $address, implode( ',', $targets ) );
-
-		if ( is_wp_error( $added ) ) {
-			return MailGuard::failed( $added, __( 'create the alias', 'beltoft-services' ) );
+		if ( true !== $outcome ) {
+			return $outcome;
 		}
 
 		return array( 'address' => $address, 'goto' => $targets );

@@ -405,7 +405,9 @@ final class MailDriverTest extends MailTestCase {
 		$this->mailcow->fail_next( 'edit_mailbox', new \WP_Error( 'mailcow_transport', 'x' ), 1 );
 		$res = $this->driver()->pause( $r );
 		$this->assertTrue( $res->is_retry() );
-		$this->assertSame( array( 'a@half.example' ), Resource::find( $r->id() )->get( 'mail_paused_boxes' ) );
+
+		// The second was recorded before its switch-off was tried, so a crash there loses nothing.
+		$this->assertSame( array( 'a@half.example', 'b@half.example' ), Resource::find( $r->id() )->get( 'mail_paused_boxes' ) );
 
 		// The retry switches off the other one and keeps the first in the list.
 		$res = $this->driver()->pause( Resource::find( $r->id() ) );
@@ -489,6 +491,34 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertNull( $this->mailcow->mailbox( 'a@bye.example' ) );
 		$this->assertSame( array(), Resource::find( $r->id() )->get( MailAccess::META ) );
 		$this->assertTrue( $this->driver()->delete( Resource::find( $r->id() ) )->is_done(), 'Deleting again is fine.' );
+	}
+
+	public function test_delete_refuses_a_domain_on_the_mail_server_that_is_not_marked_as_ours(): void {
+		$r = $this->ready_mail( 'mine.example' );
+		$this->mailcow->edit_domain( 'mine.example', array( 'description' => 'beltoft-services:somebody-else' ) );
+		$this->mailcow->add_mailbox( array( 'local_part' => 'a', 'domain' => 'mine.example', 'quota' => '100' ) );
+
+		$res = $this->driver()->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $res->is_failed() );
+		$this->assertNotNull( $this->mailcow->domain( 'mine.example' ) );
+		$this->assertNotNull( $this->mailcow->mailbox( 'a@mine.example' ) );
+		$this->assertSame( array(), $this->mailcow->calls_of( 'delete_mailbox' ) );
+	}
+
+	public function test_delete_removes_a_domain_added_just_before_a_crash_that_lost_the_domain_step(): void {
+		$r = $this->ready_mail( 'crash.example' );
+		$r->set( array( 'steps' => array( 'proof' ) ) );
+		$res = $this->driver()->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertNull( $this->mailcow->domain( 'crash.example' ) );
+	}
+
+	public function test_delete_leaves_a_foreign_domain_alone_when_this_service_never_recorded_creating_it(): void {
+		$r = $this->ready_mail( 'other.example' );
+		$r->set( array( 'steps' => array( 'proof' ) ) );
+		$this->mailcow->edit_domain( 'other.example', array( 'description' => 'someone else' ) );
+		$this->assertTrue( $this->driver()->delete( Resource::find( $r->id() ) )->is_done() );
+		$this->assertNotNull( $this->mailcow->domain( 'other.example' ) );
 	}
 
 	public function test_delete_does_nothing_remote_for_a_domain_that_was_never_made(): void {

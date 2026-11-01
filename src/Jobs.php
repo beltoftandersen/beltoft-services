@@ -453,6 +453,10 @@ final class Jobs {
 			$internal = $driver instanceof InternalActions && in_array( $action, $driver->internal_actions(), true );
 			$allowed = $resource && $driver && ( $internal ? $resource->is_live() && 'deleted' !== $resource->get( 'desired' ) : $resource->accepts_actions() && array_key_exists( $action, $driver->customer_actions( $resource ) ) );
 
+			if ( ! $allowed && $resource && self::park( $resource, $action, $args ) ) {
+				return;
+			}
+
 			if ( ! $allowed ) {
 				// Dropped, but not silently: the customer asked for something that did not happen.
 				if ( $resource ) {
@@ -462,6 +466,10 @@ final class Jobs {
 				}
 
 				return;
+			}
+
+			if ( null !== $resource->get( 'act_parked_since' ) ) {
+				$resource->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null ) );
 			}
 
 			try {
@@ -479,6 +487,57 @@ final class Jobs {
 			self::$run_started = $outer;
 			self::release( $lock );
 		}
+	}
+
+	/** Seconds between looks at a parked action. */
+	private const PARK_DELAY = 300;
+
+	/** Seconds after which a parked action is dropped, and after which staff are told it is still parked. */
+	private const PARK_MAX   = DAY_IN_SECONDS;
+	private const PARK_ALERT = HOUR_IN_SECONDS;
+
+	/**
+	 * An action that cannot run now but whose work is half done (a private network attach or detach in flight: the server
+	 * may be stopped or half attached) is not dropped with "not changed": it waits until the service accepts actions again.
+	 * Staff are told once when it waits over an hour; after a day it is dropped as an unfinished action.
+	 *
+	 * @param Resource             $r      Resource.
+	 * @param string               $action Action name.
+	 * @param array<string, mixed> $args   Arguments.
+	 * @return bool True when the action was parked, false when it is to be dropped.
+	 */
+	private static function park( Resource $r, string $action, array $args ): bool {
+		if ( ! in_array( $action, \BeltoftServices\Proxmox\PrivateAttach::ACTIONS, true ) || ! \BeltoftServices\Proxmox\PrivateAttach::in_flight( $r ) || ! $r->is_live() || 'deleted' === $r->get( 'desired' ) ) {
+			return false;
+		}
+
+		$since = (int) $r->get( 'act_parked_since' );
+
+		if ( $since <= 0 ) {
+			$since = self::now();
+
+			if ( ! $r->set( array( 'act_parked_since' => $since ) ) ) {
+				return false;
+			}
+		}
+
+		$age = self::now() - $since;
+
+		if ( $age > self::PARK_MAX ) {
+			$r->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null, self::RESULT => self::result( $action, false, true ) ) );
+			Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', sprintf( 'Customer action "%s" gave up after waiting a day with its work half done', $action ) );
+			Alerts::admin( $r, sprintf( 'Customer action "%s" was dropped with its work half done', $action ) );
+			return true;
+		}
+
+		if ( $age > self::PARK_ALERT && ! $r->get( 'act_parked_alerted' ) ) {
+			$r->set( array( 'act_parked_alerted' => true ) );
+			Alerts::admin( $r, sprintf( 'Customer action "%s" is waiting with its work half done; the service does not accept actions', $action ) );
+		}
+
+		self::queue_act( $r->id(), $action, $args, self::PARK_DELAY );
+
+		return true;
 	}
 
 	/**

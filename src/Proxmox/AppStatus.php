@@ -55,7 +55,16 @@ final class AppStatus {
 		if ( ! $r || ! $r->is_live() || ! in_array( $r->get( 'app_state' ), array( 'installing', 'unknown' ), true ) ) {
 			return;
 		}
-		$r->locked( static function () use ( $r ) {
+		if ( \BeltoftServices\Settings::get( 'pause_all' ) ) {
+			self::schedule( $id, \BeltoftServices\Jobs::PAUSED_DELAY );
+			return;
+		}
+		$r->locked( static function () use ( $id ) {
+			// Read again under the lock: a paused, held or deleted server is left alone, without an alert.
+			$r = Resource::find( $id );
+			if ( ! AppInstall::installable( $r ) || ! in_array( $r->get( 'app_state' ), array( 'installing', 'unknown' ), true ) ) {
+				return true;
+			}
 			$record = VmRecords::for_resource( $r->id() );
 			$cluster = $record ? Clusters::get( $record['cluster'] ) : null;
 			if ( ! $record || ! $cluster ) {

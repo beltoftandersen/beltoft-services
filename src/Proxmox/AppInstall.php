@@ -97,12 +97,22 @@ final class AppInstall {
 		if ( ! $r || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || '' === (string) $r->get( 'app_id' ) || in_array( $r->get( 'app_state' ), array( 'ready', 'installing', 'failed' ), true ) ) {
 			return;
 		}
+		// The kill switch stops app work too: look again later.
+		if ( \BeltoftServices\Settings::get( 'pause_all' ) ) {
+			self::schedule( $id, Jobs::PAUSED_DELAY );
+			return;
+		}
 		// A name on the customer's own DNS: the install waits until it points at the server (AppOwnDomain queues it again).
 		if ( AppOwnDomain::waiting( $r ) ) {
 			AppOwnDomain::start( $r );
 			return;
 		}
-		$locked = $r->locked( static function () use ( $r ) {
+		$locked = $r->locked( static function () use ( $id ) {
+			// Read again under the lock: the server may have been paused, held or deleted since the check above. Stop quietly then.
+			$r = Resource::find( $id );
+			if ( ! self::installable( $r ) || in_array( $r->get( 'app_state' ), array( 'ready', 'installing', 'failed' ), true ) ) {
+				return true;
+			}
 			$plan = (array) $r->get( 'plan' );
 			$record = VmRecords::for_resource( $r->id() );
 			$cluster_id = $record ? $record['cluster'] : (string) ( $plan['cluster'] ?? '' );
@@ -146,6 +156,11 @@ final class AppInstall {
 		if ( null === $locked ) {
 			self::schedule( $id, 10 );
 		}
+	}
+
+	/** Is the server still ready, wanted and not held: the only time app work may touch it. */
+	public static function installable( ?Resource $r ): bool {
+		return $r && $r->is_live() && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'desired' ) && ! $r->on_hold();
 	}
 
 	private static function fail( Resource $r, string $reason ): void {
