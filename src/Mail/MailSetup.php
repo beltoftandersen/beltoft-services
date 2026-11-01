@@ -55,16 +55,19 @@ final class MailSetup {
 	}
 
 	/**
-	 * The guide as HTML.
-	 */
-	/**
 	 * The calendar and contacts (CalDAV and CardDAV) address, https only; '' when not set.
 	 */
 	public static function dav_url(): string {
 		return esc_url_raw( trim( (string) \BeltoftServices\Settings::get( 'mail_dav_url' ) ), array( 'https' ) );
 	}
 
-	public static function html(): string {
+	/**
+	 * The guide as HTML.
+	 *
+	 * @param array<string, string> $texts Optional replacements of the headings and the intro (keys: settings_title,
+	 *                                     intro, jump_label, dav_title, faq_title); empty ones keep the default.
+	 */
+	public static function html( array $texts = array() ): string {
 		$host = MailSettings::host();
 
 		if ( '' === $host ) {
@@ -92,6 +95,7 @@ final class MailSetup {
 				'imap'    => MailView::IMAP_PORT,
 				'pop'     => MailView::POP_PORT,
 				'smtp'    => array( MailView::SMTP_SSL, MailView::SMTP_TLS ),
+				'texts'   => $texts,
 			),
 			'beltoft-services/',
 			BELTOFT_SERVICES_PATH . 'templates/'

@@ -10,10 +10,16 @@
  * @var int                $imap    IMAP port.
  * @var int                $pop     POP3 port.
  * @var array<int, int>    $smtp    SMTP ports: SSL/TLS, STARTTLS.
+ * @var array<string, string> $texts Optional replacements of the headings and the intro (settings_title, intro, jump_label, dav_title, faq_title).
  */
 
 defined( 'ABSPATH' ) || exit;
 
+$beltoft_services_texts = isset( $texts ) && is_array( $texts ) ? $texts : array();
+$beltoft_services_text  = static function ( string $key, string $fallback ) use ( $beltoft_services_texts ): string {
+	$value = isset( $beltoft_services_texts[ $key ] ) ? trim( (string) $beltoft_services_texts[ $key ] ) : '';
+	return '' !== $value ? $value : $fallback;
+};
 $beltoft_services_host = '<strong>' . esc_html( $host ) . '</strong>';
 $beltoft_services_clients = array(
 	'iphone'      => __( 'iPhone and iPad', 'beltoft-services' ),
@@ -25,7 +31,7 @@ $beltoft_services_clients = array(
 );
 ?>
 <div class="beltoft-services-mailsetup">
-	<h2 id="bsms-settings"><?php esc_html_e( 'Settings for every app', 'beltoft-services' ); ?></h2>
+	<h2 id="bsms-settings"><?php echo esc_html( $beltoft_services_text( 'settings_title', __( 'Settings for every app', 'beltoft-services' ) ) ); ?></h2>
 	<div class="beltoft-services-mailsetup__scroll">
 		<table>
 			<thead>
@@ -78,19 +84,19 @@ $beltoft_services_clients = array(
 	</ul>
 
 	<p>
-		<?php esc_html_e( 'Thunderbird, Thunderbird for Android and Outlook can usually find these settings themselves from your email address. Apple Mail, the Gmail app and Samsung Email cannot, so enter the settings above by hand. For a new email domain this can take up to a day. If an app does not find the settings, enter them by hand too.', 'beltoft-services' ); ?>
+		<?php echo esc_html( $beltoft_services_text( 'intro', __( 'Thunderbird, Thunderbird for Android and Outlook can usually find these settings themselves from your email address. Apple Mail, the Gmail app and Samsung Email cannot, so enter the settings above by hand. For a new email domain this can take up to a day. If an app does not find the settings, enter them by hand too.', 'beltoft-services' ) ) ); ?>
 	</p>
 
 	<nav aria-label="<?php esc_attr_e( 'Mail apps', 'beltoft-services' ); ?>">
-		<p><?php esc_html_e( 'Jump to your app:', 'beltoft-services' ); ?></p>
+		<p><?php echo esc_html( $beltoft_services_text( 'jump_label', __( 'Jump to your app:', 'beltoft-services' ) ) ); ?></p>
 		<ul class="beltoft-services-mailsetup__jump">
 			<?php foreach ( $beltoft_services_clients as $beltoft_services_id => $beltoft_services_label ) : ?>
 				<li><a href="#bsms-<?php echo esc_attr( $beltoft_services_id ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></a></li>
 			<?php endforeach; ?>
 			<?php if ( '' !== $dav ) : ?>
-				<li><a href="#bsms-dav"><?php esc_html_e( 'Calendar and contacts', 'beltoft-services' ); ?></a></li>
+				<li><a href="#bsms-dav"><?php echo esc_html( $beltoft_services_text( 'dav_title', __( 'Calendar and contacts', 'beltoft-services' ) ) ); ?></a></li>
 			<?php endif; ?>
-			<li><a href="#bsms-faq"><?php esc_html_e( 'Questions', 'beltoft-services' ); ?></a></li>
+			<li><a href="#bsms-faq"><?php echo esc_html( $beltoft_services_text( 'faq_title', __( 'Questions', 'beltoft-services' ) ) ); ?></a></li>
 		</ul>
 	</nav>
 
@@ -204,7 +210,7 @@ $beltoft_services_clients = array(
 	<?php if ( '' !== $dav ) : ?>
 		<?php $beltoft_services_dav = '<strong>' . esc_html( $dav ) . '</strong>'; ?>
 		<section id="bsms-dav">
-			<h2><?php esc_html_e( 'Calendar and contacts', 'beltoft-services' ); ?></h2>
+			<h2><?php echo esc_html( $beltoft_services_text( 'dav_title', __( 'Calendar and contacts', 'beltoft-services' ) ) ); ?></h2>
 			<p><?php esc_html_e( 'Every mailbox has its own calendar and address book. Add them in a calendar or contacts app that supports CalDAV and CardDAV, with your full email address as the user name and the mailbox password.', 'beltoft-services' ); ?></p>
 			<div class="beltoft-services-mailsetup__scroll">
 				<table>
@@ -249,7 +255,7 @@ $beltoft_services_clients = array(
 	<?php endif; ?>
 
 	<section id="bsms-faq">
-		<h2><?php esc_html_e( 'Questions', 'beltoft-services' ); ?></h2>
+		<h2><?php echo esc_html( $beltoft_services_text( 'faq_title', __( 'Questions', 'beltoft-services' ) ) ); ?></h2>
 
 		<h3><?php esc_html_e( 'IMAP or POP3?', 'beltoft-services' ); ?></h3>
 		<p><?php esc_html_e( 'Use IMAP. Your mail stays on the server and every device shows the same mailbox. POP3 downloads mail to one device and is only for a single computer that keeps its own copy.', 'beltoft-services' ); ?></p>

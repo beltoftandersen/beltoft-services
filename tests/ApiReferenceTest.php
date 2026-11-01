@@ -244,7 +244,8 @@ final class ApiReferenceTest extends TestCase {
 		$this->assertStringContainsString( 'margin-left: calc(50% - 50vw)', $css );
 		$this->assertStringContainsString( 'overflow-x: clip', $css );
 		$this->assertStringContainsString( '--bsdocs-offset: var(--apiref-offset, 72px)', $css );
-		$this->assertStringContainsString( 'grid-template-columns: 260px', $css );
+		$this->assertStringContainsString( 'grid-template-columns: var(--bsdocs-side-w) minmax(0, 1fr)', $css );
+		$this->assertStringContainsString( '--bsdocs-side-w: var(--bsdocs-side-width, 260px)', $css );
 		$this->assertStringContainsString( '.bsdocs__content::before', $css );
 		$this->assertStringContainsString( 'prefers-reduced-motion', $css );
 		$this->assertStringContainsString( 'font-family: ui-monospace', $css );
