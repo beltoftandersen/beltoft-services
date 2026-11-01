@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
  *
  *   {beltoft_usage_line}    "Or €0.0226/hour, max €16.50/month, pay as you go", empty when there is no offer
  *   {beltoft_usage_hourly}  "€0.0226"
- *   {beltoft_usage_cap}     "€16.50"
+ *   {beltoft_usage_cap}     "€16.50" ("€15" for a whole amount)
  *
  * The tags are empty for a variation without a pay-as-you-go sibling, so a text element can hide itself with the
  * condition "dynamic data is not empty".
@@ -153,7 +153,7 @@ final class Catalog {
 			case 'beltoft_usage_hourly':
 				return Rates::money( $rates['hourly'], 4 );
 			case 'beltoft_usage_cap':
-				return Rates::money( $rates['cap'] );
+				return Rates::cap_money( $rates['cap'] );
 			default:
 				return Rates::line( $v );
 		}

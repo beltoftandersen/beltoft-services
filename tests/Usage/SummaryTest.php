@@ -62,7 +62,7 @@ class SummaryTest extends UsageTestCase {
 		$this->assertStringContainsString( '0.0205', apply_filters( 'woocommerce_cart_item_price', '€0.00', $item, $key ) );
 		$this->assertStringContainsString( '/ hour', apply_filters( 'woocommerce_cart_item_price', '€0.00', $item, $key ) );
 		$this->assertStringContainsString( 'max', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
-		$this->assertStringContainsString( '15.00', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
+		$this->assertStringContainsString( '15 /', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
 		$this->assertStringContainsString( '/ month', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
 		$this->assertEquals( 0, WC()->cart->get_total( 'edit' ) );
 		$this->assertEquals( 0, $item['line_subtotal'] );
@@ -168,7 +168,7 @@ class SummaryTest extends UsageTestCase {
 		$this->assertStringContainsString( 'per month, paid in advance', $tiles['monthly'][0] );
 		$this->assertStringContainsString( '18.00', $tiles['monthly'][1] );
 		$this->assertStringContainsString( '0.0205 per hour, max', $tiles['usage'][0] );
-		$this->assertStringContainsString( '18.00 per month', str_replace( "\u{a0}", ' ', $tiles['usage'][1] ) );
+		$this->assertStringContainsString( '18 per month', str_replace( "\u{a0}", ' ', $tiles['usage'][1] ) );
 		$this->assertSame( 'Billed monthly for the hours used', \BeltoftServices\Usage\Rates::billed_note() );
 	}
 
@@ -246,5 +246,14 @@ class SummaryTest extends UsageTestCase {
 
 		$this->assertSame( '', (string) ob_get_clean(), 'No billing box.' );
 		$this->assertFalse( \BeltoftServices\Usage\Rates::monthly_offered() );
+	}
+
+	public function test_a_whole_euro_cap_has_no_decimals_and_other_amounts_keep_two(): void {
+		$this->assertSame( "\u{20AC}15", str_replace( '$', "\u{20AC}", \BeltoftServices\Usage\Rates::cap_money( 15.0 ) ) );
+		$this->assertSame( "\u{20AC}55", str_replace( '$', "\u{20AC}", \BeltoftServices\Usage\Rates::cap_money( 55.004 ) ) );
+		$this->assertSame( "\u{20AC}16.50", str_replace( '$', "\u{20AC}", \BeltoftServices\Usage\Rates::cap_money( 16.5 ) ) );
+		$this->assertStringContainsString( 'max ', \BeltoftServices\Usage\Rates::max_per_month( 15.0 ) );
+		$this->assertStringContainsString( "\u{20AC}15 ", str_replace( '$', "\u{20AC}", str_replace( "\u{a0}", ' ', \BeltoftServices\Usage\Rates::max_per_month( 15.0 ) ) ) );
+		$this->assertStringContainsString( '0.0226', \BeltoftServices\Usage\Rates::money( 0.0226, 4 ) );
 	}
 }

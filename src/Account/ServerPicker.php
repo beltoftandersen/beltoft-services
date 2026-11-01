@@ -603,8 +603,8 @@ final class ServerPicker {
 			$attrs += array(
 				'data-usage-label'          => Rates::tile_terms( ...array_values( self::usage_rates( $plan, false ) ) ),
 				'data-usage-label-backups'  => Rates::tile_terms( ...array_values( self::usage_rates( $plan, true ) ) ),
-				'data-card-cap'             => Rates::money( self::usage_rates( $plan, false )['cap'] ),
-				'data-card-cap-backups'     => Rates::money( self::usage_rates( $plan, true )['cap'] ),
+				'data-card-cap'             => Rates::cap_money( self::usage_rates( $plan, false )['cap'] ),
+				'data-card-cap-backups'     => Rates::cap_money( self::usage_rates( $plan, true )['cap'] ),
 				'data-card-hourly'          => Rates::per_hour( self::usage_rates( $plan, false )['hourly'] ),
 				'data-card-hourly-backups'  => Rates::per_hour( self::usage_rates( $plan, true )['hourly'] ),
 				'data-summary-usage'        => self::summary( $plan, false, true ),
@@ -632,7 +632,7 @@ final class ServerPicker {
 		if ( self::payg_only( $plan ) ) {
 			$rates = self::usage_rates( $plan, false );
 
-			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::money( $rates['cap'] ) ) . '</b> <span>' . esc_html__( 'max per month, excl. VAT', 'beltoft-services' ) . '</span></span>';
+			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( $rates['cap'] ) ) . '</b> <span>' . esc_html__( 'max per month, excl. VAT', 'beltoft-services' ) . '</span></span>';
 			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( $rates['hourly'] ) ) . '</span>';
 		} else {
 			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( (float) $plan['price'] ) ) . '</b> <span>' . esc_html( self::per( (string) $plan['period'] ) ) . '</span></span>';

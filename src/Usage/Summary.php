@@ -108,8 +108,8 @@ final class Summary {
 	 * @param float $cap Cap.
 	 */
 	private static function cap_text( float $cap ): string {
-		/* translators: %s: monthly cap such as €55.00 */
-		return esc_html( sprintf( __( 'max %s / month', 'beltoft-services' ), Rates::money( $cap ) ) );
+		/* translators: %s: monthly cap such as €55 */
+		return esc_html( sprintf( __( 'max %s / month', 'beltoft-services' ), Rates::cap_money( $cap ) ) );
 	}
 
 	/**
@@ -118,8 +118,8 @@ final class Summary {
 	 * @param array{hourly: float, cap: float} $rates Rates.
 	 */
 	private static function rate_and_cap( array $rates ): string {
-		/* translators: 1: price per hour such as €0.0829, 2: monthly cap such as €55.00 */
-		return esc_html( sprintf( __( '%1$s / hour, max %2$s / month', 'beltoft-services' ), Rates::money( $rates['hourly'], 4 ), Rates::money( $rates['cap'] ) ) );
+		/* translators: 1: price per hour such as €0.0829, 2: monthly cap such as €55 */
+		return esc_html( sprintf( __( '%1$s / hour, max %2$s / month', 'beltoft-services' ), Rates::money( $rates['hourly'], 4 ), Rates::cap_money( $rates['cap'] ) ) );
 	}
 
 	/**

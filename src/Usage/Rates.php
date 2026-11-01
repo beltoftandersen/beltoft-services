@@ -102,6 +102,15 @@ final class Rates {
 	}
 
 	/**
+	 * A monthly cap for people: a whole amount has no decimals ("€55"), any other has two ("€16.50").
+	 *
+	 * @param float $cap Monthly cap.
+	 */
+	public static function cap_money( float $cap ): string {
+		return self::money( $cap, abs( $cap - round( $cap ) ) < 0.005 ? 0 : 2 );
+	}
+
+	/**
 	 * The pay-as-you-go offer next to a monthly plan: the usage sibling that can be bought, and what it costs
 	 * (hourly and the monthly cap, excluding tax). Null for a pay-as-you-go variation, a plan with no usage
 	 * sibling, one that cannot be bought, or a monthly price of 0.
@@ -146,7 +155,7 @@ final class Rates {
 		}
 
 		/* translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50 */
-		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4 ), self::money( $rates['cap'] ) ) );
+		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4 ), self::cap_money( $rates['cap'] ) ) );
 	}
 
 	/**
@@ -214,7 +223,7 @@ final class Rates {
 	 */
 	public static function max_per_month( float $cap ): string {
 		/* translators: %s: monthly cap such as €55.00 */
-		return sprintf( __( 'max %s per month', 'beltoft-services' ), self::money( $cap ) );
+		return sprintf( __( 'max %s per month', 'beltoft-services' ), self::cap_money( $cap ) );
 	}
 
 	/**
