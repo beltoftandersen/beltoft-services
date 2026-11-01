@@ -24,6 +24,8 @@
 	var usageNote = billing ? billing.querySelector( '[data-picker-usage-note]' ) : null;
 	var summary = form.querySelector( '[data-picker-summary]' );
 	var submit = form.querySelector( '[data-picker-submit]' );
+	// Whether the customer picked a billing tile (a posted form that failed counts as picked).
+	var touched = !! billing && billing.hasAttribute( 'data-picker-touched' );
 
 	function each( list, run ) {
 		Array.prototype.forEach.call( list, run );
@@ -183,7 +185,13 @@
 				usage.closest( '[data-picker-usage-tile]' ).classList.toggle( 'is-disabled', ! hasUsage );
 			}
 
-			if ( ! hasUsage && monthly ) {
+			// Pay as you go is the default while the customer has not chosen: it follows the plan (and backups) until then.
+			if ( usage && ! touched ) {
+				usage.checked = hasUsage && ! ( withBackups && '1' !== radio.getAttribute( 'data-has-usage-backups' ) );
+				if ( monthly ) {
+					monthly.checked = ! usage.checked;
+				}
+			} else if ( ! hasUsage && monthly ) {
 				monthly.checked = true;
 			}
 
@@ -231,7 +239,14 @@
 	}
 
 	each( billing ? billing.querySelectorAll( 'input[type="radio"]' ) : [], function ( radio ) {
-		radio.addEventListener( 'change', update );
+		radio.addEventListener( 'change', function ( event ) {
+			// Only a real click counts as the customer's choice, not the script's own changes.
+			if ( event.isTrusted ) {
+				touched = true;
+			}
+
+			update();
+		} );
 	} );
 
 	// The tile script handles the app's own change; the summary needs nothing from it.

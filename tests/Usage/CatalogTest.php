@@ -230,6 +230,38 @@ class CatalogTest extends UsageTestCase {
 		$this->assertDoesNotMatchRegularExpression( '#value="usage"[^>]*disabled#', $html, 'This plan offers pay as you go, so the tile can be chosen.' );
 	}
 
+	public function test_pay_as_you_go_is_selected_by_default_when_the_plan_offers_it(): void {
+		Offers::reset();
+		ob_start();
+		ServerPicker::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '#value="usage" checked#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#value="monthly" checked#', $html );
+	}
+
+	public function test_a_plan_without_pay_as_you_go_is_never_preselected_for_it(): void {
+		$this->v['u-None']->set_status( 'private' );
+		$this->v['u-None']->save();
+		Offers::reset();
+		ob_start();
+		ServerPicker::render();
+		$html = (string) ob_get_clean();
+		$this->assertDoesNotMatchRegularExpression( '#value="usage" checked#', $html );
+		$this->assertSame( $this->v['m-None']->get_id(), $this->check()['variation_id'], 'Monthly without a billing value.' );
+	}
+
+	public function test_a_refused_post_with_monthly_is_not_turned_back_into_pay_as_you_go(): void {
+		Offers::reset();
+		ServerPicker::process( array( ServerPicker::FIELD => 'bad', ServerPicker::PLAN => (string) $this->v['m-None']->get_id(), ServerPicker::BILLING => 'monthly' ), get_current_user_id() );
+		ob_start();
+		ServerPicker::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '#value="monthly" checked#', $html );
+		$this->assertStringContainsString( 'data-picker-touched', $html );
+	}
+
 	private function in_cart( \WC_Product_Variation $v ): void {
 		WC()->cart->empty_cart();
 		$this->assertNotFalse( WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), BackupField::attributes( $v ) ) );
@@ -324,8 +356,8 @@ class CatalogTest extends UsageTestCase {
 		$this->assertSame( "+\u{20AC}0.0045 / hour", \BeltoftServices\Proxmox\Backups::price_difference( $this->v['u-None'], $this->v['u-Daily'] ) );
 	}
 
-	public function test_the_choice_sits_at_the_top_of_the_billing_details(): void {
-		$this->assertSame( 5, has_action( 'woocommerce_before_checkout_billing_form', array( \BeltoftServices\Usage\BillingField::class, 'render' ) ) );
-		$this->assertFalse( has_action( 'woocommerce_after_order_notes', array( \BeltoftServices\Usage\BillingField::class, 'render' ) ) );
+	public function test_the_choice_sits_at_the_top_of_your_server(): void {
+		$this->assertSame( 1, has_action( 'woocommerce_after_order_notes', array( \BeltoftServices\Usage\BillingField::class, 'render' ) ) );
+		$this->assertFalse( has_action( 'woocommerce_before_checkout_billing_form', array( \BeltoftServices\Usage\BillingField::class, 'render' ) ) );
 	}
 }
