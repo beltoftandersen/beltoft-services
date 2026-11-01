@@ -323,4 +323,9 @@ class CatalogTest extends UsageTestCase {
 	public function test_the_backups_price_in_pay_as_you_go_is_per_hour(): void {
 		$this->assertSame( "+\u{20AC}0.0045 / hour", \BeltoftServices\Proxmox\Backups::price_difference( $this->v['u-None'], $this->v['u-Daily'] ) );
 	}
+
+	public function test_the_choice_sits_at_the_top_of_the_billing_details(): void {
+		$this->assertSame( 5, has_action( 'woocommerce_before_checkout_billing_form', array( \BeltoftServices\Usage\BillingField::class, 'render' ) ) );
+		$this->assertFalse( has_action( 'woocommerce_after_order_notes', array( \BeltoftServices\Usage\BillingField::class, 'render' ) ) );
+	}
 }
