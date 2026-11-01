@@ -303,7 +303,7 @@ final class Acts {
 		$found  = Licenses::find( $license_id );
 
 		// The same answer for someone else's license and a missing one; the plugin's own function checks it again.
-		if ( ! $found || ! LicenseAccount::owns( $found, $user_id ) || '' === $domain ) {
+		if ( ! $found || (int) ( $found['user_id'] ?? 0 ) !== $user_id || ! LicenseAccount::owns( $found, $user_id ) || '' === $domain ) {
 			return new \WP_Error( 'beltoft_services_forbidden', __( 'That license is not available.', 'beltoft-services' ) );
 		}
 
