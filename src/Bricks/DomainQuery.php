@@ -30,6 +30,8 @@ final class DomainQuery {
 		'bds_domain'        => 'Domain',
 		'bds_tld'           => 'Extension',
 		'bds_status'        => 'Status (available, taken, unknown)',
+		'bds_status_text'   => 'Status as a sentence',
+		'bds_row_class'     => 'Class of the main result (add it to the row)',
 		'bds_available'     => 'Available (1 or 0)',
 		'bds_price'         => 'Price per year',
 		'bds_renewal_price' => 'Renewal price',
@@ -116,11 +118,24 @@ final class DomainQuery {
 				'price'         => '' !== $price ? sprintf( /* translators: %s: price in euro */ __( '€%s / year', 'beltoft-services' ), $price ) : '',
 				'renewal_price' => $free && '' !== $price ? sprintf( /* translators: %s: price in euro */ __( 'Renews at €%s / year', 'beltoft-services' ), $price ) : '',
 				'note'          => $free ? (string) ( $item['note'] ?? '' ) : '',
+				'status_text'   => self::status_text( $status ),
 				'primary'       => 0 === count( $rows ) ? 1 : 0,
+				'row_class'     => 0 === count( $rows ) ? 'beltoft-domain-result--primary' : '',
 				'add_url'       => $free ? self::add_url( $domain ) : '',
 			);
 		}
 		return $rows;
+	}
+
+	/** The sentence the search script shows for a status. */
+	private static function status_text( string $status ): string {
+		$texts = array(
+			'free'     => __( 'Available to register', 'beltoft-services' ),
+			'taken'    => __( 'Already registered', 'beltoft-services' ),
+			'premium'  => __( 'Premium domain. Online ordering is unavailable.', 'beltoft-services' ),
+			'not_sold' => __( 'This domain extension is not available to order here.', 'beltoft-services' ),
+		);
+		return $texts[ $status ] ?? __( 'Availability could not be confirmed.', 'beltoft-services' );
 	}
 
 	public static function add_url( string $domain ): string {
