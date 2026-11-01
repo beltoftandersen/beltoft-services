@@ -1,5 +1,19 @@
-/* Checkout: the Billing choice. The label is bold like "Operating system", the options normal weight. */
-.checkout-page .beltoft-services-billing .beltoft-services-billing__legend, .beltoft-services-billing .beltoft-services-billing__legend { display: block; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
-.checkout-page .beltoft-services-billing label.woocommerce-form__label, .beltoft-services-billing label.woocommerce-form__label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-weight: 400; }
-.checkout-page .beltoft-services-billing label.woocommerce-form__label span, .beltoft-services-billing label.woocommerce-form__label span { font-weight: 400; }
-.checkout-page .beltoft-services-billing .beltoft-services-billing__rate { color: var(--ink-soft, #5e7080); font-size: 14px; }
+/* Checkout: the Billing choice, its own box at the top of the billing details. Two tiles like the server picker's; the chosen one is navy. Square corners, palette variables. */
+fieldset.beltoft-services-billing, .checkout-page fieldset.beltoft-services-billing, .woocommerce-checkout form fieldset.beltoft-services-billing { box-sizing: border-box; min-width: 0; margin: 0 0 24px; padding: 16px 20px 20px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #ffffff); }
+fieldset.beltoft-services-billing > legend.beltoft-services-billing__legend, .checkout-page fieldset.beltoft-services-billing > legend.beltoft-services-billing__legend { float: left; width: 100%; margin: 0 0 12px; padding: 0; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
+.beltoft-services-billing__options { clear: both; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.beltoft-services-billing__option { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
+.beltoft-services-billing .beltoft-services-billing__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
+.beltoft-services-billing__face { display: flex; flex-direction: column; justify-content: center; gap: 4px; box-sizing: border-box; height: 100%; min-height: 76px; padding: 14px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); transition: background-color .15s ease, color .15s ease; }
+.beltoft-services-billing__option:hover .beltoft-services-billing__face { background: var(--rule, #d6d2c8); }
+.beltoft-services-billing__name { font-size: 17px; font-weight: 700; line-height: 1.25; }
+.beltoft-services-billing .beltoft-services-billing__rate { color: inherit; font-size: 13px; line-height: 1.4; opacity: 0.8; }
+.beltoft-services-billing .beltoft-services-billing__input:checked + .beltoft-services-billing__face, .beltoft-services-billing__option:hover .beltoft-services-billing__input:checked + .beltoft-services-billing__face { background: var(--navy, #0c1535); color: #ffffff; }
+.beltoft-services-billing .beltoft-services-billing__input:focus-visible + .beltoft-services-billing__face { outline: 2px solid var(--green, #28513e); outline-offset: 2px; }
+.beltoft-services-billing .beltoft-services-billing__input:disabled + .beltoft-services-billing__face { cursor: progress; }
+.beltoft-services-billing .description { margin: 10px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-billing [hidden] { display: none !important; }
+@media (max-width: 478px) { .beltoft-services-billing__options { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .beltoft-services-billing__face { transition: none; } }
+/* The theme puts the system tiles first inside the step (order: -1): the billing box goes above them. */
+.checkout-page fieldset.beltoft-services-billing { order: -2; }
