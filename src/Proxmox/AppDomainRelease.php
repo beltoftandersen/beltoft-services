@@ -6,6 +6,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -168,7 +169,7 @@ final class AppDomainRelease {
 		}
 		foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 			$domain = Resource::for_license( (int) $license['id'] );
-			if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === $zone && AppDomains::editable( $domain, $user ) ) {
+			if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === $zone && ZoneAccess::editable( $domain, $user ) ) {
 				return true;
 			}
 		}

@@ -8,9 +8,9 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\ProofResolver;
-use BeltoftServices\Proxmox\AppDomains;
-use BeltoftServices\Proxmox\AppOwnDomain;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Domains\HostName;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,7 +33,7 @@ final class MailDomain {
 	 * @param mixed $raw Typed value.
 	 */
 	public static function normalise( $raw ): ?string {
-		return AppOwnDomain::normalise( $raw );
+		return HostName::normalise( $raw );
 	}
 
 	/**
@@ -113,7 +113,7 @@ final class MailDomain {
 	 * @param int    $user_id Customer.
 	 */
 	public static function on_our_servers( string $name, int $user_id ): bool {
-		return in_array( $name, AppDomains::zones( $user_id ), true );
+		return in_array( $name, ZoneAccess::zones( $user_id ), true );
 	}
 
 	/**

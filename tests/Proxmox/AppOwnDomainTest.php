@@ -20,6 +20,7 @@ use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\HostName;
 
 require_once __DIR__ . '/MonitoringTestCase.php';
 
@@ -134,12 +135,12 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 	// -- The name ------------------------------------------------------------------------------
 
 	public function test_names_are_normalised_and_unusable_ones_refused(): void {
-		$this->assertSame( 'shop.example.com', AppOwnDomain::normalise( '  Shop.Example.COM. ' ) );
-		$this->assertSame( 'a.xn--bcher-kva.example', AppOwnDomain::normalise( 'a.xn--bcher-kva.example' ) );
+		$this->assertSame( 'shop.example.com', HostName::normalise( '  Shop.Example.COM. ' ) );
+		$this->assertSame( 'a.xn--bcher-kva.example', HostName::normalise( 'a.xn--bcher-kva.example' ) );
 		foreach ( array( '', 'example', 'a..b.com', '-a.example.com', 'a.example.com/x', 'a b.example.com', 'bücher.example', '*.example.com', 'a.example.123', 'host.localhost', str_repeat( 'a', 64 ) . '.example.com', str_repeat( 'a.', 130 ) . 'com' ) as $bad ) {
-			$this->assertNull( AppOwnDomain::normalise( $bad ), $bad );
+			$this->assertNull( HostName::normalise( $bad ), $bad );
 		}
-		$this->assertNull( AppOwnDomain::normalise( array( 'x.example.com' ) ) );
+		$this->assertNull( HostName::normalise( array( 'x.example.com' ) ) );
 	}
 
 	public function test_the_verdict_needs_this_server_alone(): void {

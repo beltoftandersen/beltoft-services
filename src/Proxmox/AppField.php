@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -275,7 +276,7 @@ final class AppField {
 	public static function print_fields( array $offer, array $picked = array() ): void {
 		$picked    = Picked::clean( $picked );
 		$start     = isset( $offer['apps'][ $picked['app'] ] ) ? $picked['app'] : '';
-		$zones     = AppDomains::zones( get_current_user_id() );
+		$zones     = ZoneAccess::zones( get_current_user_id() );
 		$supports  = '' !== $start && ! empty( $offer['apps'][ $start ]['domain'] );
 		$domain_on = '' !== $picked['domain_on'] && $supports && in_array( $picked['zone'], $zones, true );
 		$own_on    = '' !== $picked['own'] && $supports;

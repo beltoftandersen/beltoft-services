@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Domains\DnsQuery;
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
@@ -34,44 +35,12 @@ final class AppOwnDomain {
 	/** Days the app waits for the name before it is installed on the server address. */
 	public const WAIT_DAYS = 14;
 
-	/** Top-level names that can never get a public certificate. */
-	private const REFUSED_TLDS = array( 'localhost', 'local', 'internal', 'invalid', 'onion', 'lan', 'home' );
-
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
 	}
 
 	// -- The name ------------------------------------------------------------------------------
-
-	/**
-	 * A host name as it would be typed into DNS: lowercase ASCII letters, digits and hyphens in labels, at least two labels.
-	 *
-	 * @param mixed $raw Typed value.
-	 */
-	public static function normalise( $raw ): ?string {
-		if ( ! is_string( $raw ) ) {
-			return null;
-		}
-		$name = strtolower( rtrim( trim( $raw ), '.' ) );
-		if ( '' === $name || strlen( $name ) > 253 ) {
-			return null;
-		}
-		$labels = explode( '.', $name );
-		if ( count( $labels ) < 2 ) {
-			return null;
-		}
-		foreach ( $labels as $label ) {
-			if ( 1 !== preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) {
-				return null;
-			}
-		}
-		$tld = end( $labels );
-		if ( in_array( $tld, self::REFUSED_TLDS, true ) || 1 !== preg_match( '/^(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/D', $tld ) ) {
-			return null;
-		}
-		return $name;
-	}
 
 	/**
 	 * The checked choice for checkout and reinstall, with the same wording for both.
@@ -87,7 +56,7 @@ final class AppOwnDomain {
 		if ( ! is_string( $raw ) || '' === trim( $raw ) ) {
 			return __( 'Enter the domain name you want to use.', 'beltoft-services' );
 		}
-		$name = self::normalise( $raw );
+		$name = HostName::normalise( $raw );
 		if ( null === $name ) {
 			return __( 'That is not a domain name we can use. Enter a name such as shop.example.com, without https:// or a path, using letters (a to z), digits and hyphens.', 'beltoft-services' );
 		}

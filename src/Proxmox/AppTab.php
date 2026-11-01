@@ -6,6 +6,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -241,7 +242,7 @@ final class AppTab {
 		if ( '' !== (string) ( $left['zone'] ?? '' ) && $user > 0 ) {
 			foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 				$domain_resource = Resource::for_license( (int) $license['id'] );
-				if ( $domain_resource && strtolower( (string) $domain_resource->get( 'domain' ) ) === $left['zone'] && AppDomains::editable( $domain_resource, $user ) ) {
+				if ( $domain_resource && strtolower( (string) $domain_resource->get( 'domain' ) ) === $left['zone'] && ZoneAccess::editable( $domain_resource, $user ) ) {
 					$left_url = Domains::url( $license, 'dns' );
 					break;
 				}
@@ -309,7 +310,7 @@ final class AppTab {
 				$url = '';
 				foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 					$domain = Resource::for_license( (int) $license['id'] );
-					if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === (string) ( $left['zone'] ?? '' ) && AppDomains::editable( $domain, $user ) ) {
+					if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === (string) ( $left['zone'] ?? '' ) && ZoneAccess::editable( $domain, $user ) ) {
 						$url = Domains::url( $license, 'dns' );
 						break;
 					}

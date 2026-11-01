@@ -8,7 +8,6 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Api\Routes;
-use BeltoftServices\Proxmox\AppDomains;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -319,7 +318,7 @@ final class RecordRoutes {
 			return self::failure( new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ), 403 );
 		}
 
-		if ( ! AppDomains::editable( $r, get_current_user_id() ) ) {
+		if ( ! ZoneAccess::editable( $r, get_current_user_id() ) ) {
 			return self::failure( new \WP_Error( 'not_ours', __( 'The DNS of this domain is not hosted here, so its records cannot be changed.', 'beltoft-services' ) ), 409 );
 		}
 
