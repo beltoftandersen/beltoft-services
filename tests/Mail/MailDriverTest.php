@@ -258,6 +258,42 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertSame( array(), DnsClients::dns()->zone( 'theirs.example' )['rrsets'] );
 	}
 
+	public function test_a_conflict_in_a_zone_of_ours_clears_when_the_customer_removes_the_record_and_checks_again(): void {
+		$user = self::factory()->user->create();
+		$this->our_zone( $user, 'again.example', array(
+			array( 'name' => '@', 'type' => 'MX', 'ttl' => 600, 'value' => 'mx.other.example', 'priority' => 5 ),
+			array( 'name' => '@', 'type' => 'TXT', 'ttl' => 600, 'value' => 'google-site-verification=abc' ),
+		) );
+		$r   = $this->mail_resource( 'again.example', array(), array(), $user );
+		$res = $this->driver()->provision( $r );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertTrue( $r->set( $res->meta() ) );
+
+		$by = array_column( (array) Resource::find( $r->id() )->get( 'mail_records' ), null, 'key' );
+		$this->assertSame( 'conflict', $by['mx']['status'] );
+
+		// Checking again while the record is still there changes nothing.
+		MailDns::restart( Resource::find( $r->id() ) );
+		MailDns::run( $r->id() );
+		$by = array_column( (array) Resource::find( $r->id() )->get( 'mail_records' ), null, 'key' );
+		$this->assertSame( 'conflict', $by['mx']['status'] );
+		$this->assertContains( 'mx.other.example', array_column( $this->zone_rows( 'again.example' ), 'value' ) );
+
+		// The customer removes the conflicting record.
+		$rows = array_values( array_filter( $this->zone_rows( 'again.example' ), static fn( $row ) => 'mx.other.example' !== $row['value'] ) );
+		$this->assertTrue( \BeltoftServices\Domains\Records::replace( 'again.example', $rows ) );
+
+		$r = Resource::find( $r->id() );
+		$r->set( array( 'mail_dns_checked' => null ) );
+		MailDns::restart( $r );
+		MailDns::run( $r->id() );
+
+		$by = array_column( (array) Resource::find( $r->id() )->get( 'mail_records' ), null, 'key' );
+		$this->assertSame( 'ok', $by['mx']['status'] );
+		$this->assertContains( 'mail.example.net', array_column( $this->zone_rows( 'again.example' ), 'value' ) );
+		$this->assertContains( 'google-site-verification=abc', array_column( $this->zone_rows( 'again.example' ), 'value' ), 'Other records stay.' );
+	}
+
 	public function test_existing_records_are_reported_and_kept_and_other_txt_records_survive(): void {
 		$user = self::factory()->user->create();
 		$this->our_zone(

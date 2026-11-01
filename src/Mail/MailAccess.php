@@ -168,6 +168,43 @@ final class MailAccess {
 	}
 
 	/**
+	 * Wipes the passwords whose time to read them has passed (nobody keeps an encrypted password forever).
+	 *
+	 * @param Resource $r Resource.
+	 * @return int How many were wiped.
+	 */
+	public static function purge_expired( Resource $r ): int {
+		$count = 0;
+
+		$r->locked(
+			static function () use ( $r, &$count ): bool {
+				$all = self::all( $r );
+
+				foreach ( $all as $email => $row ) {
+					if ( ! is_array( $row ) || (int) ( $row['until'] ?? 0 ) < time() ) {
+						unset( $all[ $email ] );
+						++$count;
+					}
+				}
+
+				if ( 0 === $count ) {
+					return true;
+				}
+
+				if ( ! $r->set( array( self::META => $all ) ) ) {
+					$count = 0;
+
+					return false;
+				}
+
+				return true;
+			}
+		);
+
+		return $count;
+	}
+
+	/**
 	 * Listener of beltoft_services_state_changed: a deleted mail service keeps no password.
 	 *
 	 * @param mixed  $r   Resource.

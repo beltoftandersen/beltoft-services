@@ -16,7 +16,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Once a day every ready email domain is read through the mail server: a mailbox that is at or above the alert
  * percentage (setting mail_quota_alert_percent) is reported to the admin, once, until it drops below it again. Meta
- * mail_usage_alerted holds the mailboxes already reported. The job reads only; nothing is changed on the server.
+ * mail_usage_alerted holds the mailboxes already reported. The job reads the mail server only; nothing is changed there.
+ * It also wipes the stored mailbox passwords that nobody revealed in time (MailAccess::purge_expired).
  */
 final class MailJobs {
 
@@ -43,6 +44,10 @@ final class MailJobs {
 	public static function run(): void {
 		foreach ( Resource::live_ids( MailDriver::KIND ) as $id ) {
 			$r = Resource::find( $id );
+
+			if ( $r && array() !== (array) $r->get( MailAccess::META ) ) {
+				MailAccess::purge_expired( $r );
+			}
 
 			if ( $r && 'ready' === $r->get( 'state' ) ) {
 				self::check( $r );

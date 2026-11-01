@@ -62,6 +62,19 @@ final class MailJobsTest extends MailTestCase {
 		$this->assertNotNull( $ready );
 	}
 
+	public function test_the_run_wipes_expired_unrevealed_passwords_and_keeps_current_ones(): void {
+		$r = $this->ready_mail( 'purge.example' );
+		$r->set( array( \BeltoftServices\Mail\MailAccess::META => array(
+			'old@purge.example' => array( 'pw' => \BeltoftServices\Crypto::encrypt( 'x' ), 'until' => time() - 10, 'pending' => false ),
+			'new@purge.example' => array( 'pw' => \BeltoftServices\Crypto::encrypt( 'y' ), 'until' => time() + 1000, 'pending' => false ),
+		) ) );
+
+		MailJobs::run();
+
+		$left = (array) Resource::find( $r->id() )->get( \BeltoftServices\Mail\MailAccess::META );
+		$this->assertSame( array( 'new@purge.example' ), array_keys( $left ) );
+	}
+
 	public function test_a_daily_job_is_scheduled(): void {
 		as_unschedule_all_actions( MailJobs::HOOK, array(), 'beltoft-services' );
 		MailJobs::schedule();

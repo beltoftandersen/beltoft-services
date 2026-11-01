@@ -561,9 +561,24 @@ final class MailDns {
 
 		$domain = (string) $r->get( MailDomain::META_DOMAIN );
 		$rows   = (array) $r->get( 'mail_records' );
+		$user   = (int) ( $r->license()['user_id'] ?? 0 );
+		$ours   = MailDomain::on_our_servers( $domain, $user );
 
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) || 'ok' === ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+
+			// A zone of ours: try to write the record again. publish() re-checks the owner, takes the zone lock and never
+			// overwrites a record that conflicts, so a customer who removed the conflicting record gets ours written.
+			if ( $ours ) {
+				$result = self::publish( $user, $domain, $row );
+
+				if ( ! is_wp_error( $result ) ) {
+					$rows[ $i ]['status'] = $result[0];
+					$rows[ $i ]['reason'] = $result[1];
+				}
+
 				continue;
 			}
 
