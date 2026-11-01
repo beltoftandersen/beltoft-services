@@ -105,6 +105,9 @@ final class Reads {
 			case 'catalog':
 				return self::catalog( (string) $args['kind'], (int) ( $args['variation_id'] ?? 0 ), (int) ( $args['id'] ?? 0 ) );
 
+			case 'list_server_plans':
+				return Purchase::plans();
+
 			case 'list_dns_claims':
 				$list = Tools::route( 'GET', '/domains/dns-claims', array(), null, null );
 

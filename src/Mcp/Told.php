@@ -64,6 +64,9 @@ final class Told {
 			case 'set_database_eviction_policy':
 				return __( 'changed what the database does when its memory is full', 'beltoft-services' );
 
+			case 'order_server':
+				return __( 'ordered a pay as you go server', 'beltoft-services' );
+
 			case 'cancel_subscription':
 				return __( 'cancelled the subscription', 'beltoft-services' );
 

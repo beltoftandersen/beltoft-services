@@ -72,6 +72,61 @@ final class ServerPicker {
 	}
 
 	/**
+	 * The address of the page with choices filled in, for a link given to a customer (an app that cannot finish the order itself).
+	 * Nothing is ordered by opening it: the customer sees the page with these choices and continues to checkout.
+	 *
+	 * @param int                   $plan    Variation id of the plan.
+	 * @param array<string, string> $choices Keys backups ('1' or ''), os, app, version, name, ssh_key; empty ones are left out.
+	 */
+	public static function prefill_url( int $plan, array $choices ): string {
+		$map  = array(
+			'backups' => self::BACKUP,
+			'os'      => OsField::POST_KEY,
+			'app'     => AppField::POST_APP,
+			'version' => AppField::POST_VERSION,
+			'name'    => ServerName::POST_KEY,
+			'ssh_key' => SshKeyField::POST_KEY,
+		);
+		$args = array();
+
+		foreach ( $map as $key => $field ) {
+			if ( isset( $choices[ $key ] ) && '' !== trim( (string) $choices[ $key ] ) ) {
+				$args[ $field ] = trim( (string) $choices[ $key ] );
+			}
+		}
+
+		return add_query_arg( array_map( 'rawurlencode', $args ), self::url( $plan ) );
+	}
+
+	/**
+	 * Choices carried in the address (see prefill_url()) as the values the page starts from. Empty when the address carries none:
+	 * a plain ?plan= link is handled by selected().
+	 *
+	 * @return array<string, string>
+	 */
+	private static function prefilled(): array {
+		$found = array();
+
+		foreach ( array( self::BACKUP, OsField::POST_KEY, AppField::POST_APP, AppField::POST_VERSION, ServerName::POST_KEY, SshKeyField::POST_KEY ) as $field ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only fills in the form; the values are checked when it is posted.
+			if ( isset( $_GET[ $field ] ) && is_scalar( $_GET[ $field ] ) ) {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- as above; every value is printed escaped and checked on the post.
+				$found[ $field ] = (string) wp_unslash( $_GET[ $field ] );
+			}
+		}
+
+		if ( array() === $found ) {
+			return array();
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- as above.
+		$found[ self::PLAN ]    = isset( $_GET['plan'] ) ? (string) absint( wp_unslash( $_GET['plan'] ) ) : '';
+		$found[ self::BILLING ] = 'usage';
+
+		return self::values( $found );
+	}
+
+	/**
 	 * Is the request for the New server page?
 	 */
 	private static function on_page(): bool {
@@ -345,7 +400,7 @@ final class ServerPicker {
 	 * @param array{variation_id: int, plan: array<string, mixed>|null, choices: array<string, string>} $checked Result of check().
 	 * @return string|null The refusal text, or null when the cart holds the server.
 	 */
-	private static function add_to_cart( array $checked ): ?string {
+	public static function add_to_cart( array $checked ): ?string {
 		$cart      = function_exists( 'WC' ) ? WC()->cart : null;
 		$variation = wc_get_product( $checked['variation_id'] );
 
@@ -473,6 +528,15 @@ final class ServerPicker {
 	 * Prints the page.
 	 */
 	public static function render(): void {
+		// A link with choices in it starts the page from them, unless a refused post is being printed again.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only tells a post from a plain visit.
+		if ( ! isset( $_POST[ self::FIELD ] ) && array() !== self::prefilled() ) {
+			self::$state = array(
+				'errors' => array(),
+				'values' => self::prefilled(),
+			);
+		}
+
 		$products = Offers::products();
 		$plans    = Offers::plans();
 		$values   = array_merge( Picked::clean( array() ), array( 'plan' => '', 'backups' => '', 'billing' => '' ), self::$state['values'] );

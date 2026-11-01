@@ -53,7 +53,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -93,6 +93,11 @@ final class Tools {
 	 * @param array<string, mixed> $args Arguments.
 	 */
 	public static function confirmation_needed( string $name, array $args ): bool {
+		// A customer who has to finish the first order in the browser gets a link and nothing is done: no confirmation to ask for.
+		if ( Purchase::NAME === $name && ! Purchase::goes_direct( get_current_user_id() ) ) {
+			return false;
+		}
+
 		return ! empty( self::definitions()[ $name ]['confirm'] ) || self::risky( $name, $args );
 	}
 

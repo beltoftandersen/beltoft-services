@@ -35,6 +35,7 @@ abstract class McpTestCase extends TestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		$this->forget_orphan_order_items();
 
 		$this->mcp_set_up();
 		$this->dns = new FakeDns();
@@ -52,6 +53,25 @@ abstract class McpTestCase extends TestCase {
 		remove_all_filters( 'woocommerce_subscription_is_manual' );
 
 		parent::tear_down();
+	}
+
+	/**
+	 * Earlier tests that end in an implicit commit (table creation, a checkout run in a process of its own) leave order items behind for
+	 * ids that this test's orders get again. Items of orders that do not exist yet are deleted (as UsageTestCase does).
+	 */
+	private function forget_orphan_order_items(): void {
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$top  = (int) $wpdb->get_var( "SELECT MAX(ID) FROM {$wpdb->posts}" );
+		$hpos = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->prefix . 'wc_orders' ) );
+
+		if ( $hpos ) {
+			$top = max( $top, (int) $wpdb->get_var( "SELECT MAX(id) FROM {$wpdb->prefix}wc_orders" ) );
+		}
+
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}woocommerce_order_items WHERE order_id > %d", $top ) );
+		// phpcs:enable
 	}
 
 	/**
