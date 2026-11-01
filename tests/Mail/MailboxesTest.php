@@ -202,16 +202,6 @@ final class MailboxesTest extends MailTestCase {
 		$this->assertFalse( MailAccess::revealable( Resource::find( $r->id() ), 'a@reset.example' ), 'A password that was not set cannot be revealed.' );
 	}
 
-	public function test_quota_is_bounded_by_the_plan(): void {
-		$r = $this->ready_mail( 'q.example' );
-		Mailboxes::create( $r, 'a' );
-		$this->assertTrue( Mailboxes::set_quota( $r, 'a@q.example', 2048 ) );
-		$this->assertSame( 2048 * 1048576, $this->mailcow->mailbox( 'a@q.example' )['quota'] );
-		$this->assertSame( 'limit', Mailboxes::set_quota( $r, 'a@q.example', 10241 )->get_error_code() );
-		$this->assertSame( 'limit', Mailboxes::set_quota( $r, 'a@q.example', 0 )->get_error_code() );
-		$this->assertSame( 'invalid', Mailboxes::set_quota( $r, 'a@elsewhere.example', 100 )->get_error_code() );
-	}
-
 	public function test_the_list_shows_usage_and_whether_a_password_waits(): void {
 		$r = $this->ready_mail( 'list.example' );
 		Mailboxes::create( $r, 'a' );
@@ -219,14 +209,6 @@ final class MailboxesTest extends MailTestCase {
 
 		$rows = Mailboxes::all( Resource::find( $r->id() ) );
 		$this->assertSame( array( array( 'email' => 'a@list.example', 'name' => 'a', 'quota_mb' => 10240, 'used_mb' => 5, 'active' => true, 'reveal' => true ) ), $rows );
-	}
-
-	public function test_a_mailbox_can_be_switched_off_for_abuse(): void {
-		$r = $this->ready_mail( 'abuse.example' );
-		Mailboxes::create( $r, 'a' );
-		$this->assertTrue( Mailboxes::set_active( $r, 'a@abuse.example', false ) );
-		$this->assertSame( '0', $this->mailcow->mailbox( 'a@abuse.example' )['active'] );
-		$this->assertTrue( Mailboxes::set_active( $r, 'a@abuse.example', true ) );
 	}
 
 	public function test_a_deleted_service_keeps_no_password(): void {

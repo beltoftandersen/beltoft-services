@@ -493,9 +493,6 @@ class DbDiskTest extends TestCase {
 			$this->assertSame( 0, (int) Product::plan( $step->get_parent_id(), $step->get_id() )['public_ip'] );
 		}
 
-		$this->assertSame( $v['e100-0']->get_id(), DbDisk::next_larger( $v['e50-0'] )->get_id() );
-		$this->assertSame( $v['e50-1']->get_id(), DbDisk::next_larger( $v['e0-1'] )->get_id() );
-		$this->assertNull( DbDisk::next_larger( $v['e250-0'] ) );
 		$this->assertStringContainsString( '4.00', DbDisk::price_label( $v['e0-0'], $v['e50-0'] ) );
 		$this->assertStringContainsString( '8.00', DbDisk::price_label( $v['e0-0'], $v['e100-0'] ) );
 	}

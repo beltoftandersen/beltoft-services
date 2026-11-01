@@ -142,23 +142,6 @@ final class DbDisk {
 	}
 
 	/**
-	 * The next larger step of the ladder, or null.
-	 *
-	 * @param \WC_Product_Variation $variation Variation.
-	 */
-	public static function next_larger( \WC_Product_Variation $variation ): ?\WC_Product_Variation {
-		$own = self::extra( Product::plan( $variation->get_parent_id(), $variation->get_id() ) );
-
-		foreach ( self::ladder( $variation ) as $extra => $step ) {
-			if ( $extra > $own ) {
-				return $step;
-			}
-		}
-
-		return null;
-	}
-
-	/**
 	 * "+€8.00 / month" of a step compared with another.
 	 *
 	 * @param \WC_Product_Variation $from From.

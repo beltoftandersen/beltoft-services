@@ -64,9 +64,9 @@ class PrivateNetsTest extends TestCase {
 		$this->assertNull( PrivateNets::address( 12, $one->id() ) );
 		$this->assertNull( PrivateNets::address( 11, $other->id() ) );
 		$this->assertFalse( PrivateNets::retire( 11 ), 'The network remains held while a VM has an address.' );
-		$this->assertTrue( PrivateNets::release_address( $one->id() ) );
-		$this->assertTrue( PrivateNets::release_address( $two->id() ) );
-		$this->assertTrue( PrivateNets::retire( 11 ) );
+		$this->assertTrue( PrivateNets::release_and_retire( $one->id() ) );
+		$this->assertSame( 'held', PrivateNets::for_user( 11 )['state'], 'One address left: not quarantined yet.' );
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ) );
 		$this->assertSame( 'quarantine', PrivateNets::for_user( 11 )['state'] );
 		$this->assertNull( PrivateNets::hold( 12 ), 'A quarantined VLAN cannot be assigned to another customer.' );
 		$this->assertSame( 0, PrivateNets::reclaim(), 'The 30-day quarantine has not elapsed.' );

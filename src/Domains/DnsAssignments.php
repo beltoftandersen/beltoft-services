@@ -458,14 +458,4 @@ final class DnsAssignments {
 
 		return is_array( $rows ) ? $rows : array();
 	}
-
-	/**
-	 * How many domains are held (active or being released).
-	 */
-	public static function open_count(): int {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table, always fresh.
-		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE status IN ( 'active', 'release_pending' )", self::table() ) );
-	}
 }

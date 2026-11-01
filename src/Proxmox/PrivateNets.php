@@ -305,27 +305,6 @@ final class PrivateNets {
 		return $user_id > 0 && $resource_id > 0 && $resource && $resource->is_valid() && 'deleted' !== $resource->get( 'state' ) && (int) ( $license['user_id'] ?? 0 ) === $user_id;
 	}
 
-	/** Remove a resource's address after its VM has actually been removed. */
-	public static function release_address( int $resource_id ): bool {
-		global $wpdb;
-		list( $locked, $released ) = Locks::with(
-			Locks::name( 'privnet', 0 ),
-			Locks::allocation_wait(),
-			static function () use ( $wpdb, $resource_id ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
-				$deleted = 1 === $wpdb->delete( Schema::tables()['private_ips'], array( 'resource_id' => $resource_id ) );
-				if ( $deleted ) {
-					IpHistory::end( 'private', $resource_id );
-				}
-				return $deleted;
-			}
-		);
-		if ( ! $locked ) {
-			throw new \RuntimeException( 'The private network pool is busy.' );
-		}
-		return (bool) $released;
-	}
-
 	/** Release a deleted VM's address and quarantine its network if this was the last one. */
 	public static function release_and_retire( int $resource_id ): bool {
 		global $wpdb;

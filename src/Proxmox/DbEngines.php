@@ -92,13 +92,4 @@ final class DbEngines {
 		 */
 		return (string) apply_filters( 'beltoft_services_db_engine_description', $lines[ $id ] ?? '', $id );
 	}
-
-	/**
-	 * The prefixes of the template families of all engines (Clusters::SERVICE_FAMILIES): postgres-, mssql-, valkey.
-	 *
-	 * @return string[]
-	 */
-	public static function family_prefixes(): array {
-		return Clusters::SERVICE_FAMILIES;
-	}
 }
