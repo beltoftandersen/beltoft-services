@@ -37,6 +37,19 @@ final class Search {
 	}
 
 	public static function rest_check( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$result = self::visitor_search( (string) $request['name'] );
+		if ( is_wp_error( $result ) ) { return $result; }
+		$response = new \WP_REST_Response( $result, 200 );
+		// Only this browser may keep it, briefly: shared caches must not hold availability.
+		$response->header( 'Cache-Control', 'private, max-age=60' );
+		return $response;
+	}
+
+	/**
+	 * A search made for the visitor of this request: the per-visitor limits, the length check and find().
+	 * The REST route and the Bricks query type both come through here, so they cannot differ.
+	 */
+	public static function visitor_search( string $name ): array|\WP_Error {
 		$id = RateLimit::visitor();
 		/** Searches allowed per visitor: per minute and per hour. */
 		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
@@ -44,15 +57,10 @@ final class Search {
 		if ( RateLimit::exceeded( $id, 'domain-search', $per_minute ) || RateLimit::exceeded( $id, 'domain-search-hour', $per_hour, HOUR_IN_SECONDS ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
-		if ( strlen( (string) $request['name'] ) > 253 ) {
+		if ( strlen( $name ) > 253 ) {
 			return new \WP_Error( 'bad_domain', 'A valid domain name is required.', array( 'status' => 400 ) );
 		}
-		$result = self::find( (string) $request['name'] );
-		if ( is_wp_error( $result ) ) { return $result; }
-		$response = new \WP_REST_Response( $result, 200 );
-		// Only this browser may keep it, briefly: shared caches must not hold availability.
-		$response->header( 'Cache-Control', 'private, max-age=60' );
-		return $response;
+		return self::find( $name );
 	}
 
 	/** IDNA and DNS label validation for a full name. */
@@ -184,7 +192,13 @@ final class Search {
 	/** Loads the script and the stylesheet of the search (once, however many forms are on the page). */
 	public static function enqueue_assets(): void {
 		$asset_dir = plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'assets/';
+		self::enqueue_style();
 		wp_enqueue_script( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.js', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.js' ), true );
+	}
+
+	/** Only the stylesheet: the search form that submits to the page needs no script. */
+	public static function enqueue_style(): void {
+		$asset_dir = plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'assets/';
 		wp_enqueue_style( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.css' ) );
 	}
 

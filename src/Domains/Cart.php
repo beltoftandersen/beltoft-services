@@ -73,7 +73,19 @@ final class Cart {
 		if ( \BeltoftServices\RateLimit::exceeded( \BeltoftServices\RateLimit::visitor(), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
-		$data = self::line_data( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ) );
+		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ) );
+		if ( is_wp_error( $result ) ) { return $result; }
+		return new \WP_REST_Response( $result, ! empty( $result['added'] ) ? 201 : 200 );
+	}
+
+	/**
+	 * Puts a domain in the cart: the checks and the cart write of the /domains/cart route, shared with the one-click add link.
+	 * The caller has done its own request checks (nonce, rate limit).
+	 *
+	 * @return array{added: bool, already_in_cart?: bool, checkout_url: string}|\WP_Error
+	 */
+	public static function add_line( string $domain, string $mode, string $auth_code = '' ): array|\WP_Error {
+		$data = self::line_data( $domain, $mode, $auth_code );
 		if ( is_wp_error( $data ) ) { return $data; }
 		// WooCommerce leaves its cart unloaded on custom REST routes.
 		if ( ! WC()->cart && function_exists( 'wc_load_cart' ) ) { wc_load_cart(); }
@@ -83,7 +95,7 @@ final class Cart {
 			if ( ( $item['beltoft_services_domain']['domain'] ?? '' ) === $data['beltoft_services_domain']['domain'] ) {
 				// The same domain the same way, for example after going back from checkout: carry on to checkout.
 				if ( ( $item['beltoft_services_domain']['mode'] ?? '' ) === $data['beltoft_services_domain']['mode'] ) {
-					return new \WP_REST_Response( array( 'added' => false, 'already_in_cart' => true, 'checkout_url' => wc_get_checkout_url() ), 200 );
+					return array( 'added' => false, 'already_in_cart' => true, 'checkout_url' => wc_get_checkout_url() );
 				}
 				return new \WP_Error( 'duplicate_domain', __( 'This domain is already in your cart.', 'beltoft-services' ), array( 'status' => 409 ) );
 			}
@@ -116,7 +128,7 @@ final class Cart {
 		$key = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
 		if ( ! $key ) { return new \WP_Error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		WC()->session->set_customer_session_cookie( true );
-		return new \WP_REST_Response( array( 'added' => true, 'checkout_url' => wc_get_checkout_url() ), 201 );
+		return array( 'added' => true, 'checkout_url' => wc_get_checkout_url() );
 	}
 
 	public static function line_data( string $domain, string $mode, string $auth_code = '' ): array|\WP_Error {

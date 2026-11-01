@@ -17,6 +17,7 @@ final class Integration {
 	/** The element files, by element name. They extend \\Bricks\\Element, so they are only loaded once Bricks exists. */
 	public const ELEMENTS = array(
 		'beltoft-domain-search' => array( 'file' => 'DomainSearchElement.php', 'class' => DomainSearchElement::class ),
+		'beltoft-domain-search-form' => array( 'file' => 'DomainSearchFormElement.php', 'class' => DomainSearchFormElement::class ),
 	);
 
 	public static function register(): void {
@@ -28,6 +29,7 @@ final class Integration {
 		if ( ! class_exists( '\\Bricks\\Elements' ) || ! class_exists( '\\Bricks\\Element' ) ) {
 			return array();
 		}
+		DomainQuery::register();
 		$done = array();
 		foreach ( self::ELEMENTS as $name => $element ) {
 			\Bricks\Elements::register_element( plugin_dir_path( __FILE__ ) . $element['file'], $name, $element['class'] );
