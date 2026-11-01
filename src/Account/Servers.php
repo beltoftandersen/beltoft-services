@@ -53,6 +53,65 @@ final class Servers {
 	/**
 	 * Hooks.
 	 */
+	/**
+	 * Kept for code outside this plugin (the theme's account shell, other plugins): these moved to ServerLinks.
+	 */
+	public const TABS      = ServerLinks::TABS;
+	public const NEW_VALUE = ServerLinks::NEW_VALUE;
+
+	/** @see ServerLinks::tabs() */
+	public static function tabs(): array {
+		return ServerLinks::tabs();
+	}
+
+	/** @see ServerLinks::slug() */
+	public static function slug(): string {
+		return ServerLinks::slug();
+	}
+
+	/**
+	 * @see ServerLinks::url()
+	 *
+	 * @param array<string, mixed> $license License.
+	 * @param string               $tab     Tab.
+	 */
+	public static function url( array $license, string $tab = '' ): string {
+		return ServerLinks::url( $license, $tab );
+	}
+
+	/**
+	 * @see ServerLinks::url_new()
+	 *
+	 * @param int $plan Plan.
+	 */
+	public static function url_new( int $plan = 0 ): string {
+		return ServerLinks::url_new( $plan );
+	}
+
+	/** @see ServerLinks::is_new() */
+	public static function is_new(): bool {
+		return ServerLinks::is_new();
+	}
+
+	/** @see ServerLinks::page() */
+	public static function page(): ?array {
+		return ServerLinks::page();
+	}
+
+	/** @see ServerLinks::requested() */
+	public static function requested(): array {
+		return ServerLinks::requested();
+	}
+
+	/**
+	 * @see ServerLinks::renewal()
+	 *
+	 * @param array<string, mixed> $license License.
+	 */
+	public static function renewal( array $license ): string {
+		return ServerLinks::renewal( $license );
+	}
+
 	public static function register(): void {
 		add_filter( 'wc_get_template', array( __CLASS__, 'template' ), 10, 3 );
 		add_action( 'template_redirect', array( __CLASS__, 'redirect' ) );
