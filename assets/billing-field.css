@@ -15,3 +15,5 @@ fieldset.beltoft-services-billing > legend.beltoft-services-billing__legend, .ch
 .beltoft-services-billing [hidden] { display: none !important; }
 @media (max-width: 478px) { .beltoft-services-billing__options { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .beltoft-services-billing__face { transition: none; } }
+/* The theme puts the system tiles first inside the step (order: -1): the billing box goes above them. */
+.checkout-page fieldset.beltoft-services-billing { order: -2; }
