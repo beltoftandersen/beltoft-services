@@ -45,6 +45,14 @@ class InvoiceViewTest extends CreditTestCase {
 		return $order;
 	}
 
+	public function tear_down(): void {
+		parent::tear_down();
+		// wcs_create_renewal_order() committed the VAT settings of this test: switch them off for good, or later tests see VAT.
+		$this->vat( false );
+		global $wpdb;
+		$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture reset.
+	}
+
 	private function labels( \WC_Order $order ): array {
 		return array_values( array_map( static fn( $r ) => wp_strip_all_tags( $r['label'] ), $order->get_order_item_totals() ) );
 	}

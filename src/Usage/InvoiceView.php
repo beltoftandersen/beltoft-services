@@ -101,7 +101,7 @@ final class InvoiceView {
 		$full = (string) $fee->get_name();
 
 		// "Server web1, September 2026: 200 hours at €0.0616 per hour (excl. VAT), capped at €55.00 a month".
-		if ( preg_match( '/^(.+?), ([^,:]+ \d{4}): (.+?) \(excl\. VAT\)(?:, capped at (.+?) a month)?$/u', $full, $m ) ) {
+		if ( preg_match( '/^(.+?), ([^,:]+ \d{4}): (.+?) \(excl\. VAT\)(?:, capped at (.+?) a month)?\z/u', $full, $m ) ) {
 			$detail = $m[2] . ': ' . $m[3];
 
 			if ( ! empty( $m[4] ) ) {
