@@ -39,7 +39,7 @@ abstract class UsageTestCase extends BackupTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		$this->settings( array( 'admin_email' => self::MAIL, 'offer_monthly' => 1 ) );
+		$this->settings( array( 'admin_email' => self::MAIL, 'offer_monthly' => 1, 'usage_minimum' => 0 ) );
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Usage\Ledger::table() );

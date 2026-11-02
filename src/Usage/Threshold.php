@@ -22,6 +22,8 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Threshold {
 
+	public const META_HOLD = '_beltoft_services_usage_early_hold';
+
 	/**
 	 * Hooks.
 	 */
@@ -81,9 +83,25 @@ final class Threshold {
 			return false;
 		}
 
-		$order = wcs_create_renewal_order( $account );
+		// An early bill was just dropped for being under the minimum: not tried again for a day.
+		if ( (int) $account->get_meta( self::META_HOLD ) > time() - DAY_IN_SECONDS ) {
+			return false;
+		}
+
+		Renewal::$early = true;
+		$order          = wcs_create_renewal_order( $account );
+		Renewal::$early = false;
 
 		if ( is_wp_error( $order ) || ! $order instanceof \WC_Order ) {
+			return false;
+		}
+
+		// Under the minimum for the card: nothing is billed early; the rows stay for the monthly renewal.
+		if ( '' !== (string) $order->get_meta( Minimum::META_ORDER ) ) {
+			$order->delete( true );
+			$account->update_meta_data( self::META_HOLD, (string) time() );
+			$account->save();
+
 			return false;
 		}
 

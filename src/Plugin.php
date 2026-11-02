@@ -181,6 +181,7 @@ final class Plugin {
 		Usage\Catalog::register();
 		Usage\Renewal::register();
 		Usage\Emails::register();
+		Usage\Minimum::register();
 		Usage\InvoiceView::register();
 		Card\Card::register();
 		Credit\Topup::register();

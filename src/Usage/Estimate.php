@@ -93,6 +93,8 @@ final class Estimate {
 		return array(
 			'total'     => (float) $statement['total'],
 			'currency'  => (string) $account->get_currency(),
+			'carried'   => round( (int) $account->get_meta( Minimum::META_AMOUNT ) / 100, 2 ),
+			'minimum'   => Minimum::amount(),
 			'next'      => $account->has_status( 'active' ) ? (int) $account->get_time( 'next_payment', 'gmt' ) : 0,
 			'resources' => $resources,
 		);

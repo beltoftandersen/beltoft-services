@@ -155,6 +155,15 @@ final class Settings {
 				'min'     => 1,
 				'label'   => __( 'Bill pay as you go early at this amount: other accounts', 'beltoft-services' ),
 			),
+			'usage_minimum' => array(
+				'tab'     => 'general',
+				'section' => 'usage',
+				'type'    => 'number',
+				'default' => 5,
+				'min'     => 0,
+				'label'   => __( 'Minimum amount to charge a card for pay as you go', 'beltoft-services' ),
+				'desc'    => __( 'In the store currency, including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month\'s invoice instead. 0 turns this off.', 'beltoft-services' ),
+			),
 			'offer_monthly' => array(
 				'tab'     => 'general',
 				'section' => 'usage',
