@@ -306,4 +306,24 @@ final class Account {
 
 		return $ids;
 	}
+
+	/**
+	 * The customer's live pay-as-you-go services that count as services of their own: servers and databases, not the
+	 * extra disks that belong to a server.
+	 *
+	 * @param int $user_id Customer.
+	 * @return int[]
+	 */
+	public static function services( int $user_id ): array {
+		return array_values(
+			array_filter(
+				self::resources( $user_id ),
+				static function ( int $id ): bool {
+					$r = Resource::find( $id );
+
+					return $r && \BeltoftServices\Proxmox\DiskDriver::ID !== (string) $r->get( 'driver' );
+				}
+			)
+		);
+	}
 }

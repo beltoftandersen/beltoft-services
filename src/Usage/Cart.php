@@ -83,6 +83,27 @@ final class Cart {
 	}
 
 	/**
+	 * Pay-as-you-go services ordered in the cart, for the new-account limit: like usage_units(), without extra disks, which
+	 * belong to a server.
+	 *
+	 * @param \WC_Cart|null $cart Cart (default: the current one).
+	 */
+	public static function service_units( ?\WC_Cart $cart = null ): int {
+		$cart  = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
+		$disks = 0;
+
+		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
+			$driver = \BeltoftServices\Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
+
+			if ( $driver && \BeltoftServices\Proxmox\DiskDriver::ID === $driver->id() && empty( $item['subscription_renewal'] ) && empty( $item['subscription_switch'] ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
+				$disks += (int) $item['quantity'];
+			}
+		}
+
+		return max( 0, self::usage_units( $cart ) - $disks );
+	}
+
+	/**
 	 * The cart key of the hidden account line, or ''.
 	 *
 	 * @param \WC_Cart $cart Cart.
@@ -158,7 +179,7 @@ final class Cart {
 	 * @param int    $units    Pay-as-you-go units ordered now.
 	 * @return string[]
 	 */
-	public static function problems( int $user_id, string $gateway, int $units ): array {
+	public static function problems( int $user_id, string $gateway, int $units, ?int $services = null ): array {
 		if ( $units < 1 ) {
 			return array();
 		}
@@ -180,7 +201,8 @@ final class Cart {
 			}
 		}
 
-		$limit = self::limit_problem( $user_id, $account, $units );
+		// The new-account limit counts services: an extra disk belongs to its server.
+		$limit = self::limit_problem( $user_id, $account, null === $services ? $units : $services );
 
 		if ( null !== $limit ) {
 			$problems[] = $limit;
@@ -200,7 +222,7 @@ final class Cart {
 	public static function limit_problem( int $user_id, ?\WC_Subscription $account, int $units ): ?string {
 		$limit = (int) Settings::get( 'usage_new_limit' );
 
-		if ( $limit > 0 && ! Account::charged( $account ) && count( Account::resources( $user_id ) ) + $units > $limit ) {
+		if ( $limit > 0 && ! Account::charged( $account ) && count( Account::services( $user_id ) ) + $units > $limit ) {
 			return sprintf(
 				/* translators: %d: number of services. */
 				_n( 'A new account can run %d pay as you go service until its first usage invoice is paid.', 'A new account can run %d pay as you go services until its first usage invoice is paid.', $limit, 'beltoft-services' ),
@@ -222,7 +244,7 @@ final class Cart {
 			return;
 		}
 
-		foreach ( self::problems( get_current_user_id(), (string) ( $data['payment_method'] ?? '' ), self::usage_units() ) as $message ) {
+		foreach ( self::problems( get_current_user_id(), (string) ( $data['payment_method'] ?? '' ), self::usage_units(), self::service_units() ) as $message ) {
 			$errors->add( 'beltoft_services_usage', $message );
 		}
 	}
@@ -239,7 +261,7 @@ final class Cart {
 			return;
 		}
 
-		$problems = self::problems( (int) $order->get_customer_id(), (string) $order->get_payment_method(), self::usage_units() );
+		$problems = self::problems( (int) $order->get_customer_id(), (string) $order->get_payment_method(), self::usage_units(), self::service_units() );
 
 		if ( $problems ) {
 			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'beltoft_services_usage', esc_html( $problems[0] ), 400 );

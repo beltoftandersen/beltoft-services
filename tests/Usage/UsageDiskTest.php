@@ -250,7 +250,8 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertNotFalse( $added );
 		WC()->cart->calculate_totals();
 		$this->assertEquals( 0, WC()->cart->get_total( 'edit' ) );
-		$this->assertSame( 1, \BeltoftServices\Usage\Cart::usage_units(), 'It counts as a pay as you go unit: the account rules (card, limits) apply.' );
+		$this->assertSame( 1, \BeltoftServices\Usage\Cart::usage_units(), 'It counts as a pay as you go unit: the account rules (card, on hold) apply.' );
+		$this->assertSame( 0, \BeltoftServices\Usage\Cart::service_units(), 'It is not a service of its own for the new-account limit.' );
 	}
 
 	public function test_a_usage_disk_for_a_monthly_server_is_refused(): void {
