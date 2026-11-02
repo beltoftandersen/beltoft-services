@@ -303,11 +303,11 @@ $beltoft_services_db_wait = array(
 		<?php if ( $view['can_reset'] ) : ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
-				<p><?php esc_html_e( 'The old password stops working at once. Applications that use it must be changed.', 'beltoft-services' ); ?></p>
+				<p><?php esc_html_e( 'We make a new random password and show it to you once. You do not choose it. The old password stops working at once, so applications that use it must be changed.', 'beltoft-services' ); ?></p>
 				<div class="beltoft-services-db__form">
 				<p>
 					<label for="beltoft-db-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $view['confirm'] ) ); ?></label>
-					<input type="text" id="beltoft-db-confirm" autocomplete="off" data-db-confirm>
+					<input type="text" id="beltoft-db-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $view['confirm'] ); ?>" data-db-confirm>
 				</p>
 				<p><button type="button" class="button woocommerce-button" data-db-reset><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
 				</div>
