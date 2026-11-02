@@ -66,6 +66,12 @@
 	function go( box, button ) {
 		var input = box.querySelector( '[data-delete-confirm]' );
 		var after = box.getAttribute( 'data-delete-after' );
+		var ask   = box.getAttribute( 'data-delete-ask' );
+
+		// A last caution, like Shut down: deleting cannot be undone.
+		if ( ask && ! window.confirm( ask ) ) {
+			return;
+		}
 
 		busy( button, true );
 		say( box, text.strings.working );
