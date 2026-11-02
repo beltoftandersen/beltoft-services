@@ -403,10 +403,10 @@ final class ApiTokensTest extends TestCase {
 		$this->assertStringContainsString( 'claude mcp add --transport http beltoft ' . \BeltoftServices\Mcp\Endpoint::url(), $html );
 		$this->assertStringContainsString( esc_html( "printf '%s' '" . $login . ":YOUR_TOKEN' | base64 | tr -d" ), $html );
 		$this->assertStringContainsString( 'data-api-copy="' . esc_attr( \BeltoftServices\Mcp\Endpoint::url() ) . '"', $html );
-		$this->assertStringContainsString( 'data-api-copy="' . esc_attr( $login ) . '"', $html );
+		$this->assertStringNotContainsString( 'data-api-copy="' . esc_attr( $login ) . '"', $html, 'No separate username row: the command holds it.' );
 		$this->assertStringContainsString( 'claude mcp list', $html );
 		$this->assertStringContainsString( 'Add custom connector', $html );
-		$this->assertStringNotContainsString( 'Shown once. Copy it now.', $html );
+		$this->assertStringNotContainsString( 'holds your new token', $html );
 		$this->assertStringNotContainsString( 'switch on', $html );
 	}
 
@@ -439,7 +439,8 @@ final class ApiTokensTest extends TestCase {
 		$html = $this->section();
 
 		$this->assertStringContainsString( esc_html( '"Authorization: Basic ' . $header . '"' ), $html );
-		$this->assertStringContainsString( 'Shown once. Copy it now.', $html );
+		$this->assertStringContainsString( 'This command holds your new token and is shown once. Copy it now.', $html );
+		$this->assertStringNotContainsString( esc_html( ":YOUR_TOKEN'" ), $html, 'One command: the new token replaces the placeholder one.' );
 
 		$reflect->setValue( null, null );
 		$later = $this->section();

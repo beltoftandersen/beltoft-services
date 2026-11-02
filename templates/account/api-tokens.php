@@ -217,7 +217,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			<?php endif; ?>
 			<ol>
 				<li><?php esc_html_e( 'Create a token above and copy it. Give it the access you want Claude to have. Ordering a server, cancelling, deleting and showing passwords need a Full access token, which you create with a code we email you.', 'beltoft-services' ); ?></li>
-				<li><?php esc_html_e( 'Copy the address and your username, or copy the command below and replace YOUR_TOKEN with the token.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Copy the command below and run it in your terminal. Right after you create a token, the command already holds it; otherwise replace YOUR_TOKEN with your token.', 'beltoft-services' ); ?></li>
 			</ol>
 			<?php
 			$beltoft_services_copy = static function ( string $label, string $text, string $id ): void {
@@ -232,15 +232,13 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<?php
 			};
 
-			$beltoft_services_copy( __( 'Address', 'beltoft-services' ), $mcp['url'], 'beltoft-mcp-url' );
-			$beltoft_services_copy( __( 'Username', 'beltoft-services' ), $username, 'beltoft-mcp-user' );
-			$beltoft_services_copy( __( 'Command', 'beltoft-services' ), $mcp['command'], 'beltoft-mcp-cmd' );
+			// One command: with the token just created in it (shown once), or with YOUR_TOKEN to replace.
+			$beltoft_services_copy( __( 'Command', 'beltoft-services' ), '' !== $mcp['fresh'] ? $mcp['fresh'] : $mcp['command'], 'beltoft-mcp-cmd' );
 			?>
-			<p><?php esc_html_e( 'The command works on Linux and macOS. Your username is the one shown above; your email address also works as the username.', 'beltoft-services' ); ?></p>
 			<?php if ( '' !== $mcp['fresh'] ) : ?>
-				<?php $beltoft_services_copy( __( 'Command with your new token', 'beltoft-services' ), $mcp['fresh'], 'beltoft-mcp-fresh' ); ?>
-				<p class="beltoft-services-api__notice"><?php esc_html_e( 'Shown once. Copy it now.', 'beltoft-services' ); ?></p>
+				<p class="beltoft-services-api__notice"><?php esc_html_e( 'This command holds your new token and is shown once. Copy it now.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
+			<p><?php esc_html_e( 'The command works on Linux and macOS.', 'beltoft-services' ); ?></p>
 			<p><?php esc_html_e( 'To check it, run this and look for beltoft:', 'beltoft-services' ); ?></p>
 			<?php $beltoft_services_copy( __( 'Check', 'beltoft-services' ), 'claude mcp list', 'beltoft-mcp-check' ); ?>
 			<p><?php esc_html_e( 'Then start Claude Code and ask, for example: "List my servers on beltoft.net".', 'beltoft-services' ); ?></p>
