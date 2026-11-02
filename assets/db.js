@@ -37,12 +37,20 @@
 		} );
 	}
 
+	// A button at work: disabled, with the three squares used by the server buttons (.is-busy in account.css).
+	function busy( button, on ) {
+		button.disabled = on;
+		button.classList.toggle( 'is-busy', on );
+		button.setAttribute( 'aria-busy', on ? 'true' : 'false' );
+	}
+
 	function reveal( box, panel, button ) {
-		button.disabled = true;
+		busy( button, true );
 		say( box, '' );
 		post( panel, '/db-reveal', '{}' ).then( function ( response ) {
 			if ( ! response.ok ) {
 				say( box, 409 === response.status ? db.strings.gone : db.strings.failed );
+				busy( button, false );
 				button.disabled = 409 === response.status;
 
 				return null;
@@ -61,12 +69,13 @@
 						own.querySelector( '[data-db-password-value]' ).textContent = data.password;
 						own.hidden = false;
 					}
+					busy( button, false );
 					button.hidden = true;
 					say( box, db.strings.once );
 				}
 			} );
 		} ).catch( function () {
-			button.disabled = false;
+			busy( button, false );
 			say( box, db.strings.failed );
 		} );
 	}
@@ -106,7 +115,7 @@
 		var input = box.querySelector( '[data-db-confirm]' );
 		var since = Math.floor( Date.now() / 1000 ) - 5;
 
-		button.disabled = true;
+		busy( button, true );
 		say( box, '' );
 		post( panel, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
@@ -117,13 +126,13 @@
 				return null;
 			}
 
-			button.disabled = false;
+			busy( button, false );
 
 			return response.json().then( function ( data ) {
 				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
 			} );
 		} ).catch( function () {
-			button.disabled = false;
+			busy( button, false );
 			say( box, db.strings.failed );
 		} );
 	}
@@ -136,7 +145,7 @@
 			return;
 		}
 
-		button.disabled = true;
+		busy( button, true );
 		say( box, '' );
 		post( panel, '/actions/db_set_policy', JSON.stringify( { args: { policy: choice.value } } ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
@@ -146,13 +155,13 @@
 				return null;
 			}
 
-			button.disabled = false;
+			busy( button, false );
 
 			return response.json().then( function ( data ) {
 				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
 			} );
 		} ).catch( function () {
-			button.disabled = false;
+			busy( button, false );
 			say( box, db.strings.failed );
 		} );
 	}
@@ -168,7 +177,7 @@
 			return;
 		}
 
-		button.disabled = true;
+		busy( button, true );
 		say( box, '' );
 		post( panel, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
@@ -178,13 +187,13 @@
 				return null;
 			}
 
-			button.disabled = false;
+			busy( button, false );
 
 			return response.json().then( function ( data ) {
 				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
 			} );
 		} ).catch( function () {
-			button.disabled = false;
+			busy( button, false );
 			say( box, db.strings.failed );
 		} );
 	}
@@ -263,7 +272,7 @@
 	}
 
 	function access( box, panel, button, body ) {
-		button.disabled = true;
+		busy( button, true );
 		say( box, '' );
 		post( panel, '/db-access', JSON.stringify( body ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
@@ -273,13 +282,13 @@
 				return null;
 			}
 
-			button.disabled = false;
+			busy( button, false );
 
 			return response.json().then( function ( data ) {
 				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
 			} );
 		} ).catch( function () {
-			button.disabled = false;
+			busy( button, false );
 			say( box, db.strings.failed );
 		} );
 	}
