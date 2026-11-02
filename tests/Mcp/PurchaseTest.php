@@ -159,7 +159,7 @@ final class PurchaseTest extends UsageTestCase {
 		$this->assertSame( 2, $plan['specs']['cpu_cores'] );
 		$this->assertSame( 4096, $plan['specs']['memory_mb'] );
 		$this->assertEqualsWithDelta( 15 * 1.1 / 730, $plan['price']['hourly'], 0.0001 );
-		$this->assertSame( 16.5, $plan['price']['monthly_cap'] );
+		$this->assertSame( 16.5, $plan['price']['max_per_month'] );
 		$this->assertStringContainsString( 'per hour, max', $plan['price']['text'] );
 		$this->assertStringContainsString( 'billed monthly for the hours used', $plan['price']['text'] );
 		$this->assertTrue( $plan['backups']['available'] );

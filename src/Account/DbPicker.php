@@ -243,7 +243,7 @@ final class DbPicker {
 	 * @param array<string, mixed> $plan The plan.
 	 * @return string|null The refusal text, or null when the cart holds the database.
 	 */
-	private static function add_to_cart( array $plan ): ?string {
+	public static function add_to_cart( array $plan ): ?string {
 		$cart      = function_exists( 'WC' ) ? WC()->cart : null;
 		$variation = wc_get_product( (int) $plan['variation_id'] );
 
