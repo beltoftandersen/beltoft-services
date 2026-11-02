@@ -1145,8 +1145,12 @@ final class Card {
 
 		try {
 			if ( $account ) {
+				$changed = (string) $account->get_meta( self::TOKEN_META, true ) !== $token->get_token();
 				self::apply_token( $account, $token, $gateway );
-				$account->add_order_note( __( 'Card changed: the new default card is used for usage invoices.', 'beltoft-services' ) );
+
+				if ( $changed ) {
+					$account->add_order_note( __( 'Card changed: the new default card is used for usage invoices.', 'beltoft-services' ) );
+				}
 			} else {
 				self::create_account_with_token( $user_id, $token, $gateway );
 			}
