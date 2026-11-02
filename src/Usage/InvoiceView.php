@@ -443,8 +443,10 @@ final class InvoiceView {
 				/* translators: 1: "Usage invoice", 2: order number. %1$s after them is the customer name, kept for printf. */
 				$tpl = __( '%1$s #%2$s for %%1$s could not be charged.', 'beltoft-services' );
 			} elseif ( $order->is_paid() ) {
+				/* translators: 1: "Usage invoice", 2: order number. The doubled %%1$s is the customer name, filled in later. */
 				$tpl = __( '%1$s #%2$s for %%1$s was paid.', 'beltoft-services' );
 			} else {
+				/* translators: 1: "Usage invoice", 2: order number. The doubled %%1$s is the customer name, filled in later. */
 				$tpl = __( '%1$s #%2$s for %%1$s was created.', 'beltoft-services' );
 			}
 
