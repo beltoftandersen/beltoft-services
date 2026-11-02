@@ -288,7 +288,7 @@ final class InvoiceView {
 			$out .= '<tr class="order_item"><td class="td font-family text-align-left" colspan="2" style="vertical-align:middle;word-wrap:break-word;">'
 				. '<div>' . esc_html( $row['name'] ) . '</div>'
 				. ( '' !== $row['detail'] ? '<div style="font-size:13px;line-height:1.4;color:#757575;margin-top:2px;">' . esc_html( $row['detail'] ) . '</div>' : '' )
-				. '</td><td class="td font-family text-align-right" style="vertical-align:middle;white-space:nowrap;width:1%;">' . wp_kses_post( $row['amount'] ) . '</td></tr>';
+				. '</td><td class="td font-family text-align-right" style="vertical-align:middle;white-space:nowrap;">' . wp_kses_post( $row['amount'] ) . '</td></tr>';
 		}
 
 		return $html . $out;
