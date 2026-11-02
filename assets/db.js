@@ -63,7 +63,16 @@
 		} );
 	}
 
-	function waitForAction( box, panel, action, since, tries ) {
+	// After the action: the page to open (the Overview shows the new password once), or this page again.
+	function done( after ) {
+		if ( after ) {
+			window.location.href = after;
+		} else {
+			window.location.reload();
+		}
+	}
+
+	function waitForAction( box, panel, action, since, tries, after ) {
 		window.setTimeout( function () {
 			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
 				return response.ok ? response.json() : null;
@@ -71,15 +80,15 @@
 				var last = data && data.last_result;
 
 				if ( last && action === last.action && last.at >= since ) {
-					window.location.reload();
+					done( after );
 				} else if ( tries < 60 ) {
-					waitForAction( box, panel, action, since, tries + 1 );
+					waitForAction( box, panel, action, since, tries + 1, after );
 				} else {
-					window.location.reload();
+					done( after );
 				}
 			} ).catch( function () {
 				if ( tries < 60 ) {
-					waitForAction( box, panel, action, since, tries + 1 );
+					waitForAction( box, panel, action, since, tries + 1, after );
 				}
 			} );
 		}, 5000 );
@@ -94,7 +103,7 @@
 		post( panel, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
 				say( box, db.strings.working );
-				waitForAction( box, panel, 'db_reset_password', since, 0 );
+				waitForAction( box, panel, 'db_reset_password', since, 0, button.getAttribute( 'data-db-after' ) );
 
 				return null;
 			}
