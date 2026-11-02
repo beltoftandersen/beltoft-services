@@ -275,7 +275,7 @@ final class Breakdown {
 		$items = array();
 
 		foreach ( $cart->get_cart() as $key => $item ) {
-			if ( apply_filters( 'woocommerce_checkout_cart_item_visible', true, $item, $key ) ) {
+			if ( apply_filters( 'woocommerce_checkout_cart_item_visible', true, $item, $key ) ) { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
 				$items[] = $item;
 			}
 		}
