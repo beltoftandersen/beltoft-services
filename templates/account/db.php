@@ -46,6 +46,9 @@ $beltoft_services_db_wait = array(
 			<div><dt><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( sprintf( /* translators: %d: number of days */ _n( 'Daily, kept %d day', 'Daily, kept %d days', (int) $view['backups']['days'], 'beltoft-services' ), (int) $view['backups']['days'] ) ); ?></dd></div>
 			<div><dt><?php esc_html_e( 'Last backup', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( '' !== $view['backups']['last_ok'] ? (string) $view['backups']['last_ok'] : __( 'None yet', 'beltoft-services' ) ); ?></dd></div>
 		<?php endif; ?>
+		<?php if ( 'ready' === $view['kind'] && ( $view['power']['busy'] || in_array( $view['power']['state'], array( 'running', 'stopped' ), true ) ) ) : ?>
+			<div><dt><?php esc_html_e( 'Power', 'beltoft-services' ); ?></dt><dd data-db-power-line><?php echo esc_html( $view['power']['busy'] ? __( 'Busy', 'beltoft-services' ) : ( 'stopped' === $view['power']['state'] ? __( 'Stopped', 'beltoft-services' ) : __( 'Running', 'beltoft-services' ) ) ); ?></dd></div>
+		<?php endif; ?>
 		<?php if ( 'ready' === $view['kind'] ) : ?>
 			<div><dt><?php esc_html_e( 'Host', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['host'] ); ?></code></dd></div>
 			<div><dt><?php esc_html_e( 'Port', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['port'] ); ?></code></dd></div>
@@ -57,6 +60,20 @@ $beltoft_services_db_wait = array(
 	</dl>
 	<?php if ( '' !== (string) ( $view['limits'] ?? '' ) ) : ?><p class="description"><?php echo esc_html( (string) $view['limits'] ); ?></p><?php endif; ?>
 	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
+
+	<?php if ( 'ready' === $view['kind'] && array() !== $view['power']['actions'] ) : ?>
+		<div class="beltoft-services-db__power" data-db-power-box>
+			<p class="beltoft-services-db__power-actions">
+				<?php foreach ( $view['power']['actions'] as $beltoft_services_power_action => $beltoft_services_power_label ) : ?>
+					<button type="button" class="button woocommerce-button" data-db-power="<?php echo esc_attr( (string) $beltoft_services_power_action ); ?>"><?php echo esc_html( (string) $beltoft_services_power_label ); ?></button>
+				<?php endforeach; ?>
+			</p>
+			<p class="description" data-db-power-note><?php echo esc_html( (string) $view['power']['note'] ); ?></p>
+			<p class="beltoft-services-panel__notice" data-db-power-notice role="status" aria-live="polite"></p>
+		</div>
+	<?php elseif ( 'ready' === $view['kind'] && $view['power']['busy'] ) : ?>
+		<p class="description" data-db-power-note><?php esc_html_e( 'The database is busy. Please try again when it is ready.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
 
 	<?php if ( 'ready' === $view['kind'] ) : ?>
 		<?php $beltoft_services_storage = $view['storage']; ?>
@@ -83,6 +100,9 @@ $beltoft_services_db_wait = array(
 	<?php else : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Connection', 'beltoft-services' ); ?></h4>
+			<?php if ( $view['stopped'] ) : ?>
+				<p class="beltoft-services-panel__notice" data-db-stopped><?php esc_html_e( 'The database is stopped. It cannot be reached until you start it.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
 			<p class="description"><?php esc_html_e( 'Reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
 			<?php foreach ( $view['connections'] as $beltoft_services_conn ) : ?>
 				<p><?php echo esc_html( (string) $beltoft_services_conn['label'] ); ?></p>
@@ -151,6 +171,8 @@ $beltoft_services_db_wait = array(
 						<li><strong><code><?php echo esc_html( (string) $beltoft_services_value ); ?></code></strong> <?php echo esc_html( $beltoft_services_choice[1] ); ?></li>
 					<?php endforeach; ?>
 				</ul>
+			<?php elseif ( $view['stopped'] ) : ?>
+				<p><?php echo esc_html( sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?> <?php echo esc_html( \BeltoftServices\Proxmox\DbPower::start_first() ); ?></p>
 			<?php else : ?>
 				<p><?php echo esc_html( $beltoft_services_policy['working'] ? __( 'A change is being applied. This can take a minute.', 'beltoft-services' ) : sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?></p>
 			<?php endif; ?>
@@ -188,6 +210,9 @@ $beltoft_services_db_wait = array(
 
 			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
 				<h4><?php esc_html_e( 'Who may connect', 'beltoft-services' ); ?></h4>
+				<?php if ( $view['stopped'] ) : ?>
+					<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\DbPower::start_first() ); ?> <?php esc_html_e( 'The list can be changed while the database runs.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
 				<p class="description"><?php esc_html_e( 'Only these addresses can reach the database over its public IP address. Everything else is refused.', 'beltoft-services' ); ?></p>
 				<?php if ( $beltoft_services_access['world'] ) : ?>
 					<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'The database is open to everyone. Anyone on the internet can try to log in. The list below is not used while this is on.', 'beltoft-services' ); ?></p>
@@ -330,6 +355,11 @@ $beltoft_services_db_wait = array(
 					<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 				<?php endif; ?>
 				</div>
+			</div>
+		<?php elseif ( $view['stopped'] ) : ?>
+			<div class="beltoft-services-vm__more">
+				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
+				<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\DbPower::start_first() ); ?></p>
 			</div>
 		<?php elseif ( $view['resetting'] ) : ?>
 			<p><?php esc_html_e( 'A new password is being made. This can take a minute.', 'beltoft-services' ); ?></p>

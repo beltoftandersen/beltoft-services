@@ -125,6 +125,12 @@ final class DbAccessRoute {
 			return $resource;
 		}
 
+		$stopped = DbPower::needs_running( $resource );
+
+		if ( $stopped instanceof \WP_Error ) {
+			return self::error( $stopped->get_error_code(), $stopped->get_error_message(), 409 );
+		}
+
 		if ( ! DbAccess::editable( $resource ) ) {
 			return self::error( 'beltoft_services_forbidden', __( 'The access list can be changed when the database is ready and has a public IP address.', 'beltoft-services' ), 403 );
 		}

@@ -15,6 +15,8 @@ use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\VmRecords;
+use BeltoftLicenses\Events;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -23,6 +25,42 @@ defined( 'ABSPATH' ) || exit;
  * Power job: every 15 minutes the power, CPU and memory of our VMs from one /cluster/resources call per cluster.
  */
 final class PowerJobs {
+
+	/**
+	 * Seconds after a shutdown that did not show as finished before the power is read again.
+	 */
+	public const FOLLOW_UP_DELAY = 90;
+
+	/**
+	 * Queues one later reading of a service whose shutdown was asked but whose VM still ran when the action ended.
+	 *
+	 * @param int $resource_id Resource id.
+	 */
+	public static function follow_up( int $resource_id ): void {
+		if ( function_exists( 'as_schedule_single_action' ) && ! as_has_scheduled_action( ProxmoxJobs::POWER_AFTER, array( $resource_id ), Jobs::GROUP ) ) {
+			as_schedule_single_action( time() + self::FOLLOW_UP_DELAY, ProxmoxJobs::POWER_AFTER, array( $resource_id ), Jobs::GROUP );
+		}
+	}
+
+	/**
+	 * The follow-up: reads the VM once and keeps the power the page shows (the status transient). When it is off
+	 * the history says so. A VM still running is left to the 15 minute job; nothing is sent to it.
+	 *
+	 * @param int $resource_id Resource id.
+	 */
+	public static function after( $resource_id ): void {
+		$r = Resource::find( (int) $resource_id );
+
+		if ( ! $r || 'proxmox' !== $r->get( 'driver' ) && ! DbActions::is_db( $r ) ) {
+			return;
+		}
+
+		$status = ( new Operations( $r ) )->status();
+
+		if ( null !== $status && 'stopped' === $status['power'] ) {
+			Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', DbActions::is_db( $r ) ? 'Database stopped' : 'Server stopped' );
+		}
+	}
 
 	/**
 	 * Every 15 minutes: one /cluster/resources call per cluster; each of our VMs' power, CPU

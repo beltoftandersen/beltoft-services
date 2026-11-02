@@ -332,7 +332,7 @@ class DbValkeyTest extends TestCase {
 
 	public function test_a_new_password_is_the_same_job_as_for_postgres(): void {
 		$r = $this->built();
-		$this->assertSame( array( DbActions::RESET => 'New password', DbPolicy::ACTION => 'When memory is full' ), Registry::get( 'proxmox-db' )->customer_actions( $r ) );
+		$this->assertSame( array( DbActions::RESET => 'New password', DbPolicy::ACTION => 'When memory is full', 'shutdown' => 'Shut down' ), Registry::get( 'proxmox-db' )->customer_actions( $r ) );
 		$this->assertTrue( Registry::get( 'proxmox-db' )->act( $r, DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ) )->is_poll() );
 		$request = (string) Resource::find( $r->id() )->get( 'db_reset_request' );
 		$this->assertSame( '{"v":1,"request":"' . $request . '","op":"reset_password"}', $this->guest( DbGuest::JOB ) );
@@ -387,6 +387,26 @@ class DbValkeyTest extends TestCase {
 		$this->assertSame( 403, $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ), $other )->get_status() );
 		$this->assertSame( 401, $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ), 0 )->get_status() );
 		$this->assertSame( 202, $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ) )->get_status() );
+	}
+
+	public function test_the_policy_waits_for_a_start_and_a_job_that_finds_the_database_stopped_ends_at_once(): void {
+		$r = $this->built();
+		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'stopped' );
+
+		$refused = $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ) );
+		$this->assertSame( 409, $refused->get_status() );
+		$this->assertSame( 'Start the database first.', $refused->get_data()['message'] );
+		$this->assertFalse( \BeltoftServices\Jobs::acting( $r->id() ) );
+		$this->assertFalse( DbCard::view( Resource::find( $r->id() ) )['policy']['can_set'], 'The card offers no form for a stopped database.' );
+
+		// A job that was queued before the stop: the VM is stopped, so it ends without waiting for the guest.
+		delete_transient( \BeltoftServices\Proxmox\Operations::STATUS_PREFIX . $r->id() );
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		$done = Registry::get( 'proxmox-db' )->act( Resource::find( $r->id() ), DbPolicy::ACTION, array( 'policy' => 'allkeys-lru' ) );
+		$this->assertTrue( $done->is_done() );
+		$this->assertStringContainsString( 'the database is stopped', $done->event() );
+		$this->assertSame( '', (string) Resource::find( $r->id() )->get( 'db_policy_request' ) );
+		$this->assertSame( 'noeviction', ValkeyEngine::policy( Resource::find( $r->id() ) ) );
 	}
 
 	public function test_the_policy_job_is_sent_and_the_choice_is_stored_when_the_guest_says_ready(): void {

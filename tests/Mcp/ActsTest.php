@@ -122,6 +122,48 @@ final class ActsTest extends McpTestCase {
 		$this->assertContains( 'Claude: set nameservers requested', $this->history( $ours ) );
 	}
 
+	public function test_start_and_shutdown_work_on_a_database_through_the_dashboards_route(): void {
+		$db    = $this->database();
+		$owner = $this->owner( $db );
+		$token = $this->oauth( $owner, Tokens::ACTIONS );
+
+		// A read token cannot power anything.
+		$this->assertTrue( $this->tool( 'shutdown', array( 'id' => $db->id() ), $this->oauth( $owner, Tokens::READ ) )['isError'] );
+		$this->assertFalse( Jobs::acting( $db->id() ) );
+
+		$ok = $this->tool( 'shutdown', array( 'id' => $db->id() ), $token );
+		$this->assertFalse( $ok['isError'], $this->text( $ok ) );
+		$this->assertTrue( $this->json( $ok )['requested'] );
+		$this->assertTrue( Jobs::acting( $db->id() ) );
+		$this->assertContains( 'Claude: shutdown requested', $this->history( $db ) );
+
+		// The dashboard's busy rule: a second request while the first waits is refused.
+		$again = $this->tool( 'shutdown', array( 'id' => $db->id() ), $token );
+		$this->assertTrue( $again['isError'] );
+		$this->assertStringContainsString( 'busy', $this->text( $again ) );
+		$this->assertContains( 'Claude: shutdown requested (refused)', $this->history( $db ) );
+
+		// A stopped database offers start, not shutdown.
+		$stopped = $this->database();
+		\BeltoftServices\Proxmox\Operations::remember_power( $stopped->id(), 'stopped' );
+		$stoken = $this->oauth( $this->owner( $stopped ), Tokens::ACTIONS );
+		$this->assertTrue( $this->tool( 'shutdown', array( 'id' => $stopped->id() ), $stoken )['isError'] );
+		$this->assertFalse( $this->tool( 'start', array( 'id' => $stopped->id() ), $stoken )['isError'] );
+		$this->assertTrue( Jobs::acting( $stopped->id() ) );
+
+		// Paused, protected: the dashboard's own refusal.
+		foreach ( array( array( 'state' => 'paused' ), array( 'protected' => true ) ) as $meta ) {
+			$other = $this->database();
+			$other->set( $meta );
+			$this->assertTrue( $this->tool( 'shutdown', array( 'id' => $other->id() ), $this->oauth( $this->owner( $other ), Tokens::ACTIONS ) )['isError'], (string) wp_json_encode( $meta ) );
+			$this->assertFalse( Jobs::acting( $other->id() ) );
+		}
+
+		// What the model is told: power in the database's details.
+		$info = $this->json( $this->tool( 'database_info', array( 'id' => $stopped->id() ), $stoken ) );
+		$this->assertSame( 'stopped', $info['power'] );
+	}
+
 	public function test_set_database_access_adds_and_removes_addresses_and_cannot_open_to_everyone(): void {
 		$db = $this->database();
 		foreach ( array( '192.0.2.10', '192.0.2.11', '192.0.2.12' ) as $address ) {

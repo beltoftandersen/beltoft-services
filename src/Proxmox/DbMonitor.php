@@ -241,7 +241,8 @@ final class DbMonitor {
 	 * @param array<int, string>   $text   Admin lines (added to).
 	 */
 	private static function dump( Resource $r, array $health, int $now, array &$state, array &$text ): void {
-		$last = max( (int) ( $health['last_dump'] ?? 0 ), (int) $r->get( 'db_ready_at' ) );
+		// A database that was stopped by its customer dumps again only once it runs: judged from its last start.
+		$last = max( (int) ( $health['last_dump'] ?? 0 ), (int) $r->get( 'db_ready_at' ), (int) $r->get( 'db_power_started_at' ) );
 
 		if ( $last <= 0 ) {
 			return;

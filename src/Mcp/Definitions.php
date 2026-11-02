@@ -106,8 +106,8 @@ final class Definitions {
 
 			// -- Everyday actions ----------------------------------------------------------------
 			'reboot'           => self::act( 'Restarts a server. Running programs stop. Ask the customer first. The restart runs in the background.', $by_id, true ),
-			'start'            => self::act( 'Starts a server that is stopped. The start runs in the background.', $by_id, false, true ),
-			'shutdown'         => self::act( 'Shuts a server down. It stays stopped until it is started. Ask the customer first. The shutdown runs in the background.', $by_id, true, true ),
+			'start'            => self::act( 'Starts a server or a managed database that is stopped. The start runs in the background.', $by_id, false, true ),
+			'shutdown'         => self::act( 'Shuts a server or a managed database down. It stays stopped until it is started, and a stopped service is still billed until it is deleted. A database cannot be reached while it is stopped. Ask the customer first. The shutdown runs in the background.', $by_id, true, true ),
 			'create_snapshot'  => self::act(
 				'Takes a snapshot of a server, if the customer has a free snapshot slot. It cannot restore or delete one.',
 				self::obj( array( 'id' => $id, 'label' => array( 'type' => 'string', 'maxLength' => 60, 'description' => 'A name for the snapshot. Letters, numbers, spaces, dots, dashes and underscores. Optional.' ) ), array( 'id' ) ),

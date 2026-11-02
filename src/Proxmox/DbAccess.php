@@ -402,6 +402,11 @@ final class DbAccess {
 		}
 
 		if ( 'guest' === $op['phase'] ) {
+			// The guest answers only while the VM runs. A change of the address (inline) handles the power itself.
+			if ( ! $inline && 'running' !== $v['status'] ) {
+				return StepResult::fail( 'db_access: the database is stopped, so the access list was not sent to it. Start the database and change the list again' );
+			}
+
 			$guest = $this->guest( $record, $v, $op );
 
 			if ( $guest instanceof StepResult && $tolerant && $guest->is_failed() ) {

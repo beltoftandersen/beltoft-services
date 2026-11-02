@@ -564,6 +564,7 @@ final class Tools {
 			'database'        => (string) $card['database'],
 			'user'            => (string) $card['user'],
 			'tls_fingerprint' => (string) $card['fingerprint'],
+			'power'           => (string) $card['power']['state'],
 			'password'        => 'Not shown here. The customer reveals it, or makes a new one, in the dashboard.',
 		);
 	}

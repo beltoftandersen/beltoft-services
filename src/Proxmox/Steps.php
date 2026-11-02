@@ -248,7 +248,7 @@ trait Steps {
 	 * @param bool                 $running True to wait for a running VM, false for a stopped one.
 	 * @return array<string, mixed>|StepResult The last read (it may still show the old state), or retry/fail.
 	 */
-	protected function reread_power( array $record, string $step, bool $running ) {
+	protected function reread_power( array $record, string $step, bool $running, ?int $seconds = null ) {
 		$v = $this->verified( $record, $step );
 
 		/**
@@ -256,7 +256,7 @@ trait Steps {
 		 *
 		 * @param int $seconds Default 20.
 		 */
-		$settle = max( 0, (int) apply_filters( 'beltoft_services_power_settle', 20 ) );
+		$settle = max( 0, (int) apply_filters( 'beltoft_services_power_settle', $seconds ?? 20 ) );
 		$waited = 0;
 
 		while ( is_array( $v ) && $running !== ( 'running' === $v['status'] ) && $waited + 2 <= $settle && Jobs::time_left() >= 2 ) {

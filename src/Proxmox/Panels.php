@@ -164,6 +164,8 @@ final class Panels {
 					'shutdownText'   => __( 'The server stops and stays off until you start it again. Anything running on it stops.', 'beltoft-services' ),
 					'shutdownStart'  => __( 'Shutting down your server.', 'beltoft-services' ),
 					'shutdownDone'   => __( 'Your server is shut down.', 'beltoft-services' ),
+					'startStart'     => __( 'Starting your server.', 'beltoft-services' ),
+					'shutdownStill'  => __( 'The server is still running. The shutdown has not finished yet.', 'beltoft-services' ),
 					'busy'           => __( 'Busy', 'beltoft-services' ),
 					'running'        => __( 'The server is running.', 'beltoft-services' ),
 					'newPassword'    => __( 'Use "Show password once" for your new password.', 'beltoft-services' ),
