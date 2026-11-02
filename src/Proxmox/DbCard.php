@@ -42,6 +42,9 @@ final class DbCard {
 				'confirmremove' => __( 'Remove this address from the list?', 'beltoft-services' ),
 				'policyworking' => __( 'Applying the setting. This can take a minute.', 'beltoft-services' ),
 				'nobackup'  => __( 'Choose a backup.', 'beltoft-services' ),
+				'confirmshutdown' => __( 'Shut down the database? It stays off until you start it, and applications cannot reach it while it is off.', 'beltoft-services' ),
+				'shuttingdown'    => __( 'Shutting down the database. This can take a minute.', 'beltoft-services' ),
+				'starting'        => __( 'Starting the database. This can take a minute.', 'beltoft-services' ),
 			),
 		) );
 	}
@@ -63,6 +66,11 @@ final class DbCard {
 		$offered = DbActions::offered( $r );
 		$backups = self::backups( $r, $ready && ! $restore && $r->accepts_actions() && array_key_exists( DbActions::RESTORE, $offered ) );
 		$access  = DbAccess::view( $r );
+		$stopped = $ready && DbPower::stopped( $r );
+		$power   = $ready && ! $restore && $r->accepts_actions() ? DbPower::offered( $r ) : array();
+		$busy    = array() !== $power && null !== DbPower::block( $r );
+
+		$access['editable'] = $access['editable'] && ! $stopped;
 		$public  = $ready && '' !== $access['address'] ? $engine->connections( $access['address'] ) : array();
 
 		return array(
@@ -82,10 +90,17 @@ final class DbCard {
 			'fingerprint' => $ready && 1 === preg_match( '/^[0-9A-F:]{95}$/D', (string) $r->get( 'db_fingerprint' ) ) ? (string) $r->get( 'db_fingerprint' ) : '',
 			'ca_url'      => $ready && DbGuest::pem( (string) $r->get( 'db_ca_pem' ) ) ? DbRoutes::ca_url( $r->id() ) : '',
 			'can_reveal'  => $ready && DbRoutes::revealable( $r ),
-			'can_reset'   => $ready && $r->accepts_actions() && array_key_exists( DbActions::RESET, $offered ),
+			'can_reset'   => $ready && ! $stopped && $r->accepts_actions() && array_key_exists( DbActions::RESET, $offered ),
+			'stopped'     => $stopped,
+			'power'       => array(
+				'state'   => $ready ? DbPower::power( $r ) : '',
+				'actions' => $busy ? array() : $power,
+				'busy'    => $busy,
+				'note'    => \BeltoftServices\Usage\CustomerDelete::stopped_note( 'database' ),
+			),
 			'resetting'   => '' !== (string) $r->get( 'db_reset_request' ),
 			'confirm'     => DbActions::CONFIRM,
-			'policy'      => DbPolicy::view( $r, $ready && $r->accepts_actions() && array_key_exists( DbPolicy::ACTION, $offered ) ),
+			'policy'      => DbPolicy::view( $r, $ready && ! $stopped && $r->accepts_actions() && array_key_exists( DbPolicy::ACTION, $offered ) ),
 			'backups'     => $backups,
 			'access'      => $access,
 			'public_connections' => $public,

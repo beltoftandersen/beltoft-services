@@ -137,6 +137,54 @@
 		} );
 	}
 
+	// Shut down and Start: the server's own actions. Shut down asks first. The page is read again when the job has run.
+	function power( box, panel, button ) {
+		var action = button.getAttribute( 'data-db-power' );
+		var area = button.closest( '[data-db-power-box]' );
+		var out = area ? area.querySelector( '[data-db-power-notice]' ) : null;
+		var since = Math.floor( Date.now() / 1000 ) - 5;
+		var all = area ? area.querySelectorAll( '[data-db-power]' ) : [ button ];
+
+		function tell( text ) {
+			if ( out ) {
+				out.textContent = text;
+			}
+		}
+
+		function release() {
+			Array.prototype.forEach.call( all, function ( one ) {
+				busy( one, false );
+			} );
+		}
+
+		if ( 'shutdown' === action && ! window.confirm( db.strings.confirmshutdown ) ) {
+			return;
+		}
+
+		Array.prototype.forEach.call( all, function ( one ) {
+			one.disabled = true;
+		} );
+		busy( button, true );
+		tell( '' );
+		post( panel, '/actions/' + action, JSON.stringify( { args: {} } ) ).then( function ( response ) {
+			if ( response.status === 202 ) {
+				tell( 'shutdown' === action ? db.strings.shuttingdown : db.strings.starting );
+				waitForAction( box, panel, action, since, 0 );
+
+				return null;
+			}
+
+			release();
+
+			return response.json().then( function ( data ) {
+				tell( 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
+			} );
+		} ).catch( function () {
+			release();
+			tell( db.strings.failed );
+		} );
+	}
+
 	function policy( box, panel, button ) {
 		var choice = box.querySelector( '[data-db-policy]' );
 		var since = Math.floor( Date.now() / 1000 ) - 5;
@@ -321,7 +369,7 @@
 	} );
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-restore], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
 		var box = button ? button.closest( '[data-db-card]' ) : null;
 		var panel = box ? box.closest( '[data-resource]' ) : null;
 
@@ -333,6 +381,8 @@
 			copy( box, button );
 		} else if ( button.hasAttribute( 'data-db-reveal' ) ) {
 			reveal( box, panel, button );
+		} else if ( button.hasAttribute( 'data-db-power' ) ) {
+			power( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-policy-save' ) ) {
 			policy( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-restore' ) ) {

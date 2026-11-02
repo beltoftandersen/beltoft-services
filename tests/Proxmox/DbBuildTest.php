@@ -481,7 +481,7 @@ class DbBuildTest extends TestCase {
 		$r->set( array( 'state' => 'ready' ) );
 		DbRoutes::take( Resource::find( $r->id() ), $this->owner( $r ) );
 
-		$this->assertSame( array( DbActions::RESET => 'New password' ), $this->driver->customer_actions( Resource::find( $r->id() ) ) );
+		$this->assertSame( array( DbActions::RESET => 'New password', 'shutdown' => 'Shut down' ), $this->driver->customer_actions( Resource::find( $r->id() ) ) );
 		$first = $this->driver->act( Resource::find( $r->id() ), DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ) );
 		$this->assertTrue( $first->is_poll() );
 		$request = (string) Resource::find( $r->id() )->get( 'db_reset_request' );
@@ -511,7 +511,9 @@ class DbBuildTest extends TestCase {
 
 		$fresh->set( array( 'db_state' => 'installing' ) );
 		$this->assertSame( array(), DbActions::offered( Resource::find( $r->id() ) ) );
-		$this->assertTrue( $this->driver->act( Resource::find( $r->id() ), 'start', array() )->is_failed() );
+		$refused = $this->driver->act( Resource::find( $r->id() ), 'start', array() );
+		$this->assertTrue( $refused->is_done() );
+		$this->assertStringContainsString( 'Start refused', $refused->event(), 'A database that is not ready is not powered.' );
 	}
 
 	private function ready_card_resource(): Resource {

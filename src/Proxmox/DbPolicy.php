@@ -69,6 +69,15 @@ final class DbPolicy {
 	}
 
 	/**
+	 * Is a change being applied?
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function busy( Resource $r ): bool {
+		return '' !== (string) $r->get( self::REQUEST );
+	}
+
+	/**
 	 * The policy now in force (as far as we know).
 	 *
 	 * @param Resource $r Database.
@@ -119,7 +128,11 @@ final class DbPolicy {
 			return new \WP_Error( 'beltoft_services_invalid', __( 'Choose one of the listed settings.', 'beltoft-services' ), array( 'status' => 422 ) );
 		}
 
-		if ( '' !== (string) $r->get( self::REQUEST ) ) {
+		if ( DbPower::stopped( $r ) ) {
+			return DbPower::needs_running( $r );
+		}
+
+		if ( self::busy( $r ) ) {
 			return new \WP_Error( 'beltoft_services_busy', __( 'A change is already being applied.', 'beltoft-services' ), array( 'status' => 409 ) );
 		}
 
@@ -163,6 +176,13 @@ final class DbPolicy {
 
 		$record['node'] = $v['node'];
 		$request        = (string) $this->r->get( self::REQUEST );
+
+		// The guest answers only while the VM runs: a stopped database is refused at once, not waited for.
+		if ( 'running' !== $v['status'] ) {
+			$this->clear();
+
+			return StepResult::done( array(), 'Memory policy change refused: the database is stopped' );
+		}
 
 		if ( '' === $request ) {
 			$want = (string) ( $args['policy'] ?? '' );

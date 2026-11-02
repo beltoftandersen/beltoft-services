@@ -75,7 +75,8 @@ final class DbActions {
 			$out[ DbPolicy::ACTION ] = __( 'When memory is full', 'beltoft-services' );
 		}
 
-		return $out;
+		// Shut down and start are the server's own actions (Actions), with the refusals of DbPower.
+		return array_merge( $out, DbPower::offered( $r ) );
 	}
 
 	/**
@@ -87,7 +88,8 @@ final class DbActions {
 	 */
 	public static function buttons( $actions, $r ) {
 		if ( is_array( $actions ) && self::is_db( $r ) ) {
-			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ DbPolicy::ACTION ] );
+			// The power buttons are drawn by the database page itself (a question first, its own note).
+			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ DbPolicy::ACTION ], $actions['start'], $actions['shutdown'] );
 		}
 
 		return $actions;
@@ -103,6 +105,10 @@ final class DbActions {
 	 * @return mixed
 	 */
 	public static function refusal( $refusal, $r, $action = '', $args = array() ) {
+		if ( self::is_db( $r ) && DbPower::is_power( $action ) ) {
+			return DbPower::refusal( $refusal, $r, (string) $action );
+		}
+
 		if ( self::is_db( $r ) && self::RESTORE === $action ) {
 			return self::restore_refusal( $refusal, $r, is_array( $args ) ? $args : array() );
 		}
@@ -113,6 +119,12 @@ final class DbActions {
 
 		if ( ! self::is_db( $r ) || self::RESET !== $action ) {
 			return $refusal;
+		}
+
+		$stopped = DbPower::needs_running( $r );
+
+		if ( null !== $stopped ) {
+			return $stopped;
 		}
 
 		if ( self::CONFIRM !== ( is_array( $args ) ? ( $args['confirm'] ?? '' ) : '' ) ) {
@@ -193,6 +205,11 @@ final class DbActions {
 
 		$record['node'] = $v['node'];
 		$request        = (string) $this->r->get( 'db_reset_request' );
+
+		// The guest answers only while the VM runs: a stopped database is refused at once, not waited for.
+		if ( 'running' !== $v['status'] ) {
+			return '' === $request ? StepResult::done( array(), 'New database password refused: the database is stopped' ) : $this->give_up( 'The database was stopped while the new password was being made' );
+		}
 
 		if ( '' === $request ) {
 			$request = wp_generate_uuid4();

@@ -17,6 +17,8 @@ use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbMonitor;
+use BeltoftServices\Proxmox\DbPower;
+use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\ProxmoxDriver;
@@ -789,5 +791,327 @@ class DbPhase5Test extends TestCase {
 		PowerJobs::power();
 
 		$this->assertGreaterThan( 0, (int) ( (array) Resource::find( $r->id() )->get( DbMonitor::META ) )['down_since'] );
+	}
+
+	// -- Shut down and Start ---------------------------------------------------------------------
+
+	/** @var int Calls made before the test's own part began. */
+	private $mark = 0;
+
+	/**
+	 * The calls since running_db() returned.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function new_calls( string $method, string $suffix ): array {
+		return array_values( array_filter( array_slice( $this->fake->calls(), $this->mark ), static fn( $c ) => $c['method'] === $method && substr( $c['path'], -strlen( $suffix ) ) === $suffix ) );
+	}
+
+	private function owner_of( Resource $r ): int {
+		return (int) Resource::find( $r->id() )->license()['user_id'];
+	}
+
+	/**
+	 * The action route, as the page script calls it.
+	 *
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	private function route( Resource $r, string $action, array $args = array(), ?int $user = null ): \WP_REST_Response {
+		wp_set_current_user( $user ?? $this->owner_of( $r ) );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/' . $action );
+		$request->set_param( 'args', $args );
+
+		return rest_get_server()->dispatch( $request );
+	}
+
+	/**
+	 * A running database whose power the page knows.
+	 */
+	private function running_db( array $plan = array() ): Resource {
+		$r = $this->ready_db( $plan );
+		Operations::remember_power( $r->id(), 'running' );
+		$this->mark = count( $this->fake->calls() );
+		$this->assertSame( 'running', (string) $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/status/current' )['status'] );
+
+		return Resource::find( $r->id() );
+	}
+
+	public function test_shut_down_is_offered_while_running_and_start_while_stopped_and_both_when_the_power_is_not_known(): void {
+		$r = $this->ready_db();
+		delete_transient( Operations::STATUS_PREFIX . $r->id() );
+		$this->assertSame( array( 'start', 'shutdown' ), array_values( array_intersect( array( 'start', 'shutdown' ), array_keys( DbActions::offered( $r ) ) ) ) );
+
+		Operations::remember_power( $r->id(), 'running' );
+		$offered = DbActions::offered( $r );
+		$this->assertArrayHasKey( 'shutdown', $offered );
+		$this->assertArrayNotHasKey( 'start', $offered );
+		$this->assertArrayNotHasKey( 'reboot', $offered, 'A reboot is not part of the database page.' );
+
+		Operations::remember_power( $r->id(), 'stopped' );
+		$offered = DbActions::offered( $r );
+		$this->assertArrayHasKey( 'start', $offered );
+		$this->assertArrayNotHasKey( 'shutdown', $offered );
+
+		$this->assertArrayNotHasKey( 'start', DbActions::buttons( $offered, $r ), 'The page draws the power buttons, not the generic ones.' );
+		$this->assertArrayNotHasKey( 'shutdown', DbActions::buttons( DbActions::offered( $r ) + array( 'shutdown' => 'Shut down' ), $r ) );
+
+		$r->set( array( 'protected' => true ) );
+		$this->assertSame( array(), DbPower::offered( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_shut_down_and_start_run_the_servers_actions_on_the_database_vm(): void {
+		$r = $this->running_db();
+
+		$this->assertSame( 202, $this->route( $r, 'shutdown' )->get_status() );
+		$this->run_jobs();
+
+		$this->assertCount( 1, $this->new_calls( 'POST', '/status/shutdown' ) );
+		$this->assertSame( 'stopped', (string) $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/status/current' )['status'] );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'stopped', DbPower::power( $fresh ) );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'stopped_by_customer' ), 'The monitor does not call a stop by the customer an outage.' );
+		$this->assertArrayHasKey( 'start', DbActions::offered( $fresh ) );
+		$this->assertArrayNotHasKey( 'shutdown', DbActions::offered( $fresh ) );
+
+		$this->assertSame( 202, $this->route( $fresh, 'start' )->get_status() );
+		$this->run_jobs();
+
+		$this->assertCount( 1, $this->new_calls( 'POST', '/status/start' ) );
+		$this->assertSame( 'running', (string) $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/status/current' )['status'] );
+		$after = Resource::find( $r->id() );
+		$this->assertSame( 'running', DbPower::power( $after ) );
+		$this->assertEmpty( $after->get( 'stopped_by_customer' ) );
+		$this->assertGreaterThan( 0, (int) $after->get( 'db_power_started_at' ) );
+		$this->assertSame( 'ready', (string) $after->get( 'state' ) );
+	}
+
+	public function test_a_stop_by_the_customer_is_not_reported_as_down_by_the_power_job(): void {
+		$r = $this->running_db();
+		$this->route( $r, 'shutdown' );
+		$this->run_jobs();
+
+		PowerJobs::power();
+		$fresh = Resource::find( $r->id() );
+		$this->assertEmpty( $fresh->get( 'monitor_down_since' ) );
+		$this->assertSame( array(), array_filter( $this->mails, static fn( $m ) => false !== stripos( (string) $m['subject'], 'down' ) ) );
+		$this->assertEmpty( (array) $fresh->get( DbMonitor::META ), 'The database monitor does not read a stopped database.' );
+	}
+
+	public function test_power_actions_are_refused_while_another_operation_runs(): void {
+		$r = $this->running_db();
+
+		$cases = array(
+			'a new password'      => array( 'db_reset_request' => wp_generate_uuid4() ),
+			'a restore'           => array( 'restore' => array( 'volid' => 'x', 'phase' => 'restored', 'ctime' => 1 ) ),
+			'a restore finishing' => array( 'was_running' => true ),
+			'an access change'    => array( 'db_access_state' => 'applying' ),
+			'a memory policy'     => array( 'db_policy_request' => wp_generate_uuid4() ),
+			'a Proxmox task'      => array( 'task' => array( 'upid' => 'UPID:x', 'phase' => 'act' ) ),
+			'a plan change'       => array( 'plan_dirty' => true ),
+		);
+
+		foreach ( $cases as $name => $meta ) {
+			$clear = array_fill_keys( array_keys( $meta ), null );
+			$this->assertTrue( Resource::find( $r->id() )->set( $meta ), $name );
+
+			foreach ( array( 'shutdown', 'start' ) as $action ) {
+				$response = $this->route( Resource::find( $r->id() ), $action );
+				$this->assertContains( $response->get_status(), array( 403, 409 ), $name . ' ' . $action );
+			}
+
+			$refusal = DbActions::refusal( null, Resource::find( $r->id() ), 'shutdown', array() );
+			$this->assertInstanceOf( \WP_Error::class, $refusal, $name );
+			$this->assertSame( 409, $refusal->get_error_data()['status'], $name );
+			$this->assertSame( 'The database is busy. Please try again when it is ready.', $refusal->get_error_message(), $name );
+			$this->assertTrue( Resource::find( $r->id() )->set( $clear ), $name );
+		}
+
+		$this->assertEmpty( $this->new_calls( 'POST', '/status/shutdown' ) );
+		$this->assertNull( DbActions::refusal( null, Resource::find( $r->id() ), 'shutdown', array() ) );
+	}
+
+	public function test_a_second_click_while_a_power_job_waits_is_refused(): void {
+		$r = $this->running_db();
+
+		$this->assertSame( 202, $this->route( $r, 'shutdown' )->get_status() );
+		$second = $this->route( Resource::find( $r->id() ), 'shutdown' );
+		$this->assertSame( 409, $second->get_status() );
+		$this->assertSame( 'The database is busy. Please try again when it is ready.', $second->get_data()['message'] );
+	}
+
+	public function test_power_actions_are_refused_when_paused_held_failed_or_protected(): void {
+		$r = $this->running_db();
+
+		foreach ( array( 'paused', 'failed', 'provisioning', 'deleting' ) as $state ) {
+			$this->assertTrue( Resource::find( $r->id() )->set( array( 'state' => $state ) ) );
+			$this->assertSame( 403, $this->route( Resource::find( $r->id() ), 'shutdown' )->get_status(), $state );
+			$this->assertSame( 403, $this->route( Resource::find( $r->id() ), 'start' )->get_status(), $state );
+			$this->assertNotNull( DbPower::block( Resource::find( $r->id() ) ), $state );
+		}
+
+		$this->assertTrue( Resource::find( $r->id() )->set( array( 'state' => 'ready', 'breach_at' => time(), 'breach_reason' => 'abuse' ) ) );
+		$this->assertSame( 403, $this->route( Resource::find( $r->id() ), 'shutdown' )->get_status(), 'A breach hold.' );
+		$this->assertNotNull( DbPower::block( Resource::find( $r->id() ) ) );
+		$this->assertTrue( Resource::find( $r->id() )->set( array( 'breach_at' => null, 'breach_reason' => null ) ) );
+
+		$this->assertTrue( Resource::find( $r->id() )->set( array( 'protected' => true ) ) );
+		$this->assertSame( 403, $this->route( Resource::find( $r->id() ), 'shutdown' )->get_status(), 'Protected.' );
+		$this->assertSame( 'This is not available for this database. Please contact support.', DbPower::block( Resource::find( $r->id() ) ) );
+
+		// The job refuses too, as a second line, and touches nothing.
+		foreach ( array( 'shutdown', 'start' ) as $action ) {
+			$result = Registry::get( 'proxmox-db' )->act( Resource::find( $r->id() ), $action, array() );
+			$this->assertTrue( $result->is_done() );
+			$this->assertStringContainsString( 'refused', $result->event() );
+		}
+
+		$this->assertEmpty( $this->new_calls( 'POST', '/status/shutdown' ) );
+		$this->assertEmpty( $this->new_calls( 'POST', '/status/start' ) );
+	}
+
+	public function test_power_actions_keep_the_servers_rate_floor(): void {
+		$r = $this->running_db();
+		wp_set_current_user( $this->owner_of( $r ) );
+		$answers = array();
+
+		for ( $i = 0; $i < 22; $i++ ) {
+			$answers[] = DbActions::refusal( null, $r, 'shutdown', array() );
+		}
+
+		$this->assertNull( $answers[19], 'Twenty in ten minutes, as for a server.' );
+		$this->assertInstanceOf( \WP_Error::class, $answers[20] );
+		$this->assertSame( 429, $answers[20]->get_error_data()['status'] );
+		$this->assertSame( 429, $answers[21]->get_error_data()['status'] );
+	}
+
+	public function test_the_page_shows_power_buttons_the_billing_note_and_a_stopped_line(): void {
+		$r = $this->running_db();
+		wp_set_current_user( $this->owner_of( $r ) );
+		$fresh = Resource::find( $r->id() );
+
+		$running = $this->page( $fresh, 'overview' );
+		$this->assertStringContainsString( 'data-db-power="shutdown"', $running );
+		$this->assertStringNotContainsString( 'data-db-power="start"', $running );
+		$this->assertStringContainsString( 'Shut down', $running );
+		$this->assertStringContainsString( '<dt>Power</dt><dd data-db-power-line>Running</dd>', $running );
+		$this->assertStringContainsString( 'A stopped database is still billed. Delete it to stop the charge.', $running );
+		$this->assertStringNotContainsString( 'data-db-stopped', $running );
+		$this->assertStringContainsString( 'data-db-reset', $this->page( $fresh, 'password' ) );
+
+		Operations::remember_power( $r->id(), 'stopped' );
+		$stopped = $this->page( Resource::find( $r->id() ), 'overview' );
+		$this->assertStringContainsString( 'data-db-power="start"', $stopped );
+		$this->assertStringNotContainsString( 'data-db-power="shutdown"', $stopped );
+		$this->assertStringContainsString( '<dt>Power</dt><dd data-db-power-line>Stopped</dd>', $stopped );
+		$this->assertStringContainsString( 'A stopped database is still billed. Delete it to stop the charge.', $stopped );
+		$this->assertStringContainsString( 'The database is stopped. It cannot be reached until you start it.', $stopped );
+		$this->assertStringContainsString( 'beltoft-services-db__block', $stopped, 'The connection details stay visible.' );
+		$this->assertStringContainsString( 'data-db-conn', $stopped );
+
+		$password = $this->page( Resource::find( $r->id() ), 'password' );
+		$this->assertStringNotContainsString( 'data-db-reset', $password );
+		$this->assertStringContainsString( 'Start the database first.', $password );
+
+		foreach ( array( $running, $stopped, $password ) as $html ) {
+			$this->assertStringNotContainsString( '—', $html );
+			$this->assertStringNotContainsString( '·', $html );
+		}
+	}
+
+	public function test_a_busy_database_shows_busy_and_no_power_buttons(): void {
+		$r = $this->running_db();
+		wp_set_current_user( $this->owner_of( $r ) );
+		$r->set( array( 'db_reset_request' => wp_generate_uuid4() ) );
+
+		$html = $this->page( Resource::find( $r->id() ), 'overview' );
+		$this->assertStringNotContainsString( 'data-db-power="', $html );
+		$this->assertStringContainsString( '<dt>Power</dt><dd data-db-power-line>Busy</dd>', $html );
+		$this->assertStringContainsString( 'The database is busy. Please try again when it is ready.', $html );
+	}
+
+	public function test_a_page_for_a_paused_or_building_database_has_no_power_controls(): void {
+		$r = $this->running_db();
+		$r->set( array( 'state' => 'paused' ) );
+		$html = $this->page( Resource::find( $r->id() ), 'overview' );
+		$this->assertStringNotContainsString( 'data-db-power', $html );
+		$this->assertStringNotContainsString( 'A stopped database is still billed', $html );
+	}
+
+	public function test_a_new_password_the_memory_policy_and_the_access_list_wait_for_a_start(): void {
+		$r = $this->running_db();
+		Operations::remember_power( $r->id(), 'stopped' );
+		$fresh = Resource::find( $r->id() );
+
+		$reset = DbActions::refusal( null, $fresh, 'db_reset_password', array( 'confirm' => 'NEW PASSWORD' ) );
+		$this->assertInstanceOf( \WP_Error::class, $reset );
+		$this->assertSame( 409, $reset->get_error_data()['status'] );
+		$this->assertSame( 'Start the database first.', $reset->get_error_message() );
+		$this->assertSame( 409, $this->route( $fresh, 'db_reset_password', array( 'confirm' => 'NEW PASSWORD' ) )->get_status() );
+
+		wp_set_current_user( $this->owner_of( $r ) );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/db-access' );
+		$request->set_header( 'content-type', 'application/json' );
+		$request->set_body( wp_json_encode( array( 'op' => 'world_off' ) ) );
+		$answer = rest_get_server()->dispatch( $request );
+		$this->assertSame( 409, $answer->get_status() );
+		$this->assertSame( 'Start the database first.', $answer->get_data()['message'] );
+
+		$this->assertSame( 'Start the database first.', DbPower::needs_running( $fresh )->get_error_message() );
+		$this->assertEmpty( $this->new_calls( 'POST', '/agent/file-write' ) );
+
+		// Running again: the same requests are accepted.
+		Operations::remember_power( $r->id(), 'running' );
+		$this->assertNull( DbActions::refusal( null, Resource::find( $r->id() ), 'db_reset_password', array( 'confirm' => 'NEW PASSWORD' ) ) );
+	}
+
+	public function test_a_new_password_job_that_finds_the_database_stopped_ends_at_once_without_retrying(): void {
+		$r = $this->running_db();
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		$this->assertSame( 'stopped', (string) $this->fake->request( 'GET', '/nodes/node-a/qemu/5000/status/current' )['status'] );
+		
+		$result = Registry::get( 'proxmox-db' )->act( Resource::find( $r->id() ), 'db_reset_password', array( 'confirm' => 'NEW PASSWORD' ) );
+
+		$this->assertTrue( $result->is_done(), 'Not a poll or a retry.' );
+		$this->assertStringContainsString( 'the database is stopped', $result->event() );
+		$this->assertSame( '', (string) Resource::find( $r->id() )->get( 'db_reset_request' ) );
+		$this->assertEmpty( $this->new_calls( 'POST', '/agent/file-write' ), 'Nothing was sent to the guest.' );
+	}
+
+	public function test_an_access_list_job_that_finds_the_database_stopped_fails_at_once(): void {
+		$r = $this->running_db();
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		
+		$result = ( new \BeltoftServices\Proxmox\DbAccess( Resource::find( $r->id() ) ) )->run();
+
+		$this->assertTrue( $result->is_failed(), 'Not a poll that waits ten minutes.' );
+		$this->assertStringContainsString( 'the database is stopped', $result->error() );
+		$this->assertEmpty( $this->new_calls( 'POST', '/agent/file-write' ) );
+	}
+
+	public function test_a_stopped_database_is_still_backed_up_like_a_stopped_server(): void {
+		$r = $this->running_db();
+		$this->route( $r, 'shutdown' );
+		$this->run_jobs();
+		$this->assertSame( 'stopped', DbPower::power( Resource::find( $r->id() ) ) );
+
+		BackupJobs::backup();
+
+		$this->assertCount( 1, $this->new_calls( 'POST', '/vzdump' ), 'vzdump in snapshot mode reads the disk of a stopped VM.' );
+		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'backup_ok_at' ) );
+	}
+
+	public function test_a_start_resets_the_monitor_so_a_long_stop_is_not_a_missing_dump(): void {
+		$r = $this->running_db();
+		$r->set( array( 'db_ready_at' => time() - 10 * DAY_IN_SECONDS, DbMonitor::META => array( 'down_since' => time() - 3600, 'down_admin' => 1 ) ) );
+		$this->route( Resource::find( $r->id() ), 'shutdown' );
+		$this->run_jobs();
+		$this->route( Resource::find( $r->id() ), 'start' );
+		$this->run_jobs();
+
+		$this->health( array( 'last_dump' => time() - 5 * DAY_IN_SECONDS ) );
+		DbMonitor::check( Resource::find( $r->id() ), $this->fake, 'node-a', 5000, 'running' );
+		$state = (array) Resource::find( $r->id() )->get( DbMonitor::META );
+		$this->assertArrayNotHasKey( 'dump_admin', $state, 'Judged from the start, not from before the stop.' );
+		$this->assertArrayNotHasKey( 'down_admin', $state );
 	}
 }

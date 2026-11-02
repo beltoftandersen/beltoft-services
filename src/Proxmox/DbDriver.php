@@ -73,6 +73,20 @@ class DbDriver extends ProxmoxDriver {
 	}
 
 	public function act( Resource $r, string $action, array $args ): StepResult {
+		// Shut down and start: the server's own actions, after the database's checks again under the lock.
+		if ( DbPower::is_power( $action ) ) {
+			$why = DbPower::block( $r, false );
+
+			if ( null !== $why ) {
+				return StepResult::done( array(), ucfirst( $action ) . ' refused: ' . $why );
+			}
+
+			$result = ( new Actions( $r ) )->run( $action, $args );
+			DbPower::after( $r, $action, $result );
+
+			return $result;
+		}
+
 		if ( DbActions::RESTORE === $action ) {
 			return ( new Actions( $r ) )->run( 'restore', $args );
 		}

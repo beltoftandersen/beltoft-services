@@ -173,6 +173,17 @@ final class CustomerDelete {
 	}
 
 	/**
+	 * The line under Shut down and Start: a stopped service is still billed.
+	 *
+	 * @param string $kind server or database.
+	 */
+	public static function stopped_note( string $kind ): string {
+		return 'database' === $kind
+			? __( 'A stopped database is still billed. Delete it to stop the charge.', 'beltoft-services' )
+			: __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' );
+	}
+
+	/**
 	 * Deletes the customer's own service.
 	 *
 	 * @param Resource $r        Resource.
