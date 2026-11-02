@@ -210,7 +210,7 @@ final class Breakdown {
 	/**
 	 * The rows of the amounts: label and text.
 	 *
-	 * @param array<string, mixed> $parts parts().
+	 * @param array<string, mixed> $parts parts(), with an optional disk and disk_gb (the extra disk of a new server).
 	 * @return array<int, array{0: string, 1: string}>
 	 */
 	public static function rows( array $parts, string $plan_name = '' ): array {
@@ -228,6 +228,12 @@ final class Breakdown {
 
 		if ( $parts['backups'] > 0 ) {
 			$rows[] = array( __( 'Daily backups', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['backups'] ) );
+		}
+
+		// The extra disk of a new server is a cart line of its own: its row is added by the caller that quotes it (parts['disk']).
+		if ( ( $parts['disk'] ?? 0 ) > 0 ) {
+			/* translators: %d: extra disk in GB */
+			$rows[] = array( ( $parts['disk_gb'] ?? 0 ) > 0 ? sprintf( __( 'Extra disk, %d GB', 'beltoft-services' ), (int) $parts['disk_gb'] ) : __( 'Extra disk', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['disk'] ) );
 		}
 
 		return $rows;

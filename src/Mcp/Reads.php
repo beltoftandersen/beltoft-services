@@ -620,7 +620,7 @@ final class Reads {
 			$out['extra_disks']    = array_values(
 				array_map(
 					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'price' => Pricing::variation_price( $v ) ),
-					DiskField::sizes()
+					DiskField::sizes_for( 'usage' === (string) ( $r->license()['source'] ?? '' ) )
 				)
 			);
 		}

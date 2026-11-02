@@ -117,6 +117,15 @@ final class Renewal {
 			return '' !== $name ? sprintf( '%1$s (%2$s)', $name, $label ) : $label;
 		}
 
+		// An extra disk is shown with its server ("Extra disk for web1"): its own product name says nothing to the customer.
+		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $resource->get( 'driver' ) ) {
+			$server = Resource::for_license( (int) $resource->get( 'server_license' ) );
+			$name   = $server ? (string) $server->get( 'server_name' ) : '';
+			$parent = $server ? wc_get_product( (int) ( $server->license()['product_id'] ?? 0 ) ) : null;
+
+			return '' !== $name ? $name : ( $parent ? $parent->get_name() : ( $product ? $product->get_name() : '#' . $resource_id ) );
+		}
+
 		if ( '' !== $name ) {
 			return $name;
 		}

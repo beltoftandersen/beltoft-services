@@ -43,6 +43,10 @@ final class DeleteService {
 		$kind = CustomerDelete::kind( $r );
 		$want = 'delete_database' === $name ? 'database' : 'server';
 
+		if ( 'disk' === $kind ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'This is an extra disk. Remove it with remove_addon.', 'beltoft-services' ) );
+		}
+
 		if ( $kind !== $want ) {
 			return new \WP_Error(
 				'beltoft_services_tool',

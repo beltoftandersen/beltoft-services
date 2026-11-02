@@ -659,7 +659,9 @@ final class DiskSteps {
 		if ( $this->r->get( 'linked' ) ) {
 			return StepResult::fail( 'An adopted disk is not deleted automatically.' );
 		}
-		if ( 'on' !== Settings::get( 'deletion_mode' ) ) {
+		// The customer's own removal of a pay as you go disk (CustomerDelete: no retention or breach origin) is not held by deletion mode, as a server's is not.
+		$by_customer = 'usage' === (string) ( $this->r->license()['source'] ?? '' ) && '' === (string) $this->r->get( 'delete_origin' );
+		if ( 'on' !== Settings::get( 'deletion_mode' ) && ! $by_customer ) {
 			return StepResult::fail( 'Disk removal requires deletion mode on.' );
 		}
 		$server_id = (int) $this->r->get( 'server_license' );

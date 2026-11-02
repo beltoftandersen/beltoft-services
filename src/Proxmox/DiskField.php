@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -58,6 +59,68 @@ final class DiskField {
 		return $out;
 	}
 
+	/**
+	 * The sizes sold with a server, billing following the server (as an app licence's tier does): the pay as you go twin of each
+	 * monthly size for a pay as you go server, the monthly size for a monthly one. A size with no twin is not offered to a pay as you
+	 * go server, so no monthly subscription lands in a pay as you go order.
+	 *
+	 * @param bool $usage Whether the server is pay as you go.
+	 * @return array<int, \WC_Product_Variation> Variation id => variation.
+	 */
+	public static function sizes_for( bool $usage ): array {
+		if ( ! $usage ) {
+			return self::sizes();
+		}
+
+		$out = array();
+
+		foreach ( self::sizes() as $monthly ) {
+			$twin = Rates::sibling( $monthly, true );
+
+			if ( $twin && 'publish' === $twin->get_status() && $twin->is_purchasable() && $twin->is_in_stock() ) {
+				$out[ $twin->get_id() ] = $twin;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Is the new server of the cart pay as you go?
+	 */
+	public static function cart_server_usage(): bool {
+		$server = self::cart_server();
+
+		return null !== $server && Rates::is_usage( (int) ( $server['item']['variation_id'] ?? 0 ) );
+	}
+
+	/**
+	 * After the server's billing was swapped, the chosen disk follows: its twin of the other billing, or no disk when it has none.
+	 */
+	public static function rematch(): void {
+		$key = self::selected_key();
+
+		if ( '' === $key || ! self::cart_server() ) {
+			return;
+		}
+
+		$usage = self::cart_server_usage();
+		$id    = (int) ( WC()->cart->get_cart()[ $key ]['variation_id'] ?? 0 );
+
+		if ( isset( self::sizes_for( $usage )[ $id ] ) ) {
+			return;
+		}
+
+		$current = wc_get_product( $id );
+		$twin    = $current instanceof \WC_Product_Variation ? Rates::sibling( $current, $usage ) : null;
+
+		if ( $twin && isset( self::sizes_for( $usage )[ $twin->get_id() ] ) ) {
+			self::choose( $twin->get_id() );
+		} else {
+			WC()->cart->remove_cart_item( $key );
+		}
+	}
+
 	private static function selected_key(): string {
 		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $key => $item ) {
 			if ( 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) ) {
@@ -68,15 +131,22 @@ final class DiskField {
 	}
 
 	public static function render(): void {
-		if ( ! self::cart_server() || ! self::sizes() ) {
+		if ( ! self::cart_server() || ! self::sizes_for( self::cart_server_usage() ) ) {
 			return;
 		}
+		$usage = self::cart_server_usage();
 		$key = self::selected_key();
 		$selected = $key ? (int) ( WC()->cart->get_cart()[ $key ]['variation_id'] ?? 0 ) : 0;
 		echo '<p class="form-row form-row-wide beltoft-services-disk-field"><label for="beltoft_services_disk_size">' . esc_html__( 'Extra disk', 'beltoft-services' ) . '</label>';
 		echo '<select id="beltoft_services_disk_size" data-nonce="' . esc_attr( wp_create_nonce( self::NONCE ) ) . '"><option value="0">' . esc_html__( 'None', 'beltoft-services' ) . '</option>';
-		foreach ( self::sizes() as $id => $variation ) {
+		foreach ( self::sizes_for( $usage ) as $id => $variation ) {
 			$plan = Product::plan( $variation->get_parent_id(), $id );
+			if ( $usage ) {
+				$rates = (array) Rates::for_usage( $variation );
+				$label = sprintf( '%d GB: %s %s', (int) $plan['disk_gb'], Rates::plus_per_month( (float) ( $rates['cap'] ?? 0 ) ), __( 'excl. VAT, billed by the hour', 'beltoft-services' ) );
+				echo '<option value="' . esc_attr( (string) $id ) . '" ' . selected( $selected, $id, false ) . '>' . esc_html( $label ) . '</option>';
+				continue;
+			}
 			$period = class_exists( '\\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $variation )
 				? ' / ' . (string) wcs_get_subscription_period_strings( max( 1, (int) \WC_Subscriptions_Product::get_interval( $variation ) ), (string) \WC_Subscriptions_Product::get_period( $variation ) )
 				: '';
@@ -87,7 +157,7 @@ final class DiskField {
 	}
 
 	public static function assets(): void {
-		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || ! self::cart_server() || ! self::sizes() ) {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || ! self::cart_server() || ! self::sizes_for( self::cart_server_usage() ) ) {
 			return;
 		}
 		wp_enqueue_script( 'beltoft-services-disk-field', plugins_url( 'assets/disk-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/disk-field.js' ), true );
@@ -107,7 +177,7 @@ final class DiskField {
 		if ( ! $cart || ! self::cart_server() ) {
 			return false;
 		}
-		$variation = 0 === $variation_id ? null : ( self::sizes()[ $variation_id ] ?? false );
+		$variation = 0 === $variation_id ? null : ( self::sizes_for( self::cart_server_usage() )[ $variation_id ] ?? false );
 		if ( false === $variation ) {
 			return false;
 		}
