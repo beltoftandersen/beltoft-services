@@ -176,7 +176,7 @@ final class Routes {
 				// The outcome of the last customer action (action, ok, at, text) and the server's clock to compare it with.
 				'last_result' => is_array( $resource->get( Jobs::RESULT ) ) ? $resource->get( Jobs::RESULT ) : null,
 				'now'      => time(),
-			),
+			) + \BeltoftServices\Proxmox\PowerWatch::view( $resource ),
 			200
 		);
 	}

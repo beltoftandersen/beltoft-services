@@ -155,6 +155,72 @@ class PowerLagTest extends BackupTestCase {
 		$this->assertTrue( as_has_scheduled_action( \BeltoftServices\Proxmox\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ) );
 	}
 
+	public function test_the_status_says_pending_while_the_vm_has_not_followed_the_shutdown_then_the_real_power(): void {
+		$r = $this->ready_vm();
+		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		$this->fake->lag_status_seconds( 5000, 60 );
+		( new ProxmoxDriver() )->act( Resource::find( $r->id() ), 'shutdown', array() );
+		Resource::find( $r->id() )->set( array( Jobs::RESULT => array( 'action' => 'shutdown', 'ok' => true, 'at' => time(), 'text' => '' ) ) );
+
+		global $wp_rest_server;
+		$wp_rest_server = new \WP_REST_Server();
+		do_action( 'rest_api_init', $wp_rest_server );
+		wp_set_current_user( (int) Resource::find( $r->id() )->license()['user_id'] );
+		$status = static function ( int $id ): array {
+			return rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $id ) )->get_data();
+		};
+
+		$first = $status( $r->id() );
+		$this->assertTrue( $first['power_pending'], 'Not claimed while the VM shows running.' );
+		$this->assertFalse( $first['power_failed'] );
+		$this->assertSame( 'running', $first['power'] );
+
+		// The VM is seen off by the next status: the cache follows at once and nothing is pending.
+		$this->fake->elapse( 61 );
+		$second = $status( $r->id() );
+		$this->assertFalse( $second['power_pending'] );
+		$this->assertFalse( $second['power_failed'] );
+		$this->assertSame( 'stopped', $second['power'] );
+		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Operations::cached_status( $r->id() )['power'] );
+	}
+
+	public function test_a_shutdown_the_vm_never_follows_is_failed_after_the_wait_and_a_start_is_the_same(): void {
+		$r = $this->ready_vm();
+		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		$this->fake->lag_status_seconds( 5000, 100000 );
+		( new ProxmoxDriver() )->act( Resource::find( $r->id() ), 'shutdown', array() );
+		$set = static function ( int $id, string $action, int $age ): Resource {
+			Resource::find( $id )->set( array( Jobs::RESULT => array( 'action' => $action, 'ok' => true, 'at' => time() - $age, 'text' => '' ) ) );
+
+			return Resource::find( $id );
+		};
+
+		$within = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'shutdown', 10 ) );
+		$this->assertTrue( $within['power_pending'] );
+
+		$over = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'shutdown', \BeltoftServices\Proxmox\PowerWatch::WINDOW + 5 ) );
+		$this->assertFalse( $over['power_pending'] );
+		$this->assertTrue( $over['power_failed'], 'The page is told not to claim it.' );
+
+		// A failed result, an old one and an action without a wanted power say nothing.
+		$old = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'shutdown', 3600 ) );
+		$this->assertFalse( $old['power_pending'] || $old['power_failed'] );
+		$reboot = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'reboot', 5 ) );
+		$this->assertFalse( $reboot['power_pending'] || $reboot['power_failed'] );
+
+		// A start: the VM is off, the job said ok, the VM does not run yet (status lags), then it does.
+		$this->fake->lag_status_seconds( 5000, 60 );
+		$fresh = Resource::find( $r->id() );
+		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
+		( new ProxmoxDriver() )->act( $fresh, 'start', array() );
+		$begin = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'start', 5 ) );
+		$this->assertTrue( $begin['power_pending'] || 'running' === $begin['power'] );
+		$this->fake->elapse( 61 );
+		$end = \BeltoftServices\Proxmox\PowerWatch::view( Resource::find( $r->id() ) );
+		$this->assertFalse( $end['power_pending'] );
+		$this->assertSame( 'running', $end['power'] );
+	}
+
 	public function test_a_vm_that_never_starts_is_a_wait_for_a_minute_after_the_settle(): void {
 		$r = $this->ready_vm();
 		Jobs::act( $r->id(), 'shutdown', array() );

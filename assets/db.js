@@ -89,6 +89,17 @@
 		}
 	}
 
+	// The power block has its own line; any other action uses the card's.
+	function sayPower( box, text ) {
+		var out = box.querySelector( '[data-db-power-notice]' );
+
+		if ( out ) {
+			out.textContent = text;
+		} else {
+			say( box, text );
+		}
+	}
+
 	function waitForAction( box, panel, action, since, tries, after ) {
 		window.setTimeout( function () {
 			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
@@ -96,7 +107,15 @@
 			} ).then( function ( data ) {
 				var last = data && data.last_result;
 
-				if ( last && action === last.action && last.at >= since ) {
+				if ( last && action === last.action && last.at >= since && data.power_pending && tries < 60 ) {
+					// The job is over but the VM has not changed power yet: keep waiting, as the server page does.
+					waitForAction( box, panel, action, since, tries + 1, after );
+				} else if ( last && action === last.action && last.at >= since && data.power_failed ) {
+					sayPower( box, 'shutdown' === action ? db.strings.stillrunning : db.strings.notstarted );
+					window.setTimeout( function () {
+						done( after );
+					}, 4000 );
+				} else if ( last && action === last.action && last.at >= since ) {
 					done( after );
 				} else if ( tries < 60 ) {
 					waitForAction( box, panel, action, since, tries + 1, after );

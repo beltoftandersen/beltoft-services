@@ -216,7 +216,7 @@
 	}
 
 	// Shows the end of a confirmed action once, from the server's record of it: done only when the job said it was.
-	function ended( panel, result, info ) {
+	function ended( panel, result, info, data ) {
 		var card = panel.querySelector( '.beltoft-services-vm' );
 		var text;
 
@@ -224,6 +224,13 @@
 
 		if ( ! result.ok ) {
 			flash( panel, result.text || vm.strings.failed, 'failed' );
+
+			return;
+		}
+
+		// Never claim what the VM does not show: the server says when it is still running after the wait.
+		if ( data && data.power_failed && 'shutdown' === result.action ) {
+			flash( panel, vm.strings.shutdownStill, 'failed' );
 
 			return;
 		}
@@ -259,6 +266,13 @@
 			return;
 		}
 
+		// The job is over but the VM has not changed power yet: still working, from the same status the badge is drawn from.
+		if ( data.power_pending && result && result.ok ) {
+			flash( panel, 'start' === result.action ? vm.strings.startStart : vm.strings.shutdownStart, 'working' );
+
+			return;
+		}
+
 		info = result ? describe( result.action, '' ) : null;
 
 		if ( ! info ) {
@@ -272,14 +286,14 @@
 					write( panel, ':asked', null );
 				}
 
-				ended( panel, result, asked.info );
+				ended( panel, result, asked.info, data );
 			}
 
 			return;
 		}
 
 		if ( data.now - result.at <= 600 && read( panel, ':seen' ) !== result.at ) {
-			ended( panel, result, info );
+			ended( panel, result, info, data );
 		}
 	}
 

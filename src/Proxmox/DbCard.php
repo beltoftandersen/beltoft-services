@@ -45,6 +45,8 @@ final class DbCard {
 				'confirmshutdown' => __( 'Shut down the database? It stays off until you start it, and applications cannot reach it while it is off.', 'beltoft-services' ),
 				'shuttingdown'    => __( 'Shutting down the database. This can take a minute.', 'beltoft-services' ),
 				'starting'        => __( 'Starting the database. This can take a minute.', 'beltoft-services' ),
+				'stillrunning'    => __( 'The database is still running. The shutdown has not finished yet.', 'beltoft-services' ),
+				'notstarted'      => __( 'The database has not started yet. Please check again in a minute.', 'beltoft-services' ),
 			),
 		) );
 	}

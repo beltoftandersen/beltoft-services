@@ -103,7 +103,8 @@
 		}
 
 		// Active only while the server says work is going on: a queued form alone proves nothing.
-		return !! ( data.working || ( data.progress && data.progress.active ) );
+		// A shutdown or start that the VM has not followed yet counts as work: the poll goes on until it does (or the server gives up waiting).
+		return !! ( data.working || data.power_pending || ( data.progress && data.progress.active ) );
 	}
 
 	// A button that has been clicked shows it is working; reset() gives it back after an error.
@@ -204,7 +205,7 @@
 			request( 'GET', id ).then( function ( response ) {
 				return response.ok ? response.json() : null;
 			} ).then( function ( data ) {
-				if ( data && ( data.state !== first || false === data.working ) ) {
+				if ( data && ! data.power_pending && ( data.state !== first || false === data.working ) ) {
 					window.location.reload();
 					return;
 				}
