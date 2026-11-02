@@ -60,7 +60,7 @@ final class Emails {
 	 *
 	 * @param \WC_Order $order Order.
 	 */
-	private static function name( \WC_Order $order ): string {
+	public static function name( \WC_Order $order ): string {
 		return '' !== (string) $order->get_meta( Renewal::META_EARLY )
 			? __( 'Usage invoice (early)', 'beltoft-services' )
 			: __( 'Usage invoice', 'beltoft-services' );
