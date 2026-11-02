@@ -83,6 +83,8 @@ final class Card {
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
 		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'swap_page' ), 1 );
 		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'bricks_methods' ), 10, 2 );
+		// A card saved on WooCommerce's Add payment method page (or made the default) becomes the usage account's card.
+		add_action( 'woocommerce_payment_token_set_default', array( __CLASS__, 'token_default' ), 10, 2 );
 	}
 
 	/**
@@ -215,7 +217,8 @@ final class Card {
 		$mandate  = self::mandate_id( $account );
 
 		if ( '' === $customer || '' === $mandate ) {
-			return null;
+			// No Mollie mandate: the card is a saved WooCommerce token (Stripe or any gateway that saves tokens).
+			return self::token_details( $account );
 		}
 
 		$name   = self::cache_name( $customer, $mandate );
@@ -349,7 +352,9 @@ final class Card {
 		return array(
 			'state'       => $state,
 			'text'        => $info && 'unknown' !== $info['status'] ? self::describe( $info ) : '',
-			'can_start'   => Mollie::configured(),
+			'can_start'   => 'token' === self::flow() ? true : Mollie::configured(),
+			'flow'        => self::flow(),
+			'add_url'     => self::add_url(),
 			'change'      => 'none' !== $state,
 			'notice'      => $notice[0],
 			'notice_kind' => $notice[1],
@@ -382,7 +387,7 @@ final class Card {
 
 		// An earlier card page that was left open stays pending: only a customer with no result yet is told to wait.
 		if ( '' === $last && self::ids( $user_id, self::META_PENDING ) ) {
-			return array( __( 'We are waiting for Mollie to confirm your card. Reload this page in a moment.', 'beltoft-services' ), 'info' );
+			return array( __( 'We are waiting for the payment provider to confirm your card. Reload this page in a moment.', 'beltoft-services' ), 'info' );
 		}
 
 		if ( 'saved' === $last && 'unknown' === $state ) {
@@ -394,10 +399,10 @@ final class Card {
 		}
 
 		if ( 'cancelled' === $last ) {
-			return array( __( 'Card not saved. You cancelled on Mollie\'s page. You can try again.', 'beltoft-services' ), 'info' );
+			return array( __( 'Card not saved. You cancelled on the card page. You can try again.', 'beltoft-services' ), 'info' );
 		}
 
-		return array( __( 'The card was not saved. Mollie could not confirm it. You can try again.', 'beltoft-services' ), 'error' );
+		return array( __( 'The card was not saved. The payment provider could not confirm it. You can try again.', 'beltoft-services' ), 'error' );
 	}
 
 	// ------------------------------------------------------------------ the button.
@@ -804,6 +809,28 @@ final class Card {
 	 * @throws \RuntimeException When the subscription cannot be made.
 	 */
 	private static function create_account( int $user_id, string $customer, string $mandate ): void {
+		self::build_account(
+			$user_id,
+			function ( \WC_Subscription $sub ) use ( $customer, $mandate ): void {
+				$sub->update_meta_data( '_mollie_customer_id', $customer );
+				$sub->update_meta_data( '_mollie_mandate_id', $mandate );
+				self::use_card_gateway( $sub );
+			},
+			__( 'Card saved on the payment provider\'s card page.', 'beltoft-services' )
+		);
+
+		self::forget( $customer, $mandate );
+	}
+
+	/**
+	 * Builds the active 0 per month usage subscription and lets the caller put the card on it.
+	 *
+	 * @param int      $user_id Customer.
+	 * @param callable $set     Puts the card on the new subscription (not yet saved).
+	 * @param string   $note    Status note.
+	 * @throws \RuntimeException When the subscription cannot be made.
+	 */
+	private static function build_account( int $user_id, callable $set, string $note ): void {
 		$product = Account::product_id() > 0 ? wc_get_product( Account::product_id() ) : false;
 
 		if ( ! function_exists( 'wcs_create_subscription' ) || ! $product ) {
@@ -844,16 +871,12 @@ final class Card {
 		$sub->set_requires_manual_renewal( false );
 		$sub->add_product( $product, 1 );
 		$sub->update_meta_data( Account::META, 'yes' );
-		$sub->update_meta_data( '_mollie_customer_id', $customer );
-		$sub->update_meta_data( '_mollie_mandate_id', $mandate );
-		self::use_card_gateway( $sub );
+		$set( $sub );
 		$sub->calculate_totals();
 		$sub->save();
 
 		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', strtotime( '+1 month' ) ) ) );
-		$sub->update_status( 'active', __( 'Card saved on Mollie\'s card page.', 'beltoft-services' ) );
-
-		self::forget( $customer, $mandate );
+		$sub->update_status( 'active', $note );
 	}
 
 	/**
@@ -872,6 +895,331 @@ final class Card {
 		}
 
 		$account->set_requires_manual_renewal( false );
+	}
+
+	// ------------------------------------------------------------------ the generic token flow (Stripe and any gateway that saves tokens).
+
+	/**
+	 * Subscription meta holding the saved payment method's token: the key WooCommerce Subscriptions gateways
+	 * (the Stripe plugin among them) read when a renewal is charged.
+	 */
+	public const TOKEN_META = '_payment_method_token';
+
+	/**
+	 * Which way a card is added: 'mollie' (a first payment on Mollie's hosted page) or 'token' (WooCommerce's own
+	 * Add payment method page, for a gateway that saves tokens and charges subscriptions). Mollie is used when its card
+	 * gateway is the enabled one, and also when no gateway offers saved tokens (the long-standing default).
+	 */
+	public static function flow(): string {
+		$flow = array() !== self::token_gateways() ? 'token' : 'mollie';
+
+		/**
+		 * Filters the card flow.
+		 *
+		 * @param string $flow 'mollie' or 'token'.
+		 */
+		$flow = (string) apply_filters( 'beltoft_services_card_flow', $flow );
+
+		return 'token' === $flow ? 'token' : 'mollie';
+	}
+
+	/**
+	 * Enabled payment gateways that can save a card on My Account and charge a subscription with it.
+	 *
+	 * @return array<string, \WC_Payment_Gateway>
+	 */
+	public static function token_gateways(): array {
+		$found    = array();
+		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
+
+		foreach ( $gateways as $id => $gateway ) {
+			if ( ! $gateway instanceof \WC_Payment_Gateway || self::GATEWAY === $id || str_starts_with( (string) $id, 'mollie_wc_gateway_' ) ) {
+				continue;
+			}
+
+			if ( 'yes' === $gateway->enabled && $gateway->supports( 'add_payment_method' ) && $gateway->supports( 'subscriptions' ) ) {
+				$found[ (string) $id ] = $gateway;
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * WooCommerce's Add payment method page (a saved card is also changed there: the newest default is the account's card).
+	 */
+	public static function add_url(): string {
+		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'add-payment-method' ) : home_url( '/' );
+	}
+
+	/**
+	 * Does this gateway id keep its saved card as a token the account must carry (so a renewal can charge it)?
+	 *
+	 * @param string $gateway Payment method id.
+	 */
+	public static function needs_token( string $gateway ): bool {
+		/**
+		 * Gateway id prefixes whose subscriptions are charged from a saved token (Stripe for WooCommerce: stripe_).
+		 *
+		 * @param string[] $prefixes Prefixes.
+		 */
+		$prefixes = (array) apply_filters( 'beltoft_services_card_token_gateways', array( 'stripe_' ) );
+
+		foreach ( $prefixes as $prefix ) {
+			if ( '' !== (string) $prefix && str_starts_with( $gateway, (string) $prefix ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * What a subscription must carry for a token gateway to charge it on renewal: the payment method token and,
+	 * for Stripe, the Stripe customer.
+	 *
+	 * @param \WC_Subscription $account Account.
+	 * @return string[] Meta keys.
+	 */
+	public static function required_meta( \WC_Subscription $account ): array {
+		$keys = array( self::TOKEN_META );
+
+		if ( str_starts_with( (string) $account->get_payment_method(), 'stripe_' ) ) {
+			$keys[] = '_wc_stripe_customer';
+		}
+
+		/**
+		 * Subscription meta a renewal of this account needs.
+		 *
+		 * @param string[]         $keys    Meta keys.
+		 * @param \WC_Subscription $account The account.
+		 */
+		return (array) apply_filters( 'beltoft_services_card_required_meta', $keys, $account );
+	}
+
+	/**
+	 * The saved WooCommerce token the account's card is: the one named by the account's token meta, when the customer still has it.
+	 *
+	 * @param \WC_Subscription $account Account.
+	 */
+	public static function token_for( \WC_Subscription $account ): ?\WC_Payment_Token {
+		$wanted = (string) $account->get_meta( self::TOKEN_META, true );
+
+		if ( '' === $wanted || $account->get_user_id() < 1 || ! class_exists( \WC_Payment_Tokens::class ) ) {
+			return null;
+		}
+
+		foreach ( \WC_Payment_Tokens::get_customer_tokens( $account->get_user_id() ) as $token ) {
+			if ( $token->get_token() === $wanted ) {
+				return $token;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * A token as the few facts the page needs (no API call): brand, last four, expiry.
+	 *
+	 * @param \WC_Payment_Token $token Token.
+	 * @return array{status: string, expired: bool, label: string, last4: string, expiry: string}
+	 */
+	public static function summarize_token( \WC_Payment_Token $token ): array {
+		$label   = '';
+		$last4   = '';
+		$expiry  = '';
+		$expired = false;
+
+		$pick = static function ( array $methods ) use ( $token ): string {
+			foreach ( $methods as $method ) {
+				if ( is_callable( array( $token, $method ) ) ) {
+					return (string) $token->$method();
+				}
+			}
+
+			return '';
+		};
+
+		// WooCommerce's card token, and Stripe's own card token, name the same facts differently.
+		$brand = $pick( array( 'get_card_type', 'get_brand' ) );
+		$digit = $pick( array( 'get_last4' ) );
+
+		if ( '' !== $digit && '' !== $brand ) {
+			$label = ucfirst( sanitize_text_field( $brand ) );
+			$last4 = preg_replace( '/\D/', '', $digit );
+			$month = (int) $pick( array( 'get_expiry_month', 'get_exp_month' ) );
+			$year  = (int) $pick( array( 'get_expiry_year', 'get_exp_year' ) );
+
+			if ( $year > 0 && $year < 100 ) {
+				$year += 2000;
+			}
+
+			if ( $month >= 1 && $month <= 12 && $year > 0 ) {
+				$expiry  = sprintf( '%02d/%02d', $month, $year % 100 );
+				$expired = gmdate( 'Y-m' ) > sprintf( '%04d-%02d', $year, $month );
+			}
+		} else {
+			$label = sanitize_text_field( wp_strip_all_tags( (string) $token->get_display_name() ) );
+		}
+
+		return array(
+			'status'  => 'valid',
+			'expired' => $expired,
+			'label'   => $label,
+			'last4'   => (string) $last4,
+			'expiry'  => $expiry,
+		);
+	}
+
+	/**
+	 * Details of the account's saved token, or null when the account has none the customer still holds.
+	 *
+	 * @param \WC_Subscription $account Account.
+	 * @return array{status: string, expired: bool, label: string, last4: string, expiry: string}|null
+	 */
+	public static function token_details( \WC_Subscription $account ): ?array {
+		$token = self::token_for( $account );
+
+		return $token ? self::summarize_token( $token ) : null;
+	}
+
+	/**
+	 * The card's fingerprint (the same physical card gives the same one), '' when it is not known. A saved token has
+	 * it on the gateway's payment method, which the Stripe plugin's client reads; the filter lets a site supply it.
+	 *
+	 * @param \WC_Subscription $account Account.
+	 */
+	public static function token_fingerprint( \WC_Subscription $account ): string {
+		$token       = self::token_for( $account );
+		$fingerprint = '';
+
+		if ( $token && function_exists( 'stripe_wc' ) && str_starts_with( $token->get_gateway_id(), 'stripe_' ) ) {
+			try {
+				$pm = stripe_wc()->client->mode( $account )->paymentMethods->retrieve( $token->get_token() );
+
+				if ( ! is_wp_error( $pm ) && isset( $pm->card->fingerprint ) ) {
+					$fingerprint = (string) $pm->card->fingerprint;
+				}
+			} catch ( \Throwable $e ) {
+				unset( $e );
+			}
+		}
+
+		/**
+		 * The fingerprint of the account's saved card.
+		 *
+		 * @param string                 $fingerprint Fingerprint, or ''.
+		 * @param \WC_Payment_Token|null $token       The saved token.
+		 * @param \WC_Subscription       $account     The account.
+		 */
+		return trim( (string) apply_filters( 'beltoft_services_card_fingerprint', $fingerprint, $token, $account ) );
+	}
+
+	/**
+	 * Makes the card of a token the usage account's: sets the account's payment method and token meta (the keys the
+	 * gateway reads on renewal). Without an account the customer gets one, like a first server order would leave.
+	 * Acts for subscription-capable token gateways only (never the Mollie card gateway, which saves no tokens).
+	 *
+	 * @param int|string        $token_id Token id.
+	 * @param \WC_Payment_Token $token    The token that became the default.
+	 */
+	public static function token_default( $token_id, $token = null ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		if ( ! $token instanceof \WC_Payment_Token || $token->get_user_id() < 1 || str_starts_with( $token->get_gateway_id(), 'mollie_wc_gateway_' ) || ! function_exists( 'wcs_create_subscription' ) ) {
+			return;
+		}
+
+		// Only the customer's own card pages: not a checkout or a pay page (a card saved there is for that order), not a subscription's change-payment-method, not admin or cron.
+		if ( get_current_user_id() !== (int) $token->get_user_id() || defined( 'WOOCOMMERCE_CHECKOUT' ) || did_action( 'woocommerce_subscriptions_pre_update_payment_method' ) || ( function_exists( 'is_checkout' ) && is_checkout() ) ) {
+			return;
+		}
+
+		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
+		$gateway  = $gateways[ $token->get_gateway_id() ] ?? null;
+
+		if ( ! $gateway instanceof \WC_Payment_Gateway || ! $gateway->supports( 'subscriptions' ) ) {
+			return;
+		}
+
+		$user_id = (int) $token->get_user_id();
+		$account = Account::for_user( $user_id );
+
+		try {
+			if ( $account ) {
+				$changed = (string) $account->get_meta( self::TOKEN_META, true ) !== $token->get_token();
+				self::apply_token( $account, $token, $gateway );
+
+				if ( $changed ) {
+					$account->add_order_note( __( 'Card changed: the new default card is used for usage invoices.', 'beltoft-services' ) );
+				}
+			} else {
+				self::create_account_with_token( $user_id, $token, $gateway );
+			}
+		} catch ( \Throwable $e ) {
+			// The card is saved; the account follows the next time the card is made the default.
+			unset( $e );
+		}
+	}
+
+	/**
+	 * Writes a token on an account.
+	 *
+	 * @param \WC_Subscription  $account Account.
+	 * @param \WC_Payment_Token $token   Token.
+	 * @param \WC_Payment_Gateway $gateway The token's gateway.
+	 */
+	public static function apply_token( \WC_Subscription $account, \WC_Payment_Token $token, \WC_Payment_Gateway $gateway ): void {
+		$account->set_payment_method( $gateway );
+		$account->set_requires_manual_renewal( false );
+
+		$meta = array( self::TOKEN_META => $token->get_token() );
+
+		if ( str_starts_with( $gateway->id, 'stripe_' ) ) {
+			if ( is_callable( array( $token, 'get_customer_id' ) ) ) {
+				$meta['_wc_stripe_customer'] = (string) $token->get_customer_id();
+			}
+
+			if ( function_exists( 'wc_stripe_mode' ) ) {
+				$meta['_wc_stripe_mode'] = (string) wc_stripe_mode();
+			}
+		}
+
+		/**
+		 * The subscription meta a saved token is written as (what the gateway reads when it charges a renewal).
+		 *
+		 * @param array<string, string> $meta    Meta key => value.
+		 * @param \WC_Payment_Token     $token   The token.
+		 * @param \WC_Subscription      $account The account.
+		 */
+		$meta = (array) apply_filters( 'beltoft_services_card_token_meta', $meta, $token, $account );
+
+		foreach ( $meta as $key => $value ) {
+			$account->update_meta_data( (string) $key, $value );
+		}
+
+		$title = trim( wp_strip_all_tags( (string) $token->get_display_name() ) );
+
+		if ( '' !== $title ) {
+			$account->set_payment_method_title( $title );
+		}
+
+		$account->save();
+	}
+
+	/**
+	 * Makes the usage account for a customer whose first card was saved on My Account.
+	 *
+	 * @param int                 $user_id Customer.
+	 * @param \WC_Payment_Token   $token   Token.
+	 * @param \WC_Payment_Gateway $gateway The token's gateway.
+	 */
+	private static function create_account_with_token( int $user_id, \WC_Payment_Token $token, \WC_Payment_Gateway $gateway ): void {
+		self::build_account(
+			$user_id,
+			function ( \WC_Subscription $sub ) use ( $token, $gateway ): void {
+				self::apply_token( $sub, $token, $gateway );
+			},
+			__( 'Card saved on My Account.', 'beltoft-services' )
+		);
 	}
 
 	// ------------------------------------------------------------------ accounts left by the old card-only checkout.
