@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Jobs\PowerJobs;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -440,11 +441,21 @@ final class Actions {
 			return new \WP_Error( 'beltoft_services_refused', $why, array( 'status' => 422 ) );
 		}
 
-		if ( isset( self::FLOORS[ $action ] ) && RateLimit::exceeded( get_current_user_id(), 'beltoft-services:vm-action:' . $resource->id() . ':' . $action, self::FLOORS[ $action ][0], self::FLOORS[ $action ][1] ) ) {
+		if ( self::floor_exceeded( $resource, $action ) ) {
 			return new \WP_Error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 
 		return null;
+	}
+
+	/**
+	 * Has the user used up the fixed floor of this action on this service? Counts the request.
+	 *
+	 * @param Resource $resource Resource.
+	 * @param string   $action   Action.
+	 */
+	public static function floor_exceeded( Resource $resource, string $action ): bool {
+		return isset( self::FLOORS[ $action ] ) && RateLimit::exceeded( get_current_user_id(), 'beltoft-services:vm-action:' . $resource->id() . ':' . $action, self::FLOORS[ $action ][0], self::FLOORS[ $action ][1] );
 	}
 
 	// -- Run -------------------------------------------------------------------------------------
@@ -622,14 +633,19 @@ final class Actions {
 			return $done;
 		}
 
-		$again = $this->verified( $record, 'shutdown' );
+		// The status can lag the task and a guest can still be powering off: look again for a while (two seconds apart) before saying anything.
+		$again = $this->reread_power( $record, 'shutdown', false, 30 );
 
 		if ( $again instanceof StepResult ) {
 			return $again;
 		}
 
 		if ( 'running' === $again['status'] ) {
-			return StepResult::done( array(), 'Shutdown did not finish: the system did not power off in time; it was left running' );
+			// Not claimed as left running: a follow-up reads the power again and keeps the page right. A stop by the customer is not an outage.
+			$this->r->set( array( 'stopped_by_customer' => time() ) );
+			PowerJobs::follow_up( $this->r->id() );
+
+			return StepResult::done( array(), 'Shutdown requested; the server is still powering off' );
 		}
 
 		Operations::remember_power( $this->r->id(), 'stopped' );

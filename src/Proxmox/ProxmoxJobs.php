@@ -47,6 +47,7 @@ final class ProxmoxJobs {
 	public const CAPACITY     = 'beltoft_services_proxmox_capacity';
 	public const CAPACITY_NOW = 'beltoft_services_proxmox_capacity_now';
 	public const POWER        = 'beltoft_services_proxmox_power';
+	public const POWER_AFTER  = 'beltoft_services_proxmox_power_after';
 	public const ABUSE        = 'beltoft_services_proxmox_abuse';
 	public const ABUSE_BATCH  = 'beltoft_services_proxmox_abuse_batch';
 	public const DISK         = 'beltoft_services_proxmox_disk';
@@ -106,6 +107,7 @@ final class ProxmoxJobs {
 		add_action( self::CAPACITY, array( CapacityJobs::class, 'capacity' ) );
 		add_action( self::CAPACITY_NOW, array( CapacityJobs::class, 'capacity_now' ) );
 		add_action( self::POWER, array( PowerJobs::class, 'power' ) );
+		add_action( self::POWER_AFTER, array( PowerJobs::class, 'after' ) );
 		add_action( self::ABUSE, array( AbuseJobs::class, 'abuse' ) );
 		add_action( self::ABUSE_BATCH, array( AbuseJobs::class, 'abuse_batch' ) );
 		add_action( self::DISK, array( DiskJobs::class, 'disk' ) );
@@ -153,5 +155,6 @@ final class ProxmoxJobs {
 		as_unschedule_all_actions( self::DISK_BATCH, array(), Jobs::GROUP );
 		as_unschedule_all_actions( self::BACKUP_NEXT, array(), Jobs::GROUP );
 		as_unschedule_all_actions( self::CAPACITY_NOW, array(), Jobs::GROUP );
+		as_unschedule_all_actions( self::POWER_AFTER, array(), Jobs::GROUP );
 	}
 }
