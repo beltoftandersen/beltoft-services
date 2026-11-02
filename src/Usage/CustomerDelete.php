@@ -73,7 +73,7 @@ final class CustomerDelete {
 			'beltoftServicesDelete',
 			array(
 				'strings' => array(
-					'working' => __( 'Deleting. This can take a minute. You are taken to the list when it starts.', 'beltoft-services' ),
+					'working' => __( 'Deleting. This can take a minute. You are taken to the list when it is done.', 'beltoft-services' ),
 					'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'limit'   => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 					'expired' => __( 'This page expired. Reload it and try again.', 'beltoft-services' ),
