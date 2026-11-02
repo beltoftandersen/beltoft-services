@@ -21,6 +21,7 @@ class DbDiskFieldTest extends BackupTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		$this->seed_private_nets();
 
 		WC()->cart->empty_cart();
 		wc_clear_notices();

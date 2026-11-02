@@ -29,6 +29,11 @@ require_once __DIR__ . '/UsageTestCase.php';
  */
 class DatabaseUsageTest extends UsageTestCase {
 
+	public function set_up(): void {
+		parent::set_up();
+		$this->seed_private_nets();
+	}
+
 	/**
 	 * Monthly prices: 25 base, +5 public IP, +8 for 50 GB extra storage.
 	 *

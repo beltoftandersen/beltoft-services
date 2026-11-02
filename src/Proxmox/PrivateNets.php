@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 
@@ -86,7 +87,70 @@ final class PrivateNets {
 		if ( ! $locked ) {
 			throw new \RuntimeException( 'The private network pool is busy.' );
 		}
+		self::check_pool();
 		return $result;
+	}
+
+	/** Addresses a /28 can give out (.2 to .14). */
+	private const HOSTS = 13;
+
+	/** The message a customer or the MCP gets when no network can be given. */
+	public static function unavailable_message(): string {
+		return __( 'New databases are not available right now. Please contact us.', 'beltoft-services' );
+	}
+
+	/** Networks nobody holds. */
+	public static function free_count(): int {
+		global $wpdb;
+		if ( ! self::db_ready() ) {
+			return 0;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE state = 'free' AND user_id IS NULL", Schema::tables()['private_nets'] ) );
+	}
+
+	/** Networks in the pool, whoever holds them. */
+	private static function total_count(): int {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Schema::tables()['private_nets'] ) );
+	}
+
+	/**
+	 * Can a database be built for this customer now? Read-only, no lock. The customer's own network (held, held for a
+	 * return, or in quarantine, as hold_locked() treats it) needs a free address; a customer without one needs a free
+	 * network in the pool (a logged-out visitor, user 0, is asked the same). With a cluster, its private bridge must be set.
+	 *
+	 * @param int    $user_id Customer, 0 for a visitor.
+	 * @param string $cluster Cluster id, or empty when not known.
+	 */
+	public static function available_for( int $user_id, string $cluster = '' ): bool {
+		global $wpdb;
+		if ( ! self::db_ready() ) {
+			return false;
+		}
+		$clusters = Clusters::all();
+		if ( '' !== $cluster && isset( $clusters[ $cluster ] ) && '' === (string) ( $clusters[ $cluster ]['private_bridge'] ?? '' ) ) {
+			return false;
+		}
+		$net = $user_id > 0 ? self::for_user( $user_id ) : null;
+		if ( null === $net ) {
+			return self::free_count() > 0;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
+		$used = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE net_id = %d', Schema::tables()['private_ips'], $net['id'] ) );
+		return $used < self::HOSTS;
+	}
+
+	/**
+	 * Warn the admin once when the free networks run low, and once more when none are left. A pool that was never
+	 * seeded (no databases sold) says nothing. Called after a reserve and by the daily sweep.
+	 */
+	public static function check_pool(): void {
+		if ( ! self::db_ready() || 0 === self::total_count() ) {
+			return;
+		}
+		Alerts::private_pool( self::free_count() );
 	}
 
 	/** Caller holds the privnet lock. */
@@ -212,8 +276,7 @@ final class PrivateNets {
 		}
 		$net = self::for_user( $user_id );
 		if ( null === $net ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
-			return null !== $wpdb->get_var( $wpdb->prepare( "SELECT id FROM %i WHERE state = 'free' AND user_id IS NULL LIMIT 1", Schema::tables()['private_nets'] ) );
+			return self::free_count() > 0;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
 		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE net_id = %d', Schema::tables()['private_ips'], $net['id'] ) );

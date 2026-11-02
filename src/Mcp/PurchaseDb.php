@@ -93,6 +93,10 @@ final class PurchaseDb {
 			return $fail( sprintf( __( 'This plan is not sold pay as you go, so it cannot be ordered through Claude. The customer can order it here: %s', 'beltoft-services' ), $url ) );
 		}
 
+		if ( ! \BeltoftServices\Proxmox\PrivateNets::available_for( $user_id, (string) $plan['cluster'] ) ) {
+			return $fail( \BeltoftServices\Proxmox\PrivateNets::unavailable_message() );
+		}
+
 		if ( ! $plan['in_stock'] ) {
 			return $fail( __( 'That plan is out of stock. Choose another plan.', 'beltoft-services' ) );
 		}

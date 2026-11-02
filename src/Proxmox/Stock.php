@@ -278,7 +278,7 @@ final class Stock {
 	 *
 	 * @param \WC_Product $product Product or variation.
 	 */
-	private static function availability( \WC_Product $product ): ?bool {
+	private static function availability( \WC_Product $product, bool $live = true ): ?bool {
 		$driver = Product::driver_for( $product->get_id() );
 		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID ), true ) ) {
 			return true; // Slots and app licences are an entitlement: nothing is built, so nothing runs out.
@@ -301,6 +301,11 @@ final class Stock {
 		$plan = Product::plan( $product->get_id() );
 
 		if ( $driver && DbDriver::ID === $driver->id() ) {
+			// A database needs a private network of its own for this customer (a visitor: any free one), also for a customer without a server.
+			if ( $live && ! PrivateNets::available_for( get_current_user_id(), (string) ( $plan['cluster'] ?? '' ) ) ) {
+				return false;
+			}
+
 			// A database needs an address only with the public IP add-on, and never the one kept for servers.
 			if ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() ) {
 				return false;
@@ -504,7 +509,8 @@ final class Stock {
 			return false;
 		}
 
-		$available = self::availability( $product );
+		// The stored status is the shop-wide capacity: the private network rule depends on who asks.
+		$available = self::availability( $product, false );
 
 		if ( null === $available ) {
 			// No cache, so nothing can be said (a product closed for lack of an address cannot be reopened): ask for one.

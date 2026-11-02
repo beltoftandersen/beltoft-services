@@ -45,6 +45,7 @@ final class PurchaseDbTest extends UsageTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		$this->seed_private_nets();
 
 		$this->user    = $this->new_user();
 		$this->account = $this->usage_account( $this->user );
@@ -137,6 +138,25 @@ final class PurchaseDbTest extends UsageTestCase {
 		$this->assertTrue( $out['isError'] );
 		$this->assertStringContainsString( 'out of stock', wp_json_encode( $out ) );
 		$this->assertSame( array(), $this->orders( $this->user ) );
+	}
+
+	public function test_no_private_network_for_the_customer_refuses_the_order_and_marks_the_plan_unavailable(): void {
+		$token = $this->oauth( $this->user, Tokens::FULL );
+		$this->seed_private_nets( 0 );
+		Offers::reset();
+
+		$plans = $this->json( $this->tool( 'catalog', array( 'kind' => 'database_plans' ), $token ) )['plans'];
+		$this->assertFalse( $plans[0]['in_stock'] );
+
+		$out = $this->tool( 'order_database', $this->args(), $token );
+		$this->assertTrue( $out['isError'] );
+		$this->assertStringContainsString( 'New databases are not available right now. Please contact us.', wp_json_encode( $out ) );
+		$this->assertSame( array(), $this->orders( $this->user ) );
+
+		$this->seed_private_nets( 1 );
+		Offers::reset();
+		$this->assertTrue( $this->json( $this->tool( 'catalog', array( 'kind' => 'database_plans' ), $token ) )['plans'][0]['in_stock'] );
+		$this->assertTrue( $this->json( $this->tool( 'order_database', $this->args(), $token ) )['requires_confirmation'] );
 	}
 
 	public function test_a_plan_with_no_pay_as_you_go_price_is_never_ordered_as_a_fixed_monthly_one(): void {
