@@ -332,6 +332,65 @@ final class Alerts {
 		);
 	}
 
+	/** Option holding the level of the last private network pool alert: low or zero. */
+	public const POOL_OPTION = 'beltoft_services_private_pool_alert';
+
+	/**
+	 * Alerts the admin when the free private networks run low (below the threshold, default 10, filter
+	 * `beltoft_services_private_net_low`), and again, more urgently, when none is left. Each level is sent once; the
+	 * level is forgotten when the pool is back at or above the threshold. Nothing is remembered while no valid alert
+	 * address exists, so the mail follows once it is fixed.
+	 *
+	 * @param int $free Free networks.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function private_pool( int $free ): bool {
+		/**
+		 * The number of free private networks below which the admin is warned.
+		 *
+		 * @param int $threshold Default 10.
+		 */
+		$threshold = max( 1, (int) apply_filters( 'beltoft_services_private_net_low', 10 ) );
+		$level     = $free < 1 ? 'zero' : ( $free < $threshold ? 'low' : '' );
+		$last      = (string) get_option( self::POOL_OPTION, '' );
+
+		if ( $level === $last ) {
+			return false;
+		}
+
+		$rank = array( '' => 0, 'low' => 1, 'zero' => 2 );
+
+		if ( $rank[ $level ] < $rank[ $last ] ) {
+			// Recovering (some networks added): remember the better level without a mail.
+			update_option( self::POOL_OPTION, $level, false );
+			return false;
+		}
+
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) ) {
+			return false;
+		}
+
+		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+		if ( 'zero' === $level ) {
+			$subject = sprintf( '[%s] No free private networks: databases cannot be sold', $site );
+			$lines   = array( 'No free private networks are left. Databases cannot be sold to new customers until more are added. Customers who already have a network can still order.' );
+		} else {
+			$subject = sprintf( '[%s] Private networks running low: %d left', $site, $free );
+			$lines   = array( sprintf( 'Only %d free private networks are left (alert below %d). Each new database customer takes one.', $free, $threshold ) );
+		}
+
+		$lines[] = 'Add more with: wp beltoft-services private-net add <vlan> <cidr>';
+
+		$sent = (bool) wp_mail( $to, $subject, implode( "\n", $lines ) . "\n" );
+
+		update_option( self::POOL_OPTION, $level, false );
+
+		return $sent;
+	}
+
 	/**
 	 * Alerts the admin that a license's service could not be created (there is no resource to
 	 * hang the alert on). Sent once per call: a creation happens once per license event.

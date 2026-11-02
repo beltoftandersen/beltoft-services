@@ -140,6 +140,7 @@ abstract class FirewallTestCase extends TestCase {
 						'storage'           => 'disk-store',
 						'cloudinit_storage' => 'ci-store',
 						'bridge'            => 'vmbr9',
+						'private_bridge'    => 'vmbr2',
 						'gateway'           => '192.0.2.1',
 						'nameservers'       => '192.0.2.53',
 						'prefix'            => '24',

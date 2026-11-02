@@ -38,6 +38,7 @@ class DbPickerTest extends BackupTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		$this->seed_private_nets();
 
 		$product = new \WC_Product_Variable();
 		$product->set_name( 'Managed database' );

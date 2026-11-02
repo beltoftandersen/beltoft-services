@@ -157,6 +157,7 @@ abstract class BackupTestCase extends TestCase {
 						'cloudinit_storage' => 'ci-store',
 						'backup_storage'    => 'backup-store',
 						'bridge'            => 'vmbr9',
+						'private_bridge'    => 'vmbr2',
 						'gateway'           => '192.0.2.1',
 						'nameservers'       => '192.0.2.53',
 						'prefix'            => '24',

@@ -53,6 +53,9 @@ abstract class TestCase extends \WP_UnitTestCase {
 		$this->http_calls     = array();
 		$this->http_responder = null;
 
+		// The low private network pool mail is tested on its own; other tests count mails and seed one or two networks.
+		update_option( \BeltoftServices\Alerts::POOL_OPTION, 'zero', false );
+
 		add_filter( 'pre_http_request', array( $this, 'record_http' ), 10, 3 );
 
 		// A public DNS lookup (an app on the customer's own domain) answers "nothing there" and never reaches the network; a test sets its own answers.
@@ -335,5 +338,22 @@ abstract class TestCase extends \WP_UnitTestCase {
 		}
 
 		$this->fail( sprintf( 'Jobs were still due after %d rounds.', $max_rounds ) );
+	}
+
+	/**
+	 * Replaces the private network pool with this many free /28 networks (10.77.n.0/28, VLAN 3000+n).
+	 *
+	 * @param int $count Free networks.
+	 */
+	protected function seed_private_nets( int $count = 3 ): void {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', \BeltoftServices\Proxmox\Schema::tables()['private_ips'] ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', \BeltoftServices\Proxmox\Schema::tables()['private_nets'] ) );
+
+		for ( $i = 1; $i <= $count; $i++ ) {
+			\BeltoftServices\Proxmox\PrivateNets::add( 3000 + $i, '10.77.' . $i . '.0/28' );
+		}
 	}
 }
