@@ -220,6 +220,10 @@ class InvoiceViewTest extends CreditTestCase {
 		$this->assertStringNotContainsString( '<tr', $bricks );
 	}
 
+	public function test_a_usage_invoice_is_not_a_card_order(): void {
+		$this->assertFalse( \BeltoftServices\Card\Card::is_card_order( $this->usage_invoice() ) );
+	}
+
 	public function test_a_normal_order_is_left_alone(): void {
 		$product = new \WC_Product_Simple();
 		$product->set_name( 'Thing' );

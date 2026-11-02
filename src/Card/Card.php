@@ -864,6 +864,11 @@ final class Card {
 		$items = $order->get_items();
 		$id    = (int) get_option( Account::OPTION_PRODUCT );
 
+		// A usage invoice also holds only the account line (and fee lines): it has its own order page.
+		if ( \BeltoftServices\Usage\InvoiceView::is_usage( $order ) ) {
+			return false;
+		}
+
 		return 1 === count( $items ) && $id > 0 && (int) reset( $items )->get_product_id() === $id;
 	}
 }
