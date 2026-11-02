@@ -134,13 +134,10 @@ final class Meter {
 		$user_id = (int) ( $license['user_id'] ?? 0 );
 		$ready   = $resource->get( self::READY_AT );
 
-		// Billing starts in the hour the resource first was ready. One that never got ready (failed or still being set up) bills nothing. One that was ready before the time was recorded (state ready, paused or deleting) starts at its activation.
+		// Billing starts in the hour the resource first was ready, which is recorded when it gets there. One that never got
+		// ready bills nothing: a failed build, or a placeholder that was paused or closed (marked deleted) before it was built.
 		if ( null === $ready ) {
-			if ( ! in_array( $resource->get( 'state' ), array( 'ready', 'paused', 'deleting', 'deleted' ), true ) ) {
-				return 0;
-			}
-
-			$ready = (int) strtotime( $row['activated_at'] . ' UTC' );
+			return 0;
 		}
 
 		$start   = max( $horizon, Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ) );
