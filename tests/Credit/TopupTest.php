@@ -442,6 +442,10 @@ class TopupTest extends CreditTestCase {
 			$this->assertStringContainsString( 'name="beltoft_credit_amount" value="' . $amount . '"', $html );
 		}
 		$this->assertStringContainsString( 'value="custom"', $html );
+		$this->assertStringContainsString( '>€10<', $html, 'Amounts are whole euros.' );
+		$this->assertStringNotContainsString( '.00 EUR', $html );
+		$this->assertStringContainsString( 'all of it goes to your balance. No VAT on top-ups; VAT is on your usage invoices.', $html );
+		$this->assertSame( 1, substr_count( $html, 'beltoft-services-credit__note"' ) - substr_count( $html, 'You need a saved card' ), 'One note on the top-up form.' );
 		$this->assertStringContainsString( 'name="beltoft_credit_custom"', $html );
 		$this->assertStringContainsString( Topup::NONCE, $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );

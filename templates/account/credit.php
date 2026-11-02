@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use BeltoftServices\Credit\Code;
 use BeltoftServices\Credit\Page;
 use BeltoftServices\Credit\Topup;
+use BeltoftServices\Usage\Rates;
 
 $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 ?>
@@ -28,27 +29,27 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 	</div>
 
 	<div class="beltoft-services-credit__balance">
-		<span class="beltoft-services-ov__label"><?php esc_html_e( 'Balance', 'beltoft-services' ); ?></span>
-		<span class="beltoft-services-ov__big"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
+		<span class="beltoft-services-credit__label"><?php esc_html_e( 'Balance', 'beltoft-services' ); ?></span>
+		<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
 	</div>
 
 	<form class="beltoft-services-credit__form" method="post" action="<?php echo esc_url( Page::url() ); ?>">
 		<fieldset class="beltoft-services-credit__amounts">
-			<legend><?php esc_html_e( 'Top up', 'beltoft-services' ); ?></legend>
+			<legend class="beltoft-services-credit__legend"><?php esc_html_e( 'Top up', 'beltoft-services' ); ?></legend>
 			<div class="beltoft-services-credit__grid">
 				<?php foreach ( $credit['amounts'] as $beltoft_services_credit_amount ) : ?>
 					<label class="beltoft-services-credit__tile">
 						<input class="beltoft-services-credit__input" type="radio" name="beltoft_credit_amount" value="<?php echo esc_attr( (string) $beltoft_services_credit_amount ); ?>"<?php checked( $beltoft_services_credit_amount, $beltoft_services_credit_first ); ?>>
-						<span class="beltoft-services-credit__face"><?php echo esc_html( Page::money( $beltoft_services_credit_amount * 100, $credit['currency'] ) ); ?></span>
+						<span class="beltoft-services-credit__face"><?php echo esc_html( Rates::money( (float) $beltoft_services_credit_amount, 0, $credit['currency'] ) ); ?></span>
 					</label>
 				<?php endforeach; ?>
 				<label class="beltoft-services-credit__tile">
 					<input class="beltoft-services-credit__input" type="radio" name="beltoft_credit_amount" value="custom"<?php checked( 0, $beltoft_services_credit_first ); ?>>
-					<span class="beltoft-services-credit__face"><?php esc_html_e( 'Other amount', 'beltoft-services' ); ?></span>
+					<span class="beltoft-services-credit__face"><?php esc_html_e( 'Other', 'beltoft-services' ); ?></span>
 				</label>
 			</div>
 			<p class="beltoft-services-credit__custom">
-				<label for="beltoft-credit-custom"><?php esc_html_e( 'Other amount', 'beltoft-services' ); ?></label>
+				<label class="screen-reader-text" for="beltoft-credit-custom"><?php esc_html_e( 'Other amount', 'beltoft-services' ); ?></label>
 				<input id="beltoft-credit-custom" type="text" inputmode="decimal" name="beltoft_credit_custom" autocomplete="off" placeholder="<?php echo esc_attr( (string) $credit['min'] ); ?>">
 			</p>
 			<p class="beltoft-services-credit__note">
@@ -56,14 +57,13 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 				echo esc_html(
 					sprintf(
 						/* translators: 1: smallest amount, 2: largest amount, with currency. */
-						__( 'From %1$s to %2$s. You pay this amount and all of it is added to your balance.', 'beltoft-services' ),
-						Topup::label_amount( $credit['min'] * 100, $credit['currency'] ),
-						Topup::label_amount( $credit['max'] * 100, $credit['currency'] )
+						__( '%1$s to %2$s, all of it goes to your balance. No VAT on top-ups; VAT is on your usage invoices.', 'beltoft-services' ),
+						Rates::money( (float) $credit['min'], 0, $credit['currency'] ),
+						Rates::money( (float) $credit['max'], 0, $credit['currency'] )
 					)
 				);
 				?>
 			</p>
-			<p class="beltoft-services-credit__note"><?php echo esc_html( Topup::receipt_text() ); ?></p>
 		</fieldset>
 		<?php wp_nonce_field( Topup::NONCE ); ?>
 		<input type="hidden" name="<?php echo esc_attr( Topup::ACTION ); ?>" value="1">
@@ -71,18 +71,22 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 	</form>
 
 	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( Page::url() ); ?>">
-		<h3><?php esc_html_e( 'Have a credit code?', 'beltoft-services' ); ?></h3>
-		<p class="beltoft-services-credit__custom">
-			<label for="beltoft-credit-code"><?php esc_html_e( 'Credit code', 'beltoft-services' ); ?></label>
+		<div class="beltoft-services-ov__head">
+			<h2><?php esc_html_e( 'Have a credit code?', 'beltoft-services' ); ?></h2>
+		</div>
+		<div class="beltoft-services-credit__coderow">
+			<label class="screen-reader-text" for="beltoft-credit-code"><?php esc_html_e( 'Credit code', 'beltoft-services' ); ?></label>
 			<input id="beltoft-credit-code" type="text" name="beltoft_credit_code" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
-		</p>
+			<?php wp_nonce_field( Code::NONCE ); ?>
+			<input type="hidden" name="<?php echo esc_attr( Code::ACTION ); ?>" value="1">
+			<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Redeem', 'beltoft-services' ); ?></button>
+		</div>
 		<p class="beltoft-services-credit__note"><?php esc_html_e( 'You need a saved card to redeem a code. Each card can use a code once.', 'beltoft-services' ); ?></p>
-		<?php wp_nonce_field( Code::NONCE ); ?>
-		<input type="hidden" name="<?php echo esc_attr( Code::ACTION ); ?>" value="1">
-		<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Redeem', 'beltoft-services' ); ?></button>
 	</form>
 
-	<h3><?php esc_html_e( 'History', 'beltoft-services' ); ?></h3>
+	<div class="beltoft-services-ov__head beltoft-services-credit__historyhead">
+		<h2><?php esc_html_e( 'History', 'beltoft-services' ); ?></h2>
+	</div>
 	<?php if ( ! $credit['history'] ) : ?>
 		<p class="beltoft-services-credit__empty"><?php esc_html_e( 'Nothing yet. Top-ups and credit used on invoices show here.', 'beltoft-services' ); ?></p>
 	<?php else : ?>

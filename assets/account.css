@@ -772,34 +772,45 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 }
 
 /* Credit page (prepaid balance). Square corners, few borders, the dashboard palette variables. */
-.beltoft-services-credit { max-width: 880px; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
-.beltoft-services-credit h3 { margin: 24px 0 8px; font-size: 16px; font-weight: 700; }
-.beltoft-services-credit__balance { display: grid; gap: 2px; margin: 0 0 20px; padding: 12px 14px; background: var(--bg-card, #fff); }
-.beltoft-services-credit__sub { color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-credit__form { display: grid; gap: 14px; }
-.beltoft-services-credit .beltoft-services-credit__amounts { min-width: 0; margin: 0; padding: 0; border: 0; }
-.beltoft-services-credit .beltoft-services-credit__amounts legend { margin: 0 0 8px; padding: 0; font-size: 15px; font-weight: 700; }
-.beltoft-services-credit__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0 0 12px; }
+.beltoft-services-credit { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 400; line-height: 1.5; }
+.beltoft-services-credit .beltoft-services-ov__head { margin: 0 0 8px; }
+.beltoft-services-credit .beltoft-services-credit__historyhead { margin-top: 24px; }
+.beltoft-services-credit__balance { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; padding: 12px 14px; background: var(--bg-card, #fff); }
+.beltoft-services-credit__label { color: var(--ink-soft, #5e7080); font-size: 15px; font-weight: 400; }
+.beltoft-services-credit__amount { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.beltoft-services-credit__form { display: grid; gap: 12px; margin: 24px 0 0; }
+.beltoft-services-credit .beltoft-services-credit__amounts { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+.beltoft-services-credit .beltoft-services-credit__amounts legend.beltoft-services-credit__legend, .woocommerce-account .woocommerce .beltoft-services-credit legend.beltoft-services-credit__legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.beltoft-services-credit__legend + * { clear: both; }
+.beltoft-services-credit__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; padding: 1px; background: var(--rule, #d9d6cc); }
 .beltoft-services-credit__tile { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
 .beltoft-services-credit__tile .beltoft-services-credit__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
-.beltoft-services-credit__face { display: flex; align-items: center; box-sizing: border-box; min-height: 56px; padding: 12px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; transition: background-color 0.12s ease, color 0.12s ease; }
-.beltoft-services-credit__tile:hover .beltoft-services-credit__face { background: var(--rule, #d6d2c8); }
-.beltoft-services-credit__tile .beltoft-services-credit__input:checked + .beltoft-services-credit__face, .beltoft-services-credit__tile:hover .beltoft-services-credit__input:checked + .beltoft-services-credit__face { background: var(--navy, #0c1535); color: #ffffff; }
-.beltoft-services-credit__tile .beltoft-services-credit__input:focus-visible + .beltoft-services-credit__face { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
-.beltoft-services-credit__custom { display: grid; gap: 4px; max-width: 220px; margin: 0 0 8px; }
-.beltoft-services-credit__custom label { font-size: 14px; color: var(--ink-soft, #5e7080); }
+.beltoft-services-credit__face { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 44px; padding: 8px; background: var(--bg-card, #fff); color: var(--navy, #0c1535); font-size: 15px; font-weight: 500; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; transition: background-color 0.12s ease, color 0.12s ease; }
+.beltoft-services-credit__tile:hover .beltoft-services-credit__face { background: var(--bg-warm, #eeece6); }
+.beltoft-services-credit__tile .beltoft-services-credit__input:checked + .beltoft-services-credit__face, .beltoft-services-credit__tile:hover .beltoft-services-credit__input:checked + .beltoft-services-credit__face { background: var(--navy, #0c1535); color: #ffffff; font-weight: 600; }
+.beltoft-services-credit__tile .beltoft-services-credit__input:focus-visible + .beltoft-services-credit__face { outline: 2px solid var(--navy, #0c1535); outline-offset: -2px; box-shadow: inset 0 0 0 4px var(--bg-card, #fff); }
+.beltoft-services-credit__tile .beltoft-services-credit__input:checked:focus-visible + .beltoft-services-credit__face { outline-color: #ffffff; box-shadow: none; }
+.beltoft-services-credit__custom { margin: 0; max-width: 220px; }
 .beltoft-services-credit__custom input { box-sizing: border-box; width: 100%; }
-.beltoft-services-credit__note { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+/* Other reveals its field only when chosen; a browser without :has() or a form without a choice keeps it shown. */
+.beltoft-services-credit__form:has(input[value="custom"]:not(:checked)) .beltoft-services-credit__custom { display: none; }
+.beltoft-services-credit .beltoft-services-credit__note { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; }
+.beltoft-services-credit__amounts .beltoft-services-credit__custom { margin-top: 8px; }
+.beltoft-services-credit__amounts .beltoft-services-credit__note { margin-top: 12px; }
 .beltoft-services-credit__submit { justify-self: start; }
-.beltoft-services-credit__code { display: grid; gap: 10px; margin: 28px 0; }
-.beltoft-services-credit__code h3 { margin: 0; }
-.beltoft-services-credit__code .beltoft-services-credit__custom { max-width: 320px; margin: 0; }
-.beltoft-services-credit__history { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-.beltoft-services-credit__history th, .beltoft-services-credit__history td { padding: 8px 10px 8px 0; border: 0; text-align: left; vertical-align: top; }
-.beltoft-services-credit__history th { color: var(--ink-soft, #5e7080); font-weight: 600; }
-.beltoft-services-credit__history tbody tr + tr td { border-top: 1px solid var(--rule, #d6d2c8); }
-.beltoft-services-credit__history th:nth-child(n+3), .beltoft-services-credit__history td:nth-child(n+3) { text-align: right; padding-right: 0; padding-left: 10px; }
-@media (max-width: 520px) { .beltoft-services-credit__history { font-size: 13px; } .beltoft-services-credit__history th:first-child, .beltoft-services-credit__history td:first-child { display: none; } }
+.beltoft-services-credit__code { display: grid; gap: 8px; margin: 24px 0 0; }
+.beltoft-services-credit__coderow { display: flex; align-items: stretch; gap: 8px; max-width: 480px; }
+.beltoft-services-credit__coderow input[type="text"] { flex: 1 1 auto; box-sizing: border-box; min-width: 0; min-height: 40px; }
+.beltoft-services-credit__coderow .button { flex: 0 0 auto; }
+.beltoft-services-credit__empty { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-credit__history { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+.beltoft-services-credit__history th, .beltoft-services-credit__history td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--rule, #d9d6cc); background: none; text-align: left; vertical-align: top; }
+.beltoft-services-credit__history th { padding-top: 0; color: var(--ink-soft, #5e7080); font-size: 13px; font-weight: 500; }
+.beltoft-services-credit__history tbody tr:last-child td { border-bottom: 0; }
+.beltoft-services-credit__history th:first-child, .beltoft-services-credit__history td:first-child { padding-left: 0; }
+.beltoft-services-credit__history th:nth-child(n+3), .beltoft-services-credit__history td:nth-child(n+3) { text-align: right; }
+.beltoft-services-credit__history th:last-child, .beltoft-services-credit__history td:last-child { padding-right: 0; }
+@media (max-width: 520px) { .beltoft-services-credit__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .beltoft-services-credit__coderow { display: grid; } .beltoft-services-credit__submit, .beltoft-services-credit__coderow .button { width: 100%; justify-self: stretch; } .beltoft-services-credit__custom { max-width: none; } .beltoft-services-credit__history { font-size: 14px; } .beltoft-services-credit__history th:first-child, .beltoft-services-credit__history td:first-child { display: none; } }
 
 /* Card box on the payment methods page. Square corners, no borders, the dashboard palette variables. */
 .beltoft-services-card { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
