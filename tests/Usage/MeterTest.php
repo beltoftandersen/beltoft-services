@@ -187,4 +187,13 @@ class MeterTest extends UsageTestCase {
 		$this->assertGreaterThan( 0, Meter::run() );
 		$this->assertNotEmpty( $this->rows( $r->id(), 'server' ) );
 	}
+
+	public function test_a_service_closed_before_it_was_ready_bills_nothing(): void {
+		$v = $this->usage_product();
+		$r = $this->usage_vm( $v['u-None'], $this->new_user(), 3 );
+		$r->set( array( Meter::READY_AT => null, 'state' => 'deleted' ) );
+
+		$this->assertSame( 0, Meter::run(), 'A failed build or a placeholder that was marked deleted is never billed.' );
+		$this->assertSame( array(), $this->rows( $r->id() ) );
+	}
 }

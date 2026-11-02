@@ -112,7 +112,7 @@ class DatabaseUsageTest extends UsageTestCase {
 				'fire'         => false,
 			)
 		);
-		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $parent->get_id(), $variation->get_id() ), array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $parent->get_id(), $variation->get_id() ), array( 'state' => 'ready', 'desired' => 'ready', \BeltoftServices\Usage\Meter::READY_AT => time() - $hours * HOUR_IN_SECONDS ) );
 		$this->assertInstanceOf( Resource::class, $r );
 		$this->activated_ago( $r->id(), $hours );
 
