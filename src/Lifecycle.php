@@ -118,9 +118,21 @@ final class Lifecycle {
 			return;
 		}
 
-		if ( $resource ) {
+		// A deletion is terminal: the customer's own delete ends its license, and that must not pause the service on its way out.
+		if ( $resource && ! self::deletion_wanted( $resource ) ) {
 			self::desire( $resource, 'paused', sprintf( 'License %s', Licenses::effective_status( $license ) ) );
 		}
+	}
+
+	/**
+	 * Is a deletion stored or waiting for the resource lock?
+	 *
+	 * @param Resource $resource Resource.
+	 */
+	private static function deletion_wanted( Resource $resource ): bool {
+		$pending = $resource->pending_desire();
+
+		return 'deleted' === ( $pending ? $pending['state'] : $resource->get( 'desired' ) );
 	}
 
 	/**

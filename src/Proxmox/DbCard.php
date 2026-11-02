@@ -66,6 +66,7 @@ final class DbCard {
 		$public  = $ready && '' !== $access['address'] ? $engine->connections( $access['address'] ) : array();
 
 		return array(
+			'resource_id' => $r->id(),
 			'kind'        => $kind,
 			'cost'        => \BeltoftServices\Usage\Estimate::cost_line( $r->id() ),
 			'host'        => $ready ? $address : '',

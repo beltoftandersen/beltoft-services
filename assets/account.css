@@ -824,3 +824,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-card__form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; }
 .beltoft-services-card__form .beltoft-services-card__note { margin: 0; }
 @media (max-width: 520px) { .beltoft-services-card__form { display: grid; } .beltoft-services-card__btn { width: 100%; } }
+
+/* Pay as you go: the billing line under the power buttons of a server page, and the Delete block. */
+.beltoft-services-page__billing { flex: 0 0 100%; margin: 0; }
+.beltoft-services-delete .beltoft-services-delete__go { margin-top: 4px; }
+.beltoft-services-delete input[type="text"] { max-width: 24em; }

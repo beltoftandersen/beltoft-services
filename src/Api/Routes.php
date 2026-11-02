@@ -104,6 +104,23 @@ final class Routes {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/resources/(?P<id>\d+)/delete',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'delete' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array(
+					'id'      => $id,
+					'confirm' => array(
+						'type'    => 'string',
+						'default' => '',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/resources/(?P<id>\d+)/open',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -242,6 +259,48 @@ final class Routes {
 				'queued'  => true,
 				'at'      => time(),
 				'message' => __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
+			),
+			202
+		);
+	}
+
+	/**
+	 * POST resources/<id>/delete: the customer deletes their pay-as-you-go server or database (typed confirmation in
+	 * `confirm`). Dashboard only: the token gate does not allow this address. The service is queued for deletion and the
+	 * driver does the work in the background.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public static function delete( \WP_REST_Request $request ): \WP_REST_Response {
+		$limited = self::limited( $request, 5 );
+
+		if ( $limited ) {
+			return $limited;
+		}
+
+		$resource = Resource::find( (int) $request['id'] );
+		$license  = $resource ? $resource->license() : array();
+		$user_id  = get_current_user_id();
+
+		// The same answer whether the service is someone else's, gone or not a pay as you go one.
+		if ( ! $resource || $user_id < 1 || empty( $license['user_id'] ) || (int) $license['user_id'] !== $user_id || ! $resource->is_live() ) {
+			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
+		}
+
+		$done = \BeltoftServices\Usage\CustomerDelete::run( $resource, $user_id, sanitize_text_field( (string) $request['confirm'] ) );
+
+		if ( $done instanceof \WP_Error ) {
+			$data = $done->get_error_data();
+
+			return self::error( $done->get_error_code(), $done->get_error_message(), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422 );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'deleting' => true,
+				'at'       => time(),
+				'message'  => __( 'Your service is being deleted. This can take a minute.', 'beltoft-services' ),
 			),
 			202
 		);

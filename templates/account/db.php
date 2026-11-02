@@ -304,6 +304,14 @@ $beltoft_services_db_wait = array(
 		</div>
 	<?php endif; ?>
 
+	<?php
+	// A pay-as-you-go database can be deleted by its owner, from the Overview.
+	if ( $beltoft_services_all || 'overview' === $active ) {
+		$beltoft_services_delete_id = (int) $view['resource_id'];
+		include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
+	}
+	?>
+
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'password' === $active ) ) : ?>
 		<?php if ( $view['can_reveal'] && ! $beltoft_services_all && 'overview' !== $active ) : ?>
 			<p class="beltoft-services-panel__notice"><?php esc_html_e( 'Your password is ready to be shown once.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $link( 'overview' ) ); ?>"><?php esc_html_e( 'Show it on the Overview tab', 'beltoft-services' ); ?></a></p>

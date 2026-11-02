@@ -79,6 +79,7 @@ final class Panels {
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'ssh_user'   => Provision::LOGIN_USER,
 			'actions'    => array_intersect_key( $offered, array_flip( array( 'start', 'reboot', 'shutdown' ) ) ),
+			'billing_note' => 'server' === \BeltoftServices\Usage\CustomerDelete::kind( $resource ) ? \BeltoftServices\Usage\CustomerDelete::billing_note( 'server' ) : '',
 		);
 
 		( static function ( array $vars ): void {
