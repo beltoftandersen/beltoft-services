@@ -166,4 +166,23 @@ final class DeletedServicesTest extends UsageTestCase {
 		$this->assertCount( 1, $rows );
 		$this->assertSame( 'monthly-vps', $rows[0]['name'] );
 	}
+
+	public function test_a_service_being_deleted_is_gone_for_the_lists_at_once(): void {
+		$v       = $this->usage_product();
+		$user    = $this->new_user();
+		$account = $this->usage_account( $user );
+		$r       = $this->usage_vm( $v['u-None'], $user, 5, $account->get_id() );
+		$r->set( array( 'server_name' => 'going-vps' ) );
+
+		// Asked to delete, jobs not run yet: still live, still in a working state.
+		$this->assertTrue( CustomerDelete::run( Resource::find( $r->id() ), $user, 'going-vps' ) );
+		$still = Resource::find( $r->id() );
+		$this->assertNotNull( $still );
+		$this->assertTrue( Resource::gone( $still ), 'Asked to delete: not listed while the deletion runs.' );
+
+		wp_set_current_user( $user );
+		ob_start();
+		Servers::render( $this->views( $still ) );
+		$this->assertStringNotContainsString( 'going-vps', (string) ob_get_clean() );
+	}
 }
