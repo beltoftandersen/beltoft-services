@@ -131,6 +131,9 @@ class EstimateTest extends UsageTestCase {
 		$this->assertStringContainsString( 'excl. VAT', $html );
 		$this->assertStringContainsString( "\u{20AC}2.26", $html );
 		$this->assertStringContainsString( '100', $html );
+		$this->assertStringContainsString( '<th scope="col">Service</th>', $html );
+		$this->assertStringContainsString( 'beltoft-services-credit__balance', $html, 'The total sits in the Credit tab\'s balance row.' );
+		$this->assertStringNotContainsString( '<h3', $html );
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ), time() + 12 * DAY_IN_SECONDS ), $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertNotSame( '', Estimate::cost_line( $r->id() ) );
