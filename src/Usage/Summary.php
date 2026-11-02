@@ -26,6 +26,7 @@ final class Summary {
 		add_filter( 'woocommerce_cart_item_price', array( __CLASS__, 'cart_price' ), 100, 2 );
 		add_filter( 'woocommerce_cart_item_subtotal', array( __CLASS__, 'cart_subtotal' ), 100, 2 );
 		add_filter( 'woocommerce_order_item_visible', array( __CLASS__, 'order_visible' ), 20, 2 );
+		add_filter( 'woocommerce_cart_contents_count', array( __CLASS__, 'contents_count' ), 20, 1 );
 		add_filter( 'woocommerce_order_formatted_line_subtotal', array( __CLASS__, 'order_subtotal' ), 100, 2 );
 		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'checkout_summary' ), 30, 1 );
 	}
@@ -49,6 +50,27 @@ final class Summary {
 	 */
 	public static function visible( $visible, $item = array() ) {
 		return is_array( $item ) && self::is_account( (int) ( $item['product_id'] ?? 0 ) ) ? false : $visible;
+	}
+
+	/**
+	 * The cart icon's count leaves out the hidden account line, so one server reads as one item.
+	 *
+	 * @param mixed $count Items in the cart.
+	 */
+	public static function contents_count( $count ) {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		if ( ! $cart ) {
+			return $count;
+		}
+
+		foreach ( $cart->get_cart() as $item ) {
+			if ( self::is_account( (int) ( $item['product_id'] ?? 0 ) ) ) {
+				$count -= (int) ( $item['quantity'] ?? 0 );
+			}
+		}
+
+		return max( 0, (int) $count );
 	}
 
 	/**
