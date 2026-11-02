@@ -13,6 +13,7 @@ use BeltoftServices\Mcp\Audit;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Oauth\Grants;
 use BeltoftServices\Api\Tokens;
+use BeltoftServices\StepUp;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,6 +34,12 @@ final class ApiTokens {
 	 * Nonce action.
 	 */
 	public const NONCE = 'beltoft_services_api_token';
+
+	/**
+	 * Wrong passwords allowed when asking for a Full access token, and how long they count (seconds).
+	 */
+	public const MAX_FAILS   = 5;
+	public const FAIL_WINDOW = 900;
 
 	/**
 	 * What the last post did: ok, message and a new password shown once.
@@ -98,6 +105,7 @@ final class ApiTokens {
 			'name'   => isset( $_POST['token_name'] ) ? sanitize_text_field( wp_unslash( $_POST['token_name'] ) ) : '',
 			'scope'  => isset( $_POST['token_scope'] ) ? sanitize_key( wp_unslash( $_POST['token_scope'] ) ) : '',
 			'uuid'   => isset( $_POST['token_uuid'] ) ? sanitize_text_field( wp_unslash( $_POST['token_uuid'] ) ) : '',
+			'secret' => isset( $_POST['token_secret'] ) ? (string) wp_unslash( $_POST['token_secret'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- A password: compared, never stored or shown.
 			'family' => isset( $_POST['app_family'] ) ? sanitize_key( wp_unslash( $_POST['app_family'] ) ) : '',
 			'allow'  => isset( $_POST['mcp_allow'] ) ? sanitize_key( wp_unslash( $_POST['mcp_allow'] ) ) : '',
 			'nonce'  => isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '',
@@ -144,7 +152,30 @@ final class ApiTokens {
 			return array( 'ok' => false, 'message' => '', 'password' => '' );
 		}
 
-		$made = Tokens::create( $user_id, (string) ( $post['name'] ?? '' ), (string) ( $post['scope'] ?? '' ) );
+		$stepped = false;
+
+		if ( Tokens::FULL === ( $post['scope'] ?? '' ) ) {
+			$key = 'beltoft_services_tokfail_' . $user_id;
+
+			if ( (int) get_transient( $key ) >= self::MAX_FAILS ) {
+				return array( 'ok' => false, 'message' => __( 'Too many wrong attempts. Please wait a few minutes and try again.', 'beltoft-services' ), 'password' => '' );
+			}
+
+			if ( ! StepUp::verify( $user_id, (string) ( $post['secret'] ?? '' ) ) ) {
+				set_transient( $key, (int) get_transient( $key ) + 1, self::FAIL_WINDOW );
+
+				return array(
+					'ok'       => false,
+					'message'  => 'code' === StepUp::ask( $user_id )['kind'] ? __( 'That code is not right. No token was made.', 'beltoft-services' ) : __( 'That password is not right. No token was made.', 'beltoft-services' ),
+					'password' => '',
+				);
+			}
+
+			delete_transient( $key );
+			$stepped = true;
+		}
+
+		$made = Tokens::create( $user_id, (string) ( $post['name'] ?? '' ), (string) ( $post['scope'] ?? '' ), $stepped );
 
 		if ( is_wp_error( $made ) ) {
 			return array( 'ok' => false, 'message' => $made->get_error_message(), 'password' => '' );
@@ -212,6 +243,7 @@ final class ApiTokens {
 				'tokens'   => Tokens::all( $user->ID ),
 				'scopes'   => Tokens::scopes(),
 				'levels'   => Tokens::levels(),
+				'step_up'  => StepUp::ask( $user->ID ),
 				'audit'    => array_slice( array_reverse( Audit::lines( $user->ID ) ), 0, 20 ),
 				'result'   => self::$result,
 				'nonce'    => wp_create_nonce( self::NONCE ),

@@ -53,7 +53,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			<?php foreach ( $tokens as $beltoft_services_token ) : ?>
 				<tr>
 					<td data-title="<?php esc_attr_e( 'Name', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_token['name'] ); ?></td>
-					<td data-title="<?php esc_attr_e( 'Access', 'beltoft-services' ); ?>"><?php echo esc_html( $scopes[ $beltoft_services_token['scope'] ] ?? '' ); ?></td>
+					<td data-title="<?php esc_attr_e( 'Access', 'beltoft-services' ); ?>"><?php echo esc_html( $levels[ $beltoft_services_token['scope'] ] ?? '' ); ?></td>
 					<td data-title="<?php esc_attr_e( 'Created', 'beltoft-services' ); ?>"><?php echo esc_html( wp_date( $beltoft_services_fmt, $beltoft_services_token['created'] ) ); ?></td>
 					<td data-title="<?php esc_attr_e( 'Last used', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_token['last_used'] ? wp_date( $beltoft_services_fmt, $beltoft_services_token['last_used'] ) : __( 'Never', 'beltoft-services' ) ); ?></td>
 					<td>
@@ -87,8 +87,13 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 						<?php foreach ( $scopes as $beltoft_services_key => $beltoft_services_label ) : ?>
 							<option value="<?php echo esc_attr( $beltoft_services_key ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></option>
 						<?php endforeach; ?>
+						<option value="full"><?php esc_html_e( 'Full access: also purchases, cancellations, password reveals and deletions, each confirmed in the chat first', 'beltoft-services' ); ?></option>
 					</select>
 				</span>
+			</p>
+			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field" id="beltoft-token-secret-row">
+				<label for="beltoft-token-secret"><?php echo esc_html( $step_up['label'] ); ?> <?php esc_html_e( '(only for Full access)', 'beltoft-services' ); ?></label>
+				<span class="woocommerce-input-wrapper"><input type="password" class="woocommerce-Input input-text" id="beltoft-token-secret" name="token_secret" maxlength="200" autocomplete="<?php echo esc_attr( $step_up['autocomplete'] ); ?>" placeholder=" "></span>
 			</p>
 			<p><button type="submit" class="button"><?php esc_html_e( 'Create token', 'beltoft-services' ); ?></button></p>
 		</form>
@@ -190,7 +195,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<p class="beltoft-services-api__notice"><?php esc_html_e( 'Claude can only connect after you switch on "Allow Claude (MCP) access" above.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
 			<ol>
-				<li><?php esc_html_e( 'Create a token above and copy it. Give it the access you want Claude to have.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Create a token above and copy it. Give it the access you want Claude to have. Ordering a server, cancelling, deleting and showing passwords need a Full access token, which you create with your account password.', 'beltoft-services' ); ?></li>
 				<li><?php esc_html_e( 'Copy the address and your username, or copy the command below and replace YOUR_TOKEN with the token.', 'beltoft-services' ); ?></li>
 			</ol>
 			<?php

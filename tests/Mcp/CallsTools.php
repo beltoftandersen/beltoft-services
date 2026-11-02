@@ -122,7 +122,7 @@ trait CallsTools {
 	 * @return array{0: int, 1: string}
 	 */
 	protected function personal( int $user, string $scope ): array {
-		$made = Tokens::create( $user, 'Script', $scope );
+		$made = Tokens::create( $user, 'Script', $scope, Tokens::FULL === $scope );
 		$this->assertIsArray( $made );
 
 		return array( $user, $made['password'] );

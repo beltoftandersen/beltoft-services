@@ -275,7 +275,7 @@ final class OpenApi {
 			'info'       => array(
 				'title'       => get_bloginfo( 'name' ) . ' customer API',
 				'version'     => defined( 'BELTOFT_SERVICES_VERSION' ) ? (string) BELTOFT_SERVICES_VERSION : '1',
-				'description' => 'Your own services. Sign in with a personal token (HTTP Basic: your username and the token) or with OAuth. A token with the read scope reads; the actions scope also changes things. Secrets, and actions that destroy something, are only available in the dashboard.',
+				'description' => 'Your own services. Sign in with a personal token (HTTP Basic: your username and the token) or with OAuth. A token with the read scope reads; the actions scope also changes things. Secrets, and actions that destroy something, are only available in the dashboard. A Full access token (made with the account password) also opens the Full tools of the MCP endpoint, each after a confirmation; on these routes it works as actions.',
 			),
 			'servers'    => array( array( 'url' => untrailingslashit( rest_url( Routes::NAMESPACE ) ) ) ),
 			'paths'      => (object) $paths,

@@ -39,10 +39,11 @@ final class LevelsTest extends McpTestCase {
 		}
 	}
 
-	public function test_a_connection_is_never_above_its_grant_and_a_personal_token_is_never_full(): void {
+	public function test_a_connection_is_never_above_its_grant_and_a_personal_token_is_full_only_with_the_password_check(): void {
 		$server = $this->server();
 		$user   = $this->owner( $server );
 
+		// Full needs the password check done by the caller (the account form).
 		$this->assertWPError( Tokens::create( $user, 'Script', Tokens::FULL ) );
 
 		// A stored personal scope that is not ours gives no access at all.
