@@ -27,6 +27,42 @@
 		button.setAttribute( 'aria-busy', on ? 'true' : 'false' );
 	}
 
+	// Opens the list once the service is really gone (the status answers 404, or says deleted), so the list never shows it as
+	// still working. Gives up after about two minutes and opens the list anyway.
+	function waitGone( id, after, tries ) {
+		function leave() {
+			if ( after ) {
+				window.location.href = after;
+			} else {
+				window.location.reload();
+			}
+		}
+
+		window.setTimeout( function () {
+			window.fetch( account.root + id, { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
+				if ( ! response.ok ) {
+					return { gone: 404 === response.status || 403 === response.status };
+				}
+
+				return response.json().then( function ( data ) {
+					return { gone: !! data && 'deleted' === data.state };
+				} );
+			} ).then( function ( result ) {
+				if ( result.gone || tries >= 40 ) {
+					leave();
+				} else {
+					waitGone( id, after, tries + 1 );
+				}
+			} ).catch( function () {
+				if ( tries >= 40 ) {
+					leave();
+				} else {
+					waitGone( id, after, tries + 1 );
+				}
+			} );
+		}, 3000 );
+	}
+
 	function go( box, button ) {
 		var input = box.querySelector( '[data-delete-confirm]' );
 		var after = box.getAttribute( 'data-delete-after' );
@@ -53,13 +89,7 @@
 				}
 
 				say( box, text.strings.working );
-				window.setTimeout( function () {
-					if ( after ) {
-						window.location.href = after;
-					} else {
-						window.location.reload();
-					}
-				}, 2500 );
+				waitGone( box.getAttribute( 'data-resource-id' ), after, 0 );
 
 				return null;
 			}
