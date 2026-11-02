@@ -1030,11 +1030,25 @@ final class Card {
 		$expiry  = '';
 		$expired = false;
 
-		if ( $token instanceof \WC_Payment_Token_CC ) {
-			$label = ucfirst( sanitize_text_field( (string) $token->get_card_type() ) );
-			$last4 = preg_replace( '/\D/', '', (string) $token->get_last4() );
-			$month = (int) $token->get_expiry_month();
-			$year  = (int) $token->get_expiry_year();
+		$pick = static function ( array $methods ) use ( $token ): string {
+			foreach ( $methods as $method ) {
+				if ( is_callable( array( $token, $method ) ) ) {
+					return (string) $token->$method();
+				}
+			}
+
+			return '';
+		};
+
+		// WooCommerce's card token, and Stripe's own card token, name the same facts differently.
+		$brand = $pick( array( 'get_card_type', 'get_brand' ) );
+		$digit = $pick( array( 'get_last4' ) );
+
+		if ( '' !== $digit && '' !== $brand ) {
+			$label = ucfirst( sanitize_text_field( $brand ) );
+			$last4 = preg_replace( '/\D/', '', $digit );
+			$month = (int) $pick( array( 'get_expiry_month', 'get_exp_month' ) );
+			$year  = (int) $pick( array( 'get_expiry_year', 'get_exp_year' ) );
 
 			if ( $year > 0 && $year < 100 ) {
 				$year += 2000;
@@ -1051,7 +1065,7 @@ final class Card {
 		return array(
 			'status'  => 'valid',
 			'expired' => $expired,
-			'label'   => 'visa' === strtolower( $label ) ? 'Visa' : ( 'mastercard' === strtolower( $label ) ? 'Mastercard' : $label ),
+			'label'   => $label,
 			'last4'   => (string) $last4,
 			'expiry'  => $expiry,
 		);
