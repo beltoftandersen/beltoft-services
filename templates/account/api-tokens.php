@@ -11,6 +11,8 @@
  * @var array<int, array{at: int, text: string}>|null      $audit    The last actions of connected apps on things that have no service history.
  * @var array<string, string>                           $levels   Level => label of a connected app (read, actions, full).
  * @var array{ok: bool, message: string, password: string}|null $result What the last post did.
+ * @var array{kind: string, label: string, autocomplete: string, email: string, purpose: string} $step_up The second check of a Full access token.
+ * @var array{name: string, scope: string, sent: bool}  $prefill  What the form had when a code was sent or refused.
  * @var string                                          $nonce    Nonce of the forms.
  * @var string                                          $field    Name of the action field.
  * @var string                                          $base     Base address of the API, with a trailing slash.
@@ -78,7 +80,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
 			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field">
 				<label for="beltoft-token-name"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></label>
-				<span class="woocommerce-input-wrapper"><input type="text" class="woocommerce-Input input-text" id="beltoft-token-name" name="token_name" maxlength="100" placeholder=" " required></span>
+				<span class="woocommerce-input-wrapper"><input type="text" class="woocommerce-Input input-text" id="beltoft-token-name" name="token_name" maxlength="100" placeholder=" " value="<?php echo esc_attr( $prefill['name'] ?? '' ); ?>" required></span>
 			</p>
 			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field">
 				<label for="beltoft-token-scope"><?php esc_html_e( 'Access', 'beltoft-services' ); ?></label>
@@ -87,15 +89,34 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 						<?php foreach ( $scopes as $beltoft_services_key => $beltoft_services_label ) : ?>
 							<option value="<?php echo esc_attr( $beltoft_services_key ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></option>
 						<?php endforeach; ?>
-						<option value="full"><?php esc_html_e( 'Full access: also purchases, cancellations, password reveals and deletions, each confirmed in the chat first', 'beltoft-services' ); ?></option>
+						<option value="full"<?php selected( $prefill['scope'] ?? '', 'full' ); ?>><?php esc_html_e( 'Full access: also purchases, cancellations, password reveals and deletions, each confirmed in the chat first', 'beltoft-services' ); ?></option>
 					</select>
 				</span>
 			</p>
 			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field" id="beltoft-token-secret-row">
 				<label for="beltoft-token-secret"><?php echo esc_html( $step_up['label'] ); ?> <?php esc_html_e( '(only for Full access)', 'beltoft-services' ); ?></label>
-				<span class="woocommerce-input-wrapper"><input type="password" class="woocommerce-Input input-text" id="beltoft-token-secret" name="token_secret" maxlength="200" autocomplete="<?php echo esc_attr( $step_up['autocomplete'] ); ?>" placeholder=" "></span>
+				<span class="woocommerce-input-wrapper"><input type="text" class="woocommerce-Input input-text" id="beltoft-token-secret" name="token_secret" maxlength="12" inputmode="numeric" autocomplete="<?php echo esc_attr( $step_up['autocomplete'] ); ?>" spellcheck="false" placeholder=" "></span>
+				<?php if ( 'emailed' === $step_up['kind'] ) : ?>
+					<span class="beltoft-services-api__hint">
+						<?php
+						echo esc_html(
+							! empty( $prefill['sent'] )
+								/* translators: %s: the account email with part of the name hidden. */
+								? sprintf( __( 'We sent a code to %s. It works once for 10 minutes.', 'beltoft-services' ), $step_up['email'] )
+								/* translators: %s: the account email with part of the name hidden. */
+								: sprintf( __( 'For Full access we email a code to %s.', 'beltoft-services' ), $step_up['email'] )
+						);
+						?>
+					</span>
+				<?php endif; ?>
 			</p>
-			<p><button type="submit" class="button"><?php esc_html_e( 'Create token', 'beltoft-services' ); ?></button></p>
+			<?php /* Create token comes first in the markup so Enter in the code field makes the token; Send code is shown before it. */ ?>
+			<p class="beltoft-services-api__buttons">
+				<button type="submit" class="button"><?php esc_html_e( 'Create token', 'beltoft-services' ); ?></button>
+				<?php if ( 'emailed' === $step_up['kind'] ) : ?>
+					<button type="submit" class="button beltoft-services-api__send" name="<?php echo esc_attr( $field ); ?>" value="send_code" formnovalidate><?php echo esc_html( ! empty( $prefill['sent'] ) ? __( 'Send a new code', 'beltoft-services' ) : __( 'Send code', 'beltoft-services' ) ); ?></button>
+				<?php endif; ?>
+			</p>
 		</form>
 	<?php endif; ?>
 
@@ -195,7 +216,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<p class="beltoft-services-api__notice"><?php esc_html_e( 'Claude can only connect after you switch on "Allow Claude (MCP) access" above.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
 			<ol>
-				<li><?php esc_html_e( 'Create a token above and copy it. Give it the access you want Claude to have. Ordering a server, cancelling, deleting and showing passwords need a Full access token, which you create with your account password.', 'beltoft-services' ); ?></li>
+				<li><?php esc_html_e( 'Create a token above and copy it. Give it the access you want Claude to have. Ordering a server, cancelling, deleting and showing passwords need a Full access token, which you create with a code we email you.', 'beltoft-services' ); ?></li>
 				<li><?php esc_html_e( 'Copy the address and your username, or copy the command below and replace YOUR_TOKEN with the token.', 'beltoft-services' ); ?></li>
 			</ol>
 			<?php

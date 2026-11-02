@@ -74,6 +74,7 @@ final class Plugin {
 		Domains\Renewals::register();
 		Domains\Actions::register();
 		Domains\AuthCodeRoute::register();
+		StepUp::register();
 		Domains\DnsClaimJobs::register();
 		Domains\DnsReleaseJob::register();
 		Domains\DnsCancel::register();

@@ -29,7 +29,7 @@ defined( 'ABSPATH' ) || exit;
  * - an access token of the OAuth server (Oauth\Grants) is a token request too, with the level the customer chose
  *   (read, actions or full). Full only means something to the MCP tools; on the REST routes it works as actions, so the
  *   action filter below keeps protecting them. A personal token is full only when the customer chose Full access
- *   and confirmed it with the account password (StepUp) when making it;
+ *   and confirmed it with an emailed code (StepUp) when making it;
  * - requests are counted per token (filter beltoft_services_token_rate_limit, default 60 a minute), on top of the
  *   per-user, per-route limits the routes keep;
  * - a change that was accepted is written to the license history ("API: reboot requested").
@@ -249,7 +249,7 @@ final class Tokens {
 	 * @param int    $user_id User.
 	 * @param string $name    A name the customer recognises.
 	 * @param string $scope   read, actions or full.
-	 * @param bool   $stepped Whether the customer confirmed with the account password (needed for full only).
+	 * @param bool   $stepped Whether the customer confirmed with the emailed code (needed for full only).
 	 * @return array{password: string, uuid: string}|\WP_Error The password is returned this once.
 	 */
 	public static function create( int $user_id, string $name, string $scope, bool $stepped = false ) {

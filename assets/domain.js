@@ -203,7 +203,7 @@
 		}
 		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form ); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
 	} );
-	// The transfer code is shown after a second check: the account password, or the code from the authenticator app.
+	// The transfer code is shown after a second check: a code emailed to the account address (or a site's own factor).
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest( '.beltoft-services-domain-auth' );
 		if ( ! button ) { return; }
@@ -211,7 +211,35 @@
 		var form = panel.querySelector( '.beltoft-services-domain-stepup' );
 		if ( ! form ) { return; }
 		form.hidden = false;
-		form.querySelector( 'input[name="secret"]' ).focus();
+		var ask = form.querySelector( '.beltoft-services-domain-send' );
+		if ( ask && ! form.querySelector( '.beltoft-services-domain-stepup__enter' ).hidden ) { ask = null; }
+		( ask || form.querySelector( 'input[name="secret"]' ) ).focus();
+	} );
+	// "Send code": the server emails a new code to the account address.
+	document.addEventListener( 'click', function ( event ) {
+		var send = event.target.closest( '.beltoft-services-domain-send' );
+		if ( ! send ) { return; }
+		var form = send.closest( '.beltoft-services-domain-stepup' );
+		var error = form.querySelector( '.beltoft-services-domain-stepup__error' );
+		var enter = form.querySelector( '.beltoft-services-domain-stepup__enter' );
+		var ask = form.querySelector( '.beltoft-services-domain-stepup__ask' );
+		send.disabled = true;
+		error.hidden = true;
+		window.fetch( config.root + 'step-up/send', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { purpose: 'transfer_code' } ) } ).then( function ( response ) {
+			var nonce = response.headers.get( 'X-WP-Nonce' );
+			if ( nonce ) { config.nonce = nonce; }
+			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
+		} ).then( function () {
+			if ( ask ) { ask.hidden = true; }
+			enter.hidden = false;
+			form.querySelector( 'input[name="secret"]' ).value = '';
+			form.querySelector( 'input[name="secret"]' ).focus();
+			send.disabled = false;
+		} ).catch( function ( failure ) {
+			error.textContent = failure.message;
+			error.hidden = false;
+			send.disabled = false;
+		} );
 	} );
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target.closest( '.beltoft-services-domain-stepup' );
