@@ -95,6 +95,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 			</p>
 			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field" id="beltoft-token-secret-row">
 				<label for="beltoft-token-secret"><?php echo esc_html( $step_up['label'] ); ?> <?php esc_html_e( '(only for Full access)', 'beltoft-services' ); ?></label>
+				<span class="woocommerce-input-wrapper"><input type="text" class="woocommerce-Input input-text" id="beltoft-token-secret" name="token_secret" maxlength="12" inputmode="numeric" autocomplete="<?php echo esc_attr( $step_up['autocomplete'] ); ?>" spellcheck="false" placeholder=" "></span>
 				<?php if ( 'emailed' === $step_up['kind'] ) : ?>
 					<span class="beltoft-services-api__hint">
 						<?php
@@ -108,7 +109,6 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 						?>
 					</span>
 				<?php endif; ?>
-				<span class="woocommerce-input-wrapper"><input type="text" class="woocommerce-Input input-text" id="beltoft-token-secret" name="token_secret" maxlength="12" inputmode="numeric" autocomplete="<?php echo esc_attr( $step_up['autocomplete'] ); ?>" spellcheck="false" placeholder=" "></span>
 			</p>
 			<?php /* Create token comes first in the markup so Enter in the code field makes the token; Send code is shown before it. */ ?>
 			<p class="beltoft-services-api__buttons">
