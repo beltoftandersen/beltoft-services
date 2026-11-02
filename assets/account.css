@@ -312,8 +312,8 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 }
 
 /* Work in progress: three squares that take turns to pulse. Before the text of a busy button, of a running progress block and of the card's working line. */
-.beltoft-services-panel .is-busy, .beltoft-services-domain-transfer .is-busy { cursor: progress; }
-.beltoft-services-panel .is-busy::before, .beltoft-services-domain-transfer .is-busy::before,
+.beltoft-services-panel .is-busy, .beltoft-services-domain-transfer .is-busy, .beltoft-services-db .is-busy { cursor: progress; }
+.beltoft-services-panel .is-busy::before, .beltoft-services-domain-transfer .is-busy::before, .beltoft-services-db .is-busy::before,
 .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before,
 .beltoft-services-vm__flash.is-working::before {
 	content: "";
@@ -328,7 +328,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 @media (prefers-reduced-motion: reduce) {
 	.beltoft-services-progress__steps li.is-current::before { animation: none; }
-	.beltoft-services-panel .is-busy::before, .beltoft-services-domain-transfer .is-busy::before,
+	.beltoft-services-panel .is-busy::before, .beltoft-services-domain-transfer .is-busy::before, .beltoft-services-db .is-busy::before,
 	.beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before,
 	.beltoft-services-vm__flash.is-working::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; }
 }
