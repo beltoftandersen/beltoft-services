@@ -703,6 +703,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-db__form label { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--navy, #0c1535); }
 .beltoft-services-db__form input[type="text"], .beltoft-services-db__form select { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
 .beltoft-services-db__form .button { justify-self: start; margin: 0; }
+.beltoft-services-db__form input + .button { margin-top: 8px; }
 
 /* Security: the API tokens box, like the two-factor box over it (880px, 24px padding, 18px heading). */
 .woocommerce-MyAccount-content section.beltoft-services-api { display: grid; min-width: 0; gap: 12px; box-sizing: border-box; max-width: 880px; padding: 24px; background: var(--bg-card, #fff); border: 1px solid var(--rule, #d6d2c8); }
