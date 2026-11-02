@@ -35,7 +35,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 
 	<form class="beltoft-services-credit__form" method="post" action="<?php echo esc_url( Page::url() ); ?>">
 		<fieldset class="beltoft-services-credit__amounts">
-			<legend><?php esc_html_e( 'Top up', 'beltoft-services' ); ?></legend>
+			<legend class="beltoft-services-credit__legend"><?php esc_html_e( 'Top up', 'beltoft-services' ); ?></legend>
 			<div class="beltoft-services-credit__grid">
 				<?php foreach ( $credit['amounts'] as $beltoft_services_credit_amount ) : ?>
 					<label class="beltoft-services-credit__tile">
