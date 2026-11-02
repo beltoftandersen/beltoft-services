@@ -379,7 +379,8 @@ final class Card {
 
 		$last = (string) get_user_meta( $user_id, self::META_LAST, true );
 
-		if ( self::ids( $user_id, self::META_PENDING ) ) {
+		// An earlier card page that was left open stays pending: only a customer with no result yet is told to wait.
+		if ( '' === $last && self::ids( $user_id, self::META_PENDING ) ) {
 			return array( __( 'We are waiting for Mollie to confirm your card. Reload this page in a moment.', 'beltoft-services' ), 'info' );
 		}
 
@@ -739,7 +740,11 @@ final class Card {
 	 */
 	private static function settle( int $user_id, string $id, string $result ): void {
 		update_user_meta( $user_id, self::META_PENDING, array_values( array_diff( self::ids( $user_id, self::META_PENDING ), array( $id ) ) ) );
-		update_user_meta( $user_id, self::META_LAST, $result );
+
+		// A left-open earlier page that expires later does not undo a card saved since.
+		if ( 'saved' === $result || 'saved' !== (string) get_user_meta( $user_id, self::META_LAST, true ) ) {
+			update_user_meta( $user_id, self::META_LAST, $result );
+		}
 	}
 
 	/**

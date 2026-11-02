@@ -604,6 +604,23 @@ class CardTest extends UsageTestCase {
 		unset( $_GET[ Card::QUERY ] );
 	}
 
+	public function test_an_abandoned_card_page_does_not_hide_the_saved_card(): void {
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		Card::start( $user );
+		Card::start( $user );
+		$this->pay( 'tr_new2' );
+		$_GET[ Card::QUERY ] = 'return';
+
+		$this->assertStringContainsString( 'Card saved.', Card::html() );
+
+		// The first one expires later: the notice stays saved, the card stays.
+		$this->mollie['payments']['tr_new1']['status'] = 'expired';
+		$this->assertStringContainsString( 'Card saved.', Card::html() );
+		$this->assertSame( array(), get_user_meta( $user, Card::META_PENDING, true ) );
+		unset( $_GET[ Card::QUERY ] );
+	}
+
 	public function test_the_page_messages_for_a_limit_and_a_failed_start(): void {
 		wp_set_current_user( $this->new_user() );
 		$_GET[ Card::QUERY ] = 'limit';
