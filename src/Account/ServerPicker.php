@@ -752,8 +752,8 @@ final class ServerPicker {
 			$rates = self::usage_rates( $plan, true );
 			$base  = self::usage_rates( $plan, false );
 
-			/* translators: %s: price difference per hour such as €0.0027 */
-			$price = sprintf( __( '+%s per hour excluding VAT', 'beltoft-services' ), Rates::money( $rates['hourly'] - $base['hourly'], 4 ) );
+			/* translators: %s: monthly maximum of the add-on such as +€3 per month */
+			$price = sprintf( __( '%s excluding VAT', 'beltoft-services' ), Rates::plus_per_month( max( 0.0, $rates['cap'] - $base['cap'] ) ) );
 		} else {
 			$money = html_entity_decode( wp_strip_all_tags( wc_price( (float) $extra['extra'] ) ), ENT_QUOTES, 'UTF-8' );
 			$per   = '' === (string) $plan['period'] ? '' : ' ' . sprintf( /* translators: %s: period such as month */ __( 'per %s', 'beltoft-services' ), (string) $plan['period'] );

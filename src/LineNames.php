@@ -181,7 +181,7 @@ final class LineNames {
 	 * @param string                $key       Attribute name.
 	 * @param string                $value     Stored value.
 	 */
-	private static function value( \WC_Product_Variation $variation, \WC_Product $parent, string $key, string $value ): string {
+	public static function value( \WC_Product_Variation $variation, \WC_Product $parent, string $key, string $value ): string {
 		$value = trim( $value );
 
 		if ( '' === $value ) {
@@ -217,7 +217,7 @@ final class LineNames {
 	 * @param string $html  Name as WooCommerce built it.
 	 * @param string $label New text.
 	 */
-	private static function swap( string $html, string $label ): string {
+	public static function swap( string $html, string $label ): string {
 		if ( false !== strpos( $html, '<a ' ) ) {
 			return (string) preg_replace( '~(<a\b[^>]*>).*?(</a>)~s', '${1}' . str_replace( array( '\\', '$' ), array( '\\\\', '\\$' ), esc_html( $label ) ) . '${2}', $html, 1 );
 		}

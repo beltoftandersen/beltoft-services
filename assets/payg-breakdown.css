@@ -1,0 +1,20 @@
+/* Order summary, cart and mini cart: a pay-as-you-go server or database as a stacked block. Square corners, palette variables, one thin rule. */
+.beltoft-services-payg__head, .beltoft-services-payg__sum { display: block; box-sizing: border-box; width: 100%; }
+.beltoft-services-payg__name, .beltoft-services-payg-line .product-name > a { display: block; color: var(--navy, #0c1535); font-weight: 700; line-height: 1.35; }
+.beltoft-services-payg__plan { display: block; margin: 2px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.45; }
+.beltoft-services-payg__sum { margin: 14px 0 0; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
+.beltoft-services-payg__row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 16px; padding: 2px 0; }
+.beltoft-services-payg__row > span:last-child { margin-left: auto; text-align: right; white-space: nowrap; }
+.beltoft-services-payg__row--max { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--rule, #d6d2c8); font-weight: 700; }
+.beltoft-services-payg__hourly { display: block; margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.45; }
+/* The line's own cells: name first, the operating system after it, the amounts last. */
+.beltoft-services-payg-line .product-name { display: flex; flex-direction: column; align-items: stretch; }
+.beltoft-services-payg-line .product-name > .variation { order: 1; margin: 10px 0 0; }
+.beltoft-services-payg-line .product-name > .beltoft-services-payg__sum { order: 2; }
+.beltoft-services-payg-line .product-name > .beltoft-services-payg__head { order: 0; }
+/* The checkout's review table has two columns: this row is full width and the empty price cell is not shown. */
+.woocommerce-checkout-review-order-table tr.beltoft-services-payg-line, .woocommerce-checkout-review-order-table tr.beltoft-services-payg-line > td { display: block; width: 100%; box-sizing: border-box; }
+.woocommerce-checkout-review-order-table tr.beltoft-services-payg-line > td.product-total { display: none; }
+/* The mini cart's item: the block is the item's text. */
+.woocommerce-mini-cart-item.beltoft-services-payg-line > a:not(.remove) { display: block; }
+.beltoft-services-payg-addon-note { margin: 0 0 16px; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.5; }

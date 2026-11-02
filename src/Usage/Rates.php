@@ -111,6 +111,61 @@ final class Rates {
 	}
 
 	/**
+	 * "€45 / month": a monthly amount in whole euros (see cap_money()) in the order summary.
+	 *
+	 * @param float $amount Monthly amount.
+	 */
+	public static function per_month_line( float $amount ): string {
+		/* translators: %s: monthly amount such as €45 */
+		return sprintf( __( '%s / month', 'beltoft-services' ), self::cap_money( $amount ) );
+	}
+
+	/**
+	 * "+€5 / month": an add-on's monthly amount in the order summary.
+	 *
+	 * @param float $amount Monthly amount.
+	 */
+	public static function plus_per_month_line( float $amount ): string {
+		/* translators: %s: monthly amount such as €5 */
+		return sprintf( __( '+%s / month', 'beltoft-services' ), self::cap_money( $amount ) );
+	}
+
+	/**
+	 * "+€5 per month": an add-on's monthly amount in a label.
+	 *
+	 * @param float $amount Monthly amount.
+	 */
+	public static function plus_per_month( float $amount ): string {
+		/* translators: %s: monthly amount such as €5 */
+		return sprintf( __( '+%s per month', 'beltoft-services' ), self::cap_money( $amount ) );
+	}
+
+	/**
+	 * The most an add-on costs in a month: the difference between two pay-as-you-go variations, from their monthly
+	 * siblings and the product's premium (the same figures as the hourly rate and the cap).
+	 *
+	 * @param \WC_Product_Variation $from From.
+	 * @param \WC_Product_Variation $to   To.
+	 */
+	public static function monthly_difference( \WC_Product_Variation $from, \WC_Product_Variation $to ): float {
+		$was = self::monthly( $from );
+		$now = self::monthly( $to );
+
+		return null === $was || null === $now ? 0.0 : self::cap( $now - $was, self::premium( $to->get_parent_id() ) );
+	}
+
+	/**
+	 * "+€5 per month" for an add-on that is a pay-as-you-go variation, or null when the target is not pay as you go
+	 * (the monthly label keeps its wording).
+	 *
+	 * @param \WC_Product_Variation $from From.
+	 * @param \WC_Product_Variation $to   To.
+	 */
+	public static function addon_per_month( \WC_Product_Variation $from, \WC_Product_Variation $to ): ?string {
+		return self::is_usage( $to ) ? self::plus_per_month( self::monthly_difference( $from, $to ) ) : null;
+	}
+
+	/**
 	 * The pay-as-you-go offer next to a monthly plan: the usage sibling that can be bought, and what it costs
 	 * (hourly and the monthly cap, excluding tax). Null for a pay-as-you-go variation, a plan with no usage
 	 * sibling, one that cannot be bought, or a monthly price of 0.

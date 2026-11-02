@@ -174,6 +174,7 @@ final class Plugin {
 		Usage\Account::register();
 		Usage\Cart::register();
 		Usage\Summary::register();
+		Usage\Breakdown::register();
 		Usage\BillingField::register();
 		Usage\Catalog::register();
 		Usage\Renewal::register();

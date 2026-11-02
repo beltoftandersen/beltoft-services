@@ -97,6 +97,25 @@ final class DbDiskField {
 	// -- Rendering -------------------------------------------------------------------------------
 
 	/**
+	 * The option of a step: "+50 GB (+€4.00 / month)", and for pay as you go the monthly maximum, "+50 GB, +€4 per month".
+	 *
+	 * @param int                   $extra Extra storage in GB.
+	 * @param \WC_Product_Variation $base  The plan without extra storage.
+	 * @param \WC_Product_Variation $step  The step.
+	 */
+	public static function step_label( int $extra, \WC_Product_Variation $base, \WC_Product_Variation $step ): string {
+		$usage = \BeltoftServices\Usage\Rates::addon_per_month( $base, $step );
+
+		if ( null !== $usage ) {
+			/* translators: 1: extra storage in GB, 2: monthly amount such as +€4 per month */
+			return sprintf( __( '+%1$d GB, %2$s', 'beltoft-services' ), $extra, $usage );
+		}
+
+		/* translators: 1: extra storage in GB, 2: price difference such as +€4.00 / month */
+		return sprintf( __( '+%1$d GB (%2$s)', 'beltoft-services' ), $extra, DbDisk::price_label( $base, $step ) );
+	}
+
+	/**
 	 * The select, with the price difference of each step (excluding tax) from the plan without extra storage.
 	 */
 	public static function render(): void {
@@ -123,7 +142,7 @@ final class DbDiskField {
 				$label = __( 'No extra storage', 'beltoft-services' );
 			} else {
 				/* translators: 1: extra storage in GB, 2: price difference such as +€4.00 / month */
-				$label = null === $base ? sprintf( __( '+%d GB', 'beltoft-services' ), $extra ) : sprintf( __( '+%1$d GB (%2$s)', 'beltoft-services' ), $extra, DbDisk::price_label( $base, $step ) );
+				$label = null === $base ? sprintf( __( '+%d GB', 'beltoft-services' ), $extra ) : self::step_label( $extra, $base, $step );
 			}
 
 			$free     = $extra === $database['extra'] || self::available( $step );
