@@ -791,6 +791,9 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-credit__custom input { box-sizing: border-box; width: 100%; }
 .beltoft-services-credit__note { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
 .beltoft-services-credit__submit { justify-self: start; }
+.beltoft-services-credit__code { display: grid; gap: 10px; margin: 28px 0; }
+.beltoft-services-credit__code h3 { margin: 0; }
+.beltoft-services-credit__code .beltoft-services-credit__custom { max-width: 320px; margin: 0; }
 .beltoft-services-credit__history { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 .beltoft-services-credit__history th, .beltoft-services-credit__history td { padding: 8px 10px 8px 0; border: 0; text-align: left; vertical-align: top; }
 .beltoft-services-credit__history th { color: var(--ink-soft, #5e7080); font-weight: 600; }

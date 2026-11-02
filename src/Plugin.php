@@ -186,6 +186,7 @@ final class Plugin {
 		Credit\Page::register();
 		Credit\Invoice::register();
 		Credit\Grant::register();
+		Credit\Code::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
