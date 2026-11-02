@@ -39,6 +39,10 @@ final class DiskCascade {
 	 * @param string   $reason Admin note.
 	 */
 	public static function cancel_undelivered( Resource $addon, string $reason ): void {
+		// A pay as you go add-on sits on the usage account's subscription, which is never ended for one add-on.
+		if ( 'usage' === (string) ( $addon->license()['source'] ?? '' ) ) {
+			return;
+		}
 		$id = (int) ( $addon->license()['subscription_id'] ?? 0 );
 		if ( $id < 1 || ! function_exists( 'wcs_get_subscription' ) ) {
 			return;
@@ -101,7 +105,7 @@ final class DiskCascade {
 			$seen = array();
 			foreach ( self::addons( $server ) as $disk ) {
 				$id = (int) ( $disk->license()['subscription_id'] ?? 0 );
-				if ( $id < 1 || isset( $seen[ $id ] ) ) {
+				if ( $id < 1 || isset( $seen[ $id ] ) || 'usage' === (string) ( $disk->license()['source'] ?? '' ) ) {
 					continue;
 				}
 				$seen[ $id ] = true;
@@ -137,7 +141,7 @@ final class DiskCascade {
 		$by_subscription = array();
 		foreach ( self::addons( $server ) as $disk ) {
 			$id = (int) ( $disk->license()['subscription_id'] ?? 0 );
-			if ( $id > 0 ) {
+			if ( $id > 0 && 'usage' !== (string) ( $disk->license()['source'] ?? '' ) ) {
 				$by_subscription[ $id ][] = $disk;
 			}
 		}

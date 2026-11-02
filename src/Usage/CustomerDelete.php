@@ -51,6 +51,7 @@ final class CustomerDelete {
 	private const KINDS = array(
 		'vm' => 'server',
 		'db' => 'database',
+		'disk' => 'disk',
 	);
 
 	/**
@@ -85,7 +86,7 @@ final class CustomerDelete {
 	 * Is it a pay-as-you-go server or database that is live?
 	 *
 	 * @param Resource $r Resource.
-	 * @return string server, database, or '' when it is neither (a monthly service, a disk, a domain).
+	 * @return string server, database, disk (a pay as you go extra disk), or '' when it is none of them (a monthly service, a domain).
 	 */
 	public static function kind( Resource $r ): string {
 		$driver  = \BeltoftServices\Drivers\Registry::get( (string) $r->get( 'driver' ) );
@@ -134,6 +135,10 @@ final class CustomerDelete {
 		}
 
 		if ( 'ready' !== $r->get( 'state' ) || null !== $r->pending_desire() || ! empty( Progress::build( $r )['active'] ) ) {
+			if ( 'disk' === $kind ) {
+				return __( 'Something is still running on this disk, such as a setup or a resize. Please try again when it has finished.', 'beltoft-services' );
+			}
+
 			return 'server' === $kind
 				? __( 'Something is still running on this server, such as a setup, a reinstall or a restore. Please try again when it has finished.', 'beltoft-services' )
 				: __( 'Something is still running on this database, such as a setup or a restore. Please try again when it has finished.', 'beltoft-services' );
@@ -156,6 +161,10 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function text( string $kind ): string {
+		if ( 'disk' === $kind ) {
+			return __( 'Removing deletes the extra disk and all its data, including the snapshots that include it. It cannot be undone. Billing stops in the hour it is removed. The server and the usage account are not touched.', 'beltoft-services' );
+		}
+
 		return 'database' === $kind
 			? __( 'Deleting removes the database and all its data, including backups. It cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' )
 			: __( 'Deleting removes the server and all its data, including snapshots and backups. It cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' );
@@ -167,6 +176,10 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function billing_note( string $kind ): string {
+		if ( 'disk' === $kind ) {
+			return __( 'The disk is billed by the hour while it exists. Remove it to stop the charge.', 'beltoft-services' );
+		}
+
 		return 'database' === $kind
 			? __( 'The database is billed every hour it exists. Delete it to stop the charge.', 'beltoft-services' )
 			: __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' );

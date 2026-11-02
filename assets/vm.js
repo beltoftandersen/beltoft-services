@@ -442,6 +442,56 @@
 		} );
 	}
 
+	// A pay as you go extra disk is changed through its own resource (never a subscription link): the answer is 202, then the page reloads.
+	function diskCall( panel, id, path, body, button ) {
+		if ( panel.beltoftPending ) {
+			return;
+		}
+
+		panel.beltoftPending = true;
+
+		if ( button ) {
+			busy( button );
+		}
+
+		window.fetch( account.root + id + '/' + path, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
+			body: JSON.stringify( body )
+		} ).then( function ( response ) {
+			var nonce = response.headers.get( 'X-WP-Nonce' );
+
+			if ( nonce ) {
+				account.nonce = nonce;
+			}
+
+			if ( 202 === response.status ) {
+				window.setTimeout( function () {
+					window.location.reload();
+				}, 1500 );
+
+				return null;
+			}
+
+			panel.beltoftPending = false;
+
+			if ( button ) {
+				reset( button );
+			}
+
+			return reply( panel, response, vm.strings.failed );
+		} ).catch( function () {
+			panel.beltoftPending = false;
+
+			if ( button ) {
+				reset( button );
+			}
+
+			notice( panel, vm.strings.failed );
+		} );
+	}
+
 	function submit( panel, form ) {
 		var args = {};
 		var action = form.getAttribute( 'data-action' );
@@ -690,6 +740,7 @@
 			var drop = event.target.closest( '[data-snapshot-delete]' );
 			var remove = event.target.closest( '[data-cancel-url]' );
 			var undo = event.target.closest( '[data-undo-url]' );
+			var diskOp = event.target.closest( '[data-delete-disk], [data-grow-disk]' );
 			var dialog = panel.querySelector( '[data-snapshot-dialog]' );
 			var button = event.target.closest( '[data-vm-reveal]' );
 			var tab = event.target.closest( 'a[data-tab-link]' );
@@ -746,6 +797,27 @@
 					}
 				} ) ) {
 					send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, drop, null, describe( 'snapshot_delete', name ) );
+				}
+
+				return;
+			}
+
+			if ( diskOp ) {
+				source = document.getElementById( diskOp.getAttribute( 'data-confirm-open' ) );
+
+				if ( source ) {
+					confirmFirst( panel, {
+						title: source.getAttribute( 'data-confirm-title' ),
+						label: source.getAttribute( 'data-confirm-yes' ),
+						source: source,
+						run: function ( yes ) {
+							if ( diskOp.hasAttribute( 'data-delete-disk' ) ) {
+								diskCall( panel, diskOp.getAttribute( 'data-delete-disk' ), 'delete', { confirm: 'DELETE' }, yes );
+							} else {
+								diskCall( panel, diskOp.getAttribute( 'data-grow-disk' ), 'grow', {}, yes );
+							}
+						}
+					} );
 				}
 
 				return;

@@ -7,6 +7,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,7 +30,7 @@ final class DiskCart {
 		}
 		$parent = $size->get_parent_id();
 		$driver = Product::driver_for( $parent );
-		if ( ! $driver || DiskDriver::ID !== $driver->id() || ! $size->is_purchasable() ) {
+		if ( ! $driver || DiskDriver::ID !== $driver->id() || ! $size->is_purchasable() || Rates::is_usage( $size ) !== self::usage_server( $server->license() ) ) {
 			return '';
 		}
 		$license = $server->license();
@@ -40,6 +41,11 @@ final class DiskCart {
 			'beltoft_services_disk_nonce' => wp_create_nonce( self::NONCE . ':' . (int) $license['id'] ),
 		), $size->get_variation_attributes() );
 		return add_query_arg( $args, wc_get_checkout_url() );
+	}
+
+	/** Is this server licence billed pay as you go? A disk bought for it follows (an hourly disk for an hourly server). */
+	public static function usage_server( array $license ): bool {
+		return 'usage' === (string) ( $license['source'] ?? '' );
 	}
 
 	private static function disk_product( int $product_id ): bool {
@@ -98,7 +104,8 @@ final class DiskCart {
 		}
 		$data = is_array( $data ) ? $data : array();
 		$product = wc_get_product( $variation_id > 0 ? $variation_id : $product_id );
-		if ( ! $product || ! class_exists( '\\WC_Subscriptions_Product' ) || ! \WC_Subscriptions_Product::is_subscription( $product ) ) {
+		$usage = $product && Rates::is_usage( $product );
+		if ( ! $product || ( ! $usage && ( ! class_exists( '\\WC_Subscriptions_Product' ) || ! \WC_Subscriptions_Product::is_subscription( $product ) ) ) ) {
 			wc_add_notice( __( 'This extra disk must be sold as a subscription.', 'beltoft-services' ), 'error' );
 			return false;
 		}
@@ -108,6 +115,12 @@ final class DiskCart {
 		$link = self::link( $data );
 		if ( null === $link || 1 !== (int) $quantity ) {
 			wc_add_notice( __( 'Choose one disk for a server in your account.', 'beltoft-services' ), 'error' );
+			return false;
+		}
+		// Billing follows the server: an hourly disk goes with an hourly server only, and an hourly server gets no monthly disk.
+		$server_usage = is_int( $link ) ? self::usage_server( (array) Licenses::find( $link ) ) : DiskField::cart_server_usage();
+		if ( $usage !== $server_usage ) {
+			wc_add_notice( __( 'This extra disk is not sold with this server\'s billing. Choose the disk on the server page.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 		if ( is_int( $link ) ) {
@@ -207,21 +220,29 @@ final class DiskCart {
 			$entry = DiskField::cart_server();
 			$server_item = $entry['item'] ?? null;
 			$plan = $server_item ? Product::plan( (int) $server_item['product_id'], (int) ( $server_item['variation_id'] ?? 0 ) ) : array();
-			$cluster_id = (string) ( $plan['cluster'] ?? '' );
-			$cluster = Clusters::get( $cluster_id );
-			$memory = max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576;
-			$space = max( 0, (int) ( $plan['disk_gb'] ?? 0 ) ) + $new_server_disk_gb;
-			$fits = false;
-			foreach ( $cluster ? (array) Capacity::free_by_node( $cluster_id ) : array() as $node => $free ) {
-				if ( $free >= $memory && DiskCapacity::fits( $cluster_id, (string) $node, (string) $cluster['storage'], $space ) ) {
-					$fits = true;
-					break;
-				}
-			}
-			if ( ! $fits ) {
+			if ( ! self::new_server_fits( $plan, $new_server_disk_gb ) ) {
 				$errors->add( 'disk_capacity', __( 'The server and extra disk cannot be delivered with the available capacity.', 'beltoft-services' ) );
 			}
 		}
+	}
+
+	/**
+	 * Can a new server of this plan and an extra disk of $gb be delivered: a node with the memory free and the room for both disks?
+	 *
+	 * @param array<string, mixed> $plan Plan numbers (cluster, memory_mb, disk_gb).
+	 * @param int                  $gb   Extra disk in GB.
+	 */
+	public static function new_server_fits( array $plan, int $gb ): bool {
+		$cluster_id = (string) ( $plan['cluster'] ?? '' );
+		$cluster = Clusters::get( $cluster_id );
+		$memory = max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576;
+		$space = max( 0, (int) ( $plan['disk_gb'] ?? 0 ) ) + $gb;
+		foreach ( $cluster ? (array) Capacity::free_by_node( $cluster_id ) : array() as $node => $free ) {
+			if ( $free >= $memory && DiskCapacity::fits( $cluster_id, (string) $node, (string) $cluster['storage'], $space ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** WooCommerce Subscriptions' own switch link, limited to the next larger size. */
@@ -230,6 +251,10 @@ final class DiskCart {
 			return '';
 		}
 		$license = $disk->license();
+		// A pay as you go disk has no subscription of its own (its licence sits on the usage account): never a switch of that. See UsageDisk.
+		if ( self::usage_server( (array) $license ) ) {
+			return '';
+		}
 		$subscription = wcs_get_subscription( (int) ( $license['subscription_id'] ?? 0 ) );
 		$current = (int) $disk->get( 'size_gb' );
 		$next = null;

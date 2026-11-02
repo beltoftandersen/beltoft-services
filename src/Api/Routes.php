@@ -121,6 +121,17 @@ final class Routes {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/resources/(?P<id>\d+)/grow',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'grow' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array( 'id' => $id ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/resources/(?P<id>\d+)/open',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -301,6 +312,46 @@ final class Routes {
 				'deleting' => true,
 				'at'       => time(),
 				'message'  => __( 'Your service is being deleted. This can take a minute.', 'beltoft-services' ),
+			),
+			202
+		);
+	}
+
+	/**
+	 * POST resources/<id>/grow: the customer makes their pay as you go extra disk the next larger size. Dashboard only: the
+	 * token gate does not allow this address. No subscription is read or changed (UsageDisk).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public static function grow( \WP_REST_Request $request ): \WP_REST_Response {
+		$limited = self::limited( $request, 5 );
+
+		if ( $limited ) {
+			return $limited;
+		}
+
+		$resource = Resource::find( (int) $request['id'] );
+		$license  = $resource ? $resource->license() : array();
+		$user_id  = get_current_user_id();
+
+		if ( ! $resource || $user_id < 1 || empty( $license['user_id'] ) || (int) $license['user_id'] !== $user_id || ! $resource->is_live() ) {
+			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
+		}
+
+		$done = \BeltoftServices\Usage\UsageDisk::grow( $resource, $user_id );
+
+		if ( $done instanceof \WP_Error ) {
+			$data = $done->get_error_data();
+
+			return self::error( $done->get_error_code(), $done->get_error_message(), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422 );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'growing' => true,
+				'at'      => time(),
+				'message' => __( 'Your disk is being made larger. This can take a minute.', 'beltoft-services' ),
 			),
 			202
 		);

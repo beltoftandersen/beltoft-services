@@ -6,6 +6,9 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\Usage\CustomerDelete;
+use BeltoftServices\Usage\Rates;
+use BeltoftServices\Usage\UsageDisk;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -28,7 +31,9 @@ final class DiskPanels {
 		usort( $live, static fn( Resource $a, Resource $b ): int => ( $order[ $a->id() ] ?? PHP_INT_MAX ) <=> ( $order[ $b->id() ] ?? PHP_INT_MAX ) );
 		foreach ( $live as $disk ) {
 			$license = $disk->license();
-			$grow_url = 'ready' === $disk->get( 'state' ) ? DiskCart::grow_url( $disk ) : '';
+			// A pay as you go disk has no subscription of its own: its remove and grow go through the licence and the usage meter (UsageDisk, CustomerDelete), never through WooCommerce Subscriptions.
+			$usage = UsageDisk::is_usage( $disk );
+			$grow_url = 'ready' === $disk->get( 'state' ) && ! $usage ? DiskCart::grow_url( $disk ) : '';
 			$grow_price = '';
 			if ( $grow_url ) {
 				$query = array();
@@ -39,7 +44,7 @@ final class DiskPanels {
 					$grow_price = Backups::price_difference( $from, $to );
 				}
 			}
-			$subscription = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $license['subscription_id'] ?? 0 ) ) : null;
+			$subscription = ! $usage && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $license['subscription_id'] ?? 0 ) ) : null;
 			$actions = $subscription instanceof \WC_Subscription && function_exists( 'wcs_get_all_user_actions_for_subscription' )
 				? wcs_get_all_user_actions_for_subscription( $subscription, get_current_user_id() ) : array();
 			$ending = self::ending( $subscription, $actions );
@@ -70,24 +75,66 @@ final class DiskPanels {
 				'needs_reboot' => (bool) $disk->get( 'needs_reboot' ),
 				'snapshots_covering' => isset( $volumes[ $disk->id() ] ) ? count( array_filter( $kept, static fn( $e ) => in_array( $volumes[ $disk->id() ], (array) ( $e['covers'] ?? array() ), true ) ) ) : 0,
 				'remove_url' => 'ready' === $disk->get( 'state' ) && null === $ending ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
+				'usage' => $usage,
+				'usage_terms' => $usage ? self::usage_terms( $disk ) : '',
+				'delete' => $usage && 'ready' === $disk->get( 'state' ) && null === CustomerDelete::blocker( $disk ),
+				'grow_next' => $usage && 'ready' === $disk->get( 'state' ) ? self::grow_next( $disk ) : null,
 			);
 		}
 		$add = array();
 		if ( count( $disks ) < max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
 			$record = $located;
 			$cluster = $where;
-			foreach ( DiskField::sizes() as $variation ) {
+			// Billing follows the server: a pay as you go server is offered the pay as you go sizes, a monthly one the monthly sizes.
+			$server_usage = DiskCart::usage_server( (array) $server->license() );
+			foreach ( DiskField::sizes_for( $server_usage ) as $variation ) {
 				$size = (int) ( Product::plan( $variation->get_parent_id(), $variation->get_id() )['disk_gb'] ?? 0 );
 				if ( ! $record || ! $cluster || ! DiskCapacity::fits( $record['cluster'], $record['node'], (string) $cluster['storage'], $size ) ) {
 					continue;
 				}
 				$url = DiskCart::add_url( $server, $variation );
 				if ( $url ) {
-					$add[] = array( 'size' => $size, 'url' => $url, 'price' => wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) . Panels::per( $variation ) );
+					$price = $server_usage ? self::usage_terms_of( $variation ) : wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) . Panels::per( $variation );
+					$add[] = array( 'size' => $size, 'url' => $url, 'price' => $price );
 				}
 			}
 		}
 		return array( 'items' => $disks, 'add' => $add, 'mode' => (string) Settings::get( 'deletion_mode' ) );
+	}
+
+	/**
+	 * What a pay as you go size costs at most in a month, for a tile: "+€4.40 per month, billed by the hour".
+	 *
+	 * @param \WC_Product_Variation $variation Pay as you go disk variation.
+	 */
+	private static function usage_terms_of( \WC_Product_Variation $variation ): string {
+		$rates = Rates::for_usage( $variation );
+
+		/* translators: %s: monthly amount such as +€4.40 per month */
+		return null === $rates ? '' : sprintf( __( '%s at most, billed by the hour', 'beltoft-services' ), Rates::plus_per_month( $rates['cap'] ) );
+	}
+
+	/**
+	 * What a pay as you go disk costs now, the way a tile shows it.
+	 *
+	 * @param Resource $disk Disk.
+	 */
+	private static function usage_terms( Resource $disk ): string {
+		$variation = wc_get_product( (int) ( $disk->license()['variation_id'] ?? 0 ) );
+
+		return $variation instanceof \WC_Product_Variation ? self::usage_terms_of( $variation ) : '';
+	}
+
+	/**
+	 * The next larger size of a pay as you go disk: its size and what it adds, or null.
+	 *
+	 * @param Resource $disk Disk.
+	 * @return array{size: int, price: string}|null
+	 */
+	private static function grow_next( Resource $disk ): ?array {
+		$to = UsageDisk::next( $disk );
+
+		return $to ? array( 'size' => (int) ( Product::plan( $to->get_parent_id(), $to->get_id() )['disk_gb'] ?? 0 ), 'price' => UsageDisk::price_difference( $disk ) ) : null;
 	}
 
 	/**

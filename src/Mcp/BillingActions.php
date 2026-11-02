@@ -11,6 +11,7 @@ use BeltoftServices\Account\Cards;
 use BeltoftServices\Billing\PaymentMethods;
 use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Resource;
+use BeltoftServices\Usage\CustomerDelete;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -62,7 +63,18 @@ final class BillingActions {
 			case 'remove_addon':
 				$r = self::addon( $user_id, (int) $args['id'] );
 
-				return $r instanceof \WP_Error ? $r : self::cancel( $user_id, (int) ( $r->license()['subscription_id'] ?? 0 ), 'add-on removed' );
+				if ( $r instanceof \WP_Error ) {
+					return $r;
+				}
+
+				// A pay as you go disk is deleted as a server is: its licence sits on the usage account, which is never cancelled here.
+				if ( 'disk' === CustomerDelete::kind( $r ) ) {
+					$done = CustomerDelete::run( $r, $user_id, '', true );
+
+					return $done instanceof \WP_Error ? new \WP_Error( 'beltoft_services_tool', $done->get_error_message() ) : array( 'deleting' => true, 'message' => 'The extra disk is being removed. This takes a minute. Billing stops in the hour it is removed. The server and the usage account were not touched.' );
+				}
+
+				return self::cancel( $user_id, (int) ( $r->license()['subscription_id'] ?? 0 ), 'add-on removed' );
 
 			default:
 				return self::set_card( $user_id, (int) $args['token_id'] );
@@ -113,6 +125,11 @@ final class BillingActions {
 			return new \WP_Error( 'beltoft_services_tool', $why );
 		}
 
+		// Any other pay as you go add-on shares the usage account's subscription: cancelling that would end every service on it.
+		if ( 'usage' === (string) ( $r->license()['source'] ?? '' ) && 'disk' !== CustomerDelete::kind( $r ) ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'This add-on is billed by the hour with the usage account and is removed in the dashboard. Nothing was cancelled.', 'beltoft-services' ) );
+		}
+
 		return $user_id > 0 ? $r : new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ) );
 	}
 
@@ -128,6 +145,16 @@ final class BillingActions {
 
 		if ( $r instanceof \WP_Error ) {
 			return $r;
+		}
+
+		if ( 'disk' === CustomerDelete::kind( $r ) ) {
+			$why = CustomerDelete::blocker( $r );
+
+			return null !== $why ? new \WP_Error( 'beltoft_services_tool', $why ) : array(
+				/* translators: 1: the disk's name, 2: what removing does, 3: the billing rule. */
+				'text'  => sprintf( __( 'Remove the extra disk %1$s. %2$s %3$s', 'beltoft-services' ), Irreversible::name( $r ), CustomerDelete::text( 'disk' ), CustomerDelete::billing_note( 'disk' ) ),
+				'state' => $r->id() . '|' . $r->get( 'state' ),
+			);
 		}
 
 		$found = Subscriptions::cancellable( $user_id, (int) ( $r->license()['subscription_id'] ?? 0 ) );

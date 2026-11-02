@@ -375,6 +375,34 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					</div>
 				<?php endif; ?>
 				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
+				<?php if ( ! empty( $beltoft_extra_disk['usage'] ) ) : ?>
+					<?php if ( '' !== $beltoft_extra_disk['usage_terms'] ) : ?><p class="description" data-disk-usage-terms><?php echo esc_html( $beltoft_extra_disk['usage_terms'] ); ?></p><?php endif; ?>
+					<?php if ( ! empty( $beltoft_extra_disk['grow_next'] ) ) : ?>
+						<button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-grow-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-grow-disk="<?php echo (int) $beltoft_extra_disk['id']; ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?> (<?php echo esc_html( (string) $beltoft_extra_disk['grow_next']['price'] ); ?>)</button>
+						<div hidden id="beltoft-vm-disk-grow-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-confirm-source data-confirm-title="<?php esc_attr_e( 'Make this extra disk larger?', 'beltoft-services' ); ?>" data-confirm-yes="<?php esc_attr_e( 'Make the disk larger', 'beltoft-services' ); ?>">
+							<p>
+								<?php
+								/* translators: 1: new size in GB, 2: what it adds at most in a month, such as +€4.40 per month */
+								echo esc_html( sprintf( __( 'The disk becomes %1$d GB. It adds %2$s at most, billed by the hour from now. A disk can only be made larger, never smaller.', 'beltoft-services' ), (int) $beltoft_extra_disk['grow_next']['size'], (string) $beltoft_extra_disk['grow_next']['price'] ) );
+								?>
+							</p>
+						</div>
+					<?php endif; ?>
+					<?php if ( ! empty( $beltoft_extra_disk['delete'] ) ) : ?>
+						<button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-delete-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-delete-disk="<?php echo (int) $beltoft_extra_disk['id']; ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button>
+						<div hidden id="beltoft-vm-disk-delete-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-confirm-source data-confirm-title="<?php esc_attr_e( 'Remove this extra disk?', 'beltoft-services' ); ?>" data-confirm-yes="<?php esc_attr_e( 'Remove the disk', 'beltoft-services' ); ?>">
+							<p><?php esc_html_e( 'The disk and all its data are deleted at once. It cannot be undone. Billing stops in the hour it is removed. Your server and your usage account are not touched.', 'beltoft-services' ); ?></p>
+							<?php if ( $beltoft_extra_disk['snapshot_labels'] ) : ?>
+								<p><?php esc_html_e( 'The snapshots that include this disk are deleted with it:', 'beltoft-services' ); ?></p>
+								<ul>
+									<?php foreach ( $beltoft_extra_disk['snapshot_labels'] as $beltoft_snapshot_label ) : ?>
+										<li><?php echo esc_html( $beltoft_snapshot_label ); ?></li>
+									<?php endforeach; ?>
+								</ul>
+							<?php endif; ?>
+						</div>
+					<?php endif; ?>
+				<?php endif; ?>
 				<?php if ( $beltoft_extra_disk['remove_url'] ) : ?><button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-confirm-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-cancel-url="<?php echo esc_url( $beltoft_extra_disk['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?>
 				<?php if ( ( $beltoft_extra_disk['remove_url'] || ( $beltoft_extra_disk['ending'] && '' !== $beltoft_extra_disk['ending']['undo_url'] ) ) && '' !== $beltoft_extra_disk['manage_url'] ) : ?>
 					<noscript><p class="description"><?php esc_html_e( 'To remove this disk or to undo it, use', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $beltoft_extra_disk['manage_url'] ); ?>"><?php esc_html_e( 'Manage subscription', 'beltoft-services' ); ?></a>.</p></noscript>
