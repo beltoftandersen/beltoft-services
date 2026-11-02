@@ -185,7 +185,7 @@ class CardTest extends UsageTestCase {
 		$html = Card::html();
 		$this->assertStringContainsString( 'Add a card', $html );
 		$this->assertStringNotContainsString( 'Change card', $html );
-		$this->assertStringContainsString( 'Nothing is charged. You enter your card on Mollie&#039;s secure page.', $html );
+		$this->assertStringContainsString( 'Nothing is charged. You enter your card on the payment provider&#039;s secure form.', $html );
 		$this->assertStringNotContainsString( 'billing', $html );
 		$this->assertDoesNotMatchRegularExpression( '/\x{2014}|\x{00B7}/u', $html, 'No em dash or middle dot.' );
 
@@ -591,15 +591,15 @@ class CardTest extends UsageTestCase {
 		Card::start( $user );
 		$this->mollie['payments']['tr_new1']['status'] = 'canceled';
 		$html = Card::html();
-		$this->assertStringContainsString( 'Card not saved. You cancelled on Mollie&#039;s page. You can try again.', $html );
+		$this->assertStringContainsString( 'Card not saved. You cancelled on the card page. You can try again.', $html );
 		$this->assertStringContainsString( 'Add a card', $html );
 
 		Card::start( $user );
 		$this->mollie['payments']['tr_new2']['status'] = 'failed';
-		$this->assertStringContainsString( 'The card was not saved. Mollie could not confirm it. You can try again.', Card::html() );
+		$this->assertStringContainsString( 'The card was not saved. The payment provider could not confirm it. You can try again.', Card::html() );
 
 		Card::start( $user );
-		$this->assertStringContainsString( 'We are waiting for Mollie to confirm your card.', Card::html() );
+		$this->assertStringContainsString( 'We are waiting for the payment provider to confirm your card.', Card::html() );
 
 		unset( $_GET[ Card::QUERY ] );
 	}

@@ -213,21 +213,28 @@ final class Code {
 		$mandate = $account ? Card::mandate_id( $account ) : '';
 		$cst     = $account ? Card::customer_id( $account ) : '';
 
-		if ( ! $account || '' === $mandate || '' === $cst ) {
+		if ( $account && ( '' === $mandate || '' === $cst ) && null !== Card::token_for( $account ) ) {
+			// A saved token (Stripe): usable by its expiry; the card fingerprint comes from the gateway's payment method.
+			if ( ! Card::usable( Card::token_details( $account ) ) ) {
+				return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
+			}
+
+			$fingerprint = Card::token_fingerprint( $account );
+		} elseif ( ! $account || '' === $mandate || '' === $cst ) {
 			return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
+		} else {
+			$raw = Mollie::mandate( $cst, $mandate );
+
+			if ( is_wp_error( $raw ) ) {
+				return self::fail( __( 'Your card could not be checked right now. Try again later.', 'beltoft-services' ) );
+			}
+
+			if ( ! Card::usable( Card::summarize( $raw ) ) ) {
+				return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
+			}
+
+			$fingerprint = isset( $raw['details']['cardFingerprint'] ) && is_string( $raw['details']['cardFingerprint'] ) ? trim( $raw['details']['cardFingerprint'] ) : '';
 		}
-
-		$raw = Mollie::mandate( $cst, $mandate );
-
-		if ( is_wp_error( $raw ) ) {
-			return self::fail( __( 'Your card could not be checked right now. Try again later.', 'beltoft-services' ) );
-		}
-
-		if ( ! Card::usable( Card::summarize( $raw ) ) ) {
-			return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
-		}
-
-		$fingerprint = isset( $raw['details']['cardFingerprint'] ) && is_string( $raw['details']['cardFingerprint'] ) ? trim( $raw['details']['cardFingerprint'] ) : '';
 
 		if ( '' === $fingerprint ) {
 			return self::fail( __( 'This card cannot be used to redeem a code. Add a credit or debit card.', 'beltoft-services' ) );

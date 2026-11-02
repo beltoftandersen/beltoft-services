@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array{state: string, text: string, can_start: bool, change: bool, notice: string, notice_kind: string, action: string} $card The data (see BeltoftServices\Card\Card::data()).
+ * @var array{state: string, text: string, can_start: bool, flow: string, add_url: string, change: bool, notice: string, notice_kind: string, action: string} $card The data (see BeltoftServices\Card\Card::data()).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -37,11 +37,18 @@ use BeltoftServices\Card\Card;
 	<?php endif; ?>
 
 	<?php if ( $card['can_start'] ) : ?>
+		<?php if ( 'token' === ( $card['flow'] ?? '' ) ) : ?>
+		<div class="beltoft-services-card__form">
+			<a class="button beltoft-services-card__btn" href="<?php echo esc_url( $card['add_url'] ); ?>"><?php echo $card['change'] ? esc_html__( 'Change card', 'beltoft-services' ) : esc_html__( 'Add a card', 'beltoft-services' ); ?></a>
+			<span class="beltoft-services-card__note"><?php esc_html_e( 'Nothing is charged. You enter your card on the payment provider\'s secure form.', 'beltoft-services' ); ?></span>
+		</div>
+		<?php else : ?>
 		<form class="beltoft-services-card__form" method="post" action="<?php echo esc_url( Card::url() ); ?>">
 			<?php wp_nonce_field( Card::NONCE ); ?>
 			<input type="hidden" name="<?php echo esc_attr( $card['action'] ); ?>" value="1">
 			<button type="submit" class="button beltoft-services-card__btn"><?php echo $card['change'] ? esc_html__( 'Change card', 'beltoft-services' ) : esc_html__( 'Add a card', 'beltoft-services' ); ?></button>
-			<span class="beltoft-services-card__note"><?php esc_html_e( 'Nothing is charged. You enter your card on Mollie\'s secure page.', 'beltoft-services' ); ?></span>
+			<span class="beltoft-services-card__note"><?php esc_html_e( 'Nothing is charged. You enter your card on the payment provider\'s secure form.', 'beltoft-services' ); ?></span>
 		</form>
+		<?php endif; ?>
 	<?php endif; ?>
 </section>
