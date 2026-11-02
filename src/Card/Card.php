@@ -333,6 +333,7 @@ final class Card {
 	public static function data( int $user_id ): array {
 		// Payments the customer has come back from (or whose webhook is late) are settled before the page is drawn.
 		self::sync_pending( $user_id );
+		wp_cache_delete( $user_id, 'user_meta' );
 
 		$account = Account::for_user( $user_id, Account::ESTABLISHED );
 		$info    = $account ? self::details( $account ) : null;
@@ -676,6 +677,9 @@ final class Card {
 		}
 
 		try {
+			// Another request (the webhook, or the return) may have written the customer's meta while this one waited for the lock.
+			wp_cache_delete( $user_id, 'user_meta' );
+
 			$claim = self::CLAIM . md5( $id );
 
 			if ( false !== get_option( $claim ) || in_array( $id, self::ids( $user_id, self::META_DONE ), true ) ) {

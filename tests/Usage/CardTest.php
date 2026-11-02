@@ -621,6 +621,24 @@ class CardTest extends UsageTestCase {
 		unset( $_GET[ Card::QUERY ] );
 	}
 
+	public function test_a_result_written_by_the_webhook_meanwhile_is_not_hidden_by_the_meta_cache(): void {
+		global $wpdb;
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		Card::start( $user );
+		get_user_meta( $user ); // This request has read the customer's meta.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Another request writes it.
+		$wpdb->insert( $wpdb->usermeta, array( 'user_id' => $user, 'meta_key' => Card::META_LAST, 'meta_value' => 'saved' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+		$this->mollie['payments']['tr_new1']['status'] = 'open';
+
+		$_GET[ Card::QUERY ] = 'return';
+		$html                = Card::html();
+		unset( $_GET[ Card::QUERY ] );
+
+		$this->assertStringContainsString( 'Card saved.', $html );
+		$this->assertStringNotContainsString( 'waiting for Mollie', $html );
+	}
+
 	public function test_the_page_messages_for_a_limit_and_a_failed_start(): void {
 		wp_set_current_user( $this->new_user() );
 		$_GET[ Card::QUERY ] = 'limit';
