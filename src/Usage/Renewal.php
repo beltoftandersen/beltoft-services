@@ -197,18 +197,37 @@ final class Renewal {
 			$fee = new \WC_Order_Item_Fee();
 			$per = 'hour' === $line['unit'] ? __( 'hour', 'beltoft-services' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), $line['unit'] );
 			$qty = 'hour' === $line['unit'] ? '' : sprintf( ' (%s %s)', rtrim( rtrim( number_format( $line['quantity'], 4, '.', '' ), '0' ), '.' ), $line['unit'] );
+			$subject = self::line_subject( (string) $line['item'], self::label( $line['resource_id'] ) );
+			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
+			$rate    = Rates::money( (float) $line['rate'], 4, $currency );
 			$fee->set_name(
 				sprintf(
 					/* translators: 1: what is billed ("Server web1"), 2: month and year, 3: hours, 4: quantity note, 5: rate with currency, 6: unit, 7: cap note. */
 					__( '%1$s, %2$s: %3$s hours%4$s at %5$s per %6$s (excl. VAT)%7$s', 'beltoft-services' ),
-					self::line_subject( (string) $line['item'], self::label( $line['resource_id'] ) ),
-					wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) ),
+					$subject,
+					$month,
 					(string) $line['hours'],
 					$qty,
-					Rates::money( (float) $line['rate'], 4, $currency ),
+					$rate,
 					$per,
 					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
 				)
+			);
+			// What the invoice views show as name and detail (InvoiceView), so they need not take the long name apart.
+			$fee->add_meta_data( InvoiceView::META_NAME, $subject, true );
+			$fee->add_meta_data(
+				InvoiceView::META_DETAIL,
+				sprintf(
+					/* translators: 1: month and year, 2: hours, 3: quantity note, 4: rate with currency, 5: unit, 6: cap note. */
+					__( '%1$s: %2$s hours%3$s at %4$s per %5$s%6$s', 'beltoft-services' ),
+					$month,
+					(string) $line['hours'],
+					$qty,
+					$rate,
+					$per,
+					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
+				),
+				true
 			);
 			$fee->set_total( (string) $line['charge'] );
 			$fee->set_tax_status( 'taxable' );
