@@ -50,9 +50,17 @@
 
 			return response.json().then( function ( data ) {
 				if ( data && data.password ) {
+					var own = box.querySelector( '[data-db-password]' );
+
 					Array.prototype.forEach.call( box.querySelectorAll( '[data-db-conn]' ), function ( code ) {
 						code.textContent = code.textContent.replace( 'PASSWORD', data.password );
 					} );
+
+					// The password on its own line too: inside a long connection line it is easy to miss.
+					if ( own ) {
+						own.querySelector( '[data-db-password-value]' ).textContent = data.password;
+						own.hidden = false;
+					}
 					button.hidden = true;
 					say( box, db.strings.once );
 				}
@@ -103,6 +111,7 @@
 		post( panel, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
 				say( box, db.strings.working );
+				button.textContent = button.getAttribute( 'data-busy' ) || button.textContent;
 				waitForAction( box, panel, 'db_reset_password', since, 0, button.getAttribute( 'data-db-after' ) );
 
 				return null;

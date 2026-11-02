@@ -101,6 +101,11 @@ $beltoft_services_db_wait = array(
 
 			<?php if ( $view['can_reveal'] ) : ?>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-db-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button></p>
+				<div data-db-password hidden>
+					<p><?php esc_html_e( 'Password', 'beltoft-services' ); ?></p>
+					<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-password-value></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+					<p class="description"><?php esc_html_e( 'It is also filled in to the connection lines above.', 'beltoft-services' ); ?></p>
+				</div>
 			<?php endif; ?>
 			<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 		</div>
@@ -312,7 +317,10 @@ $beltoft_services_db_wait = array(
 					<label for="beltoft-db-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $view['confirm'] ) ); ?></label>
 					<input type="text" id="beltoft-db-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $view['confirm'] ); ?>" data-db-confirm>
 				</p>
-				<p><button type="button" class="button woocommerce-button" data-db-reset<?php echo $nav ? ' data-db-after="' . esc_url( $link( 'overview' ) ) . '"' : ''; ?>><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
+				<p><button type="button" class="button woocommerce-button" data-db-reset data-busy="<?php esc_attr_e( 'Making a new password', 'beltoft-services' ); ?>"<?php echo $nav ? ' data-db-after="' . esc_url( $link( 'overview' ) ) . '"' : ''; ?>><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
+				<?php if ( $nav ) : ?>
+					<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
+				<?php endif; ?>
 				</div>
 			</div>
 		<?php elseif ( $view['resetting'] ) : ?>

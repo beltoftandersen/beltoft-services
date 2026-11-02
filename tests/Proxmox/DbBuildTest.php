@@ -559,9 +559,10 @@ class DbBuildTest extends TestCase {
 		$this->driver->render_account( $r );
 		$html = (string) ob_get_clean();
 
-		// Two connection strings and the fingerprint, each a code block with its own Copy button; only the strings are filled with the password.
-		$this->assertSame( 3, substr_count( $html, 'class="beltoft-services-db__block"' ) );
-		$this->assertSame( 3, substr_count( $html, 'data-db-copy' ) );
+		// Two connection strings, the password line (hidden until shown) and the fingerprint, each a code block with its own Copy button; only the strings are filled with the password.
+		$this->assertSame( 4, substr_count( $html, 'class="beltoft-services-db__block"' ) );
+		$this->assertSame( 4, substr_count( $html, 'data-db-copy' ) );
+		$this->assertStringContainsString( '<div data-db-password hidden>', $html );
 		$this->assertSame( 2, substr_count( $html, 'data-db-conn' ) );
 		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-conn>postgresql://[^<]+</code><button type="button"[^>]* data-db-copy [^>]*hidden>Copy</button></div>#', $html );
 		$this->assertStringNotContainsString( '<p><code class="beltoft-services-db__conn"', $html );
@@ -574,7 +575,7 @@ class DbBuildTest extends TestCase {
 		$this->driver->render_account( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 
-		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-db__form">\s*<p>\s*<label for="beltoft-db-confirm">.*?</p>\s*<p><button type="button" class="button woocommerce-button" data-db-reset>#s', $html );
+		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-db__form">\s*<p>\s*<label for="beltoft-db-confirm">.*?</p>\s*<p><button type="button" class="button woocommerce-button" data-db-reset[^>]*>#s', $html );
 	}
 
 	public function test_card_of_a_database_still_being_built_has_no_connection(): void {
