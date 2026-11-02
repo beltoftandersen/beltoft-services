@@ -26,7 +26,7 @@ $beltoft_services_delete_word  = \BeltoftServices\Usage\CustomerDelete::word( $b
 $beltoft_services_delete_title = 'database' === $beltoft_services_delete_kind ? __( 'Delete database', 'beltoft-services' ) : __( 'Delete server', 'beltoft-services' );
 $beltoft_services_delete_list  = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'database' === $beltoft_services_delete_kind ? \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->slug() : \BeltoftServices\Account\ServerLinks::slug() ) : '';
 ?>
-<div class="beltoft-services-vm__more beltoft-services-delete" data-delete-box data-delete-after="<?php echo esc_url( $beltoft_services_delete_list ); ?>" data-resource-id="<?php echo (int) $beltoft_services_delete_id; ?>">
+<div class="beltoft-services-vm__more beltoft-services-delete" data-delete-box data-delete-after="<?php echo esc_url( $beltoft_services_delete_list ); ?>" data-resource-id="<?php echo (int) $beltoft_services_delete_id; ?>" data-delete-ask="<?php echo esc_attr( 'database' === $beltoft_services_delete_kind ? __( 'Delete this database and all its data, including backups? This cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ) : __( 'Delete this server and all its data, including snapshots and backups? This cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ) ); ?>">
 	<h4><?php echo esc_html( $beltoft_services_delete_title ); ?></h4>
 	<p><?php echo esc_html( \BeltoftServices\Usage\CustomerDelete::text( $beltoft_services_delete_kind ) ); ?></p>
 	<p class="description" data-delete-billing><?php echo esc_html( \BeltoftServices\Usage\CustomerDelete::billing_note( $beltoft_services_delete_kind ) ); ?></p>
