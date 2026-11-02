@@ -283,7 +283,9 @@ final class Resource {
 	 * @param Resource|null $resource Resource, or null when there is none.
 	 */
 	public static function gone( ?Resource $resource ): bool {
-		return ! $resource || ! $resource->is_live() || 'deleted' === $resource->get( 'state' );
+		// A service the customer asked to delete is gone for the lists from that moment, also while the deletion still runs:
+		// its licence is revoked at once, so a row would only say "Working" until the next page load.
+		return ! $resource || ! $resource->is_live() || 'deleted' === $resource->get( 'state' ) || 'deleted' === $resource->get( 'desired' );
 	}
 
 	/**
