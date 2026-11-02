@@ -779,8 +779,9 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-credit__label { color: var(--ink-soft, #5e7080); font-size: 15px; font-weight: 400; }
 .beltoft-services-credit__amount { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .beltoft-services-credit__form { display: grid; gap: 12px; margin: 24px 0 0; }
-.beltoft-services-credit .beltoft-services-credit__amounts { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
-.beltoft-services-credit .beltoft-services-credit__amounts legend { float: left; width: 100%; margin: 0; padding: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.beltoft-services-credit .beltoft-services-credit__amounts { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+.beltoft-services-credit .beltoft-services-credit__amounts legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.beltoft-services-credit__amounts legend + .beltoft-services-credit__grid { clear: both; }
 .beltoft-services-credit__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; padding: 1px; background: var(--rule, #d9d6cc); }
 .beltoft-services-credit__tile { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
 .beltoft-services-credit__tile .beltoft-services-credit__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
@@ -794,7 +795,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 /* Other reveals its field only when chosen; a browser without :has() or a form without a choice keeps it shown. */
 .beltoft-services-credit__form:has(input[value="custom"]:not(:checked)) .beltoft-services-credit__custom { display: none; }
 .beltoft-services-credit .beltoft-services-credit__note { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; }
-.beltoft-services-credit__amounts .beltoft-services-credit__note { margin-top: 4px; }
+.beltoft-services-credit__amounts .beltoft-services-credit__custom { margin-top: 8px; }
+.beltoft-services-credit__amounts .beltoft-services-credit__note { margin-top: 12px; }
 .beltoft-services-credit__submit { justify-self: start; }
 .beltoft-services-credit__code { display: grid; gap: 8px; margin: 24px 0 0; }
 .beltoft-services-credit__coderow { display: flex; align-items: stretch; gap: 8px; max-width: 480px; }
