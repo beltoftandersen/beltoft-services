@@ -32,7 +32,7 @@
 		var after = box.getAttribute( 'data-delete-after' );
 
 		busy( button, true );
-		say( box, '' );
+		say( box, text.strings.working );
 
 		window.fetch( account.root + box.getAttribute( 'data-resource-id' ) + '/delete', {
 			method: 'POST',
