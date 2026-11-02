@@ -526,9 +526,18 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-ov__money dd { margin: 0; overflow-wrap: anywhere; }
 .woocommerce-MyAccount-content .beltoft-services-ov__section .beltoft-services-ov__money p { max-width: none; margin: 0; font-size: 14px; line-height: 1.5; }
 .beltoft-services-ov__money + .beltoft-services-ov__usage { padding-top: 0; }
-.woocommerce-MyAccount-content .beltoft-services-usage { margin-bottom: 24px; }
-.woocommerce-MyAccount-content .beltoft-services-usage .beltoft-services-ov__money h3 { margin: 4px 0 0; font-size: 15px; font-weight: 700; line-height: 1.3; letter-spacing: 0; }
-.beltoft-services-usage__cap { display: block; color: var(--ink-soft, #5e7080); font-size: 13px; }
+.beltoft-services-usage { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 400; line-height: 1.5; }
+.beltoft-services-usage .beltoft-services-ov__head { margin: 0 0 8px; }
+.beltoft-services-usage__table { width: 100%; margin: 24px 0 0; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+.beltoft-services-usage__table th, .beltoft-services-usage__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--rule, #d9d6cc); background: none; text-align: left; vertical-align: top; }
+.beltoft-services-usage__table th { padding-top: 0; color: var(--ink-soft, #5e7080); font-size: 13px; font-weight: 500; }
+.beltoft-services-usage__table tbody tr:last-child td { border-bottom: 0; }
+.beltoft-services-usage__table th:first-child, .beltoft-services-usage__table td:first-child { padding-left: 0; overflow-wrap: anywhere; }
+.beltoft-services-usage__table th:nth-child(n+2), .beltoft-services-usage__table td:nth-child(n+2) { text-align: right; }
+.beltoft-services-usage__table th:last-child, .beltoft-services-usage__table td:last-child { padding-right: 0; }
+.beltoft-services-usage__cap { margin-left: 6px; color: var(--ink-soft, #5e7080); font-size: 13px; }
+.woocommerce-account .beltoft-services-usage .beltoft-services-usage__note { max-width: none; margin: 12px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; line-height: 1.5; }
+@media (max-width: 520px) { .beltoft-services-usage__table { font-size: 14px; } }
 .beltoft-services-ov__feed { padding: 4px 0; background: var(--bg-card, #fff); }
 .beltoft-services-ov__feed ul { margin: 0; padding: 0; list-style: none; }
 .beltoft-services-ov__feed li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; margin: 0; padding: 5px 14px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
@@ -829,3 +838,20 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-page__billing { flex: 0 0 100%; margin: 0; }
 .beltoft-services-delete .beltoft-services-delete__go { margin-top: 4px; }
 .beltoft-services-delete input[type="text"] { max-width: 24em; }
+
+/* Billing, Addresses: one column as wide as the Credit tab, pairs are two equal halves, stacked on phones. */
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .woocommerce-address-fields { max-width: 880px !important; margin: 0; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .woocommerce-address-fields .woocommerce-address-fields__field-wrapper.woocommerce-address-fields__field-wrapper { column-gap: 16px; row-gap: 16px; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .form-row { width: auto; max-width: none; margin: 0; padding: 0; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .form-row label { margin: 0 0 8px; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .form-row input.input-text, .woocommerce-account .brxe-woocommerce-account-edit-address-form .form-row .select2-container { box-sizing: border-box; width: 100% !important; max-width: none; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field { margin: 24px 0 0; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field label.checkbox { display: block; margin: 0; color: var(--navy, #0c1535); font-size: 15px; font-weight: 400; line-height: 1.5; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field input[type="checkbox"] { margin: 0 10px 0 0; vertical-align: -2px; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field small { display: block; margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; line-height: 1.5; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field small strong { font-weight: 400; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .woocommerce-address-fields .brxe-woocommerce-form-submit { max-width: none; margin: 24px 0 0; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form .woocommerce-address-fields .brxe-woocommerce-form-submit .button { margin: 0; }
+@media (max-width: 478px) { .woocommerce-account .brxe-woocommerce-account-edit-address-form .woocommerce-address-fields .brxe-woocommerce-form-submit .button { width: 100%; } }
+.woocommerce-account .beltoft-services-usage { width: 100%; box-sizing: border-box; }
+.woocommerce-account .beltoft-services-usage__table { margin-bottom: 4px; }
