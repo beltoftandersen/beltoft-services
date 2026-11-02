@@ -68,11 +68,14 @@ class SummaryTest extends UsageTestCase {
 		$key  = $this->add( $v['u-None'] );
 		$item = WC()->cart->get_cart()[ $key ];
 
-		$this->assertStringContainsString( '0.0205', apply_filters( 'woocommerce_cart_item_price', '€0.00', $item, $key ) );
-		$this->assertStringContainsString( '/ hour', apply_filters( 'woocommerce_cart_item_price', '€0.00', $item, $key ) );
-		$this->assertStringContainsString( 'max', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
-		$this->assertStringContainsString( '15 /', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
-		$this->assertStringContainsString( '/ month', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
+		// Summary's own texts (other lines and the order views); a server or database line itself is shown by Breakdown.
+		$this->assertStringContainsString( '0.0205', Summary::cart_price( '€0.00', $item ) );
+		$this->assertStringContainsString( '/ hour', Summary::cart_price( '€0.00', $item ) );
+		$this->assertStringContainsString( 'max', Summary::cart_subtotal( '€0.00', $item ) );
+		$this->assertStringContainsString( '15 /', Summary::cart_subtotal( '€0.00', $item ) );
+		$this->assertStringContainsString( '/ month', Summary::cart_subtotal( '€0.00', $item ) );
+		$this->assertSame( '', apply_filters( 'woocommerce_cart_item_price', '€0.00', $item, $key ), 'The breakdown carries the price.' );
+		$this->assertSame( '', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, $key ) );
 		$this->assertEquals( 0, WC()->cart->get_total( 'edit' ) );
 		$this->assertEquals( 0, $item['line_subtotal'] );
 	}

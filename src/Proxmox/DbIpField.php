@@ -172,6 +172,26 @@ final class DbIpField {
 	// -- Rendering -------------------------------------------------------------------------------
 
 	/**
+	 * The checkbox's text: "Public IPv4 address (+€5.00 / month)", and for pay as you go the monthly maximum,
+	 * "Public IPv4 address, +€5 per month".
+	 *
+	 * @param \WC_Product_Variation $without Without the address.
+	 * @param \WC_Product_Variation $with    With the address.
+	 * @param string                $price   Price difference as Backups::price_difference() says it.
+	 */
+	public static function label( \WC_Product_Variation $without, \WC_Product_Variation $with, string $price ): string {
+		$usage = \BeltoftServices\Usage\Rates::addon_per_month( $without, $with );
+
+		if ( null !== $usage ) {
+			/* translators: %s: monthly amount such as +€5 per month */
+			return sprintf( __( 'Public IPv4 address, %s', 'beltoft-services' ), $usage );
+		}
+
+		/* translators: %s: price difference such as +€5.00 / month */
+		return sprintf( __( 'Public IPv4 address (%s)', 'beltoft-services' ), $price );
+	}
+
+	/**
 	 * The checkbox, with the price difference of the public IP variation (excluding tax).
 	 */
 	public static function render(): void {
@@ -190,10 +210,7 @@ final class DbIpField {
 			esc_attr( wp_create_nonce( self::NONCE ) ),
 			checked( $database['has'], true, false ),
 			disabled( $free, false, false ),
-			esc_html(
-				/* translators: %s: price difference such as +€5.00 / month */
-				sprintf( __( 'Public IPv4 address (%s)', 'beltoft-services' ), $price )
-			)
+			esc_html( self::label( $database['without'], $database['with'], $price ) )
 		);
 		echo '<p class="description">' . esc_html__( 'Reach the database from anywhere, not only from your servers with us. Access stays closed until you add addresses to the allow-list in your dashboard.', 'beltoft-services' ) . '</p>';
 

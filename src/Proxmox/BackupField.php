@@ -149,6 +149,26 @@ final class BackupField {
 	// -- Rendering -------------------------------------------------------------------------------
 
 	/**
+	 * The checkbox's text: "Daily backups (+€12.00 / month)", and for pay as you go the monthly maximum,
+	 * "Daily backups, +€3 per month".
+	 *
+	 * @param \WC_Product_Variation $without Without backups.
+	 * @param \WC_Product_Variation $with    With backups.
+	 * @param string                $price   Price difference as Backups::price_difference() says it.
+	 */
+	public static function label( \WC_Product_Variation $without, \WC_Product_Variation $with, string $price ): string {
+		$usage = \BeltoftServices\Usage\Rates::addon_per_month( $without, $with );
+
+		if ( null !== $usage ) {
+			/* translators: %s: monthly amount such as +€3 per month */
+			return sprintf( __( 'Daily backups, %s', 'beltoft-services' ), $usage );
+		}
+
+		/* translators: %s: price difference such as +€12.00 / month */
+		return sprintf( __( 'Daily backups (%s)', 'beltoft-services' ), $price );
+	}
+
+	/**
 	 * The checkbox, with the price difference of the backup variation (excluding tax) and its period.
 	 */
 	public static function render(): void {
@@ -165,10 +185,7 @@ final class BackupField {
 			'<p class="form-row"><label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox"><input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" id="beltoft_services_backups" data-nonce="%1$s" %2$s> <span>%3$s</span></label></p>',
 			esc_attr( wp_create_nonce( self::NONCE ) ),
 			checked( $server['has'], true, false ),
-			esc_html(
-				/* translators: %s: price difference such as +€12.00 / month */
-				sprintf( __( 'Daily backups (%s)', 'beltoft-services' ), $price )
-			)
+			esc_html( self::label( $server['without'], $server['with'], $price ) )
 		);
 
 		if ( $server['days'] > 0 ) {
