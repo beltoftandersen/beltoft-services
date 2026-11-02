@@ -131,7 +131,8 @@ final class ServerLinks {
 	public static function renewal( array $license ): string {
 		$id = (int) ( $license['subscription_id'] ?? 0 );
 
-		if ( $id <= 0 || ! function_exists( 'wcs_get_subscription' ) ) {
+		// A revoked license (a deleted pay-as-you-go service) shares the usage account's subscription, which goes on.
+		if ( $id <= 0 || 'revoked' === ( $license['status'] ?? '' ) || ! function_exists( 'wcs_get_subscription' ) ) {
 			return '';
 		}
 

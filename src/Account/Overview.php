@@ -496,7 +496,7 @@ final class Overview {
 			foreach ( $area_views[ $key ] as $view ) {
 				$resource = Resource::for_license( (int) $view['license']['id'] );
 
-				if ( ! $resource ) {
+				if ( Resource::gone( $resource ) ) {
 					continue;
 				}
 

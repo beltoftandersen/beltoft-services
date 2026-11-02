@@ -131,6 +131,13 @@ final class Databases extends ServiceArea {
 	}
 
 	/**
+	 * The line on the address of a database that was deleted.
+	 */
+	protected function deleted_text(): string {
+		return __( 'This database was deleted.', 'beltoft-services' );
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function page_tabs(): array {

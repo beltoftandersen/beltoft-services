@@ -122,6 +122,13 @@ abstract class ServiceArea {
 	abstract protected function not_found_text(): string;
 
 	/**
+	 * The line on the address of a service that was deleted.
+	 */
+	protected function deleted_text(): string {
+		return __( 'This service was deleted.', 'beltoft-services' );
+	}
+
+	/**
 	 * The row of a service: id, url, name, details, state, tone (ok, busy, off, bad), extra (a third column), action (label and url, or empty).
 	 *
 	 * @param array<string, mixed> $view     License view.
@@ -534,6 +541,7 @@ abstract class ServiceArea {
 	public function render( array $views, string $empty = '' ): void {
 		$members   = array();
 		$resources = array();
+		$gone      = array();
 
 		foreach ( $views as $view ) {
 			if ( ! is_array( $view ) || ! isset( $view['license'] ) || ! $this->is_member( $view['license'] ) ) {
@@ -541,12 +549,13 @@ abstract class ServiceArea {
 			}
 
 			$resource = Resource::for_license( (int) $view['license']['id'] );
+			$id       = (int) $view['license']['id'];
 
-			if ( ! $resource ) {
+			if ( Resource::gone( $resource ) ) {
+				$gone[ $id ] = true;
 				continue;
 			}
 
-			$id               = (int) $view['license']['id'];
 			$members[ $id ]   = $view;
 			$resources[ $id ] = $resource;
 		}
@@ -555,6 +564,13 @@ abstract class ServiceArea {
 
 		if ( $asked['id'] > 0 && isset( $members[ $asked['id'] ] ) ) {
 			$this->detail( $members[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ], $asked['path'] );
+
+			return;
+		}
+
+		if ( $asked['id'] > 0 && isset( $gone[ $asked['id'] ] ) ) {
+			echo '<div class="beltoft-services-server beltoft-services-area-page"><p class="beltoft-services-server__back"><a href="' . esc_url( $this->url_list() ) . '">&lsaquo; ' . esc_html( $this->all_label() ) . '</a></p>';
+			echo '<p class="beltoft-services-notice" role="status">' . esc_html( $this->deleted_text() ) . '</p></div>';
 
 			return;
 		}
