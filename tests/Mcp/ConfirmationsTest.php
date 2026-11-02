@@ -349,7 +349,7 @@ final class ConfirmationsTest extends McpTestCase {
 		$read   = $this->oauth( $user, Tokens::READ );
 		$action = $this->oauth( $user, Tokens::ACTIONS );
 		$full   = $this->oauth( $user, Tokens::FULL );
-		$names  = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'get_database_ca_certificate' );
+		$names  = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'get_database_ca_certificate', 'delete_server', 'delete_database' );
 
 		foreach ( array( $read, $action ) as $low ) {
 			$listed = array_column( $this->rpc( 'tools/list', array(), $low )['result']['tools'], 'name' );

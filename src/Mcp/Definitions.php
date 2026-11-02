@@ -337,6 +337,14 @@ final class Definitions {
 				'Cancels a subscription, and with it the services it pays for (a server, a database, an add-on or DNS hosting). A registered domain cannot be cancelled here. The summary says when the service ends and what happens to its data.',
 				self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ), true )
 			),
+			'delete_server'    => self::full(
+				'Deletes a pay as you go server and everything on it, including its snapshots and backups. It cannot be undone. Billing stops in the hour it is deleted; an hour that has started is billed as a whole hour, and a stopped server is billed until it is deleted. A server with an extra disk is refused: remove the disk first (remove_addon). The other services and the payment method are not touched. Give the id of the server from list_services.',
+				self::obj( array( 'id' => $id ), array( 'id' ), true )
+			),
+			'delete_database'  => self::full(
+				'Deletes a pay as you go database and all its data, including its backups. It cannot be undone. Billing stops in the hour it is deleted; an hour that has started is billed as a whole hour, and a database is billed every hour it exists. The other services and the payment method are not touched. Give the id of the database from list_services.',
+				self::obj( array( 'id' => $id ), array( 'id' ), true )
+			),
 			'remove_addon'     => self::full(
 				'Removes an add-on the customer pays for separately: an extra disk, snapshot slots or an app licence. Give the id of the add-on from list_services. Removing backups or a public IP address is a plan change in the dashboard.',
 				self::obj( array( 'id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The id of the add-on, from list_services (type disk, snapshot or applic).' ) ), array( 'id' ), true )

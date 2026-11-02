@@ -70,6 +70,12 @@ final class Told {
 			case 'order_database':
 				return __( 'ordered a pay as you go database', 'beltoft-services' );
 
+			case 'delete_server':
+				return __( 'deleted the server and all its data', 'beltoft-services' );
+
+			case 'delete_database':
+				return __( 'deleted the database and all its data', 'beltoft-services' );
+
 			case 'cancel_subscription':
 				return __( 'cancelled the subscription', 'beltoft-services' );
 

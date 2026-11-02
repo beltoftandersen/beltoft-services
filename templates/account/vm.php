@@ -343,6 +343,11 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
+	<?php
+	// A pay-as-you-go server can be deleted by its owner: the block says what it does and what stops being billed.
+	$beltoft_services_delete_id = (int) $resource_id;
+	include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
+	?>
 	<?php $beltoft_services_close(); ?>
 
 	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['disks'] ) ) : ?>

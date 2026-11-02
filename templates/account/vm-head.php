@@ -5,7 +5,7 @@
  * Variables (set by BeltoftServices\Proxmox\Panels::page_head()): $title, $group (getting-ready, ready, paused, removed or failed),
  * $badge (the state text), $message (a sentence about the state), $show_power (the power replaces the state text),
  * $busy, $show_message (print the message line: not ready, or the app is not done), $power (running, stopped or empty), $plan (the plan's name, or empty), $renews (a sentence such as "Renews 29/11/2026", or empty),
- * $ip, $ssh_user, $actions (start, reboot, shutdown => label, the ones offered now).
+ * $ip, $ssh_user, $actions (start, reboot, shutdown => label, the ones offered now), $billing_note (a pay-as-you-go server: "A stopped server is still billed...", else empty).
  * Reboot and Shut down ask first in the page's dialog (assets/vm.js). The state text and the message are the ones the
  * status poll keeps up to date, so the elements keep their data attributes.
  *
@@ -42,5 +42,8 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 				<?php endif; ?>
 			<?php endforeach; ?>
 		</div>
+		<?php if ( '' !== (string) ( $billing_note ?? '' ) && ( isset( $actions['shutdown'] ) || isset( $actions['start'] ) ) ) : ?>
+			<p class="description beltoft-services-page__billing" data-billing-note><?php echo esc_html( $billing_note ); ?></p>
+		<?php endif; ?>
 	<?php endif; ?>
 </header>
