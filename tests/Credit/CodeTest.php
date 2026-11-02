@@ -395,4 +395,13 @@ class CodeTest extends CreditTestCase {
 		$this->assertStringNotContainsString( '—', $html );
 		$this->assertStringNotContainsString( '·', $html );
 	}
+
+	public function test_the_page_prints_a_queued_notice(): void {
+		wp_set_current_user( $this->customer() );
+		wc_clear_notices();
+		wc_add_notice( 'Test notice text.', 'success' );
+
+		$this->assertStringContainsString( 'Test notice text.', \BeltoftServices\Credit\Page::html() );
+		wc_clear_notices();
+	}
 }

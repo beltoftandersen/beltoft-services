@@ -18,6 +18,11 @@ use BeltoftServices\Credit\Topup;
 $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 ?>
 <section class="beltoft-services-credit">
+	<?php
+	if ( function_exists( 'wc_print_notices' ) ) {
+		wc_print_notices(); // A redeemed or refused code is told here (a Bricks account page does not print notices for this page).
+	}
+	?>
 	<div class="beltoft-services-ov__head">
 		<h2><?php esc_html_e( 'Credit', 'beltoft-services' ); ?></h2>
 	</div>
