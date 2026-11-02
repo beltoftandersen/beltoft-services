@@ -98,7 +98,8 @@ class LineNamesTest extends UsageTestCase {
 		$this->assertNotFalse( $key );
 		$cart = WC()->cart->get_cart()[ $key ];
 
-		$this->assertStringContainsString( 'pay as you go', apply_filters( 'woocommerce_cart_item_name', 'x', $cart, $key ) );
+		// The summary and cart show the breakdown (Breakdown); the name itself is still built the same way.
+		$this->assertStringContainsString( 'pay as you go', \BeltoftServices\LineNames::label( $cart['data'] ) );
 
 		$rows = wp_list_pluck( apply_filters( 'woocommerce_get_item_data', array( array( 'key' => 'Billing', 'value' => 'Pay as you go' ), array( 'key' => 'Backups', 'value' => 'None' ) ), $cart ), 'value', 'key' );
 
