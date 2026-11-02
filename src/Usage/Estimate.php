@@ -74,7 +74,7 @@ final class Estimate {
 
 			if ( ! isset( $resources[ $id ] ) ) {
 				$resources[ $id ] = array(
-					'label' => Renewal::label( $id ),
+					'label' => self::name( $id ),
 					'total' => 0.0,
 					'lines' => array(),
 				);
@@ -83,6 +83,7 @@ final class Estimate {
 			$resources[ $id ]['total']  += (float) $line['charge'];
 			$resources[ $id ]['lines'][] = array(
 				'item'   => (string) $line['item'],
+				'subject' => self::subject( (string) $line['item'], $resources[ $id ]['label'] ),
 				'label'  => Renewal::item_label( (string) $line['item'] ),
 				'hours'  => (int) $line['hours'],
 				'charge' => (float) $line['charge'],
@@ -98,6 +99,38 @@ final class Estimate {
 			'next'      => $account->has_status( 'active' ) ? (int) $account->get_time( 'next_payment', 'gmt' ) : 0,
 			'resources' => $resources,
 		);
+	}
+
+	/**
+	 * What a service is called in the estimate: its own name (server name or host name), so two services of one product
+	 * differ. A database has no name of its own: its product name and its address, as its card shows them.
+	 *
+	 * @param int $resource_id Activation id.
+	 */
+	private static function name( int $resource_id ): string {
+		$label    = Renewal::label( $resource_id );
+		$resource = Resource::find( $resource_id );
+
+		if ( $resource && \BeltoftServices\Proxmox\DbAccess::is_db( $resource ) && '' === (string) $resource->get( 'server_name' ) ) {
+			$address = (string) $resource->get( 'db_address' );
+
+			if ( false !== filter_var( $address, FILTER_VALIDATE_IP ) ) {
+				/* translators: 1: product name, 2: the database's address. */
+				return sprintf( __( '%1$s, %2$s', 'beltoft-services' ), $label, $address );
+			}
+		}
+
+		return $label;
+	}
+
+	/**
+	 * The row's name: the service itself for a server or database, "Backups for web1" for what is added to it.
+	 *
+	 * @param string $item  Item.
+	 * @param string $label Service name.
+	 */
+	private static function subject( string $item, string $label ): string {
+		return in_array( $item, array( 'server', 'database' ), true ) ? $label : Renewal::line_subject( $item, $label );
 	}
 
 	/**

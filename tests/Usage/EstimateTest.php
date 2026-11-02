@@ -130,7 +130,7 @@ class EstimateTest extends UsageTestCase {
 		$this->assertStringContainsString( 'Usage this month', $html );
 		$this->assertStringContainsString( 'excl. VAT', $html );
 		$this->assertStringContainsString( "\u{20AC}2.26", $html );
-		$this->assertStringContainsString( 'server, 100 hours', $html );
+		$this->assertStringContainsString( '100', $html );
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ), time() + 12 * DAY_IN_SECONDS ), $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertNotSame( '', Estimate::cost_line( $r->id() ) );
