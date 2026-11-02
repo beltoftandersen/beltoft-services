@@ -376,6 +376,7 @@ final class Card {
 		}
 
 		return array(
+			'cart_busy'   => self::cart_busy(),
 			'state'       => $state,
 			'text'        => $info && 'unknown' !== $info['status'] ? self::describe( $info ) : '',
 			'can_add'     => null === $account,
@@ -444,6 +445,23 @@ final class Card {
 	}
 
 	/**
+	 * Does the cart hold anything besides a card setup line? Then "Add a card" empties it first.
+	 */
+	public static function cart_busy(): bool {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return false;
+		}
+
+		foreach ( WC()->cart->get_cart() as $item ) {
+			if ( empty( $item[ self::CART_KEY ] ) && (int) $item['product_id'] !== (int) get_option( Account::OPTION_PRODUCT ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Puts the card-only account line in the cart.
 	 *
 	 * @param int $user_id Customer.
@@ -456,12 +474,7 @@ final class Card {
 
 		$cart = WC()->cart;
 
-		foreach ( $cart->get_cart() as $item ) {
-			if ( empty( $item[ self::CART_KEY ] ) && (int) $item['product_id'] !== (int) get_option( Account::OPTION_PRODUCT ) ) {
-				return self::url( array( self::QUERY => 'cart' ) );
-			}
-		}
-
+		// The customer has no other way to empty the cart, and the button says it will: the card is added on its own.
 		$cart->empty_cart();
 
 		$key = $cart->add_to_cart( Account::product_id(), 1, 0, array(), array( self::CART_KEY => 1 ) );

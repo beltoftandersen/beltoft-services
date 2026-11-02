@@ -40,8 +40,13 @@ use BeltoftServices\Card\Card;
 		<form class="beltoft-services-card__form" method="post" action="<?php echo esc_url( Card::url() ); ?>">
 			<?php wp_nonce_field( Card::NONCE ); ?>
 			<input type="hidden" name="<?php echo esc_attr( $card['add_action'] ); ?>" value="1">
-			<button type="submit" class="button beltoft-services-card__btn"><?php esc_html_e( 'Add a card', 'beltoft-services' ); ?></button>
-			<span class="beltoft-services-card__note"><?php esc_html_e( 'Nothing is charged. You enter your billing details and card on the next pages.', 'beltoft-services' ); ?></span>
+			<?php if ( ! empty( $card['cart_busy'] ) ) : ?>
+				<button type="submit" class="button beltoft-services-card__btn"><?php esc_html_e( 'Empty cart and add a card', 'beltoft-services' ); ?></button>
+				<span class="beltoft-services-card__note"><?php esc_html_e( 'Your cart has items. They are removed so the card is saved on its own. Nothing is charged.', 'beltoft-services' ); ?></span>
+			<?php else : ?>
+				<button type="submit" class="button beltoft-services-card__btn"><?php esc_html_e( 'Add a card', 'beltoft-services' ); ?></button>
+				<span class="beltoft-services-card__note"><?php esc_html_e( 'Nothing is charged. You enter your billing details and card on the next pages.', 'beltoft-services' ); ?></span>
+			<?php endif; ?>
 		</form>
 	<?php elseif ( $card['can_replace'] ) : ?>
 		<form class="beltoft-services-card__form" method="post" action="<?php echo esc_url( Card::url() ); ?>">

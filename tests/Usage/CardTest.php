@@ -153,14 +153,21 @@ class CardTest extends UsageTestCase {
 		$this->assertSame( 0, $this->line_count() );
 	}
 
-	public function test_a_cart_with_other_items_is_not_emptied(): void {
+	public function test_a_cart_with_other_items_is_emptied_and_the_card_line_added(): void {
 		$v = $this->usage_product();
 		wp_set_current_user( $this->new_user() );
 		WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
-		$before = $this->line_count();
+		$this->assertTrue( Card::cart_busy(), 'The button says it empties the cart.' );
 
-		$this->assertStringContainsString( Card::QUERY . '=cart', Card::start_add( get_current_user_id() ) );
-		$this->assertSame( $before, $this->line_count() );
+		$this->assertStringNotContainsString( Card::QUERY . '=cart', Card::start_add( get_current_user_id() ) );
+		$this->assertSame( 1, $this->line_count() );
+		$this->assertTrue( Card::cart_has_setup() );
+		$this->assertFalse( Card::cart_busy() );
+	}
+
+	public function test_an_empty_cart_is_not_busy(): void {
+		wp_set_current_user( $this->new_user() );
+		$this->assertFalse( Card::cart_busy() );
 	}
 
 	public function test_the_card_line_has_a_plain_name_and_needs_a_card_method(): void {
