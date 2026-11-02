@@ -341,6 +341,28 @@ final class Acts {
 		$customer = new \WC_Customer( $user_id );
 		$old      = array();
 
+		// The country decides VAT: it can be set here while none is set, and changed only in the dashboard.
+		if ( isset( $values['country'] ) ) {
+			$values['country'] = strtoupper( trim( $values['country'] ) );
+			$current           = (string) $customer->get_billing_country();
+
+			if ( '' !== $current && $current !== $values['country'] ) {
+				return new \WP_Error( 'beltoft_services_tool', __( 'The country is already set. The customer changes it in the dashboard, under Addresses.', 'beltoft-services' ) );
+			}
+
+			if ( ! array_key_exists( $values['country'], (array) WC()->countries->get_allowed_countries() ) ) {
+				return new \WP_Error( 'beltoft_services_tool', __( 'That country is not one the shop sells to. Use a two-letter code, such as DK.', 'beltoft-services' ) );
+			}
+		}
+
+		if ( isset( $values['email'] ) ) {
+			$values['email'] = trim( $values['email'] );
+
+			if ( ! is_email( $values['email'] ) ) {
+				return new \WP_Error( 'beltoft_services_tool', __( 'That is not a valid email address.', 'beltoft-services' ) );
+			}
+		}
+
 		foreach ( array_keys( $values ) as $key ) {
 			$old[ $key ] = is_callable( array( $customer, 'get_billing_' . $key ) ) ? (string) $customer->{'get_billing_' . $key}() : '';
 		}
@@ -370,7 +392,6 @@ final class Acts {
 
 		Audit::add( $user_id, 'billing address changed (' . implode( '; ', $changes ) . ')' );
 		self::tell_customer( $user_id, $shown );
-
 		return array( 'changed' => array_keys( $values ), 'message' => 'The billing address was changed. The customer was told by e-mail.' );
 	}
 
@@ -391,6 +412,7 @@ final class Acts {
 			'state'      => __( 'State or region', 'beltoft-services' ),
 			'phone'      => __( 'Phone', 'beltoft-services' ),
 			'email'      => __( 'Email address', 'beltoft-services' ),
+			'country'    => __( 'Country', 'beltoft-services' ),
 		);
 
 		return $labels[ $key ] ?? ucfirst( str_replace( '_', ' ', $key ) );
