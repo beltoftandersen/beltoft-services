@@ -53,7 +53,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -94,7 +94,7 @@ final class Tools {
 	 */
 	public static function confirmation_needed( string $name, array $args ): bool {
 		// A customer who has to finish the first order in the browser gets a link and nothing is done: no confirmation to ask for.
-		if ( Purchase::NAME === $name && ! Purchase::goes_direct( get_current_user_id() ) ) {
+		if ( ( Purchase::NAME === $name || PurchaseDb::NAME === $name ) && ! Purchase::goes_direct( get_current_user_id() ) ) {
 			return false;
 		}
 
@@ -398,10 +398,11 @@ final class Tools {
 				return array( 'services' => Reads::services( $user_id, (string) ( $args['type'] ?? '' ) ) );
 
 			case 'billing_summary':
-				$next = Overview::data()['next_payment'] ?? null;
+				$next    = Overview::data()['next_payment'] ?? null;
+				$account = Pricing::account( $user_id );
 
 				return null === $next
-					? array( 'next_payment' => null, 'message' => 'There is no payment due.' )
+					? array( 'next_payment' => null, 'message' => 'There is no payment due.', 'account' => $account )
 					: array(
 						'next_payment' => array(
 							'date'    => (string) $next['date'],
@@ -409,6 +410,7 @@ final class Tools {
 							'covers'  => (string) $next['covers'],
 							'paid_by' => (string) $next['card'],
 						),
+						'account'      => $account,
 					);
 
 			case 'domain_check':

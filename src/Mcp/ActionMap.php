@@ -84,6 +84,7 @@ final class ActionMap {
 		'reset_mailbox_password'   => 'reset_mailbox_password',
 		'reveal_mailbox_password'  => 'reveal_mailbox_password',
 		'order_server'             => 'order_server',
+		'order_database'           => 'order_database',
 	);
 
 	/**

@@ -101,18 +101,8 @@ final class Purchase {
 				'name'           => (string) $plan['name'],
 				'specs'          => array( 'cpu_cores' => (int) $plan['cores'], 'memory_mb' => (int) $plan['memory_mb'], 'disk_gb' => (int) $plan['disk_gb'] ),
 				'in_stock'       => (bool) $plan['in_stock'],
-				'price'          => array(
-					'hourly'      => round( (float) $usage['hourly'], 4 ),
-					'monthly_cap' => round( (float) $usage['cap'], 2 ),
-					'text'        => self::price_text( (float) $usage['hourly'], (float) $usage['cap'] ),
-				),
-				'backups'        => ! empty( $plan['backups'] ) && (int) $usage['backups_variation_id'] > 0 ? array(
-					'available'   => true,
-					'days_kept'   => (int) $plan['backups']['days'],
-					'hourly'      => round( (float) $usage['backups_hourly'], 4 ),
-					'monthly_cap' => round( (float) $usage['backups_cap'], 2 ),
-					'text'        => self::price_text( (float) $usage['backups_hourly'], (float) $usage['backups_cap'] ),
-				) : array( 'available' => false ),
+				'price'          => Pricing::payg( (float) $usage['hourly'], (float) $usage['cap'] ),
+				'backups'        => Pricing::server_backups( $plan ),
 				'systems'        => $systems,
 				'apps'           => $apps,
 			);
@@ -120,7 +110,7 @@ final class Purchase {
 
 		return array(
 			'currency' => get_woocommerce_currency(),
-			'note'     => 'Prices exclude VAT and are pay as you go: billed monthly for the hours used, never more than the monthly cap. Pass a plan id and a system id to order_server. An app runs on its own system, so give an app or a system, not both. Apps that have a licence cost are ordered in the dashboard.',
+			'note'     => Pricing::note() . ' Pass a plan id and a system id to order_server. An app runs on its own system, so give an app or a system, not both. Apps that have a licence cost are ordered in the dashboard.',
 			'plans'    => $out,
 		);
 	}
@@ -132,8 +122,7 @@ final class Purchase {
 	 * @param float $cap    Monthly cap.
 	 */
 	private static function price_text( float $hourly, float $cap ): string {
-		/* translators: 1: "€0.0226 per hour, max €16.50 per month", 2: "Billed monthly for the hours used" in lower case. */
-		return sprintf( __( '%1$s, %2$s (excluding VAT)', 'beltoft-services' ), \BeltoftServices\Usage\Rates::tile_terms( $hourly, $cap ), lcfirst( \BeltoftServices\Usage\Rates::billed_note() ) );
+		return Pricing::text( $hourly, $cap );
 	}
 
 	// -- Checking an order -----------------------------------------------------------------------
@@ -259,36 +248,14 @@ final class Purchase {
 			return $fail( __( 'This plan cannot be ordered pay as you go through Claude.', 'beltoft-services' ) );
 		}
 
-		$account  = Account::for_user( $user_id, Account::ESTABLISHED );
-		$problems = null === $account ? array_filter( array( Cart::limit_problem( $user_id, null, 1 ) ) ) : Cart::problems( $user_id, '', 1 );
+		$state = self::account_state( $user_id, $url );
 
-		if ( array() !== $problems ) {
-			return $fail( implode( ' ', $problems ) );
+		if ( $state instanceof \WP_Error ) {
+			return $state;
 		}
 
-		$direct = self::can_charge_later( $account );
-
-		if ( null !== $account && ! $direct ) {
-			return $fail( __( 'Your usage account cannot be charged without you: it is not active or its saved card has no standing permission. Order the server in the dashboard, or add a card there first.', 'beltoft-services' ) . ' ' . $url );
-		}
-
-		if ( $direct ) {
-			$customer = new \WC_Customer( $user_id, false );
-			$missing  = array();
-
-			foreach ( BillingRequirements::FIELDS as $field ) {
-				$getter = 'get_' . $field;
-
-				if ( '' === trim( (string) $customer->$getter() ) ) {
-					$missing[] = str_replace( '_', ' ', substr( $field, 8 ) );
-				}
-			}
-
-			if ( array() !== $missing ) {
-				/* translators: %s: the missing billing details, such as "phone, postcode". */
-				return $fail( sprintf( __( 'The billing details are incomplete (missing: %s). The customer completes them in the dashboard under Account details, then asks again.', 'beltoft-services' ), implode( ', ', $missing ) ) );
-			}
-		}
+		$account = $state['account'];
+		$direct  = $state['direct'];
 
 		return array(
 			'plan'    => $plan,
@@ -309,6 +276,51 @@ final class Purchase {
 				)
 			),
 		);
+	}
+
+	/**
+	 * The customer's usage account and whether it takes an order with no payment step. Refuses when the limits of the usage
+	 * rules are reached, when the account cannot be charged without the customer, or when billing details are missing.
+	 *
+	 * @param int    $user_id Customer.
+	 * @param string $url     The dashboard page to send the customer to.
+	 * @return array{account: \WC_Subscription|null, direct: bool}|\WP_Error
+	 */
+	public static function account_state( int $user_id, string $url ) {
+		$fail = static fn( string $text ) => new \WP_Error( 'beltoft_services_tool', $text );
+		$account  = Account::for_user( $user_id, Account::ESTABLISHED );
+		$problems = null === $account ? array_filter( array( Cart::limit_problem( $user_id, null, 1 ) ) ) : Cart::problems( $user_id, '', 1 );
+
+		if ( array() !== $problems ) {
+			return $fail( implode( ' ', $problems ) );
+		}
+
+		$direct = self::can_charge_later( $account );
+
+		if ( null !== $account && ! $direct ) {
+			return $fail( __( 'Your usage account cannot be charged without you: it is not active or its saved card has no standing permission. Order it in the dashboard, or add a card there first.', 'beltoft-services' ) . ' ' . $url );
+		}
+
+		if ( $direct ) {
+			$customer = new \WC_Customer( $user_id, false );
+			$missing  = array();
+
+			foreach ( BillingRequirements::FIELDS as $field ) {
+				$getter = 'get_' . $field;
+
+				if ( '' === trim( (string) $customer->$getter() ) ) {
+					$missing[] = str_replace( '_', ' ', substr( $field, 8 ) );
+				}
+			}
+
+			if ( array() !== $missing ) {
+				/* translators: %s: the missing billing details, such as "phone, postcode". */
+				return $fail( sprintf( __( 'The billing details are incomplete (missing: %s). The customer completes them in the dashboard under Account details, then asks again.', 'beltoft-services' ), implode( ', ', $missing ) ) );
+			}
+		}
+
+
+		return array( 'account' => $account, 'direct' => $direct );
 	}
 
 	/**
@@ -367,7 +379,7 @@ final class Purchase {
 		$lines[] = sprintf( __( 'Price: %s.', 'beltoft-services' ), self::price_text( $p['hourly'], $p['cap'] ) );
 
 		if ( 'direct' === $p['mode'] ) {
-			$lines[] = __( 'Nothing is charged now: the order total is 0. The hours the server runs are invoiced once a month to the card saved on your usage account, and you can see the estimate any time with usage_summary.', 'beltoft-services' );
+			$lines[] = __( 'Nothing is charged now: the order total is 0. The hours the server runs are invoiced once a month to the card saved on your usage account (VAT is added on the invoice, and any account credit is applied first), and you can see the estimate any time with usage_summary.', 'beltoft-services' );
 			$lines[] = __( 'What happens next: the order is placed at once and the server is built and started, usually within a few minutes. Follow it with list_services and server_status. When it is ready, its address and system are shown there; the password is revealed once in the dashboard or with reveal_server_password.', 'beltoft-services' );
 
 			if ( function_exists( 'wc_terms_and_conditions_checkbox_enabled' ) && wc_terms_and_conditions_checkbox_enabled() ) {
@@ -425,18 +437,28 @@ final class Purchase {
 	public static function run( array $args, int $user_id ) {
 		$p = self::prepare( $args, $user_id );
 
-		if ( $p instanceof \WP_Error ) {
-			return $p;
-		}
+		return $p instanceof \WP_Error ? $p : self::execute( $p, $user_id, 'server' );
+	}
+
+	/**
+	 * Does what a confirmed, prepared order asks: gives the link, or places the order. Shared by order_server and order_database.
+	 *
+	 * @param array<string, mixed> $p       Result of prepare(): plan, mode, url, and put (what puts the item in the cart).
+	 * @param int                  $user_id Customer.
+	 * @param string               $kind    server or database.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function execute( array $p, int $user_id, string $kind ) {
+		$tool = 'database' === $kind ? 'order_database' : self::NAME;
 
 		if ( 'browser' === $p['mode'] ) {
-			Irreversible::trail( array(), 'gave the checkout link for a server (' . $p['plan']['name'] . '), nothing ordered' );
+			Irreversible::trail( array(), 'gave the checkout link for a ' . $kind . ' (' . $p['plan']['name'] . '), nothing ordered' );
 
 			return array(
 				'requested'    => false,
 				'ordered'      => false,
 				'checkout_url' => $p['url'],
-				'message'      => 'Nothing was ordered. This customer has no usage account yet, so the first server is finished once in the browser: open checkout_url, check the choices, continue to checkout and save a card on the payment provider\'s page (nothing is charged by saving it). Tell the customer this. After that, order_server places orders in the chat without the browser.',
+				'message'      => 'Nothing was ordered. This customer has no usage account yet, so the first ' . $kind . ' is finished once in the browser: open checkout_url, check the choices, continue to checkout and save a card on the payment provider\'s page (nothing is charged by saving it). Tell the customer this. After that, ' . $tool . ' places orders in the chat without the browser.',
 			);
 		}
 
@@ -446,7 +468,7 @@ final class Purchase {
 		 * @param int $limit Default 5.
 		 */
 		if ( RateLimit::exceeded( $user_id, 'beltoft-services:mcp-order', (int) apply_filters( 'beltoft_services_mcp_order_limit', self::ORDERS_PER_HOUR ), HOUR_IN_SECONDS ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'Too many servers were ordered in the last hour. Wait a while, or order in the dashboard.', 'beltoft-services' ) );
+			return new \WP_Error( 'beltoft_services_tool', ( 'database' === $kind ? __( 'Too many databases were ordered in the last hour. Wait a while, or order in the dashboard.', 'beltoft-services' ) : __( 'Too many servers were ordered in the last hour. Wait a while, or order in the dashboard.', 'beltoft-services' ) ) );
 		}
 
 		try {
@@ -473,12 +495,12 @@ final class Purchase {
 
 			if ( $resource && 'usage' === ( $license['source'] ?? '' ) ) {
 				$service = $resource;
-				Events::add( (int) $license['id'], 'api', 'Claude: ordered server ' . (string) $p['plan']['name'] . ' (order #' . $order->get_id() . ')' );
+				Events::add( (int) $license['id'], 'api', 'Claude: ordered ' . $kind . ' ' . (string) $p['plan']['name'] . ' (order #' . $order->get_id() . ')' );
 				break;
 			}
 		}
 
-		Audit::add( $user_id, 'ordered server ' . (string) $p['plan']['name'] . ' (order #' . $order->get_id() . ')' );
+		Audit::add( $user_id, 'ordered ' . $kind . ' ' . (string) $p['plan']['name'] . ' (order #' . $order->get_id() . ')' );
 
 		return array(
 			'requested'  => true,
@@ -486,7 +508,7 @@ final class Purchase {
 			'order_id'   => $order->get_id(),
 			'status'     => $order->get_status(),
 			'service_id' => null === $service ? null : $service->id(),
-			'message'    => 'The order is placed and nothing was charged. The server is being set up now. Use list_services and server_status' . ( null === $service ? '' : ' (service ' . $service->id() . ')' ) . ' to follow it, and tell the customer when it is ready.',
+			'message'    => 'The order is placed and nothing was charged. The ' . $kind . ' is being set up now. Use list_services' . ( 'server' === $kind ? ' and server_status' : ' and service_details' ) . ( null === $service ? '' : ' (service ' . $service->id() . ')' ) . ' to follow it, and tell the customer when it is ready.',
 		);
 	}
 
@@ -500,7 +522,7 @@ final class Purchase {
 	 */
 	private static function place( \WC_Cart $cart, array $p, int $user_id ) {
 		$fail = static fn( string $text ) => new \WP_Error( 'beltoft_services_tool', $text );
-		$put  = ServerPicker::add_to_cart( $p['checked'] );
+		$put  = isset( $p['put'] ) && is_callable( $p['put'] ) ? ( $p['put'] )() : ServerPicker::add_to_cart( $p['checked'] );
 
 		if ( null !== $put ) {
 			return $fail( $put );
@@ -533,6 +555,11 @@ final class Purchase {
 		if ( function_exists( 'wc_terms_and_conditions_checkbox_enabled' ) && wc_terms_and_conditions_checkbox_enabled() ) {
 			$form['terms']       = 'on';
 			$form['terms-field'] = '1';
+		}
+
+		// A database engine with licence terms: the customer said yes to the summary, which showed the link.
+		if ( null !== \BeltoftServices\Proxmox\DbTermsField::cart_terms() ) {
+			$form[ \BeltoftServices\Proxmox\DbTermsField::POST_KEY ] = '1';
 		}
 
 		$_POST    = $form;

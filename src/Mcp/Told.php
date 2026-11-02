@@ -67,6 +67,9 @@ final class Told {
 			case 'order_server':
 				return __( 'ordered a pay as you go server', 'beltoft-services' );
 
+			case 'order_database':
+				return __( 'ordered a pay as you go database', 'beltoft-services' );
+
 			case 'cancel_subscription':
 				return __( 'cancelled the subscription', 'beltoft-services' );
 

@@ -19,7 +19,9 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\DbIp;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
@@ -107,6 +109,9 @@ final class Reads {
 
 			case 'list_server_plans':
 				return Purchase::plans();
+
+			case 'price_quote':
+				return Pricing::quote( $args );
 
 			case 'list_dns_claims':
 				$list = Tools::route( 'GET', '/domains/dns-claims', array(), null, null );
@@ -223,6 +228,7 @@ final class Reads {
 			'servers'       => (array) ( $live['resources'] ?? array() ),
 			'servers_note'  => 'Percent of CPU, memory and disk, for each running server by id.',
 			'pay_as_you_go' => null,
+			'account'       => Pricing::account( $user_id ),
 		);
 
 		if ( $estimate ) {
@@ -426,6 +432,7 @@ final class Reads {
 				'items'            => array_values( array_map( static fn( $i ) => $i->get_name(), $s->get_items() ) ),
 				'services'         => $services[ $s->get_id() ] ?? array(),
 				'dashboard_offers' => array_keys( wcs_get_all_user_actions_for_subscription( $s, $user_id ) ),
+				'pay_as_you_go_account' => \BeltoftServices\Usage\Account::is_account( $s ),
 				'can_change_auto_renew' => class_exists( 'WCS_My_Account_Auto_Renew_Toggle' ) && \WCS_My_Account_Auto_Renew_Toggle::can_user_toggle_auto_renewal( $s, $user_id ),
 			);
 		}
@@ -524,48 +531,15 @@ final class Reads {
 			case 'server_plans':
 				return array(
 					'currency' => get_woocommerce_currency(),
-					'note'     => 'Prices exclude tax.',
-					'plans'    => array_values(
-						array_map(
-							static fn( $p ) => array(
-								'variation_id'  => (int) $p['variation_id'],
-								'name'          => (string) $p['name'],
-								'price'         => (float) $p['price'],
-								'period'        => (string) $p['period'],
-								'cores'         => (int) $p['cores'],
-								'memory_mb'     => (int) $p['memory_mb'],
-								'disk_gb'       => (int) $p['disk_gb'],
-								'in_stock'      => (bool) $p['in_stock'],
-								'with_backups'  => $p['backups'] ? array( 'variation_id' => (int) $p['backups']['variation_id'], 'extra_price' => round( (float) $p['backups']['extra'], 2 ), 'days' => (int) $p['backups']['days'] ) : null,
-								'pay_as_you_go' => $p['usage'] ? array( 'variation_id' => (int) $p['usage']['variation_id'], 'hourly' => (float) $p['usage']['hourly'], 'monthly_cap' => (float) $p['usage']['cap'] ) : null,
-							),
-							Offers::plans()
-						)
-					),
+					'note'     => Pricing::note(),
+					'plans'    => Pricing::server_plans(),
 				);
 
 			case 'database_plans':
 				return array(
 					'currency' => get_woocommerce_currency(),
-					'note'     => 'Prices exclude tax.',
-					'plans'    => array_values(
-						array_map(
-							static fn( $p ) => array(
-								'variation_id' => (int) $p['variation_id'],
-								'name'         => (string) $p['name'],
-								'price'        => (float) $p['price'],
-								'period'       => (string) $p['period'],
-								'engine'       => (string) $p['engine'],
-								'version'      => (int) $p['major'],
-								'cores'        => (int) $p['cores'],
-								'memory_mb'    => (int) $p['memory_mb'],
-								'disk_gb'      => (int) $p['disk_gb'],
-								'backup_days'  => (int) $p['backup_days'],
-								'in_stock'     => (bool) $p['in_stock'],
-							),
-							DbPicker::plans()
-						)
-					),
+					'note'     => Pricing::note() . ' ' . __( 'A database is ordered with order_database (Full access, after the customer confirms). Each plan lists its options: the public IPv4 address and the extra storage steps, with their price per month and per hour.', 'beltoft-services' ),
+					'plans'    => Pricing::database_plans(),
 				);
 
 			case 'os_and_apps':
@@ -632,26 +606,49 @@ final class Reads {
 		$currency = get_woocommerce_currency();
 		$out      = array(
 			'currency' => $currency,
-			'note'     => 'Prices exclude tax.',
+			'note'     => Pricing::note() . ' ' . __( 'Add-ons are priced by the hour and capped at the max per month shown.', 'beltoft-services' ),
 		);
+		$current  = wc_get_product( (int) ( $r->license()['variation_id'] ?? 0 ) );
 
 		if ( 'proxmox' === $driver ) {
 			$out['snapshot_packs'] = array_values(
 				array_map(
-					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'slots' => SnapshotCart::slots_of( $v ), 'price' => (float) wc_get_price_excluding_tax( $v ) ),
+					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'slots' => SnapshotCart::slots_of( $v ), 'price' => Pricing::variation_price( $v ) ),
 					SnapshotCart::packs()
 				)
 			);
 			$out['extra_disks']    = array_values(
 				array_map(
-					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'price' => (float) wc_get_price_excluding_tax( $v ) ),
+					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'price' => Pricing::variation_price( $v ) ),
 					DiskField::sizes()
 				)
 			);
 		}
 
 		if ( 'proxmox' === $driver || DbDriver::ID === $driver ) {
-			$out['backups'] = Backups::enabled( $r ) ? array( 'enabled' => true ) : array( 'enabled' => false, 'extra_price' => Backups::price_label( $r, true ) );
+			$with           = $current instanceof \WC_Product_Variation && ! Backups::enabled( $r ) ? Backups::sibling( $current, true ) : null;
+			$out['backups'] = Backups::enabled( $r ) ? array( 'enabled' => true ) : array( 'enabled' => false, 'adds' => $with ? Pricing::addon_between( $current, $with ) : null );
+		}
+
+		if ( DbDriver::ID === $driver && $current instanceof \WC_Product_Variation ) {
+			$own  = DbDisk::extra( (array) $r->get( 'plan' ) );
+			$step = array();
+
+			foreach ( DbDisk::ladder( $current ) as $gb => $variation ) {
+				if ( $gb > $own ) {
+					$step[] = array( 'extra_gb' => (int) $gb, 'more_gb' => (int) $gb - $own, 'adds' => Pricing::addon_between( $current, $variation ) );
+				}
+			}
+
+			$out['extra_storage'] = array(
+				'current_extra_gb' => $own,
+				'max_data_disk_gb' => DbDisk::max_gb(),
+				'steps'            => $step,
+				'note'             => __( 'Storage can be made larger from the database page in the dashboard, never smaller. It is billed by the hour with the database and capped. Claude cannot grow it yet.', 'beltoft-services' ),
+			);
+
+			$ip                = DbIp::sibling( $r, true );
+			$out['public_ipv4'] = $ip && $current ? array( 'enabled' => false, 'adds' => Pricing::addon_between( $current, $ip ) ) : array( 'enabled' => null === DbIp::sibling( $r, false ) ? false : true );
 		}
 
 		return $out;
