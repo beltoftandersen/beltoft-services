@@ -11,12 +11,18 @@
 
 defined( 'ABSPATH' ) || exit;
 
+use BeltoftServices\Credit\Code;
 use BeltoftServices\Credit\Page;
 use BeltoftServices\Credit\Topup;
 
 $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 ?>
 <section class="beltoft-services-credit">
+	<?php
+	if ( function_exists( 'wc_print_notices' ) ) {
+		wc_print_notices(); // A redeemed or refused code is told here (a Bricks account page does not print notices for this page).
+	}
+	?>
 	<div class="beltoft-services-ov__head">
 		<h2><?php esc_html_e( 'Credit', 'beltoft-services' ); ?></h2>
 	</div>
@@ -62,6 +68,18 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<?php wp_nonce_field( Topup::NONCE ); ?>
 		<input type="hidden" name="<?php echo esc_attr( Topup::ACTION ); ?>" value="1">
 		<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Continue to checkout', 'beltoft-services' ); ?></button>
+	</form>
+
+	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( Page::url() ); ?>">
+		<h3><?php esc_html_e( 'Have a credit code?', 'beltoft-services' ); ?></h3>
+		<p class="beltoft-services-credit__custom">
+			<label for="beltoft-credit-code"><?php esc_html_e( 'Credit code', 'beltoft-services' ); ?></label>
+			<input id="beltoft-credit-code" type="text" name="beltoft_credit_code" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+		</p>
+		<p class="beltoft-services-credit__note"><?php esc_html_e( 'You need a saved card to redeem a code. Each card can use a code once.', 'beltoft-services' ); ?></p>
+		<?php wp_nonce_field( Code::NONCE ); ?>
+		<input type="hidden" name="<?php echo esc_attr( Code::ACTION ); ?>" value="1">
+		<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Redeem', 'beltoft-services' ); ?></button>
 	</form>
 
 	<h3><?php esc_html_e( 'History', 'beltoft-services' ); ?></h3>
