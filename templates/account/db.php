@@ -300,6 +300,9 @@ $beltoft_services_db_wait = array(
 	<?php endif; ?>
 
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'password' === $active ) ) : ?>
+		<?php if ( $view['can_reveal'] && ! $beltoft_services_all && 'overview' !== $active ) : ?>
+			<p class="beltoft-services-panel__notice"><?php esc_html_e( 'Your password is ready to be shown once.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $link( 'overview' ) ); ?>"><?php esc_html_e( 'Show it on the Overview tab', 'beltoft-services' ); ?></a></p>
+		<?php endif; ?>
 		<?php if ( $view['can_reset'] ) : ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
@@ -309,7 +312,7 @@ $beltoft_services_db_wait = array(
 					<label for="beltoft-db-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $view['confirm'] ) ); ?></label>
 					<input type="text" id="beltoft-db-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $view['confirm'] ); ?>" data-db-confirm>
 				</p>
-				<p><button type="button" class="button woocommerce-button" data-db-reset><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
+				<p><button type="button" class="button woocommerce-button" data-db-reset<?php echo $nav ? ' data-db-after="' . esc_url( $link( 'overview' ) ) . '"' : ''; ?>><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
 				</div>
 			</div>
 		<?php elseif ( $view['resetting'] ) : ?>
