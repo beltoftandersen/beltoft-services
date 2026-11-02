@@ -53,6 +53,15 @@ class SummaryTest extends UsageTestCase {
 		}
 	}
 
+	public function test_the_cart_count_leaves_out_the_account_line(): void {
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		$this->add( $v['u-None'] );
+
+		$this->assertNotSame( array(), $this->account_item(), 'The account line is in the cart.' );
+		$this->assertSame( 1, WC()->cart->get_cart_contents_count(), 'One server reads as one item.' );
+	}
+
 	public function test_the_server_line_shows_rate_and_cap_and_real_prices_are_untouched(): void {
 		$v = $this->usage_product( '0' );
 		wp_set_current_user( $this->new_user() );

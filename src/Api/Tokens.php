@@ -28,7 +28,8 @@ defined( 'ABSPATH' ) || exit;
  *   that destroy or reveal something (these stay in the dashboard behind its confirmations);
  * - an access token of the OAuth server (Oauth\Grants) is a token request too, with the level the customer chose
  *   (read, actions or full). Full only means something to the MCP tools; on the REST routes it works as actions, so the
- *   action filter below keeps protecting them. Personal tokens are never full;
+ *   action filter below keeps protecting them. A personal token is full only when the customer chose Full access
+ *   and confirmed it with the account password (StepUp) when making it;
  * - requests are counted per token (filter beltoft_services_token_rate_limit, default 60 a minute), on top of the
  *   per-user, per-route limits the routes keep;
  * - a change that was accepted is written to the license history ("API: reboot requested").
@@ -247,13 +248,14 @@ final class Tokens {
 	 *
 	 * @param int    $user_id User.
 	 * @param string $name    A name the customer recognises.
-	 * @param string $scope   read or actions.
+	 * @param string $scope   read, actions or full.
+	 * @param bool   $stepped Whether the customer confirmed with the account password (needed for full only).
 	 * @return array{password: string, uuid: string}|\WP_Error The password is returned this once.
 	 */
-	public static function create( int $user_id, string $name, string $scope ) {
+	public static function create( int $user_id, string $name, string $scope, bool $stepped = false ) {
 		$name = trim( sanitize_text_field( $name ) );
 
-		if ( '' === $name || ! isset( self::scopes()[ $scope ] ) ) {
+		if ( '' === $name || ! isset( self::levels()[ $scope ] ) || ( self::FULL === $scope && ! $stepped ) ) {
 			return new \WP_Error( 'beltoft_services_token_invalid', __( 'Give the token a name and choose what it may do.', 'beltoft-services' ) );
 		}
 
@@ -268,7 +270,7 @@ final class Tokens {
 		}
 
 		$scopes                     = self::stored( $user_id );
-		$scopes[ $made[1]['uuid'] ] = $scope;
+		$scopes[ $made[1]['uuid'] ] = self::pack( $scope, true );
 		update_user_meta( $user_id, self::META, $scopes );
 
 		return array(
@@ -295,7 +297,7 @@ final class Tokens {
 			$out[] = array(
 				'uuid'      => (string) $item['uuid'],
 				'name'      => (string) $item['name'],
-				'scope'     => (string) $scopes[ $item['uuid'] ],
+				'scope'     => self::stale( (string) $scopes[ $item['uuid'] ] ) ? self::ACTIONS : self::level( (string) $scopes[ $item['uuid'] ] ),
 				'created'   => (int) $item['created'],
 				'last_used' => (int) $item['last_used'],
 			);
@@ -350,11 +352,14 @@ final class Tokens {
 			return;
 		}
 
-		$scope         = self::stored( (int) $user->ID )[ $item['uuid'] ] ?? '';
+		$stored        = (string) ( self::stored( (int) $user->ID )[ $item['uuid'] ] ?? '' );
+		$level         = self::level( $stored );
+		// A stored value of ours: read, actions or full:<consent>. Anything else gives no access.
+		$known         = '' !== $stored && ( isset( self::scopes()[ $stored ] ) || ( self::FULL === $level && str_contains( $stored, ':' ) ) );
 		self::$current = array(
 			'uuid'  => (string) $item['uuid'],
 			'user'  => (int) $user->ID,
-			'scope' => isset( self::scopes()[ $scope ] ) ? $scope : '',
+			'scope' => ! $known ? '' : ( self::stale( $stored ) ? self::ACTIONS : $level ),
 		);
 	}
 
