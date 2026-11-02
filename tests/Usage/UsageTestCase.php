@@ -22,8 +22,8 @@ require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
  * A gateway that can be charged later, and one that cannot.
  */
 class UsageCardGateway extends \WC_Payment_Gateway {
-	public function __construct() {
-		$this->id       = 'fakecard';
+	public function __construct( string $id = 'fakecard' ) {
+		$this->id       = $id;
 		$this->enabled  = 'yes';
 		$this->supports = array( 'products', 'subscriptions', 'subscription_cancellation', 'subscription_suspension', 'subscription_reactivation', 'subscription_amount_changes', 'subscription_date_changes', 'multiple_subscriptions' );
 	}

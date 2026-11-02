@@ -1,6 +1,6 @@
 <?php
 /**
- * Saved card: add one without ordering, show it, replace it.
+ * Saved card: add or change it on Mollie's hosted card page, with no order and no checkout.
  *
  * @package BeltoftServices
  */
@@ -16,37 +16,48 @@ defined( 'ABSPATH' ) || exit;
 /**
  * The card is the Mollie mandate on the customer's usage account subscription, which usage invoices charge.
  *
- * Add: a cart with only the hidden usage account line (flagged with CART_KEY, 0 total), checked out the normal
- * way; Mollie's hosted page takes a 0 first payment and the Mollie plugin stores the mandate on the subscription.
- * Replace: a new 0 first payment for the same Mollie customer, created here with a webhook of ours; when Mollie
- * says it is paid (fetched, never taken from the request), the new mandate goes on the subscription and the old
- * one is revoked. The Mollie plugin's renewal reads `_mollie_mandate_id` and `_mollie_customer_id` of the
- * subscription, so the next usage invoice charges the new mandate.
+ * Add and change are one flow: a button posts here, a 0.00 first payment (method creditcard) is made for the
+ * customer's Mollie customer, and the customer goes to Mollie's hosted card page, then back to Payment methods.
+ * When Mollie says the payment is paid (fetched, never taken from the request; the webhook and the return both
+ * do this, once) the mandate goes on the usage account subscription. A customer with no account gets one made
+ * right there: an active 0 per month subscription with the card on it, the same state a server order's checkout
+ * leaves, so later pay-as-you-go orders attach to it. The Mollie plugin's renewal reads `_mollie_mandate_id` of
+ * the subscription and `_mollie_customer_id` of the renewal order (copied from it), so the next usage invoice
+ * charges this mandate. A replaced mandate is revoked.
  */
 final class Card {
 
-	/**
-	 * Cart item key of the account line made to save a card.
-	 */
-	public const CART_KEY = 'beltoft_services_card_setup';
-
-	public const NONCE          = 'beltoft_services_card';
-	public const ACTION_ADD     = 'beltoft_services_card_add';
-	public const ACTION_REPLACE = 'beltoft_services_card_replace';
-	public const QUERY          = 'beltoft_card';
+	public const NONCE  = 'beltoft_services_card';
+	public const ACTION = 'beltoft_services_card_start';
+	public const QUERY  = 'beltoft_card';
 
 	/**
-	 * Subscription meta: Mollie payment ids of replace payments started and not yet applied, and those applied.
+	 * User meta: Mollie payment ids of card payments started and not yet settled, and those applied.
 	 */
 	public const META_PENDING = '_beltoft_services_card_pending';
 	public const META_DONE    = '_beltoft_services_card_done';
 
 	/**
-	 * Option name prefix of the row that says a payment was applied.
+	 * User meta: how the last settled card payment ended (saved, cancelled, failed), for the notice on return.
+	 */
+	public const META_LAST = '_beltoft_services_card_last';
+
+	/**
+	 * Subscription meta of an account made by the old card-only checkout, still pending: the daily cleanup
+	 * cancels those after a day. No new account gets it.
 	 */
 	public const META_SETUP = '_beltoft_services_card_setup';
 	public const CLEANUP    = 'beltoft_services_card_cleanup';
+
+	/**
+	 * Option name prefix of the row that says a payment was applied.
+	 */
 	public const CLAIM = 'beltoft_services_card_claim_';
+
+	/**
+	 * The payment method of the account's card.
+	 */
+	public const GATEWAY = 'mollie_wc_gateway_creditcard';
 
 	/**
 	 * Seconds the mandate details are kept.
@@ -54,10 +65,10 @@ final class Card {
 	public const CACHE_TTL = 600;
 
 	/**
-	 * Replace payments one customer can start in the window.
+	 * Card pages one customer can start in the window.
 	 */
-	public const REPLACE_LIMIT  = 5;
-	public const REPLACE_WINDOW = 600;
+	public const START_LIMIT  = 5;
+	public const START_WINDOW = 600;
 
 	public const NAMESPACE_REST = 'beltoft-services/v1';
 
@@ -66,17 +77,12 @@ final class Card {
 	 */
 	public static function register(): void {
 		add_action( 'template_redirect', array( __CLASS__, 'handle' ) );
-		add_action( 'template_redirect', array( __CLASS__, 'back_to_billing' ), 20 );
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
-		add_action( 'woocommerce_checkout_subscription_created', array( __CLASS__, 'mark_setup' ), 20, 2 );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
 		add_action( self::CLEANUP, array( __CLASS__, 'cleanup' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
 		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'swap_page' ), 1 );
 		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'bricks_methods' ), 10, 2 );
-		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
-		add_filter( 'woocommerce_available_payment_gateways', array( __CLASS__, 'gateways' ), 30 );
-		add_filter( 'woocommerce_cart_item_name', array( __CLASS__, 'cart_name' ), 20, 2 );
 	}
 
 	/**
@@ -196,17 +202,6 @@ final class Card {
 		}
 
 		return $id;
-	}
-
-	/**
-	 * A list kept in subscription meta, without empty entries.
-	 *
-	 * @param \WC_Subscription $account Account.
-	 * @param string           $key     Meta key.
-	 * @return string[]
-	 */
-	private static function ids( \WC_Subscription $account, string $key ): array {
-		return array_values( array_filter( array_map( 'strval', (array) $account->get_meta( $key, true ) ), 'strlen' ) );
 	}
 
 	/**
@@ -336,61 +331,79 @@ final class Card {
 	 * @return array<string, mixed>
 	 */
 	public static function data( int $user_id ): array {
+		// Payments the customer has come back from (or whose webhook is late) are settled before the page is drawn.
+		self::sync_pending( $user_id );
+		wp_cache_delete( $user_id, 'user_meta' );
+
 		$account = Account::for_user( $user_id, Account::ESTABLISHED );
-		$notice  = '';
-		$kind    = 'success';
-
-		if ( $account ) {
-			self::sync_pending( $account );
-			$account = Account::for_user( $user_id, Account::ESTABLISHED );
-		}
-
-		$info  = $account ? self::details( $account ) : null;
-		$state = 'none';
+		$info    = $account ? self::details( $account ) : null;
+		$state   = 'none';
 
 		if ( $info ) {
 			$state = 'unknown' === $info['status'] ? 'unknown' : ( self::usable( $info ) ? 'valid' : 'expired' );
 		}
 
 		$returned = isset( $_GET[ self::QUERY ] ) ? sanitize_key( wp_unslash( (string) $_GET[ self::QUERY ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only picks a message.
-
-		if ( 'return' === $returned || 'replaced' === $returned ) {
-			if ( 'valid' === $state ) {
-				$notice = 'replaced' === $returned ? __( 'Card replaced.', 'beltoft-services' ) : __( 'Card saved.', 'beltoft-services' );
-			} elseif ( 'unknown' === $state ) {
-				$notice = __( 'We could not check your card just now. Reload this page in a moment.', 'beltoft-services' );
-				$kind   = 'info';
-			} else {
-				$notice = __( 'The card was not saved. You can try again.', 'beltoft-services' );
-				$kind   = 'error';
-			}
-		} elseif ( 'limit' === $returned ) {
-			$notice = __( 'Too many attempts. Try again in a few minutes.', 'beltoft-services' );
-			$kind   = 'error';
-		} elseif ( 'failed' === $returned ) {
-			$notice = __( 'The card page could not be opened. Try again in a moment.', 'beltoft-services' );
-			$kind   = 'error';
-		} elseif ( 'cart' === $returned ) {
-			$notice = __( 'Your cart has other items. Check out or empty your cart first, then add a card.', 'beltoft-services' );
-			$kind   = 'error';
-		}
+		$notice   = self::notice( $user_id, $returned, $state );
 
 		return array(
 			'state'       => $state,
 			'text'        => $info && 'unknown' !== $info['status'] ? self::describe( $info ) : '',
-			'can_add'     => null === $account,
-			'can_replace' => $account && '' !== self::customer_id( $account ) && Mollie::configured(),
-			'notice'      => $notice,
-			'notice_kind' => $kind,
-			'add_action'  => self::ACTION_ADD,
-			'replace_action' => self::ACTION_REPLACE,
+			'can_start'   => Mollie::configured(),
+			'change'      => 'none' !== $state,
+			'notice'      => $notice[0],
+			'notice_kind' => $notice[1],
+			'action'      => self::ACTION,
 		);
 	}
 
-	// ------------------------------------------------------------------ add and replace.
+	/**
+	 * The message after a trip to Mollie's card page, or after a refusal of ours.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param string $returned Value of the query arg.
+	 * @param string $state    none, valid, expired or unknown.
+	 * @return array{0: string, 1: string} Message and its kind.
+	 */
+	private static function notice( int $user_id, string $returned, string $state ): array {
+		if ( 'limit' === $returned ) {
+			return array( __( 'Too many attempts. Try again in a few minutes.', 'beltoft-services' ), 'error' );
+		}
+
+		if ( 'failed' === $returned ) {
+			return array( __( 'The card page could not be opened. Try again in a moment.', 'beltoft-services' ), 'error' );
+		}
+
+		if ( 'return' !== $returned ) {
+			return array( '', 'success' );
+		}
+
+		$last = (string) get_user_meta( $user_id, self::META_LAST, true );
+
+		// An earlier card page that was left open stays pending: only a customer with no result yet is told to wait.
+		if ( '' === $last && self::ids( $user_id, self::META_PENDING ) ) {
+			return array( __( 'We are waiting for Mollie to confirm your card. Reload this page in a moment.', 'beltoft-services' ), 'info' );
+		}
+
+		if ( 'saved' === $last && 'unknown' === $state ) {
+			return array( __( 'We could not check your card just now. Reload this page in a moment.', 'beltoft-services' ), 'info' );
+		}
+
+		if ( 'saved' === $last ) {
+			return array( __( 'Card saved.', 'beltoft-services' ), 'success' );
+		}
+
+		if ( 'cancelled' === $last ) {
+			return array( __( 'Card not saved. You cancelled on Mollie\'s page. You can try again.', 'beltoft-services' ), 'info' );
+		}
+
+		return array( __( 'The card was not saved. Mollie could not confirm it. You can try again.', 'beltoft-services' ), 'error' );
+	}
+
+	// ------------------------------------------------------------------ the button.
 
 	/**
-	 * The two forms: sends the customer on.
+	 * The form: sends the customer on.
 	 */
 	public static function handle(): void {
 		if ( 'POST' !== strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) ) {
@@ -414,17 +427,14 @@ final class Card {
 	}
 
 	/**
-	 * What a posted form does. Both forms need a login and the nonce.
+	 * What a posted form does. It needs a login and the nonce.
 	 *
 	 * @param int                  $user_id Current user (0 for a visitor).
 	 * @param array<string, mixed> $post    Posted fields.
-	 * @return string|null Where to send the customer, null when the post is not one of ours.
+	 * @return string|null Where to send the customer, null when the post is not ours.
 	 */
 	public static function dispatch( int $user_id, array $post ): ?string {
-		$add     = ! empty( $post[ self::ACTION_ADD ] );
-		$replace = ! empty( $post[ self::ACTION_REPLACE ] );
-
-		if ( ! $add && ! $replace ) {
+		if ( empty( $post[ self::ACTION ] ) ) {
 			return null;
 		}
 
@@ -440,58 +450,38 @@ final class Card {
 			return self::url();
 		}
 
-		return $add ? self::start_add( $user_id ) : self::start_replace( $user_id );
+		return self::start( $user_id );
 	}
 
 	/**
-	 * Puts the card-only account line in the cart.
-	 *
-	 * @param int $user_id Customer.
-	 * @return string Where to go next.
-	 */
-	public static function start_add( int $user_id ): string {
-		if ( Account::for_user( $user_id, Account::ESTABLISHED ) || ! function_exists( 'WC' ) || ! WC()->cart ) {
-			return self::url();
-		}
-
-		$cart = WC()->cart;
-
-		foreach ( $cart->get_cart() as $item ) {
-			if ( empty( $item[ self::CART_KEY ] ) && (int) $item['product_id'] !== (int) get_option( Account::OPTION_PRODUCT ) ) {
-				return self::url( array( self::QUERY => 'cart' ) );
-			}
-		}
-
-		$cart->empty_cart();
-
-		$key = $cart->add_to_cart( Account::product_id(), 1, 0, array(), array( self::CART_KEY => 1 ) );
-
-		return false === $key ? self::url( array( self::QUERY => 'failed' ) ) : wc_get_checkout_url();
-	}
-
-	/**
-	 * Creates the 0 first payment of a replacement.
+	 * Creates the 0.00 first payment.
 	 *
 	 * @param int $user_id Customer.
 	 * @return string Mollie's checkout address, or a page of ours with a message.
 	 */
-	public static function start_replace( int $user_id ): string {
-		$account = Account::for_user( $user_id, Account::ESTABLISHED );
-
-		if ( ! $account || '' === self::customer_id( $account ) ) {
-			return self::url();
+	public static function start( int $user_id ): string {
+		if ( ! Mollie::configured() ) {
+			return self::url( array( self::QUERY => 'failed' ) );
 		}
 
-		if ( RateLimit::exceeded( $user_id, 'beltoft-services:card-replace', self::REPLACE_LIMIT, self::REPLACE_WINDOW ) ) {
+		if ( RateLimit::exceeded( $user_id, 'beltoft-services:card-start', self::START_LIMIT, self::START_WINDOW ) ) {
 			return self::url( array( self::QUERY => 'limit' ) );
 		}
 
-		// A replace page that was opened and left leaves a pending mandate at Mollie: it goes before the next one starts.
-		$list = Mollie::call( 'GET', '/customers/' . rawurlencode( self::customer_id( $account ) ) . '/mandates' );
+		$customer = self::customer_for( $user_id );
+
+		if ( '' === $customer ) {
+			return self::url( array( self::QUERY => 'failed' ) );
+		}
+
+		// A card page that was opened and left leaves a pending mandate at Mollie: it goes before the next one starts.
+		$list    = Mollie::call( 'GET', '/customers/' . rawurlencode( $customer ) . '/mandates' );
+		$account = Account::for_user( $user_id, Account::ESTABLISHED );
+		$current = $account ? self::mandate_id( $account ) : '';
 
 		foreach ( is_array( $list ) && isset( $list['_embedded']['mandates'] ) ? (array) $list['_embedded']['mandates'] : array() as $m ) {
-			if ( 'pending' === ( $m['status'] ?? '' ) && ! empty( $m['id'] ) && (string) $m['id'] !== self::mandate_id( $account ) ) {
-				Mollie::revoke( self::customer_id( $account ), (string) $m['id'] );
+			if ( 'pending' === ( $m['status'] ?? '' ) && ! empty( $m['id'] ) && (string) $m['id'] !== $current ) {
+				Mollie::revoke( $customer, (string) $m['id'] );
 			}
 		}
 
@@ -501,16 +491,13 @@ final class Card {
 					'currency' => get_woocommerce_currency(),
 					'value'    => '0.00',
 				),
-				'description'  => __( 'Replace card for Pay as you go', 'beltoft-services' ),
-				'customerId'   => self::customer_id( $account ),
+				'description'  => __( 'Card for Pay as you go', 'beltoft-services' ),
+				'customerId'   => $customer,
 				'sequenceType' => 'first',
 				'method'       => 'creditcard',
-				'redirectUrl'  => self::url( array( self::QUERY => 'replaced' ) ),
+				'redirectUrl'  => self::url( array( self::QUERY => 'return' ) ),
 				'webhookUrl'   => self::webhook_url(),
-				'metadata'     => array(
-					'beltoft_card_subscription' => $account->get_id(),
-					'beltoft_card_user'         => $user_id,
-				),
+				'metadata'     => array( 'beltoft_card_user' => $user_id ),
 			)
 		);
 
@@ -520,20 +507,81 @@ final class Card {
 			return self::url( array( self::QUERY => 'failed' ) );
 		}
 
-		$pending   = self::ids( $account, self::META_PENDING );
+		$pending   = self::ids( $user_id, self::META_PENDING );
 		$pending[] = (string) $payment['id'];
-		$account->update_meta_data( self::META_PENDING, array_values( array_slice( array_unique( $pending ), -5 ) ) );
-		$account->save();
+		update_user_meta( $user_id, self::META_PENDING, array_values( array_slice( array_unique( $pending ), -5 ) ) );
+		delete_user_meta( $user_id, self::META_LAST );
 
 		return $href;
 	}
 
 	/**
-	 * The address Mollie calls when a replace payment changes.
+	 * The customer's Mollie customer: the one on the account, else the one the Mollie plugin keeps on the user
+	 * (when Mollie still knows it), else a new one (name and email from the WordPress user).
+	 *
+	 * @param int $user_id Customer.
+	 * @return string Customer id (cst_...), or '' when Mollie could not be asked.
+	 */
+	private static function customer_for( int $user_id ): string {
+		$account = Account::for_user( $user_id, Account::ESTABLISHED );
+		$id      = $account ? self::customer_id( $account ) : '';
+
+		if ( '' !== $id ) {
+			return $id;
+		}
+
+		$id = (string) get_user_meta( $user_id, 'mollie_customer_id', true );
+
+		if ( '' !== $id ) {
+			$known = Mollie::call( 'GET', '/customers/' . rawurlencode( $id ) );
+
+			if ( is_wp_error( $known ) ) {
+				// Only a customer Mollie says does not exist is replaced.
+				if ( 'beltoft_services_mollie_404' !== $known->get_error_code() ) {
+					return '';
+				}
+
+				$id = '';
+			}
+		}
+
+		if ( '' !== $id ) {
+			return $id;
+		}
+
+		$user = get_userdata( $user_id );
+
+		if ( ! $user ) {
+			return '';
+		}
+
+		$name = trim( $user->first_name . ' ' . $user->last_name );
+		$new  = Mollie::call(
+			'POST',
+			'/customers',
+			array(
+				'name'     => '' !== $name ? $name : $user->display_name,
+				'email'    => $user->user_email,
+				'metadata' => array( 'user_id' => $user_id ),
+			)
+		);
+
+		if ( is_wp_error( $new ) || empty( $new['id'] ) ) {
+			return '';
+		}
+
+		// The key the Mollie plugin reads, so a later order reuses this customer.
+		update_user_meta( $user_id, 'mollie_customer_id', (string) $new['id'] );
+
+		return (string) $new['id'];
+	}
+
+	/**
+	 * The address Mollie calls when a card payment changes.
 	 */
 	public static function webhook_url(): string {
 		/**
-		 * Filters the webhook address of a replace payment (a site behind a tunnel or proxy).
+		 * Filters the webhook address of a card payment (a site behind a tunnel or proxy).
 		 *
 		 * @param string $url The REST route.
 		 */
@@ -577,42 +625,50 @@ final class Card {
 	}
 
 	/**
-	 * Applies the replace payments the customer started (when they come back, in case the webhook is late).
+	 * Settles the card payments the customer started (when they come back, in case the webhook is late).
 	 *
-	 * @param \WC_Subscription $account Account.
+	 * @param int $user_id Customer.
 	 */
-	public static function sync_pending( \WC_Subscription $account ): void {
-		foreach ( self::ids( $account, self::META_PENDING ) as $id ) {
-			if ( is_string( $id ) && '' !== $id ) {
-				self::apply_payment( $id );
-			}
+	public static function sync_pending( int $user_id ): void {
+		foreach ( self::ids( $user_id, self::META_PENDING ) as $id ) {
+			self::apply_payment( $id );
 		}
 	}
 
 	/**
-	 * Fetches the payment from Mollie and, when it is a paid replace payment we started, swaps the mandate.
-	 * Safe to call again and from two requests at once: a payment is applied once.
+	 * A list kept in user meta, without empty entries.
+	 *
+	 * @param int    $user_id Customer.
+	 * @param string $key     Meta key.
+	 * @return string[]
+	 */
+	private static function ids( int $user_id, string $key ): array {
+		return array_values( array_filter( array_map( 'strval', (array) get_user_meta( $user_id, $key, true ) ), 'strlen' ) );
+	}
+
+	/**
+	 * Fetches the payment from Mollie and, when it is a paid card payment this site started, puts its mandate on
+	 * the customer's account. Safe to call again and from two requests at once: a payment is applied once.
 	 *
 	 * @param string $id Mollie payment id.
-	 * @return string saved, done (already applied), waiting (not paid yet), ignored or error.
+	 * @return string saved, done (already applied), waiting (not paid yet), cancelled, failed, ignored or error.
 	 */
 	public static function apply_payment( string $id ): string {
 		$payment = Mollie::payment( $id );
 
 		if ( is_wp_error( $payment ) ) {
-			return 404 === (int) str_replace( 'beltoft_services_mollie_', '', $payment->get_error_code() ) ? 'ignored' : 'error';
+			return 'beltoft_services_mollie_404' === $payment->get_error_code() ? 'ignored' : 'error';
 		}
 
-		$sub_id  = isset( $payment['metadata']['beltoft_card_subscription'] ) ? (int) $payment['metadata']['beltoft_card_subscription'] : 0;
-		$account = $sub_id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $sub_id ) : null;
+		$user_id = isset( $payment['metadata']['beltoft_card_user'] ) ? (int) $payment['metadata']['beltoft_card_user'] : 0;
 
-		if ( ! $account instanceof \WC_Subscription || ! Account::is_account( $account ) ) {
+		if ( $user_id < 1 || ! get_userdata( $user_id ) ) {
 			return 'ignored';
 		}
 
 		global $wpdb;
 
-		$lock = 'bs_card_' . substr( md5( DB_NAME . $wpdb->prefix . $sub_id ), 0, 20 );
+		$lock = 'bs_card_' . substr( md5( DB_NAME . $wpdb->prefix . $user_id ), 0, 20 );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- A named lock.
 		$got = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) );
 
@@ -621,25 +677,33 @@ final class Card {
 		}
 
 		try {
-			// Read again under the lock.
-			$account = wcs_get_subscription( $sub_id );
-
-			if ( ! $account instanceof \WC_Subscription ) {
-				return 'ignored';
-			}
+			// Another request (the webhook, or the return) may have written the customer's meta while this one waited for the lock.
+			wp_cache_delete( $user_id, 'user_meta' );
 
 			$claim = self::CLAIM . md5( $id );
 
-			if ( false !== get_option( $claim ) || in_array( $id, self::ids( $account, self::META_DONE ), true ) ) {
+			if ( false !== get_option( $claim ) || in_array( $id, self::ids( $user_id, self::META_DONE ), true ) ) {
 				return 'done';
 			}
 
-			// Only a payment this site started for this account, for its Mollie customer, as a first payment.
-			if ( ! in_array( $id, self::ids( $account, self::META_PENDING ), true ) || ( $payment['customerId'] ?? '' ) !== self::customer_id( $account ) || 'first' !== ( $payment['sequenceType'] ?? '' ) ) {
+			// Only a payment this site started for this customer, for the customer's Mollie customer, as a first payment.
+			$account  = Account::for_user( $user_id, Account::ESTABLISHED );
+			$customer = $account ? self::customer_id( $account ) : '';
+			$customer = '' !== $customer ? $customer : (string) get_user_meta( $user_id, 'mollie_customer_id', true );
+
+			if ( ! in_array( $id, self::ids( $user_id, self::META_PENDING ), true ) || '' === $customer || ( $payment['customerId'] ?? '' ) !== $customer || 'first' !== ( $payment['sequenceType'] ?? '' ) ) {
 				return 'ignored';
 			}
 
-			if ( 'paid' !== ( $payment['status'] ?? '' ) || empty( $payment['mandateId'] ) ) {
+			$status = (string) ( $payment['status'] ?? '' );
+
+			if ( in_array( $status, array( 'canceled', 'failed', 'expired' ), true ) ) {
+				self::settle( $user_id, $id, 'canceled' === $status ? 'cancelled' : 'failed' );
+
+				return 'canceled' === $status ? 'cancelled' : 'failed';
+			}
+
+			if ( ! in_array( $status, array( 'paid', 'authorized' ), true ) || empty( $payment['mandateId'] ) ) {
 				return 'waiting';
 			}
 
@@ -649,17 +713,20 @@ final class Card {
 			}
 
 			try {
-				self::swap_mandate( $account, (string) $payment['mandateId'] );
+				if ( $account ) {
+					self::swap_mandate( $account, $customer, (string) $payment['mandateId'] );
+				} else {
+					self::create_account( $user_id, $customer, (string) $payment['mandateId'] );
+				}
 			} catch ( \Throwable $e ) {
 				delete_option( $claim );
 				throw $e;
 			}
 
-			$done   = self::ids( $account, self::META_DONE );
+			$done   = self::ids( $user_id, self::META_DONE );
 			$done[] = $id;
-			$account->update_meta_data( self::META_DONE, array_values( array_slice( array_unique( $done ), -20 ) ) );
-			$account->update_meta_data( self::META_PENDING, array_values( array_diff( self::ids( $account, self::META_PENDING ), array( $id ) ) ) );
-			$account->save();
+			update_user_meta( $user_id, self::META_DONE, array_values( array_slice( array_unique( $done ), -20 ) ) );
+			self::settle( $user_id, $id, 'saved' );
 
 			return 'saved';
 		} finally {
@@ -669,21 +736,39 @@ final class Card {
 	}
 
 	/**
-	 * Puts a new mandate on the account (and its first order, as the Mollie plugin does) and revokes the old one.
+	 * A payment has ended: it leaves the pending list and the result is kept for the notice.
 	 *
-	 * @param \WC_Subscription $account Account.
-	 * @param string           $new     New mandate id.
+	 * @param int    $user_id Customer.
+	 * @param string $id      Payment id.
+	 * @param string $result  saved, cancelled or failed.
 	 */
-	private static function swap_mandate( \WC_Subscription $account, string $new ): void {
-		$old      = (string) $account->get_meta( '_mollie_mandate_id', true );
-		$customer = self::customer_id( $account );
+	private static function settle( int $user_id, string $id, string $result ): void {
+		update_user_meta( $user_id, self::META_PENDING, array_values( array_diff( self::ids( $user_id, self::META_PENDING ), array( $id ) ) ) );
+
+		// A left-open earlier page that expires later does not undo a card saved since.
+		if ( 'saved' === $result || 'saved' !== (string) get_user_meta( $user_id, self::META_LAST, true ) ) {
+			update_user_meta( $user_id, self::META_LAST, $result );
+		}
+	}
+
+	/**
+	 * Puts a new mandate on the account and revokes the old one.
+	 *
+	 * @param \WC_Subscription $account  Account.
+	 * @param string           $customer Mollie customer id.
+	 * @param string           $new      New mandate id.
+	 */
+	private static function swap_mandate( \WC_Subscription $account, string $customer, string $new ): void {
+		$old = (string) $account->get_meta( '_mollie_mandate_id', true );
 
 		$account->update_meta_data( '_mollie_mandate_id', $new );
 		$account->update_meta_data( '_mollie_customer_id', $customer );
+		self::use_card_gateway( $account );
 		$account->save();
 
 		$parent = $account->get_parent();
 
+		// An account made by an order keeps the mandate on that order too, where the Mollie plugin looks when the subscription has none.
 		if ( $parent ) {
 			$parent->update_meta_data( '_mollie_mandate_id', $new );
 			$parent->save();
@@ -692,7 +777,11 @@ final class Card {
 		self::forget( $customer, $old );
 		self::forget( $customer, $new );
 
-		$note = __( 'Card replaced: a new payment method is saved for usage invoices.', 'beltoft-services' );
+		$note = '' !== $old && $old !== $new
+			/* translators: 1: old mandate id, 2: new mandate id. */
+			? sprintf( __( 'Card changed: mandate %2$s replaces %1$s for usage invoices.', 'beltoft-services' ), $old, $new )
+			/* translators: %s: mandate id. */
+			: sprintf( __( 'Card saved: mandate %s for usage invoices.', 'beltoft-services' ), $new );
 
 		if ( '' !== $old && $old !== $new ) {
 			$revoked = Mollie::revoke( $customer, $old );
@@ -705,20 +794,87 @@ final class Card {
 		$account->add_order_note( $note );
 	}
 
-	// ------------------------------------------------------------------ abandoned card setups.
+	/**
+	 * Makes the customer's usage account around a saved card: an active subscription of the hidden 0 per month
+	 * product, charged automatically with the card. It is what a first server order's checkout would leave.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param string $customer Mollie customer id.
+	 * @param string $mandate  Mandate id.
+	 * @throws \RuntimeException When the subscription cannot be made.
+	 */
+	private static function create_account( int $user_id, string $customer, string $mandate ): void {
+		$product = Account::product_id() > 0 ? wc_get_product( Account::product_id() ) : false;
+
+		if ( ! function_exists( 'wcs_create_subscription' ) || ! $product ) {
+			throw new \RuntimeException( 'The usage account cannot be made.' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Not output.
+		}
+
+		$sub = wcs_create_subscription(
+			array(
+				'customer_id'      => $user_id,
+				'status'           => 'pending',
+				'billing_period'   => 'month',
+				'billing_interval' => 1,
+				'start_date'       => gmdate( 'Y-m-d H:i:s' ),
+				'currency'         => get_woocommerce_currency(),
+			)
+		);
+
+		if ( is_wp_error( $sub ) ) {
+			throw new \RuntimeException( 'The usage account cannot be made.' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Not output.
+		}
+
+		$user         = get_userdata( $user_id );
+		$customer_obj = new \WC_Customer( $user_id );
+
+		foreach ( array( 'first_name', 'last_name', 'company', 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'phone' ) as $field ) {
+			$setter = 'set_billing_' . $field;
+			$getter = 'get_billing_' . $field;
+			$sub->$setter( (string) $customer_obj->$getter() );
+		}
+
+		$sub->set_billing_email( '' !== $customer_obj->get_billing_email() ? $customer_obj->get_billing_email() : (string) $user->user_email );
+
+		if ( '' === $sub->get_billing_first_name() && '' === $sub->get_billing_last_name() ) {
+			$sub->set_billing_first_name( (string) $user->first_name );
+			$sub->set_billing_last_name( (string) $user->last_name );
+		}
+
+		$sub->set_requires_manual_renewal( false );
+		$sub->add_product( $product, 1 );
+		$sub->update_meta_data( Account::META, 'yes' );
+		$sub->update_meta_data( '_mollie_customer_id', $customer );
+		$sub->update_meta_data( '_mollie_mandate_id', $mandate );
+		self::use_card_gateway( $sub );
+		$sub->calculate_totals();
+		$sub->save();
+
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', strtotime( '+1 month' ) ) ) );
+		$sub->update_status( 'active', __( 'Card saved on Mollie\'s card page.', 'beltoft-services' ) );
+
+		self::forget( $customer, $mandate );
+	}
 
 	/**
-	 * Marks the account made by a card-only order.
+	 * The account is charged by Mollie's card method.
 	 *
-	 * @param mixed $subscription Subscription.
-	 * @param mixed $order        Order.
+	 * @param \WC_Subscription $account Account.
 	 */
-	public static function mark_setup( $subscription, $order = null ): void {
-		if ( $subscription instanceof \WC_Subscription && $order instanceof \WC_Order && self::is_card_order( $order ) ) {
-			$subscription->update_meta_data( self::META_SETUP, 'yes' );
-			$subscription->save();
+	private static function use_card_gateway( \WC_Subscription $account ): void {
+		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
+
+		if ( isset( $gateways[ self::GATEWAY ] ) ) {
+			$account->set_payment_method( $gateways[ self::GATEWAY ] );
+		} else {
+			$account->set_payment_method( self::GATEWAY );
+			$account->set_payment_method_title( __( 'Credit card', 'beltoft-services' ) );
 		}
+
+		$account->set_requires_manual_renewal( false );
 	}
+
+	// ------------------------------------------------------------------ accounts left by the old card-only checkout.
 
 	/**
 	 * Daily job.
@@ -763,112 +919,4 @@ final class Card {
 		return $n;
 	}
 
-	// ------------------------------------------------------------------ the checkout of a card-only cart.
-
-	/**
-	 * Whether the cart holds the card-only account line.
-	 *
-	 * @param \WC_Cart|null $cart Cart.
-	 */
-	public static function cart_has_setup( ?\WC_Cart $cart = null ): bool {
-		$cart = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
-
-		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
-			if ( ! empty( $item[ self::CART_KEY ] ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * A card can only be saved with a payment method that makes a mandate.
-	 *
-	 * @param mixed $data   Posted checkout data.
-	 * @param mixed $errors Errors.
-	 */
-	public static function validate( $data, $errors ): void {
-		if ( ! $errors instanceof \WP_Error || ! is_array( $data ) || ! self::cart_has_setup() || Account::for_user( get_current_user_id(), Account::ESTABLISHED ) ) {
-			return;
-		}
-
-		$methods = function_exists( 'WC' ) ? WC()->payment_gateways()->payment_gateways() : array();
-		$chosen  = (string) ( $data['payment_method'] ?? '' );
-
-		if ( '' === $chosen || ! isset( $methods[ $chosen ] ) || ! $methods[ $chosen ]->supports( 'subscriptions' ) ) {
-			$errors->add( 'beltoft_services_card', __( 'Choose a card as the payment method to save a card.', 'beltoft-services' ) );
-		}
-	}
-
-	/**
-	 * A card-only cart offers the card method only (when it is available).
-	 *
-	 * @param mixed $gateways Available gateways.
-	 * @return mixed
-	 */
-	public static function gateways( $gateways ) {
-		if ( ! is_array( $gateways ) || is_admin() || ! self::cart_has_setup() ) {
-			return $gateways;
-		}
-
-		/**
-		 * The payment method ids that can save a card.
-		 *
-		 * @param string[] $ids Default: Mollie's card method.
-		 */
-		$ids  = (array) apply_filters( 'beltoft_services_card_gateways', array( 'mollie_wc_gateway_creditcard' ) );
-		$kept = array_intersect_key( $gateways, array_flip( $ids ) );
-
-		return $kept ? $kept : $gateways;
-	}
-
-	/**
-	 * The line reads "Card for Pay as you go" in the cart of a card-only checkout.
-	 *
-	 * @param mixed $name Name.
-	 * @param mixed $item Cart item.
-	 * @return mixed
-	 */
-	public static function cart_name( $name, $item = array() ) {
-		return is_array( $item ) && ! empty( $item[ self::CART_KEY ] ) ? esc_html__( 'Card for Pay as you go', 'beltoft-services' ) : $name;
-	}
-
-	/**
-	 * After a card-only order is paid, Mollie sends the customer to the order-received page: they go to the
-	 * payment methods page instead, where the card shows.
-	 */
-	public static function back_to_billing(): void {
-		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( 'order-received' ) || ! is_user_logged_in() ) {
-			return;
-		}
-
-		$order_id = absint( get_query_var( 'order-received' ) );
-		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
-		$key      = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['key'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- The order key is the check.
-
-		if ( ! $order instanceof \WC_Order || ! hash_equals( $order->get_order_key(), $key ) || (int) $order->get_customer_id() !== get_current_user_id() || ! self::is_card_order( $order ) ) {
-			return;
-		}
-
-		wp_safe_redirect( self::url( array( self::QUERY => 'return' ) ) );
-		exit;
-	}
-
-	/**
-	 * Is this order only the card account line?
-	 *
-	 * @param \WC_Order $order Order.
-	 */
-	public static function is_card_order( \WC_Order $order ): bool {
-		$items = $order->get_items();
-		$id    = (int) get_option( Account::OPTION_PRODUCT );
-
-		// A usage invoice also holds only the account line (and fee lines): it has its own order page.
-		if ( \BeltoftServices\Usage\InvoiceView::is_usage( $order ) ) {
-			return false;
-		}
-
-		return 1 === count( $items ) && $id > 0 && (int) reset( $items )->get_product_id() === $id;
-	}
 }
