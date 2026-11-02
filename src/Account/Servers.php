@@ -174,19 +174,23 @@ final class Servers {
 		$servers   = array();
 		$resources = array();
 		$others    = array();
+		$gone      = array();
 
 		foreach ( $views as $view ) {
 			if ( is_array( $view ) && isset( $view['license'] ) && self::is_server( $view['license'] ) ) {
 				$id = (int) $view['id'];
 
-				$servers[ $id ] = $view;
-
 				// One lookup per server: the rows and the page take the resource from here.
 				$resource = Resource::for_license( (int) $view['license']['id'] );
 
-				if ( $resource ) {
-					$resources[ $id ] = $resource;
+				if ( Resource::gone( $resource ) ) {
+					// Deleted: never listed as a live server; its own address says so.
+					$gone[ $id ] = $view;
+					continue;
 				}
+
+				$servers[ $id ]   = $view;
+				$resources[ $id ] = $resource;
 			} else {
 				$others[] = $view;
 			}
@@ -208,6 +212,13 @@ final class Servers {
 
 		if ( $asked['id'] > 0 && isset( $servers[ $asked['id'] ] ) ) {
 			self::detail( $servers[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ] ?? null );
+
+			return;
+		}
+
+		if ( $asked['id'] > 0 && isset( $gone[ $asked['id'] ] ) ) {
+			echo '<div class="beltoft-services-server"><p class="beltoft-services-server__back"><a href="' . esc_url( self::url_list() ) . '">&lsaquo; ' . esc_html__( 'All servers', 'beltoft-services' ) . '</a></p>';
+			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'This server was deleted.', 'beltoft-services' ) . '</p></div>';
 
 			return;
 		}
@@ -432,7 +443,7 @@ final class Servers {
 			$license  = $view['license'];
 			$resource = $resources[ (int) ( $view['id'] ?? 0 ) ] ?? Resource::for_license( (int) $license['id'] );
 
-			if ( ! $resource ) {
+			if ( Resource::gone( $resource ) ) {
 				continue;
 			}
 

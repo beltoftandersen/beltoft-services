@@ -277,6 +277,16 @@ final class Resource {
 	}
 
 	/**
+	 * Is the service gone: its activation closed, or its state deleted? Such a service is never listed as live.
+	 * Pass the resource a lookup gave (null when the license has no live resource).
+	 *
+	 * @param Resource|null $resource Resource, or null when there is none.
+	 */
+	public static function gone( ?Resource $resource ): bool {
+		return ! $resource || ! $resource->is_live() || 'deleted' === $resource->get( 'state' );
+	}
+
+	/**
 	 * Is the resource still live (not closed)?
 	 */
 	public function is_live(): bool {
