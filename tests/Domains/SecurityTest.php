@@ -31,7 +31,7 @@ class SecurityTest extends TestCase {
 
 	private function domain( array $meta = array() ): Resource {
 		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-security-test' ) );
-		$user    = self::factory()->user->create( array( 'first_name' => 'Dana', 'user_pass' => 'right-password' ) );
+		$user    = self::factory()->user->create( array( 'first_name' => 'Dana', 'user_email' => 'christian.beltoft+dom' . wp_generate_password( 8, false ) . '@gmail.com' ) );
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
 		$r       = Resource::create( $license, new DomainDriver(), array(), array_merge( array( 'state' => 'ready', 'domain' => 'secure-example.net', 'mode' => 'register', 'remote_id' => '321', 'is_locked' => true, 'auth' => 'AUTH-CODE-NEVER-IN-MAIL' ), $meta ) );
 		$this->assertInstanceOf( Resource::class, $r );
@@ -230,30 +230,77 @@ class SecurityTest extends TestCase {
 		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5 );
 	}
 
-	/** The transfer code route as the page calls it: a POST with the password or code in the body. */
-	private function code_request( Resource $r, string $secret = 'right-password' ): \WP_REST_Response {
-		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' );
+	/** The transfer code route as the page calls it: a POST with the code in the body. */
+	private function code_request( Resource $r, ?string $secret = null ): \WP_REST_Response {
+		if ( null === $secret ) {
+			// The code mail is not what these tests count: drop it once its code is read.
+			$secret      = $this->emailed_code( $r );
+			$this->mails = array();
+		}
+
+		$request  = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_body( (string) wp_json_encode( array( 'secret' => $secret ) ) );
 		return rest_do_request( $request );
 	}
 
-	public function test_the_transfer_code_needs_the_account_password(): void {
+	/** Emails a transfer code check code to the domain's owner and returns it from the captured mail. */
+	private function emailed_code( Resource $r ): string {
+		$before = count( $this->mails );
+		$this->assertTrue( \BeltoftServices\StepUp::send( (int) $r->license()['user_id'], \BeltoftServices\StepUp::TRANSFER_CODE ) );
+		$this->assertCount( $before + 1, $this->mails );
+		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
+
+		return $m[1];
+	}
+
+	public function test_the_transfer_code_needs_the_emailed_code(): void {
 		$r  = $this->domain();
 		$op = $this->registrar();
 		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
+		$code = $this->emailed_code( $r );
+		$mails = count( $this->mails );
 
-		$wrong = $this->code_request( $r, 'wrong-password' );
+		$wrong = $this->code_request( $r, '000000' === $code ? '111111' : '000000' );
 		$this->assertSame( 403, $wrong->get_status() );
+		$this->assertStringContainsString( 'That code is not right or has expired. Send a new code.', (string) wp_json_encode( $wrong->get_data() ) );
 		$this->assertStringNotContainsString( 'REGISTRAR-SECRET-CODE', (string) wp_json_encode( $wrong->get_data() ) );
 		$this->assertSame( array(), $op->calls(), 'The registrar is not asked.' );
-		$this->assertSame( array(), $this->mails );
+		$this->assertCount( $mails, $this->mails, 'No security notice for a refused code.' );
 
 		$get = rest_do_request( new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/domain-authcode' ) );
 		$this->assertNotSame( 200, $get->get_status(), 'The old GET without a secret is gone.' );
 
-		$this->assertSame( 200, $this->code_request( $r )->get_status() );
+		$this->assertSame( 200, $this->code_request( $r, $code )->get_status() );
+		$this->assertSame( 403, $this->code_request( $r, $code )->get_status(), 'The code works once.' );
+	}
+
+	public function test_a_code_sent_for_an_api_token_does_not_show_the_transfer_code(): void {
+		$r  = $this->domain();
+		$op = $this->registrar();
+		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
+		$user = (int) $r->license()['user_id'];
+		wp_set_current_user( $user );
+		\BeltoftServices\StepUp::send( $user, \BeltoftServices\StepUp::API_TOKEN );
+		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
+
+		$this->assertSame( 403, $this->code_request( $r, $m[1] )->get_status() );
+		$this->assertSame( array(), $op->calls() );
+	}
+
+	public function test_the_domain_page_form_asks_for_the_emailed_code(): void {
+		$r = $this->domain();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		ob_start();
+		include BELTOFT_SERVICES_PATH . 'templates/account/domain-stepup.php';
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'we email a code to c***@gmail.com', $html );
+		$this->assertStringContainsString( 'beltoft-services-domain-send', $html );
+		$this->assertStringContainsString( 'We sent a code to c***@gmail.com.', $html );
+		$this->assertStringNotContainsString( 'type="password"', $html );
+		$this->assertStringNotContainsStringIgnoringCase( 'password', $html );
 	}
 
 	public function test_a_site_can_ask_for_an_app_code_instead_and_without_a_check_for_it_nothing_is_shown(): void {
@@ -265,7 +312,7 @@ class SecurityTest extends TestCase {
 		add_filter( 'beltoft_services_step_up_ask', $ask );
 
 		$this->assertSame( 'one-time-code', \BeltoftServices\StepUp::ask( (int) $r->license()['user_id'] )['autocomplete'] );
-		$this->assertSame( 403, $this->code_request( $r )->get_status(), 'Asking for a code, the password is not accepted.' );
+		$this->assertSame( 403, $this->code_request( $r, '123456' )->get_status(), 'Without a check for it nothing is shown.' );
 
 		$check = static fn( $ok, $user, $secret ) => '123456' === $secret;
 		add_filter( 'beltoft_services_step_up_verify', $check, 10, 3 );

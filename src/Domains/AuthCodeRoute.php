@@ -1,5 +1,5 @@
 <?php
-/** Owner-only retrieval of a registrar transfer code, after a second check (StepUp). @package BeltoftServices */
+/** Owner-only retrieval of a registrar transfer code, after a second check (StepUp: a code emailed to the account address). @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Api\Routes;
@@ -13,7 +13,7 @@ final class AuthCodeRoute {
 	public static function register(): void { add_action( 'rest_api_init', array( __CLASS__, 'routes' ) ); }
 	public static function routes(): void {
 		register_rest_route( Routes::NAMESPACE, '/resources/(?P<id>\d+)/domain-authcode', array(
-			// POST: the password or code travels in the body, never in a URL or a log line.
+			// POST: the code travels in the body, never in a URL or a log line.
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => array( __CLASS__, 'get' ),
 			'permission_callback' => 'is_user_logged_in',
@@ -29,8 +29,8 @@ final class AuthCodeRoute {
 		} else {
 			$r = Routes::guard( $request, true, 5 );
 			if ( ! $r instanceof Resource ) { $response = $r; }
-			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ) ) ) {
-				$response = rest_convert_error_to_response( new \WP_Error( 'step_up', 'code' === StepUp::ask( get_current_user_id() )['kind'] ? __( 'That code is not right. Use the newest code from your app.', 'beltoft-services' ) : __( 'That password is not right.', 'beltoft-services' ), array( 'status' => 403 ) ) );
+			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ), StepUp::TRANSFER_CODE ) ) {
+				$response = rest_convert_error_to_response( new \WP_Error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 			}
 			elseif ( 'domain' !== $r->get( 'driver' ) || ! ctype_digit( (string) $r->get( 'remote_id' ) ) ) {
 				$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', 'This code is unavailable.', array( 'status' => 403 ) ) );

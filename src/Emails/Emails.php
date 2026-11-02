@@ -64,6 +64,7 @@ final class Emails {
 		'BeltoftServices_Notice' => Notice::class,
 		'BeltoftServices_MailReady' => MailReady::class,
 		'BeltoftServices_MailDnsReminder' => MailDnsReminder::class,
+		'BeltoftServices_StepUpCode' => StepUpCode::class,
 	);
 
 	/**

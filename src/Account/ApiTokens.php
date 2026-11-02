@@ -36,7 +36,7 @@ final class ApiTokens {
 	public const NONCE = 'beltoft_services_api_token';
 
 	/**
-	 * Wrong passwords allowed when asking for a Full access token, and how long they count (seconds).
+	 * Wrong codes allowed when asking for a Full access token, and how long they count (seconds).
 	 */
 	public const MAX_FAILS   = 5;
 	public const FAIL_WINDOW = 900;
@@ -47,6 +47,13 @@ final class ApiTokens {
 	 * @var array{ok: bool, message: string, password: string}|null
 	 */
 	private static $result = null;
+
+	/**
+	 * What the customer had typed in the form when a code was sent or refused, so the form comes back filled: name, scope, sent.
+	 *
+	 * @var array{name: string, scope: string, sent: bool}
+	 */
+	private static $prefill = array( 'name' => '', 'scope' => '', 'sent' => false );
 
 	/**
 	 * Hooks.
@@ -105,7 +112,7 @@ final class ApiTokens {
 			'name'   => isset( $_POST['token_name'] ) ? sanitize_text_field( wp_unslash( $_POST['token_name'] ) ) : '',
 			'scope'  => isset( $_POST['token_scope'] ) ? sanitize_key( wp_unslash( $_POST['token_scope'] ) ) : '',
 			'uuid'   => isset( $_POST['token_uuid'] ) ? sanitize_text_field( wp_unslash( $_POST['token_uuid'] ) ) : '',
-			'secret' => isset( $_POST['token_secret'] ) ? (string) wp_unslash( $_POST['token_secret'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- A password: compared, never stored or shown.
+			'secret' => isset( $_POST['token_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['token_secret'] ) ) : '',
 			'family' => isset( $_POST['app_family'] ) ? sanitize_key( wp_unslash( $_POST['app_family'] ) ) : '',
 			'allow'  => isset( $_POST['mcp_allow'] ) ? sanitize_key( wp_unslash( $_POST['mcp_allow'] ) ) : '',
 			'nonce'  => isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '',
@@ -148,6 +155,20 @@ final class ApiTokens {
 			return array( 'ok' => true, 'message' => $allow ? __( 'Apps may connect to your account.', 'beltoft-services' ) : __( 'Apps can no longer use your account.', 'beltoft-services' ), 'password' => '' );
 		}
 
+		if ( 'send_code' === ( $post['action'] ?? '' ) ) {
+			self::$prefill = array( 'name' => (string) ( $post['name'] ?? '' ), 'scope' => (string) ( $post['scope'] ?? '' ), 'sent' => false );
+			$sent          = StepUp::send( $user_id, StepUp::API_TOKEN );
+
+			if ( is_wp_error( $sent ) ) {
+				return array( 'ok' => false, 'message' => $sent->get_error_message(), 'password' => '' );
+			}
+
+			self::$prefill['sent'] = true;
+
+			/* translators: %s: the account email with part of the name hidden. */
+			return array( 'ok' => true, 'message' => sprintf( __( 'We sent a code to %s.', 'beltoft-services' ), StepUp::masked_email( $user_id ) ), 'password' => '' );
+		}
+
 		if ( 'create' !== ( $post['action'] ?? '' ) ) {
 			return array( 'ok' => false, 'message' => '', 'password' => '' );
 		}
@@ -161,12 +182,13 @@ final class ApiTokens {
 				return array( 'ok' => false, 'message' => __( 'Too many wrong attempts. Please wait a few minutes and try again.', 'beltoft-services' ), 'password' => '' );
 			}
 
-			if ( ! StepUp::verify( $user_id, (string) ( $post['secret'] ?? '' ) ) ) {
+			if ( ! StepUp::verify( $user_id, (string) ( $post['secret'] ?? '' ), StepUp::API_TOKEN ) ) {
 				set_transient( $key, (int) get_transient( $key ) + 1, self::FAIL_WINDOW );
+				self::$prefill = array( 'name' => (string) ( $post['name'] ?? '' ), 'scope' => (string) ( $post['scope'] ?? '' ), 'sent' => false );
 
 				return array(
 					'ok'       => false,
-					'message'  => 'code' === StepUp::ask( $user_id )['kind'] ? __( 'That code is not right. No token was made.', 'beltoft-services' ) : __( 'That password is not right. No token was made.', 'beltoft-services' ),
+					'message'  => __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ),
 					'password' => '',
 				);
 			}
@@ -243,7 +265,8 @@ final class ApiTokens {
 				'tokens'   => Tokens::all( $user->ID ),
 				'scopes'   => Tokens::scopes(),
 				'levels'   => Tokens::levels(),
-				'step_up'  => StepUp::ask( $user->ID ),
+				'step_up'  => StepUp::ask( $user->ID, StepUp::API_TOKEN ),
+				'prefill'  => self::$prefill,
 				'audit'    => array_slice( array_reverse( Audit::lines( $user->ID ) ), 0, 20 ),
 				'result'   => self::$result,
 				'nonce'    => wp_create_nonce( self::NONCE ),

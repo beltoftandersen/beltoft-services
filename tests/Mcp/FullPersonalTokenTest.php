@@ -1,6 +1,6 @@
 <?php
 /**
- * A personal token with Full access: made with the account password, listed, enforced like a Full OAuth grant.
+ * A personal token with Full access: made with an emailed code, listed, enforced like a Full OAuth grant.
  *
  * @package BeltoftServices
  */
@@ -18,10 +18,25 @@ require_once __DIR__ . '/McpTestCase.php';
  */
 final class FullPersonalTokenTest extends McpTestCase {
 
-	private const PW = 'correct horse battery staple';
+	/**
+	 * Captured mails.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private array $mails = array();
 
 	public function set_up(): void {
 		parent::set_up();
+		$this->mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) {
+				$this->mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
 		add_filter( 'beltoft_services_mcp_rate_limit', '__return_zero' );
 	}
 
@@ -31,7 +46,7 @@ final class FullPersonalTokenTest extends McpTestCase {
 	}
 
 	/**
-	 * A ready fake-driver server that offers snapshot rollback, and its owner with a known password.
+	 * A ready fake-driver server that offers snapshot rollback, and its owner (mail is captured).
 	 *
 	 * @return array{0: Resource, 1: int}
 	 */
@@ -41,7 +56,7 @@ final class FullPersonalTokenTest extends McpTestCase {
 		$row                      = $this->service_license( $this->service_product( 'fake', array(), array( 'max' => 3 ) ), array( 'fire' => false ) );
 		$r                        = Resource::create( $row, $driver, array(), array( 'state' => 'ready' ) );
 		$user                     = (int) $row['user_id'];
-		wp_set_password( self::PW, $user );
+		wp_update_user( array( 'ID' => $user, 'user_email' => 'christian.beltoft@gmail.com' ) );
 
 		return array( $r, $user );
 	}
@@ -53,10 +68,20 @@ final class FullPersonalTokenTest extends McpTestCase {
 		return Panel::process( $user, array( 'action' => 'create', 'name' => 'Claude Code', 'scope' => $scope, 'secret' => $secret, 'nonce' => wp_create_nonce( Panel::NONCE ) ) );
 	}
 
-	public function test_full_is_made_with_the_right_password_and_stored_and_listed(): void {
+	/**
+	 * Emails a code for a Full token and returns it from the captured mail.
+	 */
+	private function emailed_code( int $user ): string {
+		\BeltoftServices\StepUp::send( $user, \BeltoftServices\StepUp::API_TOKEN );
+		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
+
+		return $m[1];
+	}
+
+	public function test_full_is_made_with_the_emailed_code_and_stored_and_listed(): void {
 		list( , $user ) = $this->server_with_owner();
 
-		$result = $this->create( $user, Tokens::FULL, self::PW );
+		$result = $this->create( $user, Tokens::FULL, $this->emailed_code( $user ) );
 		$this->assertTrue( $result['ok'], $result['message'] );
 		$this->assertNotSame( '', $result['password'] );
 
@@ -80,31 +105,33 @@ final class FullPersonalTokenTest extends McpTestCase {
 		$this->assertSame( array(), Tokens::all( $user ) );
 	}
 
-	public function test_a_wrong_or_missing_password_refuses_and_creates_nothing(): void {
+	public function test_a_wrong_or_missing_code_refuses_and_creates_nothing(): void {
 		list( , $user ) = $this->server_with_owner();
+		$this->emailed_code( $user );
 
-		foreach ( array( 'wrong password', '' ) as $secret ) {
+		foreach ( array( 'wrong code', '' ) as $secret ) {
 			$result = $this->create( $user, Tokens::FULL, $secret );
 			$this->assertFalse( $result['ok'] );
 			$this->assertSame( '', $result['password'] );
-			$this->assertStringContainsString( 'not right', $result['message'] );
+			$this->assertStringContainsString( 'not right or has expired', $result['message'] );
 		}
 
 		$this->assertSame( array(), Tokens::all( $user ) );
 
-		// The password is not asked for read and actions.
+		// The code is not asked for read and actions.
 		$this->assertTrue( $this->create( $user, Tokens::READ, '' )['ok'] );
 		$this->assertTrue( $this->create( $user, Tokens::ACTIONS, '' )['ok'] );
 	}
 
-	public function test_failed_attempts_are_rate_limited_even_for_the_right_password(): void {
+	public function test_failed_attempts_are_rate_limited_even_for_the_right_code(): void {
 		list( , $user ) = $this->server_with_owner();
+		$code           = $this->emailed_code( $user );
 
 		for ( $i = 0; $i < Panel::MAX_FAILS; $i++ ) {
 			$this->assertStringContainsString( 'not right', $this->create( $user, Tokens::FULL, 'nope' )['message'] );
 		}
 
-		$result = $this->create( $user, Tokens::FULL, self::PW );
+		$result = $this->create( $user, Tokens::FULL, $code );
 		$this->assertFalse( $result['ok'] );
 		$this->assertStringContainsString( 'Too many', $result['message'] );
 		$this->assertSame( array(), Tokens::all( $user ) );
