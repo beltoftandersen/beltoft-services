@@ -218,7 +218,7 @@ final class Definitions {
 			'free_license_site' => self::act( 'Removes a site from a license so the license can be used on another site.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The site, as listed.' ) ), array( 'license_id', 'domain' ) ), true, false, 10 ),
 			'cancel_unpaid_order' => self::act( 'Cancels an order that has not been paid (status pending or failed). A paid order is not touched. Ask the customer first.', self::obj( array( 'order_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The order id, from list_orders.' ) ), array( 'order_id' ) ), true, false, 10 ),
 			'update_billing_address' => self::act(
-				'Changes the customer\'s billing address. Only the fields you give change. The country and the VAT number cannot be changed here. Ask the customer first.',
+				'Changes the customer\'s billing details. Only the fields you give change. The billing email is where invoices go; the customer is told by email at the account address. The country can be set here only while none is set; to change a country, or the VAT number, the customer uses the dashboard. Ask the customer first.',
 				self::obj(
 					array(
 						'first_name' => array( 'type' => 'string', 'maxLength' => 100 ),
@@ -230,6 +230,8 @@ final class Definitions {
 						'state'      => array( 'type' => 'string', 'maxLength' => 100 ),
 						'postcode'   => array( 'type' => 'string', 'maxLength' => 20 ),
 						'phone'      => array( 'type' => 'string', 'maxLength' => 40 ),
+						'email'      => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The billing email, where invoices go.' ),
+						'country'    => array( 'type' => 'string', 'minLength' => 2, 'maxLength' => 2, 'description' => 'Two-letter country code, such as DK. Only when no country is set yet.' ),
 					)
 				),
 				true,

@@ -32,7 +32,8 @@ final class AddressService {
 		}
 
 		$customer = new \WC_Customer( $user_id );
-		$country  = (string) $customer->{"get_{$type}_country"}();
+		// A country given with the rest is the one the other fields are checked against.
+		$country  = isset( $values['country'] ) && '' !== (string) $values['country'] ? strtoupper( (string) $values['country'] ) : (string) $customer->{"get_{$type}_country"}();
 		$fields   = (array) WC()->countries->get_address_fields( $country, $type . '_' );
 		$address  = array();
 

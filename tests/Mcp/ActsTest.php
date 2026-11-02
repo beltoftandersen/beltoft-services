@@ -274,6 +274,17 @@ final class ActsTest extends McpTestCase {
 		$this->assertTrue( $this->tool( 'cancel_unpaid_order', array( 'order_id' => $this->subscription( $user )->get_id() ), $token )['isError'], 'A subscription is not an order.' );
 	}
 
+	public function test_update_billing_address_sets_a_missing_country_once(): void {
+		$user  = self::factory()->user->create();
+		$token = $this->oauth( $user, Tokens::ACTIONS );
+
+		$this->assertTrue( $this->tool( 'update_billing_address', array( 'country' => 'XX' ), $token )['isError'], 'Not a country the shop sells to.' );
+		$done = $this->tool( 'update_billing_address', array( 'country' => 'dk', 'postcode' => '8000', 'city' => 'Aarhus' ), $token );
+		$this->assertFalse( $done['isError'], $this->text( $done ) );
+		$this->assertSame( 'DK', ( new \WC_Customer( $user ) )->get_billing_country() );
+		$this->assertTrue( $this->tool( 'update_billing_address', array( 'country' => 'SE' ), $token )['isError'], 'Set once; then the dashboard.' );
+	}
+
 	public function test_update_billing_address_validates_like_the_account_form_and_keeps_the_country(): void {
 		$user     = self::factory()->user->create();
 		$customer = new \WC_Customer( $user );
@@ -303,8 +314,17 @@ final class ActsTest extends McpTestCase {
 		$this->assertTrue( $this->tool( 'update_billing_address', array( 'first_name' => '' ), $token )['isError'] );
 		$this->assertSame( 'Ann', ( new \WC_Customer( $user ) )->get_billing_first_name() );
 
-		// The country, the VAT number and the e-mail are not arguments.
-		foreach ( array( 'country', 'email', 'eu_vat_number', 'customer_type' ) as $key ) {
+		// The billing email can be set; an invalid one is refused.
+		$this->assertFalse( $this->tool( 'update_billing_address', array( 'email' => 'christian.beltoft+billing@gmail.com' ), $token )['isError'] );
+		$this->assertSame( 'christian.beltoft+billing@gmail.com', ( new \WC_Customer( $user ) )->get_billing_email() );
+		$this->assertTrue( $this->tool( 'update_billing_address', array( 'email' => 'not-an-email' ), $token )['isError'] );
+
+		// A country that is set stays: changing it is for the dashboard (VAT).
+		$this->assertTrue( $this->tool( 'update_billing_address', array( 'country' => 'DE' ), $token )['isError'] );
+		$this->assertSame( 'DK', ( new \WC_Customer( $user ) )->get_billing_country() );
+
+		// The VAT number and the customer type are not arguments.
+		foreach ( array( 'eu_vat_number', 'customer_type' ) as $key ) {
 			$this->assertTrue( $this->tool( 'update_billing_address', array( $key => 'DE' ), $token )['isError'], $key );
 		}
 
