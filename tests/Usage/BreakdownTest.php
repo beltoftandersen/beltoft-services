@@ -283,6 +283,39 @@ class BreakdownTest extends UsageTestCase {
 		$this->assertSame( 'Daily backups (+€3.00)', BackupField::label( $v['m-None'], $v['m-Daily'], '+€3.00' ) );
 	}
 
+	public function test_the_bricks_summary_row_becomes_the_stacked_block(): void {
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		$key = WC()->cart->add_to_cart( $v['u-Daily']->get_parent_id(), 1, $v['u-Daily']->get_id(), array( 'attribute_billing' => 'Pay as you go', 'attribute_backups' => 'Daily' ) );
+		$this->assertNotFalse( $key );
+		WC()->cart->calculate_totals();
+		$name = wc_get_product( $v['u-Daily']->get_parent_id() )->get_name();
+
+		$html = '<div id="bricks-woo-checkout-order-summary" class="x"><div class="brxe-33b40c brxe-div"><div class="brxe-d4a5aa brxe-div"><div class="brxe-f8a552 brxe-div"><div class="brxe-4b1d33 brxe-text-basic">' . $name . ' pay as you go, daily backups</div><div class="brxe-807587 brxe-text-basic">€0.0247 / hour</div><small class="brxe-1b2247 brxe-text-basic">2 vCPU</small><div class="brxe-sumos1 brxe-text-basic checkout-summary-os">Operating system: Ubuntu 24.04 LTS</div></div><div class="brxe-781d12 brxe-div"><div class="brxe-57f1f8 brxe-text-basic">max €18 / month</div></div></div></div><div id="brxe-7e1d8f" class="brxe-divider horizontal"></div></div>';
+		$out  = (string) apply_filters( 'bricks/frontend/render_data', $html );
+
+		$this->assertStringContainsString( 'beltoft-services-payg-row', $out );
+		$this->assertStringContainsString( 'Daily backups', $out );
+		$this->assertStringContainsString( '+€3 / month', $out );
+		$this->assertStringContainsString( 'Operating system: Ubuntu 24.04 LTS', $out );
+		$this->assertStringContainsString( 'Max per month', $out );
+		$this->assertStringNotContainsString( 'max €18 / month', $out );
+		$this->assertStringNotContainsString( '/ hour', $out );
+		$this->assertStringNotContainsString( 'pay as you go, daily', $out );
+		$this->assertGreaterThan( strpos( $out, 'beltoft-services-payg__plan' ), strpos( $out, 'Operating system' ), 'The operating system follows the plan line.' );
+		$this->assertGreaterThan( strpos( $out, 'Operating system' ), strpos( $out, 'Max per month' ), 'The amounts follow the operating system.' );
+	}
+
+	public function test_a_row_that_is_not_ours_is_left_alone(): void {
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		WC()->cart->add_to_cart( $v['u-None']->get_parent_id(), 1, $v['u-None']->get_id(), array( 'attribute_billing' => 'Pay as you go', 'attribute_backups' => 'None' ) );
+		WC()->cart->calculate_totals();
+		$html = '<div id="bricks-woo-checkout-order-summary" class="x"><div class="brxe-33b40c brxe-div"><div class="brxe-d4a5aa brxe-div"><div class="brxe-f8a552 brxe-div"><div class="brxe-4b1d33 brxe-text-basic">Something else</div><div class="brxe-807587 brxe-text-basic">€1</div><small class="brxe-1b2247 brxe-text-basic">x</small><div class="brxe-sumos1 brxe-text-basic checkout-summary-os"></div></div><div class="brxe-781d12 brxe-div"><div class="brxe-57f1f8 brxe-text-basic">€1</div></div></div></div></div>';
+
+		$this->assertStringNotContainsString( 'beltoft-services-payg', (string) apply_filters( 'bricks/frontend/render_data', $html ) );
+	}
+
 	public function test_the_add_on_note_says_how_it_is_billed(): void {
 		$this->assertSame( 'Billed by the hour, like the database.', Breakdown::addon_note_text( true ) );
 		$this->assertSame( 'Billed by the hour, like the server.', Breakdown::addon_note_text( false ) );

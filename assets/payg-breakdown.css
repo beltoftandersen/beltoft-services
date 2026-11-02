@@ -18,3 +18,7 @@
 /* The mini cart's item: the block is the item's text. */
 .woocommerce-mini-cart-item.beltoft-services-payg-line > a:not(.remove) { display: block; }
 .beltoft-services-payg-addon-note { margin: 0 0 16px; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.5; }
+/* The Bricks order summary's row: the block is full width. */
+.beltoft-services-payg-row { display: block; box-sizing: border-box; width: 100%; padding: 0 0 4px; }
+.beltoft-services-payg__os { display: block; margin: 10px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.45; }
+.beltoft-services-payg-row .beltoft-services-payg__os .checkout-summary-os, .beltoft-services-payg-row .beltoft-services-payg__os div { margin: 0; }

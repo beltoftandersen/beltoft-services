@@ -43,6 +43,7 @@ final class Breakdown {
 		add_filter( 'woocommerce_cart_item_class', array( __CLASS__, 'row_class' ), 20, 2 );
 		add_filter( 'woocommerce_mini_cart_item_class', array( __CLASS__, 'row_class' ), 20, 2 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 40, 2 );
+		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'checkout_rows' ), 31, 1 );
 		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'addon_note' ), 12 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 	}
@@ -258,6 +259,60 @@ final class Breakdown {
 	}
 
 	/**
+	 * The Bricks order summary: each pay-as-you-go server or database row (title, hourly price, specs, operating
+	 * system, amount in a two-column flex row) becomes the stacked block, full width. Rows are matched to the
+	 * cart's visible items in order, and only when the title names the product; anything else is left alone.
+	 *
+	 * @param mixed $content Rendered html.
+	 */
+	public static function checkout_rows( $content ) {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		if ( ! is_string( $content ) || ! $cart || false === strpos( $content, 'bricks-woo-checkout-order-summary' ) ) {
+			return $content;
+		}
+
+		$items = array();
+
+		foreach ( $cart->get_cart() as $key => $item ) {
+			if ( apply_filters( 'woocommerce_checkout_cart_item_visible', true, $item, $key ) ) {
+				$items[] = $item;
+			}
+		}
+
+		$from = (int) strpos( $content, 'bricks-woo-checkout-order-summary' );
+		$i    = 0;
+		$row  = '~<div class="brxe-[a-z0-9]+ brxe-div"><div class="brxe-[a-z0-9]+ brxe-div"><div class="brxe-[a-z0-9]+ brxe-div"><div class="brxe-[a-z0-9]+ brxe-text-basic">(.*?)</div><div class="brxe-[a-z0-9]+ brxe-text-basic">(.*?)</div><small[^>]*>(.*?)</small><div class="brxe-[a-z0-9]+ brxe-text-basic checkout-summary-os">(.*?)</div></div><div class="brxe-[a-z0-9]+ brxe-div"><div class="brxe-[a-z0-9]+ brxe-text-basic"[^>]*>(.*?)</div></div></div></div>~s';
+
+		$tail = (string) preg_replace_callback(
+			$row,
+			static function ( array $m ) use ( &$i, $items ): string {
+				$item  = $items[ $i++ ] ?? null;
+				$parts = self::of_item( $item );
+
+				if ( null === $parts ) {
+					return $m[0];
+				}
+
+				$parent = wc_get_product( $item['data']->get_parent_id() );
+				$label  = $parent ? $parent->get_name() : '';
+
+				if ( '' === $label || false === strpos( html_entity_decode( wp_strip_all_tags( $m[1] ), ENT_QUOTES, 'UTF-8' ), html_entity_decode( $label, ENT_QUOTES, 'UTF-8' ) ) ) {
+					return $m[0];
+				}
+
+				$blocks = self::blocks( $item['data'], $parts, $label );
+				$os     = '' === trim( wp_strip_all_tags( $m[4] ) ) ? '' : '<span class="beltoft-services-payg__os">' . wp_kses_post( $m[4] ) . '</span>';
+
+				return '<div class="beltoft-services-payg-row">' . $blocks[0] . $os . $blocks[1] . '</div>';
+			},
+			substr( $content, $from )
+		);
+
+		return substr( $content, 0, $from ) . $tail;
+	}
+
+	/**
 	 * The name cell of the line.
 	 *
 	 * @param mixed $name Name html.
@@ -266,7 +321,8 @@ final class Breakdown {
 	public static function name( $name, $item = array() ) {
 		$parts = self::of_item( $item );
 
-		if ( null === $parts ) {
+		// Bricks' own title tag strips the tags of this filter's result: its rows are made in checkout_rows() instead.
+		if ( null === $parts || doing_filter( 'bricks/frontend/render_data' ) || doing_filter( 'bricks/dynamic_data/render_content' ) ) {
 			return $name;
 		}
 
