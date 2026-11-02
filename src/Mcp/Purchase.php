@@ -14,8 +14,10 @@ use BeltoftServices\BillingRequirements;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Account;
@@ -103,6 +105,7 @@ final class Purchase {
 				'in_stock'       => (bool) $plan['in_stock'],
 				'price'          => Pricing::payg( (float) $usage['hourly'], (float) $usage['cap'] ),
 				'backups'        => Pricing::server_backups( $plan ),
+				'options'        => ServerDisk::options( $plan ),
 				'systems'        => $systems,
 				'apps'           => $apps,
 			);
@@ -248,6 +251,29 @@ final class Purchase {
 			return $fail( __( 'This plan cannot be ordered pay as you go through Claude.', 'beltoft-services' ) );
 		}
 
+		$hourly = $backups ? (float) $usage['backups_hourly'] : (float) $usage['hourly'];
+		$cap    = $backups ? (float) $usage['backups_cap'] : (float) $usage['cap'];
+		$gb     = max( 0, (int) ( $args['extra_disk_gb'] ?? 0 ) );
+		$quote  = null;
+		$disk   = null;
+
+		if ( $gb > 0 ) {
+			// The same check and the same amounts as price_quote; the totals include the disk.
+			$disk  = ServerDisk::pick( $plan, $gb );
+			$quote = $disk instanceof \WC_Product_Variation ? Pricing::quote( array( 'plan' => (int) $plan['variation_id'], 'backups' => $backups, 'extra_disk_gb' => $gb ) ) : null;
+
+			if ( is_string( $disk ) ) {
+				return $fail( $disk );
+			}
+
+			if ( $quote instanceof \WP_Error ) {
+				return $quote;
+			}
+
+			$hourly = (float) $quote['hourly'];
+			$cap    = (float) $quote['max_per_month'];
+		}
+
 		$state = self::account_state( $user_id, $url );
 
 		if ( $state instanceof \WP_Error ) {
@@ -256,14 +282,32 @@ final class Purchase {
 
 		$account = $state['account'];
 		$direct  = $state['direct'];
+		$put     = null;
+
+		if ( $disk instanceof \WC_Product_Variation ) {
+			$disk_id = $disk->get_id();
+			// The server with the picker's own code, then the disk the way the checkout's extra disk box chooses it.
+			$put     = static function () use ( $checked, $disk_id ): ?string {
+				$added = ServerPicker::add_to_cart( $checked );
+
+				if ( null !== $added ) {
+					return $added;
+				}
+
+				return DiskField::choose( $disk_id ) ? null : __( 'The extra disk could not be added. Order without it, or choose another size.', 'beltoft-services' );
+			};
+		}
 
 		return array(
 			'plan'    => $plan,
 			'checked' => $checked,
 			'mode'    => $direct ? 'direct' : 'browser',
 			'account' => $account,
-			'hourly'  => $backups ? (float) $usage['backups_hourly'] : (float) $usage['hourly'],
-			'cap'     => $backups ? (float) $usage['backups_cap'] : (float) $usage['cap'],
+			'hourly'  => $hourly,
+			'cap'     => $cap,
+			'disk_gb' => $gb,
+			'quote'   => $quote,
+			'put'     => $put,
 			'url'     => ServerPicker::prefill_url(
 				(int) $plan['variation_id'],
 				array(
@@ -375,6 +419,17 @@ final class Purchase {
 			/* translators: %d: days backups are kept. */
 			? sprintf( __( 'Daily backups: yes, kept %d days. Included in the price below.', 'beltoft-services' ), (int) ( $plan['backups']['days'] ?? 0 ) )
 			: __( 'Daily backups: no.', 'beltoft-services' );
+
+		if ( $p['disk_gb'] > 0 && is_array( $p['quote'] ) ) {
+			/* translators: %d: extra disk in GB. */
+			$lines[] = sprintf( __( 'Extra disk: %d GB, billed by the hour with the server. Disks can be added or made larger later in the dashboard, never smaller.', 'beltoft-services' ), (int) $p['disk_gb'] );
+			$lines[] = __( 'Per month, at most:', 'beltoft-services' );
+
+			foreach ( $p['quote']['lines'] as $line ) {
+				$lines[] = '- ' . $line['label'] . ': ' . $line['text'];
+			}
+		}
+
 		/* translators: %s: price terms such as "€0.0226 per hour, max €16.50 per month, billed monthly for the hours used (excluding VAT)". */
 		$lines[] = sprintf( __( 'Price: %s.', 'beltoft-services' ), self::price_text( $p['hourly'], $p['cap'] ) );
 
@@ -398,7 +453,7 @@ final class Purchase {
 
 		return array(
 			'text'  => implode( "\n", $lines ),
-			'state' => implode( '|', array( (int) $plan['variation_id'], (int) $p['checked']['variation_id'], $p['hourly'], $p['cap'], (int) $plan['in_stock'], $p['mode'], null === $p['account'] ? 0 : $p['account']->get_id() ) ),
+			'state' => implode( '|', array( (int) $plan['variation_id'], (int) $p['checked']['variation_id'], $p['hourly'], $p['cap'], (int) $plan['in_stock'], $p['mode'], null === $p['account'] ? 0 : $p['account']->get_id(), (int) $p['disk_gb'] ) ),
 		);
 	}
 
@@ -493,7 +548,8 @@ final class Purchase {
 		foreach ( $licenses as $license ) {
 			$resource = Resource::for_license( (int) $license['id'] );
 
-			if ( $resource && 'usage' === ( $license['source'] ?? '' ) ) {
+			// An extra disk ordered with the server is a service of its own: the answer is about the server.
+			if ( $resource && 'usage' === ( $license['source'] ?? '' ) && ( 'server' !== $kind || SshKeyField::DRIVER === $resource->get( 'driver' ) ) ) {
 				$service = $resource;
 				Events::add( (int) $license['id'], 'api', 'Claude: ordered ' . $kind . ' ' . (string) $p['plan']['name'] . ' (order #' . $order->get_id() . ')' );
 				break;

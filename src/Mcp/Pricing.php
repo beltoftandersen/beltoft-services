@@ -33,7 +33,7 @@ final class Pricing {
 	 * The model in a few plain sentences, for the server instructions and the price tools.
 	 */
 	public static function note(): string {
-		return __( 'Servers and databases are pay as you go: billed by the hour, and a month never costs more than the max per month. An hour that has started counts as a whole hour, and a stopped server is still billed until it is deleted (delete_server, delete_database); billing stops in the hour the service is deleted. The hours are invoiced monthly to the customer\'s saved card, which is required to order (account credit alone is not enough); VAT is added on the invoice, and every price here excludes VAT. Add-ons are billed by the hour like the service and capped the same way: a database can get extra storage (it can be added later in the dashboard and only made larger) and a public IPv4 address, a server can get daily backups. Use price_quote for the total of a plan with add-ons. Account credit, if the customer has some, is applied first on usage invoices. Business email is a monthly subscription, plugins are yearly and domains are yearly per ending.', 'beltoft-services' );
+		return __( 'Servers and databases are pay as you go: billed by the hour, and a month never costs more than the max per month. An hour that has started counts as a whole hour, and a stopped server is still billed until it is deleted (delete_server, delete_database); billing stops in the hour the service is deleted. The hours are invoiced monthly to the customer\'s saved card, which is required to order (account credit alone is not enough); VAT is added on the invoice, and every price here excludes VAT. Add-ons are billed by the hour like the service and capped the same way: a database can get extra storage (it can be added later in the dashboard and only made larger) and a public IPv4 address, a server can get daily backups and one extra disk. Use price_quote for the total of a plan with add-ons. Account credit, if the customer has some, is applied first on usage invoices. Business email is a monthly subscription, plugins are yearly and domains are yearly per ending.', 'beltoft-services' );
 	}
 
 	/**
@@ -130,6 +130,7 @@ final class Pricing {
 			}
 
 			$row['backups'] = self::server_backups( $plan );
+			$row['options'] = ServerDisk::options( $plan );
 			$out[]          = $row;
 		}
 
@@ -306,7 +307,7 @@ final class Pricing {
 	/**
 	 * The price of a plan with add-ons, as the checkout shows it. Nothing is ordered or put in a cart.
 	 *
-	 * @param array<string, mixed> $args plan, public_ipv4, extra_storage_gb, backups.
+	 * @param array<string, mixed> $args plan, public_ipv4, extra_storage_gb, backups, extra_disk_gb.
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function quote( array $args ) {
@@ -314,6 +315,7 @@ final class Pricing {
 		$ip      = ! empty( $args['public_ipv4'] );
 		$gb      = max( 0, (int) ( $args['extra_storage_gb'] ?? 0 ) );
 		$backups = ! empty( $args['backups'] );
+		$disk_gb = max( 0, (int) ( $args['extra_disk_gb'] ?? 0 ) );
 		$fail    = static fn( string $m ) => new \WP_Error( 'beltoft_services_tool', $m );
 		$server  = Offers::find( $id );
 		$name    = '';
@@ -321,7 +323,17 @@ final class Pricing {
 
 		if ( $server ) {
 			if ( $ip || $gb > 0 ) {
-				return $fail( __( 'A public IPv4 address and extra storage are for databases. A server plan can have daily backups.', 'beltoft-services' ) );
+				return $fail( __( 'A public IPv4 address and extra storage are for databases. A server plan can have daily backups and an extra disk (extra_disk_gb).', 'beltoft-services' ) );
+			}
+
+			$disk = null;
+
+			if ( $disk_gb > 0 ) {
+				$disk = ServerDisk::pick( $server, $disk_gb );
+
+				if ( is_string( $disk ) ) {
+					return $fail( $disk );
+				}
 			}
 
 			$usage = (array) ( $server['usage'] ?? array() );
@@ -334,7 +346,20 @@ final class Pricing {
 			$parts = self::parts_of( $vid );
 			$name  = (string) $server['name'];
 			$kind  = 'server';
+
+			if ( null !== $parts && $disk instanceof \WC_Product_Variation ) {
+				// The disk is a cart line of its own at checkout; its hourly price and cap are added to the server's.
+				$extra            = ServerDisk::parts( $disk );
+				$parts['disk']    = $extra['cap'];
+				$parts['disk_gb'] = $extra['gb'];
+				$parts['max']    += $extra['cap'];
+				$parts['hourly'] += $extra['hourly'];
+			}
 		} elseif ( isset( DbPicker::plans()[ $id ] ) ) {
+			if ( $disk_gb > 0 ) {
+				return $fail( __( 'An extra disk is for servers. A database plan has extra storage (extra_storage_gb).', 'beltoft-services' ) );
+			}
+
 			if ( $backups ) {
 				return $fail( __( 'Backups of a database are included.', 'beltoft-services' ) );
 			}
@@ -357,7 +382,7 @@ final class Pricing {
 		}
 
 		$rows    = Breakdown::rows( $parts, $name );
-		$amounts = array_values( array_filter( array( $parts['plan'], $parts['ip'], $parts['storage'], $parts['backups'] ), static fn( $a ) => $a > 0 ) );
+		$amounts = array_values( array_filter( array( $parts['plan'], $parts['ip'], $parts['storage'], $parts['backups'], $parts['disk'] ?? 0 ), static fn( $a ) => $a > 0 ) );
 		$lines   = array();
 
 		foreach ( $rows as $i => $row ) {
