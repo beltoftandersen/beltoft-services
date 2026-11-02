@@ -27,6 +27,13 @@ final class Renewal {
 	public const META_EARLY  = '_beltoft_services_usage_early';
 
 	/**
+	 * Set by Threshold while it builds an early bill (a carried one is then dropped, see Minimum).
+	 *
+	 * @var bool
+	 */
+	public static $early = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -171,7 +178,7 @@ final class Renewal {
 	 * @return mixed
 	 */
 	public static function filter( $order, $subscription ) {
-		if ( ! $order instanceof \WC_Order || ! Account::is_account( $subscription ) || '' !== (string) $order->get_meta( self::META_LINES ) ) {
+		if ( ! $order instanceof \WC_Order || ! Account::is_account( $subscription ) || '' !== (string) $order->get_meta( self::META_LINES ) || '' !== (string) $order->get_meta( Minimum::META_ORDER ) ) {
 			return $order;
 		}
 
@@ -238,11 +245,21 @@ final class Renewal {
 			$order->add_item( $fee );
 		}
 
+		$order->calculate_totals( true );
+
+		// A month whose card amount is under the minimum is carried: the lines go, the rows wait for the next renewal.
+		if ( Minimum::carries( \BeltoftServices\Credit\Balance::cents( $order->get_total() ), (int) $subscription->get_customer_id() ) ) {
+			Minimum::carry( $order, $subscription, self::$early );
+			$order->save();
+
+			return $order;
+		}
+
+		Minimum::clear( $subscription );
 		$order->update_meta_data( self::META_LINES, 'yes' );
 		$order->update_meta_data( self::META_BILLED, (string) $statement['total'] );
 		// The latest month among the lines (Unix time of its first hour), for the emails.
 		$order->update_meta_data( self::META_PERIOD, (string) max( array_column( $statement['lines'], 'month' ) ) );
-		$order->calculate_totals( true );
 		// Credit pays after the usage lines and taxes are final.
 		\BeltoftServices\Credit\Invoice::apply( $order, (int) $subscription->get_customer_id() );
 		$order->save();

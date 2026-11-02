@@ -61,6 +61,20 @@ use BeltoftServices\Usage\Estimate;
 				?>
 			</p>
 		<?php endif; ?>
+		<?php if ( ! empty( $estimate['carried'] ) && $estimate['carried'] > 0 && ! empty( $estimate['minimum'] ) ) : ?>
+			<p class="beltoft-services-usage__carried">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: 1: amount carried, 2: minimum amount. */
+						__( 'Carried to next month: %1$s (under the %2$s minimum)', 'beltoft-services' ),
+						Estimate::money( (float) $estimate['carried'], $estimate['currency'] ),
+						Estimate::money( (float) $estimate['minimum'], $estimate['currency'] )
+					)
+				);
+				?>
+			</p>
+		<?php endif; ?>
 		<?php if ( $estimate['next'] > 0 ) : ?>
 			<p>
 				<?php

@@ -441,6 +441,14 @@ final class Pricing {
 			'note'   => 'Excluding VAT, an estimate. Each service is capped at its max per month (usage_summary shows which lines reached it).',
 		) : null;
 
+		$minimum = \BeltoftServices\Usage\Minimum::amount();
+
+		$out['usage_minimum'] = array(
+			'minimum' => $minimum > 0 ? Rates::money( $minimum, 2, $currency ) : null,
+			'carried' => $estimate && $estimate['carried'] > 0 ? Estimate::money( (float) $estimate['carried'], (string) $estimate['currency'] ) : null,
+			'note'    => 'Including VAT. When the amount to charge the card for a month is under the minimum, it is added to the next month\'s invoice instead.',
+		);
+
 		return $out;
 	}
 }
