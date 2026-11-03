@@ -24,6 +24,18 @@ final class BillingRequirements {
 	public const FIELDS = array( 'billing_first_name', 'billing_last_name', 'billing_email', 'billing_phone', 'billing_address_1', 'billing_city', 'billing_postcode', 'billing_country' );
 
 	/**
+	 * Required service billing fields, shared by classic checkout and the Store API.
+	 * Sites can relax individual fields without replacing either validation path.
+	 *
+	 * @return string[]
+	 */
+	public static function required_fields(): array {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+		$fields = apply_filters( 'beltoft_services_required_billing_fields', self::FIELDS, $cart );
+		return array_values( array_intersect( self::FIELDS, (array) $fields ) );
+	}
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -68,7 +80,7 @@ final class BillingRequirements {
 			return $fields;
 		}
 
-		foreach ( self::FIELDS as $key ) {
+		foreach ( self::required_fields() as $key ) {
 			if ( isset( $fields['billing'][ $key ] ) ) {
 				$fields['billing'][ $key ]['required'] = true;
 			}
@@ -89,13 +101,13 @@ final class BillingRequirements {
 			return;
 		}
 
-		foreach ( self::FIELDS as $key ) {
+		foreach ( self::required_fields() as $key ) {
 			$getter = 'get_' . $key;
 
 			if ( '' === trim( (string) $order->$getter() ) ) {
 				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
 					'beltoft_services_billing_required',
-					esc_html__( 'Enter your full billing details (name, address, country and phone) to order this service.', 'beltoft-services' ),
+					esc_html__( 'Enter all required billing details to order this service.', 'beltoft-services' ),
 					400
 				);
 			}

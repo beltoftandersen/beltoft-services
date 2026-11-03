@@ -36,6 +36,8 @@ It honours the kill switch and the per-service lock; the `flock -n` in the line 
 
 ## Domains and DNS hosting
 
+Service drivers implementing `NeedsBilling` require name, email, phone, address, city, postcode and country by default. The `beltoft_services_required_billing_fields` filter receives that field list and the current cart; a site can return a subset to relax its policy. Classic checkout, Store API validation and direct server purchase eligibility share the list. Field visibility remains the site's responsibility. Retain the contact fields required by your registrar for domain registration and transfer.
+
 1. In Settings → Services → Domains, enter at least two authoritative name servers, the registrar account, and the DNS API key. The DNS API accepts only a loopback HTTP URL. Start in `fake` mode; `sandbox` uses Openprovider's sandbox and keeps DNS fake. Live registrar and DNS access require `define( 'BELTOFT_SERVICES_DOMAINS_LIVE', true );` in `wp-config.php` and an appropriate API mode.
    On this VM, set Primary DNS query address to `10.10.10.2`: the public address of `ns1.beltoft.net` does not hairpin from the VM. Other installations can leave it blank if the public address is reachable locally.
 2. Run `wp beltoft-services domain-prices` to load EUR costs and apply the markup, minimum margin, and any per-TLD price overrides. The table is also refreshed daily. A TLD without a usable price is not sold.

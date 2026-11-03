@@ -349,7 +349,7 @@ final class Purchase {
 			$customer = new \WC_Customer( $user_id, false );
 			$missing  = array();
 
-			foreach ( BillingRequirements::FIELDS as $field ) {
+			foreach ( BillingRequirements::required_fields() as $field ) {
 				$getter = 'get_' . $field;
 
 				if ( '' === trim( (string) $customer->$getter() ) ) {

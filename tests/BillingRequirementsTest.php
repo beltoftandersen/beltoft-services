@@ -74,4 +74,32 @@ class BillingRequirementsTest extends TestCase {
 		BillingRequirements::check_store_api( $order, new \WP_REST_Request() );
 		$this->addToAssertionCount( 1 );
 	}
+
+	public function test_required_fields_filter_applies_to_classic_and_store_api(): void {
+		$without_phone = static function ( $fields, $cart ) {
+			return array_values( array_diff( $fields, array( 'billing_phone' ) ) );
+		};
+		add_filter( 'beltoft_services_required_billing_fields', $without_phone, 10, 2 );
+		try {
+			$billing = $this->fields( 'proxmox' );
+			$this->assertFalse( $billing['billing_phone']['required'] );
+			$this->assertTrue( $billing['billing_address_1']['required'] );
+			$order = new \WC_Order();
+			foreach ( array( 'first_name' => 'A', 'last_name' => 'B', 'email' => 'a@example.org', 'address_1' => 'Road 1', 'city' => 'Aarhus', 'postcode' => '8000', 'country' => 'DK' ) as $k => $v ) {
+				$order->{"set_billing_$k"}( $v );
+			}
+			BillingRequirements::check_store_api( $order, new \WP_REST_Request() );
+			$this->addToAssertionCount( 1 );
+			$order->set_billing_address_1( '' );
+			try {
+				BillingRequirements::check_store_api( $order, new \WP_REST_Request() );
+				$this->fail( 'Other required fields must remain enforced.' );
+			} catch ( \Automattic\WooCommerce\StoreApi\Exceptions\RouteException $e ) {
+				$this->assertSame( 'beltoft_services_billing_required', $e->getErrorCode() );
+			}
+		} finally {
+			remove_filter( 'beltoft_services_required_billing_fields', $without_phone, 10 );
+		}
+		$this->assertContains( 'billing_phone', BillingRequirements::required_fields(), 'Default policy must be unchanged.' );
+	}
 }

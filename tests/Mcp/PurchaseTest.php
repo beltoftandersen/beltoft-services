@@ -487,6 +487,20 @@ final class PurchaseTest extends UsageTestCase {
 		$this->assertStringContainsString( 'phone', $text );
 	}
 
+	public function test_site_billing_policy_also_applies_to_direct_purchase_eligibility(): void {
+		delete_user_meta( $this->user, 'billing_phone' );
+		$without_phone = static fn( $fields ) => array_values( array_diff( $fields, array( 'billing_phone' ) ) );
+		add_filter( 'beltoft_services_required_billing_fields', $without_phone );
+		try {
+			$state = Purchase::account_state( $this->user, 'https://example.org/account/' );
+			$this->assertIsArray( $state );
+			$this->assertTrue( $state['direct'] );
+			$this->assertSame( array(), $this->orders( $this->user ), 'Eligibility must not place an order.' );
+		} finally {
+			remove_filter( 'beltoft_services_required_billing_fields', $without_phone );
+		}
+	}
+
 	public function test_nothing_that_costs_money_is_placed(): void {
 		$this->v['u-None']->set_regular_price( '3' );
 		$this->v['u-None']->save();
