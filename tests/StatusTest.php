@@ -23,4 +23,15 @@ class StatusTest extends TestCase {
 		$this->assertStringNotContainsString( '—', $js );
 		$this->assertStringNotContainsString( '·', $js );
 	}
+
+	public function test_the_bar_is_an_overlay_that_takes_no_space(): void {
+		$js  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+		$this->assertMatchesRegularExpression( '/\.bs-status-slot \{[^}]*position: sticky;[^}]*height: 0;/', $css );
+		$this->assertMatchesRegularExpression( '/\.bs-status \{[^}]*position: absolute;[^}]*margin: 0;/', $css );
+		$this->assertStringNotContainsString( 'box-shadow', (string) preg_replace( '/^(?!\.bs-status \{).*$/m', '', $css ) );
+		$this->assertStringContainsString( 'scroll-margin-top: var(--bs-overlay-clear', $css );
+		$this->assertStringContainsString( 'bs-status-slot', $js );
+		$this->assertStringNotContainsString( 'insertBefore( notices', $js );
+	}
 }
