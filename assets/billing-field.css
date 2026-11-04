@@ -9,7 +9,7 @@ fieldset.beltoft-services-billing > legend.beltoft-services-billing__legend, .ch
 .beltoft-services-billing__name { font-size: 17px; font-weight: 700; line-height: 1.25; }
 .beltoft-services-billing .beltoft-services-billing__rate { color: inherit; font-size: 13px; line-height: 1.4; opacity: 0.8; }
 .beltoft-services-billing .beltoft-services-billing__input:checked + .beltoft-services-billing__face, .beltoft-services-billing__option:hover .beltoft-services-billing__input:checked + .beltoft-services-billing__face { background: var(--navy, #0c1535); color: #ffffff; }
-.beltoft-services-billing .beltoft-services-billing__input:focus-visible + .beltoft-services-billing__face { outline: 2px solid var(--green, #28513e); outline-offset: 2px; }
+.beltoft-services-billing .beltoft-services-billing__input:focus-visible + .beltoft-services-billing__face { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 .beltoft-services-billing .beltoft-services-billing__input:disabled + .beltoft-services-billing__face { cursor: progress; }
 @media (max-width: 478px) { .beltoft-services-billing__options { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .beltoft-services-billing__face { transition: none; } }

@@ -101,8 +101,9 @@ class ConsoleTabTest extends MonitoringTestCase {
 			$this->assertMatchesRegularExpression( '#<button type="button" class="beltoft-services-btn beltoft-services-console__action" data-console-' . $key . '>#', $html );
 		}
 		$this->assertStringNotContainsString( 'data-console-status', $html, 'The console reports in the shared status bar.' );
-		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.css' );
-		$this->assertStringContainsString( 'box-shadow: inset 0 0 0 1px', $css );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+		$this->assertStringContainsString( '.beltoft-services-console__action', $css, 'The console buttons take the shared secondary button style.' );
+		$this->assertStringNotContainsString( 'box-shadow: inset 0 0 0 1px', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.css' ), 'A real 1px border, not an inset shadow.' );
 	}
 
 	public function test_keyboard_field_is_visible_and_paste_types_the_clipboard(): void {

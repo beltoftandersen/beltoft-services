@@ -3,29 +3,29 @@
 .beltoft-services-app-pane .beltoft-services-facts__wide { grid-column: 1 / -1; }
 @media (max-width: 760px) { .beltoft-services-app-pane .beltoft-services-facts { grid-template-columns: 1fr; } }
 .beltoft-services-app-pane .beltoft-services-facts a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-.beltoft-services-app-pane > .beltoft-services-vm__more:first-of-type { margin-top: 20px; }
+.beltoft-services-app-pane > .beltoft-services-vm__more:first-of-type { margin-top: 24px; }
 .beltoft-services-app-pane > .description { margin: 16px 0 0; }
-.beltoft-services-app-steps { display: grid; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; counter-reset: appstep; }
-.beltoft-services-app-steps__item { position: relative; padding-left: 28px; color: var(--ink-muted, #8a98a6); counter-increment: appstep; }
+.beltoft-services-app-steps { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; counter-reset: appstep; }
+.beltoft-services-app-steps__item { position: relative; padding-left: 32px; color: var(--ink-soft, #5e7080); counter-increment: appstep; }
 .beltoft-services-app-steps__item::before { content: ""; position: absolute; left: 0; top: 0.4em; width: 10px; height: 10px; background: var(--rule, #d6d2c8); }
 .beltoft-services-app-steps__item.is-done { color: var(--ink-soft, #5e7080); }
-.beltoft-services-app-steps__item.is-done::before { background: var(--green, #004400); }
+.beltoft-services-app-steps__item.is-done::before { background: var(--green, #28513e); }
 .beltoft-services-app-steps__item.is-current { color: var(--navy, #0c1535); font-weight: 500; }
 .beltoft-services-app-steps__item.is-current::before { background: var(--navy, #0c1535); }
 .beltoft-services-app-login { display: grid; gap: 8px; margin: 12px 0; }
-.beltoft-services-app-login > div { display: grid; gap: 2px; margin: 0; }
-.beltoft-services-app-login dt { margin: 0; color: var(--ink-muted, #8a98a6); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+.beltoft-services-app-login > div { display: grid; gap: 4px; margin: 0; }
+.beltoft-services-app-login dt { margin: 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-app-login dd { margin: 0; }
 .beltoft-services-app-login code { display: inline-block; padding: 4px 8px; background: var(--bg-warm, #eeece6); font: inherit; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
 .beltoft-services-app-reinstall { margin: 0 0 8px; }
 .beltoft-services-app-reinstall label { display: block; }
 .beltoft-services-app-reinstall select { width: 100%; }
 .beltoft-services-app-reinstall [hidden] { display: none !important; }
-.beltoft-services-vm-form .beltoft-services-app-reinstall fieldset.beltoft-services-app-reinstall__domain { margin: 28px 0 0; padding: 0; border: 0; }
+.beltoft-services-vm-form .beltoft-services-app-reinstall fieldset.beltoft-services-app-reinstall__domain { margin: 32px 0 0; padding: 0; border: 0; }
 .beltoft-services-app-reinstall__domain legend { margin-bottom: 8px; font-weight: 600; }
-.beltoft-services-vm-form .beltoft-services-app-reinstall p.beltoft-services-app-reinstall__removal { margin: 24px 0 20px; }
+.beltoft-services-vm-form .beltoft-services-app-reinstall p.beltoft-services-app-reinstall__removal { margin: 24px 0 24px; }
 .beltoft-services-app-reinstall__choice { display: block; margin: 0 0 12px; }
-.beltoft-services-app-reinstall__choice input { margin-right: 6px; }
-.beltoft-services-app-reinstall__choice .description { display: block; margin: 3px 0 0 24px; }
-.beltoft-services-app-reinstall__domain-fields { display: grid; gap: 6px; margin: 0 0 14px 24px; }
+.beltoft-services-app-reinstall__choice input { margin-right: 8px; }
+.beltoft-services-app-reinstall__choice .description { display: block; margin: 4px 0 0 24px; }
+.beltoft-services-app-reinstall__domain-fields { display: grid; gap: 8px; margin: 0 0 16px 24px; }
 .beltoft-services-app-reinstall__domain-fields input[type="text"], .beltoft-services-app-reinstall__domain-fields select { width: 100%; box-sizing: border-box; border-radius: 0; }
