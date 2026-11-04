@@ -23,13 +23,16 @@
 	var strings = config.strings || {};
 	var SELECTOR = 'button, input[type="submit"], input[type="button"], [data-bs-action]';
 	var DONE_MS = 5000;
+var FADE_MS = 150;
 	var bar = null;
+var slot = null;
 	var current = null;
 	var timers = { done: 0, fade: 0 };
 	var active = [];
 	var recent = { el: null, at: 0 };
 	var fieldNotes = [];
 	var candidates = null;
+var headerTop = 0;
 
 	function text( key, fallback ) {
 		return strings[ key ] || fallback;
@@ -59,18 +62,19 @@
 		return document.querySelector( '.woocommerce-MyAccount-content' ) || document.querySelector( '[data-bs-scope="page"]' ) || document.querySelector( 'main' ) || document.body;
 	}
 
-	// Below the page's tabs when it has any, else at the top of the content area.
+	// The bar is an overlay: its slot has no height, so nothing in the page moves when the bar shows or hides.
+	// The slot sits below the page's tabs when it has any, else at the top of the content area.
 	function place() {
 		var area = contentArea();
 		var tabs = area.querySelectorAll( 'nav.beltoft-services-tabs, nav.beltoft-services-billing-tabs, .beltoft-services-billing-tabs, nav.beltoft-services-account-tabs' );
 		var anchor = tabs.length ? tabs[ tabs.length - 1 ] : null;
 
 		if ( anchor && anchor.parentNode ) {
-			anchor.parentNode.insertBefore( bar, anchor.nextSibling );
+			anchor.parentNode.insertBefore( slot, anchor.nextSibling );
 		} else if ( area.firstChild ) {
-			area.insertBefore( bar, area.firstChild );
+			area.insertBefore( slot, area.firstChild );
 		} else {
-			area.appendChild( bar );
+			area.appendChild( slot );
 		}
 	}
 
@@ -98,9 +102,18 @@
 			}
 		} );
 
-		if ( bar ) {
-			bar.style.setProperty( '--bs-header-offset', Math.round( top ) + 'px' );
-		}
+		headerTop = Math.round( top );
+		document.documentElement.style.setProperty( '--bs-header-offset', headerTop + 'px' );
+		clearance();
+	}
+
+	// How far from the top of the viewport the page must keep clear: the site header plus the bar while it shows.
+	// Fields use it as scroll-margin-top, so a field that gets the focus lands below both.
+	function clearance() {
+		var shown = bar && ! bar.hidden;
+		var height = shown ? bar.offsetHeight + 8 : 0;
+
+		document.documentElement.style.setProperty( '--bs-overlay-clear', ( headerTop + height + 16 ) + 'px' );
 	}
 
 	function ensure() {
@@ -123,6 +136,9 @@
 			hide( true );
 		} );
 		bar.appendChild( close );
+
+		slot = make( 'div', 'bs-status-slot' );
+		slot.appendChild( bar );
 
 		place();
 		offset();
@@ -148,6 +164,7 @@
 			bar.hidden = true;
 			bar.classList.remove( 'is-fading' );
 			current = null;
+			clearance();
 
 			return;
 		}
@@ -157,7 +174,8 @@
 			bar.hidden = true;
 			bar.classList.remove( 'is-fading' );
 			current = null;
-		}, 400 );
+			clearance();
+		}, FADE_MS );
 	}
 
 	// kind: busy, done, fail, info. Only the newest message is shown.
@@ -185,9 +203,15 @@
 			}, DONE_MS );
 		}
 
-		// A failure may be above the viewport on a phone: bring it into view.
-		if ( 'fail' === kind && box.scrollIntoView && box.getBoundingClientRect().top < 0 ) {
-			box.scrollIntoView( { block: 'center' } );
+		clearance();
+
+		// The bar is pinned under the header, so it is in view whenever its slot is; if the slot is out of the viewport, bring it in.
+		if ( 'fail' === kind && slot && slot.scrollIntoView ) {
+			var seen = box.getBoundingClientRect();
+
+			if ( seen.bottom < 0 || seen.top > window.innerHeight ) {
+				slot.scrollIntoView( { block: 'center' } );
+			}
 		}
 	}
 
@@ -422,8 +446,25 @@
 			fieldNote( target, text( 'failedPrefix', 'Failed: ' ) + message );
 
 			if ( target.focus ) {
-				target.focus();
+				target.focus( { preventScroll: true } );
 			}
+
+			keepClear( target );
+		}
+	}
+
+	// The field a failure points to must never sit under the bar: if it does, scroll it below the bar
+	// (scroll-margin-top on fields is the same distance).
+	function keepClear( target ) {
+		if ( ! bar || bar.hidden || ! target.getBoundingClientRect ) {
+			return;
+		}
+
+		var below = bar.getBoundingClientRect().bottom + 8;
+		var rect = target.getBoundingClientRect();
+
+		if ( rect.top < below || rect.bottom > window.innerHeight ) {
+			target.scrollIntoView( { block: 'start' } );
 		}
 	}
 
@@ -606,12 +647,7 @@
 		if ( document.querySelector( '.woocommerce-MyAccount-content' ) ) {
 			ensure();
 
-			// WooCommerce's own notices after a reload sit right under the bar.
-			var notices = contentArea().querySelector( '.woocommerce-notices-wrapper' );
-
-			if ( notices && bar.parentNode && ! notices.contains( bar ) ) {
-				bar.parentNode.insertBefore( notices, bar.nextSibling );
-			}
+			// WooCommerce's own notices after a reload stay where the page prints them (in the flow, not moved by script).
 			window.addEventListener( 'resize', function () {
 				candidates = null;
 				offset();

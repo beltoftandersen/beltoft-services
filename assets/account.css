@@ -841,7 +841,9 @@ div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-ser
 .woocommerce-account .beltoft-services-usage__table { margin-bottom: 4px; }
 
 /* Status bar, action lock and question (assets/status.js). One colour variable per state: change it here and it changes everywhere. */
-.bs-status { --bs-header-offset: 0px; position: sticky; top: calc(var(--bs-header-offset) + 8px); z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 8px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); border-left: 3px solid var(--navy, #0c1535); font-size: 15px; font-weight: 600; line-height: 1.4; transition: opacity .4s ease; }
+.bs-status-slot { position: sticky; top: calc(var(--bs-header-offset, 0px) + 8px); z-index: 50; height: 0; margin: 0; padding: 0; border: 0; overflow: visible; }
+.bs-status { position: absolute; top: 0; left: 0; right: 0; box-sizing: border-box; display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); border-left: 3px solid var(--navy, #0c1535); font-size: 15px; font-weight: 600; line-height: 1.4; transition: opacity .15s ease; animation: bs-status-in .15s ease-out; }
+@keyframes bs-status-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .bs-status[hidden] { display: none; }
 .bs-status.is-fading { opacity: 0; }
 .bs-status.is-done { color: var(--bs-status-ok); border-left-color: var(--bs-status-ok); }
@@ -853,6 +855,7 @@ div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-ser
 .bs-status__close { flex: none; width: var(--bs-btn-h); height: var(--bs-btn-h); margin: calc(-1 * var(--bs-space-2)) calc(-1 * var(--bs-space-2)) calc(-1 * var(--bs-space-2)) 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
 .bs-status__close[hidden] { display: none; }
 .bs-status__close:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: 1px; }
+.woocommerce-MyAccount-content :is(input, select, textarea, button, a, summary, [aria-invalid]), .woocommerce-checkout :is(input, select, textarea, button), .bs-field-error { scroll-margin-top: var(--bs-overlay-clear, 88px); }
 .bs-field-error { margin: 8px 0 0; color: var(--bs-status-fail); font-size: 14px; font-weight: 600; }
 [aria-invalid="true"] { outline: 2px solid var(--bs-status-fail); outline-offset: 1px; }
 button.is-busy, input.is-busy, [data-bs-action].is-busy { cursor: progress; }
@@ -866,7 +869,7 @@ button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display:
 .bs-dialog .beltoft-services-vm__buttons { margin: 0; }
 .bs-dialog .bs-danger { background: var(--bs-status-fail); border-color: var(--bs-status-fail); color: #fff; }
 @media (prefers-reduced-motion: reduce) {
-	.bs-status { transition: none; }
+	.bs-status { transition: none; animation: none; }
 	.bs-status.is-busy .bs-status__text::before, button.is-busy::before, [data-bs-action].is-busy::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; }
 }
 
