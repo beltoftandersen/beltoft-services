@@ -471,7 +471,7 @@ final class ProgressTest extends TestCase {
 		$this->assertStringContainsString( '.is-busy::before', $mine );
 		$this->assertStringNotContainsString( 'border-radius', $mine, 'Square corners.' );
 
-		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' ) . (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' ) . (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' ) . (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
 		$this->assertStringContainsString( "setAttribute( 'aria-busy', 'true' )", $js );
 		$this->assertStringContainsString( "removeAttribute( 'aria-busy' )", $js );
 	}

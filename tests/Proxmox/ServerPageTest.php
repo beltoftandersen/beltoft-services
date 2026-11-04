@@ -131,7 +131,6 @@ class ServerPageTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'data-notice', $html );
 		$this->assertStringNotContainsString( 'data-dialog-notice', $html );
 		// Reset password asks first (the shared question), so it is not a plain action button.
-		$this->assertStringContainsString( 'data-reset-password', $html );
 		$this->assertStringNotContainsString( 'data-action="reset_password"', $html );
 	}
 

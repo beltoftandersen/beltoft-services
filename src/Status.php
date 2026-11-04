@@ -37,7 +37,9 @@ final class Status {
 		$checkout = ( function_exists( 'is_checkout' ) && is_checkout() ) || ( function_exists( 'is_cart' ) && is_cart() );
 
 		if ( $account || $checkout ) {
-			Account\Panel::style();
+			if ( apply_filters( 'beltoft_services_account_css', true ) ) {
+				wp_enqueue_style( 'beltoft-services-account', plugins_url( 'assets/account.css', BELTOFT_SERVICES_FILE ), array(), Assets::version( 'assets/account.css' ) );
+			}
 			wp_enqueue_script( self::HANDLE );
 		}
 	}

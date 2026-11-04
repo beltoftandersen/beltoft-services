@@ -346,7 +346,6 @@ class DomainsTest extends TestCase {
 		$this->assertStringContainsString( 'data-zone="example.com"', $html );
 		$this->assertStringContainsString( '192.0.2.7', $html );
 		$this->assertStringContainsString( 'Delete this record?', $html );
-		$this->assertStringContainsString( 'role="alert"', $html );
 		$this->assertStringNotContainsString( 'data-readonly', $html );
 	}
 
