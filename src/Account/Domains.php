@@ -398,8 +398,13 @@ final class Domains {
 
 		try {
 			echo '<div class="beltoft-services-server beltoft-services-domain-page">';
-			echo '<p class="beltoft-services-server__back"><a href="' . esc_url( self::url_list() ) . '">&lsaquo; ' . esc_html__( 'All domains', 'beltoft-services' ) . '</a></p>';
+			// The head prints the back link on its first row; any other page prints it above.
+			ServerLinks::set_back( self::url_list(), __( 'All domains', 'beltoft-services' ) );
+			ob_start();
 			Panel::render( $view['license'], $view );
+			$panel = (string) ob_get_clean();
+			echo ServerLinks::end_back(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built with esc_url and esc_html.
+			echo $panel; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- The panel's own, escaped markup.
 			echo '</div>';
 		} finally {
 			self::$page = null;

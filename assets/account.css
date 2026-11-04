@@ -446,6 +446,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-page__rename-name { min-width: 0; overflow-wrap: anywhere; }
 .beltoft-services-page__rename-hint { flex: none; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-regular); letter-spacing: normal; opacity: 0; text-decoration: underline; transition: opacity .15s ease; }
 .beltoft-services-page__rename:hover .beltoft-services-page__rename-hint, .beltoft-services-page__rename:focus-visible .beltoft-services-page__rename-hint { opacity: 1; }
+.beltoft-services-page__namerow button.beltoft-services-page__rename:disabled { opacity: 1; color: inherit; cursor: default; }
 .beltoft-services-page__rename:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 @media (hover: none) { .beltoft-services-page__rename-hint { opacity: 1; } }
 .beltoft-services-page__renameform { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2); min-width: 0; max-width: 100%; margin: 0; }
@@ -944,3 +945,10 @@ div.beltoft-services-vm__more > h4 { margin-top: 0; }
 }
 .beltoft-services-ov__head h2, .beltoft-services-ov__head h3 { margin: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 body.woocommerce-account .beltoft-services-billing-tabs a:focus-visible, body.woocommerce-account .beltoft-services-tabs a:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
+
+/* DNS records: the row actions (Edit, Delete) keep 16px between them, and a 40px tap target on a phone. */
+body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: var(--bs-space-4); }
+@media (max-width: 767px) {
+	body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--bs-btn-h); min-height: var(--bs-btn-h); }
+	body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: var(--bs-space-2); }
+}

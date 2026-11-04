@@ -131,6 +131,33 @@ class DomainsTest extends TestCase {
 		$this->assertSame( '/default.php', Domains::template( '/default.php', 'myaccount/licenses.php', $args ) );
 	}
 
+	public function test_a_domain_page_head_says_active_and_has_one_state_line_without_kind_or_renewal(): void {
+		$domain = $this->service( $this->user, 'registered.example' );
+		$id     = (string) $domain->license()['id'];
+		$html   = $this->render( $this->views( $domain ), $id );
+
+		$head = (string) substr( $html, (int) strpos( $html, '<header class="beltoft-services-page__head">' ), 900 );
+		$this->assertMatchesRegularExpression( '#page__bar.*All domains.*page__name">registered.example.*data-badge>Active</span>\s*<span class="bs-inline" data-bs-inline#s', $head );
+		$this->assertStringNotContainsString( 'Ready', substr( $html, (int) strpos( $html, 'page__head' ), 900 ) );
+		$this->assertStringNotContainsString( 'beltoft-services-page__renews', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-page__plan', $html );
+		$this->assertSame( 1, substr_count( $html, 'data-bs-inline' ) );
+	}
+
+	public function test_the_domain_state_words(): void {
+		$d = $this->service( $this->user, 'words.example' );
+		$words = static function ( Resource $r, string $state ): string {
+			$r->set( array( 'state' => $state ) );
+			return \BeltoftServices\Account\Panel::label( $state, Resource::find( $r->id() ) );
+		};
+		$this->assertSame( 'Active', $words( $d, 'ready' ) );
+		$this->assertSame( 'Being registered', $words( $d, 'provisioning' ) );
+		$d->set( array( 'mode' => 'transfer' ) );
+		$this->assertSame( 'Transfer in progress', $words( Resource::find( $d->id() ), 'provisioning' ) );
+		$this->assertSame( 'Removed', $words( $d, 'deleted' ) );
+		$this->assertSame( 'Failed: contact us', $words( $d, 'failed' ) );
+	}
+
 	// -- The list ------------------------------------------------------------------------------
 
 	public function test_the_list_has_one_row_per_domain_with_type_state_and_a_link_to_its_page(): void {
