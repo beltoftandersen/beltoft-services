@@ -109,7 +109,6 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 					<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-mail-secret-value></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-mail-copy><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
 					<p><button type="button" class="button woocommerce-button" data-mail-secret-done><?php esc_html_e( 'Done', 'beltoft-services' ); ?></button></p>
 				</div>
-				<p class="beltoft-services-panel__notice" data-mail-notice role="status" aria-live="polite"></p>
 			</div>
 
 			<div class="beltoft-services-vm__more">
@@ -189,7 +188,6 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<p><button type="button" class="button woocommerce-button" data-mail-alias-submit><?php esc_html_e( 'Create alias', 'beltoft-services' ); ?></button></p>
 					</div>
 				<?php endif; ?>
-				<p class="beltoft-services-panel__notice" data-mail-notice role="status" aria-live="polite"></p>
 			</div>
 		<?php endif; ?>
 	<?php endif; ?>
@@ -255,7 +253,6 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 					<p><button type="button" class="button woocommerce-button" data-mail-dns-check><?php esc_html_e( 'Check again', 'beltoft-services' ); ?></button></p>
 				<?php endif; ?>
 			<?php endif; ?>
-			<p class="beltoft-services-panel__notice" data-mail-notice role="status" aria-live="polite"></p>
 		</div>
 	<?php endif; ?>
 

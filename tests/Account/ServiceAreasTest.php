@@ -11,6 +11,7 @@ use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\DbJob;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
@@ -189,6 +190,30 @@ class ServiceAreasTest extends TestCase {
 		$this->assertStringContainsString( 'aria-current="page">New password', $html );
 		$this->assertStringNotContainsString( 'Reachable from your servers', $html );
 		$this->assertSame( array( 'overview', 'access', 'backups', 'password' ), array_keys( $this->db_area()->nav() ) );
+	}
+
+	public function test_the_new_password_tab_has_its_own_section_with_the_show_once_button_and_no_old_notice_spots(): void {
+		$db = $this->database( $this->user, array( DbJob::REVEAL => 'sealed', DbJob::UNTIL => time() + 600 ) );
+		$id = (int) $db->license()['id'];
+
+		$overview = $this->render( $this->db_area(), $this->views( $db ), (string) $id );
+		$tab      = $this->render( $this->db_area(), $this->views( $db ), $id . '/password' );
+
+		$this->assertStringContainsString( 'data-bs-scope="' . $db->id() . '"', $overview );
+		$this->assertStringContainsString( 'data-db-reveal', $overview );
+		$this->assertStringContainsString( 'Connection', $overview );
+
+		$this->assertStringContainsString( 'aria-current="page">New password', $tab );
+		$this->assertStringContainsString( 'data-db-reveal', $tab, 'The tab has the Show password once button.' );
+		$this->assertStringContainsString( 'data-db-password-value', $tab );
+		$this->assertStringNotContainsString( 'Reachable from your servers', $tab, 'The tab does not repeat the Overview.' );
+		$this->assertStringNotContainsString( 'Show it on the Overview tab', $tab );
+
+		foreach ( array( $overview, $tab ) as $html ) {
+			$this->assertStringNotContainsString( 'data-db-notice', $html );
+			$this->assertStringNotContainsString( 'data-db-power-notice', $html );
+			$this->assertStringNotContainsString( 'data-delete-notice', $html );
+		}
 	}
 
 	public function test_a_database_in_progress_shows_the_progress_list_on_its_page(): void {

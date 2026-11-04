@@ -103,6 +103,8 @@ final class FirewallTab {
 			'offBody'       => __( 'Every port on your server can then be reached from the internet. Your rules are kept, so you can turn the firewall on again.', 'beltoft-services' ),
 			'resetTitle'    => __( 'Start again?', 'beltoft-services' ),
 			'resetBody'     => __( 'Your rules are replaced by the standard rules: SSH, HTTP, HTTPS and ping, and the ports of your app.', 'beltoft-services' ),
+			'ok'            => __( 'OK', 'beltoft-services' ),
+			'added'         => __( 'Added to the list. Apply the changes to use it.', 'beltoft-services' ),
 			'reset'         => __( 'Start again', 'beltoft-services' ),
 			'cancel'        => __( 'Cancel', 'beltoft-services' ),
 			'remove'        => __( 'Remove', 'beltoft-services' ),
@@ -150,7 +152,7 @@ final class FirewallTab {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/firewall.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/firewall.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/firewall.js', BELTOFT_SERVICES_FILE ), array( $parent ), \BeltoftServices\Assets::version( 'assets/firewall.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/firewall.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/firewall.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesFirewall', array( 'strings' => self::strings() ) );
 	}
 

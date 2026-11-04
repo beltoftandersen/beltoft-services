@@ -1,6 +1,6 @@
 /**
  * My Account, Delete block of a pay-as-you-go server or database: asks the server to delete it after the typed word, shows the
- * busy loader while it works, says that it is being deleted and then opens the list. No dependencies.
+ * bar while it works, says that it is being deleted and then opens the list. No dependencies.
  */
 ( function () {
 	'use strict';
@@ -8,23 +8,8 @@
 	var account = window.beltoftServicesAccount;
 	var text = window.beltoftServicesDelete;
 
-	if ( ! account || ! text || ! window.fetch ) {
+	if ( ! account || ! text || ! window.fetch || ! window.beltoftStatus ) {
 		return;
-	}
-
-	function say( box, line ) {
-		var out = box.querySelector( '[data-delete-notice]' );
-
-		if ( out ) {
-			out.textContent = line;
-		}
-	}
-
-	// A button at work: disabled, with the three squares of the other buttons (.is-busy in account.css).
-	function busy( button, on ) {
-		button.disabled = on;
-		button.classList.toggle( 'is-busy', on );
-		button.setAttribute( 'aria-busy', on ? 'true' : 'false' );
 	}
 
 	// Opens the list once the service is really gone (the status answers 404, or says deleted), so the list never shows it as
@@ -63,20 +48,12 @@
 		}, 3000 );
 	}
 
-	function go( box, button ) {
-		var input = box.querySelector( '[data-delete-confirm]' );
+	function send( box, button, input ) {
 		var after = box.getAttribute( 'data-delete-after' );
-		var ask   = box.getAttribute( 'data-delete-ask' );
+		var id = box.getAttribute( 'data-resource-id' );
+		var h = window.beltoftStatus.busy( text.strings.working, id, button );
 
-		// A last caution, like Shut down: deleting cannot be undone.
-		if ( ask && ! window.confirm( ask ) ) {
-			return;
-		}
-
-		busy( button, true );
-		say( box, text.strings.working );
-
-		window.fetch( account.root + box.getAttribute( 'data-resource-id' ) + '/delete', {
+		window.fetch( account.root + id + '/delete', {
 			method: 'POST',
 			credentials: 'same-origin',
 			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
@@ -89,33 +66,64 @@
 			}
 
 			if ( 202 === response.status ) {
-				// The button keeps working until the page changes: nothing can be pressed twice.
+				// The service stays locked until the page changes: nothing can be pressed twice.
 				if ( input ) {
 					input.disabled = true;
 				}
 
-				say( box, text.strings.working );
-				waitGone( box.getAttribute( 'data-resource-id' ), after, 0 );
+				waitGone( id, after, 0 );
 
 				return null;
 			}
 
-			busy( button, false );
-
 			return response.json().then( function ( data ) {
 				if ( 429 === response.status ) {
-					say( box, text.strings.limit );
+					window.beltoftStatus.fail( h, text.strings.limit );
 				} else if ( 403 === response.status && data && 'rest_cookie_invalid_nonce' === data.code ) {
-					say( box, text.strings.expired );
+					window.beltoftStatus.fail( h, text.strings.expired );
+				} else if ( 422 === response.status && data && data.message ) {
+					window.beltoftStatus.fail( h, data.message, input );
 				} else {
-					say( box, 422 === response.status && data && data.message ? data.message : text.strings.failed );
+					window.beltoftStatus.fail( h, text.strings.failed );
 				}
 			}, function () {
-				say( box, text.strings.failed );
+				window.beltoftStatus.fail( h, text.strings.failed );
 			} );
 		} ).catch( function () {
-			busy( button, false );
-			say( box, text.strings.failed );
+			window.beltoftStatus.fail( h, text.strings.failed );
+		} );
+	}
+
+	function go( box, button ) {
+		var input = box.querySelector( '[data-delete-confirm]' );
+		var word = box.getAttribute( 'data-delete-word' ) || '';
+		var ask = box.getAttribute( 'data-delete-ask' );
+		var S = window.beltoftStatus;
+
+		if ( S.locked( box.getAttribute( 'data-resource-id' ) ) ) {
+			return;
+		}
+
+		// The typed word first, inline: a wrong or empty word never opens the question.
+		if ( ! input || input.value.trim() !== word ) {
+			S.fail( null, text.strings.type.replace( '%s', function () {
+				return word;
+			} ), input );
+
+			return;
+		}
+
+		// A last caution, like Shut down: deleting cannot be undone.
+		if ( ! ask ) {
+			send( box, button, input );
+
+			return;
+		}
+
+		S.confirm( { text: ask, confirm: button.textContent, danger: true } ).then( function ( yes ) {
+			if ( yes ) {
+				send( box, button, input );
+			}
 		} );
 	}
 

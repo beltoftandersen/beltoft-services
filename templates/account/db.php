@@ -29,7 +29,7 @@ $beltoft_services_db_wait = array(
 	'failed'    => __( 'Your database could not be set up. We have been told about the problem. Please contact support.', 'beltoft-services' ),
 );
 ?>
-<div class="beltoft-services-db" data-db-card>
+<div class="beltoft-services-db" data-db-card data-bs-scope="<?php echo (int) $view['resource_id']; ?>">
 	<?php if ( $nav ) : ?>
 		<nav class="beltoft-services-tabs" aria-label="<?php esc_attr_e( 'Database sections', 'beltoft-services' ); ?>">
 			<?php foreach ( $nav as $beltoft_services_slug => $beltoft_services_title ) : ?>
@@ -69,7 +69,6 @@ $beltoft_services_db_wait = array(
 				<?php endforeach; ?>
 			</p>
 			<p class="description" data-db-power-note><?php echo esc_html( (string) $view['power']['note'] ); ?></p>
-			<p class="beltoft-services-panel__notice" data-db-power-notice role="status" aria-live="polite"></p>
 		</div>
 	<?php elseif ( 'ready' === $view['kind'] && $view['power']['busy'] ) : ?>
 		<p class="description" data-db-power-note><?php esc_html_e( 'The database is busy. Please try again when it is ready.', 'beltoft-services' ); ?></p>
@@ -127,7 +126,6 @@ $beltoft_services_db_wait = array(
 					<p class="description"><?php esc_html_e( 'It is also filled in to the connection lines above.', 'beltoft-services' ); ?></p>
 				</div>
 			<?php endif; ?>
-			<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 		</div>
 
 		<div class="beltoft-services-vm__more">
@@ -176,7 +174,6 @@ $beltoft_services_db_wait = array(
 			<?php else : ?>
 				<p><?php echo esc_html( $beltoft_services_policy['working'] ? __( 'A change is being applied. This can take a minute.', 'beltoft-services' ) : sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?></p>
 			<?php endif; ?>
-			<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 		</div>
 	<?php endif; ?>
 
@@ -271,7 +268,6 @@ $beltoft_services_db_wait = array(
 				<?php elseif ( 'applying' === $beltoft_services_access['state'] ) : ?>
 					<p data-db-access-pending><?php esc_html_e( 'A change is being applied. This can take a minute.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
-				<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
@@ -322,7 +318,6 @@ $beltoft_services_db_wait = array(
 						</p>
 						<p><button type="button" class="button woocommerce-button" data-db-restore><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
 						</div>
-						<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
 					</details>
 				<?php endif; ?>
 			<?php endif; ?>
@@ -338,8 +333,15 @@ $beltoft_services_db_wait = array(
 	?>
 
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'password' === $active ) ) : ?>
-		<?php if ( $view['can_reveal'] && ! $beltoft_services_all && 'overview' !== $active ) : ?>
-			<p class="beltoft-services-panel__notice"><?php esc_html_e( 'Your password is ready to be shown once.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $link( 'overview' ) ); ?>"><?php esc_html_e( 'Show it on the Overview tab', 'beltoft-services' ); ?></a></p>
+		<?php if ( $view['can_reveal'] && ! $beltoft_services_all ) : ?>
+			<div class="beltoft-services-vm__more" data-db-reveal-box>
+				<h4><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></h4>
+				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-db-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button></p>
+				<div data-db-password hidden>
+					<p><?php esc_html_e( 'Password', 'beltoft-services' ); ?></p>
+					<div class="beltoft-services-db__block"><code class="beltoft-services-db__conn" data-db-password-value></code><button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-db-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
+				</div>
+			</div>
 		<?php endif; ?>
 		<?php if ( $view['can_reset'] ) : ?>
 			<div class="beltoft-services-vm__more">
@@ -351,9 +353,6 @@ $beltoft_services_db_wait = array(
 					<input type="text" id="beltoft-db-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $view['confirm'] ); ?>" data-db-confirm>
 				</p>
 				<p><button type="button" class="button woocommerce-button" data-db-reset data-busy="<?php esc_attr_e( 'Making a new password', 'beltoft-services' ); ?>"<?php echo $nav ? ' data-db-after="' . esc_url( $link( 'overview' ) ) . '"' : ''; ?>><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button></p>
-				<?php if ( $nav ) : ?>
-					<p class="beltoft-services-panel__notice" data-db-notice role="status" aria-live="polite"></p>
-				<?php endif; ?>
 				</div>
 			</div>
 		<?php elseif ( $view['stopped'] ) : ?>

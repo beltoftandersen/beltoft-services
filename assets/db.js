@@ -8,16 +8,23 @@
 	var account = window.beltoftServicesAccount;
 	var db = window.beltoftServicesDb;
 
-	if ( ! account || ! db || ! window.fetch ) {
+	if ( ! account || ! db || ! window.fetch || ! window.beltoftStatus ) {
 		return;
 	}
 
-	function say( box, text ) {
-		var out = box.querySelector( '[data-db-notice]' );
+	var S = window.beltoftStatus;
 
-		if ( out ) {
-			out.textContent = text;
-		}
+	function scopeOf( panel ) {
+		return panel.getAttribute( 'data-resource' );
+	}
+
+	// The server's own refusal text is written for the customer; anything else gets a fixed line.
+	function refusal( response ) {
+		return response.json().then( function ( data ) {
+			return 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed );
+		}, function () {
+			return db.strings.failed;
+		} );
 	}
 
 	function post( panel, path, body ) {
@@ -37,20 +44,17 @@
 		} );
 	}
 
-	// A button at work: disabled, with the three squares used by the server buttons (.is-busy in account.css).
-	function busy( button, on ) {
-		button.disabled = on;
-		button.classList.toggle( 'is-busy', on );
-		button.setAttribute( 'aria-busy', on ? 'true' : 'false' );
-	}
-
 	function reveal( box, panel, button ) {
-		busy( button, true );
-		say( box, '' );
+		var h;
+
+		if ( S.locked( scopeOf( panel ) ) ) {
+			return;
+		}
+
+		h = S.busy( db.strings.revealing, scopeOf( panel ), button );
 		post( panel, '/db-reveal', '{}' ).then( function ( response ) {
 			if ( ! response.ok ) {
-				say( box, 409 === response.status ? db.strings.gone : db.strings.failed );
-				busy( button, false );
+				S.fail( h, 409 === response.status ? db.strings.gone : db.strings.failed );
 				button.disabled = 409 === response.status;
 
 				return null;
@@ -69,14 +73,14 @@
 						own.querySelector( '[data-db-password-value]' ).textContent = data.password;
 						own.hidden = false;
 					}
-					busy( button, false );
+					S.done( h, db.strings.once );
 					button.hidden = true;
-					say( box, db.strings.once );
+				} else {
+					S.fail( h, db.strings.failed );
 				}
 			} );
 		} ).catch( function () {
-			busy( button, false );
-			say( box, db.strings.failed );
+			S.fail( h, db.strings.failed );
 		} );
 	}
 
@@ -89,18 +93,8 @@
 		}
 	}
 
-	// The power block has its own line; any other action uses the card's.
-	function sayPower( box, text ) {
-		var out = box.querySelector( '[data-db-power-notice]' );
-
-		if ( out ) {
-			out.textContent = text;
-		} else {
-			say( box, text );
-		}
-	}
-
-	function waitForAction( box, panel, action, since, tries, after ) {
+	// h: the handle of the request that is waited for; it stays busy (and the service locked) until the page is read again.
+	function waitForAction( panel, action, since, tries, after, h ) {
 		window.setTimeout( function () {
 			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
 				return response.ok ? response.json() : null;
@@ -109,160 +103,100 @@
 
 				if ( last && action === last.action && last.at >= since && data.power_pending && tries < 60 ) {
 					// The job is over but the VM has not changed power yet: keep waiting, as the server page does.
-					waitForAction( box, panel, action, since, tries + 1, after );
+					waitForAction( panel, action, since, tries + 1, after, h );
 				} else if ( last && action === last.action && last.at >= since && data.power_failed ) {
-					sayPower( box, 'shutdown' === action ? db.strings.stillrunning : db.strings.notstarted );
+					S.fail( h, 'shutdown' === action ? db.strings.stillrunning : db.strings.notstarted );
 					window.setTimeout( function () {
 						done( after );
 					}, 4000 );
 				} else if ( last && action === last.action && last.at >= since ) {
 					done( after );
 				} else if ( tries < 60 ) {
-					waitForAction( box, panel, action, since, tries + 1, after );
+					waitForAction( panel, action, since, tries + 1, after, h );
 				} else {
 					done( after );
 				}
 			} ).catch( function () {
 				if ( tries < 60 ) {
-					waitForAction( box, panel, action, since, tries + 1, after );
+					waitForAction( panel, action, since, tries + 1, after, h );
 				}
 			} );
 		}, 5000 );
 	}
 
-	function reset( box, panel, button ) {
-		var input = box.querySelector( '[data-db-confirm]' );
+	// One request of an action: busy at once, then wait for the job (202) or show the refusal under the field.
+	function run( panel, button, text, path, body, action, after, field ) {
 		var since = Math.floor( Date.now() / 1000 ) - 5;
+		var h;
 
-		busy( button, true );
-		say( box, '' );
-		post( panel, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ) ).then( function ( response ) {
-			if ( response.status === 202 ) {
-				say( box, db.strings.working );
-				button.textContent = button.getAttribute( 'data-busy' ) || button.textContent;
-				waitForAction( box, panel, 'db_reset_password', since, 0, button.getAttribute( 'data-db-after' ) );
+		if ( S.locked( scopeOf( panel ) ) ) {
+			return;
+		}
+
+		h = S.busy( text, scopeOf( panel ), button );
+		post( panel, path, body ).then( function ( response ) {
+			if ( 202 === response.status ) {
+				waitForAction( panel, action, since, 0, after, h );
 
 				return null;
 			}
 
-			busy( button, false );
-
-			return response.json().then( function ( data ) {
-				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
+			return refusal( response ).then( function ( message ) {
+				S.fail( h, message, field );
 			} );
 		} ).catch( function () {
-			busy( button, false );
-			say( box, db.strings.failed );
+			S.fail( h, db.strings.failed );
 		} );
+	}
+
+	function reset( box, panel, button ) {
+		var input = box.querySelector( '[data-db-confirm]' );
+
+		run( panel, button, db.strings.working, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ), 'db_reset_password', button.getAttribute( 'data-db-after' ), input );
 	}
 
 	// Shut down and Start: the server's own actions. Shut down asks first. The page is read again when the job has run.
 	function power( box, panel, button ) {
 		var action = button.getAttribute( 'data-db-power' );
-		var area = button.closest( '[data-db-power-box]' );
-		var out = area ? area.querySelector( '[data-db-power-notice]' ) : null;
-		var since = Math.floor( Date.now() / 1000 ) - 5;
-		var all = area ? area.querySelectorAll( '[data-db-power]' ) : [ button ];
 
-		function tell( text ) {
-			if ( out ) {
-				out.textContent = text;
-			}
+		function go() {
+			run( panel, button, 'shutdown' === action ? db.strings.shuttingdown : db.strings.starting, '/actions/' + action, JSON.stringify( { args: {} } ), action, undefined );
 		}
 
-		function release() {
-			Array.prototype.forEach.call( all, function ( one ) {
-				busy( one, false );
+		if ( 'shutdown' === action ) {
+			S.confirm( { text: db.strings.confirmshutdown, confirm: button.textContent } ).then( function ( yes ) {
+				if ( yes ) {
+					go();
+				}
 			} );
-		}
 
-		if ( 'shutdown' === action && ! window.confirm( db.strings.confirmshutdown ) ) {
 			return;
 		}
 
-		Array.prototype.forEach.call( all, function ( one ) {
-			one.disabled = true;
-		} );
-		busy( button, true );
-		tell( '' );
-		post( panel, '/actions/' + action, JSON.stringify( { args: {} } ) ).then( function ( response ) {
-			if ( response.status === 202 ) {
-				tell( 'shutdown' === action ? db.strings.shuttingdown : db.strings.starting );
-				waitForAction( box, panel, action, since, 0 );
-
-				return null;
-			}
-
-			release();
-
-			return response.json().then( function ( data ) {
-				tell( 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
-			} );
-		} ).catch( function () {
-			release();
-			tell( db.strings.failed );
-		} );
+		go();
 	}
 
 	function policy( box, panel, button ) {
 		var choice = box.querySelector( '[data-db-policy]' );
-		var since = Math.floor( Date.now() / 1000 ) - 5;
 
 		if ( ! choice || ! choice.value ) {
 			return;
 		}
 
-		busy( button, true );
-		say( box, '' );
-		post( panel, '/actions/db_set_policy', JSON.stringify( { args: { policy: choice.value } } ) ).then( function ( response ) {
-			if ( response.status === 202 ) {
-				say( box, db.strings.policyworking );
-				waitForAction( box, panel, 'db_set_policy', since, 0 );
-
-				return null;
-			}
-
-			busy( button, false );
-
-			return response.json().then( function ( data ) {
-				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
-			} );
-		} ).catch( function () {
-			busy( button, false );
-			say( box, db.strings.failed );
-		} );
+		run( panel, button, db.strings.policyworking, '/actions/db_set_policy', JSON.stringify( { args: { policy: choice.value } } ), 'db_set_policy', undefined );
 	}
 
 	function restore( box, panel, button ) {
 		var input = box.querySelector( '[data-db-restore-confirm]' );
 		var choice = box.querySelector( '[data-db-backup]' );
-		var since = Math.floor( Date.now() / 1000 ) - 5;
 
 		if ( ! choice || ! choice.value ) {
-			say( box, db.strings.nobackup );
+			S.fail( null, db.strings.nobackup, choice );
 
 			return;
 		}
 
-		busy( button, true );
-		say( box, '' );
-		post( panel, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ) ).then( function ( response ) {
-			if ( response.status === 202 ) {
-				say( box, db.strings.restoring );
-				waitForAction( box, panel, 'restore', since, 0 );
-
-				return null;
-			}
-
-			busy( button, false );
-
-			return response.json().then( function ( data ) {
-				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
-			} );
-		} ).catch( function () {
-			busy( button, false );
-			say( box, db.strings.failed );
-		} );
+		run( panel, button, db.strings.restoring, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ), 'restore', undefined, input );
 	}
 
 	function copyText( text ) {
@@ -310,53 +244,58 @@
 				button.textContent = label;
 			}, 2000 );
 		}, function () {
-			say( box, db.strings.failed );
+			S.fail( null, db.strings.failed );
 		} );
 	}
 
 	// Access tab: one change to the allow-list, then wait until it is applied.
-	function waitForAccess( box, panel, tries ) {
+	function waitForAccess( panel, tries, h ) {
 		window.setTimeout( function () {
 			window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/db-access', { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
 				return response.ok ? response.json() : null;
 			} ).then( function ( data ) {
 				if ( data && 'applying' !== data.state ) {
-					say( box, 'failed' === data.state ? db.strings.notapplied : db.strings.applied );
+					if ( 'failed' === data.state ) {
+						S.fail( h, db.strings.notapplied );
+					} else {
+						S.done( h, db.strings.applied );
+					}
 					window.setTimeout( function () {
 						window.location.reload();
 					}, 1200 );
 				} else if ( tries < 100 ) {
-					waitForAccess( box, panel, tries + 1 );
+					waitForAccess( panel, tries + 1, h );
 				} else {
 					window.location.reload();
 				}
 			} ).catch( function () {
 				if ( tries < 100 ) {
-					waitForAccess( box, panel, tries + 1 );
+					waitForAccess( panel, tries + 1, h );
 				}
 			} );
 		}, 3000 );
 	}
 
-	function access( box, panel, button, body ) {
-		busy( button, true );
-		say( box, '' );
+	function access( panel, button, body, field ) {
+		var h;
+
+		if ( S.locked( scopeOf( panel ) ) ) {
+			return;
+		}
+
+		h = S.busy( db.strings.applying, scopeOf( panel ), button );
 		post( panel, '/db-access', JSON.stringify( body ) ).then( function ( response ) {
 			if ( response.status === 202 ) {
-				say( box, db.strings.applying );
-				waitForAccess( box, panel, 0 );
+				waitForAccess( panel, 0, h );
 
 				return null;
 			}
 
-			busy( button, false );
-
-			return response.json().then( function ( data ) {
-				say( box, 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed ) );
+			return refusal( response ).then( function ( message ) {
+				S.fail( h, message, field );
 			} );
 		} ).catch( function () {
-			busy( button, false );
-			say( box, db.strings.failed );
+			S.fail( h, db.strings.failed );
 		} );
 	}
 
@@ -369,16 +308,18 @@
 			if ( cidr ) {
 				cidr.value = button.getAttribute( 'data-db-access-mine' ) || '';
 			} else {
-				say( box, db.strings.noip );
+				S.fail( null, db.strings.noip );
 			}
 		} else if ( button.hasAttribute( 'data-db-access-add' ) ) {
-			access( box, panel, button, { op: 'add', cidr: cidr ? cidr.value : '', label: label ? label.value : '' } );
+			access( panel, button, { op: 'add', cidr: cidr ? cidr.value : '', label: label ? label.value : '' }, cidr );
 		} else if ( button.hasAttribute( 'data-db-access-remove' ) ) {
-			if ( window.confirm( db.strings.confirmremove ) ) {
-				access( box, panel, button, { op: 'remove', cidr: button.getAttribute( 'data-db-access-remove' ) } );
-			}
+			S.confirm( { text: db.strings.confirmremove, confirm: button.textContent, danger: true } ).then( function ( yes ) {
+				if ( yes ) {
+					access( panel, button, { op: 'remove', cidr: button.getAttribute( 'data-db-access-remove' ) } );
+				}
+			} );
 		} else {
-			access( box, panel, button, { op: button.getAttribute( 'data-db-access-world' ), confirm: confirm ? confirm.value : '' } );
+			access( panel, button, { op: button.getAttribute( 'data-db-access-world' ), confirm: confirm ? confirm.value : '' }, confirm );
 		}
 	}
 
