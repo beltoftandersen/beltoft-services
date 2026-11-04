@@ -66,10 +66,15 @@ var headerTop = 0;
 	// The slot sits below the page's tabs when it has any, else at the top of the content area.
 	function place() {
 		var area = contentArea();
-		var tabs = area.querySelectorAll( 'nav.beltoft-services-tabs, nav.beltoft-services-billing-tabs, .beltoft-services-billing-tabs, nav.beltoft-services-account-tabs, nav.brx-checkout-steps-nav' );
+		var tabs = area.querySelectorAll( 'nav.beltoft-services-tabs, nav.beltoft-services-billing-tabs, .beltoft-services-billing-tabs, nav.beltoft-services-account-tabs' );
 		var anchor = tabs.length ? tabs[ tabs.length - 1 ] : null;
 
-		if ( anchor && anchor.parentNode ) {
+		// The checkout: the first child of the step (a block, so the slot adds no gap), which is right under the step navigation.
+		var step = area.querySelector( '.brxe-woocommerce-checkout-step' );
+
+		if ( step && ! anchor ) {
+			step.insertBefore( slot, step.firstChild );
+		} else if ( anchor && anchor.parentNode ) {
 			anchor.parentNode.insertBefore( slot, anchor.nextSibling );
 		} else if ( area.firstChild ) {
 			area.insertBefore( slot, area.firstChild );
@@ -441,6 +446,13 @@ var headerTop = 0;
 		var target = resolveField( field );
 
 		finish( handle, 'fail', message );
+
+		// On the checkout the bar goes with the step that holds the field.
+		var home = target && target.closest ? target.closest( '.brxe-woocommerce-checkout-step' ) : null;
+
+		if ( home && slot && slot.parentNode !== home ) {
+			home.insertBefore( slot, home.firstChild );
+		}
 
 		if ( target ) {
 			fieldNote( target, text( 'failedPrefix', 'Failed: ' ) + message );
