@@ -207,6 +207,7 @@ final class Search {
 		return array(
 			'data-check'      => esc_url( rest_url( Routes::NAMESPACE . '/domains/check' ) ),
 			'data-cart'       => esc_url( rest_url( Routes::NAMESPACE . '/domains/cart' ) ),
+			'data-transfer-dns' => esc_url( rest_url( Routes::NAMESPACE . '/domains/transfer-dns' ) ),
 			'data-nonce'      => wp_create_nonce( 'wc_store_api' ),
 			'data-rest-nonce' => wp_create_nonce( 'wp_rest' ),
 		);

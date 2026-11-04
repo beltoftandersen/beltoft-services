@@ -75,41 +75,18 @@ final class Actions {
 		}
 		$id = rawurlencode( (string) $r->get( 'remote_id' ) );
 		if ( '' === $id ) { return StepResult::fail( 'Registrar id is unavailable.' ); }
+		if ( 'set_nameservers' === $action && 'ours' === (string) $args['mode'] ) { return self::switch_to_ours( $r ); }
 		if ( 'set_nameservers' === $action ) {
-			$mode = (string) $args['mode'];
-			$hosts = 'ours' === $mode ? Zone::nameservers() : self::hosts( (string) $args['hosts'] );
-			$keys = array();
-			if ( 'custom' === $mode && ! empty( $r->get( 'dnssec_keys' ) ) ) {
+			$hosts = self::hosts( (string) $args['hosts'] );
+			if ( ! empty( $r->get( 'dnssec_keys' ) ) ) {
 				$cleared = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'dnssec_keys' => array(), 'is_dnssec_enabled' => false ) );
 				if ( is_wp_error( $cleared ) ) { return StepResult::retry( 60, 'DNSSEC could not be removed.' ); }
 				$r->set( array( 'dnssec_keys' => array() ) );
 			}
-			$made = false;
-			if ( 'ours' === $mode ) {
-				// As at registration (Zone::prepare): a zone that is already on our name servers and was not made for
-				// this domain is never taken over without staff review.
-				$existing = Clients::dns()->zone( $name );
-				if ( is_wp_error( $existing ) ) { return StepResult::retry( 60, 'DNS zone could not be checked.' ); }
-				if ( null !== $existing && ! $r->get( 'zone_claimed' ) && 'dns' !== Zone::owner( $r ) ) {
-					if ( ! $r->get( 'zone_conflict_alerted' ) ) { Alerts::admin( $r, 'Name servers were not switched: an existing DNS zone needs staff review.' ); $r->set( array( 'zone_conflict_alerted' => true ) ); }
-					return StepResult::fail( 'An existing zone needs staff review.' );
-				}
-				$made = null === $existing;
-				$zone = Zone::ensure( $r, true, false );
-				if ( ! $zone->is_done() ) { return $zone; }
-				$keys = (array) ( $zone->meta()['dnssec_keys'] ?? array() );
-				// The DS is published only once every name server serves the keys; nothing was changed yet, so a retry is safe.
-				$signed = $keys ? Zone::served_signed( $name ) : StepResult::done();
-				if ( ! $signed->is_done() ) { return $signed; }
-			}
 			$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'ns_group' => '', 'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), $hosts ) ) );
 			if ( is_wp_error( $reply ) ) { return StepResult::retry( 60, 'Name servers could not be changed.' ); }
-			if ( 'ours' === $mode ) {
-				$ds = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'dnssec_keys' => $keys, 'is_dnssec_enabled' => true ) );
-				if ( is_wp_error( $ds ) ) { return StepResult::retry( 60, 'DNSSEC could not be published.' ); }
-			}
 			Security::notify( $r, 'ns_changed' );
-			return StepResult::done( array( 'ns_mode' => $mode, 'nameservers' => $hosts, 'dnssec_keys' => $keys ) + ( $made ? array( 'zone_claimed' => true ) : array() ) );
+			return StepResult::done( array( 'ns_mode' => 'custom', 'nameservers' => $hosts, 'dnssec_keys' => array() ) );
 		}
 		$locked = 'lock' === $action;
 		$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'is_locked' => $locked ) );
@@ -117,5 +94,40 @@ final class Actions {
 		// The days an unlocked domain stays unlocked count from the unlock.
 		if ( ! $locked ) { Security::notify( $r, 'unlocked' ); }
 		return StepResult::done( array( 'is_locked' => $locked, 'unlocked_at' => $locked ? null : time() ) );
+	}
+
+	/**
+	 * Moves the domain to our name servers: the zone is ensured, the registrar gets our name servers, and the DS follows once every
+	 * name server serves the keys. The customer's own change and the switch after a transfer take this one path.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param bool     $notify Tell the customer that the name servers changed (not for the switch that follows a transfer, which has its own email).
+	 */
+	public static function switch_to_ours( Resource $r, bool $notify = true ): StepResult {
+		$name = (string) $r->get( 'domain' );
+		$id   = rawurlencode( (string) $r->get( 'remote_id' ) );
+		if ( '' === $id ) { return StepResult::fail( 'Registrar id is unavailable.' ); }
+		$hosts = Zone::nameservers();
+		// As at registration (Zone::prepare): a zone that is already on our name servers and was not made for
+		// this domain is never taken over without staff review.
+		$existing = Clients::dns()->zone( $name );
+		if ( is_wp_error( $existing ) ) { return StepResult::retry( 60, 'DNS zone could not be checked.' ); }
+		if ( null !== $existing && ! $r->get( 'zone_claimed' ) && 'dns' !== Zone::owner( $r ) ) {
+			if ( ! $r->get( 'zone_conflict_alerted' ) ) { Alerts::admin( $r, 'Name servers were not switched: an existing DNS zone needs staff review.' ); $r->set( array( 'zone_conflict_alerted' => true ) ); }
+			return StepResult::fail( 'An existing zone needs staff review.' );
+		}
+		$made = null === $existing;
+		$zone = Zone::ensure( $r, true, false );
+		if ( ! $zone->is_done() ) { return $zone; }
+		$keys = (array) ( $zone->meta()['dnssec_keys'] ?? array() );
+		// The DS is published only once every name server serves the keys; nothing was changed yet, so a retry is safe.
+		$signed = $keys ? Zone::served_signed( $name ) : StepResult::done();
+		if ( ! $signed->is_done() ) { return $signed; }
+		$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'ns_group' => '', 'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), $hosts ) ) );
+		if ( is_wp_error( $reply ) ) { return StepResult::retry( 60, 'Name servers could not be changed.' ); }
+		$ds = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'dnssec_keys' => $keys, 'is_dnssec_enabled' => true ) );
+		if ( is_wp_error( $ds ) ) { return StepResult::retry( 60, 'DNSSEC could not be published.' ); }
+		if ( $notify ) { Security::notify( $r, 'ns_changed' ); }
+		return StepResult::done( array( 'ns_mode' => 'ours', 'nameservers' => $hosts, 'dnssec_keys' => $keys ) + ( $made ? array( 'zone_claimed' => true ) : array() ) );
 	}
 }

@@ -62,7 +62,7 @@ final class Cart {
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => array( __CLASS__, 'rest_add' ),
 			'permission_callback' => '__return_true',
-			'args' => array( 'domain' => array( 'type' => 'string', 'required' => true ), 'mode' => array( 'type' => 'string', 'required' => true ), 'auth_code' => array( 'type' => 'string' ) ),
+			'args' => array( 'domain' => array( 'type' => 'string', 'required' => true ), 'mode' => array( 'type' => 'string', 'required' => true ), 'auth_code' => array( 'type' => 'string' ), 'dns' => array( 'type' => 'string' ) ),
 		) );
 	}
 
@@ -73,7 +73,7 @@ final class Cart {
 		if ( \BeltoftServices\RateLimit::exceeded( \BeltoftServices\RateLimit::visitor(), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
-		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ) );
+		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ), (string) ( $request['dns'] ?? '' ) );
 		if ( is_wp_error( $result ) ) { return $result; }
 		return new \WP_REST_Response( $result, ! empty( $result['added'] ) ? 201 : 200 );
 	}
@@ -84,17 +84,22 @@ final class Cart {
 	 *
 	 * @return array{added: bool, already_in_cart?: bool, checkout_url: string}|\WP_Error
 	 */
-	public static function add_line( string $domain, string $mode, string $auth_code = '' ): array|\WP_Error {
-		$data = self::line_data( $domain, $mode, $auth_code );
+	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
+		$data = self::line_data( $domain, $mode, $auth_code, $dns );
 		if ( is_wp_error( $data ) ) { return $data; }
 		// WooCommerce leaves its cart unloaded on custom REST routes.
 		if ( ! WC()->cart && function_exists( 'wc_load_cart' ) ) { wc_load_cart(); }
 		$cart = WC()->cart;
 		if ( ! $cart ) { return new \WP_Error( 'no_cart', __( 'The cart is unavailable.', 'beltoft-services' ), array( 'status' => 503 ) ); }
-		foreach ( $cart->get_cart() as $item ) {
+		foreach ( $cart->get_cart() as $key => $item ) {
 			if ( ( $item['beltoft_services_domain']['domain'] ?? '' ) === $data['beltoft_services_domain']['domain'] ) {
 				// The same domain the same way, for example after going back from checkout: carry on to checkout.
 				if ( ( $item['beltoft_services_domain']['mode'] ?? '' ) === $data['beltoft_services_domain']['mode'] ) {
+					// A transfer ordered again with another DNS choice takes the new choice.
+					if ( 'transfer' === $data['beltoft_services_domain']['mode'] && ( $item['beltoft_services_domain']['dns'] ?? '' ) !== ( $data['beltoft_services_domain']['dns'] ?? '' ) ) {
+						$cart->remove_cart_item( $key );
+						break;
+					}
 					return array( 'added' => false, 'already_in_cart' => true, 'checkout_url' => wc_get_checkout_url() );
 				}
 				return new \WP_Error( 'duplicate_domain', __( 'This domain is already in your cart.', 'beltoft-services' ), array( 'status' => 409 ) );
@@ -131,7 +136,7 @@ final class Cart {
 		return array( 'added' => true, 'checkout_url' => wc_get_checkout_url() );
 	}
 
-	public static function line_data( string $domain, string $mode, string $auth_code = '' ): array|\WP_Error {
+	public static function line_data( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
 		$domain = Search::normalise( $domain );
 		if ( is_wp_error( $domain ) ) { return $domain; }
 		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', 'Choose registration, transfer or DNS hosting.' ); }
@@ -145,7 +150,10 @@ final class Cart {
 		}
 		if ( 'transfer' === $mode && '' === trim( $auth_code ) ) { return new \WP_Error( 'auth_required', __( 'Enter the transfer code.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		if ( 'transfer' === $mode && ! self::auth_code_valid( trim( $auth_code ) ) ) { return new \WP_Error( 'auth_invalid', __( 'The transfer code must be 6 to 64 characters, letters, digits and common symbols only.', 'beltoft-services' ), array( 'status' => 400 ) ); }
+		$dns = trim( $dns );
+		if ( 'transfer' === $mode && '' !== $dns && ! in_array( $dns, TransferDns::CHOICES, true ) ) { return new \WP_Error( 'bad_dns_choice', __( 'Choose where your DNS lives.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		$data = array( 'beltoft_services_domain' => array( 'domain' => $domain, 'mode' => $mode ) );
+		if ( 'transfer' === $mode && '' !== $dns ) { $data['beltoft_services_domain']['dns'] = $dns; }
 		if ( 'transfer' === $mode ) {
 			try { $data['beltoft_services_domain_auth'] = Crypto::encrypt( trim( $auth_code ) ); }
 			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', 'Transfer cannot start until secure storage is configured.' ); }

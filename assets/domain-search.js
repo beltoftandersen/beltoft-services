@@ -24,12 +24,12 @@
       results.prepend(error);
     }
 
-    async function add(domain, mode, authCode) {
+    async function add(domain, mode, authCode, dns) {
       const response = await fetch(root.dataset.cart, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
-        body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '' })
+        body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Could not add this domain.');
@@ -44,10 +44,59 @@
       button.textContent = text;
     }
 
+    // Where the customer's DNS lives now, so the form can recommend what keeps the website and email running.
+    async function recommendation(domain) {
+      if (!root.dataset.transferDns) return null;
+      try {
+        const response = await fetch(root.dataset.transferDns + '?domain=' + encodeURIComponent(domain), {
+          credentials: 'same-origin',
+          headers: { 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce }
+        });
+        return response.ok ? await response.json() : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function dnsChoices(advice) {
+      const hosts = advice && advice.hosts && advice.hosts.length ? advice.hosts.join(', ') : '';
+      const preselected = advice && advice.choice ? advice.choice : 'first';
+      const group = document.createElement('div');
+      group.className = 'beltoft-domain-transfer__dns';
+      group.setAttribute('role', 'radiogroup');
+      group.setAttribute('aria-label', 'Where your DNS lives');
+      if (advice && advice.at_risk === true) {
+        group.appendChild(element('p', 'beltoft-domain-transfer__help', 'Your DNS looks to be hosted by your current registrar (' + hosts + '). It can stop when the domain leaves them, and then your website and email stop.'));
+      } else if (!advice || advice.at_risk === null) {
+        group.appendChild(element('p', 'beltoft-domain-transfer__help', 'We could not read where your DNS is hosted, so we recommend moving it first.'));
+      }
+      const options = [
+        ['first', 'Move my DNS to Beltoft first' + (preselected === 'first' ? ' (recommended)' : ''), 'We copy your DNS records now. The transfer starts when your domain uses our name servers, so your website and email never stop.'],
+        ['after', 'Move my DNS to Beltoft when the transfer is done', 'The transfer starts at once with your current name servers. We copy your DNS records now and switch to our name servers when the transfer is done.'],
+        ['keep', 'Keep my DNS where it is', hosts ? 'Your DNS stays where it is (' + hosts + ').' : 'Your DNS stays where it is.']
+      ];
+      options.forEach(function (option) {
+        const label = document.createElement('label');
+        label.className = 'beltoft-domain-transfer__choice';
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'beltoft-dns-choice';
+        radio.value = option[0];
+        radio.checked = option[0] === preselected;
+        const text = document.createElement('span');
+        text.appendChild(element('strong', '', option[1]));
+        text.appendChild(document.createElement('br'));
+        text.appendChild(document.createTextNode(option[2]));
+        label.append(radio, text);
+        group.appendChild(label);
+      });
+      return group;
+    }
+
     function transferForm(domain, actions) {
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
-      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and enter the transfer code (also called auth or EPP code). The transfer can take several days.'));
+      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and enter the transfer code (also called auth or EPP code). Turn off DNSSEC at your current registrar first. The transfer can take several days.'));
       const field = document.createElement('input');
       field.type = 'text';
       field.autocomplete = 'off';
@@ -56,14 +105,27 @@
       field.placeholder = 'Transfer code';
       const submit = element('button', 'beltoft-domain-action', 'Add transfer to order');
       submit.type = 'submit';
-      form.append(field, submit);
+      const choices = document.createElement('div');
+      choices.setAttribute('aria-live', 'polite');
+      form.append(choices, field, submit);
+      // The order cannot be added before the DNS question is answered: the choice is part of it.
+      submit.disabled = true;
+      choices.appendChild(element('p', 'beltoft-domain-transfer__help', 'Checking where your DNS is hosted…'));
+      let served = false;
+      recommendation(domain).then(function (advice) {
+        served = !!(advice && advice.served);
+        choices.replaceChildren();
+        if (!served) choices.appendChild(dnsChoices(advice));
+        submit.disabled = false;
+      });
       form.addEventListener('submit', async function (event) {
         event.preventDefault();
         const code = field.value.trim();
         if (!code) return;
+        const picked = form.querySelector('input[name="beltoft-dns-choice"]:checked');
         working(submit, true, 'Adding to order…');
         try {
-          await add(domain, 'transfer', code);
+          await add(domain, 'transfer', code, served || !picked ? '' : picked.value);
         } catch (error) {
           showError(error.message);
           working(submit, false, 'Add transfer to order');

@@ -315,6 +315,23 @@
 	} );
 }() );
 
+// Transfer: "Check now" asks whether the domain uses our name servers yet, then reloads the page to show the answer.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-check]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-check' ).then( function () {
+			window.location.reload();
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, null );
+		} );
+	} );
+}() );
+
 // Domain cards start closed: the header shows the domain and its status, a click (or Enter / Space)
 // opens the rest. A card that was open stays open when the page reloads after a change.
 ( function () {
