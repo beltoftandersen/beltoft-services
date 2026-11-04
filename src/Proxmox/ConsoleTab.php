@@ -61,7 +61,7 @@ final class ConsoleTab {
 			return;
 		}
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/console.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/console.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/console.js', BELTOFT_SERVICES_FILE ), array( $parent ), \BeltoftServices\Assets::version( 'assets/console.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/console.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/console.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesConsole', array(
 			'rest' => esc_url_raw( rest_url( Routes::NAMESPACE . '/resources/' . $r->id() . '/console' ) ),
 			'nonce' => wp_create_nonce( 'wp_rest' ),

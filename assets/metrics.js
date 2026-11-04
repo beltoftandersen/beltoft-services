@@ -150,8 +150,13 @@
 		if ( alerts ) {
 			alerts.addEventListener( 'change', function () {
 				var wanted = alerts.checked;
-				alerts.disabled = true;
-				window.fetch( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/usage-alerts', {
+				var bs = window.beltoftStatus;
+				var id = panel.getAttribute( 'data-resource' );
+				var handle;
+				// One request per click: the switch is busy until the answer is in.
+				if ( bs.locked( id ) ) { alerts.checked = ! wanted; return; }
+				handle = bs.busy( labels.alertsSaving, id, alerts );
+				window.fetch( account.root + encodeURIComponent( id ) + '/usage-alerts', {
 					method: 'POST', credentials: 'same-origin',
 					headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
 					body: JSON.stringify( { on: wanted } )
@@ -163,10 +168,12 @@
 				} ).then( function ( body ) {
 					alerts.checked = !! ( body && body.on );
 					alertsNote.textContent = alerts.checked ? labels.alertsOn : labels.alertsOff;
+					bs.done( handle, alertsNote.textContent );
 				} ).catch( function () {
 					alerts.checked = ! wanted;
-					alertsNote.textContent = labels.alertsFailed;
-				} ).then( function () { alerts.disabled = false; } );
+					alertsNote.textContent = '';
+					bs.fail( handle, labels.alertsFailed );
+				} );
 			} );
 		}
 		var serial = 0;

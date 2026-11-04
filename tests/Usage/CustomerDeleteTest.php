@@ -243,7 +243,14 @@ final class CustomerDeleteTest extends UsageTestCase {
 
 			$this->assertStringContainsString( 'data-delete-go', $html );
 			$this->assertStringContainsString( 'Billing stops in the hour it is deleted.', $html );
-			$this->assertStringContainsString( 'Delete it to stop the charge.', $html );
+
+			// A server's note is under its power buttons, once; the delete block only says it for a database.
+			if ( $id === $r->id() ) {
+				$this->assertStringNotContainsString( 'Delete it to stop the charge.', $html );
+				$this->assertStringNotContainsString( 'data-delete-billing', $html );
+			} else {
+				$this->assertStringContainsString( 'Delete it to stop the charge.', $html );
+			}
 		}
 
 		// The note next to Shut down and Start on the server's head.
@@ -252,6 +259,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$head = (string) ob_get_clean();
 		$this->assertStringContainsString( 'A stopped server is still billed. Delete it to stop the charge.', $head );
 		$this->assertStringContainsString( 'data-power-action="shutdown"', $head );
+		$this->assertSame( 1, substr_count( $head, 'is still billed' ), 'The note is printed once.' );
 	}
 
 	public function test_the_route_deletes_for_the_owner_only_and_asks_for_the_word(): void {

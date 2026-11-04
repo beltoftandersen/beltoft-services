@@ -87,12 +87,13 @@ class FeedbackUiTest extends SnapshotsTestCase {
 
 	// -- Items 9 and 13: the dialogs and the card's own line ---------------------------------------
 
-	public function test_the_card_has_one_confirm_dialog_the_flash_line_and_the_power_for_the_done_line(): void {
+	public function test_the_card_has_one_confirm_dialog_and_the_power_for_the_done_line(): void {
 		$r    = $this->server();
 		$html = $this->card( $r );
 
 		$this->assertSame( 1, substr_count( $html, 'data-confirm-dialog' ) );
-		$this->assertStringContainsString( 'data-flash role="status" aria-live="polite" hidden', $html );
+		$this->assertStringNotContainsString( 'data-flash', $html, 'Messages go to the shared status bar.' );
+		$this->assertStringNotContainsString( 'data-notice', $html );
 		$this->assertStringContainsString( 'data-confirm-submit', $html );
 		$this->assertStringContainsString( 'data-confirm-cancel', $html );
 		$this->assertMatchesRegularExpression( '/class="beltoft-services-vm" data-power="(running|stopped|)"/', $html );

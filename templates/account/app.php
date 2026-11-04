@@ -143,7 +143,6 @@ $beltoft_services_status_text = array(
 			<p><?php esc_html_e( 'The install has not reported back yet. Your server is running. After an hour you can try again, or contact support.', 'beltoft-services' ); ?></p>
 			<?php if ( $view['can_retry'] ) : ?>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-app-retry><?php esc_html_e( 'Try again', 'beltoft-services' ); ?></button></p>
-				<p class="beltoft-services-panel__notice" data-app-notice role="status" aria-live="polite"></p>
 			<?php endif; ?>
 			<p><a href="<?php echo esc_url( (string) $view['support_url'] ); ?>"><?php esc_html_e( 'Contact support', 'beltoft-services' ); ?></a></p>
 		</div>
@@ -153,7 +152,6 @@ $beltoft_services_status_text = array(
 			<p><?php esc_html_e( 'Your server is running and you can log in over SSH. We have been told about the problem. Contact support and we will help you.', 'beltoft-services' ); ?></p>
 			<?php if ( $view['can_retry'] ) : ?>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-app-retry><?php esc_html_e( 'Try again', 'beltoft-services' ); ?></button></p>
-				<p class="beltoft-services-panel__notice" data-app-notice role="status" aria-live="polite"></p>
 			<?php endif; ?>
 			<p><a href="<?php echo esc_url( (string) $view['support_url'] ); ?>"><?php esc_html_e( 'Contact support', 'beltoft-services' ); ?></a></p>
 		</div>
@@ -165,7 +163,6 @@ $beltoft_services_status_text = array(
 					<button type="button" class="button woocommerce-button" data-app-reveal><?php esc_html_e( 'Show login once', 'beltoft-services' ); ?></button>
 				</p>
 				<dl class="beltoft-services-app-login" data-app-login hidden></dl>
-				<p class="beltoft-services-panel__notice" data-app-notice role="status" aria-live="polite"></p>
 				<p class="description"><?php esc_html_e( 'The login is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ); ?></p>
 			</div>
 		<?php endif; ?>

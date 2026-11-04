@@ -11,8 +11,6 @@
 .beltoft-services-net code { overflow-wrap: anywhere; }
 .beltoft-services-net__notice { padding: 10px 12px; background: var(--bg-warm, #eeece6); max-width: 640px; }
 .beltoft-services-net__others { margin: 0 0 12px; padding-left: 1.25em; }
-.beltoft-services-net__status { min-height: 1.5em; color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-net__status:empty { min-height: 0; margin: 0; }
 /* Like the Reboot dialog: title and text on one left edge. */
 .beltoft-services-net__dialog h5 { margin: 0; font-size: 16px; }
 .beltoft-services-net__dialog p { margin: 0 0 12px; }

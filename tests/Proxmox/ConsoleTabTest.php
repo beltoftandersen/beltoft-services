@@ -93,16 +93,15 @@ class ConsoleTabTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'https://', $js );
 	}
 
-	public function test_toolbar_buttons_use_the_action_style_and_status_stays_live(): void {
+	public function test_toolbar_buttons_use_the_action_style_and_status_goes_to_the_bar(): void {
 		ob_start();
 		ConsoleTab::pane( 'console', $this->server()->id() );
 		$html = (string) ob_get_clean();
 		foreach ( array( 'fullscreen', 'cad', 'keyboard', 'disconnect' ) as $key ) {
 			$this->assertMatchesRegularExpression( '#<button type="button" class="beltoft-services-btn beltoft-services-console__action" data-console-' . $key . '>#', $html );
 		}
-		$this->assertMatchesRegularExpression( '#<p[^>]*role="status"[^>]*aria-live="polite"[^>]*data-console-status></p>#', $html );
+		$this->assertStringNotContainsString( 'data-console-status', $html, 'The console reports in the shared status bar.' );
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.css' );
-		$this->assertStringContainsString( '__status:empty { margin: 0; min-height: 0; }', $css );
 		$this->assertStringContainsString( 'box-shadow: inset 0 0 0 1px', $css );
 	}
 
