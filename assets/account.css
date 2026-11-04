@@ -949,8 +949,7 @@ div.beltoft-services-vm__more > h4 { margin-top: 0; }
 body.woocommerce-account .beltoft-services-billing-tabs a:focus-visible, body.woocommerce-account .beltoft-services-tabs a:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 
 /* DNS records: the row actions (Edit, Delete) keep 16px between them, and a 40px tap target on a phone. */
-body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: var(--bs-space-4); }
+body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: var(--bs-space-4); }
 @media (max-width: 767px) {
 	body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--bs-btn-h); min-height: var(--bs-btn-h); }
-	body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: var(--bs-space-2); }
 }
