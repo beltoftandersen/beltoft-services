@@ -219,6 +219,7 @@ class BackupFieldTest extends BackupTestCase {
 		$this->assertSame( $v['a-Daily']->get_id(), (int) reset( $cart )['variation_id'] );
 
 		WC()->cart->empty_cart();
+		WC()->session->save_data(); // As a finished request would: a swap starts from the saved session.
 		$answer = BackupField::respond();
 		$this->assertSame( 409, $answer[1] );
 		$this->assertFalse( $answer[0]['ok'] );
