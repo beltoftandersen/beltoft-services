@@ -1,91 +1,123 @@
 /*
- * My Account → Licenses: the service panel. Layout only: fonts and colours come from the theme
- * except for the state badge. Turn it off with
- * add_filter( 'beltoft_services_account_css', '__return_false' ).
+ * My Account: the service panels and the design tokens of every account page. Layout, type, buttons, inputs, tabs
+ * and tables follow one small set (below); the theme repeats the tokens for what it owns (WooCommerce pages).
+ * Turn this file off with add_filter( 'beltoft_services_account_css', '__return_false' ).
  */
+:root {
+	/* Type: five sizes, three weights, three line heights. */
+	--bs-fs-caption: 13px; /* table heads, labels over values, units */
+	--bs-fs-small: 14px; /* muted text, form labels, compact buttons */
+	--bs-fs-body: 15px; /* body, inputs, buttons, tables */
+	--bs-fs-heading: 18px; /* h2 h3 h4 and heading-like names */
+	--bs-fs-title: 24px; /* the page title */
+	--bs-fw-regular: 400;
+	--bs-fw-medium: 500; /* labels, buttons, tabs */
+	--bs-fw-strong: 600; /* headings, strong values */
+	--bs-lh-text: 1.5;
+	--bs-lh-heading: 1.3;
+	--bs-lh-title: 1.2;
+	/* Spacing: a 4px scale (4 8 12 16 24 32). */
+	--bs-space-1: 4px;
+	--bs-space-2: 8px;
+	--bs-space-3: 12px;
+	--bs-space-4: 16px;
+	--bs-space-5: 24px;
+	--bs-space-6: 32px;
+	/* Controls: one button, one compact button, one input. */
+	--bs-btn-h: 40px;
+	--bs-btn-h-sm: 32px;
+	--bs-input-h: 44px;
+	--bs-input-border: #7d8b99; /* 3.5:1 on white (the palette rule colour is 1.5:1) */
+	--bs-focus: var(--navy, #0c1535);
+	/* Status colours: change one here and it changes everywhere. */
+	--bs-status-ok: var(--green, #28513e);
+	--bs-status-fail: #a4372a;
+	--bs-status-warn: #8a5a00;
+}
+
 .beltoft-services-panel {
-	margin-top: 1em;
-	padding-top: 1em;
-	border-top: 1px solid rgba(0, 0, 0, 0.12);
+	margin-top: var(--bs-space-4);
+	padding-top: 0;
 }
 
 .beltoft-services-panel__head {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;
-	gap: 0.5em 1em;
+	gap: var(--bs-space-2) var(--bs-space-4);
 }
 
+/* The service state reads as plain coloured text, never as a chip. */
 .beltoft-services-badge {
 	display: inline-block;
-	font-size: 0.875em;
+	font-size: var(--bs-fs-small);
 	white-space: nowrap;
 }
 
 .beltoft-services-badge--ready {
-	color: #1a7f37;
+	color: var(--bs-status-ok);
 }
 
 .beltoft-services-badge--getting-ready {
-	color: #8a6d00;
+	color: var(--bs-status-warn);
 }
 
 .beltoft-services-badge--paused,
 .beltoft-services-badge--removed {
-	color: #57606a;
+	color: var(--ink-soft, #5e7080);
 }
 
 .beltoft-services-badge--failed {
-	color: #b42318;
+	color: var(--bs-status-fail);
 }
 
 .beltoft-services-panel__actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.5em;
+	gap: var(--bs-space-2);
 }
 
 .beltoft-services-vm__disks {
-	margin: 1.5em 0;
+	margin: var(--bs-space-5) 0;
 }
 
 .beltoft-services-vm__disk {
-	padding: 0.75em 0;
-	border-top: 1px solid rgba(0, 0, 0, 0.12);
+	padding: var(--bs-space-3) 0;
+	border-top: 1px solid var(--rule, #d6d2c8);
 }
 
 .beltoft-services-vm__disk p {
-	margin: 0 0 0.35em;
+	margin: 0 0 var(--bs-space-1);
 }
 
 .beltoft-services-vm__disk a + a,
 .beltoft-services-vm__disks p a + a {
-	margin-left: 1em;
+	margin-left: var(--bs-space-4);
 }
 
-.beltoft-services-domain { --bsd-ink: var(--navy, #0c1535); --bsd-soft: var(--ink-soft, #5e7080); --bsd-rule: var(--rule, #d6d2c8); --bsd-warm: var(--bg-warm, #eeece6); --bsd-card: var(--bg-card, #fff); font-size: 15px; line-height: 1.5; }
-.beltoft-services-domain__facts { display: grid; gap: 10px; margin: 0; }
+.beltoft-services-domain { --bsd-ink: var(--navy, #0c1535); --bsd-soft: var(--ink-soft, #5e7080); --bsd-rule: var(--rule, #d6d2c8); --bsd-warm: var(--bg-warm, #eeece6); --bsd-card: var(--bg-card, #fff); font-size: var(--bs-fs-body); line-height: var(--bs-lh-text); }
+.beltoft-services-domain__facts { display: grid; gap: 8px; margin: 0; }
 .beltoft-services-domain__facts > div { display: grid; grid-template-columns: 9.5em 1fr; align-items: baseline; gap: 0 16px; }
-.beltoft-services-domain__facts dt { color: var(--bsd-soft); font-size: 14px; }
-.beltoft-services-domain__facts dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; margin: 0; }
+.beltoft-services-domain__facts dt { color: var(--bsd-soft); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
+.beltoft-services-domain__facts dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; margin: 0; }
 .beltoft-services-domain__facts form { position: relative; margin: 0; }
 div.beltoft-services-domain p { margin: 0; }
-div.beltoft-services-domain .beltoft-services-domain__note + .beltoft-services-domain__note { margin-top: 6px; }
-.beltoft-services-domain__section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--bsd-rule); }
-.beltoft-services-domain__title { margin: 0 0 12px; color: var(--bsd-ink); font-size: 17px; font-weight: 700; line-height: 1.3; }
+div.beltoft-services-domain .beltoft-services-domain__note + .beltoft-services-domain__note { margin-top: 8px; }
+.beltoft-services-domain__section { margin-top: var(--bs-space-6); }
+.beltoft-services-domain__title { margin: 0 0 var(--bs-space-3); color: var(--bsd-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-domain__hosts { margin: 0 0 16px; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
 .beltoft-services-domain__section form { margin: 0; }
-div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link { display: inline; width: auto; height: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--bsd-ink); font: inherit; line-height: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:hover, div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:focus, div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:active { background: none; box-shadow: none; color: var(--green, #004400); text-decoration-thickness: 2px; }
+div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link { display: inline; width: auto; height: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--bsd-ink); font: inherit; line-height: inherit; font-weight: var(--bs-fw-medium); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:hover, div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:focus, div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:active { background: none; box-shadow: none; color: var(--green, #28513e); text-decoration-thickness: 2px; }
 div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link:disabled { opacity: .5; cursor: default; }
 .beltoft-services-domain-code { font-variant-numeric: tabular-nums; }
-div.beltoft-services-domain.beltoft-services-domain fieldset.beltoft-services-domain__choices { display: grid; gap: 10px; margin: 0 0 14px; padding: 0; border: 0; }
-.beltoft-services-domain__choice { display: flex; align-items: center; gap: 10px; margin: 0; cursor: pointer; }
+div.beltoft-services-domain.beltoft-services-domain fieldset.beltoft-services-domain__choices { display: grid; gap: 8px; margin: 0 0 16px; padding: 0; border: 0; }
+.beltoft-services-domain__choice { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
 div.beltoft-services-domain input[type="radio"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--bsd-ink); }
 .beltoft-services-domain__custom { display: block; max-width: 560px; margin: 0 0 16px; color: var(--bsd-soft); font-size: 14px; }
 .beltoft-services-domain__custom[hidden] { display: none; }
-div.beltoft-services-domain input[type="text"], div.beltoft-services-domain input[type="number"] { box-sizing: border-box; width: 100%; height: 43px; margin: 4px 0 0; padding: 0 12px; border: 1px solid var(--bsd-rule); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; }
-div.beltoft-services-domain .button { height: 43px; margin: 0; padding: 0 20px; line-height: 1; }
+div.beltoft-services-domain input[type="text"], div.beltoft-services-domain input[type="number"] { box-sizing: border-box; width: 100%; height: var(--bs-input-h); margin: var(--bs-space-1) 0 0; padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: var(--bs-fs-body); box-shadow: none; }
+div.beltoft-services-domain .button { margin: 0; }
 div.beltoft-services-domain :focus-visible { outline: 2px solid var(--bsd-ink); outline-offset: 2px; }
 div.beltoft-services-domain .beltoft-services-domain__empty { margin: 0 0 12px; color: var(--bsd-soft); }
 .beltoft-dns-editor table { width: 100%; border-collapse: collapse; }
@@ -96,7 +128,7 @@ div.beltoft-services-domain .beltoft-services-domain__empty { margin: 0 0 12px; 
 .beltoft-dns-editor td:nth-child(3) { width: 6.5em; }
 .beltoft-dns-editor td:last-child { width: 1%; padding-left: 8px; text-align: right; white-space: nowrap; }
 div.beltoft-services-domain .beltoft-dns-editor input[type="text"], div.beltoft-services-domain .beltoft-dns-editor input[type="number"], div.beltoft-services-domain .beltoft-dns-editor select { box-sizing: border-box; width: 100%; height: 44px; margin: 0; padding: 0 8px; border: 0; background: transparent; box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
-div.beltoft-services-domain .beltoft-dns-editor select { appearance: none; padding-right: 22px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230c1535' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center; }
+div.beltoft-services-domain .beltoft-dns-editor select { appearance: none; padding-right: 24px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230c1535' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center; }
 div.beltoft-services-domain .beltoft-dns-editor input:hover, div.beltoft-services-domain .beltoft-dns-editor select:hover { background-color: var(--bsd-warm); }
 div.beltoft-services-domain .beltoft-dns-editor input:focus-visible, div.beltoft-services-domain .beltoft-dns-editor select:focus-visible { background-color: var(--bsd-card); outline: 2px solid var(--bsd-ink); outline-offset: -2px; }
 .beltoft-dns-value { display: flex; flex-wrap: wrap; }
@@ -116,13 +148,13 @@ div.beltoft-services-domain .beltoft-dns-note { margin: 12px 0 0; color: var(--b
 	.beltoft-dns-editor td:nth-child(3) { grid-column: 1; }
 	.beltoft-dns-editor td:nth-child(4) { grid-column: 2 / 4; }
 	.beltoft-dns-editor td:last-child { grid-column: 1 / 4; }
-	.beltoft-dns-editor td::before { content: attr(data-label); display: block; padding: 6px 8px 0; color: var(--bsd-soft); font-size: 12px; }
+	.beltoft-dns-editor td::before { content: attr(data-label); display: block; padding: var(--bs-space-2) var(--bs-space-2) 0; color: var(--bsd-soft); font-size: var(--bs-fs-caption); }
 	.beltoft-dns-editor td:last-child { padding: 4px 8px 0; text-align: right; }
 	.beltoft-dns-editor td:last-child::before { content: none; }
 }
 /* The card around a domain: its name is the heading, and the status reads as plain text. */
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__product { color: var(--navy, #0c1535); font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__status { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--green, #004400); font-size: 14px; font-weight: 500; }
+.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__product { color: var(--navy, #0c1535); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__status { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--bs-status-ok); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__status::before { content: ""; width: 8px; height: 8px; background: currentColor; }
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__facts dt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__facts { display: inline-block; margin: 0 24px 0 0; }
@@ -130,20 +162,20 @@ div.beltoft-services-domain .beltoft-dns-note { margin: 12px 0 0; color: var(--b
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__actions { display: inline-block; margin: 0; }
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-panel__head:has(.beltoft-services-badge--ready), .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-panel__actions:empty { display: none; }
 /* The state label on these cards (Getting ready, Paused) is plain status text like "Active": no box, no border. */
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 0; border: 0; background: none; color: var(--ink-mid, #57606a); font-size: 14px; font-weight: 500; opacity: 1; }
+.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 0; border: 0; background: none; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); opacity: 1; }
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge::before { content: ""; width: 8px; height: 8px; background: currentColor; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--ready { color: var(--green, #004400); }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--failed { color: #b42318; }
+.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--ready { color: var(--bs-status-ok); }
+.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--failed { color: var(--bs-status-fail); }
 div.beltoft-services-domain [hidden] { display: none; }
-.beltoft-services-vm h4 { margin: 0 0 8px; color: var(--navy, #0c1535); font-size: 17px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-vm h4 { margin: 0 0 var(--bs-space-2); color: var(--navy, #0c1535); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 @keyframes beltoft-services-wait { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 .beltoft-services-domain__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 16px; }
 .beltoft-services-domain__actions form { margin: 0; }
 .beltoft-services-domain__code { display: flex; gap: 8px; max-width: 520px; margin-top: 12px; }
-.beltoft-services-domain-stepup { display: grid; gap: 6px; max-width: 520px; margin-top: 12px; }
+.beltoft-services-domain-stepup { display: grid; gap: 8px; max-width: 520px; margin-top: 12px; }
 .beltoft-services-domain-stepup[hidden] { display: none; }
 .beltoft-services-domain-stepup p { margin: 0; }
-.beltoft-services-domain-stepup__ask, .beltoft-services-domain-stepup__enter { display: grid; gap: 6px; justify-items: start; }
+.beltoft-services-domain-stepup__ask, .beltoft-services-domain-stepup__enter { display: grid; gap: 8px; justify-items: start; }
 .beltoft-services-domain-stepup__ask[hidden], .beltoft-services-domain-stepup__enter[hidden] { display: none; }
 .beltoft-services-domain-stepup__enter .beltoft-services-domain-stepup__row { justify-self: stretch; }
 .beltoft-services-domain-stepup label { font-size: 14px; font-weight: 500; color: var(--navy, #0c1535); }
@@ -153,7 +185,7 @@ div.beltoft-services-domain [hidden] { display: none; }
 .beltoft-services-domain-stepup__field input { box-sizing: border-box; width: 100%; margin: 0; }
 .beltoft-services-domain-stepup__row { align-items: stretch; }
 .beltoft-services-domain-stepup__row .button { flex: none; }
-div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; background: var(--bsd-warm); font-size: 17px; font-weight: 500; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+div.beltoft-services-domain input[type="text"].beltoft-services-domain-code { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; background: var(--bsd-warm); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-medium); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .beltoft-services-domain__code .button { flex: none; min-width: 5.5em; }
 
 /* DNS hosting card: move the registration here. */
@@ -247,7 +279,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain) > header[aria-ex
 }
 
 .beltoft-services-domain__toggle:focus-visible {
-	outline: 2px solid currentColor;
+	outline: 2px solid var(--bs-focus);
 	outline-offset: 4px;
 }
 
@@ -259,8 +291,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 /* The domain name in a card header: a heading, not a page title. */
 section.beltoft-licenses__license:has(.beltoft-services-domain) > header .beltoft-licenses__product,
 section.beltoft-licenses__license:has(.beltoft-services-domain) > header h3 {
-	font-size: 20px;
-	line-height: 1.3;
+	font-size: var(--bs-fs-heading);
+	font-weight: var(--bs-fw-strong);
+	line-height: var(--bs-lh-heading);
 	margin: 0;
 	overflow-wrap: anywhere;
 }
@@ -272,7 +305,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 }
 
 /* Live progress of a service being set up, reinstalled, restored or removed (assets/progress.js). */
-.beltoft-services-progress { --bsp-ink: var(--navy, #0c1535); --bsp-soft: var(--ink-soft, #5e7080); --bsp-ok: #1a7f37; --bsp-busy: #8a6d00; --bsp-bad: #b42318; --bsp-rule: var(--rule, #d6d2c8); margin: 0 0 1em; }
+.beltoft-services-progress { --bsp-ink: var(--navy, #0c1535); --bsp-soft: var(--ink-soft, #5e7080); --bsp-ok: var(--bs-status-ok); --bsp-busy: var(--bs-status-warn); --bsp-bad: var(--bs-status-fail); --bsp-rule: var(--rule, #d6d2c8); margin: 0 0 1em; }
 .beltoft-services-progress.is-idle { display: none; }
 .beltoft-services-progress__text { margin: 0 0 0.75em; color: var(--bsp-ink); font-weight: 600; }
 .beltoft-services-progress__text:empty { display: none; }
@@ -337,7 +370,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 .beltoft-services-vm__dialog .beltoft-services-vm-form { margin: 0; }
 
-.beltoft-services-vm__dialog h5 { margin: 0; font-size: 16px; font-weight: 600; }
+.beltoft-services-vm__dialog h5 { margin: 0; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 
 .beltoft-services-vm__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -355,33 +388,33 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-vm__ending .beltoft-services-vm__link { margin-left: 0.5em; }
 
 /* Servers: the list, and one server's page (templates/account/servers-list.php, vm-head.php, vm.php). Palette variables come from the theme; the fallbacks keep the layout when they are missing. */
-.beltoft-services-notice { margin: 0 0 12px; padding: 8px 14px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-notice { margin: 0 0 12px; padding: 8px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-servers { max-width: 880px; background: var(--bg-card, #fff); container-type: inline-size; }
-.beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
+.beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
 .beltoft-services-servers a.beltoft-services-srv:first-child { border-top: 0; }
-.beltoft-services-servers a.beltoft-services-srv:hover, .beltoft-services-servers a.beltoft-services-srv:focus-visible { background: #fcfbf8; }
-.beltoft-services-servers a.beltoft-services-srv:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: -2px; }
+.beltoft-services-servers a.beltoft-services-srv:hover, .beltoft-services-servers a.beltoft-services-srv:focus-visible { background: var(--bg, #f9f7f2); }
+.beltoft-services-servers a.beltoft-services-srv:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 .beltoft-services-srv__id, .beltoft-services-srv__state { display: grid; gap: 0; min-width: 0; }
-.beltoft-services-srv__name { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
-.beltoft-services-srv__sub { color: var(--ink-soft, #5e7080); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.beltoft-services-srv__bars { display: grid; gap: 3px; font-size: 12px; color: var(--ink-soft, #5e7080); font-variant-numeric: tabular-nums; }
+.beltoft-services-srv__name { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); overflow-wrap: anywhere; }
+.beltoft-services-srv__sub { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.beltoft-services-srv__bars { display: grid; gap: 4px; font-size: var(--bs-fs-caption); color: var(--ink-soft, #5e7080); font-variant-numeric: tabular-nums; }
 .beltoft-services-bar { display: grid; grid-template-columns: 52px minmax(0, 1fr) 34px; gap: 8px; align-items: center; }
 .beltoft-services-bar > span:last-child { text-align: right; }
 .beltoft-services-bar__track { position: relative; height: 4px; background: var(--bg-warm, #eeece6); }
 .beltoft-services-bar__track i { position: absolute; inset: 0 auto 0 0; background: var(--ink-mid, #2d4060); }
-.beltoft-services-srv__go { color: var(--ink-muted, #8a98a6); font-size: 22px; line-height: 1; }
-.beltoft-services-state { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.beltoft-services-srv__go { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-title); line-height: 1; }
+.beltoft-services-state { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .beltoft-services-state::before { content: ""; width: 8px; height: 8px; background: currentColor; }
-.beltoft-services-state.is-ok { color: #1a7f37; }
-.beltoft-services-state.is-busy { color: #8a6d00; }
+.beltoft-services-state.is-ok { color: var(--bs-status-ok); }
+.beltoft-services-state.is-busy { color: var(--bs-status-warn); }
 .beltoft-services-state.is-busy::before { animation: beltoft-services-pulse 1.2s ease-in-out infinite; }
-.beltoft-services-state.is-off { color: var(--ink-muted, #8a98a6); }
-.beltoft-services-state.is-bad { color: #b42318; }
+.beltoft-services-state.is-off { color: var(--ink-soft, #5e7080); }
+.beltoft-services-state.is-bad { color: var(--bs-status-fail); }
 /* A narrow list (a half column on the Overview, a phone): two lines, name and state above, the bars side by side below. */
 @container (max-width: 620px) {
 	.beltoft-services-servers a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
 	.beltoft-services-srv__state { justify-items: end; text-align: right; }
-	.beltoft-services-srv__bars { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 16px; }
+	.beltoft-services-srv__bars { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
 	.beltoft-services-srv__go { display: none; }
 }
 @media (max-width: 700px) {
@@ -400,53 +433,49 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-panel--page .beltoft-services-panel__driver { gap: 0; margin-top: 0; }
 .beltoft-services-page__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
 .beltoft-services-page__title { min-width: 0; }
-.beltoft-services-page__name { margin: 0; color: var(--navy, #0c1535); font-size: 24px; font-weight: 700; line-height: 1.2; letter-spacing: -0.015em; overflow-wrap: anywhere; }
-.beltoft-services-page__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; margin: 4px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-panel--page .beltoft-services-badge { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: none; color: var(--ink-mid, #2d4060); font-size: 14px; font-weight: 500; letter-spacing: normal; line-height: 1.4; opacity: 1; }
-.beltoft-services-panel--page .beltoft-services-badge--ready { color: #1a7f37; }
-.beltoft-services-panel--page .beltoft-services-badge--getting-ready { color: #8a6d00; }
-.beltoft-services-panel--page .beltoft-services-badge--paused, .beltoft-services-panel--page .beltoft-services-badge--removed { color: var(--ink-muted, #8a98a6); }
-.beltoft-services-panel--page .beltoft-services-badge--failed { color: #b42318; }
+.beltoft-services-page__name { margin: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-title); letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.beltoft-services-page__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 4px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-panel--page .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--ink-mid, #2d4060); font-size: 14px; font-weight: 500; letter-spacing: normal; line-height: 1.4; opacity: 1; }
+.beltoft-services-panel--page .beltoft-services-badge--ready { color: var(--bs-status-ok); }
+.beltoft-services-panel--page .beltoft-services-badge--getting-ready { color: var(--bs-status-warn); }
+.beltoft-services-panel--page .beltoft-services-badge--paused, .beltoft-services-panel--page .beltoft-services-badge--removed { color: var(--ink-soft, #5e7080); }
+.beltoft-services-panel--page .beltoft-services-badge--failed { color: var(--bs-status-fail); }
 .beltoft-services-panel--page .beltoft-services-badge::before { content: ""; width: 8px; height: 8px; background: currentColor; }
 .beltoft-services-panel--page .beltoft-services-panel__message { margin: 8px 0 0; color: var(--ink-soft, #5e7080); }
-.beltoft-services-page__actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.beltoft-services-panel--page .beltoft-services-page__actions .beltoft-services-btn { min-height: 0; margin: 0; padding: 7px 14px !important; border: 0 !important; background: transparent !important; box-shadow: inset 0 0 0 1px var(--navy, #0c1535) !important; color: var(--navy, #0c1535) !important; font-size: 14px; font-weight: 500; line-height: 1.3; white-space: nowrap; cursor: pointer; }
-.beltoft-services-panel--page .beltoft-services-page__actions .beltoft-services-btn:hover { background: var(--bg-warm, #eeece6) !important; color: var(--navy, #0c1535) !important; }
-.beltoft-services-panel--page .beltoft-services-page__actions .beltoft-services-btn[disabled] { opacity: 0.6; cursor: progress; }
-.beltoft-services-panel--page .beltoft-services-btn:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }
+.beltoft-services-page__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .beltoft-services-panel__head[hidden], .beltoft-services-badge[hidden], .beltoft-services-panel__message[hidden], .beltoft-services-btn[hidden], .beltoft-services-tab[hidden] { display: none !important; }
 .beltoft-services-panel--page .beltoft-services-progress { margin-top: 16px; }
 
-.beltoft-services-tabs { display: flex; gap: 2px; margin: 14px 0 16px; border-bottom: 1px solid var(--rule, #d6d2c8); overflow-x: auto; }
-.beltoft-services-tabs a { padding: 8px 12px; color: var(--ink-soft, #5e7080) !important; font-weight: 500; text-decoration: none !important; white-space: nowrap; }
+.beltoft-services-tabs { display: flex; gap: 0; margin: var(--bs-space-4) 0; border-bottom: 1px solid var(--rule, #d6d2c8); overflow-x: auto; }
+.beltoft-services-tabs a { display: block; box-sizing: border-box; min-height: var(--bs-input-h); padding: 10px 14px; color: var(--ink-soft, #5e7080) !important; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 24px; text-decoration: none !important; white-space: nowrap; }
 .beltoft-services-tabs a:hover { color: var(--navy, #0c1535) !important; }
-.beltoft-services-tabs a[aria-current="page"] { color: var(--navy, #0c1535) !important; box-shadow: inset 0 -3px 0 var(--green, #004400); }
-.beltoft-services-tabs a:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: -2px; }
+.beltoft-services-tabs a[aria-current="page"] { color: var(--navy, #0c1535) !important; box-shadow: inset 0 -3px 0 var(--green, #28513e); }
+.beltoft-services-tabs a:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 @media (max-width: 600px) {
 	.beltoft-services-tabs { flex-wrap: wrap; max-width: 100%; }
 }
 
 /* The lines between the cells are each cell's shadow in the 1px gap, so a row that is not full stays white. */
 .beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; background: var(--bg-card, #fff); }
-.beltoft-services-facts > div { margin: 0; padding: 10px 14px; background: var(--bg-card, #fff); box-shadow: 0 0 0 1px var(--bg-warm, #eeece6); min-width: 0; }
-.beltoft-services-facts dt { margin: 0; color: var(--ink-muted, #8a98a6); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
-.beltoft-services-facts dd { margin: 2px 0 0; font-weight: 500; overflow-wrap: anywhere; }
-.beltoft-services-facts code { padding: 2px 6px; background: var(--bg-warm, #eeece6); font: inherit; font-size: 14px; }
+.beltoft-services-facts > div { margin: 0; padding: 8px 16px; background: var(--bg-card, #fff); box-shadow: 0 0 0 1px var(--bg-warm, #eeece6); min-width: 0; }
+.beltoft-services-facts dt { margin: 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
+.beltoft-services-facts dd { margin: var(--bs-space-1) 0 0; font-weight: var(--bs-fw-medium); overflow-wrap: anywhere; }
+.beltoft-services-facts code { padding: 4px 8px; background: var(--bg-warm, #eeece6); font: inherit; font-size: 14px; }
 @media (max-width: 760px) { .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.beltoft-services-tab:not([data-tab="overview"]) { padding: 14px; background: var(--bg-card, #fff); }
+.beltoft-services-tab:not([data-tab="overview"]) { padding: 16px; background: var(--bg-card, #fff); }
 .beltoft-services-tab > .beltoft-services-vm__disks { margin-top: 0; }
 .beltoft-services-glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-.beltoft-services-glance a.beltoft-services-glance__item { display: grid; gap: 4px; align-content: start; padding: 10px 14px; background: var(--bg-card, #fff); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
-.beltoft-services-glance a.beltoft-services-glance__item:hover { background: #fcfbf8; }
-.beltoft-services-glance__label { color: var(--ink-muted, #8a98a6); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
-.beltoft-services-glance__value { font-weight: 500; }
+.beltoft-services-glance a.beltoft-services-glance__item { display: grid; gap: 4px; align-content: start; padding: 8px 16px; background: var(--bg-card, #fff); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
+.beltoft-services-glance a.beltoft-services-glance__item:hover { background: var(--bg, #f9f7f2); }
+.beltoft-services-glance__label { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
+.beltoft-services-glance__value { font-weight: var(--bs-fw-medium); }
 @media (max-width: 760px) { .beltoft-services-glance { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
-.beltoft-services-slots { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 6px; }
+.beltoft-services-slots { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 8px; }
 .beltoft-services-slots i { width: 28px; height: 8px; background: var(--bg-warm, #eeece6); }
-.beltoft-services-slots i.is-used { background: var(--green, #004400); }
+.beltoft-services-slots i.is-used { background: var(--green, #28513e); }
 .beltoft-services-vm__more { margin: 12px 0 0; }
-div.beltoft-services-vm__more > h4 { margin-top: 18px; }
+div.beltoft-services-vm__more > h4 { margin-top: 16px; }
 .beltoft-services-tab > div.beltoft-services-vm__more:first-child > h4, .beltoft-services-tab > p:first-child + div.beltoft-services-vm__more > h4 { margin-top: 0; }
 .beltoft-services-tab .beltoft-services-vm__backups { padding-top: 0; border-top: 0; }
 .beltoft-services-vm--page .beltoft-services-vm__more { border-top: 0; }
@@ -455,12 +484,12 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 
 /* An extra disk or snapshot pack with no server on the list: a plain card, the status as text. */
 .beltoft-services-servers--addons { margin-top: 12px; }
-.beltoft-services-servers .beltoft-services-srv--addon { display: grid; gap: 4px; padding: 10px 14px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-servers .beltoft-services-srv--addon { display: grid; gap: 4px; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-servers .beltoft-services-srv--addon:first-child { border-top: 0; }
 .beltoft-services-srv__body { font-size: 14px; }
 .beltoft-services-srv__body p { margin: 0 0 4px; }
 .beltoft-services-srv__body > :last-child { margin-bottom: 0; }
-.beltoft-services-srv--addon .beltoft-services-srv__id { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+.beltoft-services-srv--addon .beltoft-services-srv__id { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
 
 /* Overview: sections of the Dashboard. Square corners, no chips; status is a small square and plain text. */
 .beltoft-services-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); color: var(--navy, #0c1535); }
@@ -469,35 +498,34 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-ov__col { display: contents; }
 .beltoft-services-ov__slot { min-width: 0; }
 @media (min-width: 1000px) {
-	.beltoft-services-overview { gap: 20px; }
-	.beltoft-services-ov__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; align-items: start; }
+	.beltoft-services-overview { gap: 24px; }
+	.beltoft-services-ov__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 24px; align-items: start; }
 	.beltoft-services-ov__cols.is-single { grid-template-columns: minmax(0, 1fr); }
-	.beltoft-services-ov__col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+	.beltoft-services-ov__col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 }
 .beltoft-services-overview > * { min-width: 0; }
 .beltoft-services-ov__section { min-width: 0; }
 .beltoft-services-ov__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
-.beltoft-services-ov__head h2 { margin: 0; color: var(--navy, #0c1535); font-size: 17px; font-weight: 700; line-height: 1.3; }
 .beltoft-services-ov__head a { color: var(--ink-soft, #5e7080) !important; font-size: 14px; text-decoration: none !important; }
 .beltoft-services-ov__head a:hover { color: var(--navy, #0c1535) !important; text-decoration: underline !important; }
-.beltoft-services-ov__attention { display: grid; gap: 6px; padding: 10px 14px; background: var(--paper-light, #f0ede4); }
-.beltoft-services-ov__attention > div { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; min-width: 0; }
+.beltoft-services-ov__attention { display: grid; gap: 8px; padding: 8px 16px; background: var(--paper-light, #f0ede4); }
+.beltoft-services-ov__attention > div { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; min-width: 0; }
 .beltoft-services-ov__attention b { font-weight: 500; overflow-wrap: anywhere; }
-.beltoft-services-ov__attention a { color: var(--green, #004400) !important; font-weight: 500; text-decoration: underline !important; text-underline-offset: 3px; }
+.beltoft-services-ov__attention a { color: var(--green, #28513e) !important; font-weight: 500; text-decoration: underline !important; text-underline-offset: 3px; }
 .beltoft-services-ov__rows { background: var(--bg-card, #fff); }
-.beltoft-services-ov__rows a.beltoft-services-ov__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
+.beltoft-services-ov__rows a.beltoft-services-ov__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
 .beltoft-services-ov__rows a.beltoft-services-ov__row:first-child { border-top: 0; }
-.beltoft-services-ov__rows a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { background: #fcfbf8; }
-.beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: -2px; }
+.beltoft-services-ov__rows a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { background: var(--bg, #f9f7f2); }
+.beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 .beltoft-services-ov__id, .beltoft-services-ov__end { display: grid; gap: 0; min-width: 0; }
-.beltoft-services-ov__id b { font-weight: 700; overflow-wrap: anywhere; }
+.beltoft-services-ov__id b { font-weight: var(--bs-fw-strong); overflow-wrap: anywhere; }
 .beltoft-services-ov__end { justify-items: end; text-align: right; }
-.beltoft-services-ov__money { display: grid; gap: 8px; align-content: start; padding: 12px 14px; background: var(--bg-card, #fff); color: var(--navy, #0c1535); }
-.beltoft-services-ov__moneyhead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
-.beltoft-services-ov__label { color: var(--ink-muted, #8a98a6); font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
-.beltoft-services-ov__big { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.beltoft-services-ov__money { display: grid; gap: 8px; align-content: start; padding: 12px 16px; background: var(--bg-card, #fff); color: var(--navy, #0c1535); }
+.beltoft-services-ov__moneyhead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.beltoft-services-ov__label { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
+.beltoft-services-ov__big { font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); letter-spacing: -.01em; line-height: var(--bs-lh-title); font-variant-numeric: tabular-nums; }
 .beltoft-services-ov__big .woocommerce-Price-amount, .beltoft-services-ov__big bdi { color: inherit; }
-.beltoft-services-ov__money dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0; font-size: 14px; }
+.beltoft-services-ov__money dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 14px; }
 .beltoft-services-ov__money dt { margin: 0; color: var(--ink-soft, #5e7080); }
 .beltoft-services-ov__money dd { margin: 0; overflow-wrap: anywhere; }
 .woocommerce-MyAccount-content .beltoft-services-ov__section .beltoft-services-ov__money p { max-width: none; margin: 0; font-size: 14px; line-height: 1.5; }
@@ -505,27 +533,25 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-services-usage { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 400; line-height: 1.5; }
 .beltoft-services-usage .beltoft-services-ov__head { margin: 0 0 8px; }
 .beltoft-services-usage__table { width: 100%; margin: 24px 0 0; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
-.beltoft-services-usage__table th, .beltoft-services-usage__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--rule, #d9d6cc); background: none; text-align: left; vertical-align: top; }
+.beltoft-services-usage__table th, .beltoft-services-usage__table td { padding: 8px 8px; border: 0; border-bottom: 1px solid var(--rule, #d9d6cc); background: none; text-align: left; vertical-align: top; }
 .beltoft-services-usage__table th { padding-top: 0; color: var(--ink-soft, #5e7080); font-size: 13px; font-weight: 500; }
 .beltoft-services-usage__table tbody tr:last-child td { border-bottom: 0; }
 .beltoft-services-usage__table th:first-child, .beltoft-services-usage__table td:first-child { padding-left: 0; overflow-wrap: anywhere; }
 .beltoft-services-usage__table th:nth-child(n+2), .beltoft-services-usage__table td:nth-child(n+2) { text-align: right; }
 .beltoft-services-usage__table th:last-child, .beltoft-services-usage__table td:last-child { padding-right: 0; }
-.beltoft-services-usage__cap { margin-left: 6px; color: var(--ink-soft, #5e7080); font-size: 13px; }
+.beltoft-services-usage__cap { margin-left: 8px; color: var(--ink-soft, #5e7080); font-size: 13px; }
 .woocommerce-account .beltoft-services-usage .beltoft-services-usage__note { max-width: none; margin: 12px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; line-height: 1.5; }
 @media (max-width: 520px) { .beltoft-services-usage__table { font-size: 14px; } }
 .beltoft-services-ov__feed { padding: 4px 0; background: var(--bg-card, #fff); }
 .beltoft-services-ov__feed ul { margin: 0; padding: 0; list-style: none; }
-.beltoft-services-ov__feed li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; margin: 0; padding: 5px 14px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
-.beltoft-services-ov__feed time { color: var(--ink-muted, #8a98a6); font-size: 13px; font-variant-numeric: tabular-nums; }
-.beltoft-services-ov__welcome h2 { margin: 0; color: var(--navy, #0c1535); font-size: 24px; font-weight: 700; line-height: 1.2; }
+.beltoft-services-ov__feed li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; margin: 0; padding: 4px 16px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
+.beltoft-services-ov__feed time { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-variant-numeric: tabular-nums; }
 .beltoft-services-ov__welcome > p { max-width: 70ch; margin: 4px 0 12px; color: var(--ink-soft, #5e7080); }
 .beltoft-services-ov__cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.beltoft-services-ov__card { display: grid; gap: 6px; align-content: start; padding: 14px; background: var(--bg-card, #fff); }
-.beltoft-services-ov__card h3 { margin: 0; color: var(--navy, #0c1535); font-size: 17px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-ov__card { display: grid; gap: 8px; align-content: start; padding: 16px; background: var(--bg-card, #fff); }
+.beltoft-services-ov__card h3 { margin: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-ov__card p { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-ov__card a.beltoft-services-ov__btn { justify-self: start; display: inline-block; padding: 7px 14px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; text-decoration: none !important; white-space: nowrap; }
-.beltoft-services-ov__card a.beltoft-services-ov__btn.is-ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
+.beltoft-services-ov__card a.beltoft-services-ov__btn { justify-self: start; white-space: nowrap; }
 @media (max-width: 760px) {
 	.beltoft-services-ov__cards { grid-template-columns: minmax(0, 1fr); }
 }
@@ -534,13 +560,13 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 .beltoft-licenses__empty { max-width: 70ch; margin: 0; padding: 8px 0; color: var(--ink-soft, #5e7080); }
 
 /* Billing: the tab bar over the subscriptions, orders, payment methods and addresses pages. One rule, no chips. */
-.beltoft-services-billing-tabs { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; margin: 0 0 16px; border-bottom: 1px solid var(--rule, #d9d6cc); font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); overflow-x: auto; }
-.beltoft-services-billing-tabs ul { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.beltoft-services-billing-tabs { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; margin: var(--bs-space-4) 0; border-bottom: 1px solid var(--rule, #d6d2c8); font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); }
+.beltoft-services-billing-tabs ul { display: flex; flex-wrap: wrap; gap: 0; margin: 0; padding: 0; list-style: none; }
 .beltoft-services-billing-tabs li { margin: 0; padding: 0; }
-.beltoft-services-billing-tabs a { display: block; padding: 10px 14px; color: var(--ink-soft, #5e7080) !important; font-size: 15px; font-weight: 500; white-space: nowrap; text-decoration: none !important; }
+.beltoft-services-billing-tabs a { display: block; box-sizing: border-box; min-height: var(--bs-input-h); padding: 10px 14px; color: var(--ink-soft, #5e7080) !important; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 24px; white-space: nowrap; text-decoration: none !important; }
 .beltoft-services-billing-tabs a:hover { color: var(--navy, #0c1535) !important; }
-.beltoft-services-billing-tabs a.is-active { color: var(--navy, #0c1535) !important; box-shadow: inset 0 -3px 0 var(--green, #004400); }
-.beltoft-services-billing-tabs a:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: -2px; }
+.beltoft-services-billing-tabs a.is-active { color: var(--navy, #0c1535) !important; box-shadow: inset 0 -3px 0 var(--green, #28513e); }
+.beltoft-services-billing-tabs a:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 
 /* Domains: the list (templates/account/domains-list.php), its header buttons, and a domain's page (domain-page.php). Same row, state and tab styles as Servers. */
 .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
@@ -548,25 +574,22 @@ div.beltoft-services-vm__more > h4 { margin-top: 18px; }
 @media (max-width: 700px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
 /* Databases and Apps lists: name and detail, state, one more value (the private host), then an arrow or the Open button. A row with a button is a div, the name is its link. */
 .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1.4fr) auto; }
-.beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
+.beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top: 0; }
 .beltoft-services-servers--area a.beltoft-services-srv__name { color: var(--navy, #0c1535) !important; text-decoration: none !important; }
 .beltoft-services-servers--area a.beltoft-services-srv__name:hover, .beltoft-services-servers--area a.beltoft-services-srv__name:focus-visible { text-decoration: underline !important; }
-.beltoft-services-srv__extra { color: var(--ink-soft, #5e7080); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.beltoft-services-srv__extra { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .beltoft-services-srv__extra:empty { display: none; }
 @container (max-width: 620px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } }
 @media (max-width: 700px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } }
-.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; max-width: 880px; margin: 0 0 12px; }
+.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 880px; margin: 0 0 12px; }
 .beltoft-services-domains.is-empty .beltoft-services-list-actions, .beltoft-services-list-actions.is-start { justify-content: flex-start; margin: 12px 0 0; }
-.beltoft-services-list-actions a.beltoft-services-list-btn { display: inline-block; padding: 7px 14px; background: var(--navy, #0c1535); color: #fff !important; font-size: 14px; font-weight: 500; line-height: 1.3; text-decoration: none !important; white-space: nowrap; }
-.beltoft-services-list-actions a.beltoft-services-list-btn.is-ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
-.beltoft-services-list-actions a.beltoft-services-list-btn:focus-visible { outline: 2px solid var(--leaf, #5aa05a); outline-offset: 2px; }
+.beltoft-services-list-actions a.beltoft-services-list-btn { white-space: nowrap; }
 .beltoft-services-domain--page { font-size: 15px; }
 .beltoft-services-domain--page .beltoft-services-domain__note { margin: 12px 0 0; color: var(--bsd-soft); }
 .beltoft-services-domain--page .beltoft-services-domain__note a { color: var(--bsd-ink); text-underline-offset: 3px; }
 .beltoft-services-domain--page .beltoft-services-tab > :first-child { margin-top: 0; }
-.beltoft-services-domain__transfer + .beltoft-services-domain__transfer-out { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--bsd-rule); }
-.beltoft-services-domain--page .beltoft-services-domain__title { font-size: 16px; }
+.beltoft-services-domain__transfer + .beltoft-services-domain__transfer-out { margin-top: var(--bs-space-6); }
 .beltoft-services-domain--page .beltoft-services-domain__hosts { margin-bottom: 12px; }
 .beltoft-services-domain--page .beltoft-services-facts { gap: 8px; background: none; }
 .beltoft-services-domain--page .beltoft-services-facts > div { box-shadow: none; }
@@ -578,14 +601,14 @@ div.beltoft-services-domain.beltoft-services-domain button[hidden] { display: no
 
 /* DNS records editor (assets/dns-editor.js): one row, one request. Square, one rule between rows, no chips. */
 .beltoft-dnse { margin: 0; }
-.beltoft-dnse__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; }
+.beltoft-dnse__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 12px; }
 .beltoft-dnse__bar:empty { display: none; }
-div.beltoft-services-domain input[type="search"].beltoft-dnse__search { box-sizing: border-box; flex: 1 1 14em; max-width: 24em; height: 40px; margin: 0; padding: 0 12px; border: 1px solid var(--bsd-rule); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; appearance: none; }
-div.beltoft-services-domain .beltoft-dnse__add.button { height: 40px; margin-left: auto; padding: 0 16px; }
+div.beltoft-services-domain input[type="search"].beltoft-dnse__search { box-sizing: border-box; flex: 1 1 14em; max-width: 24em; height: var(--bs-input-h); margin: 0; padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bsd-card); color: var(--bsd-ink); font: inherit; font-size: 15px; box-shadow: none; appearance: none; }
+div.beltoft-services-domain .beltoft-dnse__add.button { margin-left: auto; }
 div.beltoft-services-domain .beltoft-dnse__empty { margin: 0 0 12px; color: var(--bsd-soft); }
 .beltoft-dnse__table { width: 100%; margin: 0; border-collapse: collapse; table-layout: auto; }
 .beltoft-dnse__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; color: var(--bsd-soft); font-size: 13px; font-weight: 500; text-align: left; }
-.beltoft-dnse__table td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; }
+.beltoft-dnse__table td { padding: 8px 8px; border: 0; border-bottom: 1px solid var(--bsd-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .beltoft-dnse__table tr:last-child td { border-bottom: 0; }
 .beltoft-dnse__table td:nth-child(1) { width: 20%; overflow-wrap: anywhere; }
 .beltoft-dnse__table td:nth-child(2) { width: 5.5em; }
@@ -594,23 +617,22 @@ div.beltoft-services-domain .beltoft-dnse__empty { margin: 0 0 12px; color: var(
 .beltoft-dnse__table td.beltoft-dnse__actions { width: 1%; text-align: right; white-space: nowrap; }
 div.beltoft-services-domain.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > * + * { margin-left: 16px; }
 .beltoft-dnse__ask { color: var(--bsd-ink); font-weight: 500; }
-div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link.beltoft-dnse__danger { color: #b32d2e; }
-.beltoft-dnse__table tr[data-edit-row] td { padding-top: 6px; padding-bottom: 6px; }
-div.beltoft-services-domain .beltoft-dnse__table input[type="text"], div.beltoft-services-domain .beltoft-dnse__table input[type="number"], div.beltoft-services-domain .beltoft-dnse__table select { box-sizing: border-box; width: 100%; height: 40px; margin: 0; padding: 0 10px; border: 1px solid var(--bsd-rule); background-color: var(--bsd-card); box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
+div.beltoft-services-domain.beltoft-services-domain button.beltoft-services-domain__link.beltoft-dnse__danger { color: var(--bs-status-fail); }
+.beltoft-dnse__table tr[data-edit-row] td { padding-top: 8px; padding-bottom: 8px; }
+div.beltoft-services-domain .beltoft-dnse__table input[type="text"], div.beltoft-services-domain .beltoft-dnse__table input[type="number"], div.beltoft-services-domain .beltoft-dnse__table select { box-sizing: border-box; width: 100%; height: var(--bs-input-h); margin: 0; padding: 0 var(--bs-space-2); border: 1px solid var(--bs-input-border); background-color: var(--bsd-card); box-shadow: none; color: var(--bsd-ink); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
 div.beltoft-services-domain .beltoft-dnse__table select { appearance: none; padding-right: 24px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230c1535' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
 div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-services-domain .beltoft-dnse__table select:disabled { background-color: var(--bsd-warm); color: var(--bsd-soft); }
-.beltoft-dnse__fields { display: flex; flex-wrap: wrap; gap: 6px; }
+.beltoft-dnse__fields { display: flex; flex-wrap: wrap; gap: 8px; }
 .beltoft-dnse__fields > * { flex: 1 1 6em; min-width: 0; }
 .beltoft-dnse__fields > [data-f="value"] { flex: 4 1 10em; }
 .beltoft-dnse__fields > .beltoft-dnse__extra { flex: 0 0 6em; }
 .beltoft-dnse__fields > [hidden] { display: none; }
-div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 0 16px; }
 .beltoft-dnse__form { display: none; }
 .beltoft-dnse__more { margin-top: 12px; }
 @media (max-width: 640px) {
 	.beltoft-dnse__table thead { display: none; }
 	.beltoft-dnse__table, .beltoft-dnse__table tbody { display: block; }
-	.beltoft-dnse__table tr { display: grid; grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 8px; padding: 10px 0; border-bottom: 1px solid var(--bsd-rule); }
+	.beltoft-dnse__table tr { display: grid; grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 8px; padding: 8px 0; border-bottom: 1px solid var(--bsd-rule); }
 	.beltoft-dnse__table tr:last-child { border-bottom: 0; }
 	.beltoft-dnse__table td, .beltoft-dnse__table td:nth-child(n) { display: block; width: auto; padding: 0; border: 0; text-align: left; }
 	.beltoft-dnse__table td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 500; }
@@ -618,10 +640,10 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 	.beltoft-dnse__table td:nth-child(3) { grid-column: 3; grid-row: 1; color: var(--bsd-soft); }
 	.beltoft-dnse__table td:nth-child(4) { grid-column: 1 / 4; grid-row: 2; padding-top: 4px; }
 	.beltoft-dnse__table td:nth-child(5):not(.beltoft-dnse__actions) { grid-column: 1 / 4; grid-row: 3; color: var(--bsd-soft); }
-	.beltoft-dnse__table td.beltoft-dnse__actions { grid-column: 1 / 4; padding-top: 6px; text-align: left; white-space: normal; }
-	.beltoft-dnse__table tr[data-edit-row] td::before { content: attr(data-label); display: block; padding: 6px 0 2px; color: var(--bsd-soft); font-size: 12px; }
+	.beltoft-dnse__table td.beltoft-dnse__actions { grid-column: 1 / 4; padding-top: 8px; text-align: left; white-space: normal; }
+	.beltoft-dnse__table tr[data-edit-row] td::before { content: attr(data-label); display: block; padding: var(--bs-space-2) 0 var(--bs-space-1); color: var(--bsd-soft); font-size: var(--bs-fs-caption); }
 	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions::before { content: none; }
-	.beltoft-dnse__table tr[data-edit-row] { gap: 0 6px; }
+	.beltoft-dnse__table tr[data-edit-row] { gap: 0 8px; }
 	.beltoft-dnse__table tr[data-edit-row] td:nth-child(n) { padding: 0; }
 	.beltoft-dnse__fields > .beltoft-dnse__extra { flex: 1 1 5em; }
 }
@@ -633,23 +655,23 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-danger__open.button { margin-top: 16px; }
 .beltoft-services-domain__dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
 .beltoft-services-domain__dialog::backdrop { background: rgba(12, 21, 53, 0.5); }
-.beltoft-services-danger__dialog-form { margin: 0; padding: 20px; }
-.beltoft-services-domain__dialog h5 { margin: 0 0 12px; font-size: 17px; font-weight: 700; line-height: 1.3; }
+.beltoft-services-danger__dialog-form { margin: 0; padding: 24px; }
+.beltoft-services-domain__dialog h5 { margin: 0 0 var(--bs-space-3); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-domain__dialog p { margin: 0 0 12px; }
 .beltoft-services-domain__dialog label { display: block; margin: 0 0 4px; font-size: 14px; color: var(--ink-soft, #5e7080); }
-.beltoft-services-domain__dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 43px; margin: 0 0 16px; padding: 0 12px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; box-shadow: none; }
+.beltoft-services-domain__dialog input[type="text"] { box-sizing: border-box; width: 100%; height: var(--bs-input-h); margin: 0 0 var(--bs-space-4); padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bg-card, #fff); color: var(--navy, #0c1535); font: inherit; font-size: var(--bs-fs-body); box-shadow: none; }
 .beltoft-services-danger__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 0; }
 .beltoft-services-danger__confirm.button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* Add a disk, more snapshots: square tiles to pick from, the size or count over its price. */
 .beltoft-services-add { margin: 16px 0; }
-.beltoft-services-add__title { margin: 0 0 8px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 700; line-height: 1.4; }
+.beltoft-services-add__title { margin: 0 0 var(--bs-space-2); color: var(--navy, #0c1535); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-add__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-width: 720px; }
-.beltoft-services-add a.beltoft-services-add__tile { display: flex; flex-direction: column; gap: 3px; padding: 14px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; transition: background-color 0.12s ease, color 0.12s ease; }
+.beltoft-services-add a.beltoft-services-add__tile { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; transition: background-color 0.12s ease, color 0.12s ease; }
 .beltoft-services-add a.beltoft-services-add__tile:hover { background: var(--navy, #0c1535); color: var(--bg-card, #fff) !important; }
-.beltoft-services-add a.beltoft-services-add__tile:focus-visible { outline: 2px solid var(--green, #004400); outline-offset: 2px; }
-.beltoft-services-add__name { font-size: 18px; font-weight: 700; line-height: 1.25; }
-.beltoft-services-add__price { font-size: 13px; line-height: 1.4; opacity: 0.8; }
+.beltoft-services-add a.beltoft-services-add__tile:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
+.beltoft-services-add__name { font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
+.beltoft-services-add__price { font-size: var(--bs-fs-caption); line-height: var(--bs-lh-text); opacity: 1; }
 @media (max-width: 600px) {
 	.beltoft-services-add__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -658,7 +680,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-vm__reveal { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .beltoft-services-vm__reveal .button { margin: 0; }
 .beltoft-services-vm__password { padding: 8px 12px; background: var(--bg-warm, #eeece6); font-size: 15px; overflow-wrap: anywhere; user-select: all; }
-.beltoft-services-vm .beltoft-services-vm__copy, .beltoft-services-db .beltoft-services-vm__copy, .beltoft-services-api .beltoft-services-vm__copy { min-height: 0; padding: 7px 14px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
+.beltoft-services-vm .beltoft-services-vm__copy, .beltoft-services-db .beltoft-services-vm__copy, .beltoft-services-api .beltoft-services-vm__copy { min-height: 0; padding: 8px 16px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--navy, #0c1535); color: var(--navy, #0c1535); font-size: 14px; font-weight: 500; }
 .beltoft-services-vm .beltoft-services-vm__copy:hover, .beltoft-services-db .beltoft-services-vm__copy:hover, .beltoft-services-api .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-vm__copy[hidden] { display: none !important; }
 
@@ -673,43 +695,40 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-db .beltoft-services-tabs + .beltoft-services-vm__more > h4 { margin-top: 0; }
 /* A connection string or fingerprint: a code block in the warm background, flush left, with its Copy button. */
 .beltoft-services-db__block { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 0 0 16px; }
-.beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { box-sizing: border-box; flex: 1 1 16em; min-width: 0; margin: 0; padding: 10px 12px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; word-break: normal; }
-.beltoft-services-db__block .beltoft-services-vm__copy { flex: none; min-height: 0; margin: 0; padding: 7px 14px !important; border: 0 !important; background: transparent !important; box-shadow: inset 0 0 0 1px var(--navy, #0c1535) !important; color: var(--navy, #0c1535) !important; font-size: 14px; font-weight: 500; line-height: 1.3; }
-.beltoft-services-db__block .beltoft-services-vm__copy:hover { background: var(--bg-warm, #eeece6) !important; color: var(--navy, #0c1535) !important; }
+.beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { box-sizing: border-box; flex: 1 1 16em; min-width: 0; margin: 0; padding: 8px 12px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; word-break: normal; }
 /* A typed-confirmation form: the fields and the button are a column with the same gap as the server page's forms. */
 .beltoft-services-db__form { display: grid; gap: 12px; max-width: 520px; margin: 12px 0 0; }
 .beltoft-services-db__form p { margin: 0; }
-.beltoft-services-db__form label { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--navy, #0c1535); }
+.beltoft-services-db__form label { display: block; margin: 0 0 var(--bs-space-1); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); color: var(--navy, #0c1535); }
 .beltoft-services-db__form input[type="text"], .beltoft-services-db__form select { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
 .beltoft-services-db__form .button { justify-self: start; margin: 0; }
-.beltoft-services-db__form input + .button { margin-top: 8px; }
 
 /* Security: the API tokens box, like the two-factor box over it (880px, 24px padding, 18px heading). */
-.woocommerce-MyAccount-content section.beltoft-services-api { display: grid; min-width: 0; gap: 12px; box-sizing: border-box; max-width: 880px; padding: 24px; background: var(--bg-card, #fff); border: 1px solid var(--rule, #d6d2c8); }
+.woocommerce-MyAccount-content section.beltoft-services-api { display: grid; min-width: 0; gap: 12px; box-sizing: border-box; max-width: 880px; padding: var(--bs-space-5); background: var(--bg-card, #fff); }
 .woocommerce-MyAccount-content section.beltoft-services-api > * { min-width: 0; max-width: 100%; margin: 0; }
-.woocommerce-MyAccount-content section.beltoft-services-api h3 { margin: 0 0 -4px; }
+.woocommerce-MyAccount-content section.beltoft-services-api h3 { margin: 0; }
 .woocommerce-MyAccount-content .beltoft-services-api .form-row { position: relative; width: 100%; max-width: 520px; margin: 0; padding: 0; }
-.woocommerce-MyAccount-content .beltoft-services-api .form-row label { position: absolute; top: 8px; left: 13px; z-index: 1; margin: 0; padding: 0; color: var(--ink-soft, #5e7080); font-size: 12px; line-height: 1.2; pointer-events: none; }
+.woocommerce-MyAccount-content .beltoft-services-api .form-row label { display: block; margin: 0 0 var(--bs-space-1); padding: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); line-height: var(--bs-lh-text); }
 .woocommerce-MyAccount-content .beltoft-services-api .form-row .woocommerce-input-wrapper { display: block; }
-.woocommerce-MyAccount-content .beltoft-services-api .form-row input, .woocommerce-MyAccount-content .beltoft-services-api .form-row select { box-sizing: border-box; display: block; width: 100%; height: 56px; margin: 0; padding: 24px 12px 6px; border: 1px solid var(--rule, #d6d2c8); background: var(--bg-card, #fff); box-shadow: none; color: var(--navy, #0c1535); font: inherit; font-size: 16px; line-height: 1.3; }
-.beltoft-services-api__hint { display: block; margin: 6px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.woocommerce-MyAccount-content .beltoft-services-api .form-row input, .woocommerce-MyAccount-content .beltoft-services-api .form-row select { box-sizing: border-box; display: block; width: 100%; height: var(--bs-input-h); margin: 0; padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bg-card, #fff); box-shadow: none; color: var(--navy, #0c1535); font: inherit; font-size: var(--bs-fs-body); line-height: var(--bs-lh-text); }
+.beltoft-services-api__hint { display: block; margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
 .beltoft-services-api__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .beltoft-services-api__send { order: -1; }
 .beltoft-services-api__block { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
-.woocommerce-MyAccount-content .beltoft-services-api code.beltoft-services-api__secret { box-sizing: border-box; flex: 1 1 16em; min-width: 0; margin: 0; padding: 10px 12px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: all; }
+.woocommerce-MyAccount-content .beltoft-services-api code.beltoft-services-api__secret { box-sizing: border-box; flex: 1 1 16em; min-width: 0; margin: 0; padding: 8px 12px; border: 0; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: all; }
 .beltoft-services-api__claude { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .beltoft-services-api__claude > * { min-width: 0; max-width: 100%; margin: 0; }
 .beltoft-services-api__claude h4 { margin: 8px 0 0; }
-.beltoft-services-api__claude ol { padding-left: 20px; }
+.beltoft-services-api__claude ol { padding-left: 24px; }
 .beltoft-services-api__copyrow { display: grid; gap: 4px; }
-.beltoft-services-api__copylabel { color: var(--ink-soft, #5e7080); font-size: 13px; }
-.woocommerce-MyAccount-content .beltoft-services-api .beltoft-services-api__claude code.beltoft-services-api__secret { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; overflow-x: auto; overflow-wrap: anywhere; word-break: break-all; }
+.beltoft-services-api__copylabel { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); }
+.woocommerce-MyAccount-content .beltoft-services-api .beltoft-services-api__claude code.beltoft-services-api__secret { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--bs-fs-small); overflow-x: auto; overflow-wrap: anywhere; word-break: break-all; }
 .woocommerce-MyAccount-content .beltoft-services-api table { width: 100%; max-width: 100%; margin: 0; }
 .woocommerce-MyAccount-content .beltoft-services-api td form { display: block; }
-.beltoft-services-api__docs summary { color: var(--navy, #0c1535); font-size: 15px; font-weight: 600; cursor: pointer; }
+.beltoft-services-api__docs summary { color: var(--navy, #0c1535); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); cursor: pointer; }
 .beltoft-services-api__docs[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .beltoft-services-api__docs[open] > * { max-width: 100%; margin: 0; min-width: 0; }
-.beltoft-services-api__docs pre { box-sizing: border-box; padding: 10px 14px; background: var(--bg-warm, #eeece6); overflow-x: auto; }
+.beltoft-services-api__docs pre { box-sizing: border-box; padding: 8px 16px; background: var(--bg-warm, #eeece6); overflow-x: auto; }
 .woocommerce-MyAccount-content .beltoft-services-api code { padding: 0; border: 0; background: none; color: var(--navy, #0c1535); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
 .beltoft-services-api__scroll { overflow-x: auto; }
 .beltoft-services-api__docs table { min-width: 560px; }
@@ -720,41 +739,40 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 
 /* App connection consent page (Oauth\Server): a centred panel on the site's page. */
 .beltoft-services-oauth { box-sizing: border-box; width: calc(100% - 40px); max-width: 640px; margin: 64px auto 96px; }
-.beltoft-services-oauth__panel { padding: 32px; background: var(--bg-card, #fff); color: var(--navy, #1d2327); font-size: 16px; line-height: 1.55; }
-.beltoft-services-oauth h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.25; }
+.beltoft-services-oauth__panel { padding: 32px; background: var(--bg-card, #fff); color: var(--navy, #0c1535); font-size: var(--bs-fs-body); line-height: var(--bs-lh-text); }
+.beltoft-services-oauth h1 { margin: 0 0 var(--bs-space-3); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-title); }
 .beltoft-services-oauth p { margin: 0 0 16px; }
-.beltoft-services-oauth__lead { color: var(--ink-soft, #50575e); }
-.beltoft-services-oauth__facts { margin: 24px 0; padding: 0; border-top: 1px solid var(--rule, #dcdcde); }
-.beltoft-services-oauth__facts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule, #dcdcde); }
-.beltoft-services-oauth__facts dt { margin: 0; color: var(--ink-soft, #50575e); }
+.beltoft-services-oauth__lead { color: var(--ink-soft, #5e7080); }
+.beltoft-services-oauth__facts { margin: 24px 0; padding: 0; border-top: 1px solid var(--rule, #d6d2c8); }
+.beltoft-services-oauth__facts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule, #d6d2c8); }
+.beltoft-services-oauth__facts dt { margin: 0; color: var(--ink-soft, #5e7080); }
 .beltoft-services-oauth__facts dd { margin: 0; overflow-wrap: anywhere; }
 .beltoft-services-oauth__verified, .beltoft-services-oauth__unverified { display: block; font-size: 14px; }
-.beltoft-services-oauth__verified { color: var(--green, #00a32a); }
-.beltoft-services-oauth__unverified { color: #b32d2e; }
+.beltoft-services-oauth__verified { color: var(--green, #28513e); }
+.beltoft-services-oauth__unverified { color: var(--bs-status-fail); }
 .beltoft-services-oauth__choices { margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
 .beltoft-services-oauth__choices legend { margin: 0 0 12px; padding: 0; font-weight: 600; }
-.beltoft-services-oauth__note { padding: 12px 16px; border-left: 3px solid var(--navy, #1d2327); background: var(--bg-warm, #f6f7f7); }
-.beltoft-services-oauth .beltoft-services-oauth__choice { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 8px; padding: 14px 16px; background: var(--bg-warm, #f6f7f7); color: var(--ink-soft, #50575e); opacity: 1; cursor: pointer; font-size: 15px; font-weight: 400; line-height: 1.5; }
-.beltoft-services-oauth__choice:has(input:checked) { box-shadow: inset 3px 0 0 var(--navy, #1d2327); }
+.beltoft-services-oauth__note { padding: 12px 16px; border-left: 3px solid var(--navy, #0c1535); background: var(--bg-warm, #eeece6); }
+.beltoft-services-oauth .beltoft-services-oauth__choice { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 8px; padding: 16px 16px; background: var(--bg-warm, #eeece6); color: var(--ink-soft, #5e7080); opacity: 1; cursor: pointer; font-size: 15px; font-weight: 400; line-height: 1.5; }
+.beltoft-services-oauth__choice:has(input:checked) { box-shadow: inset 3px 0 0 var(--navy, #0c1535); }
 .beltoft-services-oauth__choice input { flex: none; margin: 4px 0 0; }
-.beltoft-services-oauth__choice strong { display: block; margin-bottom: 2px; color: var(--navy, #1d2327); font-size: 16px; }
-.beltoft-services-oauth__secret { font-size: 14px; color: var(--ink-soft, #50575e); }
+.beltoft-services-oauth__choice strong { display: block; margin-bottom: 4px; color: var(--navy, #0c1535); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); }
+.beltoft-services-oauth__secret { font-size: 14px; color: var(--ink-soft, #5e7080); }
 .beltoft-services-oauth__buttons { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 16px; }
-.beltoft-services-oauth .beltoft-services-oauth__allow { background: var(--navy, #1d2327); color: #fff; border: 0; padding: 12px 28px; font-weight: 600; cursor: pointer; }
-.beltoft-services-oauth .beltoft-services-oauth__cancel { background: transparent; color: var(--navy, #1d2327); border: 1px solid var(--navy, #1d2327); padding: 11px 24px; font-weight: 600; cursor: pointer; }
-.beltoft-services-oauth__foot { margin: 0; font-size: 14px; color: var(--ink-soft, #50575e); }
+.beltoft-services-oauth .beltoft-services-oauth__allow { min-height: var(--bs-btn-h); box-sizing: border-box; padding: 8px 16px; border: 1px solid var(--navy, #0c1535); background: var(--navy, #0c1535); color: #fff; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 1.4; cursor: pointer; }
+.beltoft-services-oauth .beltoft-services-oauth__cancel { min-height: var(--bs-btn-h); box-sizing: border-box; padding: 8px 16px; border: 1px solid var(--navy, #0c1535); background: transparent; color: var(--navy, #0c1535); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 1.4; cursor: pointer; }
+.beltoft-services-oauth__foot { margin: 0; font-size: 14px; color: var(--ink-soft, #5e7080); }
 @media (max-width: 600px) {
 	.beltoft-services-oauth { margin: 32px auto 64px; }
-	.beltoft-services-oauth__panel { padding: 20px; }
-	.beltoft-services-oauth h1 { font-size: 24px; }
-	.beltoft-services-oauth__facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+	.beltoft-services-oauth__panel { padding: 24px; }
+	.beltoft-services-oauth__facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
 
 /* Credit page (prepaid balance). Square corners, few borders, the dashboard palette variables. */
 .beltoft-services-credit { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; font-weight: 400; line-height: 1.5; }
 .beltoft-services-credit .beltoft-services-ov__head { margin: 0 0 8px; }
 .beltoft-services-credit .beltoft-services-credit__historyhead { margin-top: 24px; }
-.beltoft-services-credit__balance { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; padding: 12px 14px; background: var(--bg-card, #fff); }
+.beltoft-services-credit__balance { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; padding: 12px 16px; background: var(--bg-card, #fff); }
 .beltoft-services-credit__label { color: var(--ink-soft, #5e7080); font-size: 15px; font-weight: 400; }
 .beltoft-services-credit__amount { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .beltoft-services-credit__form { display: grid; gap: 12px; margin: 24px 0 0; }
@@ -783,7 +801,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .beltoft-services-credit__coderow .button { flex: 0 0 auto; }
 .beltoft-services-credit__empty { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
 .beltoft-services-credit__history { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
-.beltoft-services-credit__history th, .beltoft-services-credit__history td { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--rule, #d9d6cc); background: none; text-align: left; vertical-align: top; }
+.beltoft-services-credit__history th, .beltoft-services-credit__history td { padding: 8px 8px; border: 0; border-bottom: 1px solid var(--rule, #d9d6cc); background: none; text-align: left; vertical-align: top; }
 .beltoft-services-credit__history th { padding-top: 0; color: var(--ink-soft, #5e7080); font-size: 13px; font-weight: 500; }
 .beltoft-services-credit__history tbody tr:last-child td { border-bottom: 0; }
 .beltoft-services-credit__history th:first-child, .beltoft-services-credit__history td:first-child { padding-left: 0; }
@@ -794,8 +812,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 /* Card box on the payment methods page. Square corners, no borders, the dashboard palette variables. */
 .beltoft-services-card { max-width: 880px; margin: 0 0 24px; color: var(--navy, #0c1535); font-size: 15px; line-height: 1.5; }
 .beltoft-services-card__sub { margin: 0 0 12px; color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-card__card { margin: 0 0 12px; padding: 12px 14px; background: var(--bg-card, #fff); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.beltoft-services-card__warn { margin: 0 0 12px; padding: 10px 14px; background: var(--bg-warm, #eeece6); color: var(--bad, #b42318); font-weight: 600; }
+.beltoft-services-card__card { margin: 0 0 var(--bs-space-3); padding: var(--bs-space-3) var(--bs-space-4); background: var(--bg-card, #fff); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.beltoft-services-card__warn { margin: 0 0 12px; padding: 8px 16px; background: var(--bg-warm, #eeece6); color: var(--bs-status-fail); font-weight: 600; }
 .beltoft-services-card__note { margin: 0 0 12px; color: var(--ink-soft, #5e7080); font-size: 14px; }
 .beltoft-services-card__form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; }
 .beltoft-services-card__form .beltoft-services-card__note { margin: 0; }
@@ -803,7 +821,6 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 
 /* Pay as you go: the billing line under the power buttons of a server page, and the Delete block. */
 .beltoft-services-page__billing { flex: 0 0 100%; margin: 0; }
-.beltoft-services-delete .beltoft-services-delete__go { margin-top: 4px; }
 .beltoft-services-delete input[type="text"] { max-width: 24em; }
 
 /* Billing, Addresses: one column as wide as the Credit tab, pairs are two equal halves, stacked on phones. */
@@ -814,7 +831,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .woocommerce-account .brxe-woocommerce-account-edit-address-form .form-row input.input-text, .woocommerce-account .brxe-woocommerce-account-edit-address-form .form-row .select2-container { box-sizing: border-box; width: 100% !important; max-width: none; }
 .woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field { margin: 24px 0 0; }
 .woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field label.checkbox { display: block; margin: 0; color: var(--navy, #0c1535); font-size: 15px; font-weight: 400; line-height: 1.5; }
-.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field input[type="checkbox"] { margin: 0 10px 0 0; vertical-align: -2px; }
+.woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field input[type="checkbox"] { margin: 0 8px 0 0; vertical-align: -2px; }
 .woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field small { display: block; margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; line-height: 1.5; }
 .woocommerce-account .brxe-woocommerce-account-edit-address-form #update_all_subscriptions_addresses_field small strong { font-weight: 400; }
 .woocommerce-account .brxe-woocommerce-account-edit-address-form .woocommerce-address-fields .brxe-woocommerce-form-submit { max-width: none; margin: 24px 0 0; }
@@ -824,8 +841,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .woocommerce-account .beltoft-services-usage__table { margin-bottom: 4px; }
 
 /* Status bar, action lock and question (assets/status.js). One colour variable per state: change it here and it changes everywhere. */
-:root { --bs-status-ok: var(--green, #28513e); --bs-status-fail: #a4372a; --bs-status-warn: #8a5a00; }
-.bs-status { --bs-header-offset: 0px; position: sticky; top: calc(var(--bs-header-offset) + 8px); z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 10px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); border-left: 3px solid var(--navy, #0c1535); font-size: 15px; font-weight: 600; line-height: 1.4; transition: opacity .4s ease; }
+.bs-status { --bs-header-offset: 0px; position: sticky; top: calc(var(--bs-header-offset) + 8px); z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 8px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); border-left: 3px solid var(--navy, #0c1535); font-size: 15px; font-weight: 600; line-height: 1.4; transition: opacity .4s ease; }
 .bs-status[hidden] { display: none; }
 .bs-status.is-fading { opacity: 0; }
 .bs-status.is-done { color: var(--bs-status-ok); border-left-color: var(--bs-status-ok); }
@@ -834,22 +850,75 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .bs-status.is-warn { color: var(--bs-status-warn); border-left-color: var(--bs-status-warn); }
 .bs-status__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .bs-status.is-busy .bs-status__text::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
-.bs-status__close { flex: none; width: 32px; height: 32px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
+.bs-status__close { flex: none; width: var(--bs-btn-h); height: var(--bs-btn-h); margin: calc(-1 * var(--bs-space-2)) calc(-1 * var(--bs-space-2)) calc(-1 * var(--bs-space-2)) 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
 .bs-status__close[hidden] { display: none; }
 .bs-status__close:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: 1px; }
-.bs-field-error { margin: 6px 0 0; color: var(--bs-status-fail); font-size: 14px; font-weight: 600; }
+.bs-field-error { margin: 8px 0 0; color: var(--bs-status-fail); font-size: 14px; font-weight: 600; }
 [aria-invalid="true"] { outline: 2px solid var(--bs-status-fail); outline-offset: 1px; }
 button.is-busy, input.is-busy, [data-bs-action].is-busy { cursor: progress; }
 button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 [data-bs-locked] { opacity: .5; cursor: not-allowed; }
 .bs-dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
 .bs-dialog::backdrop { background: rgba(12, 21, 53, 0.5); }
-.bs-dialog__form { margin: 0; padding: 20px; }
-.bs-dialog h5 { margin: 0 0 12px; font-size: 17px; font-weight: 700; line-height: 1.3; }
+.bs-dialog__form { margin: 0; padding: 24px; }
+.bs-dialog h5 { margin: 0 0 var(--bs-space-3); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .bs-dialog__body p { margin: 0 0 12px; }
 .bs-dialog .beltoft-services-vm__buttons { margin: 0; }
-.bs-dialog .bs-danger { background: var(--bad, #b42318); border-color: var(--bad, #b42318); color: #fff; }
+.bs-dialog .bs-danger { background: var(--bs-status-fail); border-color: var(--bs-status-fail); color: #fff; }
 @media (prefers-reduced-motion: reduce) {
 	.bs-status { transition: none; }
 	.bs-status.is-busy .bs-status__text::before, button.is-busy::before, [data-bs-action].is-busy::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; }
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * One button system for every account page. Primary (navy, filled) comes from the theme's .button; here:
+ *   secondary: transparent, navy text, a real 1px navy border (Copy, Reboot, Shut down, the ghost links)
+ *   danger:    filled in the fail colour (Delete), the same on server and database pages
+ *   compact:   32px (40px on a phone) for in-row actions and the 1h / 1d / 30d switch
+ *   link:      15/500 underlined, 40px tall on a phone
+ * Specificity: body + .woocommerce-account + .woocommerce-MyAccount-content outranks the theme's button rules.
+ * ------------------------------------------------------------------------------------------------------------- */
+body.woocommerce-account .woocommerce-MyAccount-content :is(a.beltoft-services-list-btn, a.beltoft-services-ov__btn, .beltoft-services-btn, .beltoft-services-console__action, button.beltoft-services-picker__button, .beltoft-services-card__btn),
+.bs-dialog .button { display: inline-flex; align-items: center; justify-content: center; gap: var(--bs-space-2); box-sizing: border-box; width: fit-content; min-height: var(--bs-btn-h); margin: 0; padding: 8px 16px; border: 1px solid var(--navy, #0c1535); background: var(--navy, #0c1535); box-shadow: none; color: #fff !important; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 1.4; text-decoration: none !important; white-space: nowrap; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(a.beltoft-services-list-btn, a.beltoft-services-ov__btn, .beltoft-services-btn, .beltoft-services-console__action, button.beltoft-services-picker__button, .beltoft-services-card__btn):hover,
+.bs-dialog .button:hover { background: var(--ink-mid, #2d4060); border-color: var(--ink-mid, #2d4060); color: #fff !important; }
+
+/* Secondary */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-btn, .beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__outline, .beltoft-services-domain__copy, a.beltoft-services-list-btn.is-ghost, a.beltoft-services-ov__btn.is-ghost, [data-db-power], [data-power-action], [data-snapshot-cancel], [data-confirm-cancel], .beltoft-services-oauth__cancel),
+.bs-dialog .bs-dialog__no { background: transparent; border: 1px solid var(--navy, #0c1535); box-shadow: none; color: var(--navy, #0c1535) !important; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-btn, .beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__outline, .beltoft-services-domain__copy, a.beltoft-services-list-btn.is-ghost, a.beltoft-services-ov__btn.is-ghost, [data-db-power], [data-power-action], [data-snapshot-cancel], [data-confirm-cancel], .beltoft-services-oauth__cancel):hover,
+.bs-dialog .bs-dialog__no:hover { background: var(--bg-warm, #eeece6); border-color: var(--navy, #0c1535); color: var(--navy, #0c1535) !important; }
+
+/* Danger: Delete server, Delete database, and the other destructive confirmations */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-delete__go, .beltoft-services-danger__open, .beltoft-services-danger__confirm, .beltoft-services-mail__danger),
+.bs-dialog .button.bs-danger { background: var(--bs-status-fail); border: 1px solid var(--bs-status-fail); box-shadow: none; color: #fff !important; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-delete__go, .beltoft-services-danger__open, .beltoft-services-danger__confirm, .beltoft-services-mail__danger):hover,
+.bs-dialog .button.bs-danger:hover { background: color-mix(in srgb, var(--bs-status-fail) 82%, #000); border-color: color-mix(in srgb, var(--bs-status-fail) 82%, #000); color: #fff !important; }
+
+/* Compact: in-row actions (32px, 40px on a phone) */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__actions .button, .beltoft-services-mail__actions summary, [data-snapshot-rollback], [data-snapshot-delete], [data-db-access-remove], [data-db-access-mine], .beltoft-services-vm__password + .button) { min-height: var(--bs-btn-h-sm); padding: 0 14px; font-size: var(--bs-fs-small); line-height: 1.3; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions summary { display: inline-flex; align-items: center; box-sizing: border-box; border: 1px solid var(--bs-status-fail); box-shadow: none; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
+
+/* Link style: 15/500, underlined */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a) { display: inline-flex; align-items: center; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--navy, #0c1535); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 1.4; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a):hover { background: none; color: var(--ink-mid, #2d4060); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnse__danger { color: var(--bs-status-fail); }
+
+/* Tap targets: 40px at least on a phone, for every button and link-button */
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__actions .button, .beltoft-services-mail__actions summary, [data-snapshot-rollback], [data-snapshot-delete], [data-db-access-remove], [data-db-access-mine], .beltoft-services-vm__password + .button),
+	.beltoft-vm-usage__ranges button { min-height: var(--bs-btn-h); }
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a, .beltoft-services-ov__head a, .beltoft-services-server__back a, .beltoft-services-ov__attention a, table.shop_table td .button, .beltoft-licenses__copy, a.acct-edit-link) { min-height: var(--bs-btn-h); display: inline-flex; align-items: center; }
+	.beltoft-services-vm__disk p { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--bs-space-4); }
+}
+
+/* Sections are separated by white space, not rules. */
+.beltoft-services-vm__more { margin: var(--bs-space-6) 0 0; }
+div.beltoft-services-vm__more > h4 { margin-top: 0; }
+.beltoft-services-cost { margin: var(--bs-space-3) 0 0; }
+.beltoft-services-db__power { margin: var(--bs-space-3) 0 0; }
+@media (max-width: 767px) {
+	.woocommerce-MyAccount-content details > summary { display: flex; align-items: center; min-height: var(--bs-btn-h); }
+}
+.beltoft-services-ov__head h2, .beltoft-services-ov__head h3 { margin: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
+body.woocommerce-account .beltoft-services-billing-tabs a:focus-visible, body.woocommerce-account .beltoft-services-tabs a:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
