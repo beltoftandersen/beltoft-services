@@ -34,29 +34,14 @@ final class PageHead {
 	 */
 	public static function description(): string {
 		$endpoint = function_exists( 'WC' ) && WC()->query ? (string) WC()->query->get_current_endpoint() : '';
-		$billing  = array( 'orders', 'view-order', 'subscriptions', 'view-subscription', 'subscription-payment-method', 'payment-methods', 'add-payment-method', 'edit-address', 'credit' );
 
-		if ( in_array( $endpoint, $billing, true ) ) {
-			$text = __( 'Subscriptions, invoices and payment methods', 'beltoft-services' );
-		} elseif ( ServerLinks::slug() === $endpoint ) {
-			$text = ServerLinks::is_new() ? __( 'Choose a plan and set up a new server', 'beltoft-services' ) : __( 'Your servers', 'beltoft-services' );
-		} elseif ( ServiceArea::get( Databases::class )->slug() === $endpoint ) {
-			$text = ServiceArea::get( Databases::class )->is_new() ? __( 'Choose an engine and set up a new database', 'beltoft-services' ) : __( 'Your managed databases', 'beltoft-services' );
-		} elseif ( Domains::slug() === $endpoint ) {
-			$text = __( 'Your domains and DNS', 'beltoft-services' );
-		} elseif ( ServiceArea::get( Email::class )->slug() === $endpoint ) {
-			$text = __( 'Your email domains and mailboxes', 'beltoft-services' );
-		} elseif ( ServiceArea::get( Apps::class )->slug() === $endpoint ) {
-			$text = __( 'Your apps', 'beltoft-services' );
-		} else {
-			$map  = array(
-				''             => __( 'Your services at a glance', 'beltoft-services' ),
-				'edit-account' => __( 'Your name, email address and password', 'beltoft-services' ),
-				'security'     => __( 'Your password and API tokens', 'beltoft-services' ),
-				'tickets'      => __( 'Your support requests', 'beltoft-services' ),
-				'licenses'     => __( 'Your plugin licenses', 'beltoft-services' ),
-			);
-			$text = $map[ $endpoint ] ?? '';
+		// A page says nothing more than its title, except a "new" page, which says what to do there.
+		$text = '';
+
+		if ( ServerLinks::slug() === $endpoint && ServerLinks::is_new() ) {
+			$text = __( 'Choose a plan and set up a new server', 'beltoft-services' );
+		} elseif ( ServiceArea::get( Databases::class )->slug() === $endpoint && ServiceArea::get( Databases::class )->is_new() ) {
+			$text = __( 'Choose an engine and set up a new database', 'beltoft-services' );
 		}
 
 		/**

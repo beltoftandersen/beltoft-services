@@ -11,12 +11,10 @@ class PageHeadTest extends TestCase {
 		parent::tear_down();
 	}
 
-	public function test_each_page_has_a_plain_one_line_description(): void {
-		foreach ( array( 'domains' => 'Your domains and DNS', 'subscriptions' => 'Subscriptions, invoices and payment methods', 'edit-account' => 'Your name, email address and password' ) as $endpoint => $text ) {
-			$GLOBALS['wp']->query_vars = array( $endpoint => '' );
-			$this->assertSame( $text, PageHead::description(), $endpoint );
-			$this->assertStringNotContainsString( '—', $text );
-			$this->assertStringNotContainsString( '·', $text );
+	public function test_a_page_repeats_nothing_its_title_says(): void {
+		foreach ( array( 'domains', 'subscriptions', 'orders', 'edit-account', 'security', 'licenses', 'tickets', '' ) as $endpoint ) {
+			$GLOBALS['wp']->query_vars = '' === $endpoint ? array() : array( $endpoint => '' );
+			$this->assertSame( '', PageHead::description(), $endpoint );
 		}
 	}
 
@@ -25,7 +23,7 @@ class PageHeadTest extends TestCase {
 		$element = (object) array( 'name' => 'woocommerce-account-page-v2' );
 
 		$html = (string) PageHead::before_bricks_account( '<div class="brxe">content</div>', $element );
-		$this->assertStringStartsWith( '<div class="bs-pagehead"><span class="bs-inline" data-bs-inline role="status" aria-live="polite"><span class="bs-inline__text">Your domains and DNS</span>', $html );
+		$this->assertStringStartsWith( '<div class="bs-pagehead"><span class="bs-inline" data-bs-inline role="status" aria-live="polite"><span class="bs-inline__text"></span>', $html );
 
 		$own = '<header class="beltoft-services-page__head"><span class="bs-inline" data-bs-inline></span></header>';
 		$this->assertSame( $own, PageHead::before_bricks_account( $own, $element ), 'A head with its own line is not given a second one.' );
