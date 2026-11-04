@@ -1,7 +1,7 @@
 /**
  * Checkout: the "Daily backups" box swaps the cart's server for the variation with or without
- * backups, then asks WooCommerce to refresh the order review. The server's own text is never
- * shown: a fixed message is.
+ * backups, through the shared queue (cart-swap.js), which then refreshes the order review. The
+ * server's own text is never shown: a fixed message is.
  */
 ( function ( $ ) {
 	'use strict';
@@ -14,25 +14,6 @@
 	}
 
 	box.on( 'change', function () {
-		var wanted = box.is( ':checked' );
-
-		box.prop( 'disabled', true );
-
-		$.ajax( {
-			url: config.url,
-			method: 'POST',
-			dataType: 'json',
-			data: {
-				nonce: box.data( 'nonce' ),
-				with: wanted ? '1' : '0'
-			}
-		} ).done( function () {
-			$( document.body ).trigger( 'update_checkout' );
-		} ).fail( function () {
-			box.prop( 'checked', ! wanted );
-			window.setTimeout(function () { window.beltoftStatus.fail( null, config.failed, box.get( 0 ) ); }, 0); // after the field is enabled again, so it can take the focus
-		} ).always( function () {
-			box.prop( 'disabled', false );
-		} );
+		window.beltoftCartSwap.changed( box.get( 0 ) );
 	} );
 }( window.jQuery ) );

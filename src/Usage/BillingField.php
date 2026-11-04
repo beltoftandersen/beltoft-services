@@ -250,7 +250,8 @@ final class BillingField {
 		}
 
 		$usage  = isset( $_POST['billing'] ) && 'usage' === sanitize_text_field( wp_unslash( $_POST['billing'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$result = self::swap( $usage );
+		// Alone on the session's latest cart, like the backups and disk swaps (CartSwap).
+		$result = \BeltoftServices\Proxmox\CartSwap::locked( static fn(): array => self::swap( $usage ) ) ?? array( 'ok' => false, 'usage' => $usage, 'variation_id' => 0 );
 
 		return array( $result, $result['ok'] ? 200 : 409 );
 	}

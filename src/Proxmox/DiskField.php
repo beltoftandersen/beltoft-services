@@ -121,6 +121,13 @@ final class DiskField {
 		}
 	}
 
+	/** The variation id of the chosen extra disk, 0 for none. */
+	public static function selected_variation(): int {
+		$key = self::selected_key();
+
+		return '' === $key ? 0 : (int) ( WC()->cart->get_cart()[ $key ]['variation_id'] ?? 0 );
+	}
+
 	private static function selected_key(): string {
 		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $key => $item ) {
 			if ( 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) ) {
@@ -160,7 +167,8 @@ final class DiskField {
 		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || ! self::cart_server() || ! self::sizes_for( self::cart_server_usage() ) ) {
 			return;
 		}
-		wp_enqueue_script( 'beltoft-services-disk-field', plugins_url( 'assets/disk-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/disk-field.js' ), true );
+		CartSwap::enqueue();
+		wp_enqueue_script( 'beltoft-services-disk-field', plugins_url( 'assets/disk-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status', 'beltoft-services-cart-swap' ), \BeltoftServices\Assets::version( 'assets/disk-field.js' ), true );
 		wp_localize_script( 'beltoft-services-disk-field', 'beltoftServicesDiskField', array( 'url' => \WC_AJAX::get_endpoint( self::AJAX ), 'failed' => __( 'The extra disk could not be changed. Reload checkout and try again.', 'beltoft-services' ) ) );
 	}
 
@@ -168,8 +176,12 @@ final class DiskField {
 		if ( false === check_ajax_referer( self::NONCE, 'nonce', false ) ) {
 			wp_send_json( array( 'ok' => false ), 403 );
 		}
-		$id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked above.
-		wp_send_json( array( 'ok' => self::choose( $id ) ), 200 );
+		// The disk and, when the box is on the page, the backups choice: both are applied (CartSwap).
+		$raw  = $_POST['disk'] ?? $_POST['variation_id'] ?? null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked above.
+		$disk = null === $raw ? null : absint( wp_unslash( $raw ) );
+		$with = isset( $_POST['with'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked above.
+		$result = CartSwap::apply( $with, $disk );
+		wp_send_json( $result, $result['ok'] ? 200 : 409 );
 	}
 
 	public static function choose( int $variation_id ): bool {
@@ -187,6 +199,9 @@ final class DiskField {
 				$cart->remove_cart_item( $key );
 			}
 			return true;
+		}
+		if ( $key && self::selected_variation() === $variation_id ) {
+			return true; // Already chosen: a resent choice changes nothing.
 		}
 		$attributes = array();
 		foreach ( $variation->get_attributes() as $name => $value ) {

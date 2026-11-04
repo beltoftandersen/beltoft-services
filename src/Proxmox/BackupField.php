@@ -209,7 +209,8 @@ final class BackupField {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/backup-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/backup-field.js' ), true );
+		CartSwap::enqueue();
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/backup-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status', 'beltoft-services-cart-swap' ), \BeltoftServices\Assets::version( 'assets/backup-field.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesBackups',
@@ -242,7 +243,8 @@ final class BackupField {
 		}
 
 		$with   = isset( $_POST['with'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$result = self::swap( $with );
+		$disk   = isset( $_POST['disk'] ) ? absint( wp_unslash( $_POST['disk'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$result = CartSwap::apply( $with, $disk );
 
 		return array( $result, $result['ok'] ? 200 : 409 );
 	}
