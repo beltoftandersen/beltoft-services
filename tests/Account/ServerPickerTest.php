@@ -116,6 +116,14 @@ class ServerPickerTest extends BackupTestCase {
 		);
 	}
 
+	public function test_a_picker_error_carries_its_field_for_the_status_bar(): void {
+		ServerPicker::process( $this->post( array( ServerName::POST_KEY => 'not a valid name!' ) ), $this->user );
+		$html = $this->page();
+
+		$this->assertStringContainsString( 'data-picker-error="name"', $html );
+		$this->assertStringContainsString( 'name="beltoft_services_picker_plan"', $html );
+	}
+
 	/**
 	 * @param array<string, string> $over Fields.
 	 * @return array{redirect: string, errors: array<string, string>}

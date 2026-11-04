@@ -229,7 +229,7 @@ final class DbIpField {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/db-ip-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/db-ip-field.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/db-ip-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/db-ip-field.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesDbIp',

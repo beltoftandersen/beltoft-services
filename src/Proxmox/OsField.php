@@ -335,7 +335,7 @@ final class OsField {
 
 		Tiles::print_os( $choice['cluster'], $choice['options'], $selected, self::POST_KEY, self::POST_KEY );
 
-		echo '<span class="description">' . esc_html__( 'The system your server is installed with. It is used for every server of this product on the order.', 'beltoft-services' ) . '</span>';
+		echo '<span class="description">' . esc_html__( 'The system installed on your server. It applies to every server of this product in the order.', 'beltoft-services' ) . '</span>';
 		echo '</div>';
 	}
 

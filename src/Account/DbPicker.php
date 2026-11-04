@@ -318,7 +318,7 @@ final class DbPicker {
 		// The engine tiles are the tiles of the server picker (tiles.css), so those load first.
 		\BeltoftServices\Proxmox\Tiles::enqueue();
 		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
-		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
+		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
 	}
 
 	// -- The page ----------------------------------------------------------------------------------
@@ -360,7 +360,9 @@ final class DbPicker {
 
 		echo '<p class="beltoft-services-picker__intro">' . esc_html__( 'Choose a plan. You pay on the next page.', 'beltoft-services' ) . '</p>';
 
-		if ( ! \BeltoftServices\Proxmox\PrivateNets::available_for( get_current_user_id() ) ) {
+		$unavailable = ! \BeltoftServices\Proxmox\PrivateNets::available_for( get_current_user_id() );
+
+		if ( $unavailable ) {
 			echo '<p class="beltoft-services-notice" role="status">' . esc_html( \BeltoftServices\Proxmox\PrivateNets::unavailable_message() ) . '</p>';
 		}
 
@@ -404,7 +406,11 @@ final class DbPicker {
 
 		echo '<div class="beltoft-services-picker__go">';
 		echo '<p class="beltoft-services-picker__summary" data-picker-summary aria-live="polite">' . esc_html( isset( $plans[ $selected ] ) ? self::summary( $plans[ $selected ], self::payg_only( $plans[ $selected ] ) ) : '' ) . '</p>';
-		echo '<button type="submit" class="beltoft-services-picker__button" data-picker-submit' . ( isset( $plans[ $selected ] ) ? '' : ' disabled' ) . '>' . esc_html__( 'Continue to checkout', 'beltoft-services' ) . '</button>';
+		echo '<button type="submit" class="beltoft-services-picker__button" data-picker-submit' . ( $unavailable ? ' data-picker-blocked aria-describedby="beltoft-services-picker-blocked"' : '' ) . ( isset( $plans[ $selected ] ) && ! $unavailable ? '' : ' disabled' ) . '>' . esc_html__( 'Continue to checkout', 'beltoft-services' ) . '</button>';
+
+		if ( $unavailable ) {
+			echo '<p class="beltoft-services-picker__blocked" id="beltoft-services-picker-blocked">' . esc_html__( 'Continue is unavailable until new databases can be ordered.', 'beltoft-services' ) . '</p>';
+		}
 		echo '</div></form></div>';
 	}
 
@@ -632,7 +638,7 @@ final class DbPicker {
 	 */
 	private static function error( string $field ): void {
 		if ( isset( self::$errors[ $field ] ) ) {
-			echo '<p class="beltoft-services-picker__error" role="alert">' . esc_html( self::$errors[ $field ] ) . '</p>';
+			echo '<p class="beltoft-services-picker__error" role="alert" data-picker-error="' . esc_attr( $field ) . '">' . esc_html( self::$errors[ $field ] ) . '</p>';
 		}
 	}
 }

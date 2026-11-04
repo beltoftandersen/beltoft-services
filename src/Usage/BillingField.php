@@ -219,7 +219,7 @@ final class BillingField {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/billing-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/billing-field.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/billing-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/billing-field.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/billing-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/billing-field.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesBilling',

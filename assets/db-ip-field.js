@@ -30,7 +30,7 @@
 			$( document.body ).trigger( 'update_checkout' );
 		} ).fail( function () {
 			box.prop( 'checked', ! wanted );
-			window.alert( config.failed );
+			window.setTimeout(function () { window.beltoftStatus.fail( null, config.failed, box.get( 0 ) ); }, 0); // after the field is enabled again, so it can take the focus
 		} ).always( function () {
 			box.prop( 'disabled', false );
 		} );

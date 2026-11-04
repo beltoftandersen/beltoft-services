@@ -486,7 +486,7 @@ final class ServerPicker {
 		Tiles::enqueue();
 		AppField::enqueue();
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( Tiles::HANDLE, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
 	}
 
 	// -- The page ----------------------------------------------------------------------------------
@@ -925,7 +925,8 @@ final class ServerPicker {
 	 */
 	private static function error( array $errors, string $field ): void {
 		if ( isset( $errors[ $field ] ) ) {
-			echo '<p class="beltoft-services-picker__error" role="alert">' . esc_html( $errors[ $field ] ) . '</p>';
+			// picker.js shows the message in the status bar and under its field, then removes this line; without script it stays.
+			echo '<p class="beltoft-services-picker__error" role="alert" data-picker-error="' . esc_attr( $field ) . '">' . esc_html( $errors[ $field ] ) . '</p>';
 		}
 	}
 }

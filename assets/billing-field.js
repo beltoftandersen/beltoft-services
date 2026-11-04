@@ -56,7 +56,7 @@
 			$( document.body ).trigger( 'update_checkout' );
 		} ).fail( function () {
 			radios.filter( '[value="' + ( wanted ? 'monthly' : 'usage' ) + '"]' ).prop( 'checked', true );
-			window.alert( config.failed );
+			window.setTimeout(function () { window.beltoftStatus.fail( null, config.failed, radios.filter( ':checked' ).get( 0 ) ); }, 0); // after the field is enabled again, so it can take the focus
 		} ).always( function () {
 			radios.prop( 'disabled', false );
 		} );

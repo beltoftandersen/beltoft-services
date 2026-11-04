@@ -414,6 +414,23 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertSame( 1, preg_match( '#value="postgres"[^>]* checked#', $this->page() ) );
 	}
 
+	public function test_continue_is_off_and_says_why_when_no_private_network_is_free(): void {
+		$this->seed_private_nets( 0 );
+		$html = $this->page();
+
+		$this->assertStringContainsString( 'New databases are not available right now. Please contact us.', $html );
+		$this->assertSame( 1, preg_match( '#<button[^>]*data-picker-submit[^>]*data-picker-blocked[^>]*disabled#', $html ) );
+		$this->assertStringContainsString( 'aria-describedby="beltoft-services-picker-blocked"', $html );
+		$this->assertStringContainsString( 'Continue is unavailable until new databases can be ordered.', $html );
+	}
+
+	public function test_continue_is_on_when_a_network_is_free(): void {
+		$html = $this->page();
+
+		$this->assertStringNotContainsString( 'data-picker-blocked', $html );
+		$this->assertStringNotContainsString( 'Continue is unavailable', $html );
+	}
+
 	public function test_an_engine_whose_product_is_private_is_never_shown(): void {
 		$this->engine_product( 'valkey', 'private' );
 		$_GET['engine'] = 'valkey';

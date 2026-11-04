@@ -745,6 +745,8 @@ class AppFieldTest extends TestCase {
 		$this->assertMatchesRegularExpression( '#<input[^>]*value="docker"[^>]*data-versions="\[\{&quot;value&quot;:&quot;29&quot;#', $html );
 		$this->assertMatchesRegularExpression( '#<p[^>]*data-tiles-version-row hidden>.*?<select name="' . AppField::POST_VERSION . '"#s', $html, 'The version select is hidden until an app with several versions is chosen.' );
 		$this->assertStringContainsString( 'data-app-note', $html );
+		$this->assertStringContainsString( 'It comes with the system shown on its tile.', $html );
+		$this->assertStringNotContainsString( 'a system its tile names', $html );
 	}
 
 	public function test_the_script_tells_the_order_summary_when_it_forces_or_restores_the_system(): void {
