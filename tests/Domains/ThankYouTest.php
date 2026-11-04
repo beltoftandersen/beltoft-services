@@ -14,7 +14,7 @@ final class ThankYouTest extends TestCase {
 		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
 	}
 
-	private function order( string $mode, ?bool $ds = null, string $status = 'completed' ): \WC_Order {
+	private function order( string $mode, ?bool $ds = null, string $status = 'completed', string $dns = '' ): \WC_Order {
 		$user  = self::factory()->user->create();
 		$claim = DnsClaims::create( $user, 'example.com' );
 		if ( null !== $ds ) {
@@ -23,7 +23,7 @@ final class ThankYouTest extends TestCase {
 		$order = wc_create_order( array( 'customer_id' => $user ) );
 		$item  = new \WC_Order_Item_Product();
 		$item->set_name( 'DNS hosting' );
-		$item->add_meta_data( '_beltoft_services_domain', array( 'domain' => 'example.com', 'mode' => $mode, 'claim_id' => (int) $claim['id'] ), true );
+		$item->add_meta_data( '_beltoft_services_domain', array( 'domain' => 'example.com', 'mode' => $mode, 'claim_id' => (int) $claim['id'] ) + ( '' !== $dns ? array( 'dns' => $dns ) : array() ), true );
 		$order->add_item( $item );
 		$order->set_status( $status );
 		$order->save();
@@ -93,6 +93,26 @@ final class ThankYouTest extends TestCase {
 		$this->assertStringContainsString( 'Your DNS stays as it is.', $html );
 		$this->assertStringNotContainsString( 'uses our name servers', $html );
 		$this->assertStringNotContainsString( 'name servers do not change', $html );
+	}
+
+	public function test_a_transfer_says_what_happens_for_each_dns_choice(): void {
+		$first = $this->page( $this->order( 'transfer', null, 'completed', 'first' )->get_id() );
+		$this->assertStringContainsString( 'The transfer starts when your domain uses our name servers.', $first );
+		$this->assertStringContainsString( 'set at your current registrar', $first );
+		$this->assertStringContainsString( 'Turn off DNSSEC there first.', $first );
+		$this->assertStringContainsString( 'within 14 days', $first );
+		$this->assertStringContainsString( 'The transfer takes up to 5 days.', $first );
+		$this->assertStringNotContainsString( 'Your DNS stays where it is now', $first );
+		$after = $this->page( $this->order( 'transfer', null, 'completed', 'after' )->get_id() );
+		$this->assertStringContainsString( 'We have asked for the transfer of your domain.', $after );
+		$this->assertStringContainsString( 'keeps using its current name servers until the transfer is done. Then we move it to ours.', $after );
+		$keep = $this->page( $this->order( 'transfer', null, 'completed', 'keep' )->get_id() );
+		$this->assertStringContainsString( 'Your DNS stays where it is now. Your name servers do not change.', $keep );
+		$this->assertStringContainsString( 'may switch it off', $keep );
+		foreach ( array( $first, $after, $keep ) as $html ) {
+			$this->assertStringNotContainsString( "\u{2014}", $html );
+			$this->assertStringNotContainsString( "\u{00B7}", $html );
+		}
 	}
 
 	public function test_the_transfer_days_have_a_filter(): void {

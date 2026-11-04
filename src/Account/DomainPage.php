@@ -13,6 +13,7 @@ use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\LiveDns;
 use BeltoftServices\Domains\Panels as DomainPanels;
 use BeltoftServices\Domains\Records;
+use BeltoftServices\Domains\TransferDns;
 use BeltoftServices\Domains\Zone;
 use BeltoftServices\Resource;
 
@@ -84,6 +85,14 @@ final class DomainPage {
 		$ours     = ! $external && ( $dns_only || 'custom' !== $r->get( 'ns_mode' ) );
 		$can      = $r->accepts_actions();
 		$off      = $dns_only && (bool) $r->get( 'records_off' );
+		// A transfer that copies the DNS: our zone exists and the customer can review it, but the domain does not use it yet.
+		$transfer = $dns_only ? null : TransferDns::view( $r );
+		$zone_here = null !== $transfer && $transfer['editable'];
+
+		if ( null !== $transfer && ! $transfer['in_use'] ) {
+			$external = true;
+			$ours     = false;
+		}
 
 		if ( $external ) {
 			$hosts = 'custom' === $r->get( 'ns_mode' ) ? (array) $r->get( 'nameservers' ) : DomainDriver::stored_nameservers( $r );
@@ -95,7 +104,7 @@ final class DomainPage {
 		$zone_unavailable = false;
 		$rows             = array();
 
-		if ( $ours && ( $can || $off ) ) {
+		if ( ( $ours && ( $can || $off ) ) || $zone_here ) {
 			$client = Clients::dns();
 
 			if ( $client instanceof LiveDns ) {
@@ -137,6 +146,8 @@ final class DomainPage {
 			'zone_unavailable' => $zone_unavailable,
 			'rows'             => $rows,
 			'transfer_price'   => $price,
+			'transfer'         => $transfer,
+			'zone_pending'     => $zone_here,
 		);
 
 		$data['tabs']   = self::tabs( $data );
@@ -155,7 +166,7 @@ final class DomainPage {
 		$tabs = array( 'overview' => __( 'Overview', 'beltoft-services' ) );
 
 		// The DNS records are ours to show and change only when our name servers answer for the domain.
-		if ( $d['ours'] && ( $d['can'] || $d['off'] ) ) {
+		if ( ( $d['ours'] && ( $d['can'] || $d['off'] ) ) || $d['zone_pending'] ) {
 			$tabs['dns'] = __( 'DNS records', 'beltoft-services' );
 		}
 

@@ -18,7 +18,7 @@ use BeltoftServices\Tests\TestCase;
 final class DomainSearchMarkupTest extends TestCase {
 
 	public function test_the_shortcode_output_is_what_it_always_was(): void {
-		$expected = '<div class="beltoft-domain-search" data-check="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/check' ) ) . '" data-cart="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/cart' ) ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'wc_store_api' ) ) . '" data-rest-nonce="' . esc_attr( wp_create_nonce( 'wp_rest' ) ) . '"><label for="beltoft-domain-name">Find a domain</label><input id="beltoft-domain-name" type="search" autocomplete="off"><button type="button">Search</button><div class="beltoft-domain-results" aria-live="polite"></div></div>';
+		$expected = '<div class="beltoft-domain-search" data-check="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/check' ) ) . '" data-cart="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/cart' ) ) . '" data-transfer-dns="' . esc_url( rest_url( Routes::NAMESPACE . '/domains/transfer-dns' ) ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'wc_store_api' ) ) . '" data-rest-nonce="' . esc_attr( wp_create_nonce( 'wp_rest' ) ) . '"><label for="beltoft-domain-name">Find a domain</label><input id="beltoft-domain-name" type="search" autocomplete="off"><button type="button">Search</button><div class="beltoft-domain-results" aria-live="polite"></div></div>';
 		$this->assertSame( $expected, do_shortcode( '[beltoft_domain_search]' ) );
 		$this->assertTrue( wp_script_is( 'beltoft-services-domain-search', 'enqueued' ) );
 		$this->assertTrue( wp_style_is( 'beltoft-services-domain-search', 'enqueued' ) );
@@ -42,7 +42,7 @@ final class DomainSearchMarkupTest extends TestCase {
 		$html = Search::inner_markup();
 		$this->assertStringContainsString( 'type="search"', $html );
 		$this->assertStringContainsString( 'class="beltoft-domain-results"', $html );
-		$this->assertSame( array( 'data-check', 'data-cart', 'data-nonce', 'data-rest-nonce' ), array_keys( Search::root_data() ) );
+		$this->assertSame( array( 'data-check', 'data-cart', 'data-transfer-dns', 'data-nonce', 'data-rest-nonce' ), array_keys( Search::root_data() ) );
 	}
 
 	/**

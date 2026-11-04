@@ -95,6 +95,36 @@ final class Panels {
 		}
 		return $rows;
 	}
+	/**
+	 * Read-only rows for a transfer: where the customer chose to have the DNS, what the order waits for, the name servers it
+	 * uses now and what could not be copied.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, string>
+	 */
+	private static function transfer_rows( Resource $r ): array {
+		$labels = array(
+			TransferDns::FIRST => 'Move my DNS to Beltoft first',
+			TransferDns::AFTER => 'Move my DNS to Beltoft when the transfer is done',
+			TransferDns::KEEP  => 'Keep my DNS where it is',
+		);
+		$plan   = TransferDns::plan( $r );
+		$rows   = array();
+
+		if ( 'served' === $plan ) {
+			$rows['Transfer DNS'] = 'Our DNS already serves the domain for this customer (no choice)';
+		} else {
+			$rows['Transfer DNS'] = $labels[ TransferDns::choice( $r ) ] . ( '' === (string) $r->get( 'transfer_dns' ) ? ' (no choice stored: an older order)' : '' );
+		}
+
+		$rows['Waiting for']          = TransferDns::waiting_reason( $r );
+		$rows['Current name servers'] = implode( ', ', DomainDriver::stored_nameservers( $r ) );
+		$rows['Delegation checked by customer'] = $r->get( 'transfer_dns_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'transfer_dns_checked' ) ) : '';
+		$rows['Records copied']       = null !== $r->get( 'records_copied' ) ? (string) (int) $r->get( 'records_copied' ) : '';
+		$rows['Not copied']           = (string) $r->get( 'import_error' );
+
+		return $rows;
+	}
 	public static function admin( Resource $r ): void {
 		$details = array_filter( array(
 			'Domain' => $r->get( 'domain' ),
@@ -107,6 +137,9 @@ final class Panels {
 		) );
 		if ( 'dns' === $r->get( 'driver' ) ) {
 			$details = array_merge( $details, self::dns_rows( $r ) );
+		}
+		if ( 'domain' === $r->get( 'driver' ) && 'transfer' === $r->get( 'mode' ) ) {
+			$details = array_merge( $details, self::transfer_rows( $r ) );
 		}
 		foreach ( $details as $label => $value ) { printf( '<p><strong>%s:</strong> %s</p>', esc_html( $label ), esc_html( (string) $value ) ); }
 		$subscription = (int) ( $r->license()['subscription_id'] ?? 0 );

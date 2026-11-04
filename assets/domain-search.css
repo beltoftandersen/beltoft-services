@@ -122,6 +122,23 @@
   width: 100%;
 }
 
+:where(.beltoft-domain-transfer__dns) {
+  display: grid;
+  gap: .5rem;
+}
+
+:where(.beltoft-domain-transfer__choice) {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  max-width: 28rem;
+}
+
+:where(.beltoft-domain-transfer__choice input) {
+  width: auto;
+  margin-top: .3em;
+}
+
 @media (max-width: 767px) {
   :where(.beltoft-domain-result) {
     grid-template-columns: 1fr;

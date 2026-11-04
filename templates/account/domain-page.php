@@ -75,7 +75,19 @@ if ( $d['dns_only'] ) {
 		<?php if ( $d['dns_only'] && true === $d['parent_ds'] && 'ours' !== $d['delegation'] ) : ?>
 			<p class="beltoft-services-domain__note"><?php esc_html_e( 'This domain uses DNSSEC at your registrar. Remove the DS record there before you change the name servers, then wait a day.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
-		<?php if ( $d['dns_only'] && '' !== $d['import_error'] ) : ?>
+		<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
+			<p class="beltoft-services-domain__note">
+				<?php
+				if ( 'first' === $d['transfer']['choice'] ) {
+					esc_html_e( 'We have copied your DNS records here. The transfer starts when your domain uses our name servers, so your website and email keep working.', 'beltoft-services' );
+				} else {
+					esc_html_e( 'We have copied your DNS records here. When the transfer is done we move your domain to our name servers, so your website and email keep working.', 'beltoft-services' );
+				}
+				?>
+				<a href="<?php echo esc_url( $beltoft_link( 'nameservers' ) ); ?>" data-tab-link="nameservers"><?php esc_html_e( 'Name servers', 'beltoft-services' ); ?></a>
+			</p>
+		<?php endif; ?>
+		<?php if ( ( $d['dns_only'] || null !== $d['transfer'] ) && '' !== $d['import_error'] ) : ?>
 			<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the reason some records were not imported. */ __( 'Some imported records could not be added: %s. Add them in DNS records.', 'beltoft-services' ), $d['import_error'] ) ); ?></p>
 		<?php endif; ?>
 		<?php if ( $beltoft_next && isset( $beltoft_tabs[ $beltoft_next['tab'] ] ) ) : ?>
@@ -140,6 +152,9 @@ if ( $d['dns_only'] ) {
 				<?php if ( $d['off'] ) : ?>
 					<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNS hosting is paused. Your records are kept but not answered.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
+				<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
+					<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the name servers the domain uses now. */ __( 'Not in use yet: your domain still uses %s. These records were copied from there. Check them and change what you need.', 'beltoft-services' ), implode( ', ', $d['transfer']['current'] ) ) ); ?></p>
+				<?php endif; ?>
 				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
 					<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to see and change your DNS records.', 'beltoft-services' ); ?></p></noscript>
 				</div>
@@ -149,6 +164,9 @@ if ( $d['dns_only'] ) {
 
 	<?php if ( isset( $beltoft_tabs['nameservers'] ) ) : ?>
 		<?php $beltoft_open( 'nameservers' ); ?>
+			<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] && $d['hosts'] ) : ?>
+				<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your domain still uses these name servers:', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
 			<ul class="beltoft-services-domain__hosts">
 				<?php foreach ( $d['hosts'] as $beltoft_host ) : ?>
 					<li><?php echo esc_html( $beltoft_host ); ?></li>
@@ -156,6 +174,24 @@ if ( $d['dns_only'] ) {
 			</ul>
 			<?php if ( $d['external'] ) : ?>
 				<p class="beltoft-services-domain__note"><?php esc_html_e( '(DNS is hosted elsewhere)', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
+			<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
+				<?php if ( 'first' === $d['transfer']['choice'] ) : ?>
+					<p class="beltoft-services-domain__note"><?php esc_html_e( 'To go on with the transfer, set these name servers at your current registrar. We send the transfer when your domain uses them. This can take a few hours.', 'beltoft-services' ); ?></p>
+				<?php else : ?>
+					<p class="beltoft-services-domain__note"><?php esc_html_e( 'The transfer goes ahead with the name servers above. When it is done we move your domain to these name servers, and the DNS records copied here start to answer.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
+				<ul class="beltoft-services-domain__hosts">
+					<?php foreach ( $d['transfer']['ours'] as $beltoft_host ) : ?>
+						<li><?php echo esc_html( $beltoft_host ); ?></li>
+					<?php endforeach; ?>
+				</ul>
+				<?php if ( $d['transfer']['waiting'] ) : ?>
+					<?php if ( $d['transfer']['checked'] > 0 ) : ?>
+						<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: time of the last check. */ __( 'Last checked %s. Your domain does not use our name servers yet.', 'beltoft-services' ), wp_date( (string) get_option( 'time_format' ), $d['transfer']['checked'] ) ) ); ?></p>
+					<?php endif; ?>
+					<form class="beltoft-services-domain-form" data-transfer-check data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Checking…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></form>
+				<?php endif; ?>
 			<?php endif; ?>
 			<?php if ( $d['can'] && $d['dns_only'] ) : ?>
 				<form class="beltoft-services-domain-form" data-domain-action="check_delegation"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Check name servers', 'beltoft-services' ); ?></button></form>

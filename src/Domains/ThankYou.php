@@ -71,6 +71,26 @@ final class ThankYou {
 	}
 
 	/**
+	 * What each transfer does with the DNS, as the customer chose it: domain => first, after or keep ('' for an older order).
+	 *
+	 * @param \WC_Order $order Order.
+	 * @return array<string, string>
+	 */
+	public static function transfer_choices( \WC_Order $order ): array {
+		$choices = array();
+
+		foreach ( $order->get_items() as $item ) {
+			$data = $item->get_meta( '_beltoft_services_domain', true );
+
+			if ( is_array( $data ) && 'transfer' === ( $data['mode'] ?? '' ) && ! empty( $data['domain'] ) ) {
+				$choices[ (string) $data['domain'] ] = in_array( $data['dns'] ?? '', TransferDns::CHOICES, true ) ? (string) $data['dns'] : '';
+			}
+		}
+
+		return $choices;
+	}
+
+	/**
 	 * Days a transfer may take, as promised on the order received page.
 	 */
 	public static function transfer_days(): int {
@@ -112,6 +132,7 @@ final class ThankYou {
 				'order/transfer-next-steps.php',
 				array(
 					'domains'     => $transfers,
+					'choices'     => self::transfer_choices( $order ),
 					'days'        => self::transfer_days(),
 					'account_url' => $account_url,
 				),

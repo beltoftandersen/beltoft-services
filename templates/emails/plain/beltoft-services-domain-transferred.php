@@ -11,6 +11,7 @@
  * @var string   $domain_name        The domain.
  * @var bool     $dns_stays          Our DNS already served the domain.
  * @var bool     $dns_external       The DNS stays with the current name servers.
+ * @var string   $dns_choice         Where the customer chose to have the DNS at the transfer: first, after or keep ('' for a registration).
  * @var string   $domain_renews      Next renewal date, or ''.
  * @var string   $domains_url        My Account, Domains.
  * @var string[] $nameservers_shown  Name servers of the domain (registration only).
@@ -38,7 +39,11 @@ echo wp_strip_all_tags( sprintf( /* translators: %s: domain name. */ __( 'Your d
 if ( $dns_stays ) {
 	echo __( 'Your DNS stays as it is.', 'beltoft-services' ) . "\n\n";
 } elseif ( $dns_external ) {
-	echo __( 'Your DNS stays where it is now. Your name servers do not change.', 'beltoft-services' ) . "\n\n";
+	echo __( 'Your DNS stays where it is now. Your name servers do not change. Check that your DNS stays active, because your previous registrar may switch it off.', 'beltoft-services' ) . "\n\n";
+} elseif ( 'first' === $dns_choice ) {
+	echo __( 'You moved your DNS to our name servers before the transfer, and we copied your DNS records first, so your website and email kept working. Check that your DNS records are in My account > Domains.', 'beltoft-services' ) . "\n\n";
+} elseif ( 'after' === $dns_choice ) {
+	echo __( 'We copied your DNS records before the transfer and have now moved your domain to our name servers, so your website and email keep working. Check that your DNS records are in My account > Domains.', 'beltoft-services' ) . "\n\n";
 } else {
 	echo __( 'The domain now uses our name servers. Check that your DNS records are in My account > Domains, so your website and email keep working.', 'beltoft-services' ) . "\n\n";
 }

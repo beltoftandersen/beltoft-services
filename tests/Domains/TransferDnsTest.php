@@ -481,4 +481,14 @@ class TransferDnsTest extends TestCase {
 		$this->assertSame( array( 'ns1.old-host.example', 'ns2.old-host.example' ), $view['current'] );
 		$this->assertNull( TransferDns::view( $this->resource( 'keep' ) ) );
 	}
+
+	public function test_the_search_form_offers_the_three_choices_and_the_dnssec_help(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
+		$this->assertStringContainsString( 'Turn off DNSSEC at your current registrar first.', $js );
+		$this->assertStringContainsString( 'Move my DNS to Beltoft first', $js );
+		$this->assertStringContainsString( 'Move my DNS to Beltoft when the transfer is done', $js );
+		$this->assertStringContainsString( 'Keep my DNS where it is', $js );
+		$this->assertStringNotContainsString( "\u{2014}", $js );
+		$this->assertStringNotContainsString( "\u{00B7}", $js );
+	}
 }
