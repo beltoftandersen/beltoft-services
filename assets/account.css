@@ -841,7 +841,7 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 [aria-invalid="true"] { outline: 2px solid var(--bs-status-fail); outline-offset: 1px; }
 button.is-busy, input.is-busy, [data-bs-action].is-busy { cursor: progress; }
 button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
-[data-bs-locked] { opacity: .5; cursor: not-allowed; pointer-events: auto; }
+[data-bs-locked] { opacity: .5; cursor: not-allowed; }
 .bs-dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--navy, #0c1535); background: var(--bg-card, #fff); }
 .bs-dialog::backdrop { background: rgba(12, 21, 53, 0.5); }
 .bs-dialog__form { margin: 0; padding: 20px; }

@@ -210,9 +210,10 @@
 			el.beltoftTitle = el.getAttribute( 'title' );
 			el.disabled = true;
 
+			el.setAttribute( 'data-bs-locked', '' );
+
 			if ( 'BUTTON' !== el.tagName && 'INPUT' !== el.tagName ) {
 				el.setAttribute( 'aria-disabled', 'true' );
-				el.setAttribute( 'data-bs-locked', '' );
 			}
 		}
 
