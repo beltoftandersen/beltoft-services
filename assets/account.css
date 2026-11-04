@@ -378,7 +378,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 /* What the card says at once after a confirmed action, and when it is done; and the line of an extra disk that is ending. */
 .beltoft-services-vm__ending { font-weight: 600; }
-.beltoft-services-panel.has-working-flash .beltoft-services-progress__text { display: none; }
+.beltoft-services-panel.has-working-flash .beltoft-services-progress { display: none; }
 .beltoft-services-vm .beltoft-services-vm__link { display: inline; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .beltoft-services-vm .beltoft-services-vm__link:hover { background: none; }
 .beltoft-services-vm .beltoft-services-vm__link.is-busy { cursor: progress; }
