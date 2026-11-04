@@ -476,6 +476,12 @@ final class PurchaseTest extends UsageTestCase {
 		$this->account->update_meta_data( '_mollie_customer_id', 'cst_test' );
 		$this->account->update_meta_data( '_mollie_mandate_id', 'mdt_test' );
 		$this->account->save();
+
+		// A Mollie card while Mollie is not an active payment method (the site moved to Stripe) cannot be charged.
+		$this->assertStringContainsString( 'cannot be charged without you', $this->refused( $this->args() ) );
+
+		// With Mollie active it goes the direct way.
+		add_filter( 'beltoft_services_card_gateway_active', '__return_true' );
 		$sum = $this->json( $this->tool( 'order_server', $this->args(), $this->oauth( $this->user, Tokens::FULL ) ) );
 		$this->assertTrue( $sum['requires_confirmation'], 'With a customer and a mandate it goes the direct way.' );
 	}

@@ -195,4 +195,20 @@ class CardTokenTest extends UsageTestCase {
 		$this->assertStringContainsString( 'Change card', $html );
 		$this->assertDoesNotMatchRegularExpression( '/\x{2014}|\x{00B7}/u', $html );
 	}
+
+	public function test_a_card_of_an_inactive_payment_method_is_not_shown_or_charged(): void {
+		$user    = $this->new_user();
+		$account = $this->usage_account( $user );
+		$account->set_payment_method( 'mollie_wc_gateway_creditcard' );
+		$account->update_meta_data( '_mollie_customer_id', 'cst_old' );
+		$account->update_meta_data( '_mollie_mandate_id', 'mdt_old' );
+		$account->save();
+		add_filter( 'woocommerce_subscription_is_manual', '__return_false' );
+
+		// Mollie is not a registered gateway here, as on a site that moved to Stripe.
+		$this->assertFalse( \BeltoftServices\Card\Card::gateway_active( 'mollie_wc_gateway_creditcard' ) );
+		$this->assertNull( \BeltoftServices\Card\Card::details( $account ), 'No card is shown for it.' );
+		$this->assertFalse( \BeltoftServices\Usage\Account::chargeable( $account ), 'And it does not count as a card that can be charged.' );
+		$this->assertSame( array(), $this->http_calls(), 'Mollie is not asked about it.' );
+	}
 }

@@ -215,6 +215,12 @@ final class Card {
 	 * @return array{status: string, expired: bool, label: string, last4: string, expiry: string}|null Null when the account has no mandate.
 	 */
 	public static function details( \WC_Subscription $account ): ?array {
+		// A card saved through a payment method that is no longer active (Mollie after the switch to Stripe) cannot be
+		// charged: show no card, so the customer adds one with the active provider.
+		if ( ! self::gateway_active( (string) $account->get_payment_method() ) ) {
+			return null;
+		}
+
 		$customer = self::customer_id( $account );
 		$mandate  = self::mandate_id( $account );
 
@@ -912,6 +918,28 @@ final class Card {
 	 * Add payment method page, for a gateway that saves tokens and charges subscriptions). Mollie is used when its card
 	 * gateway is the enabled one, and also when no gateway offers saved tokens (the long-standing default).
 	 */
+	/**
+	 * Is this payment method registered and enabled on the site now? An empty method counts as active (nothing to check).
+	 *
+	 * @param string $method Payment method id of the account.
+	 */
+	public static function gateway_active( string $method ): bool {
+		if ( '' === $method ) {
+			return true;
+		}
+
+		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
+		$active   = isset( $gateways[ $method ] ) && 'yes' === $gateways[ $method ]->enabled;
+
+		/**
+		 * Whether a saved card's payment method is active, so the card can be shown and charged.
+		 *
+		 * @param bool   $active Registered and enabled.
+		 * @param string $method Payment method id.
+		 */
+		return (bool) apply_filters( 'beltoft_services_card_gateway_active', $active, $method );
+	}
+
 	public static function flow(): string {
 		$flow = array() !== self::token_gateways() ? 'token' : 'mollie';
 

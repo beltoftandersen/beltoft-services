@@ -177,7 +177,7 @@ final class Account {
 	 */
 	public static function chargeable( \WC_Subscription $subscription ): bool {
 		$method = (string) $subscription->get_payment_method();
-		$ok     = $subscription->has_status( 'active' ) && self::has_card( $subscription );
+		$ok     = $subscription->has_status( 'active' ) && self::has_card( $subscription ) && \BeltoftServices\Card\Card::gateway_active( $method );
 
 		if ( $ok && str_starts_with( $method, 'mollie_wc_gateway_' ) ) {
 			$ok = '' !== (string) $subscription->get_meta( '_mollie_customer_id' ) && '' !== (string) $subscription->get_meta( '_mollie_mandate_id' );
