@@ -830,7 +830,8 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .bs-status.is-fading { opacity: 0; }
 .bs-status.is-done { color: var(--bs-status-ok); border-left-color: var(--bs-status-ok); }
 .bs-status.is-fail { color: var(--bs-status-fail); border-left-color: var(--bs-status-fail); }
-.bs-status.is-info { color: var(--bs-status-warn); border-left-color: var(--bs-status-warn); }
+.bs-status.is-info { color: var(--navy, #0c1535); border-left-color: var(--navy, #0c1535); }
+.bs-status.is-warn { color: var(--bs-status-warn); border-left-color: var(--bs-status-warn); }
 .bs-status__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .bs-status.is-busy .bs-status__text::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 .bs-status__close { flex: none; width: 32px; height: 32px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
