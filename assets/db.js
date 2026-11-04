@@ -330,8 +330,9 @@
 
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
-		var box = button ? button.closest( '[data-db-card]' ) : null;
-		var panel = box ? box.closest( '[data-resource]' ) : null;
+		var panel = button ? button.closest( '[data-resource]' ) : null;
+		// The power buttons are in the page's head, outside the card.
+		var box = button ? ( button.closest( '[data-db-card]' ) || ( panel ? panel.querySelector( '[data-db-card]' ) : null ) ) : null;
 
 		if ( ! button || ! box || ! panel ) {
 			return;

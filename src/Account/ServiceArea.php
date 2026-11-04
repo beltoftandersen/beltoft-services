@@ -629,11 +629,16 @@ abstract class ServiceArea {
 		try {
 			echo '<div class="beltoft-services-server beltoft-services-area-page beltoft-services-area-page--' . esc_attr( $this->key() ) . ( self::$page['chrome'] ? '' : ' beltoft-services-area-page--bare' ) . '">';
 
+			// A head that has buttons (a database's) prints the back link on their row; any other page prints it above.
 			if ( self::$page['chrome'] ) {
-				echo '<p class="beltoft-services-server__back"><a href="' . esc_url( $this->url_list() ) . '">&lsaquo; ' . esc_html( $this->all_label() ) . '</a></p>';
+				ServerLinks::set_back( $this->url_list(), $this->all_label() );
 			}
 
+			ob_start();
 			Panel::render( $view['license'], $view );
+			$panel = (string) ob_get_clean();
+			echo ServerLinks::end_back(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built with esc_url and esc_html.
+			echo $panel; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- The panel's own, escaped markup.
 			echo '</div>';
 		} finally {
 			self::$page = null;
@@ -688,11 +693,29 @@ abstract class ServiceArea {
 			'renews'       => ServerLinks::renewal( self::$page['license'] ),
 		);
 
-		( static function ( array $vars ): void {
+		$file = 'domain-head.php';
+
+		// A database's head has the state line, the power buttons and no renewal date on a pay as you go service.
+		if ( self::$page['area'] instanceof Databases ) {
+			$card = \BeltoftServices\Proxmox\DbCard::view( $resource );
+			$file = 'db-head.php';
+
+			if ( 'usage' === (string) ( self::$page['license']['source'] ?? '' ) ) {
+				$vars['renews'] = '';
+			}
+
+			$vars['power']      = $card['power']['state'];
+			$vars['busy']       = $card['power']['busy'];
+			$vars['actions']    = $card['power']['actions'];
+			$vars['note']       = $card['power']['note'];
+			$vars['show_power'] = 'ready' === $card['kind'] && ( $card['power']['busy'] || in_array( $card['power']['state'], array( 'running', 'stopped' ), true ) );
+		}
+
+		( static function ( array $vars, string $file ): void {
 			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variables, a fixed list built above.
 			extract( $vars, EXTR_SKIP );
-			include self::file( 'domain-head.php' );
-		} )( $vars );
+			include self::file( $file );
+		} )( $vars, $file );
 
 		return true;
 	}

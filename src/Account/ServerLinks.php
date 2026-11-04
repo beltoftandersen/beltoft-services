@@ -43,6 +43,52 @@ final class ServerLinks {
 	}
 
 	/**
+	 * The "back to the list" link of the page being printed, kept for the page's head: the head prints it on the row
+	 * of its buttons. Null when no page is being printed.
+	 *
+	 * @var array{url: string, label: string, taken: bool}|null
+	 */
+	private static ?array $back = null;
+
+	/**
+	 * Keeps the back link for the head of the page that is about to print.
+	 *
+	 * @param string $url   Address of the list.
+	 * @param string $label Link text, such as "All servers".
+	 */
+	public static function set_back( string $url, string $label ): void {
+		self::$back = array( 'url' => $url, 'label' => $label, 'taken' => false );
+	}
+
+	/**
+	 * The back link as HTML, for the head that prints it (once); '' when there is none or it was taken.
+	 */
+	public static function take_back(): string {
+		if ( ! self::$back || self::$back['taken'] ) {
+			return '';
+		}
+
+		self::$back['taken'] = true;
+
+		return '<a class="beltoft-services-server__back-link" href="' . esc_url( self::$back['url'] ) . '">&lsaquo; ' . esc_html( self::$back['label'] ) . '</a>';
+	}
+
+	/**
+	 * Ends the page: the link the head did not print, as the plain line above the page ('' when the head printed it).
+	 */
+	public static function end_back(): string {
+		$back = self::$back;
+
+		self::$back = null;
+
+		if ( ! $back || $back['taken'] ) {
+			return '';
+		}
+
+		return '<p class="beltoft-services-server__back"><a href="' . esc_url( $back['url'] ) . '">&lsaquo; ' . esc_html( $back['label'] ) . '</a></p>';
+	}
+
+	/**
 	 * The endpoint the tab lives on.
 	 */
 	public static function slug(): string {

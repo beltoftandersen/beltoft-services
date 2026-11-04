@@ -9,6 +9,10 @@
  *   beltoftStatus.confirm( { title, text, confirm, cancel, danger } ).then( function ( yes ) {} );
  *   beltoftStatus.locked( scope );                                                    // true while a handle of that scope is busy
  *
+ * A page with a state line in its head ([data-bs-inline], the server and database pages) shows busy, done, fail and
+ * info there, on the one line after the state indicator, instead of in the bar. The line has a fixed height: long
+ * text is cut with an ellipsis (the title holds all of it), so nothing on the page moves.
+ *
  * Scope: the service's resource id (the container carries data-bs-scope="<id>"; a [data-resource] element is marked
  * automatically), or 'page' for the whole content area. Only the latest message is shown. No dependencies.
  */
@@ -183,8 +187,152 @@ var headerTop = 0;
 		}, FADE_MS );
 	}
 
+	// ---- the state line --------------------------------------------------------------------------------------------
+
+	function inlineTarget() {
+		var found = document.querySelector( '[data-bs-inline]' );
+
+		return found && document.body.contains( found ) ? found : null;
+	}
+
+	// The state indicator in front of the line (Running, Stopped, or the state text of a service that is not ready).
+	function indicatorOf( target ) {
+		var row = target.parentNode;
+
+		return row ? ( row.querySelector( '[data-power-line]:not([hidden])' ) || row.querySelector( '[data-badge]:not([hidden])' ) ) : null;
+	}
+
+	function inlineParts( target ) {
+		var label = target.querySelector( '.bs-inline__text' );
+		var close = target.querySelector( '.bs-inline__close' );
+
+		if ( ! label ) {
+			label = make( 'span', 'bs-inline__text', target.textContent.trim() );
+			target.textContent = '';
+			target.appendChild( label );
+		}
+
+		if ( ! close ) {
+			close = make( 'button', 'bs-inline__close' );
+			close.type = 'button';
+			close.hidden = true;
+			close.setAttribute( 'aria-label', text( 'close', 'Close' ) );
+			close.setAttribute( 'data-bs-keep', '' );
+			close.textContent = '×';
+			close.addEventListener( 'click', function () {
+				inlineHide( target, true );
+			} );
+			target.appendChild( close );
+		}
+
+		if ( undefined === target.beltoftDefault ) {
+			target.beltoftDefault = label.textContent;
+		}
+
+		return { label: label, close: close };
+	}
+
+	// While work is going on the indicator says Busy; it goes back to what it said, unless something else has changed it since.
+	function indicate( target, on ) {
+		var el = indicatorOf( target );
+
+		if ( on ) {
+			if ( el && undefined === target.beltoftIndicated ) {
+				target.beltoftIndicated = { el: el, was: el.textContent };
+				el.textContent = text( 'busyState', 'Busy' );
+			}
+
+			return;
+		}
+
+		if ( target.beltoftIndicated ) {
+			if ( target.beltoftIndicated.el.textContent === text( 'busyState', 'Busy' ) ) {
+				target.beltoftIndicated.el.textContent = target.beltoftIndicated.was;
+			}
+
+			target.beltoftIndicated = undefined;
+		}
+	}
+
+	function inlineReset( target ) {
+		var parts = inlineParts( target );
+
+		clearTimers();
+		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
+		parts.label.classList.remove( 'is-busy' );
+		target.removeAttribute( 'data-bs-kind' );
+		target.setAttribute( 'role', 'status' );
+		target.setAttribute( 'aria-live', 'polite' );
+		target.setAttribute( 'aria-busy', 'false' );
+		parts.label.textContent = target.beltoftDefault;
+
+		if ( target.beltoftDefault ) {
+			parts.label.setAttribute( 'title', target.beltoftDefault );
+		} else {
+			parts.label.removeAttribute( 'title' );
+		}
+
+		parts.close.hidden = true;
+		indicate( target, false );
+		current = null;
+	}
+
+	function inlineHide( target, now ) {
+		clearTimers();
+
+		if ( now || reduced() ) {
+			inlineReset( target );
+
+			return;
+		}
+
+		target.classList.add( 'is-fading' );
+		timers.fade = window.setTimeout( function () {
+			inlineReset( target );
+		}, FADE_MS );
+	}
+
+	function inlineShow( target, kind, message, handle ) {
+		var parts = inlineParts( target );
+		var full = ( 'fail' === kind ? text( 'failedPrefix', 'Failed: ' ) : '' ) + message;
+
+		clearTimers();
+		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
+
+		// The three squares of work in progress are the ones every busy element has (.is-busy::before), on the text.
+		parts.label.classList.toggle( 'is-busy', 'busy' === kind );
+
+		if ( 'busy' !== kind ) {
+			target.classList.add( 'is-' + kind );
+		}
+
+		target.setAttribute( 'data-bs-kind', kind );
+		target.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
+		target.setAttribute( 'aria-busy', 'busy' === kind ? 'true' : 'false' );
+		target.setAttribute( 'aria-live', 'fail' === kind ? 'assertive' : 'polite' );
+		parts.label.textContent = full;
+		parts.label.setAttribute( 'title', full );
+		parts.close.hidden = 'fail' !== kind;
+		indicate( target, 'busy' === kind );
+		current = handle || null;
+
+		if ( 'done' === kind || 'info' === kind ) {
+			timers.done = window.setTimeout( function () {
+				inlineHide( target, false );
+			}, DONE_MS );
+		}
+	}
+
 	// kind: busy, done, fail, info. Only the newest message is shown.
 	function show( kind, message, handle ) {
+		var line = inlineTarget();
+
+		if ( line ) {
+			inlineShow( line, kind, message, handle );
+
+			return;
+		}
+
 		var box = ensure();
 		var label = box.querySelector( '.bs-status__text' );
 		var close = box.querySelector( '.bs-status__close' );
@@ -447,6 +595,17 @@ var headerTop = 0;
 
 		finish( handle, 'fail', message );
 
+		// A failure with no field to point to must not go unseen: bring the state line into view.
+		var line = inlineTarget();
+
+		if ( line && ! target && line.getBoundingClientRect ) {
+			var seen = line.getBoundingClientRect();
+
+			if ( seen.top < headerTop || seen.bottom > window.innerHeight ) {
+				line.scrollIntoView( { block: 'center' } );
+			}
+		}
+
 		// On the checkout the bar goes with the step that holds the field.
 		var home = target && target.closest ? target.closest( '.brxe-woocommerce-checkout-step' ) : null;
 
@@ -656,7 +815,14 @@ var headerTop = 0;
 		} );
 
 		// Server-side notices after a reload (WooCommerce) are printed at the bar's place.
-		if ( document.querySelector( '.woocommerce-MyAccount-content' ) ) {
+		if ( inlineTarget() ) {
+			inlineParts( inlineTarget() );
+			offset();
+			window.addEventListener( 'resize', function () {
+				candidates = null;
+				offset();
+			} );
+		} else if ( document.querySelector( '.woocommerce-MyAccount-content' ) ) {
 			ensure();
 
 			// WooCommerce's own notices after a reload stay where the page prints them (in the flow, not moved by script).
