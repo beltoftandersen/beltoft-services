@@ -87,6 +87,7 @@ final class Plugin {
 		Domains\Security::register();
 		Domains\EmailDetails::register();
 		Proxmox\ClustersScreen::register();
+		Status::register();
 		Checkout::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
