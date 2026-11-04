@@ -5,7 +5,7 @@
  * Variables (set by BeltoftServices\Proxmox\Panels::page_head()): $title, $group (getting-ready, ready, paused, removed or failed),
  * $badge (the state text), $message (a sentence about the state), $show_power (the power replaces the state text),
  * $busy, $show_message (print the message line: not ready, or the app is not done), $power (running, stopped or empty), $plan (the plan's name, or empty),
- * $ip, $ssh_user, $actions (start, reboot, shutdown => label, the ones offered now), $billing_note (a pay-as-you-go server: "A stopped server is still billed...", else empty).
+ * $resource_id, $can_rename (the name can be changed: the name is a button that opens the field), $server_name (the name now set, or empty), $ip, $ssh_user, $actions (start, reboot, shutdown => label, the ones offered now), $billing_note (a pay-as-you-go server: "A stopped server is still billed...", else empty).
  * Reboot and Shut down ask first in the page's dialog (assets/vm.js). The state text and the message are the ones the
  * status poll keeps up to date, so the elements keep their data attributes.
  *
@@ -42,7 +42,26 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 		</div>
 	<?php endif; ?>
 	<div class="beltoft-services-page__title">
-		<h2 class="beltoft-services-page__name"><?php echo esc_html( $title ); ?></h2>
+		<?php if ( ! empty( $can_rename ) ) : ?>
+			<?php $beltoft_services_field = 'beltoft-vm-name-' . (int) $resource_id; ?>
+			<div class="beltoft-services-page__namerow" data-rename>
+				<h2 class="beltoft-services-page__name">
+					<button type="button" class="beltoft-services-page__rename" data-rename-open aria-label="<?php echo esc_attr( sprintf( /* translators: %s: the server's name */ __( 'Rename %s', 'beltoft-services' ), $title ) ); ?>">
+						<span class="beltoft-services-page__rename-name"><?php echo esc_html( $title ); ?></span>
+						<span class="beltoft-services-page__rename-hint" aria-hidden="true"><?php esc_html_e( 'Rename', 'beltoft-services' ); ?></span>
+					</button>
+				</h2>
+				<form class="beltoft-services-vm-form beltoft-services-page__renameform" data-action="rename" hidden>
+					<label class="screen-reader-text" for="<?php echo esc_attr( $beltoft_services_field ); ?>"><?php esc_html_e( 'Server name', 'beltoft-services' ); ?></label>
+					<input type="text" id="<?php echo esc_attr( $beltoft_services_field ); ?>" name="name" value="<?php echo esc_attr( '' !== (string) $server_name ? (string) $server_name : $title ); ?>" maxlength="63" autocomplete="off" spellcheck="false" required aria-describedby="<?php echo esc_attr( $beltoft_services_field ); ?>-help">
+					<span class="screen-reader-text" id="<?php echo esc_attr( $beltoft_services_field ); ?>-help"><?php esc_html_e( "Used as the server's hostname, for example web-01. Lowercase letters, digits and hyphens. The change shows on the server after the next reboot.", 'beltoft-services' ); ?></span>
+					<button type="submit" class="button woocommerce-button beltoft-services-btn"><?php esc_html_e( 'Save', 'beltoft-services' ); ?></button>
+					<button type="button" class="button woocommerce-button beltoft-services-btn" data-rename-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
+				</form>
+			</div>
+		<?php else : ?>
+			<h2 class="beltoft-services-page__name"><?php echo esc_html( $title ); ?></h2>
+		<?php endif; ?>
 		<p class="beltoft-services-page__meta">
 			<span class="beltoft-services-badge beltoft-services-badge--<?php echo esc_attr( $group ); ?>" data-badge<?php echo $show_power ? ' hidden' : ''; ?>><?php echo esc_html( $badge ); ?></span>
 			<?php if ( $show_power ) : ?><span class="beltoft-services-badge beltoft-services-badge--ready" data-power-line><?php echo esc_html( $beltoft_services_power_text ); ?></span><?php endif; ?>

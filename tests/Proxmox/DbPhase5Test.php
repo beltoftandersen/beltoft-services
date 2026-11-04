@@ -341,9 +341,12 @@ class DbPhase5Test extends TestCase {
 
 	// -- The Backups tab, the Overview ---------------------------------------------------------
 
-	private function page( Resource $r, string $tab ): string {
+	/**
+	 * The card as a page (tabs) or, with $tabs false, as a card (no tabs: the power buttons are in it, a page has them in its head).
+	 */
+	private function page( Resource $r, string $tab, bool $tabs = true ): string {
 		$view = DbCard::view( $r );
-		$nav  = array( 'overview' => 'Overview', 'backups' => 'Backups', 'password' => 'New password' );
+		$nav  = ! $tabs ? array() : array( 'overview' => 'Overview', 'backups' => 'Backups', 'password' => 'New password' );
 		$link = static fn( string $slug ): string => 'https://example.test/' . $slug;
 
 		ob_start();
@@ -984,12 +987,29 @@ class DbPhase5Test extends TestCase {
 		$this->assertSame( 429, $answers[21]->get_error_data()['status'] );
 	}
 
+	public function test_on_a_page_the_power_buttons_and_the_note_are_in_the_head_beside_the_back_link(): void {
+		$r = $this->running_db();
+		wp_set_current_user( $this->owner_of( $r ) );
+		$fresh = Resource::find( $r->id() );
+		$GLOBALS['wp']->query_vars['databases'] = (string) $fresh->license()['id'];
+
+		ob_start();
+		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->render( array( \BeltoftLicenses\Account\View::license( \BeltoftLicenses\Licenses::find( (int) $fresh->license()['id'] ) ) ) );
+		$html = (string) ob_get_clean();
+		unset( $GLOBALS['wp']->query_vars['databases'] );
+
+		$this->assertMatchesRegularExpression( '#beltoft-services-page__bar.*All databases.*beltoft-services-page__actions.*data-db-power="shutdown".*beltoft-services-page__name#s', $html );
+		$this->assertMatchesRegularExpression( '#data-power-line>Running</span>\s*<span class="bs-inline" data-bs-inline#', $html );
+		$this->assertSame( 1, substr_count( $html, 'data-db-power="' ), 'The buttons are in the head only.' );
+		$this->assertStringContainsString( 'data-db-power-note>A stopped database is still billed', $html );
+	}
+
 	public function test_the_page_shows_power_buttons_the_billing_note_and_a_stopped_line(): void {
 		$r = $this->running_db();
 		wp_set_current_user( $this->owner_of( $r ) );
 		$fresh = Resource::find( $r->id() );
 
-		$running = $this->page( $fresh, 'overview' );
+		$running = $this->page( $fresh, 'overview', false );
 		$this->assertStringContainsString( 'data-db-power="shutdown"', $running );
 		$this->assertStringNotContainsString( 'data-db-power="start"', $running );
 		$this->assertStringContainsString( 'Shut down', $running );
@@ -999,7 +1019,7 @@ class DbPhase5Test extends TestCase {
 		$this->assertStringContainsString( 'data-db-reset', $this->page( $fresh, 'password' ) );
 
 		Operations::remember_power( $r->id(), 'stopped' );
-		$stopped = $this->page( Resource::find( $r->id() ), 'overview' );
+		$stopped = $this->page( Resource::find( $r->id() ), 'overview', false );
 		$this->assertStringContainsString( 'data-db-power="start"', $stopped );
 		$this->assertStringNotContainsString( 'data-db-power="shutdown"', $stopped );
 		$this->assertStringContainsString( '<dt>Power</dt><dd data-db-power-line>Stopped</dd>', $stopped );

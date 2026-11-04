@@ -27,8 +27,6 @@
 defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_pending = (string) ( $hostname_pending ?? '' );
-$beltoft_services_rename  = (bool) ( $can_rename ?? false );
-$beltoft_services_named   = (string) ( $server_name ?? '' );
 $beltoft_services_page    = is_array( $page ?? null ) ? $page : null;
 $beltoft_services_reset   = (bool) ( $can_reset ?? false );
 
@@ -194,20 +192,6 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<?php $beltoft_services_note(); ?>
 	<?php endif; ?>
 	<?php if ( '' !== (string) ( $cost ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $cost ); ?></p><?php endif; ?>
-
-	<?php if ( $beltoft_services_rename ) : ?>
-		<details class="beltoft-services-vm__more">
-			<summary><?php esc_html_e( 'Rename', 'beltoft-services' ); ?></summary>
-			<form class="beltoft-services-vm-form" data-action="rename">
-				<p>
-					<label for="beltoft-vm-name-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Server name', 'beltoft-services' ); ?></label>
-					<input type="text" id="beltoft-vm-name-<?php echo (int) $resource_id; ?>" name="name" value="<?php echo esc_attr( $beltoft_services_named ); ?>" maxlength="63" autocomplete="off" spellcheck="false" required>
-				</p>
-				<p class="description"><?php esc_html_e( "Used as the server's hostname, for example web-01. Lowercase letters, digits and hyphens. The change shows on the server after the next reboot.", 'beltoft-services' ); ?></p>
-				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Save name', 'beltoft-services' ); ?></button></p>
-			</form>
-		</details>
-	<?php endif; ?>
 
 	<?php if ( $metrics ) : ?>
 		<section class="beltoft-vm-usage" data-vm-metrics>

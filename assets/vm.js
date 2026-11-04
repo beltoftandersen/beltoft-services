@@ -251,6 +251,15 @@
 		}
 
 		flash( panel, text, 'done' );
+
+		// A saved name: the focus goes back to the name (the page was read again with it).
+		if ( 'rename' === result.action ) {
+			var name = panel.querySelector( '[data-rename-open]' );
+
+			if ( name ) {
+				name.focus( { preventScroll: true } );
+			}
+		}
 	}
 
 	// On every status of the card (account.js): working while it works, then done or not done. Works on a device that did not ask too, for a minute: a later page load never shows an old result again.
@@ -728,6 +737,53 @@
 				showTab( panel, tabFromLocation( panel ) );
 			} );
 		}
+
+		// The server's name in the head is a button that opens the field in its place. Enter saves (the form's submit), Esc and Cancel close it.
+		function renameClose( box ) {
+			var form = box.querySelector( '.beltoft-services-page__renameform' );
+			var open = box.querySelector( '[data-rename-open]' );
+
+			if ( bs.clearFields ) {
+				bs.clearFields();
+			}
+
+			form.hidden = true;
+			box.querySelector( '.beltoft-services-page__name' ).hidden = false;
+			form.reset();
+			open.focus( { preventScroll: true } );
+		}
+
+		panel.addEventListener( 'click', function ( event ) {
+			var open = event.target.closest( '[data-rename-open]' );
+			var cancel = event.target.closest( '[data-rename-cancel]' );
+			var box = ( open || cancel ) ? ( open || cancel ).closest( '[data-rename]' ) : null;
+			var input;
+
+			if ( ! box ) {
+				return;
+			}
+
+			if ( cancel ) {
+				renameClose( box );
+
+				return;
+			}
+
+			input = box.querySelector( 'input[name="name"]' );
+			box.querySelector( '.beltoft-services-page__name' ).hidden = true;
+			box.querySelector( '.beltoft-services-page__renameform' ).hidden = false;
+			input.focus();
+			input.select();
+		} );
+
+		panel.addEventListener( 'keydown', function ( event ) {
+			var box = 'Escape' === event.key && event.target.closest ? event.target.closest( '[data-rename]' ) : null;
+
+			if ( box && ! box.querySelector( '.beltoft-services-page__renameform' ).hidden ) {
+				event.preventDefault();
+				renameClose( box );
+			}
+		} );
 
 		panel.addEventListener( 'submit', function ( event ) {
 			var form = event.target.closest( '.beltoft-services-vm-form' );

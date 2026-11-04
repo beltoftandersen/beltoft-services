@@ -66,7 +66,7 @@ class ServerPageTest extends MonitoringTestCase {
 		$r->set( array( 'server_name' => 'web-01', 'ip' => '192.0.2.10' ) );
 		Operations::remember_power( $r->id(), 'running' );
 		$html = $this->page( $r, (string) $r->license()['id'] );
-		$this->assertStringContainsString( '>web-01</h2>', $html );
+		$this->assertStringContainsString( 'beltoft-services-page__rename-name">web-01</span>', $html );
 		$this->assertStringContainsString( 'data-copy="ssh root@192.0.2.10"', $html );
 		$this->assertStringContainsString( 'data-power-action="reboot"', $html );
 		$this->assertStringContainsString( 'data-power-action="shutdown"', $html );
