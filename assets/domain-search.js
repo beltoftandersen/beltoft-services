@@ -84,9 +84,9 @@
         radio.value = option[0];
         radio.checked = option[0] === preselected;
         const text = document.createElement('span');
-        text.appendChild(element('strong', '', option[1]));
-        text.appendChild(document.createElement('br'));
-        text.appendChild(document.createTextNode(option[2]));
+        text.className = 'beltoft-domain-transfer__choice-text';
+        text.appendChild(element('span', 'beltoft-domain-transfer__choice-title', option[1]));
+        text.appendChild(element('span', 'beltoft-domain-transfer__choice-desc', option[2]));
         label.append(radio, text);
         group.appendChild(label);
       });
@@ -106,6 +106,7 @@
       const submit = element('button', 'beltoft-domain-action', 'Add transfer to order');
       submit.type = 'submit';
       const choices = document.createElement('div');
+      choices.className = 'beltoft-domain-transfer__choices';
       choices.setAttribute('aria-live', 'polite');
       form.append(choices, field, submit);
       // The order cannot be added before the DNS question is answered: the choice is part of it.
