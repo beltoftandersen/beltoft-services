@@ -143,6 +143,12 @@ final class CartSwapTest extends UsageTestCase {
 		$this->assertSame( 200, $answer[1] );
 		$this->assertSame( array( 'server' => $this->v['u-Daily']->get_id(), 'disk' => $this->disk['u-50']->get_id() ), array_intersect_key( $this->seen(), array( 'server' => 1, 'disk' => 1 ) ) );
 
+		// A post that names only one choice leaves the other as it is.
+		unset( $_POST['with'] );
+		$_POST['disk'] = (string) $this->disk['u-100']->get_id();
+		$this->assertSame( 200, BackupField::respond()[1] );
+		$this->assertSame( array( 'server' => $this->v['u-Daily']->get_id(), 'disk' => $this->disk['u-100']->get_id() ), array_intersect_key( $this->seen(), array( 'server' => 1, 'disk' => 1 ) ) );
+
 		$_POST['disk'] = '0';
 		$_POST['with'] = '0';
 		$this->assertSame( 200, BackupField::respond()[1] );

@@ -242,7 +242,7 @@ final class BackupField {
 			return array( array( 'ok' => false ), 403 );
 		}
 
-		$with   = isset( $_POST['with'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$with   = isset( $_POST['with'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
 		$disk   = isset( $_POST['disk'] ) ? absint( wp_unslash( $_POST['disk'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
 		$result = CartSwap::apply( $with, $disk );
 
