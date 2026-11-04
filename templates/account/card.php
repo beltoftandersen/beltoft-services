@@ -20,7 +20,8 @@ use BeltoftServices\Card\Card;
 	<p class="beltoft-services-card__sub"><?php esc_html_e( 'Card used for Pay as you go invoices', 'beltoft-services' ); ?></p>
 
 	<?php if ( '' !== $card['notice'] ) : ?>
-		<p class="beltoft-services-card__notice is-<?php echo esc_attr( $card['notice_kind'] ); ?>" role="status"><?php echo esc_html( $card['notice'] ); ?></p>
+		<?php /* assets/card.js hands the result of the last card form to the status bar. */ ?>
+		<p hidden data-bs-flash="<?php echo 'error' === $card['notice_kind'] ? 'fail' : 'done'; ?>"><?php echo esc_html( $card['notice'] ); ?></p>
 	<?php endif; ?>
 
 	<?php if ( 'valid' === $card['state'] ) : ?>
@@ -39,11 +40,11 @@ use BeltoftServices\Card\Card;
 	<?php if ( $card['can_start'] ) : ?>
 		<?php if ( 'token' === ( $card['flow'] ?? '' ) ) : ?>
 		<div class="beltoft-services-card__form">
-			<a class="button beltoft-services-card__btn" href="<?php echo esc_url( $card['add_url'] ); ?>"><?php echo $card['change'] ? esc_html__( 'Change card', 'beltoft-services' ) : esc_html__( 'Add a card', 'beltoft-services' ); ?></a>
+			<a class="button beltoft-services-card__btn" data-card-go href="<?php echo esc_url( $card['add_url'] ); ?>"><?php echo $card['change'] ? esc_html__( 'Change card', 'beltoft-services' ) : esc_html__( 'Add a card', 'beltoft-services' ); ?></a>
 			<span class="beltoft-services-card__note"><?php esc_html_e( 'Nothing is charged. You enter your card on the payment provider\'s secure form.', 'beltoft-services' ); ?></span>
 		</div>
 		<?php else : ?>
-		<form class="beltoft-services-card__form" method="post" action="<?php echo esc_url( Card::url() ); ?>">
+		<form class="beltoft-services-card__form" method="post" action="<?php echo esc_url( Card::url() ); ?>" data-bs-working="<?php esc_attr_e( 'Working…', 'beltoft-services' ); ?>">
 			<?php wp_nonce_field( Card::NONCE ); ?>
 			<input type="hidden" name="<?php echo esc_attr( $card['action'] ); ?>" value="1">
 			<button type="submit" class="button beltoft-services-card__btn"><?php echo $card['change'] ? esc_html__( 'Change card', 'beltoft-services' ) : esc_html__( 'Add a card', 'beltoft-services' ); ?></button>

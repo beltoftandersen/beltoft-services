@@ -6,7 +6,7 @@
 ( function () {
 	'use strict';
 	var config = window.beltoftServicesAccount;
-	if ( ! config ) { return; }
+	if ( ! config || ! window.beltoftStatus ) { return; }
 
 	var TYPES = [ 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' ];
 	var EXTRAS = { MX: [ 'priority' ], SRV: [ 'priority', 'weight', 'port' ], CAA: [ 'flag', 'tag' ] };
@@ -14,6 +14,7 @@
 	var TTLS = [ 60, 300, 3600, 14400, 86400 ];
 	var SHOWN = 10;
 	var counter = 0;
+	var bs = window.beltoftStatus;
 
 	function el( tag, attrs, children ) {
 		var node = document.createElement( tag );
@@ -49,7 +50,6 @@
 		this.rows = [];
 		this.editing = null; // a row id, or 'new'
 		this.confirm = null; // a row id
-		this.rowError = null; // { id, message }
 		this.busy = false;
 		this.all = false;
 		this.query = '';
@@ -126,12 +126,9 @@
 
 	Editor.prototype.build = function () {
 		var self = this;
-		this.error = this.root.querySelector( '.beltoft-dnse__error' ) || this.root.appendChild( el( 'p', { 'class': 'beltoft-dnse__error', role: 'alert', hidden: true } ) );
-		this.status = el( 'p', { 'class': 'beltoft-dnse__status', role: 'status' } );
 		this.bar = el( 'div', { 'class': 'beltoft-dnse__bar' } );
 		this.holder = el( 'div', { 'class': 'beltoft-dnse__holder' } );
 		this.root.appendChild( this.bar );
-		this.root.appendChild( this.status );
 		this.root.appendChild( this.holder );
 
 		this.search = el( 'input', { type: 'search', 'class': 'beltoft-dnse__search', 'aria-label': this.t.search, placeholder: this.t.search, autocomplete: 'off' } );
@@ -148,29 +145,28 @@
 				self.editing = null;
 				self.confirm = null;
 				self.draft = null;
-				self.rowError = null;
 				self.focusAfter = { id: id, role: 'edit' };
 				self.render();
 			}
 		} );
 	};
 
+	// What the last change said: the status bar shows it when the request is done.
 	Editor.prototype.say = function ( text ) {
-		this.status.textContent = text || '';
+		this.said = text || '';
 	};
 
-	Editor.prototype.fail = function ( message ) {
-		this.error.textContent = message || this.t.network;
-		this.error.hidden = false;
+	// A message on the status bar; with a row open, also under its value field (drawn first, so the field is there).
+	Editor.prototype.problem = function ( message, handle ) {
+		var field = this.holder.querySelector( '[data-edit-row] [data-f="value"]' );
+		bs.fail( handle || null, message || this.t.network, field || undefined );
 	};
 
 	Editor.prototype.begin = function ( id ) {
 		if ( this.busy || this.readonly ) { return; }
 		this.editing = id;
 		this.confirm = null;
-		this.rowError = null;
 		this.draft = null;
-		this.error.hidden = true;
 		this.say( '' );
 		this.render();
 		var first = this.holder.querySelector( '[data-edit-row] [data-f="name"]' );
@@ -223,10 +219,7 @@
 
 		shown.forEach( function ( row ) {
 			if ( row.id === self.editing ) { self.editRow( body, row, anyOff ); } else { self.readRow( body, row, anyOff ); }
-			if ( self.rowError && self.rowError.id === row.id ) { self.errorRow( body, anyOff ); }
 		} );
-
-		if ( this.rowError && 'new' === this.rowError.id ) { this.errorRow( body, anyOff, true ); }
 
 		this.holder.appendChild( table );
 		this.forms.forEach( function ( form ) { self.holder.appendChild( form ); } );
@@ -242,12 +235,6 @@
 		this.finishRender();
 	};
 
-	// After an error the row stays open: the focus goes to its value, so the alert is read with the field.
-	Editor.prototype.focusField = function () {
-		var field = this.holder.querySelector( '[data-edit-row] [data-f="value"]' );
-		if ( field ) { field.focus(); }
-	};
-
 	Editor.prototype.finishRender = function () {
 		var target = this.focusAfter;
 		this.focusAfter = null;
@@ -256,12 +243,6 @@
 		if ( 'add' === target.role ) { node = this.add; } else if ( target.id ) { node = this.holder.querySelector( '[data-row="' + target.id + '"] [data-act="' + target.role + '"]' ); }
 		if ( ! node ) { node = this.readonly ? this.search : this.add; }
 		if ( node && ! node.hidden ) { node.focus(); }
-	};
-
-	Editor.prototype.errorRow = function ( body, anyOff, top ) {
-		var cols = 5 + ( anyOff ? 1 : 0 );
-		var tr = el( 'tr', { 'class': 'beltoft-dnse__rowerror' }, [ el( 'td', { colspan: String( cols ), role: 'alert', text: this.rowError.message } ) ] );
-		if ( top && body.firstChild ) { body.insertBefore( tr, body.firstChild.nextSibling ); } else { body.appendChild( tr ); }
 	};
 
 	Editor.prototype.cell = function ( tr, label, content ) {
@@ -298,7 +279,6 @@
 				if ( self.busy ) { return; }
 				self.confirm = row.id;
 				self.editing = null;
-				self.rowError = null;
 				self.render();
 				var keep = self.holder.querySelector( '[data-row="' + row.id + '"] [data-act="delete-no"]' );
 				if ( keep ) { keep.focus(); }
@@ -385,7 +365,6 @@
 		cancel.addEventListener( 'click', function () {
 			self.editing = null;
 			self.draft = null;
-			self.rowError = null;
 			self.focusAfter = isNew ? { role: 'add' } : { id: row.id, role: 'edit' };
 			self.render();
 		} );
@@ -426,9 +405,8 @@
 		this.draft = { id: original.id, values: values };
 
 		if ( typed.error ) {
-			this.rowError = { id: original.id, message: typed.error };
 			this.render();
-			this.focusField();
+			this.problem( typed.error );
 			return;
 		}
 
@@ -505,22 +483,20 @@
 
 	Editor.prototype.send = function ( method, path, body, rowId, done ) {
 		var self = this;
+		if ( bs.locked( this.resource ) ) { return; }
 		this.busy = true;
-		this.rowError = null;
-		this.error.hidden = true;
-		this.say( this.t.saving );
 		var pending = this.holder.querySelector( '[data-edit-row] .beltoft-dnse__save' );
-		if ( pending ) { pending.disabled = true; pending.textContent = this.t.saving; }
-		Array.prototype.forEach.call( this.holder.querySelectorAll( 'button' ), function ( b ) { b.disabled = true; } );
+		var handle = bs.busy( this.t.saving, this.resource, pending || undefined );
+		if ( pending ) { pending.textContent = this.t.saving; }
 
 		request( method, this.resource + '/dns-records/' + path, body ).then( function ( result ) {
 			self.busy = false;
 			if ( result.ok ) {
 				done( ( result.data || {} ).rows );
 				self.render();
+				bs.done( handle, self.said );
 				return;
 			}
-			self.say( '' );
 			var code = result.data.code;
 			var message = result.data.message || self.t.network;
 			if ( 'paused' === code ) {
@@ -528,35 +504,32 @@
 				self.editing = null;
 				self.confirm = null;
 				self.add.hidden = true;
-				self.fail( message );
 				self.render();
+				bs.fail( handle, message );
 			} else if ( 'stale' === code ) {
 				// Someone changed the record since the table was drawn: show what is there now.
 				self.editing = null;
 				self.confirm = null;
 				self.draft = null;
-				self.reload( message );
+				self.reload( message, handle );
 			} else {
-				self.rowError = { id: rowId, message: message };
 				self.render();
-				self.focusField();
+				self.problem( message, handle );
 			}
 		} ).catch( function () {
 			self.busy = false;
-			self.say( '' );
-			self.rowError = { id: rowId, message: self.t.network };
 			self.render();
-			self.focusField();
+			self.problem( self.t.network, handle );
 		} );
 	};
 
-	Editor.prototype.reload = function ( message ) {
+	Editor.prototype.reload = function ( message, handle ) {
 		var self = this;
 		request( 'GET', this.resource + '/dns-records' ).then( function ( result ) {
 			if ( result.ok && Array.isArray( result.data.rows ) ) { self.setRows( result.data.rows ); }
-			self.fail( message );
 			self.render();
-		} ).catch( function () { self.fail( message ); self.render(); } );
+			bs.fail( handle, message );
+		} ).catch( function () { self.render(); bs.fail( handle, message ); } );
 	};
 
 	Array.prototype.forEach.call( document.querySelectorAll( '[data-dns-editor]' ), function ( root ) { new Editor( root ); } );

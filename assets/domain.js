@@ -10,6 +10,7 @@
 			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
 		} );
 	}
+	var bs = window.beltoftStatus;
 	var TYPES = [ 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' ];
 	var EXTRAS = { MX: [ 'priority' ], SRV: [ 'priority', 'weight', 'port' ], CAA: [ 'flag', 'tag' ] };
 	function field( name, value, label, type ) {
@@ -150,29 +151,12 @@
 		var radio = event.target.closest ? event.target.closest( '.beltoft-services-domain__ns input[name=mode]' ) : null;
 		if ( radio ) { radio.form.querySelector( '.beltoft-services-domain__custom' ).hidden = 'custom' !== radio.value; }
 	} );
-	// The change runs in the background: say so, and reload when it is done so the page shows the new state.
-	function settle( panel, form ) {
-		var note = form.querySelector( '.beltoft-services-domain__status' );
-		if ( ! note ) {
-			note = document.createElement( 'span' );
-			note.className = 'beltoft-services-domain__status';
-			note.setAttribute( 'role', 'status' );
-			form.appendChild( note );
-		}
-		note.textContent = '';
-		var bar = document.createElement( 'span' );
-		bar.className = 'beltoft-services-domain__bar';
-		bar.setAttribute( 'aria-hidden', 'true' );
-		var text = document.createElement( 'span' );
-		text.textContent = panel.dataset.updating || '';
-		var slow = document.createElement( 'span' );
-		slow.className = 'beltoft-services-domain__slow';
-		slow.textContent = panel.dataset.updatingNote || '';
-		note.appendChild( bar );
-		note.appendChild( text );
-		note.appendChild( slow );
-		Array.prototype.forEach.call( panel.querySelectorAll( 'button' ), function ( b ) { b.disabled = true; } );
+	// The change runs in the background: the bar says so (and locks the domain's buttons), and the page reloads when it is done so it shows the new state.
+	function settle( panel, form, handle ) {
 		var rounds = 15; // every 4 seconds: well inside the status route's rate limit
+		if ( ! handle && bs ) {
+			handle = bs.busy( ( panel.dataset.updating || '' ) + ( panel.dataset.updatingNote ? ' ' + panel.dataset.updatingNote : '' ), panel.dataset.domainResource );
+		}
 		function next() {
 			rounds -= 1;
 			if ( rounds < 1 ) { window.location.reload(); return; }
@@ -191,17 +175,16 @@
 		if ( ! form ) { return; }
 		event.preventDefault();
 		var panel = form.closest( '[data-domain-resource]' );
-		var box = form.querySelector( '.beltoft-dns-error' );
-		if ( box ) { box.hidden = true; }
+		var scope = panel.dataset.domainResource;
+		if ( bs && bs.locked( scope ) ) { return; }
 		if ( form.classList.contains( 'beltoft-dns-editor' ) ) { serialise( form ); }
 		var args = {};
 		new FormData( form ).forEach( function ( value, key ) { args[ key ] = String( value ); } );
-		var button = form.querySelector( 'button[type=submit]' );
-		button.disabled = true;
+		var handle = bs ? bs.busy( panel.dataset.updating || '', scope, form.querySelector( 'button[type=submit]' ) ) : null;
 		if ( 'unlock' === form.dataset.domainAction ) {
-			try { window.sessionStorage.setItem( 'beltoftShowCode', panel.dataset.domainResource ); } catch ( e ) {}
+			try { window.sessionStorage.setItem( 'beltoftShowCode', scope ); } catch ( e ) {}
 		}
-		request( 'POST', panel.dataset.domainResource + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form ); } ).catch( function ( error ) { if ( box ) { box.textContent = error.message; box.hidden = false; } else { window.alert( error.message ); } button.disabled = false; } );
+		request( 'POST', scope + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form, handle ); } ).catch( function ( error ) { if ( bs ) { bs.fail( handle, error.message ); } else { window.alert( error.message ); } } );
 	} );
 	// The transfer code is shown after a second check: a code emailed to the account address (or a site's own factor).
 	document.addEventListener( 'click', function ( event ) {
@@ -220,11 +203,11 @@
 		var send = event.target.closest( '.beltoft-services-domain-send' );
 		if ( ! send ) { return; }
 		var form = send.closest( '.beltoft-services-domain-stepup' );
-		var error = form.querySelector( '.beltoft-services-domain-stepup__error' );
 		var enter = form.querySelector( '.beltoft-services-domain-stepup__enter' );
 		var ask = form.querySelector( '.beltoft-services-domain-stepup__ask' );
-		send.disabled = true;
-		error.hidden = true;
+		var scope = form.closest( '[data-domain-resource]' ).dataset.domainResource;
+		if ( bs && bs.locked( scope ) ) { return; }
+		var handle = bs.busy( form.getAttribute( 'data-sending' ) || 'Sending the code…', scope, send );
 		window.fetch( config.root + 'step-up/send', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { purpose: 'transfer_code' } ) } ).then( function ( response ) {
 			var nonce = response.headers.get( 'X-WP-Nonce' );
 			if ( nonce ) { config.nonce = nonce; }
@@ -234,11 +217,10 @@
 			enter.hidden = false;
 			form.querySelector( 'input[name="secret"]' ).value = '';
 			form.querySelector( 'input[name="secret"]' ).focus();
-			send.disabled = false;
+			var sent = form.querySelector( '.beltoft-services-domain-stepup__sent' );
+			bs.done( handle, sent ? sent.textContent : '' );
 		} ).catch( function ( failure ) {
-			error.textContent = failure.message;
-			error.hidden = false;
-			send.disabled = false;
+			bs.fail( handle, failure.message );
 		} );
 	} );
 	document.addEventListener( 'submit', function ( event ) {
@@ -248,10 +230,10 @@
 		var panel = form.closest( '[data-domain-resource]' );
 		var input = form.querySelector( 'input[name="secret"]' );
 		var submit = form.querySelector( 'button[type="submit"]' );
-		var error = form.querySelector( '.beltoft-services-domain-stepup__error' );
-		if ( ! input.value ) { input.focus(); return; }
-		submit.disabled = true;
-		error.hidden = true;
+		var scope = panel.dataset.domainResource;
+		if ( bs && bs.locked( scope ) ) { return; }
+		if ( ! input.value ) { bs.fail( null, form.getAttribute( 'data-empty' ) || 'Enter the code.', input ); return; }
+		var handle = bs.busy( form.getAttribute( 'data-checking' ) || 'Checking the code…', scope, submit );
 		window.fetch( config.root + panel.dataset.domainResource + '/domain-authcode', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { secret: input.value } ) } ).then( function ( response ) {
 			var nonce = response.headers.get( 'X-WP-Nonce' );
 			if ( nonce ) { config.nonce = nonce; }
@@ -264,13 +246,10 @@
 			code.closest( '.beltoft-services-domain__code' ).hidden = false;
 			code.focus();
 			code.select();
-			submit.disabled = false;
+			bs.done( handle, form.getAttribute( 'data-shown' ) || 'Your transfer code is shown below.' );
 		} ).catch( function ( failure ) {
 			input.value = '';
-			error.textContent = failure.message;
-			error.hidden = false;
-			input.focus();
-			submit.disabled = false;
+			bs.fail( handle, failure.message, input );
 		} );
 	} );
 	document.addEventListener( 'click', function ( event ) {
@@ -312,17 +291,11 @@
 		event.preventDefault();
 		var input = form.querySelector( 'input[name="auth_code"]' );
 		var button = form.querySelector( 'button[type="submit"]' );
-		var error = form.querySelector( '[role="alert"]' );
 		var code = input ? input.value.trim() : '';
-		if ( ! code ) { if ( input ) { input.focus(); } return; }
-		var label = button ? button.textContent : '';
-		if ( button ) {
-			button.disabled = true;
-			button.setAttribute( 'aria-busy', 'true' );
-			button.classList.add( 'is-busy' );
-			button.textContent = form.getAttribute( 'data-busy' ) || label;
-		}
-		if ( error ) { error.hidden = true; error.textContent = ''; }
+		var scope = form.closest( '[data-domain-resource]' ) ? form.closest( '[data-domain-resource]' ).dataset.domainResource : 'page';
+		if ( bs.locked( scope ) ) { return; }
+		if ( ! code ) { bs.fail( null, form.getAttribute( 'data-empty' ) || 'Enter the transfer code.', input ); return; }
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, button );
 		window.fetch( form.getAttribute( 'data-cart' ), {
 			method: 'POST',
 			credentials: 'same-origin',
@@ -337,13 +310,7 @@
 			}
 			throw new Error( ( result.data && result.data.message ) || 'Error' );
 		} ).catch( function ( failure ) {
-			if ( button ) {
-				button.disabled = false;
-				button.removeAttribute( 'aria-busy' );
-				button.classList.remove( 'is-busy' );
-				button.textContent = label;
-			}
-			if ( error ) { error.textContent = failure.message; error.hidden = false; }
+			bs.fail( handle, failure.message, input );
 		} );
 	} );
 }() );

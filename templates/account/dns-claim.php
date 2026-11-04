@@ -17,7 +17,6 @@ defined( 'ABSPATH' ) || exit;
 			<input type="text" id="beltoft-dns-claim-domain" name="domain" placeholder="example.com" autocomplete="off" autocapitalize="off" spellcheck="false" required>
 			<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Add domain', 'beltoft-services' ); ?></button>
 		</span>
-		<p class="beltoft-dns-claim__error" data-dns-claim-error role="alert" hidden></p>
 	</form>
 	<div class="beltoft-dns-claim__list" data-dns-claim-list aria-live="polite"></div>
 </section>

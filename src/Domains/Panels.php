@@ -21,11 +21,11 @@ final class Panels {
 			return;
 		}
 
-		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/domain.js' ), true );
+		wp_enqueue_script( 'beltoft-services-domain', plugins_url( 'assets/domain.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent, \BeltoftServices\Status::HANDLE ) : array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/domain.js' ), true );
 
 		// The row-by-row DNS records editor of a domain's page.
 		if ( \BeltoftServices\Account\Domains::requested()['id'] > 0 ) {
-			wp_enqueue_script( 'beltoft-services-dns-editor', plugins_url( 'assets/dns-editor.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent ) : array(), \BeltoftServices\Assets::version( 'assets/dns-editor.js' ), true );
+			wp_enqueue_script( 'beltoft-services-dns-editor', plugins_url( 'assets/dns-editor.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent, \BeltoftServices\Status::HANDLE ) : array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/dns-editor.js' ), true );
 		}
 	}
 	public static function buttons( $buttons, $r ) {

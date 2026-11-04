@@ -20,8 +20,21 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 ?>
 <section class="beltoft-services-credit">
 	<?php
-	if ( function_exists( 'wc_print_notices' ) ) {
-		wc_print_notices(); // A redeemed or refused code is told here (a Bricks account page does not print notices for this page).
+	// A redeemed or refused code is told in the status bar (assets/credit.js); a refused code also under its field.
+	// A Bricks account page does not print notices for this page.
+	if ( function_exists( 'wc_get_notices' ) ) {
+		foreach ( wc_get_notices() as $beltoft_services_kind => $beltoft_services_list ) {
+			foreach ( $beltoft_services_list as $beltoft_services_notice ) {
+				$beltoft_services_text  = wp_strip_all_tags( is_array( $beltoft_services_notice ) ? (string) ( $beltoft_services_notice['notice'] ?? '' ) : (string) $beltoft_services_notice );
+				$beltoft_services_field = is_array( $beltoft_services_notice ) && ! empty( $beltoft_services_notice['data']['beltoft_field'] );
+				?>
+				<p hidden data-bs-flash="<?php echo 'error' === $beltoft_services_kind ? 'fail' : 'done'; ?>"<?php echo $beltoft_services_field ? ' data-bs-field="#beltoft-credit-code"' : ''; ?>><?php echo esc_html( $beltoft_services_text ); ?></p>
+				<?php
+			}
+		}
+		if ( function_exists( 'wc_clear_notices' ) ) {
+			wc_clear_notices();
+		}
 	}
 	?>
 	<div class="beltoft-services-ov__head">
@@ -33,7 +46,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
 	</div>
 
-	<form class="beltoft-services-credit__form" method="post" action="<?php echo esc_url( Page::url() ); ?>">
+	<form class="beltoft-services-credit__form" method="post" action="<?php echo esc_url( Page::url() ); ?>" data-bs-working="<?php esc_attr_e( 'Working…', 'beltoft-services' ); ?>">
 		<fieldset class="beltoft-services-credit__amounts">
 			<legend class="beltoft-services-credit__legend"><?php esc_html_e( 'Top up', 'beltoft-services' ); ?></legend>
 			<div class="beltoft-services-credit__grid">
@@ -70,7 +83,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Continue to checkout', 'beltoft-services' ); ?></button>
 	</form>
 
-	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( Page::url() ); ?>">
+	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( Page::url() ); ?>" novalidate data-bs-working="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>">
 		<div class="beltoft-services-ov__head">
 			<h2><?php esc_html_e( 'Have a credit code?', 'beltoft-services' ); ?></h2>
 		</div>

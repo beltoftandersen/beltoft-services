@@ -95,7 +95,7 @@ final class DnsClaimPanel {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/dns-claim.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dns-claim.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/dns-claim.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dns-claim.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/dns-claim.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/dns-claim.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftDnsClaims',
@@ -145,6 +145,9 @@ final class DnsClaimPanel {
 			'checkNow'      => __( 'Check now', 'beltoft-services' ),
 			'cancel'        => __( 'Cancel', 'beltoft-services' ),
 			'working'       => __( 'Working…', 'beltoft-services' ),
+			'done'          => __( 'Done.', 'beltoft-services' ),
+			'cancelled'     => __( 'Cancelled.', 'beltoft-services' ),
+			'empty'         => __( 'Enter a domain name.', 'beltoft-services' ),
 			'checking'      => __( 'Checking your name servers…', 'beltoft-services' ),
 			'stillChecking' => __( 'Still checking. Reload the page in a minute.', 'beltoft-services' ),
 			'verified'      => __( 'Verified', 'beltoft-services' ),

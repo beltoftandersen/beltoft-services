@@ -302,7 +302,7 @@ final class Code {
 		$typed  = isset( $_POST['beltoft_credit_code'] ) ? sanitize_text_field( wp_unslash( $_POST['beltoft_credit_code'] ) ) : '';
 		$result = self::redeem( get_current_user_id(), $typed );
 
-		wc_add_notice( $result['message'], $result['ok'] ? 'success' : 'error' );
+		wc_add_notice( $result['message'], $result['ok'] ? 'success' : 'error', $result['ok'] ? array() : array( 'beltoft_field' => 'code' ) );
 		wp_safe_redirect( $back );
 		exit;
 	}

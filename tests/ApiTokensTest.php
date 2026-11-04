@@ -453,4 +453,13 @@ final class ApiTokensTest extends TestCase {
 		$this->assertStringNotContainsString( $header, $stored );
 		$this->assertStringNotContainsString( $secret, $stored, 'WordPress keeps only a hash.' );
 	}
+
+	public function test_the_create_form_says_working_and_checks_the_name_in_the_page(): void {
+		list( , $user ) = $this->resource();
+		wp_set_current_user( $user );
+		$html = $this->section( true );
+
+		$this->assertMatchesRegularExpression( '/<form method="post" class="beltoft-services-api__new" novalidate data-bs-working>/', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-api__notice is-error', $html );
+	}
 }

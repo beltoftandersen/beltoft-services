@@ -4,7 +4,8 @@
 
 	var config = window.beltoftDnsClaims;
 	var root = document.querySelector( '.beltoft-dns-claim' );
-	if ( ! config || ! root ) { return; }
+	var bs = window.beltoftStatus;
+	if ( ! config || ! root || ! bs ) { return; }
 
 	var MAX_ZONE_BYTES = 100 * 1024;
 
@@ -40,16 +41,17 @@
 		} );
 	}
 
-	/* A button that is disabled with a working label while a request runs. */
-	function busy( button, run ) {
-		var label = button.textContent;
-		button.disabled = true;
-		button.textContent = t.working;
+	/* A request that runs from a button: the bar says what is going on and locks the page's other buttons; a failure stays on the bar. */
+	function busy( button, run, busyText, doneText ) {
+		var handle;
+		if ( bs.locked( 'page' ) ) { return new Promise( function () {} ); }
+		handle = bs.busy( busyText || t.working, 'page', button );
 		return run().then( function ( value ) {
-			if ( button.isConnected ) { button.disabled = false; button.textContent = label; }
+			if ( false !== doneText ) { bs.done( handle, doneText || t.done ); }
 			return value;
 		}, function ( error ) {
-			if ( button.isConnected ) { button.disabled = false; button.textContent = label; }
+			bs.fail( handle, error && error.message ? error.message : t.failed );
+			error.handled = true;
 			throw error;
 		} );
 	}
@@ -144,17 +146,9 @@
 	function cancelLink( claim ) {
 		var cancel = button( t.cancel, 'beltoft-dns-claim__link' );
 		cancel.addEventListener( 'click', function () {
-			busy( cancel, function () { return request( 'DELETE', '/' + claim.id ); } ).then( function () { drop( claim.id ); }, function ( error ) {
-				state( claim.id ).error = error.message;
-				draw( claim.id );
-			} );
+			busy( cancel, function () { return request( 'DELETE', '/' + claim.id ); }, t.working, t.cancelled ).then( function () { drop( claim.id ); }, function () {} );
 		} );
 		return cancel;
-	}
-
-	function errorLine( id ) {
-		var s = state( id );
-		return s.error ? message( s.error, 'beltoft-dns-claim__error' ) : null;
 	}
 
 	/* Polls one claim every few seconds, a limited number of times. */
@@ -188,8 +182,21 @@
 		}, config.interval );
 	}
 
+	// What a finished check found, said once on the bar.
+	function announce( claim ) {
+		if ( 'verified' === claim.status ) {
+			bs.done( null, t.verified );
+		} else if ( 'pending' === claim.status && claim.checked_at ) {
+			bs.fail( null, claim.message || t.not_found );
+		}
+	}
+
 	function waitForCheck( id ) {
-		poll( id, function ( claim ) { return 'checking' !== claim.status; } );
+		poll( id, function ( claim ) {
+			if ( 'checking' === claim.status ) { return false; }
+			announce( claim );
+			return true;
+		} );
 	}
 
 	// The last check's answer per name server, so a failed check says what was found where.
@@ -199,10 +206,8 @@
 		if ( ! claim.checked_at || ! names.length ) {
 			return null;
 		}
-		var silent = names.every( function ( name ) { return [ 'timeout', 'error', 'no_address' ].indexOf( servers[ name ] ) !== -1; } );
 		var box = el( 'div', 'beltoft-dns-claim__result' );
 		box.setAttribute( 'role', 'status' );
-		box.appendChild( el( 'p', 'beltoft-dns-claim__status', silent ? t.not_checked : t.not_found ) );
 		box.appendChild( message( claim.message ) );
 		box.appendChild( el( 'p', 'beltoft-dns-claim__note', t.looked_for.replace( '%s', full ) ) );
 		var list = el( 'ul', 'beltoft-dns-claim__servers' );
@@ -239,17 +244,14 @@
 				block.appendChild( message( t.validUntil.replace( '%s', date.toLocaleString() ), 'beltoft-dns-claim__note' ) );
 			}
 		}
-		var error = errorLine( claim.id );
-		if ( error ) { block.appendChild( error ); }
 		var actions = el( 'p', 'beltoft-dns-claim__actions' );
 		var check = button( t.checkNow );
 		check.addEventListener( 'click', function () {
-			s.error = '';
-			busy( check, function () { return request( 'POST', '/' + claim.id + '/check' ); } ).then( function ( view ) {
+			busy( check, function () { return request( 'POST', '/' + claim.id + '/check' ); }, t.checking, false ).then( function ( view ) {
 				s.polls = 0;
 				s.gave_up = false;
 				put( view );
-			}, function ( failure ) { s.error = failure.message; draw( claim.id ); } );
+			}, function () {} );
 		} );
 		actions.appendChild( check );
 		actions.appendChild( cancelLink( claim ) );
@@ -267,8 +269,6 @@
 				waitForCheck( claim.id );
 			}
 		}
-		var failure = errorLine( claim.id );
-		if ( failure ) { block.appendChild( failure ); }
 		block.appendChild( el( 'p', 'beltoft-dns-claim__actions' ) ).appendChild( cancelLink( claim ) );
 	}
 
@@ -332,7 +332,6 @@
 
 	function verified( claim, block ) {
 		var s = state( claim.id );
-		block.appendChild( el( 'p', 'beltoft-dns-claim__status', t.verified ) );
 		block.appendChild( message( claim.message ) );
 		block.appendChild( el( 'h4', 'beltoft-dns-claim__step', t.bring ) );
 
@@ -341,15 +340,14 @@
 		} else {
 			var find_button = button( t.findRecords );
 			find_button.addEventListener( 'click', function () {
-				s.error = '';
 				s.polls = 0;
 				s.gave_up = false;
-				busy( find_button, function () { return request( 'POST', '/' + claim.id + '/scan' ); } ).then( function ( view ) {
+				busy( find_button, function () { return request( 'POST', '/' + claim.id + '/scan' ); }, t.scanning, false ).then( function ( view ) {
 					s.scanning = null === view.scan;
 					claims[ claims.indexOf( find( claim.id ) ) ] = view;
 					draw( claim.id );
 					if ( s.scanning ) { poll( claim.id, function ( next ) { return null !== next.scan; } ); }
-				}, function ( failure ) { s.error = failure.message; draw( claim.id ); } );
+				}, function () { draw( claim.id ); } );
 			} );
 			block.appendChild( el( 'p', 'beltoft-dns-claim__actions' ) ).appendChild( find_button );
 			if ( s.gave_up ) { block.appendChild( message( t.stillChecking ) ); }
@@ -366,29 +364,27 @@
 		label.setAttribute( 'for', area.id );
 		var read = button( t.readZone );
 		read.addEventListener( 'click', function () {
-			s.error = '';
-			busy( read, function () { return request( 'POST', '/' + claim.id + '/zone-file', { text: area.value } ); } ).then( function ( view ) {
+			busy( read, function () { return request( 'POST', '/' + claim.id + '/zone-file', { text: area.value } ); }, t.readZone ).then( function ( view ) {
 				claims[ claims.indexOf( find( claim.id ) ) ] = view;
 				draw( claim.id );
-			}, function ( failure ) { s.error = failure.message; draw( claim.id ); } );
+			}, function () { draw( claim.id ); } );
 		} );
 		// A dropped or chosen file is read here in the browser; only its text goes to the zone-file route,
 		// which checks size and lines again and parses it. Nothing is uploaded or stored as a file.
 		function useFile( file ) {
-			s.error = '';
 			if ( ! file ) { return; }
-			if ( file.size > MAX_ZONE_BYTES ) { s.error = t.fileTooLarge; draw( claim.id ); return; }
+			if ( file.size > MAX_ZONE_BYTES ) { bs.fail( null, t.fileTooLarge, area ); return; }
 			var name = String( file.name || '' ).toLowerCase();
 			var textType = '' === file.type || 0 === file.type.indexOf( 'text/' );
-			if ( ! textType || ! /\.(txt|zone|bind|db|dns)$|^[^.]*$/.test( name ) ) { s.error = t.fileType; draw( claim.id ); return; }
+			if ( ! textType || ! /\.(txt|zone|bind|db|dns)$|^[^.]*$/.test( name ) ) { bs.fail( null, t.fileType, area ); return; }
 			var reader = new window.FileReader();
 			reader.onload = function () {
 				var text = String( reader.result || '' );
-				if ( /[\u0000-\u0008\u000E-\u001F]/.test( text ) ) { s.error = t.fileBinary; draw( claim.id ); return; }
+				if ( /[\u0000-\u0008\u000E-\u001F]/.test( text ) ) { bs.fail( null, t.fileBinary, area ); return; }
 				area.value = s.zone = text;
 				read.click();
 			};
-			reader.onerror = function () { s.error = t.fileUnread; draw( claim.id ); };
+			reader.onerror = function () { bs.fail( null, t.fileUnread, area ); };
 			reader.readAsText( file );
 		}
 		var picker = el( 'input' );
@@ -439,21 +435,14 @@
 			block.appendChild( ul );
 		}
 
-		var error = errorLine( claim.id );
-		if ( error ) { block.appendChild( error ); }
-		if ( s.note ) { block.appendChild( message( s.note, 'beltoft-dns-claim__note' ) ); }
-
 		var save = button( t.saveRecords );
 		save.disabled = ! rows.length;
 		save.addEventListener( 'click', function () {
 			var chosen = rows.filter( function ( item ) { return ! s.off[ item.key ]; } ).map( function ( item ) { return item.row; } );
-			s.error = '';
-			s.note = '';
-			busy( save, function () { return request( 'POST', '/' + claim.id + '/records', { records: chosen } ); } ).then( function ( view ) {
-				s.note = t.saved.replace( '%d', chosen.length );
+			busy( save, function () { return request( 'POST', '/' + claim.id + '/records', { records: chosen } ); }, t.saveRecords, t.saved.replace( '%d', chosen.length ) ).then( function ( view ) {
 				claims[ claims.indexOf( find( claim.id ) ) ] = view;
 				draw( claim.id );
-			}, function ( failure ) { s.error = failure.message; draw( claim.id ); } );
+			}, function () { draw( claim.id ); } );
 		} );
 		block.appendChild( el( 'p', 'beltoft-dns-claim__actions' ) ).appendChild( save );
 
@@ -471,7 +460,6 @@
 
 		var go = button( t.checkout );
 		go.addEventListener( 'click', function () {
-			s.error = '';
 			busy( go, function () {
 				var changed = rows.length ? unsaved() : null;
 				var first = null === changed ? Promise.resolve( null ) : request( 'POST', '/' + claim.id + '/records', { records: changed } );
@@ -479,15 +467,14 @@
 					if ( valid( view ) && find( claim.id ) ) { claims[ claims.indexOf( find( claim.id ) ) ] = view; }
 					return request( 'POST', '/' + claim.id + '/checkout' );
 				} );
-			} ).then( function ( answer ) {
+			}, t.checkout, false ).then( function ( answer ) {
 				if ( answer && answer.checkout_url ) {
-					go.disabled = true;
 					window.location.assign( answer.checkout_url );
 				} else {
-					s.error = t.failed;
+					bs.fail( null, t.failed );
 					draw( claim.id );
 				}
-			}, function ( failure ) { s.error = failure.message; draw( claim.id ); } );
+			}, function () { draw( claim.id ); } );
 		} );
 		var last = el( 'p', 'beltoft-dns-claim__actions' );
 		last.appendChild( go );
@@ -520,8 +507,6 @@
 		else if ( 'verified' === claim.status ) { verified( claim, block ); }
 		else if ( 'support' === claim.status ) {
 			block.appendChild( message( t.support ) );
-			var trouble = errorLine( claim.id );
-			if ( trouble ) { block.appendChild( trouble ); }
 			block.appendChild( el( 'p', 'beltoft-dns-claim__actions' ) ).appendChild( cancelLink( claim ) );
 		}
 
@@ -529,14 +514,6 @@
 			var order = claims.indexOf( claim );
 			list.insertBefore( block, list.children[ order ] || null );
 		}
-	}
-
-	function showError( text, node ) {
-		var line = root.querySelector( '[data-dns-claim-error]' );
-		while ( line.firstChild ) { line.removeChild( line.firstChild ); }
-		line.hidden = ! text && ! node;
-		if ( text ) { line.textContent = text; }
-		if ( node ) { line.appendChild( node ); }
 	}
 
 	/* The card of a domain the customer has: the licenses list anchors a card by its license. */
@@ -554,29 +531,26 @@
 		var input = form.elements.domain;
 		var submit = form.querySelector( 'button' );
 		var value = input.value.trim();
-		if ( '' === value ) { return; }
-		showError( '' );
-		var label = submit.textContent;
-		submit.disabled = true;
-		submit.textContent = t.adding;
-		function restore() {
-			submit.disabled = false;
-			submit.textContent = label;
-		}
+		if ( '' === value ) { bs.fail( null, t.empty, input ); return; }
+		if ( bs.locked( 'page' ) ) { return; }
+		var handle = bs.busy( t.adding, 'page', submit );
 		request( 'POST', '', { domain: value } ).then( function ( claim ) {
 			if ( ! valid( claim ) ) { throw new Error( t.failed ); }
 			input.value = '';
 			put( claim );
+			bs.done( handle, t.done );
 		} ).catch( function ( error ) {
 			error = error || {};
 			var id = error.data && error.data.data ? error.data.data.resource_id : 0;
 			if ( 'already_yours' === ( error.data && error.data.code ) ) {
 				var link = id ? cardLink( id ) : null;
-				showError( t.alreadyYours + ( link ? ' ' : '' ), link );
+				bs.fail( handle, t.alreadyYours, input );
+				var text = document.querySelector( '.bs-status__text' );
+				if ( link && text ) { text.appendChild( document.createTextNode( ' ' ) ); text.appendChild( link ); }
 			} else {
-				showError( error.message || t.failed );
+				bs.fail( handle, error.message || t.failed, input );
 			}
-		} ).then( restore, restore );
+		} );
 	} );
 
 	request( 'GET', '' ).then( function ( all ) {
@@ -584,5 +558,5 @@
 		claims = all.filter( function ( claim ) { return ! finished( claim ); } );
 		claims.sort( function ( a, b ) { return b.id - a.id; } );
 		claims.slice().forEach( function ( claim ) { draw( claim.id ); } );
-	} ).catch( function ( error ) { showError( error && error.message ? error.message : t.failed ); } );
+	} ).catch( function ( error ) { bs.fail( null, error && error.message ? error.message : t.failed ); } );
 }() );
