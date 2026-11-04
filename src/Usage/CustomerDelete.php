@@ -67,7 +67,7 @@ final class CustomerDelete {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/delete.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE ), \BeltoftServices\Assets::version( 'assets/delete.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/delete.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/delete.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesDelete',
@@ -77,6 +77,8 @@ final class CustomerDelete {
 					'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'limit'   => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 					'expired' => __( 'This page expired. Reload it and try again.', 'beltoft-services' ),
+					/* translators: %s: the word to type */
+					'type'    => __( 'Type %s to confirm the deletion.', 'beltoft-services' ),
 				),
 			)
 		);

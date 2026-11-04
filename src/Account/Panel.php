@@ -160,7 +160,7 @@ final class Panel {
 		echo '<div class="beltoft-services-panel' . ( null !== $page ? ' beltoft-services-panel--page' : '' ) . '" id="beltoft-service-' . (int) $resource->id() . '"';
 		if ( $owner ) {
 			printf(
-				' data-resource="%d" data-state="%s" data-desired="%s"%s',
+				' data-resource="%1$d" data-bs-scope="%1$d" data-state="%2$s" data-desired="%3$s"%4$s',
 				(int) $resource->id(),
 				esc_attr( $state ),
 				esc_attr( (string) $resource->get( 'desired' ) ),
@@ -196,11 +196,6 @@ final class Panel {
 		}
 
 		if ( $owner ) {
-			// On a server page the line for script feedback sits under the head, where the buttons are.
-			if ( null !== $page ) {
-				echo '<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>';
-			}
-
 			Progress::render( Progress::build( $resource ) );
 			self::owner_part( $resource, $page );
 		}
@@ -264,10 +259,6 @@ final class Panel {
 			}
 			echo '</p>';
 		}
-
-		if ( null === $page ) {
-			echo '<p class="beltoft-services-panel__notice" data-notice role="status" aria-live="polite"></p>';
-		}
 	}
 
 	/**
@@ -313,7 +304,7 @@ final class Panel {
 		do_action( 'beltoft_services_account_assets', self::HANDLE, $active );
 
 		wp_enqueue_script( 'beltoft-services-progress', plugins_url( 'assets/progress.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/progress.js' ), true );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array( 'beltoft-services-progress' ), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array( 'beltoft-services-progress', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesAccount',

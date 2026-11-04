@@ -297,7 +297,7 @@ class ServerNameTest extends BackupTestCase {
 		\BeltoftServices\Proxmox\Panels::account( $fresh );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'The new name is used as the hostname after the next reboot. Your SSH client may warn that the server&#039;s host key changed.', str_replace( "'", '&#039;', $html ) );
-		$this->assertMatchesRegularExpression( '#data-hostname-note.*data-action="reboot"#s', $html, 'The existing Reboot action is offered beside it.' );
+		$this->assertMatchesRegularExpression( '#data-hostname-note.*data-power-action="reboot"#s', $html, 'The existing Reboot action is offered beside it.' );
 		$this->assertStringContainsString( 'value="web-02"', $html );
 	}
 

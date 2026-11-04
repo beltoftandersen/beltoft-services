@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_fw_id = (int) $r->id();
 ?>
-<div class="beltoft-services-fw" data-fw data-resource="<?php echo (int) $beltoft_services_fw_id; ?>" data-fw-state="loading">
+<div class="beltoft-services-fw" data-fw data-resource="<?php echo (int) $beltoft_services_fw_id; ?>" data-bs-scope="<?php echo (int) $beltoft_services_fw_id; ?>" data-fw-state="loading">
 	<h4><?php esc_html_e( 'Firewall', 'beltoft-services' ); ?></h4>
 	<p class="description"><?php esc_html_e( 'Choose which ports can be reached on your server. Changes take effect within a minute and need no SSH.', 'beltoft-services' ); ?></p>
 	<p class="beltoft-services-fw__status" data-fw-status role="status" aria-live="polite"><?php esc_html_e( 'Loading…', 'beltoft-services' ); ?></p>
@@ -84,7 +84,6 @@ $beltoft_services_fw_id = (int) $r->id();
 					<label for="beltoft-fw-label-<?php echo (int) $beltoft_services_fw_id; ?>"><?php esc_html_e( 'Name (optional)', 'beltoft-services' ); ?></label>
 					<input type="text" id="beltoft-fw-label-<?php echo (int) $beltoft_services_fw_id; ?>" name="label" maxlength="40" autocomplete="off">
 				</p>
-				<p class="beltoft-services-fw__error" data-fw-form-error role="alert"></p>
 				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Add to the list', 'beltoft-services' ); ?></button></p>
 			</form>
 		</div>
@@ -97,10 +96,8 @@ $beltoft_services_fw_id = (int) $r->id();
 			<p data-fw-ssh-mine-row hidden><button type="button" class="beltoft-services-fw__link" data-fw-ssh-mine><?php esc_html_e( 'Add my address', 'beltoft-services' ); ?></button></p>
 		</div>
 
-		<p class="beltoft-services-fw__error" data-fw-error role="alert"></p>
 		<p class="beltoft-services-fw__apply">
 			<button type="button" class="button woocommerce-button" data-fw-apply disabled><?php esc_html_e( 'Apply changes', 'beltoft-services' ); ?></button>
-			<span class="beltoft-services-fw__saved" data-fw-saved></span>
 		</p>
 
 		<div class="beltoft-services-fw__fixed">
@@ -123,15 +120,4 @@ $beltoft_services_fw_id = (int) $r->id();
 
 		<p class="beltoft-services-fw__again"><button type="button" class="button woocommerce-button" data-fw-reset><?php esc_html_e( 'Start again', 'beltoft-services' ); ?></button></p>
 	</div>
-
-	<dialog class="beltoft-services-vm__dialog beltoft-services-fw__dialog" data-fw-dialog aria-labelledby="beltoft-fw-dialog-title-<?php echo (int) $beltoft_services_fw_id; ?>">
-		<form class="beltoft-services-vm-form" method="dialog" data-fw-dialog-form>
-			<h5 id="beltoft-fw-dialog-title-<?php echo (int) $beltoft_services_fw_id; ?>" data-fw-dialog-title></h5>
-			<p data-fw-dialog-body></p>
-			<p class="beltoft-services-vm__buttons">
-				<button type="submit" class="button woocommerce-button" data-fw-dialog-ok></button>
-				<button type="button" class="button woocommerce-button" data-fw-dialog-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
-			</p>
-		</form>
-	</dialog>
 </div>

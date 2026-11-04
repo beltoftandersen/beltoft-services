@@ -90,12 +90,24 @@ final class ApiTokens {
 	 * The layout stylesheet and the copy script, on the pages that can show the section.
 	 */
 	public static function assets(): void {
-		if ( ! is_user_logged_in() || ! function_exists( 'is_wc_endpoint_url' ) || ! ( is_wc_endpoint_url( 'edit-account' ) || is_wc_endpoint_url( 'security' ) ) ) {
+		if ( ! is_user_logged_in() || ! function_exists( 'is_wc_endpoint_url' ) || ! ( is_wc_endpoint_url( 'edit-account' ) || is_wc_endpoint_url( 'security' ) || is_wc_endpoint_url( 'edit-address' ) ) ) {
 			return;
 		}
 
 		Panel::style();
-		wp_enqueue_script( 'beltoft-services-api-tokens', plugins_url( 'assets/api-tokens.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-tokens.js' ), true );
+		wp_enqueue_script( 'beltoft-services-api-tokens', plugins_url( 'assets/api-tokens.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/api-tokens.js' ), true );
+		wp_localize_script(
+			'beltoft-services-api-tokens',
+			'beltoftApiTokens',
+			array(
+				'strings' => array(
+					'name'     => __( 'Enter a name for the token.', 'beltoft-services' ),
+					'sending'  => __( 'Sending the code…', 'beltoft-services' ),
+					'creating' => __( 'Creating the token…', 'beltoft-services' ),
+					'working'  => __( 'Working…', 'beltoft-services' ),
+				),
+			)
+		);
 	}
 
 	/**

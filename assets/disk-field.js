@@ -10,10 +10,10 @@
       if (reply && reply.ok) {
         $(document.body).trigger('update_checkout');
       } else {
-        window.alert(beltoftServicesDiskField.failed);
+        window.setTimeout(function () { window.beltoftStatus.fail(null, beltoftServicesDiskField.failed, select.get(0)); }, 0); // after the field is enabled again, so it can take the focus
       }
     }).fail(function () {
-      window.alert(beltoftServicesDiskField.failed);
+      window.setTimeout(function () { window.beltoftStatus.fail(null, beltoftServicesDiskField.failed, select.get(0)); }, 0); // after the field is enabled again, so it can take the focus
     }).always(function () {
       select.prop('disabled', false);
     });

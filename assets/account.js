@@ -58,12 +58,11 @@
 		return ( isNaN( seconds ) ? 60 : Math.max( 1, seconds ) ) * 1000;
 	}
 
-	function notice( panel, text ) {
-		var line = panel.querySelector( '[data-notice]' );
+	var bs = window.beltoftStatus;
 
-		if ( line ) {
-			line.textContent = text;
-		}
+	// A problem goes to the status bar, under the page's tabs.
+	function notice( panel, text ) {
+		bs.fail( null, text );
 	}
 
 	// Waits for the tab to be visible before a poll runs, and polls again when it comes back.
@@ -105,29 +104,6 @@
 		// Active only while the server says work is going on: a queued form alone proves nothing.
 		// A shutdown or start that the VM has not followed yet counts as work: the poll goes on until it does (or the server gives up waiting).
 		return !! ( data.working || data.power_pending || ( data.progress && data.progress.active ) );
-	}
-
-	// A button that has been clicked shows it is working; reset() gives it back after an error.
-	function busy( button ) {
-		button.disabled = true;
-		button.setAttribute( 'aria-busy', 'true' );
-		button.classList.add( 'is-busy' );
-
-		if ( undefined === button.beltoftLabel ) {
-			button.beltoftLabel = button.textContent;
-			button.textContent = config.strings.working;
-		}
-	}
-
-	function reset( button ) {
-		button.disabled = false;
-		button.removeAttribute( 'aria-busy' );
-		button.classList.remove( 'is-busy' );
-
-		if ( undefined !== button.beltoftLabel ) {
-			button.textContent = button.beltoftLabel;
-			button.beltoftLabel = undefined;
-		}
 	}
 
 	function poll( panel ) {
@@ -221,30 +197,40 @@
 
 	function act( panel, button ) {
 		var id = panel.getAttribute( 'data-resource' );
+		var action = button.getAttribute( 'data-action' );
+		var own = window.beltoftServicesVm && window.beltoftServicesVm.strings ? window.beltoftServicesVm.strings : {};
+		var handle;
 
-		busy( button );
+		// One request per click: while this service works, nothing else is sent for it.
+		if ( bs.locked( id ) ) {
+			return;
+		}
 
-		request( 'POST', id + '/actions/' + encodeURIComponent( button.getAttribute( 'data-action' ) ) ).then( function ( response ) {
+		handle = bs.busy( own[ action + 'Start' ] || config.strings.working, id, button );
+
+		request( 'POST', id + '/actions/' + encodeURIComponent( action ) ).then( function ( response ) {
 			if ( 202 === response.status ) {
-				notice( panel, config.strings.queued );
+				// The bar keeps saying so, and the buttons stay locked, until the page reloads at the end.
+				panel.beltoftWork = handle;
 				settle( panel, 5 );
 				return;
 			}
 
-			reset( button );
-
 			return expired( response ).then( function ( stale ) {
+				var message;
+
 				if ( stale ) {
-					notice( panel, config.strings.expired );
+					message = config.strings.expired;
 				} else if ( 429 === response.status ) {
-					notice( panel, config.strings.tooMany );
+					message = config.strings.tooMany;
 				} else {
-					notice( panel, 403 === response.status ? config.strings.refused : config.strings.failed );
+					message = 403 === response.status ? config.strings.refused : config.strings.failed;
 				}
+
+				bs.fail( handle, message );
 			} );
 		} ).catch( function () {
-			reset( button );
-			notice( panel, config.strings.failed );
+			bs.fail( handle, config.strings.failed );
 		} );
 	}
 
@@ -310,7 +296,7 @@
 				return;
 			}
 
-			if ( button && ! button.disabled ) {
+			if ( button && ! button.disabled && ! button.hasAttribute( 'aria-busy' ) ) {
 				act( panel, button );
 			}
 		} );

@@ -404,4 +404,17 @@ class CodeTest extends CreditTestCase {
 		$this->assertStringContainsString( 'Test notice text.', \BeltoftServices\Credit\Page::html() );
 		wc_clear_notices();
 	}
+
+	public function test_notices_go_to_the_status_bar_and_a_refused_code_under_its_field(): void {
+		wp_set_current_user( $this->customer() );
+		wc_clear_notices();
+		wc_add_notice( 'That code is not valid.', 'error', array( 'beltoft_field' => 'code' ) );
+		$html = \BeltoftServices\Credit\Page::html();
+
+		$this->assertStringContainsString( '<p hidden data-bs-flash="fail" data-bs-field="#beltoft-credit-code">That code is not valid.</p>', $html );
+		$this->assertStringNotContainsString( 'woocommerce-error', $html );
+		$this->assertSame( array(), wc_get_notices(), 'Printed once.' );
+		$this->assertMatchesRegularExpression( '/<form class="beltoft-services-credit__code"[^>]*novalidate data-bs-working=/', $html );
+		$this->assertTrue( wp_script_is( 'beltoft-services-credit', 'enqueued' ) );
+	}
 }

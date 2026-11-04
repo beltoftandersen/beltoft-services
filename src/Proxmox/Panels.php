@@ -102,8 +102,8 @@ final class Panels {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
-		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '' ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
+		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status' ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
 		wp_enqueue_style( 'beltoft-services-metrics', plugins_url( 'assets/metrics.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.css' ) );
 		wp_localize_script( 'beltoft-services-metrics', 'beltoftServicesMetrics', array( 'strings' => array(
 			'loading' => __( 'Loading usage…', 'beltoft-services' ),
@@ -124,6 +124,7 @@ final class Panels {
 			'noReading' => __( 'No reading', 'beltoft-services' ),
 			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),
 			'alertsOff' => __( 'Usage emails are off for this server.', 'beltoft-services' ),
+			'alertsSaving' => __( 'Saving the usage email setting…', 'beltoft-services' ),
 			'alertsFailed' => __( 'Could not save. Please try again.', 'beltoft-services' ),
 		) ) );
 		wp_localize_script(
@@ -168,6 +169,17 @@ final class Panels {
 					'shutdownStill'  => __( 'The server is still running. The shutdown has not finished yet.', 'beltoft-services' ),
 					'busy'           => __( 'Busy', 'beltoft-services' ),
 					'running'        => __( 'The server is running.', 'beltoft-services' ),
+					'renameStart'    => __( 'Saving the name.', 'beltoft-services' ),
+					'renameDone'     => __( 'The name is saved.', 'beltoft-services' ),
+					'keyStart'       => __( 'Saving the SSH key.', 'beltoft-services' ),
+					'keyDone'        => __( 'The SSH key is saved.', 'beltoft-services' ),
+					'resetTitle'     => __( 'Reset the password?', 'beltoft-services' ),
+					'resetYes'       => __( 'Reset password', 'beltoft-services' ),
+					'resetText'      => __( 'A new password is set on the server. Anything that uses the old password stops working.', 'beltoft-services' ),
+					'resetStart'     => __( 'Resetting the password.', 'beltoft-services' ),
+					'resetDone'      => __( 'The password is reset.', 'beltoft-services' ),
+					'revealStart'    => __( 'Showing the password…', 'beltoft-services' ),
+					'revealDone'     => __( 'The password is shown below, one time only. Copy it now.', 'beltoft-services' ),
 					'newPassword'    => __( 'Use "Show password once" for your new password.', 'beltoft-services' ),
 				),
 			)

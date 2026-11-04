@@ -87,7 +87,7 @@ final class AppTab {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/app-tab.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-tab.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-tab.js', BELTOFT_SERVICES_FILE ), array( $parent ), \BeltoftServices\Assets::version( 'assets/app-tab.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/app-tab.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesApp',
@@ -95,6 +95,8 @@ final class AppTab {
 				'strings' => array(
 					'gone'   => __( 'The login has already been shown or is no longer available.', 'beltoft-services' ),
 					'failed' => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
+					'revealing' => __( 'Showing the login…', 'beltoft-services' ),
+					'revealed' => __( 'The login is shown below, one time only. Copy it now.', 'beltoft-services' ),
 					'retrying' => __( 'Starting again…', 'beltoft-services' ),
 					'limit'  => __( 'You can try again three times an hour. Please wait and try again later.', 'beltoft-services' ),
 					'user'   => __( 'Username', 'beltoft-services' ),

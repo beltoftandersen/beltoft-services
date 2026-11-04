@@ -346,7 +346,6 @@ class DomainsTest extends TestCase {
 		$this->assertStringContainsString( 'data-zone="example.com"', $html );
 		$this->assertStringContainsString( '192.0.2.7', $html );
 		$this->assertStringContainsString( 'Delete this record?', $html );
-		$this->assertStringContainsString( 'role="alert"', $html );
 		$this->assertStringNotContainsString( 'data-readonly', $html );
 	}
 
@@ -448,5 +447,16 @@ class DomainsTest extends TestCase {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain.js' );
 		$this->assertStringContainsString( "hasAttribute( 'data-domain-page' )", $js );
 		$this->assertStringContainsString( 'data-tab-link', $js );
+	}
+
+	public function test_the_domain_page_has_a_scope_for_the_lock_and_no_notice_spots_of_its_own(): void {
+		$r    = $this->service( $this->user, 'scope.example' );
+		$html = $this->page( $r ) . $this->page( $r, 'transfer' );
+
+		$this->assertStringContainsString( 'data-bs-scope="' . $r->id() . '"', $html );
+		foreach ( array( 'beltoft-services-domain__error', 'beltoft-dnse__error', 'beltoft-dns-error', 'beltoft-services-domain-stepup__error' ) as $old ) {
+			$this->assertStringNotContainsString( $old, $html );
+		}
+		$this->assertStringNotContainsString( 'beltoft-dns-claim__error', $this->render( array(), 'add' ) );
 	}
 }

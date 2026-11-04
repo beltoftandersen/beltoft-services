@@ -51,7 +51,6 @@ $beltoft_services_net_words = array(
 		<p class="description"><?php esc_html_e( 'To check inside the server, run this and look for the private address:', 'beltoft-services' ); ?> <code>ip -br a</code></p>
 	<?php endif; ?>
 
-	<p class="beltoft-services-net__status" data-net-message role="status" aria-live="polite"><?php echo in_array( $beltoft_services_net_state, array( 'attaching', 'detaching' ), true ) ? esc_html__( 'Working on it. This takes a few minutes.', 'beltoft-services' ) : ''; ?></p>
 
 	<p class="beltoft-services-net__buttons">
 		<?php if ( $view['can_attach'] ) : ?>
@@ -61,15 +60,4 @@ $beltoft_services_net_words = array(
 			<button type="button" class="button woocommerce-button" data-net-detach><?php esc_html_e( 'Detach', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
 	</p>
-
-	<dialog class="beltoft-services-vm__dialog beltoft-services-net__dialog" data-net-dialog aria-labelledby="beltoft-net-dialog-title-<?php echo (int) $view['resource_id']; ?>">
-		<form class="beltoft-services-vm-form" method="dialog" data-net-dialog-form>
-			<h5 id="beltoft-net-dialog-title-<?php echo (int) $view['resource_id']; ?>" data-net-dialog-title></h5>
-			<p data-net-dialog-body></p>
-			<p class="beltoft-services-vm__buttons">
-				<button type="submit" class="button woocommerce-button" data-net-dialog-ok></button>
-				<button type="button" class="button woocommerce-button" data-net-dialog-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
-			</p>
-		</form>
-	</dialog>
 </div>

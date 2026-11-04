@@ -8,19 +8,12 @@
 	var account = window.beltoftServicesAccount;
 	var mail = window.beltoftServicesMail;
 
-	if ( ! account || ! mail || ! window.fetch ) {
+	if ( ! account || ! mail || ! window.fetch || ! window.beltoftStatus ) {
 		return;
 	}
 
 	var strings = mail.strings;
-
-	function say( box, text ) {
-		var out = box.querySelector( '[data-mail-notice]' );
-
-		if ( out ) {
-			out.textContent = text;
-		}
-	}
+	var S = window.beltoftStatus;
 
 	function resourceOf( box ) {
 		var panel = box.closest( '[data-resource]' );
@@ -70,10 +63,11 @@
 		holder.querySelector( '[data-mail-secret-value]' ).scrollIntoView( { block: 'nearest' } );
 	}
 
-	function reveal( box, email, line, button ) {
+	// h: the handle of the request that asked for the password; it ends here.
+	function reveal( box, email, line, button, h ) {
 		return call( box, 'POST', '/mail-reveal', { email: email } ).then( function ( result ) {
 			if ( ! result.ok || ! result.data.password ) {
-				say( box, 409 === result.status ? strings.gone : problem( result ) );
+				S.fail( h, 409 === result.status ? strings.gone : problem( result ) );
 
 				if ( button ) {
 					button.disabled = 409 === result.status;
@@ -82,8 +76,8 @@
 				return;
 			}
 
-			say( box, '' );
 			secret( box, line || email, result.data.password );
+			S.done( h, strings.once );
 
 			if ( button ) {
 				button.hidden = true;
@@ -91,14 +85,19 @@
 		} );
 	}
 
-	function guarded( box, button, work ) {
-		button.disabled = true;
-		say( box, '' );
+	// One request per click: the bar says what is going on, the button is busy and the domain's other buttons wait.
+	function guarded( box, button, text, work ) {
+		var scope = resourceOf( box );
+		var h;
 
-		return work().catch( function () {
-			say( box, strings.failed );
-		} ).then( function () {
-			button.disabled = false;
+		if ( S.locked( scope ) ) {
+			return Promise.resolve();
+		}
+
+		h = S.busy( text, scope, button );
+
+		return work( h ).catch( function () {
+			S.fail( h, strings.failed );
 		} );
 	}
 
@@ -125,7 +124,7 @@
 
 			if ( value && window.navigator.clipboard ) {
 				window.navigator.clipboard.writeText( value.textContent ).then( function () {
-					say( box, strings.copied );
+					S.info( strings.copied );
 				} );
 			}
 
@@ -141,8 +140,8 @@
 		if ( target.hasAttribute( 'data-mail-reveal' ) ) {
 			var email = target.getAttribute( 'data-mail-reveal' );
 
-			guarded( box, target, function () {
-				return reveal( box, email, email, target );
+			guarded( box, target, strings.revealing, function ( h ) {
+				return reveal( box, email, email, target, h );
 			} );
 
 			return;
@@ -151,15 +150,15 @@
 		if ( target.hasAttribute( 'data-mail-reset' ) ) {
 			var who = target.getAttribute( 'data-mail-reset' );
 
-			guarded( box, target, function () {
+			guarded( box, target, strings.resetting, function ( h ) {
 				return call( box, 'POST', '/mail/mailboxes/' + encodeURIComponent( who ) + '/password' ).then( function ( result ) {
 					if ( ! result.ok ) {
-						say( box, problem( result ) );
+						S.fail( h, problem( result ) );
 
 						return null;
 					}
 
-					return reveal( box, who, strings.reset.replace( '%s', who ), null );
+					return reveal( box, who, strings.reset.replace( '%s', who ), null, h );
 				} );
 			} );
 
@@ -168,7 +167,8 @@
 
 		if ( target.hasAttribute( 'data-mail-create-submit' ) ) {
 			var form = target.closest( '[data-mail-create]' );
-			var local = form.querySelector( '[data-mail-local]' ).value.trim();
+			var localField = form.querySelector( '[data-mail-local]' );
+			var local = localField.value.trim();
 			var name = form.querySelector( '[data-mail-name]' ).value.trim();
 			var size = form.querySelector( '[data-mail-size]' );
 			var body = { local: local, name: name };
@@ -177,15 +177,15 @@
 				body.quota_mb = Math.round( parseFloat( size.value ) * 1024 );
 			}
 
-			guarded( box, target, function () {
+			guarded( box, target, strings.creating, function ( h ) {
 				return call( box, 'POST', '/mail/mailboxes', body ).then( function ( result ) {
 					if ( ! result.ok ) {
-						say( box, problem( result ) );
+						S.fail( h, problem( result ), localField );
 
 						return null;
 					}
 
-					return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null );
+					return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
 				} );
 			} );
 
@@ -196,12 +196,12 @@
 			var gone = target.getAttribute( 'data-mail-delete' );
 			var input = target.closest( 'details' ).querySelector( '[data-mail-delete-confirm]' );
 
-			guarded( box, target, function () {
+			guarded( box, target, strings.deleting, function ( h ) {
 				return call( box, 'DELETE', '/mail/mailboxes/' + encodeURIComponent( gone ) + '?confirm=' + encodeURIComponent( input.value.trim() ) ).then( function ( result ) {
 					if ( result.ok ) {
 						fresh( box );
 					} else {
-						say( box, problem( result ) );
+						S.fail( h, problem( result ), input );
 					}
 				} );
 			} );
@@ -211,16 +211,17 @@
 
 		if ( target.hasAttribute( 'data-mail-alias-submit' ) ) {
 			var alias = target.closest( '[data-mail-alias-create]' );
+			var aliasField = alias.querySelector( '[data-mail-alias-local]' );
 
-			guarded( box, target, function () {
+			guarded( box, target, strings.aliasing, function ( h ) {
 				return call( box, 'POST', '/mail/aliases', {
-					address: alias.querySelector( '[data-mail-alias-local]' ).value.trim(),
+					address: aliasField.value.trim(),
 					goto: lines( alias.querySelector( '[data-mail-alias-goto]' ).value )
 				} ).then( function ( result ) {
 					if ( result.ok ) {
 						fresh( box );
 					} else {
-						say( box, problem( result ) );
+						S.fail( h, problem( result ), aliasField );
 					}
 				} );
 			} );
@@ -232,17 +233,20 @@
 			var address = target.getAttribute( 'data-mail-alias-delete' );
 			var holder = target.closest( '[data-mail-aliases]' );
 
-			if ( holder && ! window.confirm( holder.getAttribute( 'data-confirm' ) || strings.confirm ) ) {
-				return;
-			}
+			// The same question as before, in the page's own dialog.
+			S.confirm( { text: ( holder && holder.getAttribute( 'data-confirm' ) ) || strings.confirm, confirm: target.textContent, danger: true } ).then( function ( yes ) {
+				if ( ! yes ) {
+					return;
+				}
 
-			guarded( box, target, function () {
-				return call( box, 'DELETE', '/mail/aliases/' + encodeURIComponent( address ) ).then( function ( result ) {
-					if ( result.ok ) {
-						fresh( box );
-					} else {
-						say( box, problem( result ) );
-					}
+				guarded( box, target, strings.deleting, function ( h ) {
+					return call( box, 'DELETE', '/mail/aliases/' + encodeURIComponent( address ) ).then( function ( result ) {
+						if ( result.ok ) {
+							fresh( box );
+						} else {
+							S.fail( h, problem( result ) );
+						}
+					} );
 				} );
 			} );
 
@@ -250,13 +254,12 @@
 		}
 
 		if ( target.hasAttribute( 'data-mail-dns-check' ) ) {
-			say( box, strings.checking );
-			guarded( box, target, function () {
+			guarded( box, target, strings.checking, function ( h ) {
 				return call( box, 'POST', '/mail/dns/check' ).then( function ( result ) {
 					if ( result.ok ) {
 						fresh( box );
 					} else {
-						say( box, problem( result ) );
+						S.fail( h, problem( result ) );
 					}
 				} );
 			} );

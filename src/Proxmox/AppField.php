@@ -356,7 +356,7 @@ final class AppField {
 			)
 		);
 
-		echo '<p class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed after the server starts, on a system its tile names.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-services-app__note description" data-app-note>' . esc_html__( 'A ready-made app is installed after the server starts. It comes with the system shown on its tile.', 'beltoft-services' ) . '</p>';
 
 		echo '<p class="form-row form-row-wide" data-tiles-version-row hidden><label for="' . esc_attr( self::POST_VERSION ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
 		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( self::POST_VERSION ) . '" id="' . esc_attr( self::POST_VERSION ) . '" data-tiles-version data-selected="' . esc_attr( $picked['version'] ) . '"></select></span></p>';
@@ -567,7 +567,7 @@ final class AppField {
 	public static function enqueue(): void {
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/app-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-field.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-field.js' ), true );
-		wp_enqueue_script( 'beltoft-services-app-tier', plugins_url( 'assets/app-tier.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/app-tier.js' ), true );
+		wp_enqueue_script( 'beltoft-services-app-tier', plugins_url( 'assets/app-tier.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/app-tier.js' ), true );
 
 		// Only checkout keeps a cart line in step; the picker has no cart line to change before the server is added.
 		if ( function_exists( 'is_checkout' ) && is_checkout() && function_exists( 'wp_create_nonce' ) ) {

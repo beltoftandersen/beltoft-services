@@ -9,11 +9,12 @@
 	var cfg = window.beltoftServicesFirewall;
 	var root = document.querySelector( '[data-fw]' );
 
-	if ( ! account || ! cfg || ! root || ! window.fetch ) {
+	if ( ! account || ! cfg || ! root || ! window.fetch || ! window.beltoftStatus ) {
 		return;
 	}
 
 	var S = cfg.strings;
+	var B = window.beltoftStatus;
 	var id = root.getAttribute( 'data-resource' );
 	var url = account.root + id + '/firewall';
 	var data = null;
@@ -21,6 +22,7 @@
 	var saved = '';
 	var confirmOff = false;
 	var timer = null;
+	var applyHandle = null;
 
 	function q( selector ) {
 		return root.querySelector( selector );
@@ -48,6 +50,7 @@
 		} );
 	}
 
+	// The state line under the title: loading, and the hint that changes are not applied yet. Messages about what is happening go to the bar.
 	function say( text ) {
 		q( '[data-fw-status]' ).textContent = text || '';
 	}
@@ -151,14 +154,10 @@
 		q( '[data-fw-apply]' ).disabled = busy || same;
 		q( '[data-fw-reset]' ).disabled = busy;
 
-		if ( busy ) {
-			say( S.applying );
-		} else if ( data.state === 'failed' ) {
-			say( S.failed );
-		} else if ( ! same ) {
-			say( S.unsaved );
-		} else {
+		if ( busy || data.state === 'failed' || same ) {
 			say( '' );
+		} else {
+			say( S.unsaved );
 		}
 	}
 
@@ -249,7 +248,7 @@
 		if ( navigator.clipboard && navigator.clipboard.writeText ) {
 			navigator.clipboard.writeText( text ).then( done );
 		} else {
-			window.prompt( '', text );
+			B.confirm( { title: '', text: text, confirm: S.ok, cancel: false } );
 		}
 	}
 
@@ -283,16 +282,36 @@
 		ackRow.hidden = false;
 	}
 
+	// The apply (or the start of the page while the server still applies) ends in the bar: saved, or failed.
+	function settle() {
+		var h = applyHandle;
+
+		if ( ! h ) {
+			return;
+		}
+
+		applyHandle = null;
+
+		if ( data.state === 'failed' ) {
+			B.fail( h, S.failed );
+		} else {
+			B.done( h, S.saved );
+		}
+
+		render();
+	}
+
 	function load() {
 		return request( 'GET', url ).then( function ( reply ) {
 			if ( ! reply.ok ) {
-				say( S.loadFailed );
+				say( '' );
+				B.fail( applyHandle, S.loadFailed );
+				applyHandle = null;
 
 				return;
 			}
 
 			var first = data === null;
-			var wasWorking = data !== null && working();
 
 			data = reply.body;
 
@@ -301,15 +320,21 @@
 				saved = snapshot();
 			}
 
+			if ( working() && ! applyHandle ) {
+				applyHandle = B.busy( S.applying, id );
+			}
+
 			render();
 
 			if ( working() ) {
 				poll();
-			} else if ( wasWorking && data.state === 'idle' ) {
-				q( '[data-fw-saved]' ).textContent = S.saved;
+			} else {
+				settle();
 			}
 		} ).catch( function () {
-			say( S.loadFailed );
+			say( '' );
+			B.fail( applyHandle, S.loadFailed );
+			applyHandle = null;
 		} );
 	}
 
@@ -328,22 +353,24 @@
 		}, 4000 );
 	}
 
-	function send( on, rules, ack, confirm ) {
-		q( '[data-fw-error]' ).textContent = '';
-		q( '[data-fw-saved]' ).textContent = '';
+	function send( on, rules, ack, confirm, button ) {
+		var h;
+
+		if ( B.locked( id ) ) {
+			return Promise.resolve();
+		}
+
+		// At once: the bar says Applying, this button is busy and the others of the page wait.
+		h = B.busy( S.applying, id, button );
 
 		return request( 'PUT', url, { on: on, rules: rules, ack_no_ssh: ack, confirm_off: confirm } ).then( function ( reply ) {
 			if ( reply.ok ) {
 				data = null;
 				saved = '';
 				confirmOff = false;
-				say( S.applying );
+				applyHandle = h;
 
-				return load().then( function () {
-					if ( data && ! working() && data.state === 'idle' ) {
-						q( '[data-fw-saved]' ).textContent = S.saved;
-					}
-				} );
+				return load();
 			}
 
 			var message = reply.body && reply.body.message ? reply.body.message : S.error;
@@ -352,35 +379,14 @@
 				message = account.strings.tooMany;
 			}
 
-			q( '[data-fw-error]' ).textContent = message;
+			B.fail( h, message );
+			render();
 
 			return null;
 		} ).catch( function () {
-			q( '[data-fw-error]' ).textContent = S.error;
+			B.fail( h, S.error );
+			render();
 		} );
-	}
-
-	function dialog( title, body, ok, then ) {
-		var box = q( '[data-fw-dialog]' );
-
-		q( '[data-fw-dialog-title]' ).textContent = title;
-		q( '[data-fw-dialog-body]' ).textContent = body;
-		q( '[data-fw-dialog-ok]' ).textContent = ok;
-		box.onclose = null;
-		q( '[data-fw-dialog-form]' ).onsubmit = function ( event ) {
-			event.preventDefault();
-			box.close();
-			then();
-		};
-		q( '[data-fw-dialog-cancel]' ).onclick = function () {
-			box.close();
-		};
-
-		if ( box.showModal ) {
-			box.showModal();
-		} else {
-			box.setAttribute( 'open', '' );
-		}
 	}
 
 	function presetRules( name ) {
@@ -412,14 +418,22 @@
 			presetRules( target.getAttribute( 'data-fw-preset' ) ).forEach( function ( rule ) {
 				problem = addRule( rule ) || problem;
 			} );
-			q( '[data-fw-form-error]' ).textContent = problem;
+
+			if ( problem ) {
+				B.fail( null, problem );
+			} else {
+				B.info( S.added );
+			}
+
 			render();
 		} else if ( target.hasAttribute( 'data-fw-switch' ) ) {
 			if ( draft.on ) {
-				dialog( S.offTitle, S.offBody, S.turnOff, function () {
-					draft.on = false;
-					confirmOff = true;
-					render();
+				B.confirm( { title: S.offTitle, text: S.offBody, confirm: S.turnOff, danger: true } ).then( function ( yes ) {
+					if ( yes ) {
+						draft.on = false;
+						confirmOff = true;
+						render();
+					}
 				} );
 			} else {
 				draft.on = true;
@@ -428,24 +442,33 @@
 		} else if ( target.hasAttribute( 'data-fw-apply' ) ) {
 			var ack = q( '[data-fw-ssh-ack]' ).checked;
 
-			send( draft.on, draft.rules, ack, confirmOff );
+			send( draft.on, draft.rules, ack, confirmOff, target );
 		} else if ( target.hasAttribute( 'data-fw-reset' ) ) {
-			dialog( S.resetTitle, S.resetBody, S.reset, function () {
+			B.confirm( { title: S.resetTitle, text: S.resetBody, confirm: S.reset, danger: true } ).then( function ( yes ) {
+				var h;
+
+				if ( ! yes || B.locked( id ) ) {
+					return;
+				}
+
+				h = B.busy( S.applying, id, target );
 				request( 'POST', account.root + id + '/actions/fw_reset', { args: {} } ).then( function ( reply ) {
 					if ( reply.ok ) {
 						data = null;
 						saved = '';
-						say( S.applying );
+						applyHandle = h;
 						load();
 					} else {
-						q( '[data-fw-error]' ).textContent = ( reply.body && reply.body.message ) || S.error;
+						B.fail( h, ( reply.body && reply.body.message ) || S.error );
 					}
+				} ).catch( function () {
+					B.fail( h, S.error );
 				} );
 			} );
 		} else if ( target.hasAttribute( 'data-fw-start-standard' ) ) {
-			send( true, data.defaults, false, false );
+			send( true, data.defaults, false, false, target );
 		} else if ( target.hasAttribute( 'data-fw-start-open' ) ) {
-			send( false, data.defaults, false, false );
+			send( false, data.defaults, false, false, target );
 		} else if ( target.hasAttribute( 'data-fw-add-mine' ) ) {
 			var sources = q( '[name="sources"]' );
 
@@ -471,24 +494,23 @@
 	form.addEventListener( 'submit', function ( event ) {
 		event.preventDefault();
 
-		var error = q( '[data-fw-form-error]' );
-		var port = form.querySelector( '[name="port"]' ).value.trim();
+		var portField = form.querySelector( '[name="port"]' );
+		var sourcesField = form.querySelector( '[name="sources"]' );
+		var port = portField.value.trim();
 		var match = /^(\d{1,5})(?:\s*[-:]\s*(\d{1,5}))?$/.exec( port );
 		var sources = [];
 
-		error.textContent = '';
-
 		if ( ! match || +match[ 1 ] < 1 || +match[ 1 ] > 65535 || ( match[ 2 ] && ( +match[ 2 ] > 65535 || +match[ 2 ] <= +match[ 1 ] ) ) ) {
-			error.textContent = S.badPort;
+			B.fail( null, S.badPort, portField );
 
 			return;
 		}
 
 		if ( form.querySelector( '[name="who"]' ).value === 'some' ) {
-			sources = form.querySelector( '[name="sources"]' ).value.split( /[\s,]+/ ).filter( Boolean );
+			sources = sourcesField.value.split( /[\s,]+/ ).filter( Boolean );
 
 			if ( ! sources.length ) {
-				error.textContent = S.noAddress;
+				B.fail( null, S.noAddress, sourcesField );
 
 				return;
 			}
@@ -501,11 +523,14 @@
 		var problem = addRule( { proto: proto, from: from, to: to, sources: sources, label: label, origin: 'customer' } );
 
 		if ( problem ) {
-			error.textContent = problem;
+			B.fail( null, problem, portField );
 
 			return;
 		}
 
+		// A good rule ends the old complaint: the newest message replaces it, and the field marks go.
+		B.clearFields();
+		B.info( S.added );
 		form.reset();
 		q( '[data-fw-sources-row]' ).hidden = true;
 		render();

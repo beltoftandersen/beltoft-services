@@ -2,7 +2,7 @@
  * My account → New server. The form posts and the server decides; this script only keeps the page honest while the customer
  * chooses: the backups box and the summary follow the selected plan, and an app the plan is too small for is greyed out
  * with the reason (the same words checkout uses, carried on the tile). Without script the page still works.
- * Needs tiles.js (the app and system tiles). No other dependencies.
+ * Needs tiles.js (the app and system tiles) and status.js (messages, and the lock on Continue to checkout).
  */
 ( function () {
 	'use strict';
@@ -263,7 +263,51 @@
 		} );
 	} );
 
+	// What the server said about the last post: shown in the status bar and under its field (the line the page printed is taken away).
+	function problems() {
+		var fields = {
+			name: '[name="beltoft_services_server_name"]',
+			ssh_key: '[name="beltoft_services_ssh_key"]',
+			plan: 'input[name="beltoft_services_picker_plan"]:checked, input[name="beltoft_services_picker_plan"]',
+			backups: '[data-picker-backups] input[type="checkbox"]',
+			billing: '[data-picker-billing] input:checked, [data-picker-billing] input',
+			os: '[data-tiles="os"] input:checked, [data-tiles="os"] input',
+			app: '[data-tiles="app"] input:checked, [data-tiles="app"] input'
+		};
+		var lines = form.parentNode.querySelectorAll( '[data-picker-error]' );
+		var last = null;
+
+		if ( ! window.beltoftStatus ) {
+			return;
+		}
+
+		each( lines, function ( line ) {
+			var selector = fields[ line.getAttribute( 'data-picker-error' ) ];
+			var field = selector ? form.querySelector( selector ) : null;
+
+			last = { text: line.textContent, field: field };
+			line.parentNode.removeChild( line );
+		} );
+
+		// The newest message is the one the bar shows; the first field with a problem takes the focus.
+		if ( last ) {
+			window.beltoftStatus.fail( null, last.text, last.field );
+		}
+	}
+
+	// Continue to checkout: the bar says it is working, the buttons are off, and a second click sends nothing.
+	if ( window.beltoftStatus && submit ) {
+		form.setAttribute( 'data-bs-working', '' );
+		window.addEventListener( 'pageshow', function ( event ) {
+			// Back from checkout: the page is shown as it was left, locked. Start it fresh.
+			if ( event.persisted ) {
+				window.location.reload();
+			}
+		} );
+	}
+
 	// The tile script handles the app's own change; the summary needs nothing from it.
 	engines();
 	update();
+	problems();
 }() );

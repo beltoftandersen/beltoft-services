@@ -246,6 +246,13 @@ class FirewallRouteTest extends FirewallTestCase {
 		$plain = $this->page( Resource::find( $r->id() ), 'firewall' );
 
 		$this->assertStringContainsString( 'data-fw', $plain );
+		$this->assertStringContainsString( 'data-bs-scope="' . $r->id() . '"', $plain );
+
+		// Feedback goes to the status bar: no error, saved or dialog spot of its own.
+		foreach ( array( 'data-fw-error', 'data-fw-saved', 'data-fw-form-error', 'data-fw-dialog' ) as $gone ) {
+			$this->assertStringNotContainsString( $gone, $plain );
+		}
+
 		$this->assertStringContainsString( 'Outgoing mail on port 25 is blocked', $plain );
 		$this->assertStringContainsString( 'address spoofing', $plain );
 		$this->assertStringContainsString( 'in front of your server', $plain );

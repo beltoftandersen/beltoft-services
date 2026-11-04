@@ -120,14 +120,18 @@ class ServerPageTest extends MonitoringTestCase {
 	public function test_the_panel_keeps_what_the_scripts_bind_to(): void {
 		$r = $this->ready_vm();
 		$html = $this->page( $r, (string) $r->license()['id'] );
-		foreach ( array( 'data-resource="' . $r->id() . '"', 'data-flash', 'data-badge', 'data-message', 'data-notice', 'data-vm-metrics', 'data-range="hour"', 'data-confirm-dialog', 'data-progress' ) as $needle ) {
+		foreach ( array( 'data-resource="' . $r->id() . '"', 'data-bs-scope="' . $r->id() . '"', 'data-badge', 'data-message', 'data-vm-metrics', 'data-range="hour"', 'data-confirm-dialog', 'data-progress' ) as $needle ) {
 			$this->assertStringContainsString( $needle, $html, $needle );
 		}
 		// Every dialog is after the last pane, so a hidden tab never holds one.
 		$last = strrpos( $html, '</section>' );
 		$this->assertNotFalse( $last );
 		$this->assertGreaterThan( $last, (int) strpos( $html, 'data-confirm-dialog' ) );
-		$this->assertSame( 1, substr_count( $html, 'data-flash' ) );
+		$this->assertStringNotContainsString( 'data-flash', $html );
+		$this->assertStringNotContainsString( 'data-notice', $html );
+		$this->assertStringNotContainsString( 'data-dialog-notice', $html );
+		// Reset password asks first (the shared question), so it is not a plain action button.
+		$this->assertStringNotContainsString( 'data-action="reset_password"', $html );
 	}
 
 	public function test_a_foreign_or_unknown_id_shows_the_list_with_a_notice(): void {

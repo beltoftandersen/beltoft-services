@@ -14,13 +14,7 @@
 		return;
 	}
 
-	function line( box, text ) {
-		var out = box.querySelector( '[data-app-notice]' );
-
-		if ( out ) {
-			out.textContent = text;
-		}
-	}
+	var bs = window.beltoftStatus;
 
 	function show( box, credentials ) {
 		var list = box.querySelector( '[data-app-login]' );
@@ -48,13 +42,13 @@
 
 	function reveal( box, button ) {
 		var panel = box.closest( '[data-resource]' );
+		var handle;
 
-		if ( ! panel ) {
+		if ( ! panel || bs.locked( panel.getAttribute( 'data-resource' ) ) ) {
 			return;
 		}
 
-		button.disabled = true;
-		line( box, '' );
+		handle = bs.busy( app.strings.revealing, panel.getAttribute( 'data-resource' ), button );
 		window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/app-reveal', {
 			method: 'POST',
 			credentials: 'same-origin',
@@ -68,7 +62,7 @@
 			}
 
 			if ( ! response.ok ) {
-				line( box, 409 === response.status ? app.strings.gone : app.strings.failed );
+				bs.fail( handle, 409 === response.status ? app.strings.gone : app.strings.failed );
 				button.disabled = 409 === response.status;
 
 				return null;
@@ -78,11 +72,13 @@
 				if ( body && body.credentials ) {
 					show( box, body.credentials );
 					button.hidden = true;
+					bs.done( handle, app.strings.revealed );
+				} else {
+					bs.fail( handle, app.strings.failed );
 				}
 			} );
 		} ).catch( function () {
-			button.disabled = false;
-			line( box, app.strings.failed );
+			bs.fail( handle, app.strings.failed );
 		} );
 	}
 
@@ -109,13 +105,13 @@
 	// A failed install, tried again: the server queues the job again and the page reloads to show it installing.
 	function retry( box, button ) {
 		var panel = box.closest( '[data-resource]' );
+		var handle;
 
-		if ( ! panel ) {
+		if ( ! panel || bs.locked( panel.getAttribute( 'data-resource' ) ) ) {
 			return;
 		}
 
-		button.disabled = true;
-		line( box, '' );
+		handle = bs.busy( app.strings.retrying, panel.getAttribute( 'data-resource' ), button );
 		window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/actions/app_retry', {
 			method: 'POST',
 			credentials: 'same-origin',
@@ -129,18 +125,15 @@
 			}
 
 			if ( ! response.ok ) {
-				line( box, 429 === response.status ? app.strings.limit : app.strings.failed );
-				button.disabled = false;
+				bs.fail( handle, 429 === response.status ? app.strings.limit : app.strings.failed );
 
 				return;
 			}
 
-			// The button stays off. The status route is asked until the app has left failed/unknown, then the page reloads.
-			line( box, app.strings.retrying );
+			// The bar keeps saying so and the buttons stay locked. The status route is asked until the app has left failed/unknown, then the page reloads.
 			waitForRestart( box, button, panel, 0 );
 		} ).catch( function () {
-			button.disabled = false;
-			line( box, app.strings.failed );
+			bs.fail( handle, app.strings.failed );
 		} );
 	}
 

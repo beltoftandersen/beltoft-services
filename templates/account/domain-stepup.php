@@ -17,7 +17,7 @@ $beltoft_ask     = \BeltoftServices\StepUp::ask( get_current_user_id(), \Beltoft
 $beltoft_id      = 'beltoft-domain-stepup-' . $r->id();
 $beltoft_emailed = 'emailed' === $beltoft_ask['kind'];
 ?>
-<form class="beltoft-services-domain-stepup" hidden>
+<form class="beltoft-services-domain-stepup" hidden novalidate data-sending="<?php esc_attr_e( 'Sending the code…', 'beltoft-services' ); ?>" data-checking="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>" data-empty="<?php esc_attr_e( 'Enter the code.', 'beltoft-services' ); ?>" data-shown="<?php esc_attr_e( 'Your transfer code is shown below.', 'beltoft-services' ); ?>">
 	<?php if ( $beltoft_emailed ) : ?>
 		<span class="beltoft-services-domain-stepup__ask">
 			<?php /* translators: %s: the account email with part of the name hidden. */ ?>
@@ -39,5 +39,4 @@ $beltoft_emailed = 'emailed' === $beltoft_ask['kind'];
 			<button type="button" class="button beltoft-services-domain-send beltoft-services-domain-send--again"><?php esc_html_e( 'Send a new code', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
 	</span>
-	<p class="beltoft-services-domain-stepup__error" role="alert" hidden></p>
 </form>

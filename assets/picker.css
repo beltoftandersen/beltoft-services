@@ -48,6 +48,8 @@
 @media (prefers-reduced-motion: reduce) { .beltoft-services-bill__face { transition: none; } }
 .beltoft-services-picker [hidden] { display: none !important; }
 .beltoft-services-picker__soldout { margin: 0 0 8px; color: var(--ink-soft, #5e7080); }
+.beltoft-services-picker__blocked { margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
+.beltoft-services-picker__button:disabled { opacity: .5; cursor: not-allowed; }
 .beltoft-services-picker__more { display: grid; gap: 14px; }
 .beltoft-services-picker__more .form-row { margin: 0; padding: 0; }
 .beltoft-services-picker__more label { display: block; margin: 0 0 4px; font-weight: 500; }

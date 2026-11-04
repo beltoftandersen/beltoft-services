@@ -41,52 +41,43 @@
 		} );
 	}
 
-	function notice( panel, text ) {
-		// An open dialog shows its own messages; otherwise the panel's line (the dialog has no data-notice).
-		var line = panel.querySelector( 'dialog[open] [data-dialog-notice]' ) || panel.querySelector( '[data-notice]' );
+	var bs = window.beltoftStatus;
 
-		if ( line ) {
-			line.textContent = text;
-		}
+	function scopeOf( panel ) {
+		return panel.getAttribute( 'data-resource' );
+	}
+
+	// A message that something went wrong: in the status bar, and under the field when there is one.
+	function problem( panel, handle, text, field ) {
+		panel.beltoftPending = false;
+		bs.fail( handle || panel.beltoftWork || null, text, field || null );
+		panel.beltoftWork = null;
+		panel.classList.remove( 'has-working-flash' );
 	}
 
 	// The server's own refusal text is written for the customer; anything else gets a fixed line.
-	function reply( panel, response, fallback ) {
+	function reply( panel, response, fallback, handle, field ) {
 		return response.json().then( function ( body ) {
 			if ( 403 === response.status && body && 'rest_cookie_invalid_nonce' === body.code ) {
-				notice( panel, vm.strings.expired );
+				problem( panel, handle, vm.strings.expired );
 			} else if ( 429 === response.status ) {
-				notice( panel, vm.strings.tooMany );
+				problem( panel, handle, vm.strings.tooMany );
 			} else if ( 422 === response.status && body && 'string' === typeof body.message ) {
-				notice( panel, body.message );
+				problem( panel, handle, body.message, field );
 			} else {
-				notice( panel, fallback );
+				problem( panel, handle, fallback );
 			}
 		}, function () {
-			notice( panel, fallback );
+			problem( panel, handle, fallback );
 		} );
 	}
 
-	// A clicked button shows it is working until the page reloads; reset() gives it back after an error.
-	function busy( button ) {
-		button.disabled = true;
-		button.setAttribute( 'aria-busy', 'true' );
-		button.classList.add( 'is-busy' );
-
-		if ( undefined === button.beltoftLabel ) {
-			button.beltoftLabel = button.textContent;
-			button.textContent = vm.strings.working;
-		}
-	}
-
-	function reset( button ) {
-		button.disabled = false;
-		button.removeAttribute( 'aria-busy' );
-		button.classList.remove( 'is-busy' );
-
-		if ( undefined !== button.beltoftLabel ) {
-			button.textContent = button.beltoftLabel;
-			button.beltoftLabel = undefined;
+	// A button of a closed question goes back to normal: the dialog is used again for the next action.
+	function resetButton( button ) {
+		if ( button ) {
+			button.disabled = false;
+			button.removeAttribute( 'aria-busy' );
+			button.classList.remove( 'is-busy' );
 		}
 	}
 
@@ -156,33 +147,41 @@
 		var entry = read( panel, ':asked' );
 
 		// Half an hour is longer than any of these takes.
-		return entry && entry.info && Date.now() - entry.local < 1800000 ? entry : null;
+		return entry && entry.info && Date.now() - entry.local < 600000 ? entry : null;
 	}
 
-	// The card's own line, at the top of the server card: working (with the pulsing squares), done or not done.
+	// What the card says, in the status bar: working (the lock stays on while it works), done or not done.
 	function flash( panel, text, kind ) {
-		var line = panel.querySelector( '[data-flash]' );
 		var power = panel.querySelector( '[data-power-line]' );
-		var changed;
+		var work = panel.beltoftWork;
 
-		if ( ! line ) {
+		// The bar says what is happening: the progress sentence under the head would say it twice, and the power is not "Running" while it works.
+		panel.classList.toggle( 'has-working-flash', 'working' === kind );
+
+		if ( 'working' === kind ) {
+			if ( ! work || work.released || panel.beltoftWorkText !== text ) {
+				if ( work && ! work.released ) {
+					bs.release( work );
+				}
+
+				panel.beltoftWork = bs.busy( text, scopeOf( panel ), null );
+				panel.beltoftWorkText = text;
+			}
+
+			if ( power ) {
+				power.textContent = vm.strings.busy;
+			}
+
 			return;
 		}
 
-		changed = line.textContent !== text || line.className !== 'beltoft-services-vm__flash is-' + kind;
-		line.textContent = text;
-		line.className = 'beltoft-services-vm__flash is-' + kind;
-		line.hidden = false;
-		// The flash says what is happening: the progress sentence under it would say it twice, and the power is not "Running" while it works.
-		panel.classList.toggle( 'has-working-flash', 'working' === kind );
+		panel.beltoftWork = null;
+		panel.beltoftWorkText = '';
 
-		if ( 'working' === kind && power ) {
-			power.textContent = vm.strings.busy;
-		}
-
-		// Looked at once, not on every poll.
-		if ( changed && line.scrollIntoView ) {
-			line.scrollIntoView( { block: 'nearest' } );
+		if ( 'failed' === kind ) {
+			bs.fail( work || null, text );
+		} else {
+			bs.done( work || null, text );
 		}
 	}
 
@@ -206,6 +205,12 @@
 				return { action: action, start: s.reinstallStart, done: s.reinstallDone, running: true, password: true };
 			case 'snapshot_delete':
 				return { action: action, start: fill( s.deleteStart, name ), done: name ? fill( s.deleteDone, name ) : s.deleteDoneAnon };
+			case 'rename':
+				return { action: action, start: s.renameStart, done: s.renameDone };
+			case 'replace_ssh_key':
+				return { action: action, start: s.keyStart, done: s.keyDone };
+			case 'reset_password':
+				return { action: action, start: s.resetStart, done: s.resetDone, password: true };
 			case 'reboot':
 				return { action: action, start: s.rebootStart, done: s.rebootDone, power: true };
 			case 'shutdown':
@@ -248,7 +253,7 @@
 		flash( panel, text, 'done' );
 	}
 
-	// On every status of the card (account.js): working while it works, then done or not done. Works on a device that did not ask too, for ten minutes.
+	// On every status of the card (account.js): working while it works, then done or not done. Works on a device that did not ask too, for a minute: a later page load never shows an old result again.
 	function outcome( panel, data ) {
 		var result = data.last_result;
 		var asked = recall( panel );
@@ -292,7 +297,7 @@
 			return;
 		}
 
-		if ( data.now - result.at <= 600 && read( panel, ':seen' ) !== result.at ) {
+		if ( data.now - result.at <= 60 && read( panel, ':seen' ) !== result.at ) {
 			ended( panel, result, info, data );
 		}
 	}
@@ -318,8 +323,7 @@
 
 		dialog.querySelector( '[data-confirm-heading]' ).textContent = options.title;
 		yes.textContent = options.label;
-		reset( yes );
-		dialog.querySelector( '[data-dialog-notice]' ).textContent = '';
+		resetButton( yes );
 
 		while ( body.firstChild ) {
 			body.removeChild( body.firstChild );
@@ -342,22 +346,21 @@
 		}
 
 		dialog.beltoftRun = options.run;
-		notice( panel, '' );
 		openDialog( dialog );
 
 		return true;
 	}
 
-	function send( panel, action, args, button, dialog, info ) {
-		if ( panel.beltoftPending ) {
+	// One request per click: a busy panel does not start another. field: the input a refusal is shown under.
+	function send( panel, action, args, button, dialog, info, field ) {
+		var handle;
+
+		if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
 			return;
 		}
 
 		panel.beltoftPending = true;
-
-		if ( button ) {
-			busy( button );
-		}
+		handle = bs.busy( info && info.start ? info.start : vm.strings.working, scopeOf( panel ), button || null );
 
 		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
 			// An action that needs a purchase first (a reinstall to a paid app) answers with the checkout address.
@@ -366,19 +369,14 @@
 					return null;
 				} ).then( function ( body ) {
 					if ( body && body.redirect ) {
-						notice( panel, body.message || '' );
+						bs.info( body.message || '' );
 						window.location.href = body.redirect;
 
 						return;
 					}
 
-					panel.beltoftPending = false;
-
-					if ( button ) {
-						reset( button );
-					}
-
-					notice( panel, vm.strings.failed );
+					resetButton( button );
+					problem( panel, handle, vm.strings.failed );
 				} );
 			}
 
@@ -389,20 +387,21 @@
 					panel.beltoftPending = false;
 
 					if ( dialog ) {
-						// The button goes back to normal: the dialog is used again for the next action.
-						if ( button ) {
-							reset( button );
-						}
-
+						resetButton( button );
 						closeDialog( dialog );
 					}
 
+					// The bar keeps saying what is going on (and the buttons stay locked) until the work is over.
+					panel.beltoftWork = handle;
+					panel.beltoftWorkText = info ? info.start : '';
+
 					if ( info ) {
-						notice( panel, '' );
-						flash( panel, info.start, 'working' );
+						panel.classList.add( 'has-working-flash' );
 						write( panel, ':asked', { info: info, queued: body && body.at ? body.at : 0, local: Date.now() } );
 					} else {
-						notice( panel, vm.strings.queued );
+						bs.release( handle );
+						panel.beltoftWork = bs.busy( vm.strings.queued, scopeOf( panel ), null );
+						panel.beltoftWorkText = vm.strings.queued;
 					}
 
 					// The panel's status poll (account.js) shows the progress and reloads when it is over; a power action also looks a few times, as the card's own buttons do.
@@ -410,34 +409,25 @@
 				} );
 			}
 
-			panel.beltoftPending = false;
+			resetButton( button );
 
-			if ( button ) {
-				reset( button );
-			}
-
-			return reply( panel, response, vm.strings.failed );
+			return reply( panel, response, vm.strings.failed, handle, field );
 		} ).catch( function () {
-			panel.beltoftPending = false;
-
-			if ( button ) {
-				reset( button );
-			}
-			notice( panel, vm.strings.failed );
+			resetButton( button );
+			problem( panel, handle, vm.strings.failed );
 		} );
 	}
 
 	// A WooCommerce Subscriptions link (cancel, reactivate) is a GET that does its work and redirects: do it in the background, then show the card again.
 	function subscriptionLink( panel, url, button ) {
-		if ( panel.beltoftPending ) {
+		var handle;
+
+		if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
 			return;
 		}
 
 		panel.beltoftPending = true;
-
-		if ( button ) {
-			busy( button );
-		}
+		handle = bs.busy( vm.strings.working, scopeOf( panel ), button || null );
 
 		window.fetch( url, { credentials: 'same-origin' } ).then( function ( response ) {
 			if ( ! response.ok ) {
@@ -446,27 +436,21 @@
 
 			window.location.reload();
 		} ).catch( function () {
-			panel.beltoftPending = false;
-
-			if ( button ) {
-				reset( button );
-			}
-
-			notice( panel, vm.strings.failed );
+			resetButton( button );
+			problem( panel, handle, vm.strings.failed );
 		} );
 	}
 
 	// A pay as you go extra disk is changed through its own resource (never a subscription link): the answer is 202, then the page reloads.
 	function diskCall( panel, id, path, body, button ) {
-		if ( panel.beltoftPending ) {
+		var handle;
+
+		if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
 			return;
 		}
 
 		panel.beltoftPending = true;
-
-		if ( button ) {
-			busy( button );
-		}
+		handle = bs.busy( vm.strings.working, scopeOf( panel ), button || null );
 
 		window.fetch( account.root + id + '/' + path, {
 			method: 'POST',
@@ -488,21 +472,12 @@
 				return null;
 			}
 
-			panel.beltoftPending = false;
+			resetButton( button );
 
-			if ( button ) {
-				reset( button );
-			}
-
-			return reply( panel, response, vm.strings.failed );
+			return reply( panel, response, vm.strings.failed, handle );
 		} ).catch( function () {
-			panel.beltoftPending = false;
-
-			if ( button ) {
-				reset( button );
-			}
-
-			notice( panel, vm.strings.failed );
+			resetButton( button );
+			problem( panel, handle, vm.strings.failed );
 		} );
 	}
 
@@ -513,6 +488,7 @@
 		var source = form.querySelector( '[data-confirm-source]' );
 		var dialog = form.closest( 'dialog' );
 		var backup;
+		var field = form.querySelector( 'input[name]:not([type="hidden"]), textarea[name]' );
 
 		// The question's own form: run what it was opened for.
 		if ( 'confirm' === action ) {
@@ -539,7 +515,7 @@
 				name: backup && backup.selectedIndex >= 0 ? backup.options[ backup.selectedIndex ].text : '',
 				source: source,
 				run: function ( yes, box ) {
-					send( panel, action, args, yes, box, describe( action, '' ) );
+					send( panel, action, args, yes, box, describe( action, '' ), field );
 				}
 			} ) ) {
 				return;
@@ -547,17 +523,22 @@
 		}
 
 		backup = form.querySelector( '[data-snapshot-dialog-name]' );
-		send( panel, action, args, button, dialog, describe( action, backup ? backup.textContent : '' ) );
+		send( panel, action, args, button, dialog, describe( action, backup ? backup.textContent : '' ), field );
 	}
 
 	function reveal( panel, button ) {
 		var out = panel.querySelector( '[data-vm-password]' );
+		var handle;
 
-		button.disabled = true;
+		if ( bs.locked( scopeOf( panel ) ) ) {
+			return;
+		}
+
+		handle = bs.busy( vm.strings.revealStart, scopeOf( panel ), button );
 
 		post( panel, 'reveal', {} ).then( function ( response ) {
 			if ( ! response.ok ) {
-				return reply( panel, response, 409 === response.status ? vm.strings.gone : vm.strings.failed );
+				return reply( panel, response, 409 === response.status ? vm.strings.gone : vm.strings.failed, handle );
 			}
 
 			return response.json().then( function ( body ) {
@@ -573,28 +554,45 @@
 						copy.setAttribute( 'data-copy', body.password );
 						copy.hidden = false;
 					}
+
+					bs.done( handle, vm.strings.revealDone );
+				} else {
+					bs.fail( handle, vm.strings.failed );
 				}
 			} );
 		} ).catch( function () {
-			button.disabled = false;
-			notice( panel, vm.strings.failed );
+			bs.fail( handle, vm.strings.failed );
 		} );
 	}
 
-	// Reboot and Shut down ask first, in the page's one dialog.
+	// Reboot and Shut down ask first, in the shared question.
 	function askPower( panel, action ) {
 		var s = vm.strings;
 
-		if ( ! confirmFirst( panel, {
-			title: s[ action + 'Title' ],
-			label: s[ action + 'Yes' ],
-			text: s[ action + 'Text' ],
-			run: function ( yes, box ) {
-				send( panel, action, {}, yes, box, describe( action, '' ) );
-			}
-		} ) ) {
-			send( panel, action, {}, null, null, describe( action, '' ) );
+		if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
+			return;
 		}
+
+		bs.confirm( { title: s[ action + 'Title' ], confirm: s[ action + 'Yes' ], text: s[ action + 'Text' ] } ).then( function ( yes ) {
+			if ( yes ) {
+				send( panel, action, {}, null, null, describe( action, '' ) );
+			}
+		} );
+	}
+
+	// Reset password changes the root password on the server: it asks first.
+	function askReset( panel ) {
+		var s = vm.strings;
+
+		if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
+			return;
+		}
+
+		bs.confirm( { title: s.resetTitle, confirm: s.resetYes, text: s.resetText, danger: true } ).then( function ( yes ) {
+			if ( yes ) {
+				send( panel, 'reset_password', {}, null, null, describe( 'reset_password', '' ) );
+			}
+		} );
 	}
 
 	function copyText( text ) {
@@ -636,7 +634,7 @@
 				button.textContent = label;
 			}, 2000 );
 		}, function () {
-			notice( panel, vm.strings.failed );
+			bs.fail( null, vm.strings.failed );
 		} );
 	}
 
@@ -703,14 +701,6 @@
 	}
 
 	document.querySelectorAll( '.beltoft-services-panel[data-resource]' ).forEach( function ( panel ) {
-		var line = panel.querySelector( '[data-flash]' );
-		var progress = panel.querySelector( '[data-progress]' );
-
-		// The card's line goes above the steps, so there is one message and then the steps.
-		if ( line && progress && progress.parentNode ) {
-			progress.parentNode.insertBefore( line, progress );
-		}
-
 		// Esc does not close a question while its request is on its way.
 		Array.prototype.forEach.call( panel.querySelectorAll( 'dialog' ), function ( box ) {
 			box.addEventListener( 'cancel', function ( event ) {
@@ -750,6 +740,7 @@
 
 		panel.addEventListener( 'click', function ( event ) {
 			var roll = event.target.closest( '[data-snapshot-rollback]' );
+			var resetPw = event.target.closest( '[data-reset-password]' );
 			var cancel = event.target.closest( '[data-snapshot-cancel], [data-confirm-cancel]' );
 			var drop = event.target.closest( '[data-snapshot-delete]' );
 			var remove = event.target.closest( '[data-cancel-url]' );
@@ -775,6 +766,12 @@
 				return;
 			}
 
+			if ( resetPw && ! resetPw.disabled ) {
+				askReset( panel );
+
+				return;
+			}
+
 			if ( power && ! power.disabled ) {
 				askPower( panel, power.getAttribute( 'data-power-action' ) );
 
@@ -791,8 +788,6 @@
 				dialog.querySelector( 'input[name="id"]' ).value = roll.getAttribute( 'data-snapshot-rollback' );
 				dialog.querySelector( '[data-snapshot-dialog-name]' ).textContent = roll.getAttribute( 'data-snapshot-name' );
 				dialog.querySelector( 'input[name="confirm"]' ).value = '';
-				notice( panel, '' );
-				dialog.querySelector( '[data-dialog-notice]' ).textContent = '';
 				openDialog( dialog );
 
 				return;
@@ -801,17 +796,15 @@
 			if ( drop && ! drop.disabled ) {
 				name = drop.getAttribute( 'data-snapshot-name' ) || '';
 
-				if ( ! confirmFirst( panel, {
-					title: vm.strings.deleteTitle,
-					label: vm.strings.deleteYes,
-					name: name,
-					text: vm.strings.snapshotDelete,
-					run: function ( yes, box ) {
-						send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, yes, box, describe( 'snapshot_delete', name ) );
-					}
-				} ) ) {
-					send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, drop, null, describe( 'snapshot_delete', name ) );
+				if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
+					return;
 				}
+
+				bs.confirm( { title: vm.strings.deleteTitle, confirm: vm.strings.deleteYes, text: [ name, vm.strings.snapshotDelete ].filter( Boolean ), danger: true } ).then( function ( yes ) {
+					if ( yes ) {
+						send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, null, null, describe( 'snapshot_delete', name ) );
+					}
+				} );
 
 				return;
 			}

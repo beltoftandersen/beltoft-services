@@ -41,11 +41,11 @@
         if (reply && reply.ok) {
           $(document.body).trigger('update_checkout');
         } else if (app) {
-          window.alert(config.failed);
+          window.setTimeout(function () { window.beltoftStatus.fail(null, config.failed, root.querySelector('input[name="beltoft_services_app"]:checked')); }, 0); // after the field is enabled again, so it can take the focus
         }
       })
       .fail(function () {
-        window.alert(config.failed);
+        window.setTimeout(function () { window.beltoftStatus.fail(null, config.failed, root.querySelector('input[name="beltoft_services_app"]:checked')); }, 0); // after the field is enabled again, so it can take the focus
       })
       .always(function () {
         busy.prop('disabled', false);

@@ -6,14 +6,24 @@
 	var root = document.querySelector( '[data-console]' );
 	if ( ! root ) { return; }
 	var button = root.querySelector( '[data-console-open]' );
-	var status = root.querySelector( '[data-console-status]' );
+	var bs = window.beltoftStatus;
+	var handle = null;
 	var screen = root.querySelector( '[data-console-screen]' );
 	var toolbar = root.querySelector( '[data-console-toolbar]' );
 	var input = root.querySelector( '[data-console-input]' );
 	var rfb = null;
 	var idleTimer = 0;
 	var maxTimer = 0;
-	function say( key ) { status.textContent = cfg.strings[key] || ''; }
+	// What the console says goes to the status bar: busy while connecting, done when connected, a failure stays until closed.
+	function say( key ) {
+		var text = cfg.strings[ key ] || '';
+		if ( ! text ) { return; }
+		if ( 'connecting' === key ) { handle = bs.busy( text, 'page', button ); return; }
+		if ( 'connected' === key ) { bs.done( handle, text ); handle = null; return; }
+		if ( 'disconnected' === key ) { if ( handle ) { bs.done( handle, text ); } else { bs.info( text ); } handle = null; return; }
+		bs.fail( handle, text );
+		handle = null;
+	}
 	function stopTimers() { window.clearTimeout( idleTimer ); window.clearTimeout( maxTimer ); }
 	function close( message ) {
 		stopTimers();
@@ -34,7 +44,7 @@
 		input.focus();
 	}
 	function open() {
-		button.disabled = true; say( 'connecting' );
+		say( 'connecting' );
 		window.fetch( cfg.rest, { method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: { 'X-WP-Nonce': cfg.nonce, 'Content-Type': 'application/json' }, body: '{}' } )
 			.then( function ( response ) { if ( ! response.ok ) { throw response; } return response.json(); } )
 			.then( function ( data ) {
@@ -76,7 +86,7 @@
 		return chars.length;
 	}
 	function typed( count, enter ) {
-		status.textContent = ( cfg.strings[ enter ? 'sent' : 'typed' ] || '' ).replace( '%d', String( count ) );
+		bs.info( ( cfg.strings[ enter ? 'sent' : 'typed' ] || '' ).replace( '%d', String( count ) ) );
 	}
 	root.querySelector( '[data-console-keyboard]' ).addEventListener( 'click', function () { input.hidden = ! input.hidden; if ( ! input.hidden ) { input.focus(); } } );
 	var paste = root.querySelector( '[data-console-paste]' );

@@ -108,13 +108,12 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 	?>
 		<p class="description" data-hostname-note>
 			<?php esc_html_e( "The new name is used as the hostname after the next reboot. Your SSH client may warn that the server's host key changed.", 'beltoft-services' ); ?>
-			<?php if ( $forms && 'stopped' !== $power ) : ?><button type="button" class="beltoft-services-action beltoft-services-vm__link" data-action="reboot"><?php esc_html_e( 'Reboot', 'beltoft-services' ); ?></button><?php endif; ?>
+			<?php if ( $forms && 'stopped' !== $power ) : ?><button type="button" class="beltoft-services-vm__link" data-power-action="reboot"><?php esc_html_e( 'Reboot', 'beltoft-services' ); ?></button><?php endif; ?>
 		</p>
 	<?php
 };
 ?>
 <div class="beltoft-services-vm<?php echo null !== $beltoft_services_page ? ' beltoft-services-vm--page' : ''; ?>" data-power="<?php echo esc_attr( (string) $power ); ?>">
-	<p class="beltoft-services-vm__flash" data-flash role="status" aria-live="polite" hidden></p>
 	<?php if ( null !== $beltoft_services_page ) : ?>
 		<?php $beltoft_services_note(); ?>
 		<nav class="beltoft-services-tabs" aria-label="<?php esc_attr_e( 'Server sections', 'beltoft-services' ); ?>">
@@ -769,7 +768,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<?php endif; ?>
 			<?php if ( $beltoft_services_reset && null !== $beltoft_services_page ) : ?>
 				<div class="beltoft-services-vm__reset">
-					<p><button type="button" class="button woocommerce-button beltoft-services-action" data-action="reset_password"><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
+					<p><button type="button" class="button woocommerce-button" data-reset-password><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
 					<p class="description"><?php esc_html_e( 'Sets a new password on the server. Use Show password once to see it.', 'beltoft-services' ); ?></p>
 				</div>
 			<?php endif; ?>
@@ -879,7 +878,6 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				</label>
 				<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required>
 			</p>
-			<p class="beltoft-services-panel__notice" data-dialog-notice role="status" aria-live="polite"></p>
 			<p class="beltoft-services-vm__buttons">
 				<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>
 				<button type="button" class="button woocommerce-button" data-snapshot-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
@@ -893,7 +891,6 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<form class="beltoft-services-vm-form" data-action="confirm">
 			<h5 id="beltoft-vm-confirm-title-<?php echo (int) $resource_id; ?>" data-confirm-heading></h5>
 			<div class="beltoft-services-vm__confirm-body" data-confirm-body></div>
-			<p class="beltoft-services-panel__notice" data-dialog-notice role="status" aria-live="polite"></p>
 			<p class="beltoft-services-vm__buttons">
 				<button type="submit" class="button woocommerce-button" data-confirm-submit></button>
 				<button type="button" class="button woocommerce-button" data-confirm-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>

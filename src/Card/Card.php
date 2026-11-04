@@ -167,6 +167,8 @@ final class Card {
 		}
 
 		Panel::style();
+		wp_enqueue_script( 'beltoft-services-card', plugins_url( 'assets/card.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/card.js' ), true );
+		wp_localize_script( 'beltoft-services-card', 'beltoftCard', array( 'working' => __( 'Working…', 'beltoft-services' ) ) );
 
 		ob_start();
 		wc_get_template( 'card.php', array( 'card' => self::data( get_current_user_id() ) ), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );

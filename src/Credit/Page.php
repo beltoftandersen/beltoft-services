@@ -166,6 +166,8 @@ final class Page {
 		}
 
 		Panel::style();
+		wp_enqueue_script( 'beltoft-services-credit', plugins_url( 'assets/credit.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/credit.js' ), true );
+		wp_localize_script( 'beltoft-services-credit', 'beltoftCredit', array( 'empty' => __( 'Enter your credit code.', 'beltoft-services' ) ) );
 
 		ob_start();
 		wc_get_template( 'credit.php', array( 'credit' => self::data() ), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );

@@ -66,11 +66,6 @@
 	border-radius: 0;
 }
 
-.beltoft-dns-claim__error {
-	margin: 0;
-	color: #b32d2e;
-}
-
 .beltoft-dns-claim__list {
 	display: grid;
 	gap: 1.5em;
@@ -90,11 +85,6 @@
 
 .beltoft-dns-claim__step {
 	margin: 1.25em 0 0.5em;
-}
-
-.beltoft-dns-claim__status {
-	margin: 0;
-	font-weight: 700;
 }
 
 .beltoft-dns-claim__message,

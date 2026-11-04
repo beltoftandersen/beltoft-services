@@ -160,7 +160,7 @@ final class DiskField {
 		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || ! self::cart_server() || ! self::sizes_for( self::cart_server_usage() ) ) {
 			return;
 		}
-		wp_enqueue_script( 'beltoft-services-disk-field', plugins_url( 'assets/disk-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery' ), \BeltoftServices\Assets::version( 'assets/disk-field.js' ), true );
+		wp_enqueue_script( 'beltoft-services-disk-field', plugins_url( 'assets/disk-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/disk-field.js' ), true );
 		wp_localize_script( 'beltoft-services-disk-field', 'beltoftServicesDiskField', array( 'url' => \WC_AJAX::get_endpoint( self::AJAX ), 'failed' => __( 'The extra disk could not be changed. Reload checkout and try again.', 'beltoft-services' ) ) );
 	}
 

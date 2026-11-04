@@ -40,7 +40,7 @@ if ( $d['dns_only'] ) {
 	}
 }
 ?>
-<div class="beltoft-services-domain beltoft-services-domain--page" data-domain-page data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-updating="<?php echo esc_attr__( 'Updating…', 'beltoft-services' ); ?>" data-updating-note="<?php echo esc_attr__( 'This can take up to a minute.', 'beltoft-services' ); ?>">
+<div class="beltoft-services-domain beltoft-services-domain--page" data-domain-page data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-bs-scope="<?php echo esc_attr( (string) $r->id() ); ?>" data-updating="<?php echo esc_attr__( 'Updating…', 'beltoft-services' ); ?>" data-updating-note="<?php echo esc_attr__( 'This can take up to a minute.', 'beltoft-services' ); ?>">
 	<nav class="beltoft-services-tabs" aria-label="<?php esc_attr_e( 'Domain sections', 'beltoft-services' ); ?>">
 		<?php foreach ( $beltoft_tabs as $beltoft_slug => $beltoft_title ) : ?>
 			<a href="<?php echo esc_url( $beltoft_link( $beltoft_slug ) ); ?>" data-tab-link="<?php echo esc_attr( $beltoft_slug ); ?>"<?php echo $beltoft_slug === $beltoft_active ? ' aria-current="page"' : ''; ?>><?php echo esc_html( $beltoft_title ); ?></a>
@@ -141,7 +141,6 @@ if ( $d['dns_only'] ) {
 					<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNS hosting is paused. Your records are kept but not answered.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
 				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
-					<p class="beltoft-dnse__error" role="alert" hidden></p>
 					<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to see and change your DNS records.', 'beltoft-services' ); ?></p></noscript>
 				</div>
 			<?php endif; ?>
@@ -192,13 +191,12 @@ if ( $d['dns_only'] ) {
 						);
 						?>
 					</p>
-					<form class="beltoft-services-domain-transfer" data-domain-transfer data-domain="<?php echo esc_attr( $d['domain'] ); ?>" data-cart="<?php echo esc_url( rest_url( \BeltoftServices\Api\Routes::NAMESPACE . '/domains/cart' ) ); ?>" data-store-nonce="<?php echo esc_attr( wp_create_nonce( 'wc_store_api' ) ); ?>" data-rest-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-busy="<?php esc_attr_e( 'Starting transfer…', 'beltoft-services' ); ?>">
+					<form class="beltoft-services-domain-transfer" data-domain-transfer data-domain="<?php echo esc_attr( $d['domain'] ); ?>" data-cart="<?php echo esc_url( rest_url( \BeltoftServices\Api\Routes::NAMESPACE . '/domains/cart' ) ); ?>" data-store-nonce="<?php echo esc_attr( wp_create_nonce( 'wc_store_api' ) ); ?>" data-rest-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-busy="<?php esc_attr_e( 'Starting transfer…', 'beltoft-services' ); ?>" data-empty="<?php esc_attr_e( 'Enter the transfer code.', 'beltoft-services' ); ?>" novalidate>
 						<label class="beltoft-services-domain__label" for="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>"><?php esc_html_e( 'Transfer code', 'beltoft-services' ); ?></label>
 						<span class="beltoft-services-domain__inline">
 							<input type="text" id="beltoft-transfer-<?php echo esc_attr( (string) $r->id() ); ?>" name="auth_code" autocomplete="off" spellcheck="false" minlength="6" maxlength="64" required>
 							<button type="submit" class="button"><?php esc_html_e( 'Transfer to us', 'beltoft-services' ); ?></button>
 						</span>
-						<p class="beltoft-services-domain__error" role="alert" hidden></p>
 					</form>
 				</div>
 			<?php endif; ?>

@@ -230,16 +230,16 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'Busy', $this->card( $r ) );
 	}
 
-	public function test_the_dialog_notice_cannot_catch_the_panel_messages(): void {
+	public function test_the_messages_go_to_the_status_bar_not_to_notice_lines(): void {
 		$r = $this->server();
 		$this->take( $r, 'x' );
 
 		$html = $this->card( $r );
 
-		$this->assertStringNotContainsString( 'data-notice', $html, 'The panel notice is the only data-notice on the page.' );
-		$this->assertStringContainsString( 'data-dialog-notice', $html );
+		$this->assertStringNotContainsString( 'data-notice', $html, 'Messages go to the shared status bar.' );
+		$this->assertStringNotContainsString( 'data-dialog-notice', $html );
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
-		$this->assertStringContainsString( 'dialog[open] [data-dialog-notice]', $js );
+		$this->assertStringContainsString( 'beltoftStatus', $js );
 		$this->assertStringContainsString( "removeAttribute( 'open' )", $js );
 	}
 

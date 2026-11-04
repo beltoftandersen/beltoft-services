@@ -17,10 +17,6 @@
 	var id = root.getAttribute( 'data-resource' );
 	var timer = null;
 
-	function q( selector ) {
-		return root.querySelector( selector );
-	}
-
 	function request( method, path, body ) {
 		var options = { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' } };
 
@@ -43,15 +39,8 @@
 		} );
 	}
 
-	function say( text ) {
-		q( '[data-net-message]' ).textContent = text || '';
-	}
-
-	function buttons( disabled ) {
-		root.querySelectorAll( 'button[data-net-attach], button[data-net-detach]' ).forEach( function ( button ) {
-			button.disabled = disabled;
-		} );
-	}
+	var bs = window.beltoftStatus;
+	var handle = null;
 
 	function wait( action, since ) {
 		request( 'GET', account.root + id ).then( function ( reply ) {
@@ -61,8 +50,8 @@
 				if ( result.ok ) {
 					window.location.reload();
 				} else {
-					say( result.text || S.failed );
-					buttons( false );
+					bs.fail( handle, result.text || S.failed );
+					handle = null;
 				}
 
 				return;
@@ -74,55 +63,40 @@
 		} );
 	}
 
-	function run( action ) {
-		buttons( true );
-		say( S.working );
+	function run( action, button ) {
+		if ( bs.locked( id ) ) {
+			return;
+		}
+
+		handle = bs.busy( S.working, id, button );
 		request( 'POST', account.root + id + '/actions/' + action, { args: {} } ).then( function ( reply ) {
 			if ( reply.ok ) {
 				wait( action, reply.body && reply.body.at ? reply.body.at - 1 : 0 );
 			} else {
-				say( ( reply.body && reply.body.message ) || S.error );
-				buttons( false );
+				bs.fail( handle, ( reply.body && reply.body.message ) || S.error );
+				handle = null;
 			}
 		} );
-	}
-
-	function dialog( title, body, ok, then ) {
-		var box = q( '[data-net-dialog]' );
-
-		q( '[data-net-dialog-title]' ).textContent = title;
-		q( '[data-net-dialog-body]' ).textContent = body;
-		q( '[data-net-dialog-ok]' ).textContent = ok;
-		q( '[data-net-dialog-form]' ).onsubmit = function ( event ) {
-			event.preventDefault();
-			box.close();
-			then();
-		};
-		q( '[data-net-dialog-cancel]' ).onclick = function () {
-			box.close();
-		};
-
-		if ( box.showModal ) {
-			box.showModal();
-		} else {
-			box.setAttribute( 'open', '' );
-		}
 	}
 
 	root.addEventListener( 'click', function ( event ) {
 		var target = event.target.closest( 'button' );
 
-		if ( ! target ) {
+		if ( ! target || bs.locked( id ) ) {
 			return;
 		}
 
 		if ( target.hasAttribute( 'data-net-attach' ) ) {
-			dialog( S.attachTitle, S.attachBody, S.attach, function () {
-				run( 'private_attach' );
+			bs.confirm( { title: S.attachTitle, text: S.attachBody, confirm: S.attach } ).then( function ( yes ) {
+				if ( yes ) {
+					run( 'private_attach', target );
+				}
 			} );
 		} else if ( target.hasAttribute( 'data-net-detach' ) ) {
-			dialog( S.detachTitle, S.detachBody, S.detach, function () {
-				run( 'private_detach' );
+			bs.confirm( { title: S.detachTitle, text: S.detachBody, confirm: S.detach } ).then( function ( yes ) {
+				if ( yes ) {
+					run( 'private_detach', target );
+				}
 			} );
 		}
 	} );
@@ -131,7 +105,7 @@
 	var state = root.getAttribute( 'data-net-state' );
 
 	if ( state === 'attaching' || state === 'detaching' ) {
-		buttons( true );
+		handle = bs.busy( S.working, id, null );
 		wait( state === 'attaching' ? 'private_attach' : 'private_detach', 0 );
 	}
 }() );

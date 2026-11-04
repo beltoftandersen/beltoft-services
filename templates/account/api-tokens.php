@@ -31,7 +31,8 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 	<p><?php esc_html_e( 'A token lets a script or a tool use your account over the API without your password. Anyone with a token can do what its access allows, so keep it private. It is shown once, and you can revoke it at any time.', 'beltoft-services' ); ?></p>
 
 	<?php if ( is_array( $result ) && '' !== $result['message'] ) : ?>
-		<p class="beltoft-services-api__notice<?php echo $result['ok'] ? '' : ' is-error'; ?>" role="status"><?php echo esc_html( $result['message'] ); ?></p>
+		<?php /* What the post did: assets/api-tokens.js hands it to the status bar. */ ?>
+		<p hidden data-bs-flash="<?php echo $result['ok'] ? 'done' : 'fail'; ?>"><?php echo esc_html( $result['message'] ); ?></p>
 	<?php endif; ?>
 	<?php if ( is_array( $result ) && '' !== $result['password'] ) : ?>
 		<div class="beltoft-services-api__block">
@@ -75,7 +76,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 	<?php endif; ?>
 
 	<?php if ( count( $tokens ) < $max ) : ?>
-		<form method="post" class="beltoft-services-api__new">
+		<form method="post" class="beltoft-services-api__new" novalidate data-bs-working>
 			<input type="hidden" name="<?php echo esc_attr( $field ); ?>" value="create">
 			<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
 			<p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide brxe-woocommerce-form-field">

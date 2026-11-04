@@ -704,4 +704,15 @@ class CardTest extends UsageTestCase {
 		$this->assertSame( 'pending', wcs_get_subscription( $server->get_id() )->get_status() );
 		$this->assertSame( 'active', wcs_get_subscription( $active->get_id() )->get_status() );
 	}
+
+	public function test_the_card_result_goes_to_the_status_bar_and_the_form_says_working(): void {
+		wp_set_current_user( $this->new_user() );
+		$_GET[ Card::QUERY ] = 'limit';
+		$html                = Card::html();
+		unset( $_GET[ Card::QUERY ] );
+
+		$this->assertStringContainsString( '<p hidden data-bs-flash="fail">Too many attempts.', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-card__notice', $html );
+		$this->assertTrue( wp_script_is( 'beltoft-services-card', 'enqueued' ) );
+	}
 }

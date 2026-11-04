@@ -85,7 +85,7 @@ $beltoft_form  = static function ( string $what ) use ( $action, $nonce, $licens
 			?>
 		</p>
 	<?php endif; ?>
-	<form method="post" action="<?php echo esc_url( $action ); ?>" class="beltoft-services-danger__form">
+	<form method="post" action="<?php echo esc_url( $action ); ?>" class="beltoft-services-danger__form" data-bs-working>
 		<?php $beltoft_form( $offer['manual'] ? 'auto_renew_on' : 'auto_renew_off' ); ?>
 		<?php if ( $offer['manual'] && ! $offer['can_enable'] ) : ?>
 			<p class="beltoft-services-domain__note"><?php esc_html_e( 'To turn auto-renew back on, add a payment method to your account first.', 'beltoft-services' ); ?></p>
@@ -103,7 +103,7 @@ $beltoft_form  = static function ( string $what ) use ( $action, $nonce, $licens
 	</p>
 	<p><button type="button" class="button beltoft-services-danger__open" data-danger-open="beltoft-danger-stop-<?php echo (int) $license; ?>"><?php esc_html_e( 'Stop DNS hosting', 'beltoft-services' ); ?></button></p>
 	<dialog class="beltoft-services-domain__dialog" id="beltoft-danger-stop-<?php echo (int) $license; ?>" aria-labelledby="beltoft-danger-title-<?php echo (int) $license; ?>">
-		<form method="post" action="<?php echo esc_url( $action ); ?>" class="beltoft-services-danger__dialog-form" data-danger-domain="<?php echo esc_attr( strtolower( $domain ) ); ?>">
+		<form method="post" action="<?php echo esc_url( $action ); ?>" class="beltoft-services-danger__dialog-form" data-bs-working data-danger-domain="<?php echo esc_attr( strtolower( $domain ) ); ?>">
 			<?php $beltoft_form( 'stop_hosting' ); ?>
 			<h5 id="beltoft-danger-title-<?php echo (int) $license; ?>"><?php esc_html_e( 'Stop DNS hosting?', 'beltoft-services' ); ?></h5>
 			<p>
