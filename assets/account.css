@@ -439,7 +439,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-page__title { min-width: 0; margin-top: var(--bs-space-2); }
 .beltoft-services-page__name { margin: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-title); letter-spacing: -0.01em; overflow-wrap: anywhere; }
 /* The name in the head: a text button that opens its field in place (assets/vm.js). The row keeps the field's height, so the page does not move. */
-.beltoft-services-page__namerow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2); min-height: var(--bs-btn-h); }
+.beltoft-services-page__namerow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2); min-height: var(--bs-input-h); }
 .beltoft-services-page__namerow [hidden] { display: none !important; }
 .beltoft-services-page__namerow .beltoft-services-page__name { min-width: 0; }
 .beltoft-services-page__namerow button.beltoft-services-page__rename { display: inline-flex; align-items: baseline; gap: var(--bs-space-3); max-width: 100%; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; text-transform: none; cursor: pointer; }
@@ -449,8 +449,10 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-page__namerow button.beltoft-services-page__rename:disabled { opacity: 1; color: inherit; cursor: default; }
 .beltoft-services-page__rename:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 @media (hover: none) { .beltoft-services-page__rename-hint { opacity: 1; } }
-.beltoft-services-page__renameform { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2); min-width: 0; max-width: 100%; margin: 0; }
-.beltoft-services-page__renameform input[name="name"] { flex: 0 1 320px; box-sizing: border-box; min-width: 0; height: var(--bs-btn-h); margin: 0; padding: 0 var(--bs-space-3); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: 1; }
+.beltoft-services-page__namerow .beltoft-services-page__renameform.beltoft-services-vm-form { display: flex; flex-flow: row wrap; align-items: center; gap: var(--bs-space-2); min-width: 0; max-width: 100%; margin: 0; padding: 0; }
+.beltoft-services-page__namerow .beltoft-services-page__renameform[hidden] { display: none; }
+.beltoft-services-page__namerow .beltoft-services-page__renameform input[name="name"] { flex: 0 1 320px; width: auto; box-sizing: border-box; min-width: 0; height: var(--bs-btn-h); margin: 0; padding: 0 var(--bs-space-3); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: 1; }
+.beltoft-services-page__namerow .beltoft-services-page__renameform .beltoft-services-btn { flex: none; width: auto; margin: 0; }
 .beltoft-services-page__renameform .bs-field-error { order: 9; flex: 0 0 100%; margin: 0; }
 .beltoft-services-page__meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 0 var(--bs-space-4); height: 20px; margin: var(--bs-space-1) 0 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); line-height: 20px; }
 .beltoft-services-panel--page .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--ink-mid, #2d4060); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); letter-spacing: normal; line-height: 20px; opacity: 1; flex: none; }
