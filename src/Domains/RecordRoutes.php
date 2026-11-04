@@ -304,7 +304,10 @@ final class RecordRoutes {
 	 * @return Resource|\WP_REST_Response
 	 */
 	private static function resource( \WP_REST_Request $request, bool $write ) {
-		$r = Routes::guard( $request, $write, $write ? 60 : 30 );
+		// The zone made for a transfer is the customer's to review and change before it answers: the order is still being set up.
+		$found   = Resource::find( (int) $request['id'] );
+		$pending = $found && 'domain' === $found->get( 'driver' ) && (int) ( $found->license()['user_id'] ?? 0 ) === get_current_user_id() && ( TransferDns::view( $found )['editable'] ?? false );
+		$r       = Routes::guard( $request, $write && ! $pending, $write ? 60 : 30 );
 
 		if ( ! $r instanceof Resource ) {
 			return self::reply( $r );
@@ -318,7 +321,7 @@ final class RecordRoutes {
 			return self::failure( new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ), 403 );
 		}
 
-		if ( ! ZoneAccess::editable( $r, get_current_user_id() ) ) {
+		if ( ! $pending && ! ZoneAccess::editable( $r, get_current_user_id() ) ) {
 			return self::failure( new \WP_Error( 'not_ours', __( 'The DNS of this domain is not hosted here, so its records cannot be changed.', 'beltoft-services' ) ), 409 );
 		}
 

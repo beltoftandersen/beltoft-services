@@ -297,7 +297,7 @@ final class DnsClaimJobs {
 	 * @param array<int, mixed> $args Its arguments.
 	 * @return array<string, mixed>
 	 */
-	private static function proof( string $call, array $args ): array {
+	public static function proof( string $call, array $args ): array {
 		/**
 		 * Replaces a ProofResolver result (tests only).
 		 *

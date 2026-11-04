@@ -41,6 +41,7 @@ final class Meta {
 			}
 			$auth = $item->get_meta( '_beltoft_services_domain_auth', true );
 			if ( 'transfer' === $mode && is_string( $auth ) ) { $meta['auth'] = $auth; }
+			if ( 'transfer' === $mode && in_array( $data['dns'] ?? '', TransferDns::CHOICES, true ) ) { $meta['transfer_dns'] = (string) $data['dns']; }
 			$meta['order_item_id'] = (int) $item->get_id();
 			break;
 		}

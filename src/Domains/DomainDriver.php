@@ -26,6 +26,13 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	public function internal_actions(): array { return array( 'renew', 'transfer_renew' ); }
 
 	public function provision( Resource $r ): StepResult {
+		$result = $this->build( $r );
+		// A transfer that ends here never uses the zone made for it: it goes, unless the domain already points at it.
+		if ( $result->is_failed() && 'transfer' === $r->get( 'mode' ) ) { TransferDns::release( $r ); }
+		return $result;
+	}
+
+	private function build( Resource $r ): StepResult {
 		$name = (string) $r->get( 'domain' );
 		$mode = (string) $r->get( 'mode' );
 		if ( is_wp_error( Search::normalise( $name ) ) || ! in_array( $mode, array( 'register', 'transfer' ), true ) ) {
@@ -50,7 +57,43 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array( 'contact_handle' => $handle, 'steps' => $steps ) ) ) { return StepResult::retry( 3600, 'Registrant contact could not be saved.' ); }
 		}
 		if ( ! in_array( 'order', $steps, true ) ) {
-			if ( ! in_array( 'zone_prepared', $steps, true ) && 'transfer' === $mode && self::keeps_dns( $r ) ) {
+			$plan = TransferDns::plan( $r );
+			if ( TransferDns::FIRST === $plan || TransferDns::AFTER === $plan ) {
+				// The DNS is copied before the transfer: the current name servers are read, our zone is made and filled.
+				if ( ! in_array( 'ns_read', $steps, true ) ) {
+					$kept = $this->current_nameservers( $r );
+					if ( ! $kept->is_done() ) { return $kept; }
+					$steps[] = 'ns_read';
+					if ( ! $r->set( array_merge( $kept->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+				}
+				if ( ! in_array( 'zone_prepared', $steps, true ) ) {
+					$prepared = Zone::prepare( $r );
+					if ( ! $prepared->is_done() ) { return $prepared; }
+					$steps[] = 'zone_prepared';
+					if ( ! $r->set( array_merge( $prepared->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+				}
+				if ( ! in_array( 'dns_copy', $steps, true ) ) {
+					$copy = TransferDns::copy_records( $r );
+					if ( ! $copy->is_done() ) { return $copy; }
+					$steps[] = 'dns_copy';
+					if ( ! $r->set( array_merge( $copy->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'The copied DNS records could not be saved.' ); }
+				}
+				if ( TransferDns::FIRST === $plan && ! in_array( 'ns_ours', $steps, true ) ) {
+					// Nothing is sent to the registrar until the domain uses our name servers and our zone answers.
+					if ( ! $r->get( 'dns_wait_since' ) ) {
+						$r->set( array( 'dns_wait_since' => time() ) );
+						if ( 'move_dns' !== $r->get( 'action_needed_sent' ) ) {
+							$r->set( array( 'action_needed_sent' => 'move_dns' ) );
+							Emails::send( 'beltoft_services_domain_action_needed', $r, array( 'domain_action_reason' => 'move_dns' ) );
+						}
+					}
+					$moved = TransferDns::wait_for_delegation( $r );
+					if ( $moved->is_failed() ) { self::forget_code( $r ); }
+					if ( ! $moved->is_done() ) { return $moved; }
+					$steps[] = 'ns_ours';
+					if ( ! $r->set( array_merge( $moved->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+				}
+			} elseif ( ! in_array( 'zone_prepared', $steps, true ) && 'transfer' === $mode && self::keeps_dns( $r ) ) {
 				// Our DNS does not serve this domain: it keeps the name servers it has and no zone is made here.
 				$kept = $this->current_nameservers( $r );
 				if ( ! $kept->is_done() ) { return $kept; }
@@ -172,6 +215,13 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			$steps[] = 'zone';
 			if ( ! $r->set( array_merge( $zone->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
 		}
+		if ( 'transfer' === $mode && TransferDns::AFTER === TransferDns::plan( $r ) && ! in_array( 'dns_switch', $steps, true ) ) {
+			// The transfer is done: the name servers move to ours, after our zone is ensured (the customer's own change takes the same path).
+			$switched = Actions::switch_to_ours( $r, false );
+			if ( ! $switched->is_done() ) { return $switched; }
+			$steps[] = 'dns_switch';
+			if ( ! $r->set( array_merge( $switched->meta(), array( 'steps' => $steps, 'dns_external' => false ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+		}
 		if ( ! in_array( 'dates', $steps, true ) ) {
 			$dates = Renewals::set_dates( $r );
 			if ( ! $dates->is_done() ) { return $dates; }
@@ -215,7 +265,8 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 
 	/** A transfer that keeps the domain's current name servers: stored before the order, so a retry reuses them. */
 	public static function is_external( Resource $r ): bool {
-		return 'transfer' === $r->get( 'mode' ) && array() !== self::stored_nameservers( $r );
+		// The "first" choice sends our name servers: the stored ones were read only to copy the DNS.
+		return 'transfer' === $r->get( 'mode' ) && array() !== self::stored_nameservers( $r ) && TransferDns::FIRST !== TransferDns::choice( $r );
 	}
 
 	/** Does this transfer leave the DNS where it is? Not when our DNS already serves the domain for this customer. */
@@ -334,6 +385,11 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	}
 	public function update_plan( Resource $r ): StepResult { return StepResult::done(); }
 	public function delete( Resource $r ): StepResult {
+		// A cancelled transfer whose name servers already point at our zone keeps it: removing it would take the site and mail down.
+		if ( TransferDns::must_keep_zone( $r ) ) {
+			Alerts::admin( $r, 'A transfer was cancelled but the domain uses our name servers, so its DNS zone was kept. Review it by hand.' );
+			return StepResult::done();
+		}
 		$owner = Zone::owner( $r );
 		$removed = Zone::remove( $r );
 		if ( $removed->is_done() && ! in_array( $owner, array( 'domain', 'dns', 'other' ), true ) ) { DnsAssignments::release_pending_for( $r ); }
