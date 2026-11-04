@@ -184,7 +184,7 @@
 		if ( 'unlock' === form.dataset.domainAction ) {
 			try { window.sessionStorage.setItem( 'beltoftShowCode', scope ); } catch ( e ) {}
 		}
-		request( 'POST', scope + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form, handle ); } ).catch( function ( error ) { if ( bs ) { bs.fail( handle, error.message ); } else { window.alert( error.message ); } } );
+		request( 'POST', scope + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form, handle ); } ).catch( function ( error ) { bs.fail( handle, error.message ); } );
 	} );
 	// The transfer code is shown after a second check: a code emailed to the account address (or a site's own factor).
 	document.addEventListener( 'click', function ( event ) {
