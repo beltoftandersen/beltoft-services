@@ -29,6 +29,7 @@
 	var active = [];
 	var recent = { el: null, at: 0 };
 	var fieldNotes = [];
+	var candidates = null;
 
 	function text( key, fallback ) {
 		return strings[ key ] || fallback;
@@ -76,18 +77,24 @@
 	// The fixed site header covers the top of the viewport: the bar sticks right under it.
 	function offset() {
 		var top = 0;
-		var nodes = document.querySelectorAll( 'header, #brx-header, .brx-header' );
+		var wide = window.innerWidth * 0.5;
 
-		Array.prototype.forEach.call( nodes, function ( node ) {
-			var style = window.getComputedStyle( node );
-			var box;
+		if ( ! candidates ) {
+			candidates = [];
+			Array.prototype.forEach.call( document.body.querySelectorAll( 'header, section, nav, div' ), function ( node ) {
+				var style = window.getComputedStyle( node );
 
-			if ( 'fixed' === style.position || 'sticky' === style.position ) {
-				box = node.getBoundingClientRect();
-
-				if ( box.top <= 1 && box.height < 240 ) {
-					top = Math.max( top, box.bottom );
+				if ( ( 'fixed' === style.position || 'sticky' === style.position ) && 'auto' !== style.top && node.offsetWidth >= wide && node.offsetHeight < 240 && ! node.contains( bar ) ) {
+					candidates.push( node );
 				}
+			} );
+		}
+
+		candidates.forEach( function ( node ) {
+			var style = window.getComputedStyle( node );
+
+			if ( 'none' !== style.display && ( 'fixed' === style.position || 'sticky' === style.position ) ) {
+				top = Math.max( top, ( parseFloat( style.top ) || 0 ) + node.offsetHeight );
 			}
 		} );
 
@@ -605,8 +612,10 @@
 			if ( notices && bar.parentNode && ! notices.contains( bar ) ) {
 				bar.parentNode.insertBefore( notices, bar.nextSibling );
 			}
-			window.addEventListener( 'resize', offset );
-			window.addEventListener( 'scroll', offset, { passive: true } );
+			window.addEventListener( 'resize', function () {
+				candidates = null;
+				offset();
+			} );
 		}
 	}
 
