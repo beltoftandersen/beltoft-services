@@ -740,6 +740,7 @@
 
 		panel.addEventListener( 'click', function ( event ) {
 			var roll = event.target.closest( '[data-snapshot-rollback]' );
+			var resetPw = event.target.closest( '[data-reset-password]' );
 			var cancel = event.target.closest( '[data-snapshot-cancel], [data-confirm-cancel]' );
 			var drop = event.target.closest( '[data-snapshot-delete]' );
 			var remove = event.target.closest( '[data-cancel-url]' );
