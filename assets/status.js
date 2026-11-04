@@ -569,6 +569,24 @@
 		}
 	}, true );
 
+	// A form that posts and reloads (credit code, address, account details, card): data-bs-working="Working…" shows the bar and locks the page's buttons on submit.
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		var label = form && form.getAttribute ? form.getAttribute( 'data-bs-working' ) : null;
+		var submitter = event.submitter;
+
+		if ( null === label || event.defaultPrevented ) {
+			return;
+		}
+
+		// After the browser has read the form: a disabled submit button would not be sent.
+		window.setTimeout( function () {
+			if ( ! isLocked( 'page' ) ) {
+				busy( label || text( 'working', 'Working…' ), 'page', submitter || null );
+			}
+		}, 0 );
+	} );
+
 	function init() {
 		Array.prototype.forEach.call( document.querySelectorAll( '[data-resource]' ), function ( el ) {
 			if ( ! el.hasAttribute( 'data-bs-scope' ) ) {
@@ -579,6 +597,13 @@
 		// Server-side notices after a reload (WooCommerce) are printed at the bar's place.
 		if ( document.querySelector( '.woocommerce-MyAccount-content' ) ) {
 			ensure();
+
+			// WooCommerce's own notices after a reload sit right under the bar.
+			var notices = contentArea().querySelector( '.woocommerce-notices-wrapper' );
+
+			if ( notices && bar.parentNode && ! notices.contains( bar ) ) {
+				bar.parentNode.insertBefore( notices, bar.nextSibling );
+			}
 			window.addEventListener( 'resize', offset );
 			window.addEventListener( 'scroll', offset, { passive: true } );
 		}
