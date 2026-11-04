@@ -73,13 +73,59 @@ class FakeClient implements Client {
 			}
 			return new \WP_Error( 'http_404', 'Fake domain was not found.' );
 		}
+		if ( str_starts_with( $path, '/licenses/' ) ) { return $this->licence_model( $state, $method, $path, $body, $query ); }
 		if ( 'GET' === $method && '/resellers' === $path ) { return array( 'balance' => 1000, 'currency' => 'EUR' ); }
+		return new \WP_Error( 'fake_unconfigured', 'No fake registrar behavior is configured.' );
+	}
+
+	/**
+	 * Plesk licences, modelled on the Openprovider license service (documented fields only, made-up values):
+	 * POST /licenses/plesk {title, comment, items[], period, ip_address_binding} gives {key_id, attached_keys};
+	 * GET /licenses/plesk (title_pattern, key_id) gives {results[], total}; GET /licenses/plesk/{key_id} gives the
+	 * licence; PUT changes items, title, comment or ip_address_binding and gives {success}; DELETE gives {success};
+	 * GET /licenses/plesk/key/{key_id} gives {key}; POST /licenses/hwids/reset/plesk/{key_id} gives {success}.
+	 */
+	private function licence_model( array $state, string $method, string $path, array $body, array $query ): array|\WP_Error {
+		$state['licences'] = isset( $state['licences'] ) && is_array( $state['licences'] ) ? $state['licences'] : array();
+		if ( 'POST' === $method && '/licenses/plesk' === $path ) {
+			$items = array_values( array_filter( array_map( 'strval', (array) ( $body['items'] ?? array() ) ) ) );
+			$ip    = (string) ( $body['ip_address_binding'] ?? '' );
+			if ( array() === $items || ( '' !== $ip && false === filter_var( $ip, FILTER_VALIDATE_IP ) ) ) { return new \WP_Error( 'op_1000', 'Fake licence request is invalid.', array( 'status' => 400 ) ); }
+			$id = ++$state['next_id'];
+			$state['licences'][ $id ] = array( 'key_id' => $id, 'title' => (string) ( $body['title'] ?? '' ), 'comment' => (string) ( $body['comment'] ?? '' ), 'items' => $items, 'ip_address_binding' => $ip, 'period' => (int) ( $body['period'] ?? 1 ), 'status' => 'ACT', 'key_number' => 'FAKE-' . $id, 'activation_code' => '', 'hwid_resets' => 0 );
+			update_option( self::OPTION, $state, false );
+			return array( 'key_id' => $id, 'attached_keys' => array() );
+		}
+		if ( 'GET' === $method && '/licenses/plesk' === $path ) {
+			$pattern = '/^' . str_replace( '\\*', '.*', preg_quote( (string) ( $query['title_pattern'] ?? '*' ), '/' ) ) . '$/Di';
+			$found   = array_values( array_filter( $state['licences'], static fn( $l ) => 1 === preg_match( $pattern, (string) $l['title'] ) && ( ! isset( $query['key_id'] ) || (int) $query['key_id'] === (int) $l['key_id'] ) ) );
+			return array( 'results' => $found, 'total' => count( $found ) );
+		}
+		if ( preg_match( '#^/licenses/plesk/(key/)?(\d+)$#D', $path, $match ) || preg_match( '#^/licenses/hwids/reset/plesk/(\d+)$#D', $path, $reset ) ) {
+			$id = (int) ( $reset[1] ?? $match[2] );
+			if ( ! isset( $state['licences'][ $id ] ) ) { return new \WP_Error( 'http_404', 'Fake licence was not found.', array( 'status' => 404 ) ); }
+			$licence = $state['licences'][ $id ];
+			if ( isset( $reset[1] ) && 'POST' === $method ) { ++$licence['hwid_resets']; $result = array( 'success' => true ); }
+			elseif ( 'GET' === $method && '' !== ( $match[1] ?? '' ) ) { return array( 'key' => '<?xml version="1.0"?><key id="FAKE-KEY-' . $id . '"/>' ); }
+			elseif ( 'GET' === $method ) { return $licence; }
+			elseif ( 'PUT' === $method ) {
+				foreach ( array( 'items', 'title', 'comment', 'ip_address_binding' ) as $field ) { if ( isset( $body[ $field ] ) ) { $licence[ $field ] = $body[ $field ]; } }
+				$result = array( 'success' => true );
+			} elseif ( 'DELETE' === $method ) {
+				unset( $state['licences'][ $id ] );
+				update_option( self::OPTION, $state, false );
+				return array( 'success' => true );
+			} else { return new \WP_Error( 'fake_unconfigured', 'No fake registrar behavior is configured.' ); }
+			$state['licences'][ $id ] = $licence;
+			update_option( self::OPTION, $state, false );
+			return $result;
+		}
 		return new \WP_Error( 'fake_unconfigured', 'No fake registrar behavior is configured.' );
 	}
 
 	private function redact( array $body ): array {
 		foreach ( $body as $key => $value ) {
-			if ( in_array( $key, array( 'password', 'auth_code', 'token' ), true ) ) {
+			if ( in_array( $key, array( 'password', 'auth_code', 'token', 'key' ), true ) ) {
 				$body[ $key ] = '***';
 			} elseif ( is_array( $value ) ) {
 				$body[ $key ] = $this->redact( $value );

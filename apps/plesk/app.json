@@ -1,0 +1,19 @@
+{
+  "id": "plesk",
+  "name": "Plesk",
+  "logo": "logo.svg",
+  "summary": "Plesk Obsidian web hosting control panel, installed and licensed. Choose a Plesk edition when you order.",
+  "getting_started": "Open https://your-server-address:8443 and sign in as admin with the password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json. Your browser warns about the certificate at first, because Plesk starts with a certificate of its own; secure the panel with a Let's Encrypt certificate for a host name in Tools and Settings. The Plesk licence matches the edition you chose and is tied to the address of this server. It ends when you cancel the Plesk subscription or delete the server, and you can switch edition on this page. Plesk keeps itself up to date. The firewall opens ports 22, 80, 443 and 8443; open more in the firewall tab if you need them. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465.",
+  "needs_email": true,
+  "min": {"cores": 2, "memory_mb": 2048, "disk_gb": 40},
+  "ports": [{"port": 22, "proto": "tcp", "label": "SSH"}, {"port": 80, "proto": "tcp", "label": "HTTP"}, {"port": 443, "proto": "tcp", "label": "HTTPS"}, {"port": 8443, "proto": "tcp", "label": "Plesk"}],
+  "minutes": 30,
+  "credentials": ["admin_user", "admin_password"],
+  "steps": ["os", "packages", "download", "plesk", "credentials", "licence", "firewall", "verify", "install", "complete"],
+  "open": {"port": 8443, "scheme": "https"},
+  "licence": {"product_slug": "plesk"},
+  "docs_url": "https://docs.plesk.com/en-US/obsidian/administrator-guide/",
+  "versions": [
+    {"id": "18", "label": "Plesk Obsidian 18", "upstream": "18.0 (latest release)", "recipe": 1, "status": "current", "min_plan": "performance", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "252510c4ece865c53423abb28eae17575acf08675fcc9d57f55a50a0e5112530", "eol": ""}
+  ]
+}

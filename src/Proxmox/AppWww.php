@@ -250,7 +250,7 @@ final class AppWww {
 	}
 
 	/** @return array{client: Client, node: string, vmid: int}|null */
-	private static function guest( Resource $r ): ?array {
+	public static function guest( Resource $r ): ?array {
 		$record  = VmRecords::for_resource( $r->id() );
 		$cluster = $record ? Clusters::get( $record['cluster'] ) : null;
 		if ( ! $record || ! $cluster || null !== Clients::gate( $record['cluster'], $cluster, Clients::live_allowed() ) ) {

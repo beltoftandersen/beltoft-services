@@ -147,6 +147,7 @@ final class Plugin {
 		Proxmox\AppField::register();
 		Proxmox\AppLicence::register();
 		Proxmox\AppLicenceCart::register();
+		Proxmox\PleskLicence::register();
 		Proxmox\AppReinstallPaid::register();
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();

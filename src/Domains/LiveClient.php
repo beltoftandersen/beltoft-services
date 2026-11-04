@@ -45,7 +45,9 @@ class LiveClient implements Client {
 
 	public function request( string $method, string $path, array $body = array(), array $query = array() ): array|\WP_Error {
 		$method = strtoupper( $method );
-		if ( ! in_array( $method, array( 'GET', 'POST', 'PUT', 'PATCH' ), true ) || ! preg_match( '#^/[A-Za-z0-9/_.,-]+$#D', $path ) ) {
+		// A registration is never deleted. The one DELETE there is: a Plesk licence, by its key id.
+		$allowed = in_array( $method, array( 'GET', 'POST', 'PUT', 'PATCH' ), true ) || ( 'DELETE' === $method && 1 === preg_match( '#^/licenses/plesk/\d{1,10}$#D', $path ) );
+		if ( ! $allowed || ! preg_match( '#^/[A-Za-z0-9/_.,-]+$#D', $path ) ) {
 			return new \WP_Error( 'bad_request', 'Invalid registrar method or path.' );
 		}
 		$token = $this->token();
