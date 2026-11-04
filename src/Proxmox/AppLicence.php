@@ -495,11 +495,22 @@ final class AppLicence {
 
 		if ( 'active' === $state ) {
 			$plan = (array) $licence->get( 'plan' );
-
-			return array(
+			$job  = array(
 				'tier'    => (string) ( $plan['tier'] ?? '' ),
 				'licence' => array_diff_key( $plan, array_flip( array( 'app', 'tier', 'tier_label' ) ) ),
 			);
+
+			/**
+			 * What the install job carries for a paid app. A vendor driver adds what the recipe needs (the licence key)
+			 * to `licence`, or returns a StepResult to look again shortly (poll) or to fail the install.
+			 *
+			 * @param array{tier: string, licence: array<string, mixed>} $job     The job values so far.
+			 * @param Resource                                           $server  The server.
+			 * @param Resource                                           $licence The licence resource.
+			 */
+			$filtered = apply_filters( 'beltoft_services_app_install_licence', $job, $server, $licence );
+
+			return $filtered instanceof \BeltoftServices\Drivers\StepResult || ( is_array( $filtered ) && is_array( $filtered['licence'] ?? null ) && is_string( $filtered['tier'] ?? null ) ) ? $filtered : $job;
 		}
 
 		if ( 'ended' === $state ) {

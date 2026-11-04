@@ -68,7 +68,7 @@ abstract class PaidAppCase extends MonitoringTestCase {
 			'vmid_min' => '5000', 'vmid_max' => '5099',
 			'templates' => "9000 = Debian 12\n9001 = Ubuntu 24.04", 'default_template' => '9000',
 			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
-			'apps_ready' => 1, 'apps_enabled' => array( 'docker', 'wordpress' ),
+			'apps_ready' => 1, 'apps_enabled' => array( 'docker', 'wordpress', 'plesk' ),
 			'template_families_text' => "9001 = ubuntu-24.04\n9000 = debian-12",
 		) ) );
 	}

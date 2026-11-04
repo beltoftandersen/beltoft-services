@@ -144,6 +144,8 @@ final class AppTab {
 			'odoo'        => __( 'Setting up Odoo', 'beltoft-services' ),
 			'credentials' => __( 'Saving the login', 'beltoft-services' ),
 			'nextcloud'   => __( 'Setting up Nextcloud', 'beltoft-services' ),
+			'plesk'       => __( 'Installing Plesk', 'beltoft-services' ),
+			'licence'     => __( 'Applying the licence', 'beltoft-services' ),
 			'firewall'    => __( 'Setting up the firewall', 'beltoft-services' ),
 			'verify'      => __( 'Checking the install', 'beltoft-services' ),
 			'install'     => __( 'Finishing', 'beltoft-services' ),
@@ -169,7 +171,9 @@ final class AppTab {
 		$path = isset( $open['path'] ) && is_string( $open['path'] ) && 1 === preg_match( '#^/[A-Za-z0-9/_.-]*$#D', $open['path'] ) ? $open['path'] : '/';
 		$port = isset( $open['port'] ) ? (int) $open['port'] : 0;
 
-		return ( '' !== $domain && 0 === $port ? 'https://' : 'http://' ) . $host . ( $port > 0 ? ':' . $port : '' ) . $path;
+		$https = '' !== $domain && 0 === $port || ( $port > 0 && 'https' === ( $open['scheme'] ?? '' ) );
+
+		return ( $https ? 'https://' : 'http://' ) . $host . ( $port > 0 ? ':' . $port : '' ) . $path;
 	}
 
 	/**

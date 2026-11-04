@@ -134,6 +134,8 @@ final class AppStatus {
 			if ( 'ready' === $r->get( 'app_state' ) ) {
 				AppOwnDomain::installed( $r );
 				AppWww::installed( $r );
+				/** The app of a server reported ready. A vendor driver may now hand over what it kept back (a licence key). */
+				do_action( 'beltoft_services_app_installed', $r );
 			}
 			if ( 'failed' === $state ) {
 				AppAlerts::failure( $r, 'Installation failed at ' . $status['step'] );

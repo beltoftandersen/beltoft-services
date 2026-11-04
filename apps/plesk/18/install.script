@@ -1,0 +1,153 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+vendor=/root/.beltoft-app/vendor
+job="$state/job.running"
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+ip=$(jq -er '.ip' "$job")
+email=$(jq -er '.email' "$job")
+[[ "$ip" =~ ^[0-9.]+$ ]]
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates curl gnupg jq openssl ufw
+  install -m 0700 -d "$secrets" "$vendor"
+  # Plesk needs 1 GB of swap next to 1 GB of memory.
+  if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+    fallocate -l 2G /swapfile
+    chmod 0600 /swapfile
+    mkswap /swapfile >/dev/null
+    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+    swapon /swapfile
+  fi
+  # Installs a licence key given on standard input: a key file (XML) or an activation code. Nothing is printed.
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-plesk-key <<'KEY'
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+key=$(cat)
+if [[ "$key" == "<"* ]]; then
+  tmp=$(mktemp /root/.beltoft-app/key.XXXXXX)
+  trap 'rm -f "$tmp"' EXIT
+  printf '%s' "$key" > "$tmp"
+  plesk bin license --install "$tmp" >/dev/null
+elif [[ "$key" =~ ^[A-Za-z0-9-]{10,64}$ ]]; then
+  plesk bin license --install "$key" >/dev/null
+else
+  exit 1
+fi
+plesk bin license --check-installed-license
+KEY
+  # A key that arrives after the install: the plugin writes licence.json, the guest installs it and answers in licence.status.json (no key in the answer).
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-plesk-licence <<'APPLY'
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+state=/var/lib/beltoft-app
+f="$state/licence.json"
+hash=
+report() {
+  printf '{"hash":"%s","state":"%s","updated":"%s"}\n' "$hash" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/licence.status.tmp"
+  mv -f "$state/licence.status.tmp" "$state/licence.status.json"
+}
+[ -f "$f" ] || exit 0
+trap 'report failed; rm -f "$f" 2>/dev/null || true' ERR
+# The guest agent creates the file before it writes the content: wait until it is complete JSON.
+for _ in $(seq 1 30); do jq -e '.key and .hash' "$f" >/dev/null 2>&1 && break; sleep 1; done
+hash=$(jq -er '.hash' "$f")
+[[ "$hash" =~ ^[a-f0-9]{64}$ ]]
+[ "$(jq -j '.key' "$f" | sha256sum | cut -d' ' -f1)" = "$hash" ]
+jq -j '.key' "$f" | /usr/local/sbin/beltoft-plesk-key
+report ready
+rm -f "$f"
+APPLY
+  cat > /etc/systemd/system/beltoft-licence.service <<'UNIT'
+[Unit]
+Description=Install a Plesk licence key
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/beltoft-plesk-licence
+UNIT
+  cat > /etc/systemd/system/beltoft-licence.path <<'UNIT'
+[Unit]
+Description=Watch for a Plesk licence key to install
+[Path]
+PathExists=/var/lib/beltoft-app/licence.json
+Unit=beltoft-licence.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  touch "$state/stage.1"
+fi
+step=download
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  # Plesk's one-click installer script, pinned. It fetches the installer of the latest Plesk Obsidian release.
+  timeout 120 curl --proto '=https' --tlsv1.2 -fsSL https://autoinstall.plesk.com/one-click-installer -o "$vendor/one-click-installer"
+  printf '%s  one-click-installer\n' '5afcf5604661b19871b2751883ca7e3c6ddcee5354fa48033bf490f89b83beec' | ( cd "$vendor" && sha256sum -c - )
+  grep -q '^current_mode="one-click-installer"$' "$vendor/one-click-installer"
+  touch "$state/stage.2"
+fi
+step=plesk
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  # Typical installation, no questions asked. It takes 15 to 30 minutes.
+  timeout 3300 sh "$vendor/one-click-installer" > "$state/plesk-install.log" 2>&1
+  plesk version >/dev/null
+  touch "$state/stage.3"
+fi
+step=credentials
+status installing
+if [ ! -e "$secrets/plesk.json" ]; then
+  # Letters and digits only, with a capital and a digit, to pass Plesk's password rules.
+  jq -n --arg password "$(openssl rand -hex 16)Aa1" '{admin_user:"admin",admin_password:$password}' > "$secrets/plesk.json"
+  chmod 0600 "$secrets/plesk.json"
+fi
+step=licence
+status installing
+if [ ! -e "$state/stage.4" ]; then
+  # The licence key comes with the job. Without it Plesk starts on its own trial and the plugin sends the key later.
+  key=$(jq -j '.licence.key // ""' "$job")
+  trial=true
+  [ -z "$key" ] || trial=false
+  plesk bin init_conf --init -name Administrator -passwd "$(jq -er '.admin_password' "$secrets/plesk.json")" -email "$email" -default-ip "$ip" -ip-type shared -send_announce false -trial_license "$trial" -license_agreed true >/dev/null
+  if [ -n "$key" ]; then
+    khash=$(printf '%s' "$key" | sha256sum | cut -d' ' -f1)
+    # A key that does not install leaves Plesk on its trial; the plugin sees the answer and tries again.
+    if printf '%s' "$key" | /usr/local/sbin/beltoft-plesk-key; then lstate=ready; else lstate=failed; fi
+    printf '{"hash":"%s","state":"%s","updated":"%s"}\n' "$khash" "$lstate" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/licence.status.json"
+    unset key khash lstate
+  fi
+  systemctl enable --now beltoft-licence.path
+  touch "$state/stage.4"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.5" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  for port in 22 80 443 8443; do ufw allow "$port/tcp"; done
+  ufw --force enable
+  touch "$state/stage.5"
+fi
+step=verify
+status installing
+plesk bin init_conf --check-configured
+curl --insecure --fail --silent --show-error --max-time 30 https://127.0.0.1:8443/login_up.php -o /dev/null
+jq '{admin_user,admin_password}' "$secrets/plesk.json" > "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"

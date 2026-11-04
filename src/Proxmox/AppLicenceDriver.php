@@ -126,7 +126,31 @@ final class AppLicenceDriver implements Driver {
 			return StepResult::fail( $why . ' App licence not delivered: review and refund order #' . $order . '; the subscription was cancelled.' );
 		}
 
-		return StepResult::done( array( 'steps' => array( 'ready' ), 'applic_tier' => (string) ( ( (array) $r->get( 'plan' ) )['tier'] ?? '' ) ) );
+		$meta = array( 'steps' => array( 'ready' ), 'applic_tier' => (string) ( ( (array) $r->get( 'plan' ) )['tier'] ?? '' ) );
+
+		if ( $server && '' !== $app ) {
+			/**
+			 * A vendor driver's part of the provisioning of a paid app licence (create the vendor's licence). Return
+			 * null when the app is none of its business, a StepResult to wait, retry or fail, or a done result whose
+			 * meta is stored on the licence. It must be safe to run again after a crash.
+			 *
+			 * @param StepResult|null $result  Null.
+			 * @param Resource        $r       The licence resource.
+			 * @param Resource        $server  The server.
+			 * @param string          $app     App id.
+			 */
+			$vendor = apply_filters( 'beltoft_services_app_licence_provision', null, $r, $server, $app );
+
+			if ( $vendor instanceof StepResult ) {
+				if ( ! $vendor->is_done() ) {
+					return $vendor;
+				}
+
+				$meta = array_merge( $vendor->meta(), $meta );
+			}
+		}
+
+		return StepResult::done( $meta );
 	}
 
 	public function pause( Resource $r ): StepResult {
@@ -201,6 +225,15 @@ final class AppLicenceDriver implements Driver {
 			__( 'Server license', 'beltoft-services' )  => (string) $r->get( 'server_license' ),
 			__( 'Server resource', 'beltoft-services' ) => $server ? (string) $server->id() : '',
 		);
+
+		/**
+		 * Rows of the admin panel of an app licence: a vendor driver adds its own ids (never a key).
+		 *
+		 * @param array<string, string> $rows Label => value.
+		 * @param Resource              $r    The licence resource.
+		 */
+		$more = apply_filters( 'beltoft_services_app_licence_admin_rows', array(), $r );
+		$rows = array_merge( $rows, is_array( $more ) ? array_map( 'strval', $more ) : array() );
 
 		echo '<h3>' . esc_html__( 'App licence', 'beltoft-services' ) . '</h3><table class="widefat striped"><tbody>';
 
