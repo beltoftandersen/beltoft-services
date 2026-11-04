@@ -824,20 +824,20 @@ div.beltoft-services-domain .beltoft-dnse__save.button { height: 40px; padding: 
 .woocommerce-account .beltoft-services-usage__table { margin-bottom: 4px; }
 
 /* Status bar, action lock and question (assets/status.js). One colour variable per state: change it here and it changes everywhere. */
-:root { --bs-status-ok: var(--navy, #0c1535); --bs-status-fail: var(--navy, #0c1535); --bs-status-warn: var(--navy, #0c1535); }
-.bs-status { --bs-header-offset: 0px; position: sticky; top: calc(var(--bs-header-offset) + 8px); z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 10px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); border-left: 4px solid var(--navy, #0c1535); font-size: 15px; font-weight: 600; line-height: 1.4; transition: opacity .4s ease; }
+:root { --bs-status-ok: var(--green, #28513e); --bs-status-fail: #a4372a; --bs-status-warn: #8a5a00; }
+.bs-status { --bs-header-offset: 0px; position: sticky; top: calc(var(--bs-header-offset) + 8px); z-index: 50; box-sizing: border-box; display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 10px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); border-left: 3px solid var(--navy, #0c1535); font-size: 15px; font-weight: 600; line-height: 1.4; transition: opacity .4s ease; }
 .bs-status[hidden] { display: none; }
 .bs-status.is-fading { opacity: 0; }
-.bs-status.is-done { border-left-color: var(--bs-status-ok); }
-.bs-status.is-fail { border-left-color: var(--bs-status-fail); }
-.bs-status.is-info { border-left-color: var(--bs-status-warn); }
+.bs-status.is-done { color: var(--bs-status-ok); border-left-color: var(--bs-status-ok); }
+.bs-status.is-fail { color: var(--bs-status-fail); border-left-color: var(--bs-status-fail); }
+.bs-status.is-info { color: var(--bs-status-warn); border-left-color: var(--bs-status-warn); }
 .bs-status__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .bs-status.is-busy .bs-status__text::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 .bs-status__close { flex: none; width: 32px; height: 32px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
 .bs-status__close[hidden] { display: none; }
 .bs-status__close:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: 1px; }
-.bs-field-error { margin: 6px 0 0; color: var(--navy, #0c1535); font-size: 14px; font-weight: 600; }
-[aria-invalid="true"] { outline: 2px solid var(--navy, #0c1535); outline-offset: 1px; }
+.bs-field-error { margin: 6px 0 0; color: var(--bs-status-fail); font-size: 14px; font-weight: 600; }
+[aria-invalid="true"] { outline: 2px solid var(--bs-status-fail); outline-offset: 1px; }
 button.is-busy, input.is-busy, [data-bs-action].is-busy { cursor: progress; }
 button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 [data-bs-locked] { opacity: .5; cursor: not-allowed; pointer-events: auto; }
