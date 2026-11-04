@@ -79,6 +79,10 @@ final class Panel {
 			return __( 'Delayed', 'beltoft-services' );
 		}
 
+		if ( $r && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
+			return self::domain_label( $state, $r );
+		}
+
 		$app = $r ? \BeltoftServices\Proxmox\AppProgress::line( $r ) : '';
 
 		if ( '' !== $app ) {
@@ -94,6 +98,36 @@ final class Panel {
 		);
 
 		return $labels[ self::group( $state, $r ) ];
+	}
+
+	/**
+	 * The state of a domain or DNS hosting, in a domain's words.
+	 *
+	 * @param string   $state Resource state.
+	 * @param Resource $r     The domain's resource.
+	 */
+	private static function domain_label( string $state, Resource $r ): string {
+		$group = self::group( $state, $r );
+
+		if ( 'ready' === $group ) {
+			return __( 'Active', 'beltoft-services' );
+		}
+
+		if ( 'getting-ready' === $group ) {
+			if ( 'dns' === $r->get( 'driver' ) ) {
+				return __( 'Being set up', 'beltoft-services' );
+			}
+
+			return 'transfer' === $r->get( 'mode' ) ? __( 'Transfer in progress', 'beltoft-services' ) : __( 'Being registered', 'beltoft-services' );
+		}
+
+		if ( 'paused' === $group ) {
+			$license = $r->license();
+
+			return is_array( $license ) && 'expired' === ( $license['status'] ?? '' ) ? __( 'Expired', 'beltoft-services' ) : __( 'Paused', 'beltoft-services' );
+		}
+
+		return 'removed' === $group ? __( 'Removed', 'beltoft-services' ) : __( 'Failed: contact us', 'beltoft-services' );
 	}
 
 	/**

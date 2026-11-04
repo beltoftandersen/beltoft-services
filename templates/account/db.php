@@ -61,7 +61,9 @@ $beltoft_services_db_wait = array(
 	<?php if ( '' !== (string) ( $view['limits'] ?? '' ) ) : ?><p class="description"><?php echo esc_html( (string) $view['limits'] ); ?></p><?php endif; ?>
 	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
 
-	<?php if ( 'ready' === $view['kind'] && array() !== $view['power']['actions'] ) : ?>
+	<?php if ( $nav && array() !== $view['power']['actions'] ) : ?>
+		<?php // On a page the buttons and the note about billing are in the head. ?>
+	<?php elseif ( 'ready' === $view['kind'] && array() !== $view['power']['actions'] ) : ?>
 		<div class="beltoft-services-db__power" data-db-power-box>
 			<p class="beltoft-services-db__power-actions">
 				<?php foreach ( $view['power']['actions'] as $beltoft_services_power_action => $beltoft_services_power_label ) : ?>

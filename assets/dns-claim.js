@@ -545,7 +545,7 @@
 			if ( 'already_yours' === ( error.data && error.data.code ) ) {
 				var link = id ? cardLink( id ) : null;
 				bs.fail( handle, t.alreadyYours, input );
-				var text = document.querySelector( '.bs-status__text' );
+				var text = document.querySelector( '[data-bs-inline] .bs-inline__text' );
 				if ( link && text ) { text.appendChild( document.createTextNode( ' ' ) ); text.appendChild( link ); }
 			} else {
 				bs.fail( handle, error.message || t.failed, input );

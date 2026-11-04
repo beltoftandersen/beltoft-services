@@ -101,6 +101,7 @@ final class Plugin {
 		Account\DbPicker::register();
 		Account\Overview::register();
 		Account\Billing::register();
+		Account\PageHead::register();
 		Account\UsageView::register();
 
 		Lifecycle::register();

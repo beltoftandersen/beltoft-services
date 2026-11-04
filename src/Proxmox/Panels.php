@@ -36,7 +36,7 @@ final class Panels {
 
 	/**
 	 * Listener of beltoft_services_account_page_head: the head of a server's page. The server's name as
-	 * the title, its state, plan and renewal, and the buttons for copying the ssh command, rebooting,
+	 * the title, its state and plan (no renewal: it is on Billing), and the buttons for copying the ssh command, rebooting,
 	 * shutting down and starting. Nothing here calls Proxmox: the power is the one the last status kept.
 	 *
 	 * @param mixed $handled  Whether another listener printed the head.
@@ -75,7 +75,9 @@ final class Panels {
 			'show_message' => 'ready' !== $group || $app,
 			'power'      => $power,
 			'plan'       => $product !== $title ? $product : '',
-			'renews'     => \BeltoftServices\Account\ServerLinks::renewal( $license ),
+			'resource_id' => $resource->id(),
+			'can_rename' => $resource->accepts_actions() && true !== $resource->get( 'linked' ),
+			'server_name' => ServerName::of( $resource ),
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'ssh_user'   => Provision::LOGIN_USER,
 			'actions'    => array_intersect_key( $offered, array_flip( array( 'start', 'reboot', 'shutdown' ) ) ),

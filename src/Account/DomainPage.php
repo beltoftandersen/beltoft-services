@@ -56,8 +56,9 @@ final class DomainPage {
 			'badge'        => Panel::label( $state, $resource ),
 			'message'      => Panel::message( $state, $resource ),
 			'show_message' => 'ready' !== $group,
-			'kind'         => DomainRows::kind( $resource ),
-			'renews'       => DomainRows::renewal( $resource ),
+			// What the service is and when it renews are on the Overview below.
+			'kind'         => '',
+			'renews'       => '',
 		);
 
 		( static function ( array $vars ): void {

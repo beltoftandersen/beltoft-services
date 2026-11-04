@@ -58,6 +58,7 @@ final class Status {
 			'ok'           => __( 'OK', 'beltoft-services' ),
 			'cancel'       => __( 'Cancel', 'beltoft-services' ),
 			'working'      => __( 'Working…', 'beltoft-services' ),
+			'busyState'    => __( 'Busy', 'beltoft-services' ),
 		);
 	}
 }

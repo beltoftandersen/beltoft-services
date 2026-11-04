@@ -24,14 +24,16 @@ class StatusTest extends TestCase {
 		$this->assertStringNotContainsString( '·', $js );
 	}
 
-	public function test_the_bar_is_an_overlay_that_takes_no_space(): void {
+	public function test_there_is_no_overlay_only_a_state_line_of_a_fixed_height(): void {
 		$js  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
-		$this->assertMatchesRegularExpression( '/\.bs-status-slot \{[^}]*position: sticky;[^}]*height: 0;/', $css );
-		$this->assertMatchesRegularExpression( '/\.bs-status \{[^}]*position: absolute;[^}]*margin: 0;/', $css );
-		$this->assertStringNotContainsString( 'box-shadow', (string) preg_replace( '/^(?!\.bs-status \{).*$/m', '', $css ) );
+		$this->assertStringNotContainsString( 'bs-status-slot', $js . $css );
+		$this->assertStringNotContainsString( 'bs-status__', $js . $css );
+		$this->assertStringContainsString( 'data-bs-inline', $js );
+		$this->assertMatchesRegularExpression( '/\.bs-inline \{[^}]*height: 20px;/', $css );
+		$this->assertMatchesRegularExpression( '/\.bs-inline__text \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/', $css );
+		$this->assertMatchesRegularExpression( '/\.bs-pagehead \{[^}]*height: 20px;/', $css );
 		$this->assertStringContainsString( 'scroll-margin-top: var(--bs-overlay-clear', $css );
-		$this->assertStringContainsString( 'bs-status-slot', $js );
-		$this->assertStringNotContainsString( 'insertBefore( notices', $js );
+		$this->assertStringContainsString( "'alert'", $js, 'A failure is announced as an alert.' );
 	}
 }

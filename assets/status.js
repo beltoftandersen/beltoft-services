@@ -1,13 +1,18 @@
 /**
- * One place for feedback on My Account and the checkout fields: a status bar, a lock for the buttons of the
+ * One place for feedback on My Account and the checkout fields: a state line, a lock for the buttons of the
  * service that is working, and a styled question (dialog) that replaces window.confirm / alert / prompt.
  *
- *   var h = beltoftStatus.busy( 'Rebooting your server…', 'resource-id', button? );   // bar + lock, returns a handle
+ *   var h = beltoftStatus.busy( 'Rebooting your server…', 'resource-id', button? );   // state line + lock, returns a handle
  *   beltoftStatus.done( h, 'Your server has restarted.' );                           // shown about 5 s, then fades
  *   beltoftStatus.fail( h, 'Failed: …', fieldElementOrSelector? );                   // stays until closed; the field gets the message too
  *   beltoftStatus.info( 'Copied.' );                                                  // like done, without a handle
  *   beltoftStatus.confirm( { title, text, confirm, cancel, danger } ).then( function ( yes ) {} );
  *   beltoftStatus.locked( scope );                                                    // true while a handle of that scope is busy
+ *
+ * Every page has a state line ([data-bs-inline]): in the head of a server or database page it follows the state indicator,
+ * on any other page it is the line under the title row (PageHead), and it falls back to one at the top of the content.
+ * Busy, done, fail and info show there, and it goes back to what it said (the description) after a done or an info.
+ * The line has a fixed height: long text is cut with an ellipsis (the title holds all of it), so nothing on the page moves.
  *
  * Scope: the service's resource id (the container carries data-bs-scope="<id>"; a [data-resource] element is marked
  * automatically), or 'page' for the whole content area. Only the latest message is shown. No dependencies.
@@ -23,16 +28,14 @@
 	var strings = config.strings || {};
 	var SELECTOR = 'button, input[type="submit"], input[type="button"], [data-bs-action]';
 	var DONE_MS = 5000;
-var FADE_MS = 150;
-	var bar = null;
-var slot = null;
+	var FADE_MS = 150;
 	var current = null;
 	var timers = { done: 0, fade: 0 };
 	var active = [];
 	var recent = { el: null, at: 0 };
 	var fieldNotes = [];
 	var candidates = null;
-var headerTop = 0;
+	var headerTop = 0;
 
 	function text( key, fallback ) {
 		return strings[ key ] || fallback;
@@ -56,34 +59,12 @@ var headerTop = 0;
 		return el;
 	}
 
-	// ---- the bar ----------------------------------------------------------------------------------------------
-
 	function contentArea() {
 		return document.querySelector( '.woocommerce-MyAccount-content' ) || document.querySelector( '[data-bs-scope="page"]' ) || document.querySelector( 'form.woocommerce-checkout' ) || document.querySelector( '.woocommerce-cart-form, .woocommerce' ) || document.querySelector( 'main' ) || document.body;
 	}
 
-	// The bar is an overlay: its slot has no height, so nothing in the page moves when the bar shows or hides.
-	// The slot sits below the page's tabs when it has any, else at the top of the content area.
-	function place() {
-		var area = contentArea();
-		var tabs = area.querySelectorAll( 'nav.beltoft-services-tabs, nav.beltoft-services-billing-tabs, .beltoft-services-billing-tabs, nav.beltoft-services-account-tabs' );
-		var anchor = tabs.length ? tabs[ tabs.length - 1 ] : null;
-
-		// The checkout: the first child of the step (a block, so the slot adds no gap), which is right under the step navigation.
-		var step = area.querySelector( '.brxe-woocommerce-checkout-step' );
-
-		if ( step && ! anchor ) {
-			step.insertBefore( slot, step.firstChild );
-		} else if ( anchor && anchor.parentNode ) {
-			anchor.parentNode.insertBefore( slot, anchor.nextSibling );
-		} else if ( area.firstChild ) {
-			area.insertBefore( slot, area.firstChild );
-		} else {
-			area.appendChild( slot );
-		}
-	}
-
-	// The fixed site header covers the top of the viewport: the bar sticks right under it.
+	// The fixed site header covers the top of the viewport: a field that gets the focus must land below it
+	// (fields use --bs-overlay-clear as scroll-margin-top).
 	function offset() {
 		var top = 0;
 		var wide = window.innerWidth * 0.5;
@@ -93,7 +74,7 @@ var headerTop = 0;
 			Array.prototype.forEach.call( document.body.querySelectorAll( 'header, section, nav, div' ), function ( node ) {
 				var style = window.getComputedStyle( node );
 
-				if ( ( 'fixed' === style.position || 'sticky' === style.position ) && 'auto' !== style.top && node.offsetWidth >= wide && node.offsetHeight < 240 && ! node.contains( bar ) ) {
+				if ( ( 'fixed' === style.position || 'sticky' === style.position ) && 'auto' !== style.top && node.offsetWidth >= wide && node.offsetHeight < 240 ) {
 					candidates.push( node );
 				}
 			} );
@@ -109,46 +90,7 @@ var headerTop = 0;
 
 		headerTop = Math.round( top );
 		document.documentElement.style.setProperty( '--bs-header-offset', headerTop + 'px' );
-		clearance();
-	}
-
-	// How far from the top of the viewport the page must keep clear: the site header plus the bar while it shows.
-	// Fields use it as scroll-margin-top, so a field that gets the focus lands below both.
-	function clearance() {
-		var shown = bar && ! bar.hidden;
-		var height = shown ? bar.offsetHeight + 8 : 0;
-
-		document.documentElement.style.setProperty( '--bs-overlay-clear', ( headerTop + height + 16 ) + 'px' );
-	}
-
-	function ensure() {
-		if ( bar && document.body.contains( bar ) ) {
-			return bar;
-		}
-
-		bar = make( 'div', 'bs-status' );
-		bar.hidden = true;
-		bar.setAttribute( 'data-bs-status', '' );
-		bar.setAttribute( 'aria-live', 'polite' );
-		bar.appendChild( make( 'span', 'bs-status__text' ) );
-
-		var close = make( 'button', 'bs-status__close' );
-		close.type = 'button';
-		close.setAttribute( 'aria-label', text( 'close', 'Close' ) );
-		close.setAttribute( 'data-bs-keep', '' );
-		close.textContent = '×';
-		close.addEventListener( 'click', function () {
-			hide( true );
-		} );
-		bar.appendChild( close );
-
-		slot = make( 'div', 'bs-status-slot' );
-		slot.appendChild( bar );
-
-		place();
-		offset();
-
-		return bar;
+		document.documentElement.style.setProperty( '--bs-overlay-clear', ( headerTop + 16 ) + 'px' );
 	}
 
 	function clearTimers() {
@@ -158,66 +100,160 @@ var headerTop = 0;
 		timers.fade = 0;
 	}
 
-	function hide( now ) {
-		if ( ! bar ) {
+	// ---- the state line --------------------------------------------------------------------------------------------
+
+	// The line of the page: the one in a server or database head, else the one printed under the page's title row. A page that
+	// has none (a checkout step, a page of another plugin) gets one at the top of its content, made when it is first needed.
+	function inlineTarget() {
+		var found = document.querySelector( '.beltoft-services-page__head [data-bs-inline]' ) || document.querySelector( '[data-bs-inline]' );
+		var line;
+		var area;
+
+		if ( found && document.body.contains( found ) ) {
+			return found;
+		}
+
+		area = contentArea();
+		line = make( 'div', 'bs-pagehead' );
+		line.appendChild( make( 'span', 'bs-inline' ) ).setAttribute( 'data-bs-inline', '' );
+		line.firstChild.setAttribute( 'role', 'status' );
+		line.firstChild.setAttribute( 'aria-live', 'polite' );
+		area.insertBefore( line, area.firstChild );
+
+		return line.firstChild;
+	}
+
+	// The state indicator in front of the line (Running, Stopped, or the state text of a service that is not ready).
+	function indicatorOf( target ) {
+		var row = target.parentNode;
+
+		return row ? ( row.querySelector( '[data-power-line]:not([hidden])' ) || row.querySelector( '[data-badge]:not([hidden])' ) ) : null;
+	}
+
+	function inlineParts( target ) {
+		var label = target.querySelector( '.bs-inline__text' );
+		var close = target.querySelector( '.bs-inline__close' );
+
+		if ( ! label ) {
+			label = make( 'span', 'bs-inline__text', target.textContent.trim() );
+			target.textContent = '';
+			target.appendChild( label );
+		}
+
+		if ( ! close ) {
+			close = make( 'button', 'bs-inline__close' );
+			close.type = 'button';
+			close.hidden = true;
+			close.setAttribute( 'aria-label', text( 'close', 'Close' ) );
+			close.setAttribute( 'data-bs-keep', '' );
+			close.textContent = '×';
+			close.addEventListener( 'click', function () {
+				inlineHide( target, true );
+			} );
+			target.appendChild( close );
+		}
+
+		if ( undefined === target.beltoftDefault ) {
+			target.beltoftDefault = label.textContent;
+		}
+
+		return { label: label, close: close };
+	}
+
+	// While work is going on the indicator says Busy; it goes back to what it said, unless something else has changed it since.
+	function indicate( target, on ) {
+		var el = indicatorOf( target );
+
+		if ( on ) {
+			if ( el && undefined === target.beltoftIndicated ) {
+				target.beltoftIndicated = { el: el, was: el.textContent };
+				el.textContent = text( 'busyState', 'Busy' );
+			}
+
 			return;
 		}
 
+		if ( target.beltoftIndicated ) {
+			if ( target.beltoftIndicated.el.textContent === text( 'busyState', 'Busy' ) ) {
+				target.beltoftIndicated.el.textContent = target.beltoftIndicated.was;
+			}
+
+			target.beltoftIndicated = undefined;
+		}
+	}
+
+	function inlineReset( target ) {
+		var parts = inlineParts( target );
+
+		clearTimers();
+		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
+		parts.label.classList.remove( 'is-busy' );
+		target.removeAttribute( 'data-bs-kind' );
+		target.setAttribute( 'role', 'status' );
+		target.setAttribute( 'aria-live', 'polite' );
+		target.setAttribute( 'aria-busy', 'false' );
+		parts.label.textContent = target.beltoftDefault;
+
+		if ( target.beltoftDefault ) {
+			parts.label.setAttribute( 'title', target.beltoftDefault );
+		} else {
+			parts.label.removeAttribute( 'title' );
+		}
+
+		parts.close.hidden = true;
+		indicate( target, false );
+		current = null;
+	}
+
+	function inlineHide( target, now ) {
 		clearTimers();
 
 		if ( now || reduced() ) {
-			bar.hidden = true;
-			bar.classList.remove( 'is-fading' );
-			current = null;
-			clearance();
+			inlineReset( target );
 
 			return;
 		}
 
-		bar.classList.add( 'is-fading' );
+		target.classList.add( 'is-fading' );
 		timers.fade = window.setTimeout( function () {
-			bar.hidden = true;
-			bar.classList.remove( 'is-fading' );
-			current = null;
-			clearance();
+			inlineReset( target );
 		}, FADE_MS );
 	}
 
-	// kind: busy, done, fail, info. Only the newest message is shown.
-	function show( kind, message, handle ) {
-		var box = ensure();
-		var label = box.querySelector( '.bs-status__text' );
-		var close = box.querySelector( '.bs-status__close' );
-		var prefix = 'fail' === kind ? text( 'failedPrefix', 'Failed: ' ) : '';
+	function inlineShow( target, kind, message, handle ) {
+		var parts = inlineParts( target );
+		var full = ( 'fail' === kind ? text( 'failedPrefix', 'Failed: ' ) : '' ) + message;
 
 		clearTimers();
-		box.classList.remove( 'is-fading', 'is-busy', 'is-done', 'is-fail', 'is-info' );
-		box.classList.add( 'is-' + kind );
-		box.setAttribute( 'data-bs-kind', kind );
-		box.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
-		box.setAttribute( 'aria-busy', 'busy' === kind ? 'true' : 'false' );
-		box.setAttribute( 'aria-live', 'fail' === kind ? 'assertive' : 'polite' );
-		label.textContent = prefix + message;
-		close.hidden = 'fail' !== kind;
-		box.hidden = false;
+		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
+
+		// The three squares of work in progress are the ones every busy element has (.is-busy::before), on the text.
+		parts.label.classList.toggle( 'is-busy', 'busy' === kind );
+
+		if ( 'busy' !== kind ) {
+			target.classList.add( 'is-' + kind );
+		}
+
+		target.setAttribute( 'data-bs-kind', kind );
+		target.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
+		target.setAttribute( 'aria-busy', 'busy' === kind ? 'true' : 'false' );
+		target.setAttribute( 'aria-live', 'fail' === kind ? 'assertive' : 'polite' );
+		parts.label.textContent = full;
+		parts.label.setAttribute( 'title', full );
+		parts.close.hidden = 'fail' !== kind;
+		indicate( target, 'busy' === kind );
 		current = handle || null;
 
 		if ( 'done' === kind || 'info' === kind ) {
 			timers.done = window.setTimeout( function () {
-				hide( false );
+				inlineHide( target, false );
 			}, DONE_MS );
 		}
+	}
 
-		clearance();
-
-		// The bar is pinned under the header, so it is in view whenever its slot is; if the slot is out of the viewport, bring it in.
-		if ( 'fail' === kind && slot && slot.scrollIntoView ) {
-			var seen = box.getBoundingClientRect();
-
-			if ( seen.bottom < 0 || seen.top > window.innerHeight ) {
-				slot.scrollIntoView( { block: 'center' } );
-			}
-		}
+	// kind: busy, done, fail, info. Only the newest message is shown.
+	function show( kind, message, handle ) {
+		inlineShow( inlineTarget(), kind, message, handle );
 	}
 
 	// ---- the lock -----------------------------------------------------------------------------------------------
@@ -447,11 +483,15 @@ var headerTop = 0;
 
 		finish( handle, 'fail', message );
 
-		// On the checkout the bar goes with the step that holds the field.
-		var home = target && target.closest ? target.closest( '.brxe-woocommerce-checkout-step' ) : null;
+		// A failure with no field to point to must not go unseen: bring the state line into view.
+		var line = inlineTarget();
 
-		if ( home && slot && slot.parentNode !== home ) {
-			home.insertBefore( slot, home.firstChild );
+		if ( line && ! target && line.getBoundingClientRect ) {
+			var seen = line.getBoundingClientRect();
+
+			if ( seen.top < headerTop || seen.bottom > window.innerHeight ) {
+				line.scrollIntoView( { block: 'center' } );
+			}
 		}
 
 		if ( target ) {
@@ -461,22 +501,6 @@ var headerTop = 0;
 				target.focus( { preventScroll: true } );
 			}
 
-			keepClear( target );
-		}
-	}
-
-	// The field a failure points to must never sit under the bar: if it does, scroll it below the bar
-	// (scroll-margin-top on fields is the same distance).
-	function keepClear( target ) {
-		if ( ! bar || bar.hidden || ! target.getBoundingClientRect ) {
-			return;
-		}
-
-		var below = bar.getBoundingClientRect().bottom + 8;
-		var rect = target.getBoundingClientRect();
-
-		if ( rect.top < below || rect.bottom > window.innerHeight ) {
-			target.scrollIntoView( { block: 'start' } );
 		}
 	}
 
@@ -630,7 +654,7 @@ var headerTop = 0;
 		}
 	}, true );
 
-	// A form that posts and reloads (credit code, address, account details, card): data-bs-working="Working…" shows the bar and locks the page's buttons on submit.
+	// A form that posts and reloads (credit code, address, account details, card): data-bs-working="Working…" shows the state line and locks the page's buttons on submit.
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		var label = form && form.getAttribute ? form.getAttribute( 'data-bs-working' ) : null;
@@ -655,16 +679,21 @@ var headerTop = 0;
 			}
 		} );
 
-		// Server-side notices after a reload (WooCommerce) are printed at the bar's place.
-		if ( document.querySelector( '.woocommerce-MyAccount-content' ) ) {
-			ensure();
-
-			// WooCommerce's own notices after a reload stay where the page prints them (in the flow, not moved by script).
-			window.addEventListener( 'resize', function () {
-				candidates = null;
-				offset();
+		// A page with a state line in its head does not need the one under the title row.
+		if ( document.querySelector( '.beltoft-services-page__head [data-bs-inline]' ) ) {
+			Array.prototype.forEach.call( document.querySelectorAll( '.bs-pagehead' ), function ( line ) {
+				if ( line.parentNode ) {
+					line.parentNode.removeChild( line );
+				}
 			} );
 		}
+
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-bs-inline]' ), inlineParts );
+		offset();
+		window.addEventListener( 'resize', function () {
+			candidates = null;
+			offset();
+		} );
 	}
 
 	if ( 'loading' === document.readyState ) {
