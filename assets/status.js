@@ -59,14 +59,14 @@ var headerTop = 0;
 	// ---- the bar ----------------------------------------------------------------------------------------------
 
 	function contentArea() {
-		return document.querySelector( '.woocommerce-MyAccount-content' ) || document.querySelector( '[data-bs-scope="page"]' ) || document.querySelector( 'main' ) || document.body;
+		return document.querySelector( '.woocommerce-MyAccount-content' ) || document.querySelector( '[data-bs-scope="page"]' ) || document.querySelector( 'form.woocommerce-checkout' ) || document.querySelector( '.woocommerce-cart-form, .woocommerce' ) || document.querySelector( 'main' ) || document.body;
 	}
 
 	// The bar is an overlay: its slot has no height, so nothing in the page moves when the bar shows or hides.
 	// The slot sits below the page's tabs when it has any, else at the top of the content area.
 	function place() {
 		var area = contentArea();
-		var tabs = area.querySelectorAll( 'nav.beltoft-services-tabs, nav.beltoft-services-billing-tabs, .beltoft-services-billing-tabs, nav.beltoft-services-account-tabs' );
+		var tabs = area.querySelectorAll( 'nav.beltoft-services-tabs, nav.beltoft-services-billing-tabs, .beltoft-services-billing-tabs, nav.beltoft-services-account-tabs, nav.brx-checkout-steps-nav' );
 		var anchor = tabs.length ? tabs[ tabs.length - 1 ] : null;
 
 		if ( anchor && anchor.parentNode ) {
