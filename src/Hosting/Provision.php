@@ -349,9 +349,9 @@ final class Provision {
 			}
 		}
 
-		// The dump mount (a quarter of the disk) is created once; an existing mount point is never rewritten.
+		// The dump mount (a quarter of the disk) holds the nightly SQL dumps, the only copy of the databases in the container backup, so it is part of the backup (backup=1). It is created once; an existing mount point is never rewritten.
 		if ( ! isset( $v['config']['mp0'] ) ) {
-			$diff['mp0'] = sprintf( '%s:%d,mp=/mnt/dump,backup=0', $this->node['storage'], max( 1, intdiv( (int) $this->plan['disk_gb'], 4 ) ) );
+			$diff['mp0'] = sprintf( '%s:%d,mp=/mnt/dump,backup=1', $this->node['storage'], max( 1, intdiv( (int) $this->plan['disk_gb'], 4 ) ) );
 		}
 
 		if ( array() !== $diff ) {

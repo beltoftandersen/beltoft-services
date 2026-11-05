@@ -77,7 +77,7 @@ class ProvisionTest extends HostingCase {
 		$this->assertSame( 256, $c['swap'] );
 		$this->assertSame( 1, $c['onboot'] );
 		$this->assertSame( 'name=eth0,bridge=hbr0,ip=10.200.0.10/16,gw=10.200.0.1,firewall=1', $c['net0'] );
-		$this->assertSame( 'local-zfs:3,mp=/mnt/dump,backup=0', $c['mp0'] );
+		$this->assertSame( 'local-zfs:3,mp=/mnt/dump,backup=1', $c['mp0'] );
 		$this->assertStringContainsString( 'size=12G', $c['rootfs'] );
 
 		$this->assertSame(
@@ -89,6 +89,15 @@ class ProvisionTest extends HostingCase {
 			),
 			$ct['firewall_options']
 		);
+	}
+
+	public function test_the_dump_mount_is_part_of_the_container_backup(): void {
+		$r = $this->resource();
+		$this->provision_fully( $r );
+
+		// The nightly SQL dumps on this mount are the only copy of the databases (they live on the shared server).
+		$this->assertStringContainsString( ',backup=1', (string) $this->ct( $r )['config']['mp0'] );
+		$this->assertStringNotContainsString( 'backup=0', (string) $this->ct( $r )['config']['mp0'] );
 	}
 
 	public function test_the_network_rate_limit_is_added_when_the_node_has_one(): void {
