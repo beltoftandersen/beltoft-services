@@ -74,6 +74,12 @@ class FakeClient implements Client {
 			return new \WP_Error( 'http_404', 'Fake domain was not found.' );
 		}
 		if ( str_starts_with( $path, '/licenses/' ) ) { return $this->licence_model( $state, $method, $path, $body, $query ); }
+		if ( str_starts_with( $path, '/ssl/' ) ) {
+			$dirty  = false;
+			$result = \BeltoftServices\Ssl\FakeModel::handle( $state, $method, $path, $body, $query, $dirty );
+			if ( $dirty ) { update_option( self::OPTION, $state, false ); }
+			return $result;
+		}
 		if ( 'GET' === $method && '/resellers' === $path ) { return array( 'balance' => 1000, 'currency' => 'EUR' ); }
 		return new \WP_Error( 'fake_unconfigured', 'No fake registrar behavior is configured.' );
 	}

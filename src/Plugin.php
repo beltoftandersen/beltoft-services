@@ -64,6 +64,7 @@ final class Plugin {
 		Hosting\HostingSwitch::register();
 		Children::register();
 		Domains\DomainSettings::register();
+		Ssl\SslSettings::register();
 		Mail\MailSettings::register();
 		Mail\MailSetup::register();
 		Bricks\DocsElements::register();

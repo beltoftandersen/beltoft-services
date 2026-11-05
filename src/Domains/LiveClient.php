@@ -91,7 +91,7 @@ class LiveClient implements Client {
 
 	/** Seconds to wait for one request: an order is placed with the registrar by a slow call that may still go through, so it gets longer; no order is ever sent twice by this client. */
 	public static function timeout_for( string $method, string $path ): int {
-		return 'POST' === strtoupper( $method ) && in_array( $path, array( '/domains', '/domains/transfer' ), true ) ? 90 : 30;
+		return 'POST' === strtoupper( $method ) && in_array( $path, array( '/domains', '/domains/transfer', '/ssl/orders' ), true ) ? 90 : 30;
 	}
 
 	private function http( string $method, string $path, array $body, array $query, string $authorization ): array|\WP_Error {
