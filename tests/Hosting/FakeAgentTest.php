@@ -115,6 +115,12 @@ class FakeAgentTest extends TestCase {
 		$site = $a->submit( 'site.create', array( 'vmid' => 1000, 'slug' => 'shop', 'php' => '8.3', 'workers' => 4, 'host' => 'shop.example.test' ), 'j3' );
 		$this->assertSame( array( 'slug' => 'shop', 'root' => '/home/web/sites/shop' ), $site['result'] );
 
+		// The install needs the site's database first, as on the real agent.
+		$refused = $a->submit( 'site.wp_install', array( 'vmid' => 1000, 'slug' => 'shop', 'title' => 'Shop', 'admin_user' => 'owner', 'admin_email' => 'christian.beltoft@gmail.com' ), 'j3b' );
+		$this->assertSame( 'failed', $refused['status'] );
+		$this->assertStringContainsString( 'no database for this site', $refused['error'] );
+		$a->submit( 'db.create', array( 'account' => 'c1', 'vmid' => 1000, 'ip' => '10.200.0.10', 'databases' => array( 'c1_shop' ), 'password' => self::PASSWORD ), 'j3c' );
+
 		$this->assertSame( array( 'installed' => true, 'slug' => 'shop' ), $a->submit( 'site.wp_install', array( 'vmid' => 1000, 'slug' => 'shop', 'title' => 'Shop', 'admin_user' => 'owner', 'admin_email' => 'christian.beltoft@gmail.com' ), 'j4' )['result'] );
 		$this->assertSame( array( 'url' => 'https://shop.example.test/?fake-login=1' ), $a->submit( 'site.wp_login_link', array( 'vmid' => 1000, 'slug' => 'shop' ), 'j5' )['result'] );
 

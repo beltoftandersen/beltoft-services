@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
@@ -159,6 +160,34 @@ final class HostingActions {
 			return $gave;
 		}
 
+		// The site's database comes first: the install needs it (the account's user is the same, with the password kept since the order).
+		$password = Crypto::decrypt( (string) $this->r->get( 'db_secret' ) );
+
+		if ( null === $password || '' === $password ) {
+			Sites::remove( $this->r->id(), $slug );
+
+			return $this->error( 'failed', __( 'Websites cannot be added right now.', 'beltoft-services' ) );
+		}
+
+		$this->secrets[] = $password;
+		$done            = $this->call(
+			'db_add_' . $slug,
+			'db.create',
+			array(
+				'account'   => Config::account( $this->r->id() ),
+				'vmid'      => (int) $record['vmid'],
+				'ip'        => (string) $record['ip'],
+				'databases' => array( Provision::db_name( $this->r->id(), $slug ) ),
+				'password'  => $password,
+			)
+		);
+
+		if ( is_wp_error( $done ) ) {
+			Sites::remove( $this->r->id(), $slug ); // So the customer can try the same name again; every agent step is repeatable.
+
+			return $done;
+		}
+
 		$done = $this->call(
 			'site_add_' . $slug,
 			'site.create',
@@ -172,6 +201,8 @@ final class HostingActions {
 		);
 
 		if ( is_wp_error( $done ) ) {
+			Sites::remove( $this->r->id(), $slug ); // So the customer can try the same name again; every agent step is repeatable.
+
 			return $done;
 		}
 
@@ -191,6 +222,8 @@ final class HostingActions {
 			);
 
 			if ( is_wp_error( $done ) ) {
+				Sites::remove( $this->r->id(), $slug );
+
 				return $done;
 			}
 		}

@@ -75,6 +75,18 @@ class AccountTest extends HostingCase {
 		return (int) $r->license()['user_id'];
 	}
 
+	public function test_a_failed_add_leaves_no_half_made_site_and_the_same_name_works_again(): void {
+		$r = $this->account();
+		$a = new HostingActions( $r );
+
+		$this->agent->fail_next( 'site.wp_install' );
+		$err = $a->add_site( 'again', 'Again' );
+		$this->assertWPError( $err );
+		$this->assertNull( Sites::find( $r->id(), 'again' ), 'The name is free for a second try.' );
+
+		$this->assertSame( 'again', $a->add_site( 'again', 'Again' )['slug'] );
+	}
+
 	public function test_an_action_waits_for_a_job_the_agent_answers_queued_first(): void {
 		$r = $this->account();
 		$this->agent->pending( 'site.cache_purge', 2 );
@@ -96,6 +108,8 @@ class AccountTest extends HostingCase {
 		$done = $a->add_site( 'blog', 'Blog', '8.4' );
 		$this->assertSame( 'blog.preview.example.test', $done['host'] );
 		$this->assertSame( '8.4', Sites::find( $r->id(), 'blog' )['php'] );
+		$this->assertContains( 'c' . $r->id() . '_blog', $this->agent->state()['dbs'][ 'c' . $r->id() ]['databases'], 'The site has its database before the install (the real agent refuses an install without one).' );
+		$this->assertContains( 'c' . $r->id() . '_w' . $r->id(), $this->agent->state()['dbs'][ 'c' . $r->id() ]['databases'], 'The first site keeps its database.' );
 		$this->assertArrayHasKey( 'blog', $this->agent->state()['sites'][1000] );
 		$this->assertSame( 'active', SiteDomains::find( 'blog.preview.example.test' )['state'] );
 		$this->assertContains( 'blog.preview.example.test', array_column( $this->agent->state()['edge'][ 'c' . $r->id() ], 'host' ) );

@@ -484,6 +484,22 @@ class FakeAgent implements Agent {
 	// Internals.
 
 	/**
+	 * Does the container's account have the database of a site (<account>_<slug with underscores>)?
+	 *
+	 * @param int    $vmid Container id.
+	 * @param string $slug Site.
+	 */
+	private function has_database( int $vmid, string $slug ): bool {
+		foreach ( (array) ( $this->state['dbs'] ?? array() ) as $account => $db ) {
+			if ( (int) ( $db['vmid'] ?? 0 ) === $vmid && in_array( substr( $account . '_' . str_replace( '-', '_', $slug ), 0, 64 ), (array) $db['databases'], true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * A job as the API shows it. A held job shows queued, then running, until its reads are used up.
 	 *
 	 * @param string $job_id Job id.
@@ -666,6 +682,10 @@ class FakeAgent implements Agent {
 					return 'unknown site';
 				}
 
+				if ( 'site.wp_install' === $op && ! $this->has_database( $vmid, (string) $args['slug'] ) ) {
+					return 'no database for this site'; // The agent refuses an install before db.create made the site's database.
+				}
+
 				if ( 'site.wp_install' === $op ) {
 					return array(
 						'installed' => true,
@@ -704,8 +724,11 @@ class FakeAgent implements Agent {
 				);
 
 			case 'db.create':
+				// Like the agent: the account's user and the listed databases are added, the ones it already has stay.
+				$all = array_values( array_unique( array_merge( (array) ( $this->state['dbs'][ $args['account'] ]['databases'] ?? array() ), array_values( $args['databases'] ) ) ) );
+
 				$this->state['dbs'][ $args['account'] ] = array(
-					'databases' => array_values( $args['databases'] ),
+					'databases' => $all,
 					'host_ip'   => $args['ip'],
 					'vmid'      => $vmid,
 				);
