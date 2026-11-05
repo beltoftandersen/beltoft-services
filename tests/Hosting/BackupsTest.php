@@ -317,14 +317,20 @@ class BackupsTest extends HostingCase {
 		}
 	}
 
-	public function test_a_deleted_account_loses_its_backups_after_the_container(): void {
+	public function test_a_deleted_account_loses_its_backups_before_the_container_goes(): void {
 		$r = $this->round( $this->account() );
 		$this->assertCount( 1, $this->stored_backups() );
 
+		$before = count( $this->node->calls() );
 		$result = $this->driver->delete( Resource::find( $r->id() ) );
 
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$this->assertCount( 0, $this->stored_backups() );
+
+		// The node lists a guest's backups only while the guest exists (for a token with rights on guests): the purge is first.
+		$order = array_map( static fn( $c ) => false !== strpos( $c['path'], '/content/' ) ? 'backup' : ( 'DELETE' === $c['method'] && preg_match( '#/lxc/\d+$#', $c['path'] ) ? 'ct' : '' ), array_slice( $this->node->calls(), $before ) );
+		$order = array_values( array_filter( array_unique( $order ) ) );
+		$this->assertSame( array( 'backup', 'ct' ), $order );
 		$this->assertNull( Records::for_resource( $r->id() ) );
 	}
 

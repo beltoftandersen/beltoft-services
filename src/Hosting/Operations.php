@@ -210,7 +210,8 @@ final class Operations {
 
 		$done = (array) $this->r->get( 'delete_steps' );
 
-		foreach ( array( 'edge', 'dns', 'db', 'ct', 'backups', 'release' ) as $step ) {
+		// The backups go before the container: the node lists and deletes a guest's backups only while the guest still exists, for a token that has rights on the guest and not on the whole storage.
+		foreach ( array( 'edge', 'dns', 'db', 'backups', 'ct', 'release' ) as $step ) {
 			if ( in_array( $step, $done, true ) ) {
 				continue;
 			}
