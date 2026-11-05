@@ -59,6 +59,8 @@ final class Nodes {
 			'mem_gb'        => 0,
 			'disk_gb'       => 0,
 			'db_host'       => '',
+			'edge_ip'       => '',
+			'edge_ipv6'     => '',
 		);
 	}
 
@@ -328,6 +330,20 @@ final class Nodes {
 			if ( false === filter_var( $value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 				/* translators: %s: field name. */
 				return self::error( $key, sprintf( __( 'The %s must be an IPv4 address.', 'beltoft-services' ), $key ) );
+			}
+
+			$clean[ $key ] = $value;
+		}
+
+		foreach ( array(
+			'edge_ip'   => FILTER_FLAG_IPV4,
+			'edge_ipv6' => FILTER_FLAG_IPV6,
+		) as $key => $flag ) {
+			$value = trim( (string) ( $input[ $key ] ?? '' ) );
+
+			if ( '' !== $value && false === filter_var( $value, FILTER_VALIDATE_IP, $flag ) ) {
+				/* translators: %s: field name. */
+				return self::error( $key, sprintf( __( 'The %s must be an address of the right kind, or empty.', 'beltoft-services' ), $key ) );
 			}
 
 			$clean[ $key ] = $value;

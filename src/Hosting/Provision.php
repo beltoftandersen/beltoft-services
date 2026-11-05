@@ -23,8 +23,8 @@ defined( 'ABSPATH' ) || exit;
  * Steps (plan 16.4): place (the node of the plan's group), ip (a private address and an SSH port), vmid, clone
  * (linked, tagged with the ownership line), configure (limits, network, firewall options, root disk), start,
  * prepare (the agent's ct.prepare), db (db.create on the shared database server), site (site.create and
- * site.wp_install), edge (edge.apply), ready. Not in this slice: the DNS
- * step and the loopback verify step.
+ * site.wp_install), edge (edge.apply), dns (the preview name, SiteDns), verify (a loopback request inside the
+ * container through the agent), ready. Not done: the request through the public edge address, which needs a live node.
  *
  * Proxmox endpoints (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html#<path>):
  * /cluster/resources, /cluster/nextid, /nodes/{node}/lxc/{vmid}/clone, .../config (GET, PUT), .../resize,
@@ -39,7 +39,7 @@ final class Provision {
 	/**
 	 * The steps, in order.
 	 */
-	public const STEPS = array( 'place', 'ip', 'vmid', 'clone', 'configure', 'start', 'prepare', 'db', 'site', 'edge', 'ready' );
+	public const STEPS = array( 'place', 'ip', 'vmid', 'clone', 'configure', 'start', 'prepare', 'db', 'site', 'edge', 'dns', 'verify', 'ready' );
 
 	/**
 	 * The plan, typed.
@@ -581,6 +581,75 @@ final class Provision {
 		);
 
 		return $result instanceof StepResult ? $result : array();
+	}
+
+	/**
+	 * Step dns: the preview name of the first site points at the edge.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_dns() {
+		$spec = $this->site_spec();
+
+		if ( $spec instanceof StepResult ) {
+			return $spec;
+		}
+
+		$site = Sites::find( $this->r->id(), $spec['slug'] );
+
+		if ( null === $site ) {
+			return StepResult::fail( 'dns: the site record is missing' );
+		}
+
+		$host = EdgeMap::preview_host( $spec['slug'] );
+
+		if ( ! SiteDomains::add( $this->r->id(), (int) $site['id'], $host, 'preview' ) ) {
+			return StepResult::fail( 'dns: the preview name "' . $host . '" could not be recorded (is it taken?)' );
+		}
+
+		$done = SiteDns::publish_preview( $spec['slug'], $this->node );
+
+		if ( is_wp_error( $done ) ) {
+			return StepResult::retry( 0, 'dns: ' . $this->scrub( $done->get_error_message(), 160 ) );
+		}
+
+		if ( true !== $done ) {
+			return StepResult::fail( 'dns: ' . $this->scrub( (string) $done, 160 ) );
+		}
+
+		SiteDomains::set_state( $host, 'active' );
+
+		return array();
+	}
+
+	/**
+	 * Step verify: a loopback request inside the container answers for the preview name.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_verify() {
+		$spec   = $this->site_spec();
+		$record = Records::for_resource( $this->r->id() );
+
+		if ( $spec instanceof StepResult ) {
+			return $spec;
+		}
+
+		$result = $this->agent_call(
+			'site_verify',
+			'site.verify',
+			array(
+				'vmid' => (int) $record['vmid'],
+				'slug' => $spec['slug'],
+				'host' => EdgeMap::preview_host( $spec['slug'] ),
+			)
+		);
+
+		if ( $result instanceof StepResult ) {
+			return $result;
+		}
+
+		return 200 === (int) ( $result['status'] ?? 0 ) ? array() : StepResult::retry( 0, 'verify: the site answered ' . (int) ( $result['status'] ?? 0 ) );
 	}
 
 	/**

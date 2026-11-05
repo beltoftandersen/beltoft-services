@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  * - resume: the container starts, then the edge routes the names to it again.
  * - update_plan: limits and root disk follow the plan (grown, never shrunk). The agent's pool and cache budgets
  *   are a later slice.
- * - delete (only when the deletion mode allows it, which the reconciler decides): edge routes removed, databases
+ * - delete (only when the deletion mode allows it, which the reconciler decides): edge routes removed, DNS records we wrote removed, databases
  *   dropped, the container stopped and destroyed after the ownership proof, then the records are released.
  *   Backups and DNS records of the account follow with their own slices.
  *
@@ -180,7 +180,7 @@ final class Operations {
 
 		$done = (array) $this->r->get( 'delete_steps' );
 
-		foreach ( array( 'edge', 'db', 'ct', 'release' ) as $step ) {
+		foreach ( array( 'edge', 'dns', 'db', 'ct', 'release' ) as $step ) {
 			if ( in_array( $step, $done, true ) ) {
 				continue;
 			}
@@ -264,6 +264,26 @@ final class Operations {
 		);
 
 		return $result instanceof StepResult ? $result : true;
+	}
+
+	/**
+	 * Delete step dns: the records we wrote for the account's names go; an external name only loses its row.
+	 *
+	 * @param array<string, mixed> $record Record.
+	 * @return true|StepResult
+	 */
+	private function delete_dns( array $record ) {
+		unset( $record );
+
+		foreach ( SiteDomains::for_resource( $this->r->id() ) as $domain ) {
+			$done = SiteDns::remove_domain( $this->r, $domain['host'], $this->node );
+
+			if ( is_wp_error( $done ) ) {
+				return StepResult::retry( 0, 'delete: ' . $this->scrub( $done->get_error_message(), 160 ) );
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -364,7 +384,7 @@ final class Operations {
 	private function delete_release( array $record ) {
 		unset( $record );
 
-		if ( ! Sites::remove_all( $this->r->id() ) || ! Records::remove( $this->r->id() ) ) {
+		if ( ! SiteDomains::remove_all( $this->r->id() ) || ! Sites::remove_all( $this->r->id() ) || ! Records::remove( $this->r->id() ) ) {
 			return StepResult::retry( 0, 'delete: the hosting records could not be released' );
 		}
 

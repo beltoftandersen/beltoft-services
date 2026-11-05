@@ -8,6 +8,7 @@
 
 namespace BeltoftServices\Tests\Hosting;
 
+use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Hosting\Config;
@@ -44,6 +45,13 @@ abstract class HostingCase extends TestCase {
 	protected $agent;
 
 	/**
+	 * The fake DNS server.
+	 *
+	 * @var FakeDns
+	 */
+	protected $dns;
+
+	/**
 	 * The driver under test.
 	 *
 	 * @var HostingDriver
@@ -70,6 +78,10 @@ abstract class HostingCase extends TestCase {
 		add_filter( 'beltoft_services_hosting_client', fn() => $this->node );
 		add_filter( 'beltoft_services_hosting_agent', fn() => $this->agent );
 
+		$this->dns = new FakeDns();
+		$this->dns->create_zone( 'preview.example.test', array( 'ns1.example.test.' ) );
+		add_filter( 'beltoft_services_domains_dns', fn() => $this->dns );
+
 		$this->driver = Registry::get( 'hosting' );
 
 		$this->node->add_node( 'pve1' );
@@ -84,6 +96,7 @@ abstract class HostingCase extends TestCase {
 		remove_all_filters( 'beltoft_services_key' );
 		remove_all_filters( 'beltoft_services_hosting_client' );
 		remove_all_filters( 'beltoft_services_hosting_agent' );
+		remove_all_filters( 'beltoft_services_domains_dns' );
 		$this->wipe();
 
 		parent::tear_down();
@@ -138,6 +151,8 @@ abstract class HostingCase extends TestCase {
 					'mem_gb'       => 32,
 					'disk_gb'      => 1000,
 					'db_host'      => '10.200.0.3',
+					'edge_ip'      => '198.51.100.7',
+					'edge_ipv6'    => '2001:db8::7',
 				),
 				$over
 			)

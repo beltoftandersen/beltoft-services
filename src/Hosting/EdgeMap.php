@@ -57,6 +57,17 @@ final class EdgeMap {
 			}
 		}
 
+		// Names that reach the site besides the preview name, once they work (an external name waits until it points at us).
+		foreach ( SiteDomains::for_resource( $resource_id ) as $domain ) {
+			if ( 'preview' !== $domain['kind'] && 'active' === $domain['state'] ) {
+				$routes[] = array(
+					'host'      => $domain['host'],
+					'ip'        => $record['ip'],
+					'suspended' => $suspended,
+				);
+			}
+		}
+
 		return $routes;
 	}
 }

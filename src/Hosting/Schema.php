@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Schema {
 
-	public const DB_VERSION        = '1';
+	public const DB_VERSION        = '2';
 	public const OPTION_DB_VERSION = 'beltoft_services_hosting_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_hosting_schema_retry';
 
@@ -34,6 +34,9 @@ final class Schema {
 			'resource_slug' => array( 'resource_id', 'slug' ),
 			'slug'          => array( 'slug' ),
 		),
+		'hosting_domains' => array(
+			'host' => array( 'host' ),
+		),
 	);
 
 	/**
@@ -47,6 +50,7 @@ final class Schema {
 		return array(
 			'hosting'       => $wpdb->prefix . 'beltoft_services_hosting',
 			'hosting_sites' => $wpdb->prefix . 'beltoft_services_hosting_sites',
+			'hosting_domains' => $wpdb->prefix . 'beltoft_services_hosting_domains',
 		);
 	}
 
@@ -147,6 +151,26 @@ final class Schema {
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_slug (resource_id,slug),
 				UNIQUE KEY slug (slug)
+			) $collate;"
+		);
+
+		// The names of a site: its preview name, a domain on our name servers, an external domain.
+		dbDelta(
+			"CREATE TABLE {$t['hosting_domains']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				resource_id bigint(20) unsigned NOT NULL,
+				site_id bigint(20) unsigned NOT NULL,
+				host varchar(253) NOT NULL,
+				kind varchar(10) NOT NULL,
+				www_mode varchar(10) NOT NULL DEFAULT '',
+				state varchar(10) NOT NULL DEFAULT 'pending',
+				cert_state varchar(10) NOT NULL DEFAULT '',
+				checked datetime NULL DEFAULT NULL,
+				created datetime NOT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY host (host),
+				KEY resource_id (resource_id),
+				KEY site_id (site_id)
 			) $collate;"
 		);
 

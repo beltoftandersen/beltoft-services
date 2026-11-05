@@ -59,7 +59,7 @@ $beltoft_services_no_live = ( '' === $beltoft_services_live_error && '0' === (st
 // The IP pool, VM records and private network allocations. The warning is on the setting's description.
 $beltoft_services_tables = array( 'bs_usage', 'bs_credit', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' );
 if ( $beltoft_services_no_live ) {
-	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log', 'beltoft_services_hosting', 'beltoft_services_hosting_sites' ), $beltoft_services_tables );
+	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log', 'beltoft_services_hosting', 'beltoft_services_hosting_sites', 'beltoft_services_hosting_domains' ), $beltoft_services_tables );
 }
 foreach ( $beltoft_services_tables as $beltoft_services_table ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables.

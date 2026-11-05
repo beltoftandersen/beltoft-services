@@ -22,6 +22,8 @@ defined( 'ABSPATH' ) || exit;
  * - site.delete, site.php, site.domains, site.cache_purge, site.cron, site.workers: ok (true), slug. Fail with
  *   "unknown site" for a site that was not created, except site.delete (deleting a missing site is fine).
  * - site.wp_install: installed (true), slug.
+ * - site.verify: status (200), host. A loopback request inside the container for the host name (an operation this
+ *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
  * - site.wp_login_link: url (a one-time address, fake).
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - db.drop: dropped (list of names that existed), idempotent.
@@ -81,6 +83,11 @@ class FakeAgent implements Agent {
 			'title'       => array( 'string', true ),
 			'admin_user'  => array( 'ident', true ),
 			'admin_email' => array( 'string', true ),
+		),
+		'site.verify'       => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+			'host' => array( 'host', true ),
 		),
 		'site.wp_login_link' => array(
 			'vmid' => array( 'vmid', true ),
@@ -538,6 +545,7 @@ class FakeAgent implements Agent {
 				);
 
 			case 'site.wp_install':
+			case 'site.verify':
 			case 'site.wp_login_link':
 			case 'site.php':
 			case 'site.domains':
@@ -552,6 +560,13 @@ class FakeAgent implements Agent {
 					return array(
 						'installed' => true,
 						'slug'      => $args['slug'],
+					);
+				}
+
+				if ( 'site.verify' === $op ) {
+					return array(
+						'status' => 200,
+						'host'   => $args['host'],
 					);
 				}
 

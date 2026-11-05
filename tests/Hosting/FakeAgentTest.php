@@ -34,10 +34,10 @@ class FakeAgentTest extends TestCase {
 		);
 	}
 
-	public function test_the_operation_list_is_the_plans_list(): void {
+	public function test_the_operation_list_is_the_plans_list_plus_site_verify(): void {
 		$expected = array(
 			'ct.prepare', 'ct.stats',
-			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.wp_install', 'site.wp_login_link', 'site.staging_create', 'site.staging_push', 'site.cron', 'site.workers',
+			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.staging_create', 'site.staging_push', 'site.cron', 'site.workers',
 			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size',
 			'ssh.keys', 'ssh.password',
 			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
