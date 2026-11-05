@@ -106,6 +106,15 @@ final class HostingSettings {
 			'hosting_db_minutes'      => array( 'db_minutes', __( 'Database monitor: minutes', 'beltoft-services' ), '' ),
 		);
 
+		$fields['hosting_restore_test'] = array_merge(
+			$base,
+			array(
+				'type'    => 'checkbox',
+				'default' => 1,
+				'label'   => __( 'Weekly restore test', 'beltoft-services' ),
+				'desc'    => __( 'Once a week one random account backup is restored into a scratch container on the node and checked. Needs a scratch container id on the node.', 'beltoft-services' ),
+			)
+		);
 		$fields['hosting_noreply_password'] = array_merge(
 			$base,
 			array(

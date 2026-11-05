@@ -65,6 +65,7 @@ final class Nodes {
 			'db_host'       => '',
 			'backup_storage' => '',
 			'restore_safety' => 'vzdump',
+			'scratch_vmid'  => 0,
 			'edge_ip'       => '',
 			'edge_ipv6'     => '',
 		);
@@ -399,6 +400,7 @@ final class Nodes {
 			'vmid_min'     => array( 100, 999999999 ),
 			'vmid_max'     => array( 100, 999999999 ),
 			'template'     => array( 100, 999999999 ),
+			'scratch_vmid' => array( 0, 999999999 ),
 			'net_mbit'     => array( 0, 100000 ),
 			'mem_gb'       => array( 1, 100000 ),
 			'disk_gb'      => array( 1, 10000000 ),

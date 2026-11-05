@@ -36,7 +36,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Emails {
 
-	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered', 'beltoft_services_domain_security', 'beltoft_services_snapshot_notice', 'beltoft_services_quarantine', 'beltoft_services_quarantine_lifted', 'beltoft_services_app_domain_live', 'beltoft_services_notice', 'beltoft_services_mail_ready', 'beltoft_services_mail_dns_reminder', 'beltoft_services_hosting_ready', 'beltoft_services_hosting_notice' );
+	public const IDS = array( 'beltoft_services_ready', 'beltoft_services_paused', 'beltoft_services_deletion_warning', 'beltoft_services_deleted', 'beltoft_services_limit_exceeded', 'beltoft_services_provision_delay', 'beltoft_services_domain_action_needed', 'beltoft_services_monitor_alert', 'beltoft_services_domain_transferred', 'beltoft_services_domain_registered', 'beltoft_services_domain_security', 'beltoft_services_snapshot_notice', 'beltoft_services_quarantine', 'beltoft_services_quarantine_lifted', 'beltoft_services_app_domain_live', 'beltoft_services_notice', 'beltoft_services_mail_ready', 'beltoft_services_mail_dns_reminder', 'beltoft_services_hosting_ready', 'beltoft_services_hosting_notice', 'beltoft_services_hosting_restore_done' );
 
 	public const USAGE_HOOK = 'beltoft_services_usage';
 	public const USAGE_CRON = '0 6 * * *';
@@ -66,6 +66,7 @@ final class Emails {
 		'BeltoftServices_MailDnsReminder' => MailDnsReminder::class,
 		'BeltoftServices_HostingReady' => HostingReady::class,
 		'BeltoftServices_HostingNotice' => HostingNotice::class,
+		'BeltoftServices_HostingRestoreDone' => HostingRestoreDone::class,
 		'BeltoftServices_StepUpCode' => StepUpCode::class,
 	);
 

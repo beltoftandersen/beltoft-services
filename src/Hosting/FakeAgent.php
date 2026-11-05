@@ -34,6 +34,9 @@ defined( 'ABSPATH' ) || exit;
  *   refused (an Undo rolls the container back itself). Fails with "unknown site" for a site that does not exist.
  * - backup.db_restore: restored (true), database. The snapshot argument names the dump: a safety label, or b<unix time>
  *   of a backup.
+ * - backup.restore_test: ok, status (200), title_match. The agent restores the backup b<ctime> of the container into the
+ *   scratch container (no network), starts the web server and PHP, imports the dump, fetches the home page and deletes the
+ *   scratch container (an operation this plugin adds to the plan's list for the weekly restore test).
  * - db.readonly: account, readonly (the account's database user loses or gets back its write grants; an operation this
  *   plugin adds to the plan's list for the 110 percent storage rule).
  * - agent.health: ok (true), loaders (map "<vmid>/<slug>" => { state, ts }; empty unless set_loaders()), backup_slots (map
@@ -179,6 +182,11 @@ class FakeAgent implements Agent {
 			'database' => array( 'ident', true ),
 			'snapshot' => array( 'ident', true ),
 		),
+		'backup.restore_test' => array(
+			'vmid'         => array( 'vmid', true ),
+			'snapshot'     => array( 'ident', true ),
+			'scratch_vmid' => array( 'vmid', true ),
+		),
 		'backup.export'     => array(
 			'vmid' => array( 'vmid', true ),
 			'slug' => array( 'ident', true ),
@@ -256,6 +264,9 @@ class FakeAgent implements Agent {
 			'db_sizes' => array(),
 			'dumps'    => array(),
 			'dump_fails' => array(),
+			'restore_tests' => array(),
+			'restore_test_result' => array(),
+			'health_extra' => array(),
 			'backup_slots' => array(),
 			'restores' => array(),
 			'readonly' => array(),
@@ -306,6 +317,28 @@ class FakeAgent implements Agent {
 	public function set_dump_fails( array $databases ): void {
 		$this->load();
 		$this->state['dump_fails'] = $databases;
+		$this->save();
+	}
+
+	/**
+	 * Sets what the next restore tests answer (merged over ok, status 200, title_match true).
+	 *
+	 * @param array<string, mixed> $result Result.
+	 */
+	public function set_restore_test_result( array $result ): void {
+		$this->load();
+		$this->state['restore_test_result'] = $result;
+		$this->save();
+	}
+
+	/**
+	 * Sets more of what agent.health reports (alerts, isolation).
+	 *
+	 * @param array<string, mixed> $extra Members.
+	 */
+	public function set_health_extra( array $extra ): void {
+		$this->load();
+		$this->state['health_extra'] = $extra;
 		$this->save();
 	}
 
@@ -741,13 +774,18 @@ class FakeAgent implements Agent {
 
 				return array( 'restored' => true, 'database' => $args['database'] );
 
+			case 'backup.restore_test':
+				$this->state['restore_tests'][] = array( 'vmid' => $vmid, 'snapshot' => $args['snapshot'], 'scratch_vmid' => $args['scratch_vmid'] );
+
+				return array_merge( array( 'ok' => true, 'status' => 200, 'title_match' => true ), (array) ( $this->state['restore_test_result'] ?? array() ) );
+
 			case 'db.readonly':
 				$this->state['readonly'][ $args['account'] ] = $args['enabled'];
 
 				return array( 'account' => $args['account'], 'readonly' => $args['enabled'] );
 
 			case 'agent.health':
-				return array( 'ok' => true, 'loaders' => (object) (array) ( $this->state['loaders'] ?? array() ), 'backup_slots' => (object) (array) ( $this->state['backup_slots'] ?? array() ) );
+				return array_merge( array( 'ok' => true, 'loaders' => (object) (array) ( $this->state['loaders'] ?? array() ), 'backup_slots' => (object) (array) ( $this->state['backup_slots'] ?? array() ) ), (array) ( $this->state['health_extra'] ?? array() ) );
 
 			case 'mail.smtp':
 				$this->state['smtp'][ $vmid ] = array(

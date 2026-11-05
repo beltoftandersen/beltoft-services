@@ -278,6 +278,7 @@ final class HostingRestore {
 
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 		$this->r->set( array( 'restore' => array( 'kind' => '' ), 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => true ) ) );
+		$this->tell( $round, true );
 
 		return $this->signal( StepResult::done( array(), 'Restore finished' ) );
 	}
@@ -292,8 +293,31 @@ final class HostingRestore {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 		$this->r->set( array( 'restore' => array( 'kind' => '' ), 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => false, 'why' => $this->scrub( $why, 200 ) ) ) );
 		\BeltoftServices\Alerts::admin( $this->r, 'A restore failed and stopped: ' . $this->scrub( $why, 200 ) );
+		$this->tell( $round, false );
 
 		return StepResult::done( array(), 'Restore failed' );
+	}
+
+	/**
+	 * Tells the customer a round has ended (HostingRestoreDone): what, whether it worked and until when it can be
+	 * undone. Nothing of the failure is in the mail.
+	 *
+	 * @param array<string, mixed> $round Round.
+	 * @param bool                 $ok    Whether it worked.
+	 */
+	private function tell( array $round, bool $ok ): void {
+		$safety = self::safety( Resource::find( $this->r->id() ) ?? $this->r );
+
+		\BeltoftServices\Emails\Emails::send(
+			'beltoft_services_hosting_restore_done',
+			Resource::find( $this->r->id() ) ?? $this->r,
+			array(
+				'hosting_restore' => (string) $round['kind'],
+				'ok'              => $ok,
+				'until'           => null === $safety ? '' : wp_date( 'j F Y, H:i', (int) $safety['expires'] ),
+				'site'            => (string) $round['slug'],
+			)
+		);
 	}
 
 	/**

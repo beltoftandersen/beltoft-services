@@ -149,6 +149,12 @@ abstract class ServiceEmail extends \WC_Email {
 					'php_end'     => isset( $data['php_end'] ) ? sanitize_text_field( (string) $data['php_end'] ) : '',
 					'site'        => isset( $data['site'] ) ? sanitize_text_field( (string) $data['site'] ) : '',
 				) : array( 'kind' => 'storage_warning', 'percent' => 0, 'used' => 0, 'limit' => 0, 'days' => 0, 'php' => '', 'php_default' => '', 'php_end' => '', 'site' => '' ),
+				'hosting_restore' => in_array( $data['hosting_restore'] ?? '', HostingRestoreDone::KINDS, true ) ? array(
+					'kind'  => (string) $data['hosting_restore'],
+					'ok'    => ! empty( $data['ok'] ),
+					'until' => isset( $data['until'] ) ? sanitize_text_field( (string) $data['until'] ) : '',
+					'site'  => isset( $data['site'] ) ? sanitize_text_field( (string) $data['site'] ) : '',
+				) : array( 'kind' => 'account', 'ok' => true, 'until' => '', 'site' => '' ),
 				'hosting'       => 'hosting' === $r->get( 'driver' ) ? \BeltoftServices\Hosting\HostingEmail::values( $r ) : array(),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);

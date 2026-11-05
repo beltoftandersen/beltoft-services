@@ -41,7 +41,7 @@ class FakeAgentTest extends TestCase {
 			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.readonly',
 			'ssh.keys', 'ssh.password',
 			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
-			'backup.prepare', 'backup.file_restore', 'backup.db_restore', 'backup.export',
+			'backup.prepare', 'backup.file_restore', 'backup.db_restore', 'backup.restore_test', 'backup.export',
 			'mail.smtp', 'agent.health', 'agent.update',
 		);
 
