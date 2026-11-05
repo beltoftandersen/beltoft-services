@@ -32,8 +32,13 @@ $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LI
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'beltoft_services_breach_' ) . '%' ) );
 delete_option( 'beltoft_services_connections' );
 delete_option( 'beltoft_services_proxmox_clusters' );
+delete_option( 'beltoft_services_hosting_nodes' );
+delete_option( 'beltoft_services_hosting_settings' );
+delete_option( 'beltoft_services_fake_hosting_node' );
+delete_option( 'beltoft_services_fake_hosting_agent' );
 delete_option( 'beltoft_services_fake_proxmox' );
 delete_option( 'beltoft_services_db_version' );
+delete_option( 'beltoft_services_hosting_db_version' );
 delete_option( 'beltoft_services_oauth_db_version' );
 
 // Every transient of the plugin (and its timeout): capacity, power, abuse notes, rate limits, alert and screen notices.
@@ -54,7 +59,7 @@ $beltoft_services_no_live = ( '' === $beltoft_services_live_error && '0' === (st
 // The IP pool, VM records and private network allocations. The warning is on the setting's description.
 $beltoft_services_tables = array( 'bs_usage', 'bs_credit', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' );
 if ( $beltoft_services_no_live ) {
-	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log' ), $beltoft_services_tables );
+	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log', 'beltoft_services_hosting', 'beltoft_services_hosting_sites' ), $beltoft_services_tables );
 }
 foreach ( $beltoft_services_tables as $beltoft_services_table ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables.

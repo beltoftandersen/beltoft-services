@@ -69,6 +69,7 @@ tests_add_filter(
 		\BeltoftLicenses\Install::create_tables();
 		\BeltoftLicenses\Install::ensure_secret();
 		\BeltoftServices\Proxmox\Schema::create_tables();
+		\BeltoftServices\Hosting\Schema::create_tables();
 	},
 	20
 );
