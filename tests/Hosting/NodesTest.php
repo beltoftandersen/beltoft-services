@@ -175,7 +175,7 @@ class NodesTest extends HostingCase {
 		$this->assertNull( Clients::gate( 'n1', $node, true ) );
 	}
 
-	public function test_a_live_node_needs_the_constant_and_never_builds_a_live_client_in_this_version(): void {
+	public function test_a_live_node_needs_the_constant_and_the_tag_and_never_gets_a_fake(): void {
 		$node           = Nodes::get( 'n1' );
 		$node['client'] = 'live';
 
@@ -197,16 +197,18 @@ class NodesTest extends HostingCase {
 			}
 		}
 
-		// With the tag as well: the node API has no live client, and no fake is handed back. The agent client
-		// refuses a node whose mutual TLS settings are incomplete.
+		// With the tag as well: the node API gets the live client (no call is made by building it), and a bad
+		// setting is refused by the live client itself, never answered by a fake.
 		$this->settings( array( 'site_tag' => 'tagone' ) );
 		$this->assertNull( Clients::gate( 'n1', $node, true ) );
+		$this->assertInstanceOf( \BeltoftServices\Proxmox\LiveClient::class, Clients::build_node( $node, true ) );
+		$this->assertNotInstanceOf( FakeNode::class, Clients::build_node( $node, true ) );
 
 		try {
-			Clients::build_node( $node, true );
-			$this->fail( 'build_node built a client for a live node.' );
-		} catch ( \RuntimeException $e ) {
-			$this->assertStringContainsString( 'No live hosting client', $e->getMessage() );
+			Clients::build_node( array_merge( $node, array( 'api_url' => 'http://node.example.invalid:8006' ) ), true );
+			$this->fail( 'A live client was built for an address without https.' );
+		} catch ( \InvalidArgumentException $e ) {
+			$this->assertStringContainsString( 'https', $e->getMessage() );
 		}
 
 		try {

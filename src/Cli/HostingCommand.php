@@ -9,6 +9,7 @@ namespace BeltoftServices\Cli;
 
 use BeltoftServices\Hosting\Clients;
 use BeltoftServices\Hosting\Nodes;
+use BeltoftServices\Hosting\ReadOnlyClient;
 use BeltoftServices\Proxmox\Ownership;
 
 defined( 'ABSPATH' ) || exit;
@@ -136,7 +137,7 @@ final class HostingCommand {
 		$issues = array();
 
 		try {
-			$api   = Clients::for_node( $node );
+			$api   = new ReadOnlyClient( Clients::for_node( $node ) ); // Only GET calls can pass.
 			$agent = Clients::agent_for( $node );
 		} catch ( \Throwable $e ) {
 			\WP_CLI::error( 'No client for this node: ' . $e->getMessage() );
