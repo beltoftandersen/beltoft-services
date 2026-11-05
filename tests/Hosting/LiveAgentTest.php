@@ -214,12 +214,29 @@ class LiveAgentTest extends HostingCase {
 		$this->assertSame( 401, $agent->submit( 'agent.health', array(), 'j10' )->get_error_data()['status'] );
 	}
 
+	public function test_the_same_submit_twice_in_a_second_reads_the_job(): void {
+		$agent            = $this->agent();
+		$agent->answers[] = array( 409, wp_json_encode( array( 'code' => 'replay', 'message' => 'this request was already received' ) ) );
+		$agent->answers[] = array( 200, wp_json_encode( array( 'id' => 'jrep', 'status' => 'done', 'result' => array( 'ok' => true ) ) ) );
+
+		$job = $agent->submit( 'agent.health', array(), 'jrep' );
+
+		$this->assertSame( 'done', $job['status'] );
+		$this->assertSame( array( 'POST', 'GET' ), array_column( $agent->sent, 'method' ) );
+		$this->assertStringEndsWith( '/jobs/jrep', $agent->sent[1]['url'] );
+	}
+
 	public function test_a_replay_a_busy_agent_and_a_dead_line_are_retries_without_a_status(): void {
 		$agent = $this->agent();
 
 		foreach ( array( 409, 500, 503, 429, 408 ) as $code ) {
 			$agent->answers[] = array( $code, wp_json_encode( array( 'code' => 'replay', 'message' => 'again' ) ) );
-			$error            = $agent->submit( 'agent.health', array(), 'jr' . $code );
+
+			if ( 409 === $code ) {
+				$agent->answers[] = array( 404, wp_json_encode( array( 'code' => 'http_404', 'message' => 'No such job.' ) ) ); // The job is not there to read: the retry error stands.
+			}
+
+			$error = $agent->submit( 'agent.health', array(), 'jr' . $code );
 
 			$this->assertSame( 'transport', $error->get_error_code(), (string) $code );
 			$this->assertNull( $error->get_error_data(), 'No status: the step classifies it as a retry, not a refusal.' );

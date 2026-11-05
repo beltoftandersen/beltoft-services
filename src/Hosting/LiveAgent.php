@@ -164,7 +164,17 @@ class LiveAgent implements Agent {
 			return new \WP_Error( 'invalid', 'The job arguments cannot be encoded.', array( 'status' => 400 ) );
 		}
 
-		return $this->call( 'POST', '/jobs', $body, array( $this->key ) );
+		$sent = $this->call( 'POST', '/jobs', $body, array( $this->key ) );
+
+		// The same request twice in one second has the same signature, so the agent answers 409 "already received": the
+		// job is there (a polling caller sends the same submit again), so read it instead of failing the step.
+		if ( is_wp_error( $sent ) && 'transport' === $sent->get_error_code() && false !== strpos( $sent->get_error_message(), 'HTTP 409' ) ) {
+			$read = $this->job( $job_id );
+
+			return is_wp_error( $read ) ? $sent : $read;
+		}
+
+		return $sent;
 	}
 
 	/**
