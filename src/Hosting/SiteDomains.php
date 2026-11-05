@@ -95,6 +95,20 @@ final class SiteDomains {
 	}
 
 	/**
+	 * Preview names whose address was not written yet (the add stopped before the DNS record).
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function pending_previews(): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- read fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE kind = %s AND state = %s ORDER BY id', Schema::tables()['hosting_domains'], 'preview', 'pending' ), ARRAY_A );
+
+		return array_map( array( __CLASS__, 'typed' ), is_array( $rows ) ? $rows : array() );
+	}
+
+	/**
 	 * The names of an account, oldest first.
 	 *
 	 * @param int $resource_id Activation id.

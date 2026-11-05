@@ -49,6 +49,10 @@ final class HostingActions {
 		$out     = array();
 
 		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
+			if ( ! empty( $site['flags']['pending'] ) ) {
+				continue; // Not finished: the customer sees it once it works.
+			}
+
 			$names = array();
 
 			foreach ( $domains as $d ) {
@@ -109,6 +113,32 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function add_site( string $slug, string $label = '', string $php = '', bool $install = true ) {
+		return $this->locked( fn() => $this->add_site_locked( $slug, $label, $php, $install ) );
+	}
+
+	/**
+	 * Runs a change of the account's websites while holding the account's site lock, so two requests (a double click,
+	 * two tabs, the sweep) never change the same account at once.
+	 *
+	 * @param callable $change The change.
+	 * @return mixed|\WP_Error The change's result, or busy.
+	 */
+	private function locked( callable $change ) {
+		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::name( 'hosting-site', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $change );
+
+		return $taken ? $result : $this->error( 'busy', __( 'Your hosting is being changed. Try again in a moment.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Adds a website with the lock held.
+	 *
+	 * @param string $slug    Site name.
+	 * @param string $label   A title.
+	 * @param string $php     PHP version.
+	 * @param bool   $install Install WordPress.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function add_site_locked( string $slug, string $label, string $php, bool $install ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -127,12 +157,15 @@ final class HostingActions {
 		}
 
 		$existing = Sites::for_resource( $this->r->id() );
+		$found    = Sites::find( $this->r->id(), $slug );
+		$resuming = null !== $found && ! empty( $found['flags']['pending'] );
 
-		if ( null !== Sites::find( $this->r->id(), $slug ) ) {
+		// A name this account was adding and could not finish (and could not clean up) is picked up again, not refused.
+		if ( null !== $found && ! $resuming ) {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
-		if ( count( $existing ) >= (int) $this->plan['sites'] ) {
+		if ( ! $resuming && count( $existing ) >= (int) $this->plan['sites'] ) {
 			return $this->error( 'limit', __( 'Your plan has no room for another website.', 'beltoft-services' ) );
 		}
 
@@ -141,10 +174,10 @@ final class HostingActions {
 		}
 
 		// An equal share, at least 2. When the account's ceiling has no room for it, the sites with the most workers give some up.
-		$workers = max( 2, Plan::workers_per_site( $this->plan, count( $existing ) + 1 ) );
-		$deficit = $this->workers_used() + $workers - (int) $this->plan['php_workers'];
+		$workers = $resuming ? (int) $found['workers'] : max( 2, Plan::workers_per_site( $this->plan, count( $existing ) + 1 ) );
+		$deficit = $this->workers_used() + ( $resuming ? 0 : $workers ) - (int) $this->plan['php_workers'];
 
-		if ( ! Sites::add( $this->r->id(), $slug, sanitize_text_field( $label ), $php, $workers ) ) {
+		if ( ! $resuming && ! Sites::add( $this->r->id(), $slug, sanitize_text_field( $label ), $php, $workers, array( 'pending' => true ) ) ) {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
@@ -155,7 +188,7 @@ final class HostingActions {
 		$gave = $this->make_room( $deficit, $slug, (int) $record['vmid'] );
 
 		if ( is_wp_error( $gave ) ) {
-			Sites::remove( $this->r->id(), $slug );
+			$this->abandon_site( $slug, (int) $record['vmid'], false );
 
 			return $gave;
 		}
@@ -183,7 +216,7 @@ final class HostingActions {
 		);
 
 		if ( is_wp_error( $done ) ) {
-			Sites::remove( $this->r->id(), $slug ); // So the customer can try the same name again; every agent step is repeatable.
+			$this->abandon_site( $slug, (int) $record['vmid'] );
 
 			return $done;
 		}
@@ -201,7 +234,7 @@ final class HostingActions {
 		);
 
 		if ( is_wp_error( $done ) ) {
-			Sites::remove( $this->r->id(), $slug ); // So the customer can try the same name again; every agent step is repeatable.
+			$this->abandon_site( $slug, (int) $record['vmid'] );
 
 			return $done;
 		}
@@ -222,12 +255,13 @@ final class HostingActions {
 			);
 
 			if ( is_wp_error( $done ) ) {
-				Sites::remove( $this->r->id(), $slug );
+				$this->abandon_site( $slug, (int) $record['vmid'] );
 
 				return $done;
 			}
 		}
 
+		Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'pending' => false ) ) );
 		SiteDomains::add( $this->r->id(), (int) $site['id'], $host, 'preview' );
 		$dns = SiteDns::publish_preview( $slug, $this->node );
 
@@ -242,6 +276,28 @@ final class HostingActions {
 	}
 
 	/**
+	 * A website that could not be made: its database and its folder are removed again, and then its record, so the
+	 * name is free. When the agent cannot be reached to clean up, the record stays marked pending and the same
+	 * account's next add of the same name carries on from there.
+	 *
+	 * @param string $slug Site name.
+	 * @param int    $vmid Container id.
+	 * @param bool   $db   Whether a database may have been made.
+	 */
+	private function abandon_site( string $slug, int $vmid, bool $db = true ): void {
+		$clean = true;
+
+		if ( $db ) {
+			$clean = ! is_wp_error( $this->call( 'db_drop_new_' . $slug, 'db.drop', array( 'account' => Config::account( $this->r->id() ), 'databases' => array( Provision::db_name( $this->r->id(), $slug ) ) ) ) );
+			$clean = ! is_wp_error( $this->call( 'site_del_new_' . $slug, 'site.delete', array( 'vmid' => $vmid, 'slug' => $slug ) ) ) && $clean;
+		}
+
+		if ( $clean ) {
+			Sites::remove( $this->r->id(), $slug );
+		}
+	}
+
+	/**
 	 * Removes a website: its files and database go, its names too. The last website cannot be removed.
 	 *
 	 * @param string $slug    Site.
@@ -249,6 +305,15 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function remove_site( string $slug, string $confirm ) {
+		return $this->locked( fn() => $this->remove_site_locked( $slug, $confirm ) );
+	}
+
+	/**
+	 * remove_site with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function remove_site_locked( string $slug, string $confirm ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -314,6 +379,15 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error Kind and state, and for an external name what to point it at.
 	 */
 	public function add_domain( string $slug, string $host ) {
+		return $this->locked( fn() => $this->add_domain_locked( $slug, $host ) );
+	}
+
+	/**
+	 * add_domain with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function add_domain_locked( string $slug, string $host ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -357,6 +431,15 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function remove_domain( string $host ) {
+		return $this->locked( fn() => $this->remove_domain_locked( $host ) );
+	}
+
+	/**
+	 * remove_domain with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function remove_domain_locked( string $host ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -394,6 +477,15 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function set_php( string $slug, string $php, ?int $memory_mb = null, ?int $upload_mb = null ) {
+		return $this->locked( fn() => $this->set_php_locked( $slug, $php, $memory_mb, $upload_mb ) );
+	}
+
+	/**
+	 * set_php with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function set_php_locked( string $slug, string $php, ?int $memory_mb = null, ?int $upload_mb = null ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -453,6 +545,15 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function php_rollback( string $slug ) {
+		return $this->locked( fn() => $this->php_rollback_locked( $slug ) );
+	}
+
+	/**
+	 * php_rollback with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function php_rollback_locked( string $slug ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -491,6 +592,15 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function set_workers( string $slug, int $workers ) {
+		return $this->locked( fn() => $this->set_workers_locked( $slug, $workers ) );
+	}
+
+	/**
+	 * set_workers with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function set_workers_locked( string $slug, int $workers ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {

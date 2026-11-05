@@ -14,7 +14,8 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A domain the customer points at us themselves is never on the edge on the customer's word: every quarter of an hour
+ * Also writes the temporary address of a website whose add stopped before the DNS record. A domain the customer
+ * points at us themselves is never on the edge on the customer's word: every quarter of an hour
  * this sweep looks at each external name (SiteDns::check_external: our edge address AND the ownership TXT record), and when a
  * name became active, or stopped being, the account's routes are sent to the edge again.
  */
@@ -68,6 +69,27 @@ final class DomainSweep {
 				$changed[ $row['host'] ]        = $state;
 				$touched[ $row['resource_id'] ] = true;
 			}
+		}
+
+		// A website that was made but whose temporary address was not written (the DNS was busy): written now.
+		foreach ( SiteDomains::pending_previews() as $row ) {
+			$record = Records::for_resource( $row['resource_id'] );
+			$node   = $record ? Nodes::get( (string) $record['node'] ) : null;
+			$slug   = '';
+
+			foreach ( Sites::for_resource( $row['resource_id'] ) as $site ) {
+				if ( $site['id'] === $row['site_id'] ) {
+					$slug = (string) $site['slug'];
+				}
+			}
+
+			if ( null === $node || '' === $slug || true !== SiteDns::publish_preview( $slug, $node ) ) {
+				continue;
+			}
+
+			SiteDomains::set_state( $row['host'], 'active' );
+			$changed[ $row['host'] ]        = 'active';
+			$touched[ $row['resource_id'] ] = true;
 		}
 
 		foreach ( array_keys( $touched ) as $resource_id ) {

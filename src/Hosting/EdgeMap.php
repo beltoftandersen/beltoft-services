@@ -46,6 +46,10 @@ final class EdgeMap {
 		$routes = array();
 
 		foreach ( Sites::for_resource( $resource_id ) as $site ) {
+			if ( ! empty( $site['flags']['pending'] ) ) {
+				continue;
+			}
+
 			$host = self::preview_host( (string) $site['slug'] );
 
 			if ( '' !== $host ) {

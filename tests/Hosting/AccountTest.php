@@ -87,6 +87,77 @@ class AccountTest extends HostingCase {
 		$this->assertSame( 'again', $a->add_site( 'again', 'Again' )['slug'] );
 	}
 
+	public function test_a_failed_add_drops_the_database_it_made(): void {
+		$r = $this->account();
+		$a = new HostingActions( $r );
+
+		$this->agent->fail_next( 'site.wp_install' );
+		$this->assertWPError( $a->add_site( 'dbgone', 'Dbgone' ) );
+
+		$this->assertNotContains( 'c' . $r->id() . '_dbgone', $this->agent->state()['dbs'][ 'c' . $r->id() ]['databases'], 'The database of the failed site was dropped.' );
+		$this->assertArrayNotHasKey( 'dbgone', (array) ( $this->agent->state()['sites'][ \BeltoftServices\Hosting\Records::for_resource( $r->id() )['vmid'] ] ?? array() ) );
+	}
+
+	public function test_when_the_cleanup_fails_too_the_same_names_retry_carries_on_and_the_row_stays_hidden(): void {
+		$r = $this->account();
+		$a = new HostingActions( $r );
+
+		$this->agent->fail_next( 'site.wp_install' );
+		$this->agent->fail_next( 'db.drop' );
+		$this->assertWPError( $a->add_site( 'resume', 'Resume' ) );
+
+		$row = Sites::find( $r->id(), 'resume' );
+		$this->assertNotNull( $row, 'The record stays, marked pending, because the cleanup did not work.' );
+		$this->assertTrue( $row['flags']['pending'] );
+		$this->assertNotContains( 'resume', array_column( ( new HostingActions( Resource::find( $r->id() ) ) )->sites(), 'slug' ), 'The customer does not see an unfinished site.' );
+		$this->assertNotContains( 'resume.preview.example.test', array_column( \BeltoftServices\Hosting\EdgeMap::routes( $r->id(), false ), 'host' ) );
+
+		$done = ( new HostingActions( Resource::find( $r->id() ) ) )->add_site( 'resume', 'Resume' );
+		$this->assertSame( 'resume', $done['slug'], 'The retry of the same name carries on.' );
+		$this->assertArrayNotHasKey( 'pending', array_filter( Sites::find( $r->id(), 'resume' )['flags'] ) );
+		$this->assertContains( 'resume', array_column( ( new HostingActions( Resource::find( $r->id() ) ) )->sites(), 'slug' ) );
+		$this->assertCount( 2, Sites::for_resource( $r->id() ), 'No second record.' );
+	}
+
+	public function test_a_preview_address_that_could_not_be_written_is_written_by_the_sweep(): void {
+		$r = $this->account();
+		$a = new HostingActions( $r );
+
+		$saved = $this->dns->zone( 'preview.example.test' );
+		$this->dns->delete_zone( 'preview.example.test' );
+		$err = $a->add_site( 'later', 'Later' );
+		$this->assertWPError( $err );
+		$this->assertSame( 'pending', SiteDomains::find( 'later.preview.example.test' )['state'] );
+
+		$this->dns->create_zone( 'preview.example.test', array( 'ns1.example.test.' ) );
+		$this->assertSame( array( 'later.preview.example.test' => 'active' ), \BeltoftServices\Hosting\DomainSweep::run() );
+		$this->assertSame( 'active', SiteDomains::find( 'later.preview.example.test' )['state'] );
+		unset( $saved );
+	}
+
+	public function test_a_second_change_of_the_account_while_one_runs_is_refused_not_interleaved(): void {
+		$r = $this->account();
+
+		// Another connection (another request) holds the account's site lock.
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$name  = \BeltoftServices\Locks::name( 'hosting-site', $r->id() );
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		add_filter( 'beltoft_services_hosting_lock_wait', '__return_zero' );
+
+		$a = new HostingActions( $r );
+		foreach ( array( $a->add_site( 'busy1' ), $a->set_php( 'w' . $r->id(), '8.4' ), $a->remove_site( 'x', 'x' ) ) as $result ) {
+			$this->assertWPError( $result );
+			$this->assertSame( 'busy', $result->get_error_code() );
+		}
+
+		$this->assertNull( Sites::find( $r->id(), 'busy1' ), 'Nothing was started.' );
+
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
+		$other->close();
+		remove_all_filters( 'beltoft_services_hosting_lock_wait' );
+		$this->assertIsArray( $a->add_site( 'busy1' ), 'Free again.' );
+	}
+
 	public function test_an_action_waits_for_a_job_the_agent_answers_queued_first(): void {
 		$r = $this->account();
 		$this->agent->pending( 'site.cache_purge', 2 );
