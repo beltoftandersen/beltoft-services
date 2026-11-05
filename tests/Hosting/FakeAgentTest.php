@@ -130,7 +130,7 @@ class FakeAgentTest extends TestCase {
 		$this->assertSame( array( 'routes' => 0 ), $a->submit( 'edge.apply', array( 'account' => 'c1', 'routes' => array() ), 'j11' )['result'] );
 		$this->assertArrayNotHasKey( 'c1', $a->state()['edge'] );
 
-		$this->assertSame( array( 'ok' => true ), $a->submit( 'agent.health', array(), 'j12' )['result'] );
+		$this->assertEquals( array( 'ok' => true, 'loaders' => (object) array() ), $a->submit( 'agent.health', array(), 'j12' )['result'] );
 		$this->assertSame( array( 'ok' => true ), $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'j13' )['result'] );
 	}
 

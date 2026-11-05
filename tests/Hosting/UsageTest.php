@@ -89,8 +89,20 @@ class UsageTest extends HostingCase {
 	 *
 	 * @return string[]
 	 */
+	private function last_notice(): string {
+		$all = $this->notices();
+
+		return (string) end( $all );
+	}
+
+	/**
+	 * Hosting notice bodies.
+	 *
+	 * @return string[]
+	 */
 	private function notices(): array {
-		return array_values( array_map( static fn( $m ) => (string) $m['message'], array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'About your hosting' ) ) ) );
+
+		return array_values( array_map( static fn( $m ) => (string) preg_replace( '/\s+/', ' ', (string) $m['message'] ), array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'About your hosting' ) ) ) );
 	}
 
 	public function test_stats_and_database_sizes_are_recorded_with_the_time(): void {
@@ -155,7 +167,7 @@ class UsageTest extends HostingCase {
 		$this->clock += 2 * DAY_IN_SECONDS;
 		$r = $this->sample( $r, 10, 2 );
 		$this->assertTrue( $this->agent->state()['readonly'][ 'c' . $r->id() ] );
-		$this->assertStringContainsString( 'can not save new content', end( $this->mails )['message'] );
+		$this->assertStringContainsString( 'can not save new content', $this->last_notice() );
 		$this->assertCount( 3, $this->notices() );
 
 		$this->sample( $r, 10, 2 );
@@ -174,7 +186,7 @@ class UsageTest extends HostingCase {
 
 		$r = $this->sample( $r, 6, 1 ); // 70 percent.
 		$this->assertFalse( $this->agent->state()['readonly'][ 'c' . $r->id() ] );
-		$this->assertStringContainsString( 'can save new content again', end( $this->mails )['message'] );
+		$this->assertStringContainsString( 'can save new content again', $this->last_notice() );
 		$this->assertSame( 0, (int) $r->get( 'storage' )['restricted'] );
 		$this->assertSame( 0, (int) $r->get( 'storage' )['over_since'] );
 	}
@@ -259,7 +271,7 @@ class UsageTest extends HostingCase {
 		$marker = $r->get( 'php_rollback' )[ 'w' . $r->id() ];
 		$this->assertSame( '8.3', $marker['from'] );
 		$this->assertSame( $this->clock + 7 * DAY_IN_SECONDS, $marker['until'] );
-		$this->assertStringContainsString( 'now runs on PHP 8.4', end( $this->mails )['message'] );
+		$this->assertStringContainsString( 'now runs on PHP 8.4', $this->last_notice() );
 
 		$this->sample( $r, 3, 1 );
 		$this->assertCount( 1, $this->agent->calls_of( 'site.php' ), 'Switched once.' );
