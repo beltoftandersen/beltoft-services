@@ -58,27 +58,68 @@ final class IntroCoupon {
 	}
 
 	/**
-	 * Has the customer held a license of this product? By user id and by billing email.
+	 * An email as the same person writes it in different ways: lower case, no +tag, and for Gmail no dots in the name
+	 * (googlemail.com is gmail.com). A second sign-up with a variation of the same address is the same customer.
+	 *
+	 * @param string $email Email.
+	 */
+	public static function normalise_email( string $email ): string {
+		$email = strtolower( trim( $email ) );
+		$at    = strrpos( $email, '@' );
+
+		if ( false === $at || 0 === $at ) {
+			return $email;
+		}
+
+		$local  = substr( $email, 0, $at );
+		$domain = substr( $email, $at + 1 );
+		$plus   = strpos( $local, '+' );
+		$local  = false === $plus ? $local : substr( $local, 0, $plus );
+
+		if ( 'googlemail.com' === $domain ) {
+			$domain = 'gmail.com';
+		}
+
+		if ( 'gmail.com' === $domain ) {
+			$local = str_replace( '.', '', $local );
+		}
+
+		return $local . '@' . $domain;
+	}
+
+	/**
+	 * Has the customer held a license of this product (any of its plans)? By user id and by billing email, the email
+	 * compared in its normalised form.
 	 *
 	 * @param int    $product_id Product or variation id.
 	 * @param int    $user_id    Signed-in user, 0 for a guest.
 	 * @param string $email      Billing email, '' when not known yet.
 	 */
 	public static function held( int $product_id, int $user_id, string $email = '' ): bool {
+		global $wpdb;
+
 		$slug = sanitize_title( (string) get_post_meta( Product::parent_id( $product_id ), \BeltoftLicenses\Software::META_SLUG, true ) );
 
 		if ( '' === $slug ) {
 			return false;
 		}
 
-		$licenses = $user_id > 0 ? \BeltoftLicenses\Licenses::where( 'user_id', $user_id ) : array();
-		$email    = sanitize_email( $email );
+		$want = self::normalise_email( sanitize_email( $email ) );
 
-		if ( '' !== $email ) {
-			$licenses = array_merge( $licenses, \BeltoftLicenses\Licenses::where( 'email', $email ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the licenses table of beltoft-licenses, read fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT user_id, email FROM %i WHERE product_slug = %s', \BeltoftLicenses\Install::tables()['licenses'], $slug ), ARRAY_A );
+
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			if ( $user_id > 0 && (int) $row['user_id'] === $user_id ) {
+				return true;
+			}
+
+			if ( '' !== $want && self::normalise_email( (string) $row['email'] ) === $want ) {
+				return true;
+			}
 		}
 
-		return in_array( $slug, array_column( $licenses, 'product_slug' ), true );
+		return false;
 	}
 
 	/**
@@ -97,10 +138,11 @@ final class IntroCoupon {
 	}
 
 	/**
-	 * The intro coupon codes of the new purchases in the cart: code => product id.
+	 * The intro coupon codes of the new purchases in the cart: code => the product ids of its lines (a code can be on
+	 * several lines).
 	 *
 	 * @param \WC_Cart|null $cart Cart; the current one when null.
-	 * @return array<string, int>
+	 * @return array<string, int[]>
 	 */
 	public static function lines( ?\WC_Cart $cart = null ): array {
 		$cart = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
@@ -114,8 +156,9 @@ final class IntroCoupon {
 			$id   = (int) ( $item['product_id'] ?? 0 );
 			$code = $id > 0 && self::is_new( $item ) && Product::is_service( $id ) ? self::code( $id ) : '';
 
-			if ( '' !== $code ) {
-				$out[ $code ] = $id;
+			// A quantity of two is two accounts at the introductory price.
+			for ( $i = 0, $n = max( 1, (int) ( $item['quantity'] ?? 1 ) ); '' !== $code && $i < $n; $i++ ) {
+				$out[ $code ][] = $id;
 			}
 		}
 
@@ -195,16 +238,28 @@ final class IntroCoupon {
 
 		$cart = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
 
-		foreach ( self::lines( $cart ) as $code => $product_id ) {
-			if ( ! $cart || ! $cart->has_discount( $code ) || ! self::held( $product_id, get_current_user_id(), $email ) ) {
+		foreach ( self::lines( $cart ) as $code => $product_ids ) {
+			if ( ! $cart || ! $cart->has_discount( $code ) ) {
 				continue;
 			}
 
+			// One introductory price per customer: a cart with the same offer on two lines is refused as well as a customer who had the product.
+			$held = count( $product_ids ) > 1;
+
+			foreach ( $product_ids as $product_id ) {
+				$held = $held || self::held( $product_id, get_current_user_id(), $email );
+			}
+
+			if ( ! $held ) {
+				continue;
+			}
+
+			$product_id = (int) $product_ids[0];
 			$cart->remove_coupon( $code );
 			$errors->add(
 				'beltoft_services_intro_used',
 				/* translators: %s: product name. */
-				sprintf( __( 'The introductory price for %s is for new customers. We took it off your cart, please check the new total and place the order again.', 'beltoft-services' ), (string) get_the_title( $product_id ) )
+				sprintf( __( 'The introductory price for %s is for new customers, one account each. We took it off your cart, please check the new total and place the order again.', 'beltoft-services' ), (string) get_the_title( $product_id ) )
 			);
 		}
 	}

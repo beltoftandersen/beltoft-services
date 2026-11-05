@@ -487,7 +487,7 @@ final class Product {
 			array(
 				'id'          => IntroCoupon::META,
 				'label'       => __( 'Intro coupon', 'beltoft-services' ),
-				'description' => __( 'The code of a coupon applied to a customer\'s first purchase of this product (not to renewals, switches or resubscribes, and not to a customer who has had it before). The coupon itself says what it discounts. Empty: none.', 'beltoft-services' ),
+				'description' => __( 'The code of a coupon applied to a customer\'s first purchase of this product (not to renewals, switches or resubscribes, and not to a customer who has had it before, judged by account and by email without +tags and Gmail dots). The coupon itself says what it discounts. Also set the coupon\'s usage limit per user to 1 in its Usage limits tab, so WooCommerce refuses a second use by the same account or email. Empty: none.', 'beltoft-services' ),
 				'desc_tip'    => true,
 				'value'       => $product ? $product->get_meta( IntroCoupon::META ) : '',
 			)

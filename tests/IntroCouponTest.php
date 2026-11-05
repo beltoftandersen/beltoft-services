@@ -106,6 +106,48 @@ class IntroCouponTest extends TestCase {
 		WC()->customer->set_billing_email( '' );
 	}
 
+	public function test_emails_are_compared_without_case_plus_tags_and_gmail_dots(): void {
+		$this->assertSame( 'a.b@example.com', IntroCoupon::normalise_email( ' A.B+shop@Example.com ' ) );
+		$this->assertSame( 'ab@gmail.com', IntroCoupon::normalise_email( 'A.b+x@Gmail.com' ) );
+		$this->assertSame( 'ab@gmail.com', IntroCoupon::normalise_email( 'a.b@googlemail.com' ) );
+		$this->assertSame( 'not-an-email', IntroCoupon::normalise_email( 'Not-An-Email' ) );
+
+		$product = $this->product();
+		$this->service_license( $product, array( 'fire' => false, 'email' => 'First.Last@gmail.com' ) );
+
+		foreach ( array( 'firstlast@gmail.com', 'first.last+intro2@gmail.com', 'f.i.r.s.t.l.a.s.t@googlemail.com', 'FIRST.LAST@GMAIL.COM' ) as $variant ) {
+			$this->assertTrue( IntroCoupon::held( $product->get_id(), 0, $variant ), $variant );
+		}
+
+		$this->assertFalse( IntroCoupon::held( $product->get_id(), 0, 'other.person@gmail.com' ) );
+		$this->assertFalse( IntroCoupon::held( $product->get_id(), 0, 'first.last+tag@example.com' ), 'Dots only count at Gmail.' );
+	}
+
+	public function test_any_plan_of_the_product_counts_as_held(): void {
+		$product   = $this->product();
+		$variation = $this->service_license( $product, array( 'fire' => false, 'email' => 'plan@example.com' ) );
+		unset( $variation );
+
+		// Another plan of the same product: the same product slug, so the same history.
+		$this->assertTrue( IntroCoupon::held( $product->get_id(), 0, 'Plan+other@example.com' ) );
+	}
+
+	public function test_the_same_offer_on_two_lines_is_refused_with_the_coupon_taken_off(): void {
+		$this->coupon( 'intro-half' );
+		$product = $this->product();
+		$this->add( $product );
+		WC()->cart->add_to_cart( $product->get_id() );
+		$this->assertCount( 1, IntroCoupon::lines() );
+
+		$ids = array_values( IntroCoupon::lines() )[0];
+		$this->assertCount( 2, $ids, 'The cart merged the two lines into a quantity of two: two accounts.' );
+
+		$errors = new \WP_Error();
+		IntroCoupon::validate( array( 'billing_email' => 'twice@example.com' ), $errors );
+		$this->assertCount( 1, $errors->get_error_messages() );
+		$this->assertFalse( WC()->cart->has_discount( 'intro-half' ) );
+	}
+
 	public function test_another_product_held_does_not_count(): void {
 		$this->coupon( 'intro-half' );
 		$user = self::factory()->user->create();
