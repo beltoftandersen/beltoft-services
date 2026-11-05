@@ -162,6 +162,28 @@ class BackupsTest extends HostingCase {
 		$this->assertFalse( ( new HostingBackups( $off ) )->due( $day + 4 * HOUR_IN_SECONDS ) );
 	}
 
+	public function test_a_failed_night_is_tried_again_at_most_once_an_hour(): void {
+		$r    = $this->account();
+		$slot = HostingBackups::slot_minute( $r );
+		$day  = strtotime( '2027-03-02 00:00:00 UTC' );
+		$at   = $day + $slot * 60;
+		$this->clock_to( $at );
+
+		$this->node->next_task( array( 'exitstatus' => 'storage offline' ) );
+		( new HostingBackups( Resource::find( $r->id() ) ) )->start( 'nightly' );
+		( new HostingBackups( Resource::find( $r->id() ) ) )->step();
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( $at + HOUR_IN_SECONDS, (int) $fresh->get( 'backup_try_at' ) );
+		$this->assertFalse( ( new HostingBackups( $fresh ) )->due( $at + 600 ), 'The job runs every ten minutes: not again at once.' );
+		$this->assertFalse( ( new HostingBackups( $fresh ) )->due( $at + HOUR_IN_SECONDS - 1 ) );
+		$this->assertTrue( ( new HostingBackups( $fresh ) )->due( $at + HOUR_IN_SECONDS ), 'An hour later it may try again (inside the night window).' );
+
+		$this->clock_to( $at + HOUR_IN_SECONDS );
+		$good = $this->round( $r );
+		$this->assertSame( 0, (int) $good->get( 'backup_try_at' ), 'A good round clears the wait.' );
+	}
+
 	public function test_the_job_starts_due_accounts_once_and_leaves_the_rest(): void {
 		$r    = $this->account();
 		$slot = HostingBackups::slot_minute( $r );

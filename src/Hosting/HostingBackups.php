@@ -39,6 +39,7 @@ final class HostingBackups {
 	public const MANUAL_MAX = 3;
 	public const MANUAL_DAY = 3;
 	public const ALERT_AFTER = 3;
+	public const RETRY_GAP   = HOUR_IN_SECONDS;
 
 	/**
 	 * Hooks the job and its schedule.
@@ -133,6 +134,11 @@ final class HostingBackups {
 	 */
 	public function due( int $now ): bool {
 		if ( ! self::enabled( $this->r ) || $this->active() || 'ready' !== $this->r->get( 'state' ) ) {
+			return false;
+		}
+
+		// A failed night is tried again at most once an hour (the job runs every ten minutes: without this it would hammer the node).
+		if ( $now < (int) $this->r->get( 'backup_try_at' ) ) {
 			return false;
 		}
 
@@ -372,7 +378,7 @@ final class HostingBackups {
 	 */
 	private function phase_finish( array $round ) {
 		$list = $this->read_list();
-		$meta = array( 'backup' => array( 'phase' => '', 'kind' => $round['kind'] ), 'backup_error' => '', 'backup_fails' => 0 );
+		$meta = array( 'backup' => array( 'phase' => '', 'kind' => $round['kind'] ), 'backup_error' => '', 'backup_fails' => 0, 'backup_try_at' => 0 );
 
 		if ( is_array( $list ) ) {
 			// A safety point is no backup of the customer's: it is not listed and is not restored from the list.
@@ -399,7 +405,7 @@ final class HostingBackups {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 		$fails   = (int) $this->r->get( 'backup_fails' ) + 1;
 
-		$this->r->set( array( 'backup' => array( 'phase' => '', 'kind' => $round['kind'] ), 'backup_error' => $this->scrub( $why, 200 ), 'backup_fails' => $fails ) );
+		$this->r->set( array( 'backup' => array( 'phase' => '', 'kind' => $round['kind'] ), 'backup_error' => $this->scrub( $why, 200 ), 'backup_fails' => $fails, 'backup_try_at' => Jobs::now() + self::RETRY_GAP ) );
 
 		if ( 1 === $fails || self::ALERT_AFTER === $fails ) {
 			Alerts::admin( $this->r, sprintf( 'Backup failed (%d in a row): %s', $fails, $this->scrub( $why, 200 ) ) );
