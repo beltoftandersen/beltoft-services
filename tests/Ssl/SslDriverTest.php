@@ -291,6 +291,91 @@ class SslDriverTest extends SslTestCase {
 		}
 	}
 
+	public function test_a_build_stops_when_the_customer_cancelled_and_does_not_alert_again(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$r = $this->ssl_resource();
+		( new SslDriver() )->provision( $r );
+		$r = Resource::find( $r->id() );
+		$this->assertTrue( \BeltoftServices\Ssl\Operations::cancel( $r, array( 'confirm' => 'CANCEL' ) )->is_done() );
+		$alerted = (string) Resource::find( $r->id() )->get( 'alerted' );
+		$before = count( $this->calls( 'POST', '#/cancel$#' ) );
+		$stopped = ( new SslDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $stopped->is_done() );
+		$this->assertCount( $before, $this->calls( 'POST', '#/cancel$#' ) );
+		\BeltoftServices\Ssl\Provision::abandon( Resource::find( $r->id() ) );
+		$this->assertCount( $before, $this->calls( 'POST', '#/cancel$#' ), 'abandon leaves a cancelled order alone.' );
+		$this->assertSame( $alerted, (string) Resource::find( $r->id() )->get( 'alerted' ) );
+	}
+
+	public function test_a_staff_retry_after_an_abandoned_order_starts_a_fresh_order(): void {
+		$this->settings( array( 'ssl_wait_days' => 1 ) );
+		$r = $this->ssl_resource( array( 'meta' => array( 'ssl_validation' => 'email', 'ssl_approver' => 'admin@example.com' ) ) );
+		add_filter( 'beltoft_services_ssl_fake_delay', static fn() => 10 * YEAR_IN_SECONDS );
+		( new SslDriver() )->provision( $r );
+		$first = (string) Resource::find( $r->id() )->get( 'remote_id' );
+		$first_csr = (string) Resource::find( $r->id() )->get( 'ssl_csr' );
+		Resource::find( $r->id() )->set( array( 'ssl_requested_at' => time() - 2 * DAY_IN_SECONDS ) );
+		$this->assertTrue( ( new SslDriver() )->provision( Resource::find( $r->id() ) )->is_failed() );
+		$this->assertSame( 'REJ', $this->registrar->request( 'GET', '/ssl/orders/' . $first )['status'] );
+		// Staff retry: the cancelled order is not continued.
+		$this->settings( array( 'ssl_wait_days' => 14 ) );
+		$again = ( new SslDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $again->is_retry(), $again->error() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertNotSame( $first, (string) $fresh->get( 'remote_id' ) );
+		$this->assertNotSame( '', (string) $fresh->get( 'remote_id' ) );
+		$this->assertNotSame( $first_csr, (string) $fresh->get( 'ssl_csr' ), 'A key and request made here are made again.' );
+		$this->assertNull( $fresh->get( 'ssl_abandoned' ) );
+		$this->assertCount( 2, $this->calls( 'POST', '#^/ssl/orders$#' ) );
+		remove_all_filters( 'beltoft_services_ssl_fake_delay' );
+	}
+
+	public function test_a_half_published_validation_is_cleaned_up_and_our_cnames_go_when_the_service_is_deleted(): void {
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_validation' => 'auto' ) ) );
+		$publish = new \ReflectionMethod( \BeltoftServices\Ssl\Validation::class, 'publish' );
+		$publish->setAccessible( true );
+		$rows = array(
+			array( 'type' => 'CNAME', 'name' => '_one.example.com', 'value' => 'a.fakeca.example' ),
+			array( 'type' => 'CNAME', 'name' => '_two.example.com', 'value' => 'b.fakeca.example' ),
+		);
+		// The second name already holds a TXT record: it conflicts after the first was written.
+		\BeltoftServices\Domains\Clients::dns()->replace_rrsets( 'example.com', array( array( 'name' => '_two.example.com.', 'type' => 'TXT', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '"x"', 'disabled' => false ) ) ) ) );
+		$this->assertNull( $publish->invoke( null, Resource::find( $r->id() ), $rows ) );
+		$names = array_map( static fn( $s ) => strtolower( rtrim( (string) $s['name'], '.' ) ) . '|' . $s['type'], (array) \BeltoftServices\Domains\Clients::dns()->zone( 'example.com' )['rrsets'] );
+		$this->assertNotContains( '_one.example.com|CNAME', $names, 'The record written for the first row was removed again.' );
+		$this->assertContains( '_two.example.com|TXT', $names, 'What was there is untouched.' );
+
+		// A built certificate: its CNAME goes with the service, a record that was already there does not.
+		$built = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_validation' => 'auto', 'ssl_name' => 'shop.example.com' ) ) );
+		( new SslDriver() )->provision( $built );
+		$row = Resource::find( $built->id() )->get( 'ssl_validation_rows' )[0];
+		$this->assertTrue( $row['written'] );
+		$has = static fn( string $name ) => in_array( $name . '|CNAME', array_map( static fn( $s ) => strtolower( rtrim( (string) $s['name'], '.' ) ) . '|' . $s['type'], (array) \BeltoftServices\Domains\Clients::dns()->zone( 'example.com' )['rrsets'] ), true );
+		$this->assertTrue( $has( $row['name'] ) );
+		( new SslDriver() )->delete( Resource::find( $built->id() ) );
+		$this->assertFalse( $has( $row['name'] ), 'Our CNAME is removed with the service.' );
+	}
+
+	public function test_a_cname_that_was_already_there_is_not_ours_to_remove(): void {
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
+		$name = '_' . substr( md5( $made['csr'] ), 0, 32 ) . '.example.com';
+		$hash = hash( 'sha256', $made['csr'] );
+		$value = substr( $hash, 0, 32 ) . '.' . substr( $hash, 32, 32 ) . '.fakeca.example';
+		\BeltoftServices\Domains\Clients::dns()->replace_rrsets( 'example.com', array( array( 'name' => $name . '.', 'type' => 'CNAME', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => $value . '.', 'disabled' => false ) ) ) ) );
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_validation' => 'auto', 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'] ) ) );
+		( new SslDriver() )->provision( $r );
+		$row = Resource::find( $r->id() )->get( 'ssl_validation_rows' )[0];
+		$this->assertSame( 'published', $row['status'] );
+		$this->assertFalse( $row['written'] );
+		( new SslDriver() )->delete( Resource::find( $r->id() ) );
+		$names = array_map( static fn( $s ) => strtolower( rtrim( (string) $s['name'], '.' ) ), (array) \BeltoftServices\Domains\Clients::dns()->zone( 'example.com' )['rrsets'] );
+		$this->assertContains( $name, $names );
+	}
+
 	public function test_pause_keeps_the_certificate_and_a_plan_change_does_nothing(): void {
 		$r = $this->built();
 		$driver = new SslDriver();

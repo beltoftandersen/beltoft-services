@@ -36,6 +36,28 @@ final class Provision {
 	 * @param Resource $r Resource.
 	 */
 	public static function run( Resource $r ): StepResult {
+		// The customer cancelled while the order was being built: the registrar order is already cancelled, and nothing more is done.
+		if ( $r->get( 'ssl_cancelled' ) ) {
+			return StepResult::done( array(), 'SSL build stopped: the customer cancelled the certificate' );
+		}
+
+		// A build that ended in a cancelled order starts afresh when staff retry it: the old order, request and steps are not continued.
+		if ( $r->get( 'ssl_abandoned' ) && '' !== $r->get( 'remote_id' ) ) {
+			$fresh = array(
+				'steps' => array(), 'remote_id' => '', 'ssl_status' => null, 'ssl_abandoned' => null, 'ssl_post_attempted' => null,
+				'ssl_validation_rows' => array(), 'ssl_action_sent' => null, 'ssl_requested_at' => null, 'ssl_slow_alerted' => null, 'ordered_at' => null,
+				'balance_alerted' => null, 'billing_alerted' => null,
+			);
+
+			// A request made here goes with its key; a customer's own request is kept.
+			if ( 'own' !== (string) $r->get( 'ssl_key_mode' ) ) {
+				$fresh['ssl_csr'] = null;
+			}
+
+			$r->set( $fresh );
+			$r = Resource::find( $r->id() ) ?? $r;
+		}
+
 		$result = self::build( $r );
 
 		// A build that ends here holds no certificate: an order paid at the registrar is cancelled so it can be refunded.
@@ -54,7 +76,8 @@ final class Provision {
 	public static function abandon( Resource $r ): void {
 		$id = (string) $r->get( 'remote_id' );
 
-		if ( '' === $id || $r->get( 'ssl_abandoned' ) ) {
+		// An order the customer cancelled is already cancelled and its refund already flagged.
+		if ( '' === $id || $r->get( 'ssl_abandoned' ) || $r->get( 'ssl_cancelled' ) ) {
 			return;
 		}
 

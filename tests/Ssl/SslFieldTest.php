@@ -88,6 +88,58 @@ class SslFieldTest extends SslTestCase {
 		return $out;
 	}
 
+	/** @param string[] $sans */
+	private function csr_with( array $sans, string $curve = '' ): string {
+		$conf = tempnam( sys_get_temp_dir(), 'cnf' );
+		$ext  = array() === $sans ? '' : "req_extensions = ext\n[ext]\nsubjectAltName = " . implode( ',', $sans ) . "\n";
+		file_put_contents( $conf, "[req]\ndistinguished_name = dn\n" . ( '' === $ext ? '' : $ext ) . "[dn]\n" );
+		$key = '' === $curve ? openssl_pkey_new( array( 'private_key_bits' => 2048, 'config' => $conf ) ) : openssl_pkey_new( array( 'private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => $curve, 'private_key_bits' => 2048, 'config' => $conf ) );
+		$csr = openssl_csr_new( array( 'commonName' => 'example.com', 'countryName' => 'DK' ), $key, array( 'digest_alg' => 'sha256', 'config' => $conf, 'req_extensions' => '' === $ext ? null : 'ext' ) );
+		openssl_csr_export( $csr, $out );
+		unlink( $conf );
+		return $out;
+	}
+
+	public function test_an_own_request_may_use_an_ec_key_on_p256_or_p384_but_not_a_small_curve(): void {
+		$this->assertIsArray( $this->resolve( array( 'key_mode' => 'own', 'csr' => $this->csr_with( array(), 'prime256v1' ) ) ) );
+		$this->assertIsArray( $this->resolve( array( 'key_mode' => 'own', 'csr' => $this->csr_with( array(), 'secp384r1' ) ) ) );
+		$bad = $this->resolve( array( 'key_mode' => 'own', 'csr' => $this->csr_with( array(), 'secp224r1' ) ) );
+		$this->assertSame( 'ssl_csr_key', $bad->get_error_code() );
+		$this->assertStringContainsString( 'P-256', $bad->get_error_message() );
+	}
+
+	public function test_names_in_an_own_request_beyond_the_ordered_name_are_refused(): void {
+		$this->assertSame( array( 'example.com', 'www.example.com' ), Csr::sans( $this->csr_with( array( 'DNS:example.com', 'DNS:www.example.com' ) ) ) );
+		$this->assertSame( array(), Csr::sans( $this->csr_with( array() ) ) );
+		$this->assertSame( array( '#other' ), Csr::sans( $this->csr_with( array( 'IP:10.0.0.1' ) ) ) );
+		$this->assertIsArray( $this->resolve( array( 'key_mode' => 'own', 'csr' => $this->csr_with( array( 'DNS:example.com' ) ) ) ) );
+		$this->assertSame( 'ssl_csr_san', $this->resolve( array( 'key_mode' => 'own', 'csr' => $this->csr_with( array( 'DNS:example.com', 'DNS:other.org' ) ) ) )->get_error_code() );
+		$this->assertSame( 'ssl_csr_san', $this->resolve( array( 'key_mode' => 'own', 'csr' => $this->csr_with( array( 'IP:10.0.0.1' ) ) ) )->get_error_code() );
+		// A wildcard request may name the wildcard and its base.
+		$this->assertIsArray( $this->resolve( array( 'domain' => 'example.com', 'key_mode' => 'own', 'csr' => str_replace( 'x', 'x', $this->wildcard_csr( array( 'DNS:*.example.com', 'DNS:example.com' ) ) ) ), 0, 'dv', true ) );
+		$this->assertSame( 'ssl_csr_san', $this->resolve( array( 'domain' => 'example.com', 'key_mode' => 'own', 'csr' => $this->wildcard_csr( array( 'DNS:*.example.com', 'DNS:a.example.com' ) ) ), 0, 'dv', true )->get_error_code() );
+	}
+
+	/** @param string[] $sans */
+	private function wildcard_csr( array $sans ): string {
+		$conf = tempnam( sys_get_temp_dir(), 'cnf' );
+		file_put_contents( $conf, "[req]\ndistinguished_name = dn\nreq_extensions = ext\n[ext]\nsubjectAltName = " . implode( ',', $sans ) . "\n[dn]\n" );
+		$key = openssl_pkey_new( array( 'private_key_bits' => 2048, 'config' => $conf ) );
+		$csr = openssl_csr_new( array( 'commonName' => '*.example.com', 'countryName' => 'DK' ), $key, array( 'digest_alg' => 'sha256', 'config' => $conf, 'req_extensions' => 'ext' ) );
+		openssl_csr_export( $csr, $out );
+		unlink( $conf );
+		return $out;
+	}
+
+	public function test_a_request_argument_is_kept_as_typed_for_certificate_actions_only(): void {
+		$clean = new \ReflectionMethod( \BeltoftServices\Api\Routes::class, 'clean_args' );
+		$clean->setAccessible( true );
+		$pem = "-----BEGIN CERTIFICATE REQUEST-----\nAAAA  BBBB<\n-----END CERTIFICATE REQUEST-----";
+		$this->assertSame( $pem, $clean->invoke( null, array( 'csr' => $pem ), 'ssl_reissue' )['csr'] );
+		$this->assertNotSame( $pem, $clean->invoke( null, array( 'csr' => $pem ), 'reboot' )['csr'], 'Another action gets the usual cleaning.' );
+		$this->assertSame( '[{"a":1}]', $clean->invoke( null, array( 'records' => '[{"a":1}]' ), 'set_records' )['records'] );
+	}
+
 	public function test_an_organization_certificate_needs_a_company(): void {
 		$this->assertWPError( $this->resolve( array(), 0, 'ov' ) );
 		$this->assertIsArray( $this->resolve( array(), 0, 'ov', false, 'Acme ApS' ) );

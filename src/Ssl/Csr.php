@@ -96,7 +96,7 @@ final class Csr {
 		$bits = (int) ( $details['bits'] ?? 0 );
 
 		if ( 'other' === $type || ( 'rsa' === $type && $bits < self::MIN_BITS ) || ( 'ec' === $type && $bits < 256 ) ) {
-			return new \WP_Error( 'ssl_csr_key', __( 'The key of the certificate request is too weak. Use an RSA key of at least 2048 bits.', 'beltoft-services' ) );
+			return new \WP_Error( 'ssl_csr_key', __( 'The key of the certificate request is not accepted. Use an RSA key of at least 2048 bits, or an EC key on P-256 or P-384.', 'beltoft-services' ) );
 		}
 
 		$clean = array();
@@ -131,6 +131,19 @@ final class Csr {
 			);
 		}
 
+		// A request that names more than was ordered would get a certificate for more than was paid for.
+		$allowed = array( strtolower( $name ) );
+
+		if ( '*.' === substr( $name, 0, 2 ) ) {
+			$allowed[] = strtolower( substr( $name, 2 ) );
+		}
+
+		foreach ( self::sans( $csr ) as $san ) {
+			if ( ! in_array( strtolower( $san ), $allowed, true ) ) {
+				return new \WP_Error( 'ssl_csr_san', __( 'The certificate request names more than this certificate covers. Remove the extra names (subject alternative names) from the request.', 'beltoft-services' ) );
+			}
+		}
+
 		// The registrar refuses a request without a valid country ("The CSR contains an invalid country code"), whatever the level.
 		if ( 1 !== preg_match( '/^[A-Za-z]{2}$/D', (string) ( $read['subject']['C'] ?? '' ) ) ) {
 			return new \WP_Error( 'ssl_csr_country', __( 'The certificate request must include a country (C), for example C=DK.', 'beltoft-services' ) );
@@ -141,6 +154,102 @@ final class Csr {
 		}
 
 		return $read;
+	}
+
+	/**
+	 * The subject alternative names a request asks for, read from its DER (PHP has no function for it). A name that is not a DNS
+	 * name (an address, an email) comes back as "#other", so it never matches an ordered name. Empty when there is no such extension.
+	 *
+	 * @param string $csr PEM text.
+	 * @return string[]
+	 */
+	public static function sans( string $csr ): array {
+		$body = (string) preg_replace( '/-----[A-Z ]+-----|\s+/', '', $csr );
+		$der  = base64_decode( $body, true );
+
+		if ( false === $der ) {
+			return array();
+		}
+
+		// OID 2.5.29.17 (subjectAltName), then an optional BOOLEAN, then an OCTET STRING that holds a SEQUENCE of names.
+		$at = strpos( $der, "\x06\x03\x55\x1d\x11" );
+
+		if ( false === $at ) {
+			return array();
+		}
+
+		$pos = $at + 5;
+
+		if ( "\x01\x01" === substr( $der, $pos, 2 ) ) {
+			$pos += 3;
+		}
+
+		if ( "\x04" !== ( $der[ $pos ] ?? '' ) ) {
+			return array( '#other' );
+		}
+
+		$octet = self::der_length( $der, $pos + 1 );
+
+		if ( null === $octet || "\x30" !== ( $der[ $octet[1] ] ?? '' ) ) {
+			return array( '#other' );
+		}
+
+		$seq = self::der_length( $der, $octet[1] + 1 );
+
+		if ( null === $seq ) {
+			return array( '#other' );
+		}
+
+		$names = array();
+		$pos   = $seq[1];
+		$end   = $seq[1] + $seq[0];
+
+		while ( $pos < $end ) {
+			$tag = ord( $der[ $pos ] ?? "\0" );
+			$len = self::der_length( $der, $pos + 1 );
+
+			if ( null === $len ) {
+				return array( '#other' );
+			}
+
+			$names[] = 0x82 === $tag ? substr( $der, $len[1], $len[0] ) : '#other';
+			$pos     = $len[1] + $len[0];
+		}
+
+		return $names;
+	}
+
+	/**
+	 * A DER length at an offset.
+	 *
+	 * @param string $der    Bytes.
+	 * @param int    $offset Offset of the first length byte.
+	 * @return array{0: int, 1: int}|null Length and the offset where the value starts.
+	 */
+	private static function der_length( string $der, int $offset ): ?array {
+		if ( $offset >= strlen( $der ) ) {
+			return null;
+		}
+
+		$first = ord( $der[ $offset ] );
+
+		if ( $first < 0x80 ) {
+			return array( $first, $offset + 1 );
+		}
+
+		$count = $first & 0x7f;
+
+		if ( $count < 1 || $count > 3 || $offset + $count >= strlen( $der ) ) {
+			return null;
+		}
+
+		$length = 0;
+
+		for ( $i = 1; $i <= $count; $i++ ) {
+			$length = ( $length << 8 ) | ord( $der[ $offset + $i ] );
+		}
+
+		return array( $length, $offset + 1 + $count );
 	}
 
 	/**

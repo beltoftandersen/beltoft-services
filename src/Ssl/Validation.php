@@ -4,6 +4,8 @@ namespace BeltoftServices\Ssl;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Emails\Emails;
+use BeltoftServices\Domains\Records;
+use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Mail\MailDns;
 use BeltoftServices\Resource;
 
@@ -121,24 +123,129 @@ final class Validation {
 
 		foreach ( $rows as $i => $row ) {
 			if ( 'CNAME' !== $row['type'] || ( $row['name'] !== $zone && ! str_ends_with( $row['name'], '.' . $zone ) ) ) {
+				self::clean_up( $user, $zone, $rows );
+
 				return null;
 			}
 
 			$relative = $row['name'] === $zone ? '@' : substr( $row['name'], 0, -strlen( $zone ) - 1 );
+			// A record that is already exactly this one was not written by us, and is never removed by us.
+			$before   = self::holds( $zone, $row['name'], $row['value'] );
 			$result   = MailDns::publish( $user, $zone, array( 'name' => $relative, 'type' => 'CNAME', 'ttl' => self::TTL, 'value' => $row['value'] ) );
 
 			if ( is_wp_error( $result ) ) {
+				// The records written so far stay: the next run reads them as present and goes on.
 				return StepResult::retry( 300, 'The validation record could not be published yet.' );
 			}
 
 			if ( 'ok' !== $result[0] ) {
+				// The customer adds the records by hand, so none of ours is left half done in their zone.
+				self::clean_up( $user, $zone, $rows );
+
 				return null;
 			}
 
-			$rows[ $i ]['status'] = 'published';
+			$rows[ $i ]['status']  = 'published';
+			$rows[ $i ]['written'] = ! $before;
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * Does the zone hold exactly this CNAME at the name?
+	 *
+	 * @param string $zone  Zone.
+	 * @param string $name  Full name.
+	 * @param string $value Target.
+	 */
+	private static function holds( string $zone, string $name, string $value ): bool {
+		$data = \BeltoftServices\Domains\Clients::dns()->zone( $zone );
+
+		foreach ( is_array( $data ) ? (array) ( $data['rrsets'] ?? array() ) : array() as $set ) {
+			if ( 'CNAME' === ( $set['type'] ?? '' ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $name ) {
+				foreach ( (array) ( $set['records'] ?? array() ) as $record ) {
+					if ( strtolower( rtrim( (string) ( $record['content'] ?? '' ), '.' ) ) === $value ) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Removes a CNAME this service wrote, only when the name still holds exactly that one record.
+	 *
+	 * @param int                  $user Customer.
+	 * @param string               $zone Zone.
+	 * @param array<string, mixed> $row  Row (name, value).
+	 */
+	public static function unpublish( int $user, string $zone, array $row ): bool {
+		if ( ! in_array( $zone, ZoneAccess::zones( $user ), true ) ) {
+			return false;
+		}
+
+		$done = Records::locked(
+			$zone,
+			static function () use ( $zone, $row ) {
+				$data = \BeltoftServices\Domains\Clients::dns()->zone( $zone );
+
+				foreach ( is_array( $data ) ? (array) ( $data['rrsets'] ?? array() ) : array() as $set ) {
+					if ( 'CNAME' !== ( $set['type'] ?? '' ) || strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) !== $row['name'] ) {
+						continue;
+					}
+
+					$records = (array) ( $set['records'] ?? array() );
+
+					if ( 1 !== count( $records ) || strtolower( rtrim( (string) ( $records[0]['content'] ?? '' ), '.' ) ) !== $row['value'] ) {
+						return false;
+					}
+
+					return ! is_wp_error( \BeltoftServices\Domains\Clients::dns()->replace_rrsets( $zone, array( array( 'name' => $set['name'], 'type' => 'CNAME', 'changetype' => 'DELETE' ) ) ) );
+				}
+
+				return false;
+			}
+		);
+
+		return true === $done;
+	}
+
+	/**
+	 * Removes what a half finished publish wrote.
+	 *
+	 * @param int                               $user Customer.
+	 * @param string                            $zone Zone.
+	 * @param array<int, array<string, string>> $rows Rows so far.
+	 */
+	private static function clean_up( int $user, string $zone, array $rows ): void {
+		foreach ( $rows as $row ) {
+			if ( ! empty( $row['written'] ) ) {
+				self::unpublish( $user, $zone, $row );
+			}
+		}
+	}
+
+	/**
+	 * Removes the CNAMEs this service wrote when the service is deleted (best effort; a record someone changed is left).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function remove_published( Resource $r ): void {
+		$user = (int) ( $r->license()['user_id'] ?? 0 );
+		$zone = SslNames::zone_for( (string) $r->get( 'ssl_domain' ), $user );
+
+		if ( null === $zone ) {
+			return;
+		}
+
+		foreach ( (array) $r->get( 'ssl_validation_rows' ) as $row ) {
+			if ( is_array( $row ) && ! empty( $row['written'] ) && isset( $row['name'], $row['value'] ) ) {
+				self::unpublish( $user, $zone, $row );
+			}
+		}
 	}
 
 	/**

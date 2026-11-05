@@ -478,6 +478,7 @@ final class Operations {
 	 */
 	public static function delete( Resource $r ): StepResult {
 		Keys::purge( $r );
+		Validation::remove_published( $r );
 
 		if ( '' === $r->get( 'remote_id' ) || $r->get( 'ssl_cancelled' ) || ! self::cancellable( $r ) ) {
 			return StepResult::done();
