@@ -111,7 +111,7 @@ class FakeClient implements Client {
 			if ( ! isset( $state['licences'][ $id ] ) ) { return new \WP_Error( 'op_3108', 'Registrar request failed.', array( 'status' => 404, 'desc' => 'License not found.' ) ); }
 			$licence = $state['licences'][ $id ];
 			if ( isset( $reset[1] ) && 'POST' === $method ) { ++$licence['hwid_resets']; $result = array( 'success' => true ); }
-			elseif ( 'GET' === $method && '' !== ( $match[1] ?? '' ) ) { return array( 'key' => '<?xml version="1.0"?><key id="FAKE-KEY-' . $id . '"/>' ); }
+			elseif ( 'GET' === $method && '' !== ( $match[1] ?? '' ) ) { return array( 'key' => base64_encode( '<?xml version="1.0"?><key id="FAKE-KEY-' . $id . '"/>' . str_repeat( ' ', 80 ) ) ); }
 			elseif ( 'GET' === $method ) { return $licence; }
 			elseif ( 'PUT' === $method ) {
 				foreach ( array( 'items', 'title', 'comment', 'ip_address_binding' ) as $field ) { if ( isset( $body[ $field ] ) ) { $licence[ $field ] = $body[ $field ]; } }

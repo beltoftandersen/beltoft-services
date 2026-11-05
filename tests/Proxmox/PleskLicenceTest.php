@@ -286,6 +286,62 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( 'installed', $this->fresh( $o['licence'] )->get( 'plesk_key_state' ) );
 	}
 
+	public function test_the_key_openprovider_sends_base64_encoded_is_stored_and_sent_as_the_key_file(): void {
+		$xml = '<?xml version="1.0"?><plesk-key>' . str_repeat( 'x', 100 ) . '</plesk-key>';
+		$this->assertSame( $xml, PleskLicence::normalise_key( base64_encode( $xml ) ) );
+		$this->assertSame( $xml, PleskLicence::normalise_key( chunk_split( base64_encode( $xml ), 76, "\n" ) ), 'Line breaks in the base64 are fine.' );
+		$this->assertSame( $xml, PleskLicence::normalise_key( $xml ), 'The XML itself stays.' );
+		$this->assertSame( 'ABCD-1234-EFGH-5678-IJKL', PleskLicence::normalise_key( 'ABCD-1234-EFGH-5678-IJKL' ), 'An activation code stays.' );
+		$not_xml = base64_encode( str_repeat( 'plain text, not a key file. ', 5 ) );
+		$this->assertSame( $not_xml, PleskLicence::normalise_key( $not_xml ), 'Base64 of something that is not a key file is not guessed at.' );
+
+		// End to end: the fake answers base64 like Openprovider; what is stored and what goes to the guest is the file, which the guest script installs.
+		$o = $this->provisioned( 'pro' );
+		$key = (string) Crypto::decrypt( (string) $o['licence']->get( 'plesk_key' ) );
+		$this->assertStringStartsWith( '<', $key, 'The stored key is the XML, not the base64 line.' );
+		$this->assertTrue( $o['licence']->set( array( 'plesk_key_job' => null ) ) );
+		$this->assertTrue( $o['server']->set( array( 'app_state' => 'ready' ) ) );
+		PleskLicence::run_key( $o['licence']->id() );
+		$request = json_decode( (string) $this->fake->guest_file( 5000, PleskLicence::KEY_FILE ), true );
+		$this->assertStringStartsWith( '<', $request['key'] );
+		$this->assertSame( hash( 'sha256', $request['key'] ), $request['hash'] );
+
+		// A key stored earlier as the base64 line (before this fix) is read as the file too.
+		$this->assertTrue( $o['licence']->set( array( 'plesk_key' => Crypto::encrypt( base64_encode( $xml ) ), 'plesk_key_job' => null ) ) );
+		PleskLicence::run_key( $o['licence']->id() );
+		$again = json_decode( (string) $this->fake->guest_file( 5000, PleskLicence::KEY_FILE ), true );
+		$this->assertSame( $xml, $again['key'] );
+	}
+
+	public function test_a_key_the_server_refuses_is_loud_on_the_server_and_a_corrected_key_gets_new_tries(): void {
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $args ) use ( &$mails ) { $mails[] = $args; return true; }, 10, 2 );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$o = $this->provisioned( 'pro' );
+		$this->assertTrue( $o['server']->set( array( 'app_state' => 'ready' ) ) );
+		$key = (string) Crypto::decrypt( (string) $o['licence']->get( 'plesk_key' ) );
+		$this->assertTrue( $o['licence']->set( array( 'plesk_key_job' => null, 'plesk_key_pushes' => 3, 'plesk_key_tried' => hash( 'sha256', $key ), 'plesk_key_state' => 'applying', 'plesk_key_at' => time() - 3600 ) ) );
+		$this->fake->set_guest_file( 5000, PleskLicence::STATUS_FILE, wp_json_encode( array( 'hash' => hash( 'sha256', $key ), 'state' => 'failed' ) ) );
+
+		PleskLicence::run_key( $o['licence']->id() );
+
+		$this->assertSame( 'failed', $this->fresh( $o['licence'] )->get( 'plesk_key_state' ) );
+		$server = $this->fresh( $o['server'] );
+		$this->assertStringContainsString( 'NOT installed', (string) $server->get( 'app_error' ), 'The server shows it in the admin box, not only a mail about the licence.' );
+		$this->assertNotEmpty( array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['message'], 'NOT installed' ) ) );
+		$this->assertStringNotContainsString( $key, (string) wp_json_encode( $mails ) );
+
+		// The key is corrected (a different key text): it is tried afresh, not blocked by the old three.
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key' => Crypto::encrypt( '<?xml version="1.0"?><plesk-key>' . str_repeat( 'y', 100 ) . '</plesk-key>' ) ) ) );
+		$this->fake->set_guest_file( 5000, PleskLicence::KEY_FILE, '' );
+		PleskLicence::run_key( $o['licence']->id() );
+		$request = json_decode( (string) $this->fake->guest_file( 5000, PleskLicence::KEY_FILE ), true );
+		$this->assertIsArray( $request );
+		$this->assertStringContainsString( str_repeat( 'y', 100 ), $request['key'] );
+		$this->assertSame( 1, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_pushes' ) );
+		remove_all_filters( 'pre_wp_mail' );
+	}
+
 	// -- Tier switch, hold, cancel, delete ----------------------------------------------------------
 
 	public function test_a_tier_switch_puts_the_new_item_and_fetches_the_key_again(): void {

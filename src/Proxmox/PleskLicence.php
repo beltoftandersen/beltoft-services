@@ -233,7 +233,27 @@ final class PleskLicence {
 		$stored = (string) $licence->get( 'plesk_key' );
 		$plain  = '' === $stored ? null : Crypto::decrypt( $stored );
 
-		return is_string( $plain ) ? $plain : '';
+		return is_string( $plain ) ? self::normalise_key( $plain ) : '';
+	}
+
+	/**
+	 * The key as the guest can install it. Openprovider answers with the Plesk key FILE base64 encoded (one long line of
+	 * about 17 000 characters, no markup), which `plesk bin license --install` cannot read and the guest script refused
+	 * (it takes the XML itself, or an activation code of up to 64 characters): a Plesk that stayed on its trial although
+	 * the licence was paid. The XML is what is stored and sent; an activation code is left alone.
+	 *
+	 * @param string $key What Openprovider sent, or what was stored earlier.
+	 */
+	public static function normalise_key( string $key ): string {
+		$key = trim( $key );
+
+		if ( '' === $key || '<' === $key[0] || strlen( $key ) <= 64 || 1 !== preg_match( '/^[A-Za-z0-9+\/=\r\n]+$/D', $key ) ) {
+			return $key;
+		}
+
+		$decoded = base64_decode( (string) preg_replace( '/\s+/', '', $key ), true );
+
+		return false !== $decoded && 1 === preg_match( '/^\s*</', $decoded ) ? trim( $decoded ) : $key;
 	}
 
 	/**
@@ -485,7 +505,7 @@ final class PleskLicence {
 		}
 
 		$reply = self::client()->request( 'GET', '/licenses/plesk/key/' . $key_id );
-		$key   = is_wp_error( $reply ) ? '' : (string) ( $reply['key'] ?? '' );
+		$key   = is_wp_error( $reply ) ? '' : self::normalise_key( (string) ( $reply['key'] ?? '' ) );
 
 		if ( '' === $key || strlen( $key ) > 60000 ) {
 			return false;
@@ -721,6 +741,13 @@ final class PleskLicence {
 			return;
 		}
 
+		// A key that is different from the one the failed attempts used (the key was corrected since) gets its own tries.
+		$tried = (string) $licence->get( 'plesk_key_tried' );
+
+		if ( '' !== $tried && $tried !== $hash ) {
+			$licence->set( array( 'plesk_key_pushes' => 0, 'plesk_key_state' => null, 'plesk_key_job' => null, 'plesk_sync_tries' => null ) );
+		}
+
 		$app_state = (string) $server->get( 'app_state' );
 
 		if ( 'ready' !== $app_state ) {
@@ -763,6 +790,10 @@ final class PleskLicence {
 			if ( 'failed' !== (string) $licence->get( 'plesk_key_state' ) ) {
 				$licence->set( array( 'plesk_key_state' => 'failed' ) );
 				self::alert( $licence, 'The Plesk key could not be installed on the server after ' . self::PUSHES . ' tries. Plesk runs on its trial. Check the server.' );
+
+				// Loud, not silent: the server shows the reason (admin license box) and the admin is mailed about the SERVER too, because the
+				// app reports ready although the licence that was paid for is not on it.
+				AppAlerts::failure( $server, 'The Plesk licence is NOT installed on this server (Plesk runs on its trial): the key was refused ' . self::PUSHES . ' times by the server. The licence is ordered at Openprovider and paid.' );
 			}
 
 			return;
@@ -779,7 +810,7 @@ final class PleskLicence {
 			return;
 		}
 
-		$licence->set( array( 'plesk_key_state' => 'applying', 'plesk_key_at' => time(), 'plesk_key_pushes' => $pushes + 1 ) );
+		$licence->set( array( 'plesk_key_state' => 'applying', 'plesk_key_at' => time(), 'plesk_key_pushes' => $pushes + 1, 'plesk_key_tried' => $hash ) );
 		self::schedule( self::KEY_HOOK, $id, 60 );
 	}
 
