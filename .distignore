@@ -10,3 +10,4 @@ phpunit.xml.dist
 README.md
 .playwright-mcp
 .superpowers
+docs
