@@ -9,8 +9,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * - POST /ssl/orders {product_id, period, csr, organization_handle, technical_handle, domain_validation_methods[], ...}
  *   gives {id}; the order is PAI (purchased, not sent to the CA). An empty csr is op_1003; an unknown product op_1000.
- * - PUT /ssl/orders/{id} merges fields; {start_provision: true} moves PAI to REQ (an OV or EV csr without O, ST and C is
- *   op_1050). After a delay (filter beltoft_services_ssl_fake_delay, 60 s) a REQ order becomes ACT with a certificate,
+ * - PUT /ssl/orders/{id} merges fields; {start_provision: true} moves PAI to REQ (a csr without a country is op_1099 for every
+ *   product, as the sandbox answers; an OV or EV csr without O, ST and C is op_1050). After a delay (filter beltoft_services_ssl_fake_delay, 60 s) a REQ order becomes ACT with a certificate,
  *   signed by a throwaway CA for the csr, valid for 199 days (the order itself for a year). When that certificate is older
  *   than 199 days the order is reissued in place, as the registrar does.
  * - GET /ssl/orders/{id} (unknown id: HTTP 400 op_1094) and GET /ssl/orders?common_name_pattern=&contact_handle=&status=.
@@ -270,6 +270,11 @@ final class FakeModel {
 
 			$level = self::products()[ (int) $order['product_id'] ][1];
 			$dn    = openssl_csr_get_subject( (string) $order['csr'], true );
+
+			// The sandbox refuses a request without a valid country, DV included (code 1099, the text keeps its %s).
+			if ( ! is_array( $dn ) || 1 !== preg_match( '/^[A-Za-z]{2}$/D', (string) ( $dn['C'] ?? '' ) ) ) {
+				return self::error( 1099, 'csr: The CSR contains an invalid country code %s', 400 );
+			}
 
 			if ( 'domain_validation' !== $level && ( ! is_array( $dn ) || empty( $dn['O'] ) || empty( $dn['ST'] ) || empty( $dn['C'] ) ) ) {
 				return self::error( 1050, 'CSR must contain company; Bad Region', 400 );

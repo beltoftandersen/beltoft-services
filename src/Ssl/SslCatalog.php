@@ -170,8 +170,11 @@ final class SslCatalog {
 			return null;
 		}
 
+		// The validation method is the registrar's own word for what is checked; the category also holds the shape (wildcard, multi domain).
+		$method   = strtolower( (string) ( $entry['validation_method'] ?? '' ) );
 		$category = strtolower( (string) ( $entry['category'] ?? '' ) );
-		$level    = ! empty( $entry['is_extended_validation_supported'] ) || false !== strpos( $category, 'extended' ) ? 'ev' : ( false !== strpos( $category, 'organization' ) ? 'ov' : 'dv' );
+		$kind     = '' !== $method ? $method : $category;
+		$level    = ! empty( $entry['is_extended_validation_supported'] ) || false !== strpos( $kind, 'extended' ) ? 'ev' : ( false !== strpos( $kind, 'organization' ) ? 'ov' : 'dv' );
 
 		return array(
 			'id'           => (int) $entry['id'],

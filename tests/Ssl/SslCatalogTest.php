@@ -38,6 +38,22 @@ class SslCatalogTest extends TestCase {
 		$this->assertSame( 'true', $call['query']['with_price'] );
 	}
 
+	public function test_the_validation_method_decides_the_level_when_the_category_is_a_shape(): void {
+		$wildcard_ov = $this->product( 23, 241.28, 'wildcard', true );
+		$wildcard_ov['validation_method'] = 'organization';
+		$multi_ev = $this->product( 33, 193.02, 'multi_domain' );
+		$multi_ev['validation_method'] = 'extended';
+		$wildcard_dv = $this->product( 42, 77.2, 'wildcard', true );
+		$wildcard_dv['validation_method'] = 'domain';
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/ssl/products', array( 'results' => array( $wildcard_ov, $multi_ev, $wildcard_dv ) ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertSame( 3, SslCatalog::sync() );
+		$this->assertSame( 'ov', SslCatalog::level( 23 ) );
+		$this->assertSame( 'ev', SslCatalog::level( 33 ) );
+		$this->assertSame( 'dv', SslCatalog::level( 42 ) );
+	}
+
 	public function test_a_bad_list_keeps_the_old_table(): void {
 		update_option( SslCatalog::OPTION, array( 41 => array( 'id' => 41, 'cost_1y' => 8.68 ) ) );
 		$fake = new FakeClient();
@@ -106,7 +122,17 @@ class SslCatalogTest extends TestCase {
 		$conf = tempnam( sys_get_temp_dir(), 'cnf' );
 		file_put_contents( $conf, "[req]\ndistinguished_name = dn\n[dn]\n" );
 		$key = openssl_pkey_new( array( 'private_key_bits' => 2048, 'config' => $conf ) );
-		$csr = openssl_csr_new( array_merge( array( 'commonName' => $cn ), $dn ), $key, array( 'digest_alg' => 'sha256', 'config' => $conf ) );
+		$csr = openssl_csr_new( array_merge( array( 'commonName' => $cn, 'countryName' => 'DK' ), $dn ), $key, array( 'digest_alg' => 'sha256', 'config' => $conf ) );
+		openssl_csr_export( $csr, $out );
+		unlink( $conf );
+		return $out;
+	}
+
+	private function csr_without_country( string $cn ): string {
+		$conf = tempnam( sys_get_temp_dir(), 'cnf' );
+		file_put_contents( $conf, "[req]\ndistinguished_name = dn\n[dn]\n" );
+		$key = openssl_pkey_new( array( 'private_key_bits' => 2048, 'config' => $conf ) );
+		$csr = openssl_csr_new( array( 'commonName' => $cn ), $key, array( 'digest_alg' => 'sha256', 'config' => $conf ) );
 		openssl_csr_export( $csr, $out );
 		unlink( $conf );
 		return $out;
@@ -142,11 +168,15 @@ class SslCatalogTest extends TestCase {
 		$err  = $fake->request( 'GET', '/ssl/orders/99999' );
 		$this->assertSame( 'op_1094', $err->get_error_code() );
 		$this->assertSame( 400, $err->get_error_data()['status'] );
+		$no_country = (int) $fake->request( 'POST', '/ssl/orders', $this->body( $this->csr_without_country( 'example.com' ) ) )['id'];
+		$refused = $fake->request( 'PUT', '/ssl/orders/' . $no_country, array( 'start_provision' => true ) );
+		$this->assertSame( 'op_1099', $refused->get_error_code(), 'A request without a country is refused, DV included.' );
+		$this->assertStringContainsString( 'invalid country code', $refused->get_error_data()['desc'] );
 		$id = (int) $fake->request( 'POST', '/ssl/orders', $this->body( '' ) )['id'];
 		$this->assertSame( 'op_1003', $fake->request( 'PUT', '/ssl/orders/' . $id, array( 'start_provision' => true ) )->get_error_code() );
 		$ov = (int) $fake->request( 'POST', '/ssl/orders', $this->body( $this->csr( 'example.com' ), 20 ) )['id'];
 		$this->assertSame( 'op_1050', $fake->request( 'PUT', '/ssl/orders/' . $ov, array( 'start_provision' => true ) )->get_error_code() );
-		$full = $this->csr( 'example.com', array( 'organizationName' => 'Acme', 'stateOrProvinceName' => 'Midtjylland', 'countryName' => 'DK' ) );
+		$full = $this->csr( 'example.com', array( 'organizationName' => 'Acme', 'stateOrProvinceName' => 'Midtjylland' ) );
 		$ov2 = (int) $fake->request( 'POST', '/ssl/orders', $this->body( $full, 20 ) )['id'];
 		$this->assertSame( array( 'id' => $ov2 ), $fake->request( 'PUT', '/ssl/orders/' . $ov2, array( 'start_provision' => true ) ) );
 		$this->assertSame( 'op_25003', $fake->request( 'POST', '/ssl/orders/' . $ov2 . '/renew' )->get_error_code(), 'A requested order cannot be renewed.' );

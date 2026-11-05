@@ -41,7 +41,7 @@ class SslOperationsTest extends SslTestCase {
 		$r = $this->built();
 		$this->assertTrue( Operations::reissue( $r, array( 'csr' => 'not a request' ) )->is_failed() );
 		$this->assertSame( array(), $this->calls( 'POST', '#/reissue$#' ) );
-		$made = Csr::generate( 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
 		$this->assertTrue( Operations::reissue( $r, array( 'csr' => $made['csr'] ) )->is_done() );
 		$r = Resource::find( $r->id() );
 		$this->assertSame( '', (string) $r->get( Keys::META_KEY ) );

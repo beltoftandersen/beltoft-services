@@ -297,29 +297,35 @@ final class Provision {
 	}
 
 	/**
-	 * The subject entries of an OV or EV request, from the billing details of the order (none for DV).
+	 * The subject entries of a request, from the billing details of the order: the country for every level, and the company, state and city for OV and EV.
 	 *
 	 * @param Resource $r     Resource.
 	 * @param string   $level dv, ov or ev.
 	 * @return array<string, string>|StepResult The entries, or the result to return.
 	 */
 	public static function organization( Resource $r, string $level ) {
-		if ( ! in_array( $level, array( 'ov', 'ev' ), true ) ) {
-			return array();
-		}
-
 		$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
 
 		if ( ! $order ) {
 			return StepResult::retry( 3600, 'The certificate order is unavailable.' );
 		}
 
-		$company = trim( (string) $order->get_billing_company() );
 		$country = strtoupper( trim( (string) $order->get_billing_country() ) );
+
+		// The registrar refuses a request without a valid country, whatever the level.
+		if ( 1 !== preg_match( '/^[A-Z]{2}$/D', $country ) ) {
+			return StepResult::fail( 'The billing details need a country for the certificate request.' );
+		}
+
+		if ( ! in_array( $level, array( 'ov', 'ev' ), true ) ) {
+			return array( 'countryName' => $country );
+		}
+
+		$company = trim( (string) $order->get_billing_company() );
 		$state   = trim( (string) $order->get_billing_state() );
 		$city    = trim( (string) $order->get_billing_city() );
 
-		if ( '' === $company || '' === $country || ( '' === $state && '' === $city ) ) {
+		if ( '' === $company || ( '' === $state && '' === $city ) ) {
 			return StepResult::fail( 'This certificate type needs the company name, city and country in the billing details.' );
 		}
 

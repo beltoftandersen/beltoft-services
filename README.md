@@ -49,6 +49,17 @@ Service drivers implementing `NeedsBilling` require name, email, phone, address,
 
 .dk registration and transfers stay unavailable until the separate Punktum dk checkout agreement has been reviewed and `BELTOFT_SERVICES_DK_AGREEMENT_APPROVED` is explicitly set to `true`. The prepared classic checkout flow displays the applicant and requested names, requires a checkbox for each name, and records the acceptance time and terms version on the order. Store API checkout refuses .dk orders because it does not display that agreement. This constant is independent of the live registrar/DNS constant.
 
+## SSL certificates
+
+The `ssl` driver resells certificates from the registrar account of the Domains settings (same mode switch, same live constant). One service is one certificate order for one name, sold as a yearly subscription. It is off until Settings, Services, SSL certificates, "Sell SSL certificates" is on.
+
+1. Read the registrar's costs with `wp beltoft-services ssl sync` (read only; it also runs daily). An order is placed only when the paid line, after discounts and without tax, covers the cost of the product, in EUR; an unknown cost places nothing.
+2. `wp beltoft-services ssl product --dry-run` then `--create --prices=dv:19,dv_wildcard:99,ov:55,ev:129` makes one draft variable subscription product, sold individually, with a variation per certificate type (plan fields: registrar product id, validation level, wildcard). Prices are the shop's. The product ids come from `beltoft_services_ssl_launch_products`.
+3. The classic checkout asks for the name, how it is validated (a CNAME published for the customer in a zone on our name servers, a CNAME or a file the customer adds, or an approval email) and where the key comes from (made here, or the customer's own CSR). The block checkout is refused for a certificate cart.
+4. The private key never goes to the registrar. A key made here is stored encrypted (`BELTOFT_SERVICES_KEY`), shown once for seven days after issue, then wiped, and it is in no email, log or API tool. The request always carries a country (the registrar refuses one without); OV and EV requests carry the company, state and city of the billing details.
+5. Certificates are valid for at most 199 days now (100 days from March 2027), so a yearly order is reissued by the authority during the year. A daily job reads each order, stores a newer certificate, emails the customer and reports one that is about to end with no replacement. `GET beltoft-services/v1/resources/<id>/ssl-certificate` returns the current public chain to a read-scope API token.
+6. The renewal is charged `ssl_renew_days_before` days (at most 30) before the order's expiry and requests the registrar renewal when the renewal order is paid. A customer can cancel inside the refund window; the refund itself is a staff decision.
+
 ## Proxmox VE
 
 **Proxmox is production: nothing talks to a real one until you enable it.** Clusters are "fake" (a built-in model of the API) until `define( 'BELTOFT_SERVICES_PROXMOX_LIVE', true );` is in `wp-config.php`, the site tag is set, and the cluster's client is set to "live". No filter or setting replaces the constant. A stored live cluster with no site tag is left alone (jobs wait, one alert a day), never faked.

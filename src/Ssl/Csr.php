@@ -131,7 +131,12 @@ final class Csr {
 			);
 		}
 
-		if ( in_array( $level, array( 'ov', 'ev' ), true ) && ( empty( $read['subject']['O'] ) || empty( $read['subject']['C'] ) || empty( $read['subject']['ST'] ) ) ) {
+		// The registrar refuses a request without a valid country ("The CSR contains an invalid country code"), whatever the level.
+		if ( 1 !== preg_match( '/^[A-Za-z]{2}$/D', (string) ( $read['subject']['C'] ?? '' ) ) ) {
+			return new \WP_Error( 'ssl_csr_country', __( 'The certificate request must include a country (C), for example C=DK.', 'beltoft-services' ) );
+		}
+
+		if ( in_array( $level, array( 'ov', 'ev' ), true ) && ( empty( $read['subject']['O'] ) || empty( $read['subject']['ST'] ) ) ) {
 			return new \WP_Error( 'ssl_csr_org', __( 'This certificate type needs the organization in the request: company name (O), state (ST) and country (C).', 'beltoft-services' ) );
 		}
 

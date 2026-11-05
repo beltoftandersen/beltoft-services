@@ -88,6 +88,7 @@ class SslDriverTest extends SslTestCase {
 		$csr = Csr::parse( (string) $fresh->get( 'ssl_csr' ) );
 		$this->assertSame( 'example.com', $csr['cn'] );
 		$this->assertArrayNotHasKey( 'O', $csr['subject'], 'A DV request carries no organization.' );
+		$this->assertSame( 'DK', $csr['subject']['C'], 'The registrar refuses a request without a country, DV included.' );
 	}
 
 	public function test_an_ov_request_carries_the_company_and_a_dv_company_is_not_needed(): void {
@@ -102,7 +103,7 @@ class SslDriverTest extends SslTestCase {
 	}
 
 	public function test_a_customers_own_request_is_used_and_no_key_is_made(): void {
-		$made = Csr::generate( 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
 		$r = $this->ssl_resource( array( 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'] ) ) );
 		$this->assertTrue( $this->build( $r )->is_done() );
 		$fresh = Resource::find( $r->id() );
@@ -111,14 +112,14 @@ class SslDriverTest extends SslTestCase {
 	}
 
 	public function test_a_request_for_another_name_is_refused(): void {
-		$made = Csr::generate( 'other.example' );
+		$made = Csr::generate( 'other.example', array( 'countryName' => 'DK' ) );
 		$r = $this->ssl_resource( array( 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'] ) ) );
 		$this->assertTrue( ( new SslDriver() )->provision( $r )->is_failed() );
 		$this->assertSame( array(), $this->calls( 'POST', '#^/ssl/orders$#' ) );
 	}
 
 	public function test_a_crash_after_the_order_is_found_again_and_not_ordered_twice(): void {
-		$made = Csr::generate( 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
 		$user = (int) self::factory()->user->create();
 		update_user_meta( $user, '_beltoft_services_domain_handle', 'AA123-GB' );
 		$this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'period' => 1, 'csr' => $made['csr'], 'organization_handle' => 'AA123-GB', 'domain_validation_methods' => array( array( 'host_name' => 'example.com', 'method' => 'dns' ) ) ) );
@@ -145,7 +146,7 @@ class SslDriverTest extends SslTestCase {
 	public function test_a_rejected_request_cancels_the_paid_order_and_alerts(): void {
 		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		// An OV order whose request lacks the organization is refused by the authority at the request step.
-		$made = Csr::generate( 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
 		$r = $this->ssl_resource( array( 'product' => 20, 'level' => 'ov', 'company' => 'Acme ApS', 'total' => 55.0, 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'] ) ) );
 		$result = ( new SslDriver() )->provision( $r );
 		$this->assertTrue( $result->is_failed(), 'The own request has no organization.' );
@@ -204,7 +205,7 @@ class SslDriverTest extends SslTestCase {
 	public function test_automatic_validation_falls_back_to_manual_when_a_record_is_in_the_way(): void {
 		$user = (int) self::factory()->user->create();
 		$this->our_zone( $user, 'example.com' );
-		$made = Csr::generate( 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
 		// The fake authority names the record after the request, so the name is known before the order exists.
 		$name = '_' . substr( md5( $made['csr'] ), 0, 32 ) . '.example.com';
 		\BeltoftServices\Domains\Clients::dns()->replace_rrsets( 'example.com', array( array( 'name' => $name . '.', 'type' => 'TXT', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '"other"', 'disabled' => false ) ) ) ) );

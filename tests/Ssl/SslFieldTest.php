@@ -66,20 +66,22 @@ class SslFieldTest extends SslTestCase {
 	}
 
 	public function test_an_own_request_is_checked_against_name_strength_and_level(): void {
-		$good = Csr::generate( 'example.com' )['csr'];
+		$good = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) )['csr'];
 		$this->assertSame( trim( $good ), $this->resolve( array( 'key_mode' => 'own', 'csr' => $good ) )['csr'] );
 		$this->assertWPError( $this->resolve( array( 'key_mode' => 'own', 'csr' => 'garbage' ) ) );
-		$this->assertWPError( $this->resolve( array( 'key_mode' => 'own', 'csr' => Csr::generate( 'other.com' )['csr'] ) ) );
+		$no_country = $this->weak_csr( 2048 );
+		$this->assertSame( 'ssl_csr_country', $this->resolve( array( 'key_mode' => 'own', 'csr' => $no_country ) )->get_error_code(), 'A request without a country.' );
+		$this->assertWPError( $this->resolve( array( 'key_mode' => 'own', 'csr' => Csr::generate( 'other.com', array( 'countryName' => 'DK' ) )['csr'] ) ) );
 		$this->assertWPError( $this->resolve( array( 'key_mode' => 'own', 'csr' => $good ) , 0, 'ov', false, 'Acme' ), 'An OV request needs the organization.' );
-		$weak = $this->weak_csr();
+		$weak = $this->weak_csr( 1024 );
 		$this->assertWPError( $this->resolve( array( 'key_mode' => 'own', 'csr' => $weak ) ), 'A 1024 bit key is too weak.' );
 		$this->assertWPError( $this->resolve( array( 'key_mode' => 'own', 'csr' => $good . str_repeat( 'A', 9000 ) ) ) );
 	}
 
-	private function weak_csr(): string {
+	private function weak_csr( int $bits = 1024 ): string {
 		$conf = tempnam( sys_get_temp_dir(), 'cnf' );
 		file_put_contents( $conf, "[req]\ndistinguished_name = dn\n[dn]\n" );
-		$key = openssl_pkey_new( array( 'private_key_bits' => 1024, 'config' => $conf ) );
+		$key = openssl_pkey_new( array( 'private_key_bits' => $bits, 'config' => $conf ) );
 		$csr = openssl_csr_new( array( 'commonName' => 'example.com' ), $key, array( 'config' => $conf, 'digest_alg' => 'sha256' ) );
 		openssl_csr_export( $csr, $out );
 		unlink( $conf );
