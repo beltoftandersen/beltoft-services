@@ -246,7 +246,14 @@ trait Runs {
 			}
 		}
 
-		return $this->grow_rootfs( $v, (int) $plan['disk_gb'], $step );
+		$root = $this->grow_rootfs( $v, (int) $plan['disk_gb'], $step );
+
+		if ( $root instanceof StepResult || ! isset( $v['config']['mp0'] ) ) {
+			return $root;
+		}
+
+		// The dump mount follows the plan: a quarter of the disk, grown with it (never shrunk).
+		return $this->grow_rootfs( $this->verified( Records::for_resource( $this->r->id() ) ?? array(), $step ), max( 1, intdiv( (int) $plan['disk_gb'], 4 ) ), $step, 'mp0' );
 	}
 
 	/**
@@ -255,10 +262,15 @@ trait Runs {
 	 * @param array<string, mixed> $v    Verified container.
 	 * @param int                  $gb   Wanted size.
 	 * @param string               $step Step name for messages.
+	 * @param string               $disk rootfs, or mp0 (the dump mount).
 	 * @return true|StepResult
 	 */
-	protected function grow_rootfs( array $v, int $gb, string $step ) {
-		$current = 1 === preg_match( '/size=(\d+)G/', (string) ( $v['config']['rootfs'] ?? '' ), $m ) ? (int) $m[1] : 0;
+	protected function grow_rootfs( $v, int $gb, string $step, string $disk = 'rootfs' ) {
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		$current = 1 === preg_match( '/size=(\d+)G/', (string) ( $v['config'][ $disk ] ?? '' ), $m ) ? (int) $m[1] : 0;
 
 		if ( 0 === $current ) {
 			return StepResult::fail( $step . ': the root disk size could not be read' );
@@ -273,7 +285,7 @@ trait Runs {
 			'PUT',
 			$this->lxc( $v['node'] ) . '/resize',
 			array(
-				'disk' => 'rootfs',
+				'disk' => $disk,
 				'size' => $gb . 'G',
 			),
 			'resize'
@@ -289,9 +301,9 @@ trait Runs {
 			return $after;
 		}
 
-		$now = 1 === preg_match( '/size=(\d+)G/', (string) ( $after['config']['rootfs'] ?? '' ), $m ) ? (int) $m[1] : 0;
+		$now = 1 === preg_match( '/size=(\d+)G/', (string) ( $after['config'][ $disk ] ?? '' ), $m ) ? (int) $m[1] : 0;
 
-		return $now >= $gb ? true : StepResult::retry( 0, $step . ': the root disk did not grow' . ( true === $done ? '' : ' (' . $done['failed'] . ')' ) );
+		return $now >= $gb ? true : StepResult::retry( 0, $step . ': the ' . ( 'mp0' === $disk ? 'dump mount' : 'root disk' ) . ' did not grow' . ( true === $done ? '' : ' (' . $done['failed'] . ')' ) );
 	}
 
 	/**

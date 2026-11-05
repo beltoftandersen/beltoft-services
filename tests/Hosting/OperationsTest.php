@@ -201,11 +201,13 @@ class OperationsTest extends HostingCase {
 		$this->assertSame( 4, $c['cores'] );
 		$this->assertSame( 8192, $c['memory'] );
 		$this->assertStringContainsString( 'size=20G', $c['rootfs'] );
+		$this->assertStringContainsString( 'size=5G', $c['mp0'], 'The dump mount is a quarter of the disk and grows with it.' );
 
 		$r2 = Resource::find( $r->id() );
 		$r2->set( array( 'plan' => array_merge( (array) $r2->get( 'plan' ), array( 'disk_gb' => 5 ) ) ) );
 		$this->assertTrue( $this->driver->update_plan( Resource::find( $r->id() ) )->is_done() );
 		$this->assertStringContainsString( 'size=20G', $this->ct( $r )['config']['rootfs'] );
+		$this->assertStringContainsString( 'size=5G', $this->ct( $r )['config']['mp0'] );
 	}
 
 	public function test_status_comes_from_the_records_without_a_call(): void {

@@ -619,6 +619,11 @@ class FakeNode implements Client {
 
 		unset( $p['delete'] );
 
+		// A new storage mount point is given as storage:<size in GB>; the node shows it as the volume with size=<n>G.
+		if ( isset( $p['mp0'] ) && 1 === preg_match( '/^([^:,]+):(\d+),(.*)$/D', (string) $p['mp0'], $m ) ) {
+			$p['mp0'] = sprintf( '%s:subvol-%d-disk-1,%s,size=%dG', $m[1], (int) $ct['vmid'], $m[3], (int) $m[2] );
+		}
+
 		foreach ( $p as $key => $value ) {
 			$this->state['cts'][ $ct['vmid'] ]['config'][ $key ] = ctype_digit( (string) $value ) && 'description' !== $key && 'hostname' !== $key ? (int) $value : $value;
 		}

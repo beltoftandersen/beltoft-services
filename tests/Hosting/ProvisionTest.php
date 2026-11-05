@@ -77,7 +77,7 @@ class ProvisionTest extends HostingCase {
 		$this->assertSame( 256, $c['swap'] );
 		$this->assertSame( 1, $c['onboot'] );
 		$this->assertSame( 'name=eth0,bridge=hbr0,ip=10.200.0.10/16,gw=10.200.0.1,firewall=1', $c['net0'] );
-		$this->assertSame( 'local-zfs:3,mp=/var/backups/db,backup=1', $c['mp0'] );
+		$this->assertSame( 'local-zfs:subvol-1000-disk-1,mp=/var/backups/db,backup=1,size=3G', $c['mp0'] );
 		$this->assertStringContainsString( 'size=12G', $c['rootfs'] );
 
 		$this->assertSame(
