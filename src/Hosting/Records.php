@@ -185,6 +185,20 @@ final class Records {
 	}
 
 	/**
+	 * Takes back a container id that was recorded for a resource but turned out to be somebody else's (no container of ours
+	 * was made on it), so the next allocation chooses again.
+	 *
+	 * @param int $resource_id Activation id.
+	 * @param int $vmid        The recorded id.
+	 */
+	public static function clear_vmid( int $resource_id, int $vmid ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own table.
+		$wpdb->query( $wpdb->prepare( 'UPDATE %i SET vmid = NULL, updated = %s WHERE resource_id = %d AND vmid = %d', Schema::tables()['hosting'], gmdate( 'Y-m-d H:i:s' ), $resource_id, $vmid ) );
+	}
+
+	/**
 	 * Stores one allocated value (address or port) of a resource, once: an existing value stays.
 	 *
 	 * @param int        $resource_id Activation id.

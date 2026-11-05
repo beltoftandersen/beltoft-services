@@ -424,6 +424,10 @@ final class Nodes {
 			$clean[ $key ] = (int) $value;
 		}
 
+		if ( (int) $clean['scratch_vmid'] > 0 && (int) $clean['scratch_vmid'] === (int) $clean['template'] ) {
+			return self::error( 'scratch_vmid', __( 'The scratch container id cannot be the container template.', 'beltoft-services' ) );
+		}
+
 		if ( $clean['ssh_port_max'] < $clean['ssh_port_min'] || $clean['vmid_max'] < $clean['vmid_min'] ) {
 			return self::error( 'range', __( 'A range ends before it starts.', 'beltoft-services' ) );
 		}

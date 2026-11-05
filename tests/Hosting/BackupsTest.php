@@ -525,6 +525,31 @@ class BackupsTest extends HostingCase {
 		$this->assertSame( 'not_found', ( new HostingRestore( Resource::find( $r->id() ) ) )->undo()->get_error_code() );
 	}
 
+	public function test_a_second_backup_or_restore_start_while_one_is_starting_is_refused(): void {
+		list( $r, $volid ) = $this->with_backup();
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$name  = \BeltoftServices\Locks::name( 'hosting-backup', $r->id() );
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		add_filter( 'beltoft_services_hosting_lock_wait', '__return_zero' );
+
+		$fresh = Resource::find( $r->id() );
+		$now   = ( new HostingBackups( $fresh ) )->now();
+		$this->assertWPError( $now );
+		$this->assertSame( 'busy', $now->get_error_code() );
+
+		$start = ( new HostingRestore( $fresh ) )->start( 'account', $volid );
+		$this->assertWPError( $start );
+		$this->assertSame( 'busy', $start->get_error_code() );
+		$this->assertFalse( HostingRestore::active( Resource::find( $r->id() ) ), 'Nothing was started.' );
+		$this->assertSame( 'busy', ( new HostingRestore( $fresh ) )->undo()->get_error_code() );
+
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
+		$other->close();
+		remove_all_filters( 'beltoft_services_hosting_lock_wait' );
+		$this->assertIsArray( ( new HostingBackups( Resource::find( $r->id() ) ) )->now() );
+	}
+
 	public function test_the_estimate_follows_the_backup_size(): void {
 		$this->assertSame( 2, HostingRestore::estimate_minutes( 1073741824 ) );
 		$this->assertSame( 36, HostingRestore::estimate_minutes( 100 * 1073741824 ) );

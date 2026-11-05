@@ -234,6 +234,28 @@ final class Provision {
 			return $this->classify( $list, 'vmid' );
 		}
 
+		// A retry finds the id recorded by the first try. It stands only while it is still ours or still free: a container that
+		// somebody made on it since, or an id the node no longer reports free, is given up and a new one chosen.
+		$record = Records::for_resource( $this->r->id() );
+
+		if ( $record && null !== $record['vmid'] ) {
+			$seen = CtOwnership::verify( $this->client, $this->node, $record, $this->r );
+
+			if ( is_wp_error( $seen ) && in_array( $seen->get_error_code(), array( 'not_ours', 'is_template' ), true ) ) {
+				Records::clear_vmid( $this->r->id(), (int) $record['vmid'] );
+			} elseif ( is_wp_error( $seen ) && 'absent' === $seen->get_error_code() ) {
+				$free = Ownership::is_free( $this->client, (int) $record['vmid'] );
+
+				if ( is_wp_error( $free ) ) {
+					return $this->classify( $free, 'vmid' );
+				}
+
+				if ( ! $free ) {
+					Records::clear_vmid( $this->r->id(), (int) $record['vmid'] );
+				}
+			}
+		}
+
 		$taken = array_map( static fn( $e ) => (int) ( $e['vmid'] ?? 0 ), $list );
 		$c     = $this->client;
 

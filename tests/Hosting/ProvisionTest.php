@@ -98,6 +98,22 @@ class ProvisionTest extends HostingCase {
 		$this->assertCount( 1, $this->ct( $r )['firewall_rules'], 'The rule is not added twice.' );
 	}
 
+	public function test_a_recorded_container_id_somebody_else_took_since_is_given_up_on_retry(): void {
+		$r = $this->resource();
+		Records::open( $r->id(), 'n1' ); // What the place step makes.
+		$this->assertNotNull( Records::for_resource( $r->id() ) );
+
+		// The first try recorded the lowest id and stopped; before the clone, somebody made a container of their own on it.
+		$first = Records::allocate_vmid( $r->id(), 1000, 1999, array(), static fn() => true );
+		$this->assertSame( 1000, $first );
+		$this->node->add_ct( array( 'vmid' => 1000, 'node' => 'pve1', 'name' => 'foreign', 'config' => array( 'description' => 'something else' ) ) );
+
+		$this->provision_fully( Resource::find( $r->id() ) );
+
+		$this->assertNotSame( 1000, (int) Records::for_resource( $r->id() )['vmid'], 'The foreign container is not adopted and not overwritten.' );
+		$this->assertSame( 'foreign', $this->node->state()['cts'][1000]['name'] );
+	}
+
 	public function test_the_dump_mount_is_part_of_the_container_backup(): void {
 		$r = $this->resource();
 		$this->provision_fully( $r );

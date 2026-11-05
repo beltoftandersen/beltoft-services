@@ -129,6 +129,13 @@ class SettingsCliTest extends HostingCase {
 		$this->assertStringNotContainsString( self::AGENT_KEY, $text );
 
 		\WP_CLI::reset();
+		$file = tempnam( sys_get_temp_dir(), 'bsnode' );
+		file_put_contents( $file, "second-node-secret-01\n" );
+		$cli = new class() extends HostingCommand {
+			protected function stdin(): string {
+				return "second-agent-key-0001\n";
+			}
+		};
 		$cli->node(
 			array( 'add', 'n2' ),
 			array(
@@ -136,11 +143,11 @@ class SettingsCliTest extends HostingCase {
 				'node_group'   => 'g1',
 				'api_url'      => 'https://n2.example.invalid:8006',
 				'token_id'     => 'svc@pve!hosting',
-				'token_secret' => 'second-node-secret-01',
+				'token-secret-file' => $file,
+				'agent-key-stdin'   => true,
 				'pve_node'     => 'pve2',
 				'agent_url'    => 'https://n2.example.invalid:8765',
 				'agent_key_id' => 'k1',
-				'agent_key'    => 'second-agent-key-0001',
 				'pool'         => 'hosting-pool',
 				'storage'      => 'local-zfs',
 				'bridge'       => 'hbr0',
@@ -160,6 +167,27 @@ class SettingsCliTest extends HostingCase {
 		);
 		$this->assertArrayHasKey( 'n2', Nodes::all() );
 		$this->assertStringNotContainsString( 'second-node-secret', \WP_CLI::text() );
+		unlink( $file );
+
+		// What was read is what was saved.
+		$this->assertSame( 'second-node-secret-01', Nodes::get( 'n2' )['token_secret'] );
+		$this->assertSame( 'second-agent-key-0001', Nodes::get( 'n2' )['agent_key'] );
+	}
+
+	public function test_cli_refuses_a_secret_on_the_command_line(): void {
+		$cli = new HostingCommand();
+
+		foreach ( array( 'token_secret', 'agent_key', 'agent_client_key' ) as $key ) {
+			try {
+				$cli->node( array( 'add', 'n3' ), array( 'label' => 'x', $key => 'a-long-enough-secret-0001' ) );
+				$this->fail( 'A secret in the arguments was accepted: ' . $key );
+			} catch ( \RuntimeException $e ) {
+				$this->assertStringContainsString( 'command line', $e->getMessage() );
+				$this->assertStringNotContainsString( 'a-long-enough-secret', $e->getMessage() );
+			}
+		}
+
+		$this->assertArrayNotHasKey( 'n3', Nodes::all() );
 	}
 
 	public function test_cli_refuses_bad_input(): void {

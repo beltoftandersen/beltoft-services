@@ -217,6 +217,21 @@ class OpsTest extends HostingCase {
 		$this->assertCount( 0, $this->agent->calls_of( 'backup.restore_test' ) );
 	}
 
+	public function test_the_scratch_container_cannot_be_the_template(): void {
+		$err = \BeltoftServices\Hosting\Nodes::save( 'n1', array_merge( (array) \BeltoftServices\Hosting\Nodes::get( 'n1' ), array( 'token_secret' => '', 'agent_key' => '', 'scratch_vmid' => (int) \BeltoftServices\Hosting\Nodes::get( 'n1' )['template'] ) ) );
+		$this->assertWPError( $err );
+		$this->assertStringEndsWith( 'scratch_vmid', $err->get_error_code() );
+
+		// A node record that got there anyway (an older save): the test refuses, never touches the template.
+		$all                         = get_option( \BeltoftServices\Hosting\Nodes::OPTION );
+		$all['n1']['scratch_vmid']   = $all['n1']['template'];
+		update_option( \BeltoftServices\Hosting\Nodes::OPTION, $all, false );
+		$before = count( $this->agent->calls_of( 'backup.restore_test' ) );
+		$result = RestoreTest::test_node( 'n1' );
+		$this->assertFalse( $result['ok'] );
+		$this->assertCount( $before, $this->agent->calls_of( 'backup.restore_test' ) );
+	}
+
 	public function test_a_passing_test_names_the_backup_and_the_scratch_container_and_is_remembered(): void {
 		$r = $this->with_backup();
 		$this->save_node( array( 'scratch_vmid' => 9500 ) );

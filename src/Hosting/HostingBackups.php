@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -173,6 +174,18 @@ final class HostingBackups {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function now() {
+		// One start at a time per account: a double click or two tabs start one backup, not two.
+		list( $taken, $result ) = Locks::with( Locks::name( 'hosting-backup', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), fn() => $this->now_locked() );
+
+		return $taken ? $result : new \WP_Error( 'busy', __( 'A backup is already starting.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Back up now with the lock held.
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function now_locked() {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 
 		if ( ! self::enabled( $this->r ) || 'ready' !== $this->r->get( 'state' ) || 'ready' !== $this->r->get( 'desired' ) ) {

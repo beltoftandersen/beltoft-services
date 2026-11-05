@@ -95,6 +95,10 @@ final class RestoreTest {
 			return self::fail( $id, 'The scratch container id is not set or is inside the customer range.' );
 		}
 
+		if ( (int) $node['scratch_vmid'] === (int) $node['template'] ) {
+			return self::fail( $id, 'The scratch container id is the container template.' );
+		}
+
 		$pick = self::pick( $id );
 
 		if ( null === $pick ) {

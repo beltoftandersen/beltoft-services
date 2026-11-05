@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
  * calls only (the container listing, the template, the pool and the agent health job), and a live node is
  * refused unless the live gate is open (it never is in this version: no live client exists yet).
  */
-final class HostingCommand {
+class HostingCommand {
 
 	/**
 	 * Hosting node commands.
@@ -27,7 +27,7 @@ final class HostingCommand {
 	 * ## OPTIONS
 	 * <action> : add, list, status or check.
 	 * [<id>] : The node id (not for list).
-	 * [--<field>=<value>] : For add: the fields of the node form (label, node_group, api_url, token_id, token_secret, pve_node, agent_url, agent_key_id, agent_key, pool, storage, bridge, gateway, lan_cidr, ip_first, ssh_port_min, ssh_port_max, vmid_min, vmid_max, template, net_mbit, db_host, client, enabled).
+	 * [--<field>=<value>] : For add: the fields of the node form (label, node_group, api_url, token_id, pve_node, agent_url, agent_key_id, pool, storage, bridge, gateway, lan_cidr, ip_first, ssh_port_min, ssh_port_max, vmid_min, vmid_max, template, net_mbit, db_host, client, enabled; the secrets token_secret, agent_key and agent_client_key come from --<name>-file=<path> or --<name>-stdin, with dashes: --token-secret-file).
 	 *
 	 * @param array<int, string>   $args       Positional arguments.
 	 * @param array<string, mixed> $assoc_args Flags.
@@ -81,6 +81,28 @@ final class HostingCommand {
 			\WP_CLI::error( 'Give a node id.' );
 		}
 
+		// Secrets are not taken from the command line (they would sit in the shell history and the process list): a flag
+		// token_secret, agent_key or agent_client_key is refused, and --<name>-file=<path> or --<name>-stdin reads one.
+		foreach ( Nodes::SECRETS as $key ) {
+			if ( isset( $flags[ $key ] ) ) {
+				\WP_CLI::error( sprintf( 'Do not put %1$s on the command line. Use --%2$s-file=<path> (a file only you can read) or --%2$s-stdin.', $key, str_replace( '_', '-', $key ) ) );
+			}
+
+			$dash = str_replace( '_', '-', $key );
+
+			if ( isset( $flags[ $dash . '-file' ] ) || isset( $flags[ $key . '_file' ] ) ) {
+				$path = (string) ( $flags[ $dash . '-file' ] ?? $flags[ $key . '_file' ] );
+
+				if ( '' === $path || '/' !== $path[0] || ! is_file( $path ) || ! is_readable( $path ) ) {
+					\WP_CLI::error( sprintf( 'The file for %s must be an absolute path to a readable file.', $key ) );
+				}
+
+				$flags[ $key ] = trim( (string) file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local secret file.
+			} elseif ( isset( $flags[ $dash . '-stdin' ] ) || isset( $flags[ $key . '_stdin' ] ) ) {
+				$flags[ $key ] = trim( (string) $this->stdin() );
+			}
+		}
+
 		$result = Nodes::save( $id, $flags );
 
 		if ( is_wp_error( $result ) ) {
@@ -88,6 +110,15 @@ final class HostingCommand {
 		}
 
 		\WP_CLI::success( 'Node ' . $id . ' saved.' );
+	}
+
+	/**
+	 * What is on standard input (a secret, one value). A seam for the tests.
+	 */
+	protected function stdin(): string {
+		$data = stream_get_contents( STDIN );
+
+		return false === $data ? '' : $data;
 	}
 
 	/**

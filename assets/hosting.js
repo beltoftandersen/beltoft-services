@@ -120,6 +120,15 @@
 		// The sign-in link is opened from the click, so a pop-up blocker allows it.
 		var tab = 'login' === action ? window.open( '', '_blank' ) : null;
 
+		// The tab opens on the customer's own website: it must not be able to reach back to this page.
+		if ( tab ) {
+			try {
+				tab.opener = null;
+			} catch ( e ) {
+				// A browser that does not allow it opened the tab without a link back already.
+			}
+		}
+
 		call( request[ 0 ], request[ 1 ], request[ 2 ] ).then( function ( result ) {
 			button.disabled = false;
 

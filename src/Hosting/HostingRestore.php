@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -122,6 +123,31 @@ final class HostingRestore {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function start( string $kind, string $volid, string $slug = '' ) {
+		return $this->exclusive( fn() => $this->start_locked( $kind, $volid, $slug ) );
+	}
+
+	/**
+	 * Runs a start or an undo while no other backup, restore or undo of the account starts (they check each other's state, so they
+	 * must not check at the same moment).
+	 *
+	 * @param callable $change The change.
+	 * @return mixed|\WP_Error
+	 */
+	private function exclusive( callable $change ) {
+		list( $taken, $result ) = Locks::with( Locks::name( 'hosting-backup', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $change );
+
+		return $taken ? $result : new \WP_Error( 'busy', __( 'Something else is starting on your hosting. Try again in a few minutes.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Starts a restore with the lock held.
+	 *
+	 * @param string $kind  account, files or database.
+	 * @param string $volid Backup.
+	 * @param string $slug  Website.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function start_locked( string $kind, string $volid, string $slug ) {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 
 		if ( 'ready' !== $this->r->get( 'state' ) || 'ready' !== $this->r->get( 'desired' ) || ! HostingBackups::enabled( $this->r ) ) {
@@ -180,6 +206,15 @@ final class HostingRestore {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function undo() {
+		return $this->exclusive( fn() => $this->undo_locked() );
+	}
+
+	/**
+	 * Starts the undo with the lock held.
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function undo_locked() {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 		$safety  = self::safety( $this->r );
 
