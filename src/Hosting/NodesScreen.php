@@ -47,6 +47,8 @@ final class NodesScreen {
 			'vmid_max'     => array( __( 'Last customer container id', 'beltoft-services' ), '' ),
 			'template'     => array( __( 'Template container id', 'beltoft-services' ), __( 'Outside the customer range.', 'beltoft-services' ) ),
 			'net_mbit'     => array( __( 'Network speed limit, Mbit/s', 'beltoft-services' ), __( '0 means no limit.', 'beltoft-services' ) ),
+			'mem_gb'       => array( __( 'Memory of the node, GB', 'beltoft-services' ), __( 'What the node has. Capacity is counted against it.', 'beltoft-services' ) ),
+			'disk_gb'      => array( __( 'Disk of the node, GB', 'beltoft-services' ), __( 'Real disk of the container storage.', 'beltoft-services' ) ),
 			'db_host'      => array( __( 'Shared database server address', 'beltoft-services' ), __( 'IPv4 address.', 'beltoft-services' ) ),
 		);
 	}

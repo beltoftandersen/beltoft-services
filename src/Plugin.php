@@ -59,6 +59,7 @@ final class Plugin {
 		Proxmox\ProxmoxSettings::register();
 		Hosting\HostingSettings::register();
 		Hosting\NodesScreen::register();
+		Hosting\Stock::register();
 		Domains\DomainSettings::register();
 		Mail\MailSettings::register();
 		Mail\MailSetup::register();

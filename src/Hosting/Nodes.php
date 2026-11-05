@@ -56,6 +56,8 @@ final class Nodes {
 			'vmid_max'      => 1999,
 			'template'      => 0,
 			'net_mbit'      => 0,
+			'mem_gb'        => 0,
+			'disk_gb'       => 0,
 			'db_host'       => '',
 		);
 	}
@@ -338,6 +340,8 @@ final class Nodes {
 			'vmid_max'     => array( 100, 999999999 ),
 			'template'     => array( 100, 999999999 ),
 			'net_mbit'     => array( 0, 100000 ),
+			'mem_gb'       => array( 1, 100000 ),
+			'disk_gb'      => array( 1, 10000000 ),
 		) as $key => $range ) {
 			$value = trim( (string) ( $input[ $key ] ?? $clean[ $key ] ) );
 

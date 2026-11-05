@@ -23,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * Steps (plan 16.4): place (the node of the plan's group), ip (a private address and an SSH port), vmid, clone
  * (linked, tagged with the ownership line), configure (limits, network, firewall options, root disk), start,
  * prepare (the agent's ct.prepare), db (db.create on the shared database server), site (site.create and
- * site.wp_install), edge (edge.apply), ready. Not in this slice: the capacity reservation in `place`, the DNS
+ * site.wp_install), edge (edge.apply), ready. Not in this slice: the DNS
  * step and the loopback verify step.
  *
  * Proxmox endpoints (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html#<path>):
@@ -154,36 +154,42 @@ final class Provision {
 	// -- Steps -----------------------------------------------------------------------------------
 
 	/**
-	 * Step place: the node of the plan's group that holds the fewest accounts. (Capacity rules come with
-	 * HostingCapacity in a later slice.)
+	 * Step place: the node of the plan's group with room and the most free memory (HostingCapacity).
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */
 	private function step_place() {
 		$group = (string) $this->plan['node_group'];
-		$best  = null;
-		$least = PHP_INT_MAX;
 
-		foreach ( Nodes::in_group( $group ) as $id ) {
-			$count = Records::count_on_node( $id );
-
-			if ( $count < $least ) {
-				$best  = $id;
-				$least = $count;
-			}
-		}
-
-		if ( null === $best ) {
+		if ( array() === Nodes::in_group( $group ) ) {
 			return StepResult::fail( 'No enabled hosting node in the group "' . $group . '"' );
 		}
 
-		$record = Records::open( $this->r->id(), $best );
+		// The choice and the record are one step under a lock, so two accounts do not take the last room together.
+		list( $locked, $record ) = \BeltoftServices\Locks::with(
+			\BeltoftServices\Locks::name( 'hosting-place', 0 ),
+			\BeltoftServices\Locks::allocation_wait(),
+			function () {
+				$stored = Records::for_resource( $this->r->id() );
 
-		if ( ! $record ) {
-			return StepResult::retry( 0, 'place: the hosting record could not be stored' );
+				if ( $stored ) {
+					return $stored; // An account placed before keeps its node, whatever the group holds now.
+				}
+
+				$best = HostingCapacity::place( $this->plan );
+
+				return null === $best ? null : Records::open( $this->r->id(), $best );
+			}
+		);
+
+		if ( ! $locked ) {
+			return StepResult::retry( 0, 'place: the placement is busy' );
 		}
 
-		// An account placed before keeps its node, whatever the group holds now.
+		if ( ! is_array( $record ) ) {
+			return StepResult::retry( 0, 'place: no node of the group "' . $group . '" has room for this plan' );
+		}
+
 		$err = $this->connect();
 
 		return $err ?? array( 'node' => $record['node'] );

@@ -98,6 +98,19 @@ final class Records {
 	}
 
 	/**
+	 * The resource ids on a node.
+	 *
+	 * @param string $node Node record id.
+	 * @return int[]
+	 */
+	public static function resource_ids( string $node ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- a rare read of our own table.
+		return array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( 'SELECT resource_id FROM %i WHERE node = %s ORDER BY id', Schema::tables()['hosting'], $node ) ) );
+	}
+
+	/**
 	 * Gives a resource a container id: the one it has, or the lowest free id of the node's range. The id is
 	 * recorded before the assertion runs and before anything is created, so no other provision can choose it.
 	 *

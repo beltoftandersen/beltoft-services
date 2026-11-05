@@ -135,6 +135,8 @@ abstract class HostingCase extends TestCase {
 					'vmid_max'     => 1999,
 					'template'     => 9000,
 					'net_mbit'     => 0,
+					'mem_gb'       => 32,
+					'disk_gb'      => 1000,
 					'db_host'      => '10.200.0.3',
 				),
 				$over
