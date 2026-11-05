@@ -449,10 +449,11 @@ final class HostingBackups {
 			return new \WP_Error( 'failed', $this->text( $answer ) );
 		}
 
-		$out = array();
+		$out   = array();
+		$owner = Config::account( $this->r->id() ) . ' '; // The notes start with the container's name (the account): a container id that was used by a deleted account keeps its old backups, which are not this customer's.
 
 		foreach ( is_array( $answer ) ? $answer : array() as $item ) {
-			if ( ! is_array( $item ) || ! isset( $item['volid'], $item['ctime'] ) || ! is_string( $item['volid'] ) || (int) ( $item['vmid'] ?? 0 ) !== (int) $record['vmid'] || ! self::volid_fits( (int) $record['vmid'], $item['volid'] ) ) {
+			if ( ! is_array( $item ) || 0 !== strpos( (string) ( $item['notes'] ?? '' ), $owner ) || ! isset( $item['volid'], $item['ctime'] ) || ! is_string( $item['volid'] ) || (int) ( $item['vmid'] ?? 0 ) !== (int) $record['vmid'] || ! self::volid_fits( (int) $record['vmid'], $item['volid'] ) ) {
 				continue;
 			}
 

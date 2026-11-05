@@ -284,6 +284,18 @@ class BackupsTest extends HostingCase {
 		$this->assertSame( 'not_ready', ( new HostingBackups( Resource::find( $paused->id() ) ) )->now()->get_error_code() );
 	}
 
+	public function test_a_reused_container_id_never_shows_the_old_accounts_backups(): void {
+		$r    = $this->round( $this->account() );
+		$list = ( new HostingBackups( $r ) )->list();
+		$this->assertCount( 1, $list );
+
+		// The container id was used by an account that was deleted: its backups carry that account's name.
+		$put = $this->node->request( 'PUT', '/nodes/pve1/storage/pbs-store/content/' . $list[0]['volid'], array( 'notes' => 'c9999 nightly' ) );
+		$this->assertNotWPError( $put );
+
+		$this->assertSame( array(), ( new HostingBackups( Resource::find( $r->id() ) ) )->list(), 'Another account\'s backup is not listed, so it cannot be restored here.' );
+	}
+
 	public function test_only_this_containers_own_backups_are_listed_or_restorable(): void {
 		$r = $this->round( $this->account() );
 		$this->node->add_ct( array( 'vmid' => 1500, 'node' => 'pve1', 'name' => 'other' ) );

@@ -938,6 +938,10 @@ class FakeNode implements Client {
 					$this->state['backups'][ $i ]['protected'] = (int) $p['protected'];
 				}
 
+				if ( isset( $p['notes'] ) ) {
+					$this->state['backups'][ $i ]['notes'] = (string) $p['notes'];
+				}
+
 				return null;
 			}
 		}
