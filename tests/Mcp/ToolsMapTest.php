@@ -68,6 +68,7 @@ final class ToolsMapTest extends McpTestCase {
 			'BeltoftServices\Proxmox\PrivateAttach',
 			'BeltoftServices\Proxmox\DbActions',
 			'BeltoftServices\Domains\Actions',
+			'BeltoftServices\Ssl\Operations',
 		);
 		$seen    = array();
 

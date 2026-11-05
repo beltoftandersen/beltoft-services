@@ -142,6 +142,15 @@ final class Reads {
 
 				return $view;
 
+			case 'ssl_info':
+				return SslTools::info( (int) $args['id'] );
+
+			case 'get_ssl_certificate':
+				$id   = (int) $args['id'];
+				$view = Tools::route( 'GET', '/resources/' . $id . '/ssl-certificate', array(), null, $id, 'SSL certificate read' );
+
+				return $view instanceof \WP_Error ? $view : array( 'name' => (string) $view['name'], 'valid_to' => (string) $view['valid_to'], 'certificate_with_chain' => (string) $view['pem'] );
+
 			case 'console_link':
 				$r = Tools::owned( (int) $args['id'] );
 

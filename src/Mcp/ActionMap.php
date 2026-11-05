@@ -49,6 +49,8 @@ final class ActionMap {
 		'fw_reset'           => 'reset_firewall',
 		'reset_password'     => 'reset_server_password',
 		'db_set_policy'      => 'set_database_eviction_policy',
+		'ssl_reissue'        => 'ssl_reissue',
+		'ssl_resend_email'   => 'ssl_resend_email',
 	);
 
 	/**
@@ -58,6 +60,8 @@ final class ActionMap {
 		'unlock'            => 'never: a domain transfer is only possible in the dashboard',
 		'set_records'       => 'route: DNS records have their own tools (dns_upsert_record, dns_delete_record)',
 		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
+		'ssl_change_validation' => 'dashboard: the validation method, approver and request are chosen on the certificate page',
+		'ssl_cancel'        => 'later: cancelling is irreversible and ends in a refund a person decides; it needs a confirmation flow and is dashboard only for now',
 	);
 
 	/**
@@ -141,6 +145,7 @@ final class ActionMap {
 		'restore_hosting_backup'   => array( 'POST #^/resources/\d+/hosting/backups/restore$#D' ),
 		'delete_site'              => array( 'DELETE #^/resources/\d+/hosting/sites/[a-z0-9-]+$#D' ),
 		'email_domain_info'        => array( 'GET #^/resources/\d+/mail$#D' ),
+		'get_ssl_certificate'      => array( 'GET #^/resources/\d+/ssl-certificate$#D' ),
 		'create_mailbox'           => array( 'POST #^/resources/\d+/mail/mailboxes$#D' ),
 		'reset_mailbox_password'   => array( 'POST #^/resources/\d+/mail/mailboxes/[^/]+/password$#D' ),
 		'delete_mailbox'           => array( 'DELETE #^/resources/\d+/mail/mailboxes/[^/]+$#D' ),
