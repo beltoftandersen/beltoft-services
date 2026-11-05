@@ -459,6 +459,7 @@ class BackupsTest extends HostingCase {
 		$this->assertFalse( $r->get( 'restore_last' )['ok'] );
 		$this->assertNotNull( HostingRestore::safety( $r ), 'The safety point stays so the customer can undo.' );
 		$this->assertFalse( HostingRestore::active( $r ) );
+		$this->assertSame( 'running', $this->node->state()['cts'][ Records::for_resource( $r->id() )['vmid'] ]['status'], 'The container the restore stopped is started again.' );
 	}
 
 	public function test_a_restore_is_refused_for_a_backup_that_is_not_listed_a_bad_choice_or_while_busy(): void {

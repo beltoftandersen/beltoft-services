@@ -291,6 +291,12 @@ final class HostingRestore {
 	 */
 	private function abort( array $round, string $why ): StepResult {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+
+		// An account restore stopped the container first: start it again, whatever state the restore left, so the websites are not left down.
+		if ( 'account' === ( $round['kind'] ?? '' ) && in_array( 'stop', (array) ( $round['done'] ?? array() ), true ) ) {
+			$this->phase_start( $round );
+		}
+
 		$this->r->set( array( 'restore' => array( 'kind' => '' ), 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => false, 'why' => $this->scrub( $why, 200 ) ) ) );
 		\BeltoftServices\Alerts::admin( $this->r, 'A restore failed and stopped: ' . $this->scrub( $why, 200 ) );
 		$this->tell( $round, false );
@@ -574,6 +580,8 @@ final class HostingRestore {
 				'ostemplate' => (string) $round['volid'],
 				'restore'    => 1,
 				'force'      => 1,
+				'storage'    => (string) $this->node['storage'], // Without it the node uses its default storage, which holds no container disks.
+				'pool'       => (string) $this->node['pool'],
 			),
 			'restore'
 		);

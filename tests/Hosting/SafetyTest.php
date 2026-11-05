@@ -155,6 +155,8 @@ class SafetyTest extends HostingCase {
 		$restores = $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' );
 		$this->assertCount( 2, $restores, 'The first restore and the undo.' );
 		$this->assertSame( $safety['volid'], $restores[1]['params']['ostemplate'] );
+		$this->assertSame( 'local-zfs', $restores[1]['params']['storage'], 'The container disks go to the plan storage, not the node default.' );
+		$this->assertSame( 'hosting-pool', $restores[1]['params']['pool'] );
 	}
 
 	public function test_a_safety_backup_survives_the_nightly_prune_and_is_removed_after_24_hours(): void {

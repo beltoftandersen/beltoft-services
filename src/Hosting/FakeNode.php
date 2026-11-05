@@ -402,6 +402,7 @@ class FakeNode implements Client {
 				'restore'      => array( 'bool', false ),
 				'force'        => array( 'bool', false ),
 				'storage'      => array( 'string', false ),
+				'pool'         => array( 'string', false ),
 				'unprivileged' => array( 'bool', false ),
 			) ),
 			array( 'GET', $ct . '/snapshot$#', 'h_snap_list', array() ),
