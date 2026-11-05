@@ -207,7 +207,7 @@ final class SslRoutes {
 		if ( 'ssl_reissue' === $action && '' !== trim( (string) ( $args['csr'] ?? '' ) ) ) {
 			$plan  = (array) $resource->get( 'plan' );
 			$level = SslCatalog::level( (int) ( $plan['ssl_product'] ?? 0 ) );
-			$read  = Csr::check( (string) $args['csr'], (string) $resource->get( 'ssl_name' ), '' !== $level ? $level : (string) ( $plan['ssl_level'] ?? 'dv' ) );
+			$read  = Csr::check( (string) $args['csr'], (string) $resource->get( 'ssl_name' ), '' !== $level ? $level : (string) ( $plan['ssl_level'] ?? 'dv' ), array_column( SslNames::entries( $resource ), 'name' ) );
 
 			if ( is_wp_error( $read ) ) {
 				return new \WP_Error( $read->get_error_code(), $read->get_error_message(), array( 'status' => 422 ) );
@@ -217,6 +217,13 @@ final class SslRoutes {
 		if ( 'ssl_change_validation' === $action ) {
 			$method   = (string) ( $args['method'] ?? '' );
 			$wildcard = '*.' === substr( (string) $resource->get( 'ssl_name' ), 0, 2 );
+
+			$names    = array_column( SslNames::entries( $resource ), 'name' );
+			$target   = isset( $args['name'] ) ? strtolower( (string) $args['name'] ) : '';
+
+			if ( count( $names ) > 1 && ( 'email' === $method || ( '' !== $target && ! in_array( $target, $names, true ) ) ) ) {
+				return new \WP_Error( 'ssl_validation', __( 'Choose a validation method this certificate can use.', 'beltoft-services' ), array( 'status' => 422 ) );
+			}
 
 			if ( ! in_array( $method, Validation::METHODS, true ) || ( $wildcard && 'file' === $method ) || ( 'email' === $method && null === SslNames::approver( (string) ( $args['approver'] ?? '' ), (string) $resource->get( 'ssl_domain' ) ) ) ) {
 				return new \WP_Error( 'ssl_validation', __( 'Choose a validation method this certificate can use.', 'beltoft-services' ), array( 'status' => 422 ) );

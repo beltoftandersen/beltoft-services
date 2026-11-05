@@ -103,6 +103,6 @@ class SslCommandTest extends SslTestCase {
 		$this->assertSame( 'ov', $plan['ssl_level'] );
 		$this->assertSame( array(), $this->calls( 'POST', '#^/ssl/orders$#' ), 'Nothing is ordered by creating the service.' );
 		unset( $variation );
-		$this->assertSame( 4, count( SslCatalog::all() ) );
+		$this->assertSame( 10, count( SslCatalog::all() ) );
 	}
 }

@@ -107,7 +107,9 @@ final class Panels {
 		}
 
 		if ( 'REQ' === $status ) {
-			return array() !== (array) $r->get( 'ssl_validation_rows' ) && 'sent' !== ( ( (array) $r->get( 'ssl_validation_rows' ) )[0]['status'] ?? '' ) && 'published' !== ( ( (array) $r->get( 'ssl_validation_rows' ) )[0]['status'] ?? '' ) ? __( 'Waiting for validation', 'beltoft-services' ) : __( 'Waiting for the certificate authority', 'beltoft-services' );
+			$manual = array_filter( (array) $r->get( 'ssl_validation_rows' ), static fn( $row ) => is_array( $row ) && ! in_array( (string) ( $row['status'] ?? '' ), array( 'sent', 'published' ), true ) );
+
+			return array() !== $manual ? __( 'Waiting for validation', 'beltoft-services' ) : __( 'Waiting for the certificate authority', 'beltoft-services' );
 		}
 
 		return __( 'Being set up', 'beltoft-services' );
@@ -130,7 +132,14 @@ final class Panels {
 
 		echo '<div class="beltoft-services-ssl" data-resource="' . esc_attr( (string) $r->id() ) . '" data-name="' . esc_attr( $name ) . '">';
 		echo '<dl class="beltoft-services-ssl__facts">';
-		self::fact( __( 'Name', 'beltoft-services' ), $name );
+		$names = array_column( SslNames::entries( $r ), 'name' );
+
+		if ( count( $names ) > 1 ) {
+			self::fact( __( 'Names', 'beltoft-services' ), implode( ', ', $names ) );
+		} else {
+			self::fact( __( 'Name', 'beltoft-services' ), $name );
+		}
+
 		self::fact( __( 'Status', 'beltoft-services' ), self::status_text( $r ) );
 
 		if ( $has ) {
@@ -189,16 +198,33 @@ final class Panels {
 			return;
 		}
 
-		if ( ! empty( $r->get( 'ssl_validation_auto' ) ) ) {
-			echo '<p>' . esc_html__( 'We added the validation record to your DNS. The certificate is issued when the authority has seen it.', 'beltoft-services' ) . '</p>';
+		$multi = SslNames::is_multi( $r );
+		$done  = array_filter( $rows, static fn( $row ) => 'published' === ( $row['status'] ?? '' ) );
+		$rows  = array_values( array_filter( $rows, static fn( $row ) => 'published' !== ( $row['status'] ?? '' ) ) );
 
+		if ( array() !== $done ) {
+			if ( $multi ) {
+				/* translators: %s: domain names. */
+				echo '<p>' . esc_html( sprintf( __( 'We added the validation records to your DNS for %s. The certificate is issued when the authority has seen them.', 'beltoft-services' ), implode( ', ', array_unique( array_column( $done, 'domain' ) ) ) ) ) . '</p>';
+			} else {
+				echo '<p>' . esc_html__( 'We added the validation record to your DNS. The certificate is issued when the authority has seen it.', 'beltoft-services' ) . '</p>';
+			}
+		}
+
+		if ( array() === $rows ) {
 			return;
 		}
+
+		$kind = array() !== array_filter( $rows, static fn( $row ) => 'file' === ( $row['type'] ?? '' ) ) && array() === array_filter( $rows, static fn( $row ) => 'file' !== ( $row['type'] ?? '' ) ) ? 'file' : $kind;
 
 		echo '<p>' . esc_html( 'file' === $kind ? __( 'Put a file with this content on your website, at this address:', 'beltoft-services' ) : __( 'Add this CNAME record where your DNS is hosted:', 'beltoft-services' ) ) . '</p>';
 		echo '<table class="beltoft-services-ssl__rows"><tbody>';
 
 		foreach ( $rows as $row ) {
+			if ( $multi && ! empty( $row['domain'] ) ) {
+				echo '<tr><th colspan="2" scope="colgroup">' . esc_html( (string) $row['domain'] ) . '</th></tr>';
+			}
+
 			echo '<tr><th scope="row">' . esc_html( 'file' === (string) ( $row['type'] ?? '' ) ? __( 'Address', 'beltoft-services' ) : __( 'Name', 'beltoft-services' ) ) . '</th><td><code>' . esc_html( (string) ( $row['name'] ?? '' ) ) . '</code></td></tr>';
 			echo '<tr><th scope="row">' . esc_html( 'file' === (string) ( $row['type'] ?? '' ) ? __( 'Content', 'beltoft-services' ) : __( 'Points to', 'beltoft-services' ) ) . '</th><td><code style="white-space:pre-wrap;word-break:break-all">' . esc_html( (string) ( $row['value'] ?? '' ) ) . '</code></td></tr>';
 		}
@@ -245,22 +271,42 @@ final class Panels {
 		}
 
 		if ( isset( $actions['ssl_change_validation'] ) ) {
-			echo '<form class="beltoft-services-ssl__form" data-ssl-action="ssl_change_validation"><p><label>' . esc_html__( 'Validation method', 'beltoft-services' ) . ' <select name="method">';
+			$names = array_column( SslNames::entries( $r ), 'name' );
+			$multi = count( $names ) > 1;
+			echo '<form class="beltoft-services-ssl__form" data-ssl-action="ssl_change_validation"><p>';
+
+			if ( $multi ) {
+				echo '<label>' . esc_html__( 'Name', 'beltoft-services' ) . ' <select name="name">';
+
+				foreach ( $names as $one ) {
+					echo '<option value="' . esc_attr( $one ) . '">' . esc_html( $one ) . '</option>';
+				}
+
+				echo '</select></label> ';
+			}
+
+			echo '<label>' . esc_html__( 'Validation method', 'beltoft-services' ) . ' <select name="method">';
 			$wild = '*.' === substr( (string) $r->get( 'ssl_name' ), 0, 2 );
 
 			foreach ( array( 'dns' => __( 'DNS record I add myself', 'beltoft-services' ), 'file' => __( 'File on my website', 'beltoft-services' ), 'email' => __( 'Email to an approval address', 'beltoft-services' ) ) as $value => $label ) {
-				if ( ! ( $wild && 'file' === $value ) ) {
+				if ( ! ( $wild && 'file' === $value ) && ! ( $multi && 'email' === $value ) ) {
 					echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
 				}
 			}
 
-			echo '</select></label> <label>' . esc_html__( 'Approval address', 'beltoft-services' ) . ' <select name="approver">';
+			echo '</select></label> ';
 
-			foreach ( SslNames::APPROVERS as $prefix ) {
-				echo '<option value="' . esc_attr( $prefix ) . '">' . esc_html( $prefix . '@' . (string) $r->get( 'ssl_domain' ) ) . '</option>';
+			if ( ! $multi ) {
+				echo '<label>' . esc_html__( 'Approval address', 'beltoft-services' ) . ' <select name="approver">';
+
+				foreach ( SslNames::APPROVERS as $prefix ) {
+					echo '<option value="' . esc_attr( $prefix ) . '">' . esc_html( $prefix . '@' . (string) $r->get( 'ssl_domain' ) ) . '</option>';
+				}
+
+				echo '</select></label> ';
 			}
 
-			echo '</select></label> <button type="submit" class="button woocommerce-button">' . esc_html( $actions['ssl_change_validation'] ) . '</button></p></form>';
+			echo '<button type="submit" class="button woocommerce-button">' . esc_html( $actions['ssl_change_validation'] ) . '</button></p></form>';
 		}
 
 		echo '<p>';
@@ -291,6 +337,7 @@ final class Panels {
 		$details = array_filter(
 			array(
 				'Name'               => $r->get( 'ssl_name' ),
+				'Names'              => SslNames::is_multi( $r ) ? implode( ', ', array_column( SslNames::entries( $r ), 'name' ) ) : '',
 				'Registrar order'    => $r->get( 'remote_id' ),
 				'Registrar product'  => ( (array) $r->get( 'plan' ) )['ssl_product'] ?? '',
 				'Status'             => $r->get( 'ssl_status' ),

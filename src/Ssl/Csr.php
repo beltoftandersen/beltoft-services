@@ -21,12 +21,19 @@ final class Csr {
 	 * end up in a request. The file is removed afterwards.
 	 *
 	 * @param callable $work Receives the config path.
+	 * @param string[] $sans Host names for the subject alternative name extension (none for a single name).
 	 * @return mixed What the callback returns.
 	 */
-	private static function with_config( callable $work ) {
+	private static function with_config( callable $work, array $sans = array() ) {
 		$path = (string) wp_tempnam( 'beltoft-ssl' );
+		$text = "[req]\ndistinguished_name = dn\n[dn]\n";
 
-		file_put_contents( $path, "[req]\ndistinguished_name = dn\n[dn]\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- a temporary openssl config.
+		if ( array() !== $sans ) {
+			$names = array_map( static fn( $n ) => 'DNS:' . $n, $sans );
+			$text  = "[req]\ndistinguished_name = dn\nreq_extensions = v3_req\n[dn]\n[v3_req]\nsubjectAltName = " . implode( ',', $names ) . "\n";
+		}
+
+		file_put_contents( $path, $text ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- a temporary openssl config.
 
 		try {
 			return $work( $path );
@@ -41,9 +48,12 @@ final class Csr {
 	 *
 	 * @param string               $name Common name, for a wildcard "*.example.com".
 	 * @param array<string, string> $org  organizationName, stateOrProvinceName, localityName, countryName (any may be missing).
+	 * @param string[]              $names All names of a multi domain certificate (the common name first); they become the subject alternative names. Empty or one name: no extension.
 	 * @return array{key: string, csr: string}|\WP_Error
 	 */
-	public static function generate( string $name, array $org = array() ) {
+	public static function generate( string $name, array $org = array(), array $names = array() ) {
+		$sans = count( $names ) > 1 ? array_values( array_filter( array_map( 'strtolower', $names ), static fn( $n ) => 1 === preg_match( '/^[a-z0-9.-]{1,253}$/D', $n ) ) ) : array();
+
 		return self::with_config(
 			static function ( string $config ) use ( $name, $org ) {
 				$key = openssl_pkey_new( array( 'private_key_bits' => self::MIN_BITS, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $config ) );
@@ -67,7 +77,8 @@ final class Csr {
 				}
 
 				return array( 'key' => (string) $pem, 'csr' => (string) $csr );
-			}
+			},
+			$sans
 		);
 	}
 
@@ -114,9 +125,10 @@ final class Csr {
 	 * @param string $csr   PEM text.
 	 * @param string $name  The name the certificate is for ("*.example.com" for a wildcard).
 	 * @param string $level dv, ov or ev.
+	 * @param string[] $names All names of a multi domain certificate (the common name first); empty for a single name one.
 	 * @return array{cn: string, subject: array<string, string>, bits: int, type: string, public: string}|\WP_Error
 	 */
-	public static function check( string $csr, string $name, string $level ) {
+	public static function check( string $csr, string $name, string $level, array $names = array() ) {
 		$read = self::parse( $csr );
 
 		if ( is_wp_error( $read ) ) {
@@ -132,7 +144,7 @@ final class Csr {
 		}
 
 		// A request that names more than was ordered would get a certificate for more than was paid for.
-		$allowed = array( strtolower( $name ) );
+		$allowed = array_values( array_unique( array_map( 'strtolower', array_merge( array( $name ), $names ) ) ) );
 
 		if ( '*.' === substr( $name, 0, 2 ) ) {
 			$allowed[] = strtolower( substr( $name, 2 ) );

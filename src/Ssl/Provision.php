@@ -125,6 +125,15 @@ final class Provision {
 				return StepResult::retry( 3600, 'The registrar cost for this certificate product is unknown.' );
 			}
 
+			$count = count( SslNames::entries( $r ) );
+
+			// A certificate for several names needs a multi domain product, and no more names than its price includes.
+			if ( $count > 1 && ( ! SslCatalog::is_multi( $product ) || $count > SslCatalog::included( $product ) ) ) {
+				Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about how many names the certificate covers.' );
+
+				return StepResult::fail( 'The certificate product does not cover the number of names ordered.' );
+			}
+
 			if ( $wildcard !== (bool) $catalog['wildcard'] ) {
 				Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about wildcard names.' );
 
@@ -136,7 +145,7 @@ final class Provision {
 		$level = '' !== $level ? $level : (string) ( $plan['ssl_level'] ?? 'dv' );
 
 		if ( ! in_array( 'csr', $steps, true ) ) {
-			$made = self::make_csr( $r, $name, $level );
+			$made = self::make_csr( $r, $name, $level, array_column( SslNames::entries( $r ), 'name' ) );
 
 			if ( $made instanceof StepResult ) {
 				return $made;
@@ -290,11 +299,12 @@ final class Provision {
 	 * @param Resource $r     Resource.
 	 * @param string   $name  Common name.
 	 * @param string   $level dv, ov or ev.
+	 * @param string[] $names All names (the common name first); more than one makes a multi domain request.
 	 * @return array<string, mixed>|StepResult Meta to save, or the result to return.
 	 */
-	private static function make_csr( Resource $r, string $name, string $level ) {
+	private static function make_csr( Resource $r, string $name, string $level, array $names = array() ) {
 		if ( 'own' === $r->get( 'ssl_key_mode' ) ) {
-			$read = Csr::check( (string) $r->get( 'ssl_csr' ), $name, $level );
+			$read = Csr::check( (string) $r->get( 'ssl_csr' ), $name, $level, $names );
 
 			return is_wp_error( $read ) ? StepResult::fail( $read->get_error_message() ) : array();
 		}
@@ -310,7 +320,7 @@ final class Provision {
 			return $org;
 		}
 
-		$made = Csr::generate( $name, $org );
+		$made = Csr::generate( $name, $org, $names );
 
 		if ( is_wp_error( $made ) ) {
 			return StepResult::retry( 300, $made->get_error_message() );
@@ -424,6 +434,7 @@ final class Provision {
 		}
 
 		$method = Validation::registrar_method( $r );
+		$rows   = Validation::registrar_methods( $r );
 		$body   = array(
 			'product_id'                => $product,
 			'period'                    => 1,
@@ -432,8 +443,8 @@ final class Provision {
 			'technical_handle'          => $handle,
 			'signature_hash_algorithm'  => 'sha2',
 			'software_id'               => 'linux',
-			'domain_amount'             => 1,
-			'domain_validation_methods' => array( array( 'host_name' => $name, 'method' => $method ) ),
+			'domain_amount'             => count( $rows ),
+			'domain_validation_methods' => $rows,
 			'autorenew'                 => 'off',
 			'start_provision'           => false,
 		);

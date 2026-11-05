@@ -29,7 +29,26 @@ final class Validation {
 	 * @param Resource $r Resource.
 	 */
 	public static function registrar_method( Resource $r ): string {
-		return array( 'auto' => 'dns', 'dns' => 'dns', 'file' => 'https', 'email' => 'email' )[ (string) $r->get( 'ssl_validation' ) ] ?? 'dns';
+		return self::method_of( (string) $r->get( 'ssl_validation' ) );
+	}
+
+	/**
+	 * The registrar's method name for one of ours.
+	 *
+	 * @param string $validation auto, dns, file or email.
+	 */
+	public static function method_of( string $validation ): string {
+		return array( 'auto' => 'dns', 'dns' => 'dns', 'file' => 'https', 'email' => 'email' )[ $validation ] ?? 'dns';
+	}
+
+	/**
+	 * The `domain_validation_methods` of an order: one row per name.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<int, array{host_name: string, method: string}>
+	 */
+	public static function registrar_methods( Resource $r ): array {
+		return array_map( static fn( $e ) => array( 'host_name' => $e['name'], 'method' => self::method_of( $e['validation'] ) ), SslNames::entries( $r ) );
 	}
 
 	/**
@@ -39,6 +58,10 @@ final class Validation {
 	 * @param array<string, mixed> $detail The registrar order.
 	 */
 	public static function start( Resource $r, array $detail ): StepResult {
+		if ( SslNames::is_multi( $r ) ) {
+			return self::start_multi( $r, $detail );
+		}
+
 		$kind = (string) $r->get( 'ssl_validation' );
 
 		if ( 'email' === $kind ) {
@@ -82,6 +105,83 @@ final class Validation {
 	}
 
 	/**
+	 * The validation of a certificate for several names: every name has its own method, and the registrar's `additional_data` holds
+	 * one entry per name (its `domain`). The records of names validated "auto" are published in the customer's zones; every other row
+	 * is shown to the customer. A name whose record cannot be published (no zone of ours, a record in the way) falls back to a DNS
+	 * record the customer adds.
+	 *
+	 * @param Resource             $r      Resource.
+	 * @param array<string, mixed> $detail The registrar order.
+	 */
+	private static function start_multi( Resource $r, array $detail ): StepResult {
+		$entries = SslNames::entries( $r );
+		$items   = array_values( array_filter( (array) ( $detail['additional_data'] ?? array() ), 'is_array' ) );
+		$known   = array_column( $entries, 'base' );
+		$matched = false;
+
+		foreach ( $items as $item ) {
+			$matched = $matched || in_array( strtolower( ltrim( rtrim( (string) ( $item['domain'] ?? '' ), '.' ), '*.' ) ), $known, true );
+		}
+
+		$rows = array();
+
+		foreach ( $entries as $i => $entry ) {
+			// The registrar names the domain of each entry; when none of them is one of ours the entries are taken in order.
+			$mine = $matched
+				? array_values( array_filter( $items, static fn( $it ) => strtolower( ltrim( rtrim( (string) ( $it['domain'] ?? '' ), '.' ), '*.' ) ) === $entry['base'] ) )
+				: ( isset( $items[ $i ] ) ? array( $items[ $i ] ) : array() );
+			$got  = self::rows( 'file' === $entry['validation'] ? 'file' : 'dns', array( 'additional_data' => $mine ) );
+
+			if ( array() === $got ) {
+				$until = (int) ( $r->get( 'ssl_requested_at' ) ?: time() ) + 2 * HOUR_IN_SECONDS;
+
+				return time() > $until
+					? StepResult::fail( 'The certificate authority gave no validation data for ' . $entry['name'] . '.' )
+					: StepResult::wait( 300, 'Waiting for the validation data.', $until );
+			}
+
+			foreach ( $got as $row ) {
+				$rows[] = $row + array( 'domain' => $entry['name'], 'method' => $entry['validation'] );
+			}
+		}
+
+		$auto = array_keys( array_filter( $rows, static fn( $row ) => 'auto' === $row['method'] ) );
+
+		if ( array() !== $auto ) {
+			$published = self::publish( $r, array_intersect_key( $rows, array_flip( $auto ) ) );
+
+			if ( $published instanceof StepResult ) {
+				return $published;
+			}
+
+			foreach ( $auto as $i ) {
+				$rows[ $i ] = null !== $published ? $published[ $i ] + array( 'domain' => $rows[ $i ]['domain'], 'method' => 'auto' ) : array_merge( $rows[ $i ], array( 'status' => 'manual', 'method' => 'dns' ) );
+			}
+		}
+
+		$state = array();
+
+		foreach ( $rows as $i => $row ) {
+			if ( empty( $row['status'] ) ) {
+				$rows[ $i ]['status'] = 'manual';
+			}
+
+			$state[ $row['domain'] ] = $rows[ $i ]['method'];
+		}
+
+		$kept    = array_values( array_map( static fn( $e ) => array( 'name' => $e['name'], 'validation' => $state[ $e['name'] ] ?? $e['validation'] ), $entries ) );
+		$manual  = array_filter( $rows, static fn( $row ) => 'manual' === $row['status'] );
+		$extra   = array( 'ssl_names' => $kept, 'ssl_validation_auto' => array() === $manual );
+		$reason  = array() === $manual ? '' : ( array() !== array_filter( $manual, static fn( $row ) => 'file' === $row['type'] ) ? 'file' : 'dns' );
+
+		if ( '' === $reason ) {
+			return StepResult::done( array( 'ssl_validation' => $kept[0]['validation'], 'ssl_validation_rows' => array_values( $rows ) ) + $extra );
+		}
+
+		return self::told( $r, $kept[0]['validation'], array_values( $rows ), $reason, $extra );
+	}
+
+	/**
 	 * The rows the registrar order asks for.
 	 *
 	 * @param string               $kind   Method.
@@ -115,15 +215,13 @@ final class Validation {
 	 */
 	private static function publish( Resource $r, array $rows ) {
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
-		$zone = SslNames::zone_for( (string) $r->get( 'ssl_domain' ), $user );
-
-		if ( null === $zone ) {
-			return null;
-		}
 
 		foreach ( $rows as $i => $row ) {
-			if ( 'CNAME' !== $row['type'] || ( $row['name'] !== $zone && ! str_ends_with( $row['name'], '.' . $zone ) ) ) {
-				self::clean_up( $user, $zone, $rows );
+			// Each record goes into the zone it belongs to (the names of a certificate may be in different zones of the customer).
+			$zone = 'CNAME' === $row['type'] ? SslNames::zone_for( $row['name'], $user ) : null;
+
+			if ( null === $zone ) {
+				self::clean_up( $user, $rows );
 
 				return null;
 			}
@@ -140,7 +238,7 @@ final class Validation {
 
 			if ( 'ok' !== $result[0] ) {
 				// The customer adds the records by hand, so none of ours is left half done in their zone.
-				self::clean_up( $user, $zone, $rows );
+				self::clean_up( $user, $rows );
 
 				return null;
 			}
@@ -217,12 +315,13 @@ final class Validation {
 	 * Removes what a half finished publish wrote.
 	 *
 	 * @param int                               $user Customer.
-	 * @param string                            $zone Zone.
 	 * @param array<int, array<string, string>> $rows Rows so far.
 	 */
-	private static function clean_up( int $user, string $zone, array $rows ): void {
+	private static function clean_up( int $user, array $rows ): void {
 		foreach ( $rows as $row ) {
-			if ( ! empty( $row['written'] ) ) {
+			$zone = ! empty( $row['written'] ) && isset( $row['name'] ) ? SslNames::zone_for( (string) $row['name'], $user ) : null;
+
+			if ( null !== $zone ) {
 				self::unpublish( $user, $zone, $row );
 			}
 		}
@@ -235,14 +334,11 @@ final class Validation {
 	 */
 	public static function remove_published( Resource $r ): void {
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
-		$zone = SslNames::zone_for( (string) $r->get( 'ssl_domain' ), $user );
-
-		if ( null === $zone ) {
-			return;
-		}
 
 		foreach ( (array) $r->get( 'ssl_validation_rows' ) as $row ) {
-			if ( is_array( $row ) && ! empty( $row['written'] ) && isset( $row['name'], $row['value'] ) ) {
+			$zone = is_array( $row ) && ! empty( $row['written'] ) && isset( $row['name'], $row['value'] ) ? SslNames::zone_for( (string) $row['name'], $user ) : null;
+
+			if ( null !== $zone ) {
 				self::unpublish( $user, $zone, $row );
 			}
 		}
