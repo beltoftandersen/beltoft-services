@@ -96,6 +96,57 @@ final class Sites {
 	}
 
 	/**
+	 * Changes the PHP version, the workers and the flags of a site; a key that is not given stays.
+	 *
+	 * @param int                  $resource_id Activation id.
+	 * @param string               $slug        Slug.
+	 * @param array<string, mixed> $changes     php (string), workers (int), flags (array, merged over the old ones).
+	 */
+	public static function update( int $resource_id, string $slug, array $changes ): bool {
+		global $wpdb;
+
+		$site = self::find( $resource_id, $slug );
+
+		if ( null === $site ) {
+			return false;
+		}
+
+		$row = array();
+
+		if ( isset( $changes['php'] ) ) {
+			$row['php'] = mb_substr( (string) $changes['php'], 0, 8 );
+		}
+
+		if ( isset( $changes['workers'] ) ) {
+			$row['workers'] = max( 0, (int) $changes['workers'] );
+		}
+
+		if ( isset( $changes['flags'] ) && is_array( $changes['flags'] ) ) {
+			$row['flags'] = (string) wp_json_encode( array_merge( $site['flags'], $changes['flags'] ) );
+		}
+
+		if ( array() === $row ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own table.
+		return false !== $wpdb->update( Schema::tables()['hosting_sites'], $row, array( 'resource_id' => $resource_id, 'slug' => $slug ) );
+	}
+
+	/**
+	 * Removes one site record.
+	 *
+	 * @param int    $resource_id Activation id.
+	 * @param string $slug        Slug.
+	 */
+	public static function remove( int $resource_id, string $slug ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own table.
+		return false !== $wpdb->delete( Schema::tables()['hosting_sites'], array( 'resource_id' => $resource_id, 'slug' => $slug ), array( '%d', '%s' ) );
+	}
+
+	/**
 	 * Removes every site record of a resource.
 	 *
 	 * @param int $resource_id Activation id.

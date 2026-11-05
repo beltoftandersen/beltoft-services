@@ -92,6 +92,7 @@ final class HostingSettings {
 		$list = array(
 			'hosting_preview_zone'    => array( 'preview_zone', __( 'Preview zone', 'beltoft-services' ), __( 'A domain whose DNS zone this site manages. Every site gets a temporary name <name>.<zone>. Hosting provisioning waits until this is set.', 'beltoft-services' ) ),
 			'hosting_php_default'     => array( 'php_default', __( 'Default PHP version', 'beltoft-services' ), __( 'A new site starts on this version, for example 8.3.', 'beltoft-services' ) ),
+			'hosting_php_versions'    => array( 'php_versions', __( 'PHP versions offered', 'beltoft-services' ), __( 'Versions customers can choose, separated by commas, for example 8.3,8.4,8.5. The end-of-support dates are kept with the plan notes.', 'beltoft-services' ) ),
 			'hosting_prefix'          => array( 'prefix', __( 'Account name prefix', 'beltoft-services' ), __( 'Letters and numbers. The account name is this prefix and the license resource id; it names the container, the database user and the edge entry.', 'beltoft-services' ) ),
 			'hosting_tag'             => array( 'tag', __( 'Container tag', 'beltoft-services' ), __( 'A Proxmox tag put on every hosting container. Lowercase letters, numbers and dashes.', 'beltoft-services' ) ),
 			'hosting_admin_user'      => array( 'admin_user', __( 'Default WordPress admin user', 'beltoft-services' ), __( 'The administrator name of a new WordPress install when the order named none.', 'beltoft-services' ) ),

@@ -24,6 +24,7 @@ final class Config {
 	public const DEFAULTS = array(
 		'preview_zone'      => '',
 		'php_default'       => '8.3',
+		'php_versions'      => '8.3,8.4,8.5',
 		'prefix'            => 'c',
 		'tag'               => 'hosting',
 		'admin_user'        => 'owner',
@@ -84,6 +85,25 @@ final class Config {
 		$prefix = preg_replace( '/[^a-z0-9]/', '', strtolower( self::get( 'prefix' ) ) );
 
 		return ( '' === $prefix ? 'c' : substr( $prefix, 0, 8 ) ) . $resource_id;
+	}
+
+	/**
+	 * The PHP versions a customer may choose, in the order given.
+	 *
+	 * @return string[]
+	 */
+	public static function php_versions(): array {
+		$list = array();
+
+		foreach ( explode( ',', self::get( 'php_versions' ) ) as $v ) {
+			$v = trim( $v );
+
+			if ( 1 === preg_match( '/^\d\.\d{1,2}$/D', $v ) ) {
+				$list[] = $v;
+			}
+		}
+
+		return array() === $list ? array( self::DEFAULTS['php_default'] ) : array_values( array_unique( $list ) );
 	}
 
 	/**

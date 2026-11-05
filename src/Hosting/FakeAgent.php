@@ -64,9 +64,11 @@ class FakeAgent implements Agent {
 			'slug' => array( 'ident', true ),
 		),
 		'site.php'          => array(
-			'vmid' => array( 'vmid', true ),
-			'slug' => array( 'ident', true ),
-			'php'  => array( 'string', true ),
+			'vmid'      => array( 'vmid', true ),
+			'slug'      => array( 'ident', true ),
+			'php'       => array( 'string', true ),
+			'memory_mb' => array( 'int', false ),
+			'upload_mb' => array( 'int', false ),
 		),
 		'site.domains'      => array(
 			'vmid'    => array( 'vmid', true ),
@@ -576,6 +578,16 @@ class FakeAgent implements Agent {
 
 				if ( 'site.php' === $op ) {
 					$this->state['sites'][ $vmid ][ $args['slug'] ]['php'] = $args['php'];
+
+					foreach ( array( 'memory_mb', 'upload_mb' ) as $limit ) {
+						if ( isset( $args[ $limit ] ) ) {
+							$this->state['sites'][ $vmid ][ $args['slug'] ][ $limit ] = $args[ $limit ];
+						}
+					}
+				}
+
+				if ( 'site.workers' === $op ) {
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['workers'] = $args['workers'];
 				}
 
 				return array(

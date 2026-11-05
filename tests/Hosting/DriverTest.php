@@ -166,7 +166,7 @@ class DriverTest extends HostingCase {
 
 		ob_start();
 		$this->driver->render_account( $r );
-		$this->assertSame( '<p>1 website</p>', (string) ob_get_clean() );
+		$this->assertStringContainsString( '1 of 3 websites', (string) ob_get_clean() );
 
 		$this->assertStringNotContainsString( "\u{2014}", $admin );
 		$this->assertStringNotContainsString( "\u{00B7}", $admin );

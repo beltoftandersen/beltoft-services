@@ -186,19 +186,7 @@ class HostingDriver implements Driver, StopsOnDelete {
 	 * @param Resource $r Resource.
 	 */
 	public function render_account( Resource $r ): void {
-		$status = $this->status( $r );
-
-		if ( null === $status ) {
-			return;
-		}
-
-		echo '<p>' . esc_html(
-			sprintf(
-				/* translators: %d: websites. */
-				_n( '%d website', '%d websites', (int) $status['sites'], 'beltoft-services' ),
-				(int) $status['sites']
-			)
-		) . '</p>';
+		HostingAccount::render( $r );
 	}
 
 	/**
