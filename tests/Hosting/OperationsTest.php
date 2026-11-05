@@ -190,6 +190,23 @@ class OperationsTest extends HostingCase {
 		$this->assertArrayHasKey( 1000, $this->node->state()['cts'] );
 	}
 
+	public function test_delete_tells_the_agent_to_release_the_container_after_it_is_destroyed(): void {
+		$r    = $this->ready();
+		$vmid = (int) Records::for_resource( $r->id() )['vmid'];
+
+		// A refusing agent (the container still exists for it) is a retry, and the step is repeated.
+		$this->agent->fail_next( 'ct.release', 'container still exists' );
+		$first = $this->driver->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $first->is_retry() );
+		$this->assertArrayNotHasKey( $vmid, $this->node->state()['cts'] ?? array(), 'The container was destroyed before the agent was asked.' );
+
+		$again = $this->driver->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $again->is_done(), $again->error() );
+		$this->assertContains( $vmid, $this->agent->state()['released'] );
+		$this->assertArrayNotHasKey( $vmid, $this->agent->state()['cts'] );
+		$this->assertSame( array( 'ct.release' ), array_values( array_unique( array_column( array_filter( $this->agent->calls(), static fn( $c ) => 'ct.release' === $c['op'] ), 'op' ) ) ) );
+	}
+
 	public function test_update_plan_applies_limits_and_grows_the_disk_but_never_shrinks_it(): void {
 		$r = $this->ready();
 

@@ -211,7 +211,7 @@ final class Operations {
 		$done = (array) $this->r->get( 'delete_steps' );
 
 		// The backups go before the container: the node lists and deletes a guest's backups only while the guest still exists, for a token that has rights on the guest and not on the whole storage.
-		foreach ( array( 'edge', 'dns', 'db', 'backups', 'ct', 'release' ) as $step ) {
+		foreach ( array( 'edge', 'dns', 'db', 'backups', 'ct', 'agent', 'release' ) as $step ) {
 			if ( in_array( $step, $done, true ) ) {
 				continue;
 			}
@@ -421,6 +421,23 @@ final class Operations {
 		}
 
 		return ( new HostingBackups( $this->r ) )->purge_all();
+	}
+
+	/**
+	 * Delete step agent: the container is gone, so the agent forgets it (ct.release). Without it a later account on the
+	 * same container id would be refused as "belongs to another account".
+	 *
+	 * @param array<string, mixed> $record Record.
+	 * @return true|StepResult
+	 */
+	private function delete_agent( array $record ) {
+		if ( null === $record['vmid'] ) {
+			return true;
+		}
+
+		$done = $this->agent_call( 'ct_release', 'ct.release', array( 'vmid' => (int) $record['vmid'] ) );
+
+		return $done instanceof StepResult ? $done : true;
 	}
 
 	/**

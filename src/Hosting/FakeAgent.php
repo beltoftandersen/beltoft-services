@@ -26,6 +26,8 @@ defined( 'ABSPATH' ) || exit;
  *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
  * - site.wp_login_link: url (a one-time address, fake).
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
+ * - ct.release: released (true), vmid, sites (rows forgotten). The real agent refuses ("container still exists") while the
+ *   container is on the node, so the plugin calls it after the destroy; idempotent.
  * - db.drop: dropped (list of names that existed), idempotent.
  * - db.size: sizes (map of database => bytes; 0 unless set_db_size()).
  * - backup.prepare: dumped (true), label ("nightly" when none), databases (dumped), failed (not dumped). The optional
@@ -67,6 +69,7 @@ class FakeAgent implements Agent {
 			'ssh'       => array( 'bool', false ),
 		),
 		'ct.stats'          => array( 'vmid' => array( 'vmid', true ) ),
+		'ct.release'        => array( 'vmid' => array( 'vmid', true ) ),
 		'site.create'       => array(
 			'vmid'    => array( 'vmid', true ),
 			'slug'    => array( 'ident', true ),
@@ -638,6 +641,18 @@ class FakeAgent implements Agent {
 				return array(
 					'prepared' => true,
 					'hostname' => $args['hostname'],
+				);
+
+			case 'ct.release':
+				// After the container was destroyed: the agent forgets its container, account and site rows (idempotent).
+				$sites = count( (array) ( $this->state['sites'][ $vmid ] ?? array() ) );
+				unset( $this->state['cts'][ $vmid ], $this->state['sites'][ $vmid ] );
+				$this->state['released'][] = $vmid;
+
+				return array(
+					'released' => true,
+					'vmid'     => $vmid,
+					'sites'    => $sites,
 				);
 
 			case 'ct.stats':
