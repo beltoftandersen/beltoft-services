@@ -535,10 +535,26 @@ final class HostingBackups {
 		$base = '/nodes/' . rawurlencode( (string) $this->node['pve_node'] ) . '/storage/' . rawurlencode( (string) $this->node['backup_storage'] );
 
 		foreach ( $list as $b ) {
-			$done = $this->run_task( 'delete', 'DELETE', $base . '/content/' . rawurlencode( $b['volid'] ), array(), 'purge' );
+			$volume = $base . '/content/' . rawurlencode( $b['volid'] );
+
+			// A safety backup is protected so no prune can take it: it is let go first, or the node refuses to delete it.
+			if ( 'safety' === $b['kind'] ) {
+				$off = $this->client->request( 'PUT', $volume, array( 'protected' => 0 ) );
+
+				if ( is_wp_error( $off ) ) {
+					return $this->classify( $off, 'delete' );
+				}
+			}
+
+			$done = $this->run_task( 'delete', 'DELETE', $volume, array(), 'purge' );
 
 			if ( $done instanceof StepResult ) {
 				return $done;
+			}
+
+			// A delete the node refused (a task that ended with an error) is not done: the account is not released with backups left behind.
+			if ( true !== $done ) {
+				return StepResult::retry( 300, 'delete: a backup could not be deleted (' . $this->scrub( (string) ( $done['failed'] ?? '' ), 120 ) . ')' );
 			}
 		}
 

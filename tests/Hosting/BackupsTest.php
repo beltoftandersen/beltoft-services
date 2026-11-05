@@ -306,6 +306,20 @@ class BackupsTest extends HostingCase {
 		$this->assertSame( 'not_ready', ( new HostingBackups( Resource::find( $paused->id() ) ) )->now()->get_error_code() );
 	}
 
+	public function test_a_delete_removes_the_protected_safety_backup_too_and_waits_when_the_node_refuses_one(): void {
+		list( $r, $volid ) = $this->with_backup();
+		( new HostingRestore( $r ) )->start( 'account', $volid );
+		HostingRestore::run( $r->id() );
+		$r      = Resource::find( $r->id() );
+		$safety = HostingRestore::safety( $r );
+		$this->assertSame( 'vzdump', $safety['mode'] );
+		$this->assertTrue( in_array( $safety['volid'], array_column( ( new HostingBackups( $r ) )->list(), 'volid' ), true ), 'A protected safety backup is on the storage.' );
+
+		$result = $this->driver->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertCount( 0, $this->stored_backups(), 'The safety backup went with the account.' );
+	}
+
 	public function test_a_reused_container_id_never_shows_the_old_accounts_backups(): void {
 		$r    = $this->round( $this->account() );
 		$list = ( new HostingBackups( $r ) )->list();
