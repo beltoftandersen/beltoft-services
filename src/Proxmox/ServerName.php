@@ -148,8 +148,10 @@ final class ServerName {
 	}
 
 	/**
-	 * Listener of beltoft_licenses_account_title: the server's name as the heading of its card, the
-	 * product name when there is none.
+	 * Listener of beltoft_licenses_account_title: the server's name as the heading of its card. Without a
+	 * chosen name, a server this plugin created is headed by its VM name (vm-<uuid>), which is also its
+	 * hostname, so the card matches what ssh shows. A linked server (its hostname is not ours) keeps the
+	 * product name.
 	 *
 	 * @param mixed $title   Heading so far.
 	 * @param mixed $license License row.
@@ -159,7 +161,15 @@ final class ServerName {
 		$r    = is_array( $license ) && ! empty( $license['id'] ) ? Resource::for_license( (int) $license['id'] ) : null;
 		$name = $r ? self::of( $r ) : '';
 
-		return '' !== $name ? $name : $title;
+		if ( '' !== $name ) {
+			return $name;
+		}
+
+		if ( $r && SshKeyField::DRIVER === $r->get( 'driver' ) && true !== $r->get( 'linked' ) && '' !== (string) $r->get( 'uuid' ) ) {
+			return Provision::vm_name( $r );
+		}
+
+		return $title;
 	}
 
 	/**
