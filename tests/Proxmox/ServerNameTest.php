@@ -368,8 +368,15 @@ class ServerNameTest extends BackupTestCase {
 		$r       = $this->ready_vm();
 		$license = $r->license();
 
-		$this->assertSame( 'VPS Starter', ServerName::title( 'VPS Starter', $license ) );
+		// Without a chosen name the card shows the VM name, which is the hostname ssh shows.
+		$this->assertSame( Provision::vm_name( $r ), ServerName::title( 'VPS Starter', $license ) );
+		$this->assertStringStartsWith( 'vm-', ServerName::title( 'VPS Starter', $license ) );
 		$this->assertSame( \BeltoftLicenses\Account\View::product_name( $license ), ServerName::display( $r, $license ) );
+
+		// A linked server's hostname is not ours: it keeps the product name.
+		$r->set( array( 'linked' => true ) );
+		$this->assertSame( 'VPS Starter', ServerName::title( 'VPS Starter', $license ) );
+		$r->set( array( 'linked' => null ) );
 
 		$r->set( array( ServerName::META => 'web-01' ) );
 		$this->assertSame( 'web-01', ServerName::title( 'VPS Starter', $license ) );
