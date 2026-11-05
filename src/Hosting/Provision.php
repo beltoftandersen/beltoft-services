@@ -798,7 +798,7 @@ final class Provision {
 			'admin_user'  => 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', (string) ( $given['admin_user'] ?? '' ) ) ? (string) $given['admin_user'] : Config::admin_user(),
 			'admin_email' => sanitize_email( (string) ( '' !== (string) ( $given['admin_email'] ?? '' ) ? $given['admin_email'] : ( $license['email'] ?? '' ) ) ),
 			'install_kind' => in_array( (string) ( $given['install_kind'] ?? '' ), SiteField::INSTALLS, true ) ? (string) $given['install_kind'] : 'wordpress',
-			'language'    => 1 === preg_match( '/^[a-z]{2,3}(_[A-Z]{2})?$/D', (string) ( $given['language'] ?? '' ) ) ? (string) $given['language'] : 'en_US',
+			'language'    => Languages::valid( (string) ( $given['language'] ?? '' ) ) ? (string) $given['language'] : 'en_US',
 			'domain'      => isset( $given['domain'] ) ? strtolower( (string) $given['domain'] ) : '',
 		);
 

@@ -1,0 +1,25 @@
+/* Checkout: the "Your website" block of a hosting product. Square corners, palette variables, no extra boxes. */
+.beltoft-services-site-field { margin: 40px 0 0; }
+.beltoft-services-site-field > h3 { margin: 0 0 16px; }
+.beltoft-services-site-field__line { margin: 0 0 16px; }
+.beltoft-services-site-field__product { margin: 0 0 8px; font-weight: 700; }
+.beltoft-services-site-field fieldset.beltoft-services-site-field__group { min-width: 0; margin: 0 0 16px; padding: 0; border: 0; }
+.beltoft-services-site-field__group > legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-weight: 700; }
+.beltoft-services-site-field__group > legend + * { clear: both; }
+.beltoft-services-site-field__choice { margin: 0 0 8px; }
+.beltoft-services-site-field__choice label { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.beltoft-services-site-field__choice input[type="radio"] { flex: 0 0 auto; margin: 0; }
+.beltoft-services-site-field__panel { margin: 0 0 16px 24px; padding: 0 0 0 16px; border-left: 2px solid var(--rule, #d6d2c8); }
+.beltoft-services-site-field__panel[hidden], .beltoft-services-site-field [data-site-more-slug][hidden] { display: none; }
+.beltoft-services-site-field .description { display: block; margin: 4px 0 0; font-size: 14px; line-height: 1.45; }
+.beltoft-services-site-field__note { margin: 4px 0 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.beltoft-services-site-field select, .beltoft-services-site-field input[type="text"] { max-width: 100%; border-radius: 0; }
+.beltoft-services-site-field__more { margin: 0 0 16px; }
+.beltoft-services-site-field__more > summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
+.beltoft-services-site-field__more[open] > summary { margin: 0 0 12px; }
+.beltoft-services-site-field input:focus-visible, .beltoft-services-site-field select:focus-visible, .beltoft-services-site-field summary:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: 2px; }
+@media (max-width: 600px) {
+	.beltoft-services-site-field { margin-top: 32px; }
+	.beltoft-services-site-field__panel { margin-left: 8px; padding-left: 12px; }
+	.beltoft-services-site-field input[type="text"], .beltoft-services-site-field select { font-size: 16px; }
+}

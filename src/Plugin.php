@@ -61,6 +61,7 @@ final class Plugin {
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();
 		Hosting\SiteField::register();
+		Hosting\Languages::register();
 		Hosting\HostingSwitch::register();
 		Children::register();
 		Domains\DomainSettings::register();
