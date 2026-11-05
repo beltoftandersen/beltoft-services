@@ -109,7 +109,9 @@ final class SiteField {
 			return new \WP_Error( 'site_slug', __( 'Give the website a short name with lowercase letters, numbers and dashes. It is used in its temporary address.', 'beltoft-services' ) );
 		}
 
-		if ( Sites::taken( $slug ) ) {
+		$owner = self::owner( $user_id );
+
+		if ( Sites::taken( $slug ) || ! Sites::reserve( $slug, $owner ) ) {
 			return new \WP_Error( 'site_taken', __( 'That website name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
@@ -169,6 +171,21 @@ final class SiteField {
 			'language'    => '' === $language ? 'en_US' : $language,
 			'admin_email' => '' === $email ? '' : sanitize_email( $email ),
 		);
+	}
+
+	/**
+	 * Who a held name belongs to: the customer, or the cart's session for a guest.
+	 *
+	 * @param int $user_id Customer id, 0 for a guest.
+	 */
+	private static function owner( int $user_id ): string {
+		if ( $user_id > 0 ) {
+			return 'u' . $user_id;
+		}
+
+		$session = function_exists( 'WC' ) && WC() && isset( WC()->session ) && WC()->session ? (string) WC()->session->get_customer_id() : '';
+
+		return 'g' . ( '' !== $session ? $session : 'none' );
 	}
 
 	/**

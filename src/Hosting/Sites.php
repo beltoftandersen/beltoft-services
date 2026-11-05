@@ -80,7 +80,13 @@ final class Sites {
 		);
 		$wpdb->suppress_errors( $suppress );
 
-		return null !== self::find( $resource_id, $slug );
+		$made = null !== self::find( $resource_id, $slug );
+
+		if ( $made ) {
+			self::release_hold( $slug );
+		}
+
+		return $made;
 	}
 
 	/**
@@ -93,6 +99,60 @@ final class Sites {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- read fresh.
 		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE slug = %s', Schema::tables()['hosting_sites'], $slug ) ) > 0;
+	}
+
+	/** How long a name chosen at checkout is held for the customer who chose it. */
+	public const RESERVE_TTL = 2 * HOUR_IN_SECONDS;
+
+	/**
+	 * Holds a name for the person at the checkout, so two people do not pay for the same name. The hold is an option made
+	 * with add_option (the database refuses a second one), lasts two hours, and is released when the site is made.
+	 *
+	 * @param string $slug  Slug.
+	 * @param string $owner Who holds it: the customer's id, or the cart's session id for a guest.
+	 * @return bool True when the name is the owner's now.
+	 */
+	public static function reserve( string $slug, string $owner ): bool {
+		$name = 'beltoft_services_slug_hold_' . substr( md5( $slug ), 0, 20 );
+		$now  = time();
+
+		if ( add_option( $name, array( 'o' => $owner, 't' => $now + self::RESERVE_TTL ), '', false ) ) {
+			return true;
+		}
+
+		wp_cache_delete( $name, 'options' );
+		$held = get_option( $name );
+
+		if ( is_array( $held ) && (string) ( $held['o'] ?? '' ) !== $owner && (int) ( $held['t'] ?? 0 ) > $now ) {
+			return false;
+		}
+
+		update_option( $name, array( 'o' => $owner, 't' => $now + self::RESERVE_TTL ), false );
+
+		return true;
+	}
+
+	/**
+	 * Is the name held by somebody else at the checkout?
+	 *
+	 * @param string $slug  Slug.
+	 * @param string $owner The asking person.
+	 */
+	public static function held_by_other( string $slug, string $owner ): bool {
+		$name = 'beltoft_services_slug_hold_' . substr( md5( $slug ), 0, 20 );
+		wp_cache_delete( $name, 'options' );
+		$held = get_option( $name );
+
+		return is_array( $held ) && (string) ( $held['o'] ?? '' ) !== $owner && (int) ( $held['t'] ?? 0 ) > time();
+	}
+
+	/**
+	 * Lets go of a hold (the site was made, or the order failed).
+	 *
+	 * @param string $slug Slug.
+	 */
+	public static function release_hold( string $slug ): void {
+		delete_option( 'beltoft_services_slug_hold_' . substr( md5( $slug ), 0, 20 ) );
 	}
 
 	/**

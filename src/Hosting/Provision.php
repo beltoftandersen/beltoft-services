@@ -756,6 +756,12 @@ final class Provision {
 		$given = (array) $this->r->get( 'site' );
 		$slug  = isset( $given['slug'] ) ? strtolower( (string) $given['slug'] ) : 'w' . $this->r->id();
 
+		// The name was free at the checkout, but a name is taken by whoever makes it first (an order with several lines, a held name that
+		// lapsed): then the account starts on a generated name, and the customer can add or rename later. Never a failed provision.
+		if ( isset( $given['slug'] ) && null === Sites::find( $this->r->id(), $slug ) && Sites::taken( $slug ) ) {
+			$slug = 'w' . $this->r->id();
+		}
+
 		if ( ! Sites::valid_slug( $slug ) ) {
 			return StepResult::fail( 'site: the site name "' . mb_substr( sanitize_text_field( $slug ), 0, 40 ) . '" is not valid' );
 		}

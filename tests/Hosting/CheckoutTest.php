@@ -333,6 +333,39 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringContainsString( 'different server group', (string) HostingSwitch::refusal( $r, $this->target( $r, array( 'node_group' => 'g9' ) ) ) );
 	}
 
+	public function test_a_name_chosen_at_checkout_is_held_for_that_customer(): void {
+		$a = self::factory()->user->create();
+		$b = self::factory()->user->create();
+
+		$first = SiteField::resolve( array( 'slug' => 'heldname' ), $a );
+		$this->assertIsArray( $first );
+		$this->assertSame( 'site_taken', SiteField::resolve( array( 'slug' => 'heldname' ), $b )->get_error_code(), 'Held for the first customer: the second cannot pay for it too.' );
+		$this->assertIsArray( SiteField::resolve( array( 'slug' => 'heldname' ), $a ), 'The holder can submit again.' );
+
+		// The hold lapses.
+		$name = 'beltoft_services_slug_hold_' . substr( md5( 'heldname' ), 0, 20 );
+		update_option( $name, array( 'o' => 'u' . $a, 't' => time() - 1 ), false );
+		$this->assertIsArray( SiteField::resolve( array( 'slug' => 'heldname' ), $b ) );
+
+		// Made for real, the hold is let go and the name is taken in the table.
+		$r = $this->account();
+		Sites::add( $r->id(), 'heldname', 'H', '8.3', 2 );
+		$this->assertFalse( Sites::held_by_other( 'heldname', 'u' . $a ) );
+		$this->assertSame( 'site_taken', SiteField::resolve( array( 'slug' => 'heldname' ), $a )->get_error_code() );
+	}
+
+	public function test_a_provision_whose_name_was_taken_meanwhile_starts_on_a_generated_name(): void {
+		$other = $this->account();
+		Sites::add( $other->id(), 'wanted', 'W', '8.3', 2 );
+
+		$r = $this->resource( array(), array( 'site' => array( 'slug' => 'wanted', 'install' => true ) ) );
+		$this->provision_fully( $r );
+
+		$sites = Sites::for_resource( $r->id() );
+		$this->assertCount( 1, $sites );
+		$this->assertSame( 'w' . $r->id(), $sites[0]['slug'], 'The order is not failed over a name.' );
+	}
+
 	public function test_the_other_limits_may_not_go_down_either(): void {
 		$r = $this->account( array( 'php_memory_mb' => 512, 'backup_days' => 14, 'valkey_mb' => 64, 'files' => 2000000, 'mail_mailboxes' => 5, 'upload_mb' => 100 ) );
 
