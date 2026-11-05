@@ -71,6 +71,25 @@ final class SslNames {
 	}
 
 	/**
+	 * The `ssl_names` meta with the first name's validation method set, when the service keeps such a list (else nothing to save).
+	 *
+	 * @param Resource $r          Resource.
+	 * @param string   $validation Method.
+	 * @return array<string, mixed>
+	 */
+	public static function with_first_validation( Resource $r, string $validation ): array {
+		$list = array_values( array_filter( (array) $r->get( 'ssl_names' ), 'is_array' ) );
+
+		if ( array() === $list ) {
+			return array();
+		}
+
+		$list[0]['validation'] = $validation;
+
+		return array( 'ssl_names' => $list );
+	}
+
+	/**
 	 * Does the service hold a certificate for several names?
 	 *
 	 * @param Resource $r Resource.

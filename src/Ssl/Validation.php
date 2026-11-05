@@ -94,7 +94,7 @@ final class Validation {
 				$rows[ $i ]['status'] = 'manual';
 			}
 
-			return self::told( $r, 'dns', $rows, 'dns', array( 'ssl_validation' => 'dns', 'ssl_validation_auto' => false ) );
+			return self::told( $r, 'dns', $rows, 'dns', array( 'ssl_validation' => 'dns', 'ssl_validation_auto' => false ) + SslNames::with_first_validation( $r, 'dns' ) );
 		}
 
 		foreach ( $rows as $i => $row ) {
@@ -215,37 +215,49 @@ final class Validation {
 	 */
 	private static function publish( Resource $r, array $rows ) {
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
+		// Records this service wrote earlier (kept in ssl_written, which a reset of the rows does not touch): they are still ours.
+		$mine = self::written_list( $r );
 
 		foreach ( $rows as $i => $row ) {
 			// Each record goes into the zone it belongs to (the names of a certificate may be in different zones of the customer).
 			$zone = 'CNAME' === $row['type'] ? SslNames::zone_for( $row['name'], $user ) : null;
 
 			if ( null === $zone ) {
-				self::clean_up( $user, $rows );
+				self::clean_up( $r, $user, $rows );
 
 				return null;
 			}
 
 			$relative = $row['name'] === $zone ? '@' : substr( $row['name'], 0, -strlen( $zone ) - 1 );
 			// A record that is already exactly this one was not written by us, and is never removed by us.
-			$before   = self::holds( $zone, $row['name'], $row['value'] );
+			$was      = self::listed( $mine, $row );
+			$before   = ! $was && self::holds( $zone, $row['name'], $row['value'] );
 			$result   = MailDns::publish( $user, $zone, array( 'name' => $relative, 'type' => 'CNAME', 'ttl' => self::TTL, 'value' => $row['value'] ) );
 
 			if ( is_wp_error( $result ) ) {
-				// The records written so far stay: the next run reads them as present and goes on.
+				// The records written so far stay: the next run reads them as present and goes on, and they are still known as ours.
+				$r->set( array( 'ssl_written' => $mine ) );
+
 				return StepResult::retry( 300, 'The validation record could not be published yet.' );
 			}
 
 			if ( 'ok' !== $result[0] ) {
 				// The customer adds the records by hand, so none of ours is left half done in their zone.
-				self::clean_up( $user, $rows );
+				self::clean_up( $r, $user, $rows );
 
 				return null;
 			}
 
 			$rows[ $i ]['status']  = 'published';
 			$rows[ $i ]['written'] = ! $before;
+
+			if ( ! $before && ! $was ) {
+				$mine[] = array( 'name' => $row['name'], 'value' => $row['value'] );
+			}
 		}
+
+		// Saved with the rows' own save by the caller; saved here too so a crash between the two cannot lose the knowledge.
+		$r->set( array( 'ssl_written' => $mine ) );
 
 		return $rows;
 	}
@@ -317,14 +329,56 @@ final class Validation {
 	 * @param int                               $user Customer.
 	 * @param array<int, array<string, string>> $rows Rows so far.
 	 */
-	private static function clean_up( int $user, array $rows ): void {
-		foreach ( $rows as $row ) {
-			$zone = ! empty( $row['written'] ) && isset( $row['name'] ) ? SslNames::zone_for( (string) $row['name'], $user ) : null;
+	private static function clean_up( Resource $r, int $user, array $rows ): void {
+		$mine = self::written_list( $r );
 
-			if ( null !== $zone ) {
-				self::unpublish( $user, $zone, $row );
+		foreach ( $rows as $row ) {
+			if ( empty( $row['written'] ) || ! isset( $row['name'], $row['value'] ) ) {
+				continue;
+			}
+
+			$zone = SslNames::zone_for( (string) $row['name'], $user );
+
+			if ( null !== $zone && self::unpublish( $user, $zone, $row ) ) {
+				$mine = array_values( array_filter( $mine, static fn( $m ) => ! ( $m['name'] === $row['name'] && $m['value'] === $row['value'] ) ) );
 			}
 		}
+
+		$r->set( array( 'ssl_written' => $mine ) );
+	}
+
+	/**
+	 * The records this service wrote and has not removed (name and value).
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<int, array{name: string, value: string}>
+	 */
+	private static function written_list( Resource $r ): array {
+		$out = array();
+
+		foreach ( array_merge( (array) $r->get( 'ssl_written' ), array_filter( (array) $r->get( 'ssl_validation_rows' ), static fn( $row ) => is_array( $row ) && ! empty( $row['written'] ) ) ) as $row ) {
+			if ( is_array( $row ) && isset( $row['name'], $row['value'] ) && ! self::listed( $out, $row ) ) {
+				$out[] = array( 'name' => (string) $row['name'], 'value' => (string) $row['value'] );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Is the record (name and value) in the list?
+	 *
+	 * @param array<int, array<string, string>> $list List.
+	 * @param array<string, string>             $row  Row.
+	 */
+	private static function listed( array $list, array $row ): bool {
+		foreach ( $list as $one ) {
+			if ( $one['name'] === $row['name'] && $one['value'] === $row['value'] ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -335,8 +389,8 @@ final class Validation {
 	public static function remove_published( Resource $r ): void {
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
 
-		foreach ( (array) $r->get( 'ssl_validation_rows' ) as $row ) {
-			$zone = is_array( $row ) && ! empty( $row['written'] ) && isset( $row['name'], $row['value'] ) ? SslNames::zone_for( (string) $row['name'], $user ) : null;
+		foreach ( self::written_list( $r ) as $row ) {
+			$zone = SslNames::zone_for( $row['name'], $user );
 
 			if ( null !== $zone ) {
 				self::unpublish( $user, $zone, $row );

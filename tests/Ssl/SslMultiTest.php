@@ -247,4 +247,159 @@ class SslMultiTest extends SslTestCase {
 		$this->assertStringNotContainsString( 'approver', $html );
 		$this->assertTrue( Validation::method_of( 'file' ) === 'https' );
 	}
+
+	public function test_a_record_we_wrote_is_still_ours_after_a_validation_change_and_a_reissue(): void {
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_validation' => 'auto' ) ) );
+		( new SslDriver() )->provision( $r );
+		$r    = Resource::find( $r->id() );
+		$row  = $r->get( 'ssl_validation_rows' )[0];
+		$has  = static fn( string $name ) => in_array( $name . '|CNAME', array_map( static fn( $s ) => strtolower( rtrim( (string) $s['name'], '.' ) ) . '|' . $s['type'], (array) \BeltoftServices\Domains\Clients::dns()->zone( 'example.com' )['rrsets'] ), true );
+		$this->assertTrue( $row['written'] );
+
+		// The change resets the rows; the same record is published again and is still ours.
+		$this->assertTrue( $this->apply( $r, Operations::change_validation( $r, array( 'method' => 'dns' ) ) ) instanceof Resource );
+		$this->apply( Resource::find( $r->id() ), Operations::change_validation( Resource::find( $r->id() ), array( 'method' => 'auto' ) ) );
+		$again = Resource::find( $r->id() )->get( 'ssl_validation_rows' )[0];
+		$this->assertSame( 'published', $again['status'] );
+		$this->assertTrue( $again['written'], 'Our own earlier record is not mistaken for one that was there before.' );
+
+		( new SslDriver() )->delete( Resource::find( $r->id() ) );
+		$this->assertFalse( $has( $row['name'] ), 'It goes with the service.' );
+	}
+
+	public function test_a_reissue_that_publishes_a_second_record_leaves_both_known_as_ours(): void {
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$r = $this->built( array( 'user' => $user, 'meta' => array( 'ssl_validation' => 'auto' ) ) );
+		$first = $r->get( 'ssl_validation_rows' )[0];
+		$this->assertTrue( Operations::reissue( $r, array() )->is_done() );
+		$this->now += 120;
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( array(), $fresh->get( 'ssl_validation_rows' ), 'The rows are reset by a reissue.' );
+		Operations::refresh( $fresh );
+		( new SslDriver() );
+		$names = array_column( (array) Resource::find( $r->id() )->get( 'ssl_written' ), 'name' );
+		$this->assertContains( $first['name'], $names, 'The first record stays known.' );
+		( new SslDriver() )->delete( Resource::find( $r->id() ) );
+		$zone = array_map( static fn( $s ) => strtolower( rtrim( (string) $s['name'], '.' ) ), (array) \BeltoftServices\Domains\Clients::dns()->zone( 'example.com' )['rrsets'] );
+		$this->assertNotContains( $first['name'], $zone );
+	}
+
+	public function test_records_written_before_a_temporary_failure_are_kept_as_ours(): void {
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$dns = new class( true ) extends \BeltoftServices\Domains\FakeDns {
+			public int $reads = 0;
+			public bool $fail = true;
+
+			public function zone( string $name ): array|\WP_Error|null {
+				++$this->reads;
+
+				// Row one reads the zone twice (is it there, then the write); the second row's write read fails.
+				return $this->fail && $this->reads >= 4 ? new \WP_Error( 'down', 'DNS is down.' ) : parent::zone( $name );
+			}
+		};
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$r      = $this->ssl_resource( array( 'product' => 40, 'total' => 49.0, 'user' => $user, 'meta' => $this->multi_meta( array( 'auto', 'auto', 'auto' ) ) ) );
+		$result = ( new SslDriver() )->provision( $r );
+		$this->assertFalse( $result->is_done() );
+		$this->assertFalse( $result->is_failed(), 'A temporary failure retries.' );
+		$written = (array) Resource::find( $r->id() )->get( 'ssl_written' );
+		$this->assertCount( 1, $written, 'The record written before the failure is known as ours.' );
+
+		// Once DNS is back the build goes on (the order is already active at the authority), and delete removes the record we wrote.
+		$dns->fail = false;
+		$this->now += 120;
+		$again = ( new SslDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertFalse( $again->is_failed(), $again->error() );
+		$this->apply( Resource::find( $r->id() ), $again );
+		$this->assertCount( 1, (array) Resource::find( $r->id() )->get( 'ssl_written' ) );
+		$this->assertCount( 1, array_filter( (array) $dns->zone( 'example.com' )['rrsets'], static fn( $set ) => 'CNAME' === $set['type'] ) );
+		( new SslDriver() )->delete( Resource::find( $r->id() ) );
+		$left = array_filter( (array) $dns->zone( 'example.com' )['rrsets'], static fn( $set ) => 'CNAME' === $set['type'] );
+		$this->assertSame( array(), $left );
+		remove_all_filters( 'beltoft_services_domains_dns' );
+	}
+
+	public function test_a_one_name_list_on_a_service_takes_a_method_change(): void {
+		$meta = array( 'ssl_names' => array( array( 'name' => 'example.com', 'validation' => 'auto' ) ), 'ssl_validation' => 'auto' );
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => $meta ) );
+		( new SslDriver() )->provision( $r );
+		$r = Resource::find( $r->id() );
+		$this->assertSame( 'REQ', $r->get( 'ssl_status' ) );
+		$this->assertTrue( Operations::change_validation( $r, array( 'method' => 'file' ) )->is_done() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'file', $fresh->get( 'ssl_names' )[0]['validation'] );
+		$put = $this->calls( 'PUT', '#^/ssl/orders/\d+$#' );
+		$this->assertSame( 'https', end( $put )['body']['domain_validation_methods'][0]['method'] );
+	}
+
+	public function test_the_automatic_fallback_to_dns_lands_in_the_name_list_too(): void {
+		$user = (int) self::factory()->user->create();
+		$this->our_zone( $user, 'example.com' );
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
+		$name = '_' . substr( md5( $made['csr'] ), 0, 32 ) . '.example.com';
+		\BeltoftServices\Domains\Clients::dns()->replace_rrsets( 'example.com', array( array( 'name' => $name . '.', 'type' => 'TXT', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '"other"', 'disabled' => false ) ) ) ) );
+		$meta = array( 'ssl_names' => array( array( 'name' => 'example.com', 'validation' => 'auto' ) ), 'ssl_validation' => 'auto', 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'] );
+		$r    = $this->ssl_resource( array( 'user' => $user, 'meta' => $meta ) );
+		( new SslDriver() )->provision( $r );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'dns', $fresh->get( 'ssl_validation' ) );
+		$this->assertSame( 'dns', $fresh->get( 'ssl_names' )[0]['validation'] );
+	}
+
+	public function test_a_multi_domain_order_with_fewer_names_than_included_says_the_included_amount(): void {
+		$meta = $this->multi_meta();
+		$meta['ssl_names'] = array_slice( $meta['ssl_names'], 0, 2 );
+		$r = $this->ssl_resource( array( 'product' => 40, 'total' => 49.0, 'meta' => $meta ) );
+		$this->assertTrue( $this->build( $r )->is_done() );
+		$body = $this->calls( 'POST', '#^/ssl/orders$#' )[0]['body'];
+		$this->assertSame( 3, $body['domain_amount'] );
+		$this->assertCount( 2, $body['domain_validation_methods'] );
+	}
+
+	public function test_a_multi_domain_product_is_never_ordered_with_one_name(): void {
+		$meta = $this->multi_meta();
+		$meta['ssl_names'] = array_slice( $meta['ssl_names'], 0, 1 );
+		$r = $this->ssl_resource( array( 'product' => 40, 'total' => 49.0, 'meta' => $meta ) );
+		$this->assertTrue( ( new SslDriver() )->provision( $r )->is_failed() );
+		$this->assertSame( array(), $this->calls( 'POST', '#^/ssl/orders$#' ) );
+		$one = SslField::resolve( array( 'names' => array( array( 'domain' => 'example.com', 'validation' => 'dns' ) ) ), 0, 'dv', false, '', 3 );
+		$this->assertSame( 'ssl_few', $one->get_error_code() );
+	}
+
+	public function test_trailing_dots_and_case_in_checkout_rows_are_cleaned(): void {
+		$rows = array( array( 'domain' => 'Example.COM.', 'validation' => 'dns' ), array( 'domain' => 'www.example.com.', 'validation' => 'dns' ) );
+		$ok   = SslField::resolve( array( 'names' => $rows ), 0, 'dv', false, '', 3 );
+		$this->assertIsArray( $ok );
+		$this->assertSame( array( 'example.com', 'www.example.com' ), array_column( $ok['names'], 'name' ) );
+		$dup = SslField::resolve( array( 'names' => array( array( 'domain' => 'example.com', 'validation' => 'dns' ), array( 'domain' => 'example.com.', 'validation' => 'dns' ) ) ), 0, 'dv', false, '', 3 );
+		$this->assertSame( 'ssl_duplicate', $dup->get_error_code() );
+	}
+
+	public function test_san_bytes_in_the_subject_are_not_read_as_names(): void {
+		// The subject carries the bytes of the SAN identifier as text; there is no extension.
+		$subject_trick = Csr::generate( "x\x55\x1d\x11y.example.com", array( 'countryName' => 'DK' ) );
+		$this->assertSame( array(), Csr::sans( $subject_trick['csr'] ) );
+		$this->assertSame( array( 'example.com', 'www.example.com' ), Csr::sans( $this->own_csr( array( 'example.com', 'www.example.com' ) ) ) );
+		$this->assertSame( array( '#other' ), Csr::sans( "-----BEGIN CERTIFICATE REQUEST-----\nMAMCAQA=\n-----END CERTIFICATE REQUEST-----" ) );
+	}
+
+	public function test_adopting_an_order_for_a_multi_domain_certificate_needs_the_same_names(): void {
+		$r = $this->ssl_resource( array( 'product' => 40, 'total' => 49.0, 'meta' => $this->multi_meta() ) );
+		$make = function ( array $hosts ) {
+			$csr = $this->own_csr( $hosts );
+			$id  = $this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 40, 'period' => 1, 'csr' => $csr, 'organization_handle' => 'H1', 'domain_amount' => 3, 'domain_validation_methods' => array_map( static fn( $h ) => array( 'host_name' => $h, 'method' => 'dns' ), $hosts ) ) );
+
+			return (int) $id['id'];
+		};
+		$wrong = $make( array( 'example.com', 'www.example.com', 'other.example.com' ) );
+		$this->assertSame( 'mismatch', \BeltoftServices\Ssl\Provision::resolve_marker( $r, $wrong )->get_error_code() );
+		$right = $make( self::NAMES );
+		$this->assertTrue( \BeltoftServices\Ssl\Provision::resolve_marker( Resource::find( $r->id() ), $right ) );
+	}
 }

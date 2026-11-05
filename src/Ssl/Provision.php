@@ -127,8 +127,11 @@ final class Provision {
 
 			$count = count( SslNames::entries( $r ) );
 
-			// A certificate for several names needs a multi domain product, and no more names than its price includes.
-			if ( $count > 1 && ( ! SslCatalog::is_multi( $product ) || $count > SslCatalog::included( $product ) ) ) {
+			// A certificate for several names needs a multi domain product, and no more names than its price includes. A multi
+			// domain product is never ordered with one name (the registrar refuses it: alternative names must be present).
+			$multi = SslCatalog::is_multi( $product );
+
+			if ( ( $count > 1 && ( ! $multi || $count > SslCatalog::included( $product ) ) ) || ( $multi && $count < 2 ) ) {
 				Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about how many names the certificate covers.' );
 
 				return StepResult::fail( 'The certificate product does not cover the number of names ordered.' );
@@ -443,7 +446,8 @@ final class Provision {
 			'technical_handle'          => $handle,
 			'signature_hash_algorithm'  => 'sha2',
 			'software_id'               => 'linux',
-			'domain_amount'             => count( $rows ),
+			// The bundle is priced for its included names: a multi domain order with fewer names still says so (the sandbox takes both).
+			'domain_amount'             => SslCatalog::is_multi( $product ) ? max( count( $rows ), SslCatalog::included( $product ) ) : count( $rows ),
 			'domain_validation_methods' => $rows,
 			'autorenew'                 => 'off',
 			'start_provision'           => false,
@@ -510,6 +514,16 @@ final class Provision {
 
 		if ( strtolower( (string) ( $detail['common_name'] ?? '' ) ) !== strtolower( (string) $r->get( 'ssl_name' ) ) || in_array( (string) ( $detail['status'] ?? '' ), self::DEAD, true ) ) {
 			return new \WP_Error( 'mismatch', 'That order is not a live order for this name.' );
+		}
+
+		// A certificate for several names must carry exactly the ordered names, not only the same common name.
+		$wanted = array_map( 'strtolower', array_column( SslNames::entries( $r ), 'name' ) );
+		$have   = array_map( static fn( $n ) => strtolower( (string) $n ), (array) ( $detail['host_names'] ?? array() ) );
+		sort( $wanted );
+		sort( $have );
+
+		if ( count( $wanted ) > 1 && $wanted !== $have ) {
+			return new \WP_Error( 'mismatch', 'That order does not cover exactly the names of this certificate.' );
 		}
 
 		$steps = array_values( array_unique( array_merge( (array) $r->get( 'steps' ), array( 'order' ) ) ) );

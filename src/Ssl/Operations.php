@@ -303,7 +303,8 @@ final class Operations {
 
 		$next = array( 'ssl_validation' => $entries[0]['validation'], 'ssl_approver' => (string) $approver, 'ssl_action_sent' => null, 'ssl_validation_rows' => array() );
 
-		if ( $multi ) {
+		// Whenever the service keeps a name list (even of one name) the change lands there, the place entries() reads.
+		if ( $multi || array() !== (array) $r->get( 'ssl_names' ) ) {
 			$next['ssl_names'] = array_map( static fn( $e ) => array( 'name' => $e['name'], 'validation' => $e['validation'] ), $entries );
 		}
 

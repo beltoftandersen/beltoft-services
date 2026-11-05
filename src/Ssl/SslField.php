@@ -232,6 +232,11 @@ final class SslField {
 			return new \WP_Error( 'ssl_domain', __( 'Enter the domain names for the certificate, for example example.com.', 'beltoft-services' ) );
 		}
 
+		// The registrar refuses a multi domain order with a single name, so one name is a job for a single name certificate.
+		if ( count( $entries ) < 2 ) {
+			return new \WP_Error( 'ssl_few', __( 'This certificate is for several names. Enter at least two, or choose a certificate for one name.', 'beltoft-services' ) );
+		}
+
 		if ( count( $entries ) > $max ) {
 			/* translators: %d: number of names. */
 			return new \WP_Error( 'ssl_too_many', sprintf( _n( 'This certificate covers up to %d name.', 'This certificate covers up to %d names.', $max, 'beltoft-services' ), $max ) );

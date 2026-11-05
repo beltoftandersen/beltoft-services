@@ -238,7 +238,9 @@ final class FakeModel {
 		}
 
 		// The sandbox accepts any number of names; this model refuses what the product cannot hold, so a test sees a wrong order.
-		if ( count( $hosts ) > max( 1, (int) $p['max'] ) || count( $hosts ) !== (int) ( $body['domain_amount'] ?? count( $hosts ) ) ) {
+		$amount = (int) ( $body['domain_amount'] ?? count( $hosts ) );
+
+		if ( count( $hosts ) > max( 1, (int) $p['max'] ) || $amount < count( $hosts ) || $amount > max( 1, (int) $p['max'] ) ) {
 			return self::error( 1000, 'domain_amount does not match the names or the product.', 400 );
 		}
 
@@ -285,6 +287,11 @@ final class FakeModel {
 			}
 
 			$level = self::products()[ (int) $order['product_id'] ]['method'];
+
+			// The sandbox: a multi domain order needs alternative names (code 1029 at start).
+			if ( 'multi_domain' === self::products()[ (int) $order['product_id'] ]['category'] && count( (array) $order['host_names'] ) < 2 ) {
+				return self::error( 1029, 'Alternative names must be specified for multidomain certificate', 400 );
+			}
 			$dn    = openssl_csr_get_subject( (string) $order['csr'], true );
 
 			// The sandbox refuses a request without a valid country, DV included (code 1099, the text keeps its %s).
