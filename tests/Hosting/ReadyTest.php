@@ -126,7 +126,7 @@ class ReadyTest extends HostingCase {
 		$email->trigger( Resource::find( $r->id() ) );
 		$this->assertStringContainsString( 'Connect your domain', (string) $this->mails[0]['message'] );
 		$this->assertStringContainsString( 'www.elsewhere.example', (string) $this->mails[0]['message'] );
-		$this->assertStringContainsString( 'Email is included with your plan', (string) $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'so your websites can send mail', (string) $this->mails[0]['message'] );
 	}
 
 	public function test_a_resource_that_is_not_hosting_gets_no_hosting_facts(): void {

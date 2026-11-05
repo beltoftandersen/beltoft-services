@@ -360,7 +360,7 @@ class AccountTest extends HostingCase {
 		$this->assertStringContainsString( 'www.outside.example (waiting for DNS)', $html );
 		$this->assertStringContainsString( 'Blog (blog)', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
-		$this->assertStringContainsString( 'Email is included with your plan', $html );
+		$this->assertStringContainsString( 'so your websites can send mail', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 
 		$a->enable_mail( 'mine.example' );

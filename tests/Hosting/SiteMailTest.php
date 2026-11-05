@@ -292,64 +292,32 @@ class SiteMailTest extends HostingCase {
 
 	// -- The fallback sender --------------------------------------------------------------------
 
-	public function test_every_account_without_email_lite_gets_its_own_fallback_mailbox(): void {
-		$this->preview_mail_domain();
-		$r = $this->resource( array( 'site_mail_per_day' => 150 ) );
-		$this->provision_fully( $r );
-		$other = $this->resource( array( 'site_mail_per_day' => 150 ) );
-		$this->provision_fully( $other );
-
-		$one = 'wp-c' . $r->id() . '@preview.example.test';
-		$two = 'wp-c' . $other->id() . '@preview.example.test';
-		$this->assertSame( $one, SiteMail::fallback_address( $r->id() ) );
-		$this->assertNotNull( $this->mailcow->mailbox( $one ) );
-		$this->assertNotNull( $this->mailcow->mailbox( $two ) );
-
-		$smtp = $this->agent->calls_of( 'mail.smtp' );
-		$this->assertCount( 2, $smtp );
-		$this->assertSame( array( $one, $two ), array( $smtp[0]['args']['user'], $smtp[1]['args']['user'] ) );
-		$this->assertSame( '***', $smtp[0]['args']['password'] );
-
-		// No credential is shared: each account has its own random password, kept encrypted in its own meta only.
-		$a = (string) Resource::find( $r->id() )->get( 'smtp_fb_secret' );
-		$b = (string) Resource::find( $other->id() )->get( 'smtp_fb_secret' );
-		$this->assertNotSame( $a, $b );
-		$this->assertStringStartsWith( 'bs1:', $a );
-		$this->assertNotSame( Crypto::decrypt( $a ), Crypto::decrypt( $b ) );
-		$this->assertStringNotContainsString( (string) Crypto::decrypt( $a ), (string) wp_json_encode( $this->agent->state() ) );
-		$this->assertSame( array( 'mode' => 'fallback', 'address' => $one ), Resource::find( $r->id() )->get( 'mail_sender' ) );
-		$this->assertArrayNotHasKey( 'hosting_noreply_password', Settings::fields(), 'The shared password setting is gone.' );
-
-		$limit = array_filter( $this->mailcow->calls_of( 'set_mailbox_rate_limit' ), static fn( $c ) => ( $c[1] ?? null ) === $one );
-		$this->assertNotEmpty( $limit, 'The plan\'s daily cap is set on the mailbox.' );
-	}
-
-	public function test_the_fallback_is_skipped_quietly_without_a_mail_host_a_zone_or_a_mail_domain(): void {
-		$r = $this->resource();
-		$this->provision_fully( $r );
-		$this->assertCount( 0, $this->agent->calls_of( 'mail.smtp' ), 'The zone is not a mail domain: nothing made, and provisioning still finishes.' );
-
-		$this->preview_mail_domain();
-		$this->settings( array( 'mail_host' => '' ) );
-		$other = $this->resource();
-		$this->provision_fully( $other );
-		$this->assertCount( 0, $this->agent->calls_of( 'mail.smtp' ), 'No mail host.' );
-
-		$this->settings( array( 'mail_host' => 'mail.example.net', 'hosting_preview_zone' => '' ) );
-		$this->assertSame( '', SiteMail::fallback_address( $r->id() ), 'No preview zone.' );
-	}
-
-	public function test_the_fallback_mailbox_is_deleted_with_the_account(): void {
-		$this->preview_mail_domain();
+	public function test_without_email_lite_a_website_has_no_sender_and_nothing_is_made_on_the_mail_server(): void {
+		// Even when the preview zone is a mail domain, no mailbox is made for the account and the container gets no mail settings.
+		$this->mailcow->add_domain( array( 'domain' => 'preview.example.test' ) );
 		$r = $this->resource();
 		$this->provision_fully( $r );
 		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
-		$address = SiteMail::fallback_address( $r->id() );
-		$this->assertNotNull( $this->mailcow->mailbox( $address ) );
+		$r = Resource::find( $r->id() );
 
-		$result = $this->driver->delete( Resource::find( $r->id() ) );
-		$this->assertTrue( $result->is_done(), $result->error() );
-		$this->assertNull( $this->mailcow->mailbox( $address ) );
+		$this->assertCount( 0, $this->agent->calls_of( 'mail.smtp' ) );
+		$this->assertNull( $r->get( 'mail_sender' ) );
+		$this->assertSame( array(), $this->mailcow->list_mailboxes( 'preview.example.test' ), 'No mailbox on the preview zone.' );
+		$this->assertSame( array(), $this->mailcow->calls_of( 'add_mailbox' ) );
+		$this->assertArrayNotHasKey( 'hosting_noreply_password', Settings::fields(), 'No shared sender credential exists.' );
+
+		// The account says so plainly and offers Email lite.
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		ob_start();
+		\BeltoftServices\Hosting\HostingAccount::render( $r );
+		$html = (string) ob_get_clean();
+		wp_set_current_user( 0 );
+		$this->assertStringContainsString( 'Set up Email lite so your websites can send mail', $html );
+		$this->assertStringContainsString( 'data-hosting-action="enable_mail"', $html );
+
+		// Deleting the account has no mail step to run.
+		$this->assertTrue( $this->driver->delete( Resource::find( $r->id() ) )->is_done() );
+		$this->assertSame( array(), $this->mailcow->calls_of( 'delete_mailbox' ) );
 	}
 
 	// -- The account action and route -----------------------------------------------------------

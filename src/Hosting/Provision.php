@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * (linked, tagged with the ownership line), configure (limits, network, firewall options, root disk), start,
  * prepare (the agent's ct.prepare), db (db.create on the shared database server), site (site.create and
  * site.wp_install), edge (edge.apply), dns (the preview name, SiteDns), verify (a loopback request inside the
- * container through the agent), mail (the fallback sender for website mail), ready. Not done: the request through the public edge address, which needs a live node.
+ * container through the agent), mail (no step work: website mail needs Email lite), ready. Not done: the request through the public edge address, which needs a live node.
  *
  * Proxmox endpoints (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html#<path>):
  * /cluster/resources, /cluster/nextid, /nodes/{node}/lxc/{vmid}/clone, .../config (GET, PUT), .../resize,
@@ -733,13 +733,14 @@ final class Provision {
 	}
 
 	/**
-	 * Step mail: website mail goes out through our mail server from the account's own fallback mailbox (SiteMail).
-	 * Nothing happens until the mail host is set and the preview zone is a mail domain, and the step does not wait for them.
+	 * Step mail: nothing. A website can send mail only once Email lite is set up (SiteMail::enable_system_mailbox, from the
+	 * account); no mailbox is made here, none on the preview zone. The step stays in the list so accounts made earlier
+	 * keep their step records.
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */
 	private function step_mail() {
-		return ( new SiteMail( $this->r ) )->use_fallback();
+		return array();
 	}
 
 	/**

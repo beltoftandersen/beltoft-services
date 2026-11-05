@@ -62,7 +62,7 @@ if ( ! empty( $beltoft_services_h['dns_records'] ) ) {
 echo __( 'Open your hosting in My Account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 
 if ( empty( $beltoft_services_h['has_email'] ) ) {
-	echo __( 'Email is included with your plan. You can set it up for your domain in My Account.', 'beltoft-services' ) . "\n\n";
+	echo __( 'Set up Email lite in My Account so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' ) . "\n\n";
 }
 
 if ( $additional_content ) {

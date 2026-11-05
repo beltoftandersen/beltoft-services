@@ -71,7 +71,7 @@ if ( '' !== $customer_name ) {
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your hosting in My Account', 'beltoft-services' ); ?></a></p>
 <?php if ( empty( $beltoft_services_h['has_email'] ) ) : ?>
-<p><?php esc_html_e( 'Email is included with your plan. You can set it up for your domain in My Account.', 'beltoft-services' ); ?></p>
+<p><?php esc_html_e( 'Set up Email lite in My Account so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
 <?php
 

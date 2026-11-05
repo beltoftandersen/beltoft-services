@@ -238,7 +238,7 @@ final class HostingAccount {
 		if ( $mail ) {
 			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) );
 		} else {
-			echo esc_html__( 'Email is included with your plan. Set it up for your domain when you are ready.', 'beltoft-services' );
+			echo esc_html__( 'Set up Email lite so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' );
 
 			if ( $ready ) {
 				echo ' <input type="text" data-hosting-field="mail_domain" placeholder="example.com" aria-label="' . esc_attr__( 'Domain for email', 'beltoft-services' ) . '"> <button type="button" data-hosting-action="enable_mail">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</button>';
