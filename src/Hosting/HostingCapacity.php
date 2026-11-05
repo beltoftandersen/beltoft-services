@@ -122,6 +122,29 @@ final class HostingCapacity {
 	}
 
 	/**
+	 * Does an upgrade fit on the node the account is on? Only the growth counts (the account already holds the old plan).
+	 *
+	 * @param string                         $node_id Node record id.
+	 * @param array<string, int|string|bool> $have    Typed current plan.
+	 * @param array<string, int|string|bool> $target  Typed target plan.
+	 */
+	public static function fits_upgrade( string $node_id, array $have, array $target ): bool {
+		$u = self::usage( $node_id );
+
+		if ( null === $u ) {
+			return false;
+		}
+
+		$old = self::cost( $have );
+		$new = self::cost( $target );
+
+		$memory = $new['memory'] - $old['memory'];
+		$disk   = $new['disk'] - $old['disk'];
+
+		return ( $memory <= 0 || $u['memory_budget'] - $u['memory_committed'] >= $memory ) && ( $disk <= 0 || $u['disk_budget'] - $u['disk_committed'] >= $disk );
+	}
+
+	/**
 	 * The node for a new account: of the plan's group, enabled, with room, and the most free memory (the first
 	 * in stored order on a tie).
 	 *

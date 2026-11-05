@@ -333,6 +333,27 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringContainsString( 'different server group', (string) HostingSwitch::refusal( $r, $this->target( $r, array( 'node_group' => 'g9' ) ) ) );
 	}
 
+	public function test_the_other_limits_may_not_go_down_either(): void {
+		$r = $this->account( array( 'php_memory_mb' => 512, 'backup_days' => 14, 'valkey_mb' => 64, 'files' => 2000000, 'mail_mailboxes' => 5, 'upload_mb' => 100 ) );
+
+		foreach ( array( 'php_memory_mb' => 256, 'backup_days' => 7, 'valkey_mb' => 0, 'files' => 1000, 'mail_mailboxes' => 2, 'upload_mb' => 50 ) as $key => $less ) {
+			$this->assertStringContainsString( "can't be made smaller", (string) HostingSwitch::refusal( $r, $this->target( $r, array( $key => $less ) ) ), $key );
+		}
+	}
+
+	public function test_an_upgrade_that_does_not_fit_the_accounts_node_is_refused_with_a_clear_message(): void {
+		$r = $this->account( array( 'memory_mb' => 1024, 'disk_gb' => 10 ) );
+
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'memory_mb' => 2048 ) ) ), 'Room on the node.' );
+
+		$node = (array) \BeltoftServices\Hosting\Nodes::get( 'n1' );
+		$this->save_node( array( 'mem_gb' => (int) $node['mem_gb'] > 0 ? 1 : 1 ) ); // A node with no memory left after the reserve.
+		$refusal = HostingSwitch::refusal( $r, $this->target( $r, array( 'memory_mb' => 8192 ) ) );
+
+		$this->assertStringContainsString( 'cannot be added to your server', (string) $refusal );
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array() ) ), 'No growth, no refusal.' );
+	}
+
 	public function test_fewer_websites_than_in_use_is_refused(): void {
 		$r = $this->account( array( 'sites' => 3 ) );
 		Sites::add( $r->id(), 'second', 'S', '8.3', 2 );
@@ -344,7 +365,7 @@ class CheckoutTest extends HostingCase {
 	public function test_the_wcs_filter_refuses_before_payment_and_leaves_other_products_alone(): void {
 		$r        = $this->account( array( 'disk_gb' => 20, 'sites' => 3 ) );
 		$small    = $this->product( array( 'disk_gb' => 10, 'sites' => 3 ) );
-		$big      = $this->product( array( 'disk_gb' => 40, 'sites' => 3 ) );
+		$big      = $this->product( array( 'disk_gb' => 40, 'sites' => 3, 'valkey_mb' => 64 ) );
 		$license  = $r->license();
 
 		\BeltoftLicenses\Licenses::update( (int) $license['id'], array( 'subscription_id' => 4242 ) );

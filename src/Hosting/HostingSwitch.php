@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
 final class HostingSwitch {
 
 	/** Plan values that may not go down, with the words for the customer. */
-	private const KEYS = array( 'disk_gb', 'memory_mb', 'cores', 'php_workers' );
+	private const KEYS = array( 'disk_gb', 'memory_mb', 'cores', 'php_workers', 'php_memory_mb', 'upload_mb', 'backup_days', 'valkey_mb', 'files', 'mail_mailboxes', 'mail_quota_mb', 'mail_aliases', 'mail_per_minute', 'site_mail_per_day' );
 
 	public static function register(): void {
 		add_filter( 'woocommerce_subscriptions_switch_error_message', array( __CLASS__, 'check' ), 10, 6 );
@@ -91,12 +91,18 @@ final class HostingSwitch {
 
 		foreach ( self::KEYS as $key ) {
 			if ( (int) $have[ $key ] > (int) $target[ $key ] ) {
-				return __( "Hosting plans can't be made smaller. Choose a plan with at least as much storage, memory, CPU and PHP workers as you have now, or contact support to move to a smaller plan.", 'beltoft-services' );
+				return __( "Hosting plans can't be made smaller. Choose a plan with at least as much of everything (storage, memory, CPU, PHP workers and memory, backups, mail) as you have now, or contact support to move to a smaller plan.", 'beltoft-services' );
 			}
 		}
 
 		if ( count( Sites::for_resource( $resource->id() ) ) > (int) $target['sites'] ) {
 			return __( 'This plan has fewer websites than you have now. Remove a website first, or choose a larger plan.', 'beltoft-services' );
+		}
+
+		$record = Records::for_resource( $resource->id() );
+
+		if ( $record && ! HostingCapacity::fits_upgrade( (string) $record['node'], $have, $target ) ) {
+			return __( 'This plan cannot be added to your server right now. Contact support and we will move your hosting.', 'beltoft-services' );
 		}
 
 		return null;
