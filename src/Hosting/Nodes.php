@@ -44,6 +44,10 @@ final class Nodes {
 			'agent_key_id'  => '',
 			'agent_key'     => '',
 			'agent_pin'     => '',
+			'agent_tenant'  => 'hosting',
+			'agent_client_cert' => '',
+			'agent_client_key' => '',
+			'agent_ca'      => '',
 			'pool'          => '',
 			'storage'       => '',
 			'bridge'        => '',
@@ -68,7 +72,7 @@ final class Nodes {
 	/**
 	 * Fields that hold a secret: encrypted at rest.
 	 */
-	public const SECRETS = array( 'token_secret', 'agent_key' );
+	public const SECRETS = array( 'token_secret', 'agent_key', 'agent_client_key' );
 
 	/**
 	 * Every node by id, the secrets still encrypted. A node stored as live reads as fake unless wp-config.php
@@ -240,6 +244,28 @@ final class Nodes {
 
 		$clean['agent_key_id'] = $key_id;
 
+		$tenant = trim( (string) ( $input['agent_tenant'] ?? $clean['agent_tenant'] ) );
+
+		if ( 1 !== preg_match( '/^[A-Za-z0-9._:-]{1,120}$/D', $tenant ) ) {
+			return self::error( 'agent_tenant', __( 'The agent tenant is 1 to 120 characters: letters, numbers, dots, colons, dashes and underscores.', 'beltoft-services' ) );
+		}
+
+		$clean['agent_tenant'] = $tenant;
+
+		foreach ( array(
+			'agent_client_cert' => __( 'The agent client certificate', 'beltoft-services' ),
+			'agent_ca'          => __( 'The agent CA certificate', 'beltoft-services' ),
+		) as $key => $name ) {
+			$pem = trim( str_replace( "\r", '', (string) ( $input[ $key ] ?? $clean[ $key ] ) ) );
+
+			if ( '' !== $pem && ( 0 !== strpos( $pem, '-----BEGIN CERTIFICATE-----' ) || false === strpos( $pem, '-----END CERTIFICATE-----' ) || strlen( $pem ) > 20000 ) ) {
+				/* translators: %s: field name. */
+				return self::error( $key, sprintf( __( '%s must be a PEM certificate (starting with BEGIN CERTIFICATE).', 'beltoft-services' ), $name ) );
+			}
+
+			$clean[ $key ] = $pem;
+		}
+
 		$ca = trim( (string) ( $input['ca_file'] ?? '' ) );
 
 		if ( '' !== $ca && ( '/' !== $ca[0] || false !== strpos( $ca, "\0" ) || ! is_file( $ca ) || ! is_readable( $ca ) ) ) {
@@ -385,6 +411,7 @@ final class Nodes {
 		foreach ( array(
 			'token_secret' => array( 'token_secret', __( 'The token secret', 'beltoft-services' ) ),
 			'agent_key'    => array( 'agent_key', __( 'The agent key', 'beltoft-services' ) ),
+			'agent_client_key' => array( 'agent_client_key', __( 'The agent client key', 'beltoft-services' ) ),
 		) as $key => $names ) {
 			$secret = self::clean_secret( $input, (string) ( $existing[ $key ] ?? '' ), $key, $names[1] );
 
@@ -397,6 +424,10 @@ final class Nodes {
 
 		if ( '' === (string) $clean['token_secret'] || '' === (string) $clean['agent_key'] ) {
 			return self::error( 'secret', __( 'A node needs a token secret and an agent key.', 'beltoft-services' ) );
+		}
+
+		if ( '' !== (string) $clean['agent_client_key'] && false === strpos( (string) Crypto::decrypt( (string) $clean['agent_client_key'] ), '-----BEGIN' ) ) {
+			return self::error( 'agent_client_key', __( 'The agent client key must be a PEM private key.', 'beltoft-services' ) );
 		}
 
 		$all[ $id ] = $clean;

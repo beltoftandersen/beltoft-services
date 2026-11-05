@@ -197,17 +197,23 @@ class NodesTest extends HostingCase {
 			}
 		}
 
-		// With the tag as well: still no live client exists, and no fake is handed back.
+		// With the tag as well: the node API has no live client, and no fake is handed back. The agent client
+		// refuses a node whose mutual TLS settings are incomplete.
 		$this->settings( array( 'site_tag' => 'tagone' ) );
 		$this->assertNull( Clients::gate( 'n1', $node, true ) );
 
-		foreach ( array( 'build_node', 'build_agent' ) as $build ) {
-			try {
-				Clients::$build( $node, true );
-				$this->fail( $build . ' built a client for a live node.' );
-			} catch ( \RuntimeException $e ) {
-				$this->assertStringContainsString( 'No live hosting client', $e->getMessage() );
-			}
+		try {
+			Clients::build_node( $node, true );
+			$this->fail( 'build_node built a client for a live node.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertStringContainsString( 'No live hosting client', $e->getMessage() );
+		}
+
+		try {
+			Clients::build_agent( $node, true );
+			$this->fail( 'build_agent built a client for a live node without a certificate.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertStringContainsString( 'mutual TLS', $e->getMessage() );
 		}
 	}
 

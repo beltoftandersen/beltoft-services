@@ -32,6 +32,7 @@ final class NodesScreen {
 			'pve_node'     => array( __( 'Node name', 'beltoft-services' ), __( 'The Proxmox name of the node.', 'beltoft-services' ) ),
 			'agent_url'    => array( __( 'Agent address', 'beltoft-services' ), __( 'https only, with the port and no path.', 'beltoft-services' ) ),
 			'agent_key_id' => array( __( 'Agent key id', 'beltoft-services' ), '' ),
+			'agent_tenant' => array( __( 'Agent tenant', 'beltoft-services' ), __( 'Sent with every request; must match the tenant in the agent configuration if that is set.', 'beltoft-services' ) ),
 			'ca_file'      => array( __( 'CA file', 'beltoft-services' ), __( 'Optional absolute path to a certificate authority file.', 'beltoft-services' ) ),
 			'pin_sha256'   => array( __( 'Node public key pin', 'beltoft-services' ), __( 'Optional: base64 of the SHA-256 hash.', 'beltoft-services' ) ),
 			'agent_pin'    => array( __( 'Agent public key pin', 'beltoft-services' ), __( 'Optional: base64 of the SHA-256 hash.', 'beltoft-services' ) ),
@@ -271,6 +272,25 @@ final class NodesScreen {
 	}
 
 	/**
+	 * A row for PEM text (a certificate, or a private key that is never shown again).
+	 *
+	 * @param string $name  Field name.
+	 * @param string $label Label.
+	 * @param string $value Text to show (never a secret).
+	 * @param bool   $saved Whether a secret is saved (the private key row).
+	 */
+	private static function pem_row( string $name, string $label, string $value, bool $saved ): void {
+		printf(
+			'<tr><th scope="row"><label for="bs_%1$s">%2$s</label></th><td><textarea id="bs_%1$s" name="%1$s" rows="4" class="large-text code" autocomplete="off" spellcheck="false" placeholder="%3$s">%4$s</textarea><p class="description">%5$s</p></td></tr>',
+			esc_attr( $name ),
+			esc_html( $label ),
+			esc_attr( $saved ? __( 'Saved', 'beltoft-services' ) : '' ),
+			esc_textarea( $value ),
+			esc_html__( 'Paste the PEM text. For mutual TLS with the node agent. A saved private key is never shown; leave empty to keep it.', 'beltoft-services' )
+		);
+	}
+
+	/**
 	 * The add or edit form.
 	 *
 	 * @param string $id Node id, empty to add.
@@ -301,8 +321,11 @@ final class NodesScreen {
 				self::secret_row( 'token_secret', __( 'API token secret', 'beltoft-services' ), '' !== $id && Nodes::has_secret( $id ) );
 			}
 
-			if ( 'agent_key_id' === $key ) {
+			if ( 'agent_tenant' === $key ) {
 				self::secret_row( 'agent_key', __( 'Agent key', 'beltoft-services' ), '' !== $id && Nodes::has_secret( $id, 'agent_key' ) );
+				self::pem_row( 'agent_client_cert', __( 'Agent client certificate', 'beltoft-services' ), (string) $n['agent_client_cert'], false );
+				self::pem_row( 'agent_client_key', __( 'Agent client key', 'beltoft-services' ), '', '' !== $id && Nodes::has_secret( $id, 'agent_client_key' ) );
+				self::pem_row( 'agent_ca', __( 'Agent CA certificate', 'beltoft-services' ), (string) $n['agent_ca'], false );
 			}
 		}
 

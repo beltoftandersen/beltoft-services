@@ -17,9 +17,9 @@ defined( 'ABSPATH' ) || exit;
  * node to say "live" AND the constant BELTOFT_SERVICES_HOSTING_LIVE to be true in wp-config.php AND an explicit
  * site tag. No filter can switch it on.
  *
- * In this version no live client exists: a node that is live and allowed gets a RuntimeException from build(),
- * never a fake that would report success. The first live client is a later slice, built only after the read-only
- * checks of the plan.
+ * The agent has a live client (LiveAgent). The node API has none yet: a node that is live and allowed gets a
+ * RuntimeException from build_node(), never a fake that would report success. A live agent client without the node
+ * API client is not used by the driver, which builds both (Runs::connect()).
  */
 final class Clients {
 
@@ -124,7 +124,15 @@ final class Clients {
 	 * @throws \RuntimeException For a live node or a live node without a site tag.
 	 */
 	public static function build_agent( array $node, bool $allowed ): Agent {
-		self::refuse_live( $node, $allowed );
+		if ( self::untagged( $node, $allowed ) ) {
+			throw new \RuntimeException( 'The site tag is not set.' );
+		}
+
+		// The only place a live agent client is built: the node says live, the constant allows it and the site
+		// tag is set. LiveAgent refuses again without the allowance, and without a complete mutual TLS setup.
+		if ( 'live' === self::kind( $node, $allowed ) ) {
+			return new LiveAgent( $node, $allowed );
+		}
 
 		$agent  = new FakeAgent( ! empty( $node['persist'] ) );
 		$public = self::public_view( $node );
