@@ -60,6 +60,8 @@ final class Plugin {
 		Hosting\HostingSettings::register();
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();
+		Hosting\SiteField::register();
+		Hosting\HostingSwitch::register();
 		Children::register();
 		Domains\DomainSettings::register();
 		Mail\MailSettings::register();

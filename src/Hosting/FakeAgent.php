@@ -85,6 +85,7 @@ class FakeAgent implements Agent {
 			'title'       => array( 'string', true ),
 			'admin_user'  => array( 'ident', true ),
 			'admin_email' => array( 'string', true ),
+			'locale'      => array( 'string', false ),
 		),
 		'site.verify'       => array(
 			'vmid' => array( 'vmid', true ),

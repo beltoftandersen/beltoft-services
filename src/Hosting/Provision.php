@@ -554,6 +554,7 @@ final class Provision {
 					'title'       => '' !== $spec['label'] ? $spec['label'] : $spec['slug'],
 					'admin_user'  => $spec['admin_user'],
 					'admin_email' => $spec['admin_email'],
+					'locale'      => $spec['language'],
 				)
 			);
 
@@ -618,6 +619,37 @@ final class Provision {
 		}
 
 		SiteDomains::set_state( $host, 'active' );
+
+		return $this->attach_domain( $spec, $site );
+	}
+
+	/**
+	 * The domain the order named: a name on our name servers is written now, an external one waits for the customer.
+	 * A name that cannot be attached (taken since, not valid) is left out and the site still goes live on its
+	 * temporary address; the customer can add it again from the account.
+	 *
+	 * @param array<string, mixed> $spec Site spec.
+	 * @param array<string, mixed> $site Site record.
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function attach_domain( array $spec, array $site ) {
+		if ( '' === (string) $spec['domain'] || null !== SiteDomains::find( (string) $spec['domain'] ) ) {
+			return array();
+		}
+
+		$added = SiteDns::add_domain( $this->r, (string) $site['slug'], (string) $spec['domain'], $this->node );
+
+		if ( is_wp_error( $added ) ) {
+			return StepResult::retry( 0, 'dns: ' . $this->scrub( $added->get_error_message(), 160 ) );
+		}
+
+		if ( is_array( $added ) && 'active' === $added['state'] ) {
+			$edge = $this->agent_call( 'edge_domain', 'edge.apply', array( 'account' => Config::account( $this->r->id() ), 'routes' => EdgeMap::routes( $this->r->id(), false ) ) );
+
+			if ( $edge instanceof StepResult ) {
+				return $edge;
+			}
+		}
 
 		return array();
 	}
@@ -699,7 +731,9 @@ final class Provision {
 			'php'         => 1 === preg_match( '/^\d\.\d{1,2}$/D', (string) ( $given['php'] ?? '' ) ) ? (string) $given['php'] : Config::get( 'php_default' ),
 			'install'     => ! array_key_exists( 'install', $given ) || ! empty( $given['install'] ),
 			'admin_user'  => 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', (string) ( $given['admin_user'] ?? '' ) ) ? (string) $given['admin_user'] : Config::admin_user(),
-			'admin_email' => sanitize_email( (string) ( $given['admin_email'] ?? ( $license['email'] ?? '' ) ) ),
+			'admin_email' => sanitize_email( (string) ( '' !== (string) ( $given['admin_email'] ?? '' ) ? $given['admin_email'] : ( $license['email'] ?? '' ) ) ),
+			'language'    => 1 === preg_match( '/^[a-z]{2,3}(_[A-Z]{2})?$/D', (string) ( $given['language'] ?? '' ) ) ? (string) $given['language'] : 'en_US',
+			'domain'      => isset( $given['domain'] ) ? strtolower( (string) $given['domain'] ) : '',
 		);
 
 		if ( '' === $spec['admin_email'] ) {

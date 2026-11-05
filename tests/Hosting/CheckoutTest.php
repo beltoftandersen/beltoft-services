@@ -1,0 +1,365 @@
+<?php
+/**
+ * The "Your website" checkout step and upgrade-only plan changes of hosting.
+ *
+ * @package BeltoftServices
+ */
+
+namespace BeltoftServices\Tests\Hosting;
+
+require_once __DIR__ . '/HostingCase.php';
+
+use BeltoftServices\Domains\DomainDriver;
+use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Hosting\HostingSwitch;
+use BeltoftServices\Hosting\Records;
+use BeltoftServices\Hosting\SiteDomains;
+use BeltoftServices\Hosting\SiteField;
+use BeltoftServices\Hosting\Sites;
+use BeltoftServices\Product;
+use BeltoftServices\Resource;
+
+/**
+ * SiteField and HostingSwitch.
+ */
+class CheckoutTest extends HostingCase {
+
+	public function tear_down(): void {
+		unset( $_POST[ SiteField::POST_KEY ] );
+
+		if ( function_exists( 'WC' ) && WC()->cart ) {
+			WC()->cart->empty_cart();
+		}
+
+		parent::tear_down();
+	}
+
+	/**
+	 * A hosting product.
+	 *
+	 * @param array<string, mixed> $plan Plan overrides.
+	 */
+	private function product( array $plan = array() ): \WC_Product {
+		return $this->service_product( 'hosting', array_merge( array( 'node_group' => 'g1', 'sites' => 3, 'disk_gb' => 10, 'cores' => 2, 'memory_mb' => 2048 ), $plan ), array( 'slug' => 'wp-' . wp_generate_password( 4, false ) ) );
+	}
+
+	private function in_cart( \WC_Product $product ): string {
+		WC()->cart->empty_cart();
+		$key = WC()->cart->add_to_cart( $product->get_id() );
+
+		if ( ! $key ) {
+			$this->markTestSkipped( 'The fixture product cannot be put in the cart here.' );
+		}
+
+		return (string) $key;
+	}
+
+	/**
+	 * @param array<string, string> $values Posted values of one line.
+	 */
+	private function post( string $key, array $values ): void {
+		if ( ! did_action( 'woocommerce_checkout_process' ) ) {
+			do_action( 'woocommerce_checkout_process' );
+		}
+
+		$_POST[ SiteField::POST_KEY ] = array( $key => $values );
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private function errors(): array {
+		$errors = new \WP_Error();
+		SiteField::validate( array(), $errors );
+
+		return $errors->get_error_messages();
+	}
+
+	public function test_only_hosting_lines_are_offered_the_step_and_a_renewal_asks_nothing(): void {
+		$this->assertSame( array(), SiteField::cart_lines() );
+		$this->assertTrue( SiteField::is_hosting_product( $this->product()->get_id() ) );
+		$this->assertFalse( SiteField::is_hosting_product( $this->service_product( 'fake' )->get_id() ) );
+		$this->assertFalse( SiteField::is_hosting_product( 0 ) );
+
+		$key = $this->in_cart( $this->product() );
+		$this->assertSame( array( $key ), array_keys( SiteField::cart_lines() ) );
+
+		WC()->cart->cart_contents[ $key ]['subscription_switch'] = array( 'subscription_id' => 1 );
+		$this->assertSame( array(), SiteField::cart_lines() );
+		$this->assertSame( array(), $this->errors() );
+	}
+
+	public function test_the_form_prints_the_fields_and_offers_our_domains_only_to_a_customer_who_has_some(): void {
+		$product = $this->product();
+		$this->in_cart( $product );
+
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'Your website', $html );
+		$this->assertStringContainsString( 'Temporary address', $html );
+		$this->assertStringContainsString( 'A domain I have elsewhere', $html );
+		$this->assertStringNotContainsString( 'A domain I have with you', $html, 'A visitor has no domains on our name servers.' );
+		$this->assertStringContainsString( '<option value="wordpress" selected', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+
+		$this->in_cart( $this->product( array( 'sites' => 5 ) ) );
+		ob_start();
+		SiteField::render();
+		$this->assertStringContainsString( '<option value="woocommerce" selected', (string) ob_get_clean(), 'WooCommerce is preselected on the shop plans.' );
+
+		WC()->cart->empty_cart();
+		ob_start();
+		SiteField::render();
+		$this->assertSame( '', (string) ob_get_clean() );
+	}
+
+	public function test_the_store_api_checkout_is_refused_for_a_hosting_cart(): void {
+		$order = new \WC_Order();
+		$req   = new \WP_REST_Request( 'POST', '/wc/store/v1/checkout' );
+		SiteField::block_store_api( $order, $req );
+		$this->assertTrue( true, 'An empty cart is not touched.' );
+
+		$this->in_cart( $this->product() );
+		try {
+			SiteField::block_store_api( $order, $req );
+			$this->fail( 'The Store API checkout should be refused.' );
+		} catch ( \Automattic\WooCommerce\StoreApi\Exceptions\RouteException $e ) {
+			$this->assertSame( 'beltoft_services_site_checkout_required', $e->error_code );
+		}
+	}
+
+	public function test_resolve_checks_every_choice(): void {
+		$ok = SiteField::resolve( array( 'slug' => 'Shop', 'label' => 'My <b>Shop</b>', 'mode' => 'preview', 'install' => 'woocommerce', 'language' => 'da_DK', 'email' => 'christian.beltoft@gmail.com' ), 0 );
+		$this->assertSame(
+			array( 'slug' => 'shop', 'label' => 'My Shop', 'mode' => 'preview', 'domain' => '', 'install' => 'woocommerce', 'language' => 'da_DK', 'admin_email' => 'christian.beltoft@gmail.com' ),
+			$ok
+		);
+
+		$defaults = SiteField::resolve( array( 'slug' => 'a' ), 0 );
+		$this->assertSame( 'wordpress', $defaults['install'] );
+		$this->assertSame( 'en_US', $defaults['language'] );
+		$this->assertSame( '', $defaults['admin_email'] );
+
+		$bad = array(
+			'slug'        => array( array( 'slug' => 'Bad Slug' ), 'site_slug' ),
+			'no slug'     => array( array(), 'site_slug' ),
+			'mode'        => array( array( 'slug' => 'a', 'mode' => 'weird' ), 'site_mode' ),
+			'own empty'   => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => '' ), 'site_host' ),
+			'own bad'     => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => 'not a host' ), 'site_host' ),
+			'preview zone' => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => 'x.preview.example.test' ), 'site_host' ),
+			'ours no zone' => array( array( 'slug' => 'a', 'mode' => 'ours', 'host' => 'www.nowhere.example' ), 'site_zone' ),
+			'install'     => array( array( 'slug' => 'a', 'install' => 'drupal' ), 'site_install' ),
+			'language'    => array( array( 'slug' => 'a', 'language' => 'english' ), 'site_language' ),
+			'email'       => array( array( 'slug' => 'a', 'email' => 'nope' ), 'site_email' ),
+		);
+
+		foreach ( $bad as $name => $case ) {
+			$err = SiteField::resolve( $case[0], 0 );
+			$this->assertWPError( $err, $name );
+			$this->assertSame( $case[1], $err->get_error_code(), $name );
+		}
+	}
+
+	public function test_a_taken_name_or_domain_is_refused(): void {
+		Sites::add( 77, 'taken', 'T', '8.3', 2 );
+		SiteDomains::add( 77, 1, 'used.example.com', 'external' );
+
+		$this->assertSame( 'site_taken', SiteField::resolve( array( 'slug' => 'taken' ), 0 )->get_error_code() );
+		$this->assertSame( 'site_host', SiteField::resolve( array( 'slug' => 'free', 'mode' => 'own', 'host' => 'used.example.com' ), 0 )->get_error_code() );
+		$this->assertIsArray( SiteField::resolve( array( 'slug' => 'free', 'mode' => 'own', 'host' => 'Other.Example.com' ), 0 ) );
+	}
+
+	public function test_a_domain_on_our_name_servers_is_offered_and_checked_against_the_customers_zones(): void {
+		$user    = self::factory()->user->create();
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
+		$domain  = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'mine.example', 'mode' => 'register', 'zone_ready' => true ) );
+		$domain->set( array( 'state' => 'ready' ) );
+		$this->dns->create_zone( 'mine.example', array( 'ns1.example.net' ) );
+
+		$this->assertSame( array( 'mine.example' ), SiteField::zones( $user ) );
+		$this->assertSame( array(), SiteField::zones( 0 ) );
+
+		$found = SiteField::resolve( array( 'slug' => 'a', 'mode' => 'ours', 'host' => 'www.mine.example' ), $user );
+		$this->assertSame( 'www.mine.example', $found['domain'] );
+		$this->assertSame( 'site_zone', SiteField::resolve( array( 'slug' => 'a', 'mode' => 'ours', 'host' => 'www.other.example' ), $user )->get_error_code() );
+
+		wp_set_current_user( $user );
+		$this->in_cart( $this->product() );
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+		wp_set_current_user( 0 );
+
+		$this->assertStringContainsString( 'A domain I have with you', $html );
+		$this->assertStringContainsString( '<option value="mine.example"', $html );
+	}
+
+	public function test_validate_reports_the_problems_per_line(): void {
+		$key = $this->in_cart( $this->product() );
+
+		$this->post( $key, array( 'slug' => '', 'mode' => 'preview' ) );
+		$this->assertCount( 1, $this->errors() );
+
+		$this->post( $key, array( 'slug' => 'good-name', 'mode' => 'preview' ) );
+		$this->assertSame( array(), $this->errors() );
+
+		WC()->cart->empty_cart();
+		$first = (string) WC()->cart->add_to_cart( $this->product()->get_id(), 2 );
+		$this->post( $first, array( 'slug' => 'good-name' ) );
+		$this->assertStringContainsString( 'its own line', $this->errors()[0] );
+	}
+
+	public function test_the_site_is_saved_on_the_line_and_becomes_resource_meta(): void {
+		$product = $this->product();
+		$key     = $this->in_cart( $product );
+		$this->post( $key, array( 'slug' => 'saved', 'label' => 'Saved', 'mode' => 'own', 'host' => 'Saved.Example.com', 'install' => 'empty', 'language' => 'da_DK', 'email' => '' ) );
+
+		$item = new \WC_Order_Item_Product();
+		$item->set_product_id( $product->get_id() );
+		SiteField::save_on_item( $item, $key );
+		$this->assertSame( 'saved.example.com', $item->get_meta( SiteField::ITEM_META )['domain'] );
+
+		$other = new \WC_Order_Item_Product();
+		SiteField::save_on_item( $other, 'not-a-key' );
+		$this->assertSame( '', (string) $other->get_meta( SiteField::ITEM_META ), 'Not a hosting line.' );
+
+		$order = wc_create_order();
+		$order->add_item( $item );
+		$order->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$meta    = SiteField::initial_meta( array(), $license, Registry::get( 'hosting' ) );
+
+		$this->assertSame(
+			array( 'slug' => 'saved', 'label' => 'Saved', 'install' => false, 'install_kind' => 'empty', 'language' => 'da_DK', 'admin_email' => '', 'domain' => 'saved.example.com' ),
+			$meta['site']
+		);
+		$this->assertSame( array( 'x' => 1 ), SiteField::initial_meta( array( 'x' => 1 ), $license, Registry::get( 'http' ) ), 'Other drivers are left alone.' );
+	}
+
+	public function test_two_lines_of_one_plan_take_one_site_each(): void {
+		$product = $this->product();
+		$order   = wc_create_order();
+
+		foreach ( array( 'one', 'two' ) as $slug ) {
+			$item = new \WC_Order_Item_Product();
+			$item->set_product_id( $product->get_id() );
+			$item->add_meta_data( SiteField::ITEM_META, array( 'slug' => $slug ) );
+			$order->add_item( $item );
+		}
+
+		$order->save();
+		$first = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$meta1 = SiteField::initial_meta( array(), $first, Registry::get( 'hosting' ) );
+		$this->assertSame( 'one', $meta1['site']['slug'] );
+		Resource::create( $first, Registry::get( 'hosting' ), Product::plan( $product->get_id() ), $meta1 );
+
+		$second = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$this->assertSame( 'two', SiteField::initial_meta( array(), $second, Registry::get( 'hosting' ) )['site']['slug'] );
+	}
+
+	public function test_provisioning_uses_the_order_site_attaches_an_external_domain_and_passes_the_language(): void {
+		$r = $this->resource(
+			array(),
+			array(
+				'site' => array( 'slug' => 'ordered', 'label' => 'Ordered', 'install' => true, 'language' => 'da_DK', 'admin_email' => 'christian.beltoft@gmail.com', 'domain' => 'www.elsewhere.example' ),
+			)
+		);
+		$this->provision_fully( $r );
+
+		$this->assertNotNull( Sites::find( $r->id(), 'ordered' ) );
+		$install = $this->agent->calls_of( 'site.wp_install' )[0]['args'];
+		$this->assertSame( 'da_DK', $install['locale'] );
+		$this->assertSame( 'christian.beltoft@gmail.com', $install['admin_email'] );
+		$this->assertSame( 'waiting', SiteDomains::find( 'www.elsewhere.example' )['state'], 'An external name waits for the customer.' );
+	}
+
+	public function test_provisioning_a_name_on_our_servers_goes_live_with_a_route(): void {
+		$user = self::factory()->user->create();
+		$p    = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$l    = $this->service_license( $p, array( 'fire' => false, 'user_id' => $user ) );
+		$d    = Resource::create( $l, new DomainDriver(), array(), array( 'domain' => 'ours.example', 'mode' => 'register', 'zone_ready' => true ) );
+		$d->set( array( 'state' => 'ready' ) );
+		$this->dns->create_zone( 'ours.example', array( 'ns1.example.net' ) );
+
+		$product = $this->product();
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
+		$r       = Resource::create( $license, Registry::get( 'hosting' ), Product::plan( $product->get_id() ), array( 'site' => array( 'slug' => 'live', 'domain' => 'www.ours.example' ) ) );
+		$this->provision_fully( $r );
+
+		$this->assertSame( 'active', SiteDomains::find( 'www.ours.example' )['state'] );
+		$hosts = array_column( $this->agent->state()['edge'][ 'c' . $r->id() ], 'host' );
+		$this->assertContains( 'www.ours.example', $hosts );
+		$this->assertContains( 'live.preview.example.test', $hosts );
+	}
+
+	// -- Plan changes ---------------------------------------------------------------------------
+
+	/**
+	 * A provisioned account on a plan.
+	 *
+	 * @param array<string, mixed> $plan Plan overrides.
+	 */
+	private function account( array $plan = array() ): Resource {
+		$r = $this->resource( array_merge( array( 'sites' => 3, 'php_workers' => 10 ), $plan ) );
+		$this->provision_fully( $r );
+
+		return Resource::find( $r->id() );
+	}
+
+	/**
+	 * A typed target plan.
+	 *
+	 * @param array<string, mixed> $over Overrides of the account's plan.
+	 * @return array<string, int|string|bool>
+	 */
+	private function target( Resource $r, array $over ): array {
+		return \BeltoftServices\Hosting\Plan::typed( array_merge( (array) $r->get( 'plan' ), $over ) );
+	}
+
+	public function test_an_upgrade_is_allowed_and_a_smaller_plan_is_refused(): void {
+		$r = $this->account( array( 'disk_gb' => 20, 'memory_mb' => 2048, 'cores' => 2 ) );
+
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'disk_gb' => 50, 'memory_mb' => 4096, 'cores' => 3, 'php_workers' => 20, 'sites' => 5 ) ) ) );
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array() ) ), 'The same plan is fine.' );
+
+		foreach ( array( 'disk_gb' => 10, 'memory_mb' => 1024, 'cores' => 1, 'php_workers' => 5 ) as $key => $less ) {
+			$this->assertStringContainsString( "can't be made smaller", (string) HostingSwitch::refusal( $r, $this->target( $r, array( $key => $less ) ) ), $key );
+		}
+
+		$this->assertStringContainsString( 'different server group', (string) HostingSwitch::refusal( $r, $this->target( $r, array( 'node_group' => 'g9' ) ) ) );
+	}
+
+	public function test_fewer_websites_than_in_use_is_refused(): void {
+		$r = $this->account( array( 'sites' => 3 ) );
+		Sites::add( $r->id(), 'second', 'S', '8.3', 2 );
+
+		$this->assertStringContainsString( 'fewer websites', (string) HostingSwitch::refusal( $r, $this->target( $r, array( 'sites' => 1 ) ) ) );
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'sites' => 2 ) ) ) );
+	}
+
+	public function test_the_wcs_filter_refuses_before_payment_and_leaves_other_products_alone(): void {
+		$r        = $this->account( array( 'disk_gb' => 20, 'sites' => 3 ) );
+		$small    = $this->product( array( 'disk_gb' => 10, 'sites' => 3 ) );
+		$big      = $this->product( array( 'disk_gb' => 40, 'sites' => 3 ) );
+		$license  = $r->license();
+
+		\BeltoftLicenses\Licenses::update( (int) $license['id'], array( 'subscription_id' => 4242 ) );
+		$subscription = new class() {
+			public function get_id() {
+				return 4242;
+			}
+		};
+
+		$message = HostingSwitch::check( '', $small->get_id(), 1, 0, $subscription, null );
+		$this->assertStringContainsString( "can't be made smaller", $message );
+		$this->assertSame( '', HostingSwitch::check( '', $big->get_id(), 1, 0, $subscription, null ) );
+		$this->assertSame( 'Already refused', HostingSwitch::check( 'Already refused', $small->get_id(), 1, 0, $subscription, null ) );
+		$this->assertSame( '', HostingSwitch::check( '', $this->service_product( 'fake' )->get_id(), 1, 0, $subscription, null ), 'Not a hosting product.' );
+		$this->assertSame( '', HostingSwitch::check( '', $small->get_id(), 1, 0, 'not a subscription', null ) );
+		$this->assertNotNull( Records::for_resource( $r->id() ) );
+	}
+}

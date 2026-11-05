@@ -65,6 +65,18 @@ final class Sites {
 	}
 
 	/**
+	 * Is a slug used by any account? A slug names the preview address, so it is unique over all accounts.
+	 *
+	 * @param string $slug Slug.
+	 */
+	public static function taken( string $slug ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- read fresh.
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE slug = %s', Schema::tables()['hosting_sites'], $slug ) ) > 0;
+	}
+
+	/**
 	 * One site of a resource.
 	 *
 	 * @param int    $resource_id Activation id.

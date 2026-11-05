@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Resource;
@@ -23,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * The delete stops the container itself before it destroys it (StopsOnDelete), like the Proxmox driver.
  */
-class HostingDriver implements Driver, StopsOnDelete {
+class HostingDriver implements Driver, StopsOnDelete, NeedsBilling {
 
 	/**
 	 * Driver id.
