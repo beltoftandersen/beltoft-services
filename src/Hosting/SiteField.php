@@ -249,7 +249,7 @@ final class SiteField {
 	}
 
 	/**
-	 * What is preselected to install: WooCommerce on a plan with 5 websites or more (the Shop plans), WordPress otherwise.
+	 * What is preselected to install: WooCommerce when the plan says so (field woocommerce_default), WordPress otherwise.
 	 *
 	 * @param int $product_id   Product.
 	 * @param int $variation_id Variation.
@@ -257,7 +257,7 @@ final class SiteField {
 	public static function default_install( int $product_id, int $variation_id ): string {
 		$plan = Plan::typed( Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) );
 
-		return (int) $plan['sites'] >= 5 ? 'woocommerce' : 'wordpress';
+		return ! empty( $plan['woocommerce_default'] ) ? 'woocommerce' : 'wordpress';
 	}
 
 	/**

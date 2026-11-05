@@ -105,7 +105,7 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
 
-		$this->in_cart( $this->product( array( 'sites' => 5 ) ) );
+		$this->in_cart( $this->product( array( 'sites' => 1, 'woocommerce_default' => true ) ) );
 		ob_start();
 		SiteField::render();
 		$this->assertStringContainsString( '<option value="woocommerce" selected', (string) ob_get_clean(), 'WooCommerce is preselected on the shop plans.' );

@@ -46,7 +46,7 @@ class DriverTest extends HostingCase {
 	}
 
 	public function test_the_plan_fields_are_the_plans_list(): void {
-		$expected = array( 'node_group', 'sites', 'disk_gb', 'cores', 'memory_mb', 'swap_mb', 'php_workers', 'php_memory_mb', 'upload_mb', 'files', 'db_buffer_mb', 'valkey_mb', 'staging', 'ssh', 'backup_days', 'mail_mailboxes', 'mail_quota_mb', 'mail_aliases', 'mail_per_minute', 'site_mail_per_day' );
+		$expected = array( 'node_group', 'sites', 'disk_gb', 'cores', 'memory_mb', 'swap_mb', 'php_workers', 'php_memory_mb', 'upload_mb', 'files', 'db_buffer_mb', 'valkey_mb', 'staging', 'woocommerce_default', 'ssh', 'backup_days', 'mail_mailboxes', 'mail_quota_mb', 'mail_aliases', 'mail_per_minute', 'site_mail_per_day' );
 
 		$fields = $this->driver->plan_fields();
 		$this->assertSame( $expected, array_keys( $fields ) );

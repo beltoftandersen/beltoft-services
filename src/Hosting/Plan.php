@@ -36,6 +36,7 @@ final class Plan {
 			'db_buffer_mb'   => array( 'number', __( 'Database buffer share (MB)', 'beltoft-services' ), __( 'The share of the shared database server this account counts for. Used for capacity planning only.', 'beltoft-services' ), 50, true ),
 			'valkey_mb'      => array( 'number', __( 'Object cache (MB)', 'beltoft-services' ), __( 'Valkey memory. 0 means no object cache.', 'beltoft-services' ), 0, true ),
 			'staging'        => array( 'text', __( 'Staging', 'beltoft-services' ), __( 'one (one copy for the account) or per_site (one per website).', 'beltoft-services' ), 'one', true ),
+			'woocommerce_default' => array( 'checkbox', __( 'WooCommerce preselected', 'beltoft-services' ), __( 'The checkout preselects WordPress with WooCommerce for this plan (the Shop plans). The customer can still choose.', 'beltoft-services' ), false, true ),
 			'ssh'            => array( 'checkbox', __( 'SSH and WP-CLI', 'beltoft-services' ), __( 'Off means SFTP only.', 'beltoft-services' ), false, true ),
 			'backup_days'    => array( 'number', __( 'Backup days', 'beltoft-services' ), __( 'Daily backups kept for this many days.', 'beltoft-services' ), 14, true ),
 			'mail_mailboxes' => array( 'number', __( 'Mailboxes (email lite)', 'beltoft-services' ), '', 2, true ),
