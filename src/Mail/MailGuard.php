@@ -35,6 +35,18 @@ final class MailGuard {
 	}
 
 	/**
+	 * The address of the hidden system mailbox of the domain (hosting website mail), or '' when it has none. The
+	 * mailbox is not counted in the plan, not listed to the customer and not changed by the customer.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function system_address( Resource $r ): string {
+		$address = $r->get( 'mail_system' );
+
+		return is_string( $address ) ? strtolower( $address ) : '';
+	}
+
+	/**
 	 * The domain of the resource.
 	 *
 	 * @param Resource $r Resource.

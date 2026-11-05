@@ -489,6 +489,31 @@ final class HostingActions {
 		return array( 'mail_resource' => $child->id(), 'domain' => (string) $child->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );
 	}
 
+	/**
+	 * Points the websites' mail at the Email lite domain (the hidden system mailbox).
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function use_email_for_sites() {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		if ( null === SiteMail::child_of( $this->r ) ) {
+			return $this->error( 'not_ready', __( 'Set up Email lite first.', 'beltoft-services' ) );
+		}
+
+		$done = ( new SiteMail( $this->r ) )->enable_system_mailbox();
+
+		if ( $done instanceof StepResult ) {
+			return $this->error( $done->is_failed() ? 'not_ready' : 'busy', $done->is_failed() ? __( 'Email lite is not ready yet. Try again in a moment.', 'beltoft-services' ) : __( 'The mail server is busy. Try again in a moment.', 'beltoft-services' ) );
+		}
+
+		return array( 'sender' => (string) ( $done['mail_sender']['address'] ?? '' ) );
+	}
+
 	// -- Helpers ---------------------------------------------------------------------------------
 
 	/**

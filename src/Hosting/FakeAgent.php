@@ -28,6 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - db.drop: dropped (list of names that existed), idempotent.
  * - db.size: sizes (map of database => bytes, 0 here).
+ * - mail.smtp: configured (true), user. The sender is kept by container (host and user only, never the password).
  * - edge.apply: routes (count). Replaces the routes of the account; an empty list removes them.
  * - every other listed operation: ok (true) and no state change (modelled: accepted, nothing done).
  *
@@ -232,6 +233,7 @@ class FakeAgent implements Agent {
 			'sites' => array(),
 			'dbs'   => array(),
 			'edge'  => array(),
+			'smtp'  => array(),
 		);
 	}
 
@@ -628,6 +630,14 @@ class FakeAgent implements Agent {
 				}
 
 				return array( 'sizes' => $sizes );
+
+			case 'mail.smtp':
+				$this->state['smtp'][ $vmid ] = array(
+					'host' => $args['host'],
+					'user' => $args['user'],
+				);
+
+				return array( 'configured' => true, 'user' => $args['user'] );
 
 			case 'edge.apply':
 				if ( array() === $args['routes'] ) {

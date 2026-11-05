@@ -94,7 +94,7 @@ class DnsTest extends HostingCase {
 	public function test_the_dns_step_runs_after_the_edge_and_before_ready(): void {
 		$steps = Provision::STEPS;
 
-		$this->assertSame( array( 'edge', 'dns', 'verify', 'ready' ), array_slice( $steps, -4 ) );
+		$this->assertSame( array( 'edge', 'dns', 'verify', 'mail', 'ready' ), array_slice( $steps, -5 ) );
 	}
 
 	public function test_a_node_without_an_edge_address_fails_the_dns_step_for_good(): void {

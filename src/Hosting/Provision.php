@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * (linked, tagged with the ownership line), configure (limits, network, firewall options, root disk), start,
  * prepare (the agent's ct.prepare), db (db.create on the shared database server), site (site.create and
  * site.wp_install), edge (edge.apply), dns (the preview name, SiteDns), verify (a loopback request inside the
- * container through the agent), ready. Not done: the request through the public edge address, which needs a live node.
+ * container through the agent), mail (the fallback sender for website mail), ready. Not done: the request through the public edge address, which needs a live node.
  *
  * Proxmox endpoints (API viewer, https://pve.proxmox.com/pve-docs/api-viewer/index.html#<path>):
  * /cluster/resources, /cluster/nextid, /nodes/{node}/lxc/{vmid}/clone, .../config (GET, PUT), .../resize,
@@ -39,7 +39,7 @@ final class Provision {
 	/**
 	 * The steps, in order.
 	 */
-	public const STEPS = array( 'place', 'ip', 'vmid', 'clone', 'configure', 'start', 'prepare', 'db', 'site', 'edge', 'dns', 'verify', 'ready' );
+	public const STEPS = array( 'place', 'ip', 'vmid', 'clone', 'configure', 'start', 'prepare', 'db', 'site', 'edge', 'dns', 'verify', 'mail', 'ready' );
 
 	/**
 	 * The plan, typed.
@@ -682,6 +682,16 @@ final class Provision {
 		}
 
 		return 200 === (int) ( $result['status'] ?? 0 ) ? array() : StepResult::retry( 0, 'verify: the site answered ' . (int) ( $result['status'] ?? 0 ) );
+	}
+
+	/**
+	 * Step mail: website mail goes out through our mail server from the fallback sender (SiteMail). Nothing happens
+	 * until the fallback mailbox password and the mail host are set, and the step does not wait for them.
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_mail() {
+		return ( new SiteMail( $this->r ) )->use_fallback();
 	}
 
 	/**

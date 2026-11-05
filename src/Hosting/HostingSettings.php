@@ -105,6 +105,16 @@ final class HostingSettings {
 			'hosting_db_minutes'      => array( 'db_minutes', __( 'Database monitor: minutes', 'beltoft-services' ), '' ),
 		);
 
+		$fields['hosting_noreply_password'] = array_merge(
+			$base,
+			array(
+				'type'    => 'secret',
+				'default' => '',
+				'label'   => __( 'Website mail fallback password', 'beltoft-services' ),
+				'desc'    => __( 'The password of the mailbox noreply@<preview zone>, which you make once on the mail server. Websites without Email lite send from it. Stored encrypted and never shown again. Empty: such websites send no mail.', 'beltoft-services' ),
+			)
+		);
+
 		foreach ( $list as $key => $row ) {
 			$fields[ $key ] = $base + array(
 				'default' => Config::DEFAULTS[ $row[0] ],
