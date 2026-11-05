@@ -59,7 +59,8 @@ final class PageHead {
 	 * @param string $text Description.
 	 */
 	public static function line( string $text ): string {
-		return '<div class="bs-pagehead"><span class="bs-inline" data-bs-inline role="status" aria-live="polite"><span class="bs-inline__text">' . esc_html( $text ) . '</span></span></div>';
+		// A line with no description takes no room while nothing is going on (is-empty); status.js gives it its height only while it shows a message (is-live).
+		return '<div class="bs-pagehead' . ( '' === $text ? ' is-empty' : '' ) . '"><span class="bs-inline" data-bs-inline role="status" aria-live="polite"><span class="bs-inline__text">' . esc_html( $text ) . '</span></span></div>';
 	}
 
 	/**
