@@ -138,6 +138,17 @@ abstract class ServiceEmail extends \WC_Email {
 				'app_www_state' => isset( $data['app_www_state'] ) && is_string( $data['app_www_state'] ) ? $data['app_www_state'] : '',
 				'app_ip'        => isset( $data['app_ip'] ) && is_string( $data['app_ip'] ) && false !== filter_var( $data['app_ip'], FILTER_VALIDATE_IP ) ? $data['app_ip'] : '',
 				'app_name'      => (string) ( \BeltoftServices\Proxmox\Apps::definition( (string) $r->get( 'app_id' ) )['name'] ?? '' ),
+				'hosting_notice' => in_array( $data['hosting_notice'] ?? '', HostingNotice::KINDS, true ) ? array(
+					'kind'        => (string) $data['hosting_notice'],
+					'percent'     => max( 0, (int) ( $data['percent'] ?? 0 ) ),
+					'used'        => max( 0, (int) ( $data['used'] ?? 0 ) ),
+					'limit'       => max( 0, (int) ( $data['limit'] ?? 0 ) ),
+					'days'        => max( 0, (int) ( $data['days'] ?? 0 ) ),
+					'php'         => isset( $data['php'] ) ? sanitize_text_field( (string) $data['php'] ) : '',
+					'php_default' => isset( $data['php_default'] ) ? sanitize_text_field( (string) $data['php_default'] ) : '',
+					'php_end'     => isset( $data['php_end'] ) ? sanitize_text_field( (string) $data['php_end'] ) : '',
+					'site'        => isset( $data['site'] ) ? sanitize_text_field( (string) $data['site'] ) : '',
+				) : array( 'kind' => 'storage_warning', 'percent' => 0, 'used' => 0, 'limit' => 0, 'days' => 0, 'php' => '', 'php_default' => '', 'php_end' => '', 'site' => '' ),
 				'hosting'       => 'hosting' === $r->get( 'driver' ) ? \BeltoftServices\Hosting\HostingEmail::values( $r ) : array(),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);

@@ -32,6 +32,11 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling {
 	public const ID = 'hosting';
 
 	/**
+	 * Activation kind.
+	 */
+	public const KIND = 'hosting';
+
+	/**
 	 * Adds the driver to the registry (the `beltoft_services_drivers` filter).
 	 *
 	 * @param mixed $drivers Drivers keyed by id.
@@ -63,7 +68,7 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling {
 	 * {@inheritDoc}
 	 */
 	public function kind(): string {
-		return 'hosting';
+		return self::KIND;
 	}
 
 	/**

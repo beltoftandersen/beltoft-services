@@ -25,6 +25,7 @@ final class Config {
 		'preview_zone'      => '',
 		'php_default'       => '8.3',
 		'php_versions'      => '8.3,8.4,8.5',
+		'php_eol'           => '8.3=2027-12-31,8.4=2028-12-31,8.5=2029-12-31',
 		'prefix'            => 'c',
 		'tag'               => 'hosting',
 		'admin_user'        => 'owner',
@@ -104,6 +105,26 @@ final class Config {
 		}
 
 		return array() === $list ? array( self::DEFAULTS['php_default'] ) : array_values( array_unique( $list ) );
+	}
+
+	/**
+	 * The end of security support of a PHP version as a timestamp (end of that day, UTC), or null when unknown.
+	 * The table is the setting `PHP end of support dates`, "8.3=2027-12-31,8.4=2028-12-31".
+	 *
+	 * @param string $version Version, for example 8.3.
+	 */
+	public static function php_end( string $version ): ?int {
+		foreach ( explode( ',', self::get( 'php_eol' ) ) as $pair ) {
+			$parts = array_map( 'trim', explode( '=', $pair ) );
+
+			if ( 2 === count( $parts ) && $parts[0] === $version && 1 === preg_match( '/^\d{4}-\d{2}-\d{2}$/D', $parts[1] ) ) {
+				$time = strtotime( $parts[1] . ' 23:59:59 UTC' );
+
+				return false === $time ? null : $time;
+			}
+		}
+
+		return null;
 	}
 
 	/**

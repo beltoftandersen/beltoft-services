@@ -27,7 +27,10 @@ defined( 'ABSPATH' ) || exit;
  * - site.wp_login_link: url (a one-time address, fake).
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - db.drop: dropped (list of names that existed), idempotent.
- * - db.size: sizes (map of database => bytes, 0 here).
+ * - db.size: sizes (map of database => bytes; 0 unless set_db_size()).
+ * - db.readonly: account, readonly (the account's database user loses or gets back its write grants; an operation this
+ *   plugin adds to the plan's list for the 110 percent storage rule).
+ * - agent.health: ok (true), loaders (map "<vmid>/<slug>" => { state, ts }; empty unless set_loaders()).
  * - mail.smtp: configured (true), user. The sender is kept by container (host and user only, never the password).
  * - edge.apply: routes (count). Replaces the routes of the account; an empty list removes them.
  * - every other listed operation: ok (true) and no state change (modelled: accepted, nothing done).
@@ -137,6 +140,10 @@ class FakeAgent implements Agent {
 			'database' => array( 'ident', true ),
 		),
 		'db.size'           => array( 'account' => array( 'ident', true ) ),
+		'db.readonly'       => array(
+			'account' => array( 'ident', true ),
+			'enabled' => array( 'bool', true ),
+		),
 		'ssh.keys'          => array(
 			'vmid' => array( 'vmid', true ),
 			'keys' => array( 'list', true ),
@@ -236,6 +243,9 @@ class FakeAgent implements Agent {
 			'dbs'   => array(),
 			'edge'  => array(),
 			'smtp'  => array(),
+			'db_sizes' => array(),
+			'readonly' => array(),
+			'loaders'  => array(),
 		);
 	}
 
@@ -260,6 +270,29 @@ class FakeAgent implements Agent {
 	 */
 	public function pending( string $op, int $reads = 1 ): void {
 		$this->waits[ $op ][] = max( 1, $reads );
+	}
+
+	/**
+	 * Sets the size of a database in bytes, as db.size reports it.
+	 *
+	 * @param string $database Database name.
+	 * @param int    $bytes    Size.
+	 */
+	public function set_db_size( string $database, int $bytes ): void {
+		$this->load();
+		$this->state['db_sizes'][ $database ] = $bytes;
+		$this->save();
+	}
+
+	/**
+	 * Sets the loader states agent.health reports: "<vmid>/<slug>" => array( state, ts ).
+	 *
+	 * @param array<string, array<string, mixed>> $loaders Loaders.
+	 */
+	public function set_loaders( array $loaders ): void {
+		$this->load();
+		$this->state['loaders'] = $loaders;
+		$this->save();
 	}
 
 	/**
@@ -629,10 +662,18 @@ class FakeAgent implements Agent {
 				$sizes = array();
 
 				foreach ( (array) ( $this->state['dbs'][ $args['account'] ]['databases'] ?? array() ) as $name ) {
-					$sizes[ $name ] = 0;
+					$sizes[ $name ] = (int) ( $this->state['db_sizes'][ $name ] ?? 0 );
 				}
 
 				return array( 'sizes' => $sizes );
+
+			case 'db.readonly':
+				$this->state['readonly'][ $args['account'] ] = $args['enabled'];
+
+				return array( 'account' => $args['account'], 'readonly' => $args['enabled'] );
+
+			case 'agent.health':
+				return array( 'ok' => true, 'loaders' => (object) (array) ( $this->state['loaders'] ?? array() ) );
 
 			case 'mail.smtp':
 				$this->state['smtp'][ $vmid ] = array(

@@ -206,6 +206,21 @@ class FakeNode implements Client {
 	}
 
 	/**
+	 * Sets what GET .../status/current reports besides the state: cpu (0 to 1), mem, maxmem, disk, maxdisk (bytes).
+	 *
+	 * @param int                  $vmid  Container id.
+	 * @param array<string, mixed> $usage Values.
+	 */
+	public function set_usage( int $vmid, array $usage ): void {
+		$this->load();
+
+		if ( isset( $this->state['cts'][ $vmid ] ) ) {
+			$this->state['cts'][ $vmid ]['usage'] = $usage;
+			$this->save();
+		}
+	}
+
+	/**
 	 * Every call made so far.
 	 *
 	 * @return array<int, array{method: string, path: string, params: array<string, mixed>}>
@@ -593,10 +608,13 @@ class FakeNode implements Client {
 		unset( $p );
 		$ct = $this->find( $a );
 
-		return is_wp_error( $ct ) ? $ct : array(
-			'vmid'   => (int) $ct['vmid'],
-			'status' => $ct['status'],
-			'name'   => $ct['name'],
+		return is_wp_error( $ct ) ? $ct : array_merge(
+			array(
+				'vmid'   => (int) $ct['vmid'],
+				'status' => $ct['status'],
+				'name'   => $ct['name'],
+			),
+			(array) ( $ct['usage'] ?? array() )
 		);
 	}
 

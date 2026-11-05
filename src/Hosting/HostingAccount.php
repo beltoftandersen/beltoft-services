@@ -185,6 +185,17 @@ final class HostingAccount {
 
 		echo '</tbody></table>';
 
+		foreach ( HostingUsage::loader_problems( $r ) as $slug => $state ) {
+			echo '<p class="beltoft-hosting-notice">' . esc_html(
+				sprintf(
+					/* translators: 1: website name, 2: state. */
+					__( 'The website %1$s needs the hosting loader file for the sign-in link and website mail (%2$s). Contact support if it keeps showing.', 'beltoft-services' ),
+					$slug,
+					$state
+				)
+			) . '</p>';
+		}
+
 		if ( $ready ) {
 			self::print_forms( $limits, $sites );
 		}

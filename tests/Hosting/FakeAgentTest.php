@@ -38,7 +38,7 @@ class FakeAgentTest extends TestCase {
 		$expected = array(
 			'ct.prepare', 'ct.stats',
 			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.staging_create', 'site.staging_push', 'site.cron', 'site.workers',
-			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size',
+			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.readonly',
 			'ssh.keys', 'ssh.password',
 			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
 			'backup.prepare', 'backup.file_restore', 'backup.db_restore', 'backup.export',
