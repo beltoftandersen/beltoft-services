@@ -51,6 +51,77 @@ final class SslNames {
 	}
 
 	/**
+	 * The names of a service, in order, as name => validation method (auto, dns or file): the first is the common name. A service
+	 * ordered before multi domain certificates existed (and a single name one) has no list and gets its one name from
+	 * ssl_name, ssl_domain and ssl_validation.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<int, array{name: string, base: string, validation: string}>
+	 */
+	public static function entries( Resource $r ): array {
+		$out = array();
+
+		foreach ( (array) $r->get( 'ssl_names' ) as $entry ) {
+			if ( is_array( $entry ) && ! empty( $entry['name'] ) ) {
+				$out[] = array( 'name' => (string) $entry['name'], 'base' => ltrim( (string) $entry['name'], '*.' ), 'validation' => (string) ( $entry['validation'] ?? 'dns' ) );
+			}
+		}
+
+		return array() !== $out ? $out : array( array( 'name' => (string) $r->get( 'ssl_name' ), 'base' => (string) $r->get( 'ssl_domain' ), 'validation' => (string) $r->get( 'ssl_validation' ) ) );
+	}
+
+	/**
+	 * The `ssl_names` meta with the first name's validation method set, when the service keeps such a list (else nothing to save).
+	 *
+	 * @param Resource $r          Resource.
+	 * @param string   $validation Method.
+	 * @return array<string, mixed>
+	 */
+	public static function with_first_validation( Resource $r, string $validation ): array {
+		$list = array_values( array_filter( (array) $r->get( 'ssl_names' ), 'is_array' ) );
+
+		if ( array() === $list ) {
+			return array();
+		}
+
+		$list[0]['validation'] = $validation;
+
+		return array( 'ssl_names' => $list );
+	}
+
+	/**
+	 * Does the service hold a certificate for several names?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function is_multi( Resource $r ): bool {
+		return count( self::entries( $r ) ) > 1;
+	}
+
+	/**
+	 * The names a customer typed (one per line or separated by commas or spaces), as host names, or null when one is not a host name.
+	 * A wildcard name is refused here: a multi domain certificate sells plain names.
+	 *
+	 * @param mixed $raw Typed value.
+	 * @return string[]|null
+	 */
+	public static function list_of( $raw ): ?array {
+		$out = array();
+
+		foreach ( preg_split( '/[\s,;]+/', is_string( $raw ) ? trim( $raw ) : '', -1, PREG_SPLIT_NO_EMPTY ) ?: array() as $one ) {
+			$base = self::typed_wildcard( $one ) ? null : self::base( $one );
+
+			if ( null === $base ) {
+				return null;
+			}
+
+			$out[] = $base;
+		}
+
+		return array() === $out ? null : array_values( array_unique( $out ) );
+	}
+
+	/**
 	 * The customer's zone on our name servers that holds this name (the name itself or a parent), or null.
 	 *
 	 * @param string $name    Host name without a wildcard prefix.

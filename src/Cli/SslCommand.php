@@ -144,33 +144,7 @@ final class SslCommand {
 		}
 
 		foreach ( $types as $key => $type ) {
-			$variation = new \WC_Product_Subscription_Variation();
-			$variation->set_parent_id( $id );
-			$variation->set_attributes( array( 'type' => (string) $type[0] ) );
-			$variation->set_virtual( true );
-			$variation->set_status( 'publish' );
-			$variation->set_tax_class( 'parent' );
-			$vid = $variation->save();
-
-			if ( isset( $prices[ $key ] ) ) {
-				$variation = wc_get_product( $vid );
-				$variation->set_regular_price( $prices[ $key ] );
-				$variation->save();
-				update_post_meta( $vid, '_subscription_price', $prices[ $key ] );
-			}
-
-			foreach ( array(
-				'_subscription_period'               => 'year',
-				'_subscription_period_interval'      => '1',
-				'_subscription_length'               => '0',
-				'_subscription_trial_length'         => '0',
-				'_subscription_sign_up_fee'          => '0',
-				Product::META_PLAN . 'ssl_product'   => (string) (int) $ids[ $key ],
-				Product::META_PLAN . 'ssl_level'     => (string) $type[1],
-				Product::META_PLAN . 'ssl_wildcard'  => $type[2] ? 'yes' : 'no',
-			) as $meta_key => $value ) {
-				update_post_meta( $vid, $meta_key, $value );
-			}
+			self::make_variation( $id, (string) $type[0], $prices[ $key ] ?? null, (int) $ids[ $key ], (string) $type[1], (bool) $type[2], 1 );
 		}
 
 		\WC_Product_Variable::sync( $id );
@@ -179,6 +153,200 @@ final class SslCommand {
 		wc_delete_product_transients( $id );
 
 		return $id;
+	}
+
+	/**
+	 * One yearly variation of the certificate product.
+	 *
+	 * @param int         $parent   Product id.
+	 * @param string      $label    The Type attribute value.
+	 * @param string|null $price    Yearly price as entered in the shop, or null for none.
+	 * @param int         $product  Registrar product id.
+	 * @param string      $level    dv, ov or ev.
+	 * @param bool        $wildcard Wildcard product.
+	 * @param int         $domains  Names covered.
+	 * @return int Variation id.
+	 */
+	private static function make_variation( int $parent, string $label, ?string $price, int $product, string $level, bool $wildcard, int $domains ): int {
+		$variation = new \WC_Product_Subscription_Variation();
+		$variation->set_parent_id( $parent );
+		$variation->set_attributes( array( 'type' => $label ) );
+		$variation->set_virtual( true );
+		$variation->set_status( 'publish' );
+		$variation->set_tax_class( 'parent' );
+		$vid = $variation->save();
+
+		if ( null !== $price ) {
+			$variation = wc_get_product( $vid );
+			$variation->set_regular_price( $price );
+			$variation->save();
+			update_post_meta( $vid, '_subscription_price', $price );
+		}
+
+		foreach ( array(
+			'_subscription_period'              => 'year',
+			'_subscription_period_interval'     => '1',
+			'_subscription_length'              => '0',
+			'_subscription_trial_length'        => '0',
+			'_subscription_sign_up_fee'         => '0',
+			Product::META_PLAN . 'ssl_product'  => (string) $product,
+			Product::META_PLAN . 'ssl_level'    => $level,
+			Product::META_PLAN . 'ssl_wildcard' => $wildcard ? 'yes' : 'no',
+			Product::META_PLAN . 'ssl_domains'  => (string) max( 1, $domains ),
+		) as $meta_key => $value ) {
+			update_post_meta( $vid, $meta_key, $value );
+		}
+
+		return $vid;
+	}
+
+	/**
+	 * Checks a variation for a registrar product before it is added: the product must be a website certificate in the synced
+	 * catalog, the price must cover its cost, and the product must not be sold already.
+	 *
+	 * @param int    $registrar Registrar product id.
+	 * @param string $price     Yearly price excluding tax, as a number.
+	 * @return array{row: array<string, mixed>, price: string, cost: float}|\WP_Error
+	 */
+	public static function check_variation( int $registrar, string $price ) {
+		$row = SslCatalog::get( $registrar );
+
+		if ( ! $row ) {
+			return new \WP_Error( 'unknown', sprintf( 'Registrar product %d is not in the synced catalog. Run wp beltoft-services ssl sync first.', $registrar ) );
+		}
+
+		if ( ! SslCatalog::is_website( $registrar ) ) {
+			return new \WP_Error( 'not_website', sprintf( 'Registrar product %d (%s) is not a website certificate. This product does not sell code signing or S/MIME.', $registrar, (string) $row['name'] ) );
+		}
+
+		$cost = SslCatalog::cost( $registrar );
+
+		if ( null === $cost ) {
+			return new \WP_Error( 'cost', 'The cost of that product is not known.' );
+		}
+
+		if ( 1 !== preg_match( '/^\d{1,6}(\.\d{1,2})?$/D', $price ) || (float) $price <= 0 ) {
+			return new \WP_Error( 'price', 'The price must be a positive number such as 19 or 14.50.' );
+		}
+
+		if ( (float) $price + 0.001 < $cost ) {
+			return new \WP_Error( 'below_cost', sprintf( 'The price %s is below the registrar cost %s EUR per year.', $price, number_format( $cost, 2 ) ) );
+		}
+
+		$parent = self::existing();
+
+		if ( $parent < 1 ) {
+			return new \WP_Error( 'no_product', 'There is no certificate product yet. Run wp beltoft-services ssl product --create first.' );
+		}
+
+		foreach ( (array) wc_get_product( $parent )?->get_children() as $vid ) {
+			if ( (int) Product::plan( $parent, (int) $vid )['ssl_product'] === $registrar ) {
+				return new \WP_Error( 'exists', sprintf( 'Registrar product %d is sold by variation %d already.', $registrar, (int) $vid ) );
+			}
+		}
+
+		return array( 'row' => $row, 'price' => (string) (float) $price, 'cost' => $cost );
+	}
+
+	/**
+	 * Adds a variation for a registrar product to the certificate product.
+	 *
+	 * @param int    $registrar Registrar product id.
+	 * @param string $price     Yearly price.
+	 * @return int|\WP_Error Variation id.
+	 */
+	public static function add_variation( int $registrar, string $price ) {
+		$ok = self::check_variation( $registrar, $price );
+
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
+
+		$parent_id = self::existing();
+		$parent    = wc_get_product( $parent_id );
+		$label     = (string) $ok['row']['name'];
+		$attrs     = $parent->get_attributes();
+		$attribute = $attrs['type'] ?? reset( $attrs );
+
+		if ( ! $attribute instanceof \WC_Product_Attribute ) {
+			return new \WP_Error( 'attribute', 'The product has no Type attribute.' );
+		}
+
+		$options = array_map( 'strval', $attribute->get_options() );
+
+		if ( in_array( $label, $options, true ) ) {
+			return new \WP_Error( 'label', sprintf( 'A variation named "%s" exists already.', $label ) );
+		}
+
+		$options[] = $label;
+		$attribute->set_options( $options );
+		$parent->set_attributes( array( $attribute ) );
+		$parent->save();
+
+		$vid = self::make_variation( $parent_id, $label, $ok['price'], $registrar, (string) $ok['row']['level'], (bool) $ok['row']['wildcard'], SslCatalog::included( $registrar ) );
+		\WC_Product_Variable::sync( $parent_id );
+		update_post_meta( $parent_id, '_virtual', 'yes' );
+		wc_delete_product_transients( $parent_id );
+
+		return $vid;
+	}
+
+	/**
+	 * Adds a variation for another registrar product (any website certificate in the synced catalog) to the existing product.
+	 * A multi domain product covers the names its price includes (the customer enters up to that many); extra names are not sold.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --registrar-product=<id>
+	 * : The registrar product id (see wp beltoft-services ssl sync).
+	 *
+	 * --price=<price>
+	 * : Yearly price excluding tax, as entered in the shop. Refused below the registrar cost.
+	 *
+	 * [--dry-run]
+	 * : Print what would be added.
+	 *
+	 * [--create]
+	 * : Add the variation.
+	 *
+	 * @subcommand add-variation
+	 *
+	 * @param array<int, string>   $args       Positional arguments (none).
+	 * @param array<string, mixed> $assoc_args Flags.
+	 */
+	public function add_variation_command( array $args, array $assoc_args ): void {
+		unset( $args );
+
+		$dry    = ! empty( $assoc_args['dry-run'] );
+		$create = ! empty( $assoc_args['create'] );
+
+		if ( $dry === $create ) {
+			\WP_CLI::error( 'Give exactly one of --dry-run and --create.' );
+		}
+
+		$id    = (int) ( $assoc_args['registrar-product'] ?? 0 );
+		$price = (string) ( $assoc_args['price'] ?? '' );
+		$ok    = self::check_variation( $id, $price );
+
+		if ( is_wp_error( $ok ) ) {
+			\WP_CLI::error( $ok->get_error_message() . ' Nothing was changed.' );
+		}
+
+		$row = $ok['row'];
+		\WP_CLI::log( sprintf( '%s (registrar product %d): level %s, %s, names covered %d (extra names are not sold), cost %s EUR, price %s per year.', $row['name'], $id, $row['level'], $row['wildcard'] ? 'wildcard' : 'plain names', SslCatalog::included( $id ), number_format( $ok['cost'], 2 ), $ok['price'] ) );
+
+		if ( $dry ) {
+			\WP_CLI::log( 'Dry run: nothing was written.' );
+			return;
+		}
+
+		$vid = self::add_variation( $id, $price );
+
+		if ( is_wp_error( $vid ) ) {
+			\WP_CLI::error( $vid->get_error_message() );
+		}
+
+		\WP_CLI::success( sprintf( 'Added variation %d.', $vid ) );
 	}
 
 	/**
@@ -259,10 +427,10 @@ final class SslCommand {
 		$rows = array();
 
 		foreach ( SslCatalog::all() as $row ) {
-			$rows[] = array( 'id' => $row['id'], 'name' => $row['name'], 'brand' => $row['brand'], 'level' => $row['level'], 'wildcard' => $row['wildcard'] ? 'yes' : 'no', 'delivery' => $row['delivery'], 'cost_1y_eur' => number_format( (float) $row['cost_1y'], 2 ) );
+			$rows[] = array( 'id' => $row['id'], 'name' => $row['name'], 'brand' => $row['brand'], 'level' => $row['level'], 'wildcard' => $row['wildcard'] ? 'yes' : 'no', 'delivery' => $row['delivery'], 'names' => SslCatalog::included( (int) $row['id'] ), 'cost_1y_eur' => number_format( (float) $row['cost_1y'], 2 ) );
 		}
 
-		\WP_CLI\Utils\format_items( 'table', $rows, array( 'id', 'name', 'brand', 'level', 'wildcard', 'delivery', 'cost_1y_eur' ) );
+		\WP_CLI\Utils\format_items( 'table', $rows, array( 'id', 'name', 'brand', 'level', 'wildcard', 'delivery', 'names', 'cost_1y_eur' ) );
 		\WP_CLI::success( $count . ' certificate products stored.' );
 	}
 

@@ -52,7 +52,7 @@ final class SslDriver implements Driver, InternalActions, NeedsBilling {
 	}
 
 	/**
-	 * The registrar product, the validation level and whether it is a wildcard, per variation.
+	 * The registrar product, the validation level, whether it is a wildcard and how many names it covers, per variation.
 	 *
 	 * @return array<string, array<int, mixed>>
 	 */
@@ -61,6 +61,7 @@ final class SslDriver implements Driver, InternalActions, NeedsBilling {
 			'ssl_product'  => array( 'number', __( 'Registrar product id', 'beltoft-services' ), __( 'The id of the certificate product at the registrar (see Settings, Services, SSL certificates).', 'beltoft-services' ), 0, true ),
 			'ssl_level'    => array( 'text', __( 'Validation level', 'beltoft-services' ), __( 'dv, ov or ev. Decides what the checkout asks for.', 'beltoft-services' ), 'dv', true ),
 			'ssl_wildcard' => array( 'checkbox', __( 'Wildcard', 'beltoft-services' ), __( 'The certificate covers every name under the domain.', 'beltoft-services' ), false, true ),
+			'ssl_domains'  => array( 'number', __( 'Names', 'beltoft-services' ), __( 'How many names the certificate covers. 1 for a single name or a wildcard certificate; for a multi domain product the number of names its price includes (the customer may enter up to this many).', 'beltoft-services' ), 1, true ),
 		);
 	}
 
