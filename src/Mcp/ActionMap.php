@@ -87,6 +87,8 @@ final class ActionMap {
 		'order_database'           => 'order_database',
 		'delete_server'            => 'delete_server',
 		'delete_database'          => 'delete_database',
+		'restore_hosting_backup'   => 'restore_hosting_backup',
+		'delete_site'              => 'delete_site',
 	);
 
 	/**
@@ -129,6 +131,15 @@ final class ActionMap {
 		'reveal_database_password' => array( 'POST #^/resources/\d+/db-reveal$#D' ),
 		'reveal_app_login'         => array( 'POST #^/resources/\d+/app-reveal$#D' ),
 		'get_database_ca_certificate' => array( 'GET #^/resources/\d+/db-ca$#D' ),
+		'hosting_info'             => array( 'GET #^/resources/\d+/hosting$#D' ),
+		'hosting_usage'            => array( 'GET #^/resources/\d+/hosting/usage$#D' ),
+		'list_hosting_backups'     => array( 'GET #^/resources/\d+/hosting/backups$#D' ),
+		'add_site_domain'          => array( 'POST #^/resources/\d+/hosting/sites/[a-z0-9-]+/domains$#D' ),
+		'set_php_version'          => array( 'POST #^/resources/\d+/hosting/sites/[a-z0-9-]+/php$#D' ),
+		'clear_site_cache'         => array( 'POST #^/resources/\d+/hosting/sites/[a-z0-9-]+/cache$#D' ),
+		'create_hosting_backup'    => array( 'POST #^/resources/\d+/hosting/backups$#D' ),
+		'restore_hosting_backup'   => array( 'POST #^/resources/\d+/hosting/backups/restore$#D' ),
+		'delete_site'              => array( 'DELETE #^/resources/\d+/hosting/sites/[a-z0-9-]+$#D' ),
 		'email_domain_info'        => array( 'GET #^/resources/\d+/mail$#D' ),
 		'create_mailbox'           => array( 'POST #^/resources/\d+/mail/mailboxes$#D' ),
 		'reset_mailbox_password'   => array( 'POST #^/resources/\d+/mail/mailboxes/[^/]+/password$#D' ),

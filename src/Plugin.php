@@ -39,8 +39,12 @@ final class Plugin {
 		// settings and connections, then the feature parts. Features add to core filters and actions; core
 		// never names a feature.
 		Proxmox\Schema::maybe_upgrade();
+		Hosting\Schema::maybe_upgrade();
 		Domains\DnsSchema::maybe_upgrade();
 		Oauth\Schema::maybe_upgrade();
+
+		// The WordPress hosting driver joins the registry through the same filter other plugins use.
+		add_filter( 'beltoft_services_drivers', array( Hosting\HostingDriver::class, 'add' ) );
 
 		Settings::register();
 
@@ -53,6 +57,12 @@ final class Plugin {
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
 		Proxmox\ProxmoxSettings::register();
+		Hosting\HostingSettings::register();
+		Hosting\NodesScreen::register();
+		Hosting\Stock::register();
+		Hosting\SiteField::register();
+		Hosting\HostingSwitch::register();
+		Children::register();
 		Domains\DomainSettings::register();
 		Mail\MailSettings::register();
 		Mail\MailSetup::register();
@@ -60,6 +70,14 @@ final class Plugin {
 		Mail\MailDns::register();
 		Mail\MailJobs::register();
 		Mail\MailRoutes::register();
+		Hosting\HostingRoutes::register();
+		Hosting\HostingUsage::register();
+		Hosting\HostingBackups::register();
+		Hosting\HostingRestore::register();
+		Hosting\NodeHealth::register();
+		Hosting\HostingRefresh::register();
+		Hosting\DomainSweep::register();
+		Hosting\RestoreTest::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
 		Mail\MailAccess::register();
@@ -90,6 +108,7 @@ final class Plugin {
 		Proxmox\ClustersScreen::register();
 		Status::register();
 		Checkout::register();
+		IntroCoupon::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Slugs::register();

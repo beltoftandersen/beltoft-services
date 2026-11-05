@@ -31,7 +31,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'reset_database_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'reset_mailbox_password', 'order_server', 'order_database', 'delete_server', 'delete_database' );
+	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'reset_database_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'reset_mailbox_password', 'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site' );
 
 	/**
 	 * The summary of a call that needs a confirmation, and what the summary depends on.
@@ -70,6 +70,10 @@ final class Irreversible {
 			case 'delete_mailbox':
 			case 'reset_mailbox_password':
 				return ServerActions::summary_mailbox( $args, $name );
+
+			case 'restore_hosting_backup':
+			case 'delete_site':
+				return HostingTools::summary( $name, $args );
 		}
 
 		$r = Tools::owned( (int) $args['id'], true );
@@ -113,6 +117,10 @@ final class Irreversible {
 
 		if ( in_array( $name, BillingActions::NAMES, true ) ) {
 			return BillingActions::run( $name, $args, $user_id );
+		}
+
+		if ( in_array( $name, HostingTools::FULL, true ) ) {
+			return HostingTools::run( $name, $args );
 		}
 
 		return ServerActions::run( $name, $args );

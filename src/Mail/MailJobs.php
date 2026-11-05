@@ -72,7 +72,14 @@ final class MailJobs {
 		$over    = array();
 		$lines   = array();
 
+		$system = MailGuard::system_address( $r );
+
 		foreach ( $rows as $row ) {
+			// The hidden website mail mailbox is ours: the customer is not told about its size and has no way to free it.
+			if ( '' !== $system && strtolower( (string) ( $row['username'] ?? '' ) ) === $system ) {
+				continue;
+			}
+
 			$quota = (int) ( $row['quota'] ?? 0 );
 			$used  = (int) ( $row['quota_used'] ?? 0 );
 

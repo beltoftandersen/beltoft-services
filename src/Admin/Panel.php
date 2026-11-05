@@ -666,6 +666,10 @@ final class Panel {
 			__( 'Deletion warned', 'beltoft-services' ) => $warned ? wp_date( $format, $warned ) : '',
 		);
 
+		if ( \BeltoftServices\Hosting\HostingDriver::ID === $r->get( 'driver' ) ) {
+			$rows[ __( 'Container files version', 'beltoft-services' ) ] = '' === (string) $r->get( 'runner_version' ) ? '' : sprintf( /* translators: 1: version, 2: template id. */ __( '%1$s (template %2$d)', 'beltoft-services' ), (string) $r->get( 'runner_version' ), (int) $r->get( 'runner_for' ) );
+		}
+
 		$quarantine = $r->get( \BeltoftServices\Proxmox\Quarantine::META );
 
 		if ( is_array( $quarantine ) ) {

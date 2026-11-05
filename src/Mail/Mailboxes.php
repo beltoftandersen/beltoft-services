@@ -33,8 +33,14 @@ final class Mailboxes {
 
 		$out = array();
 
+		$system = MailGuard::system_address( $r );
+
 		foreach ( $rows as $row ) {
 			$email = strtolower( (string) ( $row['username'] ?? '' ) );
+
+			if ( '' !== $system && $email === $system ) {
+				continue; // The system mailbox is not the customer's.
+			}
 
 			$out[] = array(
 				'email'    => $email,
@@ -99,7 +105,10 @@ final class Mailboxes {
 					return false;
 				}
 
-				if ( count( $have ) >= MailGuard::limits( $r )['mailboxes'] ) {
+				$system = MailGuard::system_address( $r );
+				$mine   = array_filter( $have, static fn( $row ) => '' === $system || strtolower( (string) ( $row['username'] ?? '' ) ) !== $system );
+
+				if ( count( $mine ) >= MailGuard::limits( $r )['mailboxes'] ) {
 					$outcome = new \WP_Error( 'limit', __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) );
 					return false;
 				}
@@ -133,7 +142,7 @@ final class Mailboxes {
 				}
 
 				// The send limit is not optional on a mail server shared by everyone: without it the mailbox is removed again.
-				$limit = MailSettings::rate_limit();
+				$limit = MailSettings::rate_limit( $r );
 
 				if ( null !== $limit ) {
 					$set = $client->set_mailbox_rate_limit( $email, $limit[0], $limit[1] );
@@ -147,7 +156,7 @@ final class Mailboxes {
 				}
 
 				MailAccess::finish( $r, $email );
-				$count   = count( $have ) + 1;
+				$count   = count( $mine ) + 1;
 				$outcome = true;
 
 				return true;
@@ -187,6 +196,10 @@ final class Mailboxes {
 			return new \WP_Error( 'invalid', __( 'That mailbox is not part of this domain.', 'beltoft-services' ) );
 		}
 
+		if ( '' !== MailGuard::system_address( $r ) && $email === MailGuard::system_address( $r ) ) {
+			return new \WP_Error( 'invalid', __( 'That mailbox is used by your websites and cannot be deleted here.', 'beltoft-services' ) );
+		}
+
 		$gone = MailClients::for()->delete_mailbox( $email );
 
 		if ( is_wp_error( $gone ) ) {
@@ -194,7 +207,7 @@ final class Mailboxes {
 		}
 
 		MailAccess::purge( $r, $email );
-		$left = MailClients::for()->list_mailboxes( MailGuard::domain( $r ) );
+		$left = Mailboxes::all( $r );
 
 		if ( ! is_wp_error( $left ) ) {
 			MailView::remember( $r, count( $left ) );
@@ -221,6 +234,10 @@ final class Mailboxes {
 
 		if ( null === $email ) {
 			return new \WP_Error( 'invalid', __( 'That mailbox is not part of this domain.', 'beltoft-services' ) );
+		}
+
+		if ( '' !== MailGuard::system_address( $r ) && $email === MailGuard::system_address( $r ) ) {
+			return new \WP_Error( 'invalid', __( 'That mailbox is used by your websites and its password cannot be changed here.', 'beltoft-services' ) );
 		}
 
 		$client = MailClients::for();

@@ -53,7 +53,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info', 'hosting_info', 'hosting_usage', 'list_hosting_backups' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.

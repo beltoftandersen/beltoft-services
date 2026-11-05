@@ -39,6 +39,7 @@ final class MailView {
 		$out    = array(
 			'id'        => $r->id(),
 			'domain'    => MailGuard::domain( $r ),
+			'included'  => \BeltoftServices\Hosting\HostingAccount::included_label( $r ),
 			'kind'      => $kind,
 			'ready'     => $ready,
 			'limits'    => $limits,
@@ -48,8 +49,8 @@ final class MailView {
 			'dns'       => self::dns( $r, $kind ),
 			'connect'   => self::connect( MailGuard::domain( $r ) ),
 			'send'      => array(
-				'mailbox_day'   => (int) Settings::get( 'mail_rl_day' ),
-				'domain_minute' => (int) Settings::get( 'mail_rl_minute' ),
+				'mailbox_day'   => MailSettings::override( $r, 'day', (int) Settings::get( 'mail_rl_day' ) ),
+				'domain_minute' => MailSettings::override( $r, 'minute', (int) Settings::get( 'mail_rl_minute' ) ),
 			),
 			'forward_external' => (bool) Settings::get( 'mail_allow_external_forward' ),
 			'counts'    => array( 'mailboxes' => (int) $r->get( 'mail_boxes' ), 'aliases' => 0 ),

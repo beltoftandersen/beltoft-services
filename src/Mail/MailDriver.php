@@ -97,13 +97,13 @@ final class MailDriver implements Driver, NeedsBilling {
 	 * @param array{mailboxes:int,quota_mb:int,aliases:int,domains:int} $limits Limits.
 	 * @return array<string, string>
 	 */
-	public static function domain_attrs( array $limits ): array {
+	public static function domain_attrs( array $limits, int $extra_mailboxes = 0 ): array {
 		return array(
-			'mailboxes' => (string) $limits['mailboxes'],
+			'mailboxes' => (string) ( $limits['mailboxes'] + max( 0, $extra_mailboxes ) ),
 			'aliases'   => (string) $limits['aliases'],
 			'defquota'  => (string) $limits['quota_mb'],
 			'maxquota'  => (string) $limits['quota_mb'],
-			'quota'     => (string) ( $limits['mailboxes'] * $limits['quota_mb'] ),
+			'quota'     => (string) ( ( $limits['mailboxes'] + max( 0, $extra_mailboxes ) ) * $limits['quota_mb'] ),
 		);
 	}
 
@@ -177,7 +177,7 @@ final class MailDriver implements Driver, NeedsBilling {
 		}
 
 		if ( ! in_array( 'rl', $steps, true ) ) {
-			$limited = $this->domain_rate( $client, $name );
+			$limited = $this->domain_rate( $client, $name, $r );
 
 			if ( is_wp_error( $limited ) ) {
 				return $this->from_error( $limited );
@@ -319,8 +319,8 @@ final class MailDriver implements Driver, NeedsBilling {
 	 * @param string        $domain Domain.
 	 * @return \WP_Error|null
 	 */
-	private function domain_rate( MailcowClient $client, string $domain ): ?\WP_Error {
-		$limit = MailSettings::domain_rate_limit();
+	private function domain_rate( MailcowClient $client, string $domain, ?Resource $r = null ): ?\WP_Error {
+		$limit = MailSettings::domain_rate_limit( $r );
 
 		if ( null === $limit ) {
 			return null;
@@ -438,7 +438,7 @@ final class MailDriver implements Driver, NeedsBilling {
 
 		$client  = MailClients::for();
 		$domain  = (string) $r->get( MailDomain::META_DOMAIN );
-		$limited = $this->domain_rate( $client, $domain );
+		$limited = $this->domain_rate( $client, $domain, $r );
 
 		if ( is_wp_error( $limited ) ) {
 			return StepResult::retry( 300, $limited->get_error_message() );
@@ -456,7 +456,7 @@ final class MailDriver implements Driver, NeedsBilling {
 			return StepResult::done( array( 'mail_limits' => $applied ), $plan === $applied ? '' : 'Email plan change was lower: limits kept' );
 		}
 
-		$edit = $client->edit_domain( $domain, self::domain_attrs( $next ) );
+		$edit = $client->edit_domain( $domain, self::domain_attrs( $next, '' !== MailGuard::system_address( $r ) ? 1 : 0 ) );
 
 		if ( is_wp_error( $edit ) ) {
 			return StepResult::retry( 300, $edit->get_error_message() );
@@ -469,7 +469,14 @@ final class MailDriver implements Driver, NeedsBilling {
 				return StepResult::retry( 300, $boxes->get_error_message() );
 			}
 
+			$system = MailGuard::system_address( $r );
+
 			foreach ( $boxes as $box ) {
+				// The hidden website mail mailbox has its own small size: a plan change leaves it as it is.
+				if ( '' !== $system && strtolower( (string) ( $box['username'] ?? '' ) ) === $system ) {
+					continue;
+				}
+
 				if ( (int) round( (int) ( $box['quota'] ?? 0 ) / 1048576 ) === $applied['quota_mb'] ) {
 					$set = $client->edit_mailbox( (string) $box['username'], array( 'quota' => (string) $next['quota_mb'] ) );
 
