@@ -23,7 +23,26 @@ final class Sites {
 	 * @param string $slug Slug.
 	 */
 	public static function valid_slug( string $slug ): bool {
-		return 1 === preg_match( self::SLUG_PATTERN, $slug );
+		return 1 === preg_match( self::SLUG_PATTERN, $slug ) && ! self::reserved( $slug );
+	}
+
+	/**
+	 * Names that are never a website's temporary address: the names an operator's own services answer to inside the
+	 * preview zone (mail, DNS, the panel). The list is the default plus the filter.
+	 *
+	 * @param string $slug Slug.
+	 */
+	public static function reserved( string $slug ): bool {
+		$default = array( 'www', 'mail', 'smtp', 'imap', 'pop', 'pop3', 'webmail', 'autoconfig', 'autodiscover', 'ns', 'ns1', 'ns2', 'ns3', 'ns4', 'admin', 'administrator', 'api', 'cpanel', 'ftp', 'sftp', 'ssh', 'edge', 'node', 'db', 'mysql', 'dns', 'mx', 'mx1', 'mx2', 'root', 'postmaster', 'hostmaster', 'abuse', 'localhost' );
+
+		/**
+		 * Preview names no website may take.
+		 *
+		 * @param string[] $names Names (lowercase).
+		 */
+		$names = (array) apply_filters( 'beltoft_services_hosting_reserved_slugs', $default );
+
+		return in_array( strtolower( $slug ), array_map( 'strtolower', array_map( 'strval', $names ) ), true );
 	}
 
 	/**

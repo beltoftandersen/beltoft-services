@@ -180,6 +180,26 @@ final class SiteDns {
 					if ( is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host && 'CNAME' === strtoupper( (string) ( $set['type'] ?? '' ) ) ) {
 						return 'The name is an alias (CNAME). Remove it first.';
 					}
+
+					// A preview name is ours to make and nobody else's to lose: any other record at the name (a mail host, a name server, a
+					// TXT) is not ours, and an address that is not one of our edge's is not ours either. Not overwritten.
+					if ( ! $customer && is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host ) {
+						$type   = strtoupper( (string) ( $set['type'] ?? '' ) );
+						$values = array_map( static fn( $r ) => (string) ( is_array( $r ) ? ( $r['content'] ?? '' ) : '' ), (array) ( $set['records'] ?? array() ) );
+						$ours   = array();
+
+						foreach ( $sets as $mine ) {
+							if ( strtoupper( (string) ( $mine['type'] ?? '' ) ) === $type ) {
+								foreach ( (array) ( $mine['records'] ?? array() ) as $m ) {
+									$ours[] = (string) ( is_array( $m ) ? ( $m['content'] ?? '' ) : '' );
+								}
+							}
+						}
+
+						if ( ! in_array( $type, array( 'A', 'AAAA' ), true ) || array() !== array_diff( $values, $ours ) ) {
+							return 'That temporary address is already in use.';
+						}
+					}
 				}
 
 				$done = DnsClients::dns()->replace_rrsets( $zone, $sets );

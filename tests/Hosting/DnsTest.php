@@ -61,6 +61,35 @@ class DnsTest extends HostingCase {
 		return Resource::find( $r->id() );
 	}
 
+	public function test_reserved_names_are_never_a_website_and_the_list_is_filterable(): void {
+		foreach ( array( 'www', 'mail', 'smtp', 'imap', 'webmail', 'autoconfig', 'autodiscover', 'ns1', 'ns2', 'admin', 'api', '_acme-challenge' ) as $name ) {
+			$this->assertFalse( Sites::valid_slug( $name ), $name );
+		}
+
+		$this->assertTrue( Sites::valid_slug( 'blog' ) );
+		add_filter( 'beltoft_services_hosting_reserved_slugs', static fn( $names ) => array_merge( $names, array( 'blog' ) ) );
+		$this->assertFalse( Sites::valid_slug( 'blog' ) );
+		remove_all_filters( 'beltoft_services_hosting_reserved_slugs' );
+	}
+
+	public function test_a_preview_name_never_overwrites_a_record_it_did_not_make(): void {
+		list( , , $node ) = $this->account();
+		$zone = 'preview.example.test';
+
+		// A TXT set at the name, and an address that is not our edge's, are somebody else's.
+		$this->dns->replace_rrsets( $zone, array( array( 'name' => 'taken.' . $zone, 'type' => 'TXT', 'ttl' => 60, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '"v=spf1 -all"', 'disabled' => false ) ) ) ) );
+		$this->assertIsString( SiteDns::publish_preview( 'taken', $node ) );
+		$this->assertSame( array(), $this->contents( $zone, 'taken.' . $zone, 'A' ), 'No address was added.' );
+
+		$this->dns->replace_rrsets( $zone, array( array( 'name' => 'other.' . $zone, 'type' => 'A', 'ttl' => 60, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => '192.0.2.99', 'disabled' => false ) ) ) ) );
+		$this->assertIsString( SiteDns::publish_preview( 'other', $node ) );
+		$this->assertSame( array( '192.0.2.99' ), $this->contents( $zone, 'other.' . $zone, 'A' ), 'The foreign address stays.' );
+
+		// Our own record is published again without complaint.
+		$this->assertTrue( SiteDns::publish_preview( 'mine', $node ) );
+		$this->assertTrue( SiteDns::publish_preview( 'mine', $node ) );
+	}
+
 	/**
 	 * A provisioned account, its user and its node settings.
 	 *
