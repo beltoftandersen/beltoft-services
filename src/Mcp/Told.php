@@ -29,6 +29,13 @@ final class Told {
 	 */
 	public static function phrase( string $name, array $args ): string {
 		switch ( $name ) {
+			case 'delete_site':
+				/* translators: %s: website name. */
+				return sprintf( __( 'deleted the website %s with its files and its database', 'beltoft-services' ), sanitize_text_field( (string) ( $args['site'] ?? '' ) ) );
+
+			case 'restore_hosting_backup':
+				return __( 'restored the hosting from a backup', 'beltoft-services' );
+
 			case 'delete_snapshot':
 				return __( 'deleted a snapshot', 'beltoft-services' );
 

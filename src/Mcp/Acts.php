@@ -33,7 +33,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup' );
 
 	/**
 	 * Runs one of the tools.
@@ -115,6 +115,12 @@ final class Acts {
 			case 'remove_email_alias':
 			case 'email_dns_check':
 				return self::email( $name, $args );
+
+			case 'add_site_domain':
+			case 'set_php_version':
+			case 'clear_site_cache':
+			case 'create_hosting_backup':
+				return HostingTools::act( $name, $args );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );

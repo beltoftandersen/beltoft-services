@@ -29,6 +29,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
  * - POST   hosting/mail                    domain: sets up Email lite
+ * - GET    hosting/usage                   stats, database size, storage share
  * - GET    hosting/backups                 the backups, the safety point
  * - POST   hosting/backups                 back up now (3 a day)
  * - POST   hosting/backups/restore         scope (account, files, database), volid, slug
@@ -104,6 +105,7 @@ final class HostingRoutes {
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true ) ),
 		) );
+		register_rest_route( $ns, $base . '/usage', array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'usage' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ) );
 		register_rest_route( $ns, $base . '/backups', array(
 			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'backups' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ),
 			array( 'methods' => $post, 'callback' => array( __CLASS__, 'backup_now' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ),
@@ -284,6 +286,30 @@ final class HostingRoutes {
 
 	public static function enable_mail( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->enable_mail( (string) $request['domain'] ), 201 );
+	}
+
+	public static function usage( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, Routes::STATUS_RATE_LIMIT );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$usage   = (array) $r->get( 'usage' );
+		$percent = HostingUsage::storage_percent( $r );
+
+		return self::ok(
+			array(
+				'at'                => (int) ( $usage['at'] ?? 0 ),
+				'status'            => (string) ( $usage['status'] ?? '' ),
+				'cpu'               => (float) ( $usage['cpu'] ?? 0 ),
+				'memory_mb'         => (int) ( $usage['mem_mb'] ?? 0 ),
+				'disk_mb'           => (int) ( $usage['disk_mb'] ?? 0 ),
+				'database_mb'       => (int) ( $usage['db_mb'] ?? 0 ),
+				'storage_limit_gb'  => (int) Plan::typed( (array) $r->get( 'plan' ) )['disk_gb'],
+				'storage_percent'   => null === $percent ? null : (int) round( $percent ),
+			)
+		);
 	}
 
 	public static function backups( \WP_REST_Request $request ): \WP_REST_Response {

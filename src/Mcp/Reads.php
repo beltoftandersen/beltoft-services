@@ -124,6 +124,11 @@ final class Reads {
 
 				return array( 'claims' => array_map( static fn( $c ) => array_intersect_key( (array) $c, $keep ), array_values( $list ) ) );
 
+			case 'hosting_info':
+			case 'hosting_usage':
+			case 'list_hosting_backups':
+				return HostingTools::read( $name, $args );
+
 			case 'email_domain_info':
 				$id   = (int) $args['id'];
 				$view = Tools::route( 'GET', '/resources/' . $id . '/mail', array(), null, $id, 'email domain read' );
