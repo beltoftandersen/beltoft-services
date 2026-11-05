@@ -340,8 +340,12 @@ final class Provision {
 	}
 
 	/**
-	 * Finds an order a crashed attempt placed (same name, same handle, same request text), or places it. The cost is checked
-	 * first, and only when nothing is found.
+	 * Places the order, and never twice. The money is spent by the POST, so a marker (`ssl_post_attempted`, the time) is saved
+	 * BEFORE it. While the marker is set and no order id was saved, the registrar is asked for the order first: candidates are
+	 * the orders of this registrant handle for this name, made after the marker, each read in full (`GET /ssl/orders/{id}`) and
+	 * adopted only when its request text is ours. When none matches and the marker is set, nothing is posted: staff are told and
+	 * decide (`wp beltoft-services ssl order-retry`, which can also adopt an order by id). A definite refusal clears the marker,
+	 * because it means no order exists.
 	 *
 	 * @param Resource $r       Resource.
 	 * @param int      $product Registrar product id.
@@ -353,22 +357,47 @@ final class Provision {
 		$client = Clients::registrar();
 		$handle = (string) $r->get( 'contact_handle' );
 		$csr    = trim( (string) $r->get( 'ssl_csr' ) );
-		$found  = $client->request( 'GET', '/ssl/orders', array(), array( 'common_name_pattern' => $name, 'contact_handle' => $handle, 'limit' => 50 ) );
+		$marker = (int) $r->get( 'ssl_post_attempted' );
 
-		if ( is_wp_error( $found ) ) {
-			return StepResult::retry( 3600, 'The registrar could not check for an earlier order.' );
-		}
+		if ( $marker > 0 ) {
+			$found = $client->request( 'GET', '/ssl/orders', array(), array( 'common_name_pattern' => $name, 'contact_handle' => $handle, 'limit' => 50 ) );
 
-		foreach ( (array) ( $found['results'] ?? array() ) as $existing ) {
-			if ( is_array( $existing ) && ! empty( $existing['id'] ) && ! in_array( (string) ( $existing['status'] ?? '' ), self::DEAD, true ) && trim( (string) ( $existing['csr'] ?? '' ) ) === $csr ) {
-				return (string) (int) $existing['id'];
+			if ( is_wp_error( $found ) ) {
+				return StepResult::retry( 3600, 'The registrar could not check for an earlier order.' );
 			}
+
+			foreach ( (array) ( $found['results'] ?? array() ) as $candidate ) {
+				if ( ! is_array( $candidate ) || empty( $candidate['id'] ) || in_array( (string) ( $candidate['status'] ?? '' ), self::DEAD, true ) || ! self::made_after( (string) ( $candidate['order_date'] ?? '' ), $marker ) ) {
+					continue;
+				}
+
+				// The list is not trusted for the request text: the order itself is read.
+				$detail = $client->request( 'GET', '/ssl/orders/' . (int) $candidate['id'] );
+
+				if ( is_wp_error( $detail ) ) {
+					return StepResult::retry( 3600, 'The registrar could not check an earlier order.' );
+				}
+
+				if ( trim( (string) ( $detail['csr'] ?? '' ) ) === $csr && (string) ( $detail['organization_handle'] ?? '' ) === $handle ) {
+					return (string) (int) $candidate['id'];
+				}
+			}
+
+			// An order may have been placed and not be found: never post a second paid order by itself.
+			Alerts::admin( $r, 'A certificate order was sent to the registrar and its answer was lost, and no matching order was found. Nothing more is ordered until staff look: check the registrar, then run wp beltoft-services ssl order-retry ' . $r->id() . ' (add --adopt=<registrar order id> to take an order that exists).' );
+
+			return StepResult::retry( 3600, 'Waiting for staff: an order may already have been placed at the registrar.' );
 		}
 
 		$blocked = SslGuard::guard( $r, $product, SslGuard::item_of_resource( $r ) );
 
 		if ( $blocked ) {
 			return $blocked;
+		}
+
+		// Saved before the money is spent.
+		if ( ! $r->set( array( 'ssl_post_attempted' => time() ) ) ) {
+			return StepResult::retry( 300, 'The order marker could not be saved.' );
 		}
 
 		$method = Validation::registrar_method( $r );
@@ -393,12 +422,65 @@ final class Provision {
 		$ordered = $client->request( 'POST', '/ssl/orders', $body );
 
 		if ( is_wp_error( $ordered ) ) {
+			// A refusal that reached the registrar means no order exists. A timeout or a 5xx may have gone through: the marker stays.
+			if ( ! LiveClient::is_transient( $ordered ) ) {
+				$r->set( array( 'ssl_post_attempted' => null ) );
+			}
+
 			return self::error( $r, $ordered, $steps );
 		}
 
 		$id = (string) ( $ordered['id'] ?? '' );
 
 		return '' !== $id && ctype_digit( $id ) ? $id : StepResult::retry( 3600, 'The registrar did not return an order id.' );
+	}
+
+	/**
+	 * Was the registrar's order date at or after the marker (with an hour of slack)? The registrar's dates are in its own local
+	 * time (seen in the sandbox: Europe/Amsterdam), so that zone is assumed.
+	 *
+	 * @param string $date   Order date, "Y-m-d H:i:s".
+	 * @param int    $marker Marker time.
+	 */
+	private static function made_after( string $date, int $marker ): bool {
+		try {
+			$at = ( new \DateTimeImmutable( $date, new \DateTimeZone( 'Europe/Amsterdam' ) ) )->getTimestamp();
+		} catch ( \Exception $e ) {
+			return false;
+		}
+
+		return $at >= $marker - HOUR_IN_SECONDS;
+	}
+
+	/**
+	 * Takes a registrar order as this service's order (staff, after checking at the registrar), or lets the order be placed again.
+	 *
+	 * @param Resource $r        Resource.
+	 * @param int      $order_id Registrar order id to adopt, or 0 to clear the marker so the next run orders afresh.
+	 * @return true|\WP_Error
+	 */
+	public static function resolve_marker( Resource $r, int $order_id ) {
+		if ( '' !== $r->get( 'remote_id' ) ) {
+			return new \WP_Error( 'has_order', 'This service already has a registrar order.' );
+		}
+
+		if ( 0 === $order_id ) {
+			return $r->set( array( 'ssl_post_attempted' => null ) ) ? true : new \WP_Error( 'save', 'Could not save.' );
+		}
+
+		$detail = Clients::registrar()->request( 'GET', '/ssl/orders/' . $order_id );
+
+		if ( is_wp_error( $detail ) ) {
+			return new \WP_Error( 'registrar', 'The registrar order could not be read: ' . $detail->get_error_code() );
+		}
+
+		if ( strtolower( (string) ( $detail['common_name'] ?? '' ) ) !== strtolower( (string) $r->get( 'ssl_name' ) ) || in_array( (string) ( $detail['status'] ?? '' ), self::DEAD, true ) ) {
+			return new \WP_Error( 'mismatch', 'That order is not a live order for this name.' );
+		}
+
+		$steps = array_values( array_unique( array_merge( (array) $r->get( 'steps' ), array( 'order' ) ) ) );
+
+		return $r->set( array( 'remote_id' => (string) $order_id, 'steps' => $steps, 'ordered_at' => time(), 'ssl_post_attempted' => null, 'ssl_csr' => (string) ( $detail['csr'] ?? $r->get( 'ssl_csr' ) ) ) ) ? true : new \WP_Error( 'save', 'Could not save.' );
 	}
 
 	/**

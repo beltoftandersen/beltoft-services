@@ -123,24 +123,92 @@ class SslDriverTest extends SslTestCase {
 		$user = (int) self::factory()->user->create();
 		update_user_meta( $user, '_beltoft_services_domain_handle', 'AA123-GB' );
 		$this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'period' => 1, 'csr' => $made['csr'], 'organization_handle' => 'AA123-GB', 'domain_validation_methods' => array( array( 'host_name' => 'example.com', 'method' => 'dns' ) ) ) );
-		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'] ) ) );
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'], 'ssl_post_attempted' => time() - 60 ) ) );
 		$before = count( $this->calls( 'POST', '#^/ssl/orders$#' ) );
 		$this->assertTrue( $this->build( $r )->is_done() );
 		$this->assertSame( $before, count( $this->calls( 'POST', '#^/ssl/orders$#' ) ), 'The earlier order was adopted.' );
 	}
 
-	public function test_a_timeout_on_the_order_is_read_back_next_time_and_never_posted_blindly(): void {
+	public function test_a_timeout_on_the_order_sets_a_marker_and_the_next_run_never_posts_a_second_order(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$r = $this->ssl_resource();
 		$fake = new \BeltoftServices\Domains\FakeClient( true );
 		$fake->reply( 'POST', '/customers', array( 'handle' => 'AA9-XX' ) );
-		$fake->reply( 'GET', '/ssl/orders', array( 'results' => array() ) );
 		$fake->reply( 'POST', '/ssl/orders', new \WP_Error( 'transport', 'x' ) );
 		remove_all_filters( 'beltoft_services_domains_client' );
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		$result = ( new SslDriver() )->provision( $r );
 		$this->assertTrue( $result->is_retry() );
 		$this->assertStringContainsString( 'temporarily unavailable', $result->error() );
-		$this->assertNotContains( 'order', Resource::find( $r->id() )->get( 'steps' ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertNotContains( 'order', $fresh->get( 'steps' ) );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'ssl_post_attempted' ), 'The marker was saved before the order was posted.' );
+		$posts = static fn() => count( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/ssl/orders' === $c['path'] ) );
+		$this->assertSame( 1, $posts() );
+		// The answer was lost but the order was placed: nothing matches by request text, so nothing is posted again.
+		$again = ( new SslDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $again->is_retry() );
+		$this->assertStringContainsString( 'Waiting for staff', $again->error() );
+		$this->assertSame( 1, $posts(), 'No second paid order.' );
+		$this->assertNotSame( '', (string) Resource::find( $r->id() )->get( 'alerted' ) );
+	}
+
+	public function test_an_order_with_our_request_text_made_after_the_marker_is_adopted_by_reading_it_in_full(): void {
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
+		$user = (int) self::factory()->user->create();
+		update_user_meta( $user, '_beltoft_services_domain_handle', 'AA123-GB' );
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'], 'ssl_post_attempted' => time() - 30 ) ) );
+		$other = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
+		$this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'csr' => $other['csr'], 'organization_handle' => 'AA123-GB', 'domain_validation_methods' => array( array( 'host_name' => 'example.com', 'method' => 'dns' ) ) ) );
+		// A list that does not carry the request text must not matter: only the detail read decides.
+		$list_calls_before = count( $this->calls( 'GET', '#^/ssl/orders$#' ) );
+		$result = ( new SslDriver() )->provision( $r );
+		$this->assertTrue( $result->is_retry(), 'The only candidate has another request: nothing is adopted, nothing posted.' );
+		$this->assertCount( 1, $this->calls( 'POST', '#^/ssl/orders$#' ), 'Only the other order exists.' );
+		$this->assertGreaterThan( $list_calls_before, count( $this->calls( 'GET', '#^/ssl/orders$#' ) ) );
+		$mine = (int) $this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'csr' => $made['csr'], 'organization_handle' => 'AA123-GB', 'domain_validation_methods' => array( array( 'host_name' => 'example.com', 'method' => 'dns' ) ) ) )['id'];
+		$done = $this->build( Resource::find( $r->id() ) );
+		$this->assertTrue( $done->is_done(), $done->error() );
+		$this->assertSame( (string) $mine, (string) Resource::find( $r->id() )->get( 'remote_id' ) );
+		$this->assertCount( 2, $this->calls( 'POST', '#^/ssl/orders$#' ), 'Both are the test own placements; the driver placed none.' );
+	}
+
+	public function test_an_order_made_before_the_marker_is_not_adopted(): void {
+		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
+		$user = (int) self::factory()->user->create();
+		update_user_meta( $user, '_beltoft_services_domain_handle', 'AA123-GB' );
+		$this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'csr' => $made['csr'], 'organization_handle' => 'AA123-GB', 'domain_validation_methods' => array( array( 'host_name' => 'example.com', 'method' => 'dns' ) ) ) );
+		$this->now += 3 * DAY_IN_SECONDS;
+		$r = $this->ssl_resource( array( 'user' => $user, 'meta' => array( 'ssl_key_mode' => 'own', 'ssl_csr' => $made['csr'], 'ssl_post_attempted' => 1800000000 + 5 * DAY_IN_SECONDS ) ) );
+		$this->assertStringContainsString( 'Waiting for staff', ( new SslDriver() )->provision( $r )->error() );
+	}
+
+	public function test_staff_can_adopt_an_order_or_clear_the_marker(): void {
+		$r = $this->ssl_resource( array( 'meta' => array( 'ssl_post_attempted' => time() ) ) );
+		$this->assertWPError( \BeltoftServices\Ssl\Provision::resolve_marker( $r, 99999 ) );
+		$id = (int) $this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'csr' => 'x', 'domain_validation_methods' => array( array( 'host_name' => 'other.example.com', 'method' => 'dns' ) ) ) )['id'];
+		$this->assertWPError( \BeltoftServices\Ssl\Provision::resolve_marker( $r, $id ), 'Another name.' );
+		$mine = (int) $this->registrar->request( 'POST', '/ssl/orders', array( 'product_id' => 41, 'csr' => 'y', 'domain_validation_methods' => array( array( 'host_name' => 'example.com', 'method' => 'dns' ) ) ) )['id'];
+		$this->assertTrue( \BeltoftServices\Ssl\Provision::resolve_marker( $r, $mine ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( (string) $mine, $fresh->get( 'remote_id' ) );
+		$this->assertContains( 'order', $fresh->get( 'steps' ) );
+		$this->assertSame( null, $fresh->get( 'ssl_post_attempted' ) );
+		$clear = $this->ssl_resource( array( 'meta' => array( 'ssl_post_attempted' => time() ) ) );
+		$this->assertTrue( \BeltoftServices\Ssl\Provision::resolve_marker( $clear, 0 ) );
+		$this->assertSame( null, Resource::find( $clear->id() )->get( 'ssl_post_attempted' ) );
+		$this->assertWPError( \BeltoftServices\Ssl\Provision::resolve_marker( $fresh, 0 ), 'It already has an order.' );
+	}
+
+	public function test_a_definite_refusal_of_the_order_clears_the_marker(): void {
+		$r = $this->ssl_resource();
+		$fake = new \BeltoftServices\Domains\FakeClient( true );
+		$fake->reply( 'POST', '/customers', array( 'handle' => 'AA9-XX' ) );
+		$fake->reply( 'POST', '/ssl/orders', new \WP_Error( 'op_1000', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'bad' ) ) );
+		remove_all_filters( 'beltoft_services_domains_client' );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertTrue( ( new SslDriver() )->provision( $r )->is_failed() );
+		$this->assertSame( null, Resource::find( $r->id() )->get( 'ssl_post_attempted' ), 'No order exists, so a retry may order.' );
 	}
 
 	public function test_a_rejected_request_cancels_the_paid_order_and_alerts(): void {

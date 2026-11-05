@@ -24,6 +24,9 @@ final class SslRenewals {
 	public const SWEEP_CRON  = '50 4 * * *';
 	public const SWEEP_LIMIT = 20;
 
+	/** Hours a sent renewal request may show no result before staff are told. */
+	public const STUCK_HOURS = 12;
+
 	/** Hooks. */
 	public static function register(): void {
 		add_action( 'woocommerce_subscription_renewal_payment_complete', array( __CLASS__, 'on_paid' ), 20, 2 );
@@ -208,6 +211,13 @@ final class SslRenewals {
 		}
 
 		if ( isset( $started[ $order_id ] ) ) {
+			// A request that was sent and shows no result is never sent again by itself: after a while staff are told once.
+			$since = (int) ( ( (array) $r->get( 'renew_started_at' ) )[ $order_id ] ?? 0 );
+
+			if ( $since > 0 && time() - $since > self::STUCK_HOURS * HOUR_IN_SECONDS ) {
+				Alerts::admin( $r, 'A certificate renewal was requested for paid order ' . $order_id . ' and the order expiry has not moved after ' . self::STUCK_HOURS . ' hours. Check the registrar; run wp beltoft-services ssl renew-retry ' . $r->id() . ' ' . $order_id . ' to ask again.' );
+			}
+
 			return StepResult::retry( 3600, 'A renewal request is awaiting registrar confirmation.' );
 		}
 
@@ -219,8 +229,10 @@ final class SslRenewals {
 		}
 
 		$started[ $order_id ] = $baseline;
+		$times                = (array) $r->get( 'renew_started_at' );
+		$times[ $order_id ]   = time();
 
-		if ( ! $r->set( array( 'renew_started' => $started ) ) ) {
+		if ( ! $r->set( array( 'renew_started' => $started, 'renew_started_at' => $times ) ) ) {
 			return StepResult::retry( 3600, 'The renewal could not be recorded before requesting it.' );
 		}
 
@@ -251,6 +263,20 @@ final class SslRenewals {
 		$expiry = (string) ( $detail['expiration_date'] ?? '' );
 
 		return Renewals::later( $expiry, $baseline ) ? self::finish( $r, $order_id, $expiry, $done, $started ) : StepResult::retry( 3600, 'A renewal request is awaiting registrar confirmation.' );
+	}
+
+	/**
+	 * Lets a renewal be asked for again (staff, after checking at the registrar that it did not go through).
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $order_id Paid renewal order.
+	 */
+	public static function retry_marker( Resource $r, string $order_id ): bool {
+		$started = (array) $r->get( 'renew_started' );
+		$times   = (array) $r->get( 'renew_started_at' );
+		unset( $started[ $order_id ], $times[ $order_id ] );
+
+		return $r->set( array( 'renew_started' => $started, 'renew_started_at' => $times ) );
 	}
 
 	/**

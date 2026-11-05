@@ -267,6 +267,63 @@ final class SslCommand {
 	}
 
 	/**
+	 * Resolves an order whose answer was lost: takes a registrar order that exists, or lets the order be placed again.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <resource-id>
+	 * : The resource (activation) id.
+	 *
+	 * [--adopt=<order-id>]
+	 * : The registrar order id to take as this service's order (checked: same name, not ended). Without it the marker is cleared and the next run places a new order, so check the registrar first.
+	 *
+	 * @subcommand order-retry
+	 *
+	 * @param array<int, string>   $args       Resource id.
+	 * @param array<string, mixed> $assoc_args Flags.
+	 */
+	public function order_retry( array $args, array $assoc_args ): void {
+		$r = Resource::find( (int) ( $args[0] ?? 0 ) );
+
+		if ( ! $r || SslDriver::ID !== $r->get( 'driver' ) ) {
+			\WP_CLI::error( 'That is not a certificate service.' );
+		}
+
+		$done = \BeltoftServices\Ssl\Provision::resolve_marker( $r, (int) ( $assoc_args['adopt'] ?? 0 ) );
+
+		if ( is_wp_error( $done ) ) {
+			\WP_CLI::error( $done->get_error_message() );
+		}
+
+		\WP_CLI::success( isset( $assoc_args['adopt'] ) ? 'The registrar order was adopted.' : 'The marker was cleared. The next run places a new order.' );
+	}
+
+	/**
+	 * Lets a certificate renewal be requested again, after checking at the registrar that the first request did not go through.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <resource-id>
+	 * : The resource (activation) id.
+	 *
+	 * <renewal-order-id>
+	 * : The paid renewal order.
+	 *
+	 * @subcommand renew-retry
+	 *
+	 * @param array<int, string> $args Resource id and order id.
+	 */
+	public function renew_retry( array $args ): void {
+		$r = Resource::find( (int) ( $args[0] ?? 0 ) );
+
+		if ( ! $r || SslDriver::ID !== $r->get( 'driver' ) || ! ctype_digit( (string) ( $args[1] ?? '' ) ) ) {
+			\WP_CLI::error( 'Give a certificate resource id and a renewal order id.' );
+		}
+
+		\WP_CLI::success( \BeltoftServices\Ssl\SslRenewals::retry_marker( $r, (string) $args[1] ) ? 'The renewal can be requested again.' : 'Could not save.' );
+	}
+
+	/**
 	 * Shows the state of one certificate service. Never prints a key or a certificate text.
 	 *
 	 * ## OPTIONS

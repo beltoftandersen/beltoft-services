@@ -374,6 +374,33 @@ class SslOperationsTest extends SslTestCase {
 		$this->assertCount( 1, $posts );
 	}
 
+	public function test_a_sent_renewal_with_no_movement_alerts_staff_once_after_a_while_and_can_be_asked_again(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		list( $r, $order ) = $this->renewal();
+		$id = (string) $r->get( 'remote_id' );
+		$fake = new FakeClient( true );
+		$expires = (string) $r->get( 'ssl_order_expires' );
+		for ( $i = 0; $i < 3; $i++ ) {
+			$fake->reply( 'GET', '/ssl/orders/' . $id, array( 'expiration_date' => $expires ) );
+		}
+		$fake->reply( 'POST', '/ssl/orders/' . $id . '/renew', array( 'id' => (int) $id ) );
+		$fake->reply( 'GET', '/ssl/orders/' . $id, array( 'expiration_date' => $expires ) );
+		remove_all_filters( 'beltoft_services_domains_client' );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertTrue( SslRenewals::renew( $r, (string) $order->get_id() )->is_retry() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( '', (string) $fresh->get( 'alerted' ), 'Too early to alert.' );
+		$times = (array) $fresh->get( 'renew_started_at' );
+		$times[ (string) $order->get_id() ] = time() - 13 * HOUR_IN_SECONDS;
+		$fresh->set( array( 'renew_started_at' => $times ) );
+		$this->assertTrue( SslRenewals::renew( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
+		$this->assertNotSame( '', (string) Resource::find( $r->id() )->get( 'alerted' ) );
+		$posts = array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] );
+		$this->assertCount( 1, $posts, 'The request is not sent again by itself.' );
+		$this->assertTrue( SslRenewals::retry_marker( Resource::find( $r->id() ), (string) $order->get_id() ) );
+		$this->assertArrayNotHasKey( (string) $order->get_id(), (array) Resource::find( $r->id() )->get( 'renew_started' ) );
+	}
+
 	public function test_an_unpaid_order_is_not_renewed(): void {
 		list( $r, $order ) = $this->renewal();
 		$order->set_status( 'pending' );
