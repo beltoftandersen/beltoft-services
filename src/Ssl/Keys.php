@@ -173,7 +173,7 @@ final class Keys {
 		foreach ( Resource::live_ids( SslDriver::KIND ) as $id ) {
 			$r = Resource::find( $id );
 
-			if ( $r && SslDriver::ID === $r->get( 'driver' ) && '' !== (string) $r->get( self::META_KEY ) && (int) $r->get( 'ssl_issued_at' ) > 0 && (int) $r->get( self::META_UNTIL ) < time() && self::purge( $r ) ) {
+			if ( $r && SslDriver::ID === $r->get( 'driver' ) && '' !== (string) $r->get( self::META_KEY ) && (int) $r->get( self::META_UNTIL ) < time() && self::purge( $r ) ) {
 				++$wiped;
 			}
 		}

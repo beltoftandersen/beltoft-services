@@ -151,7 +151,7 @@ class SslOperationsTest extends SslTestCase {
 	public function test_after_the_refund_window_the_order_cannot_be_cancelled(): void {
 		$r = $this->built();
 		$this->assertArrayHasKey( 'ssl_cancel', Operations::offered( $r ) );
-		$r->set( array( 'ssl_issued_at' => time() - 31 * DAY_IN_SECONDS ) );
+		$r->set( array( 'ssl_first_issued_at' => time() - 31 * DAY_IN_SECONDS ) );
 		$fresh = Resource::find( $r->id() );
 		$this->assertArrayNotHasKey( 'ssl_cancel', Operations::offered( $fresh ) );
 		$this->assertTrue( Operations::cancel( $fresh, array( 'confirm' => 'CANCEL' ) )->is_failed() );
@@ -164,10 +164,60 @@ class SslOperationsTest extends SslTestCase {
 		$this->assertSame( '', (string) Resource::find( $r->id() )->get( Keys::META_KEY ) );
 		$this->assertCount( 1, $this->calls( 'POST', '#/cancel$#' ) );
 		$old = $this->built( array( 'meta' => array( 'ssl_name' => 'old.example.com' ) ) );
-		$old->set( array( 'ssl_issued_at' => time() - 60 * DAY_IN_SECONDS ) );
+		$old->set( array( 'ssl_first_issued_at' => time() - 60 * DAY_IN_SECONDS ) );
 		$before = count( $this->calls( 'POST', '#/cancel$#' ) );
 		$this->assertTrue( ( new SslDriver() )->delete( Resource::find( $old->id() ) )->is_done() );
 		$this->assertCount( $before, $this->calls( 'POST', '#/cancel$#' ), 'Outside the window nothing is cancelled.' );
+	}
+
+	public function test_a_reissue_or_a_renewal_does_not_reopen_the_refund_window(): void {
+		$r = $this->built();
+		$first = (int) $r->get( 'ssl_first_issued_at' );
+		$this->assertGreaterThan( 0, $first );
+		$r->set( array( 'ssl_first_issued_at' => time() - 40 * DAY_IN_SECONDS ) );
+		// The authority reissues: the newest certificate is dated now, the window is not.
+		$this->now += 200 * DAY_IN_SECONDS;
+		$result = Operations::refresh( Resource::find( $r->id() ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertGreaterThan( time() - 5, (int) $fresh->get( 'ssl_issued_at' ) );
+		$this->assertSame( time() - 40 * DAY_IN_SECONDS, (int) $fresh->get( 'ssl_first_issued_at' ), 'The first issue date never changes.' );
+		$this->assertFalse( Operations::cancellable( $fresh ) );
+		$this->assertTrue( Operations::cancel( $fresh, array( 'confirm' => 'CANCEL' ) )->is_failed() );
+		$this->assertTrue( $result->is_done() );
+	}
+
+	public function test_a_paid_renewal_ends_the_refund_window(): void {
+		$r = $this->built();
+		$this->assertTrue( Operations::cancellable( $r ) );
+		$r->set( array( 'renewed_orders' => array( '123' ) ) );
+		$this->assertFalse( Operations::cancellable( Resource::find( $r->id() ) ) );
+		$before = count( $this->calls( 'POST', '#/cancel$#' ) );
+		( new SslDriver() )->delete( Resource::find( $r->id() ) );
+		$this->assertCount( $before, $this->calls( 'POST', '#/cancel$#' ), 'Delete does not cancel a renewed order either.' );
+	}
+
+	public function test_the_key_window_starts_at_the_first_certificate_and_a_never_issued_key_is_swept(): void {
+		$r = $this->built();
+		$until = (int) $r->get( Keys::META_UNTIL );
+		$this->assertEqualsWithDelta( time() + 7 * DAY_IN_SECONDS, $until, 5 );
+		$open = $this->ssl_resource( array( 'meta' => array( 'ssl_name' => 'never.example.com' ) ) );
+		( new SslDriver() )->provision( $open );
+		$open = Resource::find( $open->id() );
+		$this->assertNotSame( '', (string) $open->get( Keys::META_KEY ) );
+		$open->set( array( Keys::META_UNTIL => time() - 5, 'state' => 'provisioning' ) );
+		\BeltoftServices\Ssl\Keys::sweep();
+		$this->assertSame( '', (string) Resource::find( $open->id() )->get( Keys::META_KEY ), 'A key whose window passed is wiped even when no certificate came.' );
+	}
+
+	public function test_a_failed_build_wipes_the_key(): void {
+		$this->settings( array( 'ssl_wait_days' => 1 ) );
+		$r = $this->ssl_resource( array( 'meta' => array( 'ssl_validation' => 'email', 'ssl_approver' => 'admin@example.com' ) ) );
+		add_filter( 'beltoft_services_ssl_fake_delay', static fn() => 10 * YEAR_IN_SECONDS );
+		( new SslDriver() )->provision( $r );
+		Resource::find( $r->id() )->set( array( 'ssl_requested_at' => time() - 2 * DAY_IN_SECONDS ) );
+		$this->assertTrue( ( new SslDriver() )->provision( Resource::find( $r->id() ) )->is_failed() );
+		$this->assertSame( '', (string) Resource::find( $r->id() )->get( Keys::META_KEY ) );
+		remove_all_filters( 'beltoft_services_ssl_fake_delay' );
 	}
 
 	public function test_offered_actions_follow_the_state(): void {

@@ -58,6 +58,9 @@ final class Provision {
 			return;
 		}
 
+		// A build that ends here keeps no key for a certificate that does not exist.
+		Keys::purge( $r );
+
 		$done = Clients::registrar()->request( 'POST', '/ssl/orders/' . $id . '/cancel', array( 'id' => (int) $id ) );
 
 		if ( is_wp_error( $done ) ) {
@@ -230,9 +233,13 @@ final class Provision {
 
 			$steps[] = 'deliver';
 
-			if ( ! $r->set( array_merge( $stored->meta(), array( 'steps' => $steps ) ) ) ) {
+			// ssl_first_issued_at is set here only, once: it starts the refund window.
+			if ( ! $r->set( array_merge( $stored->meta(), array( 'steps' => $steps, 'ssl_first_issued_at' => time() ) ) ) ) {
 				return StepResult::retry( 300, 'The certificate could not be saved.' );
 			}
+
+			// The customer's seven days for the key start with the first certificate.
+			Keys::start_window( Resource::find( $r->id() ) ?? $r );
 
 			Emails::send( 'beltoft_services_ssl_issued', Resource::find( $r->id() ) ?? $r );
 		}

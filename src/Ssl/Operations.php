@@ -38,7 +38,13 @@ final class Operations {
 			return false;
 		}
 
-		$issued = (int) $r->get( 'ssl_issued_at' );
+		// A paid renewal ends the window: the refund the registrar gives is for the first year, not for what was renewed after.
+		if ( array() !== (array) $r->get( 'renewed_orders' ) ) {
+			return false;
+		}
+
+		// The window counts from the FIRST issue and never moves: a reissue or the authority's own reissue must not reopen it.
+		$issued = (int) $r->get( 'ssl_first_issued_at' );
 
 		return 0 === $issued || time() < $issued + SslSettings::refund_days() * DAY_IN_SECONDS;
 	}

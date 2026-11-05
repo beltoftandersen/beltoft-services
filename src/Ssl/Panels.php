@@ -275,7 +275,7 @@ final class Panels {
 
 		if ( isset( $actions['ssl_cancel'] ) ) {
 			/* translators: %d: days. */
-			$note = '' !== (string) $r->get( 'ssl_issued_at' ) && (int) $r->get( 'ssl_issued_at' ) > 0 ? sprintf( __( 'You can cancel for a refund until %d days after the certificate was issued.', 'beltoft-services' ), SslSettings::refund_days() ) : '';
+			$note = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( __( 'You can cancel for a refund until %d days after the certificate was issued.', 'beltoft-services' ), SslSettings::refund_days() ) : '';
 			echo '<button type="button" class="button woocommerce-button" data-ssl-cancel>' . esc_html( $actions['ssl_cancel'] ) . '</button> <span class="description">' . esc_html( $note ) . '</span>';
 		}
 
