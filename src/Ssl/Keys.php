@@ -17,6 +17,10 @@ final class Keys {
 	public const META_KEY   = 'ssl_key_enc';
 	public const META_UNTIL = 'ssl_key_until';
 
+	/** The key of a reissue the registrar has not accepted or delivered yet: kept apart so the stored key is never overwritten. */
+	public const META_KEY_NEXT   = 'ssl_key_enc_next';
+	public const META_UNTIL_NEXT = 'ssl_key_until_next';
+
 	/** Days the customer has to take the key, counted from the issue. */
 	public const REVEAL_DAYS = 7;
 
@@ -83,7 +87,26 @@ final class Keys {
 	public static function revealable( Resource $r ): bool {
 		$stored = $r->get( self::META_KEY );
 
-		return is_string( $stored ) && '' !== $stored && (int) $r->get( 'ssl_issued_at' ) > 0 && (int) $r->get( self::META_UNTIL ) >= time();
+		return is_string( $stored ) && '' !== $stored && (int) $r->get( 'ssl_issued_at' ) > 0 && (int) $r->get( self::META_UNTIL ) >= time() && ! self::reissuing( $r );
+	}
+
+	/**
+	 * Is a reissue under way (asked for and not delivered, or a request kept for a retry)? While it is, the stored key is not
+	 * shown: it is about to be replaced.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function reissuing( Resource $r ): bool {
+		return (bool) $r->get( 'ssl_reissue_pending' ) || '' !== (string) $r->get( 'ssl_csr_next' );
+	}
+
+	/**
+	 * Forgets a reissue that was not accepted or never came: its key, request and mode.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function discard_pending( Resource $r ): bool {
+		return $r->set( array( self::META_KEY_NEXT => '', self::META_UNTIL_NEXT => 0, 'ssl_csr_next' => null, 'ssl_key_mode_next' => null, 'ssl_reissue_pending' => false, 'ssl_reissue_at' => null ) );
 	}
 
 	/**
@@ -108,7 +131,7 @@ final class Keys {
 				$stored = $r->get( self::META_KEY );
 
 				// Not before the certificate exists: a key shown early would only be lost.
-				if ( ! is_string( $stored ) || '' === $stored || ! (int) $r->get( 'ssl_issued_at' ) ) {
+				if ( ! is_string( $stored ) || '' === $stored || ! (int) $r->get( 'ssl_issued_at' ) || self::reissuing( $r ) ) {
 					return false;
 				}
 
@@ -142,11 +165,11 @@ final class Keys {
 	public static function purge( Resource $r ): bool {
 		$stored = $r->get( self::META_KEY );
 
-		if ( ( ! is_string( $stored ) || '' === $stored ) && 0 === (int) $r->get( self::META_UNTIL ) ) {
+		if ( ( ! is_string( $stored ) || '' === $stored ) && 0 === (int) $r->get( self::META_UNTIL ) && '' === (string) $r->get( self::META_KEY_NEXT ) ) {
 			return true;
 		}
 
-		return $r->set( array( self::META_KEY => '', self::META_UNTIL => 0 ) );
+		return $r->set( array( self::META_KEY => '', self::META_UNTIL => 0, self::META_KEY_NEXT => '', self::META_UNTIL_NEXT => 0 ) );
 	}
 
 	/**

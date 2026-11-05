@@ -429,8 +429,9 @@ final class Provision {
 	 *
 	 * @param Resource             $r      Resource.
 	 * @param array<string, mixed> $detail The registrar order.
+	 * @param string|null          $csr    The request the certificate must belong to (default: the stored one).
 	 */
-	public static function store_certificate( Resource $r, array $detail ): StepResult {
+	public static function store_certificate( Resource $r, array $detail, ?string $csr = null ): StepResult {
 		$pem  = trim( (string) ( $detail['certificate'] ?? '' ) );
 		$info = '' !== $pem ? Csr::certificate( $pem ) : new \WP_Error( 'ssl_cert', 'empty' );
 
@@ -439,7 +440,7 @@ final class Provision {
 			return StepResult::retry( 300, 'The certificate text is not available yet.' );
 		}
 
-		$wanted = Csr::parse( (string) $r->get( 'ssl_csr' ) );
+		$wanted = Csr::parse( null !== $csr ? $csr : (string) $r->get( 'ssl_csr' ) );
 
 		if ( is_array( $wanted ) && trim( $wanted['public'] ) !== trim( $info['public'] ) ) {
 			Alerts::admin( $r, 'The issued certificate does not belong to the key of the request. It was not stored.' );

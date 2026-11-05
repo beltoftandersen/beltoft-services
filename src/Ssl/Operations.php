@@ -126,6 +126,11 @@ final class Operations {
 	/**
 	 * Reissues the certificate with a new request: the customer's own, or a new key made here. Free for the life of the order.
 	 *
+	 * The new key and request are kept APART (ssl_key_enc_next, ssl_csr_next) until the registrar has delivered a certificate
+	 * for them: the stored key, which belongs to the certificate that works, is never overwritten before that. A refusal throws
+	 * the pending request away; a temporary failure keeps it, and the retry sends the same request instead of making another.
+	 * Only a reissue the registrar accepted counts against the daily limit.
+	 *
 	 * @param Resource             $r    Resource.
 	 * @param array<string, mixed> $args csr (optional).
 	 */
@@ -134,52 +139,37 @@ final class Operations {
 			return StepResult::fail( 'There is no active certificate to reissue.' );
 		}
 
+		if ( $r->get( 'ssl_reissue_pending' ) ) {
+			return StepResult::fail( 'A reissue of this certificate is already in progress.' );
+		}
+
 		$log = array_values( array_filter( array_map( 'intval', (array) $r->get( 'ssl_reissues' ) ), static fn( $t ) => $t > time() - DAY_IN_SECONDS ) );
 
 		if ( count( $log ) >= SslSettings::reissues_per_day() ) {
 			return StepResult::fail( 'This certificate was reissued too often today.' );
 		}
 
-		$name  = (string) $r->get( 'ssl_name' );
-		$level = SslCatalog::level( (int) ( ( (array) $r->get( 'plan' ) )['ssl_product'] ?? 0 ) );
-		$level = '' !== $level ? $level : (string) ( ( (array) $r->get( 'plan' ) )['ssl_level'] ?? 'dv' );
-		$csr   = isset( $args['csr'] ) && is_string( $args['csr'] ) ? trim( $args['csr'] ) : '';
-		$keep  = array();
+		$name = (string) $r->get( 'ssl_name' );
+		$csr  = (string) $r->get( 'ssl_csr_next' );
 
-		if ( '' !== $csr ) {
-			$read = Csr::check( $csr, $name, $level );
+		// A request kept by an earlier attempt that did not get an answer is sent again as it is.
+		if ( '' === $csr ) {
+			$made = self::new_request( $r, $name, $args );
 
-			if ( is_wp_error( $read ) ) {
-				return StepResult::fail( $read->get_error_message() );
+			if ( $made instanceof StepResult ) {
+				return $made;
 			}
 
-			$keep = array( 'ssl_key_mode' => 'own', Keys::META_KEY => '', Keys::META_UNTIL => 0 );
-		} else {
-			$org = Provision::organization( $r, $level );
-
-			if ( $org instanceof StepResult ) {
-				return $org;
+			// Saved before the registrar is asked, so a crash cannot lose the key.
+			if ( ! $r->set( $made ) ) {
+				return StepResult::retry( 60, 'The new request could not be saved.' );
 			}
 
-			$made = Csr::generate( $name, $org );
-
-			if ( is_wp_error( $made ) ) {
-				return StepResult::retry( 300, $made->get_error_message() );
-			}
-
-			$stored = Keys::meta( $made['key'], ( SslSettings::wait_days() + Keys::REVEAL_DAYS ) * DAY_IN_SECONDS );
-
-			if ( null === $stored ) {
-				return StepResult::fail( 'The encryption key is not set, so no private key can be stored.' );
-			}
-
-			$csr  = $made['csr'];
-			$keep = array_merge( $stored, array( 'ssl_key_mode' => 'generate' ) );
+			$csr = (string) $made['ssl_csr_next'];
 		}
 
-		$log[] = time();
-		$id    = (string) $r->get( 'remote_id' );
-		$body  = array(
+		$id   = (string) $r->get( 'remote_id' );
+		$body = array(
 			'id'                        => (int) $id,
 			'csr'                       => $csr,
 			'software_id'               => 'linux',
@@ -191,20 +181,21 @@ final class Operations {
 			$body['approver_email'] = (string) $r->get( 'ssl_approver' );
 		}
 
-		// The new request and its key are saved before the registrar is asked, so a crash cannot lose the key.
-		if ( ! $r->set( array_merge( $keep, array( 'ssl_csr_next' => $csr, 'ssl_reissues' => $log ) ) ) ) {
-			return StepResult::retry( 60, 'The new request could not be saved.' );
-		}
-
 		$sent = Clients::registrar()->request( 'POST', '/ssl/orders/' . $id . '/reissue', $body );
 
 		if ( is_wp_error( $sent ) ) {
+			// A refusal means nothing was changed at the registrar: the request and its key are thrown away. A timeout keeps them.
+			if ( ! LiveClient::is_transient( $sent ) ) {
+				Keys::discard_pending( $r );
+			}
+
 			return self::failure( $r, $sent, 'reissue the certificate' );
 		}
 
-		$after = array( 'ssl_reissue_pending' => true, 'ssl_csr' => $csr, 'ssl_csr_next' => null, 'ssl_action_sent' => null, 'ssl_validation_rows' => array() );
+		$log[] = time();
+		$after = array( 'ssl_reissue_pending' => true, 'ssl_reissue_at' => time(), 'ssl_reissues' => $log, 'ssl_action_sent' => null, 'ssl_validation_rows' => array() );
 
-		// Saved here, not only by the caller: the refresh that is queued below compares the new certificate with this request.
+		// Saved here, not only by the caller: the refresh that is queued below compares the new certificate with the pending request.
 		if ( ! $r->set( $after ) ) {
 			return StepResult::retry( 60, 'The reissue could not be saved.' );
 		}
@@ -212,6 +203,46 @@ final class Operations {
 		Jobs::queue_act( $r->id(), 'refresh', array(), 120 );
 
 		return StepResult::done( $after, 'SSL certificate reissue requested' );
+	}
+
+	/**
+	 * A new request for a reissue, as the meta that keeps it apart from the stored key.
+	 *
+	 * @param Resource             $r    Resource.
+	 * @param string               $name Common name.
+	 * @param array<string, mixed> $args csr (optional).
+	 * @return array<string, mixed>|StepResult
+	 */
+	private static function new_request( Resource $r, string $name, array $args ) {
+		$level = SslCatalog::level( (int) ( ( (array) $r->get( 'plan' ) )['ssl_product'] ?? 0 ) );
+		$level = '' !== $level ? $level : (string) ( ( (array) $r->get( 'plan' ) )['ssl_level'] ?? 'dv' );
+		$csr   = isset( $args['csr'] ) && is_string( $args['csr'] ) ? trim( $args['csr'] ) : '';
+
+		if ( '' !== $csr ) {
+			$read = Csr::check( $csr, $name, $level );
+
+			return is_wp_error( $read ) ? StepResult::fail( $read->get_error_message() ) : array( 'ssl_csr_next' => $csr, 'ssl_key_mode_next' => 'own' );
+		}
+
+		$org = Provision::organization( $r, $level );
+
+		if ( $org instanceof StepResult ) {
+			return $org;
+		}
+
+		$made = Csr::generate( $name, $org );
+
+		if ( is_wp_error( $made ) ) {
+			return StepResult::retry( 300, $made->get_error_message() );
+		}
+
+		$stored = Keys::meta( $made['key'], ( SslSettings::wait_days() + Keys::REVEAL_DAYS ) * DAY_IN_SECONDS );
+
+		if ( null === $stored ) {
+			return StepResult::fail( 'The encryption key is not set, so no private key can be stored.' );
+		}
+
+		return array( Keys::META_KEY_NEXT => $stored[ Keys::META_KEY ], Keys::META_UNTIL_NEXT => $stored[ Keys::META_UNTIL ], 'ssl_csr_next' => $made['csr'], 'ssl_key_mode_next' => 'generate' );
 	}
 
 	/**
@@ -356,23 +387,35 @@ final class Operations {
 		$newer = $info && ! is_wp_error( $info ) && $info['serial'] !== (string) $r->get( 'ssl_serial' ) && $info['to'] >= (int) strtotime( (string) $r->get( 'ssl_valid_to' ) . ' UTC' );
 
 		if ( 'ACT' === $status && $newer ) {
-			$stored = Provision::store_certificate( $r, $detail );
+			$next    = (string) $r->get( 'ssl_csr_next' );
+			$wanted  = $pending && '' !== $next ? Csr::parse( $next ) : null;
+			$promote = is_array( $wanted ) && trim( $wanted['public'] ) === trim( $info['public'] );
+			// While a reissue is pending, a certificate for the OLD request is the authority's own reissue: stored, and the pending one goes on waiting.
+			$stored = Provision::store_certificate( $r, $detail, $promote ? $next : null );
 
 			if ( $stored->is_done() ) {
-				$meta  = array_merge( $meta, $stored->meta(), array( 'ssl_reissue_pending' => false, 'ssl_expiry_alerted' => null ) );
-				$event = $pending ? 'SSL certificate reissued at the customer\'s request' : 'SSL certificate reissued by the certificate authority';
+				$meta  = array_merge( $meta, $stored->meta(), array( 'ssl_expiry_alerted' => null ) );
+				$event = $promote ? 'SSL certificate reissued at the customer\'s request' : 'SSL certificate reissued by the certificate authority';
 
-				if ( $pending ) {
-					Keys::start_window( $r );
+				if ( $promote ) {
+					$meta = array_merge( $meta, self::promotion( $r ) );
 				}
 
 				$r->set( $meta );
-				Emails::send( 'beltoft_services_ssl_reissued', Resource::find( $r->id() ) ?? $r, array( 'ssl_by_customer' => $pending ) );
+				Emails::send( 'beltoft_services_ssl_reissued', Resource::find( $r->id() ) ?? $r, array( 'ssl_by_customer' => $promote ) );
 
 				return StepResult::done( array(), $event );
 			}
 
 			return $stored;
+		}
+
+		// A reissue that never came is given up, with its key, after the wait limit.
+		if ( $pending && (int) $r->get( 'ssl_reissue_at' ) > 0 && time() > (int) $r->get( 'ssl_reissue_at' ) + SslSettings::wait_days() * DAY_IN_SECONDS ) {
+			Keys::discard_pending( $r );
+			Alerts::admin( $r, 'A customer reissue did not produce a certificate within ' . SslSettings::wait_days() . ' days and was given up. The earlier certificate still works.' );
+
+			return StepResult::done( array(), 'SSL reissue given up: no certificate came in time' );
 		}
 
 		if ( $pending && 'REQ' === $status ) {
@@ -402,6 +445,30 @@ final class Operations {
 		}
 
 		return StepResult::done( $meta, $event );
+	}
+
+	/**
+	 * The meta that makes the pending request and key the current ones, once a certificate for them is stored. The key's seven days
+	 * start now.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>
+	 */
+	private static function promotion( Resource $r ): array {
+		$generated = 'generate' === (string) $r->get( 'ssl_key_mode_next' );
+
+		return array(
+			'ssl_csr'               => (string) $r->get( 'ssl_csr_next' ),
+			'ssl_csr_next'          => null,
+			'ssl_key_mode'          => $generated ? 'generate' : 'own',
+			'ssl_key_mode_next'     => null,
+			Keys::META_KEY          => $generated ? (string) $r->get( Keys::META_KEY_NEXT ) : '',
+			Keys::META_UNTIL        => $generated ? time() + Keys::REVEAL_DAYS * DAY_IN_SECONDS : 0,
+			Keys::META_KEY_NEXT     => '',
+			Keys::META_UNTIL_NEXT   => 0,
+			'ssl_reissue_pending'   => false,
+			'ssl_reissue_at'        => null,
+		);
 	}
 
 	/**

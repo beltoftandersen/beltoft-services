@@ -23,7 +23,9 @@ class SslOperationsTest extends SslTestCase {
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$r = Resource::find( $r->id() );
 		$this->assertTrue( (bool) $r->get( 'ssl_reissue_pending' ) );
-		$this->assertNotSame( $old_key, Keys::existing( $r ), 'A new key was made.' );
+		$this->assertSame( $old_key, Keys::existing( $r ), 'The stored key is not overwritten before a certificate for the new one exists.' );
+		$this->assertNotSame( '', (string) $r->get( Keys::META_KEY_NEXT ), 'The new key waits apart.' );
+		$this->assertFalse( Keys::revealable( $r ), 'No key is shown while a reissue is pending.' );
 		$this->assertCount( 1, $this->calls( 'POST', '#/reissue$#' ) );
 		$this->assertStringNotContainsString( 'PRIVATE KEY', (string) wp_json_encode( $this->calls( 'POST', '#/reissue$#' ) ) );
 
@@ -34,6 +36,9 @@ class SslOperationsTest extends SslTestCase {
 		$this->assertFalse( (bool) $r->get( 'ssl_reissue_pending' ) );
 		$this->assertNotSame( $old, (string) $r->get( 'ssl_serial' ) );
 		$this->assertTrue( Keys::revealable( $r ), 'The new key can be taken.' );
+		$this->assertNotSame( $old_key, Keys::existing( $r ), 'The new key is the current one now.' );
+		$this->assertSame( '', (string) $r->get( Keys::META_KEY_NEXT ) );
+		$this->assertSame( '', (string) $r->get( 'ssl_csr_next' ) );
 		$this->assertNotEmpty( array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'new certificate' ) ) );
 	}
 
@@ -44,12 +49,70 @@ class SslOperationsTest extends SslTestCase {
 		$made = Csr::generate( 'example.com', array( 'countryName' => 'DK' ) );
 		$this->assertTrue( Operations::reissue( $r, array( 'csr' => $made['csr'] ) )->is_done() );
 		$r = Resource::find( $r->id() );
-		$this->assertSame( '', (string) $r->get( Keys::META_KEY ) );
-		$this->assertSame( 'own', $r->get( 'ssl_key_mode' ) );
+		$this->assertNotSame( '', (string) $r->get( Keys::META_KEY ), 'The old key stays until the new certificate is there.' );
+		$this->assertSame( 'generate', $r->get( 'ssl_key_mode' ) );
 		$this->now += 120;
 		$this->assertTrue( Operations::refresh( $r )->is_done() );
+		$this->assertSame( '', (string) Resource::find( $r->id() )->get( Keys::META_KEY ), 'Our own key is gone: the customer holds the new one.' );
+		$this->assertSame( 'own', Resource::find( $r->id() )->get( 'ssl_key_mode' ) );
 		$cert = Csr::certificate( (string) Resource::find( $r->id() )->get( 'ssl_cert' ) );
 		$this->assertSame( Csr::parse( $made['csr'] )['public'], $cert['public'] );
+	}
+
+	public function test_a_refused_reissue_throws_the_pending_key_away_and_does_not_count(): void {
+		$r = $this->built();
+		$key = Keys::existing( $r );
+		$fake = new FakeClient( true );
+		$fake->reply( 'POST', '/ssl/orders/' . $r->get( 'remote_id' ) . '/reissue', new \WP_Error( 'op_1003', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'no' ) ) );
+		remove_all_filters( 'beltoft_services_domains_client' );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertTrue( Operations::reissue( $r, array() )->is_failed() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( $key, Keys::existing( $fresh ), 'The key that belongs to the working certificate is untouched.' );
+		$this->assertSame( '', (string) $fresh->get( Keys::META_KEY_NEXT ) );
+		$this->assertSame( '', (string) $fresh->get( 'ssl_csr_next' ) );
+		$this->assertSame( array(), (array) $fresh->get( 'ssl_reissues' ), 'A refused reissue does not count.' );
+		$this->assertTrue( Keys::revealable( $fresh ) );
+	}
+
+	public function test_a_timeout_keeps_the_pending_request_and_the_retry_sends_the_same_one(): void {
+		$r = $this->built();
+		$id = (string) $r->get( 'remote_id' );
+		$fake = new FakeClient( true );
+		$fake->reply( 'POST', '/ssl/orders/' . $id . '/reissue', new \WP_Error( 'transport', 'x' ) );
+		remove_all_filters( 'beltoft_services_domains_client' );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$this->assertTrue( Operations::reissue( $r, array() )->is_retry() );
+		$fresh = Resource::find( $r->id() );
+		$csr = (string) $fresh->get( 'ssl_csr_next' );
+		$next = (string) $fresh->get( Keys::META_KEY_NEXT );
+		$this->assertNotSame( '', $csr );
+		$this->assertSame( array(), (array) $fresh->get( 'ssl_reissues' ) );
+		$this->assertTrue( Operations::reissue( $fresh, array() )->is_done() );
+		$after = Resource::find( $r->id() );
+		$this->assertSame( $next, (string) $after->get( Keys::META_KEY_NEXT ), 'No second key was made.' );
+		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && false !== strpos( $c['path'], '/reissue' ) ) );
+		$this->assertCount( 2, $posts );
+		$this->assertSame( $posts[0]['body']['csr'], $posts[1]['body']['csr'] );
+		$this->assertCount( 1, (array) $after->get( 'ssl_reissues' ) );
+		$this->assertTrue( Operations::reissue( $after, array() )->is_failed(), 'A second reissue while one is pending is refused.' );
+	}
+
+	public function test_a_reissue_that_never_comes_is_given_up_and_the_old_key_survives(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com', 'ssl_wait_days' => 1 ) );
+		$r = $this->built();
+		$key = Keys::existing( $r );
+		add_filter( 'beltoft_services_ssl_fake_delay', static fn() => 10 * YEAR_IN_SECONDS );
+		$this->assertTrue( Operations::reissue( $r, array() )->is_done() );
+		Resource::find( $r->id() )->set( array( 'ssl_reissue_at' => time() - 2 * DAY_IN_SECONDS ) );
+		$this->now += 60;
+		$result = Operations::refresh( Resource::find( $r->id() ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertStringContainsString( 'given up', $result->event() );
+		$this->assertFalse( (bool) $fresh->get( 'ssl_reissue_pending' ) );
+		$this->assertSame( $key, Keys::existing( $fresh ) );
+		$this->assertTrue( Keys::revealable( $fresh ) );
+		remove_all_filters( 'beltoft_services_ssl_fake_delay' );
 	}
 
 	public function test_reissues_are_limited_per_day(): void {
