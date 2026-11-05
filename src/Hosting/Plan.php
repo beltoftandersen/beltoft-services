@@ -41,6 +41,7 @@ final class Plan {
 			'mail_mailboxes' => array( 'number', __( 'Mailboxes (email lite)', 'beltoft-services' ), '', 2, true ),
 			'mail_quota_mb'  => array( 'number', __( 'Mailbox size (MB)', 'beltoft-services' ), '', 1024, true ),
 			'mail_aliases'   => array( 'number', __( 'Mail aliases', 'beltoft-services' ), '', 0, true ),
+			'mail_per_minute' => array( 'number', __( 'Email lite messages per minute', 'beltoft-services' ), __( 'The sending limit of the Email lite domain, all mailboxes together. Overrides the global limit for that domain only.', 'beltoft-services' ), 30, true ),
 			'site_mail_per_day' => array( 'number', __( 'Website mail per day', 'beltoft-services' ), __( 'Messages the websites may send per day through the system mailbox.', 'beltoft-services' ), 100, true ),
 		);
 	}

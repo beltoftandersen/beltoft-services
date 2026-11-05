@@ -133,7 +133,7 @@ final class Mailboxes {
 				}
 
 				// The send limit is not optional on a mail server shared by everyone: without it the mailbox is removed again.
-				$limit = MailSettings::rate_limit();
+				$limit = MailSettings::rate_limit( $r );
 
 				if ( null !== $limit ) {
 					$set = $client->set_mailbox_rate_limit( $email, $limit[0], $limit[1] );

@@ -177,7 +177,7 @@ final class MailDriver implements Driver, NeedsBilling {
 		}
 
 		if ( ! in_array( 'rl', $steps, true ) ) {
-			$limited = $this->domain_rate( $client, $name );
+			$limited = $this->domain_rate( $client, $name, $r );
 
 			if ( is_wp_error( $limited ) ) {
 				return $this->from_error( $limited );
@@ -319,8 +319,8 @@ final class MailDriver implements Driver, NeedsBilling {
 	 * @param string        $domain Domain.
 	 * @return \WP_Error|null
 	 */
-	private function domain_rate( MailcowClient $client, string $domain ): ?\WP_Error {
-		$limit = MailSettings::domain_rate_limit();
+	private function domain_rate( MailcowClient $client, string $domain, ?Resource $r = null ): ?\WP_Error {
+		$limit = MailSettings::domain_rate_limit( $r );
 
 		if ( null === $limit ) {
 			return null;
@@ -438,7 +438,7 @@ final class MailDriver implements Driver, NeedsBilling {
 
 		$client  = MailClients::for();
 		$domain  = (string) $r->get( MailDomain::META_DOMAIN );
-		$limited = $this->domain_rate( $client, $domain );
+		$limited = $this->domain_rate( $client, $domain, $r );
 
 		if ( is_wp_error( $limited ) ) {
 			return StepResult::retry( 300, $limited->get_error_message() );

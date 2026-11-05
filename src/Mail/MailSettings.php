@@ -256,10 +256,25 @@ final class MailSettings {
 	 *
 	 * @return array{0:int,1:string}|null
 	 */
-	public static function rate_limit(): ?array {
-		$day = (int) Settings::get( 'mail_rl_day' );
+	public static function rate_limit( ?\BeltoftServices\Resource $r = null ): ?array {
+		$day = self::override( $r, 'day', (int) Settings::get( 'mail_rl_day' ) );
 
 		return $day > 0 ? array( $day, 'd' ) : null;
+	}
+
+	/**
+	 * A per-resource sending limit (the resource meta `mail_rl`, keys minute and day), which wins over the global
+	 * setting for that resource's domain and mailboxes only. Hosting sets it on the Email lite domain of a plan.
+	 * A key that is not set leaves the global value; a set key, 0 included, replaces it.
+	 *
+	 * @param \BeltoftServices\Resource|null $r       Resource.
+	 * @param string                          $key     minute or day.
+	 * @param int                             $default The global value.
+	 */
+	public static function override( ?\BeltoftServices\Resource $r, string $key, int $default ): int {
+		$set = null === $r ? null : $r->get( 'mail_rl' );
+
+		return is_array( $set ) && isset( $set[ $key ] ) && is_numeric( $set[ $key ] ) ? max( 0, (int) $set[ $key ] ) : $default;
 	}
 
 	/**
@@ -267,8 +282,8 @@ final class MailSettings {
 	 *
 	 * @return array{0:int,1:string}|null
 	 */
-	public static function domain_rate_limit(): ?array {
-		$minute = (int) Settings::get( 'mail_rl_minute' );
+	public static function domain_rate_limit( ?\BeltoftServices\Resource $r = null ): ?array {
+		$minute = self::override( $r, 'minute', (int) Settings::get( 'mail_rl_minute' ) );
 
 		return $minute > 0 ? array( $minute, 'm' ) : null;
 	}
