@@ -28,6 +28,10 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
  * - POST   hosting/mail                    domain: sets up Email lite
+ * - GET    hosting/backups                 the backups, the safety point
+ * - POST   hosting/backups                 back up now (3 a day)
+ * - POST   hosting/backups/restore         scope (account, files, database), volid, slug
+ * - POST   hosting/backups/undo            back to the safety point
  * - POST   hosting/checklist              item (build or backups) or dismiss
  * - POST   hosting/mail/sites              websites send their mail from the Email lite domain
  */
@@ -98,6 +102,21 @@ final class HostingRoutes {
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true ) ),
 		) );
+		register_rest_route( $ns, $base . '/backups', array(
+			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'backups' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ),
+			array( 'methods' => $post, 'callback' => array( __CLASS__, 'backup_now' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ),
+		) );
+		register_rest_route( $ns, $base . '/backups/restore', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'restore' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array(
+				'scope' => array( 'type' => 'string', 'required' => true, 'description' => 'account, files or database.' ),
+				'volid' => array( 'type' => 'string', 'required' => true, 'description' => 'The backup, from the list.' ),
+				'slug'  => array( 'type' => 'string', 'description' => 'The website, for files and database.' ),
+			),
+		) );
+		register_rest_route( $ns, $base . '/backups/undo', array( 'methods' => $post, 'callback' => array( __CLASS__, 'undo' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ) );
 		register_rest_route( $ns, $base . '/checklist', array(
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'checklist' ),
@@ -167,6 +186,7 @@ final class HostingRoutes {
 			'not_ready'    => 409,
 			'not_hosting'  => 409,
 			'not_found'    => 404,
+			'busy_round'   => 409,
 			'failed'       => 502,
 			'rate_limited' => 429,
 		)[ $code ] ?? 400;
@@ -258,6 +278,24 @@ final class HostingRoutes {
 
 	public static function enable_mail( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->enable_mail( (string) $request['domain'] ), 201 );
+	}
+
+	public static function backups( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, Routes::STATUS_RATE_LIMIT );
+
+		return $r instanceof Resource ? self::ok( ( new HostingActions( $r ) )->backups() ) : $r;
+	}
+
+	public static function backup_now( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->backup_now(), 202 );
+	}
+
+	public static function restore( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->restore( (string) $request['scope'], (string) $request['volid'], (string) $request['slug'] ), 202 );
+	}
+
+	public static function undo( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->undo(), 202 );
 	}
 
 	public static function checklist( \WP_REST_Request $request ): \WP_REST_Response {

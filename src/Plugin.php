@@ -72,6 +72,8 @@ final class Plugin {
 		Mail\MailRoutes::register();
 		Hosting\HostingRoutes::register();
 		Hosting\HostingUsage::register();
+		Hosting\HostingBackups::register();
+		Hosting\HostingRestore::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
 		Mail\MailAccess::register();

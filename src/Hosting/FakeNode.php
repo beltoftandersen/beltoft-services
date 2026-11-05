@@ -91,6 +91,9 @@ class FakeNode implements Client {
 	private static function blank(): array {
 		return array(
 			'nodes' => array(),
+			'storages' => array(),
+			'backups'  => array(),
+			'clock'    => 0,
 			'cts'   => array(),
 			'pools' => array(),
 			'tasks' => array(),
@@ -111,6 +114,28 @@ class FakeNode implements Client {
 			'node'   => $name,
 			'status' => 'online',
 		);
+		$this->save();
+	}
+
+	/**
+	 * Adds a backup storage.
+	 *
+	 * @param string $id Storage id.
+	 */
+	public function add_storage( string $id ): void {
+		$this->load();
+		$this->state['storages'][ $id ] = true;
+		$this->save();
+	}
+
+	/**
+	 * Sets the clock the fake stamps backups and snapshots with (0: the real one).
+	 *
+	 * @param int $time Unix time.
+	 */
+	public function set_clock( int $time ): void {
+		$this->load();
+		$this->state['clock'] = $time;
 		$this->save();
 	}
 
@@ -347,6 +372,37 @@ class FakeNode implements Client {
 			array( 'POST', $ct . '/status/stop$#', 'h_stop', array() ),
 			array( 'GET', $ct . '/firewall/options$#', 'h_fw_get', array() ),
 			array( 'PUT', $ct . '/firewall/options$#', 'h_fw_put', array_fill_keys( self::FIREWALL_KEYS, array( 'string', false ) ) ),
+			array( 'POST', '#^/nodes/([A-Za-z0-9.\-]+)/vzdump$#', 'h_vzdump', array(
+				'vmid'           => array( 'int', true ),
+				'storage'        => array( 'string', true ),
+				'mode'           => array( 'string', false ),
+				'notes-template' => array( 'string', false ),
+			) ),
+			array( 'GET', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content$#', 'h_content_list', array(
+				'content' => array( 'string', false ),
+				'vmid'    => array( 'int', false ),
+			) ),
+			array( 'DELETE', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content/(.+)$#', 'h_content_delete', array() ),
+			array( 'DELETE', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/prunebackups$#', 'h_prune', array(
+				'vmid'          => array( 'int', false ),
+				'type'          => array( 'string', false ),
+				'prune-backups' => array( 'string', true ),
+			) ),
+			array( 'POST', '#^/nodes/([A-Za-z0-9.\-]+)/lxc$#', 'h_restore', array(
+				'vmid'         => array( 'int', true ),
+				'ostemplate'   => array( 'string', true ),
+				'restore'      => array( 'bool', false ),
+				'force'        => array( 'bool', false ),
+				'storage'      => array( 'string', false ),
+				'unprivileged' => array( 'bool', false ),
+			) ),
+			array( 'GET', $ct . '/snapshot$#', 'h_snap_list', array() ),
+			array( 'POST', $ct . '/snapshot$#', 'h_snap_create', array(
+				'snapname'    => array( 'string', true ),
+				'description' => array( 'string', false ),
+			) ),
+			array( 'POST', $ct . '/snapshot/([A-Za-z0-9_\-]+)/rollback$#', 'h_snap_rollback', array() ),
+			array( 'DELETE', $ct . '/snapshot/([A-Za-z0-9_\-]+)$#', 'h_snap_delete', array() ),
 			array( 'DELETE', $ct . '$#', 'h_delete', array(
 				'purge'                      => array( 'bool', false ),
 				'destroy-unreferenced-disks' => array( 'bool', false ),
@@ -751,6 +807,332 @@ class FakeNode implements Client {
 				}
 
 				unset( $this->state['cts'][ $vmid ] );
+			}
+		);
+	}
+
+	/**
+	 * The clock.
+	 */
+	private function now(): int {
+		return (int) $this->state['clock'] > 0 ? (int) $this->state['clock'] : time();
+	}
+
+	/**
+	 * POST /nodes/{node}/vzdump: a task that stores a backup of a container (with a copy of its config, modelled).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_vzdump( array $a, array $p ) {
+		$ct = $this->state['cts'][ $p['vmid'] ] ?? null;
+
+		if ( null === $ct || $ct['node'] !== $a[0] ) {
+			return $this->error( 500, 'no such container' );
+		}
+
+		if ( ! isset( $this->state['storages'][ $p['storage'] ] ) ) {
+			return $this->error( 500, "storage '" . $p['storage'] . "' does not exist" );
+		}
+
+		$vmid    = (int) $p['vmid'];
+		$storage = (string) $p['storage'];
+		$notes   = str_replace( '{{guestname}}', (string) $ct['name'], (string) ( $p['notes-template'] ?? '{{guestname}}' ) );
+		$time    = $this->now();
+
+		return $this->new_task(
+			$a[0],
+			'vzdump',
+			(string) $vmid,
+			function () use ( $vmid, $storage, $notes, $time, $ct ) {
+				$this->state['backups'][] = array(
+					'volid'   => $storage . ':backup/ct/' . $vmid . '/' . gmdate( 'Y-m-d\TH:i:s\Z', $time ),
+					'vmid'    => $vmid,
+					'storage' => $storage,
+					'ctime'   => $time,
+					'size'    => 1073741824,
+					'notes'   => $notes,
+					'content' => 'backup',
+					'format'  => 'pbs-ct',
+					'config'  => $ct['config'],
+					'pool'    => $ct['pool'],
+				);
+			}
+		);
+	}
+
+	/**
+	 * GET /nodes/{node}/storage/{storage}/content.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_content_list( array $a, array $p ) {
+		$out = array();
+
+		foreach ( $this->state['backups'] as $b ) {
+			if ( $b['storage'] === $a[1] && ( ! isset( $p['vmid'] ) || (int) $b['vmid'] === (int) $p['vmid'] ) ) {
+				$out[] = array_diff_key( $b, array( 'config' => 1, 'pool' => 1 ) );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * DELETE /nodes/{node}/storage/{storage}/content/{volid}: a task.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_content_delete( array $a, array $p ) {
+		unset( $p );
+		$volid = rawurldecode( $a[2] );
+
+		foreach ( $this->state['backups'] as $b ) {
+			if ( $b['volid'] === $volid && $b['storage'] === $a[1] ) {
+				return $this->new_task(
+					$a[0],
+					'imgdel',
+					$volid,
+					function () use ( $volid ) {
+						$this->state['backups'] = array_values( array_filter( $this->state['backups'], static fn( $x ) => $x['volid'] !== $volid ) );
+					}
+				);
+			}
+		}
+
+		return $this->error( 500, 'volume does not exist' );
+	}
+
+	/**
+	 * DELETE /nodes/{node}/storage/{storage}/prunebackups: a task. `keep-daily=N` keeps the newest backup of each of
+	 * the last N days that have one.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_prune( array $a, array $p ) {
+		if ( 1 !== preg_match( '/^keep-daily=(\d+)$/D', (string) $p['prune-backups'], $m ) ) {
+			return $this->error( 400, 'Parameter verification failed. prune-backups: invalid format' );
+		}
+
+		$keep    = (int) $m[1];
+		$storage = $a[1];
+		$vmid    = isset( $p['vmid'] ) ? (int) $p['vmid'] : 0;
+
+		return $this->new_task(
+			$a[0],
+			'prunebackups',
+			(string) $vmid,
+			function () use ( $keep, $storage, $vmid ) {
+				$mine = array_filter( $this->state['backups'], static fn( $b ) => $b['storage'] === $storage && ( 0 === $vmid || (int) $b['vmid'] === $vmid ) );
+				usort( $mine, static fn( $x, $y ) => $y['ctime'] <=> $x['ctime'] );
+				$days = array();
+				$drop = array();
+
+				foreach ( $mine as $b ) {
+					$day = gmdate( 'Y-m-d', (int) $b['ctime'] );
+
+					if ( isset( $days[ $day ] ) || count( $days ) >= $keep ) {
+						$drop[] = $b['volid'];
+						continue;
+					}
+
+					$days[ $day ] = true;
+				}
+
+				$this->state['backups'] = array_values( array_filter( $this->state['backups'], static fn( $b ) => ! in_array( $b['volid'], $drop, true ) ) );
+			}
+		);
+	}
+
+	/**
+	 * POST /nodes/{node}/lxc with restore=1: a task that puts a backup's config back on the container id. An
+	 * existing container needs force=1. The container is stopped afterwards (modelled).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_restore( array $a, array $p ) {
+		$archive = null;
+
+		foreach ( $this->state['backups'] as $b ) {
+			if ( $b['volid'] === $p['ostemplate'] ) {
+				$archive = $b;
+			}
+		}
+
+		if ( empty( $p['restore'] ) ) {
+			return $this->error( 501, 'Only restore is modelled' );
+		}
+
+		if ( null === $archive ) {
+			return $this->error( 500, 'unable to restore: the archive does not exist' );
+		}
+
+		$id = (int) $p['vmid'];
+
+		if ( isset( $this->state['cts'][ $id ] ) && empty( $p['force'] ) ) {
+			return $this->error( 500, 'CT ' . $id . ' already exists' );
+		}
+
+		if ( isset( $this->state['cts'][ $id ] ) && 'running' === $this->state['cts'][ $id ]['status'] ) {
+			return $this->error( 500, 'CT is running - restore failed' );
+		}
+
+		return $this->new_task(
+			$a[0],
+			'vzrestore',
+			(string) $id,
+			function () use ( $id, $archive, $a ) {
+				$old  = $this->state['cts'][ $id ] ?? array();
+				$name = (string) ( $archive['config']['hostname'] ?? 'CT' . $id );
+
+				$this->state['cts'][ $id ] = array(
+					'vmid'             => $id,
+					'node'             => $a[0],
+					'name'             => $name,
+					'status'           => 'stopped',
+					'template'         => 0,
+					'pool'             => (string) ( $old['pool'] ?? $archive['pool'] ),
+					'config'           => $archive['config'],
+					'firewall_options' => (array) ( $old['firewall_options'] ?? array() ),
+					'restored_from'    => $archive['volid'],
+					'snapshots'        => (array) ( $old['snapshots'] ?? array() ), // Modelled: whether a forced restore keeps snapshots is to be verified on a real node.
+				);
+			}
+		);
+	}
+
+	/**
+	 * GET .../snapshot.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snap_list( array $a, array $p ) {
+		unset( $p );
+		$ct = $this->find( $a );
+
+		if ( is_wp_error( $ct ) ) {
+			return $ct;
+		}
+
+		$out = array();
+
+		foreach ( (array) ( $ct['snapshots'] ?? array() ) as $name => $s ) {
+			$out[] = array( 'name' => $name, 'snaptime' => $s['time'], 'description' => $s['description'] );
+		}
+
+		$out[] = array( 'name' => 'current', 'description' => 'You are here!' );
+
+		return $out;
+	}
+
+	/**
+	 * POST .../snapshot: a task.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snap_create( array $a, array $p ) {
+		$ct = $this->find( $a );
+
+		if ( is_wp_error( $ct ) ) {
+			return $ct;
+		}
+
+		if ( 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9_\-]{0,39}$/D', (string) $p['snapname'] ) ) {
+			return $this->error( 400, 'Parameter verification failed. snapname: invalid format' );
+		}
+
+		if ( isset( $ct['snapshots'][ $p['snapname'] ] ) ) {
+			return $this->error( 500, 'snapshot name already used' );
+		}
+
+		$vmid = (int) $ct['vmid'];
+		$name = (string) $p['snapname'];
+		$desc = (string) ( $p['description'] ?? '' );
+		$time = $this->now();
+
+		return $this->new_task(
+			$a[0],
+			'vzsnapshot',
+			(string) $vmid,
+			function () use ( $vmid, $name, $desc, $time ) {
+				$this->state['cts'][ $vmid ]['snapshots'][ $name ] = array(
+					'time'        => $time,
+					'description' => $desc,
+					'config'      => $this->state['cts'][ $vmid ]['config'],
+				);
+			}
+		);
+	}
+
+	/**
+	 * POST .../snapshot/{name}/rollback: a task. A running container is refused (modelled).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snap_rollback( array $a, array $p ) {
+		unset( $p );
+		$ct = $this->find( $a );
+
+		if ( is_wp_error( $ct ) ) {
+			return $ct;
+		}
+
+		if ( ! isset( $ct['snapshots'][ $a[2] ] ) ) {
+			return $this->error( 500, 'snapshot does not exist' );
+		}
+
+		if ( 'running' === $ct['status'] ) {
+			return $this->error( 500, 'CT is running - rollback failed' );
+		}
+
+		$vmid = (int) $ct['vmid'];
+		$name = $a[2];
+
+		return $this->new_task(
+			$a[0],
+			'vzrollback',
+			(string) $vmid,
+			function () use ( $vmid, $name ) {
+				$this->state['cts'][ $vmid ]['config']        = $this->state['cts'][ $vmid ]['snapshots'][ $name ]['config'];
+				$this->state['cts'][ $vmid ]['rolled_back_to'] = $name;
+			}
+		);
+	}
+
+	/**
+	 * DELETE .../snapshot/{name}: a task.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_snap_delete( array $a, array $p ) {
+		unset( $p );
+		$ct = $this->find( $a );
+
+		if ( is_wp_error( $ct ) ) {
+			return $ct;
+		}
+
+		if ( ! isset( $ct['snapshots'][ $a[2] ] ) ) {
+			return $this->error( 500, 'snapshot does not exist' );
+		}
+
+		$vmid = (int) $ct['vmid'];
+		$name = $a[2];
+
+		return $this->new_task(
+			$a[0],
+			'vzdelsnapshot',
+			(string) $vmid,
+			function () use ( $vmid, $name ) {
+				unset( $this->state['cts'][ $vmid ]['snapshots'][ $name ] );
 			}
 		);
 	}

@@ -45,6 +45,8 @@ final class HostingAccount {
 					'failed'    => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'confirm'   => __( 'Type the website name to remove it. Its files and database are deleted.', 'beltoft-services' ),
 					'opening'   => __( 'Opening WordPress...', 'beltoft-services' ),
+					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
+					'confirmUndo' => __( 'Go back to the safety copy? Changes made since the restore are lost.', 'beltoft-services' ),
 				),
 			)
 		);
@@ -200,6 +202,8 @@ final class HostingAccount {
 			self::print_forms( $limits, $sites );
 		}
 
+		self::print_backups( $r, $sites, $ready );
+
 		$mail = SiteMail::child_of( $r );
 
 		echo '<p>';
@@ -215,6 +219,80 @@ final class HostingAccount {
 		}
 
 		echo '</p><p class="beltoft-hosting-message" role="status" aria-live="polite"></p></div>';
+	}
+
+	/**
+	 * The backups: the stored list, Back up now, the restore buttons and Undo. Nothing here calls the node.
+	 *
+	 * @param Resource                         $r     Hosting resource.
+	 * @param array<int, array<string, mixed>> $sites Sites.
+	 * @param bool                             $ready Whether the account takes changes.
+	 */
+	private static function print_backups( Resource $r, array $sites, bool $ready ): void {
+		if ( ! HostingBackups::enabled( $r ) ) {
+			return;
+		}
+
+		$list   = HostingBackups::stored( $r );
+		$safety = HostingRestore::safety( $r );
+		$busy   = ( new HostingBackups( $r ) )->active() || HostingRestore::active( $r );
+
+		echo '<div class="beltoft-hosting-backups"><h4>' . esc_html__( 'Backups', 'beltoft-services' ) . '</h4>';
+
+		if ( $busy ) {
+			echo '<p>' . esc_html__( 'A backup or a restore is running.', 'beltoft-services' ) . '</p>';
+		}
+
+		if ( array() === $list ) {
+			echo '<p>' . esc_html__( 'No backups yet. The first one is made tonight.', 'beltoft-services' ) . '</p>';
+		} else {
+			echo '<table class="beltoft-hosting-backup-list"><thead><tr><th>' . esc_html__( 'Date', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Kind', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Size', 'beltoft-services' ) . '</th>' . ( $ready && ! $busy ? '<th></th>' : '' ) . '</tr></thead><tbody>';
+
+			foreach ( $list as $b ) {
+				printf(
+					'<tr><td>%1$s</td><td>%2$s</td><td>%3$s</td>',
+					esc_html( wp_date( 'j F Y, H:i', (int) $b['ctime'] ) ),
+					esc_html( 'manual' === $b['kind'] ? __( 'Manual', 'beltoft-services' ) : __( 'Nightly', 'beltoft-services' ) ),
+					esc_html( size_format( (int) $b['size'] ) )
+				);
+
+				if ( $ready && ! $busy ) {
+					printf(
+						'<td><button type="button" data-hosting-action="restore" data-scope="account" data-volid="%1$s">%2$s</button> <button type="button" data-hosting-action="restore" data-scope="files" data-volid="%1$s">%3$s</button> <button type="button" data-hosting-action="restore" data-scope="database" data-volid="%1$s">%4$s</button></td>',
+						esc_attr( (string) $b['volid'] ),
+						esc_html__( 'Restore everything', 'beltoft-services' ),
+						esc_html__( 'Restore files', 'beltoft-services' ),
+						esc_html__( 'Restore database', 'beltoft-services' )
+					);
+				}
+
+				echo '</tr>';
+			}
+
+			echo '</tbody></table>';
+		}
+
+		if ( $ready && ! $busy ) {
+			echo '<p>';
+
+			if ( array() !== $sites ) {
+				echo '<select data-hosting-field="restore_slug" aria-label="' . esc_attr__( 'Website to restore', 'beltoft-services' ) . '">';
+
+				foreach ( $sites as $site ) {
+					echo '<option value="' . esc_attr( $site['slug'] ) . '">' . esc_html( $site['slug'] ) . '</option>';
+				}
+
+				echo '</select> ';
+			}
+
+			echo '<button type="button" data-hosting-action="backup_now">' . esc_html__( 'Back up now', 'beltoft-services' ) . '</button></p>';
+
+			if ( null !== $safety ) {
+				echo '<p>' . esc_html( sprintf( /* translators: %s: time the safety copy is kept until. */ __( 'A safety copy from before your last restore is kept until %s.', 'beltoft-services' ), wp_date( 'j F Y, H:i', (int) $safety['expires'] ) ) ) . ' <button type="button" data-hosting-action="undo">' . esc_html__( 'Undo the last restore', 'beltoft-services' ) . '</button></p>';
+			}
+		}
+
+		echo '</div>';
 	}
 
 	/**

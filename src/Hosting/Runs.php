@@ -321,6 +321,20 @@ trait Runs {
 	}
 
 	/**
+	 * Did the task a poll just collected belong to this step and phase? A resumed round must not start the same task
+	 * again once it ended.
+	 *
+	 * @param string $step  Step name given to run_task().
+	 * @param string $phase Phase given to run_task().
+	 * @return bool|null True: it ended well. False: it failed. Null: no such task ended in this run.
+	 */
+	protected function just_finished( string $step, string $phase ): ?bool {
+		$f = $this->finished;
+
+		return is_array( $f ) && $f['step'] === $step && $f['phase'] === $phase ? (bool) $f['ok'] : null;
+	}
+
+	/**
 	 * Runs one agent job and returns its result. The job id is the resource uuid, the name and a generation
 	 * kept in the resource meta: the same id while the job is in flight (the agent returns the same job, so a
 	 * retry never runs it twice), a new one after the job finished or failed (so a later pause or a retry after

@@ -131,7 +131,7 @@ class FakeAgentTest extends TestCase {
 		$this->assertArrayNotHasKey( 'c1', $a->state()['edge'] );
 
 		$this->assertEquals( array( 'ok' => true, 'loaders' => (object) array() ), $a->submit( 'agent.health', array(), 'j12' )['result'] );
-		$this->assertSame( array( 'ok' => true ), $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'j13' )['result'] );
+		$this->assertSame( array( 'dumped' => true, 'label' => 'nightly' ), $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'j13' )['result'] );
 	}
 
 	public function test_site_jobs_need_a_prepared_container_and_a_created_site(): void {

@@ -86,6 +86,7 @@ abstract class HostingCase extends TestCase {
 
 		$this->node->add_node( 'pve1' );
 		$this->node->add_pool( 'hosting-pool' );
+		$this->node->add_storage( 'pbs-store' );
 		$this->node->add_template( 9000, 'pve1' );
 		$this->save_node();
 
@@ -154,6 +155,7 @@ abstract class HostingCase extends TestCase {
 					'disk_gb'      => 1000,
 					'db_host'      => '10.200.0.3',
 					'edge_ip'      => '198.51.100.7',
+					'backup_storage' => 'pbs-store',
 					'edge_ipv6'    => '2001:db8::7',
 				),
 				$over

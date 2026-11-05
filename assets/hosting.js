@@ -75,6 +75,18 @@
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
 			case 'enable_mail':
 				return '' === field( panel, 'mail_domain' ) ? null : [ 'POST', base + '/mail', { domain: field( panel, 'mail_domain' ) } ];
+			case 'backup_now':
+				return [ 'POST', base + '/backups', {} ];
+			case 'restore':
+				var scope = button.getAttribute( 'data-scope' ) || '';
+
+				if ( ! window.confirm( text.confirmRestore || '' ) ) {
+					return null;
+				}
+
+				return [ 'POST', base + '/backups/restore', { scope: scope, volid: button.getAttribute( 'data-volid' ) || '', slug: field( panel, 'restore_slug' ) } ];
+			case 'undo':
+				return window.confirm( text.confirmUndo || '' ) ? [ 'POST', base + '/backups/undo', {} ] : null;
 			case 'check_item':
 				return [ 'POST', base + '/checklist', { item: button.getAttribute( 'data-item' ) || '' } ];
 			case 'dismiss_checklist':

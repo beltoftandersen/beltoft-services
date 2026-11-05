@@ -59,6 +59,7 @@ final class Nodes {
 			'mem_gb'        => 0,
 			'disk_gb'       => 0,
 			'db_host'       => '',
+			'backup_storage' => '',
 			'edge_ip'       => '',
 			'edge_ipv6'     => '',
 		);
@@ -334,6 +335,14 @@ final class Nodes {
 
 			$clean[ $key ] = $value;
 		}
+
+		$backup = trim( (string) ( $input['backup_storage'] ?? '' ) );
+
+		if ( '' !== $backup && 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/D', $backup ) ) {
+			return self::error( 'backup_storage', __( 'The backup storage must be a storage id (letters, numbers, dots, dashes, underscores), or empty for no backups.', 'beltoft-services' ) );
+		}
+
+		$clean['backup_storage'] = $backup;
 
 		foreach ( array(
 			'edge_ip'   => FILTER_FLAG_IPV4,

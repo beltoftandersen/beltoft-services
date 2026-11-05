@@ -210,7 +210,7 @@ final class Operations {
 
 		$done = (array) $this->r->get( 'delete_steps' );
 
-		foreach ( array( 'edge', 'dns', 'db', 'ct', 'release' ) as $step ) {
+		foreach ( array( 'edge', 'dns', 'db', 'ct', 'backups', 'release' ) as $step ) {
 			if ( in_array( $step, $done, true ) ) {
 				continue;
 			}
@@ -403,6 +403,23 @@ final class Operations {
 		}
 
 		return StepResult::retry( 0, 'delete: the container is still there' . ( true === $done ? '' : ' (the destroy task failed: ' . $done['failed'] . ')' ) );
+	}
+
+	/**
+	 * Delete step backups: the container's backups are removed from the backup storage (the account is only deleted
+	 * after its retention, so they were kept until now). A node without a backup storage has none.
+	 *
+	 * @param array<string, mixed> $record Record.
+	 * @return true|StepResult
+	 */
+	private function delete_backups( array $record ) {
+		unset( $record );
+
+		if ( '' === (string) $this->node['backup_storage'] ) {
+			return true;
+		}
+
+		return ( new HostingBackups( $this->r ) )->purge_all();
 	}
 
 	/**

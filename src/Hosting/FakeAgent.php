@@ -28,6 +28,10 @@ defined( 'ABSPATH' ) || exit;
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - db.drop: dropped (list of names that existed), idempotent.
  * - db.size: sizes (map of database => bytes; 0 unless set_db_size()).
+ * - backup.prepare: dumped (true), label. The optional label names the dump (a safety point keeps its own).
+ * - backup.file_restore: restored (true), slug. Fails with "unknown site" for a site that does not exist.
+ * - backup.db_restore: restored (true), database. The snapshot argument names the dump: a safety label, or b<unix time>
+ *   of a backup.
  * - db.readonly: account, readonly (the account's database user loses or gets back its write grants; an operation this
  *   plugin adds to the plan's list for the 110 percent storage rule).
  * - agent.health: ok (true), loaders (map "<vmid>/<slug>" => { state, ts }; empty unless set_loaders()).
@@ -158,7 +162,10 @@ class FakeAgent implements Agent {
 		),
 		'edge.cert_push'    => array( 'host' => array( 'host', true ) ),
 		'edge.storage_backup' => array(),
-		'backup.prepare'    => array( 'vmid' => array( 'vmid', true ) ),
+		'backup.prepare'    => array(
+			'vmid'  => array( 'vmid', true ),
+			'label' => array( 'ident', false ),
+		),
 		'backup.file_restore' => array(
 			'vmid'     => array( 'vmid', true ),
 			'slug'     => array( 'ident', true ),
@@ -244,6 +251,8 @@ class FakeAgent implements Agent {
 			'edge'  => array(),
 			'smtp'  => array(),
 			'db_sizes' => array(),
+			'dumps'    => array(),
+			'restores' => array(),
 			'readonly' => array(),
 			'loaders'  => array(),
 		);
@@ -666,6 +675,25 @@ class FakeAgent implements Agent {
 				}
 
 				return array( 'sizes' => $sizes );
+
+			case 'backup.prepare':
+				$this->state['dumps'][ $vmid ][] = $args['label'] ?? 'nightly';
+
+				return array( 'dumped' => true, 'label' => $args['label'] ?? 'nightly' );
+
+			case 'backup.file_restore':
+				if ( ! isset( $this->state['sites'][ $vmid ][ $args['slug'] ] ) ) {
+					return 'unknown site';
+				}
+
+				$this->state['restores'][] = array( 'op' => $op, 'vmid' => $vmid, 'slug' => $args['slug'], 'snapshot' => $args['snapshot'] );
+
+				return array( 'restored' => true, 'slug' => $args['slug'] );
+
+			case 'backup.db_restore':
+				$this->state['restores'][] = array( 'op' => $op, 'account' => $args['account'], 'database' => $args['database'], 'snapshot' => $args['snapshot'] );
+
+				return array( 'restored' => true, 'database' => $args['database'] );
 
 			case 'db.readonly':
 				$this->state['readonly'][ $args['account'] ] = $args['enabled'];
