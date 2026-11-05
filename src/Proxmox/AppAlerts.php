@@ -10,6 +10,9 @@ defined( 'ABSPATH' ) || exit;
 
 final class AppAlerts {
 	public static function failure( Resource $r, string $reason ): void {
+		// The reason stays on the resource (the admin license box shows it), whether or not a mail goes out.
+		$r->set( array( 'app_error' => mb_substr( wp_strip_all_tags( $reason ), 0, 300 ) ) );
+
 		$hash = hash( 'sha256', $reason );
 		if ( $hash === $r->get( 'app_alerted' ) ) {
 			return;

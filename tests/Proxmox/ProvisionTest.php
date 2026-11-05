@@ -370,6 +370,61 @@ class ProvisionTest extends TestCase {
 		return Resource::find( $resource->id() );
 	}
 
+	public function test_an_accepted_app_still_installs_after_an_admin_switches_it_off_for_new_orders(): void {
+		$resource = $this->app_resource_ready();
+
+		// The order was taken while docker was enabled; now it is not (apps_enabled empty), but the cluster can still install apps.
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array(),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		AppInstall::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'installing', $fresh->get( 'app_state' ), (string) $fresh->get( 'app_error' ) );
+		$this->assertNotNull( $this->fake->guest_file( 5000, Apps::JOB ), 'The install job was written.' );
+		$this->assertEmpty( $fresh->get( 'app_error' ) );
+
+		// A NEW order or a reinstall is still refused for an app that is switched off.
+		$cluster = \BeltoftServices\Proxmox\Clusters::get( (string) ( (array) $fresh->get( 'plan' ) )['cluster'] );
+		$this->assertSame( 'The app is not enabled on this cluster', Apps::check( $cluster, array( 'template' => 9001, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 80 ), 'docker', '29' ) );
+		$this->assertNull( Apps::check( $cluster, array( 'template' => 9001, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 80 ), 'docker', '29', false ) );
+	}
+
+	public function test_a_failed_install_records_a_visible_reason_and_tells_the_admin(): void {
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $pre, $args ) use ( &$mails ) { $mails[] = $args; return true; }, 10, 2 );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$resource = $this->app_resource_ready();
+
+		// The cluster can no longer install apps at all (no vendor snippet): unlike "switched off", that is a real refusal.
+		$this->cluster( array(
+			'vendor_snippet' => '',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		AppInstall::run( $resource->id() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( 'failed', $fresh->get( 'app_state' ) );
+		$this->assertStringContainsString( 'cannot install apps', (string) $fresh->get( 'app_error' ), 'A reason is on the resource, not a silent failed state.' );
+		$this->assertCount( 1, array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'App installation failed' ) && false !== strpos( (string) $m['message'], 'cannot install apps' ) ) );
+
+		// Try again clears the reason.
+		$this->cluster( array(
+			'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
+			'apps_ready' => 1,
+			'apps_enabled' => array( 'docker' ),
+			'template_families' => array( 9001 => 'ubuntu-24.04' ),
+		) );
+		AppInstall::retry( Resource::find( $resource->id() ) );
+		$this->assertEmpty( Resource::find( $resource->id() )->get( 'app_error' ) );
+		remove_all_filters( 'pre_wp_mail' );
+	}
+
 	public function test_app_install_and_status_jobs_wait_while_everything_is_paused(): void {
 		$resource = $this->app_resource_ready();
 		$this->settings( array( 'pause_all' => 1 ) );

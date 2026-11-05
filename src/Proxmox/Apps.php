@@ -244,10 +244,20 @@ final class Apps {
 		return 1 === count( $matches ) ? self::version( $id, (string) $matches[0]['id'] ) : null;
 	}
 
-	/** Refuse builds unless this cluster explicitly opted in and the plan fits. */
-	public static function check( array $cluster, array $plan, string $id, string $version_id ): ?string {
-		if ( empty( $cluster['apps_ready'] ) || ! in_array( $id, (array) ( $cluster['apps_enabled'] ?? array() ), true ) || ! preg_match( '#:snippets/vm-vendor-cloudinit-v2\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ) ) ) {
-			return 'The app is not enabled on this cluster';
+	/**
+	 * Refuse builds unless this cluster explicitly opted in and the plan fits (a NEW order, or a reinstall).
+	 *
+	 * @param array<string, mixed> $cluster         Cluster.
+	 * @param array<string, mixed> $plan            Plan with the template.
+	 * @param string               $id              App id.
+	 * @param string               $version_id      Version id.
+	 * @param bool                 $require_enabled Whether the app must be on the cluster's apps_enabled list. An install of an order that was
+	 *                                               already accepted passes false: an admin turning the app off for new orders afterwards does not
+	 *                                               strand a customer who ordered (and paid for) it; the app must still be installable there.
+	 */
+	public static function check( array $cluster, array $plan, string $id, string $version_id, bool $require_enabled = true ): ?string {
+		if ( empty( $cluster['apps_ready'] ) || ( $require_enabled && ! in_array( $id, (array) ( $cluster['apps_enabled'] ?? array() ), true ) ) || ! preg_match( '#:snippets/vm-vendor-cloudinit-v2\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ) ) ) {
+			return $require_enabled ? 'The app is not enabled on this cluster' : 'The cluster cannot install apps (not ready or no vendor snippet)';
 		}
 		$app = self::version( $id, $version_id );
 		if ( null === $app ) {

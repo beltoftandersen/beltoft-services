@@ -80,6 +80,7 @@ final class AppInstall {
 			'app_checked_at'  => null,
 			'app_queue_until' => null,
 			'app_alerted'     => null,
+			'app_error'       => null,
 			'app_ready_since' => null,
 		) );
 		if ( ! $ok ) {
@@ -140,7 +141,8 @@ final class AppInstall {
 			if ( ! $plan['template'] ) {
 				$plan['template'] = Clusters::default_template( $cluster_id );
 			}
-			$why = Apps::check( $cluster, $plan, (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ) );
+			// The order was accepted when it was taken: only an app that cannot be installed here is refused, not one that was switched off for new orders since.
+			$why = Apps::check( $cluster, $plan, (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ), false );
 			if ( null !== $why ) {
 				self::fail( $r, $why );
 				return true;
