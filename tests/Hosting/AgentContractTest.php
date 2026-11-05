@@ -29,6 +29,7 @@ class AgentContractTest extends TestCase {
 		'backup.prepare'    => array( 'label' ),
 		'db.readonly'       => array(),
 		'ct.release'        => array(),
+		'ct.refresh'        => array(),
 		'backup.restore_test' => array(),
 	);
 

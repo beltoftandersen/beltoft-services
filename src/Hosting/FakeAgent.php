@@ -26,6 +26,8 @@ defined( 'ABSPATH' ) || exit;
  *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
  * - site.wp_login_link: url (a one-time address, fake).
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
+ * - ct.refresh: updated (names of the replaced files, none when current), version (12 hex characters). Fails "container not
+ *   running" for an unknown container or one set with set_not_running().
  * - ct.release: released (true), vmid, sites (rows forgotten). The real agent refuses ("container still exists") while the
  *   container is on the node, so the plugin calls it after the destroy; idempotent.
  * - db.drop: dropped (list of names that existed), idempotent.
@@ -70,6 +72,7 @@ class FakeAgent implements Agent {
 		),
 		'ct.stats'          => array( 'vmid' => array( 'vmid', true ) ),
 		'ct.release'        => array( 'vmid' => array( 'vmid', true ) ),
+		'ct.refresh'        => array( 'vmid' => array( 'vmid', true ) ),
 		'site.create'       => array(
 			'vmid'    => array( 'vmid', true ),
 			'slug'    => array( 'ident', true ),
@@ -342,6 +345,18 @@ class FakeAgent implements Agent {
 	public function set_health_extra( array $extra ): void {
 		$this->load();
 		$this->state['health_extra'] = $extra;
+		$this->save();
+	}
+
+	/**
+	 * Makes ct.refresh fail with "container not running" for a container.
+	 *
+	 * @param int  $vmid Container id.
+	 * @param bool $off  Not running.
+	 */
+	public function set_not_running( int $vmid, bool $off = true ): void {
+		$this->load();
+		$this->state['not_running'][ $vmid ] = $off;
 		$this->save();
 	}
 
@@ -641,6 +656,20 @@ class FakeAgent implements Agent {
 				return array(
 					'prepared' => true,
 					'hostname' => $args['hostname'],
+				);
+
+			case 'ct.refresh':
+				if ( empty( $this->state['cts'][ $vmid ] ) || ! empty( $this->state['not_running'][ $vmid ] ) ) {
+					return 'container not running';
+				}
+
+				// The files the agent keeps current: the first refresh of a container replaces them, later ones find them current.
+				$first = empty( $this->state['cts'][ $vmid ]['refreshed'] );
+				$this->state['cts'][ $vmid ]['refreshed'] = true;
+
+				return array(
+					'updated' => $first ? array( 'hosting-site', 'hosting-sendmail', '00-hosting.php' ) : array(),
+					'version' => 'a1b2c3d4e5f6',
 				);
 
 			case 'ct.release':

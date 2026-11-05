@@ -453,6 +453,15 @@ final class Nodes {
 		$all[ $id ] = $clean;
 		update_option( self::OPTION, $all, false );
 
+		if ( (int) ( $existing['template'] ?? 0 ) !== (int) $clean['template'] ) {
+			/**
+			 * A node's container template setting changed (or the node is new): containers made from an older one are refreshed.
+			 *
+			 * @param string $id Node id.
+			 */
+			do_action( 'beltoft_services_hosting_template_changed', $id );
+		}
+
 		return true;
 	}
 

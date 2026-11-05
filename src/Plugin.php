@@ -75,6 +75,7 @@ final class Plugin {
 		Hosting\HostingBackups::register();
 		Hosting\HostingRestore::register();
 		Hosting\NodeHealth::register();
+		Hosting\HostingRefresh::register();
 		Hosting\RestoreTest::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
