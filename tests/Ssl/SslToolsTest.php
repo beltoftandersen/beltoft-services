@@ -44,7 +44,7 @@ final class SslToolsTest extends SslTestCase {
 		$tools = Definitions::all();
 		$this->assertSame( Tokens::READ, $tools['ssl_info']['level'] );
 		$this->assertSame( Tokens::READ, $tools['get_ssl_certificate']['level'] );
-		$this->assertSame( Tokens::ACTIONS, $tools['ssl_reissue']['level'] );
+		$this->assertArrayNotHasKey( 'ssl_reissue', $tools, 'A reissue replaces the working key: dashboard only.' );
 		$this->assertSame( Tokens::ACTIONS, $tools['ssl_resend_email']['level'] );
 		$this->assertArrayNotHasKey( 'ssl_cancel', $tools, 'Cancelling has no tool yet.' );
 
@@ -52,8 +52,11 @@ final class SslToolsTest extends SslTestCase {
 			$this->assertSame( 0, preg_match( '/ssl.*(key|private)|(key|private).*ssl/', $name ), $name );
 		}
 
-		$this->assertSame( 'ssl_reissue', ActionMap::ACTIONS['ssl_reissue'] );
-		$this->assertArrayHasKey( 'ssl_cancel', ActionMap::EXCLUDED );
+		foreach ( array( 'ssl_reissue', 'ssl_change_validation', 'ssl_cancel' ) as $action ) {
+			$this->assertArrayNotHasKey( $action, ActionMap::ACTIONS );
+			$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED[ $action ], $action );
+			$this->assertContains( $action, Tokens::dashboard_only_actions(), $action . ' is closed to every token.' );
+		}
 		$this->assertTrue( ActionMap::permits( 'get_ssl_certificate', 'GET', '/resources/5/ssl-certificate' ) );
 		$this->assertFalse( ActionMap::permits( 'ssl_info', 'GET', '/resources/5/ssl-certificate' ) );
 		$this->assertFalse( ActionMap::permits( 'ssl_info', 'POST', '/resources/5/ssl-key' ), 'No tool reaches the key route.' );
@@ -97,16 +100,26 @@ final class SslToolsTest extends SslTestCase {
 		$this->assertNotNull( Keys::existing( Resource::find( $r->id() ) ), 'The key was not touched.' );
 	}
 
-	public function test_reissue_and_resend_run_at_actions_level_only(): void {
+	public function test_resend_runs_at_actions_level_only_and_reissue_has_no_tool(): void {
 		list( $r, $user ) = $this->certificate();
-		$read    = $this->oauth( $user, Tokens::READ );
 		$actions = $this->oauth( $user, Tokens::ACTIONS );
-		$this->assertTrue( $this->tool( 'ssl_reissue', array( 'id' => $r->id() ), $read )['isError'], 'Read cannot reissue.' );
-		$done = $this->json( $this->tool( 'ssl_reissue', array( 'id' => $r->id() ), $actions ) );
-		$this->assertTrue( $done['requested'] );
-		$this->assertContains( 'Claude: SSL certificate reissue requested', $this->history( $r ) );
-		$this->assertCount( 0, $this->calls( 'POST', '#/reissue$#' ), 'It is queued, not done in the request.' );
 		$this->assertTrue( $this->tool( 'ssl_resend_email', array( 'id' => $r->id() ), $actions )['isError'], 'Not offered for a certificate that is not waiting for an email.' );
+	}
+
+	public function test_a_token_cannot_reissue_change_validation_or_cancel_over_rest(): void {
+		list( $r, $user ) = $this->certificate();
+		list( , $actions ) = $this->personal( $user, Tokens::ACTIONS );
+		wp_set_current_user( 0 );
+		$_SERVER['PHP_AUTH_USER'] = (string) get_userdata( $user )->user_login;
+		$_SERVER['PHP_AUTH_PW']   = $actions;
+		wp_set_current_user( (int) apply_filters( 'determine_current_user', false ) );
+		foreach ( array( 'ssl_reissue', 'ssl_change_validation', 'ssl_cancel' ) as $action ) {
+			$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/' . $action );
+			$request->set_header( 'content-type', 'application/json' );
+			$request->set_body( (string) wp_json_encode( array( 'args' => array() ) ) );
+			$this->assertSame( 403, rest_get_server()->dispatch( $request )->get_status(), $action );
+		}
+		$this->assertCount( 0, $this->calls( 'POST', '#/reissue$#' ) );
 	}
 
 	public function test_a_token_cannot_cancel_or_reach_the_key_over_rest(): void {

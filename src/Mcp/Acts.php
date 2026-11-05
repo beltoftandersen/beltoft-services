@@ -33,7 +33,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'ssl_reissue', 'ssl_resend_email' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'ssl_resend_email' );
 
 	/**
 	 * Runs one of the tools.
@@ -115,9 +115,6 @@ final class Acts {
 			case 'remove_email_alias':
 			case 'email_dns_check':
 				return self::email( $name, $args );
-
-			case 'ssl_reissue':
-				return Tools::action( (int) $args['id'], 'ssl_reissue', array(), 'SSL certificate reissue requested' );
 
 			case 'ssl_resend_email':
 				return Tools::action( (int) $args['id'], 'ssl_resend_email', array(), 'SSL approval email requested again' );

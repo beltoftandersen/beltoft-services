@@ -44,7 +44,10 @@ final class Routes {
 	/**
 	 * Arguments kept exactly as sent, because the driver validates them itself.
 	 */
-	private const RAW_ARGS = array( 'records', 'csr' );
+	private const RAW_ARGS = array( 'records' );
+
+	/** Arguments kept as typed for the actions of one driver only: a certificate request is PEM text, and no other action takes one. */
+	private const RAW_ARGS_OF_SSL = array( 'csr' );
 
 	/**
 	 * Requests per user, route and window for the status route, unless filtered: room for
@@ -213,7 +216,7 @@ final class Routes {
 			return self::error( 'beltoft_services_unknown_action', __( 'This action is not available.', 'beltoft-services' ), 403 );
 		}
 
-		$args = self::clean_args( $request['args'] );
+		$args = self::clean_args( $request['args'], $action );
 
 		/**
 		 * An action that needs something bought first (a reinstall to a paid app) answers with the checkout address
@@ -491,10 +494,11 @@ final class Routes {
 	/**
 	 * Action arguments: at most 20 entries with sanitized keys and scalar, sanitized values.
 	 *
-	 * @param mixed $args Raw arguments.
+	 * @param mixed  $args   Raw arguments.
+	 * @param string $action The action they are for.
 	 * @return array<string, string>
 	 */
-	private static function clean_args( $args ): array {
+	private static function clean_args( $args, string $action = '' ): array {
 		$clean = array();
 
 		foreach ( is_array( $args ) ? array_slice( $args, 0, 20, true ) : array() as $key => $value ) {
@@ -506,7 +510,7 @@ final class Routes {
 
 			// A DNS record list is JSON, checked record by record on the server; the text sanitizer
 			// would change real values (a "<", a "%41", repeated spaces). The size is capped.
-			$clean[ $key ] = in_array( $key, self::RAW_ARGS, true ) ? substr( (string) $value, 0, 200000 ) : sanitize_text_field( (string) $value );
+			$clean[ $key ] = in_array( $key, self::RAW_ARGS, true ) || ( 0 === strpos( $action, 'ssl_' ) && in_array( $key, self::RAW_ARGS_OF_SSL, true ) ) ? substr( (string) $value, 0, 200000 ) : sanitize_text_field( (string) $value );
 		}
 
 		return $clean;

@@ -49,7 +49,6 @@ final class ActionMap {
 		'fw_reset'           => 'reset_firewall',
 		'reset_password'     => 'reset_server_password',
 		'db_set_policy'      => 'set_database_eviction_policy',
-		'ssl_reissue'        => 'ssl_reissue',
 		'ssl_resend_email'   => 'ssl_resend_email',
 	);
 
@@ -60,8 +59,9 @@ final class ActionMap {
 		'unlock'            => 'never: a domain transfer is only possible in the dashboard',
 		'set_records'       => 'route: DNS records have their own tools (dns_upsert_record, dns_delete_record)',
 		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
-		'ssl_change_validation' => 'dashboard: the validation method, approver and request are chosen on the certificate page',
-		'ssl_cancel'        => 'later: cancelling is irreversible and ends in a refund a person decides; it needs a confirmation flow and is dashboard only for now',
+		'ssl_reissue'       => 'never: a reissue replaces the key and the certificate that works; it is done in the dashboard, where the key is taken once',
+		'ssl_change_validation' => 'never: the validation method, approver and request are chosen on the certificate page, in the dashboard',
+		'ssl_cancel'        => 'never: cancelling is irreversible and ends in a refund a person decides; it is only done in the dashboard',
 	);
 
 	/**
