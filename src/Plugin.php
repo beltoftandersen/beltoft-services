@@ -57,6 +57,8 @@ final class Plugin {
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
 		Proxmox\ProxmoxSettings::register();
+		Hosting\HostingSettings::register();
+		Hosting\NodesScreen::register();
 		Domains\DomainSettings::register();
 		Mail\MailSettings::register();
 		Mail\MailSetup::register();

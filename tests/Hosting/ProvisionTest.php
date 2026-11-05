@@ -375,10 +375,10 @@ class ProvisionTest extends HostingCase {
 		$r = $this->resource( array( 'cores' => 0 ) );
 		$this->assertStringContainsString( 'cores', $this->provision( $r )->error() );
 
-		delete_option( Config::OPTION );
+		$this->settings( array( 'hosting_preview_zone' => '' ) );
 		$this->assertStringContainsString( 'preview zone', $this->provision( $this->resource() )->error() );
 
-		update_option( Config::OPTION, array( 'preview_zone' => 'preview.example.test' ) );
+		$this->settings( array( 'hosting_preview_zone' => 'preview.example.test' ) );
 		remove_all_filters( 'beltoft_services_key' );
 		$result = $this->provision( $this->resource() );
 		$this->assertTrue( $result->is_failed() );

@@ -336,7 +336,7 @@ final class Provision {
 		foreach ( array(
 			'net0'    => $net,
 			'onboot'  => 1,
-			'tags'    => 'hosting',
+			'tags'    => Config::tag(),
 		) as $key => $value ) {
 			if ( (string) ( $v['config'][ $key ] ?? '' ) !== (string) $value ) {
 				$diff[ $key ] = $value;
@@ -623,7 +623,7 @@ final class Provision {
 			'label'       => sanitize_text_field( (string) ( $given['label'] ?? '' ) ),
 			'php'         => 1 === preg_match( '/^\d\.\d{1,2}$/D', (string) ( $given['php'] ?? '' ) ) ? (string) $given['php'] : Config::get( 'php_default' ),
 			'install'     => ! array_key_exists( 'install', $given ) || ! empty( $given['install'] ),
-			'admin_user'  => 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', (string) ( $given['admin_user'] ?? '' ) ) ? (string) $given['admin_user'] : 'owner',
+			'admin_user'  => 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', (string) ( $given['admin_user'] ?? '' ) ) ? (string) $given['admin_user'] : Config::admin_user(),
 			'admin_email' => sanitize_email( (string) ( $given['admin_email'] ?? ( $license['email'] ?? '' ) ) ),
 		);
 

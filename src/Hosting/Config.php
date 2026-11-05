@@ -7,33 +7,44 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Settings;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The few values that belong to the whole hosting product, not to a node or a plan: the preview zone (the
- * names of the temporary addresses), the PHP version a new site gets and the container naming prefix. Nothing
- * here names real infrastructure: every value is empty or neutral by default, saved in one option and open to a
- * filter. A settings screen comes with a later slice.
+ * The values that belong to the whole hosting product, not to a node or a plan. They are the plugin settings of
+ * the Hosting tab (HostingSettings), read here with their defaults and open to a filter. Nothing names real
+ * infrastructure: every default is empty or neutral.
  */
 final class Config {
 
-	public const OPTION = 'beltoft_services_hosting_settings';
+	/**
+	 * The defaults, by short key. The setting is stored as `hosting_<key>`.
+	 */
+	public const DEFAULTS = array(
+		'preview_zone'      => '',
+		'php_default'       => '8.3',
+		'prefix'            => 'c',
+		'tag'               => 'hosting',
+		'admin_user'        => 'owner',
+		'mem_overcommit'    => '1.5',
+		'disk_overcommit'   => '2',
+		'reserve_gb'        => '9',
+		'alert_percent'     => '80',
+		'db_account_cpu'    => '50',
+		'db_total_cpu'      => '80',
+		'db_minutes'        => '15',
+	);
 
 	/**
-	 * A setting.
+	 * A setting as text.
 	 *
-	 * @param string $key preview_zone, php_default or prefix.
+	 * @param string $key Short key, see DEFAULTS.
 	 * @return string
 	 */
 	public static function get( string $key ): string {
-		$defaults = array(
-			'preview_zone' => '',
-			'php_default'  => '8.3',
-			'prefix'       => 'c',
-		);
-
-		$saved = get_option( self::OPTION, array() );
-		$value = is_array( $saved ) && isset( $saved[ $key ] ) && is_string( $saved[ $key ] ) ? $saved[ $key ] : ( $defaults[ $key ] ?? '' );
+		$value = Settings::get( 'hosting_' . $key );
+		$value = is_scalar( $value ) && '' !== (string) $value ? (string) $value : ( self::DEFAULTS[ $key ] ?? '' );
 
 		/**
 		 * Filters a hosting setting.
@@ -42,6 +53,16 @@ final class Config {
 		 * @param string $key   Setting key.
 		 */
 		return (string) apply_filters( 'beltoft_services_hosting_setting', $value, $key );
+	}
+
+	/**
+	 * A setting as a number, never below a floor.
+	 *
+	 * @param string $key   Short key.
+	 * @param float  $floor Lowest value.
+	 */
+	public static function number( string $key, float $floor = 0.0 ): float {
+		return max( $floor, (float) self::get( $key ) );
 	}
 
 	/**
@@ -63,5 +84,23 @@ final class Config {
 		$prefix = preg_replace( '/[^a-z0-9]/', '', strtolower( self::get( 'prefix' ) ) );
 
 		return ( '' === $prefix ? 'c' : substr( $prefix, 0, 8 ) ) . $resource_id;
+	}
+
+	/**
+	 * The Proxmox tag put on every container (lowercase letters, numbers, dashes).
+	 */
+	public static function tag(): string {
+		$tag = preg_replace( '/[^a-z0-9-]/', '', strtolower( self::get( 'tag' ) ) );
+
+		return '' === $tag ? 'hosting' : substr( $tag, 0, 30 );
+	}
+
+	/**
+	 * The WordPress admin user name a new site gets when the order named none.
+	 */
+	public static function admin_user(): string {
+		$user = strtolower( self::get( 'admin_user' ) );
+
+		return 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', $user ) ? $user : 'owner';
 	}
 }

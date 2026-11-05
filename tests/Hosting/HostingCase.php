@@ -63,7 +63,7 @@ abstract class HostingCase extends TestCase {
 				'admin_email' => 'christian.beltoft@gmail.com',
 			)
 		);
-		update_option( Config::OPTION, array( 'preview_zone' => 'preview.example.test' ) );
+		$this->settings( array( 'hosting_preview_zone' => 'preview.example.test' ) );
 
 		$this->node  = new FakeNode();
 		$this->agent = new FakeAgent();
@@ -101,7 +101,6 @@ abstract class HostingCase extends TestCase {
 		}
 
 		delete_option( Nodes::OPTION );
-		delete_option( Config::OPTION );
 	}
 
 	/**
