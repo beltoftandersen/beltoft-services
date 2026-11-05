@@ -138,7 +138,7 @@ final class PleskLicenceTest extends PaidAppCase {
 		$o     = $this->plesk_order( 'pro' );
 		$title = 'licence ' . (int) $o['licence']->license()['id'] . ' server';
 		// The order went through at Openprovider but the answer was lost: the licence exists, our meta does not know it.
-		$made = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => $title, 'items' => array( 'PLESK-12-VPS-WEB-PRO-1M' ), 'ip_address_binding' => '192.0.2.10' ) );
+		$made = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => $title, 'items' => array( 'PLESK-12-VPS-WEB-PRO-1M' ), 'period' => 1, 'ip_address_binding' => '192.0.2.10' ) );
 		$this->assertIsArray( $made );
 		$before = count( $this->op_calls( 'POST', '/licenses/plesk' ) );
 
@@ -362,7 +362,7 @@ final class PleskLicenceTest extends PaidAppCase {
 	public function test_a_licence_already_gone_counts_as_deleted(): void {
 		$o      = $this->provisioned( 'pro' );
 		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
-		$this->op->reply( 'DELETE', '/licenses/plesk/' . $key_id, new \WP_Error( 'http_404', 'gone', array( 'status' => 404 ) ) );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . $key_id, new \WP_Error( 'op_3108', 'Registrar request failed.', array( 'status' => 404, 'desc' => 'License not found.' ) ) );
 		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'status' => Licenses::STATUS_REVOKED ) ) );
 		Jobs::run( $o['licence']->id() );
 		$this->assertSame( 0, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
@@ -486,5 +486,47 @@ final class PleskLicenceTest extends PaidAppCase {
 		}
 		$this->assertSame( 'bad_request', $client->request( 'TRACE', '/licenses/plesk/1' )->get_error_code() );
 		$this->assertSame( 'credentials_missing', $client->request( 'DELETE', '/licenses/plesk/1' )->get_error_code(), 'A licence delete is allowed; it stops at the missing login, before any request.' );
+	}
+
+	public function test_the_licence_api_wants_item_ids_and_a_period_and_reports_a_missing_licence_as_op_3108(): void {
+		// As the Openprovider sandbox answers (checked live): a SKU is no item, a period is required, a missing key is op_3108.
+		$sku = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => 't', 'items' => array( 'PLSKVPS-ADM-M' ), 'period' => 1 ) );
+		$this->assertWPError( $sku );
+		$this->assertSame( 'op_3103', $sku->get_error_code() );
+
+		$none = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => 't', 'items' => array( 'PLESK-12-VPS-WEB-ADMIN-1M' ) ) );
+		$this->assertSame( 'op_3105', $none->get_error_code() );
+
+		$missing = $this->op->request( 'DELETE', '/licenses/plesk/999999' );
+		$this->assertSame( 'op_3108', $missing->get_error_code() );
+		$this->assertTrue( PleskLicence::gone( $missing ) );
+		$this->assertTrue( PleskLicence::gone( new \WP_Error( 'http_404', 'x', array( 'status' => 404 ) ) ) );
+		$this->assertFalse( PleskLicence::gone( new \WP_Error( 'op_199', 'x', array( 'status' => 500 ) ) ), 'An unknown error is not a gone licence.' );
+
+		// The three editions are the item ids of the sandbox's listing, not the price list's SKUs.
+		$this->assertSame( array( 'admin' => 'PLESK-12-VPS-WEB-ADMIN-1M', 'pro' => 'PLESK-12-VPS-WEB-PRO-1M', 'host' => 'PLESK-12-VPS-WEB-HOST-1M' ), PleskLicence::items() );
+	}
+
+	public function test_the_product_command_sets_the_given_prices_and_stays_a_draft(): void {
+		$this->assertSame( array( 'admin' => '17', 'pro' => '30', 'host' => '60' ), PleskProductCommand::parse_prices( 'admin:17, pro:30,host:60' ) );
+		$this->assertSame( array( 'pro' => '14.5' ), PleskProductCommand::parse_prices( 'pro:14.50' ) );
+
+		foreach ( array( 'gold:10', 'pro:abc', 'pro:0', 'pro:-3', 'pro', 'pro:1.234' ) as $bad ) {
+			$this->assertWPError( PleskProductCommand::parse_prices( $bad ), $bad );
+		}
+
+		$id      = PleskProductCommand::create( array( 'admin' => '17', 'pro' => '30', 'host' => '60' ) );
+		$product = wc_get_product( $id );
+		$this->assertSame( 'draft', $product->get_status() );
+
+		$prices = array();
+		foreach ( $product->get_children() as $vid ) {
+			$v                                                  = wc_get_product( $vid );
+			$prices[ (string) $v->get_meta( '_beltoft_services_plan_tier' ) ] = array( $v->get_regular_price(), get_post_meta( $vid, '_subscription_price', true ) );
+		}
+		$this->assertSame( array( 'admin' => array( '17', '17' ), 'pro' => array( '30', '30' ), 'host' => array( '60', '60' ) ), $prices );
+
+		// Run twice: the command refuses when the product exists, so nothing doubles.
+		$this->assertSame( $id, PleskProductCommand::ensure() );
 	}
 }

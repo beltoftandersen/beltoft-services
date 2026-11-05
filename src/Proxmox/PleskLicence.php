@@ -76,7 +76,12 @@ final class PleskLicence {
 	/** Times the key is written to the server before it is called failed. */
 	private const PUSHES = 3;
 
-	/** The Openprovider items of the three Plesk for VPS editions (monthly), by tier key. */
+	/**
+	 * The Openprovider items of the three Plesk for VPS editions (monthly), by tier key. Checked against the Openprovider
+	 * sandbox's own listing (GET /licenses/items): these are the `item` ids the licence API takes. The price list's SKUs
+	 * (PLSKVPS-ADM-M, PLSKVPS-PRO-M, PLSKVPS-HST-M) are the same editions' `sku_values`, a billing name: the API refuses a
+	 * SKU as an item ("License request has invalid items").
+	 */
 	private const DEFAULT_ITEMS = array(
 		'admin' => 'PLESK-12-VPS-WEB-ADMIN-1M',
 		'pro'   => 'PLESK-12-VPS-WEB-PRO-1M',
@@ -197,6 +202,18 @@ final class PleskLicence {
 
 	private static function is_plesk( Resource $licence ): bool {
 		return self::APP === (string) ( ( (array) $licence->get( 'plan' ) )['app'] ?? '' );
+	}
+
+	/**
+	 * Does an error say the licence does not exist? Openprovider answers HTTP 404 with its own code op_3108 ("License not
+	 * found"), which the client reports as op_3108, never as http_404.
+	 *
+	 * @param \WP_Error $error Error.
+	 */
+	public static function gone( \WP_Error $error ): bool {
+		$data = $error->get_error_data();
+
+		return 'op_3108' === $error->get_error_code() || 'http_404' === $error->get_error_code() || ( is_array( $data ) && 404 === (int) ( $data['status'] ?? 0 ) );
 	}
 
 	private static function client(): RegistrarClient {
@@ -529,7 +546,7 @@ final class PleskLicence {
 			$reply = $client->request( 'DELETE', '/licenses/plesk/' . $key_id );
 
 			// A licence that is gone already is a deleted one.
-			if ( ! is_wp_error( $reply ) || 'http_404' === $reply->get_error_code() ) {
+			if ( ! is_wp_error( $reply ) || self::gone( $reply ) ) {
 				$licence->set( array( 'plesk_key_id' => null, 'plesk_key' => null, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_deleted' => time(), 'plesk_sync_tries' => null ) );
 
 				return true;

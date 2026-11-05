@@ -14,9 +14,10 @@ use BeltoftServices\Proxmox\PleskLicence;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * `wp beltoft-services plesk-product --dry-run|--create`: ONE variable subscription product, "Plesk" (software slug
- * `plesk`, driver proxmox-app, plan field app=plesk), with a "Tier" attribute and three monthly variations (plan fields
- * `tier` and `tier_label`). NO price is set and the product is a draft: the owner sets the prices and publishes it.
+ * `wp beltoft-services plesk-product --dry-run|--create [--prices=admin:17,pro:30,host:60]`: ONE variable subscription
+ * product, "Plesk" (software slug `plesk`, driver proxmox-app, plan field app=plesk), with a "Tier" attribute and three
+ * monthly variations (plan fields `tier` and `tier_label`). The product is a draft: the owner publishes it. Without
+ * --prices no price is set; with it each tier gets its monthly price (the shop's price as entered, EUR).
  * It refuses to run when a product with the slug exists, so it is safe to run twice. The tiers can be changed with the
  * filter `beltoft_services_plesk_tiers`.
  */
@@ -76,11 +77,42 @@ final class PleskProductCommand {
 	}
 
 	/**
+	 * Reads "admin:17,pro:30,host:60" into tier => price. Every tier named must exist and every price must be a positive
+	 * number with at most two decimals.
+	 *
+	 * @param string $raw The option value.
+	 * @return array<string, string>|\WP_Error
+	 */
+	public static function parse_prices( string $raw ) {
+		$out   = array();
+		$tiers = self::tiers();
+
+		foreach ( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) as $pair ) {
+			$parts = explode( ':', $pair, 2 );
+			$key   = strtolower( trim( $parts[0] ) );
+			$price = trim( (string) ( $parts[1] ?? '' ) );
+
+			if ( ! isset( $tiers[ $key ] ) ) {
+				return new \WP_Error( 'tier', sprintf( 'Unknown tier "%s". The tiers are: %s.', $key, implode( ', ', array_keys( $tiers ) ) ) );
+			}
+
+			if ( 1 !== preg_match( '/^\d{1,6}(\.\d{1,2})?$/D', $price ) || (float) $price <= 0 ) {
+				return new \WP_Error( 'price', sprintf( 'The price of "%s" must be a positive number such as 17 or 14.50.', $key ) );
+			}
+
+			$out[ $key ] = (string) (float) $price;
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Creates the product and its variations.
 	 *
+	 * @param array<string, string> $prices Tier => monthly price; a tier without one has no price.
 	 * @return int Product id.
 	 */
-	public static function create(): int {
+	public static function create( array $prices = array() ): int {
 		$tiers   = self::tiers();
 		$product = new \WC_Product_Variable_Subscription();
 		$product->set_name( 'Plesk' );
@@ -125,7 +157,14 @@ final class PleskProductCommand {
 			$variation->set_tax_class( 'parent' );
 			$vid = $variation->save();
 
-			// No price: the owner sets it.
+			// A price only when one was given; otherwise the owner sets it.
+			if ( isset( $prices[ $key ] ) ) {
+				$variation = wc_get_product( $vid );
+				$variation->set_regular_price( $prices[ $key ] );
+				$variation->save();
+				update_post_meta( $vid, '_subscription_price', $prices[ $key ] );
+			}
+
 			foreach ( array(
 				'_subscription_period'          => 'month',
 				'_subscription_period_interval' => '1',
@@ -154,7 +193,10 @@ final class PleskProductCommand {
 	 * : Print the product and its tiers. Nothing is written.
 	 *
 	 * [--create]
-	 * : Create the product (a draft, no prices). Refused when a product with the slug plesk exists.
+	 * : Create the product (a draft). Refused when a product with the slug plesk exists, so it is safe to run twice.
+	 *
+	 * [--prices=<prices>]
+	 * : Monthly price of each tier, for example admin:17,pro:30,host:60 (the shop's price as entered). Without it the tiers have no price.
 	 *
 	 * @param array<int, string>   $args       Positional arguments (none).
 	 * @param array<string, mixed> $assoc_args Flags.
@@ -169,6 +211,16 @@ final class PleskProductCommand {
 			\WP_CLI::error( 'Give exactly one of --dry-run and --create.' );
 		}
 
+		$prices = array();
+
+		if ( isset( $assoc_args['prices'] ) ) {
+			$prices = self::parse_prices( (string) $assoc_args['prices'] );
+
+			if ( is_wp_error( $prices ) ) {
+				\WP_CLI::error( $prices->get_error_message() );
+			}
+		}
+
 		$found = self::existing();
 
 		if ( $found > 0 ) {
@@ -178,14 +230,16 @@ final class PleskProductCommand {
 		$items = PleskLicence::items();
 
 		foreach ( self::tiers() as $key => $name ) {
-			\WP_CLI::log( sprintf( '%s (tier %s): Openprovider item %s, no price', $name, $key, $items[ $key ] ?? 'NOT SET' ) );
+			\WP_CLI::log( sprintf( '%s (tier %s): Openprovider item %s, %s', $name, $key, $items[ $key ] ?? 'NOT SET', isset( $prices[ $key ] ) ? 'price ' . $prices[ $key ] . ' per month' : 'no price' ) );
 		}
 
 		if ( $dry ) {
-			\WP_CLI::log( 'Dry run: would create one draft variable subscription product "Plesk" with these tiers (monthly, no price). Nothing was written.' );
+			\WP_CLI::log( 'Dry run: would create one draft variable subscription product "Plesk" with these tiers (monthly). Nothing was written.' );
 			return;
 		}
 
-		\WP_CLI::success( 'Created draft product ' . self::create() . ' with ' . count( self::tiers() ) . ' tiers and no prices. Set the prices, the costs (Settings, Domains) and publish it.' );
+		$id = self::create( $prices );
+
+		\WP_CLI::success( sprintf( 'Created draft product %1$d with %2$d tiers%3$s. Set the licence costs (Settings, Domains, Plesk licence costs) and publish it.', $id, count( self::tiers() ), array() === $prices ? ' and no prices' : ' and the given prices' ) );
 	}
 }

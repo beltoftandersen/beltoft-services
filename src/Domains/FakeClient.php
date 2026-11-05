@@ -84,13 +84,18 @@ class FakeClient implements Client {
 	 * GET /licenses/plesk (title_pattern, key_id) gives {results[], total}; GET /licenses/plesk/{key_id} gives the
 	 * licence; PUT changes items, title, comment or ip_address_binding and gives {success}; DELETE gives {success};
 	 * GET /licenses/plesk/key/{key_id} gives {key}; POST /licenses/hwids/reset/plesk/{key_id} gives {success}.
+	 * Errors as the Openprovider sandbox answers them: a create without a period is op_3105 (400, "License period is
+	 * required."), an item that is not an item id (a SKU such as PLSKVPS-ADM-M) op_3103 (400, "License request has invalid
+	 * items."), a key id that does not exist op_3108 (404, "License not found."). The items are the ids of GET /licenses/items.
 	 */
 	private function licence_model( array $state, string $method, string $path, array $body, array $query ): array|\WP_Error {
 		$state['licences'] = isset( $state['licences'] ) && is_array( $state['licences'] ) ? $state['licences'] : array();
 		if ( 'POST' === $method && '/licenses/plesk' === $path ) {
 			$items = array_values( array_filter( array_map( 'strval', (array) ( $body['items'] ?? array() ) ) ) );
 			$ip    = (string) ( $body['ip_address_binding'] ?? '' );
-			if ( array() === $items || ( '' !== $ip && false === filter_var( $ip, FILTER_VALIDATE_IP ) ) ) { return new \WP_Error( 'op_1000', 'Fake licence request is invalid.', array( 'status' => 400 ) ); }
+			if ( ! isset( $body['period'] ) || (int) $body['period'] < 1 ) { return new \WP_Error( 'op_3105', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'License period is required.' ) ); }
+			if ( array() === $items || array() !== array_filter( $items, static fn( $i ) => 1 !== preg_match( '/^[A-Z0-9][A-Z0-9-]{2,78}-(1M|1Y)$/D', $i ) || 0 === strpos( $i, 'PLSK' ) ) ) { return new \WP_Error( 'op_3103', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'License request has invalid items.' ) ); }
+			if ( '' !== $ip && false === filter_var( $ip, FILTER_VALIDATE_IP ) ) { return new \WP_Error( 'op_1000', 'Fake licence request is invalid.', array( 'status' => 400 ) ); }
 			$id = ++$state['next_id'];
 			$state['licences'][ $id ] = array( 'key_id' => $id, 'title' => (string) ( $body['title'] ?? '' ), 'comment' => (string) ( $body['comment'] ?? '' ), 'items' => $items, 'ip_address_binding' => $ip, 'period' => (int) ( $body['period'] ?? 1 ), 'status' => 'ACT', 'key_number' => 'FAKE-' . $id, 'activation_code' => '', 'hwid_resets' => 0 );
 			update_option( self::OPTION, $state, false );
@@ -103,7 +108,7 @@ class FakeClient implements Client {
 		}
 		if ( preg_match( '#^/licenses/plesk/(key/)?(\d+)$#D', $path, $match ) || preg_match( '#^/licenses/hwids/reset/plesk/(\d+)$#D', $path, $reset ) ) {
 			$id = (int) ( $reset[1] ?? $match[2] );
-			if ( ! isset( $state['licences'][ $id ] ) ) { return new \WP_Error( 'http_404', 'Fake licence was not found.', array( 'status' => 404 ) ); }
+			if ( ! isset( $state['licences'][ $id ] ) ) { return new \WP_Error( 'op_3108', 'Registrar request failed.', array( 'status' => 404, 'desc' => 'License not found.' ) ); }
 			$licence = $state['licences'][ $id ];
 			if ( isset( $reset[1] ) && 'POST' === $method ) { ++$licence['hwid_resets']; $result = array( 'success' => true ); }
 			elseif ( 'GET' === $method && '' !== ( $match[1] ?? '' ) ) { return array( 'key' => '<?xml version="1.0"?><key id="FAKE-KEY-' . $id . '"/>' ); }
