@@ -97,6 +97,8 @@ abstract class HostingCase extends TestCase {
 		remove_all_filters( 'beltoft_services_hosting_client' );
 		remove_all_filters( 'beltoft_services_hosting_agent' );
 		remove_all_filters( 'beltoft_services_domains_dns' );
+		wp_dequeue_script( 'beltoft-services-hosting' );
+		wp_deregister_script( 'beltoft-services-hosting' );
 		$this->wipe();
 
 		parent::tear_down();

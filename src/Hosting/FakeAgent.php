@@ -51,6 +51,7 @@ class FakeAgent implements Agent {
 			'ssh_port'  => array( 'int', true ),
 			'valkey_mb' => array( 'int', true ),
 			'workers'   => array( 'int', true ),
+			'ssh'       => array( 'bool', false ),
 		),
 		'ct.stats'          => array( 'vmid' => array( 'vmid', true ) ),
 		'site.create'       => array(
@@ -87,6 +88,7 @@ class FakeAgent implements Agent {
 			'admin_user'  => array( 'ident', true ),
 			'admin_email' => array( 'string', true ),
 			'locale'      => array( 'string', false ),
+			'woocommerce' => array( 'bool', false ),
 		),
 		'site.verify'       => array(
 			'vmid' => array( 'vmid', true ),
@@ -512,6 +514,7 @@ class FakeAgent implements Agent {
 					'ssh_port'  => $args['ssh_port'],
 					'valkey_mb' => $args['valkey_mb'],
 					'workers'   => $args['workers'],
+					'ssh'       => $args['ssh'] ?? true,
 				);
 
 				return array(

@@ -153,7 +153,37 @@ final class Operations {
 
 		$limits = $this->apply_limits( $v, $plan, 'update' );
 
-		return $limits instanceof StepResult ? $limits : StepResult::done( array(), 'Hosting plan applied' );
+		if ( $limits instanceof StepResult ) {
+			return $limits;
+		}
+
+		// SSH on or off follows the plan: ct.prepare is idempotent, so it is sent again only when the value changed.
+		$meta = array();
+
+		if ( (bool) $this->r->get( 'prepared_ssh' ) !== ! empty( $plan['ssh'] ) ) {
+			$sent = $this->agent_call(
+				'prepare_ssh',
+				'ct.prepare',
+				array(
+					'vmid'      => (int) $record['vmid'],
+					'account'   => Config::account( $this->r->id() ),
+					'hostname'  => Config::account( $this->r->id() ),
+					'ip'        => (string) $record['ip'],
+					'ssh_port'  => (int) $record['ssh_port'],
+					'valkey_mb' => (int) $plan['valkey_mb'],
+					'workers'   => Plan::workers_per_site( $plan, max( 1, count( Sites::for_resource( $this->r->id() ) ) ) ),
+					'ssh'       => ! empty( $plan['ssh'] ),
+				)
+			);
+
+			if ( $sent instanceof StepResult ) {
+				return $sent;
+			}
+
+			$meta['prepared_ssh'] = ! empty( $plan['ssh'] );
+		}
+
+		return StepResult::done( $meta, 'Hosting plan applied' );
 	}
 
 	/**

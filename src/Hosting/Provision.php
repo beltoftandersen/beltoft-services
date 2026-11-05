@@ -450,10 +450,11 @@ final class Provision {
 				'ssh_port'  => (int) $record['ssh_port'],
 				'valkey_mb' => (int) $this->plan['valkey_mb'],
 				'workers'   => Plan::workers_per_site( $this->plan, 1 ),
+				'ssh'       => ! empty( $this->plan['ssh'] ), // False is SFTP only (the Start plan).
 			)
 		);
 
-		return $result instanceof StepResult ? $result : array();
+		return $result instanceof StepResult ? $result : array( 'prepared_ssh' => ! empty( $this->plan['ssh'] ) );
 	}
 
 	/**
@@ -555,6 +556,7 @@ final class Provision {
 					'admin_user'  => $spec['admin_user'],
 					'admin_email' => $spec['admin_email'],
 					'locale'      => $spec['language'],
+					'woocommerce' => 'woocommerce' === $spec['install_kind'],
 				)
 			);
 
@@ -742,6 +744,7 @@ final class Provision {
 			'install'     => ! array_key_exists( 'install', $given ) || ! empty( $given['install'] ),
 			'admin_user'  => 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', (string) ( $given['admin_user'] ?? '' ) ) ? (string) $given['admin_user'] : Config::admin_user(),
 			'admin_email' => sanitize_email( (string) ( '' !== (string) ( $given['admin_email'] ?? '' ) ? $given['admin_email'] : ( $license['email'] ?? '' ) ) ),
+			'install_kind' => in_array( (string) ( $given['install_kind'] ?? '' ), SiteField::INSTALLS, true ) ? (string) $given['install_kind'] : 'wordpress',
 			'language'    => 1 === preg_match( '/^[a-z]{2,3}(_[A-Z]{2})?$/D', (string) ( $given['language'] ?? '' ) ) ? (string) $given['language'] : 'en_US',
 			'domain'      => isset( $given['domain'] ) ? strtolower( (string) $given['domain'] ) : '',
 		);

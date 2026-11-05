@@ -186,6 +186,7 @@ final class HostingActions {
 					'title'       => '' !== $label ? sanitize_text_field( $label ) : $slug,
 					'admin_user'  => Config::admin_user(),
 					'admin_email' => sanitize_email( (string) ( $license['email'] ?? '' ) ),
+					'woocommerce' => false,
 				)
 			);
 
@@ -512,6 +513,29 @@ final class HostingActions {
 		}
 
 		return array( 'sender' => (string) ( $done['mail_sender']['address'] ?? '' ) );
+	}
+
+	/**
+	 * Ticks a getting-started item the customer does by hand, or hides the list.
+	 *
+	 * @param string $item build, backups, or '' with $dismiss.
+	 * @param bool   $dismiss Hide the list.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function checklist( string $item, bool $dismiss = false ) {
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+
+		if ( $dismiss ) {
+			return $fresh->set( array( 'checklist_dismissed' => 1 ) ) ? array( 'dismissed' => true ) : $this->error( 'failed', __( 'That could not be saved. Try again.', 'beltoft-services' ) );
+		}
+
+		if ( ! in_array( $item, HostingAccount::MANUAL_ITEMS, true ) ) {
+			return $this->error( 'invalid', __( 'Unknown item.', 'beltoft-services' ) );
+		}
+
+		$done = array_values( array_unique( array_merge( array_map( 'strval', (array) $fresh->get( 'checklist' ) ), array( $item ) ) ) );
+
+		return $fresh->set( array( 'checklist' => $done ) ) ? array( 'done' => $item ) : $this->error( 'failed', __( 'That could not be saved. Try again.', 'beltoft-services' ) );
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------

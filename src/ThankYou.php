@@ -193,6 +193,15 @@ final class ThankYou {
 			);
 		}
 
+		if ( \BeltoftServices\Hosting\HostingDriver::ID === (string) $r->get( 'driver' ) && 'ready' === $group ) {
+			$facts = \BeltoftServices\Hosting\HostingEmail::values( $r );
+
+			$row['hosting'] = array(
+				'site_url'  => (string) $facts['site_url'],
+				'admin_url' => (string) $facts['admin_url'],
+			);
+		}
+
 		return $row;
 	}
 
@@ -209,6 +218,7 @@ final class ThankYou {
 			'applic' => __( 'Open your server', 'beltoft-services' ),
 			'domain' => __( 'Open your domain', 'beltoft-services' ),
 			'dns'    => __( 'Open your DNS hosting', 'beltoft-services' ),
+			'hosting' => __( 'Open your hosting', 'beltoft-services' ),
 		);
 
 		return $labels[ $kind ] ?? __( 'Open in My Account', 'beltoft-services' );

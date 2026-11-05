@@ -28,6 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
  * - POST   hosting/mail                    domain: sets up Email lite
+ * - POST   hosting/checklist              item (build or backups) or dismiss
  * - POST   hosting/mail/sites              websites send their mail from the Email lite domain
  */
 final class HostingRoutes {
@@ -96,6 +97,15 @@ final class HostingRoutes {
 			'callback'            => array( __CLASS__, 'remove_domain' ),
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true ) ),
+		) );
+		register_rest_route( $ns, $base . '/checklist', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'checklist' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array(
+				'item'    => array( 'type' => 'string', 'description' => 'build or backups.' ),
+				'dismiss' => array( 'type' => 'boolean', 'description' => 'Hide the getting-started list.' ),
+			),
 		) );
 		register_rest_route( $ns, $base . '/mail/sites', array( 'methods' => $post, 'callback' => array( __CLASS__, 'mail_for_sites' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ) );
 		register_rest_route( $ns, $base . '/mail', array(
@@ -248,6 +258,10 @@ final class HostingRoutes {
 
 	public static function enable_mail( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->enable_mail( (string) $request['domain'] ), 201 );
+	}
+
+	public static function checklist( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->checklist( (string) $request['item'], (bool) $request['dismiss'] ) );
 	}
 
 	public static function mail_for_sites( \WP_REST_Request $request ): \WP_REST_Response {
