@@ -211,7 +211,7 @@ final class Operations {
 		$done = (array) $this->r->get( 'delete_steps' );
 
 		// The backups go before the container: the node lists and deletes a guest's backups only while the guest still exists, for a token that has rights on the guest and not on the whole storage.
-		foreach ( array( 'edge', 'dns', 'db', 'backups', 'ct', 'agent', 'release' ) as $step ) {
+		foreach ( array( 'edge', 'dns', 'db', 'backups', 'ct', 'agent', 'mail', 'release' ) as $step ) {
 			if ( in_array( $step, $done, true ) ) {
 				continue;
 			}
@@ -438,6 +438,18 @@ final class Operations {
 		$done = $this->agent_call( 'ct_release', 'ct.release', array( 'vmid' => (int) $record['vmid'] ) );
 
 		return $done instanceof StepResult ? $done : true;
+	}
+
+	/**
+	 * Delete step mail: the account's own fallback mailbox on the preview zone goes with it.
+	 *
+	 * @param array<string, mixed> $record Record.
+	 * @return true|StepResult
+	 */
+	private function delete_mail( array $record ) {
+		unset( $record );
+
+		return ( new SiteMail( $this->r ) )->delete_fallback();
 	}
 
 	/**

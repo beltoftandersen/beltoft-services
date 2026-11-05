@@ -711,8 +711,8 @@ final class Provision {
 	}
 
 	/**
-	 * Step mail: website mail goes out through our mail server from the fallback sender (SiteMail). Nothing happens
-	 * until the fallback mailbox password and the mail host are set, and the step does not wait for them.
+	 * Step mail: website mail goes out through our mail server from the account's own fallback mailbox (SiteMail).
+	 * Nothing happens until the mail host is set and the preview zone is a mail domain, and the step does not wait for them.
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */

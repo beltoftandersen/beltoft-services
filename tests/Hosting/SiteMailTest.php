@@ -75,12 +75,10 @@ class SiteMailTest extends HostingCase {
 	}
 
 	/**
-	 * Saves the fallback mailbox password setting, encrypted like the settings page does.
-	 *
-	 * @param string $password Password.
+	 * Makes the preview zone a mail domain on the fake mail server (the owner does this once on the real one).
 	 */
-	private function fallback_password( string $password ): void {
-		$this->settings( array( 'hosting_noreply_password' => Crypto::encrypt( $password ) ) );
+	private function preview_mail_domain(): void {
+		$this->mailcow->add_domain( array( 'domain' => 'preview.example.test' ) );
 	}
 
 	/**
@@ -236,45 +234,64 @@ class SiteMailTest extends HostingCase {
 
 	// -- The fallback sender --------------------------------------------------------------------
 
-	public function test_websites_without_email_lite_send_from_noreply_on_the_preview_zone(): void {
-		$this->fallback_password( 'fallback-mailbox-pass-1' );
-		$r = $this->resource();
+	public function test_every_account_without_email_lite_gets_its_own_fallback_mailbox(): void {
+		$this->preview_mail_domain();
+		$r = $this->resource( array( 'site_mail_per_day' => 150 ) );
 		$this->provision_fully( $r );
+		$other = $this->resource( array( 'site_mail_per_day' => 150 ) );
+		$this->provision_fully( $other );
 
-		$this->assertSame( 'noreply@preview.example.test', SiteMail::fallback_address() );
+		$one = 'wp-c' . $r->id() . '@preview.example.test';
+		$two = 'wp-c' . $other->id() . '@preview.example.test';
+		$this->assertSame( $one, SiteMail::fallback_address( $r->id() ) );
+		$this->assertNotNull( $this->mailcow->mailbox( $one ) );
+		$this->assertNotNull( $this->mailcow->mailbox( $two ) );
+
 		$smtp = $this->agent->calls_of( 'mail.smtp' );
-		$this->assertCount( 1, $smtp );
-		$this->assertSame( 'noreply@preview.example.test', $smtp[0]['args']['user'] );
+		$this->assertCount( 2, $smtp );
+		$this->assertSame( array( $one, $two ), array( $smtp[0]['args']['user'], $smtp[1]['args']['user'] ) );
 		$this->assertSame( '***', $smtp[0]['args']['password'] );
-		$this->assertStringNotContainsString( 'fallback-mailbox-pass-1', (string) wp_json_encode( $this->agent->state() ) );
-		$this->assertSame( array( 'mode' => 'fallback', 'address' => 'noreply@preview.example.test' ), Resource::find( $r->id() )->get( 'mail_sender' ) );
+
+		// No credential is shared: each account has its own random password, kept encrypted in its own meta only.
+		$a = (string) Resource::find( $r->id() )->get( 'smtp_fb_secret' );
+		$b = (string) Resource::find( $other->id() )->get( 'smtp_fb_secret' );
+		$this->assertNotSame( $a, $b );
+		$this->assertStringStartsWith( 'bs1:', $a );
+		$this->assertNotSame( Crypto::decrypt( $a ), Crypto::decrypt( $b ) );
+		$this->assertStringNotContainsString( (string) Crypto::decrypt( $a ), (string) wp_json_encode( $this->agent->state() ) );
+		$this->assertSame( array( 'mode' => 'fallback', 'address' => $one ), Resource::find( $r->id() )->get( 'mail_sender' ) );
+		$this->assertArrayNotHasKey( 'hosting_noreply_password', Settings::fields(), 'The shared password setting is gone.' );
+
+		$limit = array_filter( $this->mailcow->calls_of( 'set_mailbox_rate_limit' ), static fn( $c ) => ( $c[1] ?? null ) === $one );
+		$this->assertNotEmpty( $limit, 'The plan\'s daily cap is set on the mailbox.' );
 	}
 
-	public function test_the_fallback_is_skipped_quietly_without_a_password_a_zone_or_a_mail_host(): void {
+	public function test_the_fallback_is_skipped_quietly_without_a_mail_host_a_zone_or_a_mail_domain(): void {
 		$r = $this->resource();
 		$this->provision_fully( $r );
-		$this->assertSame( '', SiteMail::fallback_address() );
-		$this->assertCount( 0, $this->agent->calls_of( 'mail.smtp' ), 'No password: nothing is sent and provisioning still finishes.' );
+		$this->assertCount( 0, $this->agent->calls_of( 'mail.smtp' ), 'The zone is not a mail domain: nothing made, and provisioning still finishes.' );
 
-		$this->fallback_password( 'fallback-mailbox-pass-1' );
+		$this->preview_mail_domain();
 		$this->settings( array( 'mail_host' => '' ) );
 		$other = $this->resource();
 		$this->provision_fully( $other );
 		$this->assertCount( 0, $this->agent->calls_of( 'mail.smtp' ), 'No mail host.' );
 
 		$this->settings( array( 'mail_host' => 'mail.example.net', 'hosting_preview_zone' => '' ) );
-		$this->assertSame( '', SiteMail::fallback_address(), 'No preview zone.' );
+		$this->assertSame( '', SiteMail::fallback_address( $r->id() ), 'No preview zone.' );
 	}
 
-	public function test_the_fallback_password_is_a_secret_setting_never_stored_in_clear(): void {
-		$field = Settings::fields()['hosting_noreply_password'];
-		$this->assertSame( 'secret', $field['type'] );
+	public function test_the_fallback_mailbox_is_deleted_with_the_account(): void {
+		$this->preview_mail_domain();
+		$r = $this->resource();
+		$this->provision_fully( $r );
+		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$address = SiteMail::fallback_address( $r->id() );
+		$this->assertNotNull( $this->mailcow->mailbox( $address ) );
 
-		$clean = Settings::sanitize( array( 'hosting_noreply_password' => 'a-clear-password-0001' ) );
-		$this->assertStringStartsWith( 'bs1:', $clean['hosting_noreply_password'] );
-		$this->assertStringNotContainsString( 'a-clear-password', $clean['hosting_noreply_password'] );
-		update_option( Settings::OPTION, $clean );
-		$this->assertSame( 'a-clear-password-0001', SiteMail::fallback_password() );
+		$result = $this->driver->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertNull( $this->mailcow->mailbox( $address ) );
 	}
 
 	// -- The account action and route -----------------------------------------------------------
