@@ -74,6 +74,7 @@ class IntroCouponTest extends TestCase {
 
 		$this->assertTrue( WC()->cart->has_discount( 'intro-half' ) );
 		$this->assertSame( array(), wc_get_notices( 'error' ) );
+		$this->assertSame( array(), wc_get_notices( 'notice' ), 'A new customer is told nothing.' );
 	}
 
 	public function test_a_product_without_the_setting_or_a_missing_coupon_changes_nothing(): void {
@@ -97,6 +98,12 @@ class IntroCouponTest extends TestCase {
 		wp_set_current_user( $user );
 		$this->add( $product );
 		$this->assertFalse( WC()->cart->has_discount( 'intro-half' ), 'Held by the user.' );
+		$notices = wc_get_notices( 'notice' );
+		$this->assertCount( 1, $notices, 'The customer is told why the regular price applies.' );
+		$this->assertStringContainsString( 'is for your first order, so the regular price applies', (string) ( $notices[0]['notice'] ?? '' ) );
+		$this->assertSame( array(), wc_get_notices( 'error' ) );
+		$this->add( $product );
+		$this->assertCount( 1, wc_get_notices( 'notice' ), 'Told once, not on every add.' );
 
 		WC()->cart->empty_cart();
 		wp_set_current_user( 0 );

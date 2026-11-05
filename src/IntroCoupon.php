@@ -189,6 +189,8 @@ final class IntroCoupon {
 		$email = function_exists( 'WC' ) && WC()->customer ? (string) WC()->customer->get_billing_email() : '';
 
 		if ( self::held( (int) $product_id, get_current_user_id(), $email ) ) {
+			self::tell_held( (int) $product_id );
+
 			return;
 		}
 
@@ -199,6 +201,24 @@ final class IntroCoupon {
 			$notices          = wc_get_notices();
 			$notices['error'] = array_slice( (array) ( $notices['error'] ?? array() ), 0, $before );
 			wc_set_notices( $notices );
+		}
+	}
+
+	/**
+	 * Tells a returning customer why the cart shows the regular price (once per product name).
+	 *
+	 * @param int $product_id Product or variation id.
+	 */
+	private static function tell_held( int $product_id ): void {
+		if ( ! function_exists( 'wc_add_notice' ) ) {
+			return;
+		}
+
+		/* translators: %s: product name. */
+		$message = sprintf( __( 'The introductory price for %s is for your first order, so the regular price applies.', 'beltoft-services' ), (string) get_the_title( Product::parent_id( $product_id ) ) );
+
+		if ( ! wc_has_notice( $message, 'notice' ) ) {
+			wc_add_notice( $message, 'notice' );
 		}
 	}
 
