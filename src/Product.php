@@ -99,7 +99,7 @@ final class Product {
 	 *
 	 * @param int $product_id Product or variation id.
 	 */
-	private static function parent_id( int $product_id ): int {
+	public static function parent_id( int $product_id ): int {
 		$parent = wp_get_post_parent_id( $product_id );
 
 		return 'product_variation' === get_post_type( $product_id ) && $parent ? (int) $parent : $product_id;
@@ -483,6 +483,16 @@ final class Product {
 			)
 		);
 
+		woocommerce_wp_text_input(
+			array(
+				'id'          => IntroCoupon::META,
+				'label'       => __( 'Intro coupon', 'beltoft-services' ),
+				'description' => __( 'The code of a coupon applied to a customer\'s first purchase of this product (not to renewals, switches or resubscribes, and not to a customer who has had it before). The coupon itself says what it discounts. Empty: none.', 'beltoft-services' ),
+				'desc_tip'    => true,
+				'value'       => $product ? $product->get_meta( IntroCoupon::META ) : '',
+			)
+		);
+
 		if ( '' !== $driver_id ) {
 			woocommerce_wp_text_input(
 				array(
@@ -596,6 +606,7 @@ final class Product {
 		$retention = isset( $_POST[ self::META_RETENTION ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::META_RETENTION ] ) ) ) : '';
 		$product->update_meta_data( self::META_RETENTION, '' === $retention ? '' : (string) absint( $retention ) );
 		$product->update_meta_data( self::META_TRIAL_PAID, isset( $_POST[ self::META_TRIAL_PAID ] ) ? 'yes' : 'no' );
+		$product->update_meta_data( IntroCoupon::META, isset( $_POST[ IntroCoupon::META ] ) ? IntroCoupon::clean_code( sanitize_text_field( wp_unslash( $_POST[ IntroCoupon::META ] ) ) ) : '' );
 
 		if ( '' !== $driver_id && isset( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) {
 			$premium = trim( sanitize_text_field( wp_unslash( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) );

@@ -101,6 +101,7 @@ final class Plugin {
 		Proxmox\ClustersScreen::register();
 		Status::register();
 		Checkout::register();
+		IntroCoupon::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Slugs::register();
