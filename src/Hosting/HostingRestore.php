@@ -417,6 +417,7 @@ final class HostingRestore {
 				'vmid'           => (int) $record['vmid'],
 				'storage'        => (string) $this->node['backup_storage'],
 				'mode'           => 'snapshot',
+				'compress'       => 'zstd',
 				'notes-template' => '{{guestname}} safety',
 			),
 			'vzdump'

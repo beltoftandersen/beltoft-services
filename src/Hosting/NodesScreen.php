@@ -51,6 +51,7 @@ final class NodesScreen {
 			'mem_gb'       => array( __( 'Memory of the node, GB', 'beltoft-services' ), __( 'What the node has. Capacity is counted against it.', 'beltoft-services' ) ),
 			'disk_gb'      => array( __( 'Disk of the node, GB', 'beltoft-services' ), __( 'Real disk of the container storage.', 'beltoft-services' ) ),
 			'restore_safety' => array( __( 'Safety point for an account restore', 'beltoft-services' ), __( 'vzdump (a protected backup, the safe default) or snapshot. Use snapshot only after a forced container restore was shown to keep snapshots.', 'beltoft-services' ) ),
+			'fw_group' => array( __( 'Firewall security group', 'beltoft-services' ), __( 'The security group on the node (datacenter firewall) that every customer container joins: edge, database and DNS access. Empty adds no group rule.', 'beltoft-services' ) ),
 			'scratch_vmid' => array( __( 'Scratch container id for the restore test', 'beltoft-services' ), __( 'Outside the customer range. The weekly restore test restores a backup into this container and deletes it. 0 turns the test off for this node.', 'beltoft-services' ) ),
 			'backup_storage' => array( __( 'Backup storage', 'beltoft-services' ), __( 'Storage id for container backups. Empty: no backups on this node.', 'beltoft-services' ) ),
 			'edge_ip'      => array( __( 'Edge address (IPv4)', 'beltoft-services' ), __( 'The public address names point to. Needed for the DNS step.', 'beltoft-services' ) ),

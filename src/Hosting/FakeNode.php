@@ -184,6 +184,7 @@ class FakeNode implements Client {
 				'pool'             => '',
 				'config'           => array(),
 				'firewall_options' => array(),
+				'firewall_rules'   => array(),
 			),
 			$ct
 		);
@@ -371,11 +372,14 @@ class FakeNode implements Client {
 			array( 'POST', $ct . '/status/shutdown$#', 'h_shutdown', array( 'timeout' => array( 'int', false ) ) ),
 			array( 'POST', $ct . '/status/stop$#', 'h_stop', array() ),
 			array( 'GET', $ct . '/firewall/options$#', 'h_fw_get', array() ),
+			array( 'GET', $ct . '/firewall/rules$#', 'h_fwr_get', array() ),
+			array( 'POST', $ct . '/firewall/rules$#', 'h_fwr_post', array( 'type' => array( 'string', true ), 'action' => array( 'string', true ), 'enable' => array( 'string', false ), 'digest' => array( 'string', false ) ) ),
 			array( 'PUT', $ct . '/firewall/options$#', 'h_fw_put', array_fill_keys( self::FIREWALL_KEYS, array( 'string', false ) ) ),
 			array( 'POST', '#^/nodes/([A-Za-z0-9.\-]+)/vzdump$#', 'h_vzdump', array(
 				'vmid'           => array( 'int', true ),
 				'storage'        => array( 'string', true ),
 				'mode'           => array( 'string', false ),
+				'compress'       => array( 'string', false ),
 				'notes-template' => array( 'string', false ),
 			) ),
 			array( 'GET', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content$#', 'h_content_list', array(
@@ -556,6 +560,7 @@ class FakeNode implements Client {
 					'pool'             => $pool,
 					'config'           => $config,
 					'firewall_options' => array(),
+				'firewall_rules'   => array(),
 				);
 
 				if ( '' !== $pool ) {
@@ -755,6 +760,40 @@ class FakeNode implements Client {
 		$ct = $this->find( $a );
 
 		return is_wp_error( $ct ) ? $ct : $ct['firewall_options'];
+	}
+
+	/**
+	 * GET .../firewall/rules.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_fwr_get( array $a, array $p ) {
+		unset( $p );
+		$ct = $this->find( $a );
+
+		return is_wp_error( $ct ) ? $ct : array_values( (array) ( $ct['firewall_rules'] ?? array() ) );
+	}
+
+	/**
+	 * POST .../firewall/rules: appends a rule.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_fwr_post( array $a, array $p ) {
+		$ct = $this->find( $a );
+
+		if ( is_wp_error( $ct ) ) {
+			return $ct;
+		}
+
+		unset( $p['digest'] );
+		$rules                                                = (array) ( $ct['firewall_rules'] ?? array() );
+		$rules[]                                              = array( 'pos' => count( $rules ) ) + $p;
+		$this->state['cts'][ $ct['vmid'] ]['firewall_rules'] = $rules;
+
+		return null;
 	}
 
 	/**
@@ -1029,6 +1068,7 @@ class FakeNode implements Client {
 					'pool'             => (string) ( $old['pool'] ?? $archive['pool'] ),
 					'config'           => $archive['config'],
 					'firewall_options' => (array) ( $old['firewall_options'] ?? array() ),
+					'firewall_rules'   => (array) ( $old['firewall_rules'] ?? array() ),
 					'restored_from'    => $archive['volid'],
 					'snapshots'        => (array) ( $old['snapshots'] ?? array() ), // Modelled: whether a forced restore keeps snapshots is to be verified on a real node.
 				);

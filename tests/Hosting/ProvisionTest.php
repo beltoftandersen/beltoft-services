@@ -77,7 +77,7 @@ class ProvisionTest extends HostingCase {
 		$this->assertSame( 256, $c['swap'] );
 		$this->assertSame( 1, $c['onboot'] );
 		$this->assertSame( 'name=eth0,bridge=hbr0,ip=10.200.0.10/16,gw=10.200.0.1,firewall=1', $c['net0'] );
-		$this->assertSame( 'local-zfs:3,mp=/mnt/dump,backup=1', $c['mp0'] );
+		$this->assertSame( 'local-zfs:3,mp=/var/backups/db,backup=1', $c['mp0'] );
 		$this->assertStringContainsString( 'size=12G', $c['rootfs'] );
 
 		$this->assertSame(
@@ -86,9 +86,16 @@ class ProvisionTest extends HostingCase {
 				'ipfilter'  => 1,
 				'macfilter' => 1,
 				'policy_in' => 'DROP',
+				'policy_out' => 'DROP',
 			),
 			$ct['firewall_options']
 		);
+
+		// Both policies drop, so the container joins the node's security group (edge, database, DNS), once.
+		$this->assertSame( array( 'group' ), array_column( $ct['firewall_rules'], 'type' ) );
+		$this->assertSame( array( 'hosting-ct' ), array_column( $ct['firewall_rules'], 'action' ) );
+		$this->provision( Resource::find( $r->id() ) );
+		$this->assertCount( 1, $this->ct( $r )['firewall_rules'], 'The rule is not added twice.' );
 	}
 
 	public function test_the_dump_mount_is_part_of_the_container_backup(): void {
@@ -197,7 +204,7 @@ class ProvisionTest extends HostingCase {
 		$this->provision_fully( $r );
 
 		$writes = array(
-			'POST' => array( '#/clone$#', '#/status/start$#' ),
+			'POST' => array( '#/clone$#', '#/status/start$#', '#/firewall/rules$#' ),
 			'PUT'  => array( '#/config$#', '#/resize$#', '#/firewall/options$#' ),
 		);
 		$count  = function () use ( $writes ): array {

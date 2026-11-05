@@ -293,6 +293,13 @@ class BackupsTest extends HostingCase {
 		$this->assertCount( 1, $list, 'The other container backup is not listed.' );
 
 		$this->assertTrue( HostingBackups::volid_fits( 1000, 'pbs-store:backup/ct/1000/2027-03-01T03:00:00Z' ) );
+		// A directory storage names the file instead.
+		$this->assertTrue( HostingBackups::volid_fits( 1000, 'local:backup/vzdump-lxc-1000-2027_03_01-03_00_00.tar.zst' ) );
+		$this->assertTrue( HostingBackups::volid_fits( 1000, 'local:backup/vzdump-lxc-1000-2027_03_01-03_00_00.tar' ) );
+		foreach ( array( 'local:backup/vzdump-lxc-1001-2027_03_01-03_00_00.tar.zst', 'local:backup/vzdump-qemu-1000-2027_03_01-03_00_00.tar.zst', 'local:backup/../vzdump-lxc-1000-2027_03_01-03_00_00.tar', 'local:backup/vzdump-lxc-1000-2027_03_01-03_00_00.tar.zst.notes' ) as $bad ) {
+			$this->assertFalse( HostingBackups::volid_fits( 1000, $bad ), $bad );
+		}
+
 		foreach ( array( 'pbs-store:backup/ct/1001/2027-03-01T03:00:00Z', 'pbs-store:backup/vm/1000/2027-03-01T03:00:00Z', 'pbs-store:backup/ct/1000/../x', 'backup/ct/1000/2027-03-01T03:00:00Z', "pbs-store:backup/ct/1000/2027-03-01T03:00:00Z\n" ) as $bad ) {
 			$this->assertFalse( HostingBackups::volid_fits( 1000, $bad ), $bad );
 		}

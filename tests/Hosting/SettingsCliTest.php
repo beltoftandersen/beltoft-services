@@ -181,6 +181,12 @@ class SettingsCliTest extends HostingCase {
 		}
 	}
 
+	public function test_cli_check_waits_for_a_live_agent_that_answers_queued_first(): void {
+		$this->agent->pending( 'agent.health', 2 );
+		( new HostingCommand() )->node( array( 'check', 'n1' ), array() );
+		$this->assertStringContainsString( 'checks passed', \WP_CLI::text() );
+	}
+
 	public function test_cli_check_reads_only_and_reports_problems(): void {
 		$cli = new HostingCommand();
 

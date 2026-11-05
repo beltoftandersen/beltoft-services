@@ -66,6 +66,7 @@ final class Nodes {
 			'backup_storage' => '',
 			'restore_safety' => 'vzdump',
 			'scratch_vmid'  => 0,
+			'fw_group'      => 'hosting-ct',
 			'edge_ip'       => '',
 			'edge_ipv6'     => '',
 		);
@@ -371,6 +372,14 @@ final class Nodes {
 		}
 
 		$clean['backup_storage'] = $backup;
+
+		$group_fw = trim( (string) ( $input['fw_group'] ?? $clean['fw_group'] ) );
+
+		if ( '' !== $group_fw && 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9_-]{0,19}$/D', $group_fw ) ) {
+			return self::error( 'fw_group', __( 'The firewall security group is a name of up to 20 letters, numbers, dashes and underscores, or empty for none.', 'beltoft-services' ) );
+		}
+
+		$clean['fw_group'] = $group_fw;
 
 		$safety = (string) ( $input['restore_safety'] ?? $clean['restore_safety'] );
 

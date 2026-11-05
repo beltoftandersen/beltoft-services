@@ -312,7 +312,7 @@ final class Provision {
 	}
 
 	/**
-	 * Step configure: limits, network, mount point, firewall options, root disk.
+	 * Step configure: limits, network, mount point, firewall options and group, root disk.
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */
@@ -351,7 +351,7 @@ final class Provision {
 
 		// The dump mount (a quarter of the disk) holds the nightly SQL dumps, the only copy of the databases in the container backup, so it is part of the backup (backup=1). It is created once; an existing mount point is never rewritten.
 		if ( ! isset( $v['config']['mp0'] ) ) {
-			$diff['mp0'] = sprintf( '%s:%d,mp=/mnt/dump,backup=1', $this->node['storage'], max( 1, intdiv( (int) $this->plan['disk_gb'], 4 ) ) );
+			$diff['mp0'] = sprintf( '%s:%d,mp=/var/backups/db,backup=1', $this->node['storage'], max( 1, intdiv( (int) $this->plan['disk_gb'], 4 ) ) );
 		}
 
 		if ( array() !== $diff ) {
@@ -397,6 +397,7 @@ final class Provision {
 			'ipfilter'  => 1,
 			'macfilter' => 1,
 			'policy_in' => 'DROP',
+			'policy_out' => 'DROP',
 		);
 		$diff = array();
 
@@ -406,13 +407,36 @@ final class Provision {
 			}
 		}
 
-		if ( array() === $diff ) {
+		if ( array() !== $diff ) {
+			$answer = $this->client->request( 'PUT', $base . '/firewall/options', $diff );
+
+			if ( is_wp_error( $answer ) ) {
+				return $this->classify( $answer, 'configure' );
+			}
+		}
+
+		// With both policies on DROP nothing passes until the node's security group (edge, database, DNS, mail ports) is joined.
+		$group = (string) ( $this->node['fw_group'] ?? '' );
+
+		if ( '' === $group ) {
 			return true;
 		}
 
-		$answer = $this->client->request( 'PUT', $base . '/firewall/options', $diff );
+		$rules = $this->client->request( 'GET', $base . '/firewall/rules' );
 
-		return is_wp_error( $answer ) ? $this->classify( $answer, 'configure' ) : true;
+		if ( is_wp_error( $rules ) ) {
+			return $this->classify( $rules, 'configure' );
+		}
+
+		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
+			if ( is_array( $rule ) && 'group' === ( $rule['type'] ?? '' ) && $group === ( $rule['action'] ?? '' ) ) {
+				return true;
+			}
+		}
+
+		$added = $this->client->request( 'POST', $base . '/firewall/rules', array( 'type' => 'group', 'action' => $group, 'enable' => 1 ) );
+
+		return is_wp_error( $added ) ? $this->classify( $added, 'configure' ) : true;
 	}
 
 	/**

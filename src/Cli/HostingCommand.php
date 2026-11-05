@@ -165,7 +165,14 @@ final class HostingCommand {
 			}
 		}
 
-		$job = $agent->submit( 'agent.health', array(), 'check-' . wp_generate_password( 12, false ) );
+		$job_id = 'check-' . wp_generate_password( 12, false );
+		$job    = $agent->submit( 'agent.health', array(), $job_id );
+
+		// A live agent answers queued or running at first: look again for a few seconds.
+		for ( $i = 0; $i < 20 && ! is_wp_error( $job ) && in_array( $job['status'] ?? '', array( 'queued', 'running' ), true ); $i++ ) {
+			usleep( 500000 );
+			$job = $agent->job( $job_id );
+		}
 
 		if ( is_wp_error( $job ) || 'done' !== ( $job['status'] ?? '' ) ) {
 			$issues[] = 'The agent health job did not finish: ' . ( is_wp_error( $job ) ? $job->get_error_code() : (string) ( $job['status'] ?? 'unknown' ) );

@@ -728,6 +728,19 @@ final class HostingActions {
 	private function call( string $name, string $op, array $args ) {
 		$done = $this->agent_call( $name, $op, $args );
 
+		// A live agent answers queued first and finishes in a second or two: look again (same job id) for a few seconds before asking the customer to retry.
+		/**
+		 * Seconds a customer action waits for the agent's job.
+		 *
+		 * @param int $seconds Seconds.
+		 */
+		$until = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', 8 );
+
+		while ( $done instanceof StepResult && $done->is_poll() && microtime( true ) < $until ) {
+			usleep( 400000 );
+			$done = $this->agent_call( $name, $op, $args );
+		}
+
 		if ( ! $done instanceof StepResult ) {
 			return $done;
 		}

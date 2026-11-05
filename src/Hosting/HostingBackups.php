@@ -296,6 +296,7 @@ final class HostingBackups {
 				'vmid'           => (int) $record['vmid'],
 				'storage'        => (string) $this->node['backup_storage'],
 				'mode'           => 'snapshot',
+				'compress'       => 'zstd',
 				'notes-template' => 'manual' === $round['kind'] ? '{{guestname}} manual' : '{{guestname}} nightly',
 			),
 			'dump'
@@ -469,14 +470,18 @@ final class HostingBackups {
 	}
 
 	/**
-	 * Is the volume id one of a container's own container backups? (Proxmox\Backups::volid_fits is the virtual
+	 * Is the volume id one of a container's own container backups, on a Backup Server or a directory storage? (Proxmox\Backups::volid_fits is the virtual
 	 * machine version and refuses these.)
 	 *
 	 * @param int    $vmid  Container id.
 	 * @param string $volid Volume id.
 	 */
 	public static function volid_fits( int $vmid, string $volid ): bool {
-		return 1 === preg_match( '#^[A-Za-z0-9][A-Za-z0-9._-]*:backup/ct/' . $vmid . '/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$#D', $volid );
+		$store = '[A-Za-z0-9][A-Za-z0-9._-]*';
+
+		// A Proxmox Backup Server volume, or a file on a directory storage (vzdump-lxc-<vmid>-<date>.tar.zst).
+		return 1 === preg_match( '#^' . $store . ':backup/ct/' . $vmid . '/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$#D', $volid )
+			|| 1 === preg_match( '#^' . $store . ':backup/vzdump-lxc-' . $vmid . '-[0-9]{4}_[0-9]{2}_[0-9]{2}-[0-9]{2}_[0-9]{2}_[0-9]{2}\.tar(\.zst|\.gz|\.lzo)?$#D', $volid );
 	}
 
 	/**

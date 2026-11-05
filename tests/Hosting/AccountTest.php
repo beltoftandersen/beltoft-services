@@ -75,6 +75,20 @@ class AccountTest extends HostingCase {
 		return (int) $r->license()['user_id'];
 	}
 
+	public function test_an_action_waits_for_a_job_the_agent_answers_queued_first(): void {
+		$r = $this->account();
+		$this->agent->pending( 'site.cache_purge', 2 );
+		$this->assertSame( array( 'purged' => 'w' . $r->id() ), ( new HostingActions( $r ) )->purge_cache( 'w' . $r->id() ) );
+
+		// With no time to wait the customer is asked to try again, and the same job is read next time.
+		add_filter( 'beltoft_services_hosting_action_wait', '__return_zero' );
+		$this->agent->pending( 'site.cache_purge', 2 );
+		$busy = ( new HostingActions( Resource::find( $r->id() ) ) )->purge_cache( 'w' . $r->id() );
+		remove_all_filters( 'beltoft_services_hosting_action_wait' );
+		$this->assertWPError( $busy );
+		$this->assertSame( 'busy', $busy->get_error_code() );
+	}
+
 	public function test_add_a_site_within_the_plan_and_refusals(): void {
 		$r = $this->account();
 		$a = new HostingActions( $r );
