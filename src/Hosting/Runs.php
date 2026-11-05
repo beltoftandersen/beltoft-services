@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Steps;
+use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -362,9 +363,12 @@ trait Runs {
 			return StepResult::wait( Jobs::PAUSED_DELAY, $name . ': all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
 		}
 
-		$jobs = (array) $this->r->get( 'agent_jobs' );
-		$gen  = (int) ( $jobs[ $name ] ?? 0 );
-		$id   = $this->r->get( 'uuid' ) . ':' . $name . ':' . $gen;
+		// One meta key per job name (not one map of all names): two runs that each count a different job never overwrite
+		// each other's number. Read fresh, so a number another run just stored is seen.
+		$key   = 'agent_job_' . substr( (string) preg_replace( '/[^a-z0-9_]/', '_', strtolower( $name ) ), 0, 60 );
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+		$gen   = (int) ( $fresh->get( $key ) ?? 0 );
+		$id    = $this->r->get( 'uuid' ) . ':' . $name . ':' . $gen;
 		$job  = $this->agent->submit( $op, $args, $id );
 
 		if ( is_wp_error( $job ) ) {
@@ -381,9 +385,7 @@ trait Runs {
 			return StepResult::retry( 0, $name . ': the node agent sent an unknown job status' );
 		}
 
-		$jobs[ $name ] = $gen + 1;
-
-		if ( ! $this->r->set( array( 'agent_jobs' => $jobs ) ) ) {
+		if ( ! $this->r->set( array( $key => $gen + 1 ) ) ) {
 			return StepResult::retry( 0, $name . ': the agent job state could not be stored' );
 		}
 

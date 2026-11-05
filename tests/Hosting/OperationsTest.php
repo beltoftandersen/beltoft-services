@@ -138,6 +138,32 @@ class OperationsTest extends HostingCase {
 		$this->assertCount( 1, $this->node->calls_to( '#/lxc/\d+$#', 'DELETE' ) );
 	}
 
+	public function test_two_runs_counting_different_agent_jobs_do_not_overwrite_each_other(): void {
+		$r    = $this->ready();
+		$vmid = (int) Records::for_resource( $r->id() )['vmid'];
+
+		// Two runs that both read the resource before either wrote.
+		$one = new \BeltoftServices\Hosting\HostingActions( Resource::find( $r->id() ) );
+		$two = new \BeltoftServices\Hosting\HostingActions( Resource::find( $r->id() ) );
+
+		$call = static function ( $actions, string $name ) use ( $vmid ) {
+			$m = new \ReflectionMethod( $actions, 'connect' );
+			$m->setAccessible( true );
+			$m->invoke( $actions );
+			$m = new \ReflectionMethod( $actions, 'agent_call' );
+			$m->setAccessible( true );
+
+			return $m->invoke( $actions, $name, 'ct.stats', array( 'vmid' => $vmid ) );
+		};
+
+		$this->assertIsArray( $call( $one, 'job_a' ) );
+		$this->assertIsArray( $call( $two, 'job_b' ) );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 1, (int) $fresh->get( 'agent_job_job_a' ) );
+		$this->assertSame( 1, (int) $fresh->get( 'agent_job_job_b' ), 'The second run did not undo the first run\'s count.' );
+	}
+
 	public function test_delete_resumes_after_a_failed_destroy_task_without_repeating_the_agent_jobs(): void {
 		$r = $this->ready();
 		$this->node->next_task( array() ); // The shutdown works.
