@@ -101,6 +101,10 @@ final class LiteMail {
 		}
 
 		if ( ! Children::attach( $parent, $child ) ) {
+			// No half-made child: the service never started, so it is closed and its license revoked, and a retry starts clean.
+			$child->set( array( 'state' => 'deleted', 'desired' => 'deleted' ) );
+			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
+
 			return new \WP_Error( 'link', 'The Email lite service could not be linked to the account.' );
 		}
 

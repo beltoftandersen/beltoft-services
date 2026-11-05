@@ -667,6 +667,16 @@ final class HostingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function enable_mail( string $domain ) {
+		return $this->locked( fn() => $this->enable_mail_locked( $domain ) );
+	}
+
+	/**
+	 * Sets up Email lite with the site lock held (a double click makes one child, not two).
+	 *
+	 * @param string $domain Mail domain.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function enable_mail_locked( string $domain ) {
 		$child = LiteMail::enable( $this->r, $domain );
 
 		if ( is_wp_error( $child ) ) {

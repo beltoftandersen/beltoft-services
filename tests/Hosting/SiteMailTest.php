@@ -195,6 +195,64 @@ class SiteMailTest extends HostingCase {
 		$this->assertSame( '6', (string) $this->mailcow->domain( 'shop.example' )['mailboxes'] );
 	}
 
+	public function test_a_customers_own_wordpress_mailbox_is_never_taken_over(): void {
+		list( $r ) = $this->account_with_mail();
+		$this->mailcow->add_mailbox( array( 'local_part' => 'wordpress', 'domain' => 'shop.example', 'password' => 'customers-own-secret-1', 'password2' => 'customers-own-secret-1', 'quota' => '1024', 'active' => '1', 'name' => 'Theirs' ) );
+		$before = $this->mailcow->mailbox( 'wordpress@shop.example' );
+
+		$done = ( new SiteMail( $r ) )->enable_system_mailbox();
+
+		$address = 'wp-c' . $r->id() . '@shop.example';
+		$this->assertSame( array( 'mode' => 'system', 'address' => $address ), $done['mail_sender'] );
+		$this->assertNotNull( $this->mailcow->mailbox( $address ) );
+		$this->assertSame( $before, $this->mailcow->mailbox( 'wordpress@shop.example' ), 'Their mailbox was not edited.' );
+		$this->assertSame( 'wp-c' . $r->id(), Resource::find( $r->id() )->get( 'smtp_local' ), 'Chosen once and kept.' );
+		$this->assertSame( $address, MailGuard::system_address( Resource::find( SiteMail::child_of( $r )->id() ) ) );
+	}
+
+	public function test_a_plan_change_leaves_the_system_mailbox_size_and_the_quota_alerts_skip_it(): void {
+		list( $r, $child ) = $this->account_with_mail( array( 'mail_quota_mb' => 1024 ) );
+		( new SiteMail( $r ) )->enable_system_mailbox();
+		$this->mailcow->add_mailbox( array( 'local_part' => 'info', 'domain' => 'shop.example', 'password' => 'customers-own-secret-1', 'password2' => 'customers-own-secret-1', 'quota' => '1024', 'active' => '1', 'name' => 'Info' ) );
+		$this->mailcow->edit_mailbox( 'wordpress@shop.example', array( 'quota' => '1024' ) ); // The size the customer's own boxes have too.
+		$small = $this->mailcow->mailbox( 'wordpress@shop.example' )['quota'];
+
+		$child = Resource::find( $child->id() );
+		$child->set( array( 'plan' => array_merge( (array) $child->get( 'plan' ), array( 'quota_mb' => 2048 ) ) ) );
+		$this->assertTrue( Registry::get( 'mail' )->update_plan( Resource::find( $child->id() ) )->is_done() );
+
+		$this->assertSame( $small, $this->mailcow->mailbox( 'wordpress@shop.example' )['quota'], 'The system mailbox keeps its own size.' );
+		$this->assertSame( 2048 * 1048576, (int) $this->mailcow->mailbox( 'info@shop.example' )['quota'], 'The customer\'s mailbox grows with the plan.' );
+
+		// Alerts: the system mailbox full is not the customer's to hear about.
+		$this->mailcow->set_usage( 'wordpress@shop.example', (int) $small );
+		$this->assertSame( array(), \BeltoftServices\Mail\MailJobs::check( Resource::find( $child->id() ) ) );
+		$this->mailcow->set_usage( 'info@shop.example', 2048 * 1048576 );
+		$this->assertSame( array( 'info@shop.example' ), \BeltoftServices\Mail\MailJobs::check( Resource::find( $child->id() ) ) );
+	}
+
+	public function test_enabling_email_lite_twice_at_once_makes_one_child(): void {
+		$r = $this->resource( array( 'mail_mailboxes' => 2 ) );
+		$this->provision_fully( $r );
+		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$r = Resource::find( $r->id() );
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$name  = \BeltoftServices\Locks::name( 'hosting-site', $r->id() );
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		add_filter( 'beltoft_services_hosting_lock_wait', '__return_zero' );
+
+		$busy = ( new HostingActions( $r ) )->enable_mail( 'twice.example' );
+		$this->assertWPError( $busy );
+		$this->assertSame( 'busy', $busy->get_error_code() );
+		$this->assertNull( SiteMail::child_of( $r ) );
+
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
+		$other->close();
+		remove_all_filters( 'beltoft_services_hosting_lock_wait' );
+		$this->assertIsArray( ( new HostingActions( $r ) )->enable_mail( 'twice.example' ) );
+	}
+
 	public function test_without_ready_email_lite_nothing_is_made(): void {
 		$r = $this->resource( array( 'mail_mailboxes' => 2 ) );
 		$this->provision_fully( $r );

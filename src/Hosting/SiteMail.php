@@ -206,8 +206,26 @@ final class SiteMail {
 			return $early;
 		}
 
-		$domain  = MailGuard::domain( $child );
-		$address = self::SYSTEM_LOCAL . '@' . $domain;
+		$domain = MailGuard::domain( $child );
+		$local  = (string) $this->r->get( 'smtp_local' );
+
+		// A mailbox the customer already has at wordpress@<domain> is theirs: it is never taken over, never given our password.
+		// Website mail then uses a different hidden local part (wp-<account>), which is chosen once and kept.
+		if ( '' === $local ) {
+			$existing = MailClients::for()->get_mailbox( self::SYSTEM_LOCAL . '@' . $domain );
+
+			if ( is_wp_error( $existing ) ) {
+				return StepResult::retry( 300, 'mail: ' . $this->scrub( $existing->get_error_message(), 160 ) );
+			}
+
+			$local = null === $existing ? self::SYSTEM_LOCAL : self::FALLBACK_PREFIX . Config::account( $this->r->id() );
+
+			if ( ! $this->r->set( array( 'smtp_local' => $local ) ) ) {
+				return StepResult::retry( 0, 'mail: the mailbox name could not be stored' );
+			}
+		}
+
+		$address = $local . '@' . $domain;
 		$secret  = (string) $this->r->get( 'smtp_secret' );
 
 		if ( '' === $secret ) {
@@ -253,7 +271,7 @@ final class SiteMail {
 		);
 
 		$done = null === $box
-			? $client->add_mailbox( array_merge( $attrs, array( 'local_part' => self::SYSTEM_LOCAL, 'domain' => $domain, 'name' => 'Website mail', 'quota' => (string) min( self::SYSTEM_QUOTA_MB, $limits['quota_mb'] ), 'active' => '1' ) ) )
+			? $client->add_mailbox( array_merge( $attrs, array( 'local_part' => $local, 'domain' => $domain, 'name' => 'Website mail', 'quota' => (string) min( self::SYSTEM_QUOTA_MB, $limits['quota_mb'] ), 'active' => '1' ) ) )
 			: $client->edit_mailbox( $address, $attrs );
 
 		if ( is_wp_error( $done ) ) {

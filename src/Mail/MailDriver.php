@@ -469,7 +469,14 @@ final class MailDriver implements Driver, NeedsBilling {
 				return StepResult::retry( 300, $boxes->get_error_message() );
 			}
 
+			$system = MailGuard::system_address( $r );
+
 			foreach ( $boxes as $box ) {
+				// The hidden website mail mailbox has its own small size: a plan change leaves it as it is.
+				if ( '' !== $system && strtolower( (string) ( $box['username'] ?? '' ) ) === $system ) {
+					continue;
+				}
+
 				if ( (int) round( (int) ( $box['quota'] ?? 0 ) / 1048576 ) === $applied['quota_mb'] ) {
 					$set = $client->edit_mailbox( (string) $box['username'], array( 'quota' => (string) $next['quota_mb'] ) );
 
