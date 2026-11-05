@@ -81,6 +81,20 @@ final class SiteDomains {
 	}
 
 	/**
+	 * Every external name of every account.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function external(): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- read fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE kind = %s ORDER BY id', Schema::tables()['hosting_domains'], 'external' ), ARRAY_A );
+
+		return array_map( array( __CLASS__, 'typed' ), is_array( $rows ) ? $rows : array() );
+	}
+
+	/**
 	 * The names of an account, oldest first.
 	 *
 	 * @param int $resource_id Activation id.

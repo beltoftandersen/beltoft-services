@@ -99,6 +99,30 @@ final class DnsQuery {
 	}
 
 	/**
+	 * The TXT strings of a name through the system resolver. Tests answer through the filter
+	 * beltoft_services_dns_resolve with type TXT; nothing in a test run reaches the network.
+	 *
+	 * @param string $name Host name.
+	 * @return array<int, string>|\WP_Error
+	 */
+	public static function texts( string $name ) {
+		$test = apply_filters( 'beltoft_services_dns_resolve', null, $name, 'TXT' );
+		if ( null !== $test ) {
+			if ( is_wp_error( $test ) ) { return $test; }
+			return is_array( $test ) ? array_values( array_map( 'strval', $test ) ) : new \WP_Error( 'bad_query', 'Invalid DNS query result.' );
+		}
+		$records = @dns_get_record( rtrim( $name, '.' ) . '.', DNS_TXT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
+		if ( false === $records ) {
+			return new \WP_Error( 'dns_transport', 'The name did not resolve.' );
+		}
+		$out = array();
+		foreach ( $records as $record ) {
+			if ( 'TXT' === ( $record['type'] ?? '' ) && isset( $record['txt'] ) && is_string( $record['txt'] ) ) { $out[] = $record['txt']; }
+		}
+		return array_values( array_unique( $out ) );
+	}
+
+	/**
 	 * The question sent to a name server. A name server refuses a direct question for the record
 	 * type RRSIG, so the signature check (type 46) asks for the zone's SOA with signatures
 	 * requested (EDNS0, DO bit) and reads the RRSIG that comes back with it.

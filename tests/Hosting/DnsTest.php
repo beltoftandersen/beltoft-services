@@ -212,35 +212,86 @@ class DnsTest extends HostingCase {
 		$this->assertStringContainsString( 'does not exist', (string) SiteDns::add_domain( $r, 'nosite', 'www.theirs.example', $node ) );
 	}
 
-	public function test_an_external_domain_waits_until_it_points_at_the_edge(): void {
+	/**
+	 * Answers the public lookups of the external domain checks.
+	 *
+	 * @param string[] $a   Addresses.
+	 * @param string[] $txt TXT strings.
+	 */
+	private function lookups( array $a, array $txt ): void {
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+		add_filter( 'beltoft_services_dns_resolve', static fn( $pre, $name, $type ) => 'TXT' === $type ? $txt : $a, 10, 3 );
+	}
+
+	public function test_an_external_domain_is_active_only_with_the_ownership_proof_and_our_address(): void {
 		list( $r, , $node ) = $this->account();
-		$slug = 'w' . $r->id();
+		$slug  = 'w' . $r->id();
+		$host  = 'www.elsewhere.example';
+		$token = SiteDns::proof_token( $r->id(), $host );
 
 		$calls = count( $this->dns->calls() );
-		$this->assertSame( array( 'kind' => 'external', 'state' => 'waiting' ), SiteDns::add_domain( $r, $slug, 'www.elsewhere.example', $node ) );
+		$this->assertSame( array( 'kind' => 'external', 'state' => 'waiting' ), SiteDns::add_domain( $r, $slug, $host, $node ) );
 		$this->assertCount( $calls, $this->dns->calls(), 'Nothing is written for an external name.' );
 
 		$this->assertSame(
 			array( array( 'type' => 'A', 'value' => '198.51.100.7' ), array( 'type' => 'AAAA', 'value' => '2001:db8::7' ) ),
 			SiteDns::instructions( $node )
 		);
-		$this->assertNotContains( 'www.elsewhere.example', array_column( EdgeMap::routes( $r->id(), false ), 'host' ), 'A waiting name is not on the edge.' );
+		$with = SiteDns::instructions( $node, $host, $r->id() );
+		$this->assertSame( array( 'type' => 'TXT', 'name' => '_beltoft-verify.' . $host, 'value' => $token ), end( $with ) );
+		$this->assertNotSame( $token, SiteDns::proof_token( $r->id() + 1, $host ), 'The token belongs to the account.' );
+		$this->assertNotContains( $host, array_column( EdgeMap::routes( $r->id(), false ), 'host' ), 'A waiting name is not on the edge.' );
 
-		add_filter( 'beltoft_services_dns_resolve', fn() => array( '203.0.113.50' ), 20 );
-		$this->assertSame( 'waiting', SiteDns::check_external( 'www.elsewhere.example', $node ) );
-		remove_all_filters( 'beltoft_services_dns_resolve' );
+		$this->lookups( array( '203.0.113.50' ), array( $token ) );
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ), 'The proof without our address.' );
 
-		add_filter( 'beltoft_services_dns_resolve', fn() => array( '198.51.100.7' ) );
-		$this->assertSame( 'active', SiteDns::check_external( 'www.elsewhere.example', $node ) );
-		$this->assertContains( 'www.elsewhere.example', array_column( EdgeMap::routes( $r->id(), false ), 'host' ) );
+		$this->lookups( array( '198.51.100.7' ), array() );
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ), 'Pointing at us proves nothing: anybody can point a name they do not own.' );
+		$this->lookups( array( '198.51.100.7' ), array( 'someone-elses-token' ) );
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ) );
+
+		$this->lookups( array( '198.51.100.7' ), array( '"' . $token . '"' ) );
+		$this->assertSame( 'active', SiteDns::check_external( $host, $node ) );
+		$this->assertContains( $host, array_column( EdgeMap::routes( $r->id(), false ), 'host' ) );
 
 		remove_all_filters( 'beltoft_services_dns_resolve' );
 		add_filter( 'beltoft_services_dns_resolve', fn() => new \WP_Error( 'down', 'down' ) );
-		$this->assertNull( SiteDns::check_external( 'www.elsewhere.example', $node ), 'A failed lookup changes nothing.' );
-		$this->assertSame( 'active', SiteDomains::find( 'www.elsewhere.example' )['state'] );
+		$this->assertNull( SiteDns::check_external( $host, $node ), 'A failed lookup changes nothing.' );
+		$this->assertSame( 'active', SiteDomains::find( $host )['state'] );
+		remove_all_filters( 'beltoft_services_dns_resolve' );
 
 		$this->assertNull( SiteDns::check_external( 'w' . $r->id() . '.preview.example.test', $node ), 'Only external names are checked.' );
 		$this->assertNull( SiteDns::check_external( 'unknown.example', $node ) );
+	}
+
+	public function test_the_sweep_activates_and_deactivates_external_names_and_sends_the_routes(): void {
+		list( $r, , $node ) = $this->account();
+		$r->set( array( 'state' => 'ready', 'desired' => 'ready', 'steps' => array( 'ready' ) ) );
+		$host = 'www.sweep.example';
+		SiteDns::add_domain( Resource::find( $r->id() ), 'w' . $r->id(), $host, $node );
+
+		$this->lookups( array( '198.51.100.7' ), array( SiteDns::proof_token( $r->id(), $host ) ) );
+		$this->assertSame( array( $host => 'active' ), \BeltoftServices\Hosting\DomainSweep::run() );
+		$edge = array_filter( $this->agent->calls_of( 'edge.apply' ), static fn( $c ) => in_array( 'www.sweep.example', array_column( (array) ( $c['args']['routes'] ?? array() ), 'host' ), true ) );
+		$this->assertNotEmpty( $edge, 'The edge was told.' );
+		$this->assertSame( array(), \BeltoftServices\Hosting\DomainSweep::run(), 'Nothing changed.' );
+
+		$this->lookups( array( '198.51.100.7' ), array() );
+		$this->assertSame( array( $host => 'waiting' ), \BeltoftServices\Hosting\DomainSweep::run(), 'The proof was removed.' );
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+	}
+
+	public function test_the_operators_own_domains_cannot_be_added(): void {
+		list( $r, , $node ) = $this->account();
+		$this->settings( array( 'hosting_denied_domains' => "beltofttest.example\nshop.example" ) );
+
+		foreach ( array( 'beltofttest.example', 'www.beltofttest.example', 'a.b.shop.example' ) as $host ) {
+			$this->assertIsString( SiteDns::add_domain( $r, 'w' . $r->id(), $host, $node ), $host );
+			$this->assertNull( SiteDomains::find( $host ) );
+		}
+
+		$this->assertIsArray( SiteDns::add_domain( $r, 'w' . $r->id(), 'www.notmine.example', $node ), 'Another domain is fine.' );
+		$this->assertIsArray( SiteDns::add_domain( $r, 'w' . $r->id(), 'xshop.example', $node ), 'Only the name and what is under it.' );
 	}
 
 	public function test_a_domain_belongs_to_one_account(): void {

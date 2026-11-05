@@ -191,6 +191,23 @@ final class HostingAccount {
 
 		echo '</tbody></table>';
 
+		// A name the customer points at us themselves: the records to add, including the proof that the name is theirs.
+		$node = (array) ( Nodes::get( (string) ( Records::for_resource( $r->id() )['node'] ?? '' ) ) ?? array() );
+
+		foreach ( SiteDomains::for_resource( $r->id() ) as $d ) {
+			if ( 'external' !== $d['kind'] || 'active' === $d['state'] ) {
+				continue;
+			}
+
+			$rows = array();
+
+			foreach ( SiteDns::instructions( $node, $d['host'], $r->id() ) as $row ) {
+				$rows[] = $row['type'] . ' ' . ( $row['name'] ?? $d['host'] ) . ' = ' . $row['value'];
+			}
+
+			echo '<p class="beltoft-hosting-notice">' . esc_html( sprintf( /* translators: 1: domain name, 2: DNS records. */ __( 'To use %1$s, add these DNS records at your DNS provider: %2$s. The website goes live when both are found.', 'beltoft-services' ), $d['host'], implode( '; ', $rows ) ) ) . '</p>';
+		}
+
 		foreach ( (array) $r->get( 'php_pinned' ) as $slug => $version ) {
 			if ( null !== Sites::find( $r->id(), (string) $slug ) && Config::php_end( (string) $version ) !== null && (int) Config::php_end( (string) $version ) < \BeltoftServices\Jobs::now() ) {
 				echo '<p class="beltoft-hosting-warning" style="color:#b32d2e">' . esc_html( sprintf( /* translators: 1: website name, 2: PHP version. */ __( 'The website %1$s runs on PHP %2$s, which no longer gets security updates. Move it to a supported version as soon as you can.', 'beltoft-services' ), (string) $slug, (string) $version ) ) . '</p>';

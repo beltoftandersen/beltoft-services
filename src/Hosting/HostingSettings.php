@@ -106,6 +106,15 @@ final class HostingSettings {
 			'hosting_db_minutes'      => array( 'db_minutes', __( 'Database monitor: minutes', 'beltoft-services' ), '' ),
 		);
 
+		$fields['hosting_denied_domains'] = array_merge(
+			$base,
+			array(
+				'type'    => 'textarea',
+				'default' => '',
+				'label'   => __( 'Domains customers may not point at hosting', 'beltoft-services' ),
+				'desc'    => __( 'One domain per line. A domain here, and any name under it, is refused: use it for your own domains (the shop, the mail host, the name servers).', 'beltoft-services' ),
+			)
+		);
 		$fields['hosting_restore_test'] = array_merge(
 			$base,
 			array(

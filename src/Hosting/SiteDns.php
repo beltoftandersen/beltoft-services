@@ -12,6 +12,7 @@ use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -54,7 +55,7 @@ final class SiteDns {
 	 * @param array<string, mixed> $node Node settings.
 	 * @return array<int, array{type: string, value: string}>
 	 */
-	public static function instructions( array $node ): array {
+	public static function instructions( array $node, string $host = '', int $resource_id = 0 ): array {
 		$out = array();
 
 		foreach ( self::edge( $node ) as $type => $value ) {
@@ -66,7 +67,56 @@ final class SiteDns {
 			}
 		}
 
+		// The proof that the customer controls the name: a TXT record with a token only this account and name can show.
+		if ( '' !== $host && $resource_id > 0 ) {
+			$out[] = array(
+				'type'  => 'TXT',
+				'name'  => self::PROOF_LABEL . '.' . $host,
+				'value' => self::proof_token( $resource_id, $host ),
+			);
+		}
+
 		return $out;
+	}
+
+	/** Label of the ownership proof record, in front of the host name. */
+	public const PROOF_LABEL = '_beltoft-verify';
+
+	/**
+	 * The ownership token of a name for an account (not stored: made again from the site's secret keys).
+	 *
+	 * @param int    $resource_id Hosting resource id.
+	 * @param string $host        Host name.
+	 */
+	public static function proof_token( int $resource_id, string $host ): string {
+		return substr( hash_hmac( 'sha256', 'hosting-domain|' . $resource_id . '|' . strtolower( $host ), wp_salt( 'auth' ) ), 0, 32 );
+	}
+
+	/**
+	 * Is the name one the operator keeps for itself (setting "domains customers may not add", one per line; a name
+	 * under a listed domain counts)?
+	 *
+	 * @param string $host Host name.
+	 */
+	public static function denied( string $host ): bool {
+		$list = preg_split( '/[\s,]+/', strtolower( (string) Settings::get( 'hosting_denied_domains' ) ), -1, PREG_SPLIT_NO_EMPTY );
+
+		/**
+		 * Domains customers may not point at their hosting.
+		 *
+		 * @param string[] $list Lower case domains.
+		 */
+		$list = (array) apply_filters( 'beltoft_services_hosting_denied_domains', is_array( $list ) ? $list : array() );
+
+		foreach ( $list as $domain ) {
+			$domain = rtrim( strtolower( (string) $domain ), '.' );
+
+			if ( '' !== $domain && ( $host === $domain || str_ends_with( $host, '.' . $domain ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -297,6 +347,10 @@ final class SiteDns {
 			return 'That name belongs to the preview zone.';
 		}
 
+		if ( self::denied( $host ) ) {
+			return 'That domain cannot be used for hosting.';
+		}
+
 		$existing = SiteDomains::find( $host );
 
 		if ( null !== $existing && $existing['resource_id'] !== $r->id() ) {
@@ -333,8 +387,10 @@ final class SiteDns {
 	}
 
 	/**
-	 * Looks at an external name: it is active once a public lookup shows our edge address, and goes back to
-	 * waiting if it stops showing it. A lookup that fails changes nothing.
+	 * Looks at an external name: it is active once the customer has proved the name is theirs (the TXT record
+	 * `_beltoft-verify.<name>` with the account's token) AND a public lookup shows our edge address, and goes back to
+	 * waiting if either stops showing. A lookup that fails changes nothing. Pointing at us alone proves nothing: anybody
+	 * can point a name they do not own.
 	 *
 	 * @param string               $host Host name.
 	 * @param array<string, mixed> $node Node settings.
@@ -349,12 +405,14 @@ final class SiteDns {
 
 		$edge  = self::edge( $node );
 		$found = DnsQuery::addresses( $host, 'A' );
+		$texts = DnsQuery::texts( self::PROOF_LABEL . '.' . $host );
 
-		if ( is_wp_error( $found ) ) {
+		if ( is_wp_error( $found ) || is_wp_error( $texts ) ) {
 			return null;
 		}
 
-		$state = '' !== $edge['A'] && in_array( $edge['A'], $found, true ) ? 'active' : 'waiting';
+		$proved = in_array( self::proof_token( (int) $row['resource_id'], $host ), array_map( static fn( $t ) => trim( (string) $t, " \t\"" ), $texts ), true );
+		$state  = $proved && '' !== $edge['A'] && in_array( $edge['A'], $found, true ) ? 'active' : 'waiting';
 
 		SiteDomains::set_state( $host, $state );
 

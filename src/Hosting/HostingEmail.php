@@ -43,8 +43,8 @@ final class HostingEmail {
 			$domains[] = array( 'host' => $d['host'], 'state' => $d['state'], 'kind' => $d['kind'] );
 
 			if ( 'external' === $d['kind'] && 'active' !== $d['state'] ) {
-				foreach ( SiteDns::instructions( $node ) as $row ) {
-					$records[] = array( 'name' => $d['host'], 'type' => $row['type'], 'value' => $row['value'] );
+				foreach ( SiteDns::instructions( $node, $d['host'], $r->id() ) as $row ) {
+					$records[] = array( 'name' => (string) ( $row['name'] ?? $d['host'] ), 'type' => $row['type'], 'value' => $row['value'] );
 				}
 			}
 		}

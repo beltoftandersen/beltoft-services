@@ -336,7 +336,18 @@ final class HostingActions {
 			return $edge;
 		}
 
-		return array_merge( $added, array( 'point_at' => 'external' === $added['kind'] ? SiteDns::instructions( $this->node ) : array() ) );
+		return array_merge( $added, array( 'point_at' => 'external' === $added['kind'] ? SiteDns::instructions( $this->node, strtolower( rtrim( trim( $host ), '.' ) ), $this->r->id() ) : array() ) );
+	}
+
+	/**
+	 * Sends the account's current routes to the edge (a name became active or stopped being).
+	 *
+	 * @return true|\WP_Error
+	 */
+	public function sync_edge() {
+		$ready = $this->ready();
+
+		return is_wp_error( $ready ) ? $ready : $this->edge();
 	}
 
 	/**

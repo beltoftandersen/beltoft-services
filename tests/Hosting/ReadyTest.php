@@ -116,6 +116,7 @@ class ReadyTest extends HostingCase {
 			array(
 				array( 'name' => 'www.elsewhere.example', 'type' => 'A', 'value' => '198.51.100.7' ),
 				array( 'name' => 'www.elsewhere.example', 'type' => 'AAAA', 'value' => '2001:db8::7' ),
+				array( 'name' => '_beltoft-verify.www.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'www.elsewhere.example' ) ),
 			),
 			$facts['dns_records']
 		);
