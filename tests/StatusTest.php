@@ -33,6 +33,11 @@ class StatusTest extends TestCase {
 		$this->assertMatchesRegularExpression( '/\.bs-inline \{[^}]*height: 20px;/', $css );
 		$this->assertMatchesRegularExpression( '/\.bs-inline__text \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/', $css );
 		$this->assertMatchesRegularExpression( '/\.bs-pagehead \{[^}]*height: 20px;/', $css );
+		// An empty line takes no room while idle; status.js opens it for a message (is-live) and closes it after.
+		$this->assertMatchesRegularExpression( '/\.bs-pagehead\.is-empty:not\(\.is-live\) \{[^}]*height: 0;[^}]*margin-bottom: 0;[^}]*overflow: hidden;/', $css );
+		$this->assertMatchesRegularExpression( '/@media \(prefers-reduced-motion: reduce\) \{[^}]*\.bs-pagehead \{? ?[^}]*transition: none|\.bs-inline, \.bs-pagehead \{ transition: none/', $css );
+		$this->assertStringContainsString( "classList.toggle( 'is-live', on )", $js );
+		$this->assertStringContainsString( "'bs-pagehead is-empty'", $js );
 		$this->assertStringContainsString( 'scroll-margin-top: var(--bs-overlay-clear', $css );
 		$this->assertStringContainsString( "'alert'", $js, 'A failure is announced as an alert.' );
 	}

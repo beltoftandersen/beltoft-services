@@ -473,7 +473,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .bs-inline.is-fading { opacity: 0; }
 .bs-inline__text.is-busy::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 /* The line under the title row of a page that has no head of its own: one line, a fixed height. */
-.bs-pagehead { box-sizing: border-box; height: 20px; margin: 0 0 var(--bs-space-4); }
+.bs-pagehead { box-sizing: border-box; height: 20px; margin: 0 0 var(--bs-space-4); transition: height .15s ease, margin-bottom .15s ease; }
+/* No description and nothing happening: the line takes no room (it only holds the hidden close button). */
+.bs-pagehead.is-empty:not(.is-live) { height: 0; margin-bottom: 0; overflow: hidden; }
 .bs-inline.is-done, .bs-inline.is-info { color: var(--ink-mid, #2d4060); }
 .bs-inline.is-fail { color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
 .bs-inline__close { flex: none; width: var(--bs-btn-h); height: var(--bs-btn-h); margin: -10px -10px -10px 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
@@ -891,7 +893,7 @@ button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display:
 .bs-dialog .beltoft-services-vm__buttons { margin: 0; }
 .bs-dialog .bs-danger { background: var(--bs-status-fail); border-color: var(--bs-status-fail); color: #fff; }
 @media (prefers-reduced-motion: reduce) {
-	.bs-inline { transition: none; animation: none; }
+	.bs-inline, .bs-pagehead { transition: none; animation: none; }
 	button.is-busy::before, [data-bs-action].is-busy::before, .bs-inline__text.is-busy::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; }
 }
 

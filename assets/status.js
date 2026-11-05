@@ -114,7 +114,7 @@
 		}
 
 		area = contentArea();
-		line = make( 'div', 'bs-pagehead' );
+		line = make( 'div', 'bs-pagehead is-empty' );
 		line.appendChild( make( 'span', 'bs-inline' ) ).setAttribute( 'data-bs-inline', '' );
 		line.firstChild.setAttribute( 'role', 'status' );
 		line.firstChild.setAttribute( 'aria-live', 'polite' );
@@ -182,6 +182,15 @@
 		}
 	}
 
+	// A page line without a description is closed while idle; it opens for a message and closes again after it.
+	function live( target, on ) {
+		var head = target.parentNode;
+
+		if ( head && head.classList && head.classList.contains( 'bs-pagehead' ) ) {
+			head.classList.toggle( 'is-live', on );
+		}
+	}
+
 	function inlineReset( target ) {
 		var parts = inlineParts( target );
 
@@ -202,6 +211,7 @@
 
 		parts.close.hidden = true;
 		indicate( target, false );
+		live( target, false );
 		current = null;
 	}
 
@@ -226,6 +236,7 @@
 
 		clearTimers();
 		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
+		live( target, true );
 
 		// The three squares of work in progress are the ones every busy element has (.is-busy::before), on the text.
 		parts.label.classList.toggle( 'is-busy', 'busy' === kind );

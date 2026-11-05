@@ -23,11 +23,17 @@ class PageHeadTest extends TestCase {
 		$element = (object) array( 'name' => 'woocommerce-account-page-v2' );
 
 		$html = (string) PageHead::before_bricks_account( '<div class="brxe">content</div>', $element );
-		$this->assertStringStartsWith( '<div class="bs-pagehead"><span class="bs-inline" data-bs-inline role="status" aria-live="polite"><span class="bs-inline__text"></span>', $html );
+		$this->assertStringStartsWith( '<div class="bs-pagehead is-empty"><span class="bs-inline" data-bs-inline role="status" aria-live="polite"><span class="bs-inline__text"></span>', $html );
 
 		$own = '<header class="beltoft-services-page__head"><span class="bs-inline" data-bs-inline></span></header>';
 		$this->assertSame( $own, PageHead::before_bricks_account( $own, $element ), 'A head with its own line is not given a second one.' );
 		$this->assertSame( 'x', PageHead::before_bricks_account( 'x', (object) array( 'name' => 'heading' ) ) );
+	}
+
+	public function test_a_line_without_a_description_is_marked_empty_and_one_with_a_description_is_not(): void {
+		$this->assertStringStartsWith( '<div class="bs-pagehead is-empty">', PageHead::line( '' ) );
+		$this->assertStringStartsWith( '<div class="bs-pagehead">', PageHead::line( 'Create a new server.' ) );
+		$this->assertStringContainsString( 'Create a new server.', PageHead::line( 'Create a new server.' ) );
 	}
 
 	public function test_the_description_can_be_changed_with_a_filter(): void {
