@@ -219,10 +219,12 @@ class IntroCouponTest extends TestCase {
 		$this->assertSame( '', get_post_meta( $product->get_id(), IntroCoupon::META, true ), 'An empty box clears it.' );
 		$_POST = array();
 
-		$GLOBALS['post'] = get_post( $product->get_id() );
+		include_once WC_ABSPATH . 'includes/admin/wc-meta-box-functions.php';
+		$GLOBALS['product_object'] = wc_get_product( $product->get_id() );
 		ob_start();
 		Product::panel();
 		$html = (string) ob_get_clean();
+		unset( $GLOBALS['product_object'] );
 		$this->assertStringContainsString( 'name="_beltoft_services_intro_coupon"', $html );
 		$this->assertStringContainsString( 'Intro coupon', $html );
 	}
