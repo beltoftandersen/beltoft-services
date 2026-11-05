@@ -225,6 +225,20 @@ final class OpenApi {
 				'reply'   => array( 'dns' => array( 'type' => 'object' ) ),
 				'errors'  => array( 401, 403, 429 ),
 			),
+			'GET /resources/{id}/ssl-certificate'        => array(
+				'summary' => 'The current certificate of an SSL certificate service and its chain, as PEM text, for a script that installs it. Only public parts: the private key is never in a reply.',
+				'scope'   => 'read',
+				'query'   => array( 'part' => array( 'type' => 'string', 'enum' => array( 'fullchain', 'cert', 'chain' ), 'description' => 'Which part to return. Default fullchain.' ) ),
+				'reply'   => array(
+					'name'       => $text,
+					'serial'     => $text,
+					'valid_from' => $text,
+					'valid_to'   => $text,
+					'part'       => $text,
+					'pem'        => $text,
+				),
+				'errors'  => array( 401, 403, 404, 429 ),
+			),
 			'GET /domains/check'                         => array(
 				'summary' => 'Whether a domain name is available, and its price.',
 				'scope'   => 'read',

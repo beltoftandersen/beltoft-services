@@ -98,7 +98,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'used'          => $used,
 				'limit'         => $limit,
 				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
-				'domain_name'   => in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : ( $mail ? (string) $mail->get( 'mail_domain' ) : '' ),
+				'domain_name'   => 'ssl' === $r->get( 'driver' ) ? (string) $r->get( 'ssl_name' ) : ( in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : ( $mail ? (string) $mail->get( 'mail_domain' ) : '' ) ),
 				'mail_domain'   => $mail ? (string) $mail->get( 'mail_domain' ) : '',
 				'mail_external' => $mail && 'external' === (string) $mail->get( 'mail_mode' ),
 				'mail_records'  => $mail ? \BeltoftServices\Mail\MailDns::missing_rows( $mail ) : array(),
@@ -161,6 +161,7 @@ abstract class ServiceEmail extends \WC_Email {
 					'price_html' => wp_kses_post( (string) ( $data['renewal']['price_html'] ?? '' ) ),
 					'view_url'   => esc_url_raw( (string) ( $data['renewal']['view_url'] ?? '' ) ),
 				) : array( 'date' => '', 'plan' => '', 'price_html' => '', 'view_url' => '' ),
+				'ssl'           => \BeltoftServices\Ssl\SslEmail::values( $r, $data ),
 				'hosting'       => 'hosting' === $r->get( 'driver' ) ? \BeltoftServices\Hosting\HostingEmail::values( $r ) : array(),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);
@@ -227,6 +228,10 @@ abstract class ServiceEmail extends \WC_Email {
 
 		if ( \BeltoftServices\Proxmox\DbDriver::ID === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( $license );
+		}
+
+		if ( 'ssl' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->url( $license );
 		}
 
 		if ( 'mail' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {

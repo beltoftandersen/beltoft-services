@@ -37,6 +37,7 @@ final class Registry {
 				'domain'  => new \BeltoftServices\Domains\DomainDriver(),
 				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
 				'mail'    => new \BeltoftServices\Mail\MailDriver(),
+				'ssl'     => new \BeltoftServices\Ssl\SslDriver(),
 			)
 		);
 

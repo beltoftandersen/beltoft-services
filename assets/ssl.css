@@ -1,0 +1,13 @@
+/* SSL certificate page. Square corners, few borders. */
+.beltoft-services-ssl { --bss-rule: var(--rule, #d6d2c8); --bss-soft: var(--ink-soft, #5e7080); }
+.beltoft-services-ssl .beltoft-services-ssl__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 0 0 24px; }
+.beltoft-services-ssl .beltoft-services-ssl__facts dt { color: var(--bss-soft); font-size: 13px; }
+.beltoft-services-ssl .beltoft-services-ssl__facts dd { margin: 0; overflow-wrap: anywhere; }
+.beltoft-services-ssl .beltoft-services-ssl__rows { width: 100%; margin: 0 0 16px; border-collapse: collapse; }
+.beltoft-services-ssl .beltoft-services-ssl__rows th { width: 1%; padding: 8px 16px 8px 0; border: 0; background: none; color: var(--bss-soft); font-weight: 500; text-align: left; white-space: nowrap; vertical-align: top; }
+.beltoft-services-ssl .beltoft-services-ssl__rows td { padding: 8px 0; border: 0; background: none; overflow-wrap: anywhere; }
+.beltoft-services-ssl .beltoft-services-ssl__rows code { padding: 0; border: 0; background: none; font: inherit; }
+.beltoft-services-ssl .beltoft-services-ssl__note, .beltoft-services-ssl .beltoft-services-ssl__pull { color: var(--bss-soft); }
+.beltoft-services-ssl .beltoft-services-ssl__form textarea { box-sizing: border-box; width: 100%; max-width: 100%; }
+.beltoft-services-ssl .beltoft-services-ssl__notice { margin: 16px 0 0; }
+.beltoft-services-ssl .beltoft-services-ssl__downloads .button { margin: 0 8px 8px 0; }

@@ -55,7 +55,7 @@ abstract class ServiceArea {
 	 * @return array<int, ServiceArea>
 	 */
 	public static function all(): array {
-		return array( self::get( Databases::class ), self::get( Apps::class ), self::get( Email::class ) );
+		return array( self::get( Databases::class ), self::get( Apps::class ), self::get( Email::class ), self::get( Ssl::class ) );
 	}
 
 	/**

@@ -143,6 +143,16 @@ final class Progress {
 				'zone'          => __( 'Set up the DNS', 'beltoft-services' ),
 				'dates'         => __( 'Final checks', 'beltoft-services' ),
 			),
+			'ssl'               => array(
+				'csr'      => __( 'Make the certificate request', 'beltoft-services' ),
+				'contact'  => __( 'Save the owner details', 'beltoft-services' ),
+				'order'    => __( 'Place the order', 'beltoft-services' ),
+				'request'  => __( 'Send the request to the certificate authority', 'beltoft-services' ),
+				'validate' => __( 'Validate the domain', 'beltoft-services' ),
+				'active'   => __( 'Wait for the certificate authority', 'beltoft-services' ),
+				'deliver'  => __( 'Collect the certificate', 'beltoft-services' ),
+				'dates'    => __( 'Final checks', 'beltoft-services' ),
+			),
 			'dns'               => array(
 				'claim'      => __( 'Reserve the domain', 'beltoft-services' ),
 				'zone'       => __( 'Create the DNS zone', 'beltoft-services' ),

@@ -69,7 +69,7 @@ final class Tokens {
 	 * .../password, mail-reveal) are left out on purpose: only the MCP tools do these, with Full access and the customer's
 	 * confirmation.
 	 */
-	private const ALLOWED = '#^/beltoft-services/v1/(resources(/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+|mail(/(mailboxes|aliases(/[^/]+)?|dns/check))?))?)?|usage|domains/check|openapi\.json)$#D';
+	private const ALLOWED = '#^/beltoft-services/v1/(resources(/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+|ssl-certificate|mail(/(mailboxes|aliases(/[^/]+)?|dns/check))?))?)?|usage|domains/check|openapi\.json)$#D';
 
 	/**
 	 * Actions a token can never run.

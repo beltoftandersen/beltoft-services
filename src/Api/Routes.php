@@ -44,7 +44,7 @@ final class Routes {
 	/**
 	 * Arguments kept exactly as sent, because the driver validates them itself.
 	 */
-	private const RAW_ARGS = array( 'records' );
+	private const RAW_ARGS = array( 'records', 'csr' );
 
 	/**
 	 * Requests per user, route and window for the status route, unless filtered: room for
