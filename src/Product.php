@@ -493,6 +493,18 @@ final class Product {
 			)
 		);
 
+		woocommerce_wp_text_input(
+			array(
+				'id'                => RenewalReminder::META,
+				'label'             => __( 'Renewal reminder, days before', 'beltoft-services' ),
+				'description'       => __( 'Sends the customer a "your subscription renews on ..." email this many days before each renewal of a subscription longer than that (for example 30 for a yearly plan), with the plan, the date, the price and how to cancel. Empty: none. The shop-wide WooCommerce Subscriptions reminder is not changed.', 'beltoft-services' ),
+				'desc_tip'          => true,
+				'type'              => 'number',
+				'custom_attributes' => array( 'min' => '0', 'max' => '365', 'step' => '1' ),
+				'value'             => $product ? $product->get_meta( RenewalReminder::META ) : '',
+			)
+		);
+
 		if ( '' !== $driver_id ) {
 			woocommerce_wp_text_input(
 				array(
@@ -606,6 +618,7 @@ final class Product {
 		$retention = isset( $_POST[ self::META_RETENTION ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::META_RETENTION ] ) ) ) : '';
 		$product->update_meta_data( self::META_RETENTION, '' === $retention ? '' : (string) absint( $retention ) );
 		$product->update_meta_data( self::META_TRIAL_PAID, isset( $_POST[ self::META_TRIAL_PAID ] ) ? 'yes' : 'no' );
+		$product->update_meta_data( RenewalReminder::META, isset( $_POST[ RenewalReminder::META ] ) ? RenewalReminder::clean_days( sanitize_text_field( wp_unslash( $_POST[ RenewalReminder::META ] ) ) ) : '' );
 		$product->update_meta_data( IntroCoupon::META, isset( $_POST[ IntroCoupon::META ] ) ? IntroCoupon::clean_code( sanitize_text_field( wp_unslash( $_POST[ IntroCoupon::META ] ) ) ) : '' );
 
 		if ( '' !== $driver_id && isset( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) {

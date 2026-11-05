@@ -109,6 +109,7 @@ final class Plugin {
 		Status::register();
 		Checkout::register();
 		IntroCoupon::register();
+		RenewalReminder::register();
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Slugs::register();

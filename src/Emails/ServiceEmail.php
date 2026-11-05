@@ -155,6 +155,12 @@ abstract class ServiceEmail extends \WC_Email {
 					'until' => isset( $data['until'] ) ? sanitize_text_field( (string) $data['until'] ) : '',
 					'site'  => isset( $data['site'] ) ? sanitize_text_field( (string) $data['site'] ) : '',
 				) : array( 'kind' => 'account', 'ok' => true, 'until' => '', 'site' => '' ),
+				'renewal'       => is_array( $data['renewal'] ?? null ) ? array(
+					'date'       => sanitize_text_field( (string) ( $data['renewal']['date'] ?? '' ) ),
+					'plan'       => sanitize_text_field( (string) ( $data['renewal']['plan'] ?? '' ) ),
+					'price_html' => wp_kses_post( (string) ( $data['renewal']['price_html'] ?? '' ) ),
+					'view_url'   => esc_url_raw( (string) ( $data['renewal']['view_url'] ?? '' ) ),
+				) : array( 'date' => '', 'plan' => '', 'price_html' => '', 'view_url' => '' ),
 				'hosting'       => 'hosting' === $r->get( 'driver' ) ? \BeltoftServices\Hosting\HostingEmail::values( $r ) : array(),
 				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);
@@ -162,6 +168,7 @@ abstract class ServiceEmail extends \WC_Email {
 			$this->placeholders['{product_name}']  = $this->values['product_name'];
 			$this->placeholders['{deletion_date}'] = $this->values['deletion_date'];
 			$this->placeholders['{domain_name}']   = $this->values['domain_name'];
+			$this->placeholders['{renewal_date}']  = $this->values['renewal']['date'];
 
 			if ( $this->is_enabled() && $this->get_recipient() ) {
 				$sent = (bool) $this->send( $this->get_recipient(), $this->get_subject(), $this->get_content(), $this->get_headers(), $this->get_attachments() );
