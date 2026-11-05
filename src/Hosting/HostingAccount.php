@@ -173,6 +173,9 @@ final class HostingAccount {
 			);
 
 			if ( $ready ) {
+				$marker = ( (array) $r->get( 'php_rollback' ) )[ $site['slug'] ] ?? null;
+				$back   = is_array( $marker ) && (int) ( $marker['until'] ?? 0 ) > \BeltoftServices\Jobs::now() ? ' <button type="button" data-hosting-action="php_rollback" data-slug="' . esc_attr( $site['slug'] ) . '">' . esc_html( sprintf( /* translators: %s: PHP version. */ __( 'Go back to PHP %s', 'beltoft-services' ), (string) $marker['from'] ) ) . '</button>' : '';
+
 				printf(
 					'<td><button type="button" data-hosting-action="login" data-slug="%1$s">%2$s</button> <button type="button" data-hosting-action="cache" data-slug="%1$s">%3$s</button> <button type="button" data-hosting-action="remove_site" data-slug="%1$s">%4$s</button></td>',
 					esc_attr( $site['slug'] ),
@@ -180,12 +183,19 @@ final class HostingAccount {
 					esc_html__( 'Clear cache', 'beltoft-services' ),
 					esc_html__( 'Remove', 'beltoft-services' )
 				);
+				echo wp_kses( $back, array( 'button' => array( 'type' => true, 'data-hosting-action' => true, 'data-slug' => true ) ) );
 			}
 
 			echo '</tr>';
 		}
 
 		echo '</tbody></table>';
+
+		foreach ( (array) $r->get( 'php_pinned' ) as $slug => $version ) {
+			if ( null !== Sites::find( $r->id(), (string) $slug ) && Config::php_end( (string) $version ) !== null && (int) Config::php_end( (string) $version ) < \BeltoftServices\Jobs::now() ) {
+				echo '<p class="beltoft-hosting-warning" style="color:#b32d2e">' . esc_html( sprintf( /* translators: 1: website name, 2: PHP version. */ __( 'The website %1$s runs on PHP %2$s, which no longer gets security updates. Move it to a supported version as soon as you can.', 'beltoft-services' ), (string) $slug, (string) $version ) ) . '</p>';
+			}
+		}
 
 		foreach ( HostingUsage::loader_problems( $r ) as $slug => $state ) {
 			echo '<p class="beltoft-hosting-notice">' . esc_html(

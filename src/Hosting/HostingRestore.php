@@ -105,12 +105,12 @@ final class HostingRestore {
 	 * The safety point: name, label, time, expiry, scope.
 	 *
 	 * @param Resource $r Hosting resource.
-	 * @return array{name: string, at: int, expires: int, scope: string}|null Null when none is kept.
+	 * @return array{name: string, at: int, expires: int, scope: string, mode: string, volid: string}|null Null when none is kept.
 	 */
 	public static function safety( Resource $r ): ?array {
 		$s = $r->get( 'safety' );
 
-		return is_array( $s ) && ! empty( $s['name'] ) && (int) ( $s['expires'] ?? 0 ) > 0 ? array_merge( array( 'scope' => '' ), $s ) : null;
+		return is_array( $s ) && ! empty( $s['name'] ) && (int) ( $s['expires'] ?? 0 ) > 0 ? array_merge( array( 'scope' => '', 'mode' => 'snapshot', 'volid' => '' ), $s ) : null;
 	}
 
 	/**
@@ -328,7 +328,7 @@ final class HostingRestore {
 		$old = self::safety( $this->r );
 
 		if ( null !== $old && $old['name'] !== $round['safety'] ) {
-			$gone = $this->run_task( 'safety', 'DELETE', $this->lxc( $v['node'] ) . '/snapshot/' . $old['name'], array(), 'snapdel' );
+			$gone = $this->discard( $old, $v );
 
 			if ( $gone instanceof StepResult ) {
 				return $gone;
@@ -344,6 +344,12 @@ final class HostingRestore {
 			return $dump->is_poll() ? $dump : StepResult::fail( 'The safety dump failed: ' . $dump->error() );
 		}
 
+		$mode = $this->mode( (string) $round['kind'] );
+
+		if ( 'vzdump' === $mode ) {
+			return $this->safety_vzdump( $round, $v );
+		}
+
 		$ended = $this->just_finished( 'safety', 'snapshot' );
 		$snap  = null === $ended ? $this->run_task( 'safety', 'POST', $this->lxc( $v['node'] ) . '/snapshot', array( 'snapname' => $round['safety'], 'description' => 'safety point before a restore' ), 'snapshot' ) : $ended;
 
@@ -355,9 +361,145 @@ final class HostingRestore {
 			return StepResult::fail( 'The safety snapshot failed (' . ( is_array( $snap ) ? $snap['failed'] : (string) ( $this->finished['exit'] ?? '' ) ) . ')' );
 		}
 
+		return $this->keep_safety( $round, 'snapshot', '' );
+	}
+
+	/**
+	 * How the safety point of a kind of round is made: a whole-account restore uses the node's setting (a vzdump
+	 * unless the node was shown to keep snapshots over a forced restore), every other round a snapshot.
+	 *
+	 * @param string $kind Kind of round.
+	 */
+	private function mode( string $kind ): string {
+		return 'account' === $kind && 'snapshot' !== (string) ( $this->node['restore_safety'] ?? 'vzdump' ) ? 'vzdump' : 'snapshot';
+	}
+
+	/**
+	 * The safety point as a protected backup: vzdump, found in the listing by its note, protected against the
+	 * nightly prune.
+	 *
+	 * @param array<string, mixed> $round Round.
+	 * @param array<string, mixed> $v     Verified container.
+	 * @return true|StepResult
+	 */
+	private function safety_vzdump( array $round, array $v ) {
+		$record = (array) Records::for_resource( $this->r->id() );
+		$ended  = $this->just_finished( 'safety', 'vzdump' );
+		$done   = null === $ended ? $this->run_task(
+			'safety',
+			'POST',
+			'/nodes/' . rawurlencode( (string) $v['node'] ) . '/vzdump',
+			array(
+				'vmid'           => (int) $record['vmid'],
+				'storage'        => (string) $this->node['backup_storage'],
+				'mode'           => 'snapshot',
+				'notes-template' => '{{guestname}} safety',
+			),
+			'vzdump'
+		) : $ended;
+
+		if ( $done instanceof StepResult ) {
+			return $done;
+		}
+
+		if ( true !== $done ) {
+			return StepResult::fail( 'The safety backup failed (' . ( is_array( $done ) ? $done['failed'] : (string) ( $this->finished['exit'] ?? '' ) ) . ')' );
+		}
+
+		$list = ( new HostingBackups( $this->r ) )->list();
+		$volid = '';
+
+		foreach ( is_array( $list ) ? $list : array() as $b ) {
+			if ( 'safety' === $b['kind'] ) {
+				$volid = $b['volid'];
+				break;
+			}
+		}
+
+		if ( '' === $volid ) {
+			return StepResult::fail( 'The safety backup is not in the listing' );
+		}
+
+		$kept = $this->client->request( 'PUT', '/nodes/' . rawurlencode( (string) $v['node'] ) . '/storage/' . rawurlencode( (string) $this->node['backup_storage'] ) . '/content/' . rawurlencode( $volid ), array( 'protected' => 1 ) );
+
+		if ( is_wp_error( $kept ) ) {
+			return $this->classify( $kept, 'safety' );
+		}
+
+		return $this->keep_safety( $round, 'vzdump', $volid );
+	}
+
+	/**
+	 * Stores the safety point.
+	 *
+	 * @param array<string, mixed> $round Round.
+	 * @param string               $mode  snapshot or vzdump.
+	 * @param string               $volid The backup volume (vzdump).
+	 * @return true|StepResult
+	 */
+	private function keep_safety( array $round, string $mode, string $volid ) {
 		$now = Jobs::now();
 
-		return $this->r->set( array( 'safety' => array( 'name' => $round['safety'], 'at' => $now, 'expires' => $now + self::SAFETY_TTL, 'scope' => (string) $round['kind'] ) ) ) ? true : StepResult::retry( 0, 'restore: the safety point could not be stored' );
+		return $this->r->set( array( 'safety' => array( 'name' => $round['safety'], 'at' => $now, 'expires' => $now + self::SAFETY_TTL, 'scope' => (string) $round['kind'], 'mode' => $mode, 'volid' => $volid ) ) ) ? true : StepResult::retry( 0, 'restore: the safety point could not be stored' );
+	}
+
+	/**
+	 * Removes a safety point: the snapshot, or the protected backup (unprotected first).
+	 *
+	 * @param array<string, mixed> $safety The safety point.
+	 * @param array<string, mixed> $v      Verified container.
+	 * @return true|StepResult
+	 */
+	private function discard( array $safety, array $v ) {
+		if ( 'vzdump' === ( $safety['mode'] ?? 'snapshot' ) && '' !== (string) ( $safety['volid'] ?? '' ) ) {
+			$base = '/nodes/' . rawurlencode( (string) $v['node'] ) . '/storage/' . rawurlencode( (string) $this->node['backup_storage'] ) . '/content/' . rawurlencode( (string) $safety['volid'] );
+			$off  = $this->client->request( 'PUT', $base, array( 'protected' => 0 ) );
+
+			if ( is_wp_error( $off ) ) {
+				return $this->classify( $off, 'safety' );
+			}
+
+			return true === ( $gone = $this->run_task( 'safety', 'DELETE', $base, array(), 'voldel' ) ) ? true : ( $gone instanceof StepResult ? $gone : StepResult::retry( 0, 'safety: the old safety backup could not be deleted' ) );
+		}
+
+		$gone = $this->run_task( 'safety', 'DELETE', $this->lxc( $v['node'] ) . '/snapshot/' . $safety['name'], array(), 'snapdel' );
+
+		return $gone instanceof StepResult ? $gone : true;
+	}
+
+	/**
+	 * A safety point made on its own (before an automatic PHP switch). A safety point of the last 24 hours is
+	 * reused, so a customer's Undo is never replaced by it. Nothing is made while a round runs.
+	 *
+	 * @param string $scope What it is for (php).
+	 * @return true|StepResult True: a safety point is there. Otherwise retry (wait, try again next time) or fail.
+	 */
+	public function make_safety( string $scope ) {
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+
+		if ( self::active( $this->r ) || ( new HostingBackups( $this->r ) )->active() ) {
+			return StepResult::retry( 0, 'safety: another round is running' );
+		}
+
+		$early = null === $this->client ? $this->connect() : null;
+
+		if ( null !== $early ) {
+			return $early;
+		}
+
+		$early = $this->poll_task();
+
+		if ( null !== $early ) {
+			return $early;
+		}
+
+		$safety = self::safety( $this->r );
+
+		if ( null !== $safety && $safety['expires'] > Jobs::now() ) {
+			return true;
+		}
+
+		return $this->phase_safety( array( 'safety' => 'safety' . Jobs::now(), 'kind' => $scope ) );
 	}
 
 	/**
@@ -438,6 +580,13 @@ final class HostingRestore {
 	 * @return true|StepResult
 	 */
 	private function phase_rollback( array $round ) {
+		$safety = self::safety( $this->r );
+
+		// A safety backup: the container is restored from it, like any backup.
+		if ( null !== $safety && 'vzdump' === ( $safety['mode'] ?? 'snapshot' ) ) {
+			return $this->phase_restore( array_merge( $round, array( 'volid' => (string) $safety['volid'] ) ) );
+		}
+
 		$v = $this->verified( (array) Records::for_resource( $this->r->id() ), 'rollback' );
 
 		if ( $v instanceof StepResult ) {
@@ -518,9 +667,7 @@ final class HostingRestore {
 			return;
 		}
 
-		$gone = $this->run_task( 'expire', 'DELETE', $this->lxc( $v['node'] ) . '/snapshot/' . $safety['name'], array(), 'snapdel' );
-
-		if ( true === $gone ) {
+		if ( true === $this->discard( $safety, $v ) ) {
 			$this->r->set( array( 'safety' => null ) );
 		}
 	}

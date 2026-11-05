@@ -315,4 +315,19 @@ class UsageTest extends HostingCase {
 		as_unschedule_all_actions( HostingUsage::HOOK, array(), 'beltoft-services' );
 		$this->assertSame( 'beltoft_services_hosting_notice', Emails::get( 'beltoft_services_hosting_notice' )->id );
 	}
+
+	public function test_the_nightly_slot_comes_from_the_agent_when_it_has_one(): void {
+		$r = $this->account();
+		$this->assertSame( 30 + ( $r->id() % 300 ), \BeltoftServices\Hosting\HostingBackups::slot_minute( $r ), 'By account id until the agent says.' );
+
+		$this->agent->set_backup_slots( array( 1000 => array( 'at' => '02:15', 'offset_minutes' => 105, 'disk_mb' => 800 ) ) );
+		$r = $this->sample( $r, 3, 1 );
+		$this->assertSame( 135, (int) $r->get( 'backup_slot' ) );
+		$this->assertSame( 135, \BeltoftServices\Hosting\HostingBackups::slot_minute( $r ) );
+
+		$this->agent->set_backup_slots( array( 1000 => array( 'at' => '07:00', 'offset_minutes' => 0, 'disk_mb' => 1 ) ) );
+		$r->set( array( 'backup_slot' => 0 ) );
+		$r = $this->sample( $r, 3, 1 );
+		$this->assertSame( 30 + ( $r->id() % 300 ), \BeltoftServices\Hosting\HostingBackups::slot_minute( $r ), 'A slot outside the night window is ignored.' );
+	}
 }

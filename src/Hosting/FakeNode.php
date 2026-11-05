@@ -382,6 +382,10 @@ class FakeNode implements Client {
 				'content' => array( 'string', false ),
 				'vmid'    => array( 'int', false ),
 			) ),
+			array( 'PUT', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content/(.+)$#', 'h_content_put', array(
+				'protected' => array( 'bool', false ),
+				'notes'     => array( 'string', false ),
+			) ),
 			array( 'DELETE', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/content/(.+)$#', 'h_content_delete', array() ),
 			array( 'DELETE', '#^/nodes/([A-Za-z0-9.\-]+)/storage/([A-Za-z0-9._\-]+)/prunebackups$#', 'h_prune', array(
 				'vmid'          => array( 'int', false ),
@@ -880,6 +884,29 @@ class FakeNode implements Client {
 	}
 
 	/**
+	 * PUT /nodes/{node}/storage/{storage}/content/{volid}: sets protected (a protected backup is kept by prune and
+	 * refuses a delete; modelled on the PVE 7 and later volume attributes, to be verified on a real node).
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_content_put( array $a, array $p ) {
+		$volid = rawurldecode( $a[2] );
+
+		foreach ( $this->state['backups'] as $i => $b ) {
+			if ( $b['volid'] === $volid && $b['storage'] === $a[1] ) {
+				if ( isset( $p['protected'] ) ) {
+					$this->state['backups'][ $i ]['protected'] = (int) $p['protected'];
+				}
+
+				return null;
+			}
+		}
+
+		return $this->error( 500, 'volume does not exist' );
+	}
+
+	/**
 	 * DELETE /nodes/{node}/storage/{storage}/content/{volid}: a task.
 	 *
 	 * @param array<int, string>   $a Captures.
@@ -891,6 +918,10 @@ class FakeNode implements Client {
 
 		foreach ( $this->state['backups'] as $b ) {
 			if ( $b['volid'] === $volid && $b['storage'] === $a[1] ) {
+				if ( ! empty( $b['protected'] ) ) {
+					return $this->error( 500, 'cannot remove protected volume' );
+				}
+
 				return $this->new_task(
 					$a[0],
 					'imgdel',
@@ -926,7 +957,7 @@ class FakeNode implements Client {
 			'prunebackups',
 			(string) $vmid,
 			function () use ( $keep, $storage, $vmid ) {
-				$mine = array_filter( $this->state['backups'], static fn( $b ) => $b['storage'] === $storage && ( 0 === $vmid || (int) $b['vmid'] === $vmid ) );
+				$mine = array_filter( $this->state['backups'], static fn( $b ) => $b['storage'] === $storage && empty( $b['protected'] ) && ( 0 === $vmid || (int) $b['vmid'] === $vmid ) );
 				usort( $mine, static fn( $x, $y ) => $y['ctime'] <=> $x['ctime'] );
 				$days = array();
 				$drop = array();

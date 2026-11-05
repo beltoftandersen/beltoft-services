@@ -267,7 +267,16 @@ final class HostingUsage {
 			}
 		}
 
-		$this->r->set( array( 'loaders' => $loaders ) );
+		$meta = array( 'loaders' => $loaders );
+		$vmid = (int) ( Records::for_resource( $this->r->id() )['vmid'] ?? 0 );
+		$slot = ( (array) ( $result['backup_slots'] ?? array() ) )[ (string) $vmid ] ?? null;
+
+		// The nightly slot the agent chose ("HH:MM", UTC), kept for HostingBackups::slot_minute().
+		if ( is_array( $slot ) && 1 === preg_match( '/^(\d{2}):(\d{2})$/D', (string) ( $slot['at'] ?? '' ), $m ) ) {
+			$meta['backup_slot'] = (int) $m[1] * 60 + (int) $m[2];
+		}
+
+		$this->r->set( $meta );
 	}
 
 	/**
@@ -320,6 +329,18 @@ final class HostingUsage {
 			}
 
 			if ( $days <= 0 && empty( $notified[ $key ]['switched'] ) ) {
+				// A safety point first (a snapshot and a fresh dump, or the customer's own of the last 24 hours). Without
+				// one the site is not switched: the next run tries again, and the admin is told when it cannot be made.
+				$safe = ( new HostingRestore( $this->r ) )->make_safety( 'php' );
+
+				if ( $safe instanceof StepResult ) {
+					if ( $safe->is_failed() ) {
+						\BeltoftServices\Alerts::admin( $this->r, 'The PHP version of ' . $site['slug'] . ' was not switched: no safety point could be made (' . $this->scrub( $safe->error(), 160 ) . ')' );
+					}
+
+					continue;
+				}
+
 				$done = $this->agent_call( 'usage_php_' . $site['slug'], 'site.php', array( 'vmid' => (int) $record['vmid'], 'slug' => $site['slug'], 'php' => $default ) );
 
 				if ( ! $done instanceof StepResult ) {
@@ -334,5 +355,12 @@ final class HostingUsage {
 		}
 
 		$this->r->set( array( 'php_notified' => $notified ) );
+
+		// A rollback marker that ran out is forgotten.
+		$rollback = array_filter( (array) $this->r->get( 'php_rollback' ), static fn( $m ) => is_array( $m ) && (int) ( $m['until'] ?? 0 ) > $now );
+
+		if ( count( $rollback ) !== count( (array) $this->r->get( 'php_rollback' ) ) ) {
+			$this->r->set( array( 'php_rollback' => $rollback ) );
+		}
 	}
 }

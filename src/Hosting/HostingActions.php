@@ -402,6 +402,44 @@ final class HostingActions {
 	}
 
 	/**
+	 * Goes back to the PHP version a site ran on before the automatic switch, for the 7 days after it. The old
+	 * version may be out of support: the site stays on it, with a warning in the account, until the customer moves it.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function php_rollback( string $slug ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$fresh  = Resource::find( $this->r->id() ) ?? $this->r;
+		$marker = ( (array) $fresh->get( 'php_rollback' ) )[ $slug ] ?? null;
+
+		if ( null === Sites::find( $this->r->id(), $slug ) || ! is_array( $marker ) || (int) ( $marker['until'] ?? 0 ) <= \BeltoftServices\Jobs::now() ) {
+			return $this->error( 'not_found', __( 'There is nothing to go back to for this website.', 'beltoft-services' ) );
+		}
+
+		$record = (array) Records::for_resource( $this->r->id() );
+		$done   = $this->call( 'site_php_back_' . $slug, 'site.php', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'php' => (string) $marker['from'] ) );
+
+		if ( is_wp_error( $done ) ) {
+			return $done;
+		}
+
+		Sites::update( $this->r->id(), $slug, array( 'php' => (string) $marker['from'] ) );
+		$left = (array) $fresh->get( 'php_rollback' );
+		unset( $left[ $slug ] );
+		$pinned          = (array) $fresh->get( 'php_pinned' );
+		$pinned[ $slug ] = (string) $marker['from'];
+		$fresh->set( array( 'php_rollback' => $left, 'php_pinned' => $pinned ) );
+
+		return array( 'slug' => $slug, 'php' => (string) $marker['from'] );
+	}
+
+	/**
 	 * Moves PHP workers to a site. The sites together stay within the plan's ceiling, each has at least 2.
 	 *
 	 * @param string $slug    Site.

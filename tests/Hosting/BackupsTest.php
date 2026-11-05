@@ -328,6 +328,7 @@ class BackupsTest extends HostingCase {
 	}
 
 	public function test_a_whole_account_restore_makes_a_safety_point_restores_and_imports_every_database(): void {
+		$this->save_node( array( 'restore_safety' => 'snapshot' ) ); // A node shown to keep snapshots over a forced restore.
 		list( $r, $volid, $label ) = $this->with_backup();
 		$vmid = Records::for_resource( $r->id() )['vmid'];
 
@@ -365,6 +366,7 @@ class BackupsTest extends HostingCase {
 	}
 
 	public function test_undo_goes_back_to_the_safety_point_for_files_and_databases(): void {
+		$this->save_node( array( 'restore_safety' => 'snapshot' ) ); // A node shown to keep snapshots over a forced restore.
 		list( $r, $volid ) = $this->with_backup();
 		( new HostingRestore( $r ) )->start( 'account', $volid );
 		HostingRestore::run( $r->id() );
@@ -563,5 +565,15 @@ class BackupsTest extends HostingCase {
 		}
 
 		$this->assertStringNotContainsString( "\u{2014}", $js );
+	}
+
+	public function test_a_nightly_dump_that_fails_for_some_databases_tells_the_admin_which(): void {
+		$r = $this->account();
+		$this->agent->set_dump_fails( array( 'c' . $r->id() . '_w' . $r->id() ) );
+
+		$this->round( $r );
+
+		$this->assertTrue( (bool) array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['message'], 'were not dumped' ) ) );
+		$this->assertCount( 1, $this->stored_backups(), 'The backup still ran.' );
 	}
 }

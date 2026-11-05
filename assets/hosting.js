@@ -63,6 +63,8 @@
 		switch ( button.getAttribute( 'data-hosting-action' ) ) {
 			case 'login':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/login', {} ];
+			case 'php_rollback':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/php/rollback', {} ];
 			case 'cache':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/cache', {} ];
 			case 'remove_site':

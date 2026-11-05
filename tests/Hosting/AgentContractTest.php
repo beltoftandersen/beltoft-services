@@ -70,6 +70,8 @@ class AgentContractTest extends TestCase {
 			$this->markTestSkipped( 'The agent contract file is not present.' );
 		}
 
+		$this->addToAssertionCount( 1 );
+
 		foreach ( FakeAgent::OPERATIONS as $op => $args ) {
 			$known = array_key_exists( $op, $contract );
 

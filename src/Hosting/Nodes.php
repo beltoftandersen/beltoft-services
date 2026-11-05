@@ -64,6 +64,7 @@ final class Nodes {
 			'disk_gb'       => 0,
 			'db_host'       => '',
 			'backup_storage' => '',
+			'restore_safety' => 'vzdump',
 			'edge_ip'       => '',
 			'edge_ipv6'     => '',
 		);
@@ -369,6 +370,14 @@ final class Nodes {
 		}
 
 		$clean['backup_storage'] = $backup;
+
+		$safety = (string) ( $input['restore_safety'] ?? $clean['restore_safety'] );
+
+		if ( ! in_array( $safety, array( 'snapshot', 'vzdump' ), true ) ) {
+			return self::error( 'restore_safety', __( 'The safety point for an account restore is a snapshot or a vzdump.', 'beltoft-services' ) );
+		}
+
+		$clean['restore_safety'] = $safety;
 
 		foreach ( array(
 			'edge_ip'   => FILTER_FLAG_IPV4,

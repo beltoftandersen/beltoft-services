@@ -28,13 +28,16 @@ defined( 'ABSPATH' ) || exit;
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - db.drop: dropped (list of names that existed), idempotent.
  * - db.size: sizes (map of database => bytes; 0 unless set_db_size()).
- * - backup.prepare: dumped (true), label. The optional label names the dump (a safety point keeps its own).
- * - backup.file_restore: restored (true), slug. Fails with "unknown site" for a site that does not exist.
+ * - backup.prepare: dumped (true), label ("nightly" when none), databases (dumped), failed (not dumped). The optional
+ *   label (`[a-z0-9_-]{1,32}`) names the dump, a safety point keeps its own; a labelled run fails the job if any dump fails.
+ * - backup.file_restore: restored (true), slug. The snapshot must be b<unix ctime> of a backup: a safety point name is
+ *   refused (an Undo rolls the container back itself). Fails with "unknown site" for a site that does not exist.
  * - backup.db_restore: restored (true), database. The snapshot argument names the dump: a safety label, or b<unix time>
  *   of a backup.
  * - db.readonly: account, readonly (the account's database user loses or gets back its write grants; an operation this
  *   plugin adds to the plan's list for the 110 percent storage rule).
- * - agent.health: ok (true), loaders (map "<vmid>/<slug>" => { state, ts }; empty unless set_loaders()).
+ * - agent.health: ok (true), loaders (map "<vmid>/<slug>" => { state, ts }; empty unless set_loaders()), backup_slots (map
+ *   vmid => { at "HH:MM", offset_minutes, disk_mb }; empty unless set_backup_slots()).
  * - mail.smtp: configured (true), user. The sender is kept by container (host and user only, never the password).
  * - edge.apply: routes (count). Replaces the routes of the account; an empty list removes them.
  * - every other listed operation: ok (true) and no state change (modelled: accepted, nothing done).
@@ -252,6 +255,8 @@ class FakeAgent implements Agent {
 			'smtp'  => array(),
 			'db_sizes' => array(),
 			'dumps'    => array(),
+			'dump_fails' => array(),
+			'backup_slots' => array(),
 			'restores' => array(),
 			'readonly' => array(),
 			'loaders'  => array(),
@@ -290,6 +295,28 @@ class FakeAgent implements Agent {
 	public function set_db_size( string $database, int $bytes ): void {
 		$this->load();
 		$this->state['db_sizes'][ $database ] = $bytes;
+		$this->save();
+	}
+
+	/**
+	 * Makes the dump of these databases fail (a nightly run reports them in `failed`, a labelled run fails).
+	 *
+	 * @param string[] $databases Database names.
+	 */
+	public function set_dump_fails( array $databases ): void {
+		$this->load();
+		$this->state['dump_fails'] = $databases;
+		$this->save();
+	}
+
+	/**
+	 * Sets the nightly slots agent.health reports: vmid => { at "HH:MM", offset_minutes, disk_mb }.
+	 *
+	 * @param array<int, array<string, mixed>> $slots Slots.
+	 */
+	public function set_backup_slots( array $slots ): void {
+		$this->load();
+		$this->state['backup_slots'] = $slots;
 		$this->save();
 	}
 
@@ -677,11 +704,30 @@ class FakeAgent implements Agent {
 				return array( 'sizes' => $sizes );
 
 			case 'backup.prepare':
-				$this->state['dumps'][ $vmid ][] = $args['label'] ?? 'nightly';
+				$label = $args['label'] ?? 'nightly';
+				$names = array_values( array_filter( array_map( static fn( $c ) => (array) ( $c['databases'] ?? array() ), array_values( $this->state['dbs'] ) ) ) );
+				$dbs   = array();
 
-				return array( 'dumped' => true, 'label' => $args['label'] ?? 'nightly' );
+				foreach ( $names as $list ) {
+					$dbs = array_merge( $dbs, array_values( $list ) );
+				}
+
+				$failed = array_values( array_intersect( $dbs, (array) ( $this->state['dump_fails'] ?? array() ) ) );
+
+				// A labelled run fails the job when any dump fails (a safety point needs all of them).
+				if ( 'nightly' !== $label && array() !== $failed ) {
+					return 'dump failed: ' . implode( ', ', $failed );
+				}
+
+				$this->state['dumps'][ $vmid ][] = $label;
+
+				return array( 'dumped' => true, 'label' => $label, 'databases' => array_values( array_diff( $dbs, $failed ) ), 'failed' => $failed );
 
 			case 'backup.file_restore':
+				if ( 1 !== preg_match( '/^b\d{1,12}$/D', (string) $args['snapshot'] ) ) {
+					return 'the snapshot must be a backup (b<ctime>), not a safety point';
+				}
+
 				if ( ! isset( $this->state['sites'][ $vmid ][ $args['slug'] ] ) ) {
 					return 'unknown site';
 				}
@@ -701,7 +747,7 @@ class FakeAgent implements Agent {
 				return array( 'account' => $args['account'], 'readonly' => $args['enabled'] );
 
 			case 'agent.health':
-				return array( 'ok' => true, 'loaders' => (object) (array) ( $this->state['loaders'] ?? array() ) );
+				return array( 'ok' => true, 'loaders' => (object) (array) ( $this->state['loaders'] ?? array() ), 'backup_slots' => (object) (array) ( $this->state['backup_slots'] ?? array() ) );
 
 			case 'mail.smtp':
 				$this->state['smtp'][ $vmid ] = array(

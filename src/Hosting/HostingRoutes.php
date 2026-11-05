@@ -22,6 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites                   slug, label, php, install
  * - DELETE hosting/sites/<slug>            confirm (the site name)
  * - POST   hosting/sites/<slug>/php        php, memory_mb, upload_mb
+ * - POST   hosting/sites/<slug>/php/rollback  back to the version before an automatic switch (7 days)
  * - POST   hosting/sites/<slug>/workers    workers
  * - POST   hosting/sites/<slug>/cache      clears the page cache
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
@@ -82,6 +83,7 @@ final class HostingRoutes {
 				'upload_mb' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'Upload size in MB, up to the plan.' ),
 			),
 		) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/php/rollback', array( 'methods' => $post, 'callback' => array( __CLASS__, 'php_rollback' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/workers', array(
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'set_workers' ),
@@ -258,6 +260,10 @@ final class HostingRoutes {
 			$request,
 			static fn( HostingActions $a ) => $a->set_php( (string) $request['slug'], (string) $request['php'], null === $request['memory_mb'] ? null : (int) $request['memory_mb'], null === $request['upload_mb'] ? null : (int) $request['upload_mb'] )
 		);
+	}
+
+	public static function php_rollback( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->php_rollback( (string) $request['slug'] ) );
 	}
 
 	public static function set_workers( \WP_REST_Request $request ): \WP_REST_Response {

@@ -120,7 +120,10 @@ final class HostingBackups {
 	 * @param Resource $r Hosting resource.
 	 */
 	public static function slot_minute( Resource $r ): int {
-		return 30 + ( $r->id() % 300 );
+		$agent = (int) $r->get( 'backup_slot' );
+
+		// The agent assigns slots by size (agent.health, stored by the usage job); until it does, by account id.
+		return $agent >= 30 && $agent < 330 ? $agent : 30 + ( $r->id() % 300 );
 	}
 
 	/**
@@ -258,6 +261,10 @@ final class HostingBackups {
 			Alerts::admin( $this->r, 'Backup: no fresh database dump for this account (' . $this->scrub( $done->error(), 160 ) . '). The backup runs without it.' );
 		}
 
+		if ( is_array( $done ) && array() !== (array) ( $done['failed'] ?? array() ) ) {
+			Alerts::admin( $this->r, 'Backup: these databases were not dumped: ' . $this->scrub( implode( ', ', array_map( 'strval', (array) $done['failed'] ) ), 160 ) . '. The backup runs without a fresh dump of them.' );
+		}
+
 		return $this->go( $round, 'dump' );
 	}
 
@@ -367,7 +374,8 @@ final class HostingBackups {
 		$meta = array( 'backup' => array( 'phase' => '', 'kind' => $round['kind'] ), 'backup_error' => '', 'backup_fails' => 0 );
 
 		if ( is_array( $list ) ) {
-			$meta['backup_list'] = $list;
+			// A safety point is no backup of the customer's: it is not listed and is not restored from the list.
+			$meta['backup_list'] = array_values( array_filter( $list, static fn( $b ) => 'safety' !== $b['kind'] ) );
 		}
 
 		if ( 'nightly' === $round['kind'] ) {
@@ -403,7 +411,7 @@ final class HostingBackups {
 	 * The container's backups on the node's storage, newest first: volid, ctime, size, kind (nightly or manual).
 	 * Only volumes of this container id and this plugin's volume format are listed.
 	 *
-	 * @return array<int, array{volid: string, ctime: int, size: int, kind: string}>|\WP_Error
+	 * @return array<int, array{volid: string, ctime: int, size: int, kind: string}>|\WP_Error Safety points included (kind safety).
 	 */
 	public function list() {
 		$early = null === $this->client ? $this->connect() : null;
@@ -451,7 +459,7 @@ final class HostingBackups {
 				'volid' => $item['volid'],
 				'ctime' => (int) $item['ctime'],
 				'size'  => (int) ( $item['size'] ?? 0 ),
-				'kind'  => false !== strpos( (string) ( $item['notes'] ?? '' ), 'manual' ) ? 'manual' : 'nightly',
+				'kind'  => false !== strpos( (string) ( $item['notes'] ?? '' ), 'safety' ) ? 'safety' : ( false !== strpos( (string) ( $item['notes'] ?? '' ), 'manual' ) ? 'manual' : 'nightly' ),
 			);
 		}
 

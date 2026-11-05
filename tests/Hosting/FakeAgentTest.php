@@ -130,8 +130,8 @@ class FakeAgentTest extends TestCase {
 		$this->assertSame( array( 'routes' => 0 ), $a->submit( 'edge.apply', array( 'account' => 'c1', 'routes' => array() ), 'j11' )['result'] );
 		$this->assertArrayNotHasKey( 'c1', $a->state()['edge'] );
 
-		$this->assertEquals( array( 'ok' => true, 'loaders' => (object) array() ), $a->submit( 'agent.health', array(), 'j12' )['result'] );
-		$this->assertSame( array( 'dumped' => true, 'label' => 'nightly' ), $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'j13' )['result'] );
+		$this->assertEquals( array( 'ok' => true, 'loaders' => (object) array(), 'backup_slots' => (object) array() ), $a->submit( 'agent.health', array(), 'j12' )['result'] );
+		$this->assertSame( array( 'dumped' => true, 'label' => 'nightly', 'databases' => array(), 'failed' => array() ), $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'j13' )['result'] );
 	}
 
 	public function test_site_jobs_need_a_prepared_container_and_a_created_site(): void {
@@ -197,5 +197,39 @@ class FakeAgentTest extends TestCase {
 		$this->assertCount( 0, ( new FakeAgent() )->state()['cts'] );
 
 		delete_option( FakeAgent::OPTION );
+	}
+
+	public function test_backup_prepare_reports_databases_and_a_labelled_run_fails_on_any_failed_dump(): void {
+		$a = new FakeAgent();
+		$a->submit( 'db.create', array( 'account' => 'c1', 'vmid' => 1000, 'ip' => '10.200.0.10', 'databases' => array( 'c1_a', 'c1_b' ), 'password' => self::PASSWORD ), 'd1' );
+
+		$ok = $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'p1' )['result'];
+		$this->assertSame( array( 'c1_a', 'c1_b' ), $ok['databases'] );
+
+		$a->set_dump_fails( array( 'c1_b' ) );
+		$nightly = $a->submit( 'backup.prepare', array( 'vmid' => 1000 ), 'p2' );
+		$this->assertSame( 'done', $nightly['status'], 'A nightly run reports the failure and goes on.' );
+		$this->assertSame( array( 'c1_b' ), $nightly['result']['failed'] );
+		$this->assertSame( array( 'c1_a' ), $nightly['result']['databases'] );
+
+		$safety = $a->submit( 'backup.prepare', array( 'vmid' => 1000, 'label' => 'safety1700000000' ), 'p3' );
+		$this->assertSame( 'failed', $safety['status'], 'A labelled run fails the job.' );
+		$this->assertStringContainsString( 'c1_b', $safety['error'] );
+		$this->assertSame( 'invalid', $a->submit( 'backup.prepare', array( 'vmid' => 1000, 'label' => 'Bad Label' ), 'p4' )->get_error_code() );
+	}
+
+	public function test_file_restore_takes_a_backup_name_and_refuses_a_safety_point_and_health_reports_slots(): void {
+		$a = new FakeAgent();
+		$a->submit( 'ct.prepare', $this->prepare_args(), 'f1' );
+		$a->submit( 'site.create', array( 'vmid' => 1000, 'slug' => 'shop', 'php' => '8.3', 'workers' => 4, 'host' => 'shop.example.test' ), 'f2' );
+
+		$this->assertSame( 'done', $a->submit( 'backup.file_restore', array( 'vmid' => 1000, 'slug' => 'shop', 'snapshot' => 'b1700000000' ), 'f3' )['status'] );
+		$refused = $a->submit( 'backup.file_restore', array( 'vmid' => 1000, 'slug' => 'shop', 'snapshot' => 'safety1700000000' ), 'f4' );
+		$this->assertSame( 'failed', $refused['status'] );
+		$this->assertStringContainsString( 'safety point', $refused['error'] );
+
+		$a->set_backup_slots( array( 1000 => array( 'at' => '02:15', 'offset_minutes' => 105, 'disk_mb' => 800 ) ) );
+		$health = $a->submit( 'agent.health', array(), 'f5' )['result'];
+		$this->assertSame( '02:15', ( (array) $health['backup_slots'] )['1000']['at'] );
 	}
 }
