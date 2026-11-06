@@ -74,6 +74,8 @@ final class AppReinstall {
 		$current = Apps::current( $id );
 		$retired = null === Apps::version( $id, $own );
 		$choices = array();
+		$record  = VmRecords::for_resource( $r->id() );
+		$cluster = $record ? (array) Clusters::get( $record['cluster'] ) : array();
 
 		if ( ! $retired ) {
 			$choices[ self::KEEP ] = __( 'Same app and version', 'beltoft-services' );
@@ -83,7 +85,8 @@ final class AppReinstall {
 			$vid  = is_array( $version ) ? (string) ( $version['id'] ?? '' ) : '';
 			$full = '' === $vid || $vid === $own ? null : Apps::version( $id, $vid );
 
-			if ( null !== $full ) {
+			// A version whose system this cluster has no template for cannot be installed here.
+			if ( null !== $full && ( array() === $cluster || Apps::version_template( $cluster, $full ) > 0 ) ) {
 				$choices[ $vid ] = ( $current && $current['version_id'] === $vid ? __( 'Current: ', 'beltoft-services' ) : '' ) . Apps::version_label( $full );
 			}
 		}
@@ -276,8 +279,9 @@ final class AppReinstall {
 					continue;
 				}
 
-				$versions[] = array( 'value' => (string) $choice, 'label' => (string) $label );
-				$fulls[]    = self::KEEP === (string) $choice ? Apps::version( (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ) ) : Apps::version( (string) $r->get( 'app_id' ), (string) $choice );
+				$full       = self::KEEP === (string) $choice ? Apps::version( (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ) ) : Apps::version( (string) $r->get( 'app_id' ), (string) $choice );
+				$versions[] = array( 'value' => (string) $choice, 'label' => (string) $label, 'families' => array_values( (array) ( $full['os'] ?? array() ) ) );
+				$fulls[]    = $full;
 				$value      = '' === $value || (string) $choice === $options['selected'] ? (string) $choice : $value;
 			}
 
@@ -358,7 +362,7 @@ final class AppReinstall {
 			$first    = '';
 
 			foreach ( $entry['versions'] as $value => $version ) {
-				$versions[] = array( 'value' => (string) $value, 'label' => $version['label'], 'disabled' => $version['disabled'] );
+				$versions[] = array( 'value' => (string) $value, 'label' => $version['label'], 'disabled' => $version['disabled'], 'families' => array_values( (array) ( $version['version']['os'] ?? array() ) ) );
 				$first      = '' === $first && ! $version['disabled'] ? (string) $value : $first;
 			}
 
@@ -643,19 +647,19 @@ final class AppReinstall {
 			return $refusal;
 		}
 
-		$os       = isset( $args['os'] ) && '' !== $args['os'] ? (int) $args['os'] : (int) $r->get( OsField::META );
-		$families = null === $cluster ? array() : (array) ( $cluster['template_families'] ?? array() );
-		$family   = $os > 0 ? (string) ( $families[ $os ] ?? '' ) : Apps::FAMILY;
+		$os = isset( $args['os'] ) && '' !== $args['os'] ? (int) $args['os'] : (int) $r->get( OsField::META );
 
 		if ( null === $cluster || null === $full ) {
 			return __( 'This app cannot be installed on this server.', 'beltoft-services' );
 		}
 
-		if ( Apps::FAMILY !== $family ) {
-			return __( 'This app needs Ubuntu 24.04 and cannot be installed here with the chosen system. Choose Ubuntu 24.04, or no app.', 'beltoft-services' );
+		$template = $os > 0 ? $os : Apps::version_template( $cluster, $full );
+
+		if ( ! in_array( Apps::family_of( $cluster, $template ), (array) $full['os'], true ) ) {
+			return Apps::needs_system_text( $cluster, $full );
 		}
 
-		$why = Apps::check( $cluster, array_merge( $plan, array( 'template' => $os > 0 ? $os : Apps::os_template( $cluster ) ) ), (string) $r->get( 'app_id' ), $version );
+		$why = Apps::check( $cluster, array_merge( $plan, array( 'template' => $template ) ), (string) $r->get( 'app_id' ), $version );
 
 		if ( null !== $why ) {
 			return $why . '.';
@@ -702,14 +706,13 @@ final class AppReinstall {
 			return $refusal;
 		}
 
-		$families = (array) ( $cluster['template_families'] ?? array() );
-		$os       = isset( $args['os'] ) && '' !== $args['os'] ? (int) $args['os'] : 0;
+		$os = isset( $args['os'] ) && '' !== $args['os'] ? (int) $args['os'] : 0;
 
-		if ( $os > 0 && Apps::FAMILY !== (string) ( $families[ $os ] ?? '' ) ) {
-			return __( 'This app needs Ubuntu 24.04 and cannot be installed here with the chosen system. Choose Ubuntu 24.04, or no app.', 'beltoft-services' );
+		if ( $os > 0 && ! in_array( Apps::family_of( $cluster, $os ), (array) $full['os'], true ) ) {
+			return Apps::needs_system_text( $cluster, $full );
 		}
 
-		$why = Apps::check( $cluster, array_merge( $plan, array( 'template' => Apps::os_template( $cluster ) ) ), $pick[0], $pick[1] );
+		$why = Apps::check( $cluster, array_merge( $plan, array( 'template' => Apps::version_template( $cluster, $full, $os ) ) ), $pick[0], $pick[1] );
 
 		if ( null !== $why ) {
 			return $why . '.';
@@ -826,16 +829,17 @@ final class AppReinstall {
 		if ( is_array( $meta ) && $r instanceof Resource && ( '' === (string) $r->get( 'app_id' ) || self::is_switch( $r, (array) $args ) ) ) {
 			$pick   = self::plain_pick( $r, $args['app_version'] ?? '' );
 			$record = VmRecords::for_resource( $r->id() );
-			$os     = $record ? Apps::os_template( (array) Clusters::get( $record['cluster'] ) ) : 0;
+			$full   = is_array( $pick ) ? Apps::version( $pick[0], $pick[1] ) : null;
+			$os     = $record && null !== $full ? Apps::version_template( (array) Clusters::get( $record['cluster'] ), $full, isset( $args['os'] ) && '' !== $args['os'] ? (int) $args['os'] : 0 ) : 0;
 
 			if ( ! is_array( $pick ) ) {
 				return null === $pick && ( '' !== self::current_domain( $r ) || $r->get( 'app_domain_old' ) ) ? array_merge( $meta, self::domain_meta( $r, $args, array() ) ) : $meta;
 			}
-			if ( $os <= 0 || null === Apps::version( $pick[0], $pick[1] ) ) {
+			if ( $os <= 0 || null === $full ) {
 				return $meta;
 			}
 
-			// The app runs on Ubuntu 24.04, as at checkout, whatever system was posted.
+			// The app runs on its own system, as at checkout: the posted one when the version runs on it, else the version's.
 			$paid = AppLicence::paid( $pick[0] ) ? array( 'app_tier' => sanitize_key( (string) ( $args['app_tier'] ?? '' ) ) ) : array();
 
 			return array_merge( $meta, self::fresh(), self::domain_meta( $r, $args, (array) Apps::definition( $pick[0] ) ), array( 'app_id' => $pick[0], 'app_version' => $pick[1], OsField::META => $os ), $paid );
