@@ -453,7 +453,7 @@ class SmimeTest extends SslTestCase {
 			$this->assertStringContainsString( self::BOX, $all );
 		}
 
-		$this->assertStringContainsString( 'click the link', $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'click the link', (string) preg_replace( '/\s+/', ' ', $this->mails[0]['message'] ) );
 		$this->assertStringNotContainsString( 'validated', $this->mails[0]['message'], 'No domain talk.' );
 		$this->assertStringContainsString( '.p12', $this->mails[1]['message'] );
 		$this->assertStringNotContainsString( 'your server', $this->mails[1]['message'] );
