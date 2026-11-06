@@ -100,21 +100,21 @@ final class Licences extends ServiceArea {
 	 * {@inheritDoc}
 	 */
 	public function label(): string {
-		return __( 'Licences', 'beltoft-services' );
+		return __( 'Server licences', 'beltoft-services' );
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	protected function empty_text(): string {
-		return __( 'You have no licences yet.', 'beltoft-services' );
+		return __( 'You have no server licences yet.', 'beltoft-services' );
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	public function all_label(): string {
-		return __( 'All licences', 'beltoft-services' );
+		return __( 'All server licences', 'beltoft-services' );
 	}
 
 	/**
