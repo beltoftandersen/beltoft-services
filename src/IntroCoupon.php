@@ -103,7 +103,7 @@ final class IntroCoupon {
 
 	/**
 	 * Filter woocommerce_cart_totals_coupon_label: the customer did not type the intro coupon, so its code means nothing
-	 * to them. The coupon's description is shown, or a plain name.
+	 * to them. A plain name is shown instead (the coupon description is an admin note and is not used).
 	 *
 	 * @param mixed $label  Label.
 	 * @param mixed $coupon Coupon.
@@ -114,9 +114,13 @@ final class IntroCoupon {
 			return $label;
 		}
 
-		$text = trim( wp_strip_all_tags( (string) $coupon->get_description() ) );
-
-		return '' !== $text ? $text : __( 'Introductory discount', 'beltoft-services' );
+		/**
+		 * Filters the name of the intro coupon in the cart and checkout totals.
+		 *
+		 * @param string     $name   Name.
+		 * @param \WC_Coupon $coupon Coupon.
+		 */
+		return (string) apply_filters( 'beltoft_services_intro_coupon_label', __( 'First year discount', 'beltoft-services' ), $coupon );
 	}
 
 	/**

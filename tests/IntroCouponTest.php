@@ -110,9 +110,8 @@ class IntroCouponTest extends TestCase {
 		$this->add( $this->product() );
 		$coupon = new \WC_Coupon( 'intro-half' );
 
-		$this->assertSame( 'Introductory discount', apply_filters( 'woocommerce_cart_totals_coupon_label', 'Coupon: intro-half', $coupon ) );
-		$coupon->set_description( 'First year, 50% off' );
-		$this->assertSame( 'First year, 50% off', apply_filters( 'woocommerce_cart_totals_coupon_label', 'Coupon: intro-half', $coupon ) );
+		$coupon->set_description( 'Admin note, not for customers' );
+		$this->assertSame( 'First year discount', apply_filters( 'woocommerce_cart_totals_coupon_label', 'Coupon: intro-half', $coupon ) );
 
 		$html = '-<span class="amount">5</span> <a href="/cart/?remove_coupon=intro-half" class="woocommerce-remove-coupon" data-coupon="intro-half">[Remove]</a>';
 		$this->assertSame( '-<span class="amount">5</span>', apply_filters( 'woocommerce_cart_totals_coupon_html', $html, $coupon ) );
