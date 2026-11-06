@@ -255,6 +255,39 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->assertSame( 'Runs on Ubuntu 24.04 or AlmaLinux 9', Apps::runs_on( $this->lab(), Apps::families( $offered['plesk']['choices'] ) ) );
 	}
 
+	public function test_the_alma_10_version_is_its_own_recipe_and_is_offered_only_with_an_alma_10_template(): void {
+		$v10  = Apps::version( 'plesk', '18-alma10' );
+		$file = BELTOFT_SERVICES_PATH . 'apps/plesk/18-alma10/install.script';
+		$this->assertNotNull( $v10, 'The checksum in app.json matches the script.' );
+		$this->assertSame( array( 'almalinux-10' ), $v10['os'] );
+		$this->assertSame( 'available', $v10['status'] );
+		$this->assertSame( '18', Apps::current( 'plesk' )['version_id'] );
+		$this->assertStringContainsString( hash_file( 'sha256', $file ) . '  plesk/18-alma10/install.script', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/CHECKSUMS' ) );
+		$script = (string) file_get_contents( $file );
+		$this->assertStringContainsString( "grep -qE '^VERSION_ID=\"?10[.\"]' /etc/os-release", $script, 'Refuses any release but 10.' );
+		$this->assertSame( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/plesk/18-alma/install.script' ), str_replace( array( "AlmaLinux 10 (any 10.x), the AlmaLinux 9 recipe with the release check changed.", 'VERSION_ID="?10[."]' ), array( 'AlmaLinux 9 (any 9.x).', 'VERSION_ID="?9[."]' ), $script ), 'Otherwise the AlmaLinux 9 recipe.' );
+		$check = array();
+		$code  = 1;
+		exec( 'bash -n ' . escapeshellarg( $file ), $check, $code );
+		$this->assertSame( 0, $code );
+
+		// Not on the lab cluster (no AlmaLinux 10 template).
+		$this->assertSame( array( '18', '18-alma' ), array_map( 'strval', array_keys( Apps::offered( $this->lab() )['plesk']['choices'] ) ) );
+
+		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9003 = almalinux-9\n9006 = almalinux-10" );
+		$lab  = $this->lab();
+		$plan = array( 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 );
+		$this->assertSame( array( '18', '18-alma', '18-alma10' ), array_map( 'strval', array_keys( Apps::offered( $lab )['plesk']['choices'] ) ) );
+		$this->assertNull( Apps::check( $lab, $plan + array( 'template' => 9006 ), 'plesk', '18-alma10' ) );
+		$this->assertSame( 'The app does not support the selected operating system', Apps::check( $lab, $plan + array( 'template' => 9003 ), 'plesk', '18-alma10' ) );
+		$this->assertSame( 'The app does not support the selected operating system', Apps::check( $lab, $plan + array( 'template' => 9006 ), 'plesk', '18-alma' ) );
+		$this->assertSame( 9006, Apps::version_template( $lab, (array) $v10 ) );
+
+		// Like AlmaLinux 9 it needs snippet v4.
+		$this->cluster( "9001 = Ubuntu 24.04\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9006 = almalinux-10", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v3.yaml' ) );
+		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( Apps::offered( $this->lab() )['plesk']['choices'] ) ) );
+	}
+
 	public function test_check_matches_the_version_to_the_system(): void {
 		$lab  = $this->lab();
 		$plan = array( 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 );

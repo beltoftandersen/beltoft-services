@@ -15,6 +15,7 @@
   "docs_url": "https://docs.plesk.com/en-US/obsidian/administrator-guide/",
   "versions": [
     {"id": "18", "label": "Plesk Obsidian 18", "upstream": "18.0 (latest release)", "recipe": 1, "status": "current", "min_plan": "performance", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "a9b70c20bfd4b91b7cbb1fda71cf7fd90bf47bb53600d0217c0efbae2b6087ff", "eol": ""},
-    {"id": "18-alma", "label": "Plesk Obsidian 18 (AlmaLinux 9)", "upstream": "18.0 (latest release)", "recipe": 1, "status": "available", "min_plan": "performance", "os": ["almalinux-9"], "install": "install.script", "sha256": "2d09e1ff93a6edfe93ae9feda6b5b1cebf983ab0a96e764d5502872eeffcdbb1", "eol": ""}
+    {"id": "18-alma", "label": "Plesk Obsidian 18 (AlmaLinux 9)", "upstream": "18.0 (latest release)", "recipe": 1, "status": "available", "min_plan": "performance", "os": ["almalinux-9"], "install": "install.script", "sha256": "2d09e1ff93a6edfe93ae9feda6b5b1cebf983ab0a96e764d5502872eeffcdbb1", "eol": ""},
+    {"id": "18-alma10", "label": "Plesk Obsidian 18 (AlmaLinux 10)", "upstream": "18.0 (latest release)", "recipe": 1, "status": "available", "min_plan": "performance", "os": ["almalinux-10"], "install": "install.script", "sha256": "dd6ebe07327f49c03696e5fe723eebf4641c789e9623bf9a531f8b0235ddfe2c", "eol": ""}
   ]
 }
