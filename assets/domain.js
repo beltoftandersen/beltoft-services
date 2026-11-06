@@ -367,6 +367,9 @@
 
 // Transfer: a refused transfer code is replaced here. The code is sent once and the field is cleared.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-code]' ) ) { return; }
