@@ -61,12 +61,15 @@
 			radio.dispatchEvent( new Event( 'change', { bubbles: true } ) );
 		}
 
+		var touched = false;
+
 		function say( text ) {
 			note.textContent = text;
 			note.hidden = '' === text;
 		}
 
 		// An app was chosen: when the system chosen is not one it runs on, choose the first one it runs on.
+		// The first system an app lists is its default (Plesk lists AlmaLinux 10 first where the cluster has it): used until the customer picks a system.
 		function follow() {
 			var app = checked( apps );
 			var wanted = families( app );
@@ -75,14 +78,20 @@
 
 			say( '' );
 
-			if ( ! os || ! wanted.length || ( system && -1 !== wanted.indexOf( family( system ) ) ) ) {
+			if ( ! os || ! wanted.length ) {
 				return;
 			}
 
-			each( os.querySelectorAll( 'input[type="radio"]' ), function ( radio ) {
-				if ( ! target && ! radio.disabled && -1 !== wanted.indexOf( family( radio ) ) ) {
-					target = radio;
-				}
+			if ( system && -1 !== wanted.indexOf( family( system ) ) && ( touched || wanted[ 0 ] === family( system ) ) ) {
+				return;
+			}
+
+			each( wanted, function ( name ) {
+				each( os.querySelectorAll( 'input[type="radio"]' ), function ( radio ) {
+					if ( ! target && ! radio.disabled && name === family( radio ) ) {
+						target = radio;
+					}
+				} );
 			} );
 
 			// Without family data (an older cluster setting) the group names the one app system.
@@ -175,6 +184,7 @@
 		if ( os ) {
 			os.addEventListener( 'change', function ( event ) {
 				if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
+					touched = true;
 					drop();
 					fill();
 					refresh();

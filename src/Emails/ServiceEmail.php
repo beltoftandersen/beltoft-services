@@ -107,6 +107,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'mail_smtp'     => \BeltoftServices\Mail\MailView::SMTP_SSL,
 				'mail_guide_url' => \BeltoftServices\Mail\MailSetup::page_url(),
 				'domain_action_reason' => in_array( $data['domain_action_reason'] ?? '', array( 'registrant_check', 'transfer_approval', 'move_dns' ), true ) ? $data['domain_action_reason'] : 'transfer_approval',
+				'transfer_fix_reason' => in_array( $data['transfer_fix_reason'] ?? '', array( 'auth_refused', 'locked' ), true ) ? $data['transfer_fix_reason'] : 'locked',
 				'domain_security_event' => in_array( $data['domain_event'] ?? '', DomainSecurity::EVENTS, true ) ? $data['domain_event'] : 'unlocked',
 				'dns_stays'     => 'domain' === $r->get( 'driver' ) && \BeltoftServices\Domains\Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $license['user_id'] ?? 0 ) ),
 				'domain_renews' => self::domain_renews( $r ),
@@ -233,6 +234,10 @@ abstract class ServiceEmail extends \WC_Email {
 
 		if ( 'ssl' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->url( $license );
+		}
+
+		if ( 'licence-key' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Licences::class )->url( $license );
 		}
 
 		if ( 'mail' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {

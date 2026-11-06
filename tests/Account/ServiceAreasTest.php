@@ -328,9 +328,9 @@ class ServiceAreasTest extends TestCase {
 		$this->assertNotNull( $db );
 	}
 
-	public function test_the_overview_has_an_empty_databases_section_but_no_apps_section_without_any(): void {
+	public function test_the_overview_has_empty_databases_and_apps_sections_without_any(): void {
 		$this->assertStringContainsString( 'ov__databases is-empty', Overview::section( 'databases' ) );
-		$this->assertSame( '', Overview::section( 'apps' ) );
+		$this->assertStringContainsString( 'ov__apps is-empty', Overview::section( 'apps' ) );
 	}
 
 	public function test_a_working_database_is_followed_on_its_own_page(): void {

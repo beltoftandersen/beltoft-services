@@ -215,8 +215,8 @@ final class SslCommand {
 			return new \WP_Error( 'unknown', sprintf( 'Registrar product %d is not in the synced catalog. Run wp beltoft-services ssl sync first.', $registrar ) );
 		}
 
-		if ( ! SslCatalog::is_website( $registrar ) ) {
-			return new \WP_Error( 'not_website', sprintf( 'Registrar product %d (%s) is not a website certificate. This product does not sell code signing or S/MIME.', $registrar, (string) $row['name'] ) );
+		if ( ! SslCatalog::is_sellable( $registrar ) ) {
+			return new \WP_Error( 'not_website', sprintf( 'Registrar product %d (%s) is not a website certificate or S/MIME Personal. This product does not sell code signing or S/MIME Pro.', $registrar, (string) $row['name'] ) );
 		}
 
 		$cost = SslCatalog::cost( $registrar );
@@ -292,7 +292,9 @@ final class SslCommand {
 	}
 
 	/**
-	 * Adds a variation for another registrar product (any website certificate in the synced catalog) to the existing product.
+	 * Adds a variation for another registrar product (any website certificate in the synced catalog, or S/MIME Personal, product 60,
+	 * which is for one mailbox and asks for an email address instead of a domain) to the existing product. The price is the
+	 * variation's price in the shop: `--price=29` for S/MIME Personal, never below the registrar cost.
 	 * A multi domain product covers the names its price includes (the customer enters up to that many); extra names are not sold.
 	 *
 	 * ## OPTIONS

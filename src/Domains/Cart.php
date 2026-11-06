@@ -48,6 +48,7 @@ final class Cart {
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_duplicate_domain_checkout' ), 10, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_unpriced_domain_checkout' ), 10, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_dns_checkout' ), 10, 2 );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_transfer_lock_checkout' ), 10, 2 );
 		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'bind_dns_claims' ) );
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( __CLASS__, 'bind_dns_claims' ) );
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'release_dns_claims' ) );
@@ -85,9 +86,9 @@ final class Cart {
 	 * @return array{added: bool, already_in_cart?: bool, checkout_url: string}|\WP_Error
 	 */
 	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
-		// A locked domain cannot be transferred: the lookup the order form just made is read from its cache, never asked again here.
+		// A locked domain cannot be transferred: asked again now (a few seconds at most); the cached answer stands in when that fails.
 		if ( 'transfer' === $mode ) {
-			$known = TransferDns::cached_registrar( $domain );
+			$known = TransferDns::fresh_registrar( $domain );
 			if ( ! empty( $known['locked'] ) ) { return new \WP_Error( 'domain_locked', TransferDns::locked_message( $domain ), array( 'status' => 422 ) ); }
 		}
 		$data = self::line_data( $domain, $mode, $auth_code, $dns );
@@ -282,6 +283,20 @@ final class Cart {
 	public static function check_duplicate_domain_items(): void {
 		$message = self::duplicate_message();
 		if ( null !== $message ) { wc_add_notice( $message, 'error' ); }
+	}
+
+	/** A transfer line whose domain is locked at its registrar now stops the checkout: the lock is asked again, with a short timeout. */
+	public static function validate_transfer_lock_checkout( $data, $errors ): void {
+		if ( ! WC()->cart || ! $errors instanceof \WP_Error ) { return; }
+		$seen = array();
+		foreach ( WC()->cart->get_cart() as $item ) {
+			$line = $item['beltoft_services_domain'] ?? array();
+			$name = strtolower( (string) ( $line['domain'] ?? '' ) );
+			if ( 'transfer' !== ( $line['mode'] ?? '' ) || '' === $name || isset( $seen[ $name ] ) || self::is_continuation( $item ) ) { continue; }
+			$seen[ $name ] = true;
+			$known = TransferDns::fresh_registrar( $name );
+			if ( ! empty( $known['locked'] ) ) { $errors->add( 'domain_locked', TransferDns::locked_message( $name ) ); }
+		}
 	}
 
 	/** The same rule when the classic checkout form is posted. */

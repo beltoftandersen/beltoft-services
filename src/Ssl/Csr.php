@@ -21,15 +21,16 @@ final class Csr {
 	 * end up in a request. The file is removed afterwards.
 	 *
 	 * @param callable $work Receives the config path.
-	 * @param string[] $sans Host names for the subject alternative name extension (none for a single name).
+	 * @param string[] $sans Names for the subject alternative name extension (none for a single name).
+	 * @param string   $type DNS for host names, email for mailboxes.
 	 * @return mixed What the callback returns.
 	 */
-	private static function with_config( callable $work, array $sans = array() ) {
+	private static function with_config( callable $work, array $sans = array(), string $type = 'DNS' ) {
 		$path = (string) wp_tempnam( 'beltoft-ssl' );
 		$text = "[req]\ndistinguished_name = dn\n[dn]\n";
 
 		if ( array() !== $sans ) {
-			$names = array_map( static fn( $n ) => 'DNS:' . $n, $sans );
+			$names = array_map( static fn( $n ) => $type . ':' . $n, $sans );
 			$text  = "[req]\ndistinguished_name = dn\nreq_extensions = v3_req\n[dn]\n[v3_req]\nsubjectAltName = " . implode( ',', $names ) . "\n";
 		}
 
@@ -80,6 +81,121 @@ final class Csr {
 			},
 			$sans
 		);
+	}
+
+	/**
+	 * Makes a private key and an S/MIME request for one mailbox: the mailbox is the subject's emailAddress and the only subject
+	 * alternative name (an email entry, rfc822Name); the common name is the person's name when one is given.
+	 *
+	 * @param string $mailbox Email address.
+	 * @param string $person  Name of the person (may be empty).
+	 * @param string $country Two letter country.
+	 * @return array{key: string, csr: string}|\WP_Error
+	 */
+	public static function generate_email( string $mailbox, string $person, string $country ) {
+		$mailbox = strtolower( trim( $mailbox ) );
+
+		if ( ! is_email( $mailbox ) || 1 !== preg_match( '/^[^\s,;:]+$/D', $mailbox ) ) {
+			return new \WP_Error( 'ssl_mailbox', 'The mailbox is not a valid email address.' );
+		}
+
+		return self::with_config(
+			static function ( string $config ) use ( $mailbox, $person, $country ) {
+				$key = openssl_pkey_new( array( 'private_key_bits' => self::MIN_BITS, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $config ) );
+
+				if ( ! $key ) {
+					return new \WP_Error( 'ssl_key', 'The key could not be made.' );
+				}
+
+				$dn     = array();
+				$person = trim( (string) preg_replace( '/[\x00-\x1f\x7f]+/', ' ', $person ) );
+
+				if ( '' !== $person ) {
+					$dn['commonName'] = mb_substr( $person, 0, 64 );
+				}
+
+				$dn['emailAddress'] = $mailbox;
+
+				if ( 1 === preg_match( '/^[A-Za-z]{2}$/D', $country ) ) {
+					$dn['countryName'] = strtoupper( $country );
+				}
+
+				$request = openssl_csr_new( $dn, $key, array( 'digest_alg' => 'sha256', 'config' => $config ) );
+
+				if ( ! $request || ! openssl_csr_export( $request, $csr ) || ! openssl_pkey_export( $key, $pem, null, array( 'config' => $config ) ) ) {
+					return new \WP_Error( 'ssl_csr', 'The certificate request could not be made.' );
+				}
+
+				return array( 'key' => (string) $pem, 'csr' => (string) $csr );
+			},
+			array( $mailbox ),
+			'email'
+		);
+	}
+
+	/**
+	 * Checks an S/MIME request against the mailbox that was paid for: a usable request whose email (subject or subject alternative
+	 * name) is that mailbox and names nothing else, with a country.
+	 *
+	 * @param string $csr     PEM text.
+	 * @param string $mailbox Email address the certificate is for.
+	 * @return array{cn: string, subject: array<string, string>, bits: int, type: string, public: string}|\WP_Error
+	 */
+	public static function check_email( string $csr, string $mailbox ) {
+		$read = self::parse( $csr );
+
+		if ( is_wp_error( $read ) ) {
+			return $read;
+		}
+
+		$mailbox = strtolower( trim( $mailbox ) );
+		$subject = strtolower( (string) ( $read['subject']['emailAddress'] ?? '' ) );
+		$sans    = array_map( 'strtolower', self::sans( $csr, true ) );
+
+		if ( '' === $subject && array() === $sans ) {
+			/* translators: %s: email address. */
+			return new \WP_Error( 'ssl_csr_mailbox', sprintf( __( 'The certificate request must contain the email address %s.', 'beltoft-services' ), $mailbox ) );
+		}
+
+		foreach ( array_merge( '' !== $subject ? array( $subject ) : array(), $sans ) as $found ) {
+			if ( $found !== $mailbox ) {
+				/* translators: %s: email address. */
+				return new \WP_Error( 'ssl_csr_mailbox', sprintf( __( 'The certificate request may contain only the email address %s, and nothing else (no host names or other addresses).', 'beltoft-services' ), $mailbox ) );
+			}
+		}
+
+		if ( 1 !== preg_match( '/^[A-Za-z]{2}$/D', (string) ( $read['subject']['C'] ?? '' ) ) ) {
+			return new \WP_Error( 'ssl_csr_country', __( 'The certificate request must include a country (C), for example C=DK.', 'beltoft-services' ) );
+		}
+
+		return $read;
+	}
+
+	/**
+	 * Does the certificate belong to the mailbox: the address is in its subject or its subject alternative names?
+	 *
+	 * @param string $pem     Certificate PEM.
+	 * @param string $mailbox Email address.
+	 */
+	public static function certificate_has_mailbox( string $pem, string $mailbox ): bool {
+		$parsed  = openssl_x509_parse( $pem );
+		$mailbox = strtolower( trim( $mailbox ) );
+
+		if ( ! is_array( $parsed ) ) {
+			return false;
+		}
+
+		if ( strtolower( (string) ( $parsed['subject']['emailAddress'] ?? '' ) ) === $mailbox ) {
+			return true;
+		}
+
+		foreach ( preg_split( '/\s*,\s*/', (string) ( $parsed['extensions']['subjectAltName'] ?? '' ) ) ?: array() as $entry ) {
+			if ( 0 === stripos( $entry, 'email:' ) && strtolower( trim( substr( $entry, 6 ) ) ) === $mailbox ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -175,10 +291,11 @@ final class Csr {
 	 * an email) comes back as "#other", so it never matches an ordered name, and so does anything that cannot be parsed. Empty when
 	 * there is no such extension.
 	 *
-	 * @param string $csr PEM text.
+	 * @param string $csr   PEM text.
+	 * @param bool   $email Read the email entries (rfc822Name, for S/MIME) instead of the DNS ones; every other kind is then "#other".
 	 * @return string[]
 	 */
-	public static function sans( string $csr ): array {
+	public static function sans( string $csr, bool $email = false ): array {
 		$body = (string) preg_replace( '/-----[A-Z ]+-----|\s+/', '', $csr );
 		$der  = base64_decode( $body, true );
 
@@ -205,7 +322,7 @@ final class Csr {
 			}
 
 			if ( 0xA0 === $item[0] ) {
-				$found = self::attribute_names( $der, $item[1], $item[2] );
+				$found = self::attribute_names( $der, $item[1], $item[2], $email ? 0x81 : 0x82 );
 
 				if ( null === $found ) {
 					return array( '#other' );
@@ -243,9 +360,10 @@ final class Csr {
 	 * @param string $der   Bytes.
 	 * @param int    $start Start of the attribute list.
 	 * @param int    $end   End of the attribute list.
+	 * @param int    $want  The general name tag read: 0x82 DNS name, 0x81 email.
 	 * @return string[]|null Null when the structure is malformed.
 	 */
-	private static function attribute_names( string $der, int $start, int $end ): ?array {
+	private static function attribute_names( string $der, int $start, int $end, int $want = 0x82 ): ?array {
 		$ext_req = "\x2a\x86\x48\x86\xf7\x0d\x01\x09\x0e";
 		$san     = "\x55\x1d\x11";
 		$names   = array();
@@ -305,7 +423,7 @@ final class Csr {
 						return null;
 					}
 
-					$names[] = 0x82 === $name[0] ? substr( $der, $name[1], $name[2] - $name[1] ) : '#other';
+					$names[] = $want === $name[0] ? substr( $der, $name[1], $name[2] - $name[1] ) : '#other';
 					$g       = $name[2];
 				}
 			}

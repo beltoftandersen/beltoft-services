@@ -75,6 +75,9 @@ if ( $d['dns_only'] ) {
 		<?php if ( $d['dns_only'] && true === $d['parent_ds'] && 'ours' !== $d['delegation'] ) : ?>
 			<p class="beltoft-services-domain__note"><?php esc_html_e( 'This domain uses DNSSEC at your registrar. Remove the DS record there before you change the name servers, then wait a day.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
+		<?php if ( $d['fix'] ) : ?>
+			<?php $beltoft_fix = $d['fix']; include \BeltoftServices\Account\Domains::file( 'domain-fix.php' ); ?>
+		<?php endif; ?>
 		<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
 			<p class="beltoft-services-domain__note">
 				<?php

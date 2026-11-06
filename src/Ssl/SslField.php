@@ -78,12 +78,13 @@ final class SslField {
 	 * The plan of a cart line: registrar product, level and wildcard.
 	 *
 	 * @param array<string, mixed> $item Cart item.
-	 * @return array{level: string, wildcard: bool, domains: int}
+	 * @return array{level: string, wildcard: bool, domains: int, smime: bool}
 	 */
 	private static function plan_of( array $item ): array {
 		$plan = Product::plan( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) ?: null );
 
 		return array(
+			'smime'    => SslCatalog::is_smime( (int) ( $plan['ssl_product'] ?? 0 ) ),
 			'level'    => in_array( (string) ( $plan['ssl_level'] ?? '' ), array( 'dv', 'ov', 'ev' ), true ) ? (string) $plan['ssl_level'] : 'dv',
 			'wildcard' => ! empty( $plan['ssl_wildcard'] ),
 			'domains'  => max( 1, (int) ( $plan['ssl_domains'] ?? 1 ) ),
@@ -178,6 +179,76 @@ final class SslField {
 		$saved = array( 'domain' => $base, 'name' => $name, 'validation' => $method, 'approver' => $approver, 'key_mode' => $key_mode, 'csr' => $csr );
 
 		return array() === $entries ? $saved : $saved + array( 'names' => $entries );
+	}
+
+	/**
+	 * The choices of an S/MIME line: the mailbox the certificate is for, the name on it, and where the key comes from. The mailbox is
+	 * the address of the account or the billing email of this order: the authority mails its confirmation link there, and the
+	 * checkout does not let an order be placed for any address (the filter beltoft_services_smime_mailbox_allowed can).
+	 *
+	 * @param array<string, mixed> $input         mailbox, person, key_mode, csr.
+	 * @param int                  $user_id       Customer, 0 for a guest.
+	 * @param string               $billing_email The billing email of the order.
+	 * @param string               $account_email The email of the logged in account, or ''.
+	 * @return array<string, mixed>|\WP_Error What is saved on the order line; the error's message is for the customer.
+	 */
+	public static function resolve_smime( array $input, int $user_id, string $billing_email, string $account_email ) {
+		if ( ! SslSettings::enabled() ) {
+			return new \WP_Error( 'ssl_off', __( 'SSL certificates cannot be ordered right now. Please try again later.', 'beltoft-services' ) );
+		}
+
+		$mailbox = strtolower( trim( (string) ( $input['mailbox'] ?? '' ) ) );
+
+		if ( '' === $mailbox || ! is_email( $mailbox ) || 1 !== preg_match( '/^[^\s,;:]+$/D', $mailbox ) || strlen( $mailbox ) > 120 ) {
+			return new \WP_Error( 'ssl_mailbox', __( 'Enter the email address the certificate is for.', 'beltoft-services' ) );
+		}
+
+		$allowed = in_array( $mailbox, array_filter( array( strtolower( trim( $billing_email ) ), strtolower( trim( $account_email ) ) ) ), true );
+
+		/**
+		 * May an S/MIME certificate be ordered for this mailbox? By default only the account email and the billing email of the order.
+		 *
+		 * @param bool   $allowed Whether it is allowed.
+		 * @param string $mailbox The address.
+		 * @param int    $user_id Customer.
+		 */
+		if ( ! apply_filters( 'beltoft_services_smime_mailbox_allowed', $allowed, $mailbox, $user_id ) ) {
+			return new \WP_Error( 'ssl_mailbox_bound', __( 'The certificate can be ordered for your account email or the billing email of this order. Change the billing email, or use that address.', 'beltoft-services' ) );
+		}
+
+		$key_mode = 'own' === ( $input['key_mode'] ?? '' ) ? 'own' : 'generate';
+		$csr      = '';
+
+		if ( 'own' === $key_mode ) {
+			$read = Csr::check_email( (string) ( $input['csr'] ?? '' ), $mailbox );
+
+			if ( is_wp_error( $read ) ) {
+				return $read;
+			}
+
+			$csr = trim( (string) $input['csr'] );
+		} elseif ( ! Crypto::available() ) {
+			return new \WP_Error( 'ssl_key', __( 'We cannot make a key for you right now. Paste your own certificate request instead.', 'beltoft-services' ) );
+		}
+
+		$refused = SslNames::refusal( $user_id, $mailbox );
+
+		if ( null !== $refused ) {
+			return new \WP_Error( 'ssl_refused', $refused );
+		}
+
+		$person = trim( (string) preg_replace( '/[\x00-\x1f\x7f]+/', ' ', wp_strip_all_tags( (string) ( $input['person'] ?? '' ) ) ) );
+
+		return array(
+			'profile'    => 'smime',
+			'domain'     => (string) substr( strrchr( $mailbox, '@' ), 1 ),
+			'name'       => $mailbox,
+			'person'     => mb_substr( $person, 0, 64 ),
+			'validation' => 'email',
+			'approver'   => $mailbox,
+			'key_mode'   => $key_mode,
+			'csr'        => $csr,
+		);
 	}
 
 	/**
@@ -281,7 +352,7 @@ final class SslField {
 		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
 		$out = array();
 
-		foreach ( array( 'domain', 'validation', 'approver', 'key_mode', 'csr' ) as $field ) {
+		foreach ( array( 'domain', 'validation', 'approver', 'key_mode', 'csr', 'mailbox', 'person' ) as $field ) {
 			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
 		}
 
@@ -324,7 +395,7 @@ final class SslField {
 	 * The fields of one line.
 	 *
 	 * @param string                               $key   Cart item key.
-	 * @param array{level: string, wildcard: bool, domains: int} $plan  Plan.
+	 * @param array{level: string, wildcard: bool, domains: int, smime: bool} $plan  Plan.
 	 * @param string[]                                           $zones The customer's domains on our name servers.
 	 */
 	private static function print_line( string $key, array $plan, array $zones ): void {
@@ -334,7 +405,9 @@ final class SslField {
 
 		echo '<fieldset class="beltoft-services-ssl-field__line" style="border:0;padding:0;margin:0 0 16px">';
 
-		if ( $plan['domains'] > 1 ) {
+		if ( $plan['smime'] ) {
+			self::print_smime( $name, $id, $post );
+		} elseif ( $plan['domains'] > 1 ) {
 			self::print_names( $name, $id, $plan['domains'], $post, $zones );
 		} else {
 			self::print_name( $name, $id, $plan, $post, $zones );
@@ -394,6 +467,25 @@ final class SslField {
 		}
 
 		echo '</select></span><span class="description">' . esc_html__( 'Only for the email method: the address is the prefix at your domain.', 'beltoft-services' ) . '</span></p>';
+	}
+
+	/**
+	 * The mailbox and the name of an S/MIME certificate.
+	 *
+	 * @param string               $name Field name prefix.
+	 * @param string               $id   Field id prefix.
+	 * @param array<string, mixed> $post Posted values.
+	 */
+	private static function print_smime( string $name, string $id, array $post ): void {
+		$user    = wp_get_current_user();
+		$mailbox = '' !== $post['mailbox'] ? $post['mailbox'] : ( $user->exists() ? (string) $user->user_email : '' );
+
+		echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_mailbox">' . esc_html__( 'Email address for the certificate', 'beltoft-services' ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
+		echo '<span class="woocommerce-input-wrapper"><input type="email" class="input-text" name="' . esc_attr( $name ) . '[mailbox]" id="' . esc_attr( $id ) . '_mailbox" maxlength="120" autocomplete="email" spellcheck="false" value="' . esc_attr( $mailbox ) . '"></span>';
+		echo '<span class="description">' . esc_html__( 'The certificate is for this one address, your account email or the billing email of this order. We send you a link to confirm that the mailbox is yours, and you click it.', 'beltoft-services' ) . '</span></p>';
+		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_person">' . esc_html__( 'Name on the certificate (optional)', 'beltoft-services' ) . '</label>';
+		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[person]" id="' . esc_attr( $id ) . '_person" maxlength="64" autocomplete="name" value="' . esc_attr( $post['person'] ) . '"></span>';
+		echo '<span class="description">' . esc_html__( 'Left empty, the name in your billing details is used.', 'beltoft-services' ) . '</span></p>';
 	}
 
 	/**
@@ -491,12 +583,25 @@ final class SslField {
 			}
 
 			$plan  = self::plan_of( $item );
-			$found = self::resolve( self::posted( (string) $key ), $user, $plan['level'], $plan['wildcard'], $company, $plan['domains'] );
+			$found = $plan['smime']
+				? self::resolve_smime( self::posted( (string) $key ), $user, is_array( $data ) ? (string) ( $data['billing_email'] ?? '' ) : '', self::account_email( $user ) )
+				: self::resolve( self::posted( (string) $key ), $user, $plan['level'], $plan['wildcard'], $company, $plan['domains'] );
 
 			if ( is_wp_error( $found ) ) {
 				$errors->add( 'beltoft_services_ssl', $found->get_error_message() );
 			}
 		}
+	}
+
+	/**
+	 * The email of a logged in account, '' for a guest.
+	 *
+	 * @param int $user_id User.
+	 */
+	private static function account_email( int $user_id ): string {
+		$user = $user_id > 0 ? get_userdata( $user_id ) : false;
+
+		return $user ? (string) $user->user_email : '';
 	}
 
 	/**
@@ -514,7 +619,9 @@ final class SslField {
 
 		$plan    = self::plan_of( is_array( $values ) ? $values : array() );
 		$company = $order instanceof \WC_Order ? (string) $order->get_billing_company() : '';
-		$found   = self::resolve( self::posted( $key ), get_current_user_id(), $plan['level'], $plan['wildcard'], $company, $plan['domains'] );
+		$found   = $plan['smime']
+			? self::resolve_smime( self::posted( $key ), get_current_user_id(), $order instanceof \WC_Order ? (string) $order->get_billing_email() : '', self::account_email( get_current_user_id() ) )
+			: self::resolve( self::posted( $key ), get_current_user_id(), $plan['level'], $plan['wildcard'], $company, $plan['domains'] );
 
 		if ( is_array( $found ) ) {
 			$item->add_meta_data( self::ITEM_META, $found, true );
@@ -578,6 +685,10 @@ final class SslField {
 
 			if ( 'own' === $data['key_mode'] ) {
 				$meta['ssl_csr'] = (string) $data['csr'];
+			}
+
+			if ( ! empty( $data['person'] ) ) {
+				$meta['ssl_person'] = (string) $data['person'];
 			}
 
 			if ( ! empty( $data['names'] ) && is_array( $data['names'] ) ) {

@@ -102,8 +102,10 @@ class FakeClient implements Client {
 			if ( ! isset( $body['period'] ) || (int) $body['period'] < 1 ) { return new \WP_Error( 'op_3105', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'License period is required.' ) ); }
 			if ( array() === $items || array() !== array_filter( $items, static fn( $i ) => 1 !== preg_match( '/^[A-Z0-9][A-Z0-9-]{2,78}-(1M|1Y)$/D', $i ) || 0 === strpos( $i, 'PLSK' ) ) ) { return new \WP_Error( 'op_3103', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'License request has invalid items.' ) ); }
 			if ( '' !== $ip && false === filter_var( $ip, FILTER_VALIDATE_IP ) ) { return new \WP_Error( 'op_1000', 'Fake licence request is invalid.', array( 'status' => 400 ) ); }
+			$parent = (int) ( $body['parent_key_id'] ?? 0 );
+			if ( $parent > 0 && ! isset( $state['licences'][ $parent ] ) ) { return new \WP_Error( 'op_3108', 'Registrar request failed.', array( 'status' => 404, 'desc' => 'License not found.' ) ); }
 			$id = ++$state['next_id'];
-			$state['licences'][ $id ] = array( 'key_id' => $id, 'title' => (string) ( $body['title'] ?? '' ), 'comment' => (string) ( $body['comment'] ?? '' ), 'items' => $items, 'ip_address_binding' => $ip, 'period' => (int) ( $body['period'] ?? 1 ), 'status' => 'ACT', 'key_number' => 'FAKE-' . $id, 'activation_code' => '', 'hwid_resets' => 0 );
+			$state['licences'][ $id ] = array( 'key_id' => $id, 'parent_key_id' => $parent, 'title' => (string) ( $body['title'] ?? '' ), 'comment' => (string) ( $body['comment'] ?? '' ), 'items' => $items, 'ip_address_binding' => $ip, 'period' => (int) ( $body['period'] ?? 1 ), 'status' => 'ACT', 'key_number' => 'FAKE-' . $id, 'activation_code' => '', 'hwid_resets' => 0 );
 			update_option( self::OPTION, $state, false );
 			return array( 'key_id' => $id, 'attached_keys' => array() );
 		}

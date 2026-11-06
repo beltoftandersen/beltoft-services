@@ -184,6 +184,11 @@ final class FakeModel {
 			}
 
 			if ( 'POST' === $method && '/approver-email/resend' === $tail ) {
+				// The sandbox cannot resend an S/MIME confirmation (its docs call this error one to ignore).
+				if ( 60 === (int) $order['product_id'] ) {
+					return self::error( 1099, 'domain: This domain is invalid', 400 );
+				}
+
 				return 'email' === ( $order['validation_method_kind'] ?? '' ) ? array( 'success' => true ) : self::error( 1099, 'dcvType: An email address is required', 400 );
 			}
 
@@ -233,6 +238,20 @@ final class FakeModel {
 			}
 		}
 
+		// S/MIME Personal names no host: the order is named after the common name of the request (lowercased, as the sandbox shows
+		// it) and is validated by an email to the approver address. Host validation methods are refused, as the sandbox does.
+		if ( 60 === $product ) {
+			if ( array() !== $hosts ) {
+				return self::error( 1044, 'Invalid domain validation method for host', 400 );
+			}
+
+			$dn    = '' !== trim( (string) ( $body['csr'] ?? '' ) ) ? openssl_csr_get_subject( (string) $body['csr'], true ) : false;
+			$cn    = is_array( $dn ) ? strtolower( (string) ( $dn['CN'] ?? '' ) ) : '';
+			$hosts = array( '' !== $cn ? $cn : 'smime' );
+			$kind  = 'email';
+			$methods = array();
+		}
+
 		if ( array() === $hosts ) {
 			return self::error( 1000, 'domain_validation_methods is empty.', 400 );
 		}
@@ -240,7 +259,7 @@ final class FakeModel {
 		// The sandbox accepts any number of names; this model refuses what the product cannot hold, so a test sees a wrong order.
 		$amount = (int) ( $body['domain_amount'] ?? count( $hosts ) );
 
-		if ( count( $hosts ) > max( 1, (int) $p['max'] ) || $amount < count( $hosts ) || $amount > max( 1, (int) $p['max'] ) ) {
+		if ( 60 !== $product && ( count( $hosts ) > max( 1, (int) $p['max'] ) || $amount < count( $hosts ) || $amount > max( 1, (int) $p['max'] ) ) ) {
 			return self::error( 1000, 'domain_amount does not match the names or the product.', 400 );
 		}
 
@@ -271,7 +290,7 @@ final class FakeModel {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function update( array &$state, int $id, array $order, array $body, bool &$dirty ): array|\WP_Error {
-		foreach ( array( 'csr', 'approver_email', 'domain_validation_methods', 'organization_handle', 'technical_handle' ) as $field ) {
+		foreach ( array( 'csr', 'approver_email', 'domain_validation_methods', 'organization_handle', 'technical_handle', 'software' ) as $field ) {
 			if ( array_key_exists( $field, $body ) ) {
 				$order[ $field ] = $body[ $field ];
 			}
@@ -281,9 +300,24 @@ final class FakeModel {
 			$order['validation_method_kind'] = (string) $body['domain_validation_methods'][0]['method'];
 		}
 
+		if ( array_key_exists( 'software_id', $body ) ) {
+			$order['software'] = (string) $body['software_id'];
+		}
+
 		if ( ! empty( $body['start_provision'] ) && 'PAI' === $order['status'] ) {
 			if ( '' === trim( (string) $order['csr'] ) ) {
 				return self::error( 1003, 'CSR must be set', 400 );
+			}
+
+			// The sandbox: an S/MIME order is started with the approver address (the mailbox) and a server software.
+			if ( 60 === (int) $order['product_id'] ) {
+				if ( '' === trim( (string) $order['approver_email'] ) ) {
+					return self::error( 1045, 'Approver email must be set', 400 );
+				}
+
+				if ( '' === trim( (string) $order['software'] ) ) {
+					return self::error( 1004, 'Empty field for the server software for the SSL certificate!', 400 );
+				}
 			}
 
 			$level = self::products()[ (int) $order['product_id'] ]['method'];

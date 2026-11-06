@@ -260,6 +260,41 @@ final class TransferDns {
 	}
 
 	/**
+	 * The registrar and the lock now: an uncached RDAP lookup with a short timeout, which also renews the stored answer. When the
+	 * lookup fails the stored answer is used. The same filter as registrar() answers for a test or a site.
+	 *
+	 * @param string $domain Domain.
+	 * @return array{name: string, url: string}|null
+	 */
+	public static function fresh_registrar( string $domain ): ?array {
+		/** This filter is documented in TransferDns::registrar(). */
+		$found = apply_filters( 'beltoft_services_transfer_registrar', null, $domain );
+
+		if ( null !== $found ) {
+			return self::cached_registrar( $domain );
+		}
+
+		$reply = wp_remote_get(
+			'https://rdap.org/domain/' . rawurlencode( strtolower( $domain ) ),
+			array(
+				'timeout'     => 3,
+				'redirection' => 3,
+				'headers'     => array( 'Accept' => 'application/rdap+json' ),
+			)
+		);
+		$data  = is_wp_error( $reply ) || 200 !== (int) wp_remote_retrieve_response_code( $reply ) ? null : json_decode( (string) wp_remote_retrieve_body( $reply ), true );
+
+		if ( ! is_array( $data ) ) {
+			return self::cached_registrar( $domain );
+		}
+
+		$now = self::registrar_from_rdap( $data );
+		set_transient( 'beltoft_services_rdap_' . md5( strtolower( $domain ) ), $now ? $now : array(), $now ? DAY_IN_SECONDS : HOUR_IN_SECONDS );
+
+		return $now;
+	}
+
+	/**
 	 * The registrar as far as it is already known (the filter or the stored RDAP answer). Never asks the network, so a page can use it.
 	 *
 	 * @param string $domain Domain.
@@ -843,7 +878,7 @@ final class TransferDns {
 			return $r;
 		}
 
-		if ( ! self::with_registry( $r ) ) {
+		if ( ! self::with_registry( $r ) && '' === TransferFix::pending( $r ) ) {
 			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_not_waiting', __( 'This transfer is not waiting for the registry.', 'beltoft-services' ), array( 'status' => 409 ) ) );
 		}
 
@@ -856,6 +891,11 @@ final class TransferDns {
 
 		$fresh = Resource::find( $r->id() );
 		$done  = $fresh && in_array( 'active', (array) $fresh->get( 'steps' ), true );
+		$fix   = $fresh ? TransferFix::pending( $fresh ) : '';
+
+		if ( '' !== $fix ) {
+			return new \WP_REST_Response( array( 'status' => 'waiting', 'message' => TransferFix::message( $fix ) ), 200 );
+		}
 
 		return new \WP_REST_Response(
 			array(
