@@ -20,7 +20,7 @@ require_once __DIR__ . '/PaidAppCase.php';
  */
 final class PleskAlmaTest extends PaidAppCase {
 
-	private const SNIPPET = 'local:snippets/vm-vendor-cloudinit-v3.yaml';
+	private const SNIPPET = 'local:snippets/vm-vendor-cloudinit-v4.yaml';
 
 	public function set_up(): void {
 		parent::set_up();
@@ -202,7 +202,7 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( $offered['plesk']['choices'] ) ), 'No Alma template: no Alma version.' );
 	}
 
-	public function test_alma_needs_the_v3_snippet_ubuntu_works_with_v2_or_v3_and_a_lookalike_is_not_accepted(): void {
+	public function test_alma_needs_the_v4_snippet_ubuntu_works_with_v2_or_later_and_a_lookalike_is_not_accepted(): void {
 		$plan = array( 'template' => 9003, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 );
 		$two  = array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml' );
 
@@ -212,7 +212,7 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->assertSame( 0, Apps::version_template( $this->lab(), (array) Apps::version( 'plesk', '18-alma' ) ) );
 		$this->assertFalse( Apps::family_supported( $this->lab(), 'almalinux-9' ) );
 		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( Apps::offered( $this->lab() )['plesk']['choices'] ) ) );
-		$this->assertStringContainsString( 'vm-vendor-cloudinit-v3', (string) Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ) );
+		$this->assertStringContainsString( 'vm-vendor-cloudinit-v4', (string) Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ) );
 		$this->assertNull( Apps::check( $this->lab(), array( 'template' => 9001 ) + $plan, 'plesk', '18' ) );
 
 		$this->cluster( "9003 = AlmaLinux 9", "9003 = almalinux-9", $two );
@@ -221,9 +221,18 @@ final class PleskAlmaTest extends PaidAppCase {
 
 		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9", "9001 = ubuntu-24.04\n9003 = almalinux-9" );
 		$this->assertTrue( Apps::cluster_ready( $this->lab() ) );
-		$this->assertNull( Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ), 'v3 installs on Alma.' );
+		$this->assertNull( Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ), 'v4 installs on Alma.' );
 
-		$this->cluster( "9001 = Ubuntu 24.04", "9001 = ubuntu-24.04", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v4.yaml' ) );
+		// v3 reads the job before it is written on Alma (jq 1.6 passes an empty file): Ubuntu only.
+		$three = array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v3.yaml' );
+		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9", "9001 = ubuntu-24.04\n9003 = almalinux-9", $three );
+		$this->assertTrue( Apps::cluster_ready( $this->lab() ) );
+		$this->assertFalse( Apps::family_supported( $this->lab(), 'almalinux-9' ) );
+		$this->assertTrue( Apps::family_supported( $this->lab(), 'ubuntu-24.04' ) );
+		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( Apps::offered( $this->lab() )['plesk']['choices'] ) ) );
+		$this->assertStringContainsString( 'vm-vendor-cloudinit-v4', (string) Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ) );
+
+		$this->cluster( "9001 = Ubuntu 24.04", "9001 = ubuntu-24.04", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v5.yaml' ) );
 		$this->assertFalse( Apps::cluster_ready( $this->lab() ) );
 	}
 

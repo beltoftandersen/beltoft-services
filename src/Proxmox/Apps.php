@@ -56,7 +56,7 @@ final class Apps {
 	 * @param int                  $prefer  Template the customer chose, or 0.
 	 */
 	public static function version_template( array $cluster, array $version, int $prefer = 0 ): int {
-		// A system other than Ubuntu needs the vendor snippet v3 (v2 cannot install on it): such a family is not available on a v2 cluster.
+		// A system other than Ubuntu needs the vendor snippet v4 (v2 and v3 cannot install on it): such a family is not available on an older cluster.
 		$families = array_values( array_filter( (array) ( $version['os'] ?? array() ), static fn( $f ) => is_string( $f ) && self::family_supported( $cluster, $f ) ) );
 		$mapped   = (array) ( $cluster['template_families'] ?? array() );
 
@@ -75,16 +75,19 @@ final class Apps {
 		return 0;
 	}
 
-	/** The vendor snippet level of a cluster: 3 for vm-vendor-cloudinit-v3.yaml, 2 for v2, 0 for anything else. */
+	/** The vendor snippet level of a cluster: 4 for vm-vendor-cloudinit-v4.yaml, 3 for v3, 2 for v2, 0 for anything else. */
 	public static function snippet_level( array $cluster ): int {
-		return 1 === preg_match( '#:snippets/vm-vendor-cloudinit-v([23])\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ), $m ) ? (int) $m[1] : 0;
+		return 1 === preg_match( '#:snippets/vm-vendor-cloudinit-v([234])\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ), $m ) ? (int) $m[1] : 0;
 	}
 
-	/** Can apps of this system family be installed with the cluster's vendor snippet? Ubuntu needs v2 or v3, every other system v3. */
+	/**
+	 * Can apps of this system family be installed with the cluster's vendor snippet? Ubuntu needs v2 or later, every other system v4:
+	 * v3 waits for the job file with `jq -e`, which on AlmaLinux 9 (jq 1.6) passes on the still empty file, so the job is read before the guest agent wrote it.
+	 */
 	public static function family_supported( array $cluster, string $family ): bool {
 		$level = self::snippet_level( $cluster );
 
-		return str_starts_with( $family, 'ubuntu-' ) ? $level >= 2 : $level >= 3;
+		return str_starts_with( $family, 'ubuntu-' ) ? $level >= 2 : $level >= 4;
 	}
 
 	/** The family of a template on this cluster, or ''. */
@@ -184,7 +187,7 @@ final class Apps {
 		return array() === $names ? $last : sprintf( __( '%1$s or %2$s', 'beltoft-services' ), implode( ', ', $names ), $last );
 	}
 
-	/** Are apps on offer at all on this cluster: the flag, the v2 or v3 snippet and a template of a family some app runs on (Ubuntu 24.04, AlmaLinux 9). */
+	/** Are apps on offer at all on this cluster: the flag, the v2 or later snippet and a template of a family some app runs on (Ubuntu 24.04, AlmaLinux 9). */
 	public static function cluster_ready( array $cluster ): bool {
 		if ( empty( $cluster['apps_ready'] ) || self::snippet_level( $cluster ) < 2 ) {
 			return false;
@@ -349,7 +352,7 @@ final class Apps {
 			return 'The app does not support the selected operating system';
 		}
 		if ( ! self::family_supported( $cluster, $family ) ) {
-			return 'The cluster vendor snippet cannot install apps on the selected operating system (it needs vm-vendor-cloudinit-v3.yaml)';
+			return 'The cluster vendor snippet cannot install apps on the selected operating system (it needs vm-vendor-cloudinit-v4.yaml)';
 		}
 		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {
 			if ( (int) ( $plan[ $key ] ?? 0 ) < (int) ( $app['min'][ $key ] ?? 0 ) ) {
