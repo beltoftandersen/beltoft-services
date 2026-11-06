@@ -177,6 +177,15 @@ final class AppField {
 			return __( 'Choose one of the listed versions.', 'beltoft-services' );
 		}
 
+		// A version asked for by name must run on the system chosen, when another version of the app would have: refused, not rebuilt on another system.
+		if ( '' !== (string) ( $input['version'] ?? '' ) && $prefer > 0 && array() !== $cluster && Apps::version_template( $cluster, (array) $app['choices'][ $version ], $prefer ) !== $prefer ) {
+			foreach ( $app['choices'] as $candidate ) {
+				if ( Apps::version_template( $cluster, (array) $candidate, $prefer ) === $prefer ) {
+					return Apps::needs_system_text( $cluster, (array) $app['choices'][ $version ] );
+				}
+			}
+		}
+
 		$why = Apps::plan_refusal( $app['choices'][ $version ], (array) $offer['plan'] );
 
 		if ( null !== $why ) {

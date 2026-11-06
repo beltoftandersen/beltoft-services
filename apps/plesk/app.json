@@ -14,7 +14,7 @@
   "licence": {"product_slug": "plesk"},
   "docs_url": "https://docs.plesk.com/en-US/obsidian/administrator-guide/",
   "versions": [
-    {"id": "18", "label": "Plesk Obsidian 18", "upstream": "18.0 (latest release)", "recipe": 1, "status": "current", "min_plan": "performance", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "252510c4ece865c53423abb28eae17575acf08675fcc9d57f55a50a0e5112530", "eol": ""},
-    {"id": "18-alma", "label": "Plesk Obsidian 18 (AlmaLinux 9)", "upstream": "18.0 (latest release)", "recipe": 1, "status": "available", "min_plan": "performance", "os": ["almalinux-9"], "install": "install.script", "sha256": "17ffde031d4983998e400abb749f734479bd386c670b3c2d95e2b7546137414d", "eol": ""}
+    {"id": "18", "label": "Plesk Obsidian 18", "upstream": "18.0 (latest release)", "recipe": 1, "status": "current", "min_plan": "performance", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "a9b70c20bfd4b91b7cbb1fda71cf7fd90bf47bb53600d0217c0efbae2b6087ff", "eol": ""},
+    {"id": "18-alma", "label": "Plesk Obsidian 18 (AlmaLinux 9)", "upstream": "18.0 (latest release)", "recipe": 1, "status": "available", "min_plan": "performance", "os": ["almalinux-9"], "install": "install.script", "sha256": "2d09e1ff93a6edfe93ae9feda6b5b1cebf983ab0a96e764d5502872eeffcdbb1", "eol": ""}
   ]
 }

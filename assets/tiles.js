@@ -166,6 +166,8 @@
 			if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
 				update();
 				follow();
+				// follow() may have moved the system: the versions must fit the system it chose.
+				fill();
 				refresh();
 			}
 		} );

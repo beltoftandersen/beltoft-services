@@ -243,7 +243,7 @@ final class ClustersScreen {
 			'<label><input type="checkbox" name="apps_ready" value="1" %1$s> %2$s</label><p class="description">%3$s</p>',
 			checked( (int) $c['apps_ready'], 1, false ),
 			esc_html__( 'Apps are ready on this cluster', 'beltoft-services' ),
-			esc_html__( 'Turn on only when the vendor snippet above is vm-vendor-cloudinit-v2.yaml (Ubuntu) or vm-vendor-cloudinit-v3.yaml (Ubuntu and AlmaLinux 9) and a template of the family ubuntu-24.04 or almalinux-9 is listed below. Customers then see the app choice at checkout.', 'beltoft-services' )
+			esc_html__( 'Turn on only when the vendor snippet above is vm-vendor-cloudinit-v2.yaml and a template of the family ubuntu-24.04 is listed below. Apps on AlmaLinux 9 need vm-vendor-cloudinit-v3.yaml and a template of the family almalinux-9. Customers then see the app choice at checkout.', 'beltoft-services' )
 		);
 
 		foreach ( Apps::ids() as $id ) {

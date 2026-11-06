@@ -20,7 +20,7 @@ require_once __DIR__ . '/PaidAppCase.php';
  */
 final class PleskAlmaTest extends PaidAppCase {
 
-	private const SNIPPET = 'local:snippets/vm-vendor-cloudinit-v2.yaml';
+	private const SNIPPET = 'local:snippets/vm-vendor-cloudinit-v3.yaml';
 
 	public function set_up(): void {
 		parent::set_up();
@@ -105,7 +105,7 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->assertSame( 'Plesk', $alma['name'] );
 		$this->assertSame( $ubuntu['min'], $alma['min'] );
 		$this->assertSame( '18', Apps::current( 'plesk' )['version_id'], 'One current version: the Ubuntu one stays it.' );
-		$this->assertSame( '252510c4ece865c53423abb28eae17575acf08675fcc9d57f55a50a0e5112530', $ubuntu['sha256'], 'The Ubuntu script is byte for byte what it was.' );
+		$this->assertSame( 'a9b70c20bfd4b91b7cbb1fda71cf7fd90bf47bb53600d0217c0efbae2b6087ff', $ubuntu['sha256'], 'The Ubuntu script differs from the first release only in the retry-safe swap step.' );
 
 		$file = BELTOFT_SERVICES_PATH . 'apps/plesk/18-alma/install.script';
 		$this->assertStringContainsString( hash_file( 'sha256', $file ) . '  plesk/18-alma/install.script', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/CHECKSUMS' ) );
@@ -121,10 +121,20 @@ final class PleskAlmaTest extends PaidAppCase {
 
 		$this->assertStringContainsString( 'almalinux', $alma );
 		$this->assertStringContainsString( 'dnf install', $alma );
-		$this->assertStringContainsString( 'firewall-cmd --permanent --add-port', $alma );
+		$this->assertStringContainsString( '--add-port="$port/tcp"', $alma );
 		$this->assertStringNotContainsString( 'apt-get', $alma );
 		$this->assertStringNotContainsString( 'ufw', $alma );
 		$this->assertStringContainsString( 'for port in 22 80 443 8443; do', $alma, 'The same four ports as the app definition.' );
+		// Owner decision: no port 25 (or any other mail, ftp, dns or panel port) by default. Plesk's own firewalld additions are removed.
+		$fw = substr( $alma, (int) strpos( $alma, 'step=firewall' ), (int) strpos( $alma, 'step=verify' ) - (int) strpos( $alma, 'step=firewall' ) );
+		$this->assertSame( array( '22', '80', '443', '8443' ), array_map( 'trim', explode( ' ', (string) preg_replace( '/^.*for port in ([0-9 ]+); do firewall-cmd.*$/s', '$1', $fw ) ) ) );
+		$this->assertDoesNotMatchRegularExpression( '/--add-(port|service)=?[^\n]*\b(25|587|465|993|995|143|110|21|53|8447|8880|smtp|imap|pop3|ftp|dns)\b/', $fw );
+		$this->assertStringContainsString( '--list-services', $fw );
+		$this->assertStringContainsString( '--remove-service', $fw );
+		$this->assertStringContainsString( '--remove-port', $fw );
+		$this->assertStringContainsString( '--list-rich-rules', $fw );
+		$this->assertStringNotContainsString( 'if [ ! -e "$state/stage.5" ]', $fw, 'Run on every attempt: a retry ends in the same state.' );
+		$this->assertStringContainsString( '22/tcp 443/tcp 80/tcp 8443/tcp', $fw, 'The step ends by checking that exactly these four remain.' );
 
 		// The key and licence helpers, the status files and the trial/licence step are the same text in both scripts.
 		foreach ( array( 'beltoft-plesk-key', 'beltoft-plesk-licence', 'licence.status.json', 'beltoft-licence.path', '-trial_license "$trial"', 'plesk bin license --install' ) as $needle ) {
@@ -192,13 +202,39 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( $offered['plesk']['choices'] ) ), 'No Alma template: no Alma version.' );
 	}
 
-	public function test_the_v3_snippet_is_accepted_like_v2_and_a_lookalike_is_not(): void {
-		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9", "9001 = ubuntu-24.04\n9003 = almalinux-9", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v3.yaml' ) );
+	public function test_alma_needs_the_v3_snippet_ubuntu_works_with_v2_or_v3_and_a_lookalike_is_not_accepted(): void {
+		$plan = array( 'template' => 9003, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 );
+		$two  = array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml' );
+
+		// v2 cannot install on Alma (no jq, the agent filters file and exec calls): no Alma offer, no Alma sale.
+		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9", "9001 = ubuntu-24.04\n9003 = almalinux-9", $two );
+		$this->assertTrue( Apps::cluster_ready( $this->lab() ), 'Ubuntu apps still work with v2.' );
+		$this->assertSame( 0, Apps::version_template( $this->lab(), (array) Apps::version( 'plesk', '18-alma' ) ) );
+		$this->assertFalse( Apps::family_supported( $this->lab(), 'almalinux-9' ) );
+		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( Apps::offered( $this->lab() )['plesk']['choices'] ) ) );
+		$this->assertStringContainsString( 'vm-vendor-cloudinit-v3', (string) Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ) );
+		$this->assertNull( Apps::check( $this->lab(), array( 'template' => 9001 ) + $plan, 'plesk', '18' ) );
+
+		$this->cluster( "9003 = AlmaLinux 9", "9003 = almalinux-9", $two );
+		$this->assertFalse( Apps::cluster_ready( $this->lab() ), 'Only an Alma template and v2: nothing can be installed.' );
+		$this->assertSame( array(), Apps::offered( $this->lab() ) );
+
+		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9", "9001 = ubuntu-24.04\n9003 = almalinux-9" );
 		$this->assertTrue( Apps::cluster_ready( $this->lab() ) );
-		$this->assertNull( Apps::check( $this->lab(), array( 'template' => 9003, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 ), 'plesk', '18-alma' ) );
+		$this->assertNull( Apps::check( $this->lab(), $plan, 'plesk', '18-alma' ), 'v3 installs on Alma.' );
 
 		$this->cluster( "9001 = Ubuntu 24.04", "9001 = ubuntu-24.04", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v4.yaml' ) );
 		$this->assertFalse( Apps::cluster_ready( $this->lab() ) );
+	}
+
+	public function test_the_picker_and_the_reinstall_tab_do_not_offer_alma_on_a_v2_cluster(): void {
+		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9", "9001 = ubuntu-24.04\n9003 = almalinux-9", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v2.yaml' ) );
+		$this->plesk_tiers();
+		$srv = $this->plain_server( 9003 );
+		$offer = AppField::offer_for( $this->vm_product()->get_id() );
+		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( $offer['apps']['plesk']['choices'] ) ) );
+		$this->assertStringNotContainsString( '18-alma', $this->reinstall_html( $srv ) );
+		$this->assertSame( 'Choose one of the listed app versions.', AppReinstall::check( null, $srv, array( 'confirm' => 'REINSTALL', 'app_version' => 'plesk/18-alma', 'os' => '9003', 'app_tier' => 'pro' ) ) );
 	}
 
 	public function test_both_versions_are_offered_with_both_systems_and_the_other_apps_stay_on_ubuntu(): void {
@@ -261,9 +297,15 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->assertSame( '18', $other['version'], 'Debian: the app has the last word on the system.' );
 		$this->assertSame( 9001, $other['os'] );
 
-		$explicit = AppField::resolve( $offer, $in + array( 'version' => '18-alma', 'os' => '9001' ), 0, false );
+		$explicit = AppField::resolve( $offer, $in + array( 'version' => '18-alma' ), 0, false );
 		$this->assertSame( '18-alma', $explicit['version'] );
-		$this->assertSame( 9003, $explicit['os'], 'A version asked for by name gets its own system.' );
+		$this->assertSame( 9003, $explicit['os'], 'A version asked for by name, no system said: its own system.' );
+		$this->assertSame( 9003, AppField::resolve( $offer, $in + array( 'version' => '18-alma', 'os' => '9003' ), 0, false )['os'] );
+
+		$clash = AppField::resolve( $offer, $in + array( 'version' => '18-alma', 'os' => '9001' ), 0, false );
+		$this->assertIsString( $clash, 'A version that does not run on the chosen system, while another version does, is refused.' );
+		$this->assertStringContainsString( 'needs AlmaLinux 9', $clash );
+		$this->assertIsString( AppField::resolve( $offer, $in + array( 'version' => '18', 'os' => '9003' ), 0, false ) );
 
 		$this->assertIsString( AppField::resolve( $offer, $in + array( 'version' => '18-nope' ), 0, false ) );
 	}
