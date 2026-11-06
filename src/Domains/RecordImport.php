@@ -24,6 +24,7 @@ final class RecordImport {
 		return array(
 			'label'    => __( 'Zone file', 'beltoft-services' ),
 			'choose'   => __( 'Choose a zone file', 'beltoft-services' ),
+			'paste'    => __( 'Or paste the text of the file', 'beltoft-services' ),
 			'preview'  => __( 'Preview', 'beltoft-services' ),
 			'add'      => __( 'Add these records', 'beltoft-services' ),
 			'busy'     => __( 'Reading…', 'beltoft-services' ),

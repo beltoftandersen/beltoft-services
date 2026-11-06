@@ -10,6 +10,7 @@
 			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
 		} );
 	}
+	window.beltoftDomainRequest = request;
 	var bs = window.beltoftStatus;
 	var TYPES = [ 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' ];
 	var EXTRAS = { MX: [ 'priority' ], SRV: [ 'priority', 'weight', 'port' ], CAA: [ 'flag', 'tag' ] };
@@ -285,6 +286,9 @@
 // DNS hosting card: move the registration here. The transfer goes through the same cart route as the
 // domain search; the transfer code is sent once, over HTTPS, and stored encrypted by the server.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-domain-transfer]' ) ) { return; }
@@ -317,6 +321,9 @@
 
 // Transfer: "Check now" asks whether the domain uses our name servers yet, then reloads the page to show the answer.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-check]' ) ) { return; }
@@ -339,6 +346,9 @@
 
 // Transfer: "Check now" at the registry wait asks the registry, then shows the answer and reloads the page.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-registry]' ) ) { return; }
@@ -358,6 +368,9 @@
 // DNS records: import a zone file. The file is read here in the browser and only its text is sent; a preview shows what will
 // be added, replaced or skipped, then "Add these records" writes it. Every text is set with textContent.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	function el( tag, className, text ) {
 		var node = document.createElement( tag );
 		if ( className ) { node.className = className; }
@@ -370,23 +383,34 @@
 		var id = box.getAttribute( 'data-resource' );
 		var area = el( 'textarea', 'beltoft-services-domain__zone-text' );
 		var picker = document.createElement( 'input' );
+		var pick = el( 'label', 'button beltoft-services-domain__import-pick' );
+		var pickRow = el( 'div', 'beltoft-services-domain__import-file' );
+		var fileName = el( 'span', 'beltoft-services-domain__import-name' );
+		var pasteLabel = el( 'label', 'beltoft-services-domain__import-label', t.paste );
 		var out = el( 'div', 'beltoft-services-domain__import-result' );
 		var bar = el( 'p', 'beltoft-services-domain__import-actions' );
-		var preview = el( 'button', 'button', t.preview );
+		var preview = el( 'button', 'button beltoft-services-domain__import-preview', t.preview );
 		var add = el( 'button', 'button', t.add );
 		var bs = window.beltoftStatus;
 		area.rows = 6;
 		area.setAttribute( 'aria-label', t.label );
 		area.spellcheck = false;
+		area.id = 'beltoft-zone-text-' + id;
+		pasteLabel.setAttribute( 'for', area.id );
 		picker.type = 'file';
 		picker.accept = '.txt,.zone,.bind,.db,.dns,text/plain';
-		picker.setAttribute( 'aria-label', t.choose );
+		picker.className = 'beltoft-services-domain__import-input';
+		pick.appendChild( picker );
+		pick.appendChild( document.createTextNode( t.choose ) );
+		pickRow.appendChild( pick );
+		pickRow.appendChild( fileName );
 		preview.type = 'button';
 		add.type = 'button';
 		add.hidden = true;
 		picker.addEventListener( 'change', function () {
 			var file = picker.files && picker.files[ 0 ];
 			if ( ! file ) { return; }
+			fileName.textContent = file.name;
 			if ( file.size > 102400 ) { bs.fail( null, t.tooLarge, area ); return; }
 			var reader = new window.FileReader();
 			reader.onload = function () {
@@ -399,8 +423,10 @@
 		} );
 		area.addEventListener( 'input', function () { add.hidden = true; } );
 		function line( set ) {
-			var item = el( 'li', '', set.name + ' ' + set.type + ': ' + set.values.join( ', ' ) + ' (' + t[ set.status ] + ')' );
-			if ( 'replace' === set.status && set.old.length ) { item.appendChild( el( 'span', '', ' ' + t.was + ': ' + set.old.join( ', ' ) ) ); }
+			var item = el( 'li', 'is-' + set.status );
+			item.appendChild( el( 'span', 'beltoft-services-domain__import-rec', set.name + ' ' + set.type + ' ' + set.values.join( ', ' ) ) );
+			item.appendChild( el( 'span', 'beltoft-services-domain__import-status', t[ set.status ] ) );
+			if ( 'replace' === set.status && set.old.length ) { item.appendChild( el( 'span', 'beltoft-services-domain__import-status', t.was + ': ' + set.old.join( ', ' ) ) ); }
 			return item;
 		}
 		function show( data ) {
@@ -412,7 +438,12 @@
 			if ( ( data.skipped || [] ).length ) {
 				out.appendChild( el( 'p', 'beltoft-services-domain__note', t.skipped ) );
 				var skipped = el( 'ul', 'beltoft-services-domain__import-list' );
-				data.skipped.forEach( function ( row ) { skipped.appendChild( el( 'li', '', ( row.line ? row.line + ': ' : '' ) + row.text + ' (' + row.reason + ')' ) ); } );
+				data.skipped.forEach( function ( row ) {
+					var item = el( 'li', 'is-skipped' );
+					item.appendChild( el( 'span', 'beltoft-services-domain__import-rec', ( row.line ? row.line + ': ' : '' ) + row.text ) );
+					item.appendChild( el( 'span', 'beltoft-services-domain__import-status', row.reason ) );
+					skipped.appendChild( item );
+				} );
 				out.appendChild( skipped );
 			}
 			add.hidden = 0 === changes;
@@ -442,9 +473,9 @@
 		preview.addEventListener( 'click', function () { send( false ); } );
 		add.addEventListener( 'click', function () { send( true ); } );
 		bar.appendChild( preview );
-		bar.appendChild( document.createTextNode( ' ' ) );
 		bar.appendChild( add );
-		box.appendChild( picker );
+		box.appendChild( pickRow );
+		box.appendChild( pasteLabel );
 		box.appendChild( area );
 		box.appendChild( bar );
 		box.appendChild( out );
@@ -453,6 +484,9 @@
 
 // Transfer: "I have checked the records" confirms the records of the zone, then reloads the page to show what comes next.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-confirm]' ) ) { return; }
@@ -471,6 +505,9 @@
 
 // Use Beltoft DNS: start, confirm the records, switch. Each step is one call; the answer is a sentence.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-dns-adopt]' ) ) { return; }
