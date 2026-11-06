@@ -90,11 +90,11 @@ class OverviewTest extends MonitoringTestCase {
 	public function test_a_customer_with_nothing_and_no_links_sees_only_the_empty_service_sections(): void {
 		$this->as_user( self::factory()->user->create() );
 
-		foreach ( array( 'attention', 'apps', 'licenses', 'next_payment', 'activity', 'welcome' ) as $section ) {
+		foreach ( array( 'attention', 'licenses', 'next_payment', 'activity', 'welcome' ) as $section ) {
 			$this->assertSame( '', $this->html( $section ), $section );
 		}
 
-		foreach ( array( 'servers', 'databases', 'domains', 'mail' ) as $section ) {
+		foreach ( array( 'servers', 'databases', 'domains', 'mail', 'apps' ) as $section ) {
 			$this->assertStringContainsString( 'ov__' . $section . ' is-empty', $this->html( $section ), $section );
 			$this->assertStringNotContainsString( 'list-btn', $this->html( $section ), 'No product, no button: ' . $section );
 		}

@@ -252,8 +252,8 @@ final class Overview {
 			case 'databases':
 			case 'apps':
 			case 'mail':
-				// Apps stay out of the Overview until the customer has one; the other areas always show.
-				if ( ! $data[ $section ] && 'apps' !== $section ) {
+				// Every area shows, with its empty line and create button when the customer has nothing in it.
+				if ( ! $data[ $section ] ) {
 					$area = ServiceArea::get( self::AREAS[ $section ] );
 
 					return self::empty_section( $section, $area->label(), $area->empty_line(), $area->buttons() );

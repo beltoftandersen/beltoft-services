@@ -30,7 +30,7 @@ final class Tabs {
 	/**
 	 * Every logged-in customer sees Servers, Databases, Domains and Email in the menu, with or without a service of
 	 * the kind (Beltoft Licenses leaves a tab out when the customer has nothing on it). Each page then shows its
-	 * empty state and a create button. Apps stay as they were: only for customers who have one. The items are
+	 * empty state and a create button, Apps, SSL certificates and Licences included. The items are
 	 * put before Licenses and Log out; the site's menu order (beltoft_services_account_menu_order) places them.
 	 *
 	 * @param mixed $items Menu items.
@@ -49,7 +49,7 @@ final class Tabs {
 
 		$missing = array();
 
-		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Ssl::class )->slug(), ServiceArea::get( Licences::class )->slug() ) as $slug ) {
+		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Apps::class )->slug(), ServiceArea::get( Ssl::class )->slug(), ServiceArea::get( Licences::class )->slug() ) as $slug ) {
 			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
 				$missing[ $slug ] = $labels[ $slug ];
 			}

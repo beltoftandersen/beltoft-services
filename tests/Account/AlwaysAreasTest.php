@@ -71,11 +71,10 @@ class AlwaysAreasTest extends TestCase {
 	public function test_the_four_areas_are_in_the_menu_of_a_customer_with_no_licenses(): void {
 		$menu = $this->menu();
 
-		foreach ( array( 'vps', 'databases', 'domains', 'email' ) as $slug ) {
+		foreach ( array( 'vps', 'databases', 'domains', 'email', 'apps' ) as $slug ) {
 			$this->assertArrayHasKey( $slug, $menu, $slug );
 		}
 
-		$this->assertArrayNotHasKey( 'apps', $menu, 'Apps stay for customers who have one.' );
 		$keys = array_keys( $menu );
 		$this->assertSame( 'customer-logout', end( $keys ), 'Log out stays last.' );
 		$this->assertLessThan( array_search( 'domains', $keys, true ), array_search( 'vps', $keys, true ) );
@@ -148,8 +147,8 @@ class AlwaysAreasTest extends TestCase {
 
 		$all = Overview::all();
 
-		$this->assertSame( 4, substr_count( $all, ' is-empty' ) );
-		$this->assertSame( '', Overview::section( 'apps' ) );
+		$this->assertSame( 5, substr_count( $all, ' is-empty' ), 'Apps show empty too.' );
+		$this->assertStringContainsString( 'ov__apps is-empty', Overview::section( 'apps' ) );
 	}
 
 	public function test_the_overview_empty_sections_have_no_button_without_a_product(): void {

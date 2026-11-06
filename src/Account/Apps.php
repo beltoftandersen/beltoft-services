@@ -51,6 +51,27 @@ final class Apps extends ServiceArea {
 	/**
 	 * {@inheritDoc}
 	 */
+	public function buttons(): array {
+		$url = self::product_url( array( 'http' ) );
+
+		/**
+		 * The address of the "Add an app" button on an empty Apps area. Return '' for no button.
+		 *
+		 * @param string $url The first app product, or ''.
+		 */
+		$url = (string) apply_filters( 'beltoft_services_apps_add_url', $url );
+
+		return '' === $url ? array() : array(
+			array(
+				'label' => __( 'Add an app', 'beltoft-services' ),
+				'url'   => $url,
+			),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
 	protected function empty_text(): string {
 		return __( 'You have no apps yet.', 'beltoft-services' );
 	}
