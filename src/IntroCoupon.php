@@ -28,6 +28,13 @@ final class IntroCoupon {
 	public const META = '_beltoft_services_intro_coupon';
 
 	/**
+	 * True while the plugin itself takes a refused intro coupon off, so keep() leaves it off.
+	 *
+	 * @var bool
+	 */
+	private static $refusing = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -39,6 +46,46 @@ final class IntroCoupon {
 		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
 		add_filter( 'woocommerce_cart_totals_coupon_label', array( __CLASS__, 'label' ), 10, 2 );
 		add_filter( 'woocommerce_cart_totals_coupon_html', array( __CLASS__, 'totals_html' ), 10, 2 );
+		add_action( 'woocommerce_removed_coupon', array( __CLASS__, 'keep' ) );
+		add_action( 'wp_head', array( __CLASS__, 'hide_remove_icons' ) );
+	}
+
+	/**
+	 * Action woocommerce_removed_coupon: an intro coupon taken off by the customer while its line is still in the cart
+	 * goes straight back on. It is taken off for good only with its line (on_removed) or when refused (validate).
+	 *
+	 * @param mixed $code Coupon code.
+	 */
+	public static function keep( $code ): void {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		if ( ! $cart || ! is_string( $code ) || self::$refusing || ! isset( self::lines( $cart )[ wc_format_coupon_code( $code ) ] ) ) {
+			return;
+		}
+
+		$notices = wc_get_notices();
+		$cart->apply_coupon( $code );
+		wc_set_notices( $notices );
+	}
+
+	/**
+	 * Action wp_head on the cart and checkout: page builders draw their own remove icon for a coupon, outside the
+	 * WooCommerce filter. The icon is hidden for the intro coupons (keep() undoes a removal anyway).
+	 */
+	public static function hide_remove_icons(): void {
+		if ( ! function_exists( 'is_checkout' ) || ! ( is_checkout() || is_cart() ) || ! WC()->cart ) {
+			return;
+		}
+
+		$rules = array();
+
+		foreach ( array_keys( self::lines( WC()->cart ) ) as $code ) {
+			$rules[] = '.woocommerce-remove-coupon[data-coupon="' . esc_attr( $code ) . '"]';
+		}
+
+		if ( $rules ) {
+			echo '<style id="beltoft-services-intro-coupon">' . implode( ',', $rules ) . '{display:none!important}</style>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- codes escaped above.
+		}
 	}
 
 	/**
@@ -395,8 +442,10 @@ final class IntroCoupon {
 				continue;
 			}
 
-			$product_id = (int) $product_ids[0];
+			$product_id     = (int) $product_ids[0];
+			self::$refusing = true;
 			$cart->remove_coupon( $code );
+			self::$refusing = false;
 			$errors->add(
 				'beltoft_services_intro_used',
 				/* translators: %s: product name. */

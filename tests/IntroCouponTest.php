@@ -78,6 +78,32 @@ class IntroCouponTest extends TestCase {
 		$this->assertSame( array(), wc_get_notices( 'success' ), 'No "Coupon code applied" for a code the customer never typed.' );
 	}
 
+	public function test_a_removed_intro_coupon_goes_back_on_while_its_line_is_in_the_cart(): void {
+		$this->coupon( 'intro-half' );
+		wp_set_current_user( self::factory()->user->create() );
+		$this->add( $this->product() );
+
+		WC()->cart->remove_coupon( 'intro-half' );
+
+		$this->assertTrue( WC()->cart->has_discount( 'intro-half' ) );
+		$this->assertSame( array(), wc_get_notices( 'success' ) );
+	}
+
+	public function test_the_checkout_hides_the_remove_icon_of_the_intro_coupon_only(): void {
+		$this->coupon( 'intro-half' );
+		wp_set_current_user( self::factory()->user->create() );
+		$this->add( $this->product() );
+		add_filter( 'woocommerce_is_checkout', '__return_true' );
+
+		ob_start();
+		IntroCoupon::hide_remove_icons();
+		$css = (string) ob_get_clean();
+		remove_filter( 'woocommerce_is_checkout', '__return_true' );
+
+		$this->assertStringContainsString( '.woocommerce-remove-coupon[data-coupon="intro-half"]', $css );
+		$this->assertStringContainsString( 'display:none', $css );
+	}
+
 	public function test_the_intro_coupon_shows_a_name_and_no_remove_link(): void {
 		$this->coupon( 'intro-half' );
 		wp_set_current_user( self::factory()->user->create() );
