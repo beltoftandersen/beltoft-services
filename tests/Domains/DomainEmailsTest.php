@@ -111,7 +111,7 @@ class DomainEmailsTest extends TestCase {
 			$text = (string) $this->mails[0]['message'];
 			$this->assertStringContainsString( 'mail-example.net', $text );
 			$this->assertStringContainsString( wc_get_account_endpoint_url( 'domains' ), $text );
-			$this->assertStringContainsString( 'Next renewal:', $text );
+			$this->assertMatchesRegularExpression( '/It renews on|Next renewal:/', $text );
 			$this->assertStringNotContainsString( '<p>', $text );
 			$this->assertStringNotContainsString( 'AUTH-CODE-NEVER-IN-MAIL', $text );
 			$this->assertStringNotContainsString( '—', $text );

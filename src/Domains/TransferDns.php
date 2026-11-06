@@ -229,7 +229,7 @@ final class TransferDns {
 		$found = apply_filters( 'beltoft_services_transfer_registrar', null, $domain );
 
 		if ( is_array( $found ) ) {
-			return array( 'name' => (string) ( $found['name'] ?? '' ), 'url' => (string) ( $found['url'] ?? '' ) );
+			return array( 'name' => (string) ( $found['name'] ?? '' ), 'url' => (string) ( $found['url'] ?? '' ) ) + ( ! empty( $found['locked'] ) ? array( 'locked' => true ) : array() );
 		}
 
 		if ( false === $found ) {
@@ -240,7 +240,7 @@ final class TransferDns {
 		$cached = get_transient( $key );
 
 		if ( is_array( $cached ) ) {
-			return $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) : null;
+			return $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) + ( ! empty( $cached['locked'] ) ? array( 'locked' => true ) : array() ) : null;
 		}
 
 		$reply = wp_remote_get(
@@ -270,12 +270,12 @@ final class TransferDns {
 		$found = apply_filters( 'beltoft_services_transfer_registrar', null, $domain );
 
 		if ( is_array( $found ) ) {
-			return array( 'name' => (string) ( $found['name'] ?? '' ), 'url' => (string) ( $found['url'] ?? '' ) );
+			return array( 'name' => (string) ( $found['name'] ?? '' ), 'url' => (string) ( $found['url'] ?? '' ) ) + ( ! empty( $found['locked'] ) ? array( 'locked' => true ) : array() );
 		}
 
 		$cached = false === $found ? false : get_transient( 'beltoft_services_rdap_' . md5( strtolower( $domain ) ) );
 
-		return is_array( $cached ) && $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) : null;
+		return is_array( $cached ) && $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) + ( ! empty( $cached['locked'] ) ? array( 'locked' => true ) : array() ) : null;
 	}
 
 	/**
@@ -285,6 +285,9 @@ final class TransferDns {
 	 * @return array{name: string, url: string}|null
 	 */
 	public static function registrar_from_rdap( array $data ): ?array {
+		$locked = in_array( 'client transfer prohibited', array_map( static fn( $status ) => strtolower( (string) $status ), (array) ( $data['status'] ?? array() ) ), true );
+		$extra  = $locked ? array( 'locked' => true ) : array();
+
 		foreach ( (array) ( $data['entities'] ?? array() ) as $entity ) {
 			if ( ! is_array( $entity ) || ! in_array( 'registrar', (array) ( $entity['roles'] ?? array() ), true ) ) {
 				continue;
@@ -315,11 +318,38 @@ final class TransferDns {
 			}
 
 			if ( '' !== $name || '' !== $url ) {
-				return array( 'name' => $name, 'url' => $url );
+				return array( 'name' => $name, 'url' => $url ) + $extra;
 			}
 		}
 
+		if ( $locked ) {
+			return array( 'name' => '', 'url' => '' ) + $extra;
+		}
+
 		return null;
+	}
+
+	/**
+	 * The name the customer knows their current registrar by, or ''.
+	 *
+	 * @param string $domain Domain.
+	 */
+	public static function registrar_name( string $domain ): string {
+		$found = self::cached_registrar( $domain );
+
+		return $found ? trim( (string) $found['name'] ) : '';
+	}
+
+	/**
+	 * What the customer is told about a domain that is locked at its registrar.
+	 *
+	 * @param string $domain Domain.
+	 */
+	public static function locked_message( string $domain ): string {
+		$who = self::registrar_name( $domain );
+
+		/* translators: 1: domain, 2: the current registrar. */
+		return '' === $who ? sprintf( __( '%s is locked at your current registrar. Unlock it there, then come back.', 'beltoft-services' ), $domain ) : sprintf( __( '%1$s is locked at %2$s. Unlock it there, then come back.', 'beltoft-services' ), $domain, $who );
 	}
 
 	/**
@@ -423,7 +453,11 @@ final class TransferDns {
 			return $domain;
 		}
 
-		$response = new \WP_REST_Response( self::recommend( $domain, get_current_user_id() ), 200 );
+		$advice            = self::recommend( $domain, get_current_user_id() );
+		$known             = self::registrar( $domain );
+		$advice['registrar'] = $known ? (string) $known['name'] : '';
+		$advice['locked']    = ! empty( $known['locked'] );
+		$response          = new \WP_REST_Response( $advice, 200 );
 		$response->header( 'Cache-Control', 'no-store' );
 
 		return $response;
@@ -645,13 +679,13 @@ final class TransferDns {
 	}
 
 	/**
-	 * What a domain transfer waits for at the current step, for the customer: empty when it waits for nothing in particular.
-	 * Reads stored data only (never a network call).
+	 * How a transfer shows to the customer: three steps instead of the driver's own (plus, when the DNS must be moved first, the
+	 * import of the records and the name servers), who the order waits for and what to do. Reads stored data only, never the network.
 	 *
 	 * @param mixed    $wait    Earlier answer.
 	 * @param Resource $r       Resource.
 	 * @param string   $driver  Driver id.
-	 * @param string   $current Key of the current step.
+	 * @param string   $current Key of the current driver step.
 	 * @return array<string, mixed>
 	 */
 	public static function progress_wait( $wait, $r, $driver, $current ): array {
@@ -659,63 +693,81 @@ final class TransferDns {
 			return (array) $wait;
 		}
 
-		$base = array( 'eta' => __( 'A transfer usually takes a few days.', 'beltoft-services' ) );
+		$done    = (array) $r->get( 'steps' );
+		$name    = (string) $r->get( 'domain' );
+		$who     = self::registrar_name( $name );
+		$who     = '' === $who ? __( 'your current registrar', 'beltoft-services' ) : $who;
+		$ordered = in_array( 'order', $done, true );
+		$active  = in_array( 'active', $done, true );
+		$first   = self::FIRST === self::plan( $r );
+		$ours    = in_array( 'ns_ours', $done, true );
+		$review  = self::needs_review( $r );
+		$ns_wait = $first && in_array( 'dns_copy', $done, true ) && ! $ours && ! $ordered && ! $review;
+		$list    = array();
 
-		$done = (array) $r->get( 'steps' );
+		if ( $first ) {
+			$list['import'] = array( __( 'Import your DNS records', 'beltoft-services' ), $ordered || $ours || self::reviewed( $r ) );
+			/* translators: %s: the current registrar. */
+			$list['ns']     = array( sprintf( __( 'Set our name servers at %s', 'beltoft-services' ), $who ), $ordered || $ours );
+		}
 
-		if ( 'order' === $current && self::needs_review( $r ) ) {
+		$list['send'] = array( __( 'Sending the transfer', 'beltoft-services' ), $ordered );
+		/* translators: %s: the current registrar. */
+		$list['wait'] = array( sprintf( __( 'Waiting for %s to release your domain', 'beltoft-services' ), $who ), $active );
+		$list['done'] = array( __( 'Done', 'beltoft-services' ), $active && in_array( 'dates', $done, true ) );
+
+		$steps = array();
+		$open  = false;
+
+		foreach ( $list as $key => $item ) {
+			$status  = $item[1] ? 'done' : ( $open ? 'todo' : 'current' );
+			$open    = $open || ! $item[1];
+			$steps[] = array( 'key' => $key, 'label' => $item[0], 'status' => $status );
+		}
+
+		$out = array(
+			'eta'   => __( 'A transfer usually takes up to 5 days.', 'beltoft-services' ),
+			'steps' => $steps,
+			'text'  => __( 'Nothing to do. We email you when it is done.', 'beltoft-services' ),
+		);
+
+		if ( $review ) {
 			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'dns' );
 
-			return $base + array(
-				'step_label' => __( 'Import your DNS records', 'beltoft-services' ),
-				'text'       => __( 'Action needed: import your DNS records.', 'beltoft-services' ),
-				'leave'      => __( 'You can leave this site. The transfer waits until your records are in, and the same progress is in your account.', 'beltoft-services' ),
-				'note'       => __( 'Action needed: your DNS is hosted where it stops when the domain leaves, so move your records here before the transfer starts. Export the zone file from your current DNS provider and import it. We copied the records we could find. Records we could not look up are not here: other sub-names (for example shop. or api.), other email services and verification records.', 'beltoft-services' ),
-				'hosts'      => array(),
-				'link'       => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Import your records', 'beltoft-services' ) ),
-			);
+			return array_merge( $out, array(
+				'text'  => __( 'Action needed: import your DNS records.', 'beltoft-services' ),
+				'leave' => __( 'You can leave this site. The transfer waits until your records are in, and the same progress is in your account.', 'beltoft-services' ),
+				/* translators: %s: the current registrar. */
+				'note'  => sprintf( __( 'Action needed. Your DNS is hosted by %s and stops when the domain leaves. Export the zone file from your current DNS provider and import it. We copied the records we could find. Records we could not look up are not here: other sub-names (for example shop. or api.), other email services and verification records.', 'beltoft-services' ), $who ),
+				'link'  => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Import your records', 'beltoft-services' ) ),
+			) );
 		}
 
-		if ( 'order' === $current && self::FIRST === self::plan( $r ) && in_array( 'dns_copy', $done, true ) && ! in_array( 'ns_ours', $done, true ) ) {
-			$link = array();
+		if ( $ns_wait ) {
 			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
 
-			if ( '' !== $page ) {
-				$link = array( 'url' => $page, 'label' => __( 'Open the instructions', 'beltoft-services' ) );
-			}
-
-			return $base + array(
-				'step_label' => __( 'Set our name servers at your current registrar', 'beltoft-services' ),
-				'text'       => __( 'We are waiting for you. Set our name servers at your current registrar, then we send the transfer.', 'beltoft-services' ),
-				'leave'      => __( 'You can leave this site. We check your name servers on our own, and the same progress is in your account.', 'beltoft-services' ),
-				'note'       => __( 'Your action is needed: set these name servers at your current registrar. It can take a few hours after you change them, and we check automatically. Your website and email keep working.', 'beltoft-services' ),
-				'hosts'      => Zone::nameservers(),
-				'link'       => $link,
-			);
+			return array_merge( $out, array(
+				/* translators: %s: the current registrar. */
+				'text'  => sprintf( __( 'Action needed: set our name servers at %s.', 'beltoft-services' ), $who ),
+				'leave' => __( 'You can leave this site. We check your name servers on our own, and the same progress is in your account.', 'beltoft-services' ),
+				'note'  => __( 'Action needed. Set these name servers at your current registrar. It can take a few hours after you change them, and we check automatically. Your website and email keep working.', 'beltoft-services' ),
+				'hosts' => Zone::nameservers(),
+				'link'  => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Open the instructions', 'beltoft-services' ) ),
+			) );
 		}
 
-		if ( 'active' === $current ) {
-			$page      = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
-			$registrar = self::cached_registrar( (string) $r->get( 'domain' ) );
-			$who       = $registrar && '' !== $registrar['name'] ? $registrar['name'] : '';
-			$note      = '' === $who
-				? __( 'Your current registrar can take up to 5 days to release the domain. Approve the transfer at your current registrar, or in the email they send, to finish sooner. Your website and email keep working.', 'beltoft-services' )
-				/* translators: %s: the current registrar's name. */
-				: sprintf( __( '%1$s can take up to 5 days to release the domain. Approve the transfer at %1$s, or in the email they send, to finish sooner. Your website and email keep working.', 'beltoft-services' ), $who );
+		if ( $ordered && ! $active ) {
+			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
 
-			return $base + array(
-				'step_label' => '',
-				'text'       => __( 'The transfer is with the registry. This can take up to 5 days.', 'beltoft-services' ),
-				'leave'      => '',
-				'note'       => $note,
-				'hosts'      => array(),
-				'link'       => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Check the transfer now', 'beltoft-services' ) ),
-			);
+			return array_merge( $out, array(
+				/* translators: %s: the current registrar. */
+				'note' => sprintf( __( 'This takes up to 5 days. To finish sooner, approve the transfer in %s or in the email they sent you. Your website and email keep working.', 'beltoft-services' ), $who ),
+				'link' => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Check the transfer now', 'beltoft-services' ) ),
+			) );
 		}
 
-		return $base;
+		return $out;
 	}
-
 
 	/**
 	 * POST resources/<id>/transfer-dns-confirm: the customer says they checked the records. It needs a zone file that was imported, or

@@ -34,7 +34,7 @@ if ( '' !== $customer_name ) {
 }
 ?>
 </p>
-<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your domain %s is now with us. We are its registrar from now on.', 'beltoft-services' ), $domain_name ) ); ?></p>
+<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( '%s is now registered with us. Your website and email work as before.', 'beltoft-services' ), $domain_name ) ); ?></p>
 <?php if ( $dns_stays ) : ?>
 <p><?php esc_html_e( 'Your DNS stays as it is.', 'beltoft-services' ); ?></p>
 <?php elseif ( $dns_external ) : ?>
@@ -47,7 +47,7 @@ if ( '' !== $customer_name ) {
 <p><?php esc_html_e( 'The domain now uses our name servers. Check that your DNS records are in My account > Domains, so your website and email keep working.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
 <?php if ( '' !== $domain_renews ) : ?>
-<p><?php echo esc_html( sprintf( /* translators: %s: date. */ __( 'Next renewal: %s.', 'beltoft-services' ), $domain_renews ) ); ?></p>
+<p><?php echo esc_html( sprintf( /* translators: %s: date. */ __( 'It renews on %s.', 'beltoft-services' ), $domain_renews ) ); ?></p>
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $domains_url ); ?>"><?php esc_html_e( 'Manage your domains in your account', 'beltoft-services' ); ?></a></p>
 <?php

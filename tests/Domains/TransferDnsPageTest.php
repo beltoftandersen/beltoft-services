@@ -239,24 +239,67 @@ class TransferDnsPageTest extends TestCase {
 	}
 
 	public function test_progress_asks_for_the_name_servers_after_the_review(): void {
-		$r = $this->transfer( 'first', array( 'dns_wait_since' => time() ) );
+		$r = $this->transfer( 'first', array( 'dns_reviewed_at' => time(), 'dns_wait_since' => time() ) );
 		$p = \BeltoftServices\Progress::build( $r );
-		$this->assertSame( 'Set our name servers at your current registrar', array_column( $p['steps'], 'label', 'key' )['order'] );
+		$this->assertSame( 'ns', $p['current'] );
+		$this->assertSame( 'Set our name servers at your current registrar', array_column( $p['steps'], 'label', 'key' )['ns'] );
 		$this->assertSame( array( 'ns1.example.net', 'ns2.example.net' ), $p['hosts'] );
 		$this->assertStringContainsString( 'It can take a few hours after you change them, and we check automatically.', $p['note'] );
-		$this->assertSame( 'We are waiting for you. Set our name servers at your current registrar, then we send the transfer.', $p['text'] );
+		$this->assertSame( 'Action needed: set our name servers at your current registrar.', $p['text'] );
 		$this->assertStringNotContainsString( '5 minutes', wp_json_encode( $p ) );
 	}
 
-	public function test_progress_says_the_registry_wait_takes_days_and_names_the_registrar_when_known(): void {
+	public function test_progress_shows_three_customer_steps_and_says_the_registry_wait_takes_days(): void {
 		$r = $this->with_registry();
 		$p = \BeltoftServices\Progress::build( $r );
-		$this->assertSame( 'active', $p['current'] );
-		$this->assertSame( 'Your current registrar can take up to 5 days to release the domain. Approve the transfer at your current registrar, or in the email they send, to finish sooner. Your website and email keep working.', $p['note'] );
-		$this->assertSame( 'The transfer is with the registry. This can take up to 5 days.', $p['text'] );
-		$this->assertStringNotContainsString( 'about 5 minutes', wp_json_encode( $p ) );
+		$this->assertSame( array( 'import', 'ns', 'send', 'wait', 'done' ), array_column( $p['steps'], 'key' ) );
+		$this->assertSame( 'wait', $p['current'] );
+		$this->assertSame( array( 'done', 'done', 'done', 'current', 'todo' ), array_column( $p['steps'], 'status' ) );
+		$this->assertSame( 'Waiting for your current registrar to release your domain', array_column( $p['steps'], 'label', 'key' )['wait'] );
+		$this->assertSame( 'This takes up to 5 days. To finish sooner, approve the transfer in your current registrar or in the email they sent you. Your website and email keep working.', $p['note'] );
+		$this->assertSame( 'Nothing to do. We email you when it is done.', $p['text'] );
+		$this->assertSame( 'A transfer usually takes up to 5 days.', $p['eta'] );
+		$this->assertStringNotContainsString( 'Usually about', wp_json_encode( $p ) );
 		add_filter( 'beltoft_services_transfer_registrar', static fn() => array( 'name' => 'Acme Registrar', 'url' => '' ) );
-		$this->assertStringStartsWith( 'Acme Registrar can take up to 5 days to release the domain. Approve the transfer at Acme Registrar,', \BeltoftServices\Progress::build( $r )['note'] );
+		$p = \BeltoftServices\Progress::build( $r );
+		$this->assertSame( 'Waiting for Acme Registrar to release your domain', array_column( $p['steps'], 'label', 'key' )['wait'] );
+		$this->assertStringStartsWith( 'This takes up to 5 days. To finish sooner, approve the transfer in Acme Registrar or in the email', $p['note'] );
+	}
+
+	public function test_a_transfer_that_keeps_its_dns_has_the_three_steps_and_nothing_to_do(): void {
+		$r = $this->transfer( 'keep', array( 'zone_claimed' => false, 'remote_id' => '123', 'steps' => array( 'contact', 'zone_prepared' ) ) );
+		$p = \BeltoftServices\Progress::build( $r );
+		$this->assertSame( array( 'send', 'wait', 'done' ), array_column( $p['steps'], 'key' ) );
+		$this->assertSame( 'Sending the transfer', $p['steps'][0]['label'] );
+		$this->assertSame( 'Nothing to do. We email you when it is done.', $p['text'] );
+		$this->assertSame( '', $p['note'] );
+	}
+
+	public function test_the_order_form_pre_check_names_the_registrar_and_says_when_the_domain_is_locked(): void {
+		add_filter( 'beltoft_services_transfer_registrar', static fn() => array( 'name' => 'Acme Registrar', 'url' => '', 'locked' => true ), 20 );
+		$this->assertSame( 'Acme Registrar', TransferDns::registrar_name( 'locked-example.com' ) );
+		$this->assertSame( 'locked-example.com is locked at Acme Registrar. Unlock it there, then come back.', TransferDns::locked_message( 'locked-example.com' ) );
+		$rdap = TransferDns::registrar_from_rdap( array( 'status' => array( 'client transfer prohibited' ), 'entities' => array( array( 'roles' => array( 'registrar' ), 'vcardArray' => array( 'vcard', array( array( 'fn', array(), 'text', 'Acme Registrar' ) ) ) ) ) ) );
+		$this->assertTrue( $rdap['locked'] );
+		$this->assertArrayNotHasKey( 'locked', (array) TransferDns::registrar_from_rdap( array( 'status' => array( 'ok' ), 'entities' => array( array( 'roles' => array( 'registrar' ), 'vcardArray' => array( 'vcard', array( array( 'fn', array(), 'text', 'Acme Registrar' ) ) ) ) ) ) ) );
+		$added = \BeltoftServices\Domains\Cart::add_line( 'locked-example.com', 'transfer', 'AUTH-123456' );
+		$this->assertWPError( $added );
+		$this->assertSame( 'domain_locked', $added->get_error_code() );
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
+		$this->assertStringContainsString( 'Your current registrar calls it the authorization code, EPP code or transfer code. You find it in their domain settings.', $js );
+		$this->assertStringContainsString( 'Transfer includes one year added to your registration.', $js );
+		$this->assertStringContainsString( ' and stops when the domain moves. After you order, you import your records here before the transfer starts.', $js );
+	}
+
+	public function test_the_waiting_email_names_the_registrar_and_the_done_email_says_it_renews(): void {
+		add_filter( 'beltoft_services_transfer_registrar', static fn() => array( 'name' => 'Acme Registrar', 'url' => '' ), 20 );
+		$r = $this->with_registry( array( 'expires_at' => '2027-10-26 00:00:00' ) );
+		$this->mails = array();
+		\BeltoftServices\Emails\Emails::send( 'beltoft_services_domain_action_needed', $r, array( 'domain_action_reason' => 'transfer_approval' ) );
+		$this->assertNotEmpty( $this->mails );
+		$text = $this->flat( $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'is waiting for Acme Registrar to release the domain.', $text );
+		$this->assertStringContainsString( 'This takes up to 5 days. To finish sooner, approve the transfer in Acme Registrar or in the email they sent you. Your website and email keep working.', $text );
 	}
 
 	public function test_a_register_or_other_build_still_says_minutes(): void {
@@ -408,13 +451,14 @@ class TransferDnsPageTest extends TestCase {
 	public function test_progress_asks_for_the_import_first_then_the_name_servers(): void {
 		$r = $this->transfer( 'first' );
 		$p = \BeltoftServices\Progress::build( $r );
-		$this->assertSame( 'Import your DNS records', array_column( $p['steps'], 'label', 'key' )['order'] );
+		$this->assertSame( 'import', $p['current'] );
+		$this->assertSame( 'Import your DNS records', array_column( $p['steps'], 'label', 'key' )['import'] );
 		$this->assertSame( array(), $p['hosts'] );
 		$this->assertStringContainsString( 'Action needed:', $p['text'] );
 		$this->assertStringNotContainsString( 'Usually about', wp_json_encode( $p ) );
 		$r->set( array( 'dns_reviewed_at' => time(), 'dns_wait_since' => time() ) );
 		$p = \BeltoftServices\Progress::build( Resource::find( $r->id() ) );
-		$this->assertSame( 'Set our name servers at your current registrar', array_column( $p['steps'], 'label', 'key' )['order'] );
+		$this->assertSame( 'ns', $p['current'] );
 		$this->assertSame( array( 'ns1.example.net', 'ns2.example.net' ), $p['hosts'] );
 	}
 

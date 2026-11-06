@@ -44,10 +44,24 @@
       button.textContent = text;
     }
 
+    // What the public data says about the domain now: its current registrar, whether it is locked, whether its DNS is run by that registrar.
+    async function recommendation(domain) {
+      if (!root.dataset.transferDns) return null;
+      try {
+        const response = await fetch(root.dataset.transferDns + '?domain=' + encodeURIComponent(domain), {
+          credentials: 'same-origin',
+          headers: { 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce }
+        });
+        return response.ok ? await response.json() : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
     function transferForm(domain, actions) {
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
-      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and enter the transfer code (also called auth or EPP code). Turn off DNSSEC at your current registrar first. The transfer can take several days.'));
+      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and enter the transfer code (also called auth or EPP code). Turn off DNSSEC at your current registrar first. The transfer takes up to 5 days.'));
       const field = document.createElement('input');
       field.type = 'text';
       field.autocomplete = 'off';
@@ -56,7 +70,22 @@
       field.placeholder = 'Transfer code';
       const submit = element('button', 'beltoft-domain-action', 'Add transfer to order');
       submit.type = 'submit';
-      form.append(field, submit);
+      const notice = element('p', 'beltoft-domain-transfer__help', '');
+      notice.setAttribute('aria-live', 'polite');
+      const codeHelp = element('p', 'beltoft-domain-transfer__help', 'Your current registrar calls it the authorization code, EPP code or transfer code. You find it in their domain settings.');
+      const priceLine = element('p', 'beltoft-domain-transfer__help', 'Transfer includes one year added to your registration.');
+      form.append(notice, field, codeHelp, priceLine, submit);
+      recommendation(domain).then(function (advice) {
+        if (!advice) return;
+        const who = advice.registrar || 'your current registrar';
+        if (advice.locked) {
+          notice.textContent = domain + ' is locked at ' + who + '. Unlock it there, then come back.';
+          submit.disabled = true;
+          field.disabled = true;
+        } else if (advice.at_risk === true) {
+          notice.textContent = 'Your DNS is run by ' + who + ' and stops when the domain moves. After you order, you import your records here before the transfer starts.';
+        }
+      });
       form.addEventListener('submit', async function (event) {
         event.preventDefault();
         const code = field.value.trim();

@@ -35,7 +35,7 @@ if ( '' !== $customer_name ) {
 	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
 }
 
-echo wp_strip_all_tags( sprintf( /* translators: %s: domain name. */ __( 'Your domain %s is now with us. We are its registrar from now on.', 'beltoft-services' ), $domain_name ) ) . "\n\n";
+echo wp_strip_all_tags( sprintf( /* translators: %s: domain name. */ __( '%s is now registered with us. Your website and email work as before.', 'beltoft-services' ), $domain_name ) ) . "\n\n";
 if ( $dns_stays ) {
 	echo __( 'Your DNS stays as it is.', 'beltoft-services' ) . "\n\n";
 } elseif ( $dns_external ) {
@@ -50,7 +50,7 @@ if ( $dns_stays ) {
 
 if ( '' !== $domain_renews ) {
 	/* translators: %s: date. */
-	echo wp_strip_all_tags( sprintf( __( 'Next renewal: %s.', 'beltoft-services' ), $domain_renews ) ) . "\n\n";
+	echo wp_strip_all_tags( sprintf( __( 'It renews on %s.', 'beltoft-services' ), $domain_renews ) ) . "\n\n";
 }
 
 echo __( 'Manage your domains in your account:', 'beltoft-services' ) . ' ' . esc_url_raw( $domains_url ) . "\n\n";

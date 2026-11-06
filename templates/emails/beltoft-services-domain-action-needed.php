@@ -15,6 +15,16 @@ echo esc_html( sprintf( __( 'Your transfer of %s starts when the domain uses our
 <?php endforeach; ?>
 </ul>
 <p><?php esc_html_e( 'We check every few minutes and send the transfer once the domain uses them. If that has not happened within 14 days, the transfer is not sent.', 'beltoft-services' ); ?></p>
+<?php elseif ( 'transfer_approval' === $domain_action_reason ) : ?>
+<?php $beltoft_who = '' !== $registrar_name ? $registrar_name : __( 'your current registrar', 'beltoft-services' ); ?>
+<p><?php
+/* translators: 1: the customer's domain name, 2: the current registrar. */
+echo esc_html( sprintf( __( 'Your transfer of %1$s is waiting for %2$s to release the domain.', 'beltoft-services' ), $domain_name, $beltoft_who ) );
+?></p>
+<p><?php
+/* translators: %s: the current registrar. */
+echo esc_html( sprintf( __( 'This takes up to 5 days. To finish sooner, approve the transfer in %s or in the email they sent you. Your website and email keep working.', 'beltoft-services' ), $beltoft_who ) );
+?></p>
 <?php else : ?>
 <p><?php
 /* translators: %s: the customer's domain name. */

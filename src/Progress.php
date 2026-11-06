@@ -335,7 +335,22 @@ final class Progress {
 		 * @param string   $current Key of the current step.
 		 */
 		$wait = 'build' === $kind && 'running' === $phase ? (array) apply_filters( 'beltoft_services_progress_wait', array(), $r, $driver, $current ) : array();
-		$wait = $wait + array( 'step_label' => '', 'text' => '', 'leave' => '', 'note' => '', 'hosts' => array(), 'link' => array(), 'eta' => '' );
+		$wait = $wait + array( 'step_label' => '', 'text' => '', 'leave' => '', 'note' => '', 'hosts' => array(), 'link' => array(), 'eta' => '', 'steps' => array() );
+
+		// A service may show its own list of steps for the customer instead of the driver's.
+		if ( $wait['steps'] ) {
+			$steps   = array();
+			$current = '';
+
+			foreach ( $wait['steps'] as $step ) {
+				$step['status_label'] = self::status_label( (string) $step['status'] );
+				$steps[]              = $step;
+
+				if ( '' === $current && 'current' === $step['status'] ) {
+					$current = (string) $step['key'];
+				}
+			}
+		}
 
 		if ( '' !== $wait['step_label'] ) {
 			foreach ( $steps as $i => $step ) {
