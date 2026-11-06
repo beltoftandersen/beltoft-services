@@ -451,6 +451,43 @@
 	} );
 }() );
 
+// Transfer: "I have checked the records" confirms the records of the zone, then reloads the page to show what comes next.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-confirm]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var box = form.querySelector( 'input[name="ack"]' );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-confirm', { ack: !! ( box && box.checked ) } ).then( function () {
+			window.location.reload();
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, null );
+		} );
+	} );
+}() );
+
+// Use Beltoft DNS: start, confirm the records, switch. Each step is one call; the answer is a sentence.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-dns-adopt]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var box = form.querySelector( 'input[name="ack"]' );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/dns-adopt', { step: form.getAttribute( 'data-dns-adopt' ), ack: !! ( box && box.checked ) } ).then( function ( data ) {
+			bs.done( handle, ( data && data.message ) || '' );
+			window.setTimeout( function () { window.location.reload(); }, 1500 );
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, null );
+		} );
+	} );
+}() );
+
 // Domain cards start closed: the header shows the domain and its status, a click (or Enter / Space)
 // opens the rest. A card that was open stays open when the page reloads after a change.
 ( function () {

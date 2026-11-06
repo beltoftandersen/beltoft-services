@@ -14,6 +14,11 @@ use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
 class DomainDriverTest extends TestCase {
+	protected function setUp(): void {
+		parent::setUp();
+		add_filter( 'beltoft_services_transfer_registrar', '__return_false' );
+	}
+
 	/** Registrar costs for the extensions these tests use; a row a test already stored keeps its own values. */
 	private function prices(): void {
 		$table = get_option( Prices::OPTION, array() );

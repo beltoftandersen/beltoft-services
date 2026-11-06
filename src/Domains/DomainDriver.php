@@ -57,6 +57,12 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( ! $r->set( array( 'contact_handle' => $handle, 'steps' => $steps ) ) ) { return StepResult::retry( 3600, 'Registrant contact could not be saved.' ); }
 		}
 		if ( ! in_array( 'order', $steps, true ) ) {
+			// A new transfer has no DNS question: the DNS stays where it is, unless it is a registrar's own and stops when the domain leaves.
+			if ( 'transfer' === $mode && '' === (string) $r->get( 'transfer_dns' ) && ! array_intersect( array( 'ns_read', 'zone_prepared', 'dns_copy' ), $steps ) && self::keeps_dns( $r ) ) {
+				$kept = $this->current_nameservers( $r );
+				if ( ! $kept->is_done() ) { return $kept; }
+				if ( ! $r->set( array_merge( $kept->meta(), array( 'transfer_dns' => TransferDns::detect( (array) ( $kept->meta()['transfer_ns'] ?? self::stored_nameservers( $r ) ), $name ), 'transfer_dns_detected' => true ) ) ) ) { return StepResult::retry( 3600, 'DNS status could not be saved.' ); }
+			}
 			$plan = TransferDns::plan( $r );
 			if ( TransferDns::FIRST === $plan || TransferDns::AFTER === $plan ) {
 				// The DNS is copied before the transfer: the current name servers are read, our zone is made and filled.
@@ -79,6 +85,10 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					if ( ! $r->set( array_merge( $copy->meta(), array( 'steps' => $steps ) ) ) ) { return StepResult::retry( 3600, 'The copied DNS records could not be saved.' ); }
 				}
 				if ( TransferDns::FIRST === $plan && ! in_array( 'ns_ours', $steps, true ) ) {
+					// The customer brings the records first (unless the domain already uses our name servers: that is not blocked).
+					if ( ! TransferDns::reviewed( $r ) && ! TransferDns::delegated_to_us( $name ) ) {
+						return TransferDns::wait_for_review( $r );
+					}
 					// Nothing is sent to the registrar until the domain uses our name servers and our zone answers.
 					if ( ! $r->get( 'dns_wait_since' ) ) {
 						$r->set( array( 'dns_wait_since' => time() ) );

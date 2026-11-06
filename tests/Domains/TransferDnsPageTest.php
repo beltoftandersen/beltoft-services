@@ -26,6 +26,7 @@ class TransferDnsPageTest extends TestCase {
 		$dns       = $this->dns;
 		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
 		add_filter( 'beltoft_services_zone_lock_wait', '__return_zero' );
+		add_filter( 'beltoft_services_transfer_registrar', '__return_false' );
 		add_filter( 'beltoft_services_domains_ns_answer', static fn() => array( 'ns1.old-host.example', 'ns2.old-host.example' ) );
 		add_filter( 'pre_wp_mail', function ( $pre, $atts ) { $this->mails[] = $atts; return true; }, 10, 2 );
 		$this->mails = array();
@@ -85,7 +86,7 @@ class TransferDnsPageTest extends TestCase {
 	}
 
 	public function test_the_name_server_tab_shows_ours_and_a_check_now_button_for_first(): void {
-		$r    = $this->transfer( 'first' );
+		$r    = $this->transfer( 'first', array( 'dns_reviewed_at' => time() ) );
 		$html = $this->page( $r, 'nameservers' );
 		$this->assertStringContainsString( 'Your domain still uses these name servers:', $html );
 		$this->assertStringContainsString( 'set these name servers at your current registrar', $html );
@@ -130,7 +131,7 @@ class TransferDnsPageTest extends TestCase {
 	}
 
 	public function test_the_check_now_route_is_rate_limited_to_once_a_minute(): void {
-		$r = $this->transfer( 'first' );
+		$r = $this->transfer( 'first', array( 'dns_reviewed_at' => time() ) );
 		$first = $this->call( 'POST', $r->id() . '/transfer-dns-check' );
 		$this->assertSame( 200, $first->get_status(), (string) wp_json_encode( $first->get_data() ) );
 		$this->assertSame( 'other', $first->get_data()['status'] );
@@ -145,7 +146,7 @@ class TransferDnsPageTest extends TestCase {
 		( new DomainDriver() )->render_admin( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Transfer DNS', $html );
-		$this->assertStringContainsString( 'Move my DNS to Beltoft first', $html );
+		$this->assertStringContainsString( 'Move the DNS to Beltoft first', $html );
 		$this->assertStringContainsString( 'Waiting until the domain uses our name servers', $html );
 		$this->assertStringContainsString( 'ns1.old-host.example', $html );
 		$this->assertStringContainsString( 'could not be read', $html );
@@ -222,7 +223,7 @@ class TransferDnsPageTest extends TestCase {
 
 	public function test_the_first_wait_sends_the_move_dns_email_once(): void {
 		add_filter( 'beltoft_services_key', static fn() => base64_encode( str_repeat( 't', 32 ) ) );
-		$r = $this->transfer( 'first', array( 'steps' => array( 'contact', 'ns_read', 'zone_prepared', 'dns_copy' ), 'contact_handle' => 'AA123-GB' ) );
+		$r = $this->transfer( 'first', array( 'dns_reviewed_at' => time(), 'steps' => array( 'contact', 'ns_read', 'zone_prepared', 'dns_copy' ), 'contact_handle' => 'AA123-GB' ) );
 		$this->mails = array();
 		$fake = new \BeltoftServices\Domains\FakeClient();
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
@@ -266,7 +267,7 @@ class TransferDnsPageTest extends TestCase {
 	}
 
 	public function test_check_now_after_the_name_servers_moved_says_what_is_happening(): void {
-		$r = $this->transfer( 'first', array( 'steps' => array( 'contact', 'ns_read', 'zone_prepared', 'dns_copy', 'ns_ours', 'order' ) ) );
+		$r = $this->transfer( 'first', array( 'dns_reviewed_at' => time(), 'steps' => array( 'contact', 'ns_read', 'zone_prepared', 'dns_copy', 'ns_ours', 'order' ) ) );
 		$reply = $this->call( 'POST', $r->id() . '/transfer-dns-check' );
 		$this->assertSame( 200, $reply->get_status() );
 		$this->assertSame( 'Your domain already uses our name servers. The transfer is with the registry now.', $reply->get_data()['message'] );
@@ -388,5 +389,57 @@ class TransferDnsPageTest extends TestCase {
 		$this->assertStringNotContainsString( 'Not in use yet', $html );
 		$this->assertStringContainsString( 'In use: your domain uses our name servers.', $html );
 		$this->assertStringNotContainsString( 'data-transfer-check', $this->page( Resource::find( $r->id() ), 'nameservers' ) );
+	}
+
+	public function test_the_dns_tab_asks_for_an_import_first_and_the_name_server_instructions_wait(): void {
+		$r    = $this->transfer( 'first', array( 'import_error' => '2 records could not be read in a form we can add' ) );
+		$dns  = $this->page( $r, 'dns' );
+		$this->assertStringContainsString( 'Import your DNS records', $dns );
+		$this->assertStringContainsString( 'No zone file? The list below is what we copied.', $dns );
+		$this->assertStringContainsString( 'Some records could not be added: 2 records could not be read in a form we can add.', $dns );
+		$this->assertStringContainsString( 'I did not import a zone file. I understand that records we could not find are missing until I add them.', $dns );
+		$this->assertStringContainsString( 'I have checked the records', $dns );
+		$ns = $this->page( $r, 'nameservers' );
+		$this->assertStringContainsString( 'First import or check your DNS records.', $ns );
+		$this->assertStringNotContainsString( 'data-transfer-check', $ns );
+		$this->assertStringNotContainsString( 'set these name servers at your current registrar', $ns );
+	}
+
+	public function test_progress_asks_for_the_import_first_then_the_name_servers(): void {
+		$r = $this->transfer( 'first' );
+		$p = \BeltoftServices\Progress::build( $r );
+		$this->assertSame( 'Import your DNS records', array_column( $p['steps'], 'label', 'key' )['order'] );
+		$this->assertSame( array(), $p['hosts'] );
+		$this->assertStringContainsString( 'Action needed:', $p['text'] );
+		$this->assertStringNotContainsString( 'Usually about', wp_json_encode( $p ) );
+		$r->set( array( 'dns_reviewed_at' => time(), 'dns_wait_since' => time() ) );
+		$p = \BeltoftServices\Progress::build( Resource::find( $r->id() ) );
+		$this->assertSame( 'Set our name servers at your current registrar', array_column( $p['steps'], 'label', 'key' )['order'] );
+		$this->assertSame( array( 'ns1.example.net', 'ns2.example.net' ), $p['hosts'] );
+	}
+
+	public function test_the_confirmation_needs_an_import_or_an_explicit_acknowledgement_and_records_which(): void {
+		$r = $this->transfer( 'first' );
+		$no = $this->call( 'POST', $r->id() . '/transfer-dns-confirm' );
+		$this->assertSame( 422, $no->get_status(), 'Neither an import nor the box.' );
+		$this->assertSame( 0, (int) Resource::find( $r->id() )->get( 'dns_reviewed_at' ) );
+		$ack = $this->call( 'POST', $r->id() . '/transfer-dns-confirm', array( 'ack' => true ) );
+		$this->assertSame( 200, $ack->get_status(), (string) wp_json_encode( $ack->get_data() ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'acknowledged', $fresh->get( 'dns_reviewed_path' ) );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'dns_reviewed_at' ) );
+		ob_start();
+		( new DomainDriver() )->render_admin( $fresh );
+		$this->assertStringContainsString( 'Acknowledged that records we could not find are missing', (string) ob_get_clean() );
+
+		$other = $this->transfer( 'first' );
+		$this->assertSame( 200, $this->import( $other, true )->get_status() );
+		$done = $this->call( 'POST', $other->id() . '/transfer-dns-confirm' );
+		$this->assertSame( 200, $done->get_status(), (string) wp_json_encode( $done->get_data() ) );
+		$this->assertSame( 'imported', Resource::find( $other->id() )->get( 'dns_reviewed_path' ) );
+		$this->assertStringNotContainsString( 'I did not import a zone file', $this->page( $this->transfer( 'first', array( 'dns_imported_at' => time() ) ), 'dns' ) );
+
+		wp_set_current_user( self::factory()->user->create() );
+		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/transfer-dns-confirm', array( 'ack' => true ) )->get_status(), 'Only the owner.' );
 	}
 }

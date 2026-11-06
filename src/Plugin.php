@@ -102,6 +102,7 @@ final class Plugin {
 		Domains\Actions::register();
 		Domains\AuthCodeRoute::register();
 		Domains\TransferDns::register();
+		Domains\DnsAdopt::register();
 		StepUp::register();
 		Domains\DnsClaimJobs::register();
 		Domains\DnsReleaseJob::register();

@@ -101,6 +101,16 @@ final class TransferDns {
 		);
 		register_rest_route(
 			Routes::NAMESPACE,
+			'/resources/(?P<id>\d+)/transfer-dns-confirm',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'rest_confirm' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array( 'id' => array( 'type' => 'integer', 'minimum' => 1, 'required' => true ) ),
+			)
+		);
+		register_rest_route(
+			Routes::NAMESPACE,
 			'/resources/(?P<id>\d+)/transfer-registry-check',
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
@@ -148,6 +158,40 @@ final class TransferDns {
 		}
 
 		return self::choice( $r );
+	}
+
+	/**
+	 * The way a transfer without a stored choice goes: the DNS stays where it is, unless the current name servers are a registrar's
+	 * own (their DNS may stop when the domain leaves), then the DNS must be moved first. Detected, not chosen.
+	 *
+	 * @param string[] $hosts  The name servers the domain uses now.
+	 * @param string   $domain Domain.
+	 */
+	public static function detect( array $hosts, string $domain ): string {
+		return $hosts && self::at_risk( $hosts, strtolower( $domain ) ) ? self::FIRST : self::KEEP;
+	}
+
+	/**
+	 * Has the customer confirmed the records of the zone made for the transfer (imported a zone file, or acknowledged that records
+	 * we could not find are missing)? An order that was already waiting for the name servers before this step existed counts as confirmed.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function reviewed( Resource $r ): bool {
+		return (int) $r->get( 'dns_reviewed_at' ) > 0 || (int) $r->get( 'dns_wait_since' ) > 0;
+	}
+
+	/**
+	 * Does the order wait for the customer to bring and check the records (choice first, records copied, not confirmed, transfer not accepted)?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function needs_review( Resource $r ): bool {
+		return self::FIRST === self::plan( $r )
+			&& in_array( 'dns_copy', (array) $r->get( 'steps' ), true )
+			&& ! in_array( 'active', (array) $r->get( 'steps' ), true )
+			&& ! self::reviewed( $r )
+			&& ! in_array( (string) $r->get( 'state' ), array( 'failed', 'deleted' ), true );
 	}
 
 	/**
@@ -555,7 +599,9 @@ final class TransferDns {
 			'made'    => $made,
 			'in_use'  => $in_use,
 			'registry' => self::with_registry( $r ),
-			'waiting' => self::FIRST === $choice && ! $in_use && ! in_array( $state, array( 'failed', 'deleted' ), true ),
+			'review'   => self::needs_review( $r ),
+			'imported' => (int) $r->get( 'dns_imported_at' ) > 0,
+			'waiting' => self::FIRST === $choice && ! $in_use && self::reviewed( $r ) && ! in_array( $state, array( 'failed', 'deleted' ), true ),
 			'editable' => $made && 'ready' !== $state && ! in_array( $state, array( 'failed', 'deleted' ), true ),
 			'checked' => (int) $r->get( 'transfer_dns_checked' ),
 			'since'   => (int) $r->get( 'dns_wait_since' ),
@@ -617,6 +663,19 @@ final class TransferDns {
 
 		$done = (array) $r->get( 'steps' );
 
+		if ( 'order' === $current && self::needs_review( $r ) ) {
+			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'dns' );
+
+			return $base + array(
+				'step_label' => __( 'Import your DNS records', 'beltoft-services' ),
+				'text'       => __( 'Action needed: import your DNS records.', 'beltoft-services' ),
+				'leave'      => __( 'You can leave this site. The transfer waits until your records are in, and the same progress is in your account.', 'beltoft-services' ),
+				'note'       => __( 'Action needed: your DNS is hosted where it stops when the domain leaves, so move your records here before the transfer starts. Export the zone file from your current DNS provider and import it. We copied the records we could find. Records we could not look up are not here: other sub-names (for example shop. or api.), other email services and verification records.', 'beltoft-services' ),
+				'hosts'      => array(),
+				'link'       => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Import your records', 'beltoft-services' ) ),
+			);
+		}
+
 		if ( 'order' === $current && self::FIRST === self::plan( $r ) && in_array( 'dns_copy', $done, true ) && ! in_array( 'ns_ours', $done, true ) ) {
 			$link = array();
 			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
@@ -657,6 +716,56 @@ final class TransferDns {
 		return $base;
 	}
 
+
+	/**
+	 * POST resources/<id>/transfer-dns-confirm: the customer says they checked the records. It needs a zone file that was imported, or
+	 * ack = true (an explicit acknowledgement that records we could not find are missing). Which of the two is stored with the time.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function rest_confirm( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = Routes::guard( $request, false, 10 );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$view = self::view( $r );
+
+		if ( ! $view || self::FIRST !== $view['choice'] || in_array( (string) $r->get( 'state' ), array( 'failed', 'deleted' ), true ) ) {
+			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
+		}
+
+		if ( ! $view['review'] ) {
+			return new \WP_REST_Response( array( 'status' => 'confirmed' ), 200 );
+		}
+
+		$imported = $view['imported'];
+
+		if ( ! $imported && ! filter_var( $request->get_param( 'ack' ) ?? ( (array) $request->get_param( 'args' ) )['ack'] ?? false, FILTER_VALIDATE_BOOLEAN ) ) {
+			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_ack_needed', __( 'Import a zone file, or tick the box that says records we could not find are missing until you add them.', 'beltoft-services' ), array( 'status' => 422 ) ) );
+		}
+
+		$r->set( array( 'dns_reviewed_at' => time(), 'dns_reviewed_path' => $imported ? 'imported' : 'acknowledged', 'next_attempt_at' => time() ) );
+		Jobs::enqueue( $r->id(), 0 );
+
+		return new \WP_REST_Response( array( 'status' => 'confirmed' ), 200 );
+	}
+
+	/**
+	 * The wait for the customer to bring and check the records. Bounded like the wait for the name servers.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function wait_for_review( Resource $r ): StepResult {
+		$since = (int) ( $r->get( 'dns_review_since' ) ? $r->get( 'dns_review_since' ) : time() );
+
+		if ( time() - $since > self::GIVE_UP ) {
+			return StepResult::fail( 'The DNS records were not checked within 14 days, so the transfer was not sent.' );
+		}
+
+		return StepResult::wait( HOUR_IN_SECONDS, 'Waiting for the customer to import or check the DNS records. The transfer is sent after that.', $since + self::GIVE_UP, array( 'dns_review_since' => $since, 'transfer_dns_state' => 'review' ) );
+	}
 
 	/**
 	 * Is a transfer order with the registry, not yet accepted?
@@ -736,6 +845,10 @@ final class TransferDns {
 	 */
 	public static function waiting_reason( Resource $r ): string {
 		$view = self::view( $r );
+
+		if ( $view && $view['review'] ) {
+			return 'Waiting for the customer to import or check the copied DNS records';
+		}
 
 		if ( ! $view || ! $view['waiting'] ) {
 			return '';

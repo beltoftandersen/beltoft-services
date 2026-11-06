@@ -25,6 +25,7 @@ class TransferDnsTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		add_filter( 'beltoft_services_transfer_registrar', '__return_false' );
 		$this->current = array( 'ns1.old-host.example', 'ns2.old-host.example' );
 		$this->moved = false;
 		$this->scans = 0;
@@ -129,6 +130,11 @@ class TransferDnsTest extends TestCase {
 		$result = ( new DomainDriver() )->provision( $r );
 		$this->assertTrue( $result->is_retry(), $result->error() );
 		$this->assertGreaterThan( 0, $result->wait_until(), 'A bounded wait.' );
+		$this->assertSame( 3600, $result->delay(), 'First the customer brings the records.' );
+		$this->assertFalse( (bool) Resource::find( $r->id() )->get( 'dns_wait_since' ), 'The 14 days of the name server wait have not started.' );
+		$this->assertTrue( Resource::find( $r->id() )->set( array( 'dns_reviewed_at' => time() ) ) );
+		$result = ( new DomainDriver() )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $result->is_retry(), $result->error() );
 		$this->assertSame( 300, $result->delay() );
 		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'dns_wait_since' ) );
 		$this->assertSame( 0, count( $this->posts( $fake ) ), 'Nothing is sent to the registrar.' );
@@ -478,18 +484,60 @@ class TransferDnsTest extends TestCase {
 		$view = TransferDns::view( Resource::find( $r->id() ) );
 		$this->assertTrue( $view['made'] );
 		$this->assertFalse( $view['in_use'] );
+		$this->assertTrue( $view['review'], 'The records come first.' );
+		$this->assertFalse( $view['waiting'] );
+		$this->assertTrue( Resource::find( $r->id() )->set( array( 'dns_reviewed_at' => time() ) ) );
+		$view = TransferDns::view( Resource::find( $r->id() ) );
+		$this->assertFalse( $view['review'] );
 		$this->assertTrue( $view['waiting'] );
 		$this->assertSame( array( 'ns1.old-host.example', 'ns2.old-host.example' ), $view['current'] );
 		$this->assertNull( TransferDns::view( $this->resource( 'keep' ) ) );
 	}
 
-	public function test_the_search_form_offers_the_three_choices_and_the_dnssec_help(): void {
+	public function test_the_search_form_asks_no_dns_question_and_keeps_the_dnssec_help(): void {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
 		$this->assertStringContainsString( 'Turn off DNSSEC at your current registrar first.', $js );
-		$this->assertStringContainsString( 'Move my DNS to Beltoft first', $js );
-		$this->assertStringContainsString( 'Move my DNS to Beltoft when the transfer is done', $js );
-		$this->assertStringContainsString( 'Keep my DNS where it is', $js );
+		$this->assertStringNotContainsString( 'beltoft-dns-choice', $js, 'A transfer asks no DNS question.' );
+		$this->assertStringNotContainsString( 'Move my DNS to Beltoft', $js );
+		$this->assertStringNotContainsString( 'Keep my DNS where it is', $js );
 		$this->assertStringNotContainsString( "\u{2014}", $js );
 		$this->assertStringNotContainsString( "\u{00B7}", $js );
+	}
+
+	public function test_a_new_transfer_with_registrar_dns_is_detected_and_waits_for_the_records_before_anything_is_sent(): void {
+		$fake = $this->registrar();
+		$this->wire( $fake );
+		$this->current = array( 'ns1.domaincontrol.com', 'ns2.domaincontrol.com' );
+		$r = $this->resource( '' );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertTrue( $result->is_retry(), $result->error() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'first', $fresh->get( 'transfer_dns' ), 'Detected, not chosen.' );
+		$this->assertTrue( (bool) $fresh->get( 'transfer_dns_detected' ) );
+		$this->assertContains( 'dns_copy', (array) $fresh->get( 'steps' ) );
+		$this->assertTrue( TransferDns::view( $fresh )['review'] );
+		$this->assertSame( 0, count( $this->posts( $fake ) ), 'Nothing is sent before the records are in and the name servers moved.' );
+	}
+
+	public function test_a_new_transfer_with_other_dns_has_no_customer_step_and_is_sent_at_once(): void {
+		$fake = $this->registrar();
+		$this->wire( $fake );
+		$this->current = array( 'ns1.old-host.example', 'ns2.old-host.example' );
+		$r = $this->resource( '' );
+		$result = ( new DomainDriver() )->provision( $r );
+		$this->assertSame( 1, count( $this->posts( $fake ) ), $result->error() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'keep', $fresh->get( 'transfer_dns' ) );
+		$this->assertFalse( TransferDns::view( $fresh ) !== null && TransferDns::view( $fresh )['review'] );
+	}
+
+	public function test_an_order_with_a_stored_choice_is_not_detected_again(): void {
+		$fake = $this->registrar();
+		$this->wire( $fake );
+		$this->current = array( 'ns1.domaincontrol.com', 'ns2.domaincontrol.com' );
+		$r = $this->resource( 'keep' );
+		( new DomainDriver() )->provision( $r );
+		$this->assertSame( 'keep', Resource::find( $r->id() )->get( 'transfer_dns' ) );
+		$this->assertSame( 1, count( $this->posts( $fake ) ) );
 	}
 }

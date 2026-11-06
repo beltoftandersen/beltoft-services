@@ -104,7 +104,7 @@ final class Panels {
 	 */
 	private static function transfer_rows( Resource $r ): array {
 		$labels = array(
-			TransferDns::FIRST => 'Move my DNS to Beltoft first',
+			TransferDns::FIRST => 'Move the DNS to Beltoft first (import and name servers before the transfer)',
 			TransferDns::AFTER => 'Move my DNS to Beltoft when the transfer is done',
 			TransferDns::KEEP  => 'Keep my DNS where it is',
 		);
@@ -118,6 +118,8 @@ final class Panels {
 		}
 
 		$rows['Waiting for']          = TransferDns::waiting_reason( $r );
+		$rows['DNS records checked']  = (int) $r->get( 'dns_reviewed_at' ) > 0 ? ( 'imported' === (string) $r->get( 'dns_reviewed_path' ) ? 'Imported a zone file' : 'Acknowledged that records we could not find are missing' ) . ' (' . wp_date( 'Y-m-d H:i', (int) $r->get( 'dns_reviewed_at' ) ) . ')' : '';
+		$rows['How the DNS was chosen'] = $r->get( 'transfer_dns_detected' ) ? 'Detected: the current name servers are a registrar\'s own' : '';
 		$rows['Current name servers'] = implode( ', ', DomainDriver::stored_nameservers( $r ) );
 		$rows['Delegation checked by customer'] = $r->get( 'transfer_dns_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'transfer_dns_checked' ) ) : '';
 		$rows['Records copied']       = null !== $r->get( 'records_copied' ) ? (string) (int) $r->get( 'records_copied' ) : '';

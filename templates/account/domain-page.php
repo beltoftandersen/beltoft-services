@@ -158,6 +158,22 @@ if ( $d['dns_only'] ) {
 				<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
 					<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the name servers the domain uses now. */ __( 'Not in use yet: your domain still uses %s. These records were copied from there. Check them and change what you need.', 'beltoft-services' ), implode( ', ', $d['transfer']['current'] ) ) ); ?></p>
 				<?php endif; ?>
+				<?php if ( $d['transfer'] && $d['transfer']['review'] ) : ?>
+					<div class="beltoft-services-domain__review">
+						<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'Import your DNS records', 'beltoft-services' ); ?></h4>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your DNS is hosted where it stops when the domain leaves. Move your records here before the transfer starts: export the zone file from your current DNS provider and import it below. In most DNS providers this is called Export or Download zone file.', 'beltoft-services' ); ?></p>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'No zone file? The list below is what we copied. Records we could not look up are not here: other sub-names (for example shop. or api.), other email services and verification records. Compare with your current DNS provider and add anything that is missing.', 'beltoft-services' ); ?></p>
+						<?php if ( '' !== $d['import_error'] ) : ?>
+							<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the reason some records were not imported. */ __( 'Some records could not be added: %s.', 'beltoft-services' ), $d['import_error'] ) ); ?></p>
+						<?php endif; ?>
+						<form class="beltoft-services-domain-form" data-transfer-confirm data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Saving…', 'beltoft-services' ); ?>">
+							<?php if ( ! $d['transfer']['imported'] ) : ?>
+								<label class="beltoft-services-domain__choice"><input type="checkbox" name="ack" value="1"> <?php esc_html_e( 'I did not import a zone file. I understand that records we could not find are missing until I add them.', 'beltoft-services' ); ?></label>
+							<?php endif; ?>
+							<button type="submit" class="button"><?php esc_html_e( 'I have checked the records', 'beltoft-services' ); ?></button>
+						</form>
+					</div>
+				<?php endif; ?>
 				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
 					<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to see and change your DNS records.', 'beltoft-services' ); ?></p></noscript>
 				</div>
@@ -185,7 +201,9 @@ if ( $d['dns_only'] ) {
 			<?php if ( $d['external'] ) : ?>
 				<p class="beltoft-services-domain__note"><?php esc_html_e( '(DNS is hosted elsewhere)', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
-			<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
+			<?php if ( $d['transfer'] && $d['transfer']['review'] ) : ?>
+				<p class="beltoft-services-domain__note"><?php esc_html_e( 'First import or check your DNS records. The name server instructions follow after that.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $beltoft_link( 'dns' ) ); ?>" data-tab-link="dns"><?php esc_html_e( 'Open DNS records', 'beltoft-services' ); ?></a></p>
+			<?php elseif ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
 				<?php if ( 'first' === $d['transfer']['choice'] ) : ?>
 					<p class="beltoft-services-domain__note"><?php esc_html_e( 'To go on with the transfer, set these name servers at your current registrar. We send the transfer when your domain uses them. This can take a few hours.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
@@ -207,6 +225,29 @@ if ( $d['dns_only'] ) {
 				<?php if ( $d['transfer']['registry'] ) : ?>
 					<form class="beltoft-services-domain-form" data-transfer-registry data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Checking…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></form>
 				<?php endif; ?>
+			<?php endif; ?>
+			<?php if ( $d['adopt'] ) : ?>
+				<div class="beltoft-services-domain__adopt">
+					<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'Use Beltoft DNS', 'beltoft-services' ); ?></h4>
+					<p class="beltoft-services-domain__note"><?php esc_html_e( 'One place for your domain and its DNS. Name servers are the servers that answer for your domain. Your records have to be on our name servers before you switch, or your website and email stop.', 'beltoft-services' ); ?></p>
+					<?php if ( ! $d['adopt']['started'] ) : ?>
+						<form class="beltoft-services-domain-form" data-dns-adopt="start" data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Preparing…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Use Beltoft DNS', 'beltoft-services' ); ?></button></form>
+					<?php elseif ( ! $d['adopt']['reviewed'] ) : ?>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Export the zone file from your current DNS provider (the list of all records of your domain, called Export or Download zone file in most DNS providers) and import it in DNS records. No zone file? We copied the records we could find. Records we could not look up are not there: other sub-names (for example shop. or api.), other email services and verification records.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $beltoft_link( 'dns' ) ); ?>" data-tab-link="dns"><?php esc_html_e( 'Open DNS records', 'beltoft-services' ); ?></a></p>
+						<?php if ( '' !== $d['adopt']['error'] ) : ?>
+							<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the reason some records were not imported. */ __( 'Some records could not be added: %s.', 'beltoft-services' ), $d['adopt']['error'] ) ); ?></p>
+						<?php endif; ?>
+						<form class="beltoft-services-domain-form" data-dns-adopt="confirm" data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Saving…', 'beltoft-services' ); ?>">
+							<?php if ( ! $d['adopt']['imported'] ) : ?>
+								<label class="beltoft-services-domain__choice"><input type="checkbox" name="ack" value="1"> <?php esc_html_e( 'I did not import a zone file. I understand that records we could not find are missing until I add them.', 'beltoft-services' ); ?></label>
+							<?php endif; ?>
+							<button type="submit" class="button"><?php esc_html_e( 'I have checked the records', 'beltoft-services' ); ?></button>
+						</form>
+					<?php else : ?>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your records are in place. Switching sets our name servers at your registrar. You can switch back in Name servers.', 'beltoft-services' ); ?></p>
+						<form class="beltoft-services-domain-form" data-dns-adopt="switch" data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Switching…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Switch to Beltoft DNS', 'beltoft-services' ); ?></button></form>
+					<?php endif; ?>
+				</div>
 			<?php endif; ?>
 			<?php if ( $d['can'] && $d['dns_only'] ) : ?>
 				<form class="beltoft-services-domain-form" data-domain-action="check_delegation"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Check name servers', 'beltoft-services' ); ?></button></form>
