@@ -113,7 +113,7 @@ final class SiteField {
 		$mode = '' === (string) ( $input['mode'] ?? '' ) ? self::MODE_PREVIEW : (string) $input['mode'];
 
 		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) ) {
-			return new \WP_Error( 'site_mode', __( 'Choose how the website is reached: a temporary address, a domain you have with us, or a domain you have elsewhere.', 'beltoft-services' ) );
+			return new \WP_Error( 'site_mode', __( 'Choose how the website is reached: a temporary address, a domain in your account, or a domain you have elsewhere.', 'beltoft-services' ) );
 		}
 
 		$domain = '';
@@ -136,7 +136,7 @@ final class SiteField {
 			}
 
 			if ( self::MODE_OURS === $mode && null === SiteDns::zone_for( $user_id, $host ) ) {
-				return new \WP_Error( 'site_zone', __( 'Choose a name inside one of your domains with us, or use the option for a domain you have elsewhere.', 'beltoft-services' ) );
+				return new \WP_Error( 'site_zone', __( 'Choose a name inside one of the domains in your account, or use the option for a domain you have elsewhere.', 'beltoft-services' ) );
 			}
 
 			$domain = $host;
@@ -379,7 +379,7 @@ final class SiteField {
 
 		echo '</div>';
 		if ( $have ) {
-			self::radio( $name, $id, self::MODE_OURS, $mode, __( 'A domain I have with you', 'beltoft-services' ) );
+			self::radio( $name, $id, self::MODE_OURS, $mode, __( 'A domain in my account', 'beltoft-services' ) );
 			echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_OURS ) . '"' . ( self::MODE_OURS === $mode ? '' : ' hidden' ) . '>';
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_zone">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone">';
 

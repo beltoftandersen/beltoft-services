@@ -100,7 +100,7 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringContainsString( 'Your website', $html );
 		$this->assertStringContainsString( 'Temporary address', $html );
 		$this->assertStringContainsString( 'A domain I have elsewhere', $html );
-		$this->assertStringNotContainsString( 'A domain I have with you', $html, 'A visitor has no domains on our name servers.' );
+		$this->assertStringNotContainsString( 'A domain in my account', $html, 'A visitor has no domains on our name servers.' );
 		$this->assertStringContainsString( '<option value="wordpress" selected', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
@@ -197,7 +197,7 @@ class CheckoutTest extends HostingCase {
 		$html = (string) ob_get_clean();
 		wp_set_current_user( 0 );
 
-		$this->assertStringContainsString( 'A domain I have with you', $html );
+		$this->assertStringContainsString( 'A domain in my account', $html );
 		$this->assertStringContainsString( '<option value="mine.example"', $html );
 	}
 
