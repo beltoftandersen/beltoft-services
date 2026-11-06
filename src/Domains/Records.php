@@ -156,9 +156,39 @@ final class Records {
 		return $chunks;
 	}
 
+	/**
+	 * A target host name (CNAME, MX, SRV, NS value). Unlike a registrable domain, a label may contain or start with an
+	 * underscore: DKIM CNAMEs point at names such as selector1-example._domainkey.example.onmicrosoft.com.
+	 */
 	private static function target( string $value ): string|\WP_Error {
-		$target = Search::normalise( $value );
-		return is_wp_error( $target ) ? new \WP_Error( 'bad_target', __( 'Enter a valid target host name.', 'beltoft-services' ) ) : $target . '.';
+		$error = new \WP_Error( 'bad_target', __( 'Enter a valid target host name.', 'beltoft-services' ) );
+		$name  = trim( rtrim( trim( $value ), '.' ) );
+
+		if ( '' === $name || ! function_exists( 'idn_to_ascii' ) ) {
+			return $error;
+		}
+
+		if ( preg_match( '/[^\x20-\x7E]/', $name ) ) {
+			$name = idn_to_ascii( $name, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 );
+
+			if ( false === $name ) {
+				return $error;
+			}
+		}
+
+		$name = strtolower( $name );
+
+		if ( strlen( $name ) > 253 || ! str_contains( $name, '.' ) ) {
+			return $error;
+		}
+
+		foreach ( explode( '.', $name ) as $label ) {
+			if ( ! preg_match( '/^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?$/D', $label ) ) {
+				return $error;
+			}
+		}
+
+		return $name . '.';
 	}
 
 	private static function number( $value, int $min, int $max ): int|\WP_Error {

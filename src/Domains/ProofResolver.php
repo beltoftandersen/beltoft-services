@@ -16,11 +16,13 @@ defined( 'ABSPATH' ) || exit;
 final class ProofResolver {
 	public const MAX_NS           = 10;
 	public const BUDGET           = 30;
-	public const MAX_SCAN_QUERIES = 60;
+	public const MAX_SCAN_QUERIES = 80;
 	public const TXT_LABEL        = '_beltoft-verify';
 
 	private const HOSTS    = array( 'www', 'mail', 'smtp', 'imap', 'pop', 'webmail', 'ftp', 'autodiscover', 'autoconfig' );
-	private const TXT_OWNERS = array( '_dmarc', 'default._domainkey', 'google._domainkey', 'selector1._domainkey', 'selector2._domainkey', 'k1._domainkey' );
+	// DMARC and the DKIM selectors of common mail services (Google, Microsoft 365, Mailchimp/Mandrill, MailerLite,
+	// SendGrid, Brevo, Zoho, Proton, Amazon SES-style s1/s2, Fastmail fm1-3). A selector not listed here cannot be found.
+	private const TXT_OWNERS = array( '_dmarc', 'default._domainkey', 'google._domainkey', 'selector1._domainkey', 'selector2._domainkey', 'k1._domainkey', 'k2._domainkey', 'k3._domainkey', 'ml._domainkey', 'litesrv._domainkey', 'mlsend._domainkey', 'mandrill._domainkey', 's1._domainkey', 's2._domainkey', 'smtpapi._domainkey', 'em._domainkey', 'brevo1._domainkey', 'brevo2._domainkey', 'mail._domainkey', 'dkim._domainkey', 'zmail._domainkey', 'protonmail._domainkey', 'protonmail2._domainkey', 'protonmail3._domainkey', 'fm1._domainkey', 'fm2._domainkey', 'fm3._domainkey' );
 	private const SRV_OWNERS = array( '_sip._tls', '_sipfederationtls._tcp', '_autodiscover._tcp' );
 
 	/**
