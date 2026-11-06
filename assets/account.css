@@ -699,7 +699,7 @@ div.beltoft-services-domain label.button.beltoft-services-domain__import-pick:fo
 .beltoft-services-domain__import-name { min-width: 0; color: var(--bsd-soft); font-size: var(--bs-fs-small); overflow-wrap: anywhere; }
 .beltoft-services-domain__import-name:empty { display: none; }
 div.beltoft-services-domain .beltoft-services-domain__import-label { display: block; margin: var(--bs-space-4) 0 var(--bs-space-2); color: var(--bsd-soft); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
-div.beltoft-services-domain textarea.beltoft-services-domain__zone-text { box-sizing: border-box; display: block; width: 100%; min-height: 10.5em; margin: 0; padding: var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bsd-card); box-shadow: none; color: var(--bsd-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--bs-fs-caption); line-height: 1.6; resize: vertical; }
+div.beltoft-services-domain textarea.beltoft-services-domain__zone-text { box-sizing: border-box; display: block; width: 100%; max-width: none; min-height: 10.5em; margin: 0; padding: var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bsd-card); box-shadow: none; color: var(--bsd-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--bs-fs-caption); line-height: 1.6; resize: vertical; }
 div.beltoft-services-domain textarea.beltoft-services-domain__zone-text:focus { outline: 2px solid var(--bs-focus); outline-offset: 0; }
 div.beltoft-services-domain .beltoft-services-domain__import-actions { display: flex; flex-wrap: wrap; gap: var(--bs-space-2); margin: var(--bs-space-3) 0 0; }
 .beltoft-services-domain__import-result:empty { display: none; }

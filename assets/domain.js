@@ -10,6 +10,7 @@
 			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
 		} );
 	}
+	window.beltoftDomainRequest = request;
 	var bs = window.beltoftStatus;
 	var TYPES = [ 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' ];
 	var EXTRAS = { MX: [ 'priority' ], SRV: [ 'priority', 'weight', 'port' ], CAA: [ 'flag', 'tag' ] };
@@ -285,6 +286,9 @@
 // DNS hosting card: move the registration here. The transfer goes through the same cart route as the
 // domain search; the transfer code is sent once, over HTTPS, and stored encrypted by the server.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-domain-transfer]' ) ) { return; }
@@ -317,6 +321,9 @@
 
 // Transfer: "Check now" asks whether the domain uses our name servers yet, then reloads the page to show the answer.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-check]' ) ) { return; }
@@ -339,6 +346,9 @@
 
 // Transfer: "Check now" at the registry wait asks the registry, then shows the answer and reloads the page.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-registry]' ) ) { return; }
@@ -358,6 +368,9 @@
 // DNS records: import a zone file. The file is read here in the browser and only its text is sent; a preview shows what will
 // be added, replaced or skipped, then "Add these records" writes it. Every text is set with textContent.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	function el( tag, className, text ) {
 		var node = document.createElement( tag );
 		if ( className ) { node.className = className; }
@@ -471,6 +484,9 @@
 
 // Transfer: "I have checked the records" confirms the records of the zone, then reloads the page to show what comes next.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-confirm]' ) ) { return; }
@@ -489,6 +505,9 @@
 
 // Use Beltoft DNS: start, confirm the records, switch. Each step is one call; the answer is a sentence.
 ( function () {
+	var request = window.beltoftDomainRequest;
+	var bs = window.beltoftStatus;
+	if ( ! request || ! bs ) { return; }
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		if ( ! form || ! form.matches || ! form.matches( 'form[data-dns-adopt]' ) ) { return; }
