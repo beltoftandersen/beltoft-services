@@ -85,6 +85,11 @@ final class Cart {
 	 * @return array{added: bool, already_in_cart?: bool, checkout_url: string}|\WP_Error
 	 */
 	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
+		// A locked domain cannot be transferred: the lookup the order form just made is read from its cache, never asked again here.
+		if ( 'transfer' === $mode ) {
+			$known = TransferDns::cached_registrar( $domain );
+			if ( ! empty( $known['locked'] ) ) { return new \WP_Error( 'domain_locked', TransferDns::locked_message( $domain ), array( 'status' => 422 ) ); }
+		}
 		$data = self::line_data( $domain, $mode, $auth_code, $dns );
 		if ( is_wp_error( $data ) ) { return $data; }
 		// WooCommerce leaves its cart unloaded on custom REST routes.

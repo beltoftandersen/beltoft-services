@@ -948,3 +948,5 @@ body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.bel
 @media (max-width: 767px) {
 	body.woocommerce-account .beltoft-dnse__table td.beltoft-dnse__actions > button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--bs-btn-h); min-height: var(--bs-btn-h); }
 }
+.beltoft-services-progress__note { margin: 0.75em 0 0; }
+.beltoft-services-progress__note[hidden], .beltoft-services-progress__note [hidden] { display: none; }

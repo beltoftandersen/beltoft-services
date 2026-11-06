@@ -9,6 +9,7 @@ namespace BeltoftServices\Account;
 
 use BeltoftServices\Domains\Cart;
 use BeltoftServices\Domains\Clients;
+use BeltoftServices\Domains\DnsAdopt;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\LiveDns;
 use BeltoftServices\Domains\Panels as DomainPanels;
@@ -87,7 +88,8 @@ final class DomainPage {
 		$off      = $dns_only && (bool) $r->get( 'records_off' );
 		// A transfer that copies the DNS: our zone exists and the customer can review it, but the domain does not use it yet.
 		$transfer = $dns_only ? null : TransferDns::view( $r );
-		$zone_here = null !== $transfer && $transfer['editable'];
+		$adopt     = $dns_only ? null : DnsAdopt::view( $r );
+		$zone_here = ( null !== $transfer && $transfer['editable'] ) || ( null !== $adopt && $adopt['started'] );
 
 		if ( null !== $transfer && ! $transfer['in_use'] ) {
 			$external = true;
@@ -148,6 +150,7 @@ final class DomainPage {
 			'transfer_price'   => $price,
 			'transfer'         => $transfer,
 			'zone_pending'     => $zone_here,
+			'adopt'            => $adopt,
 		);
 
 		$data['tabs']   = self::tabs( $data );

@@ -66,9 +66,22 @@ final class Zone {
 		if ( null === $serial ) { return StepResult::retry( 300, 'The authoritative zone is not ready yet.' ); }
 		foreach ( $nameservers as $server ) {
 			$answer = DnsQuery::read( $server, $name, 6 );
-			if ( is_wp_error( $answer ) || $answer !== $serial ) { return StepResult::retry( 300, 'The name servers have not received the zone yet.' ); }
+			if ( is_wp_error( $answer ) || $answer !== $serial ) { return StepResult::retry( self::propagation_delay( $r ), 'The name servers have not received the zone yet.' ); }
 		}
-		return StepResult::done( array( 'zone_prepared' => true ) );
+		return StepResult::done( array( 'zone_prepared' => true, 'zone_propagation_tries' => 0 ) );
+	}
+
+	/**
+	 * Seconds before the name servers are asked for the zone again: a second name server normally has it within seconds, so the
+	 * first attempts of the step come quickly, then every 5 minutes.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function propagation_delay( Resource $r ): int {
+		$tries = (int) $r->get( 'zone_propagation_tries' );
+		$r->set( array( 'zone_propagation_tries' => $tries + 1 ) );
+
+		return $tries < 4 ? 15 : 300;
 	}
 
 	public static function nameservers(): array {

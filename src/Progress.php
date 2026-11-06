@@ -325,12 +325,47 @@ final class Progress {
 			}
 		}
 
-		$minutes = '' === $kind ? 0 : self::minutes( $kind, $driver );
-		$eta     = $minutes ? sprintf(
+		/**
+		 * What a service waits for at its current step, for the customer: an array with step_label, text, leave, note, hosts, link
+		 * and eta (any of them), or empty. The domain feature answers for a transfer.
+		 *
+		 * @param array    $wait    Empty by default.
+		 * @param Resource $r       Resource.
+		 * @param string   $driver  Driver id.
+		 * @param string   $current Key of the current step.
+		 */
+		$wait = 'build' === $kind && 'running' === $phase ? (array) apply_filters( 'beltoft_services_progress_wait', array(), $r, $driver, $current ) : array();
+		$wait = $wait + array( 'step_label' => '', 'text' => '', 'leave' => '', 'note' => '', 'hosts' => array(), 'link' => array(), 'eta' => '', 'steps' => array() );
+
+		// A service may show its own list of steps for the customer instead of the driver's.
+		if ( $wait['steps'] ) {
+			$steps   = array();
+			$current = '';
+
+			foreach ( $wait['steps'] as $step ) {
+				$step['status_label'] = self::status_label( (string) $step['status'] );
+				$steps[]              = $step;
+
+				if ( '' === $current && 'current' === $step['status'] ) {
+					$current = (string) $step['key'];
+				}
+			}
+		}
+
+		if ( '' !== $wait['step_label'] ) {
+			foreach ( $steps as $i => $step ) {
+				if ( $step['key'] === $current ) {
+					$steps[ $i ]['label'] = $wait['step_label'];
+				}
+			}
+		}
+
+		$minutes = '' === $kind || '' !== $wait['eta'] ? 0 : self::minutes( $kind, $driver );
+		$eta     = '' !== $wait['eta'] ? $wait['eta'] : ( $minutes ? sprintf(
 			/* translators: %d: minutes. */
 			_n( 'Usually about %d minute.', 'Usually about %d minutes.', $minutes, 'beltoft-services' ),
 			$minutes
-		) : '';
+		) : '' );
 
 		return array(
 			'kind'    => $kind,
@@ -341,9 +376,12 @@ final class Progress {
 			'current' => $current,
 			'minutes' => $minutes,
 			'eta'     => $eta,
-			'text'    => 'app' === $kind ? trim( AppProgress::line( $r ) . '. ' . $eta ) : self::text( $kind, $phase, $marker, $eta, $driver ),
-			'leave'   => in_array( $phase, array( 'queued', 'running' ), true ) ? self::leave() : '',
+			'text'    => 'app' === $kind ? trim( AppProgress::line( $r ) . '. ' . $eta ) : ( '' !== $wait['text'] ? $wait['text'] : self::text( $kind, $phase, $marker, $eta, $driver ) ),
+			'leave'   => in_array( $phase, array( 'queued', 'running' ), true ) ? ( '' !== $wait['leave'] ? $wait['leave'] : self::leave() ) : '',
 			'started' => self::started( $r, $kind, $marker ),
+			'note'    => $wait['note'],
+			'hosts'   => $wait['hosts'],
+			'link'    => $wait['link'],
 		);
 	}
 

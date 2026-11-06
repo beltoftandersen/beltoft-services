@@ -250,7 +250,7 @@ final class ProgressTest extends TestCase {
 
 		$this->assertStringNotContainsString( '203.0.113.9', $json );
 		$this->assertStringNotContainsString( 'pw-1234', $json );
-		$this->assertSame( array( 'kind', 'phase', 'active', 'title', 'steps', 'current', 'minutes', 'eta', 'text', 'leave', 'started' ), array_keys( Progress::build( $r ) ) );
+		$this->assertSame( array( 'kind', 'phase', 'active', 'title', 'steps', 'current', 'minutes', 'eta', 'text', 'leave', 'started', 'note', 'hosts', 'link' ), array_keys( Progress::build( $r ) ) );
 	}
 
 	public function test_the_marker_shows_a_requested_action_at_once(): void {

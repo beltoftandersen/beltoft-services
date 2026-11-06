@@ -110,6 +110,7 @@ abstract class ServiceEmail extends \WC_Email {
 				'domain_security_event' => in_array( $data['domain_event'] ?? '', DomainSecurity::EVENTS, true ) ? $data['domain_event'] : 'unlocked',
 				'dns_stays'     => 'domain' === $r->get( 'driver' ) && \BeltoftServices\Domains\Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $license['user_id'] ?? 0 ) ),
 				'domain_renews' => self::domain_renews( $r ),
+				'registrar_name' => 'domain' === $r->get( 'driver' ) ? \BeltoftServices\Domains\TransferDns::registrar_name( (string) $r->get( 'domain' ) ) : '',
 				'domains_url'   => self::domains_url( $r, $license ),
 				'dns_external'  => 'domain' === $r->get( 'driver' ) && (bool) $r->get( 'dns_external' ),
 				'dns_choice'    => 'domain' === $r->get( 'driver' ) && 'transfer' === $r->get( 'mode' ) ? \BeltoftServices\Domains\TransferDns::choice( $r ) : '',

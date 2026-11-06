@@ -49,6 +49,17 @@ final class RecordRoutes {
 			)
 		);
 
+		register_rest_route(
+			Routes::NAMESPACE,
+			'/resources/(?P<id>\d+)/dns-import',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'import' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array( 'id' => $id ),
+			)
+		);
+
 		$set = array(
 			'id'   => $id,
 			'type' => array(
@@ -111,6 +122,46 @@ final class RecordRoutes {
 				200
 			)
 		);
+	}
+
+	/**
+	 * POST dns-import: a zone file's text. Without apply the answer is a preview (what is added, replaced, left as it is and
+	 * skipped); with apply the sets that are new or different are written. The text is parsed again on the server.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function import( \WP_REST_Request $request ): \WP_REST_Response {
+		// The page script wraps its arguments in `args`; a direct caller sends them at the top.
+		$args  = (array) ( $request->get_param( 'args' ) ?? array() ) + (array) $request->get_json_params();
+		$apply = (bool) ( $args['apply'] ?? false );
+		$r     = self::resource( $request, $apply );
+
+		if ( $r instanceof \WP_REST_Response ) {
+			return $r;
+		}
+
+		$zone = (string) $r->get( 'domain' );
+		$data = self::zone( $zone );
+
+		if ( $data instanceof \WP_REST_Response ) {
+			return $data;
+		}
+
+		$plan = RecordImport::plan( $zone, (string) ( $args['text'] ?? '' ), Records::to_rows( $zone, (array) ( $data['rrsets'] ?? array() ) ) );
+
+		if ( is_wp_error( $plan ) ) {
+			return self::failure( $plan, 400 );
+		}
+
+		$result = $apply ? RecordImport::apply( $zone, $plan['sets'] ) : null;
+
+		// A zone made for a transfer (or for the move to our DNS) notes that the customer brought their records.
+		if ( $apply && ! $result['failed'] && ( $result['added'] + $result['replaced'] + $result['unchanged'] ) > 0 ) {
+			$r->set( array( 'dns_imported_at' => time() ) );
+		}
+		$sets   = array_map( static fn( $set ) => array_diff_key( $set, array( 'rows' => 1 ) ), $plan['sets'] );
+
+		return self::reply( new \WP_REST_Response( array( 'applied' => $apply, 'sets' => $sets, 'skipped' => $plan['skipped'], 'result' => $result ), 200 ) );
 	}
 
 	/**
@@ -306,7 +357,7 @@ final class RecordRoutes {
 	private static function resource( \WP_REST_Request $request, bool $write ) {
 		// The zone made for a transfer is the customer's to review and change before it answers: the order is still being set up.
 		$found   = Resource::find( (int) $request['id'] );
-		$pending = $found && 'domain' === $found->get( 'driver' ) && (int) ( $found->license()['user_id'] ?? 0 ) === get_current_user_id() && ( TransferDns::view( $found )['editable'] ?? false );
+		$pending = $found && 'domain' === $found->get( 'driver' ) && (int) ( $found->license()['user_id'] ?? 0 ) === get_current_user_id() && ( ( TransferDns::view( $found )['editable'] ?? false ) || DnsAdopt::active( $found ) );
 		$r       = Routes::guard( $request, $write && ! $pending, $write ? 60 : 30 );
 
 		if ( ! $r instanceof Resource ) {

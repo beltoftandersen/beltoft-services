@@ -324,8 +324,164 @@
 		var scope = form.getAttribute( 'data-resource' ) || 'page';
 		if ( bs.locked( scope ) ) { return; }
 		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
-		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-check' ).then( function () {
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-check' ).then( function ( data ) {
+			if ( data && data.message ) {
+				bs.done( handle, data.message );
+				window.setTimeout( function () { window.location.reload(); }, 3000 );
+				return;
+			}
 			window.location.reload();
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, null );
+		} );
+	} );
+}() );
+
+// Transfer: "Check now" at the registry wait asks the registry, then shows the answer and reloads the page.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-registry]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-registry-check' ).then( function ( data ) {
+			bs.done( handle, ( data && data.message ) || '' );
+			if ( data && 'done' === data.status ) { window.setTimeout( function () { window.location.reload(); }, 3000 ); }
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, null );
+		} );
+	} );
+}() );
+
+// DNS records: import a zone file. The file is read here in the browser and only its text is sent; a preview shows what will
+// be added, replaced or skipped, then "Add these records" writes it. Every text is set with textContent.
+( function () {
+	function el( tag, className, text ) {
+		var node = document.createElement( tag );
+		if ( className ) { node.className = className; }
+		if ( undefined !== text ) { node.textContent = text; }
+		return node;
+	}
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-zone-import]' ), function ( box ) {
+		var t = {};
+		try { t = JSON.parse( box.getAttribute( 'data-i18n' ) || '{}' ); } catch ( e ) { t = {}; }
+		var id = box.getAttribute( 'data-resource' );
+		var area = el( 'textarea', 'beltoft-services-domain__zone-text' );
+		var picker = document.createElement( 'input' );
+		var out = el( 'div', 'beltoft-services-domain__import-result' );
+		var bar = el( 'p', 'beltoft-services-domain__import-actions' );
+		var preview = el( 'button', 'button', t.preview );
+		var add = el( 'button', 'button', t.add );
+		var bs = window.beltoftStatus;
+		area.rows = 6;
+		area.setAttribute( 'aria-label', t.label );
+		area.spellcheck = false;
+		picker.type = 'file';
+		picker.accept = '.txt,.zone,.bind,.db,.dns,text/plain';
+		picker.setAttribute( 'aria-label', t.choose );
+		preview.type = 'button';
+		add.type = 'button';
+		add.hidden = true;
+		picker.addEventListener( 'change', function () {
+			var file = picker.files && picker.files[ 0 ];
+			if ( ! file ) { return; }
+			if ( file.size > 102400 ) { bs.fail( null, t.tooLarge, area ); return; }
+			var reader = new window.FileReader();
+			reader.onload = function () {
+				var text = String( reader.result || '' );
+				if ( /[\u0000-\u0008\u000E-\u001F]/.test( text ) ) { bs.fail( null, t.notText, area ); return; }
+				area.value = text;
+				add.hidden = true;
+			};
+			reader.readAsText( file );
+		} );
+		area.addEventListener( 'input', function () { add.hidden = true; } );
+		function line( set ) {
+			var item = el( 'li', '', set.name + ' ' + set.type + ': ' + set.values.join( ', ' ) + ' (' + t[ set.status ] + ')' );
+			if ( 'replace' === set.status && set.old.length ) { item.appendChild( el( 'span', '', ' ' + t.was + ': ' + set.old.join( ', ' ) ) ); }
+			return item;
+		}
+		function show( data ) {
+			while ( out.firstChild ) { out.removeChild( out.firstChild ); }
+			var list = el( 'ul', 'beltoft-services-domain__import-list' );
+			var changes = 0;
+			( data.sets || [] ).forEach( function ( set ) { if ( 'same' !== set.status ) { ++changes; } list.appendChild( line( set ) ); } );
+			if ( ! ( data.sets || [] ).length ) { out.appendChild( el( 'p', 'beltoft-services-domain__note', t.nothing ) ); } else { out.appendChild( list ); }
+			if ( ( data.skipped || [] ).length ) {
+				out.appendChild( el( 'p', 'beltoft-services-domain__note', t.skipped ) );
+				var skipped = el( 'ul', 'beltoft-services-domain__import-list' );
+				data.skipped.forEach( function ( row ) { skipped.appendChild( el( 'li', '', ( row.line ? row.line + ': ' : '' ) + row.text + ' (' + row.reason + ')' ) ); } );
+				out.appendChild( skipped );
+			}
+			add.hidden = 0 === changes;
+		}
+		function send( apply ) {
+			if ( '' === area.value.trim() ) { bs.fail( null, t.empty, area ); return; }
+			var scope = id || 'page';
+			if ( bs.locked( scope ) ) { return; }
+			var handle = bs.busy( apply ? t.adding : t.busy, scope, apply ? add : preview );
+			request( 'POST', id + '/dns-import', { text: area.value, apply: apply } ).then( function ( data ) {
+				if ( apply ) {
+					var failed = ( data.result && data.result.failed ) || [];
+					if ( failed.length ) {
+						bs.fail( handle, t.failed + ': ' + failed.map( function ( f ) { return f.name + ' ' + f.type + ' (' + f.reason + ')'; } ).join( ', ' ), null );
+						return;
+					}
+					bs.done( handle, t.done );
+					window.setTimeout( function () { window.location.reload(); }, 1500 );
+					return;
+				}
+				bs.done( handle, '' );
+				show( data );
+			} ).catch( function ( failure ) {
+				bs.fail( handle, failure.message, null );
+			} );
+		}
+		preview.addEventListener( 'click', function () { send( false ); } );
+		add.addEventListener( 'click', function () { send( true ); } );
+		bar.appendChild( preview );
+		bar.appendChild( document.createTextNode( ' ' ) );
+		bar.appendChild( add );
+		box.appendChild( picker );
+		box.appendChild( area );
+		box.appendChild( bar );
+		box.appendChild( out );
+	} );
+}() );
+
+// Transfer: "I have checked the records" confirms the records of the zone, then reloads the page to show what comes next.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-confirm]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var box = form.querySelector( 'input[name="ack"]' );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-confirm', { ack: !! ( box && box.checked ) } ).then( function () {
+			window.location.reload();
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, null );
+		} );
+	} );
+}() );
+
+// Use Beltoft DNS: start, confirm the records, switch. Each step is one call; the answer is a sentence.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-dns-adopt]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var box = form.querySelector( 'input[name="ack"]' );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/dns-adopt', { step: form.getAttribute( 'data-dns-adopt' ), ack: !! ( box && box.checked ) } ).then( function ( data ) {
+			bs.done( handle, ( data && data.message ) || '' );
+			window.setTimeout( function () { window.location.reload(); }, 1500 );
 		} ).catch( function ( failure ) {
 			bs.fail( handle, failure.message, null );
 		} );
