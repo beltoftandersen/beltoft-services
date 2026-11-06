@@ -44,6 +44,16 @@ class RecordsTest extends TestCase {
 		$this->assertSame( $value, $rows[0]['value'] );
 	}
 
+	public function test_a_dkim_cname_target_with_underscores_is_accepted(): void {
+		$sets = Records::validate( 'example.com', array( array( 'name' => 'selector1._domainkey', 'type' => 'CNAME', 'value' => 'selector1-example-com._domainkey.example.onmicrosoft.com.' ) ) );
+		$this->assertIsArray( $sets );
+		$this->assertSame( 'selector1-example-com._domainkey.example.onmicrosoft.com.', $sets[0]['records'][0]['content'] );
+		$this->assertIsArray( Records::validate( 'example.com', array( array( 'name' => 'mail', 'type' => 'CNAME', 'value' => 'Mail.Example.NET' ) ) ) );
+		foreach ( array( 'no spaces.example.com', 'bad..example.com', '-dash.example.com', 'single', 'a\x00b.example.com', str_repeat( 'a', 64 ) . '.example.com' ) as $bad ) {
+			$this->assertWPError( Records::validate( 'example.com', array( array( 'name' => 'x', 'type' => 'CNAME', 'value' => $bad ) ) ), $bad );
+		}
+	}
+
 	public function test_invalid_names_and_addresses_are_refused(): void {
 		foreach ( array(
 			array( 'name' => 'outside.example.net.', 'type' => 'A', 'value' => '192.0.2.1' ),

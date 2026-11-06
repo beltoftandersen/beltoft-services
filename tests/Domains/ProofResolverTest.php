@@ -378,7 +378,7 @@ class ProofResolverTest extends TestCase {
 		$empty = ProofResolver::scan( 'example.com', $this->delegation_for( array( 'ns1.x.net' => array( self::N1 ) ) ) );
 		$this->assertSame( array( 'records' => array(), 'server' => '', 'queries' => 1 ), $empty );
 		$this->asked = array();
-		$ips = array_map( static fn( $i ) => '93.184.217.' . $i, range(1, 70) );
+		$ips = array_map( static fn( $i ) => '93.184.217.' . $i, range(1, 90) );
 		$many = ProofResolver::scan( 'example.com', $this->delegation_for( array( 'ns1.x.net' => $ips ) ) );
 		$this->assertSame( ProofResolver::MAX_SCAN_QUERIES, $many['queries'] );
 		$this->assertSame( ProofResolver::MAX_SCAN_QUERIES, count( $this->asked ) );
