@@ -277,7 +277,7 @@ final class PleskAlmaTest extends PaidAppCase {
 		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9003 = almalinux-9\n9006 = almalinux-10" );
 		$lab  = $this->lab();
 		$plan = array( 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 );
-		$this->assertSame( array( '18', '18-alma', '18-alma10' ), array_map( 'strval', array_keys( Apps::offered( $lab )['plesk']['choices'] ) ) );
+		$this->assertSame( array( '18-alma10', '18', '18-alma' ), array_map( 'strval', array_keys( Apps::offered( $lab )['plesk']['choices'] ) ), 'AlmaLinux 10 is the default and comes first.' );
 		$this->assertNull( Apps::check( $lab, $plan + array( 'template' => 9006 ), 'plesk', '18-alma10' ) );
 		$this->assertSame( 'The app does not support the selected operating system', Apps::check( $lab, $plan + array( 'template' => 9003 ), 'plesk', '18-alma10' ) );
 		$this->assertSame( 'The app does not support the selected operating system', Apps::check( $lab, $plan + array( 'template' => 9006 ), 'plesk', '18-alma' ) );
@@ -286,6 +286,40 @@ final class PleskAlmaTest extends PaidAppCase {
 		// Like AlmaLinux 9 it needs snippet v4.
 		$this->cluster( "9001 = Ubuntu 24.04\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9006 = almalinux-10", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v3.yaml' ) );
 		$this->assertSame( array( '18' ), array_map( 'strval', array_keys( Apps::offered( $this->lab() )['plesk']['choices'] ) ) );
+	}
+
+	public function test_alma_10_is_the_default_plesk_version_only_where_the_cluster_can_install_it(): void {
+		$this->assertTrue( (bool) Apps::version( 'plesk', '18-alma10' )['default'] );
+		$this->assertArrayNotHasKey( 'default', (array) Apps::version( 'plesk', '18' ) );
+
+		// With the template and snippet v4: first, and the first family the picker offers.
+		$this->cluster( "9001 = Ubuntu 24.04\n9003 = AlmaLinux 9\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9003 = almalinux-9\n9006 = almalinux-10" );
+		$plesk = Apps::offered( $this->lab() )['plesk'];
+		$this->assertSame( '18-alma10', (string) array_key_first( $plesk['choices'] ) );
+		$this->assertSame( array( 'almalinux-10', 'ubuntu-24.04', 'almalinux-9' ), Apps::families( $plesk['choices'] ) );
+
+		// No template for it: the Ubuntu version stays first.
+		$this->cluster();
+		$this->assertSame( '18', (string) array_key_first( Apps::offered( $this->lab() )['plesk']['choices'] ) );
+
+		// A template but an older snippet: also the Ubuntu version.
+		$this->cluster( "9001 = Ubuntu 24.04\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9006 = almalinux-10", array( 'vendor_snippet' => 'local:snippets/vm-vendor-cloudinit-v3.yaml' ) );
+		$this->assertSame( '18', (string) array_key_first( Apps::offered( $this->lab() )['plesk']['choices'] ) );
+
+		// The checkout resolves a version asked for by nobody to the default.
+		$this->cluster( "9001 = Ubuntu 24.04\n9006 = AlmaLinux 10", "9001 = ubuntu-24.04\n9006 = almalinux-10" );
+		$offer = $this->offer();
+		$got   = AppField::resolve( $offer, array( 'app' => 'plesk', 'tier' => 'admin' ), 0, false );
+		$this->assertIsArray( $got );
+		$this->assertSame( '18-alma10', $got['version'] );
+		$this->assertSame( 9006, $got['os'] );
+	}
+
+	public function test_the_picker_script_moves_to_the_apps_first_system_until_the_customer_chooses_one(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
+		$this->assertStringContainsString( 'wanted[ 0 ] === family( system )', $js );
+		$this->assertStringContainsString( 'touched = true;', $js );
+		$this->assertStringContainsString( 'each( wanted, function ( name )', $js );
 	}
 
 	public function test_check_matches_the_version_to_the_system(): void {

@@ -233,6 +233,11 @@ final class Apps {
 			}
 			// A version whose system has no template on this cluster cannot be ordered here.
 			$choices = array_filter( $choices, static fn( $v ) => self::version_template( $cluster, (array) $v ) > 0 );
+			// A version marked "default" in app.json (Plesk on AlmaLinux 10) comes first when this cluster can install it; else the order stays.
+			$default = array_filter( $choices, static fn( $v ) => ! empty( ( (array) $v )['default'] ) );
+			if ( array() !== $default ) {
+				$choices = $default + array_diff_key( $choices, $default );
+			}
 			if ( array() === $choices ) {
 				continue;
 			}
