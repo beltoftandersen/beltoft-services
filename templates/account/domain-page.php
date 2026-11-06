@@ -152,12 +152,22 @@ if ( $d['dns_only'] ) {
 				<?php if ( $d['off'] ) : ?>
 					<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNS hosting is paused. Your records are kept but not answered.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
+				<?php if ( $d['transfer'] && $d['transfer']['in_use'] ) : ?>
+					<p class="beltoft-services-domain__note"><?php esc_html_e( 'In use: your domain uses our name servers.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
 				<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
 					<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the name servers the domain uses now. */ __( 'Not in use yet: your domain still uses %s. These records were copied from there. Check them and change what you need.', 'beltoft-services' ), implode( ', ', $d['transfer']['current'] ) ) ); ?></p>
 				<?php endif; ?>
 				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
 					<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to see and change your DNS records.', 'beltoft-services' ); ?></p></noscript>
 				</div>
+				<?php if ( ! $d['off'] && ! $d['zone_unavailable'] ) : ?>
+					<div class="beltoft-services-domain__import" data-zone-import data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( \BeltoftServices\Domains\RecordImport::strings() ) ); ?>">
+						<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'Import from a zone file', 'beltoft-services' ); ?></h4>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Export the zone file from your current DNS provider and import it here. In most DNS providers this is called Export or Download zone file.', 'beltoft-services' ); ?></p>
+						<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to import a zone file.', 'beltoft-services' ); ?></p></noscript>
+					</div>
+				<?php endif; ?>
 			<?php endif; ?>
 		</section>
 	<?php endif; ?>
@@ -191,6 +201,11 @@ if ( $d['dns_only'] ) {
 						<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: time of the last check. */ __( 'Last checked %s. Your domain does not use our name servers yet.', 'beltoft-services' ), wp_date( (string) get_option( 'time_format' ), $d['transfer']['checked'] ) ) ); ?></p>
 					<?php endif; ?>
 					<form class="beltoft-services-domain-form" data-transfer-check data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Checking…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></form>
+				<?php endif; ?>
+			<?php elseif ( $d['transfer'] && 'first' === $d['transfer']['choice'] && $d['transfer']['in_use'] && 'ready' !== (string) $r->get( 'state' ) ) : ?>
+				<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your domain uses our name servers. The transfer is with the registry now. Your current registrar can take up to 5 days to release the domain. Approve the transfer at your current registrar, or in the email they send, to finish sooner.', 'beltoft-services' ); ?></p>
+				<?php if ( $d['transfer']['registry'] ) : ?>
+					<form class="beltoft-services-domain-form" data-transfer-registry data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Checking…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></form>
 				<?php endif; ?>
 			<?php endif; ?>
 			<?php if ( $d['can'] && $d['dns_only'] ) : ?>

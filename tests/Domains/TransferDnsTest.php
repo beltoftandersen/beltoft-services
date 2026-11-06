@@ -130,6 +130,7 @@ class TransferDnsTest extends TestCase {
 		$this->assertTrue( $result->is_retry(), $result->error() );
 		$this->assertGreaterThan( 0, $result->wait_until(), 'A bounded wait.' );
 		$this->assertSame( 300, $result->delay() );
+		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'dns_wait_since' ) );
 		$this->assertSame( 0, count( $this->posts( $fake ) ), 'Nothing is sent to the registrar.' );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( array( 'ns1.old-host.example', 'ns2.old-host.example' ), $fresh->get( 'transfer_ns' ) );

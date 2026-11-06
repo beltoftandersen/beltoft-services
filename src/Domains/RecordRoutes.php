@@ -49,6 +49,17 @@ final class RecordRoutes {
 			)
 		);
 
+		register_rest_route(
+			Routes::NAMESPACE,
+			'/resources/(?P<id>\d+)/dns-import',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'import' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array( 'id' => $id ),
+			)
+		);
+
 		$set = array(
 			'id'   => $id,
 			'type' => array(
@@ -111,6 +122,39 @@ final class RecordRoutes {
 				200
 			)
 		);
+	}
+
+	/**
+	 * POST dns-import: a zone file's text. Without apply the answer is a preview (what is added, replaced, left as it is and
+	 * skipped); with apply the sets that are new or different are written. The text is parsed again on the server.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function import( \WP_REST_Request $request ): \WP_REST_Response {
+		$apply = (bool) $request->get_param( 'apply' );
+		$r     = self::resource( $request, $apply );
+
+		if ( $r instanceof \WP_REST_Response ) {
+			return $r;
+		}
+
+		$zone = (string) $r->get( 'domain' );
+		$data = self::zone( $zone );
+
+		if ( $data instanceof \WP_REST_Response ) {
+			return $data;
+		}
+
+		$plan = RecordImport::plan( $zone, (string) $request->get_param( 'text' ), Records::to_rows( $zone, (array) ( $data['rrsets'] ?? array() ) ) );
+
+		if ( is_wp_error( $plan ) ) {
+			return self::failure( $plan, 400 );
+		}
+
+		$result = $apply ? RecordImport::apply( $zone, $plan['sets'] ) : null;
+		$sets   = array_map( static fn( $set ) => array_diff_key( $set, array( 'rows' => 1 ) ), $plan['sets'] );
+
+		return self::reply( new \WP_REST_Response( array( 'applied' => $apply, 'sets' => $sets, 'skipped' => $plan['skipped'], 'result' => $result ), 200 ) );
 	}
 
 	/**

@@ -169,8 +169,13 @@ class ZoneTest extends TestCase {
 		$r = $this->resource( 'wait-example.com' );
 		$result = Zone::prepare( $r );
 		$this->assertTrue( $result->is_retry() );
-		$this->assertSame( 300, $result->delay() );
+		$this->assertSame( 15, $result->delay(), 'The first attempts come quickly.' );
 		$this->assertNotNull( $dns->zone( 'wait-example.com' ) );
+		$delays = array( $result->delay() );
+		for ( $i = 0; $i < 5; ++$i ) {
+			$delays[] = Zone::prepare( Resource::find( $r->id() ) )->delay();
+		}
+		$this->assertSame( array( 15, 15, 15, 15, 300, 300 ), $delays, 'Four quick attempts, then every 5 minutes.' );
 	}
 
 	public function test_sandbox_fake_zone_does_not_publish_fake_dnssec_key(): void {

@@ -467,7 +467,7 @@ class DomainDriverTest extends TestCase {
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		$result = ( new DomainDriver() )->provision( $this->resource() );
 		$this->assertTrue( $result->is_retry(), $result->error() );
-		$this->assertSame( 3600, $result->delay() );
+		$this->assertSame( 300, $result->delay(), 'Asked every 5 minutes in the first 2 hours.' );
 		$this->assertTrue( $result->has_progress() );
 		$this->assertGreaterThan( time() + 13 * DAY_IN_SECONDS, $result->wait_until() );
 	}

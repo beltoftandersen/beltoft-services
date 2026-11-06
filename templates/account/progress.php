@@ -23,5 +23,14 @@ $beltoft_services_phase = (string) ( $progress['phase'] ?? 'idle' );
 			</li>
 		<?php endforeach; ?>
 	</ol>
+	<div class="beltoft-services-progress__note" data-progress-note<?php echo '' === (string) ( $progress['note'] ?? '' ) ? ' hidden' : ''; ?>>
+		<p data-progress-note-text><?php echo esc_html( (string) ( $progress['note'] ?? '' ) ); ?></p>
+		<ul data-progress-hosts<?php echo empty( $progress['hosts'] ) ? ' hidden' : ''; ?>>
+			<?php foreach ( (array) ( $progress['hosts'] ?? array() ) as $beltoft_services_host ) : ?>
+				<li><?php echo esc_html( (string) $beltoft_services_host ); ?></li>
+			<?php endforeach; ?>
+		</ul>
+		<p data-progress-link<?php echo empty( $progress['link']['url'] ) ? ' hidden' : ''; ?>><?php if ( ! empty( $progress['link']['url'] ) ) : ?><a href="<?php echo esc_url( (string) $progress['link']['url'] ); ?>"><?php echo esc_html( (string) ( $progress['link']['label'] ?? '' ) ); ?></a><?php endif; ?></p>
+	</div>
 	<p class="beltoft-services-progress__leave" data-progress-leave<?php echo '' === (string) ( $progress['leave'] ?? '' ) ? ' hidden' : ''; ?>><?php echo esc_html( (string) ( $progress['leave'] ?? '' ) ); ?></p>
 </div>

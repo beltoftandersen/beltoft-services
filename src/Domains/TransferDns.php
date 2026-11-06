@@ -82,6 +82,7 @@ final class TransferDns {
 	 */
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+		add_filter( 'beltoft_services_progress_wait', array( __CLASS__, 'progress_wait' ), 10, 4 );
 	}
 
 	/**
@@ -96,6 +97,16 @@ final class TransferDns {
 				'callback'            => array( __CLASS__, 'rest_recommend' ),
 				'permission_callback' => '__return_true',
 				'args'                => array( 'domain' => array( 'type' => 'string', 'required' => true ) ),
+			)
+		);
+		register_rest_route(
+			Routes::NAMESPACE,
+			'/resources/(?P<id>\d+)/transfer-registry-check',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'rest_registry_check' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array( 'id' => array( 'type' => 'integer', 'minimum' => 1, 'required' => true ) ),
 			)
 		);
 		register_rest_route(
@@ -202,6 +213,25 @@ final class TransferDns {
 		set_transient( $key, $found ? $found : array(), $found ? DAY_IN_SECONDS : HOUR_IN_SECONDS );
 
 		return $found;
+	}
+
+	/**
+	 * The registrar as far as it is already known (the filter or the stored RDAP answer). Never asks the network, so a page can use it.
+	 *
+	 * @param string $domain Domain.
+	 * @return array{name: string, url: string}|null
+	 */
+	public static function cached_registrar( string $domain ): ?array {
+		/** This filter is documented in TransferDns::registrar(). */
+		$found = apply_filters( 'beltoft_services_transfer_registrar', null, $domain );
+
+		if ( is_array( $found ) ) {
+			return array( 'name' => (string) ( $found['name'] ?? '' ), 'url' => (string) ( $found['url'] ?? '' ) );
+		}
+
+		$cached = false === $found ? false : get_transient( 'beltoft_services_rdap_' . md5( strtolower( $domain ) ) );
+
+		return is_array( $cached ) && $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) : null;
 	}
 
 	/**
@@ -516,7 +546,7 @@ final class TransferDns {
 		$state  = (string) $r->get( 'state' );
 		$made   = (bool) $r->get( 'zone_claimed' ) && in_array( 'zone_prepared', $steps, true );
 		// First: the zone answers once the domain uses it. After: once the name servers were switched.
-		$in_use = self::FIRST === $choice ? in_array( 'ns_ours', $steps, true ) : in_array( 'dns_switch', $steps, true );
+		$in_use = self::FIRST === $choice ? in_array( 'ns_ours', $steps, true ) || 'ours' === (string) $r->get( 'transfer_dns_state' ) : in_array( 'dns_switch', $steps, true );
 
 		return array(
 			'choice'  => $choice,
@@ -524,6 +554,7 @@ final class TransferDns {
 			'ours'    => Zone::nameservers(),
 			'made'    => $made,
 			'in_use'  => $in_use,
+			'registry' => self::with_registry( $r ),
 			'waiting' => self::FIRST === $choice && ! $in_use && ! in_array( $state, array( 'failed', 'deleted' ), true ),
 			'editable' => $made && 'ready' !== $state && ! in_array( $state, array( 'failed', 'deleted' ), true ),
 			'checked' => (int) $r->get( 'transfer_dns_checked' ),
@@ -545,6 +576,15 @@ final class TransferDns {
 
 		$view = self::view( $r );
 
+		if ( $view && self::FIRST === $view['choice'] && $view['in_use'] ) {
+			// A page that was open while the order moved on: say what is happening instead of refusing.
+			return new \WP_REST_Response( array( 'status' => 'ours', 'message' => __( 'Your domain already uses our name servers. The transfer is with the registry now.', 'beltoft-services' ) ), 200 );
+		}
+
+		if ( $view && self::FIRST === $view['choice'] && ! $view['waiting'] ) {
+			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_not_waiting', __( 'This transfer is no longer waiting for the name servers.', 'beltoft-services' ), array( 'status' => 409 ) ) );
+		}
+
 		if ( ! $view || ! $view['waiting'] ) {
 			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 		}
@@ -556,6 +596,115 @@ final class TransferDns {
 		}
 
 		return new \WP_REST_Response( array( 'status' => $result ), 200 );
+	}
+
+	/**
+	 * What a domain transfer waits for at the current step, for the customer: empty when it waits for nothing in particular.
+	 * Reads stored data only (never a network call).
+	 *
+	 * @param mixed    $wait    Earlier answer.
+	 * @param Resource $r       Resource.
+	 * @param string   $driver  Driver id.
+	 * @param string   $current Key of the current step.
+	 * @return array<string, mixed>
+	 */
+	public static function progress_wait( $wait, $r, $driver, $current ): array {
+		if ( ! $r instanceof Resource || 'domain' !== $driver || 'transfer' !== (string) $r->get( 'mode' ) ) {
+			return (array) $wait;
+		}
+
+		$base = array( 'eta' => __( 'A transfer usually takes a few days.', 'beltoft-services' ) );
+
+		$done = (array) $r->get( 'steps' );
+
+		if ( 'order' === $current && self::FIRST === self::plan( $r ) && in_array( 'dns_copy', $done, true ) && ! in_array( 'ns_ours', $done, true ) ) {
+			$link = array();
+			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
+
+			if ( '' !== $page ) {
+				$link = array( 'url' => $page, 'label' => __( 'Open the instructions', 'beltoft-services' ) );
+			}
+
+			return $base + array(
+				'step_label' => __( 'Set our name servers at your current registrar', 'beltoft-services' ),
+				'text'       => __( 'We are waiting for you. Set our name servers at your current registrar, then we send the transfer.', 'beltoft-services' ),
+				'leave'      => __( 'You can leave this site. We check your name servers on our own, and the same progress is in your account.', 'beltoft-services' ),
+				'note'       => __( 'Your action is needed: set these name servers at your current registrar. It can take a few hours after you change them, and we check automatically. Your website and email keep working.', 'beltoft-services' ),
+				'hosts'      => Zone::nameservers(),
+				'link'       => $link,
+			);
+		}
+
+		if ( 'active' === $current ) {
+			$page      = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
+			$registrar = self::cached_registrar( (string) $r->get( 'domain' ) );
+			$who       = $registrar && '' !== $registrar['name'] ? $registrar['name'] : '';
+			$note      = '' === $who
+				? __( 'Your current registrar can take up to 5 days to release the domain. Approve the transfer at your current registrar, or in the email they send, to finish sooner. Your website and email keep working.', 'beltoft-services' )
+				/* translators: %s: the current registrar's name. */
+				: sprintf( __( '%1$s can take up to 5 days to release the domain. Approve the transfer at %1$s, or in the email they send, to finish sooner. Your website and email keep working.', 'beltoft-services' ), $who );
+
+			return $base + array(
+				'step_label' => '',
+				'text'       => __( 'The transfer is with the registry. This can take up to 5 days.', 'beltoft-services' ),
+				'leave'      => '',
+				'note'       => $note,
+				'hosts'      => array(),
+				'link'       => '' === $page ? array() : array( 'url' => $page, 'label' => __( 'Check the transfer now', 'beltoft-services' ) ),
+			);
+		}
+
+		return $base;
+	}
+
+
+	/**
+	 * Is a transfer order with the registry, not yet accepted?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function with_registry( Resource $r ): bool {
+		$steps = (array) $r->get( 'steps' );
+
+		return 'domain' === $r->get( 'driver' ) && 'transfer' === $r->get( 'mode' ) && in_array( 'order', $steps, true ) && ! in_array( 'active', $steps, true ) && ! in_array( (string) $r->get( 'state' ), array( 'failed', 'deleted', 'ready' ), true );
+	}
+
+	/**
+	 * POST resources/<id>/transfer-registry-check: asks the registry now whether the transfer is done, through the order's own job.
+	 * One check a minute.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function rest_registry_check( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = Routes::guard( $request, false, 10 );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		if ( ! self::with_registry( $r ) ) {
+			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_not_waiting', __( 'This transfer is not waiting for the registry.', 'beltoft-services' ), array( 'status' => 409 ) ) );
+		}
+
+		if ( (int) $r->get( 'registry_checked' ) > time() - self::CHECK_EVERY ) {
+			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_rate_limited', __( 'Check again in a minute.', 'beltoft-services' ), array( 'status' => 429 ) ) );
+		}
+
+		$r->set( array( 'registry_checked' => time(), 'next_attempt_at' => time() ) );
+		Jobs::run( $r->id() );
+
+		$fresh = Resource::find( $r->id() );
+		$done  = $fresh && in_array( 'active', (array) $fresh->get( 'steps' ), true );
+
+		return new \WP_REST_Response(
+			array(
+				'status'  => $done ? 'done' : 'waiting',
+				'message' => $done
+					? __( 'The transfer is done. We are setting up the DNS now.', 'beltoft-services' )
+					: __( 'The registry has not finished the transfer yet. Your current registrar can take up to 5 days.', 'beltoft-services' ),
+			),
+			200
+		);
 	}
 
 	/**

@@ -69,6 +69,40 @@
 			steps( list, payload );
 		}
 
+		var note = element.querySelector( '[data-progress-note]' );
+
+		if ( note ) {
+			var noteText = note.querySelector( '[data-progress-note-text]' );
+			var hosts = note.querySelector( '[data-progress-hosts]' );
+			var link = note.querySelector( '[data-progress-link]' );
+			var names = payload.hosts || [];
+
+			note.hidden = ! payload.note;
+
+			if ( noteText ) { noteText.textContent = payload.note || ''; }
+
+			if ( hosts ) {
+				while ( hosts.firstChild ) { hosts.removeChild( hosts.firstChild ); }
+				names.forEach( function ( host ) {
+					var li = document.createElement( 'li' );
+					li.textContent = host;
+					hosts.appendChild( li );
+				} );
+				hosts.hidden = ! names.length;
+			}
+
+			if ( link ) {
+				while ( link.firstChild ) { link.removeChild( link.firstChild ); }
+				if ( payload.link && payload.link.url ) {
+					var a = document.createElement( 'a' );
+					a.href = payload.link.url;
+					a.textContent = payload.link.label || '';
+					link.appendChild( a );
+				}
+				link.hidden = ! ( payload.link && payload.link.url );
+			}
+		}
+
 		if ( leave ) {
 			leave.textContent = payload.leave || '';
 			leave.hidden = ! payload.leave;

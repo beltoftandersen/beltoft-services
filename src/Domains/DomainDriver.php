@@ -173,7 +173,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					$r->set( array( 'action_needed_sent' => $reason ) );
 					Emails::send( 'beltoft_services_domain_action_needed', $r, array( 'domain_action_reason' => $reason ) );
 				}
-				return StepResult::wait( 3600, 'The registry is still processing this domain.', $since + 14 * DAY_IN_SECONDS, array( 'pending_since' => $since ) );
+				return StepResult::wait( self::registry_delay( time() - $since ), 'The registry is still processing this domain.', $since + 14 * DAY_IN_SECONDS, array( 'pending_since' => $since ) );
 			}
 			$expiry = (string) ( $detail['expiration_date'] ?? '' );
 			$steps[] = 'active';
@@ -258,6 +258,20 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	}
 
 	/** The name servers stored before a transfer order, as a list of host names. */
+	/**
+	 * Seconds until the registry is asked again about a domain it is still processing: every 5 minutes for the first 2 hours, every
+	 * 15 minutes until 24 hours, then every hour.
+	 *
+	 * @param int $elapsed Seconds since the order was sent.
+	 */
+	public static function registry_delay( int $elapsed ): int {
+		if ( $elapsed < 2 * HOUR_IN_SECONDS ) {
+			return 5 * MINUTE_IN_SECONDS;
+		}
+
+		return $elapsed < DAY_IN_SECONDS ? 15 * MINUTE_IN_SECONDS : HOUR_IN_SECONDS;
+	}
+
 	public static function stored_nameservers( Resource $r ): array {
 		$stored = $r->get( 'transfer_ns' );
 		return is_array( $stored ) ? array_values( array_filter( array_map( 'strval', $stored ) ) ) : array();
