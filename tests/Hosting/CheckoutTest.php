@@ -102,6 +102,8 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringContainsString( 'A domain I have elsewhere', $html );
 		$this->assertStringNotContainsString( 'A domain in my account', $html, 'A visitor has no domains on our name servers.' );
 		$this->assertStringContainsString( '<option value="wordpress" selected', $html );
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_host">Domain name#', $html, 'The checkout step stops on an empty domain name, as it does on an empty website name.' );
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_slug">#', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
 

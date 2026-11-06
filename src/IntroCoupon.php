@@ -28,6 +28,13 @@ final class IntroCoupon {
 	public const META = '_beltoft_services_intro_coupon';
 
 	/**
+	 * True while the plugin itself takes a refused intro coupon off, so keep() leaves it off.
+	 *
+	 * @var bool
+	 */
+	private static $refusing = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -37,6 +44,99 @@ final class IntroCoupon {
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'drop_unbacked' ), 0 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
+		add_filter( 'woocommerce_cart_totals_coupon_label', array( __CLASS__, 'label' ), 10, 2 );
+		add_filter( 'woocommerce_cart_totals_coupon_html', array( __CLASS__, 'totals_html' ), 10, 2 );
+		add_action( 'woocommerce_removed_coupon', array( __CLASS__, 'keep' ) );
+		add_action( 'wp_head', array( __CLASS__, 'hide_remove_icons' ) );
+	}
+
+	/**
+	 * Action woocommerce_removed_coupon: an intro coupon taken off by the customer while its line is still in the cart
+	 * goes straight back on. It is taken off for good only with its line (on_removed) or when refused (validate).
+	 *
+	 * @param mixed $code Coupon code.
+	 */
+	public static function keep( $code ): void {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		if ( ! $cart || ! is_string( $code ) || self::$refusing || ! isset( self::lines( $cart )[ wc_format_coupon_code( $code ) ] ) ) {
+			return;
+		}
+
+		$notices = wc_get_notices();
+		$cart->apply_coupon( $code );
+		wc_set_notices( $notices );
+	}
+
+	/**
+	 * Action wp_head on the cart and checkout: page builders draw their own remove icon for a coupon, outside the
+	 * WooCommerce filter. The icon is hidden for the intro coupons (keep() undoes a removal anyway).
+	 */
+	public static function hide_remove_icons(): void {
+		if ( ! function_exists( 'is_checkout' ) || ! ( is_checkout() || is_cart() ) || ! WC()->cart ) {
+			return;
+		}
+
+		$rules = array();
+
+		foreach ( array_keys( self::lines( WC()->cart ) ) as $code ) {
+			$rules[] = '.woocommerce-remove-coupon[data-coupon="' . esc_attr( $code ) . '"]';
+		}
+
+		if ( $rules ) {
+			echo '<style id="beltoft-services-intro-coupon">' . implode( ',', $rules ) . '{display:none!important}</style>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- codes escaped above.
+		}
+	}
+
+	/**
+	 * Is this coupon the intro coupon of a line in the cart?
+	 *
+	 * @param mixed $coupon Coupon.
+	 */
+	private static function is_intro( $coupon ): bool {
+		if ( ! $coupon instanceof \WC_Coupon || ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return false;
+		}
+
+		return isset( self::lines( WC()->cart )[ wc_format_coupon_code( $coupon->get_code() ) ] );
+	}
+
+	/**
+	 * Filter woocommerce_cart_totals_coupon_label: the customer did not type the intro coupon, so its code means nothing
+	 * to them. A plain name is shown instead (the coupon description is an admin note and is not used).
+	 *
+	 * @param mixed $label  Label.
+	 * @param mixed $coupon Coupon.
+	 * @return mixed
+	 */
+	public static function label( $label, $coupon = null ) {
+		if ( ! self::is_intro( $coupon ) ) {
+			return $label;
+		}
+
+		/**
+		 * Filters the name of the intro coupon in the cart and checkout totals.
+		 *
+		 * @param string     $name   Name.
+		 * @param \WC_Coupon $coupon Coupon.
+		 */
+		return (string) apply_filters( 'beltoft_services_intro_coupon_label', __( 'First year discount', 'beltoft-services' ), $coupon );
+	}
+
+	/**
+	 * Filter woocommerce_cart_totals_coupon_html: no remove link on the intro coupon. It comes with the product, and
+	 * taking it off would only raise the price.
+	 *
+	 * @param mixed $html   Coupon html.
+	 * @param mixed $coupon Coupon.
+	 * @return mixed
+	 */
+	public static function totals_html( $html, $coupon = null ) {
+		if ( ! is_string( $html ) || ! self::is_intro( $coupon ) ) {
+			return $html;
+		}
+
+		return (string) preg_replace( '#\s*<a [^>]*class="[^"]*woocommerce-remove-coupon[^"]*"[^>]*>.*?</a>#s', '', $html );
 	}
 
 	/**
@@ -198,13 +298,21 @@ final class IntroCoupon {
 		}
 
 		// A coupon that does not fit this line (a monthly variation, when the coupon is for yearly ones) is not an error for the customer.
-		$before = wc_notice_count( 'error' );
+		// Applied without a word either: the customer typed no code, so "Coupon code applied successfully" only confuses.
+		$before  = wc_notice_count( 'error' );
+		$success = wc_notice_count( 'success' );
+		$applied = $cart->apply_coupon( $code );
+		$notices = wc_get_notices();
 
-		if ( ! $cart->apply_coupon( $code ) && wc_notice_count( 'error' ) > $before ) {
-			$notices          = wc_get_notices();
+		if ( ! $applied && wc_notice_count( 'error' ) > $before ) {
 			$notices['error'] = array_slice( (array) ( $notices['error'] ?? array() ), 0, $before );
-			wc_set_notices( $notices );
 		}
+
+		if ( wc_notice_count( 'success' ) > $success ) {
+			$notices['success'] = array_slice( (array) ( $notices['success'] ?? array() ), 0, $success );
+		}
+
+		wc_set_notices( $notices );
 	}
 
 	/**
@@ -338,8 +446,10 @@ final class IntroCoupon {
 				continue;
 			}
 
-			$product_id = (int) $product_ids[0];
+			$product_id     = (int) $product_ids[0];
+			self::$refusing = true;
 			$cart->remove_coupon( $code );
+			self::$refusing = false;
 			$errors->add(
 				'beltoft_services_intro_used',
 				/* translators: %s: product name. */
