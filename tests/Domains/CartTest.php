@@ -87,6 +87,22 @@ class CartTest extends TestCase {
 	public function test_cart_summary_shows_selected_domain(): void {
 		$data = Cart::item_data( array(), array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'dns' ) ) );
 		$this->assertSame( 'example.com', $data[0]['value'] );
+		$this->assertSame( 'Domain', $data[0]['key'] );
+		$data = Cart::item_data( array(), array( 'beltoft_services_domain' => array( 'domain' => 'example.nl', 'mode' => 'transfer' ) ) );
+		$this->assertSame( 'Transfer', $data[0]['key'], 'A transfer says so in the cart.' );
+	}
+
+	public function test_an_extension_cheaper_than_the_product_price_is_not_shown_as_a_sale(): void {
+		update_option( Prices::OPTION, array( 'nl' => array( 'price' => 14, 'restricted' => false ) ) );
+		$product = new \WC_Product_Simple();
+		$product->set_regular_price( '15' );
+		$product->set_price( '15' );
+		WC()->cart->set_cart_contents( array( 'dom' => array( 'beltoft_services_domain' => array( 'domain' => 'example.nl', 'mode' => 'transfer' ), 'quantity' => 1, 'data' => $product ) ) );
+		Cart::apply_prices( WC()->cart );
+		$this->assertSame( '14', (string) $product->get_price() );
+		$this->assertSame( '14', (string) $product->get_regular_price() );
+		$this->assertFalse( $product->is_on_sale(), 'No "Save" line for a discount that does not exist.' );
+		WC()->cart->empty_cart();
 	}
 
 	public function test_order_line_preserves_domain_for_customer_and_provisioning(): void {

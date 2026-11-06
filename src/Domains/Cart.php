@@ -435,7 +435,12 @@ final class Cart {
 			// One line is one domain: a quantity raised by a cart update or the Store API goes back to 1.
 			if ( isset( $item['beltoft_services_domain'] ) && 1 !== (int) ( $item['quantity'] ?? 1 ) ) { $cart->cart_contents[ $key ]['quantity'] = 1; }
 			$price = self::price_for( $item );
-			if ( null !== $price && isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) { $item['data']->set_price( $price ); }
+			if ( null !== $price && isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) {
+				// The regular price too: left at the product's own price, a cheaper extension showed as a sale ("Save").
+				$item['data']->set_regular_price( $price );
+				$item['data']->set_sale_price( '' );
+				$item['data']->set_price( $price );
+			}
 		}
 	}
 
@@ -456,7 +461,7 @@ final class Cart {
 	public static function item_data( array $data, array $cart_item ): array {
 		$domain = $cart_item['beltoft_services_domain'] ?? null;
 		if ( is_array( $domain ) && ! empty( $domain['domain'] ) ) {
-			$data[] = array( 'key' => __( 'Domain', 'beltoft-services' ), 'value' => (string) $domain['domain'] );
+			$data[] = array( 'key' => 'transfer' === ( $domain['mode'] ?? '' ) ? __( 'Transfer', 'beltoft-services' ) : __( 'Domain', 'beltoft-services' ), 'value' => (string) $domain['domain'] );
 		}
 		return $data;
 	}
