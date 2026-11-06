@@ -113,6 +113,25 @@ class SslMultiTest extends SslTestCase {
 		$this->assertSame( 'ssl_auto', SslField::resolve( array( 'names' => array( array( 'domain' => 'example.com', 'validation' => 'auto' ) ) ), 0, 'dv', false, '', 3 )->get_error_code(), 'Automatic needs a zone of ours.' );
 	}
 
+	public function test_the_first_name_row_is_required_and_holds_nothing_else(): void {
+		$product = $this->service_product( 'ssl', array( 'ssl_product' => 40, 'ssl_level' => 'dv', 'ssl_domains' => 3 ), array( 'slug' => 'ssl-multi-' . wp_generate_password( 4, false ) ) );
+		WC()->cart->empty_cart();
+		if ( ! WC()->cart->add_to_cart( $product->get_id() ) ) {
+			$this->markTestSkipped( 'The fixture product cannot be put in the cart here.' );
+		}
+
+		ob_start();
+		SslField::render();
+		$html = (string) ob_get_clean();
+		WC()->cart->empty_cart();
+
+		// A select in the same row has a value, which made an empty required name pass the checkout step.
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_name_0">Name 1&nbsp;<abbr class="required"#', $html );
+		$this->assertSame( 1, preg_match( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_name_0">.*?</p>#s', $html, $row ) );
+		$this->assertStringNotContainsString( '<select', $row[0] );
+		$this->assertStringContainsString( '[names][0][validation]', $html );
+	}
+
 	public function test_an_own_request_must_stay_within_the_ordered_names(): void {
 		$names = array( 'example.com', 'www.example.com' );
 		$rows  = array( array( 'domain' => 'example.com', 'validation' => 'dns' ), array( 'domain' => 'www.example.com', 'validation' => 'dns' ) );

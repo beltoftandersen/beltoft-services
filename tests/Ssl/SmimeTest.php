@@ -188,6 +188,7 @@ class SmimeTest extends SslTestCase {
 		SslField::render();
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( '[mailbox]', $html );
+		$this->assertStringContainsString( 'Email certificate (S/MIME)</h3>', $html );
 		$this->assertStringNotContainsString( '[domain]', $html );
 		$this->assertStringNotContainsString( 'wildcard', strtolower( $html ) );
 		$this->assertStringNotContainsString( '—', $html );
