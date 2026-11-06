@@ -394,7 +394,7 @@ final class SiteField {
 
 		self::radio( $name, $id, self::MODE_OWN, $mode, __( 'A domain I have elsewhere', 'beltoft-services' ) );
 		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_OWN ) . '"' . ( self::MODE_OWN === $mode ? '' : ' hidden' ) . '>';
-		self::text_row( $name . '[host]', $id . '_host', __( 'Domain name', 'beltoft-services' ), self::MODE_OWN === $mode ? $post['host'] : '', false, __( 'For example www.example.com', 'beltoft-services' ), 'url' );
+		self::text_row( $name . '[host]', $id . '_host', __( 'Domain name', 'beltoft-services' ), self::MODE_OWN === $mode ? $post['host'] : '', true, __( 'For example www.example.com', 'beltoft-services' ), 'url' );
 		echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'After you order, your account page shows the DNS records to add where your domain is managed: an A record that points the domain to our server, and a TXT record that proves the domain is yours. Until the domain points to us, the website works on a temporary address.', 'beltoft-services' ) . '</p>';
 		echo '</div>';
 

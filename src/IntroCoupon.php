@@ -37,6 +37,55 @@ final class IntroCoupon {
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'drop_unbacked' ), 0 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
+		add_filter( 'woocommerce_cart_totals_coupon_label', array( __CLASS__, 'label' ), 10, 2 );
+		add_filter( 'woocommerce_cart_totals_coupon_html', array( __CLASS__, 'totals_html' ), 10, 2 );
+	}
+
+	/**
+	 * Is this coupon the intro coupon of a line in the cart?
+	 *
+	 * @param mixed $coupon Coupon.
+	 */
+	private static function is_intro( $coupon ): bool {
+		if ( ! $coupon instanceof \WC_Coupon || ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return false;
+		}
+
+		return isset( self::lines( WC()->cart )[ wc_format_coupon_code( $coupon->get_code() ) ] );
+	}
+
+	/**
+	 * Filter woocommerce_cart_totals_coupon_label: the customer did not type the intro coupon, so its code means nothing
+	 * to them. The coupon's description is shown, or a plain name.
+	 *
+	 * @param mixed $label  Label.
+	 * @param mixed $coupon Coupon.
+	 * @return mixed
+	 */
+	public static function label( $label, $coupon = null ) {
+		if ( ! self::is_intro( $coupon ) ) {
+			return $label;
+		}
+
+		$text = trim( wp_strip_all_tags( (string) $coupon->get_description() ) );
+
+		return '' !== $text ? $text : __( 'Introductory discount', 'beltoft-services' );
+	}
+
+	/**
+	 * Filter woocommerce_cart_totals_coupon_html: no remove link on the intro coupon. It comes with the product, and
+	 * taking it off would only raise the price.
+	 *
+	 * @param mixed $html   Coupon html.
+	 * @param mixed $coupon Coupon.
+	 * @return mixed
+	 */
+	public static function totals_html( $html, $coupon = null ) {
+		if ( ! is_string( $html ) || ! self::is_intro( $coupon ) ) {
+			return $html;
+		}
+
+		return (string) preg_replace( '#\s*<a [^>]*class="[^"]*woocommerce-remove-coupon[^"]*"[^>]*>.*?</a>#s', '', $html );
 	}
 
 	/**
@@ -198,13 +247,21 @@ final class IntroCoupon {
 		}
 
 		// A coupon that does not fit this line (a monthly variation, when the coupon is for yearly ones) is not an error for the customer.
-		$before = wc_notice_count( 'error' );
+		// Applied without a word either: the customer typed no code, so "Coupon code applied successfully" only confuses.
+		$before  = wc_notice_count( 'error' );
+		$success = wc_notice_count( 'success' );
+		$applied = $cart->apply_coupon( $code );
+		$notices = wc_get_notices();
 
-		if ( ! $cart->apply_coupon( $code ) && wc_notice_count( 'error' ) > $before ) {
-			$notices          = wc_get_notices();
+		if ( ! $applied && wc_notice_count( 'error' ) > $before ) {
 			$notices['error'] = array_slice( (array) ( $notices['error'] ?? array() ), 0, $before );
-			wc_set_notices( $notices );
 		}
+
+		if ( wc_notice_count( 'success' ) > $success ) {
+			$notices['success'] = array_slice( (array) ( $notices['success'] ?? array() ), 0, $success );
+		}
+
+		wc_set_notices( $notices );
 	}
 
 	/**

@@ -75,6 +75,21 @@ class IntroCouponTest extends TestCase {
 		$this->assertTrue( WC()->cart->has_discount( 'intro-half' ) );
 		$this->assertSame( array(), wc_get_notices( 'error' ) );
 		$this->assertSame( array(), wc_get_notices( 'notice' ), 'A new customer is told nothing.' );
+		$this->assertSame( array(), wc_get_notices( 'success' ), 'No "Coupon code applied" for a code the customer never typed.' );
+	}
+
+	public function test_the_intro_coupon_shows_a_name_and_no_remove_link(): void {
+		$this->coupon( 'intro-half' );
+		wp_set_current_user( self::factory()->user->create() );
+		$this->add( $this->product() );
+		$coupon = new \WC_Coupon( 'intro-half' );
+
+		$this->assertSame( 'Introductory discount', apply_filters( 'woocommerce_cart_totals_coupon_label', 'Coupon: intro-half', $coupon ) );
+		$coupon->set_description( 'First year, 50% off' );
+		$this->assertSame( 'First year, 50% off', apply_filters( 'woocommerce_cart_totals_coupon_label', 'Coupon: intro-half', $coupon ) );
+
+		$html = '-<span class="amount">5</span> <a href="/cart/?remove_coupon=intro-half" class="woocommerce-remove-coupon" data-coupon="intro-half">[Remove]</a>';
+		$this->assertSame( '-<span class="amount">5</span>', apply_filters( 'woocommerce_cart_totals_coupon_html', $html, $coupon ) );
 	}
 
 	public function test_a_product_without_the_setting_or_a_missing_coupon_changes_nothing(): void {
@@ -198,6 +213,10 @@ class IntroCouponTest extends TestCase {
 		do_action( 'woocommerce_check_cart_items' );
 
 		$this->assertTrue( WC()->cart->has_discount( 'spring' ) );
+		$spring = new \WC_Coupon( 'spring' );
+		$this->assertSame( 'Coupon: spring', apply_filters( 'woocommerce_cart_totals_coupon_label', 'Coupon: spring', $spring ), 'A typed coupon keeps its label.' );
+		$link = '<a href="#" class="woocommerce-remove-coupon">[Remove]</a>';
+		$this->assertSame( $link, apply_filters( 'woocommerce_cart_totals_coupon_html', $link, $spring ), 'and its remove link.' );
 	}
 
 	public function test_another_product_held_does_not_count(): void {
