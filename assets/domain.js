@@ -389,7 +389,7 @@
 		var pasteLabel = el( 'label', 'beltoft-services-domain__import-label', t.paste );
 		var out = el( 'div', 'beltoft-services-domain__import-result' );
 		var bar = el( 'p', 'beltoft-services-domain__import-actions' );
-		var preview = el( 'button', 'button', t.preview );
+		var preview = el( 'button', 'button beltoft-services-domain__import-preview', t.preview );
 		var add = el( 'button', 'button', t.add );
 		var bs = window.beltoftStatus;
 		area.rows = 6;

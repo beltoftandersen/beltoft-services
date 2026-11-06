@@ -692,7 +692,9 @@ div.beltoft-services-domain .beltoft-services-domain__import { margin: var(--bs-
 div.beltoft-services-domain .beltoft-services-domain__import > .beltoft-services-domain__title { margin: 0 0 var(--bs-space-2); }
 div.beltoft-services-domain .beltoft-services-domain__import > .beltoft-services-domain__note { max-width: 62ch; margin: 0; }
 .beltoft-services-domain__import-file { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2) var(--bs-space-3); margin: var(--bs-space-4) 0 0; }
+div.beltoft-services-domain .beltoft-services-domain__import-actions .button.beltoft-services-domain__import-preview,
 div.beltoft-services-domain label.button.beltoft-services-domain__import-pick { position: relative; display: inline-flex; align-items: center; height: var(--bs-btn-h); margin: 0; padding: 0 var(--bs-space-4); border: 1px solid var(--bsd-ink); background: transparent; color: var(--bsd-ink); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); cursor: pointer; }
+div.beltoft-services-domain .beltoft-services-domain__import-actions .button.beltoft-services-domain__import-preview:hover,
 div.beltoft-services-domain label.button.beltoft-services-domain__import-pick:hover { background: var(--bsd-warm); }
 div.beltoft-services-domain label.button.beltoft-services-domain__import-pick:focus-within { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 .beltoft-services-domain__import-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; opacity: 0; }
@@ -710,8 +712,8 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list { margin: 0;
 div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--bs-space-1) var(--bs-space-4); margin: 0; padding: var(--bs-space-2) 0; border-bottom: 1px solid var(--bsd-rule); }
 .beltoft-services-domain__import-rec { min-width: 0; flex: 1 1 18em; color: var(--bsd-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .beltoft-services-domain__import-status { flex: 0 1 auto; color: var(--bsd-soft); font-size: var(--bs-fs-small); }
-.beltoft-services-domain__import-list .is-new .beltoft-services-domain__import-status:first-of-type { color: var(--bs-status-ok); }
-.beltoft-services-domain__import-list .is-replace .beltoft-services-domain__import-status:first-of-type { color: var(--bs-status-warn); }
+.beltoft-services-domain__import-list .is-new .beltoft-services-domain__import-rec + .beltoft-services-domain__import-status { color: var(--bs-status-ok); }
+.beltoft-services-domain__import-list .is-replace .beltoft-services-domain__import-rec + .beltoft-services-domain__import-status { color: var(--bs-status-warn); }
 .beltoft-services-domain__import-list .is-replace .beltoft-services-domain__import-status + .beltoft-services-domain__import-status { flex-basis: 100%; }
 
 /* Danger zone tab and its dialog. Square, one danger colour for the destructive button only. */
