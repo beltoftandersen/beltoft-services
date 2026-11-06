@@ -467,23 +467,19 @@ final class PurchaseTest extends UsageTestCase {
 
 	public function test_an_account_without_a_saved_mandate_is_refused_with_the_dashboard_as_the_way(): void {
 		add_filter( 'woocommerce_subscription_is_manual', '__return_false' );
-		$this->account->set_payment_method( 'mollie_wc_gateway_creditcard' );
+		$this->account->set_payment_method( 'retired_gateway' );
 		$this->account->save();
 		$text = $this->refused( $this->args() );
 		$this->assertStringContainsString( 'cannot be charged without you', $text );
 		$this->assertSame( array(), $this->orders( $this->user ) );
 
-		$this->account->update_meta_data( '_mollie_customer_id', 'cst_test' );
-		$this->account->update_meta_data( '_mollie_mandate_id', 'mdt_test' );
-		$this->account->save();
-
-		// A Mollie card while Mollie is not an active payment method (the site moved to Stripe) cannot be charged.
+		// A card of a payment method that is not active on the site cannot be charged.
 		$this->assertStringContainsString( 'cannot be charged without you', $this->refused( $this->args() ) );
 
-		// With Mollie active it goes the direct way.
+		// With the method active it goes the direct way.
 		add_filter( 'beltoft_services_card_gateway_active', '__return_true' );
 		$sum = $this->json( $this->tool( 'order_server', $this->args(), $this->oauth( $this->user, Tokens::FULL ) ) );
-		$this->assertTrue( $sum['requires_confirmation'], 'With a customer and a mandate it goes the direct way.' );
+		$this->assertTrue( $sum['requires_confirmation'], 'With an active payment method it goes the direct way.' );
 	}
 
 	public function test_incomplete_billing_details_are_refused(): void {
