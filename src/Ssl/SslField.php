@@ -34,6 +34,18 @@ final class SslField {
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+	}
+
+	/**
+	 * Checkout with a certificate line: the script that shows only the inputs of the chosen options.
+	 */
+	public static function assets(): void {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || array() === self::cart_lines() ) {
+			return;
+		}
+
+		wp_enqueue_script( 'beltoft-services-ssl-field', plugins_url( 'assets/ssl-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/ssl-field.js' ), true );
 	}
 
 	/**
@@ -381,8 +393,14 @@ final class SslField {
 		$user  = get_current_user_id();
 		$zones = $user > 0 ? ZoneAccess::zones( $user ) : array();
 
+		$smime = true;
+
+		foreach ( $lines as $item ) {
+			$smime = $smime && self::plan_of( $item )['smime'];
+		}
+
 		echo '<div class="beltoft-services-ssl-field" style="margin:40px 0 0">';
-		echo '<h3 style="margin:0 0 16px">' . esc_html__( 'SSL certificate', 'beltoft-services' ) . '</h3>';
+		echo '<h3 style="margin:0 0 16px">' . esc_html( $smime ? __( 'Email certificate (S/MIME)', 'beltoft-services' ) : __( 'SSL certificate', 'beltoft-services' ) ) . '</h3>';
 
 		foreach ( $lines as $key => $item ) {
 			self::print_line( (string) $key, self::plan_of( $item ), $zones );
@@ -460,13 +478,14 @@ final class SslField {
 			}
 		}
 
-		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[approver]" aria-label="' . esc_attr__( 'Approval address', 'beltoft-services' ) . '">';
+		echo '</p><p class="form-row form-row-wide" data-ssl-show="validation:email"' . ( 'email' === $meth ? '' : ' hidden' ) . '><label for="' . esc_attr( $id ) . '_approver">' . esc_html__( 'Approval address', 'beltoft-services' ) . '</label>';
+		echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[approver]" id="' . esc_attr( $id ) . '_approver">';
 
 		foreach ( SslNames::APPROVERS as $prefix ) {
 			echo '<option value="' . esc_attr( $prefix ) . '"' . selected( $post['approver'], $prefix, false ) . '>' . esc_html( $prefix . '@' ) . '</option>';
 		}
 
-		echo '</select></span><span class="description">' . esc_html__( 'Only for the email method: the address is the prefix at your domain.', 'beltoft-services' ) . '</span></p>';
+		echo '</select></span><span class="description">' . esc_html__( 'The approval email goes to this address at your domain.', 'beltoft-services' ) . '</span></p>';
 	}
 
 	/**
@@ -524,9 +543,10 @@ final class SslField {
 			/* translators: %d: row number. */
 			$label = sprintf( __( 'Name %d', 'beltoft-services' ), $i + 1 );
 
-			echo '<p class="form-row form-row-wide' . ( 0 === $i ? ' validate-required' : '' ) . '"><label for="' . esc_attr( $id ) . '_name_' . (int) $i . '">' . esc_html( $label ) . '</label>';
-			echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[names][' . (int) $i . '][domain]" id="' . esc_attr( $id ) . '_name_' . (int) $i . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( (string) $row['domain'] ) . '"></span> ';
-			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[names][' . (int) $i . '][validation]" aria-label="' . esc_attr( sprintf( /* translators: %d: row number. */ __( 'How name %d is validated', 'beltoft-services' ), $i + 1 ) ) . '">';
+			// The method list sits in its own row: in the name's row its value would make an empty required name pass the step check.
+			echo '<p class="form-row form-row-wide' . ( 0 === $i ? ' validate-required' : '' ) . '"><label for="' . esc_attr( $id ) . '_name_' . (int) $i . '">' . esc_html( $label ) . ( 0 === $i ? '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr>' : '' ) . '</label>';
+			echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[names][' . (int) $i . '][domain]" id="' . esc_attr( $id ) . '_name_' . (int) $i . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( (string) $row['domain'] ) . '"></span></p>';
+			echo '<p class="form-row form-row-wide"><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[names][' . (int) $i . '][validation]" aria-label="' . esc_attr( sprintf( /* translators: %d: row number. */ __( 'How name %d is validated', 'beltoft-services' ), $i + 1 ) ) . '">';
 
 			foreach ( $methods as $value => $m ) {
 				if ( $m[1] ) {
@@ -553,7 +573,8 @@ final class SslField {
 		echo '<p class="form-row form-row-wide"><span>' . esc_html__( 'Private key', 'beltoft-services' ) . '</span>';
 		echo '<label style="display:block"><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[key_mode]" value="generate"' . checked( $mode, 'generate', false ) . '> ' . esc_html__( 'Make the key for me. I download it once from my account.', 'beltoft-services' ) . '</label>';
 		echo '<label style="display:block"><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[key_mode]" value="own"' . checked( $mode, 'own', false ) . '> ' . esc_html__( 'I have a certificate request (CSR). We never see my key.', 'beltoft-services' ) . '</label>';
-		echo '<span class="woocommerce-input-wrapper"><textarea name="' . esc_attr( $name ) . '[csr]" rows="5" spellcheck="false" placeholder="-----BEGIN CERTIFICATE REQUEST-----">' . esc_textarea( $post['csr'] ) . '</textarea></span></p>';
+		echo '</p><p class="form-row form-row-wide validate-required" data-ssl-show="key_mode:own"' . ( 'own' === $mode ? '' : ' hidden' ) . '><label for="' . esc_attr( sanitize_key( $name ) ) . '_csr">' . esc_html__( 'Certificate request (CSR)', 'beltoft-services' ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
+		echo '<span class="woocommerce-input-wrapper"><textarea class="input-text" name="' . esc_attr( $name ) . '[csr]" id="' . esc_attr( sanitize_key( $name ) ) . '_csr" rows="5" spellcheck="false" placeholder="-----BEGIN CERTIFICATE REQUEST-----">' . esc_textarea( $post['csr'] ) . '</textarea></span></p>';
 
 		if ( 'dv' !== $plan['level'] ) {
 			echo '<p class="description">' . esc_html__( 'This certificate is issued to the company in your billing details. The certificate authority checks the company and may phone or ask for documents, which can take a few days.', 'beltoft-services' ) . '</p>';

@@ -207,6 +207,10 @@ class SslFieldTest extends SslTestCase {
 		SslField::render();
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'name="' . SslField::POST_KEY . '[' . $key . '][domain]"', $html );
+		$this->assertStringContainsString( '<h3 style="margin:0 0 16px">SSL certificate</h3>', $html );
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide" data-ssl-show="validation:email" hidden>.*?\[approver\]#s', $html, 'The approval address shows only for the email method.' );
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required" data-ssl-show="key_mode:own" hidden>.*?\[csr\]#s', $html, 'The CSR box shows, and is required, only for an own key.' );
+		$this->assertStringNotContainsString( 'Only for the email method', $html );
 		$this->assertStringNotContainsString( '—', $html );
 		$this->assertStringNotContainsString( '·', $html );
 	}

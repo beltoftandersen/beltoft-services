@@ -323,7 +323,8 @@ final class KeyField {
 
 		if ( KeyCatalog::is_edition( $plan['key'] ) ) {
 			$text = $plan['physical'] ? __( 'The server is a physical server.', 'beltoft-services' ) : __( 'The server is a virtual server (VPS). This licence is not valid on a physical server.', 'beltoft-services' );
-			echo '<p class="form-row form-row-wide"><label><input type="checkbox" class="input-checkbox" name="' . esc_attr( $name ) . '[confirm]" value="1"' . checked( $post['confirm'] ?? '', '1', false ) . '> ' . esc_html( $text ) . '</label></p>';
+			// validate-required: the checkout step stops on an unticked box, as on an empty address.
+			echo '<p class="form-row form-row-wide validate-required"><label><input type="checkbox" class="input-checkbox" name="' . esc_attr( $name ) . '[confirm]" value="1"' . checked( $post['confirm'] ?? '', '1', false ) . '> ' . esc_html( $text ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label></p>';
 		} elseif ( str_starts_with( $plan['key'], 'cloudlinux-' ) ) {
 			echo '<p class="description">' . esc_html__( 'CloudLinux runs on AlmaLinux. On a server of ours it needs the Plesk version on AlmaLinux.', 'beltoft-services' ) . '</p>';
 		}
