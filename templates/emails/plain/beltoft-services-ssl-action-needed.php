@@ -30,6 +30,12 @@ if ( '' !== $customer_name ) {
 	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
 }
 
+if ( $ssl['smime'] ) {
+	/* translators: %s: email address of the certificate. */
+	echo wp_strip_all_tags( sprintf( __( 'To issue your S/MIME certificate the certificate authority has sent an email with a link to %s. Open it and click the link to confirm that the mailbox is yours.', 'beltoft-services' ), $ssl['name'] ) ) . "\n\n";
+	echo __( 'The certificate is issued a few minutes after you click. If the email did not arrive, look in your spam folder, or open the certificate authority page from your certificate page.', 'beltoft-services' ) . "\n\n";
+	echo __( 'Your certificate:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
+} else {
 /* translators: %s: name on the certificate. */
 echo wp_strip_all_tags( sprintf( __( 'To issue your certificate for %s the domain has to be validated.', 'beltoft-services' ), $ssl['name'] ) ) . "\n\n";
 if ( 'email' === $ssl['reason'] ) {
@@ -49,6 +55,7 @@ if ( 'email' === $ssl['reason'] ) {
 }
 echo __( 'The certificate is issued a few minutes after the authority has seen it. Certificates that name a company can take a few days.', 'beltoft-services' ) . "\n\n";
 echo __( 'Your certificate:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
+}
 
 if ( $additional_content ) {
 	echo wp_strip_all_tags( wptexturize( $additional_content ) );

@@ -105,12 +105,14 @@ final class Provision {
 		$name    = (string) $r->get( 'ssl_name' );
 		$base    = (string) $r->get( 'ssl_domain' );
 		$steps   = (array) $r->get( 'steps' );
+		$smime   = SslCatalog::is_smime( $product );
 
-		if ( $product < 1 || '' === $name || null === SslNames::base( $base ) ) {
+		// An S/MIME certificate is for one mailbox: the name is the address, there are no host names and no wildcard.
+		if ( $product < 1 || '' === $name || ( $smime ? ! is_email( $name ) : ( is_email( $name ) || null === SslNames::base( $base ) ) ) ) {
 			return StepResult::fail( 'The order did not contain a valid certificate product and name.' );
 		}
 
-		$wildcard = '*.' === substr( $name, 0, 2 );
+		$wildcard = ! $smime && '*.' === substr( $name, 0, 2 );
 
 		if ( ! in_array( 'order', $steps, true ) ) {
 			if ( ! SslSettings::enabled() ) {
@@ -125,22 +127,24 @@ final class Provision {
 				return StepResult::retry( 3600, 'The registrar cost for this certificate product is unknown.' );
 			}
 
-			$count = count( SslNames::entries( $r ) );
+			if ( ! $smime ) {
+				$count = count( SslNames::entries( $r ) );
 
-			// A certificate for several names needs a multi domain product, and no more names than its price includes. A multi
-			// domain product is never ordered with one name (the registrar refuses it: alternative names must be present).
-			$multi = SslCatalog::is_multi( $product );
+				// A certificate for several names needs a multi domain product, and no more names than its price includes. A multi
+				// domain product is never ordered with one name (the registrar refuses it: alternative names must be present).
+				$multi = SslCatalog::is_multi( $product );
 
-			if ( ( $count > 1 && ( ! $multi || $count > SslCatalog::included( $product ) ) ) || ( $multi && $count < 2 ) ) {
-				Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about how many names the certificate covers.' );
+				if ( ( $count > 1 && ( ! $multi || $count > SslCatalog::included( $product ) ) ) || ( $multi && $count < 2 ) ) {
+					Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about how many names the certificate covers.' );
 
-				return StepResult::fail( 'The certificate product does not cover the number of names ordered.' );
-			}
+					return StepResult::fail( 'The certificate product does not cover the number of names ordered.' );
+				}
 
-			if ( $wildcard !== (bool) $catalog['wildcard'] ) {
-				Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about wildcard names.' );
+				if ( $wildcard !== (bool) $catalog['wildcard'] ) {
+					Alerts::admin( $r, 'The product variation and the registrar product ' . $product . ' disagree about wildcard names.' );
 
-				return StepResult::fail( 'The certificate product does not match the name ordered.' );
+					return StepResult::fail( 'The certificate product does not match the name ordered.' );
+				}
 			}
 		}
 
@@ -199,7 +203,9 @@ final class Provision {
 		$id = (string) $r->get( 'remote_id' );
 
 		if ( ! in_array( 'request', $steps, true ) ) {
-			$sent = Clients::registrar()->request( 'PUT', '/ssl/orders/' . $id, array( 'start_provision' => true ) );
+			// The authority mails the link to the mailbox: an S/MIME order is started with that address and a server software.
+			$start = self::is_smime( $r ) ? array( 'start_provision' => true, 'approver_email' => (string) $r->get( 'ssl_approver' ), 'software_id' => 'linux' ) : array( 'start_provision' => true );
+			$sent  = Clients::registrar()->request( 'PUT', '/ssl/orders/' . $id, $start );
 
 			if ( is_wp_error( $sent ) ) {
 				// An order already past PAI answers differently; read it back before judging.
@@ -306,8 +312,10 @@ final class Provision {
 	 * @return array<string, mixed>|StepResult Meta to save, or the result to return.
 	 */
 	private static function make_csr( Resource $r, string $name, string $level, array $names = array() ) {
+		$smime = self::is_smime( $r );
+
 		if ( 'own' === $r->get( 'ssl_key_mode' ) ) {
-			$read = Csr::check( (string) $r->get( 'ssl_csr' ), $name, $level, $names );
+			$read = $smime ? Csr::check_email( (string) $r->get( 'ssl_csr' ), $name ) : Csr::check( (string) $r->get( 'ssl_csr' ), $name, $level, $names );
 
 			return is_wp_error( $read ) ? StepResult::fail( $read->get_error_message() ) : array();
 		}
@@ -323,7 +331,7 @@ final class Provision {
 			return $org;
 		}
 
-		$made = Csr::generate( $name, $org, $names );
+		$made = $smime ? Csr::generate_email( $name, self::person( $r ), (string) ( $org['countryName'] ?? '' ) ) : Csr::generate( $name, $org, $names );
 
 		if ( is_wp_error( $made ) ) {
 			return StepResult::retry( 300, $made->get_error_message() );
@@ -337,6 +345,32 @@ final class Provision {
 		}
 
 		return array_merge( $keep, array( 'ssl_csr' => $made['csr'] ) );
+	}
+
+	/**
+	 * Is this service an S/MIME certificate (its registrar product is the S/MIME one)?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function is_smime( Resource $r ): bool {
+		return SslCatalog::is_smime( (int) ( ( (array) $r->get( 'plan' ) )['ssl_product'] ?? 0 ) );
+	}
+
+	/**
+	 * The name on an S/MIME request: the one the customer typed at checkout, else the billing name.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function person( Resource $r ): string {
+		$typed = trim( (string) $r->get( 'ssl_person' ) );
+
+		if ( '' !== $typed ) {
+			return $typed;
+		}
+
+		$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
+
+		return $order ? trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ) : '';
 	}
 
 	/**
@@ -396,7 +430,9 @@ final class Provision {
 		$marker = (int) $r->get( 'ssl_post_attempted' );
 
 		if ( $marker > 0 ) {
-			$found = $client->request( 'GET', '/ssl/orders', array(), array( 'common_name_pattern' => $name, 'contact_handle' => $handle, 'limit' => 50 ) );
+			// The registrar names an S/MIME order after the person in the request, not the mailbox: it is found by handle and request text.
+			$query = self::is_smime( $r ) ? array( 'contact_handle' => $handle, 'limit' => 50 ) : array( 'common_name_pattern' => $name, 'contact_handle' => $handle, 'limit' => 50 );
+			$found = $client->request( 'GET', '/ssl/orders', array(), $query );
 
 			if ( is_wp_error( $found ) ) {
 				return StepResult::retry( 3600, 'The registrar could not check for an earlier order.' );
@@ -436,25 +472,43 @@ final class Provision {
 			return StepResult::retry( 300, 'The order marker could not be saved.' );
 		}
 
-		$method = Validation::registrar_method( $r );
-		$rows   = Validation::registrar_methods( $r );
-		$body   = array(
-			'product_id'                => $product,
-			'period'                    => 1,
-			'csr'                       => (string) $r->get( 'ssl_csr' ),
-			'organization_handle'       => $handle,
-			'technical_handle'          => $handle,
-			'signature_hash_algorithm'  => 'sha2',
-			'software_id'               => 'linux',
-			// The bundle is priced for its included names: a multi domain order with fewer names still says so (the sandbox takes both).
-			'domain_amount'             => SslCatalog::is_multi( $product ) ? max( count( $rows ), SslCatalog::included( $product ) ) : count( $rows ),
-			'domain_validation_methods' => $rows,
-			'autorenew'                 => 'off',
-			'start_provision'           => false,
-		);
+		if ( self::is_smime( $r ) ) {
+			// No host names, no validation methods: only the mailbox the authority writes to.
+			$body = array(
+				'product_id'               => $product,
+				'period'                   => 1,
+				'csr'                      => (string) $r->get( 'ssl_csr' ),
+				'organization_handle'      => $handle,
+				'technical_handle'         => $handle,
+				'signature_hash_algorithm' => 'sha2',
+				'software_id'              => 'linux',
+				'approver_email'           => (string) $r->get( 'ssl_approver' ),
+				'autorenew'                => 'off',
+				'start_provision'          => false,
+			);
+			$rows   = array();
+			$method = 'email';
+		} else {
+			$method = Validation::registrar_method( $r );
+			$rows   = Validation::registrar_methods( $r );
+			$body   = array(
+				'product_id'                => $product,
+				'period'                    => 1,
+				'csr'                       => (string) $r->get( 'ssl_csr' ),
+				'organization_handle'       => $handle,
+				'technical_handle'          => $handle,
+				'signature_hash_algorithm'  => 'sha2',
+				'software_id'               => 'linux',
+				// The bundle is priced for its included names: a multi domain order with fewer names still says so (the sandbox takes both).
+				'domain_amount'             => SslCatalog::is_multi( $product ) ? max( count( $rows ), SslCatalog::included( $product ) ) : count( $rows ),
+				'domain_validation_methods' => $rows,
+				'autorenew'                 => 'off',
+				'start_provision'           => false,
+			);
 
-		if ( 'email' === $method ) {
-			$body['approver_email'] = (string) $r->get( 'ssl_approver' );
+			if ( 'email' === $method ) {
+				$body['approver_email'] = (string) $r->get( 'ssl_approver' );
+			}
 		}
 
 		$ordered = $client->request( 'POST', '/ssl/orders', $body );
@@ -512,7 +566,10 @@ final class Provision {
 			return new \WP_Error( 'registrar', 'The registrar order could not be read: ' . $detail->get_error_code() );
 		}
 
-		if ( strtolower( (string) ( $detail['common_name'] ?? '' ) ) !== strtolower( (string) $r->get( 'ssl_name' ) ) || in_array( (string) ( $detail['status'] ?? '' ), self::DEAD, true ) ) {
+		// An S/MIME order is named after the person in its request, so it is recognised by the request text.
+		$same = self::is_smime( $r ) ? trim( (string) ( $detail['csr'] ?? '' ) ) === trim( (string) $r->get( 'ssl_csr' ) ) : strtolower( (string) ( $detail['common_name'] ?? '' ) ) === strtolower( (string) $r->get( 'ssl_name' ) );
+
+		if ( ! $same || in_array( (string) ( $detail['status'] ?? '' ), self::DEAD, true ) ) {
 			return new \WP_Error( 'mismatch', 'That order is not a live order for this name.' );
 		}
 
@@ -576,6 +633,13 @@ final class Provision {
 			Alerts::admin( $r, 'The issued certificate does not belong to the key of the request. It was not stored.' );
 
 			return StepResult::fail( 'The issued certificate does not match the request.' );
+		}
+
+		// An S/MIME certificate must carry the mailbox it was paid for.
+		if ( self::is_smime( $r ) && ! Csr::certificate_has_mailbox( $pem, (string) $r->get( 'ssl_name' ) ) ) {
+			Alerts::admin( $r, 'The issued S/MIME certificate does not carry the mailbox that was ordered. It was not stored.' );
+
+			return StepResult::fail( 'The issued certificate does not carry the ordered mailbox.' );
 		}
 
 		$expires = (string) ( $detail['expiration_date'] ?? '' );

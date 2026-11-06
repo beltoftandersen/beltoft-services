@@ -141,9 +141,7 @@ final class Ssl extends ServiceArea {
 	 * @param Resource $resource Resource.
 	 */
 	public function label_of( Resource $resource ): string {
-		unset( $resource );
-
-		return __( 'SSL certificate', 'beltoft-services' );
+		return \BeltoftServices\Ssl\Provision::is_smime( $resource ) ? __( 'S/MIME certificate', 'beltoft-services' ) : __( 'SSL certificate', 'beltoft-services' );
 	}
 
 	/**

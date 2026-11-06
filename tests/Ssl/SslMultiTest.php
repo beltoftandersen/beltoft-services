@@ -58,7 +58,8 @@ class SslMultiTest extends SslTestCase {
 
 		$this->assertSame( 'unknown', SslCommand::check_variation( 999, '49' )->get_error_code() );
 		$this->assertSame( 'not_website', SslCommand::check_variation( 58, '119' )->get_error_code() );
-		$this->assertSame( 'not_website', SslCommand::check_variation( 60, '29' )->get_error_code() );
+		$this->assertIsArray( SslCommand::check_variation( 60, '29' ), 'S/MIME Personal can be sold.' );
+		$this->assertSame( 'below_cost', SslCommand::check_variation( 60, '10' )->get_error_code() );
 		$this->assertSame( 'below_cost', SslCommand::check_variation( 40, '19.28' )->get_error_code() );
 		$this->assertSame( 'price', SslCommand::check_variation( 40, 'free' )->get_error_code() );
 		$this->assertSame( 'exists', SslCommand::check_variation( 41, '19' )->get_error_code() );

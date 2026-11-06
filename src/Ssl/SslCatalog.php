@@ -15,6 +15,9 @@ final class SslCatalog {
 	public const OPTION = 'beltoft_services_ssl_costs';
 	private const PAGE_SIZE = 100;
 
+	/** The one registrar product the S/MIME profile sells: S/MIME Personal (one mailbox, no host names). S/MIME Pro and code signing are not sold. */
+	public const SMIME_PRODUCT = 60;
+
 	/**
 	 * The certificate products of the launch catalog, as key => registrar product id, for the product CLI.
 	 * A site changes them with the filter; ids come from the registrar's product list.
@@ -99,6 +102,33 @@ final class SslCatalog {
 		$row = self::get( $product_id );
 
 		return $row && (int) ( $row['max_domains'] ?? 0 ) >= 1;
+	}
+
+	/**
+	 * Is this the S/MIME profile (one certificate for one mailbox, validated by an email to it)? Only product 60 is.
+	 *
+	 * @param int $product_id Registrar product id.
+	 */
+	public static function is_smime( int $product_id ): bool {
+		return self::SMIME_PRODUCT === $product_id;
+	}
+
+	/**
+	 * The profile of a product: smime or website.
+	 *
+	 * @param int $product_id Registrar product id.
+	 */
+	public static function profile( int $product_id ): string {
+		return self::is_smime( $product_id ) ? 'smime' : 'website';
+	}
+
+	/**
+	 * Can a certificate product sell this registrar product: a website certificate, or S/MIME Personal?
+	 *
+	 * @param int $product_id Registrar product id.
+	 */
+	public static function is_sellable( int $product_id ): bool {
+		return null !== self::get( $product_id ) && ( self::is_website( $product_id ) || self::is_smime( $product_id ) );
 	}
 
 	/**

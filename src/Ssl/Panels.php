@@ -51,6 +51,8 @@ final class Panels {
 					'limit'     => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 					'keyGone'   => __( 'The key has already been taken or is no longer available.', 'beltoft-services' ),
 					'keyOnce'   => __( 'The key is saved on your device. It is shown one time only and we keep no copy.', 'beltoft-services' ),
+					'p12Once'   => __( 'The .p12 file is saved on your device. It is made one time only and we keep no copy. Your password is', 'beltoft-services' ),
+					'p12Saved'  => __( 'The .p12 file is saved on your device. We keep no copy.', 'beltoft-services' ),
 					'copied'    => __( 'Copied', 'beltoft-services' ),
 					'working'   => __( 'Working...', 'beltoft-services' ),
 					'queued'    => __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
@@ -134,7 +136,9 @@ final class Panels {
 		echo '<dl class="beltoft-services-ssl__facts">';
 		$names = array_column( SslNames::entries( $r ), 'name' );
 
-		if ( count( $names ) > 1 ) {
+		if ( Provision::is_smime( $r ) ) {
+			self::fact( __( 'Email address', 'beltoft-services' ), $name );
+		} elseif ( count( $names ) > 1 ) {
 			self::fact( __( 'Names', 'beltoft-services' ), implode( ', ', $names ) );
 		} else {
 			self::fact( __( 'Name', 'beltoft-services' ), $name );
@@ -158,7 +162,11 @@ final class Panels {
 			self::downloads( $r );
 		}
 
-		echo '<p class="beltoft-services-ssl__note">' . esc_html__( 'Certificates are valid for at most 199 days now and 100 days from March 2027. Your yearly order is reissued during the year, and each new certificate has to be installed. We email you when a new one is ready, and the pull address above always holds the current one.', 'beltoft-services' ) . '</p>';
+		if ( Provision::is_smime( $r ) ) {
+			echo '<p class="beltoft-services-ssl__note">' . esc_html__( 'Install the certificate in your email program to sign and encrypt email. Install a .p12 file with its password; with your own key, install the certificate where the key is. If you lose the key, reissue the certificate for free with a new one.', 'beltoft-services' ) . '</p>';
+		} else {
+			echo '<p class="beltoft-services-ssl__note">' . esc_html__( 'Certificates are valid for at most 199 days now and 100 days from March 2027. Your yearly order is reissued during the year, and each new certificate has to be installed. We email you when a new one is ready, and the pull address above always holds the current one.', 'beltoft-services' ) . '</p>';
+		}
 
 		if ( array() !== $actions && '' !== $r->get( 'remote_id' ) ) {
 			self::actions( $r, $actions );
@@ -190,6 +198,14 @@ final class Panels {
 		$kind = (string) $r->get( 'ssl_validation' );
 
 		echo '<h3>' . esc_html__( 'Validation', 'beltoft-services' ) . '</h3>';
+
+		if ( 'email' === $kind && Provision::is_smime( $r ) ) {
+			/* translators: %s: email address of the certificate. */
+			echo '<p>' . esc_html( sprintf( __( 'The certificate authority sent an email with a link to %s. Open it and click the link to confirm that the mailbox is yours. The certificate is issued a few minutes after that.', 'beltoft-services' ), (string) ( $rows[0]['value'] ?? '' ) ) ) . '</p>';
+			echo '<p>' . esc_html__( 'If the email did not arrive, look in your spam folder, or open the certificate authority page below.', 'beltoft-services' ) . '</p>';
+
+			return;
+		}
 
 		if ( 'email' === $kind ) {
 			/* translators: %s: approval email address. */
@@ -246,9 +262,15 @@ final class Panels {
 		}
 
 		echo '</p>';
+		$smime = Provision::is_smime( $r );
+
 		echo '<p class="beltoft-services-ssl__pull">' . esc_html__( 'To fetch the current certificate from a script, read this address with an API token (read access is enough). It never holds a key.', 'beltoft-services' ) . '<br><code>' . esc_html( rest_url( \BeltoftServices\Api\Routes::NAMESPACE . '/resources/' . $r->id() . '/ssl-certificate' ) ) . '</code></p>';
 
-		if ( Keys::revealable( $r ) ) {
+		if ( $smime && Keys::revealable( $r ) ) {
+			echo '<p><label>' . esc_html__( 'Password for the .p12 file (at least 12 characters, or leave empty and we make one)', 'beltoft-services' ) . '<br><input type="password" class="input-text" data-ssl-p12-password autocomplete="new-password" maxlength="128"></label></p>';
+			echo '<p><button type="button" class="button woocommerce-button" data-ssl-p12>' . esc_html__( 'Take the key and certificate as a .p12 file', 'beltoft-services' ) . '</button> ';
+			echo '<span class="description">' . esc_html__( 'We made the key for you. You can take it once in the next days, then we delete it. If you miss it, reissue the certificate for free to get a new key.', 'beltoft-services' ) . '</span></p>';
+		} elseif ( Keys::revealable( $r ) ) {
 			echo '<p><button type="button" class="button woocommerce-button" data-ssl-key>' . esc_html__( 'Take the private key', 'beltoft-services' ) . '</button> ';
 			echo '<span class="description">' . esc_html__( 'We made the key for you. You can take it once in the next days, then we delete it. If you miss it, reissue the certificate for free to get a new key.', 'beltoft-services' ) . '</span></p>';
 		} elseif ( 'generate' === (string) $r->get( 'ssl_key_mode' ) ) {
@@ -337,6 +359,7 @@ final class Panels {
 		$details = array_filter(
 			array(
 				'Name'               => $r->get( 'ssl_name' ),
+				'Profile'            => Provision::is_smime( $r ) ? 'S/MIME' : '',
 				'Names'              => SslNames::is_multi( $r ) ? implode( ', ', array_column( SslNames::entries( $r ), 'name' ) ) : '',
 				'Registrar order'    => $r->get( 'remote_id' ),
 				'Registrar product'  => ( (array) $r->get( 'plan' ) )['ssl_product'] ?? '',
