@@ -32,6 +32,9 @@ final class IntroCoupon {
 	 */
 	public static function register(): void {
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'on_add' ), 20, 6 );
+		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'on_removed' ), 10, 2 );
+		// Before WooCommerce's own coupon check (priority 1) turns a coupon with no line into an error that hides the checkout.
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'drop_unbacked' ), 0 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_cart_errors', array( __CLASS__, 'store_api_errors' ), 10, 2 );
 	}
@@ -202,6 +205,67 @@ final class IntroCoupon {
 			$notices['error'] = array_slice( (array) ( $notices['error'] ?? array() ), 0, $before );
 			wc_set_notices( $notices );
 		}
+	}
+
+	/**
+	 * Action woocommerce_cart_item_removed: the intro coupon goes with the last line it was for. Without this the coupon
+	 * stays when another product replaces the service (the shop keeps one purchase per cart), and WooCommerce then answers
+	 * the next page with the error "coupon is invalid", which hides the whole checkout form as if the cart were empty.
+	 *
+	 * @param mixed $cart_item_key Cart item key.
+	 * @param mixed $cart          Cart.
+	 */
+	public static function on_removed( $cart_item_key, $cart = null ): void {
+		if ( ! $cart instanceof \WC_Cart || ! is_string( $cart_item_key ) || ! isset( $cart->removed_cart_contents[ $cart_item_key ] ) ) {
+			return;
+		}
+
+		$code = self::code( (int) ( $cart->removed_cart_contents[ $cart_item_key ]['product_id'] ?? 0 ) );
+
+		if ( '' !== $code && $cart->has_discount( $code ) && ! isset( self::lines( $cart )[ $code ] ) ) {
+			$cart->remove_coupon( $code );
+		}
+	}
+
+	/**
+	 * Action woocommerce_check_cart_items: an intro coupon in a cart that no longer has a line for it is taken off
+	 * quietly (a cart saved before on_removed() existed, or changed by another plugin).
+	 */
+	public static function drop_unbacked(): void {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		if ( ! $cart instanceof \WC_Cart || array() === $cart->get_applied_coupons() ) {
+			return;
+		}
+
+		$lines = self::lines( $cart );
+
+		foreach ( $cart->get_applied_coupons() as $code ) {
+			if ( ! isset( $lines[ $code ] ) && self::is_intro_code( (string) $code ) ) {
+				$cart->remove_coupon( $code );
+			}
+		}
+	}
+
+	/**
+	 * Is this coupon code the intro coupon of some product?
+	 *
+	 * @param string $code Coupon code.
+	 */
+	private static function is_intro_code( string $code ): bool {
+		$found = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'any',
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => true,
+				'meta_key'       => self::META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one cheap lookup, only for a cart that holds a coupon.
+				'meta_value'     => wc_format_coupon_code( $code ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- same.
+			)
+		);
+
+		return array() !== $found;
 	}
 
 	/**

@@ -155,6 +155,51 @@ class IntroCouponTest extends TestCase {
 		$this->assertFalse( WC()->cart->has_discount( 'intro-half' ) );
 	}
 
+	public function test_the_coupon_goes_when_another_product_replaces_the_service(): void {
+		$this->coupon( 'intro-half' );
+		$product = $this->product();
+		$key     = $this->add( $product );
+		$this->assertTrue( WC()->cart->has_discount( 'intro-half' ) );
+
+		// The shop keeps one purchase per cart: the theme removes the service line when another product is added.
+		$other = $this->service_product( 'fake', array(), array( 'slug' => 'other-' . wp_generate_password( 5, false ) ) );
+		WC()->cart->add_to_cart( $other->get_id() );
+		WC()->cart->remove_cart_item( $key );
+
+		$this->assertFalse( WC()->cart->has_discount( 'intro-half' ), 'The intro coupon left with its line.' );
+
+		// What WooCommerce checks on the next page: no "coupon is invalid" error, so the checkout form is not hidden.
+		wc_clear_notices();
+		do_action( 'woocommerce_check_cart_items' );
+		$this->assertSame( 0, wc_notice_count( 'error' ) );
+	}
+
+	public function test_a_saved_cart_with_an_intro_coupon_and_no_line_for_it_is_cleaned_before_the_error(): void {
+		$this->coupon( 'intro-half' );
+		$this->product();
+		$other = $this->service_product( 'fake', array(), array( 'slug' => 'other-' . wp_generate_password( 5, false ) ) );
+		WC()->cart->add_to_cart( $other->get_id() );
+		WC()->cart->set_applied_coupons( array( 'intro-half' ) );
+
+		wc_clear_notices();
+		do_action( 'woocommerce_check_cart_items' );
+
+		$this->assertFalse( WC()->cart->has_discount( 'intro-half' ) );
+		$this->assertSame( 0, wc_notice_count( 'error' ) );
+	}
+
+	public function test_a_coupon_that_is_not_an_intro_coupon_is_left_alone(): void {
+		$this->coupon( 'spring' );
+		$other = $this->service_product( 'fake', array(), array( 'slug' => 'other-' . wp_generate_password( 5, false ) ) );
+		WC()->cart->add_to_cart( $other->get_id() );
+		WC()->cart->apply_coupon( 'spring' );
+		$this->assertTrue( WC()->cart->has_discount( 'spring' ) );
+
+		do_action( 'woocommerce_check_cart_items' );
+
+		$this->assertTrue( WC()->cart->has_discount( 'spring' ) );
+	}
+
 	public function test_another_product_held_does_not_count(): void {
 		$this->coupon( 'intro-half' );
 		$user = self::factory()->user->create();
