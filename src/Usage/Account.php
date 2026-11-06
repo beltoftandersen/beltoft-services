@@ -154,10 +154,9 @@ final class Account {
 	}
 
 	/**
-	 * Does the customer have an active usage account whose saved card can be charged (valid, not expired)? A Mollie
-	 * mandate is checked with Mollie (details cached for ten minutes); a saved token (Stripe) is read from the
-	 * customer's WooCommerce tokens, with no API call. False when the account is on hold, has no card, or Mollie
-	 * cannot be asked: an order that relies on the card then goes the normal way.
+	 * Does the customer have an active usage account whose saved card can be charged (valid, not expired)? The saved
+	 * token is read from the customer's WooCommerce tokens, with no API call. False when the account is on hold or has
+	 * no card: an order that relies on the card then goes the normal way.
 	 *
 	 * @param int $user_id Customer.
 	 */
@@ -169,9 +168,8 @@ final class Account {
 
 	/**
 	 * Can the account be charged without the customer present: it is active, its payment method is one WooCommerce Subscriptions
-	 * charges by itself, a Mollie payment method has its customer and mandate on the account (the card saved at the first,
-	 * 0 payment), and a Stripe payment method has its token and customer on the account with the token still saved and
-	 * not expired. The filter lets a site with another gateway say what "a saved mandate" is.
+	 * charges by itself, and a token gateway (Stripe) has its token and customer on the account with the token still saved
+	 * and not expired. The filter lets a site with another gateway say what "a saved card" is.
 	 *
 	 * @param \WC_Subscription $subscription Account.
 	 */
@@ -179,9 +177,7 @@ final class Account {
 		$method = (string) $subscription->get_payment_method();
 		$ok     = $subscription->has_status( 'active' ) && self::has_card( $subscription ) && \BeltoftServices\Card\Card::gateway_active( $method );
 
-		if ( $ok && str_starts_with( $method, 'mollie_wc_gateway_' ) ) {
-			$ok = '' !== (string) $subscription->get_meta( '_mollie_customer_id' ) && '' !== (string) $subscription->get_meta( '_mollie_mandate_id' );
-		} elseif ( $ok && \BeltoftServices\Card\Card::needs_token( $method ) ) {
+		if ( $ok && \BeltoftServices\Card\Card::needs_token( $method ) ) {
 			// A token gateway (Stripe) charges the token and customer on the subscription; the token must still be a saved card that has not expired.
 			foreach ( \BeltoftServices\Card\Card::required_meta( $subscription ) as $key ) {
 				if ( '' === trim( (string) $subscription->get_meta( $key ) ) ) {

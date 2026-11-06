@@ -1,16 +1,16 @@
 <?php
 /**
- * Credit codes: the coupon type, the cart refusal and redeeming on the credit page (a faked Mollie).
+ * Credit codes: the coupon type, the cart refusal and redeeming on the credit page (the card is a saved token, its fingerprint supplied by a filter).
  *
  * @package BeltoftServices
  */
 
 namespace BeltoftServices\Tests\Credit;
 
-use BeltoftServices\Card\Mollie;
 use BeltoftServices\Credit\Balance;
 use BeltoftServices\Credit\Code;
 use BeltoftServices\RateLimit;
+use BeltoftServices\Tests\Usage\UsageCardGateway;
 
 require_once __DIR__ . '/CreditTestCase.php';
 
@@ -20,68 +20,69 @@ require_once __DIR__ . '/CreditTestCase.php';
 class CodeTest extends CreditTestCase {
 
 	/**
-	 * Mandates the fake Mollie holds, by id.
+	 * Card fingerprint of each fake payment method id.
 	 *
-	 * @var array<string, array<string, mixed>>
+	 * @var array<string, string>
 	 */
-	private $mandates = array();
+	private $fingerprints = array();
+
+	/**
+	 * Expiry year of the cards made by customer().
+	 *
+	 * @var string
+	 */
+	private $year = '2099';
 
 	public function set_up(): void {
 		parent::set_up();
-		update_option( 'mollie-payments-for-woocommerce_test_mode_enabled', 'yes' );
-		update_option( 'mollie-payments-for-woocommerce_test_api_key', 'test_' . str_repeat( 'a', 30 ) );
-		$this->mandates = array(
-			'mdt_a' => $this->mandate( 'fp_AAA' ),
-			'mdt_b' => $this->mandate( 'fp_BBB' ),
-			'mdt_a2' => $this->mandate( 'fp_AAA' ),
-			'mdt_nofp' => $this->mandate( '' ),
+		WC()->payment_gateways()->payment_gateways['stripe_cc'] = new UsageCardGateway( 'stripe_cc' );
+		$this->year         = '2099';
+		$this->fingerprints = array(
+			'mdt_a'    => 'fp_AAA',
+			'mdt_b'    => 'fp_BBB',
+			'mdt_a2'   => 'fp_AAA',
+			'mdt_nofp' => '',
 		);
-		$this->respond_with(
-			function ( string $url ): array {
-				$out  = array();
-				$code = 404;
-				if ( preg_match( '#/mandates/(mdt_\w+)$#', $url, $m ) && isset( $this->mandates[ $m[1] ] ) ) {
-					$out  = $this->mandates[ $m[1] ];
-					$code = 200;
-				}
-				return array(
-					'headers'  => array(),
-					'body'     => $out ? wp_json_encode( $out ) : '',
-					'response' => array( 'code' => $code, 'message' => '' ),
-					'cookies'  => array(),
-					'filename' => null,
-				);
-			}
+		add_filter(
+			'beltoft_services_card_fingerprint',
+			function ( $fingerprint, $token ) {
+				return $token ? ( $this->fingerprints[ $token->get_token() ] ?? '' ) : '';
+			},
+			10,
+			2
 		);
 	}
 
-	/**
-	 * A valid card mandate.
-	 *
-	 * @param string $fingerprint Fingerprint ('' for none).
-	 * @return array<string, mixed>
-	 */
-	private function mandate( string $fingerprint ): array {
-		$details = array( 'cardLabel' => 'Visa', 'cardNumber' => '1111', 'cardExpiryDate' => '2099-08-31' );
-		if ( '' !== $fingerprint ) {
-			$details['cardFingerprint'] = $fingerprint;
-		}
-
-		return array( 'status' => 'valid', 'method' => 'creditcard', 'details' => $details );
+	public function tear_down(): void {
+		remove_all_filters( 'beltoft_services_card_fingerprint' );
+		unset( WC()->payment_gateways()->payment_gateways['stripe_cc'] );
+		parent::tear_down();
 	}
 
 	/**
-	 * A customer with an active usage account holding a mandate.
+	 * A customer with an active usage account holding a saved card (a token named by $mandate, which picks its fingerprint).
 	 *
-	 * @param string $mandate Mandate id ('' for no card).
+	 * @param string $mandate Token id ('' for no card).
+	 * @param string $email   Email.
 	 */
 	private function customer( string $mandate = 'mdt_a', string $email = '' ): int {
 		$user = (int) self::factory()->user->create( array( 'user_email' => '' !== $email ? $email : 'christian.beltoft+code' . wp_generate_password( 6, false ) . '@gmail.com' ) );
 
 		if ( '' !== $mandate ) {
+			$token = new \WC_Payment_Token_CC();
+			$token->set_gateway_id( 'stripe_cc' );
+			$token->set_token( $mandate );
+			$token->set_user_id( $user );
+			$token->set_card_type( 'visa' );
+			$token->set_last4( '1111' );
+			$token->set_expiry_month( '08' );
+			$token->set_expiry_year( $this->year );
+			$token->save();
+
 			$sub = $this->usage_account( $user, 'active' );
-			$sub->update_meta_data( '_mollie_customer_id', 'cst_1' );
-			$sub->update_meta_data( '_mollie_mandate_id', $mandate );
+			$sub->set_payment_method( 'stripe_cc' );
+			$sub->update_meta_data( '_payment_method_token', $mandate );
+			$sub->update_meta_data( '_wc_stripe_customer', 'cus_1' );
 			$sub->save();
 		}
 
@@ -195,17 +196,9 @@ class CodeTest extends CreditTestCase {
 		$this->assertSame( 0, Balance::get( $user ) );
 	}
 
-	public function test_mollie_error_is_refused(): void {
-		$user = $this->customer( 'mdt_gone' );
-		$r    = Code::redeem( $user, $this->code()->get_code() );
-
-		$this->assertFalse( $r['ok'] );
-		$this->assertSame( 0, Balance::get( $user ) );
-	}
-
 	public function test_expired_card_is_refused(): void {
-		$this->mandates['mdt_a']['details']['cardExpiryDate'] = '2020-01-31';
-		$user = $this->customer( 'mdt_a' );
+		$this->year = '2020';
+		$user       = $this->customer( 'mdt_a' );
 
 		$this->assertFalse( Code::redeem( $user, $this->code()->get_code() )['ok'] );
 	}
@@ -320,13 +313,11 @@ class CodeTest extends CreditTestCase {
 		wc_clear_notices();
 	}
 
-	public function test_mollie_is_asked_with_the_saved_mandate_and_no_other_call(): void {
+	public function test_redeeming_makes_no_network_call(): void {
 		$user = $this->customer( 'mdt_a' );
 		Code::redeem( $user, $this->code()->get_code() );
 
-		$urls = array_column( $this->http_calls(), 'url' );
-		$this->assertCount( 1, $urls );
-		$this->assertStringContainsString( Mollie::API . '/customers/cst_1/mandates/mdt_a', $urls[0] );
+		$this->assertSame( array(), $this->http_calls() );
 	}
 
 	public function test_form_handler_redeems_with_a_nonce(): void {
