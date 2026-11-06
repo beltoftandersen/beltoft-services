@@ -61,8 +61,7 @@ final class KeyCatalog {
 	);
 
 	/**
-	 * Items known from the live catalogue (CloudLinux, the VPS editions) or inferred from the sandbox (the physical
-	 * editions: UNVERIFIED, check with GET /licenses/items before the first order and override in the settings).
+	 * Items read from the live catalogue (GET /licenses/items, 2026-11-06). The settings or the filter override them.
 	 */
 	private const DEFAULT_ITEMS = array(
 		'admin'                 => 'PLESK-12-VPS-WEB-ADMIN-1M',
@@ -75,6 +74,15 @@ final class KeyCatalog {
 		'cloudlinux-admin'      => 'CLNX-ADM-1M',
 		'cloudlinux-shared'     => 'CLNX-SH-1M',
 		'cloudlinux-shared-pro' => 'CLNX-SH-PRO-1M',
+		'imunify360-1'          => 'ADD-IMUNIFY360-1-USER-1M',
+		'imunify360-30'         => 'ADD-IMUNIFY360-30-USERS-1M',
+		'imunify360-250'        => 'ADD-IMUNIFY360-250-USERS-1M',
+		'imunify360-unlimited'  => 'ADD-IMUNIFY360-UNL-USERS-1M',
+		'imunifyav-plus'        => 'PLSK-EXT-RAV-PRE-1M',
+		'kernelcare'            => 'ADD-KERNELCARE-1M',
+		'spamexperts-in-1'      => 'ADD-SPAMEXPERTS-IN-1-DOM-1M',
+		'spamexperts-inout-1'   => 'ADD-SPAMEXPERTS-INOUT-1-DOM-1M',
+		'spamexperts-inout-10'  => 'ADD-SPAMEXPERTS-INOUT-10-DOM-1M',
 	);
 
 	/**

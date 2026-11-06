@@ -116,7 +116,7 @@ final class KeyTest extends TestCase {
 		$this->assertSame( 'PLESK-12-WEB-HOST-1M', $items['host-physical'] );
 		$this->assertSame( 'CLNX-SOL-1M', $items['cloudlinux-solo'] );
 		$this->assertSame( 'CLNX-SH-PRO-1M', $items['cloudlinux-shared-pro'] );
-		$this->assertArrayNotHasKey( 'kernelcare', $items, 'An item that is not known is never guessed.' );
+		$this->assertSame( 'ADD-KERNELCARE-1M', $items['kernelcare'], 'The live catalogue item is the default.' );
 
 		$this->settings( array( 'licence_items' => "kernelcare=KC-ITEM-1M\nhost=OTHER-1M\nbad key=x", 'licence_costs' => "kernelcare=2.5\npro-physical=x\nhost=20" ) );
 		$items = KeyCatalog::items();
@@ -296,12 +296,15 @@ final class KeyTest extends TestCase {
 	}
 
 	public function test_an_addon_without_an_item_waits_and_tells_the_admin_and_orders_nothing(): void {
+		$drop = static function ( $items ) { unset( $items['imunify360-1'] ); return $items; };
+		add_filter( 'beltoft_services_licence_items', $drop );
 		$r      = $this->licence( array( 'kind' => 'addon', 'tier' => 'imunify360-1', 'total' => 12.0 ) );
 		$result = $this->build( $r );
 		$this->assertTrue( $result->is_retry() );
 		$this->assertSame( array(), $this->calls( 'POST', '/licenses/plesk' ) );
 		$this->assertNotSame( array(), $this->mails );
 
+		remove_filter( 'beltoft_services_licence_items', $drop );
 		$this->settings( array( 'licence_items' => 'imunify360-1=IMUNIFY-ITEM-1M' ) );
 		$this->assertTrue( $this->build( $r )->is_done() );
 		$this->assertSame( array( 'IMUNIFY-ITEM-1M' ), $this->calls( 'POST', '/licenses/plesk' )[0]['body']['items'] );
