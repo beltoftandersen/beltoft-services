@@ -21,12 +21,19 @@ final class Csr {
 	 * end up in a request. The file is removed afterwards.
 	 *
 	 * @param callable $work Receives the config path.
+	 * @param string[] $sans Host names for the subject alternative name extension (none for a single name).
 	 * @return mixed What the callback returns.
 	 */
-	private static function with_config( callable $work ) {
+	private static function with_config( callable $work, array $sans = array() ) {
 		$path = (string) wp_tempnam( 'beltoft-ssl' );
+		$text = "[req]\ndistinguished_name = dn\n[dn]\n";
 
-		file_put_contents( $path, "[req]\ndistinguished_name = dn\n[dn]\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- a temporary openssl config.
+		if ( array() !== $sans ) {
+			$names = array_map( static fn( $n ) => 'DNS:' . $n, $sans );
+			$text  = "[req]\ndistinguished_name = dn\nreq_extensions = v3_req\n[dn]\n[v3_req]\nsubjectAltName = " . implode( ',', $names ) . "\n";
+		}
+
+		file_put_contents( $path, $text ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- a temporary openssl config.
 
 		try {
 			return $work( $path );
@@ -41,9 +48,12 @@ final class Csr {
 	 *
 	 * @param string               $name Common name, for a wildcard "*.example.com".
 	 * @param array<string, string> $org  organizationName, stateOrProvinceName, localityName, countryName (any may be missing).
+	 * @param string[]              $names All names of a multi domain certificate (the common name first); they become the subject alternative names. Empty or one name: no extension.
 	 * @return array{key: string, csr: string}|\WP_Error
 	 */
-	public static function generate( string $name, array $org = array() ) {
+	public static function generate( string $name, array $org = array(), array $names = array() ) {
+		$sans = count( $names ) > 1 ? array_values( array_filter( array_map( 'strtolower', $names ), static fn( $n ) => 1 === preg_match( '/^[a-z0-9.-]{1,253}$/D', $n ) ) ) : array();
+
 		return self::with_config(
 			static function ( string $config ) use ( $name, $org ) {
 				$key = openssl_pkey_new( array( 'private_key_bits' => self::MIN_BITS, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $config ) );
@@ -67,7 +77,8 @@ final class Csr {
 				}
 
 				return array( 'key' => (string) $pem, 'csr' => (string) $csr );
-			}
+			},
+			$sans
 		);
 	}
 
@@ -114,9 +125,10 @@ final class Csr {
 	 * @param string $csr   PEM text.
 	 * @param string $name  The name the certificate is for ("*.example.com" for a wildcard).
 	 * @param string $level dv, ov or ev.
+	 * @param string[] $names All names of a multi domain certificate (the common name first); empty for a single name one.
 	 * @return array{cn: string, subject: array<string, string>, bits: int, type: string, public: string}|\WP_Error
 	 */
-	public static function check( string $csr, string $name, string $level ) {
+	public static function check( string $csr, string $name, string $level, array $names = array() ) {
 		$read = self::parse( $csr );
 
 		if ( is_wp_error( $read ) ) {
@@ -132,7 +144,7 @@ final class Csr {
 		}
 
 		// A request that names more than was ordered would get a certificate for more than was paid for.
-		$allowed = array( strtolower( $name ) );
+		$allowed = array_values( array_unique( array_map( 'strtolower', array_merge( array( $name ), $names ) ) ) );
 
 		if ( '*.' === substr( $name, 0, 2 ) ) {
 			$allowed[] = strtolower( substr( $name, 2 ) );
@@ -157,8 +169,11 @@ final class Csr {
 	}
 
 	/**
-	 * The subject alternative names a request asks for, read from its DER (PHP has no function for it). A name that is not a DNS
-	 * name (an address, an email) comes back as "#other", so it never matches an ordered name. Empty when there is no such extension.
+	 * The subject alternative names a request asks for, read by walking its DER structure (PHP has no function for it):
+	 * CertificationRequest, its info, the attributes ([0]), the extensionRequest attribute and every subjectAltName extension in it.
+	 * Bytes that merely look like the OID elsewhere (in the subject, say) are not read. A name that is not a DNS name (an address,
+	 * an email) comes back as "#other", so it never matches an ordered name, and so does anything that cannot be parsed. Empty when
+	 * there is no such extension.
 	 *
 	 * @param string $csr PEM text.
 	 * @return string[]
@@ -171,49 +186,129 @@ final class Csr {
 			return array();
 		}
 
-		// OID 2.5.29.17 (subjectAltName), then an optional BOOLEAN, then an OCTET STRING that holds a SEQUENCE of names.
-		$at = strpos( $der, "\x06\x03\x55\x1d\x11" );
+		$top  = self::tlv( $der, 0 );
+		$info = $top && 0x30 === $top[0] ? self::tlv( $der, $top[1] ) : null;
 
-		if ( false === $at ) {
-			return array();
-		}
-
-		$pos = $at + 5;
-
-		if ( "\x01\x01" === substr( $der, $pos, 2 ) ) {
-			$pos += 3;
-		}
-
-		if ( "\x04" !== ( $der[ $pos ] ?? '' ) ) {
-			return array( '#other' );
-		}
-
-		$octet = self::der_length( $der, $pos + 1 );
-
-		if ( null === $octet || "\x30" !== ( $der[ $octet[1] ] ?? '' ) ) {
-			return array( '#other' );
-		}
-
-		$seq = self::der_length( $der, $octet[1] + 1 );
-
-		if ( null === $seq ) {
+		if ( ! $info || 0x30 !== $info[0] ) {
 			return array( '#other' );
 		}
 
 		$names = array();
-		$pos   = $seq[1];
-		$end   = $seq[1] + $seq[0];
+		$pos   = $info[1];
 
-		while ( $pos < $end ) {
-			$tag = ord( $der[ $pos ] ?? "\0" );
-			$len = self::der_length( $der, $pos + 1 );
+		// version, subject, public key, then the attributes.
+		while ( $pos < $info[2] ) {
+			$item = self::tlv( $der, $pos );
 
-			if ( null === $len ) {
+			if ( ! $item ) {
 				return array( '#other' );
 			}
 
-			$names[] = 0x82 === $tag ? substr( $der, $len[1], $len[0] ) : '#other';
-			$pos     = $len[1] + $len[0];
+			if ( 0xA0 === $item[0] ) {
+				$found = self::attribute_names( $der, $item[1], $item[2] );
+
+				if ( null === $found ) {
+					return array( '#other' );
+				}
+
+				$names = array_merge( $names, $found );
+			}
+
+			$pos = $item[2];
+		}
+
+		return $names;
+	}
+
+	/**
+	 * One element at an offset: tag, where its value starts and where it ends. Null when it does not fit.
+	 *
+	 * @param string $der Bytes.
+	 * @param int    $pos Offset of the tag.
+	 * @return array{0: int, 1: int, 2: int}|null
+	 */
+	private static function tlv( string $der, int $pos ): ?array {
+		if ( $pos >= strlen( $der ) ) {
+			return null;
+		}
+
+		$len = self::der_length( $der, $pos + 1 );
+
+		return $len && $len[1] + $len[0] <= strlen( $der ) ? array( ord( $der[ $pos ] ), $len[1], $len[1] + $len[0] ) : null;
+	}
+
+	/**
+	 * The DNS names of every subjectAltName extension inside the extensionRequest attributes of a request.
+	 *
+	 * @param string $der   Bytes.
+	 * @param int    $start Start of the attribute list.
+	 * @param int    $end   End of the attribute list.
+	 * @return string[]|null Null when the structure is malformed.
+	 */
+	private static function attribute_names( string $der, int $start, int $end ): ?array {
+		$ext_req = "\x2a\x86\x48\x86\xf7\x0d\x01\x09\x0e";
+		$san     = "\x55\x1d\x11";
+		$names   = array();
+
+		for ( $pos = $start; $pos < $end; ) {
+			$attr = self::tlv( $der, $pos );
+			$oid  = $attr && 0x30 === $attr[0] ? self::tlv( $der, $attr[1] ) : null;
+
+			if ( ! $oid || 0x06 !== $oid[0] ) {
+				return null;
+			}
+
+			$pos = $attr[2];
+
+			if ( substr( $der, $oid[1], $oid[2] - $oid[1] ) !== $ext_req ) {
+				continue;
+			}
+
+			$set = self::tlv( $der, $oid[2] );
+			$seq = $set && 0x31 === $set[0] ? self::tlv( $der, $set[1] ) : null;
+
+			if ( ! $seq || 0x30 !== $seq[0] ) {
+				return null;
+			}
+
+			for ( $e = $seq[1]; $e < $seq[2]; ) {
+				$ext = self::tlv( $der, $e );
+				$id  = $ext && 0x30 === $ext[0] ? self::tlv( $der, $ext[1] ) : null;
+
+				if ( ! $id || 0x06 !== $id[0] ) {
+					return null;
+				}
+
+				$e = $ext[2];
+
+				if ( substr( $der, $id[1], $id[2] - $id[1] ) !== $san ) {
+					continue;
+				}
+
+				$next = self::tlv( $der, $id[2] );
+
+				// An optional "critical" BOOLEAN comes before the OCTET STRING.
+				if ( $next && 0x01 === $next[0] ) {
+					$next = self::tlv( $der, $next[2] );
+				}
+
+				$general = $next && 0x04 === $next[0] ? self::tlv( $der, $next[1] ) : null;
+
+				if ( ! $general || 0x30 !== $general[0] ) {
+					return null;
+				}
+
+				for ( $g = $general[1]; $g < $general[2]; ) {
+					$name = self::tlv( $der, $g );
+
+					if ( ! $name ) {
+						return null;
+					}
+
+					$names[] = 0x82 === $name[0] ? substr( $der, $name[1], $name[2] - $name[1] ) : '#other';
+					$g       = $name[2];
+				}
+			}
 		}
 
 		return $names;

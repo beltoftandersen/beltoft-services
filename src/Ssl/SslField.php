@@ -78,57 +78,75 @@ final class SslField {
 	 * The plan of a cart line: registrar product, level and wildcard.
 	 *
 	 * @param array<string, mixed> $item Cart item.
-	 * @return array{level: string, wildcard: bool}
+	 * @return array{level: string, wildcard: bool, domains: int}
 	 */
 	private static function plan_of( array $item ): array {
 		$plan = Product::plan( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) ?: null );
 
-		return array( 'level' => in_array( (string) ( $plan['ssl_level'] ?? '' ), array( 'dv', 'ov', 'ev' ), true ) ? (string) $plan['ssl_level'] : 'dv', 'wildcard' => ! empty( $plan['ssl_wildcard'] ) );
+		return array(
+			'level'    => in_array( (string) ( $plan['ssl_level'] ?? '' ), array( 'dv', 'ov', 'ev' ), true ) ? (string) $plan['ssl_level'] : 'dv',
+			'wildcard' => ! empty( $plan['ssl_wildcard'] ),
+			'domains'  => max( 1, (int) ( $plan['ssl_domains'] ?? 1 ) ),
+		);
 	}
 
 	/**
 	 * The choices of one line, or why they cannot be used.
 	 *
-	 * @param array<string, string> $input   domain, validation, approver, key_mode, csr.
-	 * @param int                   $user_id Customer, 0 for a guest.
-	 * @param string                $level   dv, ov or ev.
-	 * @param bool                  $wildcard Wildcard product.
-	 * @param string                $company  The billing company, for OV and EV.
-	 * @return array<string, string>|\WP_Error What is saved on the order line; the error's message is for the customer.
+	 * @param array<string, mixed> $input    domain, validation, approver, key_mode, csr; for a multi domain certificate names (a list of domain and validation).
+	 * @param int                  $user_id  Customer, 0 for a guest.
+	 * @param string               $level    dv, ov or ev.
+	 * @param bool                 $wildcard Wildcard product.
+	 * @param string               $company  The billing company, for OV and EV.
+	 * @param int                  $domains  How many names the product includes (more than one makes it a multi domain certificate).
+	 * @return array<string, mixed>|\WP_Error What is saved on the order line; the error's message is for the customer.
 	 */
-	public static function resolve( array $input, int $user_id, string $level, bool $wildcard, string $company ) {
+	public static function resolve( array $input, int $user_id, string $level, bool $wildcard, string $company, int $domains = 1 ) {
 		if ( ! SslSettings::enabled() ) {
 			return new \WP_Error( 'ssl_off', __( 'SSL certificates cannot be ordered right now. Please try again later.', 'beltoft-services' ) );
 		}
 
-		$base = SslNames::base( $input['domain'] ?? '' );
-
-		if ( null === $base ) {
-			return new \WP_Error( 'ssl_domain', __( 'Enter the domain name for the certificate, for example example.com.', 'beltoft-services' ) );
-		}
-
-		if ( ! $wildcard && SslNames::typed_wildcard( $input['domain'] ?? '' ) ) {
-			return new \WP_Error( 'ssl_wildcard', __( 'This certificate covers one name. Choose a wildcard certificate for *.example.com.', 'beltoft-services' ) );
-		}
-
-		$name   = SslNames::common_name( $base, $wildcard );
-		$method = (string) ( $input['validation'] ?? '' );
-
-		if ( ! in_array( $method, Validation::METHODS, true ) || ( $wildcard && 'file' === $method ) ) {
-			return new \WP_Error( 'ssl_validation', $wildcard ? __( 'A wildcard certificate is validated with a DNS record or an email.', 'beltoft-services' ) : __( 'Choose how the domain is validated.', 'beltoft-services' ) );
-		}
-
-		if ( 'auto' === $method && null === SslNames::zone_for( $base, $user_id ) ) {
-			return new \WP_Error( 'ssl_auto', __( 'Automatic validation needs a domain on our name servers. Choose another method.', 'beltoft-services' ) );
-		}
-
+		$entries  = array();
 		$approver = '';
 
-		if ( 'email' === $method ) {
-			$approver = (string) SslNames::approver( (string) ( $input['approver'] ?? '' ), $base );
+		if ( $domains > 1 ) {
+			$entries = self::multi_entries( $input, $user_id, $domains );
 
-			if ( '' === $approver ) {
-				return new \WP_Error( 'ssl_approver', __( 'Choose the address the approval email is sent to.', 'beltoft-services' ) );
+			if ( is_wp_error( $entries ) ) {
+				return $entries;
+			}
+
+			$base   = $entries[0]['base'];
+			$name   = $entries[0]['name'];
+			$method = $entries[0]['validation'];
+		} else {
+			$base = SslNames::base( $input['domain'] ?? '' );
+
+			if ( null === $base ) {
+				return new \WP_Error( 'ssl_domain', __( 'Enter the domain name for the certificate, for example example.com.', 'beltoft-services' ) );
+			}
+
+			if ( ! $wildcard && SslNames::typed_wildcard( $input['domain'] ?? '' ) ) {
+				return new \WP_Error( 'ssl_wildcard', __( 'This certificate covers one name. Choose a wildcard certificate for *.example.com.', 'beltoft-services' ) );
+			}
+
+			$name   = SslNames::common_name( $base, $wildcard );
+			$method = (string) ( $input['validation'] ?? '' );
+
+			if ( ! in_array( $method, Validation::METHODS, true ) || ( $wildcard && 'file' === $method ) ) {
+				return new \WP_Error( 'ssl_validation', $wildcard ? __( 'A wildcard certificate is validated with a DNS record or an email.', 'beltoft-services' ) : __( 'Choose how the domain is validated.', 'beltoft-services' ) );
+			}
+
+			if ( 'auto' === $method && null === SslNames::zone_for( $base, $user_id ) ) {
+				return new \WP_Error( 'ssl_auto', __( 'Automatic validation needs a domain on our name servers. Choose another method.', 'beltoft-services' ) );
+			}
+
+			if ( 'email' === $method ) {
+				$approver = (string) SslNames::approver( (string) ( $input['approver'] ?? '' ), $base );
+
+				if ( '' === $approver ) {
+					return new \WP_Error( 'ssl_approver', __( 'Choose the address the approval email is sent to.', 'beltoft-services' ) );
+				}
 			}
 		}
 
@@ -136,7 +154,7 @@ final class SslField {
 		$csr      = '';
 
 		if ( 'own' === $key_mode ) {
-			$read = Csr::check( (string) ( $input['csr'] ?? '' ), $name, $level );
+			$read = Csr::check( (string) ( $input['csr'] ?? '' ), $name, $level, array_column( $entries, 'name' ) );
 
 			if ( is_wp_error( $read ) ) {
 				return $read;
@@ -157,7 +175,74 @@ final class SslField {
 			return new \WP_Error( 'ssl_refused', $refused );
 		}
 
-		return array( 'domain' => $base, 'name' => $name, 'validation' => $method, 'approver' => $approver, 'key_mode' => $key_mode, 'csr' => $csr );
+		$saved = array( 'domain' => $base, 'name' => $name, 'validation' => $method, 'approver' => $approver, 'key_mode' => $key_mode, 'csr' => $csr );
+
+		return array() === $entries ? $saved : $saved + array( 'names' => $entries );
+	}
+
+	/**
+	 * The names of a multi domain certificate, each with its validation method. Blank rows are skipped; the first filled row is
+	 * the common name. Email validation is not offered (the registrar's sandbox does not take it per name), nor are wildcard names.
+	 *
+	 * @param array<string, mixed> $input   The posted choices.
+	 * @param int                  $user_id Customer.
+	 * @param int                  $max     Names the product includes.
+	 * @return array<int, array{name: string, base: string, validation: string}>|\WP_Error
+	 */
+	private static function multi_entries( array $input, int $user_id, int $max ) {
+		$entries = array();
+		$seen    = array();
+
+		foreach ( (array) ( $input['names'] ?? array() ) as $row ) {
+			$typed = is_array( $row ) ? trim( (string) ( $row['domain'] ?? '' ) ) : '';
+
+			if ( '' === $typed ) {
+				continue;
+			}
+
+			$one = SslNames::list_of( $typed );
+
+			if ( null === $one || 1 !== count( $one ) ) {
+				/* translators: %s: what was typed. */
+				return new \WP_Error( 'ssl_domain', sprintf( __( '%s is not a domain name. Enter one name per row, for example example.com or www.example.com. A wildcard name needs a wildcard certificate.', 'beltoft-services' ), wp_strip_all_tags( $typed ) ) );
+			}
+
+			$method = (string) ( $row['validation'] ?? '' );
+
+			if ( ! in_array( $method, array( 'auto', 'dns', 'file' ), true ) ) {
+				/* translators: %s: domain name. */
+				return new \WP_Error( 'ssl_validation', sprintf( __( 'Choose how %s is validated: automatically, with a DNS record or with a file.', 'beltoft-services' ), $one[0] ) );
+			}
+
+			if ( 'auto' === $method && null === SslNames::zone_for( $one[0], $user_id ) ) {
+				/* translators: %s: domain name. */
+				return new \WP_Error( 'ssl_auto', sprintf( __( 'Automatic validation needs %s on our name servers. Choose another method for it.', 'beltoft-services' ), $one[0] ) );
+			}
+
+			if ( isset( $seen[ $one[0] ] ) ) {
+				/* translators: %s: domain name. */
+				return new \WP_Error( 'ssl_duplicate', sprintf( __( '%s is entered twice.', 'beltoft-services' ), $one[0] ) );
+			}
+
+			$seen[ $one[0] ] = true;
+			$entries[]       = array( 'name' => $one[0], 'base' => $one[0], 'validation' => $method );
+		}
+
+		if ( array() === $entries ) {
+			return new \WP_Error( 'ssl_domain', __( 'Enter the domain names for the certificate, for example example.com.', 'beltoft-services' ) );
+		}
+
+		// The registrar refuses a multi domain order with a single name, so one name is a job for a single name certificate.
+		if ( count( $entries ) < 2 ) {
+			return new \WP_Error( 'ssl_few', __( 'This certificate is for several names. Enter at least two, or choose a certificate for one name.', 'beltoft-services' ) );
+		}
+
+		if ( count( $entries ) > $max ) {
+			/* translators: %d: number of names. */
+			return new \WP_Error( 'ssl_too_many', sprintf( _n( 'This certificate covers up to %d name.', 'This certificate covers up to %d names.', $max, 'beltoft-services' ), $max ) );
+		}
+
+		return $entries;
 	}
 
 	/**
@@ -177,7 +262,7 @@ final class SslField {
 	 * What the form posted for one cart line, only inside WooCommerce's own checkout run (it verified its nonce first).
 	 *
 	 * @param string $key Cart item key.
-	 * @return array<string, string>
+	 * @return array<string, mixed>
 	 */
 	private static function posted( string $key ): array {
 		return did_action( 'woocommerce_checkout_process' ) ? self::read_post( $key ) : array();
@@ -187,7 +272,7 @@ final class SslField {
 	 * The posted values of one line as plain strings (the CSR keeps its line breaks).
 	 *
 	 * @param string $key Cart item key.
-	 * @return array<string, string>
+	 * @return array<string, mixed>
 	 */
 	private static function read_post( string $key ): array {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce (or the form is only refilled); every value is checked in resolve().
@@ -198,6 +283,15 @@ final class SslField {
 
 		foreach ( array( 'domain', 'validation', 'approver', 'key_mode', 'csr' ) as $field ) {
 			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
+		}
+
+		$out['names'] = array();
+
+		foreach ( isset( $one['names'] ) && is_array( $one['names'] ) ? array_slice( $one['names'], 0, 20 ) : array() as $row ) {
+			$out['names'][] = array(
+				'domain'     => is_array( $row ) && isset( $row['domain'] ) && is_string( $row['domain'] ) ? trim( $row['domain'] ) : '',
+				'validation' => is_array( $row ) && isset( $row['validation'] ) && is_string( $row['validation'] ) ? trim( $row['validation'] ) : '',
+			);
 		}
 
 		return $out;
@@ -230,18 +324,39 @@ final class SslField {
 	 * The fields of one line.
 	 *
 	 * @param string                               $key   Cart item key.
-	 * @param array{level: string, wildcard: bool} $plan  Plan.
-	 * @param string[]                             $zones The customer's domains on our name servers.
+	 * @param array{level: string, wildcard: bool, domains: int} $plan  Plan.
+	 * @param string[]                                           $zones The customer's domains on our name servers.
 	 */
 	private static function print_line( string $key, array $plan, array $zones ): void {
 		$name = self::POST_KEY . '[' . $key . ']';
 		$id   = self::POST_KEY . '_' . sanitize_key( $key );
 		$post = self::read_post( $key );
-		$have = array() !== $zones;
-		$meth = '' !== $post['validation'] ? $post['validation'] : ( $have ? 'auto' : 'dns' );
-		$mode = 'own' === $post['key_mode'] ? 'own' : 'generate';
 
 		echo '<fieldset class="beltoft-services-ssl-field__line" style="border:0;padding:0;margin:0 0 16px">';
+
+		if ( $plan['domains'] > 1 ) {
+			self::print_names( $name, $id, $plan['domains'], $post, $zones );
+		} else {
+			self::print_name( $name, $id, $plan, $post, $zones );
+		}
+
+		self::print_key( $name, $plan, $post );
+		echo '</fieldset>';
+	}
+
+	/**
+	 * The name and validation fields of a single name or wildcard certificate.
+	 *
+	 * @param string                $name  Field name prefix.
+	 * @param string                $id    Field id prefix.
+	 * @param array<string, mixed>  $plan  Plan.
+	 * @param array<string, mixed>  $post  Posted values.
+	 * @param string[]              $zones The customer's domains on our name servers.
+	 */
+	private static function print_name( string $name, string $id, array $plan, array $post, array $zones ): void {
+		$have = array() !== $zones;
+		$meth = '' !== $post['validation'] ? $post['validation'] : ( $have ? 'auto' : 'dns' );
+
 		echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_domain">' . esc_html( $plan['wildcard'] ? __( 'Domain for the wildcard certificate', 'beltoft-services' ) : __( 'Domain name', 'beltoft-services' ) ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
 		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[domain]" id="' . esc_attr( $id ) . '_domain" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( $post['domain'] ) . '"></span>';
 
@@ -279,6 +394,69 @@ final class SslField {
 		}
 
 		echo '</select></span><span class="description">' . esc_html__( 'Only for the email method: the address is the prefix at your domain.', 'beltoft-services' ) . '</span></p>';
+	}
+
+	/**
+	 * One row per name of a multi domain certificate: the name and how it is validated.
+	 *
+	 * @param string               $name    Field name prefix.
+	 * @param string               $id      Field id prefix.
+	 * @param int                  $domains Names the certificate includes.
+	 * @param array<string, mixed> $post    Posted values.
+	 * @param string[]             $zones   The customer's domains on our name servers.
+	 */
+	private static function print_names( string $name, string $id, int $domains, array $post, array $zones ): void {
+		$have = array() !== $zones;
+
+		echo '<p class="form-row form-row-wide"><span>' . esc_html( sprintf( /* translators: %d: number of names. */ _n( 'One certificate for up to %d name. The first name is the main name.', 'One certificate for up to %d names. The first name is the main name.', $domains, 'beltoft-services' ), $domains ) ) . '</span></p>';
+
+		if ( $have ) {
+			echo '<datalist id="' . esc_attr( $id ) . '_zones">';
+
+			foreach ( $zones as $zone ) {
+				echo '<option value="' . esc_attr( $zone ) . '"></option>';
+			}
+
+			echo '</datalist>';
+		}
+
+		$methods = array(
+			'auto' => array( __( 'We add the DNS record', 'beltoft-services' ), $have ),
+			'dns'  => array( __( 'I add a DNS record', 'beltoft-services' ), true ),
+			'file' => array( __( 'I put a file on my website', 'beltoft-services' ), true ),
+		);
+
+		for ( $i = 0; $i < $domains; $i++ ) {
+			$row  = $post['names'][ $i ] ?? array( 'domain' => '', 'validation' => '' );
+			$meth = '' !== (string) $row['validation'] ? (string) $row['validation'] : ( $have ? 'auto' : 'dns' );
+			/* translators: %d: row number. */
+			$label = sprintf( __( 'Name %d', 'beltoft-services' ), $i + 1 );
+
+			echo '<p class="form-row form-row-wide' . ( 0 === $i ? ' validate-required' : '' ) . '"><label for="' . esc_attr( $id ) . '_name_' . (int) $i . '">' . esc_html( $label ) . '</label>';
+			echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[names][' . (int) $i . '][domain]" id="' . esc_attr( $id ) . '_name_' . (int) $i . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( (string) $row['domain'] ) . '"></span> ';
+			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[names][' . (int) $i . '][validation]" aria-label="' . esc_attr( sprintf( /* translators: %d: row number. */ __( 'How name %d is validated', 'beltoft-services' ), $i + 1 ) ) . '">';
+
+			foreach ( $methods as $value => $m ) {
+				if ( $m[1] ) {
+					echo '<option value="' . esc_attr( $value ) . '"' . selected( $meth, $value, false ) . '>' . esc_html( $m[0] ) . '</option>';
+				}
+			}
+
+			echo '</select></span></p>';
+		}
+
+		echo '<p class="description">' . esc_html__( 'Leave a row empty to use fewer names. Every name is validated on its own.', 'beltoft-services' ) . '</p>';
+	}
+
+	/**
+	 * The key choice and the note for company certificates.
+	 *
+	 * @param string               $name Field name prefix.
+	 * @param array<string, mixed> $plan Plan.
+	 * @param array<string, mixed> $post Posted values.
+	 */
+	private static function print_key( string $name, array $plan, array $post ): void {
+		$mode = 'own' === $post['key_mode'] ? 'own' : 'generate';
 
 		echo '<p class="form-row form-row-wide"><span>' . esc_html__( 'Private key', 'beltoft-services' ) . '</span>';
 		echo '<label style="display:block"><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[key_mode]" value="generate"' . checked( $mode, 'generate', false ) . '> ' . esc_html__( 'Make the key for me. I download it once from my account.', 'beltoft-services' ) . '</label>';
@@ -288,8 +466,6 @@ final class SslField {
 		if ( 'dv' !== $plan['level'] ) {
 			echo '<p class="description">' . esc_html__( 'This certificate is issued to the company in your billing details. The certificate authority checks the company and may phone or ask for documents, which can take a few days.', 'beltoft-services' ) . '</p>';
 		}
-
-		echo '</fieldset>';
 	}
 
 	/**
@@ -315,7 +491,7 @@ final class SslField {
 			}
 
 			$plan  = self::plan_of( $item );
-			$found = self::resolve( self::posted( (string) $key ), $user, $plan['level'], $plan['wildcard'], $company );
+			$found = self::resolve( self::posted( (string) $key ), $user, $plan['level'], $plan['wildcard'], $company, $plan['domains'] );
 
 			if ( is_wp_error( $found ) ) {
 				$errors->add( 'beltoft_services_ssl', $found->get_error_message() );
@@ -338,7 +514,7 @@ final class SslField {
 
 		$plan    = self::plan_of( is_array( $values ) ? $values : array() );
 		$company = $order instanceof \WC_Order ? (string) $order->get_billing_company() : '';
-		$found   = self::resolve( self::posted( $key ), get_current_user_id(), $plan['level'], $plan['wildcard'], $company );
+		$found   = self::resolve( self::posted( $key ), get_current_user_id(), $plan['level'], $plan['wildcard'], $company, $plan['domains'] );
 
 		if ( is_array( $found ) ) {
 			$item->add_meta_data( self::ITEM_META, $found, true );
@@ -402,6 +578,10 @@ final class SslField {
 
 			if ( 'own' === $data['key_mode'] ) {
 				$meta['ssl_csr'] = (string) $data['csr'];
+			}
+
+			if ( ! empty( $data['names'] ) && is_array( $data['names'] ) ) {
+				$meta['ssl_names'] = array_values( array_map( static fn( $e ) => array( 'name' => (string) $e['name'], 'validation' => (string) $e['validation'] ), array_filter( $data['names'], 'is_array' ) ) );
 			}
 
 			break;

@@ -90,6 +90,54 @@ final class SslCatalog {
 	}
 
 	/**
+	 * Is this a website certificate (it names at least one host name)? Code signing and S/MIME products name none
+	 * (the registrar lists them with max_domains 0) and are not sold by the website certificate product.
+	 *
+	 * @param int $product_id Registrar product id.
+	 */
+	public static function is_website( int $product_id ): bool {
+		$row = self::get( $product_id );
+
+		return $row && (int) ( $row['max_domains'] ?? 0 ) >= 1;
+	}
+
+	/**
+	 * Is this a multi domain product (one certificate for several names)?
+	 *
+	 * @param int $product_id Registrar product id.
+	 */
+	public static function is_multi( int $product_id ): bool {
+		$row = self::get( $product_id );
+
+		return $row && self::is_website( $product_id ) && ( 'multi_domain' === (string) ( $row['category'] ?? '' ) || (int) ( $row['max_domains'] ?? 1 ) > 1 );
+	}
+
+	/**
+	 * How many names the price of the product includes: 1 for a single name or wildcard product, the registrar's
+	 * included count for a multi domain one (0 when the product is unknown).
+	 *
+	 * @param int $product_id Registrar product id.
+	 */
+	public static function included( int $product_id ): int {
+		$row = self::get( $product_id );
+
+		if ( ! $row || ! self::is_website( $product_id ) ) {
+			return 0;
+		}
+
+		return self::is_multi( $product_id ) ? max( 1, min( (int) $row['max_domains'], (int) ( $row['included'] ?? 1 ) ) ) : 1;
+	}
+
+	/**
+	 * The products a website certificate product can sell: everything in the stored catalog that names host names.
+	 *
+	 * @return array<int, array<string, mixed>> By registrar id.
+	 */
+	public static function sellable(): array {
+		return array_filter( self::all(), static fn( $row, $id ) => self::is_website( (int) $id ), ARRAY_FILTER_USE_BOTH );
+	}
+
+	/**
 	 * Reads the product list and replaces the table after every page was read and valid.
 	 *
 	 * @return int|\WP_Error Products stored.
@@ -185,6 +233,8 @@ final class SslCatalog {
 			'delivery'     => sanitize_text_field( (string) ( $entry['delivery_time'] ?? '' ) ),
 			'refund'       => sanitize_text_field( (string) ( $entry['free_refund_period'] ?? '' ) ),
 			'max_domains'  => (int) ( $entry['max_domains'] ?? 1 ),
+			'category'     => sanitize_key( (string) ( $entry['category'] ?? '' ) ),
+			'included'     => max( 1, (int) ( $entry['included_domains_count'] ?? $entry['number_of_domains'] ?? 1 ) ),
 			'cost_1y'      => $cost,
 			'extra_domain' => $extra,
 		);

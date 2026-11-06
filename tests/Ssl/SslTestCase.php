@@ -32,7 +32,7 @@ abstract class SslTestCase extends MailTestCase {
 		$this->registrar = new FakeClient( true );
 		add_filter( 'beltoft_services_domains_client', fn() => $this->registrar );
 		$this->settings( array( 'ssl_enabled' => 1, 'domain_api_mode' => 'fake' ) );
-		$this->assertSame( 4, SslCatalog::sync() );
+		$this->assertSame( 10, SslCatalog::sync() );
 	}
 
 	public function tear_down(): void {

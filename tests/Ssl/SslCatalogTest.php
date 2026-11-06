@@ -112,7 +112,7 @@ class SslCatalogTest extends TestCase {
 	public function test_the_fake_model_lists_products_in_the_shape_sync_reads(): void {
 		$fake = new FakeClient( true );
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
-		$this->assertSame( 4, SslCatalog::sync() );
+		$this->assertSame( 10, SslCatalog::sync() );
 		$this->assertSame( 8.68, SslCatalog::cost( 41 ) );
 		$this->assertSame( 'ev', SslCatalog::level( 24 ) );
 	}

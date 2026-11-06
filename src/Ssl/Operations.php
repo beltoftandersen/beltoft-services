@@ -174,7 +174,7 @@ final class Operations {
 			'csr'                       => $csr,
 			'software_id'               => 'linux',
 			'signature_hash_algorithm'  => 'sha2',
-			'domain_validation_methods' => array( array( 'host_name' => $name, 'method' => Validation::registrar_method( $r ) ) ),
+			'domain_validation_methods' => Validation::registrar_methods( $r ),
 		);
 
 		if ( 'email' === (string) $r->get( 'ssl_validation' ) ) {
@@ -217,9 +217,11 @@ final class Operations {
 		$level = SslCatalog::level( (int) ( ( (array) $r->get( 'plan' ) )['ssl_product'] ?? 0 ) );
 		$level = '' !== $level ? $level : (string) ( ( (array) $r->get( 'plan' ) )['ssl_level'] ?? 'dv' );
 		$csr   = isset( $args['csr'] ) && is_string( $args['csr'] ) ? trim( $args['csr'] ) : '';
+		// A reissue keeps the names of the order: the request covers exactly them.
+		$names = array_column( SslNames::entries( $r ), 'name' );
 
 		if ( '' !== $csr ) {
-			$read = Csr::check( $csr, $name, $level );
+			$read = Csr::check( $csr, $name, $level, $names );
 
 			return is_wp_error( $read ) ? StepResult::fail( $read->get_error_message() ) : array( 'ssl_csr_next' => $csr, 'ssl_key_mode_next' => 'own' );
 		}
@@ -230,7 +232,7 @@ final class Operations {
 			return $org;
 		}
 
-		$made = Csr::generate( $name, $org );
+		$made = Csr::generate( $name, $org, $names );
 
 		if ( is_wp_error( $made ) ) {
 			return StepResult::retry( 300, $made->get_error_message() );
@@ -258,19 +260,24 @@ final class Operations {
 	}
 
 	/**
-	 * Changes how the domain is validated, while the order waits for it.
+	 * Changes how the domain is validated, while the order waits for it. A certificate for several names changes the method of
+	 * one name (`name`) or of every name; email is not offered for it.
 	 *
 	 * @param Resource             $r    Resource.
-	 * @param array<string, mixed> $args method (auto, dns, file or email) and approver (a mailbox name, for email).
+	 * @param array<string, mixed> $args method (auto, dns, file or email), approver (a mailbox name, for email) and name (several names only).
 	 */
 	public static function change_validation( Resource $r, array $args ): StepResult {
 		$method   = isset( $args['method'] ) ? (string) $args['method'] : '';
 		$wildcard = '*.' === substr( (string) $r->get( 'ssl_name' ), 0, 2 );
+		$entries  = SslNames::entries( $r );
+		$multi    = count( $entries ) > 1;
 
-		if ( ! in_array( $method, Validation::METHODS, true ) || ( $wildcard && 'file' === $method ) || 'REQ' !== (string) $r->get( 'ssl_status' ) ) {
+		if ( ! in_array( $method, Validation::METHODS, true ) || ( $wildcard && 'file' === $method ) || ( $multi && 'email' === $method ) || 'REQ' !== (string) $r->get( 'ssl_status' ) ) {
 			return StepResult::fail( 'This validation method cannot be used now.' );
 		}
 
+		$user     = (int) ( $r->license()['user_id'] ?? 0 );
+		$target   = isset( $args['name'] ) ? strtolower( (string) $args['name'] ) : '';
 		$base     = (string) $r->get( 'ssl_domain' );
 		$approver = 'email' === $method ? SslNames::approver( (string) ( $args['approver'] ?? '' ), $base ) : '';
 
@@ -278,11 +285,28 @@ final class Operations {
 			return StepResult::fail( 'Choose one of the approval addresses.' );
 		}
 
-		if ( 'auto' === $method && null === SslNames::zone_for( $base, (int) ( $r->license()['user_id'] ?? 0 ) ) ) {
-			return StepResult::fail( 'Automatic validation needs a domain on our name servers.' );
+		if ( $multi && '' !== $target && ! in_array( $target, array_column( $entries, 'name' ), true ) ) {
+			return StepResult::fail( 'That name is not on this certificate.' );
 		}
 
-		$next = array( 'ssl_validation' => $method, 'ssl_approver' => (string) $approver, 'ssl_action_sent' => null, 'ssl_validation_rows' => array() );
+		foreach ( $entries as $i => $entry ) {
+			if ( $multi && '' !== $target && $entry['name'] !== $target ) {
+				continue;
+			}
+
+			if ( 'auto' === $method && null === SslNames::zone_for( $entry['base'], $user ) ) {
+				return StepResult::fail( 'Automatic validation needs a domain on our name servers.' );
+			}
+
+			$entries[ $i ]['validation'] = $method;
+		}
+
+		$next = array( 'ssl_validation' => $entries[0]['validation'], 'ssl_approver' => (string) $approver, 'ssl_action_sent' => null, 'ssl_validation_rows' => array() );
+
+		// Whenever the service keeps a name list (even of one name) the change lands there, the place entries() reads.
+		if ( $multi || array() !== (array) $r->get( 'ssl_names' ) ) {
+			$next['ssl_names'] = array_map( static fn( $e ) => array( 'name' => $e['name'], 'validation' => $e['validation'] ), $entries );
+		}
 
 		if ( ! $r->set( $next ) ) {
 			return StepResult::retry( 60, 'The validation method could not be saved.' );
@@ -290,7 +314,7 @@ final class Operations {
 
 		$fresh = Resource::find( $r->id() ) ?? $r;
 		$id    = (string) $r->get( 'remote_id' );
-		$body  = array( 'domain_validation_methods' => array( array( 'host_name' => (string) $r->get( 'ssl_name' ), 'method' => Validation::registrar_method( $fresh ) ) ) );
+		$body  = array( 'domain_validation_methods' => Validation::registrar_methods( $fresh ) );
 
 		if ( 'email' === $method ) {
 			$body['approver_email'] = $approver;

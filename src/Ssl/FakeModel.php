@@ -26,16 +26,25 @@ final class FakeModel {
 	public const LIFETIME_DAYS = 199;
 
 	/**
-	 * The made-up product list: id => [name, category, wildcard, delivery, cost for one year].
+	 * The made-up product list: id => name, category (as the registrar words it), validation method, wildcard, delivery, cost for one
+	 * year, domains (max, included) and the cost of an extra name. Code signing (58) and S/MIME (60) name no host (max 0).
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
 	private static function products(): array {
+		$p = static fn( string $name, string $category, string $method, bool $wild, string $delivery, float $cost, int $max = 1, int $included = 1, float $extra = 0.0 ) => compact( 'name', 'category', 'method', 'wild', 'delivery', 'cost', 'max', 'included', 'extra' );
+
 		return array(
-			41 => array( 'Positive SSL', 'domain_validation', false, '10m', 8.68 ),
-			42 => array( 'Positive SSL Wildcard', 'domain_validation', true, '10m', 77.20 ),
-			20 => array( 'InstantSSL', 'organization_validation', false, 'up to 2 days', 33.77 ),
-			24 => array( 'EV SSL', 'extended_validation', false, 'within 1 day', 86.85 ),
+			41 => $p( 'Positive SSL', 'domain_validation', 'domain', false, '10m', 8.68 ),
+			42 => $p( 'Positive SSL Wildcard', 'wildcard', 'domain', true, '10m', 77.20 ),
+			20 => $p( 'InstantSSL', 'organization_validation', 'organization', false, 'up to 2 days', 33.77 ),
+			24 => $p( 'EV SSL', 'extended_validation', 'extended', false, 'within 1 day', 86.85 ),
+			31 => $p( 'EssentialSSL', 'domain_validation', 'domain', false, '10m', 8.68 ),
+			40 => $p( 'Positive SSL multi-domain', 'multi_domain', 'domain', false, '10m', 19.29, 210, 3, 9.64 ),
+			33 => $p( 'EVSSL multi-domain', 'multi_domain', 'extended', false, 'within 1 day', 193.02, 210, 3, 86.85 ),
+			28 => $p( 'Unified Communications Certificate (UCC)', 'multi_domain', 'organization', false, 'up to 2 days', 38.60, 210, 3, 19.29 ),
+			58 => $p( 'Code Signing', 'organization_validation', 'organization', false, '1-3 days', 86.85, 0, 0 ),
+			60 => $p( 'S/MIME Personal', 'domain_validation', 'domain', false, '10m', 18.33, 0, 0 ),
 		);
 	}
 
@@ -66,9 +75,10 @@ final class FakeModel {
 
 			foreach ( self::products() as $id => $p ) {
 				$results[] = array(
-					'id' => $id, 'name' => $p[0], 'brand_name' => 'Fake CA', 'category' => $p[1], 'is_wildcard_supported' => $p[2], 'is_extended_validation_supported' => 'extended_validation' === $p[1],
-					'delivery_time' => $p[3], 'free_refund_period' => '30d', 'free_reissue_period' => 'lifetime', 'max_period' => 5, 'max_domains' => 1,
-					'prices' => array( array( 'period' => 1, 'price' => array( 'reseller' => array( 'price' => $p[4], 'currency' => 'EUR' ) ), 'extra_domain_price' => array( 'reseller' => array( 'price' => 0, 'currency' => 'EUR' ) ) ) ),
+					'id' => $id, 'name' => $p['name'], 'brand_name' => 'Fake CA', 'category' => $p['category'], 'validation_method' => $p['method'], 'is_wildcard_supported' => $p['wild'], 'is_extended_validation_supported' => 'extended' === $p['method'],
+					'delivery_time' => $p['delivery'], 'free_refund_period' => '30d', 'free_reissue_period' => 'lifetime', 'max_period' => 5, 'max_domains' => $p['max'],
+					'number_of_domains' => $p['included'], 'included_domains_count' => $p['included'],
+					'prices' => array( array( 'period' => 1, 'price' => array( 'reseller' => array( 'price' => $p['cost'], 'currency' => 'EUR' ) ), 'extra_domain_price' => array( 'reseller' => array( 'price' => $p['extra'], 'currency' => 'EUR' ) ) ) ),
 				);
 			}
 
@@ -211,6 +221,7 @@ final class FakeModel {
 			return self::error( 1000, 'Unknown product.', 400 );
 		}
 
+		$p       = self::products()[ $product ];
 		$methods = (array) ( $body['domain_validation_methods'] ?? array() );
 		$hosts   = array();
 		$kind    = '';
@@ -226,10 +237,17 @@ final class FakeModel {
 			return self::error( 1000, 'domain_validation_methods is empty.', 400 );
 		}
 
+		// The sandbox accepts any number of names; this model refuses what the product cannot hold, so a test sees a wrong order.
+		$amount = (int) ( $body['domain_amount'] ?? count( $hosts ) );
+
+		if ( count( $hosts ) > max( 1, (int) $p['max'] ) || $amount < count( $hosts ) || $amount > max( 1, (int) $p['max'] ) ) {
+			return self::error( 1000, 'domain_amount does not match the names or the product.', 400 );
+		}
+
 		$id = ++$state['ssl_next'];
 
 		$state['ssl_orders'][ $id ] = array(
-			'id' => $id, 'product_id' => $product, 'common_name' => $hosts[0], 'product_name' => self::products()[ $product ][0], 'brand_name' => 'Fake CA',
+			'id' => $id, 'product_id' => $product, 'common_name' => $hosts[0], 'product_name' => self::products()[ $product ]['name'], 'brand_name' => 'Fake CA',
 			'status' => 'PAI', 'order_date' => gmdate( 'Y-m-d H:i:s', self::now() ), 'host_names' => $hosts,
 			'organization_handle' => (string) ( $body['organization_handle'] ?? '' ), 'technical_handle' => (string) ( $body['technical_handle'] ?? '' ),
 			'csr' => (string) ( $body['csr'] ?? '' ), 'period' => (int) ( $body['period'] ?? 1 ), 'software' => (string) ( $body['software_id'] ?? '' ),
@@ -268,7 +286,12 @@ final class FakeModel {
 				return self::error( 1003, 'CSR must be set', 400 );
 			}
 
-			$level = self::products()[ (int) $order['product_id'] ][1];
+			$level = self::products()[ (int) $order['product_id'] ]['method'];
+
+			// The sandbox: a multi domain order needs alternative names (code 1029 at start).
+			if ( 'multi_domain' === self::products()[ (int) $order['product_id'] ]['category'] && count( (array) $order['host_names'] ) < 2 ) {
+				return self::error( 1029, 'Alternative names must be specified for multidomain certificate', 400 );
+			}
 			$dn    = openssl_csr_get_subject( (string) $order['csr'], true );
 
 			// The sandbox refuses a request without a valid country, DV included (code 1099, the text keeps its %s).
@@ -276,7 +299,7 @@ final class FakeModel {
 				return self::error( 1099, 'csr: The CSR contains an invalid country code %s', 400 );
 			}
 
-			if ( 'domain_validation' !== $level && ( ! is_array( $dn ) || empty( $dn['O'] ) || empty( $dn['ST'] ) || empty( $dn['C'] ) ) ) {
+			if ( 'domain' !== $level && ( ! is_array( $dn ) || empty( $dn['O'] ) || empty( $dn['ST'] ) || empty( $dn['C'] ) ) ) {
 				return self::error( 1050, 'CSR must contain company; Bad Region', 400 );
 			}
 
@@ -305,13 +328,22 @@ final class FakeModel {
 		$delay = max( 0, (int) apply_filters( 'beltoft_services_ssl_fake_delay', 60 ) );
 
 		if ( 'REQ' === $order['status'] && empty( $order['additional_data'] ) && 'email' !== ( $order['validation_method_kind'] ?? '' ) ) {
-			$host = ltrim( (string) $order['common_name'], '*.' );
 			$hash = hash( 'sha256', (string) $order['csr'] );
+			$data = array();
 
-			$order['additional_data'] = 'dns' === $order['validation_method_kind']
-				? array( array( 'domain' => (string) $order['common_name'], 'dns_record' => '_' . substr( md5( (string) $order['csr'] ), 0, 32 ) . '.' . $host, 'dns_value' => substr( $hash, 0, 32 ) . '.' . substr( $hash, 32, 32 ) . '.fakeca.example' ) )
-				: array( array( 'domain' => (string) $order['common_name'], 'file_location' => 'http://' . $host . '/.well-known/pki-validation/' . strtoupper( substr( md5( (string) $order['csr'] ), 0, 32 ) ) . '.txt', 'file_contents' => substr( $hash, 0, 32 ) . "\nfakeca.example" ) );
-			$dirty = true;
+			// One entry per name, each with the method chosen for it (the registrar's `domain` field names the host).
+			foreach ( (array) $order['domain_validation_methods'] as $row ) {
+				$name = (string) ( $row['host_name'] ?? '' );
+				$host = ltrim( $name, '*.' );
+				$tag  = substr( md5( (string) $order['csr'] . ( $name === (string) $order['common_name'] ? '' : $name ) ), 0, 32 );
+
+				$data[] = 'https' === ( $row['method'] ?? '' )
+					? array( 'domain' => $name, 'file_location' => 'http://' . $host . '/.well-known/pki-validation/' . strtoupper( $tag ) . '.txt', 'file_contents' => substr( $hash, 0, 32 ) . "\nfakeca.example" )
+					: array( 'domain' => $name, 'dns_record' => '_' . $tag . '.' . $host, 'dns_value' => substr( $hash, 0, 32 ) . '.' . substr( $hash, 32, 32 ) . '.fakeca.example' );
+			}
+
+			$order['additional_data'] = $data;
+			$dirty                    = true;
 		}
 
 		if ( 'REQ' === $order['status'] && (int) $order['requested_at'] > 0 && $now >= (int) $order['requested_at'] + $delay ) {
