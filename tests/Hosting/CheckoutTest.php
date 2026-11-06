@@ -100,7 +100,7 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringContainsString( 'Your website', $html );
 		$this->assertStringContainsString( 'Temporary address', $html );
 		$this->assertStringContainsString( 'A domain I have elsewhere', $html );
-		$this->assertStringNotContainsString( 'A domain I have with you', $html, 'A visitor has no domains on our name servers.' );
+		$this->assertStringNotContainsString( 'A domain in my account', $html, 'A visitor has no domains on our name servers.' );
 		$this->assertStringContainsString( '<option value="wordpress" selected', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
@@ -152,7 +152,10 @@ class CheckoutTest extends HostingCase {
 			'preview zone' => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => 'x.preview.example.test' ), 'site_host' ),
 			'ours no zone' => array( array( 'slug' => 'a', 'mode' => 'ours', 'host' => 'www.nowhere.example' ), 'site_zone' ),
 			'install'     => array( array( 'slug' => 'a', 'install' => 'drupal' ), 'site_install' ),
+			'empty site'  => array( array( 'slug' => 'a', 'install' => 'empty' ), 'site_install' ),
+			'reserved'    => array( array( 'slug' => 'www' ), 'site_slug' ),
 			'language'    => array( array( 'slug' => 'a', 'language' => 'english' ), 'site_language' ),
+			'language unlisted' => array( array( 'slug' => 'a', 'language' => 'xx_XX' ), 'site_language' ),
 			'email'       => array( array( 'slug' => 'a', 'email' => 'nope' ), 'site_email' ),
 		);
 
@@ -194,7 +197,7 @@ class CheckoutTest extends HostingCase {
 		$html = (string) ob_get_clean();
 		wp_set_current_user( 0 );
 
-		$this->assertStringContainsString( 'A domain I have with you', $html );
+		$this->assertStringContainsString( 'A domain in my account', $html );
 		$this->assertStringContainsString( '<option value="mine.example"', $html );
 	}
 
@@ -216,7 +219,7 @@ class CheckoutTest extends HostingCase {
 	public function test_the_site_is_saved_on_the_line_and_becomes_resource_meta(): void {
 		$product = $this->product();
 		$key     = $this->in_cart( $product );
-		$this->post( $key, array( 'slug' => 'saved', 'label' => 'Saved', 'mode' => 'own', 'host' => 'Saved.Example.com', 'install' => 'empty', 'language' => 'da_DK', 'email' => '' ) );
+		$this->post( $key, array( 'slug_domain' => 'saved', 'label' => 'Saved', 'mode' => 'own', 'host' => 'Saved.Example.com', 'install' => 'woocommerce', 'language' => 'da_DK', 'email' => '' ) );
 
 		$item = new \WC_Order_Item_Product();
 		$item->set_product_id( $product->get_id() );
@@ -234,7 +237,7 @@ class CheckoutTest extends HostingCase {
 		$meta    = SiteField::initial_meta( array(), $license, Registry::get( 'hosting' ) );
 
 		$this->assertSame(
-			array( 'slug' => 'saved', 'label' => 'Saved', 'install' => false, 'install_kind' => 'empty', 'language' => 'da_DK', 'admin_email' => '', 'domain' => 'saved.example.com' ),
+			array( 'slug' => 'saved', 'label' => 'Saved', 'install' => true, 'install_kind' => 'woocommerce', 'language' => 'da_DK', 'admin_email' => '', 'domain' => 'saved.example.com' ),
 			$meta['site']
 		);
 		$this->assertSame( array( 'x' => 1 ), SiteField::initial_meta( array( 'x' => 1 ), $license, Registry::get( 'http' ) ), 'Other drivers are left alone.' );
@@ -415,5 +418,87 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( '', HostingSwitch::check( '', $this->service_product( 'fake' )->get_id(), 1, 0, $subscription, null ), 'Not a hosting product.' );
 		$this->assertSame( '', HostingSwitch::check( '', $small->get_id(), 1, 0, 'not a subscription', null ) );
 		$this->assertNotNull( Records::for_resource( $r->id() ) );
+	}
+
+	public function test_a_domain_order_needs_no_temporary_name_and_gets_a_unique_one(): void {
+		$one = SiteField::resolve( array( 'mode' => 'own', 'host' => 'www.Example.com' ), 0 );
+		$this->assertIsArray( $one );
+		$this->assertSame( 'example-com', $one['slug'] );
+		$this->assertSame( 'example.com', '' === $one['domain'] ? '' : preg_replace( '/^www\./', '', $one['domain'] ) );
+		$this->assertSame( 'www.example.com', $one['label'], 'The title defaults to the domain.' );
+
+		// The same person asking again keeps the name they hold.
+		$this->assertSame( 'example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'www.example.com' ), 0 )['slug'] );
+
+		// A taken name gets a number.
+		Sites::add( 78, 'shop-example-org', 'T', '8.3', 2 );
+		$this->assertSame( 'shop-example-org-2', SiteField::resolve( array( 'mode' => 'own', 'host' => 'shop.example.org' ), 0 )['slug'] );
+
+		// A long domain still makes a valid name.
+		$long = SiteField::resolve( array( 'mode' => 'own', 'host' => 'a-very-long-subdomain-name.another-long-label.example.com' ), 0 );
+		$this->assertTrue( Sites::valid_slug( $long['slug'] ) );
+
+		// A name typed under "more options" is used as typed; a preview order still needs its name.
+		$typed = SiteField::resolve( array( 'mode' => 'own', 'host' => 'typed.example.net', 'slug' => 'my-pick' ), 0 );
+		$this->assertSame( 'my-pick', $typed['slug'] );
+		$this->assertSame( 'site_slug', SiteField::resolve( array( 'mode' => 'preview' ), 0 )->get_error_code() );
+	}
+
+	public function test_each_address_option_posts_its_own_inputs(): void {
+		$key = $this->in_cart( $this->product() );
+		$this->post( $key, array( 'mode' => 'own', 'host' => 'posted.example.com', 'slug' => 'ignored', 'slug_domain' => '' ) );
+		$this->assertSame( array(), $this->errors() );
+
+		$product = $this->product();
+		$key     = $this->in_cart( $product );
+		$this->post( $key, array( 'mode' => 'own', 'host' => 'posted2.example.com', 'slug' => 'ignored', 'slug_domain' => 'chosen' ) );
+		$item = new \WC_Order_Item_Product();
+		SiteField::save_on_item( $item, $key );
+		$this->assertSame( 'chosen', $item->get_meta( SiteField::ITEM_META )['slug'], 'The advanced name counts for a domain.' );
+
+		$key = $this->in_cart( $this->product() );
+		$this->post( $key, array( 'mode' => 'preview', 'slug' => 'plain', 'slug_domain' => 'ignored' ) );
+		$item = new \WC_Order_Item_Product();
+		SiteField::save_on_item( $item, $key );
+		$this->assertSame( 'plain', $item->get_meta( SiteField::ITEM_META )['slug'] );
+	}
+
+	public function test_an_account_with_the_old_empty_install_still_works(): void {
+		$product = $this->product();
+		$order   = wc_create_order();
+		$item    = new \WC_Order_Item_Product();
+		$item->set_product_id( $product->get_id() );
+		$item->add_meta_data( SiteField::ITEM_META, array( 'slug' => 'oldempty', 'install' => 'empty', 'language' => 'da_DK' ) );
+		$order->add_item( $item );
+		$order->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$meta    = SiteField::initial_meta( array(), $license, Registry::get( 'hosting' ) );
+
+		$this->assertFalse( $meta['site']['install'] );
+		$this->assertSame( 'empty', $meta['site']['install_kind'] );
+		$this->assertContains( 'empty', SiteField::INSTALLS );
+		$this->assertNotContains( 'empty', SiteField::OFFERED );
+	}
+
+	public function test_the_form_has_a_language_list_without_the_empty_site_and_explains_the_domain_step(): void {
+		$this->in_cart( $this->product() );
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringNotContainsString( 'Empty site', $html );
+		$this->assertStringNotContainsString( 'value="empty"', $html );
+		$this->assertStringContainsString( '<select name="beltoft_services_site[' . array_key_first( WC()->cart->get_cart() ) . '][language]"', $html );
+		$this->assertStringContainsString( '<option value="en_US" selected', $html );
+		$this->assertStringContainsString( '>Dansk</option>', $html );
+		$this->assertStringContainsString( '>Deutsch</option>', $html );
+		$this->assertStringContainsString( 'TXT record', $html );
+		$this->assertStringContainsString( 'A record', $html );
+		$this->assertStringContainsString( 'reachable at this address until your domain points to us', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+		$this->assertStringNotContainsString( 'Hetzner', $html );
+		$this->assertStringContainsString( 'data-site-panel="preview"', $html );
+		$this->assertMatchesRegularExpression( '/data-site-panel="own" hidden/', $html, 'Only the chosen option is open.' );
 	}
 }
