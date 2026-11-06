@@ -243,7 +243,7 @@ final class ClustersScreen {
 			'<label><input type="checkbox" name="apps_ready" value="1" %1$s> %2$s</label><p class="description">%3$s</p>',
 			checked( (int) $c['apps_ready'], 1, false ),
 			esc_html__( 'Apps are ready on this cluster', 'beltoft-services' ),
-			esc_html__( 'Turn on only when the vendor snippet above is vm-vendor-cloudinit-v2.yaml and a template of the family ubuntu-24.04 is listed below. Customers then see the app choice at checkout.', 'beltoft-services' )
+			esc_html__( 'Turn on only when the vendor snippet above is vm-vendor-cloudinit-v2.yaml (Ubuntu) or vm-vendor-cloudinit-v3.yaml (Ubuntu and AlmaLinux 9) and a template of the family ubuntu-24.04 or almalinux-9 is listed below. Customers then see the app choice at checkout.', 'beltoft-services' )
 		);
 
 		foreach ( Apps::ids() as $id ) {
@@ -258,7 +258,7 @@ final class ClustersScreen {
 		}
 
 		echo '</td></tr>';
-		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04. A managed database template has a postgres family per version it carries, comma separated: 9101 = postgres-17,postgres-18 (a template with only postgres-18 serves version 18 only).', 'beltoft-services' ), 'textarea' );
+		self::row( 'template_families_text', __( 'Template families', 'beltoft-services' ), $families, __( 'One per line: VMID = family, for example 9000 = ubuntu-24.04. Only a template in the list above can have a family. Apps run on ubuntu-24.04 or almalinux-9 (see each app). A managed database template has a postgres family per version it carries, comma separated: 9101 = postgres-17,postgres-18 (a template with only postgres-18 serves version 18 only).', 'beltoft-services' ), 'textarea' );
 	}
 
 	/**
