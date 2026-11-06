@@ -171,6 +171,10 @@ final class Slugs {
 			}
 		}
 
+		if ( 'licences' === $type ) {
+			return \BeltoftServices\Licences\KeyPanel::label( $resource );
+		}
+
 		if ( 'domains' === $type ) {
 			$domain = strtolower( trim( (string) $resource->get( 'domain' ) ) );
 
@@ -226,6 +230,7 @@ final class Slugs {
 			'apps'      => 'app',
 			'email'     => 'email',
 			'ssl'       => 'certificate',
+			'licences'  => 'licence',
 		);
 
 		return $words[ $type ] ?? 'service';

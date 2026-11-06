@@ -72,6 +72,9 @@ final class Plugin {
 		Ssl\SslRenewals::register();
 		Ssl\SslRoutes::register();
 		Ssl\SslJobs::register();
+		Licences\KeyCatalog::register();
+		Licences\KeyOrder::register();
+		Licences\KeyField::register();
 		Mail\MailSettings::register();
 		Mail\MailSetup::register();
 		Bricks\DocsElements::register();
@@ -92,6 +95,7 @@ final class Plugin {
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Ssl::class, 'menu' ), 101 );
+		add_filter( 'woocommerce_account_menu_items', array( Account\Licences::class, 'menu' ), 102 );
 		Domains\Search::register();
 		Bricks\Integration::register();
 		Domains\Cart::register();

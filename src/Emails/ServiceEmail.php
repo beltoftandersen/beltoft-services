@@ -235,6 +235,10 @@ abstract class ServiceEmail extends \WC_Email {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->url( $license );
 		}
 
+		if ( 'licence-key' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Licences::class )->url( $license );
+		}
+
 		if ( 'mail' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class )->url( $license );
 		}
