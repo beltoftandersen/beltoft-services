@@ -34,13 +34,20 @@ final class SiteField {
 	public const MODE_OURS    = 'ours';
 	public const MODE_OWN     = 'own';
 
+	/** Every value an account can carry (an earlier order may hold `empty`). */
 	public const INSTALLS = array( 'wordpress', 'woocommerce', 'empty' );
+
+	/** What the checkout offers and accepts for a new order. */
+	public const OFFERED = array( 'wordpress', 'woocommerce' );
+
+	public const HANDLE = 'beltoft-services-site-field';
 
 	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'render' ), 25 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
@@ -103,68 +110,81 @@ final class SiteField {
 	 * @return array<string, mixed>|\WP_Error The site (slug, label, mode, domain, install, language, admin_email) or an error whose message is for the customer.
 	 */
 	public static function resolve( array $input, int $user_id ) {
-		$slug = strtolower( trim( (string) ( $input['slug'] ?? '' ) ) );
+		$mode = '' === (string) ( $input['mode'] ?? '' ) ? self::MODE_PREVIEW : (string) $input['mode'];
 
-		if ( ! Sites::valid_slug( $slug ) ) {
-			return new \WP_Error( 'site_slug', __( 'Give the website a short name with lowercase letters, numbers and dashes. It is used in its temporary address.', 'beltoft-services' ) );
+		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) ) {
+			return new \WP_Error( 'site_mode', __( 'Choose how the website is reached: a temporary address, a domain you have with us, or a domain you have elsewhere.', 'beltoft-services' ) );
 		}
 
-		$owner = self::owner( $user_id );
-
-		if ( Sites::taken( $slug ) || ! Sites::reserve( $slug, $owner ) ) {
-			return new \WP_Error( 'site_taken', __( 'That website name is taken. Choose another.', 'beltoft-services' ) );
-		}
-
-		$mode   = '' === (string) ( $input['mode'] ?? '' ) ? self::MODE_PREVIEW : (string) $input['mode'];
 		$domain = '';
 
-		if ( self::MODE_OURS === $mode || self::MODE_OWN === $mode ) {
+		if ( self::MODE_PREVIEW !== $mode ) {
 			$host = HostName::normalise( (string) ( $input['host'] ?? '' ) );
 
 			if ( null === $host || ! SiteDomains::valid_host( $host ) ) {
-				return new \WP_Error( 'site_host', __( 'Enter the domain name for the website, for example www.example.com.', 'beltoft-services' ) );
+				return new \WP_Error( 'site_host', __( 'Enter the domain name without http:// or a path, for example www.example.com.', 'beltoft-services' ) );
 			}
 
 			$zone = Config::preview_zone();
 
 			if ( '' !== $zone && ( $host === $zone || str_ends_with( $host, '.' . $zone ) ) ) {
-				return new \WP_Error( 'site_host', __( 'Choose your own domain, or use the temporary address.', 'beltoft-services' ) );
+				return new \WP_Error( 'site_host', __( 'That is a temporary address. Enter your own domain, or choose the temporary address option.', 'beltoft-services' ) );
 			}
 
 			if ( null !== SiteDomains::find( $host ) ) {
-				return new \WP_Error( 'site_host', __( 'That domain is already used by a hosting account.', 'beltoft-services' ) );
+				return new \WP_Error( 'site_host', __( 'That domain is already used by a hosting account. Enter another domain.', 'beltoft-services' ) );
 			}
 
 			if ( self::MODE_OURS === $mode && null === SiteDns::zone_for( $user_id, $host ) ) {
-				return new \WP_Error( 'site_zone', __( 'Choose a name inside one of your domains on our name servers, or enter a domain hosted elsewhere.', 'beltoft-services' ) );
+				return new \WP_Error( 'site_zone', __( 'Choose a name inside one of your domains with us, or use the option for a domain you have elsewhere.', 'beltoft-services' ) );
 			}
 
 			$domain = $host;
-		} elseif ( self::MODE_PREVIEW !== $mode ) {
-			return new \WP_Error( 'site_mode', __( 'Choose how the website is reached.', 'beltoft-services' ) );
+		}
+
+		$slug  = strtolower( trim( (string) ( $input['slug'] ?? '' ) ) );
+		$owner = self::owner( $user_id );
+
+		if ( '' === $slug && '' !== $domain ) {
+			// A domain order needs no temporary name from the customer: it is made from the domain.
+			$slug = self::free_slug( $domain, $owner );
+		}
+
+		if ( Sites::reserved( $slug ) ) {
+			return new \WP_Error( 'site_slug', __( 'That website name is reserved. Choose another.', 'beltoft-services' ) );
+		}
+
+		if ( ! Sites::valid_slug( $slug ) ) {
+			return new \WP_Error( 'site_slug', __( 'Enter a website name of 1 to 32 characters: lowercase letters, numbers and dashes, not starting or ending with a dash. For example myshop.', 'beltoft-services' ) );
+		}
+
+		if ( Sites::taken( $slug ) || ! Sites::reserve( $slug, $owner ) ) {
+			return new \WP_Error( 'site_taken', __( 'That website name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
 		$install = '' === (string) ( $input['install'] ?? '' ) ? 'wordpress' : (string) $input['install'];
 
-		if ( ! in_array( $install, self::INSTALLS, true ) ) {
-			return new \WP_Error( 'site_install', __( 'Choose what to install.', 'beltoft-services' ) );
+		if ( ! in_array( $install, self::OFFERED, true ) ) {
+			return new \WP_Error( 'site_install', __( 'Choose WordPress or WordPress with WooCommerce.', 'beltoft-services' ) );
 		}
 
 		$language = (string) ( $input['language'] ?? '' );
 
-		if ( '' !== $language && 1 !== preg_match( '/^[a-z]{2,3}(_[A-Z]{2})?$/D', $language ) ) {
-			return new \WP_Error( 'site_language', __( 'Choose a site language from the list.', 'beltoft-services' ) );
+		if ( '' !== $language && ! Languages::offered( $language ) ) {
+			return new \WP_Error( 'site_language', __( 'Choose the site language from the list.', 'beltoft-services' ) );
 		}
 
 		$email = trim( (string) ( $input['email'] ?? '' ) );
 
 		if ( '' !== $email && ! is_email( $email ) ) {
-			return new \WP_Error( 'site_email', __( 'Enter a valid admin email address, or leave it empty to use your billing email.', 'beltoft-services' ) );
+			return new \WP_Error( 'site_email', __( 'Enter a valid admin email address, for example name@example.com, or leave it empty to use your billing email.', 'beltoft-services' ) );
 		}
+
+		$label = sanitize_text_field( (string) ( $input['label'] ?? '' ) );
 
 		return array(
 			'slug'        => $slug,
-			'label'       => sanitize_text_field( (string) ( $input['label'] ?? '' ) ),
+			'label'       => '' === $label ? $domain : $label,
 			'mode'        => $mode,
 			'domain'      => $domain,
 			'install'     => $install,
@@ -228,13 +248,17 @@ final class SiteField {
 		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
 		$out = array();
 
-		foreach ( array( 'slug', 'label', 'mode', 'host', 'zone', 'install', 'language', 'email' ) as $field ) {
+		foreach ( array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'zone', 'install', 'language', 'email' ) as $field ) {
 			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
 		}
 
-		// The select of our zones and the text field share one value: the one that matches the chosen mode.
-		if ( self::MODE_OURS === $out['mode'] && '' !== $out['zone'] && '' === $out['host'] ) {
-			$out['host'] = $out['zone'];
+		// Each mode has its own inputs; only the chosen mode's inputs count.
+		if ( '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ) {
+			$out['slug'] = $out['slug_domain'];
+		}
+
+		if ( self::MODE_OURS === $out['mode'] ) {
+			$out['host'] = '' !== $out['host_ours'] ? $out['host_ours'] : ( '' !== $out['host'] ? $out['host'] : $out['zone'] );
 		}
 
 		return $out;
@@ -252,8 +276,8 @@ final class SiteField {
 
 		$zones = self::zones( get_current_user_id() );
 
-		echo '<div class="beltoft-services-site-field" style="margin:40px 0 0">';
-		echo '<h3 style="margin:0 0 16px">' . esc_html__( 'Your website', 'beltoft-services' ) . '</h3>';
+		echo '<div class="beltoft-services-site-field">';
+		echo '<h3>' . esc_html__( 'Your website', 'beltoft-services' ) . '</h3>';
 
 		foreach ( $lines as $key => $item ) {
 			$product = $item['data'] ?? null;
@@ -276,6 +300,43 @@ final class SiteField {
 
 		return ! empty( $plan['woocommerce_default'] ) ? 'woocommerce' : 'wordpress';
 	}
+	/**
+	 * The scripts and styles, on the checkout page only, and only when the cart has a new hosting line.
+	 */
+	public static function assets(): void {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || array() === self::cart_lines() ) {
+			return;
+		}
+
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/site-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/site-field.css' ) );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/site-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/site-field.js' ), true );
+	}
+
+	/**
+	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
+	 * first is used. The name is only the temporary address, so the customer is not asked for it.
+	 *
+	 * @param string $domain Domain.
+	 * @param string $owner  Who holds the name (see owner()).
+	 */
+	private static function free_slug( string $domain, string $owner ): string {
+		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
+		$base = trim( substr( $base, 0, 28 ), '-' );
+
+		if ( '' === $base ) {
+			$base = 'site';
+		}
+
+		for ( $n = 1; $n <= 50; $n++ ) {
+			$slug = 1 === $n ? $base : $base . '-' . $n;
+
+			if ( Sites::valid_slug( $slug ) && ! Sites::taken( $slug ) && Sites::reserve( $slug, $owner ) ) {
+				return $slug;
+			}
+		}
+
+		return $base;
+	}
 
 	/**
 	 * The fields of one line.
@@ -291,45 +352,103 @@ final class SiteField {
 		$post = self::read_post( $key );
 		$mode = '' === $post['mode'] ? self::MODE_PREVIEW : $post['mode'];
 		$have = array() !== $zones;
-		$pick = '' === $post['install'] ? $install : $post['install'];
+		$pick = in_array( $post['install'], self::OFFERED, true ) ? $post['install'] : $install;
+		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::DEFAULT;
+		$zone = Config::preview_zone();
 
-		echo '<fieldset class="beltoft-services-site-field__line" style="border:0;padding:0;margin:0 0 16px">';
-
-		if ( '' !== $label ) {
-			echo '<legend>' . esc_html( $label ) . '</legend>';
+		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) || ( self::MODE_OURS === $mode && ! $have ) ) {
+			$mode = self::MODE_PREVIEW;
 		}
 
-		self::text_row( $name . '[slug]', $id . '_slug', __( 'Website name', 'beltoft-services' ), $post['slug'], true, __( 'Lowercase letters, numbers and dashes. It is used in the temporary address.', 'beltoft-services' ) );
-		self::text_row( $name . '[label]', $id . '_label', __( 'Website title', 'beltoft-services' ), $post['label'], false, '' );
+		echo '<div class="beltoft-services-site-field__line" data-site-line>';
 
-		echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_PREVIEW ) . '"' . checked( $mode, self::MODE_PREVIEW, false ) . '> ' . esc_html__( 'Temporary address', 'beltoft-services' ) . '</label>';
-		echo '<span class="description">' . esc_html__( 'Start on a temporary address and connect your domain later.', 'beltoft-services' ) . '</span></p>';
+		if ( '' !== $label ) {
+			echo '<p class="beltoft-services-site-field__product">' . esc_html( $label ) . '</p>';
+		}
 
+		// Where the website is reached.
+		echo '<fieldset class="beltoft-services-site-field__group"><legend>' . esc_html__( 'Website address', 'beltoft-services' ) . '</legend>';
+		self::radio( $name, $id, self::MODE_PREVIEW, $mode, __( 'Temporary address, connect a domain later', 'beltoft-services' ) );
+		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_PREVIEW ) . '"' . ( self::MODE_PREVIEW === $mode ? '' : ' hidden' ) . '>';
+		self::text_row( $name . '[slug]', $id . '_slug', __( 'Website name', 'beltoft-services' ), $post['slug'], true, '' !== $zone ? __( 'Lowercase letters, numbers and dashes. You connect your own domain later.', 'beltoft-services' ) : __( 'Lowercase letters, numbers and dashes.', 'beltoft-services' ), 'text', 32 );
+
+		if ( '' !== $zone ) {
+			/* translators: %s: address such as myshop.example.net, with the name part marked. */
+			echo '<p class="beltoft-services-site-field__note" data-site-address data-zone="' . esc_attr( $zone ) . '">' . wp_kses( sprintf( __( 'Your website opens at %s', 'beltoft-services' ), '<strong><span data-site-address-name>' . esc_html( '' !== $post['slug'] ? $post['slug'] : 'myshop' ) . '</span>.' . esc_html( $zone ) . '</strong>' ), array( 'strong' => array(), 'span' => array( 'data-site-address-name' => true ) ) ) . '</p>';
+		}
+
+		echo '</div>';
 		if ( $have ) {
-			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OURS ) . '"' . checked( $mode, self::MODE_OURS, false ) . '> ' . esc_html__( 'A domain I have with you', 'beltoft-services' ) . '</label>';
-			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" aria-label="' . esc_attr__( 'Domain on our name servers', 'beltoft-services' ) . '">';
+			self::radio( $name, $id, self::MODE_OURS, $mode, __( 'A domain I have with you', 'beltoft-services' ) );
+			echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_OURS ) . '"' . ( self::MODE_OURS === $mode ? '' : ' hidden' ) . '>';
+			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_zone">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone">';
 
-			foreach ( $zones as $zone ) {
-				echo '<option value="' . esc_attr( $zone ) . '"' . selected( $post['zone'], $zone, false ) . '>' . esc_html( $zone ) . '</option>';
+			foreach ( $zones as $one ) {
+				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['zone'], $one, false ) . '>' . esc_html( $one ) . '</option>';
 			}
 
 			echo '</select></span></p>';
+			self::text_row( $name . '[host_ours]', $id . '_host_ours', __( 'Or a name inside it', 'beltoft-services' ), $post['host_ours'], false, __( 'For example www.mine.example. Leave empty to use the domain itself. We set up its DNS for you.', 'beltoft-services' ), 'url' );
+			echo '</div>';
 		}
 
-		echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OWN ) . '"' . checked( $mode, self::MODE_OWN, false ) . '> ' . esc_html__( 'A domain I have elsewhere', 'beltoft-services' ) . '</label></p>';
-		self::text_row( $name . '[host]', $id . '_host', __( 'Domain name', 'beltoft-services' ), $post['host'], false, __( 'You add one DNS record where the domain is hosted. We show you which after the order.', 'beltoft-services' ) );
+		self::radio( $name, $id, self::MODE_OWN, $mode, __( 'A domain I have elsewhere', 'beltoft-services' ) );
+		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_OWN ) . '"' . ( self::MODE_OWN === $mode ? '' : ' hidden' ) . '>';
+		self::text_row( $name . '[host]', $id . '_host', __( 'Domain name', 'beltoft-services' ), self::MODE_OWN === $mode ? $post['host'] : '', false, __( 'For example www.example.com', 'beltoft-services' ), 'url' );
+		echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'After you order, your account page shows the DNS records to add where your domain is managed: an A record that points the domain to our server, and a TXT record that proves the domain is yours. Until the domain points to us, the website works on a temporary address.', 'beltoft-services' ) . '</p>';
+		echo '</div>';
 
+		echo '</fieldset>';
+
+		// What to install and in which language.
 		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_install">' . esc_html__( 'Install', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[install]" id="' . esc_attr( $id ) . '_install">';
 
-		foreach ( array( 'wordpress' => __( 'WordPress', 'beltoft-services' ), 'woocommerce' => __( 'WordPress with WooCommerce', 'beltoft-services' ), 'empty' => __( 'Empty site', 'beltoft-services' ) ) as $value => $text ) {
+		foreach ( array( 'wordpress' => __( 'WordPress', 'beltoft-services' ), 'woocommerce' => __( 'WordPress with WooCommerce', 'beltoft-services' ) ) as $value => $text ) {
 			echo '<option value="' . esc_attr( $value ) . '"' . selected( $pick, $value, false ) . '>' . esc_html( $text ) . '</option>';
 		}
 
 		echo '</select></span></p>';
 
-		self::text_row( $name . '[language]', $id . '_language', __( 'Site language', 'beltoft-services' ), '' === $post['language'] ? 'en_US' : $post['language'], false, __( 'A WordPress locale such as en_US or da_DK.', 'beltoft-services' ) );
-		self::text_row( $name . '[email]', $id . '_email', __( 'Admin email', 'beltoft-services' ), $post['email'], false, __( 'Empty uses your billing email.', 'beltoft-services' ) );
-		echo '</fieldset>';
+		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_language">' . esc_html__( 'Site language', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[language]" id="' . esc_attr( $id ) . '_language">';
+		$groups = Languages::groups();
+		echo '<optgroup label="' . esc_attr__( 'Common languages', 'beltoft-services' ) . '">';
+
+		foreach ( $groups['common'] as $locale => $text ) {
+			echo '<option value="' . esc_attr( $locale ) . '"' . selected( $lang, $locale, false ) . '>' . esc_html( $text ) . '</option>';
+		}
+
+		echo '</optgroup><optgroup label="' . esc_attr__( 'All languages', 'beltoft-services' ) . '">';
+
+		foreach ( $groups['all'] as $locale => $text ) {
+			echo '<option value="' . esc_attr( $locale ) . '"' . selected( $lang, $locale, false ) . '>' . esc_html( $text ) . '</option>';
+		}
+
+		echo '</optgroup></select></span></p>';
+
+		// Everything that has a good default.
+		$open = '' !== $post['email'] || '' !== $post['label'] || '' !== $post['slug_domain'];
+
+		echo '<details class="beltoft-services-site-field__more"' . ( $open ? ' open' : '' ) . '><summary>' . esc_html__( 'More options', 'beltoft-services' ) . '</summary>';
+		self::text_row( $name . '[label]', $id . '_label', __( 'Website title', 'beltoft-services' ), $post['label'], false, __( 'Shown in the browser tab. Empty uses the domain or the website name. You can change it in WordPress.', 'beltoft-services' ), 'text', 100 );
+		self::text_row( $name . '[email]', $id . '_email', __( 'WordPress admin email', 'beltoft-services' ), $post['email'], false, __( 'Empty uses your billing email.', 'beltoft-services' ), 'email' );
+		echo '<div data-site-more-slug' . ( self::MODE_PREVIEW === $mode ? ' hidden' : '' ) . '>';
+		self::text_row( $name . '[slug_domain]', $id . '_slug_domain', __( 'Temporary address name', 'beltoft-services' ), $post['slug_domain'], false, __( 'Made from your domain, for example example-com. Your website is reachable at this address until your domain points to us.', 'beltoft-services' ), 'text', 32 );
+		echo '</div>';
+		echo '</details>';
+		echo '</div>';
+	}
+
+	/**
+	 * One radio of the address choice.
+	 *
+	 * @param string $name  Field name prefix of the line.
+	 * @param string $id    Id prefix of the line.
+	 * @param string $value Mode.
+	 * @param string $mode  Chosen mode.
+	 * @param string $text  Label.
+	 */
+	private static function radio( string $name, string $id, string $value, string $mode, string $text ): void {
+		echo '<p class="form-row form-row-wide beltoft-services-site-field__choice"><label for="' . esc_attr( $id . '_mode_' . $value ) . '"><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" id="' . esc_attr( $id . '_mode_' . $value ) . '" value="' . esc_attr( $value ) . '"' . checked( $mode, $value, false ) . '> ' . esc_html( $text ) . '</label></p>';
 	}
 
 	/**
@@ -341,11 +460,16 @@ final class SiteField {
 	 * @param string $value    Value.
 	 * @param bool   $required Whether it is required.
 	 * @param string $help     Help text.
+	 * @param string $type     Input kind: text, url or email (sets the mobile keyboard).
+	 * @param int    $max      Longest value.
 	 */
-	private static function text_row( string $name, string $id, string $label, string $value, bool $required, string $help ): void {
+	private static function text_row( string $name, string $id, string $label, string $value, bool $required, string $help, string $type = 'text', int $max = 253 ): void {
+		$mode = 'email' === $type ? 'email' : ( 'url' === $type ? 'url' : 'text' );
+		$auto = 'email' === $type ? 'email' : 'off';
+
 		echo '<p class="form-row form-row-wide' . ( $required ? ' validate-required' : '' ) . '"><label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . ( $required ? '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr>' : '' ) . '</label>';
-		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '" id="' . esc_attr( $id ) . '" maxlength="253" autocomplete="off" spellcheck="false" value="' . esc_attr( $value ) . '"></span>';
-		echo '' === $help ? '' : '<span class="description">' . esc_html( $help ) . '</span>';
+		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '" id="' . esc_attr( $id ) . '" maxlength="' . (int) $max . '" inputmode="' . esc_attr( $mode ) . '" autocomplete="' . esc_attr( $auto ) . '" autocapitalize="none" spellcheck="false" value="' . esc_attr( $value ) . '"' . ( '' === $help ? '' : ' aria-describedby="' . esc_attr( $id ) . '_help"' ) . '></span>';
+		echo '' === $help ? '' : '<span class="description" id="' . esc_attr( $id ) . '_help">' . esc_html( $help ) . '</span>';
 		echo '</p>';
 	}
 
