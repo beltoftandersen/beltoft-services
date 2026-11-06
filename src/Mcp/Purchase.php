@@ -380,7 +380,7 @@ final class Purchase {
 
 	/**
 	 * The one place that says whether the customer's usage account can take a new server with no payment step: it is active
-	 * and its saved card (a Mollie customer and mandate, or a saved Stripe token) can be charged later without the customer. A customer who only
+	 * and its saved card (a saved Stripe token) can be charged later without the customer. A customer who only
 	 * added a card, with no server yet, passes this as well. Kept in one method so it can be switched to a shared helper.
 	 *
 	 * @param \WC_Subscription|null $account The customer's usage account, if any.

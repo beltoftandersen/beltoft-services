@@ -9,7 +9,6 @@ namespace BeltoftServices\Credit;
 
 use Automattic\WooCommerce\Utilities\DiscountsUtil;
 use BeltoftServices\Card\Card;
-use BeltoftServices\Card\Mollie;
 use BeltoftServices\Locks;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Usage\Account;
@@ -21,8 +20,8 @@ defined( 'ABSPATH' ) || exit;
  * store currency, and expiry, usage limit, limit per user and allowed emails are the screen's own. Such a coupon never
  * applies in a cart or at checkout. A customer redeems it on the credit page. The rules, in order: logged in and not
  * rate limited, the code is an account credit coupon and is valid (not expired, within its usage limit, within its limit
- * per user, the customer's email allowed), the customer has a saved card that Mollie says is valid, and that card (by the
- * fingerprint Mollie puts on the mandate) has not redeemed this code before. The fingerprints are kept only as keyed hashes
+ * per user, the customer's email allowed), the customer has a saved card that is valid, and that card (by its Stripe
+ * fingerprint) has not redeemed this code before. The fingerprints are kept only as keyed hashes
  * in the coupon's meta. The credit is a ledger row (kind promo, reference "code", "<coupon id>-<card hash>"), so the same
  * card never credits one code twice even if the meta write is lost; the coupon's usage count goes up with the customer
  * recorded, so WooCommerce's limit per user counts. The whole redemption holds a lock on the code.
@@ -124,7 +123,7 @@ final class Code {
 	/**
 	 * The keyed hash of a card fingerprint for one code (the fingerprint itself is never stored).
 	 *
-	 * @param string $fingerprint Mollie's card fingerprint.
+	 * @param string $fingerprint The card fingerprint.
 	 * @param int    $coupon_id   Coupon.
 	 */
 	public static function card_hash( string $fingerprint, int $coupon_id ): string {
@@ -210,31 +209,12 @@ final class Code {
 		}
 
 		$account = Account::for_user( $user_id );
-		$mandate = $account ? Card::mandate_id( $account ) : '';
-		$cst     = $account ? Card::customer_id( $account ) : '';
-
-		if ( $account && ( '' === $mandate || '' === $cst ) && null !== Card::token_for( $account ) ) {
-			// A saved token (Stripe): usable by its expiry; the card fingerprint comes from the gateway's payment method.
-			if ( ! Card::usable( Card::token_details( $account ) ) ) {
-				return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
-			}
-
-			$fingerprint = Card::token_fingerprint( $account );
-		} elseif ( ! $account || '' === $mandate || '' === $cst ) {
+		if ( ! $account || null === Card::token_for( $account ) || ! Card::usable( Card::token_details( $account ) ) ) {
 			return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
-		} else {
-			$raw = Mollie::mandate( $cst, $mandate );
-
-			if ( is_wp_error( $raw ) ) {
-				return self::fail( __( 'Your card could not be checked right now. Try again later.', 'beltoft-services' ) );
-			}
-
-			if ( ! Card::usable( Card::summarize( $raw ) ) ) {
-				return self::fail( __( 'Add a card first, then redeem the code.', 'beltoft-services' ) );
-			}
-
-			$fingerprint = isset( $raw['details']['cardFingerprint'] ) && is_string( $raw['details']['cardFingerprint'] ) ? trim( $raw['details']['cardFingerprint'] ) : '';
 		}
+
+		// The card fingerprint comes from the gateway's payment method (Stripe's), never stored in the clear.
+		$fingerprint = Card::token_fingerprint( $account );
 
 		if ( '' === $fingerprint ) {
 			return self::fail( __( 'This card cannot be used to redeem a code. Add a credit or debit card.', 'beltoft-services' ) );
