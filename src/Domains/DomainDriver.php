@@ -123,7 +123,8 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			foreach ( (array) ( $found['results'] ?? array() ) as $item ) {
 				if ( ! is_array( $item ) || empty( $item['id'] ) ) { continue; }
 				$full = $item['full_name'] ?? ( ( $item['domain']['name'] ?? '' ) . '.' . ( $item['domain']['extension'] ?? '' ) );
-				if ( strtolower( (string) $full ) === $name ) { $existing = $item; break; }
+				// A transfer the registry failed is not continued: the order is sent again.
+				if ( strtolower( (string) $full ) === $name && 'FAI' !== strtoupper( (string) ( $item['status'] ?? '' ) ) ) { $existing = $item; break; }
 			}
 			// Fail closed: a domain already in our account continues only when it names this order's registrant (a crash-resume).
 			if ( $existing && ( ! isset( $existing['owner_handle'] ) || ! is_string( $existing['owner_handle'] ) || '' === $existing['owner_handle'] || $existing['owner_handle'] !== $r->get( 'contact_handle' ) ) ) {
@@ -153,6 +154,8 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 				}
 				if ( 'transfer' === $mode ) {
 					$auth = Crypto::decrypt( (string) $r->get( 'auth' ) );
+					// A code the registry refused is gone; the customer enters a new one, and nothing is sent until then.
+					if ( ( null === $auth || '' === $auth ) && TransferFix::AUTH === (string) $r->get( 'transfer_fix' ) ) { return TransferFix::hold( $r, TransferFix::AUTH, array( 'steps' => $steps ) ); }
 					if ( null === $auth || '' === $auth ) { return StepResult::fail( 'The transfer code is unavailable. Contact support.' ); }
 					$body['auth_code'] = $auth;
 				}
@@ -160,18 +163,29 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 				$blocked = SpendGuard::guard( $r, $name, 'transfer' === $mode ? 'transfer' : 'create', SpendGuard::item_of_resource( $r ) );
 				if ( $blocked ) { return $blocked; }
 				$ordered = $client->request( 'POST', 'transfer' === $mode ? '/domains/transfer' : '/domains', $body );
-				if ( is_wp_error( $ordered ) ) { return $this->error( $r, $ordered, $steps ); }
+				if ( is_wp_error( $ordered ) ) {
+					// A refused code or a locked domain is the customer's to fix: the order waits, and they are told once.
+					$fix = 'transfer' === $mode && ! LiveClient::is_transient( $ordered ) ? TransferFix::from_error( $ordered ) : '';
+					if ( '' !== $fix ) { return TransferFix::hold( $r, $fix, array( 'steps' => $steps ) ); }
+					return $this->error( $r, $ordered, $steps );
+				}
 			}
 			$remote_id = (string) ( $ordered['id'] ?? '' );
 			if ( '' === $remote_id || ! ctype_digit( $remote_id ) ) { return StepResult::retry( 3600, 'Registrar did not return a domain id.' ); }
 			$steps[] = 'order';
 			$meta = array( 'remote_id' => $remote_id, 'steps' => $steps, 'ordered_at' => time() );
 			if ( 'transfer' === $mode ) { $meta['transfer_expiry_before'] = (string) ( $ordered['expiration_date'] ?? '' ); }
+			if ( $r->get( 'transfer_fix' ) ) { $meta += array( 'transfer_fix' => null, 'transfer_fix_sent' => null, 'transfer_fix_since' => null ); }
 			if ( ! $r->set( $meta ) ) { return StepResult::retry( 3600, 'The registrar order id could not be saved.' ); }
 		}
 		if ( ! in_array( 'active', $steps, true ) ) {
 			$detail = Clients::registrar()->request( 'GET', '/domains/' . $r->get( 'remote_id' ) );
 			if ( is_wp_error( $detail ) ) { return $this->error( $r, $detail, $steps ); }
+			$fix = 'ACT' !== ( $detail['status'] ?? '' ) && 'transfer' === $mode ? TransferFix::from_detail( $detail ) : '';
+			if ( '' !== $fix ) {
+				// The registry failed the transfer for a reason the customer can fix: the order is sent again once they have.
+				return TransferFix::hold( $r, $fix, array( 'steps' => array_values( array_diff( $steps, array( 'order' ) ) ), 'remote_id' => null, 'pending_since' => null ) );
+			}
 			if ( 'ACT' !== ( $detail['status'] ?? '' ) ) {
 				$since = (int) ( $r->get( 'pending_since' ) ?: time() );
 				if ( time() - $since > 14 * DAY_IN_SECONDS ) {

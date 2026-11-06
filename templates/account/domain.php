@@ -23,6 +23,10 @@ if ( $beltoft_time ) {
 }
 ?>
 <div class="beltoft-services-domain" data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-bs-scope="<?php echo esc_attr( (string) $r->id() ); ?>" data-updating="<?php echo esc_attr__( 'Updating…', 'beltoft-services' ); ?>" data-updating-note="<?php echo esc_attr__( 'This can take up to a minute.', 'beltoft-services' ); ?>">
+	<?php $beltoft_fix = $dns_only ? null : \BeltoftServices\Domains\TransferFix::view( $r ); ?>
+	<?php if ( $beltoft_fix ) : ?>
+		<?php include \BeltoftServices\Account\Domains::file( 'domain-fix.php' ); ?>
+	<?php endif; ?>
 	<?php if ( $dns_only ) : ?>
 		<?php
 		$beltoft_state = (string) $r->get( 'delegation' );

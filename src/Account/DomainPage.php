@@ -15,6 +15,7 @@ use BeltoftServices\Domains\LiveDns;
 use BeltoftServices\Domains\Panels as DomainPanels;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\TransferDns;
+use BeltoftServices\Domains\TransferFix;
 use BeltoftServices\Domains\Zone;
 use BeltoftServices\Resource;
 
@@ -149,6 +150,7 @@ final class DomainPage {
 			'rows'             => $rows,
 			'transfer_price'   => $price,
 			'transfer'         => $transfer,
+			'fix'              => $dns_only ? null : TransferFix::view( $r ),
 			'zone_pending'     => $zone_here,
 			'adopt'            => $adopt,
 		);
