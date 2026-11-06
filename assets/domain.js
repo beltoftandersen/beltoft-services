@@ -370,6 +370,10 @@
 		var id = box.getAttribute( 'data-resource' );
 		var area = el( 'textarea', 'beltoft-services-domain__zone-text' );
 		var picker = document.createElement( 'input' );
+		var pick = el( 'label', 'button beltoft-services-domain__import-pick' );
+		var pickRow = el( 'div', 'beltoft-services-domain__import-file' );
+		var fileName = el( 'span', 'beltoft-services-domain__import-name' );
+		var pasteLabel = el( 'label', 'beltoft-services-domain__import-label', t.paste );
 		var out = el( 'div', 'beltoft-services-domain__import-result' );
 		var bar = el( 'p', 'beltoft-services-domain__import-actions' );
 		var preview = el( 'button', 'button', t.preview );
@@ -378,15 +382,22 @@
 		area.rows = 6;
 		area.setAttribute( 'aria-label', t.label );
 		area.spellcheck = false;
+		area.id = 'beltoft-zone-text-' + id;
+		pasteLabel.setAttribute( 'for', area.id );
 		picker.type = 'file';
 		picker.accept = '.txt,.zone,.bind,.db,.dns,text/plain';
-		picker.setAttribute( 'aria-label', t.choose );
+		picker.className = 'beltoft-services-domain__import-input';
+		pick.appendChild( picker );
+		pick.appendChild( document.createTextNode( t.choose ) );
+		pickRow.appendChild( pick );
+		pickRow.appendChild( fileName );
 		preview.type = 'button';
 		add.type = 'button';
 		add.hidden = true;
 		picker.addEventListener( 'change', function () {
 			var file = picker.files && picker.files[ 0 ];
 			if ( ! file ) { return; }
+			fileName.textContent = file.name;
 			if ( file.size > 102400 ) { bs.fail( null, t.tooLarge, area ); return; }
 			var reader = new window.FileReader();
 			reader.onload = function () {
@@ -399,8 +410,10 @@
 		} );
 		area.addEventListener( 'input', function () { add.hidden = true; } );
 		function line( set ) {
-			var item = el( 'li', '', set.name + ' ' + set.type + ': ' + set.values.join( ', ' ) + ' (' + t[ set.status ] + ')' );
-			if ( 'replace' === set.status && set.old.length ) { item.appendChild( el( 'span', '', ' ' + t.was + ': ' + set.old.join( ', ' ) ) ); }
+			var item = el( 'li', 'is-' + set.status );
+			item.appendChild( el( 'span', 'beltoft-services-domain__import-rec', set.name + ' ' + set.type + ' ' + set.values.join( ', ' ) ) );
+			item.appendChild( el( 'span', 'beltoft-services-domain__import-status', t[ set.status ] ) );
+			if ( 'replace' === set.status && set.old.length ) { item.appendChild( el( 'span', 'beltoft-services-domain__import-status', t.was + ': ' + set.old.join( ', ' ) ) ); }
 			return item;
 		}
 		function show( data ) {
@@ -412,7 +425,12 @@
 			if ( ( data.skipped || [] ).length ) {
 				out.appendChild( el( 'p', 'beltoft-services-domain__note', t.skipped ) );
 				var skipped = el( 'ul', 'beltoft-services-domain__import-list' );
-				data.skipped.forEach( function ( row ) { skipped.appendChild( el( 'li', '', ( row.line ? row.line + ': ' : '' ) + row.text + ' (' + row.reason + ')' ) ); } );
+				data.skipped.forEach( function ( row ) {
+					var item = el( 'li', 'is-skipped' );
+					item.appendChild( el( 'span', 'beltoft-services-domain__import-rec', ( row.line ? row.line + ': ' : '' ) + row.text ) );
+					item.appendChild( el( 'span', 'beltoft-services-domain__import-status', row.reason ) );
+					skipped.appendChild( item );
+				} );
 				out.appendChild( skipped );
 			}
 			add.hidden = 0 === changes;
@@ -442,9 +460,9 @@
 		preview.addEventListener( 'click', function () { send( false ); } );
 		add.addEventListener( 'click', function () { send( true ); } );
 		bar.appendChild( preview );
-		bar.appendChild( document.createTextNode( ' ' ) );
 		bar.appendChild( add );
-		box.appendChild( picker );
+		box.appendChild( pickRow );
+		box.appendChild( pasteLabel );
 		box.appendChild( area );
 		box.appendChild( bar );
 		box.appendChild( out );
