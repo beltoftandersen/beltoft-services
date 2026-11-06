@@ -38,6 +38,7 @@ final class Registry {
 				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
 				'mail'    => new \BeltoftServices\Mail\MailDriver(),
 				'ssl'     => new \BeltoftServices\Ssl\SslDriver(),
+				'licence-key' => new \BeltoftServices\Licences\KeyDriver(),
 			)
 		);
 

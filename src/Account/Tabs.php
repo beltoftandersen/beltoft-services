@@ -49,7 +49,7 @@ final class Tabs {
 
 		$missing = array();
 
-		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Ssl::class )->slug() ) as $slug ) {
+		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), Domains::slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Ssl::class )->slug(), ServiceArea::get( Licences::class )->slug() ) as $slug ) {
 			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
 				$missing[ $slug ] = $labels[ $slug ];
 			}
