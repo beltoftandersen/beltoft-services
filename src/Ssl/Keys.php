@@ -115,13 +115,15 @@ final class Keys {
 	 *
 	 * @param Resource $r       Resource.
 	 * @param int      $user_id The requesting user; must own the license.
-	 * @return string|null The key, or null.
+	 * @param callable $shape   Optional: turns the key into what is handed out (a PKCS#12 file, say) BEFORE the key is wiped; a null answer
+	 *                          reveals nothing and wipes nothing.
+	 * @return string|null The key (or what $shape made of it), or null.
 	 */
-	public static function take( Resource $r, int $user_id ): ?string {
+	public static function take( Resource $r, int $user_id, ?callable $shape = null ): ?string {
 		$taken = null;
 
 		$r->locked(
-			static function () use ( $r, $user_id, &$taken ): bool {
+			static function () use ( $r, $user_id, &$taken, $shape ): bool {
 				$license = $r->license();
 
 				if ( $user_id <= 0 || empty( $license['user_id'] ) || (int) $license['user_id'] !== $user_id ) {
@@ -143,17 +145,49 @@ final class Keys {
 
 				$plain = Crypto::decrypt( $stored );
 
-				if ( null === $plain || '' === $plain || ! $r->set( $wipe ) ) {
+				if ( null === $plain || '' === $plain ) {
 					return false;
 				}
 
-				$taken = $plain;
+				$out = null === $shape ? $plain : $shape( $plain );
+
+				if ( ! is_string( $out ) || '' === $out || ! $r->set( $wipe ) ) {
+					return false;
+				}
+
+				$taken = $out;
 
 				return true;
 			}
 		);
 
 		return $taken;
+	}
+
+	/**
+	 * A PKCS#12 file of the stored key, the certificate and its chain, protected by a password: the form an S/MIME key is handed
+	 * out in. Null when it cannot be made.
+	 *
+	 * @param Resource $r        Resource.
+	 * @param string   $key      Private key PEM.
+	 * @param string   $password Password of the file.
+	 */
+	public static function pkcs12( Resource $r, string $key, string $password ): ?string {
+		$cert = trim( (string) $r->get( 'ssl_cert' ) );
+
+		if ( '' === $cert || '' === $password ) {
+			return null;
+		}
+
+		$extra = array();
+
+		if ( preg_match_all( '/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', (string) $r->get( 'ssl_chain' ), $found ) ) {
+			$extra['extracerts'] = $found[0];
+		}
+
+		$made = openssl_pkcs12_export( $cert, $out, $key, $password, $extra );
+
+		return $made && is_string( $out ) && '' !== $out ? $out : null;
 	}
 
 	/**

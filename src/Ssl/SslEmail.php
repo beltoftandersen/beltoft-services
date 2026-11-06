@@ -31,6 +31,7 @@ final class SslEmail {
 
 		return array(
 			'name'        => (string) $r->get( 'ssl_name' ),
+			'smime'       => Provision::is_smime( $r ),
 			'reason'      => in_array( $data['ssl_reason'] ?? '', array( 'dns', 'file', 'email' ), true ) ? (string) $data['ssl_reason'] : 'dns',
 			'rows'        => $rows,
 			'approver'    => (string) $r->get( 'ssl_approver' ),

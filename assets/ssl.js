@@ -79,6 +79,28 @@
 		}, 1000 );
 	}
 
+	function savePkcs12( base64, name ) {
+		var bytes = window.atob( base64 );
+		var array = new window.Uint8Array( bytes.length );
+		var i;
+		var blob;
+		var link = document.createElement( 'a' );
+
+		for ( i = 0; i < bytes.length; i++ ) {
+			array[ i ] = bytes.charCodeAt( i );
+		}
+
+		blob = new window.Blob( [ array ], { type: 'application/x-pkcs12' } );
+		link.href = window.URL.createObjectURL( blob );
+		link.download = name;
+		document.body.appendChild( link );
+		link.click();
+		document.body.removeChild( link );
+		window.setTimeout( function () {
+			window.URL.revokeObjectURL( link.href );
+		}, 1000 );
+	}
+
 	function fileName( box, suffix ) {
 		var name = ( box.getAttribute( 'data-name' ) || 'certificate' ).replace( /[^A-Za-z0-9.-]/g, '_' );
 
@@ -141,6 +163,33 @@
 					save( result.data.key, fileName( box, '.key' ) );
 					S.done( h, strings.keyOnce );
 					target.hidden = true;
+				} );
+			} );
+
+			return;
+		}
+
+		if ( target.hasAttribute( 'data-ssl-p12' ) ) {
+			var field = box.querySelector( '[data-ssl-p12-password]' );
+			var typedPassword = field ? field.value : '';
+
+			guarded( box, target, strings.working, function ( h ) {
+				return call( box, 'POST', '/ssl-pkcs12', { password: typedPassword } ).then( function ( result ) {
+					if ( ! result.ok || ! result.data.pkcs12 ) {
+						S.fail( h, 409 === result.status ? strings.keyGone : problem( result ) );
+						target.disabled = 409 === result.status;
+
+						return;
+					}
+
+					savePkcs12( result.data.pkcs12, fileName( box, '.p12' ) );
+					S.done( h, result.data.password ? strings.p12Once + ' ' + result.data.password : strings.p12Saved );
+					target.hidden = true;
+
+					if ( field ) {
+						field.value = '';
+						field.hidden = true;
+					}
 				} );
 			} );
 

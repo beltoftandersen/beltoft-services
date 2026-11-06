@@ -63,7 +63,8 @@ final class Operations {
 			$actions['ssl_reissue'] = __( 'Reissue the certificate', 'beltoft-services' );
 		}
 
-		if ( '' !== $r->get( 'remote_id' ) && 'REQ' === $status && ! $r->get( 'ssl_cancelled' ) ) {
+		// An S/MIME certificate is validated by an email to its mailbox only: there is no other method and no resend (the registrar refuses it).
+		if ( '' !== $r->get( 'remote_id' ) && 'REQ' === $status && ! $r->get( 'ssl_cancelled' ) && ! Provision::is_smime( $r ) ) {
 			$actions['ssl_change_validation'] = __( 'Change the validation method', 'beltoft-services' );
 
 			if ( 'email' === (string) $r->get( 'ssl_validation' ) ) {
@@ -177,7 +178,11 @@ final class Operations {
 			'domain_validation_methods' => Validation::registrar_methods( $r ),
 		);
 
-		if ( 'email' === (string) $r->get( 'ssl_validation' ) ) {
+		if ( Provision::is_smime( $r ) ) {
+			// No host names: the authority writes to the mailbox again.
+			unset( $body['domain_validation_methods'] );
+			$body['approver_email'] = (string) $r->get( 'ssl_approver' );
+		} elseif ( 'email' === (string) $r->get( 'ssl_validation' ) ) {
 			$body['approver_email'] = (string) $r->get( 'ssl_approver' );
 		}
 
@@ -219,9 +224,10 @@ final class Operations {
 		$csr   = isset( $args['csr'] ) && is_string( $args['csr'] ) ? trim( $args['csr'] ) : '';
 		// A reissue keeps the names of the order: the request covers exactly them.
 		$names = array_column( SslNames::entries( $r ), 'name' );
+		$smime = Provision::is_smime( $r );
 
 		if ( '' !== $csr ) {
-			$read = Csr::check( $csr, $name, $level, $names );
+			$read = $smime ? Csr::check_email( $csr, $name ) : Csr::check( $csr, $name, $level, $names );
 
 			return is_wp_error( $read ) ? StepResult::fail( $read->get_error_message() ) : array( 'ssl_csr_next' => $csr, 'ssl_key_mode_next' => 'own' );
 		}
@@ -232,7 +238,7 @@ final class Operations {
 			return $org;
 		}
 
-		$made = Csr::generate( $name, $org, $names );
+		$made = $smime ? Csr::generate_email( $name, Provision::person( $r ), (string) ( $org['countryName'] ?? '' ) ) : Csr::generate( $name, $org, $names );
 
 		if ( is_wp_error( $made ) ) {
 			return StepResult::retry( 300, $made->get_error_message() );
@@ -253,6 +259,10 @@ final class Operations {
 	 * @param Resource $r Resource.
 	 */
 	public static function resend( Resource $r ): StepResult {
+		if ( Provision::is_smime( $r ) ) {
+			return StepResult::fail( 'The registrar cannot send the S/MIME confirmation again. Open the certificate authority page instead.' );
+		}
+
 		$id   = (string) $r->get( 'remote_id' );
 		$sent = Clients::registrar()->request( 'POST', '/ssl/orders/' . $id . '/approver-email/resend', array( 'id' => (int) $id ) );
 
@@ -267,6 +277,10 @@ final class Operations {
 	 * @param array<string, mixed> $args method (auto, dns, file or email), approver (a mailbox name, for email) and name (several names only).
 	 */
 	public static function change_validation( Resource $r, array $args ): StepResult {
+		if ( Provision::is_smime( $r ) ) {
+			return StepResult::fail( 'An S/MIME certificate is validated by an email to its mailbox only.' );
+		}
+
 		$method   = isset( $args['method'] ) ? (string) $args['method'] : '';
 		$wildcard = '*.' === substr( (string) $r->get( 'ssl_name' ), 0, 2 );
 		$entries  = SslNames::entries( $r );

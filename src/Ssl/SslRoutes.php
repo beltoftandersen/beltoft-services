@@ -20,6 +20,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * - GET  ssl-certificate   the public certificate and chain (part: fullchain, cert or chain). Reachable with a read token.
  * - POST ssl-key           the private key we made, once. Never reachable with an API token, and never by MCP.
+ * - POST ssl-pkcs12       an S/MIME key we made, once, as a password protected PKCS#12 file with the certificate. Never reachable with an API token.
  * - POST ssl-panel         a one-time link to the certificate authority's page for this order.
  *
  * The key is in no reply except the one of ssl-key.
@@ -50,6 +51,12 @@ final class SslRoutes {
 			'callback'            => array( __CLASS__, 'key' ),
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id,
+		) );
+		register_rest_route( Routes::NAMESPACE, '/resources/(?P<id>\d+)/ssl-pkcs12', array(
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'pkcs12' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array( 'password' => array( 'type' => 'string', 'description' => 'Password of the file, at least 12 characters. Empty: one is made and returned.' ) ),
 		) );
 		register_rest_route( Routes::NAMESPACE, '/resources/(?P<id>\d+)/ssl-panel', array(
 			'methods'             => \WP_REST_Server::CREATABLE,
@@ -139,6 +146,11 @@ final class SslRoutes {
 			return $resource;
 		}
 
+		// An S/MIME key is only handed out inside a protected PKCS#12 file.
+		if ( Provision::is_smime( $resource ) ) {
+			return self::error( 'ssl_key_pkcs12', __( 'The key of an S/MIME certificate is downloaded as a .p12 file.', 'beltoft-services' ), 409 );
+		}
+
 		$key = Keys::take( $resource, get_current_user_id() );
 
 		if ( null === $key ) {
@@ -147,6 +159,50 @@ final class SslRoutes {
 
 		\BeltoftLicenses\Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', 'Customer took the private key of the SSL certificate' );
 		$response = new \WP_REST_Response( array( 'key' => $key ), 200 );
+		$response->header( 'Cache-Control', 'no-store' );
+
+		return $response;
+	}
+
+	/**
+	 * The S/MIME key, the certificate and its chain as a PKCS#12 file, once. The password is the customer's own (at least 12
+	 * characters) or, when none is sent, one made now and returned in this reply only. It is not stored and not logged.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function pkcs12( \WP_REST_Request $request ): \WP_REST_Response {
+		$resource = self::guard( $request, false, self::SECRET_LIMIT );
+
+		if ( ! $resource instanceof Resource ) {
+			return $resource;
+		}
+
+		if ( ! Provision::is_smime( $resource ) ) {
+			return self::error( 'ssl_not_smime', __( 'Only the key of an S/MIME certificate is downloaded as a .p12 file.', 'beltoft-services' ), 404 );
+		}
+
+		$typed     = is_string( $request['password'] ) ? $request['password'] : '';
+		$generated = '' === $typed;
+		$password  = $generated ? wp_generate_password( 20, false ) : $typed;
+
+		if ( ! $generated && ( strlen( $password ) < 12 || strlen( $password ) > 128 ) ) {
+			return self::error( 'ssl_password', __( 'Choose a password of at least 12 characters, or leave it empty and we make one.', 'beltoft-services' ), 422 );
+		}
+
+		$file = Keys::take( $resource, get_current_user_id(), static fn( string $key ): ?string => Keys::pkcs12( $resource, $key, $password ) );
+
+		if ( null === $file ) {
+			return self::error( 'ssl_key_gone', __( 'The key has already been taken or is no longer available.', 'beltoft-services' ), 409 );
+		}
+
+		\BeltoftLicenses\Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', 'Customer took the private key of the S/MIME certificate as a PKCS#12 file' );
+		$reply = array( 'pkcs12' => base64_encode( $file ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- a binary file in a JSON reply.
+
+		if ( $generated ) {
+			$reply['password'] = $password;
+		}
+
+		$response = new \WP_REST_Response( $reply, 200 );
 		$response->header( 'Cache-Control', 'no-store' );
 
 		return $response;
@@ -207,11 +263,17 @@ final class SslRoutes {
 		if ( 'ssl_reissue' === $action && '' !== trim( (string) ( $args['csr'] ?? '' ) ) ) {
 			$plan  = (array) $resource->get( 'plan' );
 			$level = SslCatalog::level( (int) ( $plan['ssl_product'] ?? 0 ) );
-			$read  = Csr::check( (string) $args['csr'], (string) $resource->get( 'ssl_name' ), '' !== $level ? $level : (string) ( $plan['ssl_level'] ?? 'dv' ), array_column( SslNames::entries( $resource ), 'name' ) );
+			$read  = Provision::is_smime( $resource )
+				? Csr::check_email( (string) $args['csr'], (string) $resource->get( 'ssl_name' ) )
+				: Csr::check( (string) $args['csr'], (string) $resource->get( 'ssl_name' ), '' !== $level ? $level : (string) ( $plan['ssl_level'] ?? 'dv' ), array_column( SslNames::entries( $resource ), 'name' ) );
 
 			if ( is_wp_error( $read ) ) {
 				return new \WP_Error( $read->get_error_code(), $read->get_error_message(), array( 'status' => 422 ) );
 			}
+		}
+
+		if ( in_array( $action, array( 'ssl_change_validation', 'ssl_resend_email' ), true ) && Provision::is_smime( $resource ) ) {
+			return new \WP_Error( 'ssl_validation', __( 'An S/MIME certificate is validated by the email sent to its mailbox. Use the certificate authority page if the email did not arrive.', 'beltoft-services' ), array( 'status' => 422 ) );
 		}
 
 		if ( 'ssl_change_validation' === $action ) {
