@@ -286,8 +286,9 @@ class TransferDnsPageTest extends TestCase {
 		$this->assertWPError( $added );
 		$this->assertSame( 'domain_locked', $added->get_error_code() );
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
-		$this->assertStringContainsString( 'Your current registrar calls it the authorization code, EPP code or transfer code. You find it in their domain settings.', $js );
-		$this->assertStringContainsString( 'Transfer includes one year added to your registration.', $js );
+		$this->assertStringContainsString( 'copy its transfer code, also called EPP or auth code. You find it in their domain settings.', $js );
+		$this->assertStringContainsString( 'The transfer takes up to 5 days and adds one year to the registration.', $js );
+		$this->assertStringNotContainsString( 'Your current registrar calls it', $js, 'The code is explained once.' );
 		$this->assertStringContainsString( ' and stops when the domain moves. After you order, you import your records here before the transfer starts.', $js );
 	}
 

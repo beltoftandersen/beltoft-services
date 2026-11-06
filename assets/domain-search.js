@@ -61,7 +61,7 @@
     function transferForm(domain, actions) {
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
-      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and enter the transfer code (also called auth or EPP code). Turn off DNSSEC at your current registrar first. The transfer takes up to 5 days.'));
+      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC there first.'));
       const field = document.createElement('input');
       field.type = 'text';
       field.autocomplete = 'off';
@@ -72,9 +72,10 @@
       submit.type = 'submit';
       const notice = element('p', 'beltoft-domain-transfer__help', '');
       notice.setAttribute('aria-live', 'polite');
-      const codeHelp = element('p', 'beltoft-domain-transfer__help', 'Your current registrar calls it the authorization code, EPP code or transfer code. You find it in their domain settings.');
-      const priceLine = element('p', 'beltoft-domain-transfer__help', 'Transfer includes one year added to your registration.');
-      form.append(notice, field, codeHelp, priceLine, submit);
+      const priceLine = element('p', 'beltoft-domain-transfer__help', 'The transfer takes up to 5 days and adds one year to the registration.');
+      const row = element('div', 'beltoft-domain-transfer__row', '');
+      row.append(field, submit);
+      form.append(notice, row, priceLine);
       recommendation(domain).then(function (advice) {
         if (!advice) return;
         const who = advice.registrar || 'your current registrar';

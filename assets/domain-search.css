@@ -106,12 +106,28 @@
 
 :where(.beltoft-domain-transfer) {
   display: grid;
-  gap: .5rem;
+  gap: .75rem;
+  flex: 1 1 100%;
 }
 
 :where(.beltoft-domain-transfer__help) {
   margin: 0;
-  max-width: 28rem;
+  max-width: 42em;
+}
+
+/* The code and its button side by side; the button drops under the field on a phone. */
+:where(.beltoft-domain-transfer__row) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  max-width: 42em;
+}
+
+/* em, not rem: sites with a 62.5% root would get a field a few characters wide. */
+:where(.beltoft-domain-transfer__row input) {
+  flex: 1 1 16em;
+  width: auto;
+  min-width: 0;
 }
 
 :where(.beltoft-domain-transfer__help, .beltoft-domain-transfer__choices) {
