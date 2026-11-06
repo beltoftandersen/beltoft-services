@@ -240,6 +240,12 @@ class SchemaTest extends TestCase {
 			$this->assertNotFalse( get_transient( $name ), $name . ' stays without the setting.' );
 		}
 
+		// uninstall.php keeps the IP pool, VM records and hosting tables while a live service exists. The test database is shared
+		// and other suites (SSL) leave committed live activations in it, so this test starts from none.
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture: rolled back with the test.
+		$wpdb->query( $wpdb->prepare( 'UPDATE %i SET deactivated_at = NOW() WHERE deactivated_at IS NULL', $wpdb->prefix . 'beltoft_licenses_activations' ) );
+
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
 		$this->assertCount( 15, $drops );
