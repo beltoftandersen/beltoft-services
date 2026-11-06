@@ -8,12 +8,10 @@
 namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Card\Card;
-use BeltoftServices\Cli\CardCommand;
 use BeltoftServices\Usage\Account;
 use BeltoftServices\Usage\Cart;
 
 require_once __DIR__ . '/UsageTestCase.php';
-require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
 
 /**
  * A gateway that saves cards as tokens and charges subscriptions.
@@ -36,7 +34,6 @@ class CardTest extends UsageTestCase {
 		update_option( 'woocommerce_currency', 'EUR' );
 		WC()->payment_gateways()->payment_gateways['stripe_cc']        = new UsageTokenGateway( 'stripe_cc' );
 		WC()->payment_gateways()->payment_gateways['stripe_googlepay'] = new UsageTokenGateway( 'stripe_googlepay' );
-		\WP_CLI::reset();
 	}
 
 	public function tear_down(): void {
@@ -345,103 +342,66 @@ class CardTest extends UsageTestCase {
 
 	// ------------------------------------------------------------------ the page.
 
-	public function test_the_page_without_a_card_says_so_and_offers_add_a_card_only(): void {
-		wp_set_current_user( $this->new_user() );
-		$html = Card::html();
+	/**
+	 * What the plugin prints on the page (WooCommerce Subscriptions adds a hidden notice stub of its own at the same hook).
+	 */
+	private function note_html(): string {
+		ob_start();
+		Card::note();
 
-		$this->assertStringContainsString( 'No card saved. Pay as you go services are invoiced to a saved card.', $html );
-		$this->assertStringContainsString( 'add-payment-method', $html );
-		$this->assertStringContainsString( 'Add a card', $html );
-		$this->assertStringNotContainsString( 'is used for Pay as you go', $html );
-		$this->assertStringNotContainsString( 'Change card', $html );
-		$this->assertStringNotContainsString( 'ollie', $html );
+		return (string) ob_get_clean();
 	}
 
-	public function test_the_page_with_a_card_shows_it_and_says_it_is_the_pay_as_you_go_card(): void {
+	public function test_the_page_has_one_line_and_no_box_of_its_own(): void {
 		$user = $this->new_user();
 		$this->add_card( $user );
-		$html = Card::html();
+		$html = $this->note_html();
 
-		$this->assertStringContainsString( 'Visa ending 4242, expires 08/99', $html );
-		$this->assertStringContainsString( 'This card is used for Pay as you go invoices.', $html );
-		$this->assertStringContainsString( 'Change card', $html );
-		$this->assertStringNotContainsString( 'No card saved', $html );
-		$this->assertStringNotContainsString( 'ollie', $html );
+		$this->assertSame( '<p class="beltoft-services-card__note">Your default card is used for Pay as you go invoices.</p>', $html );
+		$this->assertNotFalse( has_action( 'woocommerce_before_account_payment_methods', array( Card::class, 'note' ) ) );
+		$this->assertFalse( has_action( 'woocommerce_account_payment-methods_endpoint', array( Card::class, 'render' ) ) );
+		$this->assertFalse( has_filter( 'bricks/frontend/render_element', array( Card::class, 'bricks_methods' ) ) );
+		$this->assertFalse( method_exists( Card::class, 'html' ) );
+		$this->assertFalse( file_exists( BELTOFT_SERVICES_PATH . 'templates/account/card.php' ) );
 		$this->assertDoesNotMatchRegularExpression( '/\x{2014}|\x{00B7}/u', $html );
 	}
 
-	public function test_an_expired_default_card_is_shown_with_a_warning(): void {
+	public function test_the_line_without_a_card_but_with_an_account_says_to_add_one(): void {
 		$user = $this->new_user();
-		$this->add_card( $user, 'pm_old', '2020' );
-		$html = Card::html();
-
-		$this->assertStringContainsString( 'Visa ending 4242, expires 08/20', $html );
-		$this->assertStringContainsString( 'Your card has expired.', $html );
-		$this->assertStringNotContainsString( 'No card saved', $html );
-	}
-
-	public function test_the_box_follows_the_default_card_even_when_the_account_was_never_linked(): void {
-		// The owner's state: a saved card that is the only token, so the default, and an account that never got it.
-		$user    = $this->new_user();
-		wp_set_current_user( 0 );
-		$this->token( $user, 'pm_g', '2099', 'visa', 'stripe_googlepay', '1013' );
-		$account = $this->legacy_account( $user );
-		$this->assertSame( 'mollie_wc_gateway_creditcard', $this->fresh( $account )->get_payment_method(), 'The account was made after the card, so nothing linked it.' );
-
-		wp_set_current_user( $user );
-		$html = Card::html();
-
-		$this->assertStringContainsString( 'Visa ending 1013, expires 08/99', $html );
-		$this->assertStringNotContainsString( 'No card saved', $html );
-
-		// Reading the page linked the account and cleared the old data.
-		$account = $this->fresh( $account );
-		$this->assertSame( 'pm_g', $account->get_meta( '_payment_method_token' ) );
-		$this->assertSame( 'stripe_googlepay', $account->get_payment_method() );
-		$this->assertSame( '', $account->get_meta( '_mollie_mandate_id' ) );
-		$this->assertCount( 1, wcs_get_subscriptions( array( 'customer_id' => $user, 'subscription_status' => 'any' ) ), 'The page made no second account.' );
-	}
-
-	public function test_the_page_makes_no_account_for_a_customer_without_one(): void {
-		$user = $this->new_user();
-		wp_set_current_user( 0 );
-		$this->token( $user );
+		$this->usage_account( $user );
 		wp_set_current_user( $user );
 
-		Card::html();
-
-		$this->assertNull( Account::for_user( $user ) );
+		$this->assertSame( '<p class="beltoft-services-card__note">Pay as you go services are invoiced to your default card. Add a card to use them.</p>', $this->note_html() );
 	}
 
-	// ------------------------------------------------------------------ the relink command.
+	public function test_no_line_for_a_customer_with_neither_a_card_nor_an_account(): void {
+		wp_set_current_user( $this->new_user() );
 
-	public function test_relink_dry_run_writes_nothing(): void {
-		$user    = $this->new_user();
-		wp_set_current_user( 0 );
-		$this->token( $user, 'pm_g', '2099', 'visa', 'stripe_googlepay', '1013' );
-		$account = $this->legacy_account( $user );
-
-		( new CardCommand() )->relink( array(), array( 'dry-run' => true ) );
-
-		$text = \WP_CLI::text();
-		$this->assertStringContainsString( 'Account #' . $account->get_id() . ' (user #' . $user . ', active): would link Visa ending 1013, expires 08/99 (stripe_googlepay), would remove the old provider data.', $text );
-		$this->assertStringContainsString( 'dry run', $text );
-
-		$account = $this->fresh( $account );
-		$this->assertSame( 'mollie_wc_gateway_creditcard', $account->get_payment_method() );
-		$this->assertSame( 'mdt_old', $account->get_meta( '_mollie_mandate_id' ) );
-		$this->assertSame( '', (string) $account->get_meta( '_payment_method_token' ) );
+		$this->assertSame( '', $this->note_html() );
 	}
 
-	public function test_relink_links_the_default_token_and_removes_the_old_meta(): void {
+	public function test_the_payment_methods_menu_item_is_still_added(): void {
+		wp_set_current_user( $this->new_user() );
+		$items = Card::menu( array( 'orders' => 'Orders', 'customer-logout' => 'Log out' ) );
+
+		$this->assertSame( 'Payment methods', $items['payment-methods'] );
+		$this->assertSame( 'customer-logout', array_key_last( $items ) );
+	}
+
+	public function test_the_cli_command_is_gone(): void {
+		$this->assertFalse( class_exists( 'BeltoftServices\\Cli\\CardCommand' ) );
+		$this->assertFalse( method_exists( Card::class, 'relink' ) );
+	}
+
+	// ------------------------------------------------------------------ an account that still carries the retired provider.
+
+	public function test_an_old_account_moves_to_the_card_when_a_card_is_added(): void {
 		$user    = $this->new_user();
-		wp_set_current_user( 0 );
-		$this->token( $user, 'pm_g', '2099', 'visa', 'stripe_googlepay', '1013' );
+		add_filter( 'beltoft_services_card_token_meta', static fn( $meta ) => $meta + array( '_wc_stripe_customer' => 'cus_1' ) );
 		$account = $this->legacy_account( $user );
+		$this->assertFalse( Account::chargeable( $this->fresh( $account ) ) );
 
-		( new CardCommand() )->relink( array(), array() );
-
-		$this->assertStringContainsString( ': linked Visa ending 1013, expires 08/99 (stripe_googlepay), removed the old provider data.', \WP_CLI::text() );
+		$this->add_card( $user, 'pm_g', '2099', 'visa', 'stripe_googlepay' );
 
 		$account = $this->fresh( $account );
 		$this->assertSame( 'stripe_googlepay', $account->get_payment_method() );
@@ -449,22 +409,51 @@ class CardTest extends UsageTestCase {
 		$this->assertSame( '', $account->get_meta( '_mollie_customer_id' ) );
 		$this->assertSame( '', $account->get_meta( '_mollie_mandate_id' ) );
 		$this->assertFalse( $account->is_manual() );
-
-		\WP_CLI::reset();
-		( new CardCommand() )->relink( array(), array() );
-		$this->assertStringContainsString( 'already on the default card, nothing to do.', \WP_CLI::text(), 'A second run changes nothing.' );
+		$this->assertTrue( Account::chargeable( $account ) );
 	}
 
-	public function test_relink_takes_the_old_provider_off_an_owner_with_no_card(): void {
-		$user    = $this->new_user();
+	public function test_an_old_account_moves_to_the_card_when_one_is_made_the_default(): void {
+		add_filter( 'beltoft_services_card_token_meta', static fn( $meta ) => $meta + array( '_wc_stripe_customer' => 'cus_1' ) );
+		$user = $this->new_user();
+		wp_set_current_user( 0 );
+		$first  = $this->token( $user, 'pm_1' );
+		$second = $this->token( $user, 'pm_2', '2099', 'visa', 'stripe_googlepay', '1013' );
 		$account = $this->legacy_account( $user );
 
-		( new CardCommand() )->relink( array(), array() );
+		wp_set_current_user( $user );
+		\WC_Payment_Tokens::set_users_default( $user, $second->get_id() );
 
-		$this->assertStringContainsString( 'no default card; took the old provider off the account, it has no card.', \WP_CLI::text() );
 		$account = $this->fresh( $account );
-		$this->assertSame( '', (string) $account->get_payment_method() );
+		$this->assertSame( 'pm_2', $account->get_meta( '_payment_method_token' ) );
+		$this->assertSame( 'stripe_googlepay', $account->get_payment_method() );
 		$this->assertSame( '', $account->get_meta( '_mollie_mandate_id' ) );
-		$this->assertTrue( $account->is_manual() );
+		$this->assertTrue( Account::chargeable( $account ) );
+	}
+
+	// ------------------------------------------------------------------ Subscriptions' own handling.
+
+	public function test_a_new_default_card_is_followed_before_subscriptions_asks_about_the_others(): void {
+		$this->assertLessThan( 10, has_action( 'woocommerce_payment_token_set_default', array( Card::class, 'token_event' ) ) );
+		$this->assertGreaterThan( 11, has_action( 'woocommerce_payment_token_deleted', array( Card::class, 'token_deleted' ) ) );
+	}
+
+	public function test_a_card_only_the_usage_account_uses_can_be_deleted(): void {
+		$user  = $this->new_user();
+		$token = $this->add_card( $user );
+
+		$this->assertTrue( Card::allow_deletion( false, $token ) );
+		$this->assertTrue( apply_filters( 'wc_subscriptions_allow_subscription_token_deletion', false, $token ) );
+	}
+
+	public function test_a_card_another_subscription_uses_keeps_the_subscriptions_rule(): void {
+		$user  = $this->new_user();
+		$token = $this->add_card( $user );
+		$other = wcs_create_subscription( array( 'customer_id' => $user, 'status' => 'pending', 'billing_period' => 'month', 'billing_interval' => 1 ) );
+		$other->set_payment_method( WC()->payment_gateways()->payment_gateways()['stripe_cc'] );
+		$other->update_meta_data( '_payment_method_token', $token->get_token() );
+		$other->set_requires_manual_renewal( false );
+		$other->save();
+
+		$this->assertFalse( Card::allow_deletion( false, $token ) );
 	}
 }

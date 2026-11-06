@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * Cards are added, changed and deleted on WooCommerce's own pages (Add payment method, the token table, the
  * checkout). Whenever a token is added, made the default or deleted, the customer's default token is written on
  * the usage account subscription (the keys the Stripe plugin reads when it charges a renewal), or removed from it
- * when the customer has no card left. The Payment methods page shows that one card and WooCommerce's list.
+ * when the customer has no card left. The Payment methods page is WooCommerce's own, with one line above it.
  */
 final class Card {
 
@@ -38,11 +38,14 @@ final class Card {
 	public static function register(): void {
 		add_action( 'action_scheduler_init', array( __CLASS__, 'unschedule' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
-		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'swap_page' ), 1 );
-		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'bricks_methods' ), 10, 2 );
-		// Any change of a customer's saved cards: the default card is the usage account's card.
+		add_action( 'woocommerce_before_account_payment_methods', array( __CLASS__, 'note' ) );
+		add_filter( 'wc_subscriptions_allow_subscription_token_deletion', array( __CLASS__, 'allow_deletion' ), 10, 2 );
+		// Any change of a customer's saved cards: the default card is the usage account's card. A new default is
+		// followed before WooCommerce Subscriptions looks at which subscriptions sit on the other cards (priority 10),
+		// so its "update your subscriptions?" question only appears for the customer's own subscriptions. A deleted
+		// card is handled after Subscriptions moved its subscriptions to another card (priority 11).
 		add_action( 'woocommerce_new_payment_token', array( __CLASS__, 'token_event' ), 20, 2 );
-		add_action( 'woocommerce_payment_token_set_default', array( __CLASS__, 'token_event' ), 20, 2 );
+		add_action( 'woocommerce_payment_token_set_default', array( __CLASS__, 'token_event' ), 5, 2 );
 		add_action( 'woocommerce_payment_token_deleted', array( __CLASS__, 'token_deleted' ), 20, 2 );
 	}
 
@@ -54,7 +57,7 @@ final class Card {
 	}
 
 	/**
-	 * The page is listed even when no gateway offers saved cards, so the card box has a place.
+	 * The page is listed even when no gateway offers saved cards, so the line about Pay as you go invoices has a place.
 	 *
 	 * @param mixed $items Menu items.
 	 * @return mixed
@@ -71,91 +74,60 @@ final class Card {
 	}
 
 	/**
-	 * The page shows the card box, then WooCommerce's own list only when the customer has saved methods.
+	 * One line above WooCommerce's list of saved methods, when the customer has saved cards or a usage account.
 	 */
-	public static function swap_page(): void {
-		remove_action( 'woocommerce_account_payment-methods_endpoint', 'woocommerce_account_payment_methods' );
-		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'render' ), 9 );
-		add_action( 'woocommerce_account_payment-methods_endpoint', array( __CLASS__, 'render_tokens' ), 10 );
+	public static function note(): void {
+		$text = self::note_text( get_current_user_id() );
+
+		if ( '' !== $text ) {
+			Panel::style();
+			echo '<p class="beltoft-services-card__note">' . esc_html( $text ) . '</p>';
+		}
 	}
 
 	/**
-	 * With Bricks the payment methods list is its own element: the card box goes in front of it, and the list
-	 * (which only says that nothing is saved) stays only when the customer has saved methods.
+	 * The line: the default card pays Pay as you go invoices; with no card, say a card is needed. Empty for a
+	 * customer with neither a card nor a usage account.
 	 *
-	 * @param mixed $html    The element's markup.
-	 * @param mixed $element The element.
-	 * @return mixed
+	 * @param int $user_id Customer.
 	 */
-	public static function bricks_methods( $html, $element ) {
-		if ( ! is_string( $html ) || ! is_object( $element ) || 'woocommerce-account-payment-methods' !== ( $element->name ?? '' ) || ! is_user_logged_in() ) {
-			return $html;
-		}
-
-		$has = function_exists( 'wc_get_customer_saved_methods_list' ) && wc_get_customer_saved_methods_list( get_current_user_id() );
-
-		return self::html() . ( $has ? $html : '' );
-	}
-
-	/**
-	 * Endpoint output of the card box.
-	 */
-	public static function render(): void {
-		echo self::html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
-	}
-
-	/**
-	 * WooCommerce's list of saved methods, only when there are any.
-	 */
-	public static function render_tokens(): void {
-		if ( function_exists( 'wc_get_customer_saved_methods_list' ) && wc_get_customer_saved_methods_list( get_current_user_id() ) && function_exists( 'woocommerce_account_payment_methods' ) ) {
-			woocommerce_account_payment_methods();
-		}
-	}
-
-	/**
-	 * The box's markup.
-	 */
-	public static function html(): string {
-		if ( ! is_user_logged_in() ) {
+	public static function note_text( int $user_id ): string {
+		if ( $user_id < 1 ) {
 			return '';
 		}
 
-		Panel::style();
-
-		ob_start();
-		wc_get_template( 'card.php', array( 'card' => self::data( get_current_user_id() ) ), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
-
-		return (string) ob_get_clean();
-	}
-
-	// ------------------------------------------------------------------ what the page shows.
-
-	/**
-	 * What the page shows: the customer's default saved card, never the account's own meta, so the box and
-	 * WooCommerce's list always agree. An account that does not carry that card yet is linked here (the customer's
-	 * own page, no new account).
-	 *
-	 * @param int $user_id Customer.
-	 * @return array{state: string, text: string, can_start: bool, add_url: string, change: bool}
-	 */
-	public static function data( int $user_id ): array {
-		$token = self::default_token( $user_id );
-		$info  = $token ? self::summarize_token( $token ) : null;
-		$state = 'none';
-
-		if ( $info ) {
-			$state = self::usable( $info ) ? 'valid' : 'expired';
-			self::guarded_sync( $user_id, false );
+		if ( class_exists( \WC_Payment_Tokens::class ) && self::holds_tokens( $user_id ) ) {
+			return __( 'Your default card is used for Pay as you go invoices.', 'beltoft-services' );
 		}
 
-		return array(
-			'state'     => $state,
-			'text'      => $info ? self::describe( $info ) : '',
-			'can_start' => array() !== self::token_gateways(),
-			'add_url'   => self::add_url(),
-			'change'    => 'none' !== $state,
-		);
+		if ( Account::for_user( $user_id ) ) {
+			return __( 'Pay as you go services are invoiced to your default card. Add a card to use them.', 'beltoft-services' );
+		}
+
+		return '';
+	}
+
+	/**
+	 * WooCommerce Subscriptions keeps a card that an active subscription uses from being deleted unless the customer
+	 * has another card. The usage account follows the default card by itself, so a card only the usage account uses
+	 * can be deleted (the account then has no card until one is added).
+	 *
+	 * @param mixed $allow Whether the delete button stays.
+	 * @param mixed $token The token.
+	 * @return mixed
+	 */
+	public static function allow_deletion( $allow, $token ) {
+		if ( $allow || ! $token instanceof \WC_Payment_Token || ! class_exists( \WCS_Payment_Tokens::class ) ) {
+			return $allow;
+		}
+
+		foreach ( \WCS_Payment_Tokens::get_subscriptions_from_token( $token ) as $subscription ) {
+			if ( ! Account::is_account( $subscription ) ) {
+				return $allow;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -209,31 +181,6 @@ final class Card {
 		 * @param string $method Payment method id.
 		 */
 		return (bool) apply_filters( 'beltoft_services_card_gateway_active', $active, $method );
-	}
-
-	/**
-	 * Enabled payment gateways that can save a card on My Account and charge a subscription with it.
-	 *
-	 * @return array<string, \WC_Payment_Gateway>
-	 */
-	public static function token_gateways(): array {
-		$found    = array();
-		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
-
-		foreach ( $gateways as $id => $gateway ) {
-			if ( $gateway instanceof \WC_Payment_Gateway && 'yes' === $gateway->enabled && $gateway->supports( 'add_payment_method' ) && $gateway->supports( 'subscriptions' ) ) {
-				$found[ (string) $id ] = $gateway;
-			}
-		}
-
-		return $found;
-	}
-
-	/**
-	 * WooCommerce's Add payment method page (a saved card is also changed there: the newest default is the account's card).
-	 */
-	public static function add_url(): string {
-		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'add-payment-method' ) : home_url( '/' );
 	}
 
 	/**
@@ -627,47 +574,9 @@ final class Card {
 	}
 
 	/**
-	 * Brings one account to the customer's current default card and removes what a retired provider left on it.
-	 *
-	 * @param \WC_Subscription $account Account.
-	 * @param bool             $dry     Report only, write nothing.
-	 * @return string One line saying what was (or would be) done.
-	 */
-	public static function relink( \WC_Subscription $account, bool $dry = false ): string {
-		$user_id = (int) $account->get_user_id();
-		$token   = self::default_token( $user_id );
-		$legacy  = self::has_legacy( $account );
-		$prefix  = sprintf( 'Account #%d (user #%d, %s): ', $account->get_id(), $user_id, $account->get_status() );
-
-		if ( $token ) {
-			if ( self::linked( $account, $token ) ) {
-				return $prefix . 'already on the default card, nothing to do.';
-			}
-
-			if ( ! $dry ) {
-				$gateways = WC()->payment_gateways()->payment_gateways();
-				self::apply_token( $account, $token, $gateways[ $token->get_gateway_id() ] );
-				$account->add_order_note( __( 'The default card is used for usage invoices.', 'beltoft-services' ) );
-			}
-
-			return $prefix . ( $dry ? 'would link ' : 'linked ' ) . self::describe( self::summarize_token( $token ) ) . ' (' . $token->get_gateway_id() . ')'
-				. ( $legacy ? ( $dry ? ', would remove' : ', removed' ) . ' the old provider data' : '' ) . '.';
-		}
-
-		if ( $legacy || str_starts_with( (string) $account->get_payment_method(), 'mollie_wc_gateway_' ) ) {
-			if ( ! $dry ) {
-				self::unlink( $account );
-			}
-
-			return $prefix . 'no default card; ' . ( $dry ? 'would take' : 'took' ) . ' the old provider off the account, it has no card.';
-		}
-
-		return $prefix . 'no default card, nothing to do.';
-	}
-
-	/**
 	 * Writes a token on an account: the payment method and the meta the gateway reads when it charges a renewal
-	 * (the token, and for Stripe the customer and the mode), and clears what a retired provider left.
+	 * (the token, and for Stripe the customer and the mode), and clears what a retired provider left (an old account
+	 * moves to the card the next time the customer adds one or makes one the default).
 	 *
 	 * @param \WC_Subscription    $account Account.
 	 * @param \WC_Payment_Token   $token   Token.
