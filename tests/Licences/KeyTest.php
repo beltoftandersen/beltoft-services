@@ -513,4 +513,21 @@ final class KeyTest extends TestCase {
 	public function test_crypto_is_available_in_the_tests(): void {
 		$this->assertTrue( Crypto::available() );
 	}
+
+	public function test_the_checkout_step_stops_on_an_unticked_server_type_box_as_on_an_empty_address(): void {
+		$plan    = array( 'lic_kind' => 'edition', 'lic_tier' => 'admin', 'lic_server' => 'vps', 'lic_label' => '' );
+		$product = $this->service_product( KeyDriver::ID, $plan, array( 'slug' => 'lic-cart-' . wp_generate_password( 6, false ) ) );
+		WC()->cart->empty_cart();
+		if ( ! WC()->cart->add_to_cart( $product->get_id() ) ) {
+			$this->markTestSkipped( 'The fixture product cannot be put in the cart here.' );
+		}
+
+		ob_start();
+		\BeltoftServices\Licences\KeyField::render();
+		$html = (string) ob_get_clean();
+		WC()->cart->empty_cart();
+
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label><input type="checkbox" class="input-checkbox" name="[^"]*\[confirm\]"#', $html );
+		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_ip">#', $html );
+	}
 }
