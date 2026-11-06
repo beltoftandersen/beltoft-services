@@ -365,6 +365,26 @@
 	} );
 }() );
 
+// Transfer: a refused transfer code is replaced here. The code is sent once and the field is cleared.
+( function () {
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target;
+		if ( ! form || ! form.matches || ! form.matches( 'form[data-transfer-code]' ) ) { return; }
+		event.preventDefault();
+		var scope = form.getAttribute( 'data-resource' ) || 'page';
+		if ( bs.locked( scope ) ) { return; }
+		var input = form.querySelector( 'input[name="auth_code"]' );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-code', { auth_code: input ? input.value : '' } ).then( function ( data ) {
+			if ( input ) { input.value = ''; }
+			bs.done( handle, ( data && data.message ) || '' );
+			window.setTimeout( function () { window.location.reload(); }, 3000 );
+		} ).catch( function ( failure ) {
+			bs.fail( handle, failure.message, input );
+		} );
+	} );
+}() );
+
 // DNS records: import a zone file. The file is read here in the browser and only its text is sent; a preview shows what will
 // be added, replaced or skipped, then "Add these records" writes it. Every text is set with textContent.
 ( function () {
