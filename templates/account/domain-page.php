@@ -161,7 +161,7 @@ if ( $d['dns_only'] ) {
 				<?php if ( $d['transfer'] && $d['transfer']['review'] ) : ?>
 					<div class="beltoft-services-domain__review">
 						<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'Import your DNS records', 'beltoft-services' ); ?></h4>
-						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your DNS is hosted where it stops when the domain leaves. Move your records here before the transfer starts: export the zone file from your current DNS provider and import it below. In most DNS providers this is called Export or Download zone file.', 'beltoft-services' ); ?></p>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your current DNS stops when the domain leaves. Move your records here before the transfer starts: export the zone file from your current DNS provider and import it below. In most DNS providers this is called Export or Download zone file.', 'beltoft-services' ); ?></p>
 						<p class="beltoft-services-domain__note"><?php esc_html_e( 'No zone file? The list below is what we copied. Records we could not look up are not here: other sub-names (for example shop. or api.), other email services and verification records. Compare with your current DNS provider and add anything that is missing.', 'beltoft-services' ); ?></p>
 						<?php if ( '' !== $d['import_error'] ) : ?>
 							<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %s: the reason some records were not imported. */ __( 'Some records could not be added: %s.', 'beltoft-services' ), $d['import_error'] ) ); ?></p>
