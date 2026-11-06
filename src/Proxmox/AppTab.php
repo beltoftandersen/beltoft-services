@@ -232,7 +232,8 @@ final class AppTab {
 		$installed = (int) $r->get( 'app_installed_at' );
 		$domain    = (string) $r->get( 'app_domain' );
 		$reveal    = is_string( $r->get( 'app_reveal' ) ) && '' !== $r->get( 'app_reveal' ) && (int) $r->get( 'app_reveal_until' ) > time();
-		$newer     = null !== $current && '' !== $vid && $current['version_id'] !== $vid ? $current : null;
+		// A version of another operating system (Plesk on AlmaLinux next to the Ubuntu one) is not an update.
+		$newer     = null !== $current && '' !== $vid && $current['version_id'] !== $vid && ( null === $full || array() !== array_intersect( (array) $current['os'], (array) $full['os'] ) ) ? $current : null;
 		$retired   = null !== $full && null === Apps::version( $id, $vid );
 		$steps_n   = count( $order );
 		$position  = false === $at ? 0 : min( $steps_n, (int) $at + 1 );

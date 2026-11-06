@@ -114,15 +114,31 @@
 			say( text );
 		}
 
+		// The versions that run on the chosen system (an app can have one version per system, such as Plesk on Ubuntu and on AlmaLinux).
+		function fitting( radio ) {
+			var list = radio ? versions( radio ) : [];
+			var chosen = family( checked( os ) );
+			var fit = list.filter( function ( entry ) {
+				return ! chosen || ! entry.families || ! entry.families.length || -1 !== entry.families.indexOf( chosen );
+			} );
+
+			return fit.length ? fit : list;
+		}
+
 		function fill() {
 			var radio = checked( apps );
-			var list = radio ? versions( radio ) : [];
+			var list = fitting( radio );
 
 			if ( ! row || ! select ) {
 				return;
 			}
 
 			var wanted = select.getAttribute( 'data-selected' ) || '';
+
+			// On the Reinstall tab the tile's value is what is posted: keep it on a version that fits the system.
+			if ( merge && radio && ! radio.hasAttribute( 'data-none' ) && list.length && ! list.some( function ( entry ) { return entry.value === radio.value; } ) ) {
+				radio.value = list[ 0 ].value;
+			}
 
 			select.textContent = '';
 			row.hidden = ! ( radio && ! radio.hasAttribute( 'data-none' ) && list.length > 1 );
@@ -150,6 +166,8 @@
 			if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
 				update();
 				follow();
+				// follow() may have moved the system: the versions must fit the system it chose.
+				fill();
 				refresh();
 			}
 		} );
@@ -158,6 +176,7 @@
 			os.addEventListener( 'change', function ( event ) {
 				if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
 					drop();
+					fill();
 					refresh();
 				}
 			} );

@@ -10,7 +10,7 @@ final class Apps {
 	public const STATUS = '/var/lib/beltoft-app/status.json';
 	public const CREDENTIALS = '/root/.beltoft-app/credentials.json';
 
-	/** The operating system family every v1 app runs on. */
+	/** The operating system family most apps run on, and the one a cluster is asked for first. An app version lists its own families in "os". */
 	public const FAMILY = 'ubuntu-24.04';
 
 	/** App ids shipped with the plugin, by directory name. */
@@ -37,14 +37,69 @@ final class Apps {
 		return is_array( $data ) && ( $data['id'] ?? '' ) === $id && is_array( $data['versions'] ?? null ) ? $data : null;
 	}
 
-	/** The template that carries the app operating system on this cluster (VMID), or 0 when there is none. */
-	public static function os_template( array $cluster ): int {
-		foreach ( (array) ( $cluster['template_families'] ?? array() ) as $vmid => $family ) {
-			if ( self::FAMILY === $family && isset( ( (array) ( $cluster['templates'] ?? array() ) )[ (int) $vmid ] ) ) {
+	/** The template of an operating system family on this cluster (VMID, the first listed), or 0 when there is none. */
+	public static function os_template( array $cluster, string $family = self::FAMILY ): int {
+		foreach ( (array) ( $cluster['template_families'] ?? array() ) as $vmid => $of ) {
+			if ( $family === $of && isset( ( (array) ( $cluster['templates'] ?? array() ) )[ (int) $vmid ] ) ) {
 				return (int) $vmid;
 			}
 		}
 		return 0;
+	}
+
+	/**
+	 * The template an app version is installed on: the preferred one (what the customer chose) when the version runs on its
+	 * family, else the first of the version's families that has a template here (in the order of its "os" list). 0 when none.
+	 *
+	 * @param array<string, mixed> $cluster Cluster.
+	 * @param array<string, mixed> $version Full version.
+	 * @param int                  $prefer  Template the customer chose, or 0.
+	 */
+	public static function version_template( array $cluster, array $version, int $prefer = 0 ): int {
+		// A system other than Ubuntu needs the vendor snippet v3 (v2 cannot install on it): such a family is not available on a v2 cluster.
+		$families = array_values( array_filter( (array) ( $version['os'] ?? array() ), static fn( $f ) => is_string( $f ) && self::family_supported( $cluster, $f ) ) );
+		$mapped   = (array) ( $cluster['template_families'] ?? array() );
+
+		if ( $prefer > 0 && isset( ( (array) ( $cluster['templates'] ?? array() ) )[ $prefer ] ) && in_array( (string) ( $mapped[ $prefer ] ?? '' ), $families, true ) ) {
+			return $prefer;
+		}
+
+		foreach ( $families as $family ) {
+			$vmid = is_string( $family ) ? self::os_template( $cluster, $family ) : 0;
+
+			if ( $vmid > 0 ) {
+				return $vmid;
+			}
+		}
+
+		return 0;
+	}
+
+	/** The vendor snippet level of a cluster: 3 for vm-vendor-cloudinit-v3.yaml, 2 for v2, 0 for anything else. */
+	public static function snippet_level( array $cluster ): int {
+		return 1 === preg_match( '#:snippets/vm-vendor-cloudinit-v([23])\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ), $m ) ? (int) $m[1] : 0;
+	}
+
+	/** Can apps of this system family be installed with the cluster's vendor snippet? Ubuntu needs v2 or v3, every other system v3. */
+	public static function family_supported( array $cluster, string $family ): bool {
+		$level = self::snippet_level( $cluster );
+
+		return str_starts_with( $family, 'ubuntu-' ) ? $level >= 2 : $level >= 3;
+	}
+
+	/** The family of a template on this cluster, or ''. */
+	public static function family_of( array $cluster, int $vmid ): string {
+		return (string) ( ( (array) ( $cluster['template_families'] ?? array() ) )[ $vmid ] ?? '' );
+	}
+
+	/** Every operating system family any shipped app version runs on. */
+	private static function known_families(): array {
+		$out = array();
+		foreach ( self::ids() as $id ) {
+			$def = self::definition( $id );
+			$out = array_merge( $out, self::families( (array) ( $def['versions'] ?? array() ) ) );
+		}
+		return array_values( array_unique( $out ) );
 	}
 
 	/**
@@ -91,6 +146,18 @@ final class Apps {
 	}
 
 	/**
+	 * Why an app version cannot be installed with the system chosen: "This app needs Ubuntu 24.04 and cannot be installed here ...".
+	 *
+	 * @param array<string, mixed> $cluster Cluster.
+	 * @param array<string, mixed> $version Full version.
+	 */
+	public static function needs_system_text( array $cluster, array $version ): string {
+		$list = self::os_names( $cluster, array_values( array_filter( (array) ( $version['os'] ?? array() ), 'is_string' ) ) );
+		/* translators: %s: operating systems such as Ubuntu 24.04 or AlmaLinux 9 */
+		return sprintf( __( 'This app needs %1$s and cannot be installed here with the chosen system. Choose %1$s, or no app.', 'beltoft-services' ), $list );
+	}
+
+	/**
 	 * "Ubuntu 24.04" or "Ubuntu 24.04 or Debian 12": names from the cluster's template labels.
 	 *
 	 * @param array<string, mixed> $cluster  Cluster.
@@ -117,9 +184,17 @@ final class Apps {
 		return array() === $names ? $last : sprintf( __( '%1$s or %2$s', 'beltoft-services' ), implode( ', ', $names ), $last );
 	}
 
-	/** Are apps on offer at all on this cluster: the flag, the v2 snippet and an Ubuntu 24.04 template. */
+	/** Are apps on offer at all on this cluster: the flag, the v2 or v3 snippet and a template of a family some app runs on (Ubuntu 24.04, AlmaLinux 9). */
 	public static function cluster_ready( array $cluster ): bool {
-		return ! empty( $cluster['apps_ready'] ) && 1 === preg_match( '#:snippets/vm-vendor-cloudinit-v2\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ) ) && self::os_template( $cluster ) > 0;
+		if ( empty( $cluster['apps_ready'] ) || self::snippet_level( $cluster ) < 2 ) {
+			return false;
+		}
+		foreach ( self::known_families() as $family ) {
+			if ( self::family_supported( $cluster, $family ) && self::os_template( $cluster, $family ) > 0 ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -152,6 +227,11 @@ final class Apps {
 				if ( null !== $full ) {
 					$choices[ $vid ] = $full;
 				}
+			}
+			// A version whose system has no template on this cluster cannot be ordered here.
+			$choices = array_filter( $choices, static fn( $v ) => self::version_template( $cluster, (array) $v ) > 0 );
+			if ( array() === $choices ) {
+				continue;
 			}
 			unset( $data['versions'] );
 			$out[ $id ] = $data + array( 'choices' => $choices );
@@ -256,7 +336,7 @@ final class Apps {
 	 *                                               strand a customer who ordered (and paid for) it; the app must still be installable there.
 	 */
 	public static function check( array $cluster, array $plan, string $id, string $version_id, bool $require_enabled = true ): ?string {
-		if ( empty( $cluster['apps_ready'] ) || ( $require_enabled && ! in_array( $id, (array) ( $cluster['apps_enabled'] ?? array() ), true ) ) || ! preg_match( '#:snippets/vm-vendor-cloudinit-v2\.yaml$#', (string) ( $cluster['vendor_snippet'] ?? '' ) ) ) {
+		if ( empty( $cluster['apps_ready'] ) || ( $require_enabled && ! in_array( $id, (array) ( $cluster['apps_enabled'] ?? array() ), true ) ) || self::snippet_level( $cluster ) < 2 ) {
 			return $require_enabled ? 'The app is not enabled on this cluster' : 'The cluster cannot install apps (not ready or no vendor snippet)';
 		}
 		$app = self::version( $id, $version_id );
@@ -267,6 +347,9 @@ final class Apps {
 		$family = (string) ( $families[ (int) ( $plan['template'] ?? 0 ) ] ?? '' );
 		if ( ! in_array( $family, $app['os'], true ) ) {
 			return 'The app does not support the selected operating system';
+		}
+		if ( ! self::family_supported( $cluster, $family ) ) {
+			return 'The cluster vendor snippet cannot install apps on the selected operating system (it needs vm-vendor-cloudinit-v3.yaml)';
 		}
 		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {
 			if ( (int) ( $plan[ $key ] ?? 0 ) < (int) ( $app['min'][ $key ] ?? 0 ) ) {

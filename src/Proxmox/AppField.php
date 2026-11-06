@@ -94,8 +94,27 @@ final class AppField {
 		}
 
 		$apps   = Apps::offered( $cluster );
-		$os     = Apps::os_template( $cluster );
 		$choice = OsField::choice_for( $product_id, $variation_id );
+		$os     = 0;
+		$ubuntu = Apps::os_template( $cluster );
+
+		// A version is offered only on a system this product lists. The offer's system is the Ubuntu one when an app runs on it, else the first system an app runs on.
+		foreach ( $apps as $id => $app ) {
+			foreach ( $app['choices'] as $vid => $version ) {
+				$vmid = Apps::version_template( $cluster, (array) $version );
+
+				if ( null === $choice || ! isset( $choice['options'][ $vmid ] ) ) {
+					unset( $apps[ $id ]['choices'][ $vid ] );
+					continue;
+				}
+
+				$os = $ubuntu > 0 && $ubuntu === Apps::version_template( $cluster, (array) $version, $ubuntu ) ? $ubuntu : ( 0 === $os ? $vmid : $os );
+			}
+
+			if ( array() === $apps[ $id ]['choices'] ) {
+				unset( $apps[ $id ] );
+			}
+		}
 
 		// A paid app nobody can buy a tier of is not offered.
 		foreach ( array_keys( $apps ) as $id ) {
@@ -120,13 +139,13 @@ final class AppField {
 	 * The choice a customer made, checked against what is offered.
 	 *
 	 * @param array<string, mixed> $offer  The offer.
-	 * @param array<string, mixed> $input  app, version, tier (a paid app), domain_on, zone, sub, own_on, own (a domain registered elsewhere).
+	 * @param array<string, mixed> $input  app, version, os (the system template chosen, optional), tier (a paid app), domain_on, zone, sub, own_on, own (a domain registered elsewhere).
 	 * @param int                  $user   The customer.
 	 * @param bool                 $check_dns Whether to read the zone for a free name, and whether a paid app's tier must be on sale now (an order already paid is built even if the tier is out of stock).
-	 * @return array{app: string, version: string, tier: string, zone: string, domain: string, own: string}|string An empty app when none is wanted; else the refusal text.
+	 * @return array{app: string, version: string, os: int, tier: string, zone: string, domain: string, own: string}|string An empty app when none is wanted; else the refusal text. `os` is the template the server is built from: the chosen one when the version runs on it, else the version's own.
 	 */
 	public static function resolve( array $offer, array $input, int $user, bool $check_dns = true ) {
-		$none = array( 'app' => '', 'version' => '', 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
+		$none = array( 'app' => '', 'version' => '', 'os' => 0, 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
 		$id   = (string) ( $input['app'] ?? '' );
 
 		if ( '' === $id ) {
@@ -139,10 +158,32 @@ final class AppField {
 
 		$app     = $offer['apps'][ $id ];
 		$version = (string) ( $input['version'] ?? '' );
-		$version = '' === $version ? (string) array_key_first( $app['choices'] ) : $version;
+		$cluster = (array) Clusters::get( (string) ( $offer['cluster'] ?? '' ) );
+		$prefer  = (int) ( $input['os'] ?? 0 );
+
+		if ( '' === $version ) {
+			// No version asked for: the first one that runs on the chosen system, else the first.
+			$version = (string) array_key_first( $app['choices'] );
+
+			foreach ( $app['choices'] as $vid => $candidate ) {
+				if ( $prefer > 0 && Apps::version_template( $cluster, (array) $candidate, $prefer ) === $prefer ) {
+					$version = (string) $vid;
+					break;
+				}
+			}
+		}
 
 		if ( ! isset( $app['choices'][ $version ] ) ) {
 			return __( 'Choose one of the listed versions.', 'beltoft-services' );
+		}
+
+		// A version asked for by name must run on the system chosen, when another version of the app would have: refused, not rebuilt on another system.
+		if ( '' !== (string) ( $input['version'] ?? '' ) && $prefer > 0 && array() !== $cluster && Apps::version_template( $cluster, (array) $app['choices'][ $version ], $prefer ) !== $prefer ) {
+			foreach ( $app['choices'] as $candidate ) {
+				if ( Apps::version_template( $cluster, (array) $candidate, $prefer ) === $prefer ) {
+					return Apps::needs_system_text( $cluster, (array) $app['choices'][ $version ] );
+				}
+			}
 		}
 
 		$why = Apps::plan_refusal( $app['choices'][ $version ], (array) $offer['plan'] );
@@ -151,7 +192,8 @@ final class AppField {
 			return $why;
 		}
 
-		$out = array( 'app' => $id, 'version' => $version, 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
+		$os  = array() === $cluster ? (int) $offer['os'] : Apps::version_template( $cluster, (array) $app['choices'][ $version ], $prefer );
+		$out = array( 'app' => $id, 'version' => $version, 'os' => $os, 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
 
 		if ( AppLicence::paid( $id ) ) {
 			$tier = (string) ( $input['tier'] ?? '' );
@@ -231,6 +273,7 @@ final class AppField {
 			return array(
 				'app'       => $picked['app'],
 				'version'   => $picked['version'],
+				'os'        => $picked['os'],
 				'tier'      => $picked['tier'],
 				'domain_on' => '' !== $picked['domain_on'],
 				'zone'      => $picked['zone'],
@@ -245,6 +288,7 @@ final class AppField {
 		return array(
 			'app'       => $get( self::POST_APP ),
 			'version'   => $get( self::POST_VERSION ),
+			'os'        => $get( OsField::POST_KEY ),
 			'tier'      => $get( self::POST_TIER ),
 			'domain_on' => '' !== $mode && self::MODE_OWN !== $mode,
 			'zone'      => $get( self::POST_ZONE ),
@@ -287,7 +331,7 @@ final class AppField {
 			$versions = array();
 
 			foreach ( $app['choices'] as $vid => $version ) {
-				$versions[] = array( 'id' => (string) $vid, 'label' => Apps::version_label( $version ) );
+				$versions[] = array( 'id' => (string) $vid, 'label' => Apps::version_label( $version ), 'families' => array_values( (array) $version['os'] ) );
 			}
 
 			$data[ $id ] = array(
@@ -321,7 +365,7 @@ final class AppField {
 			$versions = array();
 
 			foreach ( $app['choices'] as $vid => $version ) {
-				$versions[] = array( 'value' => (string) $vid, 'label' => Apps::version_label( $version ) );
+				$versions[] = array( 'value' => (string) $vid, 'label' => Apps::version_label( $version ), 'families' => array_values( (array) $version['os'] ) );
 			}
 
 			$items[] = array(
@@ -536,7 +580,7 @@ final class AppField {
 			$item->add_meta_data( self::ITEM_TIER, $choice['tier'], true );
 		}
 
-		$item->update_meta_data( OsField::ITEM_META, (string) $offer['os'] );
+		$item->update_meta_data( OsField::ITEM_META, (string) $choice['os'] );
 
 		if ( '' !== $choice['domain'] ) {
 			$item->add_meta_data( self::ITEM_ZONE, $choice['zone'], true );
@@ -622,9 +666,9 @@ final class AppField {
 
 			$plan    = Product::plan( $product_id, $variation ?: null );
 			$cluster = Clusters::get( (string) ( $plan['cluster'] ?? '' ) );
-			$offer   = $cluster ? array( 'apps' => Apps::offered( $cluster ), 'plan' => $plan, 'os' => Apps::os_template( $cluster ) ) : null;
+			$offer   = $cluster ? array( 'cluster' => (string) $plan['cluster'], 'apps' => Apps::offered( $cluster ), 'plan' => $plan, 'os' => Apps::os_template( $cluster ) ) : null;
 
-			if ( null === $offer || $offer['os'] <= 0 ) {
+			if ( null === $offer || array() === $offer['apps'] ) {
 				return $meta;
 			}
 
@@ -633,6 +677,7 @@ final class AppField {
 				array(
 					'app'       => $id,
 					'version'   => (string) $item->get_meta( self::ITEM_VERSION, true ),
+					'os'        => (string) $item->get_meta( OsField::ITEM_META, true ),
 					'tier'      => (string) $item->get_meta( self::ITEM_TIER, true ),
 					'domain_on' => '' !== (string) $item->get_meta( self::ITEM_DOMAIN, true ),
 					'zone'      => (string) $item->get_meta( self::ITEM_ZONE, true ),
@@ -655,7 +700,7 @@ final class AppField {
 				$meta['app_tier'] = $choice['tier'];
 			}
 
-			$meta[ OsField::META ]   = $offer['os'];
+			$meta[ OsField::META ]   = $choice['os'];
 
 			if ( '' !== $choice['domain'] ) {
 				$meta['app_zone']        = $choice['zone'];

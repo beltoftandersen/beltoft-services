@@ -333,6 +333,7 @@ final class ServerPicker {
 				array(
 					'app'       => $values['app'],
 					'version'   => $values['version'],
+					'os'        => $values['os'],
 					'tier'      => $values['tier'],
 					'domain_on' => '' !== $values['domain_on'],
 					'zone'      => $values['zone'],
@@ -354,7 +355,7 @@ final class ServerPicker {
 				$choices['domain_on'] = '' !== $app['domain'] ? '1' : '';
 				$choices['own']       = $app['own'];
 				// An app runs on its own operating system, whatever the tiles said.
-				$values['os'] = (string) $offer['os'];
+				$values['os'] = (string) $app['os'];
 			}
 		}
 
