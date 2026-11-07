@@ -38,6 +38,34 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertStringNotContainsString( 'placeholder', $html );
 	}
 
+	public function test_a_transfer_address_adds_the_link_under_the_form(): void {
+		$html = Search::inner_markup( array(), '#transfer' );
+		$this->assertStringContainsString( '<p class="beltoft-domain-search__transfer"><a href="#transfer">Transfer a domain you already own</a></p>', $html );
+		$this->assertLessThan( strpos( $html, 'beltoft-domain-results' ), strpos( $html, 'beltoft-domain-search__transfer' ) );
+		$this->assertStringContainsString( '>Move it</a>', Search::inner_markup( array( 'transfer' => 'Move it' ), '/domains/#transfer' ) );
+		$this->assertStringNotContainsString( 'beltoft-domain-search__transfer', Search::inner_markup( array(), '  ' ) );
+		$this->assertStringContainsString( 'href="#transfer"', do_shortcode( '[beltoft_domain_search transfer_url="#transfer"]' ) );
+	}
+
+	public function test_the_transfer_shortcode_is_its_own_form(): void {
+		$html = do_shortcode( '[beltoft_domain_transfer]' );
+		$this->assertStringStartsWith( '<div class="beltoft-domain-transfer-box" data-check="', $html );
+		$this->assertStringContainsString( '>Domain to transfer</label><input id="beltoft-transfer-domain" type="text" inputmode="url" autocomplete="off"><button type="button">Continue</button><div class="beltoft-domain-transfer-result" aria-live="polite"></div>', $html );
+		$this->assertStringNotContainsString( 'type="search"', $html, 'The search script binds to the search input only.' );
+		$this->assertTrue( wp_script_is( 'beltoft-services-domain-search', 'enqueued' ) );
+	}
+
+	public function test_the_search_offers_no_transfer_button_and_greys_out_a_taken_domain(): void {
+		$js  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.css' );
+		$this->assertStringNotContainsString( "'Transfer domain'", $js );
+		$this->assertStringContainsString( "taken: 'Taken'", $js );
+		$this->assertStringContainsString( "item.status === 'free' && item.price", $js, 'A taken domain shows no price.' );
+		$this->assertStringContainsString( '.beltoft-domain-result--taken', $css );
+		$this->assertStringContainsString( 'initTransfer', $js );
+		$this->assertStringContainsString( "primary && item.status !== 'taken'", $js, 'A taken domain is not highlighted.' );
+	}
+
 	public function test_the_script_hooks_stay_in_the_markup(): void {
 		$html = Search::inner_markup();
 		$this->assertStringContainsString( 'type="search"', $html );

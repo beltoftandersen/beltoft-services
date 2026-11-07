@@ -18,6 +18,7 @@ final class Integration {
 	public const ELEMENTS = array(
 		'beltoft-domain-search' => array( 'file' => 'DomainSearchElement.php', 'class' => DomainSearchElement::class ),
 		'beltoft-domain-search-form' => array( 'file' => 'DomainSearchFormElement.php', 'class' => DomainSearchFormElement::class ),
+		'beltoft-domain-transfer' => array( 'file' => 'DomainTransferElement.php', 'class' => DomainTransferElement::class ),
 	);
 
 	public static function register(): void {

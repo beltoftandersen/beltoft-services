@@ -12,6 +12,7 @@ final class Search {
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_shortcode( 'beltoft_domain_search', array( __CLASS__, 'shortcode' ) );
+		add_shortcode( 'beltoft_domain_transfer', array( __CLASS__, 'transfer_shortcode' ) );
 		add_action( Sync::HOOK, array( __CLASS__, 'cleanup' ) );
 	}
 
@@ -186,6 +187,16 @@ final class Search {
 			'label'       => __( 'Find a domain', 'beltoft-services' ),
 			'placeholder' => '',
 			'button'      => __( 'Search', 'beltoft-services' ),
+			'transfer'    => __( 'Transfer a domain you already own', 'beltoft-services' ),
+		);
+	}
+
+	/** The default visible strings of the transfer form. */
+	public static function transfer_texts(): array {
+		return array(
+			'label'       => __( 'Domain to transfer', 'beltoft-services' ),
+			'placeholder' => '',
+			'button'      => __( 'Continue', 'beltoft-services' ),
 		);
 	}
 
@@ -214,21 +225,46 @@ final class Search {
 	}
 
 	/**
-	 * What is inside the form's root element: label, input, button and the empty results list.
+	 * What is inside the form's root element: label, input, button, the optional transfer link and the empty results list.
 	 *
-	 * @param array $texts Optional label, placeholder and button; an empty or missing one falls back to the default.
-	 *                     The placeholder has no default here (the script supplies example.com).
+	 * @param array  $texts        Optional label, placeholder, button and transfer link text; an empty or missing one falls back to the default.
+	 *                             The placeholder has no default here (the script supplies example.com).
+	 * @param string $transfer_url Where the transfer section is (for example #transfer). Empty: no transfer link, and a taken
+	 *                             domain in the results has no link either.
 	 */
-	public static function inner_markup( array $texts = array() ): string {
+	public static function inner_markup( array $texts = array(), string $transfer_url = '' ): string {
 		$texts       = array_merge( self::default_texts(), array_filter( array_map( 'strval', $texts ), 'strlen' ) );
 		$placeholder = '' !== $texts['placeholder'] ? ' placeholder="' . esc_attr( $texts['placeholder'] ) . '"' : '';
-		return '<label for="beltoft-domain-name">' . esc_html( $texts['label'] ) . '</label><input id="beltoft-domain-name" type="search" autocomplete="off"' . $placeholder . '><button type="button">' . esc_html( $texts['button'] ) . '</button><div class="beltoft-domain-results" aria-live="polite"></div>';
+		$link        = '' !== trim( $transfer_url ) ? '<p class="beltoft-domain-search__transfer"><a href="' . esc_url( trim( $transfer_url ) ) . '">' . esc_html( $texts['transfer'] ) . '</a></p>' : '';
+		return '<label for="beltoft-domain-name">' . esc_html( $texts['label'] ) . '</label><input id="beltoft-domain-name" type="search" autocomplete="off"' . $placeholder . '><button type="button">' . esc_html( $texts['button'] ) . '</button>' . $link . '<div class="beltoft-domain-results" aria-live="polite"></div>';
 	}
 
-	public static function shortcode(): string {
+	/** What is inside the transfer form's root element: label, domain input, button and the empty result. */
+	public static function transfer_markup( array $texts = array() ): string {
+		$texts       = array_merge( self::transfer_texts(), array_filter( array_map( 'strval', $texts ), 'strlen' ) );
+		$placeholder = '' !== $texts['placeholder'] ? ' placeholder="' . esc_attr( $texts['placeholder'] ) . '"' : '';
+		return '<label for="beltoft-transfer-domain">' . esc_html( $texts['label'] ) . '</label><input id="beltoft-transfer-domain" type="text" inputmode="url" autocomplete="off"' . $placeholder . '><button type="button">' . esc_html( $texts['button'] ) . '</button><div class="beltoft-domain-transfer-result" aria-live="polite"></div>';
+	}
+
+	/** [beltoft_domain_transfer]: the transfer form on its own, for a section apart from the search. */
+	public static function transfer_shortcode(): string {
 		self::enqueue_assets();
 		$attributes = '';
 		foreach ( self::root_data() as $name => $value ) { $attributes .= ' ' . $name . '="' . esc_attr( $value ) . '"'; }
-		return '<div class="beltoft-domain-search"' . $attributes . '>' . self::inner_markup() . '</div>';
+		return '<div class="beltoft-domain-transfer-box"' . $attributes . '>' . self::transfer_markup() . '</div>';
+	}
+
+	/**
+	 * [beltoft_domain_search transfer_url="#transfer"]: the search form. With transfer_url, a link to the transfer section
+	 * shows under the form and on each taken domain.
+	 *
+	 * @param array|string $atts Shortcode attributes.
+	 */
+	public static function shortcode( $atts = array() ): string {
+		$atts = shortcode_atts( array( 'transfer_url' => '' ), is_array( $atts ) ? $atts : array(), 'beltoft_domain_search' );
+		self::enqueue_assets();
+		$attributes = '';
+		foreach ( self::root_data() as $name => $value ) { $attributes .= ' ' . $name . '="' . esc_attr( $value ) . '"'; }
+		return '<div class="beltoft-domain-search"' . $attributes . '>' . self::inner_markup( array(), (string) $atts['transfer_url'] ) . '</div>';
 	}
 }

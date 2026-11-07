@@ -3,10 +3,15 @@
  *   --bds-accent, --bds-border, --bds-muted, --bds-bar, --bds-track.
  * The layout is kept in :where() (no specificity), so the Bricks element's controls, a theme or custom CSS win.
  */
-:where(.beltoft-domain-search, .beltoft-domain-form) {
+:where(.beltoft-domain-search, .beltoft-domain-form, .beltoft-domain-transfer-box) {
   display: grid;
   gap: .75rem;
   max-width: 42rem;
+}
+
+/* The transfer form: domain and button side by side (the element's Columns control can change this). */
+:where(.beltoft-domain-transfer-box) {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 /* As a block in a flex column (Bricks), the form still fills the row. */
@@ -17,27 +22,56 @@
 /* Form controls use the page's font, not the browser's. */
 .beltoft-domain-search input,
 .beltoft-domain-search button,
+.beltoft-domain-transfer-box input,
+.beltoft-domain-transfer-box button,
 .beltoft-domain-form input,
 .beltoft-domain-form button {
   font-family: inherit;
 }
 
-:where(.beltoft-domain-search > label, .beltoft-domain-form > label, .beltoft-domain-results) {
+:where(.beltoft-domain-search > label, .beltoft-domain-form > label, .beltoft-domain-transfer-box > label, .beltoft-domain-results, .beltoft-domain-transfer-result, .beltoft-domain-search__transfer) {
   grid-column: 1 / -1;
 }
 
-:where(.beltoft-domain-search > input, .beltoft-domain-form > input) {
+:where(.beltoft-domain-search > input, .beltoft-domain-form > input, .beltoft-domain-transfer-box > input) {
   width: 100%;
 }
 
-:where(.beltoft-domain-search > input:focus-visible, .beltoft-domain-search button:focus-visible, .beltoft-domain-form > input:focus-visible, .beltoft-domain-form > button:focus-visible) {
+:where(.beltoft-domain-search > input:focus-visible, .beltoft-domain-search button:focus-visible, .beltoft-domain-form > input:focus-visible, .beltoft-domain-form > button:focus-visible, .beltoft-domain-transfer-box input:focus-visible, .beltoft-domain-transfer-box button:focus-visible, .beltoft-domain-search a:focus-visible) {
   outline: 2px solid var(--bds-accent, var(--green, #28513e));
   outline-offset: 2px;
 }
 
-:where(.beltoft-domain-results) {
+:where(.beltoft-domain-results, .beltoft-domain-transfer-result) {
   display: grid;
   gap: .75rem;
+}
+
+/* The link to the transfer section, under the search form. */
+:where(.beltoft-domain-search__transfer) {
+  margin: 0;
+  font-size: .95em;
+}
+
+:where(.beltoft-domain-search__transfer a, .beltoft-domain-result__transfer) {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+/* A taken domain is shown, greyed out: the search is for domains that can be registered. */
+:where(.beltoft-domain-search .beltoft-domain-result--taken) {
+  background: var(--bds-taken-bg, transparent);
+  border-style: dashed;
+}
+
+:where(.beltoft-domain-search .beltoft-domain-result--taken) .beltoft-domain-result__information {
+  opacity: var(--bds-taken-opacity, .55);
+}
+
+:where(.beltoft-domain-result__transfer) {
+  font-size: .9em;
+  color: var(--bds-muted, var(--ink-grey, #59615c));
 }
 
 :where(.beltoft-domain-result) {
@@ -180,6 +214,11 @@
   :where(.beltoft-domain-result) {
     grid-template-columns: 1fr;
   }
+}
+
+/* In the transfer section the code form takes the whole width of the result. */
+:where(.beltoft-domain-transfer-result .beltoft-domain-result) > .beltoft-domain-result__actions {
+  grid-column: 1 / -1;
 }
 
 :where(.beltoft-domain-loading) {
