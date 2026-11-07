@@ -208,7 +208,7 @@
     function codeForm(domain) {
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
-      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC there first.'));
+      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC at your current registrar first.'));
       const field = document.createElement('input');
       field.type = 'text';
       field.autocomplete = 'off';
