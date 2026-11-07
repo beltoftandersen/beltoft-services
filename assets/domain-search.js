@@ -89,7 +89,8 @@
 
     function result(item, primary) {
       const row = document.createElement('div');
-      row.className = 'beltoft-domain-result beltoft-domain-result--' + item.status + (primary ? ' beltoft-domain-result--primary' : '');
+      // A taken domain is never highlighted, even when it is the one typed: only what can be registered stands out.
+      row.className = 'beltoft-domain-result beltoft-domain-result--' + item.status + (primary && item.status !== 'taken' ? ' beltoft-domain-result--primary' : '');
       const information = document.createElement('div');
       information.className = 'beltoft-domain-result__information';
       information.appendChild(element('strong', 'beltoft-domain-result__name', item.domain));
@@ -223,7 +224,7 @@
       form.append(notice, row, element('p', 'beltoft-domain-transfer__help', 'The transfer takes up to 5 days and adds one year to the registration.'));
       recommendation(domain).then(function (advice) {
         if (!advice) return;
-        const who = advice.registrar || 'your current registrar';
+        const who = advice.registrar ? String(advice.registrar).replace(/\.+$/, '') : 'your current registrar';
         if (advice.locked) {
           notice.textContent = domain + ' is locked at ' + who + '. Unlock it there, then come back.';
           submit.disabled = true;

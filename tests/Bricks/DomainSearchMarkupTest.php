@@ -63,6 +63,7 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertStringContainsString( "item.status === 'free' && item.price", $js, 'A taken domain shows no price.' );
 		$this->assertStringContainsString( '.beltoft-domain-result--taken', $css );
 		$this->assertStringContainsString( 'initTransfer', $js );
+		$this->assertStringContainsString( "primary && item.status !== 'taken'", $js, 'A taken domain is not highlighted.' );
 	}
 
 	public function test_the_script_hooks_stay_in_the_markup(): void {
