@@ -70,6 +70,9 @@ class DomainSearchElement extends \Bricks\Element {
 		$this->controls['labelText']   = $text( esc_html__( 'Label', 'beltoft-services' ), $defaults['label'] );
 		$this->controls['placeholder'] = $text( esc_html__( 'Input placeholder', 'beltoft-services' ), 'example.com' );
 		$this->controls['buttonText']  = $text( esc_html__( 'Search button', 'beltoft-services' ), $defaults['button'] );
+		// The transfer link: under the form and on a taken domain. Empty address: no link anywhere.
+		$this->controls['transferUrl']      = $text( esc_html__( 'Transfer section address', 'beltoft-services' ), '#transfer' );
+		$this->controls['transferLinkText'] = $text( esc_html__( 'Transfer link', 'beltoft-services' ), $defaults['transfer'] );
 
 		// Form layout. Columns are a grid template (for example "minmax(0,1fr) auto"); set it per breakpoint for a stacked form on a phone.
 		$this->style( 'formColumns', 'form', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns' ) ), array( 'placeholder' => 'minmax(0,1fr) auto', 'hasDynamicData' => false ) );
@@ -113,6 +116,8 @@ class DomainSearchElement extends \Bricks\Element {
 		$this->style( 'rowBackground', 'results', esc_html__( 'Row background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', $row ) ) );
 		$this->style( 'rowBorder', 'results', esc_html__( 'Row border', 'beltoft-services' ), 'border', array( self::rule( 'border', $row ) ) );
 		$this->style( 'rowPadding', 'results', esc_html__( 'Row padding', 'beltoft-services' ), 'dimensions', array( self::rule( 'padding', $row ) ) );
+		$this->style( 'takenBackground', 'results', esc_html__( 'Taken row background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', '.beltoft-domain-result--taken' ) ) );
+		$this->style( 'takenOpacity', 'results', esc_html__( 'Taken row text opacity', 'beltoft-services' ), 'number', array( self::rule( '--bds-taken-opacity' ) ), array( 'min' => 0, 'max' => 1, 'step' => 0.05, 'placeholder' => '0.55' ) );
 		$this->style( 'unavailableBackground', 'results', esc_html__( 'Unavailable and premium row background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', '.beltoft-domain-result--not_sold, .beltoft-domain-result--premium' ) ) );
 		$this->style( 'primaryBackground', 'results', esc_html__( 'Main result background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', '.beltoft-domain-result--primary' ) ) );
 		$this->style( 'primaryBorderColor', 'results', esc_html__( 'Main result border colour', 'beltoft-services' ), 'color', array( self::rule( 'border-color', '.beltoft-domain-result--primary' ) ) );
@@ -127,12 +132,13 @@ class DomainSearchElement extends \Bricks\Element {
 			'detail' => array( esc_html__( 'Details and renewal', 'beltoft-services' ), '.beltoft-domain-result__note, .beltoft-domain-result__renewal' ),
 			'note'   => array( esc_html__( 'Price note above the results', 'beltoft-services' ), '.beltoft-domain-note' ),
 			'error'  => array( esc_html__( 'Error message', 'beltoft-services' ), '.beltoft-domain-error' ),
+			'link'   => array( esc_html__( 'Transfer links', 'beltoft-services' ), '.beltoft-domain-search__transfer a, .beltoft-domain-result__transfer' ),
 		);
 		foreach ( $texts as $id => list( $title, $selector ) ) {
 			$this->style( $id . 'Typography', 'text', $title, 'typography', array( self::rule( 'font', $selector ) ) );
 		}
 
-		// Transfer code form, shown in a row when the customer chooses to transfer a domain.
+		// Transfer code form, shown by the transfer element once the domain is checked.
 		$this->style( 'transferColumns', 'transfer', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns', '.beltoft-domain-transfer' ) ), array( 'placeholder' => 'minmax(12rem,1fr) auto', 'hasDynamicData' => false ) );
 		$this->style( 'transferMaxWidth', 'transfer', esc_html__( 'Maximum width', 'beltoft-services' ), 'number', array( self::rule( 'max-width', '.beltoft-domain-transfer' ) ), array( 'units' => true ) );
 		$this->style( 'transferHelpTypography', 'transfer', esc_html__( 'Help text typography', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-transfer__help' ) ) );
@@ -157,8 +163,9 @@ class DomainSearchElement extends \Bricks\Element {
 			'label'       => (string) ( $settings['labelText'] ?? '' ),
 			'placeholder' => (string) ( $settings['placeholder'] ?? '' ),
 			'button'      => (string) ( $settings['buttonText'] ?? '' ),
+			'transfer'    => (string) ( $settings['transferLinkText'] ?? '' ),
 		);
 		// Inner markup is escaped by the builder.
-		echo '<div ' . $this->render_attributes( '_root' ) . '>' . Search::inner_markup( $texts ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<div ' . $this->render_attributes( '_root' ) . '>' . Search::inner_markup( $texts, (string) ( $settings['transferUrl'] ?? '' ) ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 }

@@ -1,126 +1,90 @@
 (function () {
   'use strict';
 
-  // Sets up every search form that is not set up yet. Bricks calls this again when the element is rendered in the builder.
-  function init() {
-  document.querySelectorAll('.beltoft-domain-search').forEach(function (root) {
-    if (root.dataset.bdsReady) return;
-    root.dataset.bdsReady = '1';
+  function element(tag, className, content) {
+    const node = document.createElement(tag);
+    node.className = className;
+    node.textContent = content;
+    return node;
+  }
+
+  function showError(container, message) {
+    const error = element('p', 'beltoft-domain-error', message);
+    error.setAttribute('role', 'alert');
+    container.prepend(error);
+  }
+
+  // Adds a domain to the order and goes on to the checkout. The root holds the endpoints and nonces.
+  async function add(root, domain, mode, authCode, dns) {
+    const response = await fetch(root.dataset.cart, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
+      body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Could not add this domain.');
+    window.location.assign(data.checkout_url);
+  }
+
+  // The same moving bar as the search, on the button that was clicked: the page goes on to the checkout when the add is done.
+  function working(button, on, text) {
+    if (on) button.dataset.label = button.textContent;
+    button.disabled = on;
+    button.classList.toggle('is-working', on);
+    button.textContent = text;
+  }
+
+  // A visible waiting state: a registrar answer can take a few seconds.
+  function loader(text) {
+    const box = element('div', 'beltoft-domain-loading', '');
+    box.setAttribute('role', 'status');
+    const bar = element('span', 'beltoft-domain-loading__bar', '');
+    bar.setAttribute('aria-hidden', 'true');
+    box.appendChild(bar);
+    box.appendChild(element('span', 'beltoft-domain-loading__text', text));
+    box.appendChild(element('span', 'beltoft-domain-loading__note', 'This takes a few seconds.'));
+    return box;
+  }
+
+  // One availability lookup through the public check route.
+  async function check(root, name) {
+    const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(name), { credentials: 'same-origin' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'The search could not be completed.');
+    return data;
+  }
+
+  // A button that registers a free domain.
+  function registerButton(root, domain, errors) {
+    const button = element('button', 'beltoft-domain-action', 'Register domain');
+    button.type = 'button';
+    button.addEventListener('click', async function () {
+      working(button, true, 'Adding to order…');
+      try {
+        await add(root, domain, 'register', '');
+      } catch (error) {
+        showError(errors, error.message);
+        working(button, false, 'Register domain');
+      }
+    });
+    return button;
+  }
+
+  /* ---------- the search: free domains to register; a taken one is shown greyed out ---------- */
+
+  function initSearch(root) {
     const input = root.querySelector('input[type="search"]');
     const results = root.querySelector('.beltoft-domain-results');
-    const searchButton = root.querySelector('button');
+    const searchButton = root.querySelector(':scope > button');
+    const transferLink = root.querySelector('.beltoft-domain-search__transfer a');
     if (!input.placeholder) input.placeholder = 'example.com';
 
-    function element(tag, className, content) {
-      const node = document.createElement(tag);
-      node.className = className;
-      node.textContent = content;
-      return node;
-    }
-
-    function showError(message) {
-      const error = element('p', 'beltoft-domain-error', message);
-      error.setAttribute('role', 'alert');
-      results.prepend(error);
-    }
-
-    async function add(domain, mode, authCode, dns) {
-      const response = await fetch(root.dataset.cart, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
-        body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Could not add this domain.');
-      window.location.assign(data.checkout_url);
-    }
-
-    // The same moving bar as the search, on the button that was clicked: the page goes on to the checkout when the add is done.
-    function working(button, on, text) {
-      if (on) button.dataset.label = button.textContent;
-      button.disabled = on;
-      button.classList.toggle('is-working', on);
-      button.textContent = text;
-    }
-
-    // What the public data says about the domain now: its current registrar, whether it is locked, whether its DNS is run by that registrar.
-    async function recommendation(domain) {
-      if (!root.dataset.transferDns) return null;
-      try {
-        const response = await fetch(root.dataset.transferDns + '?domain=' + encodeURIComponent(domain), {
-          credentials: 'same-origin',
-          headers: { 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce }
-        });
-        return response.ok ? await response.json() : null;
-      } catch (error) {
-        return null;
-      }
-    }
-
-    function transferForm(domain, actions) {
-      const form = document.createElement('form');
-      form.className = 'beltoft-domain-transfer';
-      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC there first.'));
-      const field = document.createElement('input');
-      field.type = 'text';
-      field.autocomplete = 'off';
-      field.required = true;
-      field.setAttribute('aria-label', 'Transfer code for ' + domain);
-      field.placeholder = 'Transfer code';
-      const submit = element('button', 'beltoft-domain-action', 'Add transfer to order');
-      submit.type = 'submit';
-      const notice = element('p', 'beltoft-domain-transfer__help', '');
-      notice.setAttribute('aria-live', 'polite');
-      const priceLine = element('p', 'beltoft-domain-transfer__help', 'The transfer takes up to 5 days and adds one year to the registration.');
-      const row = element('div', 'beltoft-domain-transfer__row', '');
-      row.append(field, submit);
-      form.append(notice, row, priceLine);
-      recommendation(domain).then(function (advice) {
-        if (!advice) return;
-        const who = advice.registrar || 'your current registrar';
-        if (advice.locked) {
-          notice.textContent = domain + ' is locked at ' + who + '. Unlock it there, then come back.';
-          submit.disabled = true;
-          field.disabled = true;
-        } else if (advice.at_risk === true) {
-          notice.textContent = 'Your DNS is run by ' + who + ' and stops when the domain moves. After you order, you import your records here before the transfer starts.';
-        }
-      });
-      form.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        const code = field.value.trim();
-        if (!code) return;
-        working(submit, true, 'Adding to order…');
-        try {
-          await add(domain, 'transfer', code, '');
-        } catch (error) {
-          showError(error.message);
-          working(submit, false, 'Add transfer to order');
-        }
-      });
-      actions.replaceChildren(form);
-      field.focus();
-    }
-
-    function action(label, domain, mode, secondary) {
-      const button = element('button', 'beltoft-domain-action' + (secondary ? ' beltoft-domain-action--secondary' : ''), label);
-      button.type = 'button';
-      button.addEventListener('click', async function () {
-        if (mode === 'transfer') {
-          transferForm(domain, button.closest('.beltoft-domain-result__actions'));
-          return;
-        }
-        const label = button.textContent;
-        working(button, true, 'Adding to order…');
-        try {
-          await add(domain, mode, '');
-        } catch (error) {
-          showError(error.message);
-          working(button, false, label);
-        }
-      });
-      return button;
+    // Where "Transfer this domain" goes: the transfer section, with the domain filled in.
+    function transferHref(domain) {
+      const url = new URL(transferLink.getAttribute('href'), window.location.href);
+      url.searchParams.set('transfer', domain);
+      return url.toString();
     }
 
     function result(item, primary) {
@@ -132,7 +96,7 @@
 
       const descriptions = {
         free: 'Available to register',
-        taken: 'Already registered',
+        taken: 'Taken',
         premium: 'Premium domain. Online ordering is unavailable.',
         not_sold: 'This domain extension is not available to order here.'
       };
@@ -140,33 +104,30 @@
       if (item.note && item.status === 'free') information.appendChild(element('span', 'beltoft-domain-result__note', item.note));
       row.appendChild(information);
 
-      if (item.price !== null && item.price !== undefined) {
+      if (item.status === 'free' && item.price !== null && item.price !== undefined) {
         const price = element('div', 'beltoft-domain-result__price', '€' + item.price + ' / year');
         // The renewal price is the same as the first year's; saying so under the price answers the question before it is asked.
-        if (item.status === 'free') price.appendChild(element('span', 'beltoft-domain-result__renewal', 'Renews at €' + item.price + ' / year'));
+        price.appendChild(element('span', 'beltoft-domain-result__renewal', 'Renews at €' + item.price + ' / year'));
         row.appendChild(price);
       }
 
       const actions = document.createElement('div');
       actions.className = 'beltoft-domain-result__actions';
-      if (item.status === 'free') actions.appendChild(action('Register domain', item.domain, 'register', false));
-      if (item.status === 'taken') {
-        actions.appendChild(action('Transfer domain', item.domain, 'transfer', false));
+      if (item.status === 'free') actions.appendChild(registerButton(root, item.domain, results));
+      if (item.status === 'taken' && transferLink) {
+        const link = element('a', 'beltoft-domain-result__transfer', 'Transfer this domain');
+        link.href = transferHref(item.domain);
+        link.addEventListener('click', function (event) {
+          // The transfer section is on this page: fill it in and go there without a reload.
+          const box = document.querySelector('.beltoft-domain-transfer-box');
+          if (!box || !box.beltoftStart) return;
+          event.preventDefault();
+          box.beltoftStart(item.domain);
+        });
+        actions.appendChild(link);
       }
       if (actions.children.length) row.appendChild(actions);
       return row;
-    }
-
-    // A visible waiting state: a registrar answer can take a few seconds.
-    function loader() {
-      const box = element('div', 'beltoft-domain-loading', '');
-      box.setAttribute('role', 'status');
-      const bar = element('span', 'beltoft-domain-loading__bar', '');
-      bar.setAttribute('aria-hidden', 'true');
-      box.appendChild(bar);
-      box.appendChild(element('span', 'beltoft-domain-loading__text', 'Searching for domains…'));
-      box.appendChild(element('span', 'beltoft-domain-loading__note', 'This takes a few seconds.'));
-      return box;
     }
 
     // Draws a search answer; also used to bring back the last search when the page is opened again.
@@ -179,7 +140,7 @@
       // An extension we do not sell is noise, unless the customer typed that exact extension.
       const typedExtension = typed.indexOf('.') > 0;
       const shown = data.results.filter(function (item, index) { return item.status !== 'not_sold' || (typedExtension && index === 0); });
-      if (shown.some(function (item) { return item.price !== null && item.price !== undefined; })) {
+      if (shown.some(function (item) { return item.status === 'free'; })) {
         results.appendChild(element('p', 'beltoft-domain-note', 'Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.'));
       }
       // The first result is what the customer typed (or the first extension): it leads, the rest are alternatives.
@@ -187,13 +148,11 @@
     }
 
     async function search() {
-      results.replaceChildren(loader());
+      results.replaceChildren(loader('Searching for domains…'));
       results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
       try {
-        const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(input.value.trim()), { credentials: 'same-origin' });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'The search could not be completed.');
+        const data = await check(root, input.value.trim());
         render(data, input.value.trim());
         remember(input.value.trim(), data);
       } catch (error) {
@@ -221,7 +180,156 @@
     searchButton.addEventListener('click', search);
     restore();
     input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); search(); } });
-  });
+  }
+
+  /* ---------- the transfer section: a registered domain moved here with its transfer code ---------- */
+
+  function initTransfer(root) {
+    const input = root.querySelector(':scope > input');
+    const button = root.querySelector(':scope > button');
+    const out = root.querySelector('.beltoft-domain-transfer-result');
+    if (!input.placeholder) input.placeholder = 'example.com';
+
+    // What the public data says about the domain now: its current registrar, whether it is locked, whether its DNS is run by that registrar.
+    async function recommendation(domain) {
+      if (!root.dataset.transferDns) return null;
+      try {
+        const response = await fetch(root.dataset.transferDns + '?domain=' + encodeURIComponent(domain), {
+          credentials: 'same-origin',
+          headers: { 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce }
+        });
+        return response.ok ? await response.json() : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function codeForm(domain) {
+      const form = document.createElement('form');
+      form.className = 'beltoft-domain-transfer';
+      form.appendChild(element('p', 'beltoft-domain-transfer__help', 'Unlock ' + domain + ' at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC there first.'));
+      const field = document.createElement('input');
+      field.type = 'text';
+      field.autocomplete = 'off';
+      field.required = true;
+      field.setAttribute('aria-label', 'Transfer code for ' + domain);
+      field.placeholder = 'Transfer code';
+      const submit = element('button', 'beltoft-domain-action', 'Add transfer to order');
+      submit.type = 'submit';
+      const notice = element('p', 'beltoft-domain-transfer__help', '');
+      notice.setAttribute('aria-live', 'polite');
+      const row = element('div', 'beltoft-domain-transfer__row', '');
+      row.append(field, submit);
+      form.append(notice, row, element('p', 'beltoft-domain-transfer__help', 'The transfer takes up to 5 days and adds one year to the registration.'));
+      recommendation(domain).then(function (advice) {
+        if (!advice) return;
+        const who = advice.registrar || 'your current registrar';
+        if (advice.locked) {
+          notice.textContent = domain + ' is locked at ' + who + '. Unlock it there, then come back.';
+          submit.disabled = true;
+          field.disabled = true;
+        } else if (advice.at_risk === true) {
+          notice.textContent = 'Your DNS is run by ' + who + ' and stops when the domain moves. After you order, you import your records here before the transfer starts.';
+        }
+      });
+      form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const code = field.value.trim();
+        if (!code) return;
+        working(submit, true, 'Adding to order…');
+        try {
+          await add(root, domain, 'transfer', code, '');
+        } catch (error) {
+          showError(out, error.message);
+          working(submit, false, 'Add transfer to order');
+        }
+      });
+      return { form: form, field: field };
+    }
+
+    function render(item) {
+      out.replaceChildren();
+      const card = element('div', 'beltoft-domain-result beltoft-domain-result--primary beltoft-domain-result--' + item.status, '');
+      const information = element('div', 'beltoft-domain-result__information', '');
+      information.appendChild(element('strong', 'beltoft-domain-result__name', item.domain));
+      card.appendChild(information);
+      const actions = element('div', 'beltoft-domain-result__actions', '');
+      card.appendChild(actions);
+      out.appendChild(card);
+      const hasPrice = item.price !== null && item.price !== undefined;
+
+      if (item.status === 'taken') {
+        information.appendChild(element('span', 'beltoft-domain-result__status', 'Registered, can be transferred'));
+        if (hasPrice) {
+          card.insertBefore(element('div', 'beltoft-domain-result__price', '€' + item.price + ' / year'), actions);
+          information.appendChild(element('span', 'beltoft-domain-result__note', 'The transfer is charged as one year and adds that year to the registration. Price excluding VAT.'));
+        }
+        const code = codeForm(item.domain);
+        actions.appendChild(code.form);
+        code.field.focus();
+        return;
+      }
+      if (item.status === 'free') {
+        information.appendChild(element('span', 'beltoft-domain-result__status', 'Not registered, so there is nothing to transfer. You can register it instead.'));
+        if (hasPrice) card.insertBefore(element('div', 'beltoft-domain-result__price', '€' + item.price + ' / year'), actions);
+        actions.appendChild(registerButton(root, item.domain, out));
+        return;
+      }
+      const reasons = {
+        premium: 'Premium domain. It cannot be transferred online.',
+        not_sold: 'This domain extension is not available here.'
+      };
+      information.appendChild(element('span', 'beltoft-domain-result__status', reasons[item.status] || 'The domain could not be checked. Try again in a minute.'));
+    }
+
+    async function start(domain) {
+      if (domain) input.value = domain;
+      const wanted = input.value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#].*$/, '');
+      if (!wanted) { input.focus(); return; }
+      if (wanted.indexOf('.') < 1) {
+        out.textContent = 'Enter the full domain, for example example.com.';
+        return;
+      }
+      root.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      out.replaceChildren(loader('Checking the domain…'));
+      out.setAttribute('aria-busy', 'true');
+      button.disabled = true;
+      try {
+        const data = await check(root, wanted);
+        const item = data.results.find(function (row) { return row.domain === wanted; }) || data.results[0];
+        if (!item) {
+          out.textContent = 'The domain could not be checked. Try again in a minute.';
+          return;
+        }
+        render(item);
+      } catch (error) {
+        out.textContent = error.message;
+      } finally {
+        out.removeAttribute('aria-busy');
+        button.disabled = false;
+      }
+    }
+
+    root.beltoftStart = start;
+    button.addEventListener('click', function () { start(''); });
+    input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); start(''); } });
+    // Arrived from a search result on another page: the domain is in the address.
+    const asked = new URLSearchParams(window.location.search).get('transfer');
+    if (asked) start(asked);
+  }
+
+  // Sets up every form that is not set up yet. Bricks calls this again when the element is rendered in the builder.
+  function init() {
+    document.querySelectorAll('.beltoft-domain-search').forEach(function (root) {
+      if (root.dataset.bdsReady) return;
+      root.dataset.bdsReady = '1';
+      initSearch(root);
+    });
+    document.querySelectorAll('.beltoft-domain-transfer-box').forEach(function (root) {
+      if (root.dataset.bdsReady) return;
+      root.dataset.bdsReady = '1';
+      initTransfer(root);
+    });
   }
 
   window.beltoftDomainSearchInit = init;
@@ -235,9 +343,9 @@ window.addEventListener('pageshow', function (event) {
   fetch(window.location.href, { credentials: 'same-origin', cache: 'reload' })
     .then(function (response) { return response.text(); })
     .then(function (html) {
-      const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.beltoft-domain-search');
+      const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.beltoft-domain-search, .beltoft-domain-transfer-box');
       if (!fresh) return;
-      document.querySelectorAll('.beltoft-domain-search').forEach(function (root) {
+      document.querySelectorAll('.beltoft-domain-search, .beltoft-domain-transfer-box').forEach(function (root) {
         root.dataset.nonce = fresh.dataset.nonce;
         root.dataset.restNonce = fresh.dataset.restNonce;
       });

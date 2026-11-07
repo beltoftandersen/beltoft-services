@@ -51,7 +51,7 @@ final class DomainSearchElementTest extends TestCase {
 	}
 
 	public function test_the_element_is_registered_when_bricks_exists(): void {
-		$this->assertSame( array( 'beltoft-domain-search', 'beltoft-domain-search-form' ), Integration::register_elements() );
+		$this->assertSame( array( 'beltoft-domain-search', 'beltoft-domain-search-form', 'beltoft-domain-transfer' ), Integration::register_elements() );
 		$this->assertSame( Integration::ELEMENTS['beltoft-domain-search']['class'], \Bricks\Elements::$registered['beltoft-domain-search'][1] );
 		$this->assertFileExists( \Bricks\Elements::$registered['beltoft-domain-search'][0] );
 	}
@@ -95,6 +95,37 @@ final class DomainSearchElementTest extends TestCase {
 		$this->assertStringContainsString( 'class="beltoft-domain-results"', $html );
 	}
 
+	public function test_the_transfer_address_control_adds_the_link(): void {
+		ob_start();
+		$this->element( array( 'transferUrl' => '#transfer', 'transferLinkText' => 'Move a domain here' ) )->render();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( '<a href="#transfer">Move a domain here</a>', $html );
+		$this->assertSame( 'texts', $this->element()->controls['transferUrl']['group'] );
+	}
+
+	public function test_the_transfer_element_renders_its_own_form_without_search_controls(): void {
+		Integration::register_elements();
+		require_once BELTOFT_SERVICES_PATH . 'src/Bricks/DomainTransferElement.php';
+		$el           = new \BeltoftServices\Bricks\DomainTransferElement();
+		$el->settings = array( 'buttonText' => 'Check' );
+		$el->set_control_groups();
+		$el->set_controls();
+		$this->assertArrayNotHasKey( 'transferUrl', $el->controls );
+		$this->assertArrayNotHasKey( 'takenBackground', $el->controls );
+		$this->assertArrayHasKey( 'transferInputBorder', $el->controls );
+		$this->assertSame( 'Domain to transfer', $el->controls['labelText']['placeholder'] );
+		foreach ( $el->controls as $key => $control ) {
+			$this->assertArrayHasKey( $control['group'], $el->control_groups, $key );
+		}
+		ob_start();
+		$el->render();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'class="beltoft-domain-transfer-box"', $html );
+		$this->assertStringContainsString( 'data-cart="', $html );
+		$this->assertStringContainsString( '>Check</button>', $html );
+		$this->assertStringNotContainsString( 'class="beltoft-domain-search"', $html );
+	}
+
 	public function test_render_without_settings_matches_the_shortcode_inner_markup(): void {
 		ob_start();
 		$this->element()->render();
@@ -103,7 +134,7 @@ final class DomainSearchElementTest extends TestCase {
 	}
 
 	public function test_the_form_element_is_a_get_form_with_the_param_and_the_current_term(): void {
-		$this->assertCount( 2, Integration::register_elements() );
+		$this->assertCount( 3, Integration::register_elements() );
 		require_once BELTOFT_SERVICES_PATH . 'src/Bricks/DomainSearchFormElement.php';
 		$_GET['domain'] = 'abc.com';
 		$form           = new \BeltoftServices\Bricks\DomainSearchFormElement();
