@@ -119,6 +119,23 @@ final class DomainSearchElementTest extends TestCase {
 		$this->assertGreaterThan( array_search( 'linkTypography', $keys, true ), array_search( 'resultLinkTypography', $keys, true ) );
 	}
 
+	public function test_an_offer_under_the_results_is_printed_hidden_with_its_link(): void {
+		ob_start();
+		$this->element( array( 'offerText' => 'Add hosting with email', 'offerLinkText' => 'See the plans', 'offerUrl' => '/wordpress-hosting/' ) )->render();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( '<p class="beltoft-domain-offer" hidden>Add hosting with email <a class="beltoft-domain-offer__link" href="/wordpress-hosting/">See the plans</a></p>', $html );
+		$controls = $this->element()->controls;
+		$this->assertSame( 'texts', $controls['offerText']['group'] );
+		$this->assertSame( '.beltoft-domain-offer', $controls['offerBackground']['css'][0]['selector'] );
+		$this->assertSame( '.beltoft-domain-offer__link', $controls['offerLinkTypography']['css'][0]['selector'] );
+	}
+
+	public function test_without_an_offer_text_there_is_no_offer(): void {
+		ob_start();
+		$this->element( array( 'offerUrl' => '/wordpress-hosting/' ) )->render();
+		$this->assertStringNotContainsString( 'beltoft-domain-offer', (string) ob_get_clean() );
+	}
+
 	public function test_without_a_search_page_address_the_search_stays_on_the_page(): void {
 		ob_start();
 		$this->element()->render();

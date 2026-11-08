@@ -45,6 +45,7 @@ class DomainSearchElement extends \Bricks\Element {
 			'results' => esc_html__( 'Results', 'beltoft-services' ),
 			'text'    => esc_html__( 'Result text', 'beltoft-services' ),
 			'transfer' => esc_html__( 'Transfer form', 'beltoft-services' ),
+			'offer'   => esc_html__( 'Offer under the results', 'beltoft-services' ),
 			'loading' => esc_html__( 'Loading', 'beltoft-services' ),
 		);
 		foreach ( $groups as $key => $title ) {
@@ -74,6 +75,10 @@ class DomainSearchElement extends \Bricks\Element {
 		$this->controls['transferUrl']      = $text( esc_html__( 'Transfer section address', 'beltoft-services' ), '#transfer' );
 		$this->controls['transferLinkText'] = $text( esc_html__( 'Transfer link', 'beltoft-services' ), $defaults['transfer'] );
 		// Another page that does the search (for example /domains/): this form sends the term there and that page starts the search.
+		// An optional line under the results, shown once a domain is free (for example hosting for the new domain). Dynamic data allowed.
+		$this->controls['offerText']     = array_merge( $text( esc_html__( 'Offer under the results (shown when a domain is free)', 'beltoft-services' ), '' ), array( 'hasDynamicData' => true ) );
+		$this->controls['offerLinkText'] = $text( esc_html__( 'Offer link text', 'beltoft-services' ), '' );
+		$this->controls['offerUrl']      = $text( esc_html__( 'Offer link address', 'beltoft-services' ), '/' );
 		$this->controls['searchUrl'] = $text( esc_html__( 'Search page address (empty: results on this page)', 'beltoft-services' ), '/domains/' );
 
 		// Form layout. Columns are a grid template (for example "minmax(0,1fr) auto"); set it per breakpoint for a stacked form on a phone.
@@ -142,6 +147,14 @@ class DomainSearchElement extends \Bricks\Element {
 		// The link in a taken result row sits on the row's background, not the form's: it gets its own colour (later rule, so it wins).
 		$this->style( 'resultLinkTypography', 'text', esc_html__( 'Transfer link in a result', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-results .beltoft-domain-result__transfer' ) ) );
 
+		// The offer line under the results.
+		$this->style( 'offerTypography', 'offer', esc_html__( 'Typography', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-offer' ) ) );
+		$this->style( 'offerBackground', 'offer', esc_html__( 'Background', 'beltoft-services' ), 'color', array( self::rule( 'background-color', '.beltoft-domain-offer' ) ) );
+		$this->style( 'offerBorder', 'offer', esc_html__( 'Border', 'beltoft-services' ), 'border', array( self::rule( 'border', '.beltoft-domain-offer' ) ) );
+		$this->style( 'offerPadding', 'offer', esc_html__( 'Padding', 'beltoft-services' ), 'dimensions', array( self::rule( 'padding', '.beltoft-domain-offer' ) ) );
+		$this->style( 'offerMargin', 'offer', esc_html__( 'Margin', 'beltoft-services' ), 'dimensions', array( self::rule( 'margin', '.beltoft-domain-offer' ) ) );
+		$this->style( 'offerLinkTypography', 'offer', esc_html__( 'Link typography', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-offer__link' ) ) );
+
 		// Transfer code form, shown by the transfer element once the domain is checked.
 		$this->style( 'transferColumns', 'transfer', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns', '.beltoft-domain-transfer' ) ), array( 'placeholder' => 'minmax(12rem,1fr) auto', 'hasDynamicData' => false ) );
 		$this->style( 'transferMaxWidth', 'transfer', esc_html__( 'Maximum width', 'beltoft-services' ), 'number', array( self::rule( 'max-width', '.beltoft-domain-transfer' ) ), array( 'units' => true ) );
@@ -175,6 +188,21 @@ class DomainSearchElement extends \Bricks\Element {
 			'transfer'    => (string) ( $settings['transferLinkText'] ?? '' ),
 		);
 		// Inner markup is escaped by the builder.
-		echo '<div ' . $this->render_attributes( '_root' ) . '>' . Search::inner_markup( $texts, (string) ( $settings['transferUrl'] ?? '' ) ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<div ' . $this->render_attributes( '_root' ) . '>' . Search::inner_markup( $texts, (string) ( $settings['transferUrl'] ?? '' ) ) . $this->offer_markup() . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/** The offer line, hidden until the script shows a free domain. Empty text: no offer. */
+	private function offer_markup(): string {
+		$text = trim( (string) ( $this->settings['offerText'] ?? '' ) );
+		if ( '' === $text ) {
+			return '';
+		}
+		if ( method_exists( $this, 'render_dynamic_data' ) ) {
+			$text = (string) $this->render_dynamic_data( $text );
+		}
+		$url  = trim( (string) ( $this->settings['offerUrl'] ?? '' ) );
+		$link = trim( (string) ( $this->settings['offerLinkText'] ?? '' ) );
+		$a    = '' !== $url && '' !== $link ? ' <a class="beltoft-domain-offer__link" href="' . esc_url( $url ) . '">' . esc_html( $link ) . '</a>' : '';
+		return '<p class="beltoft-domain-offer" hidden>' . wp_kses_post( $text ) . $a . '</p>';
 	}
 }
