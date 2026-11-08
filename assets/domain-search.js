@@ -148,7 +148,22 @@
       shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
     }
 
+    const param = root.dataset.param || 'domain';
+
+    // The search page is elsewhere (a search box on the front page, for example): go there, and that page searches.
+    function handOff() {
+      if (!root.dataset.searchUrl) return false;
+      const target = new URL(root.dataset.searchUrl, window.location.href);
+      if (target.pathname.replace(/\/+$/, '') === window.location.pathname.replace(/\/+$/, '')) return false;
+      const typed = input.value.trim();
+      if (!typed) { input.focus(); return true; }
+      target.searchParams.set(param, typed);
+      window.location.assign(target.toString());
+      return true;
+    }
+
     async function search() {
+      if (handOff()) return;
       results.replaceChildren(loader('Searching for domains…'));
       results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
@@ -179,7 +194,14 @@
     }
 
     searchButton.addEventListener('click', search);
-    restore();
+    // Arrived from a search box on another page: the term is in the address, so search for it now.
+    const asked = root.dataset.searchUrl ? '' : (new URLSearchParams(window.location.search).get(param) || '').trim();
+    if (asked) {
+      input.value = asked;
+      search();
+    } else {
+      restore();
+    }
     input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); search(); } });
   }
 

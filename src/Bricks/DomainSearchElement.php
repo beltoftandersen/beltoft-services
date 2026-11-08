@@ -73,6 +73,8 @@ class DomainSearchElement extends \Bricks\Element {
 		// The transfer link: under the form and on a taken domain. Empty address: no link anywhere.
 		$this->controls['transferUrl']      = $text( esc_html__( 'Transfer section address', 'beltoft-services' ), '#transfer' );
 		$this->controls['transferLinkText'] = $text( esc_html__( 'Transfer link', 'beltoft-services' ), $defaults['transfer'] );
+		// Another page that does the search (for example /domains/): this form sends the term there and that page starts the search.
+		$this->controls['searchUrl'] = $text( esc_html__( 'Search page address (empty: results on this page)', 'beltoft-services' ), '/domains/' );
 
 		// Form layout. Columns are a grid template (for example "minmax(0,1fr) auto"); set it per breakpoint for a stacked form on a phone.
 		$this->style( 'formColumns', 'form', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns' ) ), array( 'placeholder' => 'minmax(0,1fr) auto', 'hasDynamicData' => false ) );
@@ -158,6 +160,11 @@ class DomainSearchElement extends \Bricks\Element {
 		$this->set_attribute( '_root', 'class', 'beltoft-domain-search' );
 		foreach ( Search::root_data() as $name => $value ) {
 			$this->set_attribute( '_root', $name, $value );
+		}
+		$this->set_attribute( '_root', 'data-param', DomainQuery::param() );
+		$search_url = trim( (string) ( $settings['searchUrl'] ?? '' ) );
+		if ( '' !== $search_url ) {
+			$this->set_attribute( '_root', 'data-search-url', esc_url( $search_url ) );
 		}
 		$texts = array(
 			'label'       => (string) ( $settings['labelText'] ?? '' ),
