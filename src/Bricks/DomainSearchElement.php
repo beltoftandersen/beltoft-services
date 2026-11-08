@@ -139,6 +139,8 @@ class DomainSearchElement extends \Bricks\Element {
 		foreach ( $texts as $id => list( $title, $selector ) ) {
 			$this->style( $id . 'Typography', 'text', $title, 'typography', array( self::rule( 'font', $selector ) ) );
 		}
+		// The link in a taken result row sits on the row's background, not the form's: it gets its own colour (later rule, so it wins).
+		$this->style( 'resultLinkTypography', 'text', esc_html__( 'Transfer link in a result', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-results .beltoft-domain-result__transfer' ) ) );
 
 		// Transfer code form, shown by the transfer element once the domain is checked.
 		$this->style( 'transferColumns', 'transfer', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns', '.beltoft-domain-transfer' ) ), array( 'placeholder' => 'minmax(12rem,1fr) auto', 'hasDynamicData' => false ) );

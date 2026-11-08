@@ -112,6 +112,13 @@ final class DomainSearchElementTest extends TestCase {
 		$this->assertSame( 'texts', $this->element()->controls['searchUrl']['group'] );
 	}
 
+	public function test_the_transfer_link_in_a_result_row_has_its_own_style_after_the_form_link(): void {
+		$controls = $this->element()->controls;
+		$keys     = array_keys( $controls );
+		$this->assertSame( '.beltoft-domain-results .beltoft-domain-result__transfer', $controls['resultLinkTypography']['css'][0]['selector'] );
+		$this->assertGreaterThan( array_search( 'linkTypography', $keys, true ), array_search( 'resultLinkTypography', $keys, true ) );
+	}
+
 	public function test_without_a_search_page_address_the_search_stays_on_the_page(): void {
 		ob_start();
 		$this->element()->render();

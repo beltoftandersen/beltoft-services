@@ -158,6 +158,7 @@
       const typed = input.value.trim();
       if (!typed) { input.focus(); return true; }
       target.searchParams.set(param, typed);
+      remember(typed, null); // going back to this page puts the term in the box again
       window.location.assign(target.toString());
       return true;
     }
@@ -171,6 +172,7 @@
         const data = await check(root, input.value.trim());
         render(data, input.value.trim());
         remember(input.value.trim(), data);
+        keepInAddress(input.value.trim());
       } catch (error) {
         results.textContent = error.message;
       } finally {
@@ -187,10 +189,20 @@
     function restore() {
       try {
         const saved = JSON.parse(window.sessionStorage.getItem(STORE) || 'null');
-        if (!saved || !saved.q || !saved.data || Date.now() - saved.t > 30 * 60 * 1000) return;
+        if (!saved || !saved.q || Date.now() - saved.t > 30 * 60 * 1000) return;
         input.value = saved.q;
-        render(saved.data, saved.q);
+        // A form that sends its searches to another page only gets the term back, not the results.
+        if (saved.data && !root.dataset.searchUrl) render(saved.data, saved.q);
       } catch (error) { /* nothing to restore */ }
+    }
+    // The term goes in the address of the results page, so the back button and a reload show the same search.
+    function keepInAddress(typed) {
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get(param) === typed) return;
+        url.searchParams.set(param, typed);
+        window.history.replaceState(window.history.state, '', url.toString());
+      } catch (error) { /* the address stays as it was */ }
     }
 
     searchButton.addEventListener('click', search);

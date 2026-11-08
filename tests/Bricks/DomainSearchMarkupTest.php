@@ -99,5 +99,9 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertStringContainsString( 'root.dataset.searchUrl', $js );
 		$this->assertStringContainsString( 'window.location.assign(target', $js );
 		$this->assertStringContainsString( "new URLSearchParams(window.location.search).get(param)", $js );
+		// The back button keeps the term: saved before the hand-off, and in the address of the results page.
+		$this->assertStringContainsString( 'remember(typed, null)', $js );
+		$this->assertStringContainsString( 'window.history.replaceState', $js );
+		$this->assertStringContainsString( 'if (saved.data && !root.dataset.searchUrl) render(saved.data, saved.q);', $js );
 	}
 }

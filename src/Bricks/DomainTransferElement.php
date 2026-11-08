@@ -38,7 +38,7 @@ class DomainTransferElement extends DomainSearchElement {
 		$this->controls['buttonText']['label']       = esc_html__( 'Button', 'beltoft-services' );
 		$this->controls['buttonText']['placeholder'] = $defaults['button'];
 		// No search results here: the link to a transfer section and the taken-row styles do not apply.
-		foreach ( array( 'transferUrl', 'transferLinkText', 'takenBackground', 'takenOpacity', 'linkTypography', 'noteTypography' ) as $key ) {
+		foreach ( array( 'transferUrl', 'transferLinkText', 'takenBackground', 'takenOpacity', 'linkTypography', 'resultLinkTypography', 'noteTypography' ) as $key ) {
 			unset( $this->controls[ $key ] );
 		}
 	}
