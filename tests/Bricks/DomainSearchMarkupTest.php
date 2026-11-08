@@ -104,4 +104,11 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertStringContainsString( 'window.history.replaceState', $js );
 		$this->assertStringContainsString( 'if (saved.data && !root.dataset.searchUrl) render(saved.data, saved.q);', $js );
 	}
+
+	public function test_the_script_shows_the_offer_only_with_a_free_domain_and_handles_extension_links(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
+		$this->assertStringContainsString( "offer.hidden = !shown.some(function (item) { return item.status === 'free'; });", $js );
+		$this->assertStringContainsString( '[data-beltoft-domain-ext]', $js );
+		$this->assertStringContainsString( 'root.beltoftSearch = search;', $js );
+	}
 }

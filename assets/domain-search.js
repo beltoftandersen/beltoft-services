@@ -76,6 +76,7 @@
   function initSearch(root) {
     const input = root.querySelector('input[type="search"]');
     const results = root.querySelector('.beltoft-domain-results');
+    const offer = root.querySelector('.beltoft-domain-offer');
     const searchButton = root.querySelector(':scope > button');
     const transferLink = root.querySelector('.beltoft-domain-search__transfer a');
     if (!input.placeholder) input.placeholder = 'example.com';
@@ -134,6 +135,7 @@
     // Draws a search answer; also used to bring back the last search when the page is opened again.
     function render(data, typed) {
       results.replaceChildren();
+      if (offer) offer.hidden = true;
       if (!data.results.length) {
         results.textContent = 'No results found.';
         return;
@@ -146,6 +148,8 @@
       }
       // The first result is what the customer typed (or the first extension): it leads, the rest are alternatives.
       shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
+      // The offer under the results (for example hosting for the new domain) only makes sense once something can be registered.
+      if (offer) offer.hidden = !shown.some(function (item) { return item.status === 'free'; });
     }
 
     const param = root.dataset.param || 'domain';
@@ -165,6 +169,7 @@
 
     async function search() {
       if (handOff()) return;
+      if (offer) offer.hidden = true;
       results.replaceChildren(loader('Searching for domains…'));
       results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
@@ -205,6 +210,7 @@
       } catch (error) { /* the address stays as it was */ }
     }
 
+    root.beltoftSearch = search;
     searchButton.addEventListener('click', search);
     // Arrived from a search box on another page: the term is in the address, so search for it now.
     const asked = root.dataset.searchUrl ? '' : (new URLSearchParams(window.location.search).get(param) || '').trim();
@@ -354,6 +360,28 @@
   }
 
   // Sets up every form that is not set up yet. Bricks calls this again when the element is rendered in the builder.
+  // A link or card with data-beltoft-domain-ext="dk" puts that extension behind the typed name and searches for it.
+  document.addEventListener('click', function (event) {
+    const link = event.target.closest('[data-beltoft-domain-ext]');
+    if (!link) return;
+    const roots = Array.prototype.slice.call(document.querySelectorAll('.beltoft-domain-search'));
+    const root = roots.find(function (r) { return !r.dataset.searchUrl; }) || roots[0];
+    if (!root || !root.beltoftSearch) return;
+    event.preventDefault();
+    const input = root.querySelector(':scope > input');
+    const extension = String(link.dataset.beltoftDomainExt).replace(/^\.+/, '').toLowerCase();
+    const name = input.value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[./?#]/)[0];
+    root.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    if (!name) {
+      input.value = '.' + extension;
+      input.focus();
+      input.setSelectionRange(0, 0);
+      return;
+    }
+    input.value = name + '.' + extension;
+    root.beltoftSearch();
+  });
+
   function init() {
     document.querySelectorAll('.beltoft-domain-search').forEach(function (root) {
       if (root.dataset.bdsReady) return;
