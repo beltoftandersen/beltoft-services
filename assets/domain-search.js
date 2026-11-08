@@ -148,7 +148,23 @@
       shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
     }
 
+    const param = root.dataset.param || 'domain';
+
+    // The search page is elsewhere (a search box on the front page, for example): go there, and that page searches.
+    function handOff() {
+      if (!root.dataset.searchUrl) return false;
+      const target = new URL(root.dataset.searchUrl, window.location.href);
+      if (target.pathname.replace(/\/+$/, '') === window.location.pathname.replace(/\/+$/, '')) return false;
+      const typed = input.value.trim();
+      if (!typed) { input.focus(); return true; }
+      target.searchParams.set(param, typed);
+      remember(typed, null); // going back to this page puts the term in the box again
+      window.location.assign(target.toString());
+      return true;
+    }
+
     async function search() {
+      if (handOff()) return;
       results.replaceChildren(loader('Searching for domains…'));
       results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
@@ -156,6 +172,7 @@
         const data = await check(root, input.value.trim());
         render(data, input.value.trim());
         remember(input.value.trim(), data);
+        keepInAddress(input.value.trim());
       } catch (error) {
         results.textContent = error.message;
       } finally {
@@ -172,14 +189,31 @@
     function restore() {
       try {
         const saved = JSON.parse(window.sessionStorage.getItem(STORE) || 'null');
-        if (!saved || !saved.q || !saved.data || Date.now() - saved.t > 30 * 60 * 1000) return;
+        if (!saved || !saved.q || Date.now() - saved.t > 30 * 60 * 1000) return;
         input.value = saved.q;
-        render(saved.data, saved.q);
+        // A form that sends its searches to another page only gets the term back, not the results.
+        if (saved.data && !root.dataset.searchUrl) render(saved.data, saved.q);
       } catch (error) { /* nothing to restore */ }
+    }
+    // The term goes in the address of the results page, so the back button and a reload show the same search.
+    function keepInAddress(typed) {
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get(param) === typed) return;
+        url.searchParams.set(param, typed);
+        window.history.replaceState(window.history.state, '', url.toString());
+      } catch (error) { /* the address stays as it was */ }
     }
 
     searchButton.addEventListener('click', search);
-    restore();
+    // Arrived from a search box on another page: the term is in the address, so search for it now.
+    const asked = root.dataset.searchUrl ? '' : (new URLSearchParams(window.location.search).get(param) || '').trim();
+    if (asked) {
+      input.value = asked;
+      search();
+    } else {
+      restore();
+    }
     input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); search(); } });
   }
 

@@ -103,6 +103,30 @@ final class DomainSearchElementTest extends TestCase {
 		$this->assertSame( 'texts', $this->element()->controls['transferUrl']['group'] );
 	}
 
+	public function test_a_search_page_address_sends_the_search_there_with_the_url_parameter(): void {
+		ob_start();
+		$this->element( array( 'searchUrl' => '/domains/' ) )->render();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'data-search-url="/domains/"', $html );
+		$this->assertStringContainsString( 'data-param="domain"', $html );
+		$this->assertSame( 'texts', $this->element()->controls['searchUrl']['group'] );
+	}
+
+	public function test_the_transfer_link_in_a_result_row_has_its_own_style_after_the_form_link(): void {
+		$controls = $this->element()->controls;
+		$keys     = array_keys( $controls );
+		$this->assertSame( '.beltoft-domain-results .beltoft-domain-result__transfer', $controls['resultLinkTypography']['css'][0]['selector'] );
+		$this->assertGreaterThan( array_search( 'linkTypography', $keys, true ), array_search( 'resultLinkTypography', $keys, true ) );
+	}
+
+	public function test_without_a_search_page_address_the_search_stays_on_the_page(): void {
+		ob_start();
+		$this->element()->render();
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'data-search-url', $html );
+		$this->assertStringContainsString( 'data-param="domain"', $html );
+	}
+
 	public function test_the_transfer_element_renders_its_own_form_without_search_controls(): void {
 		Integration::register_elements();
 		require_once BELTOFT_SERVICES_PATH . 'src/Bricks/DomainTransferElement.php';

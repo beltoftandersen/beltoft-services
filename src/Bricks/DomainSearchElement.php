@@ -73,6 +73,8 @@ class DomainSearchElement extends \Bricks\Element {
 		// The transfer link: under the form and on a taken domain. Empty address: no link anywhere.
 		$this->controls['transferUrl']      = $text( esc_html__( 'Transfer section address', 'beltoft-services' ), '#transfer' );
 		$this->controls['transferLinkText'] = $text( esc_html__( 'Transfer link', 'beltoft-services' ), $defaults['transfer'] );
+		// Another page that does the search (for example /domains/): this form sends the term there and that page starts the search.
+		$this->controls['searchUrl'] = $text( esc_html__( 'Search page address (empty: results on this page)', 'beltoft-services' ), '/domains/' );
 
 		// Form layout. Columns are a grid template (for example "minmax(0,1fr) auto"); set it per breakpoint for a stacked form on a phone.
 		$this->style( 'formColumns', 'form', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns' ) ), array( 'placeholder' => 'minmax(0,1fr) auto', 'hasDynamicData' => false ) );
@@ -137,6 +139,8 @@ class DomainSearchElement extends \Bricks\Element {
 		foreach ( $texts as $id => list( $title, $selector ) ) {
 			$this->style( $id . 'Typography', 'text', $title, 'typography', array( self::rule( 'font', $selector ) ) );
 		}
+		// The link in a taken result row sits on the row's background, not the form's: it gets its own colour (later rule, so it wins).
+		$this->style( 'resultLinkTypography', 'text', esc_html__( 'Transfer link in a result', 'beltoft-services' ), 'typography', array( self::rule( 'font', '.beltoft-domain-results .beltoft-domain-result__transfer' ) ) );
 
 		// Transfer code form, shown by the transfer element once the domain is checked.
 		$this->style( 'transferColumns', 'transfer', esc_html__( 'Columns (grid template)', 'beltoft-services' ), 'text', array( self::rule( 'grid-template-columns', '.beltoft-domain-transfer' ) ), array( 'placeholder' => 'minmax(12rem,1fr) auto', 'hasDynamicData' => false ) );
@@ -158,6 +162,11 @@ class DomainSearchElement extends \Bricks\Element {
 		$this->set_attribute( '_root', 'class', 'beltoft-domain-search' );
 		foreach ( Search::root_data() as $name => $value ) {
 			$this->set_attribute( '_root', $name, $value );
+		}
+		$this->set_attribute( '_root', 'data-param', DomainQuery::param() );
+		$search_url = trim( (string) ( $settings['searchUrl'] ?? '' ) );
+		if ( '' !== $search_url ) {
+			$this->set_attribute( '_root', 'data-search-url', esc_url( $search_url ) );
 		}
 		$texts = array(
 			'label'       => (string) ( $settings['labelText'] ?? '' ),
