@@ -216,6 +216,7 @@
     const asked = root.dataset.searchUrl ? '' : (new URLSearchParams(window.location.search).get(param) || '').trim();
     if (asked) {
       input.value = asked;
+      root.scrollIntoView({ behavior: 'auto', block: 'start' }); // the search starts where the visitor can see it
       search();
     } else {
       restore();

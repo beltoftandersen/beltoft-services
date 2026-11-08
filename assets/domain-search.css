@@ -9,6 +9,11 @@
   max-width: 42rem;
 }
 
+/* Scrolled to on arrival from another page: room for a fixed site header (--bds-scroll-offset). */
+:where(.beltoft-domain-search, .beltoft-domain-transfer-box) {
+  scroll-margin-top: var(--bds-scroll-offset, 96px);
+}
+
 /* The transfer form: domain and button side by side (the element's Columns control can change this). */
 :where(.beltoft-domain-transfer-box) {
   grid-template-columns: minmax(0, 1fr) auto;

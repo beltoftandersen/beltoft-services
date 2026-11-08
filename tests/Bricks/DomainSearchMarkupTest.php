@@ -103,6 +103,10 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertStringContainsString( 'remember(typed, null)', $js );
 		$this->assertStringContainsString( 'window.history.replaceState', $js );
 		$this->assertStringContainsString( 'if (saved.data && !root.dataset.searchUrl) render(saved.data, saved.q);', $js );
+		// Arriving with a term scrolls the search into view, below a fixed header.
+		$this->assertMatchesRegularExpression( '/input\.value = asked;\s*root\.scrollIntoView\(/', $js );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.css' );
+		$this->assertStringContainsString( 'scroll-margin-top: var(--bds-scroll-offset, 96px);', $css );
 	}
 
 	public function test_the_script_shows_the_offer_only_with_a_free_domain_and_handles_extension_links(): void {
