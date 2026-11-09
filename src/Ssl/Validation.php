@@ -418,27 +418,4 @@ final class Validation {
 
 		return StepResult::done( $meta );
 	}
-
-	/**
-	 * Looks at public DNS for each CNAME row and records whether it is there. Read only; used to show the customer progress.
-	 *
-	 * @param Resource $r Resource.
-	 * @return array<int, array<string, string>> The rows with `seen` set to found or missing.
-	 */
-	public static function check_public( Resource $r ): array {
-		$rows = (array) $r->get( 'ssl_validation_rows' );
-
-		foreach ( $rows as $i => $row ) {
-			if ( ! is_array( $row ) || 'CNAME' !== ( $row['type'] ?? '' ) ) {
-				continue;
-			}
-
-			$found = MailDns::lookup( (string) $row['name'], 'CNAME' );
-			$seen  = ! is_wp_error( $found ) && in_array( strtolower( rtrim( (string) ( $found[0] ?? '' ), '.' ) ), array( (string) $row['value'] ), true );
-
-			$rows[ $i ]['seen'] = $seen ? 'found' : 'missing';
-		}
-
-		return $rows;
-	}
 }

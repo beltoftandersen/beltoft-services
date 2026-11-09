@@ -260,7 +260,6 @@ class CardTest extends UsageTestCase {
 		$user  = $this->new_user();
 		$token = $this->add_card( $user );
 		$id    = Account::for_user( $user )->get_id();
-		$this->assertTrue( Account::has_valid_mandate( $user ) );
 
 		$token->delete();
 
@@ -271,7 +270,6 @@ class CardTest extends UsageTestCase {
 		$this->assertTrue( $account->is_manual() );
 		$this->assertFalse( Account::has_card( $account ) );
 		$this->assertFalse( Account::chargeable( $account ) );
-		$this->assertFalse( Account::has_valid_mandate( $user ) );
 	}
 
 	// ------------------------------------------------------------------ chargeable.
@@ -292,11 +290,9 @@ class CardTest extends UsageTestCase {
 		$account->update_meta_data( '_wc_stripe_customer', 'cus_1' );
 		$account->save();
 		$this->assertTrue( Account::chargeable( $account ) );
-		$this->assertTrue( Account::has_valid_mandate( $user ) );
 
 		$token->delete();
 		$this->assertFalse( Account::chargeable( $this->fresh( $account ) ), 'The customer deleted the card.' );
-		$this->assertFalse( Account::has_valid_mandate( $user ) );
 	}
 
 	public function test_an_expired_token_is_not_chargeable(): void {

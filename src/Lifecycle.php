@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Listens to beltoft-licenses only. Its license statuses already carry WooCommerce
  * Subscriptions' lifecycle (grace while on hold, pending-cancel running to the end of the paid
- * period, expiry, refunds), so nothing here reads WCS. A license event only records what the
+ * period, expiry, refunds), so nothing in this class reads WCS (other classes hook WooCommerce Subscriptions themselves). A license event only records what the
  * service should become (Resource::desire()) and queues the resource: the driver work runs
  * in the reconcile job.
  *
