@@ -12,6 +12,7 @@ require_once __DIR__ . '/HostingCase.php';
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Hosting\Addons;
+use BeltoftServices\Hosting\HostingAccount;
 use BeltoftServices\Hosting\HostingActions;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Mail\FakeMailcowClient;
@@ -138,6 +139,29 @@ class AddonsTest extends HostingCase {
 		$this->assertFalse( is_wp_error( $made ), is_wp_error( $made ) ? $made->get_error_message() : '' );
 
 		return $child;
+	}
+
+	public function test_the_hosting_page_shows_the_storage_block_with_no_mailbox_and_links_to_the_mailboxes(): void {
+		$r = $this->account();
+		$this->connect_domain( $r, 'mail.customer.example' );
+		$child  = $this->lite( $r, 'mail.customer.example' );
+		$result = Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
+		$child->set( array_merge( $result->meta(), array( 'state' => 'ready', 'desired' => 'ready' ) ) );
+
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Extra mailbox storage', $html );
+		$this->assertStringContainsString( 'Create a mailbox first', $html );
+		$this->assertStringContainsString( 'Manage mailboxes', $html );
+		$this->assertStringNotContainsString( 'data-hosting-action="add_pack"', $html );
+
+		Mailboxes::create( Resource::find( $child->id() ), 'info', 'Info', 0 );
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'Create a mailbox first', $html );
+		$this->assertStringContainsString( 'data-hosting-action="add_pack"', $html );
 	}
 
 	public function test_the_price_is_one_unit_for_each_started_month_until_the_renewal(): void {

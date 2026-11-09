@@ -259,6 +259,13 @@ final class HostingAccount {
 					$mail_domain
 				)
 			);
+
+			$area = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
+			$url  = $area->url( $mail->license() );
+
+			if ( '' !== $url ) {
+				echo ' <a href="' . esc_url( $url ) . '">' . esc_html__( 'Manage mailboxes', 'beltoft-services' ) . '</a>';
+			}
 		} elseif ( null === LiteMail::ready_domain( $r ) ) {
 			echo esc_html__( 'Connect your own domain to a website to set up Email lite. It is included with your plan and uses that domain.', 'beltoft-services' );
 		} else {
@@ -294,7 +301,13 @@ final class HostingAccount {
 		$quote = Addons::quote( $r, Addons::KIND_PACK );
 		$boxes = \BeltoftServices\Mail\Mailboxes::all( $mail );
 
-		if ( null === $quote || ! is_array( $boxes ) || array() === $boxes ) {
+		if ( null === $quote || ! is_array( $boxes ) ) {
+			return;
+		}
+
+		if ( array() === $boxes ) {
+			echo '<div class="beltoft-hosting-packs"><h4>' . esc_html__( 'Extra mailbox storage', 'beltoft-services' ) . '</h4><p>' . esc_html__( 'Create a mailbox first. Extra storage is added to a mailbox.', 'beltoft-services' ) . '</p></div>';
+
 			return;
 		}
 

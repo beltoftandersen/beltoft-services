@@ -116,22 +116,36 @@ class LiteMailTest extends HostingCase {
 		$this->assertSame( array( 'value' => 60, 'frame' => 'm' ), $domain['rl'], 'The plan limit, not the global 30.' );
 	}
 
-	public function test_an_email_lite_child_is_not_an_email_plan_member_and_not_in_the_email_list(): void {
+	public function test_an_email_lite_child_is_listed_in_the_email_area_with_its_own_page_and_label(): void {
 		$parent = $this->account();
 		$child  = $this->make_ready( $this->lite( $parent, 'lite.example' ) );
 		$area   = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
 
-		$this->assertFalse( $area->is_member( $child->license() ) );
+		$this->assertTrue( $area->is_member( $child->license() ), 'The licence is grouped under Email, so the Licenses tab does not list it as a separate key.' );
 
 		wp_set_current_user( (int) $child->license()['user_id'] );
+		$view = \BeltoftLicenses\Account\View::license( $child->license() );
+
 		$GLOBALS['wp']->query_vars[ $area->slug() ] = '';
 		ob_start();
-		$area->render( array( \BeltoftLicenses\Account\View::license( $child->license() ) ) );
-		$html = (string) ob_get_clean();
+		$area->render( array( $view ) );
+		$list = (string) ob_get_clean();
+		$this->assertStringContainsString( 'lite.example', $list );
+		$this->assertStringContainsString( 'Included with', $list );
+
+		// Its own page: the normal mailbox page, labelled as included, with no plan or domain actions.
+		$GLOBALS['wp']->query_vars[ $area->slug() ] = (string) $child->license()['id'];
+		ob_start();
+		$area->render( array( $view ) );
+		$page = (string) ob_get_clean();
 		unset( $GLOBALS['wp']->query_vars[ $area->slug() ] );
 		wp_set_current_user( 0 );
 
-		$this->assertStringNotContainsString( 'lite.example', $html );
+		$this->assertStringNotContainsString( 'was not found', $page );
+		$this->assertStringContainsString( 'lite.example', $page );
+		$this->assertStringContainsString( 'Included with', $page );
+		$this->assertStringContainsString( 'data-mail-card', $page );
+		$this->assertStringNotContainsString( 'Domains in this plan', $page );
 	}
 
 	public function test_email_lite_follows_the_accounts_own_domain_never_the_preview_address(): void {

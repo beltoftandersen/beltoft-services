@@ -52,6 +52,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<dl class="beltoft-services-facts">
 			<?php
 			$beltoft_services_row( __( 'Status', 'beltoft-services' ), esc_html( $beltoft_services_status[ $view['kind'] ] ?? '' ) );
+			if ( '' !== (string) $view['included'] ) {
+				$beltoft_services_row( __( 'Plan', 'beltoft-services' ), esc_html( (string) $view['included'] ) );
+			}
 			$beltoft_services_row( __( 'Mailboxes', 'beltoft-services' ), esc_html( sprintf( /* translators: 1: mailboxes in use, 2: mailboxes the plan allows */ __( '%1$d of %2$d', 'beltoft-services' ), (int) $view['counts']['mailboxes'], (int) $beltoft_services_limits['mailboxes'] ) ) );
 			$beltoft_services_row( __( 'Size of each', 'beltoft-services' ), esc_html( $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) );
 			$beltoft_services_row( __( 'Aliases allowed', 'beltoft-services' ), esc_html( (string) (int) $beltoft_services_limits['aliases'] ) );
