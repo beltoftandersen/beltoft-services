@@ -8,6 +8,7 @@
 namespace BeltoftServices\Account;
 
 use BeltoftServices\Mail\MailGuard;
+use BeltoftServices\Mail\MailPlan;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -199,7 +200,8 @@ final class Email extends ServiceArea {
 	public function row( array $view, Resource $resource ): array {
 		list( $state, $tone ) = self::state( $resource );
 
-		$limits = MailGuard::limits( $resource );
+		$root   = MailPlan::root( $resource );
+		$limits = MailPlan::limits( $resource );
 		$dns    = (string) $resource->get( 'mail_dns' );
 
 		return array(
@@ -207,9 +209,9 @@ final class Email extends ServiceArea {
 			'url'     => $this->url( $view['license'] ),
 			'name'    => '' !== MailGuard::domain( $resource ) ? MailGuard::domain( $resource ) : (string) ( $view['product'] ?? '' ),
 			'details' => sprintf(
-				/* translators: 1: mailboxes in use, 2: mailboxes the plan allows */
-				__( '%1$d of %2$d mailboxes', 'beltoft-services' ),
-				(int) $resource->get( 'mail_boxes' ),
+				/* translators: 1: mailboxes in use across the whole plan, 2: mailboxes the plan allows */
+				_n( '%1$d of %2$d mailbox', '%1$d of %2$d mailboxes', $limits['mailboxes'], 'beltoft-services' ),
+				MailPlan::cached( $root )['mailboxes'],
 				$limits['mailboxes']
 			),
 			'state'   => $state,

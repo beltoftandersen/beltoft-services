@@ -53,6 +53,11 @@ final class MailView {
 				'domain_minute' => MailSettings::override( $r, 'minute', (int) Settings::get( 'mail_rl_minute' ) ),
 			),
 			'forward_external' => (bool) Settings::get( 'mail_allow_external_forward' ),
+			'plan'      => array(
+				'used'    => MailPlan::cached( MailPlan::root( $r ) ),
+				'limits'  => MailPlan::limits( $r ),
+				'domains' => array_values( array_filter( array_map( array( MailGuard::class, 'domain' ), MailPlan::members( MailPlan::root( $r ) ) ) ) ),
+			),
 			'counts'    => array( 'mailboxes' => (int) $r->get( 'mail_boxes' ), 'aliases' => 0 ),
 			'delete_word' => MailRoutes::CONFIRM_DELETE,
 		);
@@ -83,6 +88,8 @@ final class MailView {
 				$out['counts']['aliases'] = count( $rows );
 			}
 		}
+
+		$out['plan']['used'] = MailPlan::used( MailPlan::root( $r ) );
 
 		return $out;
 	}

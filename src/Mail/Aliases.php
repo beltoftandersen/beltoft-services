@@ -114,7 +114,8 @@ final class Aliases {
 
 		// State, count and add are one step under the resource lock: parallel requests cannot pass the plan's limit together.
 		$outcome = null;
-		$ran     = $r->locked(
+		$ran     = MailPlan::locked(
+			$r,
 			static function () use ( $r, $address, $targets, &$outcome ): bool {
 				$bad = MailGuard::check( $r );
 
@@ -123,14 +124,14 @@ final class Aliases {
 					return false;
 				}
 
-				$have = self::all( $r );
+				$used = MailPlan::measure_aliases( MailPlan::root( $r ) );
 
-				if ( is_wp_error( $have ) ) {
-					$outcome = $have;
+				if ( is_wp_error( $used ) ) {
+					$outcome = $used;
 					return false;
 				}
 
-				if ( count( $have ) >= MailGuard::limits( $r )['aliases'] ) {
+				if ( $used >= MailPlan::limits( $r )['aliases'] ) {
 					$outcome = new \WP_Error( 'limit', __( 'Your plan has no room for more aliases.', 'beltoft-services' ) );
 					return false;
 				}
