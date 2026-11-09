@@ -220,6 +220,26 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $proved->id() ), 'mail', '' ), 'Once the proof step has run the wait is over.' );
 	}
 
+	public function test_a_wait_for_the_proof_or_the_registration_shows_the_waiting_text_and_no_time_estimate(): void {
+		$proof = $this->mail_resource( 'prooftext.example', array( 'mail_mode' => 'external', 'mail_proof_until' => time() + DAY_IN_SECONDS ) );
+		$proof->set( array( 'state' => 'provisioning', 'op' => 'provision', 'steps' => array() ) );
+		$p = \BeltoftServices\Progress::build( Resource::find( $proof->id() ) );
+		$this->assertSame( 'Waiting for the proof that the domain is yours. Add the record on the DNS tab.', $p['text'] );
+		$this->assertSame( '', $p['eta'] );
+		$this->assertStringNotContainsString( 'Usually about', $p['text'] );
+		$this->assertSame( $p['text'], \BeltoftServices\Account\Panel::message( 'provisioning', Resource::find( $proof->id() ) ) );
+
+		$reg = $this->mail_resource( 'regtext.example', array( 'mail_wait_until' => time() + DAY_IN_SECONDS ) );
+		$reg->set( array( 'state' => 'provisioning', 'op' => 'provision', 'steps' => array() ) );
+		$p = \BeltoftServices\Progress::build( Resource::find( $reg->id() ) );
+		$this->assertSame( 'Waiting for your domain registration to finish.', $p['text'] );
+		$this->assertSame( '', $p['eta'] );
+
+		$plain = $this->mail_resource( 'plaintext.example' );
+		$plain->set( array( 'state' => 'provisioning', 'op' => 'provision', 'steps' => array() ) );
+		$this->assertStringContainsString( 'Usually about', \BeltoftServices\Progress::build( Resource::find( $plain->id() ) )['text'], 'Ordinary setup work keeps its estimate.' );
+	}
+
 	public function test_the_domain_is_saved_on_the_line_and_becomes_resource_meta(): void {
 		$product = $this->product();
 		$key     = $this->in_cart( $product );

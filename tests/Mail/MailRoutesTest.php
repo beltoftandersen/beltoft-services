@@ -251,6 +251,57 @@ final class MailRoutesTest extends MailTestCase {
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail/dns/check', self::factory()->user->create() )->get_status() );
 	}
 
+	/** A domain at another provider still waiting for the TXT proof. */
+	private function proof_waiting( string $name ): array {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( $name, array(), array(), $user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+		$r = Resource::find( $r->id() );
+		$this->assertNotSame( 'ready', $r->get( 'state' ) );
+		$this->assertGreaterThan( time(), (int) $r->get( 'next_attempt_at' ) );
+
+		return array( $r, $user );
+	}
+
+	public function test_check_now_on_the_proof_state_looks_at_once_and_is_rate_limited(): void {
+		list( $r, $user ) = $this->proof_waiting( 'proofnow.example' );
+
+		$response = $this->call( 'POST', $r->id() . '/mail/proof/check', $user );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'building', $response->get_data()['kind'] );
+		$this->assertNotSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );
+
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		$response = $this->call( 'POST', $r->id() . '/mail/proof/check', $user );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'state' ) );
+		$this->assertSame( 'ready', $response->get_data()['kind'] );
+
+		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail/proof/check', self::factory()->user->create() )->get_status() );
+	}
+
+	public function test_check_now_is_limited_per_hour_and_refused_for_a_ready_domain(): void {
+		list( $r, $user ) = $this->proof_waiting( 'proofrate.example' );
+		$codes = array();
+		for ( $i = 0; $i < 8; $i++ ) {
+			$codes[] = $this->call( 'POST', $r->id() . '/mail/proof/check', $user )->get_status();
+		}
+		$this->assertContains( 429, $codes );
+
+		list( $ready, $owner ) = $this->domain( 'proofready.example' );
+		$this->assertSame( 409, $this->call( 'POST', $ready->id() . '/mail/proof/check', $owner )->get_status() );
+	}
+
+	public function test_check_now_is_refused_for_a_setup_that_is_not_waiting_for_proof_or_registration(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'failing.example', array(), array(), $user );
+		$r->set( array( 'state' => 'provisioning', 'op' => 'provision', 'attempts' => 2, 'next_attempt_at' => time() + 900 ) );
+		$response = $this->call( 'POST', $r->id() . '/mail/proof/check', $user );
+		$this->assertSame( 409, $response->get_status() );
+		$this->assertGreaterThan( time(), (int) Resource::find( $r->id() )->get( 'next_attempt_at' ), 'The backoff stays.' );
+	}
+
 	public function test_changes_are_counted_and_a_paused_service_is_refused(): void {
 		list( $r, $user ) = $this->domain();
 		$r->set( array( 'state' => 'paused' ) );

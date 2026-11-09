@@ -8,6 +8,7 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Children;
+use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -160,7 +161,7 @@ final class MailPlan {
 			return $aliases;
 		}
 
-		return array( 'mailboxes' => $boxes, 'aliases' => $aliases, 'domains' => count( self::members( $root ) ) );
+		return array( 'mailboxes' => $boxes, 'aliases' => $aliases, 'domains' => count( self::counted( $root ) ) );
 	}
 
 	/**
@@ -186,7 +187,7 @@ final class MailPlan {
 	 * @return array{mailboxes:int,aliases:int,domains:int}
 	 */
 	public static function cached( Resource $root ): array {
-		$members = self::members( $root );
+		$members = self::counted( $root );
 		$boxes   = 0;
 
 		foreach ( $members as $member ) {
@@ -222,5 +223,57 @@ final class MailPlan {
 		);
 
 		return $busy ? null : $ran;
+	}
+
+	/**
+	 * The domains that count against the plan: the members, less those whose removal was asked for (they are gone for the
+	 * customer at once; the job that closes them runs a moment later).
+	 *
+	 * @param Resource $root Plan root.
+	 * @return Resource[]
+	 */
+	public static function counted( Resource $root ): array {
+		return array_values(
+			array_filter(
+				self::members( $root ),
+				static fn( Resource $m ): bool => $m->id() === $root->id() || 'deleted' !== (string) $m->get( 'desired' )
+			)
+		);
+	}
+
+	/**
+	 * The switch link to the nearest larger plan of the same product (more mailboxes, nothing smaller), for the customer
+	 * who is logged in. Empty when Subscriptions is not active, the plan has no subscription or no larger plan exists.
+	 *
+	 * @param Resource $root Plan root.
+	 */
+	public static function larger_plan_url( Resource $root ): string {
+		$license      = $root->license();
+		$variation_id = (int) ( $license['variation_id'] ?? 0 );
+		$variation    = $variation_id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : null;
+
+		if ( ! $variation instanceof \WC_Product_Variation || ! class_exists( '\WC_Subscriptions_Switcher' ) ) {
+			return '';
+		}
+
+		$parent = wc_get_product( $variation->get_parent_id() );
+		$have   = MailGuard::limits( $root );
+		$best   = null;
+
+		foreach ( $parent instanceof \WC_Product_Variable ? $parent->get_children() : array() as $id ) {
+			$offer = wc_get_product( (int) $id );
+
+			if ( ! $offer instanceof \WC_Product_Variation || $offer->get_id() === $variation_id ) {
+				continue;
+			}
+
+			$limits = MailDriver::limits_from( Product::plan( $parent->get_id(), $offer->get_id() ) );
+
+			if ( $limits['mailboxes'] > $have['mailboxes'] && $limits['aliases'] >= $have['aliases'] && $limits['domains'] >= $have['domains'] && $limits['quota_mb'] >= $have['quota_mb'] && ( null === $best || $limits['mailboxes'] < $best['mailboxes'] ) ) {
+				$best = array( 'mailboxes' => $limits['mailboxes'], 'variation' => $offer );
+			}
+		}
+
+		return null === $best ? '' : \BeltoftServices\SwitchLink::to( $root, $best['variation'] );
 	}
 }

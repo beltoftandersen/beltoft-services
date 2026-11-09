@@ -152,6 +152,10 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					if ( ! $order || ! $order->get_meta( '_beltoft_services_dk_agreement' ) ) { return StepResult::fail( 'The .dk agreement was not accepted on this order.', array( 'steps' => $steps ) ); }
 					$body['additional_data'] = array( 'dk_acceptance' => 1 );
 				}
+				// An internationalised name is sent in punycode with the registrar's language tag (the registry fails it with a 399 without one).
+				// Not for .dk: that registry takes no tag, and the sandbox cannot register any .dk to confirm it.
+				$idn_script = 'register' === $mode && ! str_ends_with( $name, '.dk' ) ? IdnScript::for_name( $name ) : '';
+				if ( '' !== $idn_script ) { $body['additional_data'] = array( 'idn_script' => $idn_script ); }
 				if ( 'transfer' === $mode ) {
 					$auth = Crypto::decrypt( (string) $r->get( 'auth' ) );
 					// A code the registry refused is gone; the customer enters a new one, and nothing is sent until then.

@@ -75,7 +75,7 @@ final class DkAgreement {
 		$seller = self::seller();
 		echo '<section class="beltoft-dk-agreement"><h3>' . esc_html__( '.dk registration agreement', 'beltoft-services' ) . '</h3>';
 		echo '<p>' . esc_html( self::INTRO[0] ) . ' ' . esc_html( self::INTRO[1] ) . '</p>';
-		echo '<p><strong>' . esc_html__( 'Domain name', 'beltoft-services' ) . ':</strong> ' . esc_html( implode( ', ', $names ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Domain name', 'beltoft-services' ) . ':</strong> ' . esc_html( implode( ', ', array_map( array( HostName::class, 'display' ), $names ) ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Applicant', 'beltoft-services' ) . '*:</strong> <span data-dk-applicant></span><br><span data-dk-address></span><br><span data-dk-phone></span><br><span data-dk-email></span></p>';
 		echo '<p class="beltoft-dk-note">* ' . esc_html__( "Applicant's name and address are required.", 'beltoft-services' ) . '</p>';
 		echo '<p><strong>Punktum dk A/S</strong><br>Ørestads Boulevard 108, 11th floor<br>DK-2300 Copenhagen S<br><a href="' . esc_url( self::ADDRESS_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Address and agreement text in Danish and English', 'beltoft-services' ) . '</a></p>';
@@ -84,7 +84,7 @@ final class DkAgreement {
 		}
 		echo '<p><a href="' . esc_url( self::TERMS_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( self::TERMS_LABEL ) . '</a><br><a href="' . esc_url( self::PRIVACY_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( self::PRIVACY_LABEL ) . '</a></p>';
 		foreach ( $names as $index => $name ) {
-			echo '<label class="beltoft-dk-accept"><input type="checkbox" name="beltoft_dk_agreement[' . esc_attr( (string) $index ) . ']" value="' . esc_attr( $name ) . '"> ' . esc_html( self::CHECKBOX_LABEL ) . ' (' . esc_html( $name ) . ')</label>';
+			echo '<label class="beltoft-dk-accept"><input type="checkbox" name="beltoft_dk_agreement[' . esc_attr( (string) $index ) . ']" value="' . esc_attr( $name ) . '"> ' . esc_html( self::CHECKBOX_LABEL ) . ' (' . esc_html( HostName::display( $name ) ) . ')</label>';
 		}
 		echo '</section>';
 	}

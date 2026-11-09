@@ -10,6 +10,7 @@ namespace BeltoftServices\Mail;
 use BeltoftServices\Account\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -103,6 +104,12 @@ final class MailRoutes {
 		register_rest_route( $ns, $base . '/dns/check', array(
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'check_dns' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id,
+		) );
+		register_rest_route( $ns, $base . '/proof/check', array(
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'check_proof' ),
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id,
 		) );
@@ -451,6 +458,41 @@ final class MailRoutes {
 		$view  = MailView::data( $fresh, array() );
 
 		return self::ok( array( 'dns' => $view['dns'] ) );
+	}
+
+	/**
+	 * Looks for the ownership proof now, for a domain that waits for it. Without this the next look is up to ten minutes away.
+	 * Limited per hour like the DNS check.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function check_proof( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, 3 );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		// Only while the service waits for the proof or for a registration: a failing setup keeps its own backoff.
+		if ( ! MailField::waiting_for_proof( $r ) && ! MailField::waiting_for_registration( $r ) ) {
+			return self::error( 'not_ready', __( 'There is nothing to check now.', 'beltoft-services' ) );
+		}
+
+		$limited = self::too_many( $r, 'proof', self::CHECK_LIMIT );
+
+		if ( $limited ) {
+			return $limited;
+		}
+
+		if ( (int) $r->get( 'next_attempt_at' ) > 0 ) {
+			$r->set( array( 'next_attempt_at' => null ) );
+		}
+
+		Jobs::run( $r->id() );
+
+		$fresh = Resource::find( $r->id() ) ?? $r;
+
+		return self::ok( MailView::data( $fresh, array() ) );
 	}
 
 	/**

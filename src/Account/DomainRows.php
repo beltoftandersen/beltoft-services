@@ -61,7 +61,26 @@ final class DomainRows {
 			return __( 'DNS with us', 'beltoft-services' );
 		}
 
+		// A registration that has not gone through is not "registered".
+		if ( ! self::registered( $resource ) ) {
+			return 'transfer' === $resource->get( 'mode' ) ? __( 'Domain transfer', 'beltoft-services' ) : __( 'Domain registration', 'beltoft-services' );
+		}
+
 		return $ours ? __( 'Registered and DNS with us', 'beltoft-services' ) : __( 'Registered with us', 'beltoft-services' );
+	}
+
+	/**
+	 * Has the registrar really registered (or moved) the domain? A DNS service has no registration to ask about.
+	 *
+	 * @param Resource $resource Resource.
+	 */
+	public static function registered( Resource $resource ): bool {
+		if ( 'dns' === $resource->get( 'driver' ) || in_array( 'active', (array) $resource->get( 'steps' ), true ) ) {
+			return true;
+		}
+
+		// Every state after the order went through (ready, paused, being removed ...) is a registered domain.
+		return ! in_array( (string) $resource->get( 'state' ), array( 'requested', 'provisioning', 'failed' ), true );
 	}
 
 	/**
@@ -81,6 +100,11 @@ final class DomainRows {
 	 * @param string               $group    Panel group of the state.
 	 */
 	private static function renews( array $view, Resource $resource, string $group ): string {
+		// Nothing renews until the domain is registered.
+		if ( ! self::registered( $resource ) ) {
+			return '';
+		}
+
 		$renews = ServerLinks::renewal( $view['license'] );
 
 		if ( '' === $renews && 'ready' === $group ) {

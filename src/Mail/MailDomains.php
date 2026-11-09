@@ -74,7 +74,7 @@ final class MailDomains {
 			return 'the email plan is not active';
 		}
 
-		if ( count( MailPlan::members( $root ) ) >= MailPlan::limits( $root )['domains'] ) {
+		if ( count( MailPlan::counted( $root ) ) >= MailPlan::limits( $root )['domains'] ) {
 			return 'the email plan has no room for another domain';
 		}
 
@@ -209,7 +209,7 @@ final class MailDomains {
 			}
 		}
 
-		if ( count( MailPlan::members( $root ) ) >= $limits['domains'] ) {
+		if ( count( MailPlan::counted( $root ) ) >= $limits['domains'] ) {
 			return new \WP_Error( 'no_room', __( 'Your plan has no room for another domain.', 'beltoft-services' ) );
 		}
 

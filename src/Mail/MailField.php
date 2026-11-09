@@ -438,8 +438,13 @@ final class MailField {
 	public static function progress_wait( $wait, $r, $driver, $current = '' ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
 		$wait = (array) $wait;
 
+		// Waiting for a registration or for the customer's DNS record is no work of ours: the waiting text only, no time estimate.
 		if ( $r instanceof Resource && MailDriver::ID === $driver && self::waiting_for_registration( $r ) ) {
-			$wait['text'] = self::wait_text();
+			$wait['text']   = self::wait_text();
+			$wait['no_eta'] = true;
+		} elseif ( $r instanceof Resource && MailDriver::ID === $driver && self::waiting_for_proof( $r ) ) {
+			$wait['text']   = self::proof_text();
+			$wait['no_eta'] = true;
 		}
 
 		return $wait;
@@ -464,6 +469,22 @@ final class MailField {
 		}
 
 		return $formatted;
+	}
+
+	/**
+	 * True while the customer has to add the TXT record that proves the domain is theirs.
+	 *
+	 * @param Resource $r Mail resource.
+	 */
+	public static function waiting_for_proof( Resource $r ): bool {
+		return MailDriver::ID === $r->get( 'driver' ) && 'external' === (string) $r->get( 'mail_mode' ) && (int) $r->get( 'mail_proof_until' ) > time() && ! in_array( 'proof', (array) $r->get( 'steps' ), true );
+	}
+
+	/**
+	 * Fixed text while the proof record is missing.
+	 */
+	public static function proof_text(): string {
+		return __( 'Waiting for the proof that the domain is yours. Add the record on the DNS tab.', 'beltoft-services' );
 	}
 
 	/**

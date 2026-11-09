@@ -55,7 +55,10 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 			if ( '' !== (string) $view['included'] ) {
 				$beltoft_services_row( __( 'Plan', 'beltoft-services' ), esc_html( (string) $view['included'] ) );
 			}
-			$beltoft_services_row( __( 'Mailboxes', 'beltoft-services' ), esc_html( sprintf( /* translators: 1: mailboxes in use, 2: mailboxes the plan allows */ __( '%1$d of %2$d', 'beltoft-services' ), (int) $view['counts']['mailboxes'], (int) $beltoft_services_limits['mailboxes'] ) ) );
+			$beltoft_services_row( __( 'Mailboxes', 'beltoft-services' ), esc_html( sprintf( /* translators: 1: mailboxes in use in the whole plan, 2: mailboxes the plan allows */ _n( '%1$d of %2$d mailbox in your plan', '%1$d of %2$d mailboxes in your plan', (int) $beltoft_services_limits['mailboxes'], 'beltoft-services' ), (int) $view['plan']['used']['mailboxes'], (int) $beltoft_services_limits['mailboxes'] ) ) );
+			if ( count( $view['plan']['members'] ) > 1 ) {
+				$beltoft_services_row( __( 'On this domain', 'beltoft-services' ), esc_html( (string) (int) $view['counts']['mailboxes'] ) );
+			}
 			$beltoft_services_row( __( 'Size of each', 'beltoft-services' ), esc_html( $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) );
 			$beltoft_services_row( __( 'Aliases allowed', 'beltoft-services' ), esc_html( (string) (int) $beltoft_services_limits['aliases'] ) );
 			?>
@@ -154,6 +157,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
 			<p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p>
+			<?php if ( 'building' === $view['kind'] && null !== $view['dns']['proof'] ) : ?>
+				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
+			<?php endif; ?>
 		<?php else : ?>
 			<?php if ( 'ok' !== $view['dns']['status'] && array() !== $view['dns']['rows'] ) : ?>
 				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Some DNS records are not in place yet, so mail may not arrive. See the DNS tab.', 'beltoft-services' ); ?></p>
@@ -208,8 +214,16 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New mailbox', 'beltoft-services' ); ?></h4>
-				<?php if ( (int) $view['counts']['mailboxes'] >= (int) $beltoft_services_limits['mailboxes'] ) : ?>
-					<p><?php esc_html_e( 'Your plan has no room for more mailboxes.', 'beltoft-services' ); ?></p>
+				<?php if ( (int) $view['plan']['used']['mailboxes'] >= (int) $beltoft_services_limits['mailboxes'] ) : ?>
+					<p data-mail-no-room>
+						<?php
+						esc_html_e( 'Your plan has no room for more mailboxes. Delete a mailbox or change to a larger plan.', 'beltoft-services' );
+
+						if ( '' !== (string) $view['plan']['upgrade'] ) {
+							echo ' <a href="' . esc_url( (string) $view['plan']['upgrade'] ) . '">' . esc_html__( 'Change plan', 'beltoft-services' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped here.
+						}
+						?>
+					</p>
 				<?php else : ?>
 					<p class="description"><?php echo esc_html( sprintf( /* translators: %s: size of a mailbox, such as 5 GB */ __( 'Each mailbox has %s of storage. You get a password to show once.', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) ); ?></p>
 					<div class="beltoft-services-db__form" data-mail-create>
@@ -301,6 +315,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<tr><td><code><?php echo esc_html( $beltoft_services_dns['proof']['name'] ); ?></code></td><td><?php echo esc_html( $beltoft_services_dns['proof']['type'] ); ?></td><td class="beltoft-services-mail__value"><code><?php echo esc_html( $beltoft_services_dns['proof']['value'] ); ?></code></td></tr>
 					</tbody>
 				</table>
+				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php elseif ( array() === $beltoft_services_dns['rows'] ) : ?>
 				<p><?php esc_html_e( 'The records appear here when your email domain is ready.', 'beltoft-services' ); ?></p>
 			<?php else : ?>

@@ -67,6 +67,40 @@ final class MailProductsCommand {
 	}
 
 	/**
+	 * Writes the plain-words description again on every plan of the mail product, from the plan limits stored on each
+	 * plan. For a product made before the descriptions were worded with plurals. Returns the number of plans changed.
+	 */
+	public static function refresh_descriptions(): int {
+		$id      = self::existing();
+		$product = $id > 0 ? wc_get_product( $id ) : null;
+		$changed = 0;
+
+		if ( ! $product instanceof \WC_Product_Variable ) {
+			return 0;
+		}
+
+		foreach ( $product->get_children() as $vid ) {
+			$variation = wc_get_product( (int) $vid );
+
+			if ( ! $variation instanceof \WC_Product_Variation ) {
+				continue;
+			}
+
+			$text = self::plan_description( MailDriver::limits_from( Product::plan( $id, (int) $vid ) ) );
+
+			if ( $variation->get_description() !== $text ) {
+				$variation->set_description( $text );
+				$variation->save();
+				++$changed;
+			}
+		}
+
+		wc_delete_product_transients( $id );
+
+		return $changed;
+	}
+
+	/**
 	 * The id of a product with the mail driver, 0 when there is none.
 	 */
 	public static function existing(): int {
@@ -170,11 +204,19 @@ final class MailProductsCommand {
 	 * [--create]
 	 * : Create the product. Refused when a product with the mail driver exists.
 	 *
+	 * [--refresh-descriptions]
+	 * : Write the plan descriptions again on the existing product (singular and plural wording).
+	 *
 	 * @param array<int, string>   $args       Positional arguments (none).
 	 * @param array<string, mixed> $assoc_args Flags.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		unset( $args );
+
+		if ( ! empty( $assoc_args['refresh-descriptions'] ) ) {
+			\WP_CLI::success( 'Changed the description of ' . self::refresh_descriptions() . ' plans.' );
+			return;
+		}
 
 		$dry    = ! empty( $assoc_args['dry-run'] );
 		$create = ! empty( $assoc_args['create'] );
@@ -190,7 +232,7 @@ final class MailProductsCommand {
 		}
 
 		foreach ( self::plans() as $name => $plan ) {
-			\WP_CLI::log( sprintf( '%s: %s EUR per month excluding VAT, %d mailbox(es), %d MB each, %d aliases, %d domain(s)', $name, $plan['price'], $plan['mailboxes'], $plan['quota_mb'], $plan['aliases'], $plan['domains'] ) );
+			\WP_CLI::log( sprintf( '%s: %s EUR per month excluding VAT, %s', $name, $plan['price'], self::plan_description( $plan ) ) );
 		}
 
 		if ( $dry ) {
