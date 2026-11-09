@@ -278,15 +278,7 @@ final class Reconciler {
 			}
 		}
 
-		try {
-			$result = $driver->$operation( $r );
-		} catch ( \Throwable $e ) {
-			$result = StepResult::retry( 0, $e->getMessage() );
-		}
-
-		if ( ! $result instanceof StepResult ) {
-			$result = StepResult::retry( 0, 'The driver returned no result' );
-		}
+		$result = self::call( static fn() => $driver->$operation( $r ) );
 
 		// The driver may have run for a while: work from what is stored now.
 		$fresh = Resource::find( $r->id() );
@@ -367,15 +359,7 @@ final class Reconciler {
 	 * @return bool True when the delete may go on.
 	 */
 	private static function pause_before_delete( Resource $r, Driver $driver ): bool {
-		try {
-			$result = $driver->pause( $r );
-		} catch ( \Throwable $e ) {
-			$result = StepResult::retry( 0, $e->getMessage() );
-		}
-
-		if ( ! $result instanceof StepResult ) {
-			$result = StepResult::retry( 0, 'The driver returned no result' );
-		}
+		$result = self::call( static fn() => $driver->pause( $r ) );
 
 		$fresh = Resource::find( $r->id() );
 
@@ -565,6 +549,82 @@ final class Reconciler {
 	}
 
 	/**
+	 * Runs a driver call. An exception, or an answer that is not a StepResult, becomes a retry, so every
+	 * caller treats a broken driver the same way.
+	 *
+	 * @param callable $call Returns the driver's StepResult.
+	 * @return StepResult
+	 */
+	public static function call( callable $call ): StepResult {
+		try {
+			$result = $call();
+		} catch ( \Throwable $e ) {
+			$result = StepResult::retry( 0, $e->getMessage() );
+		}
+
+		if ( ! $result instanceof StepResult ) {
+			$result = StepResult::retry( 0, 'The driver returned no result' );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * The delay of a counted retry: what the driver asked for, never beyond the longest backoff and never below
+	 * the backoff of this attempt.
+	 *
+	 * @param int $delay    Delay the driver asked for.
+	 * @param int $attempts Attempts counted so far, this one included (1 or more).
+	 * @return int Seconds.
+	 */
+	public static function clamp_delay( int $delay, int $attempts ): int {
+		return max( min( $delay, self::BACKOFF[ count( self::BACKOFF ) - 1 ] ), self::BACKOFF[ $attempts - 1 ] );
+	}
+
+	/**
+	 * The poll budget a driver asked for, held to the longest wait a site allows.
+	 *
+	 * @param int $budget Seconds the driver asked for.
+	 * @return int Seconds.
+	 */
+	public static function poll_budget( int $budget ): int {
+		/**
+		 * The longest a wait may last whatever a driver asks for.
+		 *
+		 * @param int $seconds Default 1800.
+		 */
+		return min( $budget, max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+	}
+
+	/**
+	 * Where a poll episode stands: progress starts it again (at most MAX_PROGRESS_RESETS times), a new one starts
+	 * now, and it has expired once it has lasted longer than its budget. The same maths for a step and an action.
+	 *
+	 * @param int  $since    When the episode began (0 for none).
+	 * @param int  $resets   Progress resets so far.
+	 * @param bool $progress The run progressed.
+	 * @param int  $budget   Budget in seconds (see poll_budget()).
+	 * @param int  $now      The clock (Jobs::now()).
+	 * @return array{since: int, resets: int, expired: bool}
+	 */
+	public static function poll_episode( int $since, int $resets, bool $progress, int $budget, int $now ): array {
+		if ( $progress && $resets < self::MAX_PROGRESS_RESETS ) {
+			++$resets;
+			$since = 0;
+		}
+
+		if ( $since <= 0 ) {
+			$since = $now;
+		}
+
+		return array(
+			'since'   => $since,
+			'resets'  => $resets,
+			'expired' => $now - $since > $budget,
+		);
+	}
+
+	/**
 	 * Counts an attempt and waits, or fails after the last retry. Driver meta that cannot be
 	 * stored is dropped and the attempt is recorded with META_ERROR.
 	 *
@@ -604,7 +664,7 @@ final class Reconciler {
 		}
 
 		// A driver cannot push its retry beyond the longest backoff.
-		$delay       = max( min( $delay, self::BACKOFF[ count( self::BACKOFF ) - 1 ] ), self::BACKOFF[ $attempts - 1 ] );
+		$delay       = self::clamp_delay( $delay, $attempts );
 		$bookkeeping = array(
 			'op'              => $operation,
 			'attempts'        => $attempts,
@@ -648,24 +708,12 @@ final class Reconciler {
 	 * @return bool True when the poll was stored and queued.
 	 */
 	private static function polled( Resource $r, string $operation, string $why, array $meta, bool $progress, int $resets, int $seconds, int $budget ): bool {
-		/**
-		 * The longest a wait may last whatever a driver asks for.
-		 *
-		 * @param int $seconds Default 1800.
-		 */
-		$budget = min( $budget, max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
-		$since  = $r->get( 'op' ) === $operation ? (int) $r->get( 'wait_since' ) : 0;
+		$budget  = self::poll_budget( $budget );
+		$episode = self::poll_episode( $r->get( 'op' ) === $operation ? (int) $r->get( 'wait_since' ) : 0, $resets, $progress, $budget, Jobs::now() );
+		$resets  = $episode['resets'];
+		$since   = $episode['since'];
 
-		if ( $progress && $resets < self::MAX_PROGRESS_RESETS ) {
-			++$resets;
-			$since = 0;
-		}
-
-		if ( $since <= 0 ) {
-			$since = Jobs::now();
-		}
-
-		if ( Jobs::now() - $since > $budget ) {
+		if ( $episode['expired'] ) {
 			return false;
 		}
 

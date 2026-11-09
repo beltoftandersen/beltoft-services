@@ -537,15 +537,7 @@ final class Jobs {
 				$resource->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null ) );
 			}
 
-			try {
-				$result = $driver->act( $resource, $action, $args );
-			} catch ( \Throwable $e ) {
-				$result = StepResult::retry( 0, $e->getMessage() );
-			}
-
-			if ( ! $result instanceof StepResult ) {
-				$result = StepResult::retry( 0, 'The driver returned no result' );
-			}
+			$result = Reconciler::call( static fn() => $driver->act( $resource, $action, $args ) );
 
 			self::acted( Resource::find( $activation_id ) ?? $resource, $action, $args, $result );
 		} finally {
@@ -637,7 +629,7 @@ final class Jobs {
 				return;
 			}
 
-			$delay = max( min( $result->delay(), $backoff[ count( $backoff ) - 1 ] ), $backoff[ $attempts - 1 ] );
+			$delay = Reconciler::clamp_delay( $result->delay(), $attempts );
 			self::queue_act( $r->id(), $action, $args, $delay );
 			return;
 		}
@@ -702,23 +694,14 @@ final class Jobs {
 	 * @return bool True when the poll was stored and queued.
 	 */
 	private static function polled( Resource $r, string $action, array $args, StepResult $result, array $meta ): bool {
-		$budget   = min( $result->poll_budget(), max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+		$budget   = Reconciler::poll_budget( $result->poll_budget() );
 		$episodes = (array) $r->get( 'act_wait_since' );
 		$episode  = is_array( $episodes[ $action ] ?? null ) ? $episodes[ $action ] : array( 'since' => 0, 'resets' => 0 );
-		$since    = (int) $episode['since'];
-		$resets   = (int) $episode['resets'];
-
-		// Progress starts the wait again, at most as often as the reconciler allows.
-		if ( $result->has_progress() && $resets < Reconciler::MAX_PROGRESS_RESETS ) {
-			++$resets;
-			$since = 0;
-		}
-
-		$since = $since > 0 ? $since : self::now();
+		$state    = Reconciler::poll_episode( (int) $episode['since'], (int) $episode['resets'], $result->has_progress(), $budget, self::now() );
 
 		// One episode per action name, kept when it has run out: every later run of it counts.
-		$episodes[ $action ] = array( 'since' => $since, 'resets' => $resets );
-		$expired             = self::now() - $since > $budget;
+		$episodes[ $action ] = array( 'since' => $state['since'], 'resets' => $state['resets'] );
+		$expired             = $state['expired'];
 
 		if ( $expired ) {
 			$r->set( array( 'act_wait_since' => $episodes ) );
