@@ -32,6 +32,6 @@
 	.beltoft-services-mail .beltoft-services-mail__table tr { padding: 12px 0; border-bottom: 1px solid var(--bsm-rule); }
 	.beltoft-services-mail .beltoft-services-mail__table tr:last-child { border-bottom: 0; }
 	.beltoft-services-mail .beltoft-services-mail__table td { padding: 4px 0; border: 0; }
-	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: auto; padding-top: 8px; white-space: normal; text-align: left; }
+	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: auto; min-width: 0; padding-top: 8px; white-space: normal; text-align: left; }
 	.beltoft-services-mail .beltoft-services-mail__actions .button, .beltoft-services-mail .beltoft-services-mail__actions details { margin: 0 8px 8px 0; }
 }

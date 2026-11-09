@@ -245,7 +245,12 @@ final class Email extends ServiceArea {
 	 * @param Resource $resource Resource.
 	 */
 	public function label_of( Resource $resource ): string {
-		unset( $resource );
+		// Email lite is the mail domain that comes with a hosting account: a child of the hosting resource.
+		$parent = \BeltoftServices\Children::parent_of( $resource );
+
+		if ( $parent && \BeltoftServices\Hosting\HostingDriver::ID === (string) $parent->get( 'driver' ) ) {
+			return __( 'Email lite', 'beltoft-services' );
+		}
 
 		return __( 'Business email', 'beltoft-services' );
 	}

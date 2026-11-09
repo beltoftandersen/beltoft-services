@@ -313,4 +313,14 @@ class LiteMailTest extends HostingCase {
 
 		$this->assertSame( array( 'value' => 250, 'frame' => 'd' ), $this->mailcow->mailbox( 'info@boxes.example' )['rl'], 'The child day limit, not the global 500.' );
 	}
+
+	public function test_the_email_lite_page_is_headed_email_lite_and_a_plan_domain_keeps_business_email(): void {
+		$r     = $this->account();
+		$child = $this->lite( $r, 'lite.customer.example' );
+		$area  = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
+		$this->assertSame( 'Email lite', $area->label_of( Resource::find( $child->id() ) ) );
+
+		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail.css' );
+		$this->assertMatchesRegularExpression( '/@media \(max-width: 700px\).*mail__actions \{ width: auto; min-width: 0;/s', $css, 'No 430px minimum on a phone.' );
+	}
 }
