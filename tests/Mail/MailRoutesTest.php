@@ -269,4 +269,76 @@ final class MailRoutesTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'secret-host', (string) wp_json_encode( $response->get_data() ) );
 		$this->assertArrayNotHasKey( 'a@route.example', (array) Resource::find( $r->id() )->get( MailAccess::META ) );
 	}
+
+	public function test_add_a_domain_of_ours_and_one_at_another_provider(): void {
+		list( $r, $user ) = $this->domain( 'plan.example' );
+		$this->our_zone( $user, 'zone.example' );
+
+		$ours = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'ours', 'domain' => 'zone.example' ) );
+		$this->assertSame( 201, $ours->get_status() );
+		$this->assertSame( 'zone.example', $ours->get_data()['domain'] );
+
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$own = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'Elsewhere.Example' ) );
+		$this->assertSame( 201, $own->get_status() );
+		$this->assertSame( 'elsewhere.example', $own->get_data()['domain'] );
+
+		$this->run_jobs();
+		$child = Resource::find( (int) $own->get_data()['id'] );
+		$view  = \BeltoftServices\Mail\MailView::data( $child, array() );
+		$this->assertNotNull( $view['dns']['proof'], 'The new domain shows the TXT proof.' );
+		$this->assertSame( 'TXT', $view['dns']['proof']['type'] );
+		$this->assertSame( 'ours', Resource::find( (int) $ours->get_data()['id'] )->get( 'mail_mode' ) );
+	}
+
+	public function test_a_zone_that_is_not_the_users_is_refused_for_mode_ours(): void {
+		list( $r, $user ) = $this->domain( 'plan2.example' );
+		$other = self::factory()->user->create();
+		$this->our_zone( $other, 'theirs.example' );
+
+		$res = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'ours', 'domain' => 'theirs.example' ) );
+		$this->assertSame( 422, $res->get_status() );
+		$this->assertSame( 400, $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'nope', 'domain' => 'x.example' ) )->get_status() );
+	}
+
+	public function test_another_users_plan_is_refused_and_a_full_plan_says_no_room(): void {
+		list( $r, $user ) = $this->domain( 'plan3.example' );
+		$stranger = self::factory()->user->create();
+		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail-domains', $stranger, array( 'mode' => 'own', 'domain' => 'a.example' ) )->get_status() );
+		$this->assertSame( 403, $this->call( 'DELETE', $r->id() . '/mail-domains/a.example', $stranger )->get_status() );
+
+		$this->assertSame( 201, $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'b.example' ) )->get_status() );
+		$this->assertSame( 201, $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'c.example' ) )->get_status() );
+		$full = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'd.example' ) );
+		$this->assertSame( 409, $full->get_status() );
+		$this->assertSame( 'Your plan has no room for another domain.', $full->get_data()['message'] );
+	}
+
+	public function test_a_domain_is_removed_through_the_route_and_a_root_is_not(): void {
+		list( $r, $user ) = $this->domain( 'plan4.example' );
+		$made = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'gone.example' ) );
+		$this->run_jobs();
+
+		$this->assertSame( 409, $this->call( 'DELETE', $r->id() . '/mail-domains/plan4.example', $user )->get_status() );
+		$this->assertSame( 404, $this->call( 'DELETE', $r->id() . '/mail-domains/unknown.example', $user )->get_status() );
+
+		$done = $this->call( 'DELETE', $r->id() . '/mail-domains/gone.example', $user );
+		$this->assertSame( 200, $done->get_status() );
+		$this->assertSame( 'deleted', Resource::find( (int) $made->get_data()['id'] )->get( 'desired' ) );
+	}
+
+	public function test_a_domain_with_mailboxes_and_a_paused_plan_refuse_removal(): void {
+		list( $r, $user ) = $this->domain( 'plan5.example' );
+		$made  = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'full.example' ) );
+		$this->run_jobs();
+		$child = Resource::find( (int) $made->get_data()['id'] );
+		\BeltoftServices\Mail\Mailboxes::create( $child, 'a' );
+
+		$res = $this->call( 'DELETE', $r->id() . '/mail-domains/full.example', $user );
+		$this->assertSame( 409, $res->get_status() );
+
+		\BeltoftServices\Mail\Mailboxes::delete( Resource::find( $child->id() ), 'a@full.example' );
+		Resource::find( $r->id() )->set( array( 'state' => 'paused' ) );
+		$this->assertSame( 403, $this->call( 'DELETE', $r->id() . '/mail-domains/full.example', $user )->get_status(), 'A paused plan is not available to the routes.' );
+	}
 }

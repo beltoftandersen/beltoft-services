@@ -253,6 +253,61 @@
 			return;
 		}
 
+		if ( target.hasAttribute( 'data-mail-domain-submit' ) ) {
+			var addForm = target.closest( '[data-mail-domain-add]' );
+			var chosen = addForm.querySelector( '[data-mail-domain-mode]:checked' );
+			var ours = chosen && 'ours' === chosen.value;
+			var domainField = addForm.querySelector( ours ? '[data-mail-domain-zone]' : '[data-mail-domain-own]' );
+
+			guarded( box, target, strings.adding, function ( h ) {
+				return call( box, 'POST', '/mail-domains', { mode: ours ? 'ours' : 'own', domain: domainField.value.trim() } ).then( function ( result ) {
+					if ( result.ok && result.data.url ) {
+						// The new domain's page: it shows the proof record to add for a domain at another provider.
+						window.location.href = result.data.url;
+					} else if ( result.ok ) {
+						fresh( box );
+					} else {
+						S.fail( h, problem( result ), domainField );
+					}
+				} );
+			} );
+
+			return;
+		}
+
+		if ( target.hasAttribute( 'data-mail-domain-remove' ) ) {
+			var removed = target.getAttribute( 'data-mail-domain-remove' );
+			var rest = target.closest( '[data-mail-domains]' );
+			var back = rest ? rest.querySelector( 'a[href]' ) : null;
+
+			if ( target.disabled ) {
+				return;
+			}
+
+			S.confirm( { text: strings.removeAsk, confirm: target.textContent, danger: true } ).then( function ( yes ) {
+				if ( ! yes ) {
+					return;
+				}
+
+				guarded( box, target, strings.removing, function ( h ) {
+					return call( box, 'DELETE', '/mail-domains/' + encodeURIComponent( removed ) ).then( function ( result ) {
+						if ( result.ok ) {
+							// The page of a removed domain is gone: back to the first domain of the plan.
+							if ( back ) {
+								window.location.href = back.getAttribute( 'href' );
+							} else {
+								fresh( box );
+							}
+						} else {
+							S.fail( h, problem( result ) );
+						}
+					} );
+				} );
+			} );
+
+			return;
+		}
+
 		if ( target.hasAttribute( 'data-mail-dns-check' ) ) {
 			guarded( box, target, strings.checking, function ( h ) {
 				return call( box, 'POST', '/mail/dns/check' ).then( function ( result ) {

@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Account\Email;
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -24,6 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * - POST   mail/mailboxes/<email>/password   a new password, kept for one reveal
  * - POST   mail/aliases                      address (the part before the @), goto
  * - DELETE mail/aliases/<address>
+ * - POST   mail-domains                     mode (ours or own), domain: adds a domain to the plan
+ * - DELETE mail-domains/<domain>             removes an extra domain of the plan
  * - POST   mail/dns/check                    reads public DNS now
  * - POST   mail-reveal                       email: the password, once (never reachable with an API token)
  *
@@ -102,6 +106,21 @@ final class MailRoutes {
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id,
 		) );
+		register_rest_route( $ns, '/resources/(?P<id>\d+)/mail-domains', array(
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'add_domain' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array(
+				'mode'   => array( 'type' => 'string', 'required' => true, 'enum' => array( MailField::MODE_OURS, MailField::MODE_OWN ), 'description' => 'ours: a domain on our name servers. own: a domain at another provider.' ),
+				'domain' => array( 'type' => 'string', 'required' => true, 'description' => 'The domain, such as example.com.' ),
+			),
+		) );
+		register_rest_route( $ns, '/resources/(?P<id>\d+)/mail-domains/(?P<domain>[^/]+)', array(
+			'methods'             => \WP_REST_Server::DELETABLE,
+			'callback'            => array( __CLASS__, 'remove_domain' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array( 'domain' => array( 'type' => 'string', 'required' => true, 'description' => 'The extra domain to remove.' ) ),
+		) );
 		register_rest_route( $ns, '/resources/(?P<id>\d+)/mail-reveal', array(
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'reveal' ),
@@ -161,6 +180,13 @@ final class MailRoutes {
 			'unavailable' => 503,
 			'failed'      => 502,
 			'rate_limited' => 429,
+			'no_room'     => 409,
+			'not_active'  => 409,
+			'has_mailboxes' => 409,
+			'is_root'     => 409,
+			'bad_domain'  => 422,
+			'license'     => 502,
+			'link'        => 502,
 		)[ $code ] ?? 400;
 
 		$response = rest_convert_error_to_response( new \WP_Error( 'beltoft_services_mail_' . $code, $message, array( 'status' => $status ) ) );
@@ -316,6 +342,88 @@ final class MailRoutes {
 		$gone    = Aliases::delete( $r, $address );
 
 		return is_wp_error( $gone ) ? self::failure( $gone ) : self::ok( array( 'deleted' => strtolower( $address ) ) );
+	}
+
+	/**
+	 * Adds a domain to the plan: one of the customer's zones on our name servers (ours) or a domain at another
+	 * provider (own, which then shows the TXT proof on its own page).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function add_domain( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$root    = MailPlan::root( $r );
+		$limited = self::too_many( $root, 'change', self::CHANGE_LIMIT );
+
+		if ( $limited ) {
+			return $limited;
+		}
+
+		$typed  = (string) $request->get_param( 'domain' );
+		$mode   = (string) $request->get_param( 'mode' );
+		$domain = MailField::resolve( array( 'mode' => $mode, 'zone' => $typed, 'own' => $typed ), get_current_user_id() );
+
+		if ( is_wp_error( $domain ) ) {
+			return self::error( 'invalid', $domain->get_error_message() );
+		}
+
+		$child = MailDomains::add( $root, $domain );
+
+		if ( is_wp_error( $child ) ) {
+			return self::failure( $child );
+		}
+
+		return self::ok(
+			array(
+				'id'      => $child->id(),
+				'domain'  => $domain,
+				'url'     => ServiceArea::get( Email::class )->url( $child->license() ),
+				'message' => __( 'The domain is added to your plan.', 'beltoft-services' ),
+			),
+			201
+		);
+	}
+
+	/**
+	 * Removes an extra domain of the plan.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function remove_domain( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, Routes::RATE_LIMIT );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$root    = MailPlan::root( $r );
+		$limited = self::too_many( $root, 'change', self::CHANGE_LIMIT );
+
+		if ( $limited ) {
+			return $limited;
+		}
+
+		$name  = (string) MailDomain::normalise( rawurldecode( (string) $request['domain'] ) );
+		$child = null;
+
+		foreach ( MailPlan::members( $root ) as $member ) {
+			if ( '' !== $name && MailGuard::domain( $member ) === $name ) {
+				$child = $member;
+			}
+		}
+
+		if ( null === $child ) {
+			return self::error( 'not_found', __( 'That domain is not in your plan.', 'beltoft-services' ) );
+		}
+
+		$gone = MailDomains::remove( $child );
+
+		return is_wp_error( $gone ) ? self::failure( $gone ) : self::ok( array( 'deleted' => $name ) );
 	}
 
 	/**

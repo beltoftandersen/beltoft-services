@@ -173,7 +173,8 @@ final class Panel {
 	 * @param mixed $view    Display values of the license (the title of a server page).
 	 */
 	public static function render( $license, $view = array() ): void {
-		if ( ! is_array( $license ) || empty( $license['id'] ) || ! Product::is_service_license( $license ) ) {
+		// An extra domain of an email plan has a license without a service product, and still has a page.
+		if ( ! is_array( $license ) || empty( $license['id'] ) || ( ! Product::is_service_license( $license ) && ! ServiceArea::get( Email::class )->is_member( $license ) ) ) {
 			return;
 		}
 

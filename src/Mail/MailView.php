@@ -53,11 +53,7 @@ final class MailView {
 				'domain_minute' => MailSettings::override( $r, 'minute', (int) Settings::get( 'mail_rl_minute' ) ),
 			),
 			'forward_external' => (bool) Settings::get( 'mail_allow_external_forward' ),
-			'plan'      => array(
-				'used'    => MailPlan::cached( MailPlan::root( $r ) ),
-				'limits'  => MailPlan::limits( $r ),
-				'domains' => array_values( array_filter( array_map( array( MailGuard::class, 'domain' ), MailPlan::members( MailPlan::root( $r ) ) ) ) ),
-			),
+			'plan'      => self::plan( $r ),
 			'counts'    => array( 'mailboxes' => (int) $r->get( 'mail_boxes' ), 'aliases' => 0 ),
 			'delete_word' => MailRoutes::CONFIRM_DELETE,
 		);
@@ -92,6 +88,30 @@ final class MailView {
 		$out['plan']['used'] = MailPlan::used( MailPlan::root( $r ) );
 
 		return $out;
+	}
+
+	/**
+	 * The plan the domain belongs to: counts, limits, its domains, whether this is the first one, and the plan root.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>
+	 */
+	private static function plan( Resource $r ): array {
+		$root    = MailPlan::root( $r );
+		$members = MailPlan::members( $root );
+
+		return array(
+			'used'       => MailPlan::cached( $root ),
+			'limits'     => MailPlan::limits( $r ),
+			'domains'    => array_values( array_filter( array_map( array( MailGuard::class, 'domain' ), $members ) ) ),
+			'is_root'    => $root->id() === $r->id(),
+			'root'       => array( 'id' => $root->id(), 'domain' => MailGuard::domain( $root ), 'name' => \BeltoftLicenses\Account\View::product_name( $root->license() ) ),
+			'root_ready' => 'ready' === (string) $root->get( 'state' ) && 'ready' === (string) $root->get( 'desired' ),
+			'members'    => array_map(
+				static fn( Resource $m ): array => array( 'id' => $m->id(), 'domain' => MailGuard::domain( $m ), 'is_root' => $m->id() === $root->id() ),
+				$members
+			),
+		);
 	}
 
 	/**

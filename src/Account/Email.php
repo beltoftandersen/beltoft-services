@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftLicenses\Licenses;
+use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Mail\MailPlan;
 use BeltoftServices\Resource;
@@ -76,9 +78,65 @@ final class Email extends ServiceArea {
 	}
 
 	/**
+	 * An extra domain of an email plan is a child license without a service product: it belongs here too. The hidden
+	 * mail of a hosting plan is a child of the hosting, not of an email plan, and stays out.
+	 *
+	 * {@inheritDoc}
+	 *
+	 * @param mixed $license License row.
+	 */
+	public function is_member( $license ): bool {
+		if ( parent::is_member( $license ) ) {
+			return true;
+		}
+
+		if ( ! is_array( $license ) || empty( $license['id'] ) || 'child' !== ( $license['source'] ?? '' ) ) {
+			return false;
+		}
+
+		$r = Resource::for_license( (int) $license['id'] );
+
+		return $r && MailDriver::ID === $r->get( 'driver' ) && MailPlan::root( $r )->id() !== $r->id();
+	}
+
+	/**
+	 * The plan root of the customer that is active and has room for another domain, or null.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function plan_with_room( int $user_id ): ?Resource {
+		if ( $user_id <= 0 || ! class_exists( Licenses::class ) ) {
+			return null;
+		}
+
+		foreach ( Licenses::where( 'user_id', $user_id ) as $license ) {
+			$r = Resource::for_license( (int) $license['id'] );
+
+			if ( $r && MailDriver::ID === $r->get( 'driver' ) && $r->accepts_actions() && 'ready' === (string) $r->get( 'desired' ) && MailPlan::root( $r )->id() === $r->id() && count( MailPlan::members( $r ) ) < MailPlan::limits( $r )['domains'] ) {
+				return $r;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * With room in a plan: Add a domain (to the form on the first domain's page). Otherwise Create an email domain.
+	 *
 	 * {@inheritDoc}
 	 */
 	public function buttons(): array {
+		$root = self::plan_with_room( get_current_user_id() );
+
+		if ( $root ) {
+			return array(
+				array(
+					'label' => __( 'Add a domain', 'beltoft-services' ),
+					'url'   => $this->url( $root->license() ) . '#beltoft-mail-domains',
+				),
+			);
+		}
+
 		$url = $this->url_add();
 
 		return '' === $url ? array() : array(
