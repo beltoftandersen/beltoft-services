@@ -169,4 +169,37 @@ class ZoneWriterTest extends MailTestCase {
 		$this->assertNull( ZoneAccess::zone_of( $this->user, 'other.example' ) );
 		$this->assertNull( ZoneAccess::zone_of( $this->user, 'nota.example' ) );
 	}
+
+	public function test_a_cname_policy_writes_only_a_free_name_and_leaves_the_neighbours(): void {
+		$row  = array( 'name' => '_val', 'type' => 'CNAME', 'ttl' => 300, 'value' => 'target.example.net' );
+		$base = count( $this->writes() );
+		$r    = ZoneWriter::write( $this->user, 'writer.example', array( $row ), ZoneWriter::cname_policy( 'target.example.net' ) );
+		$this->assertSame( 'ok', $r['status'] );
+		$this->assertTrue( $r['wrote'] );
+		$writes = $this->writes();
+		$this->assertCount( $base + 1, $writes );
+		$sent = end( $writes )[2];
+		$this->assertCount( 1, $sent );
+		$this->assertSame( 'CNAME', $sent[0]['type'] );
+		$this->assertSame( '_val.writer.example.', $sent[0]['name'] );
+
+		// The same alias again is already right: nothing is written.
+		$r = ZoneWriter::write( $this->user, 'writer.example', array( $row ), ZoneWriter::cname_policy( 'target.example.net' ) );
+		$this->assertSame( array( 'status' => 'ok', 'reason' => '', 'wrote' => false ), $r );
+		$this->assertCount( $base + 1, $this->writes() );
+
+		// A name that holds something else (here the customer's A at www) is refused and untouched.
+		$taken = array( 'name' => 'www', 'type' => 'CNAME', 'ttl' => 300, 'value' => 'target.example.net' );
+		$r     = ZoneWriter::write( $this->user, 'writer.example', array( $taken ), ZoneWriter::cname_policy( 'target.example.net' ) );
+		$this->assertSame( 'refused', $r['status'] );
+		$this->assertSame( 'conflict:name_taken', $r['reason'] );
+		$this->assertCount( $base + 1, $this->writes() );
+	}
+
+	public function test_public_dns_answers_through_the_test_filter(): void {
+		add_filter( 'beltoft_services_mail_dns_lookup', static fn( $pre, $fqdn, $type ) => array( $fqdn . '|' . $type ), 10, 3 );
+		$this->assertSame( array( 'a.example|CNAME' ), \BeltoftServices\Domains\PublicDns::lookup( 'a.example', 'CNAME' ) );
+		$this->assertSame( array( 'a.example|CNAME' ), \BeltoftServices\Mail\MailDns::lookup( 'a.example', 'CNAME' ) );
+		remove_all_filters( 'beltoft_services_mail_dns_lookup' );
+	}
 }
