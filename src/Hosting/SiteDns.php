@@ -127,15 +127,7 @@ final class SiteDns {
 	 * @return string|null Zone name, or null when the name is in none.
 	 */
 	public static function zone_for( int $user_id, string $host ): ?string {
-		$best = null;
-
-		foreach ( ZoneAccess::zones( $user_id ) as $zone ) {
-			if ( ( $host === $zone || str_ends_with( $host, '.' . $zone ) ) && ( null === $best || strlen( $zone ) > strlen( $best ) ) ) {
-				$best = $zone;
-			}
-		}
-
-		return $best;
+		return ZoneAccess::zone_of( $user_id, $host );
 	}
 
 	/**
