@@ -14,6 +14,7 @@ use BeltoftServices\Mail\MailClients;
 use BeltoftServices\Mail\MailDomain;
 use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
+use BeltoftServices\Mail\MailMeta;
 use BeltoftServices\Mail\MailSettings;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -118,7 +119,7 @@ final class SiteMail {
 		$client          = MailClients::for();
 
 		// The domain gets room for one more mailbox before the mailbox is made; the customer's own count is unchanged.
-		if ( strtolower( (string) $child->get( 'mail_system' ) ) !== $address && ! $child->set( array( 'mail_system' => $address ) ) ) {
+		if ( strtolower( (string) $child->get( MailMeta::SYSTEM ) ) !== $address && ! $child->set( array( MailMeta::SYSTEM => $address ) ) ) {
 			return StepResult::retry( 0, 'mail: the system mailbox could not be recorded' );
 		}
 

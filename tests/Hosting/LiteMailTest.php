@@ -152,6 +152,17 @@ class LiteMailTest extends HostingCase {
 		$this->assertStringNotContainsString( 'Domains in this plan', $page );
 	}
 
+	public function test_the_included_label_comes_from_the_hosting_filter(): void {
+		$parent = $this->account();
+		$child  = $this->make_ready( $this->lite( $parent, 'label.example' ) );
+
+		$this->assertStringStartsWith( 'Included with ', \BeltoftServices\Mail\MailView::data( $child, array() )['included'] );
+
+		remove_filter( 'beltoft_services_mail_included_label', array( \BeltoftServices\Hosting\HostingAccount::class, 'included_label' ), 10 );
+		$this->assertSame( '', \BeltoftServices\Mail\MailView::data( $child, array() )['included'] );
+		add_filter( 'beltoft_services_mail_included_label', array( \BeltoftServices\Hosting\HostingAccount::class, 'included_label' ), 10, 2 );
+	}
+
 	public function test_email_lite_follows_the_accounts_own_domain_never_the_preview_address(): void {
 		$parent = $this->account();
 		$slug   = 'w' . $parent->id();
@@ -290,7 +301,7 @@ class LiteMailTest extends HostingCase {
 		$this->assertSame( array( 60, 'm' ), MailSettings::domain_rate_limit( $child ) );
 		$this->assertSame( array( 500, 'd' ), MailSettings::rate_limit( $child ), 'A key that is not set leaves the global value.' );
 
-		$child->set( array( 'mail_rl' => array( 'minute' => 0, 'day' => 1000 ) ) );
+		$child->set( array( \BeltoftServices\Mail\MailMeta::RATE_LIMIT => array( 'minute' => 0, 'day' => 1000 ) ) );
 		$child = Resource::find( $child->id() );
 		$this->assertNull( MailSettings::domain_rate_limit( $child ), '0 turns the limit off for this domain.' );
 		$this->assertSame( array( 1000, 'd' ), MailSettings::rate_limit( $child ) );
@@ -298,14 +309,14 @@ class LiteMailTest extends HostingCase {
 		$other = $this->account();
 		$this->assertSame( array( 30, 'm' ), MailSettings::domain_rate_limit( $other ), 'Another resource keeps the global value.' );
 		$this->assertSame( 77, MailSettings::override( null, 'day', 77 ) );
-		$child->set( array( 'mail_rl' => array( 'day' => 'x' ) ) );
+		$child->set( array( \BeltoftServices\Mail\MailMeta::RATE_LIMIT => array( 'day' => 'x' ) ) );
 		$this->assertSame( 5, MailSettings::override( Resource::find( $child->id() ), 'day', 5 ), 'A value that is not a number is ignored.' );
 	}
 
 	public function test_a_mailbox_of_the_child_gets_the_child_day_limit(): void {
 		$parent = $this->account();
 		$child  = $this->lite( $parent, 'boxes.example' );
-		$child->set( array( 'mail_rl' => array( 'minute' => 60, 'day' => 250 ) ) );
+		$child->set( array( \BeltoftServices\Mail\MailMeta::RATE_LIMIT => array( 'minute' => 60, 'day' => 250 ) ) );
 		$child = $this->make_ready( Resource::find( $child->id() ) );
 
 		$made = Mailboxes::create( $child, 'info', 'Info', 0 );

@@ -11,6 +11,7 @@ use BeltoftServices\Children;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Mail\MailDomain;
 use BeltoftServices\Mail\MailDriver;
+use BeltoftServices\Mail\MailMeta;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -114,7 +115,7 @@ final class LiteMail {
 			),
 			array(
 				MailDomain::META_DOMAIN => $name,
-				'mail_rl'               => array( 'minute' => (int) $plan['mail_per_minute'] ),
+				MailMeta::RATE_LIMIT    => array( 'minute' => (int) $plan['mail_per_minute'] ),
 			),
 			__( 'The Email lite license could not be made.', 'beltoft-services' ),
 			__( 'The Email lite service could not be linked to the account.', 'beltoft-services' )

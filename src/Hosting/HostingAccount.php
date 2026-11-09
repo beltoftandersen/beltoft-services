@@ -21,6 +21,13 @@ defined( 'ABSPATH' ) || exit;
  */
 final class HostingAccount {
 
+	/**
+	 * Gives the mail area the "Included with" label of an Email lite resource that is a child of a hosting account.
+	 */
+	public static function register(): void {
+		add_filter( 'beltoft_services_mail_included_label', array( self::class, 'included_label' ), 10, 2 );
+	}
+
 	public const HANDLE = 'beltoft-services-hosting';
 
 	/** The checklist items the customer ticks by hand. */
@@ -129,17 +136,20 @@ final class HostingAccount {
 	/**
 	 * "Included with <hosting product name>" for a mail resource that is a child of a hosting account, else ''.
 	 *
-	 * @param Resource $r Resource.
+	 * @param string   $label What an earlier callback made of the label.
+	 * @param Resource $r     Resource.
 	 */
-	public static function included_label( Resource $r ): string {
+	public static function included_label( $label, Resource $r ): string {
+		$label = (string) $label;
+
 		if ( MailDriver::ID !== $r->get( 'driver' ) ) {
-			return '';
+			return $label;
 		}
 
 		$parent = Children::parent_of( $r );
 
 		if ( ! $parent || HostingDriver::ID !== $parent->get( 'driver' ) ) {
-			return '';
+			return $label;
 		}
 
 		/* translators: %s: the name of the hosting plan. */
@@ -311,7 +321,7 @@ final class HostingAccount {
 		if ( $mail ) {
 			$mail_domain = \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );
 
-			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), $mail_domain ) );
+			echo esc_html( sprintf( '%s: %s', self::included_label( '', $mail ), $mail_domain ) );
 			echo ' ' . esc_html(
 				sprintf(
 					/* translators: %s: the mail domain. */

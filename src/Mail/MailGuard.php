@@ -41,7 +41,7 @@ final class MailGuard {
 	 * @param Resource $r Resource.
 	 */
 	public static function system_address( Resource $r ): string {
-		$address = $r->get( 'mail_system' );
+		$address = $r->get( MailMeta::SYSTEM );
 
 		return is_string( $address ) ? strtolower( $address ) : '';
 	}
