@@ -82,6 +82,22 @@ final class MailDomains {
 	}
 
 	/**
+	 * Is this domain already a live member of the plan?
+	 *
+	 * @param mixed  $root Plan root.
+	 * @param string $name Domain.
+	 */
+	private static function in_plan( $root, string $name ): bool {
+		foreach ( $root instanceof Resource ? MailPlan::members( $root ) : array() as $member ) {
+			if ( MailGuard::domain( $member ) === strtolower( $name ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Action beltoft_services_state_changed: a domain bought from the email area joins the plan when it is ready.
 	 * The root named on the order line is checked again here: owner, live, room. Otherwise an order note, nothing else.
 	 *
@@ -92,7 +108,14 @@ final class MailDomains {
 	public static function on_state_changed( $r, $old, $new ): void {
 		unset( $old );
 
-		if ( 'ready' !== $new || ! $r instanceof Resource || 'domain' !== $r->get( 'driver' ) || $r->get( self::ATTACH_DONE ) ) {
+		if ( 'ready' !== $new || ! $r instanceof Resource || 'domain' !== $r->get( 'driver' ) ) {
+			return;
+		}
+
+		// Read fresh: another run of the same event may have finished already.
+		$r = Resource::find( $r->id() ) ?? $r;
+
+		if ( $r->get( self::ATTACH_DONE ) ) {
 			return;
 		}
 
@@ -109,7 +132,10 @@ final class MailDomains {
 		$root  = self::attach_check( $root_id, $user );
 		$added = $root instanceof Resource ? self::add( $root, $name, array( 'mail_mode_hint' => 'ours' ) ) : null;
 
-		if ( $added instanceof Resource ) {
+		// The domain is already in the plan (another run got there first): joined, nothing to tell.
+		$already = is_wp_error( $added ) && 'bad_domain' === $added->get_error_code() && self::in_plan( $root, $name );
+
+		if ( $added instanceof Resource || $already ) {
 			$r->set( array( self::ATTACH_DONE => 'joined' ) );
 
 			return;

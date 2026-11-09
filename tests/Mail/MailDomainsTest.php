@@ -339,4 +339,36 @@ final class MailDomainsTest extends MailTestCase {
 		\BeltoftServices\Domains\Cart::order_item( $item, 'k', array( 'beltoft_services_domain' => array( 'domain' => 'a.example', 'mode' => 'register' ), 'beltoft_services_mail_attach' => 42 ), wc_create_order() );
 		$this->assertSame( 42, (int) $item->get_meta( '_beltoft_services_mail_attach' ) );
 	}
+
+	public function test_a_domain_already_in_the_plan_counts_as_joined_without_a_note(): void {
+		$user = self::factory()->user->create();
+		$root = $this->ready_mail( 'root.example', array(), $user );
+		MailDomains::add( $root, 'bought.example' );
+		list( $r, $order ) = $this->bought_domain( $user, 'bought.example', 'register', $root->id() );
+
+		$this->ready_event( $r );
+		$this->assertSame( 'joined', Resource::find( $r->id() )->get( MailDomains::ATTACH_DONE ) );
+		$this->assertCount( 2, MailPlan::members( $root ) );
+		$this->assertSame( array(), wc_get_order_notes( array( 'order_id' => $order->get_id() ) ) );
+	}
+
+	public function test_the_cart_filter_is_hooked_and_a_transfer_that_is_not_ready_fires_nothing(): void {
+		$this->assertNotFalse( has_filter( 'beltoft_services_domain_cart_attach' ) );
+		$user = self::factory()->user->create();
+		$root = $this->ready_mail( 'root.example', array(), $user );
+		list( $r, $order ) = $this->bought_domain( $user, 'pending.example', 'transfer', $root->id() );
+
+		foreach ( array( 'provisioning', 'failed', 'paused' ) as $state ) {
+			do_action( 'beltoft_services_state_changed', $r, 'new', $state );
+		}
+		$this->assertCount( 1, MailPlan::members( $root ) );
+		$this->assertSame( array(), wc_get_order_notes( array( 'order_id' => $order->get_id() ) ) );
+	}
+
+	public function test_the_transfer_link_fragment_is_an_id_of_the_transfer_markup(): void {
+		$default = \BeltoftServices\Domains\Search::transfer_markup();
+		$source  = (string) file_get_contents( dirname( __DIR__, 2 ) . '/templates/account/mail.php' );
+		$this->assertSame( 1, preg_match( "/register \. '#([A-Za-z0-9_-]+)'/", $source, $m ), 'The template has a default fragment.' );
+		$this->assertStringContainsString( 'id="' . $m[1] . '"', $default );
+	}
 }

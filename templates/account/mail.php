@@ -127,9 +127,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						/**
 						 * The address of the "Transfer a domain to us" link on the email page.
 						 *
-						 * @param string $url The domain search page with its transfer section, or ''.
+						 * @param string $url The domain search page with its transfer form (the id of the form's domain input is the default fragment), or ''.
 						 */
-						$beltoft_services_transfer = (string) apply_filters( 'beltoft_services_mail_transfer_url', '' !== $beltoft_services_register ? $beltoft_services_register . '#transfer' : '' );
+						$beltoft_services_transfer = (string) apply_filters( 'beltoft_services_mail_transfer_url', '' !== $beltoft_services_register ? $beltoft_services_register . '#beltoft-transfer-domain' : '' );
 						// The page learns which plan the domain is for; add_query_arg() keeps a #fragment at the end.
 						$beltoft_services_for = (int) $beltoft_services_plan['root']['id'];
 						$beltoft_services_register = '' !== $beltoft_services_register ? add_query_arg( 'mail_for', $beltoft_services_for, $beltoft_services_register ) : '';
