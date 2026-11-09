@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests\Mail;
 
 use BeltoftServices\Children;
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Mail\Aliases;
 use BeltoftServices\Mail\MailDomain;
 use BeltoftServices\Mail\MailDomains;
 use BeltoftServices\Mail\MailPlan;
@@ -108,11 +109,47 @@ final class MailDomainsTest extends MailTestCase {
 		$this->assertWPError( $res );
 		$this->assertSame( 'has_mailboxes', $res->get_error_code() );
 
-		$this->assertTrue( Mailboxes::delete( $child, 'anna@child.example' ) === true || ! is_wp_error( Mailboxes::delete( $child, 'anna@child.example' ) ) );
+		$this->assertNotWPError( Mailboxes::delete( $child, 'anna@child.example' ) );
 		$this->assertTrue( MailDomains::remove( Resource::find( $child->id() ) ) );
 		$this->run_jobs();
 		$this->assertSame( 'deleted', Resource::find( $child->id() )->get( 'state' ) );
 		$this->assertCount( 1, MailPlan::members( Resource::find( $root->id() ) ) );
+	}
+
+	public function test_removing_a_domain_is_refused_when_the_mail_server_cannot_be_asked(): void {
+		$root  = $this->ready_mail( 'root.example' );
+		$child = $this->add_ready( $root, 'child.example' );
+		$this->assertIsArray( Mailboxes::create( $child, 'anna' ) );
+		$this->mailcow->fail_next( 'list_mailboxes', new \WP_Error( 'mailcow_transport', 'down' ) );
+
+		$res = MailDomains::remove( Resource::find( $child->id() ) );
+		$this->assertWPError( $res );
+		$this->assertSame( 'unavailable', $res->get_error_code() );
+		$this->assertSame( 'Try again in a moment.', $res->get_error_message() );
+		$this->assertSame( 'ready', Resource::find( $child->id() )->get( 'desired' ) );
+	}
+
+	public function test_a_domain_with_an_alias_but_no_mailbox_is_not_removed(): void {
+		$root  = $this->ready_mail( 'root.example' );
+		$child = $this->add_ready( $root, 'child.example' );
+		$this->assertIsArray( Aliases::create( $child, 'info', 'x@elsewhere.example' ) );
+
+		$res = MailDomains::remove( Resource::find( $child->id() ) );
+		$this->assertWPError( $res );
+		$this->assertSame( 'has_mailboxes', $res->get_error_code() );
+		$this->assertSame( 'ready', Resource::find( $child->id() )->get( 'desired' ) );
+	}
+
+	public function test_a_child_that_cannot_be_made_leaves_no_active_license(): void {
+		$root = $this->ready_mail( 'root.example' );
+		$res  = MailDomains::add( $root, 'new.example', array( 'uuid' => 'not a valid uuid!' ) );
+		$this->assertWPError( $res );
+
+		$slug  = (string) $root->license()['product_slug'] . '-domain';
+		$found = array_values( array_filter( \BeltoftLicenses\Licenses::where( 'user_id', (int) $root->license()['user_id'] ), static fn( $l ) => $slug === $l['product_slug'] ) );
+		$this->assertCount( 1, $found );
+		$this->assertSame( \BeltoftLicenses\Licenses::STATUS_REVOKED, $found[0]['status'] );
+		$this->assertCount( 1, MailPlan::members( $root ) );
 	}
 
 	public function test_removing_a_domain_is_refused_while_the_plan_is_paused(): void {

@@ -107,6 +107,9 @@ final class MailDomains {
 		$child = Resource::create( $license, Registry::get( MailDriver::ID ), $limits, array_merge( $meta, array( MailDomain::META_DOMAIN => $name ) ) );
 
 		if ( is_wp_error( $child ) ) {
+			// No active license without a service.
+			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
+
 			return $child;
 		}
 
@@ -149,14 +152,36 @@ final class MailDomains {
 			return new \WP_Error( 'not_active', __( 'You can remove a domain when the plan is active again.', 'beltoft-services' ) );
 		}
 
-		$boxes = in_array( 'domain', (array) $child->get( 'steps' ), true ) ? MailPlan::mailboxes_of( $child ) : 0;
+		$result = null;
+		$ran    = $root->locked(
+			static function () use ( $child, &$result ): bool {
+				$result = self::remove_locked( $child );
 
-		if ( is_wp_error( $boxes ) ) {
-			$boxes = (int) $child->get( 'mail_boxes' ); // The mail server cannot be asked: what was last seen.
-		}
+				return true;
+			}
+		);
 
-		if ( $boxes > 0 ) {
-			return new \WP_Error( 'has_mailboxes', __( 'Delete the mailboxes of this domain first.', 'beltoft-services' ) );
+		return null === $ran || null === $result ? new \WP_Error( 'busy', __( 'The domain could not be removed. Try again in a moment.', 'beltoft-services' ) ) : $result;
+	}
+
+	/**
+	 * The checks and the desire to delete, under the lock of the root. Fails closed: what cannot be read is not empty.
+	 *
+	 * @param Resource $child The extra domain.
+	 * @return true|\WP_Error
+	 */
+	private static function remove_locked( Resource $child ) {
+		if ( in_array( 'domain', (array) $child->get( 'steps' ), true ) ) {
+			$boxes   = MailPlan::mailboxes_of( $child );
+			$aliases = is_wp_error( $boxes ) ? $boxes : Aliases::all( $child );
+
+			if ( is_wp_error( $aliases ) ) {
+				return new \WP_Error( 'unavailable', __( 'Try again in a moment.', 'beltoft-services' ) );
+			}
+
+			if ( $boxes > 0 || count( $aliases ) > 0 ) {
+				return new \WP_Error( 'has_mailboxes', __( 'Delete the mailboxes of this domain first.', 'beltoft-services' ) );
+			}
 		}
 
 		if ( ! $child->desire( 'deleted', 'The domain was removed from the email plan' ) ) {
