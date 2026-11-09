@@ -69,13 +69,7 @@ register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsClaimJo
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\DnsReleaseJob::class, 'unschedule' ) );
 
 // Translations: the plugin's own .mo files in /languages (the site's language packs in wp-content/languages load first).
-add_action(
-	'init',
-	static function () {
-		load_plugin_textdomain( 'beltoft-services', false, dirname( plugin_basename( BELTOFT_SERVICES_FILE ) ) . '/languages' );
-	},
-	1
-);
+add_action( 'init', array( \BeltoftServices\Plugin::class, 'load_textdomain' ), 1 );
 
 // After beltoft-licenses (priority 10), so its classes and hooks exist.
 add_action( 'plugins_loaded', array( \BeltoftServices\Plugin::class, 'boot' ), 20 );

@@ -28,10 +28,19 @@ defined( 'ABSPATH' ) || exit;
 final class Catalog {
 
 	public const TAGS = array(
-		'beltoft_usage_line'   => 'Pay as you go: hourly price and monthly cap as one line',
-		'beltoft_usage_hourly' => 'Pay as you go: price per hour',
-		'beltoft_usage_cap'    => 'Pay as you go: monthly cap',
+		'beltoft_usage_line' => 'beltoft_usage_line',
+		'beltoft_usage_hourly' => 'beltoft_usage_hourly',
+		'beltoft_usage_cap' => 'beltoft_usage_cap',
 	);
+
+	/** Tag name => translated label. */
+	private static function labels(): array {
+		return array(
+			'beltoft_usage_line' => __( 'Pay as you go: hourly price and monthly cap as one line', 'beltoft-services' ),
+			'beltoft_usage_hourly' => __( 'Pay as you go: price per hour', 'beltoft-services' ),
+			'beltoft_usage_cap' => __( 'Pay as you go: monthly cap', 'beltoft-services' ),
+		);
+	}
 
 	/**
 	 * Hooks.
@@ -96,7 +105,7 @@ final class Catalog {
 			return $tags;
 		}
 
-		foreach ( self::TAGS as $name => $label ) {
+		foreach ( self::labels() as $name => $label ) {
 			$tags[] = array(
 				'name'  => '{' . $name . '}',
 				'label' => $label,

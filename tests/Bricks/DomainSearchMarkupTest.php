@@ -59,7 +59,7 @@ final class DomainSearchMarkupTest extends TestCase {
 		$js  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.css' );
 		$this->assertStringNotContainsString( "'Transfer domain'", $js );
-		$this->assertStringContainsString( "taken: 'Taken'", $js );
+		$this->assertStringContainsString( "taken: __('Taken', 'beltoft-services')", $js );
 		$this->assertStringContainsString( "item.status === 'free' && item.price", $js, 'A taken domain shows no price.' );
 		$this->assertStringContainsString( '.beltoft-domain-result--taken', $css );
 		$this->assertStringContainsString( 'initTransfer', $js );

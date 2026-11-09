@@ -242,6 +242,13 @@ final class Plugin {
 	}
 
 	/**
+	 * Loads the plugin's translations (init, so the front end and the admin both have them).
+	 */
+	public static function load_textdomain(): void {
+		load_plugin_textdomain( 'beltoft-services', false, dirname( plugin_basename( BELTOFT_SERVICES_FILE ) ) . '/languages' );
+	}
+
+	/**
 	 * Whether every dependency is present.
 	 */
 	public static function requirements_met(): bool {

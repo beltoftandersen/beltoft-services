@@ -27,18 +27,35 @@ final class DomainQuery {
 
 	/** Tag name => label. */
 	public const TAGS = array(
-		'bds_domain'        => 'Domain',
-		'bds_tld'           => 'Extension',
-		'bds_status'        => 'Status (available, taken, unknown)',
-		'bds_status_text'   => 'Status as a sentence',
-		'bds_row_class'     => 'Class of the main result (add it to the row)',
-		'bds_available'     => 'Available (1 or 0)',
-		'bds_price'         => 'Price per year',
-		'bds_renewal_price' => 'Renewal price',
-		'bds_add_url'       => 'Add to order link',
-		'bds_search_term'   => 'Search term',
-		'bds_error'         => 'Search error message',
+		'bds_domain' => 'bds_domain',
+		'bds_tld' => 'bds_tld',
+		'bds_status' => 'bds_status',
+		'bds_status_text' => 'bds_status_text',
+		'bds_row_class' => 'bds_row_class',
+		'bds_available' => 'bds_available',
+		'bds_price' => 'bds_price',
+		'bds_renewal_price' => 'bds_renewal_price',
+		'bds_add_url' => 'bds_add_url',
+		'bds_search_term' => 'bds_search_term',
+		'bds_error' => 'bds_error',
 	);
+
+	/** Tag name => translated label. */
+	private static function labels(): array {
+		return array(
+			'bds_domain' => __( 'Domain', 'beltoft-services' ),
+			'bds_tld' => __( 'Extension', 'beltoft-services' ),
+			'bds_status' => __( 'Status (available, taken, unknown)', 'beltoft-services' ),
+			'bds_status_text' => __( 'Status as a sentence', 'beltoft-services' ),
+			'bds_row_class' => __( 'Class of the main result (add it to the row)', 'beltoft-services' ),
+			'bds_available' => __( 'Available (1 or 0)', 'beltoft-services' ),
+			'bds_price' => __( 'Price per year', 'beltoft-services' ),
+			'bds_renewal_price' => __( 'Renewal price', 'beltoft-services' ),
+			'bds_add_url' => __( 'Add to order link', 'beltoft-services' ),
+			'bds_search_term' => __( 'Search term', 'beltoft-services' ),
+			'bds_error' => __( 'Search error message', 'beltoft-services' ),
+		);
+	}
 
 	/**
 	 * The last search of this request: term, rows and error.
@@ -181,7 +198,7 @@ final class DomainQuery {
 
 	public static function tags_list( $tags ) {
 		$tags = is_array( $tags ) ? $tags : array();
-		foreach ( self::TAGS as $name => $label ) {
+		foreach ( self::labels() as $name => $label ) {
 			$tags[] = array( 'name' => '{' . $name . '}', 'label' => $label, 'group' => esc_html__( 'Domain search', 'beltoft-services' ) );
 		}
 		return $tags;
