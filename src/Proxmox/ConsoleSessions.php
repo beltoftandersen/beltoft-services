@@ -23,9 +23,7 @@ final class ConsoleSessions {
 	}
 
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::PURGE, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), '*/5 * * * *', self::PURGE, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::PURGE, '*/5 * * * *' );
 	}
 
 	/** Fingerprint the request's trusted peer address without storing it. */

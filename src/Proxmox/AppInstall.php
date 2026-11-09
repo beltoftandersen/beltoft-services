@@ -92,13 +92,7 @@ final class AppInstall {
 	}
 
 	public static function schedule( int $id, int $delay = 0 ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-		$waiting = as_get_scheduled_actions( array( 'hook' => self::HOOK, 'args' => array( $id ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-		if ( ! $waiting ) {
-			as_schedule_single_action( time() + $delay, self::HOOK, array( $id ), Jobs::GROUP );
-		}
+		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
 	/** Run one bounded attempt under the resource lock; app failures never affect server state. */

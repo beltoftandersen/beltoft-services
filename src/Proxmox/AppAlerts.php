@@ -4,7 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
+use BeltoftServices\Alerts;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -17,14 +17,22 @@ final class AppAlerts {
 		if ( $hash === $r->get( 'app_alerted' ) ) {
 			return;
 		}
-		$to = (string) Settings::get( 'admin_email' );
-		if ( ! is_email( $to ) ) {
-			return;
+		$valid = '' !== Alerts::address();
+		Alerts::notify(
+			sprintf( 'App installation failed for server %d', $r->id() ),
+			array(
+				sprintf( 'Server resource: %d', $r->id() ),
+				sprintf( 'App: %s', (string) $r->get( 'app_id' ) ),
+				sprintf( 'Version: %s', (string) $r->get( 'app_version' ) ),
+				sprintf( 'Reason: %s', $reason ),
+			),
+			$r,
+			'',
+			array( 'prefix' => false )
+		);
+		if ( $valid ) {
+			$r->set( array( 'app_alerted' => $hash ) );
 		}
-		$subject = sprintf( 'App installation failed for server %d', $r->id() );
-		$body = sprintf( "Server resource: %d\nApp: %s\nVersion: %s\nReason: %s\n", $r->id(), (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ), $reason );
-		wp_mail( $to, $subject, $body );
-		$r->set( array( 'app_alerted' => $hash ) );
 	}
 
 	/** The customer asked for a domain and it was dropped: the app goes on the server address. One mail per server. */
@@ -32,22 +40,37 @@ final class AppAlerts {
 		if ( '' !== (string) $r->get( 'app_domain_alerted' ) ) {
 			return;
 		}
-		$to = (string) Settings::get( 'admin_email' );
-		if ( ! is_email( $to ) ) {
-			return;
+		$valid = '' !== Alerts::address();
+		Alerts::notify(
+			sprintf( 'App domain dropped for server %d', $r->id() ),
+			array(
+				sprintf( 'Server resource: %d', $r->id() ),
+				sprintf( 'App: %s', (string) $r->get( 'app_id' ) ),
+				sprintf( 'Domain: %s', $domain ),
+				sprintf( 'Reason: %s', $reason ),
+				'The app is installed on the server address instead.',
+			),
+			$r,
+			'',
+			array( 'prefix' => false )
+		);
+		if ( $valid ) {
+			$r->set( array( 'app_domain_alerted' => '1' ) );
 		}
-		$subject = sprintf( 'App domain dropped for server %d', $r->id() );
-		$body = sprintf( "Server resource: %d\nApp: %s\nDomain: %s\nReason: %s\nThe app is installed on the server address instead.\n", $r->id(), (string) $r->get( 'app_id' ), $domain, $reason );
-		wp_mail( $to, $subject, $body );
-		$r->set( array( 'app_domain_alerted' => '1' ) );
 	}
 
 	/** A record we made could not be checked or removed after all retries. Tell an admin once. */
 	public static function domain_release_failed( Resource $r, string $domain, string $reason ): void {
-		$to = (string) Settings::get( 'admin_email' );
-		if ( ! is_email( $to ) ) {
-			return;
-		}
-		wp_mail( $to, sprintf( 'App DNS record removal failed for server %d', $r->id() ), sprintf( "Server resource: %d\nDomain: %s\nReason: %s\n", $r->id(), $domain, $reason ) );
+		Alerts::notify(
+			sprintf( 'App DNS record removal failed for server %d', $r->id() ),
+			array(
+				sprintf( 'Server resource: %d', $r->id() ),
+				sprintf( 'Domain: %s', $domain ),
+				sprintf( 'Reason: %s', $reason ),
+			),
+			$r,
+			'',
+			array( 'prefix' => false )
+		);
 	}
 }

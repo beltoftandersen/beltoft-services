@@ -34,13 +34,7 @@ final class AppStatus {
 	}
 
 	public static function schedule( int $id, int $delay ): void {
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$waiting = as_get_scheduled_actions( array( 'hook' => self::HOOK, 'args' => array( $id ), 'group' => \BeltoftServices\Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-			if ( $waiting ) {
-				return;
-			}
-			as_schedule_single_action( time() + $delay, self::HOOK, array( $id ), \BeltoftServices\Jobs::GROUP );
-		}
+		\BeltoftServices\Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
 	/** Recover a lost poll after an interrupted worker. */

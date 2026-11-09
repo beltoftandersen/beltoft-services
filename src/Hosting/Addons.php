@@ -47,6 +47,7 @@ final class Addons {
 	/** An unpaid add-on order is cancelled after this many seconds. */
 	public const STALE_AFTER = 2 * DAY_IN_SECONDS;
 	public const SWEEP_HOOK  = 'beltoft_services_addon_sweep';
+	public const SWEEP_CRON  = '30 3 * * *';
 
 	/** One later attempt at an order whose activation lock was busy (the holder may stop half way). */
 	public const ACTIVATE_RETRY_HOOK = 'beltoft_services_addon_activate_retry';
@@ -76,9 +77,27 @@ final class Addons {
 		add_action( 'woocommerce_subscriptions_switch_completed', array( __CLASS__, 'after_switch' ), 20 );
 		add_action( self::SWEEP_HOOK, array( __CLASS__, 'cancel_stale' ) );
 		add_action( self::ACTIVATE_RETRY_HOOK, array( __CLASS__, 'activate' ) );
+		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+	}
 
-		if ( function_exists( 'wp_next_scheduled' ) && ! wp_next_scheduled( self::SWEEP_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::SWEEP_HOOK );
+	/**
+	 * Schedules the daily sweep in Action Scheduler, once. The sweep used to be a WP-Cron event of the same hook: that
+	 * event is removed here so the sweep does not run twice.
+	 */
+	public static function schedule(): void {
+		if ( false !== wp_next_scheduled( self::SWEEP_HOOK ) ) {
+			wp_clear_scheduled_hook( self::SWEEP_HOOK );
+		}
+
+		Jobs::ensure_cron( self::SWEEP_HOOK, self::SWEEP_CRON, array(), HOUR_IN_SECONDS );
+	}
+
+	/**
+	 * Removes the sweep (plugin deactivation).
+	 */
+	public static function unschedule(): void {
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( self::SWEEP_HOOK, array(), Jobs::GROUP );
 		}
 	}
 
@@ -381,11 +400,7 @@ final class Addons {
 	 * @param string $body    Body.
 	 */
 	public static function alert( string $subject, string $body ): void {
-		$to = (string) \BeltoftServices\Settings::get( 'admin_email' );
-
-		if ( is_email( $to ) ) {
-			wp_mail( $to, '[' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) . '] ' . $subject, $body );
-		}
+		\BeltoftServices\Alerts::notify( $subject, array( $body ), null, '', array( 'newline' => false ) );
 	}
 
 	/**
@@ -623,8 +638,8 @@ final class Addons {
 			);
 
 			// Another process holds the order. If it stops half way nothing would call this again, so look once more later.
-			if ( ! $taken && function_exists( 'as_schedule_single_action' ) && ! Jobs::pending_action( self::ACTIVATE_RETRY_HOOK, array( $id ) ) ) {
-				as_schedule_single_action( time() + 120, self::ACTIVATE_RETRY_HOOK, array( $id ), Jobs::GROUP );
+			if ( ! $taken ) {
+				Jobs::schedule_once( time() + 120, self::ACTIVATE_RETRY_HOOK, array( $id ) );
 			}
 		} finally {
 			unset( $busy[ $id ] );

@@ -184,9 +184,7 @@ final class MailDomains {
 			}
 
 			if ( time() + self::RETRY_AFTER <= $until && function_exists( 'as_schedule_single_action' ) ) {
-				if ( ! \BeltoftServices\Jobs::pending_action( self::RETRY_HOOK, array( $r->id() ) ) ) {
-					as_schedule_single_action( time() + self::RETRY_AFTER, self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
-				}
+				\BeltoftServices\Jobs::schedule_once( time() + self::RETRY_AFTER, self::RETRY_HOOK, array( $r->id() ) );
 			} else {
 				$r->set( array( self::ATTACH_DONE => 'refused' ) );
 				$first = true;

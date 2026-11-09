@@ -2,6 +2,7 @@
 /** Registrar funds and DNS health checks. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,9 +19,8 @@ final class Health {
 		if ( $balance < (float) Settings::get( 'domain_low_balance', 50 ) ) {
 			$today = gmdate( 'Y-m-d' );
 			if ( $today !== get_option( self::LOW_ALERT, '' ) ) {
-				$to = (string) Settings::get( 'admin_email' );
-				if ( is_email( $to ) ) {
-					wp_mail( $to, __( 'Domain registrar balance is low', 'beltoft-services' ), sprintf( 'Registrar balance: %.2f EUR', $balance ) );
+				if ( '' !== Alerts::address() ) {
+					Alerts::notify( __( 'Domain registrar balance is low', 'beltoft-services' ), array( sprintf( 'Registrar balance: %.2f EUR', $balance ) ), null, '', array( 'prefix' => false, 'newline' => false ) );
 					update_option( self::LOW_ALERT, $today, false );
 				}
 			}
@@ -89,8 +89,10 @@ final class Health {
 			$today = gmdate( 'Y-m-d' );
 			$hash = md5( implode( "\n", $issues ) . $today );
 			if ( $hash !== get_option( self::DNS_ORPHAN_ALERT, '' ) ) {
-				$to = (string) Settings::get( 'admin_email' );
-				if ( is_email( $to ) ) { wp_mail( $to, __( 'Domain DNS health needs attention', 'beltoft-services' ), implode( "\n", $issues ) ); update_option( self::DNS_ORPHAN_ALERT, $hash, false ); }
+				if ( '' !== Alerts::address() ) {
+					Alerts::notify( __( 'Domain DNS health needs attention', 'beltoft-services' ), $issues, null, '', array( 'prefix' => false, 'newline' => false ) );
+					update_option( self::DNS_ORPHAN_ALERT, $hash, false );
+				}
 			}
 		}
 		return $issues;
