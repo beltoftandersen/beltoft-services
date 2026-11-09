@@ -419,4 +419,31 @@ final class MailDomainsTest extends MailTestCase {
 		$this->assertFalse( as_next_scheduled_action( MailDomains::RETRY_HOOK, array( $r->id() ), 'beltoft-services' ) );
 		unset( $order );
 	}
+
+	public function test_the_plan_lock_is_taken_before_the_lock_of_a_domain(): void {
+		global $wpdb;
+		$user  = self::factory()->user->create();
+		$root  = $this->ready_mail( 'root.example', array(), $user );
+		$child = MailDomains::add( $root, 'two.example' );
+		$this->assertInstanceOf( Resource::class, $child );
+
+		$taken = array();
+		$spy   = static function ( $sql ) use ( &$taken ) {
+			if ( preg_match( '/GET_LOCK\(\s*\'([^\']+)\'/', (string) $sql, $m ) ) {
+				$taken[] = $m[1];
+			}
+			return $sql;
+		};
+		add_filter( 'query', $spy );
+		$ran = MailPlan::locked( $child, static fn(): bool => true );
+		remove_filter( 'query', $spy );
+
+		$this->assertTrue( $ran );
+		$this->assertSame(
+			array( \BeltoftServices\Locks::name( 'resource', $root->id() ), \BeltoftServices\Locks::name( 'resource', $child->id() ) ),
+			array_slice( $taken, 0, 2 ),
+			'The root first, like removing a domain and the plan job do.'
+		);
+		unset( $wpdb );
+	}
 }

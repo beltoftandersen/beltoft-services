@@ -503,6 +503,7 @@ final class MailDriver implements Driver, NeedsBilling {
 
 	/**
 	 * A plan root hands its plan to every live extra domain, each of which raises its own limits like any mail resource.
+	 * The root's lock is held by the job, then each child's is taken: the order of MailPlan::locked().
 	 *
 	 * @param Resource $r Resource.
 	 */

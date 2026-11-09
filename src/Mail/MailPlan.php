@@ -198,8 +198,9 @@ final class MailPlan {
 	}
 
 	/**
-	 * Runs a callback under the lock of the resource and, for a child, under the lock of the plan root too, so two
-	 * domains of one plan cannot pass the limit together. The root lock is always taken second.
+	 * Runs a callback under the lock of the plan root and, for a child, under the lock of the child too, so two domains
+	 * of one plan cannot pass the limit together. Lock order everywhere in the mail code: the plan root first, then a
+	 * child (removing a domain and the plan job work the same way), so two runs never wait for each other.
 	 *
 	 * @param Resource $r        Resource.
 	 * @param callable $callback Returns whether it stored something.
@@ -213,9 +214,9 @@ final class MailPlan {
 		}
 
 		$busy = false;
-		$ran  = $r->locked(
-			static function () use ( $root, $callback, &$busy ): bool {
-				$inner = $root->locked( $callback );
+		$ran  = $root->locked(
+			static function () use ( $r, $callback, &$busy ): bool {
+				$inner = $r->locked( $callback );
 				$busy  = null === $inner;
 
 				return (bool) $inner;
