@@ -76,7 +76,7 @@
 			case 'add_domain':
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
 			case 'add_pack':
-				return window.confirm( button.getAttribute( 'data-confirm' ) || '' ) ? [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: true } ] : null;
+				return window.confirm( button.getAttribute( 'data-confirm' ) || '' ) ? [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: parseInt( button.getAttribute( 'data-cents' ) || '0', 10 ) } ] : null;
 			case 'remove_pack':
 				return window.confirm( text.confirmPack || '' ) ? [ 'DELETE', base + '/addons?target=' + encodeURIComponent( button.getAttribute( 'data-mailbox' ) || '' ), undefined ] : null;
 			case 'enable_mail':
@@ -106,6 +106,8 @@
 	function pay( panel, bought, next ) {
 		if ( bought.ok && bought.data && 'paid' === bought.data.status ) {
 			next();
+		} else if ( bought.ok && bought.data && 'pending' === bought.data.status ) {
+			say( panel, bought.data.message || '' );
 		} else if ( bought.ok && bought.data && bought.data.pay_url ) {
 			window.location.href = bought.data.pay_url;
 		} else {
@@ -150,7 +152,7 @@
 			// An extra domain is a paid add-on: show the price, and when it is accepted buy it and add the domain again.
 			if ( ! result.ok && 402 === result.status && 'add_domain' === action && result.data && 'beltoft_services_hosting_addon_required' === result.data.code ) {
 				if ( window.confirm( result.data.message || '' ) ) {
-					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: result.data.target, confirm: true } ).then( function ( bought ) {
+					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: result.data.target, confirm: result.data.amount_cents } ).then( function ( bought ) {
 						button.disabled = false;
 						pay( panel, bought, function () {
 							button.click();
@@ -161,6 +163,12 @@
 					say( panel, '' );
 				}
 
+				return;
+			}
+
+			if ( result.ok && result.data && 'pending' === result.data.status ) {
+				button.disabled = false;
+				say( panel, result.data.message || '' );
 				return;
 			}
 

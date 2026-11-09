@@ -404,7 +404,7 @@ final class HostingActions {
 				return $this->error( 'failed', __( 'Your account has its domain. Another domain cannot be added online right now. Contact support.', 'beltoft-services' ) );
 			}
 
-			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs ) );
+			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
 		}
 
 		$added = SiteDns::add_domain( $this->r, $slug, $host, $this->node );
@@ -440,7 +440,8 @@ final class HostingActions {
 	/**
 	 * Removes a domain from a website (the preview name stays).
 	 *
-	 * @param string $host Domain name.
+	 * @param string $host  Domain name.
+	 * @param bool   $final True when its paid add-on has ended (the renewal): the names go now, whatever the line says.
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function remove_domain( string $host, bool $final = false ) {
@@ -501,11 +502,11 @@ final class HostingActions {
 	 *
 	 * @param string $kind    domain or mail_pack.
 	 * @param string $target  The domain name, or the mailbox address.
-	 * @param bool   $confirm The customer confirmed the price.
+	 * @param int    $confirm_cents The amount charged now that the customer saw and accepted, in cents; 0 when not confirmed.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function buy_addon( string $kind, string $target, bool $confirm ) {
-		return $this->locked( fn() => $this->buy_addon_locked( $kind, $target, $confirm ) );
+	public function buy_addon( string $kind, string $target, int $confirm_cents ) {
+		return $this->locked( fn() => $this->buy_addon_locked( $kind, $target, $confirm_cents ) );
 	}
 
 	/**
@@ -513,10 +514,10 @@ final class HostingActions {
 	 *
 	 * @param string $kind    Kind.
 	 * @param string $target  Target.
-	 * @param bool   $confirm Confirmed.
+	 * @param int    $confirm_cents Accepted amount in cents.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function buy_addon_locked( string $kind, string $target, bool $confirm ) {
+	private function buy_addon_locked( string $kind, string $target, int $confirm_cents ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -545,8 +546,9 @@ final class HostingActions {
 			return $this->error( 'failed', __( 'This add-on cannot be bought online right now. Contact support.', 'beltoft-services' ) );
 		}
 
-		if ( ! $confirm ) {
-			return new \WP_Error( 'confirm', Addons::confirm_text( $kind, $quote ), array( 'kind' => $kind, 'target' => $target ) );
+		// Nothing is bought unless the customer accepted this very amount: a price that changed since is shown again.
+		if ( $confirm_cents <= 0 || $confirm_cents !== (int) round( $quote['now'] * 100 ) ) {
+			return new \WP_Error( 'confirm', Addons::confirm_text( $kind, $quote ), array( 'kind' => $kind, 'target' => $target, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
 		}
 
 		$bought = Addons::buy( $this->r, $kind, $target );

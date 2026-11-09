@@ -232,10 +232,10 @@ class AddonsTest extends HostingCase {
 		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
 
 		// Not confirmed: nothing is bought. Confirmed: paid, then the domain can be added.
-		$ask = $a->buy_addon( 'domain', 'www.other.example', false );
+		$ask = $a->buy_addon( 'domain', 'www.other.example', 0 );
 		$this->assertSame( 'confirm', $ask->get_error_code() );
 		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
-		$done = $a->buy_addon( 'domain', 'www.other.example', true );
+		$done = $a->buy_addon( 'domain', 'www.other.example', 100 );
 		$this->assertSame( 'paid', $done['status'] );
 		$this->assertIsArray( $a->add_domain( $s, 'www.other.example' ) );
 		$this->assertIsArray( $a->add_domain( $s, 'shop.other.example' ), 'The same registrable domain is paid once.' );
@@ -265,17 +265,17 @@ class AddonsTest extends HostingCase {
 		$mb    = static fn( $m ) => (int) round( (int) $m['quota'] / 1048576 );
 
 		$this->assertSame( 1024, $mb( $this->mailcow->mailbox( 'info@mail.customer.example' ) ) );
-		$this->assertSame( 'not_found', $a->buy_addon( 'mail_pack', 'nobody@mail.customer.example', true )->get_error_code() );
+		$this->assertSame( 'not_found', $a->buy_addon( 'mail_pack', 'nobody@mail.customer.example', 100 )->get_error_code() );
 
-		$this->assertSame( 'paid', $a->buy_addon( 'mail_pack', 'info@mail.customer.example', true )['status'] );
+		$this->assertSame( 'paid', $a->buy_addon( 'mail_pack', 'info@mail.customer.example', 100 )['status'] );
 		$this->assertSame( 1024 + 5120, $mb( $this->mailcow->mailbox( 'info@mail.customer.example' ) ) );
 		$this->assertSame( (string) ( 1024 + 5120 ), $this->mailcow->domain( 'mail.customer.example' )['maxquota'] );
 
 		for ( $i = 2; $i <= 4; $i++ ) {
-			$this->assertSame( 'paid', $a->buy_addon( 'mail_pack', 'info@mail.customer.example', true )['status'] );
+			$this->assertSame( 'paid', $a->buy_addon( 'mail_pack', 'info@mail.customer.example', 100 )['status'] );
 		}
 		$this->assertSame( 1024 + 4 * 5120, $mb( $this->mailcow->mailbox( 'info@mail.customer.example' ) ), '+20 GB at most.' );
-		$this->assertSame( 'limit', $a->buy_addon( 'mail_pack', 'info@mail.customer.example', true )->get_error_code() );
+		$this->assertSame( 'limit', $a->buy_addon( 'mail_pack', 'info@mail.customer.example', 100 )->get_error_code() );
 
 		// Removing one pack changes nothing until the renewal, then the size is lowered by 5 GB.
 		$this->assertTrue( $a->remove_pack( 'info@mail.customer.example' )['at_renewal'] );
@@ -303,5 +303,149 @@ class AddonsTest extends HostingCase {
 		$this->assertStringContainsString( 'up to 4 packs', $html );
 		$this->assertStringNotContainsString( 'remove_pack', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
+	}
+
+	public function test_a_declined_card_leaves_no_line_and_a_second_buy_reuses_the_open_order(): void {
+		add_action( 'woocommerce_scheduled_subscription_payment_bacs', static fn( $amount, $order ) => $order->update_status( 'failed' ), 10, 2 );
+		$r = $this->account();
+
+		$first = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		$this->assertSame( 'pay', $first['status'] );
+		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
+
+		$again = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		$this->assertSame( $first['order'], $again['order'], 'The open order is offered again, not doubled.' );
+		$this->assertCount( 1, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
+
+		wc_get_order( $first['order'] )->payment_complete();
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ), 'Paid by the link: one line.' );
+		$this->assertSame( 'exists', Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' )->get_error_code(), 'A target with a line is not bought twice.' );
+	}
+
+	public function test_a_payment_in_process_is_not_a_paid_add_on(): void {
+		add_action( 'woocommerce_scheduled_subscription_payment_bacs', static fn( $amount, $order ) => $order->update_status( 'on-hold' ), 10, 2 );
+		$r   = $this->account();
+		$out = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+
+		$this->assertSame( 'pending', $out['status'] );
+		$this->assertSame( 'Your payment is being processed.', $out['message'] );
+		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
+	}
+
+	public function test_a_paid_order_for_a_target_that_has_a_line_is_not_added_twice_and_alerts_the_owner(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$mails = array();
+		add_filter( 'wp_mail', static function ( $args ) use ( &$mails ) {
+			if ( str_contains( (string) $args['subject'], 'Add-on payment needs a look' ) ) {
+				$mails[] = $args;
+			}
+			return $args;
+		} );
+		$r = $this->account();
+
+		$one = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		wc_get_order( $one['order'] )->payment_complete();
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ) );
+
+		// A second order for the same domain is paid anyway (made another way, or in parallel).
+		$meta = wc_get_order( $one['order'] )->get_meta( Addons::ORDER_META );
+		$dup  = wc_create_order( array( 'customer_id' => (int) $r->license()['user_id'], 'created_via' => 'beltoft_services_addon' ) );
+		$dup->update_meta_data( Addons::ORDER_META, $meta );
+		$dup->set_total( '1.00' );
+		$dup->save();
+		$dup->payment_complete();
+
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ), 'Not added twice.' );
+		$this->assertSame( 'refused', wc_get_order( $dup->get_id() )->get_meta( Addons::ORDER_DONE ), 'Kept on record, never dropped silently.' );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'duplicate', $mails[0]['message'] );
+		remove_all_filters( 'wp_mail' );
+	}
+
+	public function test_an_order_paid_after_its_quoted_renewal_is_refused_and_stale_orders_are_cancelled(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$mails = array();
+		add_filter( 'wp_mail', static function ( $args ) use ( &$mails ) {
+			if ( str_contains( (string) $args['subject'], 'Add-on payment needs a look' ) ) {
+				$mails[] = $args;
+			}
+			return $args;
+		} );
+		$r   = $this->account();
+		$one = Addons::buy( $r, Addons::KIND_DOMAIN, 'late.example' );
+		$o   = wc_get_order( $one['order'] );
+		$m   = $o->get_meta( Addons::ORDER_META );
+		$m['next'] = time() - 60;
+		$o->update_meta_data( Addons::ORDER_META, $m );
+		$o->save();
+		$o->payment_complete();
+
+		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
+		$this->assertSame( 'refused', wc_get_order( $o->get_id() )->get_meta( Addons::ORDER_DONE ) );
+		$this->assertCount( 1, $mails );
+
+		$old = Addons::buy( $r, Addons::KIND_DOMAIN, 'old.example' );
+		$oo  = wc_get_order( $old['order'] );
+		$oo->set_date_created( time() - 3 * DAY_IN_SECONDS );
+		$oo->save();
+		Addons::cancel_stale();
+		$this->assertSame( 'cancelled', wc_get_order( $old['order'] )->get_status() );
+		remove_all_filters( 'wp_mail' );
+	}
+
+	public function test_the_vat_position_of_the_subscription_decides_the_tax_of_the_one_off_order(): void {
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		\WC_Tax::_insert_tax_rate( array( 'tax_rate_country' => '', 'tax_rate_state' => '', 'tax_rate' => '25.0000', 'tax_rate_name' => 'VAT', 'tax_rate_priority' => 1, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 1, 'tax_rate_order' => 1, 'tax_rate_class' => '' ) );
+
+		$normal = $this->account();
+		$this->sub( $normal )->set_billing_country( 'DK' );
+		$this->sub( $normal )->save();
+		$a = Addons::buy( $normal, Addons::KIND_DOMAIN, 'taxed.example' );
+		$this->assertSame( 1.25, $a['total'], 'Charged like the hosting product: with VAT.' );
+
+		$exempt = $this->account();
+		$sub    = $this->sub( $exempt );
+		$sub->set_billing_country( 'DE' );
+		$sub->update_meta_data( 'is_vat_exempt', 'yes' );
+		$sub->update_meta_data( '_billing_eu_vat_number', 'DE123456789' );
+		$sub->save();
+		$b = Addons::buy( $exempt, Addons::KIND_DOMAIN, 'exempt.example' );
+		$this->assertSame( 1.0, $b['total'], 'No VAT for an exempt customer.' );
+		$this->assertSame( 'DE123456789', wc_get_order( $b['order'] )->get_meta( '_billing_eu_vat_number' ) );
+		delete_option( 'woocommerce_calc_taxes' );
+	}
+
+	public function test_a_refunded_order_ends_its_line_and_the_confirmed_amount_must_match(): void {
+		$this->card_pays();
+		$r   = $this->account();
+		$a   = new HostingActions( Resource::find( $r->id() ) );
+		$this->connect_domain( $r, 'main.example' );
+
+		$stale = $a->buy_addon( 'domain', 'www.other.example', 999 );
+		$this->assertSame( 'confirm', $stale->get_error_code(), 'The accepted amount differs from the price now.' );
+		$this->assertSame( 100, $stale->get_error_data()['amount_cents'] );
+		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
+
+		$ok = $a->buy_addon( 'domain', 'www.other.example', 100 );
+		$this->assertSame( 'paid', $ok['status'] );
+		wc_get_order( $ok['order'] )->update_status( 'refunded' );
+		$lines = Addons::lines( $r, Addons::KIND_DOMAIN );
+		$line  = reset( $lines );
+		$this->assertSame( 'yes', (string) $line->get_meta( Addons::I_ENDING ), 'Ends at once, leaves at the renewal.' );
+		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ), 'The line is still there until the renewal.' );
+	}
+
+	public function test_a_plan_switch_to_another_period_reprices_the_add_on_lines_and_keeps_them(): void {
+		$this->card_pays();
+		$r = $this->account();
+		Addons::buy( $r, Addons::KIND_DOMAIN, 'keep.example' );
+		$sub = $this->sub( $r );
+		$sub->set_billing_period( 'year' );
+		$sub->save();
+
+		Addons::resync_prices( $sub );
+		$lines = Addons::lines( $r, Addons::KIND_DOMAIN );
+		$this->assertCount( 1, $lines, 'Kept through the switch.' );
+		$this->assertSame( 12.0, (float) reset( $lines )->get_total(), 'EUR 12 for a yearly period now.' );
 	}
 }

@@ -330,7 +330,7 @@ final class HostingAccount {
 			}
 
 			if ( $n < Addons::MAX_PACKS ) {
-				echo ' <button type="button" data-hosting-action="add_pack" data-mailbox="' . esc_attr( $email ) . '" data-confirm="' . esc_attr( $confirm ) . '">' . esc_html__( 'Add 5 GB', 'beltoft-services' ) . '</button>';
+				echo ' <button type="button" data-hosting-action="add_pack" data-mailbox="' . esc_attr( $email ) . '" data-confirm="' . esc_attr( $confirm ) . '" data-cents="' . (int) round( $quote['now'] * 100 ) . '">' . esc_html__( 'Add 5 GB', 'beltoft-services' ) . '</button>';
 			}
 
 			if ( $n - $ending > 0 ) {

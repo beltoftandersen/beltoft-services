@@ -38,6 +38,11 @@ final class Addons {
 	public const I_RESOURCE  = '_beltoft_services_addon_resource';
 	public const I_TARGET    = '_beltoft_services_addon_target';
 	public const I_ENDING    = '_beltoft_services_addon_ending';
+	public const I_ORDER     = '_beltoft_services_addon_order_id';
+
+	/** An unpaid add-on order is cancelled after this many seconds. */
+	public const STALE_AFTER = 2 * DAY_IN_SECONDS;
+	public const SWEEP_HOOK  = 'beltoft_services_addon_sweep';
 
 	/** Storage of one pack, MB, and the most packs one mailbox can have. */
 	public const PACK_MB   = 5120;
@@ -51,6 +56,14 @@ final class Addons {
 		add_action( 'woocommerce_order_status_processing', array( __CLASS__, 'activate' ), 20 );
 		add_action( 'woocommerce_order_status_completed', array( __CLASS__, 'activate' ), 20 );
 		add_filter( 'wcs_renewal_order_created', array( __CLASS__, 'at_renewal' ), 20, 2 );
+		add_action( 'woocommerce_order_status_refunded', array( __CLASS__, 'reverse' ), 20 );
+		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'reverse' ), 20 );
+		add_action( 'woocommerce_subscriptions_switch_completed', array( __CLASS__, 'after_switch' ), 20 );
+		add_action( self::SWEEP_HOOK, array( __CLASS__, 'cancel_stale' ) );
+
+		if ( function_exists( 'wp_next_scheduled' ) && ! wp_next_scheduled( self::SWEEP_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::SWEEP_HOOK );
+		}
 	}
 
 	/**
@@ -268,14 +281,69 @@ final class Addons {
 	}
 
 	/**
+	 * Mails the shop owner about a payment that needs a person (never silent).
+	 *
+	 * @param string $subject Subject.
+	 * @param string $body    Body.
+	 */
+	public static function alert( string $subject, string $body ): void {
+		$to = (string) \BeltoftServices\Settings::get( 'admin_email' );
+
+		if ( is_email( $to ) ) {
+			wp_mail( $to, '[' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) . '] ' . $subject, $body );
+		}
+	}
+
+	/**
+	 * An unpaid add-on order of the same account and target that is still fresh.
+	 *
+	 * @param Resource $r      Hosting resource.
+	 * @param string   $kind   Kind.
+	 * @param string   $target Target.
+	 */
+	private static function pending_order( Resource $r, string $kind, string $target ): ?\WC_Order {
+		$sub = self::subscription( $r );
+
+		foreach ( $sub ? wc_get_orders( array( 'limit' => -1, 'customer_id' => (int) $sub->get_customer_id(), 'created_via' => 'beltoft_services_addon', 'status' => array( 'pending', 'on-hold', 'failed' ) ) ) : array() as $order ) {
+			$meta = $order->get_meta( self::ORDER_META );
+
+			if ( is_array( $meta ) && (int) ( $meta['resource'] ?? 0 ) === $r->id() && $kind === ( $meta['kind'] ?? '' ) && $target === ( $meta['target'] ?? '' ) && time() - (int) $order->get_date_created()->getTimestamp() < self::STALE_AFTER ) {
+				return $order;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * The result of a purchase for the customer: paid, still being processed, or an order to pay.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @return array{status: string, order: int, total: float, pay_url: string, message: string}
+	 */
+	private static function outcome( \WC_Order $order ): array {
+		$paid = $order->has_status( array( 'processing', 'completed' ) );
+		$hold = $order->has_status( 'on-hold' );
+
+		return array(
+			'status'  => $paid ? 'paid' : ( $hold ? 'pending' : 'pay' ),
+			'order'   => $order->get_id(),
+			'total'   => (float) $order->get_total(),
+			'pay_url' => $paid || $hold ? '' : $order->get_checkout_payment_url(),
+			'message' => $hold ? __( 'Your payment is being processed.', 'beltoft-services' ) : '',
+		);
+	}
+
+	/**
 	 * Starts buying an add-on: the one-off order for the time until the renewal, paid with the saved card or through
-	 * the pay-for-order link. The line is added when the order is paid.
+	 * the pay-for-order link. The line is added when the order is paid. An unpaid order for the same target is reused,
+	 * never doubled.
 	 *
 	 * @param Resource $r      Hosting resource.
 	 * @param string   $kind   Kind.
 	 * @param string   $target Registrable domain, or mailbox address.
 	 * @param int|null $now    Time (tests).
-	 * @return array{status: string, order: int, total: float, pay_url: string}|\WP_Error status is paid or pay.
+	 * @return array{status: string, order: int, total: float, pay_url: string, message: string}|\WP_Error status is paid, pending or pay.
 	 */
 	public static function buy( Resource $r, string $kind, string $target, ?int $now = null ) {
 		$sub     = self::subscription( $r );
@@ -294,6 +362,13 @@ final class Addons {
 			return new \WP_Error( 'exists', __( 'This domain is paid for already.', 'beltoft-services' ) );
 		}
 
+		self::cancel_stale();
+		$open = self::pending_order( $r, $kind, $target );
+
+		if ( $open ) {
+			return self::outcome( $open );
+		}
+
 		$order = wc_create_order( array( 'customer_id' => (int) $sub->get_customer_id(), 'created_via' => 'beltoft_services_addon' ) );
 
 		if ( is_wp_error( $order ) ) {
@@ -302,6 +377,17 @@ final class Addons {
 
 		$order->set_currency( $sub->get_currency() );
 		$order->set_address( $sub->get_address( 'billing' ), 'billing' );
+		$order->set_address( $sub->get_address( 'shipping' ), 'shipping' );
+
+		// The VAT position of the subscription (an exempt customer with a VAT number) is the order's too, before the totals.
+		foreach ( array( 'is_vat_exempt', '_billing_eu_vat_number' ) as $key ) {
+			$value = (string) $sub->get_meta( $key, true );
+
+			if ( '' !== $value ) {
+				$order->update_meta_data( $key, $value );
+			}
+		}
+
 		$order->add_product(
 			$product,
 			1,
@@ -318,6 +404,7 @@ final class Addons {
 				'kind'     => $kind,
 				'target'   => $target,
 				'period'   => $quote['period'],
+				'next'     => (int) $sub->get_time( 'next_payment' ),
 			)
 		);
 		$order->calculate_totals( true );
@@ -329,15 +416,22 @@ final class Addons {
 			\WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook( $order );
 		}
 
-		$order = wc_get_order( $order->get_id() );
-		$paid  = $order instanceof \WC_Order && ! $order->needs_payment();
+		return self::outcome( wc_get_order( $order->get_id() ) );
+	}
 
-		return array(
-			'status'  => $paid ? 'paid' : 'pay',
-			'order'   => $order->get_id(),
-			'total'   => (float) $order->get_total(),
-			'pay_url' => $paid ? '' : $order->get_checkout_payment_url(),
-		);
+	/**
+	 * Cancels the unpaid add-on orders that have waited longer than the quote holds.
+	 */
+	public static function cancel_stale(): void {
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return;
+		}
+
+		foreach ( wc_get_orders( array( 'limit' => 50, 'created_via' => 'beltoft_services_addon', 'status' => array( 'pending', 'failed' ), 'date_created' => '<' . ( time() - self::STALE_AFTER ) ) ) as $order ) {
+			if ( '' === (string) $order->get_meta( self::ORDER_DONE ) ) {
+				$order->update_status( 'cancelled', 'The add-on order was not paid in time.' );
+			}
+		}
 	}
 
 	/**
@@ -346,42 +440,147 @@ final class Addons {
 	 * @param int|string $order_id Order id.
 	 */
 	public static function activate( $order_id ): void {
+		static $busy = array();
+
 		$order = wc_get_order( (int) $order_id );
 		$meta  = $order instanceof \WC_Order ? $order->get_meta( self::ORDER_META ) : null;
 
-		if ( ! is_array( $meta ) || '' !== (string) $order->get_meta( self::ORDER_DONE ) || $order->needs_payment() ) {
+		if ( ! is_array( $meta ) || '' !== (string) $order->get_meta( self::ORDER_DONE ) || isset( $busy[ $order->get_id() ] ) || ! $order->has_status( array( 'processing', 'completed' ) ) ) {
 			return;
 		}
 
+		$busy[ $order->get_id() ] = true;
+
+		try {
+			self::add_line( $order, $meta );
+		} finally {
+			unset( $busy[ $order->get_id() ] );
+		}
+	}
+
+	/**
+	 * Adds the line of a paid order, or says why it was not added (a paid order is never dropped without a trace).
+	 *
+	 * @param \WC_Order            $order Paid order.
+	 * @param array<string, mixed> $meta  Order meta of the add-on.
+	 */
+	private static function add_line( \WC_Order $order, array $meta ): void {
 		$r       = Resource::find( (int) ( $meta['resource'] ?? 0 ) );
 		$sub     = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $meta['sub'] ?? 0 ) ) : null;
-		$product = self::product( (string) ( $meta['kind'] ?? '' ) );
+		$kind    = (string) ( $meta['kind'] ?? '' );
+		$target  = (string) ( $meta['target'] ?? '' );
+		$product = self::product( $kind );
+		$problem = '';
 
 		if ( ! $r || ! $sub instanceof \WC_Subscription || null === $product ) {
-			$order->add_order_note( 'The add-on was paid but could not be added to the subscription. Check it.' );
+			$problem = 'the account, its subscription or the add-on product is gone';
+		} elseif ( (int) ( $meta['next'] ?? 0 ) > 0 && time() > (int) $meta['next'] ) {
+			$problem = 'it was paid after the renewal date it was quoted for, so the charge does not match the period';
+		} elseif ( self::KIND_DOMAIN === $kind && self::has( $r, $kind, $target ) ) {
+			$problem = 'the domain already has an add-on line (a duplicate payment)';
+		} elseif ( self::KIND_PACK === $kind && count( self::lines( $r, $kind, $target ) ) >= self::MAX_PACKS ) {
+			$problem = 'the mailbox already has the most packs (a duplicate payment)';
+		}
 
+		if ( '' === $problem ) {
+			$price = (string) round( (float) wc_get_price_excluding_tax( $product ) * (int) ( $meta['period'] ?? 1 ), 2 );
+			$id    = $sub->add_product( $product, 1, array( 'subtotal' => $price, 'total' => $price ) );
+			$item  = $id ? $sub->get_item( (int) $id ) : null;
+
+			if ( $item instanceof \WC_Order_Item_Product ) {
+				$item->update_meta_data( self::I_KIND, $kind );
+				$item->update_meta_data( self::I_RESOURCE, (string) $r->id() );
+				$item->update_meta_data( self::I_TARGET, $target );
+				$item->update_meta_data( self::I_ORDER, (string) $order->get_id() );
+				$item->save();
+				$sub->calculate_totals();
+				$sub->add_order_note( sprintf( 'Add-on %1$s (%2$s) added after order #%3$d was paid.', $kind, $target, $order->get_id() ) );
+				$sub->save();
+				$order->update_meta_data( self::ORDER_DONE, gmdate( 'c' ) );
+				$order->save();
+				self::apply( $r );
+
+				return;
+			}
+
+			$problem = 'the line could not be saved on the subscription';
+		}
+
+		$order->update_meta_data( self::ORDER_DONE, 'refused' );
+		$order->add_order_note( 'Paid add-on order, but no line was added: ' . $problem . '. Check it and refund if needed.' );
+		$order->save();
+		self::alert( 'Add-on payment needs a look', sprintf( "Order #%1\$d (%2\$s, %3\$s) was paid but no line was added: %4\$s.\n\nCheck the order and refund it if needed.", $order->get_id(), $kind, $target, $problem ) );
+	}
+
+	/**
+	 * A one-off add-on order that was refunded or cancelled after its line was added: the line ends at once (it leaves
+	 * at the next renewal like a normal removal).
+	 *
+	 * @param int|string $order_id Order id.
+	 */
+	public static function reverse( $order_id ): void {
+		$order = wc_get_order( (int) $order_id );
+		$meta  = $order instanceof \WC_Order ? $order->get_meta( self::ORDER_META ) : null;
+
+		if ( ! is_array( $meta ) || '' === (string) $order->get_meta( self::ORDER_DONE ) || 'refused' === (string) $order->get_meta( self::ORDER_DONE ) ) {
 			return;
 		}
 
-		$order->update_meta_data( self::ORDER_DONE, gmdate( 'c' ) );
-		$order->save();
+		$r   = Resource::find( (int) ( $meta['resource'] ?? 0 ) );
+		$sub = $r ? self::subscription( $r ) : null;
 
-		$price = (string) round( (float) wc_get_price_excluding_tax( $product ) * (int) ( $meta['period'] ?? 1 ), 2 );
-		$id    = $sub->add_product( $product, 1, array( 'subtotal' => $price, 'total' => $price ) );
-		$item  = $id ? $sub->get_item( (int) $id ) : null;
+		foreach ( $r ? self::lines( $r, (string) $meta['kind'], (string) $meta['target'] ) : array() as $item ) {
+			if ( (string) $order->get_id() === (string) $item->get_meta( self::I_ORDER ) && '' === (string) $item->get_meta( self::I_ENDING ) ) {
+				$item->update_meta_data( self::I_ENDING, 'yes' );
+				$item->save();
 
-		if ( $item instanceof \WC_Order_Item_Product ) {
-			$item->update_meta_data( self::I_KIND, (string) $meta['kind'] );
-			$item->update_meta_data( self::I_RESOURCE, (string) $r->id() );
-			$item->update_meta_data( self::I_TARGET, (string) $meta['target'] );
-			$item->save();
+				if ( $sub ) {
+					$sub->add_order_note( sprintf( 'Add-on %1$s (%2$s) ends at the next renewal: order #%3$d was refunded or cancelled.', (string) $meta['kind'], (string) $meta['target'], $order->get_id() ) );
+				}
+			}
+		}
+	}
+
+	/**
+	 * After a plan switch the billing period may have changed: the add-on lines bill the price for the new period.
+	 *
+	 * @param mixed $order Switch order.
+	 */
+	public static function after_switch( $order ): void {
+		if ( function_exists( 'wcs_get_subscriptions_for_switch_order' ) && $order instanceof \WC_Order ) {
+			foreach ( wcs_get_subscriptions_for_switch_order( $order ) as $sub ) {
+				self::resync_prices( $sub );
+			}
+		}
+	}
+
+	/**
+	 * Sets each add-on line of a subscription to the unit price times the months of its billing period.
+	 *
+	 * @param \WC_Subscription $sub Subscription.
+	 */
+	public static function resync_prices( \WC_Subscription $sub ): void {
+		$changed = false;
+
+		foreach ( $sub->get_items() as $item ) {
+			$product = $item instanceof \WC_Order_Item_Product && '' !== (string) $item->get_meta( self::I_KIND ) ? self::product( (string) $item->get_meta( self::I_KIND ) ) : null;
+
+			if ( $product ) {
+				$price = (string) round( (float) wc_get_price_excluding_tax( $product ) * self::period_months( $sub ), 2 );
+
+				if ( (float) $item->get_total() !== (float) $price ) {
+					$item->set_subtotal( $price );
+					$item->set_total( $price );
+					$item->save();
+					$changed = true;
+				}
+			}
 		}
 
-		$sub->calculate_totals();
-		$sub->add_order_note( sprintf( 'Add-on %1$s (%2$s) added after order #%3$d was paid.', (string) $meta['kind'], (string) $meta['target'], $order->get_id() ) );
-		$sub->save();
-
-		self::apply( $r );
+		if ( $changed ) {
+			$sub->calculate_totals();
+			$sub->save();
+		}
 	}
 
 	/**
