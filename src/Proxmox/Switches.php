@@ -7,9 +7,8 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
-use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -52,24 +51,15 @@ final class Switches {
 			$target = Product::plan( (int) $product_id, (int) $variation_id > 0 ? (int) $variation_id : null );
 			$target_driver = Product::driver_for( (int) $product_id );
 			if ( $target_driver && DiskDriver::ID === $target_driver->id() ) {
-				$item_product = ( is_object( $item ) && method_exists( $item, 'get_product_id' ) ) ? (int) $item->get_product_id() : 0;
-				$found = false;
-				foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
-					if ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) {
-						continue;
-					}
-					$disk = Resource::for_license( (int) $license['id'] );
-					if ( ! $disk || DiskDriver::ID !== $disk->get( 'driver' ) ) {
-						continue;
-					}
-					$found = true;
+				$disks = SwitchGuard::resources( (int) $subscription->get_id(), $item, DiskDriver::ID );
+				foreach ( $disks as $disk ) {
 					$plan = (array) $disk->get( 'plan' );
 					$have = max( (int) ( $plan['disk_gb'] ?? 0 ), (int) $disk->get( 'size_gb' ) );
 					if ( $have > (int) ( $target['disk_gb'] ?? 0 ) ) {
 						return __( "Disks can't be made smaller. Choose a size at least as large as your current disk.", 'beltoft-services' );
 					}
 				}
-				return $found ? $message : __( 'The disk for this subscription could not be found.', 'beltoft-services' );
+				return array() !== $disks ? $message : __( 'The disk for this subscription could not be found.', 'beltoft-services' );
 			}
 
 			if ( $target_driver && DbDriver::ID === $target_driver->id() ) {
@@ -80,24 +70,13 @@ final class Switches {
 				return $message;
 			}
 
-			$item_product = ( is_object( $item ) && method_exists( $item, 'get_product_id' ) ) ? (int) $item->get_product_id() : 0;
-			$have         = array(
+			$have = array(
 				'disk_gb'   => 0,
 				'cores'     => 0,
 				'memory_mb' => 0,
 			);
 
-			foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
-				if ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) {
-					continue;
-				}
-
-				$resource = Resource::for_license( (int) $license['id'] );
-
-				if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
-					continue;
-				}
-
+			foreach ( SwitchGuard::resources( (int) $subscription->get_id(), $item, ProxmoxDriver::ID ) as $resource ) {
 				$plan              = (array) $resource->get( 'plan' );
 				$have['disk_gb']   = max( $have['disk_gb'], (int) ( $plan['disk_gb'] ?? 0 ), (int) $resource->get( 'disk_gb' ) );
 				$have['cores']     = max( $have['cores'], (int) ( $plan['cores'] ?? 0 ) );

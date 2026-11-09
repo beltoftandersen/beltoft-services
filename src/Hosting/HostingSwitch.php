@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -49,20 +49,9 @@ final class HostingSwitch {
 		}
 
 		try {
-			$target       = Plan::typed( Product::plan( (int) $product_id, (int) $variation_id > 0 ? (int) $variation_id : null ) );
-			$item_product = ( is_object( $item ) && method_exists( $item, 'get_product_id' ) ) ? (int) $item->get_product_id() : 0;
+			$target = Plan::typed( Product::plan( (int) $product_id, (int) $variation_id > 0 ? (int) $variation_id : null ) );
 
-			foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
-				if ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) {
-					continue;
-				}
-
-				$resource = Resource::for_license( (int) $license['id'] );
-
-				if ( ! $resource || HostingDriver::ID !== $resource->get( 'driver' ) ) {
-					continue;
-				}
-
+			foreach ( SwitchGuard::resources( (int) $subscription->get_id(), $item, HostingDriver::ID ) as $resource ) {
 				$refusal = self::refusal( $resource, $target );
 
 				if ( null !== $refusal ) {

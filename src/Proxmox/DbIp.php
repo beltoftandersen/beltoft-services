@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
@@ -158,16 +158,8 @@ final class DbIp {
 			return '';
 		}
 
-		$item_product = is_object( $item ) && method_exists( $item, 'get_product_id' ) ? (int) $item->get_product_id() : 0;
-
-		foreach ( Licenses::where( 'subscription_id', $subscription_id ) as $license ) {
-			if ( ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) || (int) ( $license['product_id'] ?? 0 ) !== $product_id ) {
-				continue;
-			}
-
-			$resource = Resource::for_license( (int) $license['id'] );
-
-			if ( $resource && DbDriver::ID === $resource->get( 'driver' ) && null === IpPool::for_resource( $resource->id() ) && 0 === IpPool::available_for_db() ) {
+		foreach ( SwitchGuard::resources( $subscription_id, $item, DbDriver::ID, $product_id ) as $resource ) {
+			if ( null === IpPool::for_resource( $resource->id() ) && 0 === IpPool::available_for_db() ) {
 				return __( 'No public IP address is available right now. Please try again later.', 'beltoft-services' );
 			}
 		}
