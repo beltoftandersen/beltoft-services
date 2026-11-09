@@ -12,6 +12,7 @@
 	var account = window.beltoftServicesAccount;
 	var config = window.beltoftHosting || { strings: {} };
 	var text = config.strings || {};
+	var S = window.beltoftStatus;
 
 	if ( ! account || ! window.fetch ) {
 		return;
@@ -55,6 +56,19 @@
 		} );
 	}
 
+	// A request that waits for the customer's answer in the account area's own dialog (window.beltoftStatus.confirm).
+	function ask( question, button, request, danger ) {
+		return { ask: question, label: button.textContent, danger: danger, request: request };
+	}
+
+	function confirmed( question, label, danger ) {
+		if ( S && S.confirm ) {
+			return S.confirm( { text: question, confirm: label, danger: danger } );
+		}
+
+		return Promise.resolve( window.confirm( question ) );
+	}
+
 	// The request for each action: [ method, path, body ] or null when the input is not complete.
 	function plan( panel, button, id ) {
 		var base = id + '/hosting';
@@ -76,9 +90,9 @@
 			case 'add_domain':
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
 			case 'add_pack':
-				return window.confirm( button.getAttribute( 'data-confirm' ) || '' ) ? [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: parseInt( button.getAttribute( 'data-cents' ) || '0', 10 ) } ] : null;
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: parseInt( button.getAttribute( 'data-cents' ) || '0', 10 ) } ], false );
 			case 'remove_pack':
-				return window.confirm( text.confirmPack || '' ) ? [ 'DELETE', base + '/addons?target=' + encodeURIComponent( button.getAttribute( 'data-mailbox' ) || '' ), undefined ] : null;
+				return ask( text.confirmPack || '', button, [ 'DELETE', base + '/addons?target=' + encodeURIComponent( button.getAttribute( 'data-mailbox' ) || '' ), undefined ], true );
 			case 'enable_mail':
 				return [ 'POST', base + '/mail', { domain: field( panel, 'mail_domain' ) } ];
 			case 'backup_now':
@@ -86,13 +100,9 @@
 			case 'restore':
 				var scope = button.getAttribute( 'data-scope' ) || '';
 
-				if ( ! window.confirm( text.confirmRestore || '' ) ) {
-					return null;
-				}
-
-				return [ 'POST', base + '/backups/restore', { scope: scope, volid: button.getAttribute( 'data-volid' ) || '', slug: field( panel, 'restore_slug' ) } ];
+				return ask( text.confirmRestore || '', button, [ 'POST', base + '/backups/restore', { scope: scope, volid: button.getAttribute( 'data-volid' ) || '', slug: field( panel, 'restore_slug' ) } ], false );
 			case 'undo':
-				return window.confirm( text.confirmUndo || '' ) ? [ 'POST', base + '/backups/undo', {} ] : null;
+				return ask( text.confirmUndo || '', button, [ 'POST', base + '/backups/undo', {} ], false );
 			case 'check_item':
 				return [ 'POST', base + '/checklist', { item: button.getAttribute( 'data-item' ) || '' } ];
 			case 'dismiss_checklist':
@@ -131,6 +141,21 @@
 			return;
 		}
 
+		if ( request.ask ) {
+			var next = request.request;
+
+			confirmed( request.ask, request.label, request.danger ).then( function ( yes ) {
+				if ( yes ) {
+					run( panel, button, id, action, next );
+				}
+			} );
+			return;
+		}
+
+		run( panel, button, id, action, request );
+	} );
+
+	function run( panel, button, id, action, request ) {
 		button.disabled = true;
 		say( panel, 'login' === action ? ( text.opening || '' ) : ( text.working || '' ) );
 
@@ -151,17 +176,24 @@
 
 			// An extra domain is a paid add-on: show the price, and when it is accepted buy it and add the domain again.
 			if ( ! result.ok && 402 === result.status && 'add_domain' === action && result.data && 'beltoft_services_hosting_addon_required' === result.data.code ) {
-				if ( window.confirm( result.data.message || '' ) ) {
-					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: result.data.target, confirm: result.data.amount_cents } ).then( function ( bought ) {
+				// WordPress nests the data of an error response one level down: result.data.data.
+				var offer = result.data.data || {};
+
+				say( panel, '' );
+				confirmed( result.data.message || '', text.buy || '', false ).then( function ( yes ) {
+					if ( ! yes ) {
+						say( panel, '' );
+						return;
+					}
+
+					button.disabled = true;
+					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: offer.target, confirm: offer.amount_cents } ).then( function ( bought ) {
 						button.disabled = false;
 						pay( panel, bought, function () {
 							button.click();
 						} );
 					} );
-				} else {
-					button.disabled = false;
-					say( panel, '' );
-				}
+				} );
 
 				return;
 			}
@@ -209,5 +241,5 @@
 
 			say( panel, text.failed || '' );
 		} );
-	} );
+	}
 }() );

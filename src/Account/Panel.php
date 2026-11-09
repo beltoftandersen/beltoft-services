@@ -75,7 +75,7 @@ final class Panel {
 			return __( 'Suspended', 'beltoft-services' );
 		}
 
-		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
+		if ( $r && ( ( 'failed' === $state && Emails::delay_applies( $r ) ) || Emails::delay_running( $r ) ) ) {
 			return __( 'Delayed', 'beltoft-services' );
 		}
 
@@ -143,7 +143,7 @@ final class Panel {
 		}
 
 		// A server that could not be set up: a delay, never what went wrong.
-		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
+		if ( $r && ( ( 'failed' === $state && Emails::delay_applies( $r ) ) || Emails::delay_running( $r ) ) ) {
 			return __( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
 		}
 

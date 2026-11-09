@@ -55,6 +55,7 @@ final class SiteField {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
+		add_action( 'woocommerce_created_customer', array( __CLASS__, 'customer_made' ), 5 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
 	}
@@ -335,19 +336,53 @@ final class SiteField {
 	}
 
 	/**
-	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
-	 * first is used. The name is only the temporary address, so the customer is not asked for it.
+	 * A guest's account was made at the checkout: the names the guest's cart holds are the new customer's now.
 	 *
+	 * @param mixed $customer_id New customer id.
+	 */
+	public static function customer_made( $customer_id ): void {
+		if ( (int) $customer_id > 0 ) {
+			Sites::rekey_holds( self::owner( 0 ), self::owner( (int) $customer_id ) );
+		}
+	}
+
+	/**
+	 * The name a domain gives before any number is added: example.com is example-com.
+	 *
+	 * @param string $domain Domain.
+	 */
+	public static function slug_base( string $domain ): string {
+		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
+		$base = trim( substr( $base, 0, 28 ), '-' );
+
+		return '' === $base ? 'site' : $base;
+	}
+
+	/**
+	 * Is the name one that was made from the website's title (a domain order), so the customer never chose it? Then it
+	 * is an internal name and the account page shows the title only.
+	 *
+	 * @param string $slug  Name of the site.
+	 * @param string $label Title of the site.
+	 */
+	public static function slug_is_made( string $slug, string $label ): bool {
+		if ( '' === $label ) {
+			return false;
+		}
+
+		$base = self::slug_base( $label );
+
+		return $slug === $base || 1 === preg_match( '/^' . preg_quote( $base, '/' ) . '-[0-9]{1,2}$/', $slug );
+	}
+
+	/**
+	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
+	 * first is used. The name is only the temporary address, so the customer is not asked for it.	 *
 	 * @param string $domain Domain.
 	 * @param string $owner  Who holds the name (see owner()).
 	 */
 	private static function free_slug( string $domain, string $owner ): string {
-		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
-		$base = trim( substr( $base, 0, 28 ), '-' );
-
-		if ( '' === $base ) {
-			$base = 'site';
-		}
+		$base = self::slug_base( $domain );
 
 		for ( $n = 1; $n <= 50; $n++ ) {
 			$slug = 1 === $n ? $base : $base . '-' . $n;

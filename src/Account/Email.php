@@ -78,8 +78,9 @@ final class Email extends ServiceArea {
 	}
 
 	/**
-	 * An extra domain of an email plan is a child license without a service product: it belongs here too. The hidden
-	 * mail of a hosting plan is a child of the hosting, not of an email plan, and stays out.
+	 * An extra domain of an email plan is a child license without a service product: it belongs here too, and so does
+	 * the Email lite domain of a hosting account (a child of the hosting). Grouping it here is also what keeps its
+	 * licence out of the Licenses tab as a key of its own.
 	 *
 	 * {@inheritDoc}
 	 *
@@ -96,7 +97,7 @@ final class Email extends ServiceArea {
 
 		$r = Resource::for_license( (int) $license['id'] );
 
-		return $r && MailDriver::ID === $r->get( 'driver' ) && MailPlan::root( $r )->id() !== $r->id();
+		return $r && MailDriver::ID === $r->get( 'driver' );
 	}
 
 	/**
@@ -266,11 +267,19 @@ final class Email extends ServiceArea {
 			'id'      => $resource->id(),
 			'url'     => $this->url( $view['license'] ),
 			'name'    => '' !== MailGuard::domain( $resource ) ? \BeltoftServices\Domains\HostName::display( MailGuard::domain( $resource ) ) : (string) ( $view['product'] ?? '' ),
-			'details' => sprintf(
-				/* translators: 1: mailboxes in use across the whole plan, 2: mailboxes the plan allows */
-				_n( '%1$d of %2$d mailbox', '%1$d of %2$d mailboxes', $limits['mailboxes'], 'beltoft-services' ),
-				MailPlan::cached( $root )['mailboxes'],
-				$limits['mailboxes']
+			'details' => implode(
+				', ',
+				array_filter(
+					array(
+						sprintf(
+							/* translators: 1: mailboxes in use across the whole plan, 2: mailboxes the plan allows */
+							_n( '%1$d of %2$d mailbox', '%1$d of %2$d mailboxes', $limits['mailboxes'], 'beltoft-services' ),
+							MailPlan::cached( $root )['mailboxes'],
+							$limits['mailboxes']
+						),
+						\BeltoftServices\Hosting\HostingAccount::included_label( $resource ),
+					)
+				)
 			),
 			'state'   => $state,
 			'tone'    => $tone,

@@ -463,6 +463,24 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( 'site_slug', SiteField::resolve( array( 'mode' => 'preview' ), 0 )->get_error_code() );
 	}
 
+	public function test_a_guest_hold_moves_to_the_customer_the_checkout_makes_and_to_nobody_else(): void {
+		$guest = SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), 0 );
+		$this->assertSame( 'ux-shop-example-com', $guest['slug'] );
+
+		// Another signed-in customer does not take the guest's hold.
+		$stranger = $this->factory()->user->create();
+		$this->assertSame( 'ux-shop-example-com-2', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $stranger )['slug'] );
+
+		// The checkout makes an account of that guest: the guest's holds become theirs.
+		$user = $this->factory()->user->create();
+		do_action( 'woocommerce_created_customer', $user, array(), false );
+		$this->assertSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $user )['slug'] );
+
+		// And it is theirs alone from then on.
+		$other = $this->factory()->user->create();
+		$this->assertNotSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $other )['slug'] );
+	}
+
 	public function test_each_address_option_posts_its_own_inputs(): void {
 		$key = $this->in_cart( $this->product() );
 		$this->post( $key, array( 'mode' => 'own', 'host' => 'posted.example.com', 'slug' => 'ignored', 'slug_domain' => '' ) );
