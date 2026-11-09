@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Domains\PublicSuffix;
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
@@ -103,10 +104,8 @@ final class Addons {
 		// The renewal, resubscribe and switch carts of WooCommerce Subscriptions legitimately carry the lines.
 		$data = is_array( $data ) ? $data : array();
 
-		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
-			if ( ! empty( $data[ $key ] ) ) {
-				return true;
-			}
+		if ( CartFlow::has_value( $data, CartFlow::BOUGHT_BEFORE ) ) {
+			return true;
 		}
 
 		wc_add_notice( __( 'Extra domains and mailbox storage are bought from your hosting account page.', 'beltoft-services' ), 'error' );

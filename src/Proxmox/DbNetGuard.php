@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -77,7 +78,7 @@ final class DbNetGuard {
 		$cart = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
 
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) || isset( $item['subscription_resubscribe'] ) || isset( $item['subscription_renewal_early'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::ALL ) ) {
 				continue;
 			}
 

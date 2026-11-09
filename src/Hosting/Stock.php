@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,8 +20,6 @@ defined( 'ABSPATH' ) || exit;
  * resubscribe is never blocked.
  */
 final class Stock {
-
-	private const CART_KEYS = array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe', 'subscription_renewal_early' );
 
 	/**
 	 * Product and variation id of the item being added now when it belongs to a WooCommerce Subscriptions flow.
@@ -131,13 +130,7 @@ final class Stock {
 	 * @param array<string, mixed> $data Cart item data or session values.
 	 */
 	private static function has_flow_key( array $data ): bool {
-		foreach ( self::CART_KEYS as $key ) {
-			if ( isset( $data[ $key ] ) ) {
-				return true;
-			}
-		}
-
-		return false;
+		return CartFlow::has( $data, CartFlow::ALL );
 	}
 
 	/**
@@ -200,10 +193,8 @@ final class Stock {
 
 			$same = in_array( $product->get_id(), array( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) ), true );
 
-			foreach ( self::CART_KEYS as $key ) {
-				if ( $same && isset( $item[ $key ] ) ) {
-					return true;
-				}
+			if ( $same && CartFlow::has( $item, CartFlow::ALL ) ) {
+				return true;
 			}
 		}
 

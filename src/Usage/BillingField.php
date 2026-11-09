@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Proxmox\Backups;
@@ -72,7 +73,7 @@ final class BillingField {
 
 		$server = self::cart_server();
 
-		if ( null === $server || $server['usage'] || isset( $server['item']['subscription_resubscribe'] ) ) {
+		if ( null === $server || $server['usage'] || CartFlow::is_resubscribe( $server['item'] ) ) {
 			return;
 		}
 

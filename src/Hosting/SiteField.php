@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Mail\MailField;
@@ -86,7 +87,7 @@ final class SiteField {
 
 		foreach ( $cart->get_cart() as $key => $item ) {
 			// A renewal or a switch pays for an account that exists.
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 

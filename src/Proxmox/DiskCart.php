@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -55,12 +56,7 @@ final class DiskCart {
 
 	/** A renewal, resubscribe or switch cart: the line was bought before. */
 	public static function flow( array $data ): bool {
-		foreach ( array( 'subscription_renewal', 'subscription_renewal_early', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
-			if ( ! empty( $data[ $key ] ) ) {
-				return true;
-			}
-		}
-		return false;
+		return CartFlow::has_value( $data, CartFlow::ALL );
 	}
 
 	/** Confirm WCS is switching this customer's existing disk line. */
