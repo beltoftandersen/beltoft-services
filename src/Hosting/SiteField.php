@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Mail\MailField;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -33,6 +34,10 @@ final class SiteField {
 	public const MODE_PREVIEW = 'preview';
 	public const MODE_OURS    = 'ours';
 	public const MODE_OWN     = 'own';
+	public const MODE_NEW     = 'new';
+
+	/** Days the site waits for a domain registered or transferred in the same order. */
+	public const WAIT_DAYS = 7;
 
 	/** Every value an account can carry (an earlier order may hold `empty`). */
 	public const INSTALLS = array( 'wordpress', 'woocommerce', 'empty' );
@@ -112,13 +117,26 @@ final class SiteField {
 	public static function resolve( array $input, int $user_id ) {
 		$mode = '' === (string) ( $input['mode'] ?? '' ) ? self::MODE_PREVIEW : (string) $input['mode'];
 
-		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) ) {
+		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, self::MODE_NEW ), true ) ) {
 			return new \WP_Error( 'site_mode', __( 'Choose how the website is reached: a temporary address, a domain in your account, or a domain you have elsewhere.', 'beltoft-services' ) );
 		}
 
 		$domain = '';
 
-		if ( self::MODE_PREVIEW !== $mode ) {
+		if ( self::MODE_NEW === $mode ) {
+			// Only a domain this cart registers or transfers: the name is checked against the cart, never taken from the form alone.
+			$host = HostName::normalise( (string) ( $input['host'] ?? '' ) );
+
+			if ( null === $host || ! in_array( $host, MailField::cart_domains(), true ) ) {
+				return new \WP_Error( 'site_new', __( 'Choose a domain that is part of this order.', 'beltoft-services' ) );
+			}
+
+			if ( null !== SiteDomains::find( $host ) ) {
+				return new \WP_Error( 'site_host', __( 'That domain is already used by a hosting account. Enter another domain.', 'beltoft-services' ) );
+			}
+
+			$domain = $host;
+		} elseif ( self::MODE_PREVIEW !== $mode ) {
 			$host = HostName::normalise( (string) ( $input['host'] ?? '' ) );
 
 			if ( null === $host || ! SiteDomains::valid_host( $host ) ) {
@@ -248,13 +266,17 @@ final class SiteField {
 		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
 		$out = array();
 
-		foreach ( array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'zone', 'install', 'language', 'email' ) as $field ) {
+		foreach ( array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'host_new', 'zone', 'install', 'language', 'email' ) as $field ) {
 			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
 		}
 
 		// Each mode has its own inputs; only the chosen mode's inputs count.
 		if ( '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ) {
 			$out['slug'] = $out['slug_domain'];
+		}
+
+		if ( self::MODE_NEW === $out['mode'] ) {
+			$out['host'] = $out['host_new'];
 		}
 
 		if ( self::MODE_OURS === $out['mode'] ) {
@@ -356,7 +378,9 @@ final class SiteField {
 		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::DEFAULT;
 		$zone = Config::preview_zone();
 
-		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) || ( self::MODE_OURS === $mode && ! $have ) ) {
+		$new = MailField::cart_domains();
+
+		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, self::MODE_NEW ), true ) || ( self::MODE_OURS === $mode && ! $have ) || ( self::MODE_NEW === $mode && array() === $new ) ) {
 			$mode = self::MODE_PREVIEW;
 		}
 
@@ -389,6 +413,20 @@ final class SiteField {
 
 			echo '</select></span></p>';
 			self::text_row( $name . '[host_ours]', $id . '_host_ours', __( 'Or a name inside it', 'beltoft-services' ), $post['host_ours'], false, __( 'For example www.mine.example. Leave empty to use the domain itself. We set up its DNS for you.', 'beltoft-services' ), 'url' );
+			echo '</div>';
+		}
+
+		if ( array() !== $new ) {
+			self::radio( $name, $id, self::MODE_NEW, $mode, __( 'A new domain in this order', 'beltoft-services' ) );
+			echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_NEW ) . '"' . ( self::MODE_NEW === $mode ? '' : ' hidden' ) . '>';
+			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_host_new">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[host_new]" id="' . esc_attr( $id ) . '_host_new">';
+
+			foreach ( $new as $one ) {
+				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['host_new'], $one, false ) . '>' . esc_html( HostName::display( $one ) ) . '</option>';
+			}
+
+			echo '</select></span></p>';
+			echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'The website starts on a temporary address and moves to this domain when its registration is finished.', 'beltoft-services' ) . '</p>';
 			echo '</div>';
 		}
 
@@ -593,8 +631,15 @@ final class SiteField {
 					'install_kind' => (string) ( $site['install'] ?? 'wordpress' ),
 					'language'    => (string) ( $site['language'] ?? 'en_US' ),
 					'admin_email' => (string) ( $site['admin_email'] ?? '' ),
-					'domain'      => (string) ( $site['domain'] ?? '' ),
+					'domain'      => self::MODE_NEW === ( $site['mode'] ?? '' ) ? '' : (string) ( $site['domain'] ?? '' ),
 				);
+
+				// A domain of the same order is attached when its registration is ready (SiteNewDomain), not at provisioning.
+				if ( self::MODE_NEW === ( $site['mode'] ?? '' ) && '' !== (string) ( $site['domain'] ?? '' ) ) {
+					$meta[ SiteNewDomain::META_DOMAIN ] = (string) $site['domain'];
+					$meta[ SiteNewDomain::META_UNTIL ]  = time() + self::WAIT_DAYS * DAY_IN_SECONDS;
+				}
+
 				break;
 			}
 		}
