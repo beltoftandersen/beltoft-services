@@ -36,7 +36,7 @@ final class MailWake {
 	public static function on_state_changed( $r, $old, $new ): void {
 		unset( $old );
 
-		if ( 'ready' !== $new || ! $r instanceof Resource || 'domain' !== $r->get( 'driver' ) ) {
+		if ( 'ready' !== $new || ! $r instanceof Resource || ! in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
 			return;
 		}
 

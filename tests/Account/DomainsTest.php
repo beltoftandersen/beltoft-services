@@ -503,5 +503,11 @@ class DomainsTest extends TestCase {
 		$active->set( array( 'steps' => array( 'owner', 'order', 'active' ) ) );
 		$this->assertTrue( DomainRows::registered( Resource::find( $failed->id() ) ) );
 		$this->assertSame( 'Registered and DNS with us', DomainRows::kind( Resource::find( $failed->id() ) ) );
+
+		foreach ( array( 'paused', 'deleting', 'deleted' ) as $state ) {
+			$other = $this->service( $this->user, $state . '.example' );
+			$other->set( array( 'state' => $state ) );
+			$this->assertTrue( DomainRows::registered( Resource::find( $other->id() ) ), $state );
+		}
 	}
 }

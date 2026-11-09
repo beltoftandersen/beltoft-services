@@ -17,17 +17,35 @@ final class IdnScript {
 
 	/** Letters that point to one language, most telling first. */
 	private const HINTS = array(
-		'DAN' => 'æøå',
+		'DAN' => 'æø',
+		'GER' => 'üß',
+		'SWE' => 'åäö',
 		'ICE' => 'ðþ',
-		'GER' => 'üößä',
-		'SPA' => 'ñ¿¡',
+		'SPA' => 'ñ',
 		'POR' => 'ãõ',
 		'FRE' => 'éèêëàâçùûîïôœ',
-		'SWE' => '',
+	);
+
+	/** Site language (first part of the locale) to tag, used when the letters themselves do not say. */
+	private const LOCALE = array(
+		'da' => 'DAN',
+		'sv' => 'SWE',
+		'de' => 'GER',
+		'is' => 'ICE',
+		'es' => 'SPA',
+		'pt' => 'POR',
+		'fr' => 'FRE',
+		'en' => 'ENG',
+		'fi' => 'FIN',
+		'nl' => 'DUT',
+		'it' => 'ITA',
+		'nb' => 'NOR',
+		'nn' => 'NOR',
 	);
 
 	/**
-	 * The tag for a stored (punycode) name; an empty string for a plain ASCII name.
+	 * The tag for a stored (punycode) name; an empty string for a plain ASCII name, for a name in a non-Latin script
+	 * (the registry answers for those) and when neither the letters nor the site language point to a tag.
 	 *
 	 * @param string $name Stored name, for example xn--blegrd-ux1109-2fb9y.com.
 	 */
@@ -36,11 +54,18 @@ final class IdnScript {
 			return '';
 		}
 		$unicode = mb_strtolower( HostName::display( $name ) );
-		$tag     = 'ENG';
-		foreach ( self::HINTS as $code => $letters ) {
-			if ( '' !== $letters && 1 === preg_match( '/[' . $letters . ']/u', $unicode ) ) {
-				$tag = $code;
-				break;
+		$tag     = '';
+		if ( 1 === preg_match( '/[^\p{Latin}\p{N}\p{P}\p{M}]/u', $unicode ) ) {
+			$tag = '';
+		} else {
+			foreach ( self::HINTS as $code => $letters ) {
+				if ( 1 === preg_match( '/[' . $letters . ']/u', $unicode ) ) {
+					$tag = $code;
+					break;
+				}
+			}
+			if ( '' === $tag ) {
+				$tag = self::LOCALE[ strtolower( substr( (string) determine_locale(), 0, 2 ) ) ] ?? '';
 			}
 		}
 		/**

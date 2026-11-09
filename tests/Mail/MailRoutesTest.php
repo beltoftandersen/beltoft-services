@@ -293,6 +293,15 @@ final class MailRoutesTest extends MailTestCase {
 		$this->assertSame( 409, $this->call( 'POST', $ready->id() . '/mail/proof/check', $owner )->get_status() );
 	}
 
+	public function test_check_now_is_refused_for_a_setup_that_is_not_waiting_for_proof_or_registration(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'failing.example', array(), array(), $user );
+		$r->set( array( 'state' => 'provisioning', 'op' => 'provision', 'attempts' => 2, 'next_attempt_at' => time() + 900 ) );
+		$response = $this->call( 'POST', $r->id() . '/mail/proof/check', $user );
+		$this->assertSame( 409, $response->get_status() );
+		$this->assertGreaterThan( time(), (int) Resource::find( $r->id() )->get( 'next_attempt_at' ), 'The backoff stays.' );
+	}
+
 	public function test_changes_are_counted_and_a_paused_service_is_refused(): void {
 		list( $r, $user ) = $this->domain();
 		$r->set( array( 'state' => 'paused' ) );

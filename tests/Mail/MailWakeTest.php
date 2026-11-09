@@ -67,4 +67,30 @@ final class MailWakeTest extends MailTestCase {
 		$this->run_jobs();
 		$this->assertSame( 'ready', Resource::find( $waiting->id() )->get( 'state' ) );
 	}
+
+	public function test_a_dns_only_zone_turning_ready_wakes_too(): void {
+		$user    = self::factory()->user->create();
+		$waiting = $this->waiting_mail( 'dnsonly.example', $user );
+		$product = $this->service_product( 'dns', array(), array( 'slug' => 'dns-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
+		$zone    = Resource::create( $license, new \BeltoftServices\Domains\DnsDriver(), array(), array( 'domain' => 'dnsonly.example', 'mode' => 'dns' ) );
+		MailWake::on_state_changed( $zone, 'provisioning', 'ready' );
+		$this->assertNotEmpty( Jobs::pending( $waiting->id() ) );
+	}
+
+	public function test_a_child_mail_resource_waiting_for_its_domain_wakes_too(): void {
+		$user = self::factory()->user->create();
+		$root = $this->ready_mail( 'root-wake.example', array(), $user );
+		$kid  = \BeltoftServices\Mail\MailDomains::add( $root, 'kid-wake.example' );
+		$this->assertInstanceOf( Resource::class, $kid );
+		$kid->set( array( 'state' => 'provisioning', 'op' => 'provision', 'attempts' => 1, 'next_attempt_at' => time() + 900, 'mail_wait_until' => time() + DAY_IN_SECONDS ) );
+		foreach ( Jobs::pending( $kid->id() ) as $action_id => $at ) {
+			\ActionScheduler::store()->cancel_action( $action_id );
+		}
+		$this->assertSame( array(), Jobs::pending( $kid->id() ) );
+
+		MailWake::on_state_changed( $this->our_zone( $user, 'kid-wake.example' ), 'provisioning', 'ready' );
+		$this->assertNotEmpty( Jobs::pending( $kid->id() ) );
+		$this->assertEmpty( Resource::find( $kid->id() )->get( 'next_attempt_at' ) );
+	}
 }

@@ -473,7 +473,8 @@ final class MailRoutes {
 			return $r;
 		}
 
-		if ( 'building' !== MailView::data( $r, array() )['kind'] || in_array( 'proof', (array) $r->get( 'steps' ), true ) ) {
+		// Only while the service waits for the proof or for a registration: a failing setup keeps its own backoff.
+		if ( ! MailField::waiting_for_proof( $r ) && ! MailField::waiting_for_registration( $r ) ) {
 			return self::error( 'not_ready', __( 'There is nothing to check now.', 'beltoft-services' ) );
 		}
 

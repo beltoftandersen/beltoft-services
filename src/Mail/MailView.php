@@ -87,6 +87,11 @@ final class MailView {
 
 		$out['plan']['used'] = MailPlan::used( MailPlan::root( $r ) );
 
+		// The way to a larger plan is only looked up when the plan is full: it is all the page uses it for.
+		if ( $out['plan']['used']['mailboxes'] >= $limits['mailboxes'] ) {
+			$out['plan']['upgrade'] = MailPlan::larger_plan_url( MailPlan::root( $r ) );
+		}
+
 		return $out;
 	}
 
@@ -102,7 +107,7 @@ final class MailView {
 
 		return array(
 			'used'       => MailPlan::cached( $root ),
-			'upgrade'    => MailPlan::larger_plan_url( $root ),
+			'upgrade'    => '',
 			'limits'     => MailPlan::limits( $r ),
 			'domains'    => array_values( array_filter( array_map( array( MailGuard::class, 'domain' ), $members ) ) ),
 			'is_root'    => $root->id() === $r->id(),

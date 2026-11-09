@@ -75,7 +75,12 @@ final class DomainRows {
 	 * @param Resource $resource Resource.
 	 */
 	public static function registered( Resource $resource ): bool {
-		return 'dns' === $resource->get( 'driver' ) || in_array( 'active', (array) $resource->get( 'steps' ), true ) || in_array( (string) $resource->get( 'state' ), array( 'ready', 'paused' ), true );
+		if ( 'dns' === $resource->get( 'driver' ) || in_array( 'active', (array) $resource->get( 'steps' ), true ) ) {
+			return true;
+		}
+
+		// Every state after the order went through (ready, paused, being removed ...) is a registered domain.
+		return ! in_array( (string) $resource->get( 'state' ), array( 'requested', 'provisioning', 'failed' ), true );
 	}
 
 	/**

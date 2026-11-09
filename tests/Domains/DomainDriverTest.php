@@ -580,11 +580,69 @@ class DomainDriverTest extends TestCase {
 		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains' === $c['path'] ) );
 		$this->assertArrayNotHasKey( 'additional_data', $posts[0]['body'] );
 		$this->assertSame( 'DAN', \BeltoftServices\Domains\IdnScript::for_name( 'xn--blegrd-ux1109-2fb9y.com' ) );
-		$this->assertSame( 'GER', \BeltoftServices\Domains\IdnScript::for_name( \idn_to_ascii( 'müller.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) ) );
-		$this->assertSame( 'FRE', \BeltoftServices\Domains\IdnScript::for_name( \idn_to_ascii( 'café.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) ) );
 		add_filter( 'beltoft_services_domain_idn_script', static fn() => 'SWE' );
 		$this->assertSame( 'SWE', \BeltoftServices\Domains\IdnScript::for_name( 'xn--blegrd-ux1109-2fb9y.com' ) );
 		$this->assertSame( '', \BeltoftServices\Domains\IdnScript::for_name( 'plain.com' ) );
+	}
+
+	private function idn( string $unicode ): string {
+		return \BeltoftServices\Domains\IdnScript::for_name( \idn_to_ascii( $unicode . '.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) );
+	}
+
+	public function test_the_language_tag_follows_the_letters_then_the_site_language(): void {
+		$this->assertSame( 'DAN', $this->idn( 'blåbærgrød' ), 'ae or o-slash decide for Danish, also with an a-ring.' );
+		$this->assertSame( 'DAN', $this->idn( 'smørrebrød' ) );
+		$this->assertSame( 'GER', $this->idn( 'müller' ) );
+		$this->assertSame( 'GER', $this->idn( 'füße' ) );
+		$this->assertSame( 'SWE', $this->idn( 'älg' ) );
+		$this->assertSame( 'SWE', $this->idn( 'kråka' ) );
+		$this->assertSame( 'SWE', $this->idn( 'söder' ) );
+		$this->assertSame( 'ICE', $this->idn( 'þing' ) );
+		$this->assertSame( 'SPA', $this->idn( 'español-ñ' ) );
+		$this->assertSame( 'POR', $this->idn( 'coração' ) );
+		$this->assertSame( 'FRE', $this->idn( 'café' ) );
+		$this->assertSame( '', $this->idn( 'пример' ), 'A non-Latin script gets no tag.' );
+		$this->assertSame( '', $this->idn( '例え' ) );
+		$this->assertSame( '', \BeltoftServices\Domains\IdnScript::for_name( 'plain.com' ) );
+		add_filter( 'beltoft_services_domain_idn_script', static fn() => 'FIN' );
+		$this->assertSame( 'FIN', $this->idn( 'café' ), 'The filter has the last word.' );
+		remove_all_filters( 'beltoft_services_domain_idn_script' );
+	}
+
+	public function test_a_name_the_letters_do_not_place_takes_the_site_language_when_it_maps(): void {
+		$name = \idn_to_ascii( 'ĉapelo.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 );
+		add_filter( 'locale', static fn() => 'it_IT' );
+		$this->assertSame( 'ITA', \BeltoftServices\Domains\IdnScript::for_name( $name ) );
+		remove_all_filters( 'locale' );
+		add_filter( 'locale', static fn() => 'xx_XX' );
+		$this->assertSame( '', \BeltoftServices\Domains\IdnScript::for_name( $name ) );
+		remove_all_filters( 'locale' );
+	}
+
+	public function test_dk_and_transfer_orders_never_carry_a_language_tag(): void {
+		$key = base64_encode( str_repeat( 'k', 32 ) );
+		add_filter( 'beltoft_services_key', static fn() => $key );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 324, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'POST', '/domains/transfer', array( 'id' => 325, 'status' => 'REQ', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+
+		$dk = $this->resource( 'register', \idn_to_ascii( 'blåbær-' . strtolower( wp_generate_password( 5, false, false ) ) . '.dk', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) );
+		$order = wc_get_order( (int) $dk->license()['order_id'] );
+		$order->update_meta_data( '_beltoft_services_dk_agreement', array( 'version' => 1 ) );
+		$order->save();
+		( new DomainDriver() )->provision( $dk );
+		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains' === $c['path'] ) );
+		$this->assertSame( array( 'dk_acceptance' => 1 ), $posts[0]['body']['additional_data'], 'Only the .dk acceptance.' );
+
+		$move = $this->resource( 'transfer', \idn_to_ascii( 'blåbær-' . strtolower( wp_generate_password( 5, false, false ) ) . '.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) );
+		( new DomainDriver() )->provision( $move );
+		$transfers = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains/transfer' === $c['path'] ) );
+		if ( $transfers ) {
+			$this->assertArrayNotHasKey( 'additional_data', $transfers[0]['body'] );
+		}
+		$this->assertCount( 1, array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains' === $c['path'] ), 'The transfer did not go out as a registration.' );
 	}
 
 	public function test_a_eu_domain_is_not_registered_for_a_registrant_outside_the_eu(): void {
