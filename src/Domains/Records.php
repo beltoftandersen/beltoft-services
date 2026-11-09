@@ -208,6 +208,33 @@ final class Records {
 		return $taken ? $result : new \WP_Error( 'zone_busy', __( 'Your DNS is being changed. Try again in a moment.', 'beltoft-services' ) );
 	}
 
+	/**
+	 * The full name a zone record name stands for: no trailing dot, lower case; empty or "@" is the zone itself, a name
+	 * already inside the zone is itself, any other is a label under the zone.
+	 */
+	public static function fqdn_of_set( string $zone, string $name ): string {
+		$name = strtolower( rtrim( $name, '.' ) );
+		if ( '' === $name || '@' === $name ) { return $zone; }
+		return ( $name === $zone || str_ends_with( $name, '.' . $zone ) ) ? $name : $name . '.' . $zone;
+	}
+
+	/**
+	 * The raw RRsets at a name, by upper-case type. SOA and NS are the zone's own and never ours to judge.
+	 *
+	 * @param array<int, array<string, mixed>> $rrsets Raw RRsets.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function sets_at( string $zone, string $fqdn, array $rrsets ): array {
+		$out = array();
+		foreach ( $rrsets as $set ) {
+			if ( is_array( $set ) && self::fqdn_of_set( $zone, (string) ( $set['name'] ?? '' ) ) === $fqdn ) {
+				$out[ strtoupper( (string) ( $set['type'] ?? '' ) ) ] = $set;
+			}
+		}
+		unset( $out['SOA'], $out['NS'] );
+		return $out;
+	}
+
 	/** The zone as the DNS server has it right now: array, or a WP_Error (zone_missing when there is none). */
 	private static function read( string $zone ): array|\WP_Error {
 		$current = Clients::dns()->zone( $zone );
