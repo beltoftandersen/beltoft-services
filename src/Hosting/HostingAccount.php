@@ -392,7 +392,7 @@ final class HostingAccount {
 				sprintf(
 					/* translators: 1: mailbox address, 2: size in GB. */
 					__( '%1$s: %2$s GB', 'beltoft-services' ),
-					$email,
+					\BeltoftServices\Domains\HostName::display( $email ),
 					(string) round( (int) $box['quota_mb'] / 1024, 1 )
 				)
 			) . '</span>';

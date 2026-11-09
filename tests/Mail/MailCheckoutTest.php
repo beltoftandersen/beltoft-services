@@ -455,4 +455,16 @@ final class MailCheckoutTest extends MailTestCase {
 	public function test_an_email_cart_needs_the_full_billing_details_like_a_server(): void {
 		$this->assertInstanceOf( \BeltoftServices\Drivers\NeedsBilling::class, \BeltoftServices\Drivers\Registry::get( 'mail' ) );
 	}
+
+	public function test_the_order_line_shows_the_email_domain_in_unicode(): void {
+		if ( ! function_exists( 'idn_to_utf8' ) ) {
+			$this->markTestSkipped( 'intl is missing.' );
+		}
+		$item = new \WC_Order_Item_Product();
+		$item->add_meta_data( MailField::ITEM_META, 'xn--bcher-kva.example', true );
+		$rows = MailField::show_item_domain( array(), $item );
+		$this->assertCount( 1, $rows );
+		$this->assertSame( '<p>bücher.example</p>', $rows[0]->display_value );
+		$this->assertSame( 'xn--bcher-kva.example', $rows[0]->value, 'The stored value stays punycode.' );
+	}
 }

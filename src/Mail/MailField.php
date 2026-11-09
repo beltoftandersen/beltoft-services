@@ -465,7 +465,7 @@ final class MailField {
 		$name = MailDomain::normalise( $item->get_meta( self::ITEM_META, true ) );
 
 		if ( null !== $name ) {
-			$formatted[] = (object) array( 'id' => 0, 'key' => self::ITEM_META, 'value' => $name, 'display_key' => __( 'Email domain', 'beltoft-services' ), 'display_value' => '<p>' . esc_html( $name ) . '</p>' );
+			$formatted[] = (object) array( 'id' => 0, 'key' => self::ITEM_META, 'value' => $name, 'display_key' => __( 'Email domain', 'beltoft-services' ), 'display_value' => '<p>' . esc_html( \BeltoftServices\Domains\HostName::display( $name ) ) . '</p>' );
 		}
 
 		return $formatted;

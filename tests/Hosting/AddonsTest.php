@@ -128,9 +128,9 @@ class AddonsTest extends HostingCase {
 	/**
 	 * Email lite on the account's own domain with one mailbox.
 	 */
-	private function with_mailbox( Resource $r ): Resource {
-		$this->connect_domain( $r, 'mail.customer.example' );
-		$child  = $this->lite( $r, 'mail.customer.example' );
+	private function with_mailbox( Resource $r, string $domain = 'mail.customer.example' ): Resource {
+		$this->connect_domain( $r, $domain );
+		$child  = $this->lite( $r, $domain );
 		$result = Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$child->set( array_merge( $result->meta(), array( 'state' => 'ready', 'desired' => 'ready' ) ) );
@@ -751,5 +751,20 @@ class AddonsTest extends HostingCase {
 		$this->assertCount( 1, $mails );
 		$this->assertStringContainsString( 'info@mail.customer.example', $mails[0]['message'] );
 		remove_all_filters( 'wp_mail' );
+	}
+
+	public function test_the_mailbox_list_of_the_packs_shows_an_idn_domain_in_unicode(): void {
+		if ( ! function_exists( 'idn_to_utf8' ) ) {
+			$this->markTestSkipped( 'intl is missing.' );
+		}
+		$this->card_pays();
+		$r = $this->account();
+		$this->with_mailbox( $r, 'xn--bcher-kva.example' );
+
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'info@bücher.example: 1 GB', $html );
+		$this->assertStringContainsString( 'data-mailbox="info@xn--bcher-kva.example"', $html, 'The stored address stays in the attribute.' );
 	}
 }
