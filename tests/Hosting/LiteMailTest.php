@@ -116,6 +116,24 @@ class LiteMailTest extends HostingCase {
 		$this->assertSame( array( 'value' => 60, 'frame' => 'm' ), $domain['rl'], 'The plan limit, not the global 30.' );
 	}
 
+	public function test_an_email_lite_child_is_not_an_email_plan_member_and_not_in_the_email_list(): void {
+		$parent = $this->account();
+		$child  = $this->make_ready( LiteMail::enable( $parent, 'lite.example' ) );
+		$area   = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
+
+		$this->assertFalse( $area->is_member( $child->license() ) );
+
+		wp_set_current_user( (int) $child->license()['user_id'] );
+		$GLOBALS['wp']->query_vars[ $area->slug() ] = '';
+		ob_start();
+		$area->render( array( \BeltoftLicenses\Account\View::license( $child->license() ) ) );
+		$html = (string) ob_get_clean();
+		unset( $GLOBALS['wp']->query_vars[ $area->slug() ] );
+		wp_set_current_user( 0 );
+
+		$this->assertStringNotContainsString( 'lite.example', $html );
+	}
+
 	public function test_the_hosting_account_is_ready_without_email_and_enable_has_rules(): void {
 		$parent = $this->account();
 		$this->assertSame( array(), Children::of( $parent ) );

@@ -115,7 +115,9 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertStringContainsString( 'type="radio"', $html );
 		$this->assertStringContainsString( '<option value="mine.example"', $html );
 		$this->assertStringContainsString( '[own]', $html );
-		$this->assertStringContainsString( 'A domain hosted elsewhere', $html );
+		$this->assertStringContainsString( 'One of your domains with us', $html );
+		$this->assertStringContainsString( 'A domain at another provider', $html );
+		$this->assertStringNotContainsString( 'A domain hosted elsewhere', $html );
 	}
 
 	public function test_resolve_checks_the_name(): void {
@@ -179,6 +181,36 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertSame( array(), MailField::cart_lines() );
 		$this->post( $key, array() );
 		$this->assertSame( array(), $this->errors() );
+	}
+
+	public function test_the_order_line_shows_the_email_domain(): void {
+		$item = new \WC_Order_Item_Product();
+		$item->add_meta_data( MailField::ITEM_META, 'Shown.Example', true );
+		$rows = array_values( $item->get_formatted_meta_data() );
+
+		$this->assertCount( 1, $rows );
+		$this->assertSame( 'Email domain', $rows[0]->display_key );
+		$this->assertStringContainsString( 'shown.example', $rows[0]->display_value );
+		$this->assertCount( 0, ( new \WC_Order_Item_Product() )->get_formatted_meta_data(), 'A line without the choice shows nothing.' );
+	}
+
+	public function test_a_domain_waiting_for_its_registration_has_a_fixed_text_for_the_customer(): void {
+		$text = 'Waiting for your domain registration to finish.';
+		$r    = $this->mail_resource( 'wait.example', array( 'mail_wait_until' => time() + DAY_IN_SECONDS, 'last_error' => 'secret detail' ) );
+
+		$this->assertSame( $text, \BeltoftServices\Account\Panel::message( 'provisioning', Resource::find( $r->id() ) ) );
+		$wait = MailField::progress_wait( array(), Resource::find( $r->id() ), 'mail', '' );
+		$this->assertSame( $text, $wait['text'] );
+
+		$plain = $this->mail_resource( 'plain.example' );
+		$this->assertSame( 'Your service is being set up. This page updates by itself.', \BeltoftServices\Account\Panel::message( 'provisioning', Resource::find( $plain->id() ) ) );
+		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $plain->id() ), 'mail', '' ) );
+
+		$past = $this->mail_resource( 'past.example', array( 'mail_wait_until' => time() - 60 ) );
+		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $past->id() ), 'mail', '' ), 'After the deadline the generic text applies.' );
+
+		$proved = $this->mail_resource( 'proved.example', array( 'mail_wait_until' => time() + DAY_IN_SECONDS, 'steps' => array( 'proof' ) ) );
+		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $proved->id() ), 'mail', '' ), 'Once the proof step has run the wait is over.' );
 	}
 
 	public function test_the_domain_is_saved_on_the_line_and_becomes_resource_meta(): void {

@@ -40,6 +40,11 @@ final class MailProductsTest extends MailTestCase {
 		$this->assertStringContainsString( 'Business: 60 EUR per month excluding VAT, 10 mailbox(es), 20480 MB each, 200 aliases, 10 domain(s)', \WP_CLI::text() );
 	}
 
+	public function test_variation_descriptions_read_in_plain_words(): void {
+		$this->assertSame( '5 mailboxes of 10 GB, 50 aliases, 3 domains', MailProductsCommand::plan_description( array( 'mailboxes' => 5, 'quota_mb' => 10240, 'aliases' => 50, 'domains' => 3 ) ) );
+		$this->assertSame( '1 mailbox of 5 GB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 1, 'quota_mb' => 5120, 'aliases' => 1, 'domains' => 1 ) ) );
+	}
+
 	public function test_one_of_the_flags_is_needed(): void {
 		$this->assertStringContainsString( 'exactly one', $this->run_command( array() ) );
 		$this->assertStringContainsString( 'exactly one', $this->run_command( array( 'dry-run' => true, 'create' => true ) ) );
