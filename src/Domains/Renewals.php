@@ -26,9 +26,7 @@ final class Renewals {
 
 	/** Schedules the daily sweep for stuck paid renewals, once. */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::SWEEP_HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::SWEEP_CRON, self::SWEEP_HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::SWEEP_HOOK, self::SWEEP_CRON );
 	}
 
 	/** Removes the daily sweep (plugin deactivation). */

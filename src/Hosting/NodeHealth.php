@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Jobs;
 use BeltoftServices\Settings;
 
@@ -43,9 +44,7 @@ final class NodeHealth {
 	 * Schedules the hourly run once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::CRON, self::HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::HOOK, self::CRON );
 	}
 
 	/**
@@ -153,17 +152,7 @@ final class NodeHealth {
 	 * @return string The text.
 	 */
 	private static function notify( string $id, string $kind, string $text ): string {
-		$to  = (string) Settings::get( 'admin_email' );
-		$key = 'beltoft_services_hosting_health_' . md5( $id . '|' . $kind );
-
-		if ( is_email( $to ) && false === get_transient( $key ) ) {
-			set_transient( $key, 1, DAY_IN_SECONDS );
-			wp_mail(
-				$to,
-				sprintf( '[%s] Hosting node %s: attention', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $id ),
-				$text . "\n"
-			);
-		}
+		Alerts::notify( sprintf( 'Hosting node %s: attention', $id ), array( $text ), null, 'beltoft_services_hosting_health_' . md5( $id . '|' . $kind ) );
 
 		return $text;
 	}

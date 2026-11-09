@@ -299,9 +299,7 @@ final class Emails {
 	 * Schedules the daily usage check, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::USAGE_HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::USAGE_CRON, self::USAGE_HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::USAGE_HOOK, self::USAGE_CRON );
 	}
 
 	/**

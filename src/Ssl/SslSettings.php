@@ -2,6 +2,7 @@
 /** Settings, Services, SSL certificates. @package BeltoftServices */
 namespace BeltoftServices\Ssl;
 
+use BeltoftServices\Jobs;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -22,9 +23,7 @@ final class SslSettings {
 
 	/** The daily cost read. */
 	public static function schedule(): void {
-		if ( function_exists( 'as_next_scheduled_action' ) && ! as_next_scheduled_action( 'beltoft_services_ssl_costs', array(), 'beltoft-services' ) ) {
-			as_schedule_cron_action( time() + HOUR_IN_SECONDS, '25 4 * * *', 'beltoft_services_ssl_costs', array(), 'beltoft-services' );
-		}
+		Jobs::ensure_cron( 'beltoft_services_ssl_costs', '25 4 * * *', array(), HOUR_IN_SECONDS );
 	}
 
 	/**

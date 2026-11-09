@@ -80,9 +80,7 @@ final class Jobs {
 	 * Schedules the sweep, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::SWEEP, array(), self::GROUP ) ) {
-			as_schedule_cron_action( time(), self::CRON, self::SWEEP, array(), self::GROUP );
-		}
+		self::ensure_cron( self::SWEEP, self::CRON );
 	}
 
 	/**
@@ -133,6 +131,40 @@ final class Jobs {
 	 */
 	public static function pending_action( string $hook, array $args ): bool {
 		return function_exists( 'as_next_scheduled_action' ) && is_int( as_next_scheduled_action( $hook, $args, self::GROUP ) );
+	}
+
+	/**
+	 * Schedules a one-off plugin action, unless one with the same arguments is waiting to run (a running one
+	 * does not count, see pending_action()).
+	 *
+	 * @param int               $timestamp When to run (unix time).
+	 * @param string            $hook      Action hook.
+	 * @param array<int, mixed> $args      Action arguments.
+	 * @return bool Whether it was scheduled.
+	 */
+	public static function schedule_once( int $timestamp, string $hook, array $args = array() ): bool {
+		if ( ! function_exists( 'as_schedule_single_action' ) || self::pending_action( $hook, $args ) ) {
+			return false;
+		}
+
+		as_schedule_single_action( $timestamp, $hook, $args, self::GROUP );
+
+		return true;
+	}
+
+	/**
+	 * Schedules a recurring plugin action, unless one is scheduled already (a running one counts, so a sweep that is
+	 * running now is not scheduled a second time).
+	 *
+	 * @param string            $hook  Action hook.
+	 * @param string            $cron  Cron expression.
+	 * @param array<int, mixed> $args  Action arguments.
+	 * @param int               $delay Seconds from now to the first run.
+	 */
+	public static function ensure_cron( string $hook, string $cron, array $args = array(), int $delay = 0 ): void {
+		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( $hook, $args, self::GROUP ) ) {
+			as_schedule_cron_action( time() + $delay, $cron, $hook, $args, self::GROUP );
+		}
 	}
 
 	/**

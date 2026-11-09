@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,10 +21,9 @@ final class Sync {
 		add_action( self::HEALTH_HOOK, array( Health::class, 'dns_check' ) );
 	}
 	public static function schedule(): void {
-		if ( ! function_exists( 'as_next_scheduled_action' ) ) { return; }
-		if ( ! as_next_scheduled_action( self::HOOK, array(), 'beltoft-services' ) ) { as_schedule_cron_action( time() + HOUR_IN_SECONDS, '45 4 * * *', self::HOOK, array(), 'beltoft-services' ); }
-		if ( ! as_next_scheduled_action( self::DELEGATION_HOOK, array(), 'beltoft-services' ) ) { as_schedule_cron_action( time() + HOUR_IN_SECONDS, '15 5 * * *', self::DELEGATION_HOOK, array(), 'beltoft-services' ); }
-		if ( ! as_next_scheduled_action( self::HEALTH_HOOK, array(), 'beltoft-services' ) ) { as_schedule_cron_action( time() + 15 * MINUTE_IN_SECONDS, '*/15 * * * *', self::HEALTH_HOOK, array(), 'beltoft-services' ); }
+		Jobs::ensure_cron( self::HOOK, '45 4 * * *', array(), HOUR_IN_SECONDS );
+		Jobs::ensure_cron( self::DELEGATION_HOOK, '15 5 * * *', array(), HOUR_IN_SECONDS );
+		Jobs::ensure_cron( self::HEALTH_HOOK, '*/15 * * * *', array(), 15 * MINUTE_IN_SECONDS );
 	}
 	public static function run(): void {
 		$ids = Resource::live_ids( 'domain' );

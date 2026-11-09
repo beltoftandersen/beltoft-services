@@ -128,14 +128,8 @@ final class ProxmoxJobs {
 	 * Schedules the recurring jobs, once each.
 	 */
 	public static function schedule(): void {
-		if ( ! function_exists( 'as_has_scheduled_action' ) ) {
-			return;
-		}
-
 		foreach ( self::CRONS as $hook => $cron ) {
-			if ( ! as_has_scheduled_action( $hook, array(), Jobs::GROUP ) ) {
-				as_schedule_cron_action( time(), $cron, $hook, array(), Jobs::GROUP );
-			}
+			Jobs::ensure_cron( $hook, $cron );
 		}
 	}
 

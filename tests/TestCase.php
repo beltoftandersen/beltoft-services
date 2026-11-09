@@ -46,7 +46,7 @@ abstract class TestCase extends \WP_UnitTestCase {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . $wpdb->prefix . 'beltoft_licenses_activations WHERE kind = %s', 'domain' ) );
 		// The daily domain jobs are scheduled once per test database and fall due by the wall clock,
 		// so run_jobs() would run them in whichever test comes after their time. Tests call them directly.
-		foreach ( array( \BeltoftServices\Domains\Sync::HOOK, \BeltoftServices\Domains\Sync::DELEGATION_HOOK, \BeltoftServices\Domains\Sync::HEALTH_HOOK, 'beltoft_services_domain_prices', \BeltoftServices\Domains\Security::HOOK ) as $hook ) {
+		foreach ( array( \BeltoftServices\Domains\Sync::HOOK, \BeltoftServices\Domains\Sync::DELEGATION_HOOK, \BeltoftServices\Domains\Sync::HEALTH_HOOK, 'beltoft_services_domain_prices', \BeltoftServices\Domains\Security::HOOK, \BeltoftServices\Hosting\Addons::SWEEP_HOOK ) as $hook ) {
 			as_unschedule_all_actions( $hook, array(), 'beltoft-services' );
 		}
 

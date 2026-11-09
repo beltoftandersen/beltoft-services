@@ -8,7 +8,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Settings;
+use BeltoftServices\Alerts;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -42,9 +42,7 @@ final class DnsClaimJobs {
 	 * Schedules the daily cleanup, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::CLEANUP, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::CRON, self::CLEANUP, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::CLEANUP, self::CRON );
 	}
 
 	/**
@@ -329,17 +327,6 @@ final class DnsClaimJobs {
 	 * @param string               $reason Reason code.
 	 */
 	private static function alert( array $claim, string $reason ): void {
-		$to = (string) Settings::get( 'admin_email' );
-
-		if ( ! is_email( $to ) ) {
-			$to = (string) get_option( 'admin_email' );
-		}
-
-		if ( ! is_email( $to ) ) {
-			return;
-		}
-
-		$site  = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 		$lines = array(
 			sprintf( 'Domain: %s', $claim['domain'] ),
 			sprintf( 'Customer: %d', (int) $claim['user_id'] ),
@@ -347,6 +334,6 @@ final class DnsClaimJobs {
 			sprintf( 'Reason: %s', $reason ),
 		);
 
-		wp_mail( $to, sprintf( '[%s] DNS hosting claim needs a manual check: %s', $site, $claim['domain'] ), implode( "\n", $lines ) . "\n" );
+		Alerts::notify( sprintf( 'DNS hosting claim needs a manual check: %s', $claim['domain'] ), $lines, null, '', array( 'fallback' => true ) );
 	}
 }

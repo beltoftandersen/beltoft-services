@@ -596,14 +596,6 @@ final class KeyOrder {
 	 * @param int    $delay Seconds.
 	 */
 	private static function schedule( string $hook, int $id, int $delay ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-
-		$waiting = as_get_scheduled_actions( array( 'hook' => $hook, 'args' => array( $id ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-
-		if ( ! $waiting ) {
-			as_schedule_single_action( time() + $delay, $hook, array( $id ), Jobs::GROUP );
-		}
+		Jobs::schedule_once( time() + $delay, $hook, array( $id ) );
 	}
 }

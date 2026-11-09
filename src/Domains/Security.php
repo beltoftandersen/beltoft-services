@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Emails\Emails;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -24,9 +25,7 @@ final class Security {
 	}
 
 	public static function schedule(): void {
-		if ( function_exists( 'as_next_scheduled_action' ) && ! as_next_scheduled_action( self::HOOK, array(), 'beltoft-services' ) ) {
-			as_schedule_cron_action( time() + HOUR_IN_SECONDS, '30 5 * * *', self::HOOK, array(), 'beltoft-services' );
-		}
+		Jobs::ensure_cron( self::HOOK, '30 5 * * *', array(), HOUR_IN_SECONDS );
 	}
 
 	/** Tell the customer of one security event. Never throws; the transfer code is never part of it. */

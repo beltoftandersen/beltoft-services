@@ -2,6 +2,7 @@
 /** Settings → Services → Domains. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Jobs;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,9 +21,7 @@ final class DomainSettings {
 	}
 
 	public static function schedule_prices(): void {
-		if ( function_exists( 'as_next_scheduled_action' ) && ! as_next_scheduled_action( 'beltoft_services_domain_prices', array(), 'beltoft-services' ) ) {
-			as_schedule_cron_action( time() + HOUR_IN_SECONDS, '15 4 * * *', 'beltoft_services_domain_prices', array(), 'beltoft-services' );
-		}
+		Jobs::ensure_cron( 'beltoft_services_domain_prices', '15 4 * * *', array(), HOUR_IN_SECONDS );
 	}
 
 	public static function tabs( $tabs ) {

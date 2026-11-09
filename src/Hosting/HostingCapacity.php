@@ -7,8 +7,8 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -187,7 +187,6 @@ final class HostingCapacity {
 	 */
 	public static function alert(): array {
 		$limit = Config::number( 'alert_percent', 10.0 ) / 100;
-		$to    = (string) Settings::get( 'admin_email' );
 		$sent  = array();
 
 		foreach ( array_keys( Nodes::all() ) as $id ) {
@@ -206,17 +205,19 @@ final class HostingCapacity {
 
 			$key = 'beltoft_services_hosting_capacity_alert_' . md5( (string) $id );
 
-			if ( false !== get_transient( $key ) || ! is_email( $to ) ) {
+			$mail = Alerts::notify(
+				sprintf( 'Hosting node %s is filling up', $id ),
+				array(
+					sprintf( 'Hosting node %s has committed %d%% of its memory budget and %d%% of its disk.', $id, (int) round( $mem * 100 ), (int) round( $disk * 100 ) ),
+					'Add a node or raise the capacity before more accounts are sold.',
+				),
+				null,
+				$key
+			);
+
+			if ( ! $mail ) {
 				continue;
 			}
-
-			set_transient( $key, 1, DAY_IN_SECONDS );
-
-			wp_mail(
-				$to,
-				sprintf( '[%s] Hosting node %s is filling up', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $id ),
-				sprintf( "Hosting node %s has committed %d%% of its memory budget and %d%% of its disk.\nAdd a node or raise the capacity before more accounts are sold.\n", $id, (int) round( $mem * 100 ), (int) round( $disk * 100 ) )
-			);
 
 			$sent[] = (string) $id;
 		}

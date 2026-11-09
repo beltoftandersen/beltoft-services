@@ -22,6 +22,99 @@ final class Alerts {
 	public const PROBLEM_OPTION = 'beltoft_services_alert_problem';
 
 	/**
+	 * The address admin alerts go to: the alert address setting, or (with $fallback) the WordPress admin address
+	 * when that setting is not a valid address. Empty when there is none.
+	 *
+	 * @param bool $fallback Fall back to the site admin address.
+	 */
+	public static function address( bool $fallback = false ): string {
+		$to = (string) Settings::get( 'admin_email' );
+
+		if ( ! is_email( $to ) && $fallback ) {
+			$to = (string) get_option( 'admin_email' );
+		}
+
+		return is_email( $to ) ? $to : '';
+	}
+
+	/**
+	 * One plain mail to the alert address. The body is the lines joined by newlines.
+	 *
+	 * With a dedupe key (the name of a transient) it sends at most once per ttl and sets the transient before it
+	 * sends. When there is no valid address nothing is sent and, if a resource is given, the unsent alert is
+	 * recorded for the admin screen (it is cleared again by the next mail that is sent for that resource).
+	 *
+	 * Options: prefix (bool, default true) starts the subject with "[site name] "; newline (bool, default true) ends
+	 * the body with a newline; fallback (bool, default false) uses the WordPress admin address when the alert
+	 * address is not valid; ttl (int, default one day) is how long a dedupe key holds.
+	 *
+	 * @param string               $subject    Subject, after the site name.
+	 * @param array<int, string>   $lines      Body lines.
+	 * @param Resource|null        $resource   The resource it is about, for the unsent record.
+	 * @param string               $dedupe_key Transient name that holds the mail back, or empty.
+	 * @param array<string, mixed> $options    See above.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function notify( string $subject, array $lines, ?Resource $resource = null, string $dedupe_key = '', array $options = array() ): bool {
+		$options = array_merge(
+			array(
+				'prefix'   => true,
+				'newline'  => true,
+				'fallback' => false,
+				'ttl'      => DAY_IN_SECONDS,
+			),
+			$options
+		);
+
+		$to = self::address( (bool) $options['fallback'] );
+
+		if ( '' === $to ) {
+			if ( $resource ) {
+				self::record_unsent( $resource );
+			}
+
+			return false;
+		}
+
+		if ( '' !== $dedupe_key ) {
+			if ( false !== get_transient( $dedupe_key ) ) {
+				return false;
+			}
+
+			set_transient( $dedupe_key, 1, (int) $options['ttl'] );
+		}
+
+		if ( $options['prefix'] ) {
+			$subject = '[' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) . '] ' . $subject;
+		}
+
+		$sent = (bool) wp_mail( $to, $subject, implode( "\n", $lines ) . ( $options['newline'] ? "\n" : '' ) );
+
+		if ( $resource ) {
+			self::clear_problem( $resource->id() );
+		}
+
+		return $sent;
+	}
+
+	/**
+	 * Remembers that an alert about a resource could not be sent because there is no valid alert address.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function record_unsent( Resource $r ): void {
+		$problems = self::problems();
+
+		$problems[ $r->id() ] = array(
+			'time'     => time(),
+			'resource' => $r->id(),
+			'message'  => 'An admin alert could not be sent: the alert address is not a valid email address.',
+		);
+
+		update_option( self::PROBLEM_OPTION, $problems, false );
+	}
+
+	/**
 	 * Alerts the admin about a failed resource, unless this operation's error was already sent.
 	 * The alert is remembered (meta `alerted`) only once a mail was attempted, so a missing
 	 * address does not swallow it: it is sent once the address is fixed.
