@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\PublicSuffix;
+use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -455,6 +456,29 @@ final class Addons {
 			return new \WP_Error( 'exists', __( 'This domain is paid for already.', 'beltoft-services' ) );
 		}
 
+		// The look for an open order and the making of a new one are one step: a double click or a second tab waits and then finds the order.
+		[ $taken, $out ] = Locks::with(
+			Locks::name( 'addon_buy', $r->id() ),
+			self::lock_wait(),
+			static fn() => self::order_for( $r, $sub, $product, $quote, $kind, $target, $connect )
+		);
+
+		return $taken ? $out : new \WP_Error( 'busy', __( 'This add-on is being bought already. Try again in a moment.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Offers the open order of an add-on, or makes the order and tries the saved card.
+	 *
+	 * @param Resource             $r       Hosting resource.
+	 * @param \WC_Subscription     $sub     Its subscription.
+	 * @param \WC_Product          $product Add-on product.
+	 * @param array<string, mixed> $quote   The quote.
+	 * @param string               $kind    Add-on kind.
+	 * @param string               $target  Add-on target.
+	 * @param array<string, string> $connect Domain to connect after payment.
+	 * @return array{status: string, order: int, total: float, pay_url: string, message: string}|\WP_Error
+	 */
+	private static function order_for( Resource $r, $sub, $product, array $quote, string $kind, string $target, array $connect ) {
 		self::cancel_stale();
 		$open = self::pending_order( $r, $kind, $target );
 
@@ -562,26 +586,52 @@ final class Addons {
 	public static function activate( $order_id ): void {
 		static $busy = array();
 
-		$order = wc_get_order( (int) $order_id );
-		$meta  = $order instanceof \WC_Order ? $order->get_meta( self::ORDER_META ) : null;
+		$id = (int) $order_id;
 
-		if ( $order instanceof \WC_Order && ! is_array( $meta ) && $order->has_status( array( 'processing', 'completed' ) ) ) {
-			self::stray( $order );
-
+		if ( isset( $busy[ $id ] ) ) {
 			return;
 		}
 
-		if ( ! is_array( $meta ) || '' !== (string) $order->get_meta( self::ORDER_DONE ) || isset( $busy[ $order->get_id() ] ) || ! $order->has_status( array( 'processing', 'completed' ) ) ) {
-			return;
-		}
-
-		$busy[ $order->get_id() ] = true;
+		$busy[ $id ] = true;
 
 		try {
-			self::add_line( $order, $meta );
+			// One process at a time for an order: the payment webhook and the customer's return page can fire together.
+			Locks::with(
+				Locks::name( 'addon_order', $id ),
+				self::lock_wait(),
+				static function () use ( $id ): void {
+					// Read inside the lock, so the one that waited sees what the other did.
+					$order = wc_get_order( $id );
+					$meta  = $order instanceof \WC_Order ? $order->get_meta( self::ORDER_META ) : null;
+
+					if ( $order instanceof \WC_Order && ! is_array( $meta ) && $order->has_status( array( 'processing', 'completed' ) ) ) {
+						self::stray( $order );
+
+						return;
+					}
+
+					if ( ! is_array( $meta ) || '' !== (string) $order->get_meta( self::ORDER_DONE ) || ! $order->has_status( array( 'processing', 'completed' ) ) ) {
+						return;
+					}
+
+					self::add_line( $order, $meta );
+				}
+			);
 		} finally {
-			unset( $busy[ $order->get_id() ] );
+			unset( $busy[ $id ] );
 		}
+	}
+
+	/**
+	 * Seconds a purchase or an order's activation waits for its lock (default 10).
+	 */
+	private static function lock_wait(): int {
+		/**
+		 * Filters how long an add-on purchase or activation waits for its lock.
+		 *
+		 * @param int $seconds Seconds (default 10).
+		 */
+		return max( 0, (int) apply_filters( 'beltoft_services_addon_lock_wait', 10 ) );
 	}
 
 	/**

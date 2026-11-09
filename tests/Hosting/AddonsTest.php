@@ -767,4 +767,45 @@ class AddonsTest extends HostingCase {
 		$this->assertStringContainsString( 'info@bücher.example: 1 GB', $html );
 		$this->assertStringContainsString( 'data-mailbox="info@xn--bcher-kva.example"', $html, 'The stored address stays in the attribute.' );
 	}
+
+	/**
+	 * Takes a lock on a second connection, as another process would.
+	 *
+	 * @param string $name Lock name.
+	 */
+	private function hold_elsewhere( string $name ): \mysqli {
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		$this->assertSame( '1', $held->fetch_row()[0], 'The second connection holds the lock.' );
+
+		return $other;
+	}
+
+	public function test_an_order_being_activated_elsewhere_is_not_activated_here_too(): void {
+		add_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
+		$r      = $this->account();
+		$bought = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		$other  = $this->hold_elsewhere( \BeltoftServices\Locks::name( 'addon_order', $bought['order'] ) );
+
+		wc_get_order( $bought['order'] )->payment_complete();
+		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ), 'The other process owns this order, so no line is added here.' );
+
+		$other->close();
+		Addons::activate( $bought['order'] );
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ), 'Free again: it is added once.' );
+		remove_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
+	}
+
+	public function test_a_purchase_that_is_being_made_elsewhere_makes_no_second_order(): void {
+		add_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
+		$r     = $this->account();
+		$other = $this->hold_elsewhere( \BeltoftServices\Locks::name( 'addon_buy', $r->id() ) );
+
+		$this->assertSame( 'busy', Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' )->get_error_code() );
+		$this->assertCount( 0, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
+
+		$other->close();
+		$this->assertSame( 'pay', Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' )['status'] );
+		remove_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
+	}
 }
