@@ -75,6 +75,10 @@
 				return '' === field( panel, 'slug' ) ? null : [ 'POST', base + '/sites', { slug: field( panel, 'slug' ), php: field( panel, 'php' ) } ];
 			case 'add_domain':
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
+			case 'add_pack':
+				return window.confirm( button.getAttribute( 'data-confirm' ) || '' ) ? [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: true } ] : null;
+			case 'remove_pack':
+				return window.confirm( text.confirmPack || '' ) ? [ 'DELETE', base + '/addons?target=' + encodeURIComponent( button.getAttribute( 'data-mailbox' ) || '' ), undefined ] : null;
 			case 'enable_mail':
 				return [ 'POST', base + '/mail', { domain: field( panel, 'mail_domain' ) } ];
 			case 'backup_now':
@@ -96,6 +100,17 @@
 		}
 
 		return null;
+	}
+
+	// The answer of an add-on purchase: paid with the saved card (go on), or a link to pay the order first.
+	function pay( panel, bought, next ) {
+		if ( bought.ok && bought.data && 'paid' === bought.data.status ) {
+			next();
+		} else if ( bought.ok && bought.data && bought.data.pay_url ) {
+			window.location.href = bought.data.pay_url;
+		} else {
+			say( panel, ( bought.data && bought.data.message ) || text.failed || '' );
+		}
 	}
 
 	document.addEventListener( 'click', function ( event ) {
@@ -131,6 +146,29 @@
 
 		call( request[ 0 ], request[ 1 ], request[ 2 ] ).then( function ( result ) {
 			button.disabled = false;
+
+			// An extra domain is a paid add-on: show the price, and when it is accepted buy it and add the domain again.
+			if ( ! result.ok && 402 === result.status && 'add_domain' === action && result.data && 'beltoft_services_hosting_addon_required' === result.data.code ) {
+				if ( window.confirm( result.data.message || '' ) ) {
+					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: result.data.target, confirm: true } ).then( function ( bought ) {
+						button.disabled = false;
+						pay( panel, bought, function () {
+							button.click();
+						} );
+					} );
+				} else {
+					button.disabled = false;
+					say( panel, '' );
+				}
+
+				return;
+			}
+
+			if ( result.ok && result.data && 'pay' === result.data.status && result.data.pay_url ) {
+				button.disabled = false;
+				window.location.href = result.data.pay_url;
+				return;
+			}
 
 			if ( ! result.ok ) {
 				if ( tab ) {

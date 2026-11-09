@@ -46,6 +46,7 @@ final class HostingAccount {
 					'confirm'   => __( 'Type the website name to remove it. Its files and database are deleted.', 'beltoft-services' ),
 					'opening'   => __( 'Opening WordPress...', 'beltoft-services' ),
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
+					'confirmPack' => __( 'Remove one extra storage pack from this mailbox? It ends at your next renewal, the storage stays until then, and nothing is refunded.', 'beltoft-services' ),
 					'confirmUndo' => __( 'Go back to the safety copy? Changes made since the restore are lost.', 'beltoft-services' ),
 				),
 			)
@@ -269,7 +270,77 @@ final class HostingAccount {
 			}
 		}
 
-		echo '</p><p class="beltoft-hosting-message" role="status" aria-live="polite"></p></div>';
+		echo '</p>';
+
+		if ( $mail && $ready ) {
+			self::print_packs( $r, $mail );
+		}
+
+		echo '<p class="beltoft-hosting-message" role="status" aria-live="polite"></p></div>';
+	}
+
+	/**
+	 * Extra storage per Email lite mailbox: packs of 5 GB, up to four for each, added and ended here.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param Resource $mail Email lite resource.
+	 */
+	private static function print_packs( Resource $r, Resource $mail ): void {
+		$quote = Addons::quote( $r, Addons::KIND_PACK );
+		$boxes = \BeltoftServices\Mail\Mailboxes::all( $mail );
+
+		if ( null === $quote || ! is_array( $boxes ) || array() === $boxes ) {
+			return;
+		}
+
+		$confirm = Addons::confirm_text( Addons::KIND_PACK, $quote );
+		$packs   = Addons::packs( $r );
+
+		echo '<div class="beltoft-hosting-packs"><h4>' . esc_html__( 'Extra mailbox storage', 'beltoft-services' ) . '</h4><p>' . esc_html(
+			sprintf(
+				/* translators: 1: price per month and pack, 2: most packs on one mailbox. */
+				__( 'Add 5 GB to a mailbox for %1$s per month, up to %2$d packs for each mailbox.', 'beltoft-services' ),
+				Addons::money( (float) $quote['unit'] ),
+				Addons::MAX_PACKS
+			)
+		) . '</p><ul>';
+
+		foreach ( $boxes as $box ) {
+			$email = (string) $box['email'];
+			$n     = (int) ( $packs[ $email ] ?? 0 );
+			$ending = count( array_filter( Addons::lines( $r, Addons::KIND_PACK, $email ), static fn( $i ) => 'yes' === (string) $i->get_meta( Addons::I_ENDING ) ) );
+
+			echo '<li>' . esc_html(
+				sprintf(
+					/* translators: 1: mailbox address, 2: size in GB. */
+					__( '%1$s: %2$s GB', 'beltoft-services' ),
+					$email,
+					(string) round( (int) $box['quota_mb'] / 1024, 1 )
+				)
+			);
+
+			if ( $ending > 0 ) {
+				echo ' ' . esc_html(
+					sprintf(
+						/* translators: %d: packs that end at the next renewal. */
+						_n( '(%d pack ends at the next renewal)', '(%d packs end at the next renewal)', $ending, 'beltoft-services' ),
+						$ending
+					)
+				);
+			}
+
+			if ( $n < Addons::MAX_PACKS ) {
+				echo ' <button type="button" data-hosting-action="add_pack" data-mailbox="' . esc_attr( $email ) . '" data-confirm="' . esc_attr( $confirm ) . '">' . esc_html__( 'Add 5 GB', 'beltoft-services' ) . '</button>';
+			}
+
+			if ( $n - $ending > 0 ) {
+				echo ' <button type="button" data-hosting-action="remove_pack" data-mailbox="' . esc_attr( $email ) . '">' . esc_html__( 'Remove a pack', 'beltoft-services' ) . '</button>';
+			}
+
+			echo '</li>';
+		}
+
+		echo '</ul></div>';
 	}
 
 	/**
