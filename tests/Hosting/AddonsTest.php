@@ -628,4 +628,49 @@ class AddonsTest extends HostingCase {
 		$this->assertNotNull( SiteDomains::find( 'shop.other.example' ) );
 		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ) );
 	}
+
+	public function test_nothing_is_sold_on_a_subscription_that_will_not_renew(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$this->assertNotNull( Addons::quote( $r, Addons::KIND_DOMAIN ) );
+
+		$sub = $this->sub( $r );
+		add_filter( 'woocommerce_can_subscription_be_updated_to_on-hold', '__return_true' );
+		$sub->update_status( 'on-hold' );
+		remove_filter( 'woocommerce_can_subscription_be_updated_to_on-hold', '__return_true' );
+		$this->assertNull( Addons::quote( $r, Addons::KIND_DOMAIN ) );
+		$err = Addons::buy( $r, Addons::KIND_DOMAIN, 'other.example' );
+		$this->assertWPError( $err );
+		$this->assertSame( 'failed', $err->get_error_code() );
+		$this->assertSame( 'failed', ( new HostingActions( Resource::find( $r->id() ) ) )->add_domain( 'w' . $r->id(), 'www.other.example' )->get_error_code() );
+		$this->assertSame( array(), wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
+	}
+
+	public function test_a_subscription_with_no_renewal_date_left_sells_nothing(): void {
+		$r   = $this->account();
+		$sub = $this->sub( $r );
+		$sub->update_dates( array( 'next_payment' => 0 ) );
+		$this->assertNull( Addons::quote( $r, Addons::KIND_PACK ) );
+	}
+
+	public function test_an_add_on_is_not_sold_for_a_domain_that_needs_none(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+
+		foreach ( array( 'main.example', 'www.main.example' ) as $target ) {
+			$err = $a->buy_addon( 'domain', $target, 100 );
+			$this->assertWPError( $err );
+			$this->assertSame( 'invalid', $err->get_error_code(), $target );
+		}
+
+		$this->assertIsArray( $a->buy_addon( 'domain', 'other.example', 100 ) );
+		$again = $a->buy_addon( 'domain', 'other.example', 100 );
+		$this->assertWPError( $again );
+		$this->assertSame( 'invalid', $again->get_error_code(), 'Covered by a line already.' );
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ) );
+		$this->assertCount( 1, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
+	}
 }

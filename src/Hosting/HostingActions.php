@@ -538,6 +538,11 @@ final class HostingActions {
 			if ( ! SiteDomains::valid_host( $target ) ) {
 				return $this->error( 'invalid', __( 'The domain name is not valid.', 'beltoft-services' ) );
 			}
+
+			// The account's first domain, and every name under a domain it has, needs no add-on; a paid one is not paid twice.
+			if ( Addons::domain_needing_addon( $this->r, $target ) !== $target || Addons::has( $this->r, Addons::KIND_DOMAIN, $target ) ) {
+				return $this->error( 'invalid', __( 'That domain needs no add-on.', 'beltoft-services' ) );
+			}
 		} elseif ( Addons::KIND_PACK === $kind ) {
 			if ( ! $this->mailbox_exists( $target ) ) {
 				return $this->error( 'not_found', __( 'That mailbox is not on your Email lite.', 'beltoft-services' ) );

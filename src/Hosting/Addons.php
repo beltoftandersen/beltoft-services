@@ -179,7 +179,8 @@ final class Addons {
 		$product = self::product( $kind );
 		$sub     = self::subscription( $r );
 
-		if ( null === $product || null === $sub ) {
+		// A subscription that will not renew (pending cancel, on hold, no date) would deliver the add-on without ever billing it.
+		if ( null === $product || null === $sub || ! $sub->has_status( 'active' ) || (int) $sub->get_time( 'next_payment' ) <= ( $now ?? time() ) ) {
 			return null;
 		}
 
