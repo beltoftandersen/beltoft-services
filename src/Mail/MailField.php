@@ -294,7 +294,7 @@ final class MailField {
 			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[new]" id="' . esc_attr( $id ) . '_new" aria-label="' . esc_attr__( 'New domain in this order', 'beltoft-services' ) . '">';
 
 			foreach ( $fresh as $option ) {
-				echo '<option value="' . esc_attr( $option ) . '"' . selected( $new, $option, false ) . '>' . esc_html( $option ) . '</option>';
+				echo '<option value="' . esc_attr( $option ) . '"' . selected( $new, $option, false ) . '>' . esc_html( \BeltoftServices\Domains\HostName::display( $option ) ) . '</option>';
 			}
 
 			echo '</select></span>';
@@ -306,7 +306,7 @@ final class MailField {
 			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone" aria-label="' . esc_attr__( 'Domain on our name servers', 'beltoft-services' ) . '">';
 
 			foreach ( $zones as $option ) {
-				echo '<option value="' . esc_attr( $option ) . '"' . selected( $zone, $option, false ) . '>' . esc_html( $option ) . '</option>';
+				echo '<option value="' . esc_attr( $option ) . '"' . selected( $zone, $option, false ) . '>' . esc_html( \BeltoftServices\Domains\HostName::display( $option ) ) . '</option>';
 			}
 
 			echo '</select></span>';

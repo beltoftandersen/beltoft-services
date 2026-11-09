@@ -42,6 +42,7 @@ final class Cart {
 		}
 		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
+		add_filter( 'woocommerce_order_item_display_meta_value', array( __CLASS__, 'meta_display' ), 10, 2 );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unverified_dns_items' ) );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_unpriced_domain_items' ) );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'check_duplicate_domain_items' ) );
@@ -277,17 +278,17 @@ final class Cart {
 			$name = strtolower( (string) ( $line['domain'] ?? '' ) );
 			if ( isset( $seen[ $name ] ) ) {
 				/* translators: %s: domain name */
-				return sprintf( __( '%s is in your cart twice. Remove one of them.', 'beltoft-services' ), $name );
+				return sprintf( __( '%s is in your cart twice. Remove one of them.', 'beltoft-services' ), HostName::display( $name ) );
 			}
 			$seen[ $name ] = true;
 			$holder = self::domain_held( $name );
 			if ( null !== $holder ) {
 				if ( get_current_user_id() > 0 && $holder === get_current_user_id() ) {
 					/* translators: %s: domain name */
-					return sprintf( __( '%s is already registered here. Remove it from your cart.', 'beltoft-services' ), $name );
+					return sprintf( __( '%s is already registered here. Remove it from your cart.', 'beltoft-services' ), HostName::display( $name ) );
 				}
 				/* translators: %s: domain name */
-				return sprintf( __( '%s cannot be added right now. Remove it from your cart.', 'beltoft-services' ), $name );
+				return sprintf( __( '%s cannot be added right now. Remove it from your cart.', 'beltoft-services' ), HostName::display( $name ) );
 			}
 		}
 		return null;
@@ -475,9 +476,23 @@ final class Cart {
 	public static function item_data( array $data, array $cart_item ): array {
 		$domain = $cart_item['beltoft_services_domain'] ?? null;
 		if ( is_array( $domain ) && ! empty( $domain['domain'] ) ) {
-			$data[] = array( 'key' => 'transfer' === ( $domain['mode'] ?? '' ) ? __( 'Transfer', 'beltoft-services' ) : __( 'Domain', 'beltoft-services' ), 'value' => (string) $domain['domain'] );
+			$data[] = array( 'key' => 'transfer' === ( $domain['mode'] ?? '' ) ? __( 'Transfer', 'beltoft-services' ) : __( 'Domain', 'beltoft-services' ), 'value' => (string) $domain['domain'], 'display' => HostName::display( (string) $domain['domain'] ) );
 		}
 		return $data;
+	}
+
+	/** Is this the domain line of an order item? The key was stored in the locale of the order, so the value is checked as well. */
+	private static function is_domain_meta( object $meta ): bool {
+		$key = (string) ( $meta->key ?? '' );
+		if ( in_array( $key, array( 'Domain', __( 'Domain', 'beltoft-services' ) ), true ) ) {
+			return true;
+		}
+		return 1 === preg_match( '/^\s*(?:<p>)?\s*(?:[a-z0-9-]+\.)*xn--[a-z0-9-]+(?:\.[a-z0-9-]+)+\s*(?:<\/p>)?\s*$/i', (string) ( $meta->value ?? '' ) );
+	}
+
+	/** The domain meta line of an order item in Unicode letters (the stored value stays punycode). */
+	public static function meta_display( $value, $meta ) {
+		return is_object( $meta ) && is_string( $value ) && false !== stripos( $value, 'xn--' ) && ( ! isset( $meta->key ) || ! str_starts_with( (string) $meta->key, '_' ) ) && self::is_domain_meta( $meta ) ? (string) preg_replace_callback( '/(?:[a-z0-9-]+\\.)*xn--[a-z0-9-]+(?:\\.[a-z0-9-]+)*/i', static fn ( array $m ): string => esc_html( HostName::display( $m[0] ) ), $value ) : $value;
 	}
 
 	/** Keep each domain on its own subscription, so each gets its own license and renewal date. */

@@ -422,6 +422,13 @@ class CheckoutTest extends HostingCase {
 		$this->assertNotNull( Records::for_resource( $r->id() ) );
 	}
 
+	public function test_an_own_domain_with_national_letters_is_accepted_and_stored_as_punycode(): void {
+		$one = SiteField::resolve( array( 'mode' => 'own', 'host' => "www.\u{e6}blegr\u{f8}d-\u{f8}ster\u{e5}.dk" ), 0 );
+		$this->assertIsArray( $one );
+		$this->assertSame( 'www.xn--blegrd-ster-78ab1xc.dk', $one['label'] );
+		$this->assertSame( 'www.xn--blegrd-ster-78ab1xc.dk', $one['host'] ?? $one['label'] );
+	}
+
 	public function test_a_domain_order_needs_no_temporary_name_and_gets_a_unique_one(): void {
 		$one = SiteField::resolve( array( 'mode' => 'own', 'host' => 'www.Example.com' ), 0 );
 		$this->assertIsArray( $one );

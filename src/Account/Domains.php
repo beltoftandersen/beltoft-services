@@ -318,7 +318,7 @@ final class Domains {
 			$rows[] = array(
 				'id'     => 'claim-' . (int) $claim['id'],
 				'url'    => self::url_add(),
-				'name'   => (string) $claim['domain'],
+				'name'   => \BeltoftServices\Domains\HostName::display( (string) $claim['domain'] ),
 				'sub'    => __( 'DNS hosting', 'beltoft-services' ),
 				'state'  => 'verified' === $claim['status'] ? __( 'Verified, finish adding', 'beltoft-services' ) : __( 'Waiting for verification', 'beltoft-services' ),
 				'tone'   => 'busy',

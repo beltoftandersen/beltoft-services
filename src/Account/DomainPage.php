@@ -54,7 +54,7 @@ final class DomainPage {
 		$state = (string) $resource->get( 'state' );
 		$group = Panel::group( $state, $resource );
 		$vars  = array(
-			'title'        => (string) $resource->get( 'domain' ),
+			'title'        => \BeltoftServices\Domains\HostName::display( (string) $resource->get( 'domain' ) ),
 			'group'        => $group,
 			'badge'        => Panel::label( $state, $resource ),
 			'message'      => Panel::message( $state, $resource ),

@@ -172,7 +172,7 @@ final class SslNames {
 
 			if ( $r->is_live() && strtolower( (string) $r->get( 'ssl_name' ) ) === strtolower( $name ) ) {
 				/* translators: %s: name. */
-				return sprintf( __( 'You already have a certificate for %s. Reissue it from your account instead of ordering another.', 'beltoft-services' ), $name );
+				return sprintf( __( 'You already have a certificate for %s. Reissue it from your account instead of ordering another.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $name ) );
 			}
 
 			if ( strtotime( (string) ( $license['created_at'] ?? '' ) . ' UTC' ) > time() - DAY_IN_SECONDS ) {

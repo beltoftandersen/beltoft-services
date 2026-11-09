@@ -36,7 +36,7 @@ if ( '' !== $customer_name ) {
 <table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
 	<tr>
 		<th scope="row" style="text-align:left"><?php esc_html_e( 'Your website', 'beltoft-services' ); ?></th>
-		<td><a href="<?php echo esc_url( $beltoft_services_h['site_url'] ); ?>"><?php echo esc_html( $beltoft_services_h['site_url'] ); ?></a></td>
+		<td><a href="<?php echo esc_url( $beltoft_services_h['site_url'] ); ?>"><?php echo esc_html( \BeltoftServices\Domains\HostName::display_url( $beltoft_services_h['site_url'] ) ); ?></a></td>
 	</tr>
 	<tr>
 		<th scope="row" style="text-align:left"><?php esc_html_e( 'WordPress admin', 'beltoft-services' ); ?></th>

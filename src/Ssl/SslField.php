@@ -294,17 +294,17 @@ final class SslField {
 
 			if ( ! in_array( $method, array( 'auto', 'dns', 'file' ), true ) ) {
 				/* translators: %s: domain name. */
-				return new \WP_Error( 'ssl_validation', sprintf( __( 'Choose how %s is validated: automatically, with a DNS record or with a file.', 'beltoft-services' ), $one[0] ) );
+				return new \WP_Error( 'ssl_validation', sprintf( __( 'Choose how %s is validated: automatically, with a DNS record or with a file.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $one[0] ) ) );
 			}
 
 			if ( 'auto' === $method && null === SslNames::zone_for( $one[0], $user_id ) ) {
 				/* translators: %s: domain name. */
-				return new \WP_Error( 'ssl_auto', sprintf( __( 'Automatic validation needs %s on our name servers. Choose another method for it.', 'beltoft-services' ), $one[0] ) );
+				return new \WP_Error( 'ssl_auto', sprintf( __( 'Automatic validation needs %s on our name servers. Choose another method for it.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $one[0] ) ) );
 			}
 
 			if ( isset( $seen[ $one[0] ] ) ) {
 				/* translators: %s: domain name. */
-				return new \WP_Error( 'ssl_duplicate', sprintf( __( '%s is entered twice.', 'beltoft-services' ), $one[0] ) );
+				return new \WP_Error( 'ssl_duplicate', sprintf( __( '%s is entered twice.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $one[0] ) ) );
 			}
 
 			$seen[ $one[0] ] = true;

@@ -120,6 +120,13 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'A domain hosted elsewhere', $html );
 	}
 
+	public function test_resolve_accepts_a_name_with_national_letters_and_stores_punycode(): void {
+		$user = self::factory()->user->create();
+
+		$this->assertSame( 'xn--blegrd-ster-78ab1xc.dk', MailField::resolve( array( 'mode' => 'own', 'own' => "\u{e6}blegr\u{f8}d-\u{f8}ster\u{e5}.dk" ), $user ) );
+		$this->assertSame( 'mail_refused', MailField::resolve( array( 'mode' => 'own', 'own' => "\u{e6} \u{f8}.dk" ), $user )->get_error_code() );
+	}
+
 	public function test_resolve_checks_the_name(): void {
 		$user = self::factory()->user->create();
 		$this->our_zone( $user, 'mine.example' );

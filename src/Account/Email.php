@@ -233,7 +233,7 @@ final class Email extends ServiceArea {
 	public function title_of( Resource $resource, array $view ): string {
 		$domain = MailGuard::domain( $resource );
 
-		return '' !== $domain ? $domain : (string) ( $view['product'] ?? '' );
+		return '' !== $domain ? \BeltoftServices\Domains\HostName::display( $domain ) : (string) ( $view['product'] ?? '' );
 	}
 
 	/**
@@ -265,7 +265,7 @@ final class Email extends ServiceArea {
 		return array(
 			'id'      => $resource->id(),
 			'url'     => $this->url( $view['license'] ),
-			'name'    => '' !== MailGuard::domain( $resource ) ? MailGuard::domain( $resource ) : (string) ( $view['product'] ?? '' ),
+			'name'    => '' !== MailGuard::domain( $resource ) ? \BeltoftServices\Domains\HostName::display( MailGuard::domain( $resource ) ) : (string) ( $view['product'] ?? '' ),
 			'details' => sprintf(
 				/* translators: 1: mailboxes in use across the whole plan, 2: mailboxes the plan allows */
 				_n( '%1$d of %2$d mailbox', '%1$d of %2$d mailboxes', $limits['mailboxes'], 'beltoft-services' ),
