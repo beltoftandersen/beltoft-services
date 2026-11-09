@@ -227,6 +227,94 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertSame( 'two.example', $meta2[ MailDomain::META_DOMAIN ] );
 	}
 
+	/** Puts a domain registration line next to the mail line already in the cart. */
+	private function add_domain_line( string $name, string $mode = 'register' ): string {
+		$domain = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$key    = WC()->cart->add_to_cart( $domain->get_id(), 1, 0, array(), array( 'beltoft_services_domain' => array( 'domain' => $name, 'mode' => $mode ) ) );
+
+		if ( ! $key ) {
+			$this->markTestSkipped( 'The fixture domain product cannot be put in the cart here.' );
+		}
+
+		return (string) $key;
+	}
+
+	public function test_the_email_step_offers_a_domain_registered_in_the_same_order(): void {
+		$key = $this->in_cart( $this->product() );
+		$this->add_domain_line( 'Brand-New.example' );
+		wp_set_current_user( 0 );
+		ob_start();
+		MailField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'A new domain in this order', $html );
+		$this->assertStringContainsString( '<option value="brand-new.example"', $html );
+		$this->assertStringContainsString( 'type="radio"', $html );
+
+		$this->post( $key, array( 'mode' => 'new', 'new' => 'brand-new.example' ) );
+		$this->assertSame( array(), $this->errors() );
+
+		$this->post( $key, array( 'mode' => 'new', 'new' => 'other.example' ) );
+		$this->assertNotSame( array(), $this->errors(), 'Only a domain of this cart is a new domain.' );
+	}
+
+	public function test_a_transfer_counts_a_dns_line_does_not_and_without_one_the_find_link_shows(): void {
+		$this->in_cart( $this->product() );
+		$this->add_domain_line( 'moving.example', 'transfer' );
+		$dns = $this->add_domain_line( 'dns-only.example' );
+		WC()->cart->cart_contents[ $dns ]['beltoft_services_domain']['mode'] = 'dns';
+		$this->assertSame( array( 'moving.example' ), MailField::cart_domains() );
+
+		WC()->cart->empty_cart();
+		$this->in_cart( $this->product() );
+		ob_start();
+		MailField::render();
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'A new domain in this order', $html );
+		$this->assertStringContainsString( 'No domain yet?', $html );
+	}
+
+	public function test_a_new_domain_line_is_marked_to_wait_and_carries_the_deadline_to_the_resource(): void {
+		$product = $this->product();
+		$key     = $this->in_cart( $product );
+		$this->add_domain_line( 'fresh.example' );
+		$this->post( $key, array( 'mode' => 'new', 'new' => 'fresh.example' ) );
+
+		$item = new \WC_Order_Item_Product();
+		$item->set_product_id( $product->get_id() );
+		MailField::save_on_item( $item, $key );
+		$this->assertSame( 'fresh.example', $item->get_meta( MailField::ITEM_META ) );
+		$this->assertSame( '1', $item->get_meta( MailField::WAIT_META ) );
+
+		$order = wc_create_order();
+		$order->add_item( $item );
+		$order->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$meta    = MailField::initial_meta( array(), $license, Registry::get( 'mail' ) );
+		$this->assertEqualsWithDelta( time() + 7 * DAY_IN_SECONDS, (int) $meta['mail_wait_until'], 5 );
+	}
+
+	public function test_the_mail_domain_waits_for_the_registration_and_then_sets_up_as_ours(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'waiting.example', array( 'mail_wait_until' => time() + 3 * DAY_IN_SECONDS ), array(), $user );
+		$res  = Registry::get( 'mail' )->provision( $r );
+		$this->assertTrue( $res->is_retry(), 'Waits while the domain is not ready.' );
+		$this->assertSame( 'Waiting for the domain registration to finish.', $res->error() );
+
+		$this->our_zone( $user, 'waiting.example' );
+		$res = Registry::get( 'mail' )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertSame( 'ours', $res->meta()['mail_mode'] ?? ( Resource::find( $r->id() )->get( 'mail_mode' ) ) );
+	}
+
+	public function test_a_registration_that_never_arrives_falls_back_to_the_txt_proof_after_seven_days(): void {
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		$r   = $this->mail_resource( 'late.example', array( 'mail_wait_until' => time() - 60 ) );
+		$res = Registry::get( 'mail' )->provision( $r );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertSame( 'external', Resource::find( $r->id() )->get( 'mail_mode' ) );
+	}
+
 	// -- Plan changes ---------------------------------------------------------------------------
 
 	private function switch_message( int $subscription, \WC_Product $target, string $message = '' ) {

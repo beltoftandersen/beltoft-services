@@ -247,6 +247,12 @@ final class MailDriver implements Driver, NeedsBilling {
 			return 'ours';
 		}
 
+		// A domain registered or transferred in the same order: wait for it, then it is ours. After the deadline the
+		// usual TXT proof applies.
+		if ( (int) $r->get( MailField::META_WAIT_UNTIL ) > time() ) {
+			return StepResult::retry( 600, 'Waiting for the domain registration to finish.', array(), true );
+		}
+
 		$token = MailDomain::token( $r );
 
 		if ( '' === $token ) {
