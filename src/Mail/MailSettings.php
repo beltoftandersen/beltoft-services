@@ -149,7 +149,7 @@ final class MailSettings {
 			'type'    => 'email',
 			'default' => '',
 			'label'   => __( 'DMARC report address', 'beltoft-services' ),
-			'desc'    => __( 'Where receivers send aggregate reports (rua). Empty leaves the report address out of the DMARC record.', 'beltoft-services' ),
+			'desc'    => __( 'Where DMARC reports for customer domains go. Empty: the WordPress admin email.', 'beltoft-services' ),
 		);
 
 		$fields['mail_rl_minute'] = $limits + array(
@@ -224,7 +224,7 @@ final class MailSettings {
 	}
 
 	/**
-	 * The DMARC report address, '' when unset.
+	 * The DMARC report address as set, '' when unset (the DNS records then use the admin email).
 	 */
 	public static function dmarc_rua(): string {
 		$email = sanitize_email( (string) Settings::get( 'mail_dmarc_rua' ) );

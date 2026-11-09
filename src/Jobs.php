@@ -125,6 +125,17 @@ final class Jobs {
 	}
 
 	/**
+	 * Whether a plugin action with these arguments is waiting to run. A running action does not count, so an
+	 * action can schedule its own next attempt (as_has_scheduled_action also counts the running one).
+	 *
+	 * @param string            $hook Action hook.
+	 * @param array<int, mixed> $args Action arguments.
+	 */
+	public static function pending_action( string $hook, array $args ): bool {
+		return function_exists( 'as_next_scheduled_action' ) && is_int( as_next_scheduled_action( $hook, $args, self::GROUP ) );
+	}
+
+	/**
 	 * The jobs waiting for a resource, as action id => scheduled time. Only pending jobs count:
 	 * the job that is running now must be able to queue its own follow-up
 	 * (as_has_scheduled_action also counts running ones).

@@ -105,6 +105,20 @@
 		window.location.reload();
 	}
 
+	// Draws the card again from the server (counts, mailbox list and limits) without leaving the page, so a password panel
+	// can be shown over fresh numbers. Any failure keeps the page as it is.
+	function redraw( box ) {
+		return window.fetch( window.location.href, { credentials: 'same-origin', headers: { Accept: 'text/html' } } ).then( function ( response ) {
+			return response.ok ? response.text() : '';
+		} ).then( function ( html ) {
+			var next = html ? new window.DOMParser().parseFromString( html, 'text/html' ).querySelector( '[data-mail-card]' ) : null;
+
+			if ( next ) {
+				box.innerHTML = next.innerHTML;
+			}
+		} ).catch( function () {} );
+	}
+
 	function lines( text ) {
 		return ( text || '' ).split( /[\n,;]+/ ).map( function ( part ) {
 			return part.trim();
@@ -180,12 +194,21 @@
 			guarded( box, target, strings.creating, function ( h ) {
 				return call( box, 'POST', '/mail/mailboxes', body ).then( function ( result ) {
 					if ( ! result.ok ) {
+						// The plan is full: the page shows the way on (delete a mailbox, change plan), so the message is said once, on the bar.
+						if ( result.data && 'beltoft_services_mail_limit' === result.data.code ) {
+							S.fail( h, problem( result ) );
+
+							return redraw( box );
+						}
+
 						S.fail( h, problem( result ), localField );
 
 						return null;
 					}
 
-					return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+					return redraw( box ).then( function () {
+						return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+					} );
 				} );
 			} );
 
@@ -247,6 +270,75 @@
 							S.fail( h, problem( result ) );
 						}
 					} );
+				} );
+			} );
+
+			return;
+		}
+
+		if ( target.hasAttribute( 'data-mail-domain-submit' ) ) {
+			var addForm = target.closest( '[data-mail-domain-add]' );
+			var chosen = addForm.querySelector( '[data-mail-domain-mode]:checked' );
+			var ours = chosen && 'ours' === chosen.value;
+			var domainField = addForm.querySelector( ours ? '[data-mail-domain-zone]' : '[data-mail-domain-own]' );
+
+			guarded( box, target, strings.adding, function ( h ) {
+				return call( box, 'POST', '/mail-domains', { mode: ours ? 'ours' : 'own', domain: domainField.value.trim() } ).then( function ( result ) {
+					if ( result.ok && result.data.url ) {
+						// The new domain's page: it shows the proof record to add for a domain at another provider.
+						window.location.href = result.data.url;
+					} else if ( result.ok ) {
+						fresh( box );
+					} else {
+						S.fail( h, problem( result ), domainField );
+					}
+				} );
+			} );
+
+			return;
+		}
+
+		if ( target.hasAttribute( 'data-mail-domain-remove' ) ) {
+			var removed = target.getAttribute( 'data-mail-domain-remove' );
+			var rest = target.closest( '[data-mail-domains]' );
+			var back = rest ? rest.querySelector( 'a[href]' ) : null;
+
+			if ( target.disabled ) {
+				return;
+			}
+
+			S.confirm( { text: strings.removeAsk, confirm: target.textContent, danger: true } ).then( function ( yes ) {
+				if ( ! yes ) {
+					return;
+				}
+
+				guarded( box, target, strings.removing, function ( h ) {
+					return call( box, 'DELETE', '/mail-domains/' + encodeURIComponent( removed ) ).then( function ( result ) {
+						if ( result.ok ) {
+							// The page of a removed domain is gone: back to the first domain of the plan.
+							if ( back ) {
+								window.location.href = back.getAttribute( 'href' );
+							} else {
+								fresh( box );
+							}
+						} else {
+							S.fail( h, problem( result ) );
+						}
+					} );
+				} );
+			} );
+
+			return;
+		}
+
+		if ( target.hasAttribute( 'data-mail-proof-check' ) ) {
+			guarded( box, target, strings.checking, function ( h ) {
+				return call( box, 'POST', '/mail/proof/check' ).then( function ( result ) {
+					if ( result.ok ) {
+						fresh( box );
+					} else {
+						S.fail( h, problem( result ) );
+					}
 				} );
 			} );
 

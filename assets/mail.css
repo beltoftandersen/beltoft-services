@@ -13,6 +13,12 @@
 .beltoft-services-mail .beltoft-services-mail__actions details[open] { display: block; margin: 8px 0 0; }
 .beltoft-services-mail .beltoft-services-mail__actions summary { display: inline-flex; align-items: center; cursor: pointer; list-style: none; }
 .beltoft-services-mail .beltoft-services-mail__actions summary::-webkit-details-marker { display: none; }
+/* The delete disclosure is a button: no plus sign behind it (the theme adds one to every disclosure of the account). */
+.beltoft-services-mail .beltoft-services-mail__actions summary::after, .beltoft-services-mail .beltoft-services-mail__actions summary::before { content: none; }
+.beltoft-services-mail .beltoft-services-mail__actions summary { justify-content: center; }
+/* A notice has room above it, also right under a button. */
+.beltoft-services-mail p.beltoft-services-panel__notice { margin: 16px 0; }
+.beltoft-services-mail [data-mail-domains] { margin-bottom: 16px; }
 .beltoft-services-mail .beltoft-services-mail__at { display: inline-block; margin-left: 8px; color: var(--bsm-soft); overflow-wrap: anywhere; }
 .beltoft-services-mail .beltoft-services-db__form textarea { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
 .beltoft-services-mail .beltoft-services-mail__secret { margin: 16px 0; padding: 16px; background: var(--bsm-warm); }
@@ -26,6 +32,6 @@
 	.beltoft-services-mail .beltoft-services-mail__table tr { padding: 12px 0; border-bottom: 1px solid var(--bsm-rule); }
 	.beltoft-services-mail .beltoft-services-mail__table tr:last-child { border-bottom: 0; }
 	.beltoft-services-mail .beltoft-services-mail__table td { padding: 4px 0; border: 0; }
-	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: auto; padding-top: 8px; white-space: normal; text-align: left; }
+	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: auto; min-width: 0; padding-top: 8px; white-space: normal; text-align: left; }
 	.beltoft-services-mail .beltoft-services-mail__actions .button, .beltoft-services-mail .beltoft-services-mail__actions details { margin: 0 8px 8px 0; }
 }

@@ -132,7 +132,7 @@ final class Ssl extends ServiceArea {
 	public function title_of( Resource $resource, array $view ): string {
 		$name = (string) $resource->get( 'ssl_name' );
 
-		return '' !== $name ? $name : (string) ( $view['product'] ?? '' );
+		return '' !== $name ? \BeltoftServices\Domains\HostName::display( $name ) : (string) ( $view['product'] ?? '' );
 	}
 
 	/**
@@ -159,7 +159,7 @@ final class Ssl extends ServiceArea {
 		return array(
 			'id'      => $resource->id(),
 			'url'     => $this->url( $view['license'] ),
-			'name'    => '' !== (string) $resource->get( 'ssl_name' ) ? (string) $resource->get( 'ssl_name' ) : (string) ( $view['product'] ?? '' ),
+			'name'    => '' !== (string) $resource->get( 'ssl_name' ) ? \BeltoftServices\Domains\HostName::display( (string) $resource->get( 'ssl_name' ) ) : (string) ( $view['product'] ?? '' ),
 			'details' => (string) ( $view['product'] ?? '' ),
 			'state'   => 'ready' === (string) $resource->get( 'state' ) ? Panels::status_text( $resource ) : $state,
 			'tone'    => $tone,

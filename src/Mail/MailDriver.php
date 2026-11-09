@@ -11,6 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -56,7 +57,7 @@ final class MailDriver implements Driver, NeedsBilling {
 	 */
 	public function plan_fields(): array {
 		return array(
-			'mailboxes' => array( 'number', __( 'Mailboxes', 'beltoft-services' ), __( 'How many mailboxes one email domain may have.', 'beltoft-services' ), 1, true ),
+			'mailboxes' => array( 'number', __( 'Mailboxes', 'beltoft-services' ), __( 'How many mailboxes the whole plan may have, over all its domains.', 'beltoft-services' ), 1, true ),
 			'quota_mb'  => array( 'number', __( 'Size of each mailbox (MB)', 'beltoft-services' ), __( 'The storage of every mailbox, in MB (5 GB is 5120).', 'beltoft-services' ), 5120, true ),
 			'aliases'   => array( 'number', __( 'Aliases', 'beltoft-services' ), __( 'How many aliases one email domain may have.', 'beltoft-services' ), 20, true ),
 			'domains'   => array( 'number', __( 'Email domains', 'beltoft-services' ), __( 'How many email domains the plan allows. Each domain is one service.', 'beltoft-services' ), 1, true ),
@@ -246,6 +247,12 @@ final class MailDriver implements Driver, NeedsBilling {
 			return 'ours';
 		}
 
+		// A domain registered or transferred in the same order: wait for it, then it is ours. After the deadline the
+		// usual TXT proof applies.
+		if ( (int) $r->get( MailField::META_WAIT_UNTIL ) > time() ) {
+			return StepResult::wait( 600, 'Waiting for the domain registration to finish.', (int) $r->get( MailField::META_WAIT_UNTIL ) );
+		}
+
 		$token = MailDomain::token( $r );
 
 		if ( '' === $token ) {
@@ -432,6 +439,8 @@ final class MailDriver implements Driver, NeedsBilling {
 	 * old size gets the new one.
 	 */
 	public function update_plan( Resource $r ): StepResult {
+		$this->plan_to_children( $r );
+
 		if ( ! $this->created( $r ) ) {
 			return StepResult::done();
 		}
@@ -487,7 +496,30 @@ final class MailDriver implements Driver, NeedsBilling {
 			}
 		}
 
+		\BeltoftServices\Hosting\MailPacks::reapply( $r );
+
 		return StepResult::done( array( 'mail_limits' => $next ), 'Email plan updated' );
+	}
+
+	/**
+	 * A plan root hands its plan to every live extra domain, each of which raises its own limits like any mail resource.
+	 * The root's lock is held by the job, then each child's is taken: the order of MailPlan::locked().
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function plan_to_children( Resource $r ): void {
+		$plan = (array) $r->get( 'plan' );
+
+		foreach ( MailPlan::members( $r ) as $member ) {
+			if ( $member->id() === $r->id() || $member->get( 'plan' ) === $plan ) {
+				continue;
+			}
+
+			// The same call Lifecycle::apply_plan makes: stored under the lock of the child, then its job runs.
+			if ( true === $member->change_plan( $plan, 'Plan changed with the email plan' ) ) {
+				Jobs::enqueue( $member->id() );
+			}
+		}
 	}
 
 	public function delete( Resource $r ): StepResult {
@@ -605,6 +637,19 @@ final class MailDriver implements Driver, NeedsBilling {
 			__( 'Size (MB)', 'beltoft-services' ) => (string) $limits['quota_mb'],
 			__( 'Aliases', 'beltoft-services' )   => (string) $limits['aliases'],
 		);
+
+		$root    = MailPlan::root( $r );
+		$members = MailPlan::members( $root );
+
+		if ( count( $members ) > 1 || $root->id() !== $r->id() ) {
+			$names = array();
+
+			foreach ( $members as $member ) {
+				$names[] = MailGuard::domain( $member ) . ( $member->id() === $root->id() ? '' : ' (' . (string) $member->get( 'state' ) . ')' );
+			}
+
+			$rows[ __( 'Plan domains', 'beltoft-services' ) ] = implode( ', ', $names );
+		}
 
 		echo '<h3>' . esc_html__( 'Business email', 'beltoft-services' ) . '</h3><table class="widefat striped"><tbody>';
 

@@ -37,7 +37,14 @@ final class MailProductsTest extends MailTestCase {
 		$this->assertSame( '', $this->run_command( array( 'dry-run' => true ) ) );
 		$this->assertSame( 0, MailProductsCommand::existing() );
 		$this->assertStringContainsString( 'Personal: 5 EUR per month', \WP_CLI::text() );
-		$this->assertStringContainsString( 'Business: 60 EUR per month excluding VAT, 10 mailbox(es), 20480 MB each, 200 aliases, 10 domain(s)', \WP_CLI::text() );
+		$this->assertStringContainsString( 'Business: 60 EUR per month excluding VAT, 10 mailboxes of 20 GB, 200 aliases, 10 domains', \WP_CLI::text() );
+	}
+
+	public function test_variation_descriptions_read_in_plain_words(): void {
+		$this->assertSame( '5 mailboxes of 10 GB, 50 aliases, 3 domains', MailProductsCommand::plan_description( array( 'mailboxes' => 5, 'quota_mb' => 10240, 'aliases' => 50, 'domains' => 3 ) ) );
+		$this->assertSame( '2 mailboxes of 512 MB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 2, 'quota_mb' => 512, 'aliases' => 1, 'domains' => 1 ) ) );
+		$this->assertSame( '1 mailbox of 1.5 GB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 1, 'quota_mb' => 1536, 'aliases' => 1, 'domains' => 1 ) ) );
+		$this->assertSame( '1 mailbox of 5 GB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 1, 'quota_mb' => 5120, 'aliases' => 1, 'domains' => 1 ) ) );
 	}
 
 	public function test_one_of_the_flags_is_needed(): void {
@@ -97,5 +104,21 @@ final class MailProductsTest extends MailTestCase {
 		$this->run_command( array( 'create' => true ) );
 		remove_all_filters( 'beltoft_services_mail_plans' );
 		$this->assertCount( 1, wc_get_product( MailProductsCommand::existing() )->get_children() );
+	}
+
+	public function test_old_descriptions_with_bracketed_plurals_can_be_refreshed(): void {
+		$this->run_command( array( 'create' => true ) );
+		$id = MailProductsCommand::existing();
+		foreach ( wc_get_product( $id )->get_children() as $vid ) {
+			$v = wc_get_product( $vid );
+			$v->set_description( '5 mailbox(es) of 10 GB, 50 aliases, 3 domain(s)' );
+			$v->save();
+		}
+
+		$this->assertSame( '', $this->run_command( array( 'refresh-descriptions' => true ) ) );
+		$descriptions = array_map( static fn( $vid ) => wc_get_product( $vid )->get_description(), wc_get_product( $id )->get_children() );
+		$this->assertContains( '5 mailboxes of 10 GB, 50 aliases, 3 domains', $descriptions );
+		$this->assertStringNotContainsString( '(es)', implode( ' ', $descriptions ) );
+		$this->assertSame( 0, MailProductsCommand::refresh_descriptions(), 'A second run changes nothing.' );
 	}
 }

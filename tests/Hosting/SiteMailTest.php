@@ -93,7 +93,7 @@ class SiteMailTest extends HostingCase {
 		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
 		$r = Resource::find( $r->id() );
 
-		$child  = LiteMail::enable( $r, 'shop.example' );
+		$child  = $this->lite( $r, 'shop.example' );
 		$result = Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$child->set( array_merge( $result->meta(), array( 'state' => 'ready', 'desired' => 'ready' ) ) );
@@ -236,6 +236,7 @@ class SiteMailTest extends HostingCase {
 		$this->provision_fully( $r );
 		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
 		$r = Resource::find( $r->id() );
+		$this->connect_domain( $r, 'twice.example' );
 
 		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
 		$name  = \BeltoftServices\Locks::name( 'hosting-site', $r->id() );
@@ -262,7 +263,7 @@ class SiteMailTest extends HostingCase {
 		$none = ( new SiteMail( $r ) )->enable_system_mailbox();
 		$this->assertTrue( $none->is_failed() );
 
-		$child = LiteMail::enable( $r, 'later.example' );
+		$child = $this->lite( $r, 'later.example' );
 		$this->assertTrue( ( new SiteMail( Resource::find( $r->id() ) ) )->enable_system_mailbox()->is_failed(), 'The child is not ready yet.' );
 		$this->assertNull( $this->mailcow->mailbox( 'wordpress@later.example' ) );
 		$this->assertNotNull( $child );
@@ -312,8 +313,8 @@ class SiteMailTest extends HostingCase {
 		\BeltoftServices\Hosting\HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
 		wp_set_current_user( 0 );
-		$this->assertStringContainsString( 'Set up Email lite so your websites can send mail', $html );
-		$this->assertStringContainsString( 'data-hosting-action="enable_mail"', $html );
+		$this->assertStringContainsString( 'Connect your own domain to a website to set up Email lite', $html );
+		$this->assertStringNotContainsString( 'data-hosting-action="enable_mail"', $html );
 
 		// Deleting the account has no mail step to run.
 		$this->assertTrue( $this->driver->delete( Resource::find( $r->id() ) )->is_done() );

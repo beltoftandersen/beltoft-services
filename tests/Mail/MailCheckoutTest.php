@@ -115,7 +115,16 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertStringContainsString( 'type="radio"', $html );
 		$this->assertStringContainsString( '<option value="mine.example"', $html );
 		$this->assertStringContainsString( '[own]', $html );
-		$this->assertStringContainsString( 'A domain hosted elsewhere', $html );
+		$this->assertStringContainsString( 'One of your domains with us', $html );
+		$this->assertStringContainsString( 'A domain at another provider', $html );
+		$this->assertStringNotContainsString( 'A domain hosted elsewhere', $html );
+	}
+
+	public function test_resolve_accepts_a_name_with_national_letters_and_stores_punycode(): void {
+		$user = self::factory()->user->create();
+
+		$this->assertSame( 'xn--blegrd-ster-78ab1xc.dk', MailField::resolve( array( 'mode' => 'own', 'own' => "\u{e6}blegr\u{f8}d-\u{f8}ster\u{e5}.dk" ), $user ) );
+		$this->assertSame( 'mail_refused', MailField::resolve( array( 'mode' => 'own', 'own' => "\u{e6} \u{f8}.dk" ), $user )->get_error_code() );
 	}
 
 	public function test_resolve_checks_the_name(): void {
@@ -181,6 +190,56 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertSame( array(), $this->errors() );
 	}
 
+	public function test_the_order_line_shows_the_email_domain(): void {
+		$item = new \WC_Order_Item_Product();
+		$item->add_meta_data( MailField::ITEM_META, 'Shown.Example', true );
+		$rows = array_values( $item->get_formatted_meta_data() );
+
+		$this->assertCount( 1, $rows );
+		$this->assertSame( 'Email domain', $rows[0]->display_key );
+		$this->assertStringContainsString( 'shown.example', $rows[0]->display_value );
+		$this->assertCount( 0, ( new \WC_Order_Item_Product() )->get_formatted_meta_data(), 'A line without the choice shows nothing.' );
+	}
+
+	public function test_a_domain_waiting_for_its_registration_has_a_fixed_text_for_the_customer(): void {
+		$text = 'Waiting for your domain registration to finish.';
+		$r    = $this->mail_resource( 'wait.example', array( 'mail_wait_until' => time() + DAY_IN_SECONDS, 'last_error' => 'secret detail' ) );
+
+		$this->assertSame( $text, \BeltoftServices\Account\Panel::message( 'provisioning', Resource::find( $r->id() ) ) );
+		$wait = MailField::progress_wait( array(), Resource::find( $r->id() ), 'mail', '' );
+		$this->assertSame( $text, $wait['text'] );
+
+		$plain = $this->mail_resource( 'plain.example' );
+		$this->assertSame( 'Your service is being set up. This page updates by itself.', \BeltoftServices\Account\Panel::message( 'provisioning', Resource::find( $plain->id() ) ) );
+		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $plain->id() ), 'mail', '' ) );
+
+		$past = $this->mail_resource( 'past.example', array( 'mail_wait_until' => time() - 60 ) );
+		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $past->id() ), 'mail', '' ), 'After the deadline the generic text applies.' );
+
+		$proved = $this->mail_resource( 'proved.example', array( 'mail_wait_until' => time() + DAY_IN_SECONDS, 'steps' => array( 'proof' ) ) );
+		$this->assertSame( array(), MailField::progress_wait( array(), Resource::find( $proved->id() ), 'mail', '' ), 'Once the proof step has run the wait is over.' );
+	}
+
+	public function test_a_wait_for_the_proof_or_the_registration_shows_the_waiting_text_and_no_time_estimate(): void {
+		$proof = $this->mail_resource( 'prooftext.example', array( 'mail_mode' => 'external', 'mail_proof_until' => time() + DAY_IN_SECONDS ) );
+		$proof->set( array( 'state' => 'provisioning', 'op' => 'provision', 'steps' => array() ) );
+		$p = \BeltoftServices\Progress::build( Resource::find( $proof->id() ) );
+		$this->assertSame( 'Waiting for the proof that the domain is yours. Add the record on the DNS tab.', $p['text'] );
+		$this->assertSame( '', $p['eta'] );
+		$this->assertStringNotContainsString( 'Usually about', $p['text'] );
+		$this->assertSame( $p['text'], \BeltoftServices\Account\Panel::message( 'provisioning', Resource::find( $proof->id() ) ) );
+
+		$reg = $this->mail_resource( 'regtext.example', array( 'mail_wait_until' => time() + DAY_IN_SECONDS ) );
+		$reg->set( array( 'state' => 'provisioning', 'op' => 'provision', 'steps' => array() ) );
+		$p = \BeltoftServices\Progress::build( Resource::find( $reg->id() ) );
+		$this->assertSame( 'Waiting for your domain registration to finish.', $p['text'] );
+		$this->assertSame( '', $p['eta'] );
+
+		$plain = $this->mail_resource( 'plaintext.example' );
+		$plain->set( array( 'state' => 'provisioning', 'op' => 'provision', 'steps' => array() ) );
+		$this->assertStringContainsString( 'Usually about', \BeltoftServices\Progress::build( Resource::find( $plain->id() ) )['text'], 'Ordinary setup work keeps its estimate.' );
+	}
+
 	public function test_the_domain_is_saved_on_the_line_and_becomes_resource_meta(): void {
 		$product = $this->product();
 		$key     = $this->in_cart( $product );
@@ -225,6 +284,115 @@ final class MailCheckoutTest extends MailTestCase {
 		$second = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
 		$meta2  = MailField::initial_meta( array(), $second, Registry::get( 'mail' ) );
 		$this->assertSame( 'two.example', $meta2[ MailDomain::META_DOMAIN ] );
+	}
+
+	/** Puts a domain registration line next to the mail line already in the cart. */
+	private function add_domain_line( string $name, string $mode = 'register' ): string {
+		$domain = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$key    = WC()->cart->add_to_cart( $domain->get_id(), 1, 0, array(), array( 'beltoft_services_domain' => array( 'domain' => $name, 'mode' => $mode ) ) );
+
+		if ( ! $key ) {
+			$this->markTestSkipped( 'The fixture domain product cannot be put in the cart here.' );
+		}
+
+		return (string) $key;
+	}
+
+	public function test_the_email_step_offers_a_domain_registered_in_the_same_order(): void {
+		$key = $this->in_cart( $this->product() );
+		$this->add_domain_line( 'Brand-New.example' );
+		wp_set_current_user( 0 );
+		ob_start();
+		MailField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'A new domain in this order', $html );
+		$this->assertStringContainsString( '<option value="brand-new.example"', $html );
+		$this->assertStringContainsString( 'type="radio"', $html );
+
+		$this->post( $key, array( 'mode' => 'new', 'new' => 'brand-new.example' ) );
+		$this->assertSame( array(), $this->errors() );
+
+		$this->post( $key, array( 'mode' => 'new', 'new' => 'other.example' ) );
+		$this->assertNotSame( array(), $this->errors(), 'Only a domain of this cart is a new domain.' );
+	}
+
+	public function test_a_transfer_counts_a_dns_line_does_not_and_without_one_the_find_link_shows(): void {
+		$this->in_cart( $this->product() );
+		$this->add_domain_line( 'moving.example', 'transfer' );
+		$dns = $this->add_domain_line( 'dns-only.example' );
+		WC()->cart->cart_contents[ $dns ]['beltoft_services_domain']['mode'] = 'dns';
+		$this->assertSame( array( 'moving.example' ), MailField::cart_domains() );
+
+		WC()->cart->empty_cart();
+		$this->in_cart( $this->product() );
+		ob_start();
+		MailField::render();
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'A new domain in this order', $html );
+		$this->assertStringContainsString( 'No domain yet?', $html );
+	}
+
+	public function test_a_new_domain_line_is_marked_to_wait_and_carries_the_deadline_to_the_resource(): void {
+		$product = $this->product();
+		$key     = $this->in_cart( $product );
+		$this->add_domain_line( 'fresh.example' );
+		$this->post( $key, array( 'mode' => 'new', 'new' => 'fresh.example' ) );
+
+		$item = new \WC_Order_Item_Product();
+		$item->set_product_id( $product->get_id() );
+		MailField::save_on_item( $item, $key );
+		$this->assertSame( 'fresh.example', $item->get_meta( MailField::ITEM_META ) );
+		$this->assertSame( '1', $item->get_meta( MailField::WAIT_META ) );
+
+		$order = wc_create_order();
+		$order->add_item( $item );
+		$order->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$meta    = MailField::initial_meta( array(), $license, Registry::get( 'mail' ) );
+		$this->assertEqualsWithDelta( time() + 7 * DAY_IN_SECONDS, (int) $meta['mail_wait_until'], 5 );
+	}
+
+	public function test_the_mail_domain_waits_for_the_registration_and_then_sets_up_as_ours(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'waiting.example', array( 'mail_wait_until' => time() + 3 * DAY_IN_SECONDS ), array(), $user );
+		$res  = Registry::get( 'mail' )->provision( $r );
+		$this->assertTrue( $res->is_retry(), 'Waits while the domain is not ready.' );
+		$this->assertSame( 'Waiting for the domain registration to finish.', $res->error() );
+
+		$this->our_zone( $user, 'waiting.example' );
+		$res = Registry::get( 'mail' )->provision( Resource::find( $r->id() ) );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertSame( 'ours', Resource::find( $r->id() )->get( 'mail_mode' ) );
+	}
+
+	public function test_waiting_for_a_registration_survives_many_runs_and_then_proves_ours(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'slow.example', array( 'mail_wait_until' => time() + 6 * DAY_IN_SECONDS ), array(), $user );
+
+		for ( $i = 0; $i < 20; $i++ ) {
+			Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
+			\BeltoftServices\Reconciler::step( Resource::find( $r->id() ) );
+			$this->assertNotSame( 'failed', Resource::find( $r->id() )->get( 'state' ), 'Run ' . $i );
+		}
+
+		$this->assertStringContainsString( 'Waiting for the domain registration', (string) Resource::find( $r->id() )->get( 'last_error' ) );
+		$this->assertNotContains( 'proof', (array) Resource::find( $r->id() )->get( 'steps' ) );
+
+		$this->our_zone( $user, 'slow.example' );
+		Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
+		\BeltoftServices\Reconciler::step( Resource::find( $r->id() ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'ours', $fresh->get( 'mail_mode' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
+	}
+
+	public function test_a_registration_that_never_arrives_falls_back_to_the_txt_proof_after_seven_days(): void {
+		$this->proof['check_txt'] = array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+		$r   = $this->mail_resource( 'late.example', array( 'mail_wait_until' => time() - 60 ) );
+		$res = Registry::get( 'mail' )->provision( $r );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertSame( 'external', Resource::find( $r->id() )->get( 'mail_mode' ) );
 	}
 
 	// -- Plan changes ---------------------------------------------------------------------------
@@ -286,5 +454,17 @@ final class MailCheckoutTest extends MailTestCase {
 
 	public function test_an_email_cart_needs_the_full_billing_details_like_a_server(): void {
 		$this->assertInstanceOf( \BeltoftServices\Drivers\NeedsBilling::class, \BeltoftServices\Drivers\Registry::get( 'mail' ) );
+	}
+
+	public function test_the_order_line_shows_the_email_domain_in_unicode(): void {
+		if ( ! function_exists( 'idn_to_utf8' ) ) {
+			$this->markTestSkipped( 'intl is missing.' );
+		}
+		$item = new \WC_Order_Item_Product();
+		$item->add_meta_data( MailField::ITEM_META, 'xn--bcher-kva.example', true );
+		$rows = MailField::show_item_domain( array(), $item );
+		$this->assertCount( 1, $rows );
+		$this->assertSame( '<p>bücher.example</p>', $rows[0]->display_value );
+		$this->assertSame( 'xn--bcher-kva.example', $rows[0]->value, 'The stored value stays punycode.' );
 	}
 }

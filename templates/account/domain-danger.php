@@ -12,6 +12,7 @@
  * @var array<string, mixed>     $offer   What the tab offers (kind, manual, can_enable, next).
  * @var \BeltoftServices\Resource $r       The domain's resource.
  * @var string                   $domain  Domain name.
+ * @var string                   $shown   Domain name as shown to the customer (Unicode letters).
  * @var string                   $action  Address the forms post to.
  * @var string                   $nonce   Nonce of the forms.
  * @var string                   $expires Registered until, formatted, or ''.
@@ -98,24 +99,24 @@ $beltoft_form  = static function ( string $what ) use ( $action, $nonce, $licens
 	<p class="beltoft-services-domain__note">
 		<?php
 		/* translators: %s: domain name */
-		echo esc_html( sprintf( __( 'DNS hosting for %s ends at once. Its records stop answering and the subscription ends. Nothing is changed at your registrar: if the domain still uses our name servers, change them there first.', 'beltoft-services' ), $domain ) );
+		echo esc_html( sprintf( __( 'DNS hosting for %s ends at once. Its records stop answering and the subscription ends. Nothing is changed at your registrar: if the domain still uses our name servers, change them there first.', 'beltoft-services' ), $shown ) );
 		?>
 	</p>
 	<p><button type="button" class="button beltoft-services-danger__open" data-danger-open="beltoft-danger-stop-<?php echo (int) $license; ?>"><?php esc_html_e( 'Stop DNS hosting', 'beltoft-services' ); ?></button></p>
 	<dialog class="beltoft-services-domain__dialog" id="beltoft-danger-stop-<?php echo (int) $license; ?>" aria-labelledby="beltoft-danger-title-<?php echo (int) $license; ?>">
-		<form method="post" action="<?php echo esc_url( $action ); ?>" class="beltoft-services-danger__dialog-form" data-bs-working data-danger-domain="<?php echo esc_attr( strtolower( $domain ) ); ?>">
+		<form method="post" action="<?php echo esc_url( $action ); ?>" class="beltoft-services-danger__dialog-form" data-bs-working data-danger-domain="<?php echo esc_attr( strtolower( $shown ) ); ?>" data-danger-ascii="<?php echo esc_attr( strtolower( $domain ) ); ?>">
 			<?php $beltoft_form( 'stop_hosting' ); ?>
 			<h5 id="beltoft-danger-title-<?php echo (int) $license; ?>"><?php esc_html_e( 'Stop DNS hosting?', 'beltoft-services' ); ?></h5>
 			<p>
 				<?php
 				/* translators: %s: domain name */
-				echo esc_html( sprintf( __( 'The DNS records of %s stop answering at once and the subscription ends. This cannot be undone here; to host the domain with us again you add it as a new domain.', 'beltoft-services' ), $domain ) );
+				echo esc_html( sprintf( __( 'The DNS records of %s stop answering at once and the subscription ends. This cannot be undone here; to host the domain with us again you add it as a new domain.', 'beltoft-services' ), $shown ) );
 				?>
 			</p>
 			<label for="beltoft-danger-confirm-<?php echo (int) $license; ?>">
 				<?php
 				/* translators: %s: domain name */
-				echo esc_html( sprintf( __( 'Type %s to confirm', 'beltoft-services' ), $domain ) );
+				echo esc_html( sprintf( __( 'Type %s to confirm', 'beltoft-services' ), $shown ) );
 				?>
 			</label>
 			<input type="text" id="beltoft-danger-confirm-<?php echo (int) $license; ?>" name="confirm" autocomplete="off" autocapitalize="off" spellcheck="false">

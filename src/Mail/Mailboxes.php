@@ -89,7 +89,8 @@ final class Mailboxes {
 		$count   = 0;
 
 		// State, count, password and add are one step under the resource lock: parallel requests cannot pass the plan's limit together.
-		$ran = $r->locked(
+		$ran = MailPlan::locked(
+			$r,
 			static function () use ( $r, $client, $email, $name, $quota, &$outcome, &$count ): bool {
 				$bad = MailGuard::check( $r );
 
@@ -98,17 +99,15 @@ final class Mailboxes {
 					return false;
 				}
 
-				$have = $client->list_mailboxes( MailGuard::domain( $r ) );
+				// The limit is the plan's: the mailboxes of the root and of every extra domain count together.
+				$used = MailPlan::measure_mailboxes( MailPlan::root( $r ) );
 
-				if ( is_wp_error( $have ) ) {
-					$outcome = MailGuard::failed( $have, __( 'create the mailbox', 'beltoft-services' ) );
+				if ( is_wp_error( $used ) ) {
+					$outcome = MailGuard::failed( $used, __( 'create the mailbox', 'beltoft-services' ) );
 					return false;
 				}
 
-				$system = MailGuard::system_address( $r );
-				$mine   = array_filter( $have, static fn( $row ) => '' === $system || strtolower( (string) ( $row['username'] ?? '' ) ) !== $system );
-
-				if ( count( $mine ) >= MailGuard::limits( $r )['mailboxes'] ) {
+				if ( $used >= MailPlan::limits( $r )['mailboxes'] ) {
 					$outcome = new \WP_Error( 'limit', __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) );
 					return false;
 				}
@@ -156,7 +155,8 @@ final class Mailboxes {
 				}
 
 				MailAccess::finish( $r, $email );
-				$count   = count( $mine ) + 1;
+				$seen    = MailPlan::mailboxes_of( $r );
+				$count   = is_wp_error( $seen ) ? (int) $r->get( 'mail_boxes' ) + 1 : $seen;
 				$outcome = true;
 
 				return true;

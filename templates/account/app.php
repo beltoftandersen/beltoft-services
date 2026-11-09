@@ -178,7 +178,7 @@ $beltoft_services_status_text = array(
 				sprintf(
 					/* translators: %s: a domain name */
 					__( 'The domain %s could not be pointed at this server. Check the domain in your DNS settings.', 'beltoft-services' ),
-					(string) $view['domain_wanted']
+					(string) \BeltoftServices\Domains\HostName::display( (string) $view['domain_wanted'] )
 				)
 			);
 				if ( '' !== $view['domain_reason'] ) {
@@ -231,8 +231,8 @@ $beltoft_services_status_text = array(
 				echo esc_html( sprintf(
 					/* translators: 1: www name, 2: domain name */
 					__( '%1$s is served too and redirects to %2$s.', 'beltoft-services' ),
-					(string) $view['www']['name'],
-					(string) $view['domain']
+					(string) \BeltoftServices\Domains\HostName::display( (string) $view['www']['name'] ),
+					(string) \BeltoftServices\Domains\HostName::display( (string) $view['domain'] )
 				) );
 			} elseif ( 'applying' === $view['www']['state'] ) {
 				echo esc_html( sprintf(
@@ -284,7 +284,7 @@ $beltoft_services_status_text = array(
 			echo esc_html( sprintf(
 				/* translators: %s: domain name the customer selected. */
 				__( 'We will point %s at this server when the server is ready.', 'beltoft-services' ),
-				$view['domain_wanted']
+				\BeltoftServices\Domains\HostName::display( (string) $view['domain_wanted'] )
 			) );
 			?>
 		</p>

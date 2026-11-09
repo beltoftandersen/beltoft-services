@@ -14,6 +14,7 @@
 defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_domain = (string) $view['domain'];
+$beltoft_services_shown  = \BeltoftServices\Domains\HostName::display( $beltoft_services_domain );
 $beltoft_services_limits = $view['limits'];
 $beltoft_services_status = array(
 	'ready'    => __( 'Ready', 'beltoft-services' ),
@@ -51,14 +52,114 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<dl class="beltoft-services-facts">
 			<?php
 			$beltoft_services_row( __( 'Status', 'beltoft-services' ), esc_html( $beltoft_services_status[ $view['kind'] ] ?? '' ) );
-			$beltoft_services_row( __( 'Mailboxes', 'beltoft-services' ), esc_html( sprintf( /* translators: 1: mailboxes in use, 2: mailboxes the plan allows */ __( '%1$d of %2$d', 'beltoft-services' ), (int) $view['counts']['mailboxes'], (int) $beltoft_services_limits['mailboxes'] ) ) );
+			if ( '' !== (string) $view['included'] ) {
+				$beltoft_services_row( __( 'Plan', 'beltoft-services' ), esc_html( (string) $view['included'] ) );
+			}
+			$beltoft_services_row( __( 'Mailboxes', 'beltoft-services' ), esc_html( sprintf( /* translators: 1: mailboxes in use in the whole plan, 2: mailboxes the plan allows */ _n( '%1$d of %2$d mailbox in your plan', '%1$d of %2$d mailboxes in your plan', (int) $beltoft_services_limits['mailboxes'], 'beltoft-services' ), (int) $view['plan']['used']['mailboxes'], (int) $beltoft_services_limits['mailboxes'] ) ) );
+			if ( count( $view['plan']['members'] ) > 1 ) {
+				$beltoft_services_row( __( 'On this domain', 'beltoft-services' ), esc_html( (string) (int) $view['counts']['mailboxes'] ) );
+			}
 			$beltoft_services_row( __( 'Size of each', 'beltoft-services' ), esc_html( $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) );
 			$beltoft_services_row( __( 'Aliases allowed', 'beltoft-services' ), esc_html( (string) (int) $beltoft_services_limits['aliases'] ) );
 			?>
 		</dl>
 
+		<?php
+		$beltoft_services_plan   = $view['plan'];
+		$beltoft_services_in     = count( $beltoft_services_plan['members'] );
+		$beltoft_services_room   = $beltoft_services_in < (int) $beltoft_services_plan['limits']['domains'];
+		$beltoft_services_zones  = array();
+		if ( $beltoft_services_plan['is_root'] && $beltoft_services_room && 'ready' === $view['kind'] ) {
+			$beltoft_services_zones = array_values( array_diff( \BeltoftServices\Mail\MailField::zones( get_current_user_id() ), $beltoft_services_plan['domains'] ) );
+		}
+		?>
+		<?php if ( (int) $beltoft_services_plan['limits']['domains'] > 1 || ! $beltoft_services_plan['is_root'] ) : ?>
+			<div class="beltoft-services-vm__more" id="beltoft-mail-domains" data-mail-domains>
+				<h4><?php esc_html_e( 'Domains in this plan', 'beltoft-services' ); ?></h4>
+				<?php if ( ! $beltoft_services_plan['is_root'] ) : ?>
+					<p>
+						<?php
+						echo wp_kses(
+							sprintf(
+								/* translators: 1: the name of the plan, such as Team, 2: the first domain of the plan, as a link */
+								__( 'Part of the %1$s plan of %2$s', 'beltoft-services' ),
+								esc_html( (string) $beltoft_services_plan['root']['name'] ),
+								'<a href="' . esc_url( $other_url( (int) $beltoft_services_plan['root']['id'] ) ) . '">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $beltoft_services_plan['root']['domain'] ) ) . '</a>'
+							),
+							array( 'a' => array( 'href' => array() ) )
+						);
+						?>
+					</p>
+				<?php endif; ?>
+				<p><?php echo esc_html( sprintf( /* translators: 1: domains in the plan, 2: domains the plan allows */ _n( '%1$d of %2$d domain', '%1$d of %2$d domains', (int) $beltoft_services_plan['limits']['domains'], 'beltoft-services' ), $beltoft_services_in, (int) $beltoft_services_plan['limits']['domains'] ) ); ?></p>
+				<ul>
+					<?php foreach ( $beltoft_services_plan['members'] as $beltoft_services_member ) : ?>
+						<li><?php echo $beltoft_services_member['id'] === $view['id'] ? esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_member['domain'] ) ) : '<a href="' . esc_url( $other_url( (int) $beltoft_services_member['id'] ) ) . '">' . esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_member['domain'] ) ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above. ?></li>
+					<?php endforeach; ?>
+				</ul>
+
+				<?php if ( ! $beltoft_services_plan['is_root'] ) : ?>
+					<?php if ( ! $beltoft_services_plan['root_ready'] ) : ?>
+						<p><button type="button" class="button woocommerce-button beltoft-services-mail__outline" disabled data-mail-domain-remove="<?php echo esc_attr( $beltoft_services_domain ); ?>"><?php esc_html_e( 'Remove this domain', 'beltoft-services' ); ?></button></p>
+						<p class="description"><?php esc_html_e( 'You can remove a domain when the plan is active again.', 'beltoft-services' ); ?></p>
+					<?php elseif ( (int) $view['counts']['mailboxes'] > 0 ) : ?>
+						<p class="description"><?php esc_html_e( 'Delete the mailboxes on this domain first.', 'beltoft-services' ); ?></p>
+					<?php else : ?>
+						<p><button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-domain-remove="<?php echo esc_attr( $beltoft_services_domain ); ?>"><?php esc_html_e( 'Remove this domain', 'beltoft-services' ); ?></button></p>
+					<?php endif; ?>
+				<?php elseif ( 'ready' === $view['kind'] ) : ?>
+					<?php if ( ! $beltoft_services_room ) : ?>
+						<p><?php esc_html_e( 'Your plan has no room for another domain.', 'beltoft-services' ); ?></p>
+					<?php else : ?>
+						<div class="beltoft-services-db__form" data-mail-domain-add>
+							<?php if ( array() !== $beltoft_services_zones ) : ?>
+								<p>
+									<label><input type="radio" name="beltoft-mail-domain-mode" value="ours" checked data-mail-domain-mode> <?php esc_html_e( 'One of your domains with us', 'beltoft-services' ); ?></label>
+									<select data-mail-domain-zone aria-label="<?php esc_attr_e( 'One of your domains with us', 'beltoft-services' ); ?>">
+										<?php foreach ( $beltoft_services_zones as $beltoft_services_zone ) : ?>
+											<option value="<?php echo esc_attr( $beltoft_services_zone ); ?>"><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_zone ) ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</p>
+							<?php endif; ?>
+							<p>
+								<label><input type="radio" name="beltoft-mail-domain-mode" value="own"<?php echo array() === $beltoft_services_zones ? ' checked' : ''; ?> data-mail-domain-mode> <?php esc_html_e( 'A domain at another provider', 'beltoft-services' ); ?></label>
+								<input type="text" autocomplete="off" maxlength="253" placeholder="example.com" aria-label="<?php esc_attr_e( 'A domain at another provider', 'beltoft-services' ); ?>" data-mail-domain-own>
+								<span class="description"><?php esc_html_e( 'You add a few DNS records at your provider. We show you which ones, starting with one that proves the domain is yours.', 'beltoft-services' ); ?></span>
+							</p>
+							<p><button type="button" class="button woocommerce-button" data-mail-domain-submit><?php esc_html_e( 'Add domain', 'beltoft-services' ); ?></button></p>
+						</div>
+						<?php
+						$beltoft_services_register = \BeltoftServices\Account\Domains::url_register();
+						/**
+						 * The address of the "Transfer a domain to us" link on the email page.
+						 *
+						 * @param string $url The domain search page with its transfer form (the id of the form's domain input is the default fragment), or ''.
+						 */
+						$beltoft_services_transfer = (string) apply_filters( 'beltoft_services_mail_transfer_url', '' !== $beltoft_services_register ? $beltoft_services_register . '#beltoft-transfer-domain' : '' );
+						// The page learns which plan the domain is for; add_query_arg() keeps a #fragment at the end.
+						$beltoft_services_for = (int) $beltoft_services_plan['root']['id'];
+						$beltoft_services_register = '' !== $beltoft_services_register ? add_query_arg( 'mail_for', $beltoft_services_for, $beltoft_services_register ) : '';
+						$beltoft_services_transfer = '' !== $beltoft_services_transfer ? add_query_arg( 'mail_for', $beltoft_services_for, $beltoft_services_transfer ) : '';
+						?>
+						<?php if ( '' !== $beltoft_services_register ) : ?>
+							<p>
+								<a href="<?php echo esc_url( $beltoft_services_register ); ?>"><?php esc_html_e( 'Register a new domain', 'beltoft-services' ); ?></a>
+								<?php if ( '' !== $beltoft_services_transfer ) : ?>
+									<br><a href="<?php echo esc_url( $beltoft_services_transfer ); ?>"><?php esc_html_e( 'Transfer a domain to us', 'beltoft-services' ); ?></a>
+								<?php endif; ?>
+							</p>
+						<?php endif; ?>
+					<?php endif; ?>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
 			<p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p>
+			<?php if ( 'building' === $view['kind'] && null !== $view['dns']['proof'] ) : ?>
+				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
+			<?php endif; ?>
 		<?php else : ?>
 			<?php if ( 'ok' !== $view['dns']['status'] && array() !== $view['dns']['rows'] ) : ?>
 				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Some DNS records are not in place yet, so mail may not arrive. See the DNS tab.', 'beltoft-services' ); ?></p>
@@ -78,7 +179,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							<?php foreach ( (array) $view['mailboxes'] as $beltoft_services_box ) : ?>
 								<?php $beltoft_services_percent = $beltoft_services_box['quota_mb'] > 0 ? (int) min( 100, floor( $beltoft_services_box['used_mb'] * 100 / $beltoft_services_box['quota_mb'] ) ) : 0; ?>
 								<tr data-mail-box="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>">
-									<td><code><?php echo esc_html( $beltoft_services_box['email'] ); ?></code><?php echo $beltoft_services_box['active'] ? '' : ' <span class="description">' . esc_html__( 'Paused', 'beltoft-services' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text. ?></td>
+									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_box['email'] ) ); ?></code><?php echo $beltoft_services_box['active'] ? '' : ' <span class="description">' . esc_html__( 'Paused', 'beltoft-services' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text. ?></td>
 									<td><?php echo esc_html( $beltoft_services_box['name'] ); ?></td>
 									<td><?php echo esc_html( sprintf( /* translators: 1: storage used, 2: storage of the mailbox, 3: percent used */ __( '%1$s of %2$s (%3$d%%)', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_box['used_mb'] ), $beltoft_services_size( (int) $beltoft_services_box['quota_mb'] ), $beltoft_services_percent ) ); ?></td>
 									<td class="beltoft-services-mail__actions">
@@ -113,15 +214,23 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New mailbox', 'beltoft-services' ); ?></h4>
-				<?php if ( (int) $view['counts']['mailboxes'] >= (int) $beltoft_services_limits['mailboxes'] ) : ?>
-					<p><?php esc_html_e( 'Your plan has no room for more mailboxes.', 'beltoft-services' ); ?></p>
+				<?php if ( (int) $view['plan']['used']['mailboxes'] >= (int) $beltoft_services_limits['mailboxes'] ) : ?>
+					<p data-mail-no-room>
+						<?php
+						esc_html_e( 'Your plan has no room for more mailboxes. Delete a mailbox or change to a larger plan.', 'beltoft-services' );
+
+						if ( '' !== (string) $view['plan']['upgrade'] ) {
+							echo ' <a href="' . esc_url( (string) $view['plan']['upgrade'] ) . '">' . esc_html__( 'Change plan', 'beltoft-services' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped here.
+						}
+						?>
+					</p>
 				<?php else : ?>
 					<p class="description"><?php echo esc_html( sprintf( /* translators: %s: size of a mailbox, such as 5 GB */ __( 'Each mailbox has %s of storage. You get a password to show once.', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) ); ?></p>
 					<div class="beltoft-services-db__form" data-mail-create>
 						<p>
 							<label for="beltoft-mail-local"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>
 							<input type="text" id="beltoft-mail-local" autocomplete="off" maxlength="64" placeholder="info" data-mail-local>
-							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_domain ); ?></span>
+							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_shown ); ?></span>
 						</p>
 						<p>
 							<label for="beltoft-mail-name"><?php esc_html_e( 'Name shown (optional)', 'beltoft-services' ); ?></label>
@@ -159,7 +268,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<tbody>
 							<?php foreach ( (array) $view['aliases'] as $beltoft_services_alias ) : ?>
 								<tr>
-									<td><code><?php echo esc_html( $beltoft_services_alias['address'] ); ?></code></td>
+									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_alias['address'] ) ); ?></code></td>
 									<td><?php echo esc_html( implode( ', ', $beltoft_services_alias['goto'] ) ); ?></td>
 									<td class="beltoft-services-mail__actions"><button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
 								</tr>
@@ -167,7 +276,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						</tbody>
 					</table>
 				<?php endif; ?>
-				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use, 2: aliases the plan allows */ __( '%1$d of %2$d aliases used.', 'beltoft-services' ), (int) $view['counts']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
+				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use, 2: aliases the plan allows */ _n( '%1$d of %2$d alias used.', '%1$d of %2$d aliases used.', (int) $beltoft_services_limits['aliases'], 'beltoft-services' ), (int) $view['counts']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
 			</div>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New alias', 'beltoft-services' ); ?></h4>
@@ -178,7 +287,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<p>
 							<label for="beltoft-mail-alias"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>
 							<input type="text" id="beltoft-mail-alias" autocomplete="off" maxlength="64" placeholder="sales" data-mail-alias-local>
-							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_domain ); ?></span>
+							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_shown ); ?></span>
 						</p>
 						<p>
 							<label for="beltoft-mail-goto"><?php esc_html_e( 'Deliver to', 'beltoft-services' ); ?></label>
@@ -206,6 +315,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<tr><td><code><?php echo esc_html( $beltoft_services_dns['proof']['name'] ); ?></code></td><td><?php echo esc_html( $beltoft_services_dns['proof']['type'] ); ?></td><td class="beltoft-services-mail__value"><code><?php echo esc_html( $beltoft_services_dns['proof']['value'] ); ?></code></td></tr>
 					</tbody>
 				</table>
+				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php elseif ( array() === $beltoft_services_dns['rows'] ) : ?>
 				<p><?php esc_html_e( 'The records appear here when your email domain is ready.', 'beltoft-services' ); ?></p>
 			<?php else : ?>

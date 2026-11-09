@@ -367,4 +367,14 @@ final class JobsTest extends TestCase {
 		$this->expectException( \PHPUnit\Framework\AssertionFailedError::class );
 		$this->run_jobs( 3 );
 	}
+
+	public function test_a_running_action_does_not_count_as_pending_so_it_can_schedule_its_next_attempt(): void {
+		$this->assertFalse( Jobs::pending_action( 'beltoft_services_test_retry', array( 7 ) ) );
+		$id = as_schedule_single_action( time() + 600, 'beltoft_services_test_retry', array( 7 ), Jobs::GROUP );
+		$this->assertTrue( Jobs::pending_action( 'beltoft_services_test_retry', array( 7 ) ) );
+		\ActionScheduler::store()->log_execution( $id );
+		$this->assertTrue( as_has_scheduled_action( 'beltoft_services_test_retry', array( 7 ), Jobs::GROUP ), 'Action Scheduler counts the running action.' );
+		$this->assertFalse( Jobs::pending_action( 'beltoft_services_test_retry', array( 7 ) ), 'A running action is not pending.' );
+		as_unschedule_all_actions( 'beltoft_services_test_retry' );
+	}
 }

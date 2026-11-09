@@ -112,7 +112,7 @@ final class Sites {
 	 * @param string $owner Who holds it: the customer's id, or the cart's session id for a guest.
 	 * @return bool True when the name is the owner's now.
 	 */
-	public static function reserve( string $slug, string $owner ): bool {
+	public static function reserve( string $slug, string $owner,  ): bool {
 		$name = 'beltoft_services_slug_hold_' . substr( md5( $slug ), 0, 20 );
 		$now  = time();
 
@@ -130,6 +130,30 @@ final class Sites {
 		update_option( $name, array( 'o' => $owner, 't' => $now + self::RESERVE_TTL ), false );
 
 		return true;
+	}
+
+	/**
+	 * Hands the holds of a guest cart to the customer the checkout has just made of that guest. The cart's session id
+	 * changes when the account is created, so without this the person's own hold would count as another person's.
+	 * Only the guest's own holds move; a signed-in customer never takes a hold of somebody else.
+	 *
+	 * @param string $from Owner before (g<session>).
+	 * @param string $to   Owner after (u<id>).
+	 */
+	public static function rekey_holds( string $from, string $to ): void {
+		global $wpdb;
+
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT option_name FROM %i WHERE option_name LIKE %s', $wpdb->options, $wpdb->esc_like( 'beltoft_services_slug_hold_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the few holds of the checkout.
+
+		foreach ( (array) $rows as $row ) {
+			wp_cache_delete( $row->option_name, 'options' );
+			$held = get_option( $row->option_name );
+
+			if ( is_array( $held ) && (string) ( $held['o'] ?? '' ) === $from ) {
+				$held['o'] = $to;
+				update_option( $row->option_name, $held, false );
+			}
+		}
 	}
 
 	/**

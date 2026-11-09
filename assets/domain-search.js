@@ -17,13 +17,19 @@
     container.prepend(error);
   }
 
+  // Arrived from the email page of an account: the domain is for that email plan. The server checks the plan again.
+  function mailFor() {
+    const id = parseInt(new URLSearchParams(window.location.search).get('mail_for') || '', 10);
+    return id > 0 ? id : 0;
+  }
+
   // Adds a domain to the order and goes on to the checkout. The root holds the endpoints and nonces.
   async function add(root, domain, mode, authCode, dns) {
     const response = await fetch(root.dataset.cart, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
-      body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' })
+      body: JSON.stringify(Object.assign({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' }, mailFor() ? { mail_for: mailFor() } : {}))
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || __('Could not add this domain.', 'beltoft-services'));
@@ -88,6 +94,7 @@
     function transferHref(domain) {
       const url = new URL(transferLink.getAttribute('href'), window.location.href);
       url.searchParams.set('transfer', domain);
+      if (mailFor() && !url.searchParams.has('mail_for')) url.searchParams.set('mail_for', String(mailFor()));
       return url.toString();
     }
 
@@ -97,7 +104,7 @@
       row.className = 'beltoft-domain-result beltoft-domain-result--' + item.status + (primary && item.status !== 'taken' ? ' beltoft-domain-result--primary' : '');
       const information = document.createElement('div');
       information.className = 'beltoft-domain-result__information';
-      information.appendChild(element('strong', 'beltoft-domain-result__name', item.domain));
+      information.appendChild(element('strong', 'beltoft-domain-result__name', item.display || item.domain));
 
       const descriptions = {
         free: __('Available to register', 'beltoft-services'),
@@ -249,15 +256,16 @@
       }
     }
 
-    function codeForm(domain) {
+    function codeForm(domain, shown) {
+      shown = shown || domain;
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
-      form.appendChild(element('p', 'beltoft-domain-transfer__help', sprintf(/* translators: %s: domain name */ __('Unlock %s at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC at your current registrar first.', 'beltoft-services'), domain)));
+      form.appendChild(element('p', 'beltoft-domain-transfer__help', sprintf(/* translators: %s: domain name */ __('Unlock %s at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC at your current registrar first.', 'beltoft-services'), shown)));
       const field = document.createElement('input');
       field.type = 'text';
       field.autocomplete = 'off';
       field.required = true;
-      field.setAttribute('aria-label', sprintf(/* translators: %s: domain name */ __('Transfer code for %s', 'beltoft-services'), domain));
+      field.setAttribute('aria-label', sprintf(/* translators: %s: domain name */ __('Transfer code for %s', 'beltoft-services'), shown));
       field.placeholder = __('Transfer code', 'beltoft-services');
       const submit = element('button', 'beltoft-domain-action', __('Add transfer to order', 'beltoft-services'));
       submit.type = 'submit';
@@ -270,7 +278,7 @@
         if (!advice) return;
         const who = advice.registrar ? String(advice.registrar).replace(/\.+$/, '') : __('your current registrar', 'beltoft-services');
         if (advice.locked) {
-          notice.textContent = sprintf(/* translators: 1: domain name, 2: registrar name */ __('%1$s is locked at %2$s. Unlock it there, then come back.', 'beltoft-services'), domain, who);
+          notice.textContent = sprintf(/* translators: 1: domain name, 2: registrar name */ __('%1$s is locked at %2$s. Unlock it there, then come back.', 'beltoft-services'), shown, who);
           submit.disabled = true;
           field.disabled = true;
         } else if (advice.at_risk === true) {
@@ -296,7 +304,7 @@
       out.replaceChildren();
       const card = element('div', 'beltoft-domain-result beltoft-domain-result--primary beltoft-domain-result--' + item.status, '');
       const information = element('div', 'beltoft-domain-result__information', '');
-      information.appendChild(element('strong', 'beltoft-domain-result__name', item.domain));
+      information.appendChild(element('strong', 'beltoft-domain-result__name', item.display || item.domain));
       card.appendChild(information);
       const actions = element('div', 'beltoft-domain-result__actions', '');
       card.appendChild(actions);
@@ -309,7 +317,7 @@
           card.insertBefore(element('div', 'beltoft-domain-result__price', sprintf(/* translators: %s: price in euro */ __('€%s / year', 'beltoft-services'), item.price)), actions);
           information.appendChild(element('span', 'beltoft-domain-result__note', __('The transfer is charged as one year and adds that year to the registration. Price excluding VAT.', 'beltoft-services')));
         }
-        const code = codeForm(item.domain);
+        const code = codeForm(item.domain, item.display);
         actions.appendChild(code.form);
         code.field.focus();
         return;

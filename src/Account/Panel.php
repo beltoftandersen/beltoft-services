@@ -75,7 +75,7 @@ final class Panel {
 			return __( 'Suspended', 'beltoft-services' );
 		}
 
-		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
+		if ( $r && ( ( 'failed' === $state && Emails::delay_applies( $r ) ) || Emails::delay_running( $r ) ) ) {
 			return __( 'Delayed', 'beltoft-services' );
 		}
 
@@ -143,8 +143,16 @@ final class Panel {
 		}
 
 		// A server that could not be set up: a delay, never what went wrong.
-		if ( $r && 'failed' === $state && Emails::delay_applies( $r ) ) {
+		if ( $r && ( ( 'failed' === $state && Emails::delay_applies( $r ) ) || Emails::delay_running( $r ) ) ) {
 			return __( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
+		}
+
+		if ( $r && 'getting-ready' === self::group( $state ) && \BeltoftServices\Mail\MailField::waiting_for_registration( $r ) ) {
+			return \BeltoftServices\Mail\MailField::wait_text();
+		}
+
+		if ( $r && 'getting-ready' === self::group( $state ) && \BeltoftServices\Mail\MailField::waiting_for_proof( $r ) ) {
+			return \BeltoftServices\Mail\MailField::proof_text();
 		}
 
 		$app = $r ? \BeltoftServices\Proxmox\AppProgress::message( $r ) : '';
@@ -173,7 +181,8 @@ final class Panel {
 	 * @param mixed $view    Display values of the license (the title of a server page).
 	 */
 	public static function render( $license, $view = array() ): void {
-		if ( ! is_array( $license ) || empty( $license['id'] ) || ! Product::is_service_license( $license ) ) {
+		// An extra domain of an email plan has a license without a service product, and still has a page.
+		if ( ! is_array( $license ) || empty( $license['id'] ) || ( ! Product::is_service_license( $license ) && ! ServiceArea::get( Email::class )->is_member( $license ) ) ) {
 			return;
 		}
 

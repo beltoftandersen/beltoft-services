@@ -7,7 +7,10 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftLicenses\Licenses;
+use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
+use BeltoftServices\Mail\MailPlan;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -75,9 +78,66 @@ final class Email extends ServiceArea {
 	}
 
 	/**
+	 * An extra domain of an email plan is a child license without a service product: it belongs here too, and so does
+	 * the Email lite domain of a hosting account (a child of the hosting). Grouping it here is also what keeps its
+	 * licence out of the Licenses tab as a key of its own.
+	 *
+	 * {@inheritDoc}
+	 *
+	 * @param mixed $license License row.
+	 */
+	public function is_member( $license ): bool {
+		if ( parent::is_member( $license ) ) {
+			return true;
+		}
+
+		if ( ! is_array( $license ) || empty( $license['id'] ) || 'child' !== ( $license['source'] ?? '' ) ) {
+			return false;
+		}
+
+		$r = Resource::for_license( (int) $license['id'] );
+
+		return $r && MailDriver::ID === $r->get( 'driver' );
+	}
+
+	/**
+	 * The plan root of the customer that is active and has room for another domain, or null.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function plan_with_room( int $user_id ): ?Resource {
+		if ( $user_id <= 0 || ! class_exists( Licenses::class ) ) {
+			return null;
+		}
+
+		foreach ( Licenses::where( 'user_id', $user_id ) as $license ) {
+			$r = Resource::for_license( (int) $license['id'] );
+
+			if ( $r && MailDriver::ID === $r->get( 'driver' ) && $r->accepts_actions() && 'ready' === (string) $r->get( 'desired' ) && MailPlan::root( $r )->id() === $r->id() && count( MailPlan::counted( $r ) ) < MailPlan::limits( $r )['domains'] ) {
+				return $r;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * With room in a plan: Add a domain (to the form on the first domain's page). Otherwise Create an email domain.
+	 *
 	 * {@inheritDoc}
 	 */
 	public function buttons(): array {
+		$root = self::plan_with_room( get_current_user_id() );
+
+		if ( $root ) {
+			return array(
+				array(
+					'label' => __( 'Add a domain', 'beltoft-services' ),
+					'url'   => $this->url( $root->license() ) . '#beltoft-mail-domains',
+				),
+			);
+		}
+
 		$url = $this->url_add();
 
 		return '' === $url ? array() : array(
@@ -174,7 +234,7 @@ final class Email extends ServiceArea {
 	public function title_of( Resource $resource, array $view ): string {
 		$domain = MailGuard::domain( $resource );
 
-		return '' !== $domain ? $domain : (string) ( $view['product'] ?? '' );
+		return '' !== $domain ? \BeltoftServices\Domains\HostName::display( $domain ) : (string) ( $view['product'] ?? '' );
 	}
 
 	/**
@@ -185,7 +245,12 @@ final class Email extends ServiceArea {
 	 * @param Resource $resource Resource.
 	 */
 	public function label_of( Resource $resource ): string {
-		unset( $resource );
+		// Email lite is the mail domain that comes with a hosting account: a child of the hosting resource.
+		$parent = \BeltoftServices\Children::parent_of( $resource );
+
+		if ( $parent && \BeltoftServices\Hosting\HostingDriver::ID === (string) $parent->get( 'driver' ) ) {
+			return __( 'Email lite', 'beltoft-services' );
+		}
 
 		return __( 'Business email', 'beltoft-services' );
 	}
@@ -199,18 +264,27 @@ final class Email extends ServiceArea {
 	public function row( array $view, Resource $resource ): array {
 		list( $state, $tone ) = self::state( $resource );
 
-		$limits = MailGuard::limits( $resource );
+		$root   = MailPlan::root( $resource );
+		$limits = MailPlan::limits( $resource );
 		$dns    = (string) $resource->get( 'mail_dns' );
 
 		return array(
 			'id'      => $resource->id(),
 			'url'     => $this->url( $view['license'] ),
-			'name'    => '' !== MailGuard::domain( $resource ) ? MailGuard::domain( $resource ) : (string) ( $view['product'] ?? '' ),
-			'details' => sprintf(
-				/* translators: 1: mailboxes in use, 2: mailboxes the plan allows */
-				__( '%1$d of %2$d mailboxes', 'beltoft-services' ),
-				(int) $resource->get( 'mail_boxes' ),
-				$limits['mailboxes']
+			'name'    => '' !== MailGuard::domain( $resource ) ? \BeltoftServices\Domains\HostName::display( MailGuard::domain( $resource ) ) : (string) ( $view['product'] ?? '' ),
+			'details' => implode(
+				', ',
+				array_filter(
+					array(
+						sprintf(
+							/* translators: 1: mailboxes in use across the whole plan, 2: mailboxes the plan allows */
+							_n( '%1$d of %2$d mailbox', '%1$d of %2$d mailboxes', $limits['mailboxes'], 'beltoft-services' ),
+							MailPlan::cached( $root )['mailboxes'],
+							$limits['mailboxes']
+						),
+						\BeltoftServices\Hosting\HostingAccount::included_label( $resource ),
+					)
+				)
 			),
 			'state'   => $state,
 			'tone'    => $tone,

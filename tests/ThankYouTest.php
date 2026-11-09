@@ -179,7 +179,7 @@ final class ThankYouTest extends TestCase {
 				'failed_op'  => 'provision',
 				'last_error' => 'Proxmox said: token-secret-xyz',
 				'ip'         => '192.0.2.77',
-				'vmid'       => 4242,
+				'vmid'       => 987654321,
 				'ssh_key'    => 'ssh-ed25519 AAAAkeymaterial',
 				'reveal'     => 'bs1:encrypted-password',
 			)
@@ -187,7 +187,7 @@ final class ThankYouTest extends TestCase {
 
 		$json = wp_json_encode( $this->route( $order->get_id(), $order->get_order_key() )->get_data() );
 
-		foreach ( array( 'token-secret-xyz', '192.0.2.77', '4242', 'AAAAkeymaterial', 'encrypted-password', 'last_error' ) as $secret ) {
+		foreach ( array( 'token-secret-xyz', '192.0.2.77', '987654321', 'AAAAkeymaterial', 'encrypted-password', 'last_error' ) as $secret ) {
 			$this->assertStringNotContainsString( $secret, $json );
 		}
 

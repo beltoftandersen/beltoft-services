@@ -24,7 +24,7 @@ final class Plan {
 	public static function fields(): array {
 		return array(
 			'node_group'     => array( 'text', __( 'Node group', 'beltoft-services' ), __( 'The group of hosting nodes this plan is built on. A node belongs to one group.', 'beltoft-services' ), '', true ),
-			'sites'          => array( 'number', __( 'Websites', 'beltoft-services' ), __( 'Websites in the account. Staging copies do not count.', 'beltoft-services' ), 1, true ),
+			'sites'          => array( 'number', __( 'Websites', 'beltoft-services' ), __( 'Websites in the account. 0 means unlimited: the CPU, memory and storage of the plan are the limits. Staging copies do not count.', 'beltoft-services' ), 1, true ),
 			'disk_gb'        => array( 'number', __( 'Storage (GB)', 'beltoft-services' ), __( 'Files and databases together. The container disk grows to this size and is never shrunk.', 'beltoft-services' ), 10, true ),
 			'cores'          => array( 'number', __( 'CPU cores (cap)', 'beltoft-services' ), '', 1, true ),
 			'memory_mb'      => array( 'number', __( 'Memory (MB, cap)', 'beltoft-services' ), '', 1024, true ),
@@ -74,13 +74,13 @@ final class Plan {
 	}
 
 	/**
-	 * What a provision cannot start without: positive cores, memory and disk, at least one website, a node
+	 * What a provision cannot start without: positive cores, memory and disk, a node
 	 * group. Returns the first problem as admin text, or null.
 	 *
 	 * @param array<string, int|string|bool> $plan Typed plan.
 	 */
 	public static function problem( array $plan ): ?string {
-		foreach ( array( 'cores', 'memory_mb', 'disk_gb', 'sites' ) as $key ) {
+		foreach ( array( 'cores', 'memory_mb', 'disk_gb' ) as $key ) {
 			if ( (int) $plan[ $key ] <= 0 ) {
 				return 'The plan value "' . $key . '" must be a positive number';
 			}

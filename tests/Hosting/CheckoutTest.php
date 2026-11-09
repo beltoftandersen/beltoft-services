@@ -15,6 +15,7 @@ use BeltoftServices\Hosting\HostingSwitch;
 use BeltoftServices\Hosting\Records;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\SiteField;
+use BeltoftServices\Hosting\SiteNewDomain;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -392,6 +393,15 @@ class CheckoutTest extends HostingCase {
 		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array() ) ), 'No growth, no refusal.' );
 	}
 
+	public function test_a_plan_without_a_website_count_is_never_refused_for_websites(): void {
+		$r = $this->account( array( 'sites' => 3 ) );
+		Sites::add( $r->id(), 'second', 'S', '8.3', 2 );
+		Sites::add( $r->id(), 'third', 'T', '8.3', 2 );
+		Sites::add( $r->id(), 'fourth', 'F', '8.3', 2 );
+
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'sites' => 0 ) ) ), 'Unlimited is never fewer.' );
+	}
+
 	public function test_fewer_websites_than_in_use_is_refused(): void {
 		$r = $this->account( array( 'sites' => 3 ) );
 		Sites::add( $r->id(), 'second', 'S', '8.3', 2 );
@@ -422,6 +432,13 @@ class CheckoutTest extends HostingCase {
 		$this->assertNotNull( Records::for_resource( $r->id() ) );
 	}
 
+	public function test_an_own_domain_with_national_letters_is_accepted_and_stored_as_punycode(): void {
+		$one = SiteField::resolve( array( 'mode' => 'own', 'host' => "www.\u{e6}blegr\u{f8}d-\u{f8}ster\u{e5}.dk" ), 0 );
+		$this->assertIsArray( $one );
+		$this->assertSame( 'www.xn--blegrd-ster-78ab1xc.dk', $one['label'] );
+		$this->assertSame( 'www.xn--blegrd-ster-78ab1xc.dk', $one['host'] ?? $one['label'] );
+	}
+
 	public function test_a_domain_order_needs_no_temporary_name_and_gets_a_unique_one(): void {
 		$one = SiteField::resolve( array( 'mode' => 'own', 'host' => 'www.Example.com' ), 0 );
 		$this->assertIsArray( $one );
@@ -444,6 +461,24 @@ class CheckoutTest extends HostingCase {
 		$typed = SiteField::resolve( array( 'mode' => 'own', 'host' => 'typed.example.net', 'slug' => 'my-pick' ), 0 );
 		$this->assertSame( 'my-pick', $typed['slug'] );
 		$this->assertSame( 'site_slug', SiteField::resolve( array( 'mode' => 'preview' ), 0 )->get_error_code() );
+	}
+
+	public function test_a_guest_hold_moves_to_the_customer_the_checkout_makes_and_to_nobody_else(): void {
+		$guest = SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), 0 );
+		$this->assertSame( 'ux-shop-example-com', $guest['slug'] );
+
+		// Another signed-in customer does not take the guest's hold.
+		$stranger = $this->factory()->user->create();
+		$this->assertSame( 'ux-shop-example-com-2', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $stranger )['slug'] );
+
+		// The checkout makes an account of that guest: the guest's holds become theirs.
+		$user = $this->factory()->user->create();
+		do_action( 'woocommerce_created_customer', $user, array(), false );
+		$this->assertSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $user )['slug'] );
+
+		// And it is theirs alone from then on.
+		$other = $this->factory()->user->create();
+		$this->assertNotSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $other )['slug'] );
 	}
 
 	public function test_each_address_option_posts_its_own_inputs(): void {
@@ -502,5 +537,186 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringNotContainsString( 'Hetzner', $html );
 		$this->assertStringContainsString( 'data-site-panel="preview"', $html );
 		$this->assertMatchesRegularExpression( '/data-site-panel="own" hidden/', $html, 'Only the chosen option is open.' );
+	}
+
+	/** Puts a domain line next to the hosting line already in the cart. */
+	private function add_domain_line( string $name, string $mode = 'register' ): string {
+		$domain = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$key    = WC()->cart->add_to_cart( $domain->get_id(), 1, 0, array(), array( 'beltoft_services_domain' => array( 'domain' => $name, 'mode' => $mode ) ) );
+
+		if ( ! $key ) {
+			$this->markTestSkipped( 'The fixture domain product cannot be put in the cart here.' );
+		}
+
+		return (string) $key;
+	}
+
+	public function test_the_step_offers_a_new_domain_of_the_order_and_refuses_a_forged_name(): void {
+		$key = $this->in_cart( $this->product() );
+
+		ob_start();
+		SiteField::render();
+		$this->assertStringNotContainsString( 'A new domain in this order', (string) ob_get_clean() );
+
+		$this->add_domain_line( 'Brand-New.example' );
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'A new domain in this order', $html );
+		$this->assertStringContainsString( '<option value="brand-new.example"', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+
+		$this->post( $key, array( 'mode' => 'new', 'host_new' => 'brand-new.example' ) );
+		$this->assertSame( array(), $this->errors() );
+
+		$this->post( $key, array( 'mode' => 'new', 'host_new' => 'forged.example' ) );
+		$this->assertNotSame( array(), $this->errors(), 'Only a domain of this cart is a new domain.' );
+		$this->post( $key, array( 'mode' => 'new', 'host_new' => '' ) );
+		$this->assertNotSame( array(), $this->errors() );
+
+		$dns = $this->add_domain_line( 'dns-only.example' );
+		WC()->cart->cart_contents[ $dns ]['beltoft_services_domain']['mode'] = 'dns';
+		$this->post( $key, array( 'mode' => 'new', 'host_new' => 'dns-only.example' ) );
+		$this->assertNotSame( array(), $this->errors(), 'A DNS line is not a new domain.' );
+	}
+
+	/**
+	 * A hosting account and a domain of one order, same customer.
+	 *
+	 * @return array{0: Resource, 1: Resource, 2: int}
+	 */
+	private function order_with_domain( string $name, bool $same_owner = true ): array {
+		$product = $this->product();
+		$user    = self::factory()->user->create();
+		$item    = new \WC_Order_Item_Product();
+		$item->set_product_id( $product->get_id() );
+		$item->add_meta_data( SiteField::ITEM_META, array( 'slug' => 'n' . wp_generate_password( 5, false, false ), 'label' => $name, 'mode' => 'new', 'domain' => $name, 'install' => 'wordpress', 'language' => 'en_US', 'admin_email' => '' ) );
+		$order = wc_create_order();
+		$order->add_item( $item );
+		$order->save();
+
+		$license = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id(), 'user_id' => $user ) );
+		$meta    = SiteField::initial_meta( array(), $license, Registry::get( 'hosting' ) );
+		$host    = Resource::create( $license, Registry::get( 'hosting' ), Product::plan( $product->get_id() ), $meta );
+		$this->provision_fully( $host );
+
+		$dp      = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$dl      = $this->service_license( $dp, array( 'fire' => false, 'order_id' => $order->get_id(), 'user_id' => $same_owner ? $user : self::factory()->user->create() ) );
+		$domain  = Resource::create( $dl, new DomainDriver(), array(), array( 'domain' => $name, 'mode' => 'register', 'zone_ready' => true ) );
+		$this->dns->create_zone( $name, array( 'ns1.example.net' ) );
+
+		return array( Resource::find( $host->id() ), $domain, $user );
+	}
+
+	private function make_ready( Resource $r ): void {
+		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		SiteNewDomain::on_state_changed( Resource::find( $r->id() ), 'provisioning', 'ready' );
+	}
+
+	public function test_a_new_domain_stays_off_the_site_until_its_registration_is_ready_then_it_joins(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'fresh.example' );
+
+		$this->assertSame( 'fresh.example', $host->get( SiteNewDomain::META_DOMAIN ) );
+		$this->assertGreaterThan( time() + 6 * DAY_IN_SECONDS, (int) $host->get( SiteNewDomain::META_UNTIL ) );
+		$this->assertSame( '', (string) $host->get( 'site' )['domain'], 'Nothing is attached at provisioning.' );
+		$this->assertNull( SiteDomains::find( 'fresh.example' ) );
+
+		// The account is ready first, the domain is not: still on the temporary address.
+		$this->make_ready( $host );
+		$this->assertNull( SiteDomains::find( 'fresh.example' ) );
+
+		$this->make_ready( $domain );
+		$row = SiteDomains::find( 'fresh.example' );
+		$this->assertNotNull( $row );
+		$this->assertSame( 'ours', $row['kind'] );
+		$this->assertSame( 'active', $row['state'] );
+		$this->assertSame( $host->id(), $row['resource_id'] );
+		$this->assertSame( 'joined', Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( 'fresh.example', \BeltoftServices\Hosting\LiteMail::own_domain( Resource::find( $host->id() ) ) );
+	}
+
+	public function test_a_domain_that_is_ready_before_the_account_joins_when_the_account_is_ready(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'early.example' );
+
+		$this->make_ready( $domain );
+		$this->assertNull( SiteDomains::find( 'early.example' ) );
+		$this->make_ready( $host );
+		$this->assertNotNull( SiteDomains::find( 'early.example' ) );
+	}
+
+	public function test_another_customers_domain_or_a_late_one_is_never_attached(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'notmine.example', false );
+		$this->make_ready( $host );
+		$this->make_ready( $domain );
+		$this->assertNull( SiteDomains::find( 'notmine.example' ), 'The domain license user differs from the hosting license user.' );
+
+		list( $late_host, $late ) = $this->order_with_domain( 'late.example' );
+		$late_host->set( array( SiteNewDomain::META_UNTIL => time() - 60 ) );
+		$this->make_ready( $late_host );
+		$this->make_ready( $late );
+		$this->assertNull( SiteDomains::find( 'late.example' ), 'After 7 days the site stays on the temporary address.' );
+		$this->assertSame( 'expired', Resource::find( $late_host->id() )->get( SiteNewDomain::META_DONE ) );
+		$kinds = array_column( SiteDomains::for_resource( $late_host->id() ), 'kind' );
+		$this->assertSame( array( 'preview' ), $kinds, 'Only the temporary address, and it works.' );
+	}
+
+	private function scheduled_retries( Resource $host ): int {
+		return count( as_get_scheduled_actions( array( 'hook' => SiteNewDomain::RETRY_HOOK, 'args' => array( $host->id() ), 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
+	}
+
+	private function notes( Resource $host ): int {
+		return count( wc_get_order_notes( array( 'order_id' => (int) $host->license()['order_id'] ) ) );
+	}
+
+	public function test_a_busy_account_keeps_one_retry_and_the_retry_stops_at_the_deadline(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'busy.example' );
+		$domain->set( array( 'state' => 'ready' ) );
+		$host->set( array( 'state' => 'ready', 'desired' => 'ready', 'steps' => array() ) );
+		$host = Resource::find( $host->id() );
+
+		SiteNewDomain::attempt( $host );
+		SiteNewDomain::attempt( $host );
+		SiteNewDomain::on_state_changed( $domain, 'x', 'ready' );
+		$this->assertSame( 1, $this->scheduled_retries( $host ), 'Exactly one retry chain.' );
+		$this->assertSame( '', (string) Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+
+		$host->set( array( SiteNewDomain::META_UNTIL => time() + 300 ) );
+		as_unschedule_all_actions( SiteNewDomain::RETRY_HOOK );
+		SiteNewDomain::attempt( Resource::find( $host->id() ) );
+		$this->assertSame( 0, $this->scheduled_retries( $host ), 'No retry is scheduled past the deadline.' );
+	}
+
+	public function test_a_second_attempt_after_a_join_changes_nothing(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'once.example' );
+		$this->make_ready( $host );
+		$this->make_ready( $domain );
+		$notes = $this->notes( $host );
+
+		SiteNewDomain::attempt( Resource::find( $host->id() ) );
+		$fresh = Resource::find( $host->id() );
+		$this->assertSame( 'joined', $fresh->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( $notes, $this->notes( $host ) );
+		$this->assertSame( '', SiteNewDomain::hint( $fresh ) );
+	}
+
+	public function test_a_domain_the_account_cannot_take_is_refused_with_a_note_and_a_hint(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'second.example' );
+		$this->connect_domain( $host, 'first.example' );
+		$notes = $this->notes( $host );
+
+		$this->make_ready( $host );
+		$this->make_ready( $domain );
+
+		$fresh = Resource::find( $host->id() );
+		$this->assertNull( SiteDomains::find( 'second.example' ), 'Nothing is attached.' );
+		$this->assertSame( 'refused', $fresh->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( $notes + 1, $this->notes( $host ) );
+		$hint = SiteNewDomain::hint( $fresh );
+		$this->assertStringContainsString( 'The domain second.example from your order was not connected:', $hint );
+		$this->assertStringContainsString( 'Connect it below or contact support.', $hint );
+		$this->assertStringNotContainsString( 'addon_required', $hint );
+		$this->assertStringNotContainsString( "\u{2014}", $hint );
 	}
 }

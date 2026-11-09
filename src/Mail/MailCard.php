@@ -54,6 +54,9 @@ final class MailCard {
 					'creating'  => __( 'Making the mailbox…', 'beltoft-services' ),
 					'deleting'  => __( 'Deleting…', 'beltoft-services' ),
 					'aliasing'  => __( 'Making the alias…', 'beltoft-services' ),
+					'adding'    => __( 'Adding the domain…', 'beltoft-services' ),
+					'removing'  => __( 'Removing the domain…', 'beltoft-services' ),
+					'removeAsk' => __( 'Remove this domain from your plan?', 'beltoft-services' ),
 					'checking'  => __( 'Looking at your DNS. This can take a few seconds.', 'beltoft-services' ),
 				),
 			)
@@ -89,8 +92,15 @@ final class MailCard {
 		$view = MailView::data( $r, $want[ $tab ] ?? array() );
 		$link = static fn( string $slug ): string => $area && $page ? $area->url( $page['license'], 'overview' === $slug ? '' : $slug ) : '';
 
-		( static function ( array $view, array $nav, string $active, callable $link ): void {
+		// The address of the page of another domain of the plan.
+		$other_url = static function ( int $resource ) use ( $area ): string {
+			$other = Resource::find( $resource );
+
+			return $area && $other ? $area->url( $other->license() ) : '';
+		};
+
+		( static function ( array $view, array $nav, string $active, callable $link, callable $other_url ): void {
 			include BELTOFT_SERVICES_PATH . 'templates/account/mail.php';
-		} )( $view, $nav, $tab, $link );
+		} )( $view, $nav, $tab, $link, $other_url );
 	}
 }

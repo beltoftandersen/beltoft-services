@@ -180,7 +180,8 @@ class ReadyTest extends HostingCase {
 
 		$a = new HostingActions( $r );
 		$a->add_domain( 'w' . $r->id(), 'www.elsewhere.example' );
-		$a->enable_mail( 'elsewhere.example' );
+		$this->connect_domain( $r, 'elsewhere.example' );
+		$a->enable_mail( 'www.elsewhere.example' );
 		$this->assertSame( array( 'done' => 'build' ), $a->checklist( 'build' ) );
 		$a->checklist( 'build' );
 		$this->assertSame( array( 'domain' => true, 'email' => true, 'build' => true, 'backups' => false ), HostingAccount::checklist( Resource::find( $r->id() ) ) );
@@ -199,7 +200,7 @@ class ReadyTest extends HostingCase {
 		HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Getting started', $html );
-		$this->assertStringContainsString( '[ ] Connect your domain', $html );
+		$this->assertStringContainsString( 'To do:</span><span class="beltoft-hosting-check-label">Connect your domain', $html );
 		$this->assertStringContainsString( 'data-hosting-action="check_item" data-item="build"', $html );
 		$this->assertStringContainsString( 'data-hosting-resource="' . $r->id() . '"', $html );
 
@@ -230,6 +231,7 @@ class ReadyTest extends HostingCase {
 
 	public function test_the_panel_has_action_buttons_only_while_ready_and_the_script_is_enqueued(): void {
 		$r = $this->account();
+		$this->connect_domain( $r, 'ready.example' );
 
 		ob_start();
 		HostingAccount::render( $r );

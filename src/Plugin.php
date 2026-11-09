@@ -61,9 +61,11 @@ final class Plugin {
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();
 		Hosting\SiteField::register();
+		Hosting\SiteNewDomain::register();
 		Hosting\CartRule::register();
 		Hosting\Languages::register();
 		Hosting\HostingSwitch::register();
+		Hosting\Addons::register();
 		Children::register();
 		Domains\DomainSettings::register();
 		Ssl\SslSettings::register();
@@ -93,7 +95,10 @@ final class Plugin {
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
 		Mail\MailAccess::register();
+		Mail\MailDomains::register();
+		Mail\MailWake::register();
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
+		add_action( 'beltoft_services_account_assets', array( Hosting\HostingAccount::class, 'style' ), 20, 0 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Ssl::class, 'menu' ), 101 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Licences::class, 'menu' ), 102 );

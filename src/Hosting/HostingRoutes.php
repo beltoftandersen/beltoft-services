@@ -28,7 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
- * - POST   hosting/mail                    domain: sets up Email lite
+ * - POST   hosting/mail                    domain (optional, must be the account's own domain): sets up Email lite
  * - GET    hosting/usage                   stats, database size, storage share
  * - GET    hosting/backups                 the backups, the safety point
  * - POST   hosting/backups                 back up now (3 a day)
@@ -130,12 +130,32 @@ final class HostingRoutes {
 				'dismiss' => array( 'type' => 'boolean', 'description' => 'Hide the getting-started list.' ),
 			),
 		) );
+		register_rest_route( $ns, $base . '/addons', array(
+			array(
+				'methods'             => $post,
+				'callback'            => array( __CLASS__, 'buy_addon' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + array(
+					'kind'    => array( 'type' => 'string', 'required' => true, 'description' => 'domain (an extra domain) or mail_pack (5 GB for one Email lite mailbox).' ),
+					'target'  => array( 'type' => 'string', 'required' => true, 'description' => 'The domain name, or the mailbox address.' ),
+					'host'    => array( 'type' => 'string', 'default' => '', 'description' => 'For an extra domain: the name the customer typed. When the order is paid through the pay link, it is added to the website.' ),
+					'slug'    => array( 'type' => 'string', 'default' => '', 'description' => 'For an extra domain: the website the name is for.' ),
+					'confirm' => array( 'type' => 'integer', 'description' => 'The amount charged now, in cents, that the customer accepted (amount_cents of the 402 answer). Without it, or when the price has changed, nothing is bought and the price is returned as the error message.' ),
+				),
+			),
+			array(
+				'methods'             => \WP_REST_Server::DELETABLE,
+				'callback'            => array( __CLASS__, 'remove_pack' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + array( 'target' => array( 'type' => 'string', 'required' => true, 'description' => 'The mailbox address: one storage pack of it ends at the next renewal.' ) ),
+			),
+		) );
 		register_rest_route( $ns, $base . '/mail/sites', array( 'methods' => $post, 'callback' => array( __CLASS__, 'mail_for_sites' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ) );
 		register_rest_route( $ns, $base . '/mail', array(
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'enable_mail' ),
 			'permission_callback' => 'is_user_logged_in',
-			'args'                => $id + array( 'domain' => array( 'type' => 'string', 'required' => true, 'description' => 'The mail domain.' ) ),
+			'args'                => $id + array( 'domain' => array( 'type' => 'string', 'required' => false, 'default' => '', 'description' => 'The mail domain. Email lite is on the account\'s own domain; leave empty to use it.' ) ),
 		) );
 	}
 
@@ -174,14 +194,14 @@ final class HostingRoutes {
 	 * @param int                            $status Status of a success.
 	 */
 	private static function reply( $result, int $status = 200 ): \WP_REST_Response {
-		return is_wp_error( $result ) ? self::error( $result->get_error_code(), $result->get_error_message() ) : self::ok( $result, $status );
+		return is_wp_error( $result ) ? self::error( $result->get_error_code(), $result->get_error_message(), is_array( $result->get_error_data() ) ? array_diff_key( $result->get_error_data(), array( 'status' => 1 ) ) : array() ) : self::ok( $result, $status );
 	}
 
 	/**
 	 * @param string $code    Short code.
 	 * @param string $message Words for the customer.
 	 */
-	private static function error( string $code, string $message ): \WP_REST_Response {
+	private static function error( string $code, string $message, array $data = array() ): \WP_REST_Response {
 		$status = array(
 			'invalid'      => 422,
 			'limit'        => 409,
@@ -191,11 +211,13 @@ final class HostingRoutes {
 			'not_hosting'  => 409,
 			'not_found'    => 404,
 			'busy_round'   => 409,
+			'confirm'      => 402,
+			'addon_required' => 402,
 			'failed'       => 502,
 			'rate_limited' => 429,
 		)[ $code ] ?? 400;
 
-		$response = rest_convert_error_to_response( new \WP_Error( 'beltoft_services_hosting_' . $code, $message, array( 'status' => $status ) ) );
+		$response = rest_convert_error_to_response( new \WP_Error( 'beltoft_services_hosting_' . $code, $message, array_merge( $data, array( 'status' => $status ) ) ) );
 		$response->header( 'Cache-Control', 'no-store' );
 
 		return $response;
@@ -282,6 +304,14 @@ final class HostingRoutes {
 
 	public static function remove_domain( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->remove_domain( rawurldecode( (string) $request['host'] ) ) );
+	}
+
+	public static function buy_addon( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->buy_addon( (string) $request['kind'], (string) $request['target'], (int) $request['confirm'], (string) $request['host'], (string) $request['slug'] ), 201 );
+	}
+
+	public static function remove_pack( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->remove_pack( (string) $request['target'] ) );
 	}
 
 	public static function enable_mail( \WP_REST_Request $request ): \WP_REST_Response {

@@ -229,4 +229,16 @@ final class MailboxesTest extends MailTestCase {
 		$this->assertNull( $this->mailcow->mailbox( 'big@size.example' ) );
 		$this->assertArrayNotHasKey( 'big@size.example', (array) Resource::find( $r->id() )->get( MailAccess::META ) );
 	}
+
+	public function test_a_domain_being_removed_takes_no_new_mailbox_or_alias(): void {
+		$root  = $this->ready_mail( 'rm-root.example' );
+		$child = \BeltoftServices\Mail\MailDomains::add( $root, 'rm-kid.example' );
+		$this->run_jobs();
+		$child = \BeltoftServices\Resource::find( $child->id() );
+		$this->assertTrue( \BeltoftServices\Mail\MailDomains::remove( $child ) );
+		$gone = \BeltoftServices\Resource::find( $child->id() );
+		$this->assertSame( 'deleted', $gone->get( 'desired' ) );
+		$this->assertWPError( \BeltoftServices\Mail\Mailboxes::create( $gone, 'late' ) );
+		$this->assertWPError( \BeltoftServices\Mail\Aliases::create( $gone, 'late', array( 'x@rm-root.example' ) ) );
+	}
 }

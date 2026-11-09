@@ -198,7 +198,8 @@ final class MailAccountTest extends MailTestCase {
 
 		$html = $this->page( Resource::find( $r->id() ) );
 
-		$this->assertStringContainsString( 'Your plan has no room for more mailboxes.', $html );
+		$this->assertStringContainsString( 'Your plan has no room for more mailboxes. Delete a mailbox or change to a larger plan.', $html );
+		$this->assertSame( 1, substr_count( $html, 'has no room for more mailboxes' ) );
 		$this->assertStringNotContainsString( 'data-mail-create-submit', $html );
 	}
 
@@ -369,6 +370,10 @@ final class MailAccountTest extends MailTestCase {
 			$this->assertStringNotContainsString( "\u{2014}", $text, $file . ' has no em dash.' );
 		}
 
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/mail.css' );
+		$this->assertStringContainsString( 'summary::after', $css, 'The delete disclosure has no plus sign.' );
+		$this->assertStringContainsString( 'p.beltoft-services-panel__notice { margin: 16px 0; }', $css );
+
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/mail.js' );
 		$this->assertStringNotContainsString( 'localStorage', $js, 'A password is not stored in the browser.' );
 		$this->assertStringNotContainsString( 'sessionStorage', $js );
@@ -443,5 +448,150 @@ final class MailAccountTest extends MailTestCase {
 		add_filter( 'beltoft_services_email_add_url', '__return_empty_string', 20 );
 		$this->assertSame( array(), $ref->invoke( $this->area() ) );
 		remove_all_filters( 'beltoft_services_email_add_url' );
+	}
+
+	/** A ready child domain of a root, jobs run. */
+	private function child_of( Resource $root, string $name ): Resource {
+		$child = \BeltoftServices\Mail\MailDomains::add( $root, $name );
+		$this->assertInstanceOf( Resource::class, $child );
+		$this->run_jobs();
+
+		return Resource::find( $child->id() );
+	}
+
+	public function test_a_team_root_shows_its_domains_the_counter_and_the_add_form(): void {
+		$this->settings( array( 'domain_search_url' => '/domains/' ) );
+		$root = $this->ready_mail( 'team.example', array(), $this->user );
+		$this->our_zone( $this->user, 'zone.example' );
+		$this->child_of( $root, 'second.example' );
+
+		$html = $this->page( Resource::find( $root->id() ) );
+
+		$this->assertStringContainsString( 'Domains in this plan', $html );
+		$this->assertStringContainsString( '2 of 3 domains', $html );
+		$this->assertStringContainsString( 'second.example', $html );
+		$this->assertStringContainsString( 'data-mail-domain-add', $html );
+		$this->assertStringContainsString( 'One of your domains with us', $html );
+		$this->assertStringContainsString( '<option value="zone.example">', $html );
+		$this->assertStringContainsString( 'A domain at another provider', $html );
+		$this->assertStringContainsString( 'You add a few DNS records at your provider. We show you which ones, starting with one that proves the domain is yours.', $html );
+		$this->assertStringContainsString( 'Register a new domain', $html );
+		$this->assertStringContainsString( 'Transfer a domain to us', $html );
+		$this->assertStringContainsString( '/domains/?mail_for=' . $root->id() . '"', $html );
+		$this->assertStringContainsString( '/domains/?mail_for=' . $root->id() . '#beltoft-transfer-domain"', $html, 'The transfer link keeps its anchor after the plan.' );
+		$this->assertStringNotContainsString( 'data-mail-domain-remove', $html, 'The first domain cannot be removed.' );
+		$this->assertStringNotContainsString( '—', $html );
+		$this->assertStringNotContainsString( '·', $html );
+	}
+
+	public function test_one_domain_of_one_has_one_domain_counter_and_a_full_plan_has_no_add_form(): void {
+		$root = $this->ready_mail( 'solo.example', array( 'domains' => 1 ), $this->user );
+		$html = $this->page( $root );
+		$this->assertStringNotContainsString( 'data-mail-domain-add', $html );
+
+		$full = $this->ready_mail( 'full3.example', array(), $this->user );
+		$this->child_of( $full, 'b.example' );
+		$this->child_of( $full, 'c.example' );
+		$html = $this->page( Resource::find( $full->id() ) );
+		$this->assertStringContainsString( '3 of 3 domains', $html );
+		$this->assertStringContainsString( 'Your plan has no room for another domain.', $html );
+		$this->assertStringNotContainsString( 'data-mail-domain-add', $html );
+	}
+
+	public function test_the_mailbox_counter_is_plan_wide_and_the_form_follows_the_plan_not_the_domain(): void {
+		$root = $this->ready_mail( 'wide.example', array( 'mailboxes' => 3 ), $this->user );
+		$kid  = $this->child_of( $root, 'wide-two.example' );
+		Mailboxes::create( Resource::find( $root->id() ), 'a' );
+		Mailboxes::create( Resource::find( $root->id() ), 'b' );
+		Mailboxes::create( Resource::find( $kid->id() ), 'c' );
+
+		$html = $this->page( Resource::find( $kid->id() ) );
+		$this->assertStringContainsString( '3 of 3 mailboxes in your plan', $html );
+		$this->assertStringContainsString( 'On this domain', $html );
+		$this->assertStringNotContainsString( 'data-mail-create-submit', $html, 'One mailbox on this domain, but the plan is full.' );
+
+		$solo = $this->ready_mail( 'solo-box.example', array( 'mailboxes' => 5, 'domains' => 1 ), $this->user );
+		$html = $this->page( $solo );
+		$this->assertStringContainsString( '0 of 5 mailboxes in your plan', $html );
+		$this->assertStringNotContainsString( 'On this domain', $html );
+	}
+
+	public function test_a_domain_being_removed_is_gone_from_the_page_at_once(): void {
+		$root = $this->ready_mail( 'gone.example', array(), $this->user );
+		$this->child_of( $root, 'b-gone.example' );
+		$third = $this->child_of( $root, 'c-gone.example' );
+		$this->assertStringContainsString( '3 of 3 domains', $this->page( Resource::find( $root->id() ) ) );
+
+		$this->assertTrue( \BeltoftServices\Mail\MailDomains::remove( $third ) );
+		$html = $this->page( Resource::find( $root->id() ) );
+		$this->assertStringContainsString( '2 of 3 domains', $html );
+		$this->assertStringNotContainsString( 'c-gone.example', $html );
+		$this->assertStringContainsString( 'data-mail-domain-add', $html, 'There is room again.' );
+		$this->assertSame( 2, \BeltoftServices\Mail\MailPlan::used( Resource::find( $root->id() ) )['domains'] );
+	}
+
+	public function test_a_proof_wait_offers_check_now_and_the_files_use_the_route(): void {
+		$r = $this->mail_resource( 'proofbtn.example', array(), array(), $this->user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'We are waiting for the proof that the domain is yours.', $html );
+		$this->assertStringContainsString( 'data-mail-proof-check', $html );
+		$this->assertStringContainsString( '/mail/proof/check', (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail.js' ) );
+
+		$ready = $this->ready_mail( 'noproofbtn.example', array(), $this->user );
+		$this->assertStringNotContainsString( 'data-mail-proof-check', $this->page( $ready ) );
+	}
+
+	public function test_a_child_page_names_its_plan_and_offers_remove_only_without_mailboxes(): void {
+		$root  = $this->ready_mail( 'team2.example', array(), $this->user );
+		$child = $this->child_of( $root, 'kid.example' );
+
+		$html = $this->page( $child );
+		$this->assertStringContainsString( 'Part of the', $html );
+		$this->assertMatchesRegularExpression( '#plan of <a href="[^"]+">team2\.example</a>#', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( $this->area()->url( $root->license() ) ) . '"', $html );
+		$this->assertStringContainsString( 'data-mail-domain-remove="kid.example"', $html );
+		$this->assertStringNotContainsString( 'data-mail-domain-add', $html, 'The add form is on the first domain.' );
+
+		Mailboxes::create( Resource::find( $child->id() ), 'info' );
+		$html = $this->page( Resource::find( $child->id() ) );
+		$this->assertStringNotContainsString( 'data-mail-domain-remove', $html );
+		$this->assertStringContainsString( 'Delete the mailboxes on this domain first.', $html );
+	}
+
+	public function test_on_a_paused_plan_the_remove_button_is_disabled_with_the_reason(): void {
+		$root  = $this->ready_mail( 'team3.example', array(), $this->user );
+		$child = $this->child_of( $root, 'kid3.example' );
+		Resource::find( $root->id() )->set( array( 'state' => 'paused' ) );
+
+		$html = $this->page( Resource::find( $child->id() ) );
+		$this->assertMatchesRegularExpression( '/<button[^>]*\sdisabled[^>]*data-mail-domain-remove="kid3.example"/', $html );
+		$this->assertStringContainsString( 'You can remove a domain when the plan is active again.', $html );
+	}
+
+	public function test_the_list_button_adds_a_domain_when_a_plan_has_room_else_creates_an_email_domain(): void {
+		$this->service_product( 'mail', self::PLAN, array( 'slug' => 'mail-buy' ) );
+
+		$this->assertSame( 'Create an email domain', $this->area()->buttons()[0]['label'] );
+
+		$root = $this->ready_mail( 'room.example', array(), $this->user );
+		$b    = $this->area()->buttons();
+		$this->assertSame( 'Add a domain', $b[0]['label'] );
+		$this->assertStringContainsString( $this->area()->url( $root->license() ), $b[0]['url'] );
+		$this->assertStringContainsString( '#', $b[0]['url'] );
+
+		$this->child_of( $root, 'b.example' );
+		$this->child_of( $root, 'c.example' );
+		$b = $this->area()->buttons();
+		$this->assertSame( 'Create an email domain', $b[0]['label'] );
+		$this->assertSame( $this->area()->url_add(), $b[0]['url'] );
+		$this->assertNotSame( '', $b[0]['url'] );
+	}
+
+	public function test_a_plan_of_one_alias_says_alias_and_the_copy_says_on_this_domain(): void {
+		$r = $this->ready_mail( 'oa.example', array( 'aliases' => 1 ), $this->user );
+		$this->assertStringContainsString( '0 of 1 alias used.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
+		$this->assertStringNotContainsString( 'of this domain first', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Mail/MailDomains.php' ) );
 	}
 }

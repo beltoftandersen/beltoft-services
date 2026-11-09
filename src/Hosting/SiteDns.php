@@ -411,12 +411,30 @@ final class SiteDns {
 			return null;
 		}
 
-		$proved = in_array( self::proof_token( (int) $row['resource_id'], $host ), array_map( static fn( $t ) => trim( (string) $t, " \t\"" ), $texts ), true );
+		$proved = self::under_verified_domain( (int) $row['resource_id'], $host ) || in_array( self::proof_token( (int) $row['resource_id'], $host ), array_map( static fn( $t ) => trim( (string) $t, " \t\"" ), $texts ), true );
 		$state  = $proved && '' !== $edge['A'] && in_array( $edge['A'], $found, true ) ? 'active' : 'waiting';
 
 		SiteDomains::set_state( $host, $state );
 
 		return $state;
+	}
+
+	/**
+	 * Is the name a subdomain of a domain this account already has active (a domain in the customer's zone, or an
+	 * outside domain that was proved)? Subdomains of such a domain need no proof of their own and are not counted or
+	 * charged: only the address has to point at us.
+	 *
+	 * @param int    $resource_id Hosting resource id.
+	 * @param string $host        Host name.
+	 */
+	public static function under_verified_domain( int $resource_id, string $host ): bool {
+		foreach ( SiteDomains::for_resource( $resource_id ) as $row ) {
+			if ( 'preview' !== $row['kind'] && 'active' === $row['state'] && $row['host'] !== $host && str_ends_with( $host, '.' . $row['host'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

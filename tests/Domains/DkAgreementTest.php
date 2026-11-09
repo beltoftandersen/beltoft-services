@@ -39,6 +39,27 @@ class DkAgreementTest extends TestCase {
 	/** @runInSeparateProcess
 	 * @preserveGlobalState disabled
 	 */
+	public function test_an_idn_name_is_shown_in_unicode_and_sent_in_punycode(): void {
+		define( 'BELTOFT_SERVICES_DK_AGREEMENT_APPROVED', true );
+		$product = $this->service_product( 'domain' );
+		wc_load_cart();
+		$data = Cart::line_data( 'æblegrød-ux.dk', 'register' );
+		$this->assertIsArray( $data );
+		$punycode = $data['beltoft_services_domain']['domain'];
+		$this->assertStringStartsWith( 'xn--', $punycode );
+		WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
+		ob_start();
+		DkAgreement::render();
+		$html = ob_get_clean();
+		$this->assertStringContainsString( 'æblegrød-ux.dk', $html );
+		$this->assertStringContainsString( '(æblegrød-ux.dk)</label>', $html );
+		$this->assertStringContainsString( 'value="' . $punycode . '"', $html, 'The stored value stays punycode.' );
+		$this->assertStringNotContainsString( 'xn--blegrd', str_replace( 'value="' . $punycode . '"', '', $html ) );
+	}
+
+	/** @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_approved_classic_checkout_displays_and_records_agreement(): void {
 		define( 'BELTOFT_SERVICES_DK_AGREEMENT_APPROVED', true );
 		$this->assertTrue( DkAgreement::ready() );

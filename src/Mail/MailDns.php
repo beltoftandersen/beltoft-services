@@ -11,6 +11,7 @@ use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 use BeltoftServices\Domains\ZoneAccess;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,6 +82,7 @@ final class MailDns {
 		}
 
 		$rua    = MailSettings::dmarc_rua();
+		$rua    = '' !== $rua ? $rua : sanitize_email( (string) Settings::get( 'admin_email' ) );
 		$rows[] = array( 'key' => 'dmarc', 'name' => '_dmarc', 'type' => 'TXT', 'ttl' => self::TTL, 'value' => 'v=DMARC1; p=quarantine' . ( '' !== $rua ? '; rua=mailto:' . $rua : '' ) );
 		$rows[] = array( 'key' => 'autoconfig', 'name' => 'autoconfig', 'type' => 'CNAME', 'ttl' => self::TTL, 'value' => $host );
 		$rows[] = array( 'key' => 'autodiscover', 'name' => 'autodiscover', 'type' => 'CNAME', 'ttl' => self::TTL, 'value' => $host );

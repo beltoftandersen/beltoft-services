@@ -18,6 +18,7 @@ return array(
 	'Proxmox/FirewallRoute.php -> Mcp\Endpoint',
 	'Settings.php -> Mcp\Access',
 	'ThankYou.php -> Account\Panel',
+	'ThankYou.php -> Domains\HostName',
 	'ThankYou.php -> Account\ServerLinks',
 	'ThankYou.php -> Api\Routes',
 	'ThankYou.php -> Domains\ThankYou',

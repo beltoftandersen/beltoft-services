@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Mail\MailField;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -33,6 +34,10 @@ final class SiteField {
 	public const MODE_PREVIEW = 'preview';
 	public const MODE_OURS    = 'ours';
 	public const MODE_OWN     = 'own';
+	public const MODE_NEW     = 'new';
+
+	/** Days the site waits for a domain registered or transferred in the same order. */
+	public const WAIT_DAYS = MailField::WAIT_DAYS;
 
 	/** Every value an account can carry (an earlier order may hold `empty`). */
 	public const INSTALLS = array( 'wordpress', 'woocommerce', 'empty' );
@@ -50,6 +55,7 @@ final class SiteField {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
+		add_action( 'woocommerce_created_customer', array( __CLASS__, 'customer_made' ), 5 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
 	}
@@ -112,13 +118,26 @@ final class SiteField {
 	public static function resolve( array $input, int $user_id ) {
 		$mode = '' === (string) ( $input['mode'] ?? '' ) ? self::MODE_PREVIEW : (string) $input['mode'];
 
-		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) ) {
+		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, self::MODE_NEW ), true ) ) {
 			return new \WP_Error( 'site_mode', __( 'Choose how the website is reached: a temporary address, a domain in your account, or a domain you have elsewhere.', 'beltoft-services' ) );
 		}
 
 		$domain = '';
 
-		if ( self::MODE_PREVIEW !== $mode ) {
+		if ( self::MODE_NEW === $mode ) {
+			// Only a domain this cart registers or transfers: the name is checked against the cart, never taken from the form alone.
+			$host = HostName::normalise( (string) ( $input['host'] ?? '' ) );
+
+			if ( null === $host || ! in_array( $host, MailField::cart_domains(), true ) ) {
+				return new \WP_Error( 'site_new', __( 'Choose a domain that is part of this order.', 'beltoft-services' ) );
+			}
+
+			if ( null !== SiteDomains::find( $host ) ) {
+				return new \WP_Error( 'site_host', __( 'That domain is already used by a hosting account. Enter another domain.', 'beltoft-services' ) );
+			}
+
+			$domain = $host;
+		} elseif ( self::MODE_PREVIEW !== $mode ) {
 			$host = HostName::normalise( (string) ( $input['host'] ?? '' ) );
 
 			if ( null === $host || ! SiteDomains::valid_host( $host ) ) {
@@ -248,13 +267,17 @@ final class SiteField {
 		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
 		$out = array();
 
-		foreach ( array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'zone', 'install', 'language', 'email' ) as $field ) {
+		foreach ( array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'host_new', 'zone', 'install', 'language', 'email' ) as $field ) {
 			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
 		}
 
 		// Each mode has its own inputs; only the chosen mode's inputs count.
 		if ( '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ) {
 			$out['slug'] = $out['slug_domain'];
+		}
+
+		if ( self::MODE_NEW === $out['mode'] ) {
+			$out['host'] = $out['host_new'];
 		}
 
 		if ( self::MODE_OURS === $out['mode'] ) {
@@ -313,19 +336,53 @@ final class SiteField {
 	}
 
 	/**
-	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
-	 * first is used. The name is only the temporary address, so the customer is not asked for it.
+	 * A guest's account was made at the checkout: the names the guest's cart holds are the new customer's now.
 	 *
+	 * @param mixed $customer_id New customer id.
+	 */
+	public static function customer_made( $customer_id ): void {
+		if ( (int) $customer_id > 0 ) {
+			Sites::rekey_holds( self::owner( 0 ), self::owner( (int) $customer_id ) );
+		}
+	}
+
+	/**
+	 * The name a domain gives before any number is added: example.com is example-com.
+	 *
+	 * @param string $domain Domain.
+	 */
+	public static function slug_base( string $domain ): string {
+		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
+		$base = trim( substr( $base, 0, 28 ), '-' );
+
+		return '' === $base ? 'site' : $base;
+	}
+
+	/**
+	 * Is the name one that was made from the website's title (a domain order), so the customer never chose it? Then it
+	 * is an internal name and the account page shows the title only.
+	 *
+	 * @param string $slug  Name of the site.
+	 * @param string $label Title of the site.
+	 */
+	public static function slug_is_made( string $slug, string $label ): bool {
+		if ( '' === $label ) {
+			return false;
+		}
+
+		$base = self::slug_base( $label );
+
+		return $slug === $base || 1 === preg_match( '/^' . preg_quote( $base, '/' ) . '-[0-9]{1,2}$/', $slug );
+	}
+
+	/**
+	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
+	 * first is used. The name is only the temporary address, so the customer is not asked for it.	 *
 	 * @param string $domain Domain.
 	 * @param string $owner  Who holds the name (see owner()).
 	 */
 	private static function free_slug( string $domain, string $owner ): string {
-		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
-		$base = trim( substr( $base, 0, 28 ), '-' );
-
-		if ( '' === $base ) {
-			$base = 'site';
-		}
+		$base = self::slug_base( $domain );
 
 		for ( $n = 1; $n <= 50; $n++ ) {
 			$slug = 1 === $n ? $base : $base . '-' . $n;
@@ -356,7 +413,9 @@ final class SiteField {
 		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::DEFAULT;
 		$zone = Config::preview_zone();
 
-		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN ), true ) || ( self::MODE_OURS === $mode && ! $have ) ) {
+		$new = MailField::cart_domains();
+
+		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, self::MODE_NEW ), true ) || ( self::MODE_OURS === $mode && ! $have ) || ( self::MODE_NEW === $mode && array() === $new ) ) {
 			$mode = self::MODE_PREVIEW;
 		}
 
@@ -384,11 +443,25 @@ final class SiteField {
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_zone">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone">';
 
 			foreach ( $zones as $one ) {
-				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['zone'], $one, false ) . '>' . esc_html( $one ) . '</option>';
+				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['zone'], $one, false ) . '>' . esc_html( \BeltoftServices\Domains\HostName::display( $one ) ) . '</option>';
 			}
 
 			echo '</select></span></p>';
 			self::text_row( $name . '[host_ours]', $id . '_host_ours', __( 'Or a name inside it', 'beltoft-services' ), $post['host_ours'], false, __( 'For example www.mine.example. Leave empty to use the domain itself. We set up its DNS for you.', 'beltoft-services' ), 'url' );
+			echo '</div>';
+		}
+
+		if ( array() !== $new ) {
+			self::radio( $name, $id, self::MODE_NEW, $mode, __( 'A new domain in this order', 'beltoft-services' ) );
+			echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_NEW ) . '"' . ( self::MODE_NEW === $mode ? '' : ' hidden' ) . '>';
+			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_host_new">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[host_new]" id="' . esc_attr( $id ) . '_host_new">';
+
+			foreach ( $new as $one ) {
+				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['host_new'], $one, false ) . '>' . esc_html( HostName::display( $one ) ) . '</option>';
+			}
+
+			echo '</select></span></p>';
+			echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'The website starts on a temporary address and moves to this domain when its registration is finished.', 'beltoft-services' ) . '</p>';
 			echo '</div>';
 		}
 
@@ -593,8 +666,15 @@ final class SiteField {
 					'install_kind' => (string) ( $site['install'] ?? 'wordpress' ),
 					'language'    => (string) ( $site['language'] ?? 'en_US' ),
 					'admin_email' => (string) ( $site['admin_email'] ?? '' ),
-					'domain'      => (string) ( $site['domain'] ?? '' ),
+					'domain'      => self::MODE_NEW === ( $site['mode'] ?? '' ) ? '' : (string) ( $site['domain'] ?? '' ),
 				);
+
+				// A domain of the same order is attached when its registration is ready (SiteNewDomain), not at provisioning.
+				if ( self::MODE_NEW === ( $site['mode'] ?? '' ) && '' !== (string) ( $site['domain'] ?? '' ) ) {
+					$meta[ SiteNewDomain::META_DOMAIN ] = (string) $site['domain'];
+					$meta[ SiteNewDomain::META_UNTIL ]  = time() + self::WAIT_DAYS * DAY_IN_SECONDS;
+				}
+
 				break;
 			}
 		}
