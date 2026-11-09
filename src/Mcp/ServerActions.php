@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mcp;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Mail\MailClients;
 use BeltoftServices\Mail\MailGuard;
@@ -599,7 +600,7 @@ final class ServerActions {
 		$list = array_map( static fn( $h ) => strtolower( trim( (string) $h, ". \t" ) ), (array) ( $args['hosts'] ?? array() ) );
 
 		foreach ( $list as $host ) {
-			if ( 1 !== preg_match( '/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/D', $host ) ) {
+			if ( ! HostName::is_host( $host, 253, true ) ) {
 				return new \WP_Error( 'beltoft_services_tool', __( 'Each name server must be a host name such as ns1.example.net.', 'beltoft-services' ) );
 			}
 		}

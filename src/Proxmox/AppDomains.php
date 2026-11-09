@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\Zone;
@@ -34,7 +35,7 @@ final class AppDomains {
 			return null;
 		}
 		foreach ( explode( '.', $sub ) as $label ) {
-			if ( 1 !== preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) {
+			if ( ! HostName::label( $label ) ) {
 				return null;
 			}
 		}
