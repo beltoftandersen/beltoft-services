@@ -16,7 +16,7 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The shared part of the Databases and Apps areas. Like Servers and Domains, an area takes over the licenses
+ * The shared part of the Databases, Apps, Email, SSL and Licences areas. Like Servers and Domains, an area takes over the licenses
  * template of Beltoft Licenses on its own endpoint (WooCommerce's wc_get_template filter) and prints:
  *
  *  - `/my-account/<slug>/`: one row per service (templates/account/area-list.php);
@@ -363,33 +363,6 @@ abstract class ServiceArea {
 		}
 
 		return '';
-	}
-
-	/**
-	 * Prints the tab strip of a service page: links in the strip the Databases pages use.
-	 *
-	 * @param array<string, array{title: string, url: string, attrs?: array<string, string>, hidden?: bool}> $tabs Tab slug => title, address, and optionally extra attributes and a hidden flag (a script may show it later).
-	 * @param string                                           $active Slug of the tab shown.
-	 * @param string                                           $label  Accessible name of the strip.
-	 */
-	public static function tab_nav( array $tabs, string $active, string $label ): void {
-		if ( ! $tabs ) {
-			return;
-		}
-
-		echo '<nav class="beltoft-services-tabs" aria-label="' . esc_attr( $label ) . '">';
-
-		foreach ( $tabs as $slug => $tab ) {
-			$attrs = '';
-
-			foreach ( isset( $tab['attrs'] ) && is_array( $tab['attrs'] ) ? $tab['attrs'] : array() as $name => $value ) {
-				$attrs .= ' ' . sanitize_key( (string) $name ) . '="' . esc_attr( (string) $value ) . '"';
-			}
-
-			echo '<a href="' . esc_url( $tab['url'] ) . '"' . $attrs . ( ! empty( $tab['hidden'] ) ? ' hidden' : '' ) . ( (string) $slug === $active ? ' aria-current="page"' : '' ) . '>' . esc_html( $tab['title'] ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the attributes are escaped above.
-		}
-
-		echo '</nav>';
 	}
 
 	/**

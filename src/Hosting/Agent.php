@@ -11,8 +11,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * What the hosting driver needs from the agent on a node: submit one job of the fixed operation list, and look
- * at it later. Implemented by FakeAgent (tests, staging). The live client does not exist yet: it will be built
- * by Clients only when BELTOFT_SERVICES_HOSTING_LIVE is true and the node says live.
+ * at it later. Implemented by FakeAgent (tests, staging) and LiveAgent. The live client is built by Clients
+ * only when BELTOFT_SERVICES_HOSTING_LIVE is true and the node says live.
  *
  * Job ids make a retry safe: the same id twice returns the first job, never runs it again (plan, node agent).
  *

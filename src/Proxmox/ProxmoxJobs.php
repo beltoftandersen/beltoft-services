@@ -40,7 +40,7 @@ defined( 'ABSPATH' ) || exit;
  * node's real figure is kept as `mem_used`. "This site's VMs" are those recorded in the
  * beltoft_services_vms table for the cluster, plus recorded VMs not listed yet (just placed) at
  * their plan's memory; templates are never counted. A provision commits its VM's memory in the
- * cache when it picks the node (Capacity::reserve()), so a burst does not overcommit.
+ * cache when it picks the node (Capacity::place()), so a burst does not overcommit.
  */
 final class ProxmoxJobs {
 

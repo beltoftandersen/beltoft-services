@@ -9,7 +9,6 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Product;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\PostgresProfile;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Resource;
@@ -111,23 +110,6 @@ class PrivateNetsTest extends TestCase {
 		$this->assertSame( $started, $after['updated_at'], 'A failed return must preserve the original 30-day clock.' );
 		$this->assertNull( PrivateNets::hold( 12 ) );
 		$this->assertSame( 0, PrivateNets::reclaim() );
-	}
-
-	public function test_postgres_profile_has_only_a_private_interface(): void {
-		$net = array( 'cidr' => '10.64.0.0/28', 'vlan' => 1000 );
-		$vm  = PostgresProfile::vm( $net, '10.64.0.2', 'vmbr1', 2, 4096, 60 );
-		$this->assertSame( 'virtio,bridge=vmbr1,tag=1000,firewall=1', $vm['config']['net1'] );
-		$this->assertSame( 'ip=10.64.0.2/28', $vm['config']['ipconfig1'] );
-		$this->assertSame( 60, $vm['requirements']['disk_gb'] );
-		$this->assertArrayNotHasKey( 'disk_gb', $vm['config'] );
-		$this->assertArrayNotHasKey( 'net0', $vm['config'] );
-		$this->assertArrayNotHasKey( 'gateway', $vm['config'] );
-		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.1', 'vmbr1', 2, 4096, 60 ) ) );
-		$this->assertTrue( is_wp_error( PostgresProfile::vm( array( 'cidr' => '198.51.100.0/28', 'vlan' => 1000 ), '198.51.100.2', 'vmbr1', 2, 4096, 60 ) ) );
-		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.2', 'vmbr1', 2, 512, 60 ) ) );
-		$this->assertTrue( is_wp_error( PostgresProfile::vm( $net, '10.64.0.2', 'abcdefghijklmnop', 2, 4096, 60 ) ), 'Linux bridge names cannot exceed 15 characters.' );
-		$this->assertSame( 'postgresql://app:PASSWORD@10.64.0.2:5432/appdb?sslmode=require', PostgresProfile::connection( '10.64.0.2', 'appdb', 'app' ) );
-		$this->assertNull( PostgresProfile::connection( '10.64.0.2', 'bad name', 'app' ) );
 	}
 
 	public function test_an_empty_network_is_reused_only_after_quarantine(): void {

@@ -12,8 +12,9 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * This writer is deliberately not exposed as a customer action yet. The host bridge and guest
- * configuration need live checks before a running customer's VM can use it.
+ * Writes the private interface (net1) of a VM. Customers reach it through PrivateAttach, which
+ * calls attach() with $ipconfig false: net1 only, never ipconfig1. The $ipconfig true branch
+ * (net1 plus ipconfig1) is not used by that path.
  */
 final class PrivateNic {
 

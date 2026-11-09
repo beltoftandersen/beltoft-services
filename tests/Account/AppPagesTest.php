@@ -260,28 +260,6 @@ class AppPagesTest extends TestCase {
 		$this->assertArrayNotHasKey( 'internal', $this->area()->row( $view, Resource::find( $app->id() ) )['action'] ?? array(), 'Not while it is being set up.' );
 	}
 
-	public function test_the_tab_strip_marks_the_active_tab_and_prints_nothing_without_tabs(): void {
-		ob_start();
-		ServiceArea::tab_nav( array(), 'a', 'Sections' );
-		$this->assertSame( '', ob_get_clean() );
-
-		ob_start();
-		ServiceArea::tab_nav(
-			array(
-				'a' => array( 'title' => 'One', 'url' => 'https://example.org/one/' ),
-				'b' => array( 'title' => 'Two <b>', 'url' => 'https://example.org/two/' ),
-			),
-			'b',
-			'Store sections'
-		);
-		$html = (string) ob_get_clean();
-
-		$this->assertStringContainsString( '<nav class="beltoft-services-tabs" aria-label="Store sections">', $html );
-		$this->assertSame( 1, substr_count( $html, 'aria-current="page"' ) );
-		$this->assertStringContainsString( 'aria-current="page">Two &lt;b&gt;</a>', $html );
-		$this->assertStringContainsString( 'href="https://example.org/one/">One</a>', $html );
-	}
-
 	public function test_an_app_page_shows_no_driver_name(): void {
 		$app = $this->app( $this->user );
 		Slugs::for_license( $app->license() );
@@ -351,21 +329,5 @@ class AppPagesTest extends TestCase {
 		remove_all_filters( 'beltoft_services_account_page_redirect' );
 		add_filter( 'beltoft_services_account_page_redirect', static fn() => array( 'url' => 'https://example.org/x/', 'status' => 999 ) );
 		$this->assertSame( array( 'https://example.org/x/', 301 ), $method->invoke( null ), 'Only 301, 302 and 303.' );
-	}
-
-	public function test_a_tab_can_carry_attributes_and_start_hidden(): void {
-		ob_start();
-		ServiceArea::tab_nav(
-			array(
-				'a' => array( 'title' => 'One', 'url' => 'https://example.org/one/' ),
-				'b' => array( 'title' => 'Two', 'url' => 'https://example.org/two/', 'attrs' => array( 'data-x' => 'y"z' ), 'hidden' => true ),
-			),
-			'a',
-			'Sections'
-		);
-		$html = (string) ob_get_clean();
-
-		$this->assertStringContainsString( '<a href="https://example.org/two/" data-x="y&quot;z" hidden>Two</a>', $html );
-		$this->assertStringContainsString( '<a href="https://example.org/one/" aria-current="page">One</a>', $html );
 	}
 }
