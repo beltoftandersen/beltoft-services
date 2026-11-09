@@ -448,4 +448,37 @@ class AddonsTest extends HostingCase {
 		$this->assertCount( 1, $lines, 'Kept through the switch.' );
 		$this->assertSame( 12.0, (float) reset( $lines )->get_total(), 'EUR 12 for a yearly period now.' );
 	}
+
+	public function test_a_line_saved_without_the_done_mark_is_not_added_again(): void {
+		$r   = $this->account();
+		$one = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		wc_get_order( $one['order'] )->payment_complete();
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ) );
+
+		$o = wc_get_order( $one['order'] );
+		$o->delete_meta_data( Addons::ORDER_DONE );
+		$o->save();
+		do_action( 'woocommerce_order_status_completed', $one['order'] );
+
+		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ), 'Still one line.' );
+		$this->assertNotSame( '', (string) wc_get_order( $one['order'] )->get_meta( Addons::ORDER_DONE ), 'The order is marked again.' );
+	}
+
+	public function test_an_on_hold_order_is_reused_whatever_its_age_and_never_cancelled(): void {
+		add_action( 'woocommerce_scheduled_subscription_payment_bacs', static fn( $amount, $order ) => $order->update_status( 'on-hold' ), 10, 2 );
+		$r   = $this->account();
+		$one = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		$o   = wc_get_order( $one['order'] );
+		$o->set_date_created( time() - 5 * DAY_IN_SECONDS );
+		$o->save();
+
+		Addons::cancel_stale();
+		$this->assertSame( 'on-hold', wc_get_order( $one['order'] )->get_status() );
+
+		$two = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		$this->assertSame( 'pending', $two['status'] );
+		$this->assertSame( 'Your payment is being processed.', $two['message'] );
+		$this->assertSame( $one['order'], $two['order'] );
+		$this->assertCount( 1, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
+	}
 }

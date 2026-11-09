@@ -307,7 +307,10 @@ final class Addons {
 		foreach ( $sub ? wc_get_orders( array( 'limit' => -1, 'customer_id' => (int) $sub->get_customer_id(), 'created_via' => 'beltoft_services_addon', 'status' => array( 'pending', 'on-hold', 'failed' ) ) ) : array() as $order ) {
 			$meta = $order->get_meta( self::ORDER_META );
 
-			if ( is_array( $meta ) && (int) ( $meta['resource'] ?? 0 ) === $r->id() && $kind === ( $meta['kind'] ?? '' ) && $target === ( $meta['target'] ?? '' ) && time() - (int) $order->get_date_created()->getTimestamp() < self::STALE_AFTER ) {
+			// An order on hold (a payment on its way) is reused whatever its age; an unpaid one only while it is fresh.
+			$fresh = $order->has_status( 'on-hold' ) || time() - (int) $order->get_date_created()->getTimestamp() < self::STALE_AFTER;
+
+			if ( is_array( $meta ) && (int) ( $meta['resource'] ?? 0 ) === $r->id() && $kind === ( $meta['kind'] ?? '' ) && $target === ( $meta['target'] ?? '' ) && $fresh ) {
 				return $order;
 			}
 		}
@@ -472,6 +475,16 @@ final class Addons {
 		$product = self::product( $kind );
 		$problem = '';
 
+		// A line of this very order is already on the subscription (saved, but the order was not marked): never add a second.
+		foreach ( $r ? self::lines( $r, $kind, $target ) : array() as $item ) {
+			if ( (string) $order->get_id() === (string) $item->get_meta( self::I_ORDER ) ) {
+				$order->update_meta_data( self::ORDER_DONE, gmdate( 'c' ) );
+				$order->save();
+
+				return;
+			}
+		}
+
 		if ( ! $r || ! $sub instanceof \WC_Subscription || null === $product ) {
 			$problem = 'the account, its subscription or the add-on product is gone';
 		} elseif ( (int) ( $meta['next'] ?? 0 ) > 0 && time() > (int) $meta['next'] ) {
@@ -513,8 +526,8 @@ final class Addons {
 	}
 
 	/**
-	 * A one-off add-on order that was refunded or cancelled after its line was added: the line ends at once (it leaves
-	 * at the next renewal like a normal removal).
+	 * A one-off add-on order that was refunded or cancelled after its line was added: the line is marked as ending, so it
+	 * leaves at the next renewal like a normal removal (the domain or storage stays until then).
 	 *
 	 * @param int|string $order_id Order id.
 	 */
