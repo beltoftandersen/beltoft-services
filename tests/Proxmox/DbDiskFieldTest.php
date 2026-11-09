@@ -339,6 +339,25 @@ class DbDiskFieldTest extends BackupTestCase {
 		$this->assertSame( $v['e50-0']->get_id(), $this->in_cart() );
 	}
 
+	public function test_the_endpoint_saves_the_session_under_the_cart_lock(): void {
+		$v = $this->db_variations();
+		$this->room();
+		wp_set_current_user( self::factory()->user->create() );
+		WC()->session->init_session_cookie();
+		WC()->cart->empty_cart();
+		$this->add( $v['e0-0'] );
+		WC()->session->save_data();
+
+		$_POST['nonce']    = wp_create_nonce( DbDiskField::NONCE );
+		$_REQUEST['nonce'] = $_POST['nonce'];
+		$_POST['extra']    = '50';
+		$this->assertSame( 200, DbDiskField::respond()[1] );
+
+		$saved = WC()->session->get_session( WC()->session->get_customer_id(), array() );
+		$cart  = maybe_unserialize( $saved['cart'] ?? '' );
+		$this->assertSame( $v['e50-0']->get_id(), (int) reset( $cart )['variation_id'], 'The swap is saved before the lock is let go, so a second swap starts from it.' );
+	}
+
 	public function test_the_checkout_refuses_a_size_that_does_not_fit_and_one_the_settings_forbid(): void {
 		$v = $this->db_variations();
 		$this->room();

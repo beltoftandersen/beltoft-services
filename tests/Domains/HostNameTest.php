@@ -77,4 +77,12 @@ final class HostNameTest extends TestCase {
 		$this->assertSame( self::ASCII, $row['domain'] );
 		$this->assertSame( self::UNICODE, $row['display'] );
 	}
+
+	public function test_the_domain_search_accepts_exactly_the_names_the_host_name_check_accepts(): void {
+		foreach ( array( 'foo.123', 'a.local', 'a.b.internal', 'foo.c', 'foo.com', 'Example.COM.', self::UNICODE ) as $name ) {
+			$this->assertSame( null !== HostName::normalise( $name ), is_string( \BeltoftServices\Domains\Search::normalise( $name ) ), $name );
+		}
+		$this->assertWPError( \BeltoftServices\Domains\Search::normalise( 'foo.123' ) );
+		$this->assertSame( 'example.com', \BeltoftServices\Domains\Search::normalise( 'Example.COM.' ) );
+	}
 }

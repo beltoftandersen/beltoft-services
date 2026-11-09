@@ -145,6 +145,23 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertSame( $id, (int) $r->license()['id'] );
 	}
 
+	public function test_no_slug_is_picked_while_the_customers_slug_lock_is_busy(): void {
+		$r = $this->ready_mail( 'busy.example', array(), $this->user );
+		$r->set( array( Slugs::META => '' ) );
+		$r       = Resource::find( $r->id() );
+		$license = $r->license();
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( "SELECT GET_LOCK('" . $other->real_escape_string( \BeltoftServices\Locks::name( 'slugs', (int) $license['user_id'] ) ) . "', 0)" );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		$this->assertSame( '', Slugs::assign( $r, $license, 'email' ), 'Not picked without the lock: the address falls back to the license id.' );
+		$this->assertSame( '', Slugs::stored( Resource::find( $r->id() ) ) );
+
+		$other->close();
+		$this->assertSame( 'busy.example', Slugs::assign( $r, $license, 'email' ) );
+	}
+
 	public function test_the_slug_is_the_domain_and_the_address_has_no_number(): void {
 		$r = $this->ready_mail( 'slug.example', array(), $this->user );
 
@@ -593,5 +610,35 @@ final class MailAccountTest extends MailTestCase {
 		$r = $this->ready_mail( 'oa.example', array( 'aliases' => 1 ), $this->user );
 		$this->assertStringContainsString( '0 of 1 alias used.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
 		$this->assertStringNotContainsString( 'of this domain first', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Mail/MailDomains.php' ) );
+	}
+
+	public function test_finishing_or_purging_a_password_does_not_bring_back_one_that_was_just_revealed(): void {
+		$r = $this->ready_mail( 'race.example', array(), $this->user );
+		$r->locked(
+			static function () use ( $r ): bool {
+				MailAccess::begin( $r, 'a@race.example' );
+				MailAccess::begin( $r, 'b@race.example' );
+
+				return true;
+			}
+		);
+		$r = Resource::find( $r->id() );
+		MailAccess::finish( $r, 'b@race.example' );
+
+		// Another request holds an older copy of the resource while b is revealed.
+		$stale = Resource::find( $r->id() );
+		$this->assertNotNull( MailAccess::take( Resource::find( $r->id() ), 'b@race.example', $this->user ) );
+
+		MailAccess::finish( $stale, 'a@race.example' );
+		$meta = (array) Resource::find( $r->id() )->get( MailAccess::META );
+		$this->assertArrayNotHasKey( 'b@race.example', $meta, 'A revealed password stays wiped.' );
+		$this->assertTrue( MailAccess::revealable( Resource::find( $r->id() ), 'a@race.example' ) );
+
+		$stale = Resource::find( $r->id() );
+		MailAccess::take( Resource::find( $r->id() ), 'a@race.example', $this->user );
+		$r2 = Resource::find( $r->id() );
+		$r2->locked( static fn() => MailAccess::begin( $r2, 'c@race.example' ) && true );
+		MailAccess::purge( $stale, 'zz@race.example' );
+		$this->assertArrayHasKey( 'c@race.example', (array) Resource::find( $r->id() )->get( MailAccess::META ), 'A purge works on the current map, not an old copy.' );
 	}
 }

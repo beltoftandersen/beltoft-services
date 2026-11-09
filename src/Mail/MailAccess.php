@@ -59,16 +59,28 @@ final class MailAccess {
 	 * @param string   $email Mailbox address.
 	 */
 	public static function finish( Resource $r, string $email ): bool {
-		$all   = self::all( $r );
 		$email = strtolower( $email );
+		$ok    = false;
 
-		if ( ! isset( $all[ $email ] ) ) {
-			return true;
-		}
+		// Read and written inside the resource lock: the whole map is rewritten, so a stale copy would bring back a password that was just revealed.
+		$r->locked(
+			static function () use ( $r, $email, &$ok ): bool {
+				$all = self::all( $r );
 
-		$all[ $email ]['pending'] = false;
+				if ( ! isset( $all[ $email ] ) ) {
+					$ok = true;
 
-		return $r->set( array( self::META => $all ) );
+					return true;
+				}
+
+				$all[ $email ]['pending'] = false;
+				$ok                       = $r->set( array( self::META => $all ) );
+
+				return $ok;
+			}
+		);
+
+		return $ok;
 	}
 
 	/**
@@ -146,16 +158,28 @@ final class MailAccess {
 	 * @param string   $email Mailbox address.
 	 */
 	public static function purge( Resource $r, string $email ): bool {
-		$all   = self::all( $r );
 		$email = strtolower( $email );
+		$ok    = false;
 
-		if ( ! isset( $all[ $email ] ) ) {
-			return true;
-		}
+		// Inside the resource lock, like finish().
+		$r->locked(
+			static function () use ( $r, $email, &$ok ): bool {
+				$all = self::all( $r );
 
-		unset( $all[ $email ] );
+				if ( ! isset( $all[ $email ] ) ) {
+					$ok = true;
 
-		return $r->set( array( self::META => $all ) );
+					return true;
+				}
+
+				unset( $all[ $email ] );
+				$ok = $r->set( array( self::META => $all ) );
+
+				return $ok;
+			}
+		);
+
+		return $ok;
 	}
 
 	/**

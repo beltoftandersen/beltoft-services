@@ -89,8 +89,13 @@ final class Threshold {
 		}
 
 		Renewal::$early = true;
-		$order          = wcs_create_renewal_order( $account );
-		Renewal::$early = false;
+
+		try {
+			$order = wcs_create_renewal_order( $account );
+		} finally {
+			// A throw must not leave the flag set for the rest of the request.
+			Renewal::$early = false;
+		}
 
 		if ( is_wp_error( $order ) || ! $order instanceof \WC_Order ) {
 			return false;

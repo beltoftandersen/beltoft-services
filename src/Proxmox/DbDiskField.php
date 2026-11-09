@@ -275,7 +275,8 @@ final class DbDiskField {
 
 		$posted = isset( $_POST['extra'] ) ? sanitize_text_field( wp_unslash( $_POST['extra'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
 		$extra  = 1 === preg_match( '/^[0-9]{1,6}$/D', $posted ) ? (int) $posted : -1;
-		$result = self::swap( $extra );
+		// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
+		$result = CartSwap::locked( static fn(): array => self::swap( $extra ) ) ?? array( 'ok' => false, 'extra' => $extra, 'variation_id' => 0 );
 
 		return array( $result, $result['ok'] ? 200 : 409 );
 	}

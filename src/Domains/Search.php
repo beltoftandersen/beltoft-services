@@ -64,18 +64,10 @@ final class Search {
 		return self::find( $name );
 	}
 
-	/** IDNA and DNS label validation for a full name. */
+	/** IDNA and DNS label validation for a full name: the same rules as HostName::normalise(), so the search and the rest of the plugin accept the same names. */
 	public static function normalise( string $name ): string|\WP_Error {
-		$name = trim( rtrim( $name, '.' ) );
-		if ( '' === $name || ! function_exists( 'idn_to_ascii' ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
-		$ascii = idn_to_ascii( $name, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 );
-		if ( false === $ascii ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
-		$ascii = strtolower( $ascii );
-		if ( strlen( $ascii ) > 253 || ! str_contains( $ascii, '.' ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
-		foreach ( explode( '.', $ascii ) as $label ) {
-			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
-		}
-		return $ascii;
+		$ascii = HostName::normalise( $name );
+		return null === $ascii ? new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ) : $ascii;
 	}
 
 	/**

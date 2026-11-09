@@ -323,4 +323,33 @@ class LiteMailTest extends HostingCase {
 		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail.css' );
 		$this->assertMatchesRegularExpression( '/@media \(max-width: 700px\).*mail__actions \{ width: auto; min-width: 0;/s', $css, 'No 430px minimum on a phone.' );
 	}
+
+	public function test_a_child_that_cannot_be_made_leaves_no_active_license(): void {
+		$parent = $this->account();
+		$this->connect_domain( $parent, 'customer.example' );
+		$other = null;
+
+		add_filter( 'beltoft_services_lock_timeout', '__return_zero' );
+		// Another request holds the new license's lock, so the service cannot be created.
+		add_action(
+			'beltoft_licenses_license_created',
+			function ( $license ) use ( &$other ) {
+				$license = is_array( $license ) ? $license : array( 'id' => (int) $license );
+				$other   = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+				$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( \BeltoftServices\Locks::name( 'license', (int) $license['id'] ) ) . "', 0)" );
+			}
+		);
+
+		$res = LiteMail::enable( $parent, 'customer.example' );
+		$this->assertWPError( $res );
+		$this->assertNotNull( $other, 'the hook ran' );
+		$other->close();
+
+		$slug  = sanitize_title( (string) $parent->license()['product_slug'] ) . '-mail';
+		$found = array_values( array_filter( \BeltoftLicenses\Licenses::where( 'user_id', (int) $parent->license()['user_id'] ), static fn( $l ) => $slug === $l['product_slug'] ) );
+		$this->assertCount( 1, $found );
+		$this->assertSame( \BeltoftLicenses\Licenses::STATUS_REVOKED, $found[0]['status'] );
+		remove_all_actions( 'beltoft_licenses_license_created' );
+		remove_filter( 'beltoft_services_lock_timeout', '__return_zero' );
+	}
 }

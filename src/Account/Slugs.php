@@ -136,6 +136,11 @@ final class Slugs {
 				return $slug;
 			}
 
+			// The lock stayed busy: picking a slug without it could give two services the same one. The address falls back to the license id and the next request tries again.
+			if ( ! $held ) {
+				return '';
+			}
+
 			$slug = self::unique( self::base( $resource, $license, $type ), $type, $user, $resource->id() );
 
 			return $resource->set( array( self::META => $slug ) ) ? $slug : '';

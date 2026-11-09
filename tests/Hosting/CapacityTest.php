@@ -194,4 +194,41 @@ class CapacityTest extends HostingCase {
 		$other = $this->service_product( 'fake' );
 		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', true, $other ) );
 	}
+
+	public function test_a_renewal_of_a_sold_out_plan_can_be_added_to_the_cart_reloaded_and_paid(): void {
+		$product = $this->service_product(
+			'hosting',
+			array( 'node_group' => 'g1', 'memory_mb' => 2048, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ),
+			array( 'max' => 3 )
+		);
+		Stock::register();
+		// Orders commit; the settings are written after them, so the test's rollback takes the settings back.
+		$user = self::factory()->user->create();
+		$sub  = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$sub->add_product( $product );
+		$sub->save();
+		$renewal = wcs_create_renewal_order( $sub );
+		$plain   = wc_create_order( array( 'customer_id' => $user ) );
+		$plain->add_product( $product );
+		$this->settings( array( 'hosting_reserve_gb' => '1000' ) );
+		$fresh = wc_get_product( $product->get_id() );
+		$this->assertFalse( $fresh->is_purchasable(), 'Sold out for a new customer.' );
+
+		// WooCommerce Subscriptions adds a renewal with its key in the item data; the check runs before the item is in the cart.
+		apply_filters( 'woocommerce_add_cart_item_data', array( 'subscription_renewal' => array( 'renewal_order_id' => 1 ) ), $product->get_id(), 0 );
+		$this->assertTrue( wc_get_product( $product->get_id() )->is_purchasable(), 'The renewal being added passes.' );
+		Stock::clear_flow();
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_purchasable(), 'Only while it is being added.' );
+
+		apply_filters( 'woocommerce_add_cart_item_data', array(), $product->get_id(), 0 );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_purchasable(), 'A new purchase is not let through.' );
+
+		// A cart reloaded from the session.
+		$this->assertTrue( apply_filters( 'woocommerce_cart_item_is_purchasable', false, 'k', array( 'subscription_renewal' => array() ), $fresh ) );
+		$this->assertFalse( apply_filters( 'woocommerce_cart_item_is_purchasable', false, 'k', array(), $fresh ) );
+
+		// Paying the renewal order.
+		$this->assertTrue( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $fresh->is_in_stock(), $fresh, $renewal ) );
+		$this->assertFalse( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $fresh->is_in_stock(), $fresh, $plain ) );
+	}
 }
