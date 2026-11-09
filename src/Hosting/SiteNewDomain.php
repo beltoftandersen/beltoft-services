@@ -26,6 +26,7 @@ final class SiteNewDomain {
 	public const META_DOMAIN = 'site_new_domain';
 	public const META_UNTIL  = 'site_new_domain_until';
 	public const META_DONE   = 'site_new_domain_done';
+	public const META_WHY    = 'site_new_domain_why';
 	public const RETRY_HOOK  = 'beltoft_services_site_new_domain';
 
 	/**
@@ -121,7 +122,16 @@ final class SiteNewDomain {
 		$site = Sites::for_resource( $r->id() )[0] ?? null;
 		$out  = null === $site ? new \WP_Error( 'no_site', 'the website does not exist yet' ) : ( new HostingActions( $r ) )->add_domain( (string) $site['slug'], $name );
 
-		if ( is_array( $out ) ) {
+		// Read fresh: another run of the same event may have finished while this one worked.
+		$r = Resource::find( $r->id() ) ?? $r;
+
+		if ( $r->get( self::META_DONE ) ) {
+			return;
+		}
+
+		$row = SiteDomains::find( $name );
+
+		if ( is_array( $out ) || ( null !== $row && $row['resource_id'] === $r->id() ) ) {
 			$r->set( array( self::META_DONE => 'joined' ) );
 
 			return;
@@ -129,18 +139,53 @@ final class SiteNewDomain {
 
 		$code = $out->get_error_code();
 
-		// Busy or not ready yet: try again until the deadline. Anything else is final.
+		// Busy or not ready yet: try again until the deadline, one pending retry at a time. Anything else is final.
 		if ( in_array( $code, array( 'busy', 'not_ready', 'no_site' ), true ) && function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action( time() + 600, self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
+			if ( time() + 600 <= (int) $r->get( self::META_UNTIL ) && ! ( function_exists( 'as_has_scheduled_action' ) && as_has_scheduled_action( self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' ) ) ) {
+				as_schedule_single_action( time() + 600, self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
+			}
 
 			return;
 		}
 
-		$r->set( array( self::META_DONE => 'refused' ) );
+		$r->set( array( self::META_DONE => 'refused', self::META_WHY => $code ) );
 		$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
 
 		if ( $order ) {
-			$order->add_order_note( sprintf( 'The domain %1$s was not connected to the website: %2$s.', HostName::display( $name ), $code ) );
+			/* translators: 1: domain name, 2: reason. */
+			$order->add_order_note( sprintf( __( 'The domain %1$s was not connected to the website: %2$s.', 'beltoft-services' ), HostName::display( $name ), self::reason( $code ) ) );
 		}
+	}
+
+	/**
+	 * A plain reason for a refusal code.
+	 *
+	 * @param string $code Error code of HostingActions.
+	 */
+	public static function reason( string $code ): string {
+		switch ( $code ) {
+			case 'addon_required':
+				return __( 'your account already has another domain and an extra domain is an add-on', 'beltoft-services' );
+			case 'invalid':
+				return __( 'the domain cannot be used for hosting', 'beltoft-services' );
+			default:
+				return __( 'it could not be connected', 'beltoft-services' );
+		}
+	}
+
+	/**
+	 * The hint for the account page when the order's domain was not connected, or an empty string.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function hint( Resource $r ): string {
+		$name = (string) $r->get( self::META_DOMAIN );
+
+		if ( '' === $name || 'refused' !== (string) $r->get( self::META_DONE ) ) {
+			return '';
+		}
+
+		/* translators: 1: domain name, 2: reason. */
+		return sprintf( __( 'The domain %1$s from your order was not connected: %2$s. Connect it below or contact support.', 'beltoft-services' ), HostName::display( $name ), self::reason( (string) $r->get( self::META_WHY ) ) );
 	}
 }

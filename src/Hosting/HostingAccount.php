@@ -144,6 +144,10 @@ final class HostingAccount {
 			self::print_checklist( $r, $ready );
 		}
 
+		if ( '' !== SiteNewDomain::hint( $r ) ) {
+			echo '<p class="beltoft-hosting-notice">' . esc_html( SiteNewDomain::hint( $r ) ) . '</p>';
+		}
+
 		printf(
 			'<p>%s</p>',
 			esc_html(

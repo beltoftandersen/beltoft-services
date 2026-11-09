@@ -37,7 +37,7 @@ final class SiteField {
 	public const MODE_NEW     = 'new';
 
 	/** Days the site waits for a domain registered or transferred in the same order. */
-	public const WAIT_DAYS = 7;
+	public const WAIT_DAYS = MailField::WAIT_DAYS;
 
 	/** Every value an account can carry (an earlier order may hold `empty`). */
 	public const INSTALLS = array( 'wordpress', 'woocommerce', 'empty' );

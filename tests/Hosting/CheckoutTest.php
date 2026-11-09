@@ -643,4 +643,62 @@ class CheckoutTest extends HostingCase {
 		$kinds = array_column( SiteDomains::for_resource( $late_host->id() ), 'kind' );
 		$this->assertSame( array( 'preview' ), $kinds, 'Only the temporary address, and it works.' );
 	}
+
+	private function scheduled_retries( Resource $host ): int {
+		return count( as_get_scheduled_actions( array( 'hook' => SiteNewDomain::RETRY_HOOK, 'args' => array( $host->id() ), 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
+	}
+
+	private function notes( Resource $host ): int {
+		return count( wc_get_order_notes( array( 'order_id' => (int) $host->license()['order_id'] ) ) );
+	}
+
+	public function test_a_busy_account_keeps_one_retry_and_the_retry_stops_at_the_deadline(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'busy.example' );
+		$domain->set( array( 'state' => 'ready' ) );
+		$host->set( array( 'state' => 'ready', 'desired' => 'ready', 'steps' => array() ) );
+		$host = Resource::find( $host->id() );
+
+		SiteNewDomain::attempt( $host );
+		SiteNewDomain::attempt( $host );
+		SiteNewDomain::on_state_changed( $domain, 'x', 'ready' );
+		$this->assertSame( 1, $this->scheduled_retries( $host ), 'Exactly one retry chain.' );
+		$this->assertSame( '', (string) Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+
+		$host->set( array( SiteNewDomain::META_UNTIL => time() + 300 ) );
+		as_unschedule_all_actions( SiteNewDomain::RETRY_HOOK );
+		SiteNewDomain::attempt( Resource::find( $host->id() ) );
+		$this->assertSame( 0, $this->scheduled_retries( $host ), 'No retry is scheduled past the deadline.' );
+	}
+
+	public function test_a_second_attempt_after_a_join_changes_nothing(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'once.example' );
+		$this->make_ready( $host );
+		$this->make_ready( $domain );
+		$notes = $this->notes( $host );
+
+		SiteNewDomain::attempt( Resource::find( $host->id() ) );
+		$fresh = Resource::find( $host->id() );
+		$this->assertSame( 'joined', $fresh->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( $notes, $this->notes( $host ) );
+		$this->assertSame( '', SiteNewDomain::hint( $fresh ) );
+	}
+
+	public function test_a_domain_the_account_cannot_take_is_refused_with_a_note_and_a_hint(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'second.example' );
+		$this->connect_domain( $host, 'first.example' );
+		$notes = $this->notes( $host );
+
+		$this->make_ready( $host );
+		$this->make_ready( $domain );
+
+		$fresh = Resource::find( $host->id() );
+		$this->assertNull( SiteDomains::find( 'second.example' ), 'Nothing is attached.' );
+		$this->assertSame( 'refused', $fresh->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( $notes + 1, $this->notes( $host ) );
+		$hint = SiteNewDomain::hint( $fresh );
+		$this->assertStringContainsString( 'The domain second.example from your order was not connected:', $hint );
+		$this->assertStringContainsString( 'Connect it below or contact support.', $hint );
+		$this->assertStringNotContainsString( 'addon_required', $hint );
+		$this->assertStringNotContainsString( "\u{2014}", $hint );
+	}
 }
