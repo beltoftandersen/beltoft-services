@@ -594,4 +594,34 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( '0 of 1 alias used.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
 		$this->assertStringNotContainsString( 'of this domain first', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Mail/MailDomains.php' ) );
 	}
+
+	public function test_finishing_or_purging_a_password_does_not_bring_back_one_that_was_just_revealed(): void {
+		$r = $this->ready_mail( 'race.example', array(), $this->user );
+		$r->locked(
+			static function () use ( $r ): bool {
+				MailAccess::begin( $r, 'a@race.example' );
+				MailAccess::begin( $r, 'b@race.example' );
+
+				return true;
+			}
+		);
+		$r = Resource::find( $r->id() );
+		MailAccess::finish( $r, 'b@race.example' );
+
+		// Another request holds an older copy of the resource while b is revealed.
+		$stale = Resource::find( $r->id() );
+		$this->assertNotNull( MailAccess::take( Resource::find( $r->id() ), 'b@race.example', $this->user ) );
+
+		MailAccess::finish( $stale, 'a@race.example' );
+		$meta = (array) Resource::find( $r->id() )->get( MailAccess::META );
+		$this->assertArrayNotHasKey( 'b@race.example', $meta, 'A revealed password stays wiped.' );
+		$this->assertTrue( MailAccess::revealable( Resource::find( $r->id() ), 'a@race.example' ) );
+
+		$stale = Resource::find( $r->id() );
+		MailAccess::take( Resource::find( $r->id() ), 'a@race.example', $this->user );
+		$r2 = Resource::find( $r->id() );
+		$r2->locked( static fn() => MailAccess::begin( $r2, 'c@race.example' ) && true );
+		MailAccess::purge( $stale, 'zz@race.example' );
+		$this->assertArrayHasKey( 'c@race.example', (array) Resource::find( $r->id() )->get( MailAccess::META ), 'A purge works on the current map, not an old copy.' );
+	}
 }
