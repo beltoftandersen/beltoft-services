@@ -59,6 +59,16 @@ final class MailSwitch {
 					continue;
 				}
 
+				$domains = MailPlan::used( MailPlan::root( $resource ) )['domains'];
+
+				if ( $domains > $target['domains'] ) {
+					return sprintf(
+						/* translators: %d: number of email domains in the plan. */
+						_n( 'Your plan has %d email domain. Choose a plan with at least that many.', 'Your plan has %d email domains. Choose a plan with at least that many.', $domains, 'beltoft-services' ),
+						$domains
+					);
+				}
+
 				$have = MailGuard::limits( $resource );
 
 				foreach ( array( 'mailboxes', 'quota_mb', 'aliases', 'domains' ) as $key ) {

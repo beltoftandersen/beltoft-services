@@ -36,7 +36,8 @@ final class MailPlan {
 	 * @return Resource[]
 	 */
 	public static function members( Resource $root ): array {
-		$out = array( $root );
+		$root = Resource::find( $root->id() ) ?? $root; // The links are read fresh.
+		$out  = array( $root );
 
 		foreach ( Children::of( $root ) as $child ) {
 			if ( MailDriver::ID === $child->get( 'driver' ) && ! in_array( (string) $child->get( 'state' ), array( 'deleted', 'failed' ), true ) ) {
@@ -58,12 +59,25 @@ final class MailPlan {
 	}
 
 	/**
+	 * Is the domain of the member on the mail server yet? One still being proved or set up holds nothing there.
+	 *
+	 * @param Resource $member Member.
+	 */
+	private static function on_server( Resource $member ): bool {
+		return '' !== MailGuard::domain( $member ) && in_array( 'domain', (array) $member->get( 'steps' ), true );
+	}
+
+	/**
 	 * Mailboxes of one member as the mail server has them, the system mailbox left out.
 	 *
 	 * @param Resource $member Member.
 	 * @return int|\WP_Error
 	 */
 	public static function mailboxes_of( Resource $member ) {
+		if ( ! self::on_server( $member ) ) {
+			return 0;
+		}
+
 		$have = MailClients::for()->list_mailboxes( MailGuard::domain( $member ) );
 
 		if ( is_wp_error( $have ) ) {
@@ -85,7 +99,7 @@ final class MailPlan {
 		$total = 0;
 
 		foreach ( self::members( $root ) as $member ) {
-			if ( '' === MailGuard::domain( $member ) ) {
+			if ( ! self::on_server( $member ) ) {
 				continue;
 			}
 
@@ -111,7 +125,7 @@ final class MailPlan {
 		$total = 0;
 
 		foreach ( self::members( $root ) as $member ) {
-			if ( '' === MailGuard::domain( $member ) ) {
+			if ( ! self::on_server( $member ) ) {
 				continue;
 			}
 
