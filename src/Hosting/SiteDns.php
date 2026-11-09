@@ -11,6 +11,7 @@ use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Domains\ZoneWriter;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -195,62 +196,56 @@ final class SiteDns {
 			}
 		}
 
-		$sets = Records::validate( $zone, $rows );
-
-		if ( is_wp_error( $sets ) ) {
-			return __( 'The name is not valid for a DNS record.', 'beltoft-services' );
-		}
-
-		$result = Records::locked(
-			$zone,
-			static function () use ( $zone, $host, $sets, $customer ) {
-				$data = DnsClients::dns()->zone( $zone );
-
-				if ( is_wp_error( $data ) ) {
-					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
+		$policy = static function ( array $data, array $sets ) use ( $host, $customer ) {
+			foreach ( (array) ( $data['rrsets'] ?? array() ) as $set ) {
+				if ( is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host && 'CNAME' === strtoupper( (string) ( $set['type'] ?? '' ) ) ) {
+					return __( 'The name is an alias (CNAME). Remove it first.', 'beltoft-services' );
 				}
 
-				if ( ! is_array( $data ) ) {
-					return __( 'The DNS zone does not exist.', 'beltoft-services' );
-				}
+				// A preview name is ours to make and nobody else's to lose: any other record at the name (a mail host, a name server, a
+				// TXT) is not ours, and an address that is not one of our edge's is not ours either. Not overwritten.
+				if ( ! $customer && is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host ) {
+					$type   = strtoupper( (string) ( $set['type'] ?? '' ) );
+					$values = array_map( static fn( $r ) => (string) ( is_array( $r ) ? ( $r['content'] ?? '' ) : '' ), (array) ( $set['records'] ?? array() ) );
+					$ours   = array();
 
-				if ( $customer && Records::paused( $zone, $data ) ) {
-					return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
-				}
-
-				foreach ( (array) ( $data['rrsets'] ?? array() ) as $set ) {
-					if ( is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host && 'CNAME' === strtoupper( (string) ( $set['type'] ?? '' ) ) ) {
-						return __( 'The name is an alias (CNAME). Remove it first.', 'beltoft-services' );
-					}
-
-					// A preview name is ours to make and nobody else's to lose: any other record at the name (a mail host, a name server, a
-					// TXT) is not ours, and an address that is not one of our edge's is not ours either. Not overwritten.
-					if ( ! $customer && is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host ) {
-						$type   = strtoupper( (string) ( $set['type'] ?? '' ) );
-						$values = array_map( static fn( $r ) => (string) ( is_array( $r ) ? ( $r['content'] ?? '' ) : '' ), (array) ( $set['records'] ?? array() ) );
-						$ours   = array();
-
-						foreach ( $sets as $mine ) {
-							if ( strtoupper( (string) ( $mine['type'] ?? '' ) ) === $type ) {
-								foreach ( (array) ( $mine['records'] ?? array() ) as $m ) {
-									$ours[] = (string) ( is_array( $m ) ? ( $m['content'] ?? '' ) : '' );
-								}
+					foreach ( $sets as $mine ) {
+						if ( strtoupper( (string) ( $mine['type'] ?? '' ) ) === $type ) {
+							foreach ( (array) ( $mine['records'] ?? array() ) as $m ) {
+								$ours[] = (string) ( is_array( $m ) ? ( $m['content'] ?? '' ) : '' );
 							}
 						}
+					}
 
-						if ( ! in_array( $type, array( 'A', 'AAAA' ), true ) || array() !== array_diff( $values, $ours ) ) {
-							return __( 'That temporary address is already in use.', 'beltoft-services' );
-						}
+					if ( ! in_array( $type, array( 'A', 'AAAA' ), true ) || array() !== array_diff( $values, $ours ) ) {
+						return __( 'That temporary address is already in use.', 'beltoft-services' );
 					}
 				}
-
-				$done = DnsClients::dns()->replace_rrsets( $zone, $sets );
-
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : true;
 			}
-		);
 
-		return $result; // A WP_Error is a transient failure or the zone lock being busy.
+			return $sets;
+		};
+
+		$result = ZoneWriter::write( null, $zone, $rows, $policy, $customer );
+
+		if ( is_wp_error( $result ) ) {
+			return $result; // A transient failure or the zone lock being busy, as it is.
+		}
+
+		if ( 'refused' === $result['status'] ) {
+			switch ( $result['reason'] ) {
+				case 'invalid':
+					return __( 'The name is not valid for a DNS record.', 'beltoft-services' );
+				case 'no_zone':
+					return __( 'The DNS zone does not exist.', 'beltoft-services' );
+				case 'paused':
+					return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
+				default:
+					return $result['reason'];
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -265,19 +260,10 @@ final class SiteDns {
 	public static function unpublish( string $zone, string $host, array $node ) {
 		$ours = array_filter( self::edge( $node ) );
 
-		$result = Records::locked(
+		return ZoneWriter::remove(
+			null,
 			$zone,
-			static function () use ( $zone, $host, $ours ) {
-				$data = DnsClients::dns()->zone( $zone );
-
-				if ( is_wp_error( $data ) ) {
-					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
-				}
-
-				if ( ! is_array( $data ) ) {
-					return true; // No zone, no record.
-				}
-
+			static function ( array $data ) use ( $host, $ours ): array {
 				$delete = array();
 
 				foreach ( (array) ( $data['rrsets'] ?? array() ) as $set ) {
@@ -298,17 +284,9 @@ final class SiteDns {
 					}
 				}
 
-				if ( array() === $delete ) {
-					return true;
-				}
-
-				$done = DnsClients::dns()->replace_rrsets( $zone, $delete );
-
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be removed.', 'beltoft-services' ) ) : true;
+				return $delete;
 			}
-		);
-
-		return $result; // A WP_Error is a transient failure or the zone lock being busy.
+		); // A WP_Error is a transient failure or the zone lock being busy.
 	}
 
 	/**
