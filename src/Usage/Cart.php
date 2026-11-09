@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -70,7 +71,7 @@ final class Cart {
 		$units = 0;
 
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 
@@ -95,7 +96,7 @@ final class Cart {
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
 			$driver = \BeltoftServices\Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			if ( $driver && \BeltoftServices\Proxmox\DiskDriver::ID === $driver->id() && empty( $item['subscription_renewal'] ) && empty( $item['subscription_switch'] ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
+			if ( $driver && \BeltoftServices\Proxmox\DiskDriver::ID === $driver->id() && ! CartFlow::has_value( $item, CartFlow::EXISTING_SERVICE ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
 				$disks += (int) $item['quantity'];
 			}
 		}
@@ -139,7 +140,7 @@ final class Cart {
 			$key = self::account_key( $cart );
 
 			// The account's own renewal (a usage invoice paid from the order-pay page) holds the line: it is not ours to drop.
-			if ( '' !== $key && isset( $cart->get_cart()[ $key ]['subscription_renewal'] ) ) {
+			if ( '' !== $key && CartFlow::is_renewal( $cart->get_cart()[ $key ] ?? array() ) ) {
 				return;
 			}
 

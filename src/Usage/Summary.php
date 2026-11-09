@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\CartFlow;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -90,7 +92,7 @@ final class Summary {
 	 * @param mixed $item  Cart item.
 	 */
 	public static function cart_price( $price, $item = array() ) {
-		$rates = is_array( $item ) && ! isset( $item['subscription_renewal'] ) ? Rates::for_usage( $item['data'] ?? null ) : null;
+		$rates = is_array( $item ) && ! CartFlow::is_renewal( $item ) ? Rates::for_usage( $item['data'] ?? null ) : null;
 
 		if ( null === $rates ) {
 			return $price;
@@ -107,7 +109,7 @@ final class Summary {
 	 * @param mixed $item     Cart item.
 	 */
 	public static function cart_subtotal( $subtotal, $item = array() ) {
-		$rates = is_array( $item ) && ! isset( $item['subscription_renewal'] ) ? Rates::for_usage( $item['data'] ?? null ) : null;
+		$rates = is_array( $item ) && ! CartFlow::is_renewal( $item ) ? Rates::for_usage( $item['data'] ?? null ) : null;
 
 		return null === $rates ? $subtotal : self::cap_text( $rates['cap'] );
 	}

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Drivers\NeedsBilling;
 
 defined( 'ABSPATH' ) || exit;
@@ -57,7 +58,7 @@ final class BillingRequirements {
 		}
 
 		foreach ( $cart->get_cart() as $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 

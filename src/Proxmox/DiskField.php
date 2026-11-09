@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Usage\Rates;
 
@@ -32,7 +33,7 @@ final class DiskField {
 			if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
 				continue;
 			}
-			if ( null !== $found || ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_switch'] ) || ! empty( $item['subscription_resubscribe'] ) ) {
+			if ( null !== $found || CartFlow::has_value( $item, CartFlow::BOUGHT_BEFORE ) ) {
 				return null;
 			}
 			$found = array( 'key' => $key, 'item' => $item );

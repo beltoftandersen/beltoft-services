@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -100,7 +101,7 @@ final class DbIpField {
 			}
 
 			// Two databases on one order: which one would the box mean?
-			if ( null !== $found || ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_switch'] ) || ! empty( $item['subscription_resubscribe'] ) ) {
+			if ( null !== $found || CartFlow::has_value( $item, CartFlow::BOUGHT_BEFORE ) ) {
 				return null;
 			}
 

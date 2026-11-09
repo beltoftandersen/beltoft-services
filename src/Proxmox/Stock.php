@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 
@@ -44,13 +45,6 @@ final class Stock {
 	 * Transient prefix: a capacity run was queued for the cluster lately (see queue()).
 	 */
 	private const QUEUED_PREFIX = 'beltoft_services_proxmox_stock_queued_';
-
-	/**
-	 * Cart item data keys of WooCommerce Subscriptions' flows: the `$cart_item_key` properties of
-	 * WCS_Cart_Renewal (core/class-wcs-cart-renewal.php:18), WCS_Cart_Switch (switching/class-wcs-cart-switch.php:11)
-	 * and WCS_Cart_Resubscribe (core/class-wcs-cart-resubscribe.php:19). Early renewal is a renewal cart too.
-	 */
-	private const CART_KEYS = array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe', 'subscription_renewal_early' );
 
 	/**
 	 * Product and variation id of the item being added now when it belongs to one of those flows.
@@ -194,13 +188,7 @@ final class Stock {
 	 * @param array<string, mixed> $data Cart item data or session values.
 	 */
 	private static function has_flow_key( array $data ): bool {
-		foreach ( self::CART_KEYS as $key ) {
-			if ( isset( $data[ $key ] ) ) {
-				return true;
-			}
-		}
-
-		return false;
+		return CartFlow::has( $data, CartFlow::ALL );
 	}
 
 	/**
@@ -599,10 +587,8 @@ final class Stock {
 
 			$same = in_array( $product->get_id(), array( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) ), true );
 
-			foreach ( self::CART_KEYS as $key ) {
-				if ( $same && isset( $item[ $key ] ) ) {
-					return true;
-				}
+			if ( $same && CartFlow::has( $item, CartFlow::ALL ) ) {
+				return true;
 			}
 		}
 

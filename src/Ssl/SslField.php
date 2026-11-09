@@ -8,6 +8,7 @@
 namespace BeltoftServices\Ssl;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Drivers\Driver;
@@ -74,7 +75,7 @@ final class SslField {
 
 		foreach ( $cart->get_cart() as $key => $item ) {
 			// A renewal or a switch pays for a certificate that exists.
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 

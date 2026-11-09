@@ -8,6 +8,7 @@
 namespace BeltoftServices\Licences;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Apps;
@@ -69,7 +70,7 @@ final class KeyField {
 
 		foreach ( $cart->get_cart() as $key => $item ) {
 			// A renewal or a switch pays for a licence that exists.
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 

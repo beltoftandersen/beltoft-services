@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -149,7 +150,7 @@ final class DbNeedsServer {
 		$clusters = array();
 
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 

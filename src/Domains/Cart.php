@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Crypto;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -188,7 +189,7 @@ final class Cart {
 
 	/** Is this a renewal, resubscribe or switch line, which carries no new ownership proof? */
 	private static function is_continuation( array $item ): bool {
-		return ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_resubscribe'] ) || ! empty( $item['subscription_switch'] );
+		return CartFlow::has_value( $item, CartFlow::BOUGHT_BEFORE );
 	}
 
 	/**
@@ -400,9 +401,7 @@ final class Cart {
 	private static function check_domain_selection( array $data, int $product_id ): void {
 		$driver = Product::driver_for( $product_id );
 		if ( ! $driver || ! in_array( $driver->id(), array( 'domain', 'dns' ), true ) ) { return; }
-		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
-			if ( ! empty( $data[ $key ] ) ) { return; }
-		}
+		if ( CartFlow::has_value( $data, CartFlow::BOUGHT_BEFORE ) ) { return; }
 		if ( 'dns' === $driver->id() ) {
 			$ok = self::dns_claim_ok( $data, get_current_user_id() );
 			if ( is_wp_error( $ok ) ) { throw new \Exception( esc_html( $ok->get_error_message() ) ); }
@@ -419,7 +418,7 @@ final class Cart {
 		if ( ! $valid ) { return false; }
 		$data = is_array( $data ) ? $data : array();
 		$driver = Product::driver_for( $product_id );
-		if ( $driver && in_array( $driver->id(), array( 'domain', 'dns' ), true ) && method_exists( WC(), 'is_store_api_request' ) && WC()->is_store_api_request() && empty( $data['subscription_renewal'] ) && empty( $data['subscription_resubscribe'] ) && empty( $data['subscription_switch'] ) ) {
+		if ( $driver && in_array( $driver->id(), array( 'domain', 'dns' ), true ) && method_exists( WC(), 'is_store_api_request' ) && WC()->is_store_api_request() && ! CartFlow::has_value( $data, CartFlow::BOUGHT_BEFORE ) ) {
 			wc_add_notice( __( 'Choose a domain on the domain search page first.', 'beltoft-services' ), 'error' );
 			return false;
 		}
@@ -429,9 +428,7 @@ final class Cart {
 	}
 
 	public static function price_for( array $item ): ?int {
-		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
-			if ( ! empty( $item[ $key ] ) ) { return null; }
-		}
+		if ( CartFlow::has_value( $item, CartFlow::BOUGHT_BEFORE ) ) { return null; }
 		$domain = $item['beltoft_services_domain'] ?? null;
 		if ( ! is_array( $domain ) || 'dns' === ( $domain['mode'] ?? '' ) ) { return null; }
 		$name = (string) ( $domain['domain'] ?? '' );

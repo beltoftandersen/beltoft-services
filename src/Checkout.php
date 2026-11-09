@@ -7,6 +7,8 @@
 
 namespace BeltoftServices;
 
+use BeltoftServices\Billing\CartFlow;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -55,7 +57,7 @@ final class Checkout {
 		}
 
 		foreach ( $cart->get_cart() as $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) || isset( $item['subscription_resubscribe'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::BOUGHT_BEFORE ) ) {
 				continue;
 			}
 

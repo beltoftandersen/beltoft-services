@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\LineNames;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
@@ -85,7 +86,7 @@ final class Breakdown {
 	 * @return array<string, mixed>|null
 	 */
 	private static function of_item( $item ): ?array {
-		if ( ! is_array( $item ) || isset( $item['subscription_renewal'] ) || '' === self::kind( $item['data'] ?? null ) ) {
+		if ( ! is_array( $item ) || CartFlow::is_renewal( $item ) || '' === self::kind( $item['data'] ?? null ) ) {
 			return null;
 		}
 
