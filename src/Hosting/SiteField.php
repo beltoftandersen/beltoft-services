@@ -384,7 +384,7 @@ final class SiteField {
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_zone">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone">';
 
 			foreach ( $zones as $one ) {
-				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['zone'], $one, false ) . '>' . esc_html( $one ) . '</option>';
+				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['zone'], $one, false ) . '>' . esc_html( \BeltoftServices\Domains\HostName::display( $one ) ) . '</option>';
 			}
 
 			echo '</select></span></p>';

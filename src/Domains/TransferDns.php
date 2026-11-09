@@ -384,7 +384,7 @@ final class TransferDns {
 		$who = self::registrar_name( $domain );
 
 		/* translators: 1: domain, 2: the current registrar. */
-		return '' === $who ? sprintf( __( '%s is locked at your current registrar. Unlock it there, then come back.', 'beltoft-services' ), $domain ) : sprintf( __( '%1$s is locked at %2$s. Unlock it there, then come back.', 'beltoft-services' ), $domain, $who );
+		return '' === $who ? sprintf( __( '%s is locked at your current registrar. Unlock it there, then come back.', 'beltoft-services' ), HostName::display( $domain ) ) : sprintf( __( '%1$s is locked at %2$s. Unlock it there, then come back.', 'beltoft-services' ), HostName::display( $domain ), $who );
 	}
 
 	/**

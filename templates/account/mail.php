@@ -14,6 +14,7 @@
 defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_domain = (string) $view['domain'];
+$beltoft_services_shown  = \BeltoftServices\Domains\HostName::display( $beltoft_services_domain );
 $beltoft_services_limits = $view['limits'];
 $beltoft_services_status = array(
 	'ready'    => __( 'Ready', 'beltoft-services' ),
@@ -77,7 +78,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 								/* translators: 1: the name of the plan, such as Team, 2: the first domain of the plan, as a link */
 								__( 'Part of the %1$s plan of %2$s', 'beltoft-services' ),
 								esc_html( (string) $beltoft_services_plan['root']['name'] ),
-								'<a href="' . esc_url( $other_url( (int) $beltoft_services_plan['root']['id'] ) ) . '">' . esc_html( (string) $beltoft_services_plan['root']['domain'] ) . '</a>'
+								'<a href="' . esc_url( $other_url( (int) $beltoft_services_plan['root']['id'] ) ) . '">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $beltoft_services_plan['root']['domain'] ) ) . '</a>'
 							),
 							array( 'a' => array( 'href' => array() ) )
 						);
@@ -87,7 +88,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<p><?php echo esc_html( sprintf( /* translators: 1: domains in the plan, 2: domains the plan allows */ _n( '%1$d of %2$d domain', '%1$d of %2$d domains', (int) $beltoft_services_plan['limits']['domains'], 'beltoft-services' ), $beltoft_services_in, (int) $beltoft_services_plan['limits']['domains'] ) ); ?></p>
 				<ul>
 					<?php foreach ( $beltoft_services_plan['members'] as $beltoft_services_member ) : ?>
-						<li><?php echo $beltoft_services_member['id'] === $view['id'] ? esc_html( $beltoft_services_member['domain'] ) : '<a href="' . esc_url( $other_url( (int) $beltoft_services_member['id'] ) ) . '">' . esc_html( $beltoft_services_member['domain'] ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above. ?></li>
+						<li><?php echo $beltoft_services_member['id'] === $view['id'] ? esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_member['domain'] ) ) : '<a href="' . esc_url( $other_url( (int) $beltoft_services_member['id'] ) ) . '">' . esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_member['domain'] ) ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above. ?></li>
 					<?php endforeach; ?>
 				</ul>
 
@@ -110,7 +111,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 									<label><input type="radio" name="beltoft-mail-domain-mode" value="ours" checked data-mail-domain-mode> <?php esc_html_e( 'One of your domains with us', 'beltoft-services' ); ?></label>
 									<select data-mail-domain-zone aria-label="<?php esc_attr_e( 'One of your domains with us', 'beltoft-services' ); ?>">
 										<?php foreach ( $beltoft_services_zones as $beltoft_services_zone ) : ?>
-											<option value="<?php echo esc_attr( $beltoft_services_zone ); ?>"><?php echo esc_html( $beltoft_services_zone ); ?></option>
+											<option value="<?php echo esc_attr( $beltoft_services_zone ); ?>"><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_zone ) ); ?></option>
 										<?php endforeach; ?>
 									</select>
 								</p>
@@ -165,7 +166,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							<?php foreach ( (array) $view['mailboxes'] as $beltoft_services_box ) : ?>
 								<?php $beltoft_services_percent = $beltoft_services_box['quota_mb'] > 0 ? (int) min( 100, floor( $beltoft_services_box['used_mb'] * 100 / $beltoft_services_box['quota_mb'] ) ) : 0; ?>
 								<tr data-mail-box="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>">
-									<td><code><?php echo esc_html( $beltoft_services_box['email'] ); ?></code><?php echo $beltoft_services_box['active'] ? '' : ' <span class="description">' . esc_html__( 'Paused', 'beltoft-services' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text. ?></td>
+									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_box['email'] ) ); ?></code><?php echo $beltoft_services_box['active'] ? '' : ' <span class="description">' . esc_html__( 'Paused', 'beltoft-services' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text. ?></td>
 									<td><?php echo esc_html( $beltoft_services_box['name'] ); ?></td>
 									<td><?php echo esc_html( sprintf( /* translators: 1: storage used, 2: storage of the mailbox, 3: percent used */ __( '%1$s of %2$s (%3$d%%)', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_box['used_mb'] ), $beltoft_services_size( (int) $beltoft_services_box['quota_mb'] ), $beltoft_services_percent ) ); ?></td>
 									<td class="beltoft-services-mail__actions">
@@ -208,7 +209,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<p>
 							<label for="beltoft-mail-local"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>
 							<input type="text" id="beltoft-mail-local" autocomplete="off" maxlength="64" placeholder="info" data-mail-local>
-							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_domain ); ?></span>
+							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_shown ); ?></span>
 						</p>
 						<p>
 							<label for="beltoft-mail-name"><?php esc_html_e( 'Name shown (optional)', 'beltoft-services' ); ?></label>
@@ -246,7 +247,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<tbody>
 							<?php foreach ( (array) $view['aliases'] as $beltoft_services_alias ) : ?>
 								<tr>
-									<td><code><?php echo esc_html( $beltoft_services_alias['address'] ); ?></code></td>
+									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_alias['address'] ) ); ?></code></td>
 									<td><?php echo esc_html( implode( ', ', $beltoft_services_alias['goto'] ) ); ?></td>
 									<td class="beltoft-services-mail__actions"><button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
 								</tr>
@@ -265,7 +266,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<p>
 							<label for="beltoft-mail-alias"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>
 							<input type="text" id="beltoft-mail-alias" autocomplete="off" maxlength="64" placeholder="sales" data-mail-alias-local>
-							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_domain ); ?></span>
+							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_shown ); ?></span>
 						</p>
 						<p>
 							<label for="beltoft-mail-goto"><?php esc_html_e( 'Deliver to', 'beltoft-services' ); ?></label>

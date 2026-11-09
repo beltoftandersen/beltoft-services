@@ -667,7 +667,8 @@
 	} );
 	function matches( form ) {
 		var input = form.querySelector( 'input[name="confirm"]' );
-		return !! input && input.value.trim().toLowerCase() === form.getAttribute( 'data-danger-domain' );
+		var typed = input ? input.value.trim().toLowerCase() : '';
+		return typed !== '' && ( typed === form.getAttribute( 'data-danger-domain' ) || typed === form.getAttribute( 'data-danger-ascii' ) );
 	}
 	document.addEventListener( 'input', function ( event ) {
 		var form = event.target.closest ? event.target.closest( 'form[data-danger-domain]' ) : null;

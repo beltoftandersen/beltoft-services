@@ -41,7 +41,7 @@ final class Panels {
 	public static function title( $title, $license ) {
 		$r = is_array( $license ) ? Resource::for_license( (int) ( $license['id'] ?? 0 ) ) : null;
 		$domain = $r && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : '';
-		return '' !== $domain ? $domain : $title;
+		return '' !== $domain ? HostName::display( $domain ) : $title;
 	}
 	public static function account( Resource $r ): void {
 		// On a domain page (My Account → Domains → one domain) the tabs print instead of the one card.

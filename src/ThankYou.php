@@ -163,7 +163,7 @@ final class ThankYou {
 		$kind    = $driver ? $driver->kind() : '';
 		$license = $r->license();
 		$name    = in_array( $kind, array( 'domain', 'dns' ), true ) && '' !== (string) $r->get( 'domain' )
-			? (string) $r->get( 'domain' )
+			? \BeltoftServices\Domains\HostName::display( (string) $r->get( 'domain' ) )
 			: ServerName::display( $r, $license );
 
 		$row = array(

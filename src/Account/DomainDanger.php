@@ -87,6 +87,7 @@ final class DomainDanger {
 			'offer'   => $offer,
 			'r'       => $r,
 			'domain'  => (string) $r->get( 'domain' ),
+			'shown'   => \BeltoftServices\Domains\HostName::display( (string) $r->get( 'domain' ) ),
 			'action'  => Domains::url( $license, 'danger' ),
 			'nonce'   => wp_create_nonce( self::nonce_action( (int) $license['id'] ) ),
 			'expires' => self::date( (string) $r->get( 'expires_at' ), true ),
@@ -243,7 +244,8 @@ final class DomainDanger {
 		$subscription = $offer['subscription'];
 
 		if ( 'stop_hosting' === $what ) {
-			if ( strtolower( trim( (string) ( $post['confirm'] ?? '' ) ) ) !== strtolower( (string) $resource->get( 'domain' ) ) ) {
+			$typed = strtolower( trim( (string) ( $post['confirm'] ?? '' ) ) );
+			if ( $typed !== strtolower( (string) $resource->get( 'domain' ) ) && \BeltoftServices\Domains\HostName::normalise( $typed ) !== strtolower( (string) $resource->get( 'domain' ) ) ) {
 				return array( 'ok' => false, 'message' => __( 'Type the domain name exactly as shown to stop DNS hosting.', 'beltoft-services' ), 'redirect' => $back );
 			}
 

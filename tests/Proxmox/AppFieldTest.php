@@ -560,7 +560,8 @@ class AppFieldTest extends TestCase {
 
 		$this->assertSame( array(), $this->check( $own + array( AppField::POST_OWN => 'Shop.Example.COM.' ) ) );
 		$this->assertSame( array( 'Enter the domain name you want to use.' ), $this->check( $own + array( AppField::POST_OWN => '  ' ) ) );
-		foreach ( array( 'https://shop.example.com', 'shop.example.com/path', 'nodots', '-bad-.example.com', 'shop_x.example.com', 'shop.example.123', 'shop.local', 'bücher.example', '192.0.2.5' ) as $bad ) {
+		$this->assertSame( array(), $this->check( $own + array( AppField::POST_OWN => 'bücher.example' ) ), 'National letters are accepted and stored as punycode.' );
+		foreach ( array( 'https://shop.example.com', 'shop.example.com/path', 'nodots', '-bad-.example.com', 'shop_x.example.com', 'shop.example.123', 'shop.local', '192.0.2.5' ) as $bad ) {
 			$this->assertStringContainsString( 'not a domain name we can use', implode( ' ', $this->check( $own + array( AppField::POST_OWN => $bad ) ) ), $bad );
 		}
 		$this->assertSame( array( 'This app does not use a domain at install. You can add one later.' ), $this->check( array( AppField::POST_APP => 'docker', AppField::POST_DOMAIN => 'own', AppField::POST_OWN => 'shop.example.com' ) ) );

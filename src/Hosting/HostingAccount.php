@@ -162,7 +162,7 @@ final class HostingAccount {
 			$names = array();
 
 			foreach ( $site['domains'] as $d ) {
-				$names[] = $d['host'] . ( 'active' === $d['state'] ? '' : ' (' . ( 'waiting' === $d['state'] ? __( 'waiting for DNS', 'beltoft-services' ) : __( 'pending', 'beltoft-services' ) ) . ')' );
+				$names[] = \BeltoftServices\Domains\HostName::display( $d['host'] ) . ( 'active' === $d['state'] ? '' : ' (' . ( 'waiting' === $d['state'] ? __( 'waiting for DNS', 'beltoft-services' ) : __( 'pending', 'beltoft-services' ) ) . ')' );
 			}
 
 			printf(
@@ -205,7 +205,7 @@ final class HostingAccount {
 				$rows[] = $row['type'] . ' ' . ( $row['name'] ?? $d['host'] ) . ' = ' . $row['value'];
 			}
 
-			echo '<p class="beltoft-hosting-notice">' . esc_html( sprintf( /* translators: 1: domain name, 2: DNS records. */ __( 'To use %1$s, add these DNS records at your DNS provider: %2$s. The website goes live when both are found.', 'beltoft-services' ), $d['host'], implode( '; ', $rows ) ) ) . '</p>';
+			echo '<p class="beltoft-hosting-notice">' . esc_html( sprintf( /* translators: 1: domain name, 2: DNS records. */ __( 'To use %1$s, add these DNS records at your DNS provider: %2$s. The website goes live when both are found.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $d['host'] ), implode( '; ', $rows ) ) ) . '</p>';
 		}
 
 		foreach ( (array) $r->get( 'php_pinned' ) as $slug => $version ) {
@@ -236,7 +236,7 @@ final class HostingAccount {
 		echo '<p>';
 
 		if ( $mail ) {
-			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) );
+			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), (string) \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) ) );
 		} else {
 			echo esc_html__( 'Set up Email lite so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' );
 
