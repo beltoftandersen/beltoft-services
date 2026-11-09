@@ -177,7 +177,7 @@ final class DbNeedsServer {
 		foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user_id ) as $license ) {
 			$resource = Resource::for_license( (int) $license['id'] );
 
-			if ( ! $resource || 'proxmox' !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! in_array( $resource->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! in_array( $resource->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
 				continue;
 			}
 

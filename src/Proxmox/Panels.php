@@ -49,7 +49,7 @@ final class Panels {
 	public static function page_head( $handled, $resource, $license = array(), $view = array(), $page = array() ) {
 		unset( $page );
 
-		if ( $handled || ! $resource instanceof Resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || ! is_array( $license ) ) {
+		if ( $handled || ! $resource instanceof Resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || ! is_array( $license ) ) {
 			return $handled;
 		}
 

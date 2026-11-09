@@ -25,7 +25,7 @@ final class DiskCart {
 	}
 
 	public static function add_url( Resource $server, \WC_Product_Variation $size ): string {
-		if ( ! function_exists( 'wcs_get_subscription' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) || count( DiskMeta::for_server( $server ) ) >= max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
+		if ( ! function_exists( 'wcs_get_subscription' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) || ProxmoxDriver::ID !== $server->get( 'driver' ) || count( DiskMeta::for_server( $server ) ) >= max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
 			return '';
 		}
 		$parent = $size->get_parent_id();
@@ -92,7 +92,7 @@ final class DiskCart {
 		}
 		$license = Licenses::find( $id );
 		$server = $license ? Resource::for_license( $id ) : null;
-		if ( ! $server || ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || SshKeyField::DRIVER !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
+		if ( ! $server || ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || ProxmoxDriver::ID !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
 			return null;
 		}
 		return $id;

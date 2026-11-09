@@ -768,7 +768,7 @@ final class Operations {
 	public static function on_state_changed( $r, $old, $new ): void {
 		unset( $old );
 
-		if ( 'failed' !== $new || ! $r instanceof Resource || SshKeyField::DRIVER !== $r->get( 'driver' ) || 'update_plan' !== $r->get( 'failed_op' ) || ! $r->get( 'was_running' ) ) {
+		if ( 'failed' !== $new || ! $r instanceof Resource || ProxmoxDriver::ID !== $r->get( 'driver' ) || 'update_plan' !== $r->get( 'failed_op' ) || ! $r->get( 'was_running' ) ) {
 			return;
 		}
 

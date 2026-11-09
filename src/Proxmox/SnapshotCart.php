@@ -96,7 +96,7 @@ final class SnapshotCart {
 
 	/** May this server take a pack: a ready, owned-by-caller-checked server that gets snapshots (qcow2). */
 	private static function server_ok( ?Resource $server ): bool {
-		return $server && SshKeyField::DRIVER === $server->get( 'driver' ) && 'ready' === $server->get( 'state' ) && 'ready' === $server->get( 'desired' )
+		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) && 'ready' === $server->get( 'state' ) && 'ready' === $server->get( 'desired' )
 			&& Lifecycle::is_active( $server->license() ) && Snapshots::eligible( $server );
 	}
 

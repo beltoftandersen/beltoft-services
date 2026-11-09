@@ -143,7 +143,7 @@ final class Stock {
 	 * @return string[]
 	 */
 	public static function drivers(): array {
-		return array_merge( array( 'proxmox', DbDriver::ID ), self::addon_drivers() );
+		return array_merge( array( ProxmoxDriver::ID, DbDriver::ID ), self::addon_drivers() );
 	}
 
 	/**

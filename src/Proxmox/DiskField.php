@@ -29,7 +29,7 @@ final class DiskField {
 		$found = null;
 		foreach ( $cart->get_cart() as $key => $item ) {
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
-			if ( ! $driver || SshKeyField::DRIVER !== $driver->id() ) {
+			if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
 				continue;
 			}
 			if ( null !== $found || ! empty( $item['subscription_renewal'] ) || ! empty( $item['subscription_switch'] ) || ! empty( $item['subscription_resubscribe'] ) ) {

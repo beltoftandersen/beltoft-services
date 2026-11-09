@@ -73,7 +73,7 @@ final class SnapshotMeta {
 	private static function is_server( array $license ): bool {
 		$driver = Product::driver_for( (int) ( $license['product_id'] ?? 0 ) );
 
-		return $driver && SshKeyField::DRIVER === $driver->id();
+		return $driver && ProxmoxDriver::ID === $driver->id();
 	}
 
 	/** The server resource a pack belongs to, or null. */
@@ -84,7 +84,7 @@ final class SnapshotMeta {
 		}
 		$server = Resource::for_license( $id );
 
-		return $server && SshKeyField::DRIVER === $server->get( 'driver' ) ? $server : null;
+		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) ? $server : null;
 	}
 
 	/** Live pack resources linked to one server, whatever their state (the cascade and the card use this). */
@@ -176,7 +176,7 @@ final class SnapshotMeta {
 	 * @return mixed
 	 */
 	public static function paid_slots( $slots, $server = null ) {
-		if ( ! $server instanceof Resource || SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+		if ( ! $server instanceof Resource || ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
 			return $slots;
 		}
 
@@ -194,7 +194,7 @@ final class SnapshotMeta {
 	/** A deleted server ends its packs. */
 	public static function state_changed( $resource, $old, $new ): void {
 		unset( $old );
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 			return;
 		}
 		foreach ( self::for_server( $resource ) as $pack ) {

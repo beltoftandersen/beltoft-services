@@ -18,7 +18,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\PleskLicence;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -209,7 +209,7 @@ final class KeyOrder {
 		$attach = (int) $r->get( 'lic_attach' );
 		$owner  = $attach > 0 ? Resource::for_license( $attach ) : null;
 
-		if ( $owner && SshKeyField::DRIVER === $owner->get( 'driver' ) && (int) ( $owner->license()['user_id'] ?? 0 ) === $user ) {
+		if ( $owner && ProxmoxDriver::ID === $owner->get( 'driver' ) && (int) ( $owner->license()['user_id'] ?? 0 ) === $user ) {
 			$licence = AppLicence::current( $owner );
 			$id      = $licence ? (int) $licence->get( 'plesk_key_id' ) : 0;
 

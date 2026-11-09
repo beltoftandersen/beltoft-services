@@ -35,7 +35,7 @@ final class Console {
 
 	/** A quick page check; open() verifies the VM and its current power directly. */
 	public static function available( Resource $r ): bool {
-		if ( ! self::enabled() || 'proxmox' !== $r->get( 'driver' ) || ! $r->accepts_actions() ) {
+		if ( ! self::enabled() || ProxmoxDriver::ID !== $r->get( 'driver' ) || ! $r->accepts_actions() ) {
 			return false;
 		}
 		$record = VmRecords::for_resource( $r->id() );

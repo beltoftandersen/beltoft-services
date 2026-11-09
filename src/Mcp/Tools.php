@@ -16,6 +16,7 @@ use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -481,7 +482,7 @@ final class Tools {
 			'working' => (bool) $status['working'],
 		);
 
-		if ( $r && 'proxmox' === $r->get( 'driver' ) ) {
+		if ( $r && ProxmoxDriver::ID === $r->get( 'driver' ) ) {
 			$out += Details::vm( $r );
 			$out['app_state'] = (string) $status['app_state'];
 		}

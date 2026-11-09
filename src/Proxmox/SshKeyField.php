@@ -33,11 +33,6 @@ defined( 'ABSPATH' ) || exit;
 final class SshKeyField {
 
 	/**
-	 * Driver id of the Proxmox driver.
-	 */
-	public const DRIVER = 'proxmox';
-
-	/**
 	 * Classic checkout field name.
 	 */
 	public const POST_KEY = 'beltoft_services_ssh_key';
@@ -269,7 +264,7 @@ final class SshKeyField {
 	private static function is_vm_product( int $product_id ): bool {
 		$driver = Product::driver_for( $product_id );
 
-		return $driver && self::DRIVER === $driver->id();
+		return $driver && ProxmoxDriver::ID === $driver->id();
 	}
 
 	/**
@@ -342,7 +337,7 @@ final class SshKeyField {
 				'fields'         => 'ids',
 				'no_found_rows'  => true,
 				'meta_key'       => Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one small lookup of VM products.
-				'meta_value'     => self::DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+				'meta_value'     => ProxmoxDriver::ID, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 			)
 		);
 		$parents = array_map( 'intval', $parents );
@@ -572,7 +567,7 @@ final class SshKeyField {
 	 * @return mixed
 	 */
 	public static function initial_meta( $meta, $license, $driver ) {
-		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || self::DRIVER !== $driver->id() ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return $meta;
 		}
 

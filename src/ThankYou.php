@@ -14,7 +14,7 @@ use BeltoftServices\Proxmox\DiskGuide;
 use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\SnapshotMeta;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -234,7 +234,7 @@ final class ThankYou {
 		foreach ( $resources as $resource ) {
 			$license = $resource->license();
 
-			if ( $license && SshKeyField::DRIVER === (string) $resource->get( 'driver' ) ) {
+			if ( $license && ProxmoxDriver::ID === (string) $resource->get( 'driver' ) ) {
 				return Account\ServerLinks::url( $license );
 			}
 		}

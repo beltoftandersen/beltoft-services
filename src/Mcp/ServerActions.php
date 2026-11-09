@@ -20,6 +20,7 @@ use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbPolicy;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
@@ -163,7 +164,7 @@ final class ServerActions {
 	 * @param array<string, mixed> $args   Action arguments, with the typed word the dashboard asks for.
 	 */
 	private static function refusal( Resource $r, string $action, array $args ): ?string {
-		if ( ! in_array( (string) $r->get( 'driver' ), array( SshKeyField::DRIVER, 'proxmox-db' ), true ) ) {
+		if ( ! in_array( (string) $r->get( 'driver' ), array( ProxmoxDriver::ID, 'proxmox-db' ), true ) ) {
 			return null;
 		}
 
@@ -303,7 +304,7 @@ final class ServerActions {
 	private static function summary_restore( Resource $r, string $volid, string $label ) {
 		$when = '';
 
-		foreach ( 'proxmox' === (string) $r->get( 'driver' ) || 'proxmox-db' === (string) $r->get( 'driver' ) ? Backups::listing( $r )['list'] : array() as $backup ) {
+		foreach ( ProxmoxDriver::ID === (string) $r->get( 'driver' ) || 'proxmox-db' === (string) $r->get( 'driver' ) ? Backups::listing( $r )['list'] : array() as $backup ) {
 			if ( (string) $backup['volid'] === $volid ) {
 				$when = (string) $backup['when'];
 			}

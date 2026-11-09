@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Resource;
 
@@ -415,7 +415,7 @@ final class Rates {
 			// One item: the variation's price already holds the public IP and the extra storage the plan was bought with, so
 			// the hourly rate is that price / 730 and the cap that price (the add-ons are variation attributes, not products).
 			$out[] = array( 'item' => 'database', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
-		} elseif ( SshKeyField::DRIVER === $driver ) {
+		} elseif ( ProxmoxDriver::ID === $driver ) {
 			$server = $monthly;
 			$extra  = 0.0;
 

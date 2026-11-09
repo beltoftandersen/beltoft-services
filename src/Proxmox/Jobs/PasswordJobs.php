@@ -10,7 +10,7 @@ namespace BeltoftServices\Proxmox\Jobs;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Access;
 use BeltoftServices\Proxmox\ProxmoxJobs;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -32,7 +32,7 @@ final class PasswordJobs {
 
 		set_transient( ProxmoxJobs::PURGE_RAN, 1, DAY_IN_SECONDS );
 
-		$driver = Registry::get( SshKeyField::DRIVER );
+		$driver = Registry::get( ProxmoxDriver::ID );
 
 		if ( ! $driver ) {
 			return;
@@ -41,7 +41,7 @@ final class PasswordJobs {
 		foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
 			$resource = Resource::find( $id );
 
-			if ( ! $resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 				continue;
 			}
 

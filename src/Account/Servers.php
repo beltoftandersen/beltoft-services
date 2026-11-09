@@ -18,6 +18,7 @@ use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -123,7 +124,7 @@ final class Servers {
 	 * @return array<int, array<string, string>>
 	 */
 	public static function buttons(): array {
-		$url = '' !== ServiceArea::product_url( array( 'proxmox' ) ) ? ServerLinks::url_new() : '';
+		$url = '' !== ServiceArea::product_url( array( ProxmoxDriver::ID ) ) ? ServerLinks::url_new() : '';
 
 		/**
 		 * The address of the "Create a server" button. Return '' for no button.

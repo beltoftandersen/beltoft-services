@@ -640,7 +640,7 @@ final class AppField {
 	 * @return mixed
 	 */
 	public static function initial_meta( $meta, $license, $driver ) {
-		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || SshKeyField::DRIVER !== $driver->id() ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return $meta;
 		}
 

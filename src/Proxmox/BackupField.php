@@ -58,7 +58,7 @@ final class BackupField {
 	/** Show the paid backup choice as its own line, with the surcharge inside the server price. */
 	public static function item_data( array $data, array $item ): array {
 		$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
-		if ( ! $driver || SshKeyField::DRIVER !== $driver->id() ) {
+		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return $data;
 		}
 		$variation = wc_get_product( (int) ( $item['variation_id'] ?? 0 ) );
@@ -96,7 +96,7 @@ final class BackupField {
 		foreach ( $cart->get_cart() as $key => $item ) {
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			if ( ! $driver || SshKeyField::DRIVER !== $driver->id() ) {
+			if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
 				continue;
 			}
 

@@ -33,6 +33,7 @@ use BeltoftServices\Proxmox\Quarantine;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -61,7 +62,7 @@ final class Commands {
 		}
 		$driver = Product::driver_for( (int) $disk_license['product_id'] );
 		$server = Resource::for_license( (int) $server_license['id'] );
-		if ( ! $driver || DiskDriver::ID !== $driver->id() || ! $server || 'proxmox' !== $server->get( 'driver' ) || $server->get( 'linked' ) || 'ready' !== $server->get( 'state' ) || Licenses::STATUS_ACTIVE !== Licenses::effective_status( $disk_license ) || (int) $disk_license['user_id'] !== (int) $server_license['user_id'] || Resource::for_license( (int) $disk_license['id'] ) ) {
+		if ( ! $driver || DiskDriver::ID !== $driver->id() || ! $server || ProxmoxDriver::ID !== $server->get( 'driver' ) || $server->get( 'linked' ) || 'ready' !== $server->get( 'state' ) || Licenses::STATUS_ACTIVE !== Licenses::effective_status( $disk_license ) || (int) $disk_license['user_id'] !== (int) $server_license['user_id'] || Resource::for_license( (int) $disk_license['id'] ) ) {
 			\WP_CLI::error( 'The disk license must be active, both licenses must belong to one customer, the server must be ready and managed, and the disk must have no resource.' );
 		}
 		$record = VmRecords::for_resource( $server->id() );
@@ -115,7 +116,7 @@ final class Commands {
 	public function vm_metrics( array $args, array $assoc_args ): void {
 		$license_id = (int) ( $args[0] ?? 0 );
 		$resource = $license_id > 0 ? Resource::for_license( $license_id ) : null;
-		if ( ! $resource || 'proxmox' !== $resource->get( 'driver' ) ) { \WP_CLI::error( 'Give a VPS license with a live resource.' ); }
+		if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) { \WP_CLI::error( 'Give a VPS license with a live resource.' ); }
 		$range = (string) ( $assoc_args['range'] ?? 'hour' );
 		if ( ! isset( Metrics::RANGES[ $range ] ) ) { \WP_CLI::error( 'Use --range=hour, day or month.' ); }
 		$rows = ( new Operations( $resource ) )->series( $range );

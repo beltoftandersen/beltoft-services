@@ -76,7 +76,7 @@ final class Switches {
 				return DbDisk::switch_error( (int) $subscription->get_id(), (int) $product_id, $target, $item );
 			}
 
-			if ( 'proxmox' !== ( Product::driver_for( (int) $product_id ) ? Product::driver_for( (int) $product_id )->id() : '' ) ) {
+			if ( ProxmoxDriver::ID !== ( Product::driver_for( (int) $product_id ) ? Product::driver_for( (int) $product_id )->id() : '' ) ) {
 				return $message;
 			}
 
@@ -94,7 +94,7 @@ final class Switches {
 
 				$resource = Resource::for_license( (int) $license['id'] );
 
-				if ( ! $resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+				if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 					continue;
 				}
 

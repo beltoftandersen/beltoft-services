@@ -79,7 +79,7 @@ final class DiskCascade {
 		}
 		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
 			$server = Resource::for_license( (int) $license['id'] );
-			if ( $server && SshKeyField::DRIVER === $server->get( 'driver' ) ) {
+			if ( $server && ProxmoxDriver::ID === $server->get( 'driver' ) ) {
 				self::end_disks( $subscription, $server, $status );
 			}
 		}
@@ -99,7 +99,7 @@ final class DiskCascade {
 		$server_sub_id = (int) $subscription->get_id();
 		foreach ( Licenses::where( 'subscription_id', $server_sub_id ) as $license ) {
 			$server = Resource::for_license( (int) $license['id'] );
-			if ( ! $server || SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+			if ( ! $server || ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
 				continue;
 			}
 			$seen = array();
