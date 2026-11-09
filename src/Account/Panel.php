@@ -347,7 +347,7 @@ final class Panel {
 		do_action( 'beltoft_services_account_assets', self::HANDLE, $active );
 
 		wp_enqueue_script( 'beltoft-services-progress', plugins_url( 'assets/progress.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/progress.js' ), true );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array( 'beltoft-services-progress', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/account.js', BELTOFT_SERVICES_FILE ), array( 'beltoft-services-progress', 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/account.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesAccount',

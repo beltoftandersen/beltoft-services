@@ -14,7 +14,7 @@
 	var text = config.strings || {};
 	var S = window.beltoftStatus;
 
-	if ( ! account || ! window.fetch ) {
+	if ( ! account || ! window.fetch || ! window.beltoftApi ) {
 		return;
 	}
 
@@ -33,27 +33,7 @@
 	}
 
 	function call( method, path, body ) {
-		return window.fetch( account.root + path, {
-			method: method,
-			credentials: 'same-origin',
-			headers: {
-				'X-WP-Nonce': account.nonce,
-				'Content-Type': 'application/json'
-			},
-			body: undefined === body ? undefined : JSON.stringify( body )
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
-			return response.json().then( function ( data ) {
-				return { ok: response.ok, status: response.status, data: data };
-			}, function () {
-				return { ok: response.ok, status: response.status, data: {} };
-			} );
-		} );
+		return window.beltoftApi.call( account.root + path, { method: method, body: body, holder: account } );
 	}
 
 	// A request that waits for the customer's answer in the account area's own dialog (window.beltoftStatus.confirm).

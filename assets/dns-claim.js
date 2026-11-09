@@ -5,7 +5,7 @@
 	var config = window.beltoftDnsClaims;
 	var root = document.querySelector( '.beltoft-dns-claim' );
 	var bs = window.beltoftStatus;
-	if ( ! config || ! root || ! bs ) { return; }
+	if ( ! config || ! root || ! bs || ! window.beltoftApi ) { return; }
 
 	var MAX_ZONE_BYTES = 100 * 1024;
 
@@ -24,20 +24,13 @@
 	}
 
 	function request( method, path, body ) {
-		var options = { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } };
-		if ( body ) {
-			options.headers[ 'Content-Type' ] = 'application/json';
-			options.body = JSON.stringify( body );
-		}
-		return window.fetch( config.root + path, options ).then( function ( response ) {
-			return response.json().catch( function () { return {}; } ).then( function ( data ) {
-				if ( ! response.ok ) {
-					var error = new Error( data && data.message ? data.message : ( 403 === response.status ? t.expired : t.failed ) );
-					error.data = data || {};
-					throw error;
-				}
-				return data;
-			} );
+		return window.beltoftApi.call( config.root + path, { method: method, body: body || undefined, holder: config } ).then( function ( reply ) {
+			if ( ! reply.ok ) {
+				var error = new Error( reply.data.message ? reply.data.message : ( 403 === reply.status ? t.expired : t.failed ) );
+				error.data = reply.data;
+				throw error;
+			}
+			return reply.data;
 		} );
 	}
 

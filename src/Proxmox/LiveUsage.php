@@ -57,7 +57,7 @@ final class LiveUsage {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/usage-live.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/usage-live.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/usage-live.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/usage-live.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesUsage',

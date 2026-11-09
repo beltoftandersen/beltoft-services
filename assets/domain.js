@@ -3,13 +3,14 @@
 	'use strict';
 	var __ = window.wp.i18n.__;
 	var config = window.beltoftServicesAccount;
-	if ( ! config ) { return; }
+	if ( ! config || ! window.beltoftApi ) { return; }
+	// The reply's data, or an error carrying the server's own message.
+	function unwrap( reply ) {
+		if ( ! reply.ok ) { throw new Error( reply.data.message || __( 'Request failed', 'beltoft-services' ) ); }
+		return reply.data;
+	}
 	function request( method, path, args ) {
-		return window.fetch( config.root + path, { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: args ? JSON.stringify( { args: args } ) : undefined } ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-			if ( nonce ) { config.nonce = nonce; }
-			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || __( 'Request failed', 'beltoft-services' ) ); } return body; } );
-		} );
+		return window.beltoftApi.call( config.root + path, { method: method, body: args ? { args: args } : undefined, holder: config } ).then( unwrap );
 	}
 	window.beltoftDomainRequest = request;
 	var bs = window.beltoftStatus;
@@ -210,11 +211,7 @@
 		var scope = form.closest( '[data-domain-resource]' ).dataset.domainResource;
 		if ( bs && bs.locked( scope ) ) { return; }
 		var handle = bs.busy( form.getAttribute( 'data-sending' ) || __( 'Sending the code…', 'beltoft-services' ), scope, send );
-		window.fetch( config.root + 'step-up/send', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { purpose: 'transfer_code' } ) } ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-			if ( nonce ) { config.nonce = nonce; }
-			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || __( 'Request failed', 'beltoft-services' ) ); } return body; } );
-		} ).then( function () {
+		window.beltoftApi.call( config.root + 'step-up/send', { method: 'POST', body: { purpose: 'transfer_code' }, holder: config } ).then( unwrap ).then( function () {
 			if ( ask ) { ask.hidden = true; }
 			enter.hidden = false;
 			form.querySelector( 'input[name="secret"]' ).value = '';
@@ -236,11 +233,7 @@
 		if ( bs && bs.locked( scope ) ) { return; }
 		if ( ! input.value ) { bs.fail( null, form.getAttribute( 'data-empty' ) || __( 'Enter the code.', 'beltoft-services' ), input ); return; }
 		var handle = bs.busy( form.getAttribute( 'data-checking' ) || __( 'Checking the code…', 'beltoft-services' ), scope, submit );
-		window.fetch( config.root + panel.dataset.domainResource + '/domain-authcode', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { secret: input.value } ) } ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-			if ( nonce ) { config.nonce = nonce; }
-			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || __( 'Request failed', 'beltoft-services' ) ); } return body; } );
-		} ).then( function ( body ) {
+		window.beltoftApi.call( config.root + panel.dataset.domainResource + '/domain-authcode', { method: 'POST', body: { secret: input.value }, holder: config } ).then( unwrap ).then( function ( body ) {
 			var code = panel.querySelector( '.beltoft-services-domain-code' );
 			input.value = '';
 			form.hidden = true;

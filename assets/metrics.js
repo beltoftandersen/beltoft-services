@@ -3,7 +3,7 @@
 	'use strict';
 	var account = window.beltoftServicesAccount;
 	var labels = window.beltoftServicesMetrics && window.beltoftServicesMetrics.strings;
-	if ( ! account || ! labels || ! window.fetch ) { return; }
+	if ( ! account || ! labels || ! window.fetch || ! window.beltoftApi ) { return; }
 	var ns = 'http://www.w3.org/2000/svg';
 	var specs = {
 		cpu: { keys: [ 'cpu' ], names: [ labels.cpu ], unit: '%' },
@@ -156,15 +156,11 @@
 				// One request per click: the switch is busy until the answer is in.
 				if ( bs.locked( id ) ) { alerts.checked = ! wanted; return; }
 				handle = bs.busy( labels.alertsSaving, id, alerts );
-				window.fetch( account.root + encodeURIComponent( id ) + '/usage-alerts', {
-					method: 'POST', credentials: 'same-origin',
-					headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
-					body: JSON.stringify( { on: wanted } )
-				} ).then( function ( response ) {
-					var nonce = response.headers.get( 'X-WP-Nonce' );
-					if ( nonce ) { account.nonce = nonce; }
-					if ( ! response.ok ) { throw new Error( 'alerts' ); }
-					return response.json();
+				window.beltoftApi.call( account.root + encodeURIComponent( id ) + '/usage-alerts', {
+					method: 'POST', body: { on: wanted }, holder: account
+				} ).then( function ( reply ) {
+					if ( ! reply.ok || ! reply.parsed ) { throw new Error( 'alerts' ); }
+					return reply.data;
 				} ).then( function ( body ) {
 					alerts.checked = !! ( body && body.on );
 					alertsNote.textContent = alerts.checked ? labels.alertsOn : labels.alertsOff;
@@ -186,13 +182,9 @@
 			var asked = range;
 			inflight = true;
 			if ( ! background ) { notice.textContent = labels.loading; }
-			window.fetch( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/metrics?range=' + encodeURIComponent( asked ), {
-				credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce }
-			} ).then( function ( response ) {
-				var nonce = response.headers.get( 'X-WP-Nonce' );
-				if ( nonce ) { account.nonce = nonce; }
-				if ( ! response.ok ) { throw new Error( 'metrics' ); }
-				return response.json();
+			window.beltoftApi.call( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/metrics?range=' + encodeURIComponent( asked ), { holder: account } ).then( function ( reply ) {
+				if ( ! reply.ok || ! reply.parsed ) { throw new Error( 'metrics' ); }
+				return reply.data;
 			} ).then( function ( body ) {
 				if ( current !== serial ) { return; }
 				inflight = false;

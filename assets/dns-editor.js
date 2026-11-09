@@ -6,7 +6,7 @@
 ( function () {
 	'use strict';
 	var config = window.beltoftServicesAccount;
-	if ( ! config || ! window.beltoftStatus ) { return; }
+	if ( ! config || ! window.beltoftStatus || ! window.beltoftApi ) { return; }
 
 	var TYPES = [ 'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA' ];
 	var EXTRAS = { MX: [ 'priority' ], SRV: [ 'priority', 'weight', 'port' ], CAA: [ 'flag', 'tag' ] };
@@ -32,13 +32,7 @@
 	}
 
 	function request( method, path, body ) {
-		var options = { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' } };
-		if ( body ) { options.body = JSON.stringify( body ); }
-		return window.fetch( config.root + path, options ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-			if ( nonce ) { config.nonce = nonce; }
-			return response.json().catch( function () { return {}; } ).then( function ( data ) { return { ok: response.ok, status: response.status, data: data || {} }; } );
-		} );
+		return window.beltoftApi.call( config.root + path, { method: method, body: body || undefined, holder: config } );
 	}
 
 	function Editor( root ) {

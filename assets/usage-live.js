@@ -2,7 +2,7 @@
 ( function () {
 	'use strict';
 	var config = window.beltoftServicesUsage;
-	if ( ! config || ! window.fetch ) { return; }
+	if ( ! config || ! window.fetch || ! window.beltoftApi ) { return; }
 	var busy = false;
 	var timer = null;
 
@@ -27,11 +27,9 @@
 	function load() {
 		if ( busy || 'visible' !== document.visibilityState ) { return; }
 		busy = true;
-		window.fetch( config.url, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } } ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-			if ( nonce ) { config.nonce = nonce; }
-			if ( ! response.ok ) { throw new Error( 'usage' ); }
-			return response.json();
+		window.beltoftApi.call( config.url, { holder: config } ).then( function ( reply ) {
+			if ( ! reply.ok || ! reply.parsed ) { throw new Error( 'usage' ); }
+			return reply.data;
 		} ).then( function ( body ) {
 			if ( body && body.resources ) { apply( body.resources ); }
 		} ).catch( function () {} ).then( function () { busy = false; } );

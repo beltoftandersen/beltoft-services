@@ -9,7 +9,7 @@
 	var cfg = window.beltoftServicesNetwork;
 	var root = document.querySelector( '[data-net]' );
 
-	if ( ! account || ! cfg || ! root || ! window.fetch ) {
+	if ( ! account || ! cfg || ! root || ! window.fetch || ! window.beltoftApi ) {
 		return;
 	}
 
@@ -18,25 +18,7 @@
 	var timer = null;
 
 	function request( method, path, body ) {
-		var options = { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' } };
-
-		if ( body ) {
-			options.body = JSON.stringify( body );
-		}
-
-		return window.fetch( path, options ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
-			return response.json().catch( function () {
-				return {};
-			} ).then( function ( json ) {
-				return { ok: response.ok, status: response.status, body: json };
-			} );
-		} );
+		return window.beltoftApi.call( path, { method: method, body: body || undefined, holder: account } );
 	}
 
 	var bs = window.beltoftStatus;
@@ -44,9 +26,9 @@
 
 	function wait( action, since ) {
 		request( 'GET', account.root + id ).then( function ( reply ) {
-			var result = reply.body && reply.body.last_result;
+			var result = reply.data && reply.data.last_result;
 
-			if ( reply.ok && ! reply.body.working && result && result.action === action && result.at >= since ) {
+			if ( reply.ok && ! reply.data.working && result && result.action === action && result.at >= since ) {
 				if ( result.ok ) {
 					window.location.reload();
 				} else {
@@ -71,9 +53,9 @@
 		handle = bs.busy( S.working, id, button );
 		request( 'POST', account.root + id + '/actions/' + action, { args: {} } ).then( function ( reply ) {
 			if ( reply.ok ) {
-				wait( action, reply.body && reply.body.at ? reply.body.at - 1 : 0 );
+				wait( action, reply.data && reply.data.at ? reply.data.at - 1 : 0 );
 			} else {
-				bs.fail( handle, ( reply.body && reply.body.message ) || S.error );
+				bs.fail( handle, ( reply.data && reply.data.message ) || S.error );
 				handle = null;
 			}
 		} );

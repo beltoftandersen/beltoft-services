@@ -87,7 +87,7 @@ final class AppTab {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/app-tab.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/app-tab.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/app-tab.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/app-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/app-tab.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesApp',
