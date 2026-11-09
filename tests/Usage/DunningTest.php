@@ -110,6 +110,28 @@ class DunningTest extends UsageTestCase {
 		$this->assertSame( 'paused', Resource::find( $r->id() )->get( 'state' ) );
 	}
 
+	public function test_a_failing_early_bill_does_not_leave_the_early_flag_set(): void {
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$this->hours( 501, $user, 3000, 0.02 );
+		$boom = static function () {
+			throw new \RuntimeException( 'renewal order failed' );
+		};
+		add_filter( 'wcs_renewal_order_created', $boom );
+
+		try {
+			Threshold::check( $sub );
+			$thrown = false;
+		} catch ( \RuntimeException $e ) {
+			$thrown = 'renewal order failed' === $e->getMessage();
+		} finally {
+			remove_filter( 'wcs_renewal_order_created', $boom );
+		}
+
+		$this->assertTrue( $thrown, 'The failure reaches the caller.' );
+		$this->assertFalse( \BeltoftServices\Usage\Renewal::$early );
+	}
+
 	public function test_the_threshold_bills_early_once(): void {
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );
