@@ -31,10 +31,26 @@ defined( 'ABSPATH' ) || exit;
 final class LiteMail {
 
 	/**
+	 * The account's own domain: the oldest connected name that is not a temporary preview address. A name counts once
+	 * it is active (a domain in the customer's zone, or an outside domain proved and pointing at us). Null when none.
+	 *
+	 * @param Resource $parent Hosting resource.
+	 */
+	public static function own_domain( Resource $parent ): ?string {
+		foreach ( SiteDomains::for_resource( $parent->id() ) as $row ) {
+			if ( 'preview' !== $row['kind'] && 'active' === $row['state'] ) {
+				return MailDomain::normalise( $row['host'] );
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Makes the Email lite domain of an account.
 	 *
 	 * @param Resource $parent Hosting resource.
-	 * @param string   $domain The mail domain, normally the main site domain.
+	 * @param string   $domain The mail domain: the account's own domain (empty means it).
 	 * @return Resource|\WP_Error The child resource, or the refusal.
 	 */
 	public static function enable( Resource $parent, string $domain ) {
@@ -50,10 +66,21 @@ final class LiteMail {
 			}
 		}
 
-		$name = MailDomain::normalise( $domain );
+		$own = self::own_domain( $parent );
+
+		if ( null === $own ) {
+			return new \WP_Error( 'no_domain', __( 'Connect your own domain to a website first. Email lite uses that domain.', 'beltoft-services' ) );
+		}
+
+		$name = '' === trim( $domain ) ? $own : MailDomain::normalise( $domain );
 
 		if ( null === $name ) {
 			return new \WP_Error( 'bad_domain', __( 'The domain is not valid.', 'beltoft-services' ) );
+		}
+
+		// One mail domain, the account's own: never the temporary preview address, never another name.
+		if ( $name !== $own ) {
+			return new \WP_Error( 'not_own_domain', __( 'Email lite uses the domain connected to your hosting account.', 'beltoft-services' ) );
 		}
 
 		$plan = Plan::typed( (array) $parent->get( 'plan' ) );

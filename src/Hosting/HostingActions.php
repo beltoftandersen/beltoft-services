@@ -165,7 +165,7 @@ final class HostingActions {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
-		if ( ! $resuming && count( $existing ) >= (int) $this->plan['sites'] ) {
+		if ( ! $resuming && (int) $this->plan['sites'] > 0 && count( $existing ) >= (int) $this->plan['sites'] ) {
 			return $this->error( 'limit', __( 'Your plan has no room for another website.', 'beltoft-services' ) );
 		}
 
@@ -683,10 +683,12 @@ final class HostingActions {
 			$texts = array(
 				'exists'     => __( 'Your account has Email lite already.', 'beltoft-services' ),
 				'bad_domain' => __( 'That domain name is not valid.', 'beltoft-services' ),
+				'no_domain'  => __( 'Connect your own domain to a website first. Email lite uses that domain.', 'beltoft-services' ),
+				'not_own_domain' => __( 'Email lite uses the domain connected to your hosting account.', 'beltoft-services' ),
 				'no_mail'    => __( 'Your plan has no mailboxes.', 'beltoft-services' ),
 			);
 
-			return $this->error( in_array( $child->get_error_code(), array( 'exists', 'bad_domain' ), true ) ? ( 'exists' === $child->get_error_code() ? 'exists' : 'invalid' ) : 'failed', $texts[ $child->get_error_code() ] ?? __( 'Email lite could not be set up.', 'beltoft-services' ) );
+			return $this->error( 'exists' === $child->get_error_code() ? 'exists' : ( in_array( $child->get_error_code(), array( 'bad_domain', 'no_domain', 'not_own_domain' ), true ) ? 'invalid' : 'failed' ), $texts[ $child->get_error_code() ] ?? __( 'Email lite could not be set up.', 'beltoft-services' ) );
 		}
 
 		return array( 'mail_resource' => $child->id(), 'domain' => (string) $child->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );

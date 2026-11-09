@@ -28,7 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
- * - POST   hosting/mail                    domain: sets up Email lite
+ * - POST   hosting/mail                    domain (optional, must be the account's own domain): sets up Email lite
  * - GET    hosting/usage                   stats, database size, storage share
  * - GET    hosting/backups                 the backups, the safety point
  * - POST   hosting/backups                 back up now (3 a day)
@@ -135,7 +135,7 @@ final class HostingRoutes {
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'enable_mail' ),
 			'permission_callback' => 'is_user_logged_in',
-			'args'                => $id + array( 'domain' => array( 'type' => 'string', 'required' => true, 'description' => 'The mail domain.' ) ),
+			'args'                => $id + array( 'domain' => array( 'type' => 'string', 'required' => false, 'default' => '', 'description' => 'The mail domain. Email lite is on the account\'s own domain; leave empty to use it.' ) ),
 		) );
 	}
 

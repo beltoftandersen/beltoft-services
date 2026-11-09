@@ -317,6 +317,32 @@ class AccountTest extends HostingCase {
 		$this->assertTrue( is_array( $a->purge_cache( $slug ) ), 'A later try is a new job.' );
 	}
 
+	public function test_zero_websites_in_the_plan_means_unlimited(): void {
+		$r = $this->account( array( 'sites' => 0 ) );
+		$a = new HostingActions( $r );
+
+		for ( $i = 1; $i <= 6; $i++ ) {
+			$this->assertIsArray( $a->add_site( 'site' . $i, '', '', false ), 'site' . $i );
+		}
+
+		$this->assertSame( 0, $a->limits()['sites'] );
+		$this->assertCount( 7, \BeltoftServices\Hosting\Sites::for_resource( $r->id() ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$html = (string) ob_get_clean();
+		wp_set_current_user( 0 );
+		$this->assertStringContainsString( '7 websites. Unlimited websites and subdomains.', $html );
+		$this->assertStringContainsString( 'data-hosting-action="add_site"', $html );
+	}
+
+	public function test_a_positive_website_count_still_limits(): void {
+		$r = $this->account( array( 'sites' => 1 ) );
+
+		$this->assertSame( 'limit', ( new HostingActions( $r ) )->add_site( 'two' )->get_error_code() );
+		$this->assertSame( 1, ( new HostingActions( $r ) )->limits()['sites'] );
+	}
+
 	public function test_nothing_can_change_unless_the_account_is_ready(): void {
 		$r = $this->account();
 		$r->set( array( 'desired' => 'paused' ) );
@@ -332,6 +358,7 @@ class AccountTest extends HostingCase {
 	public function test_email_lite_shows_included_with_the_hosting_product(): void {
 		$r     = $this->account();
 		$a     = new HostingActions( $r );
+		$this->connect_domain( $r, 'mine.example' );
 		$added = $a->enable_mail( 'Mine.Example' );
 
 		$this->assertSame( 'mine.example', $added['domain'] );
@@ -360,9 +387,10 @@ class AccountTest extends HostingCase {
 		$this->assertStringContainsString( 'www.outside.example (waiting for DNS)', $html );
 		$this->assertStringContainsString( 'Blog (blog)', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
-		$this->assertStringContainsString( 'so your websites can send mail', $html );
+		$this->assertStringContainsString( 'Connect your own domain to a website to set up Email lite', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 
+		$this->connect_domain( $r, 'mine.example' );
 		$a->enable_mail( 'mine.example' );
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
@@ -398,6 +426,7 @@ class AccountTest extends HostingCase {
 		$this->assertSame( 200, $this->call( 'DELETE', $id . '/hosting/domains/www.outside.example', $user )->get_status() );
 		$this->assertSame( 422, $this->call( 'DELETE', $id . '/hosting/sites/blog', $user, array( 'confirm' => 'wrong' ) )->get_status() );
 		$this->assertSame( 200, $this->call( 'DELETE', $id . '/hosting/sites/blog', $user, array( 'confirm' => 'blog' ) )->get_status() );
+		$this->connect_domain( Resource::find( (int) $r->id() ), 'mine.example' );
 		$this->assertSame( 201, $this->call( 'POST', $id . '/hosting/mail', $user, array( 'domain' => 'mine.example' ) )->get_status() );
 
 		$stranger = self::factory()->user->create();

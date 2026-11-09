@@ -76,7 +76,7 @@
 			case 'add_domain':
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
 			case 'enable_mail':
-				return '' === field( panel, 'mail_domain' ) ? null : [ 'POST', base + '/mail', { domain: field( panel, 'mail_domain' ) } ];
+				return [ 'POST', base + '/mail', { domain: field( panel, 'mail_domain' ) } ];
 			case 'backup_now':
 				return [ 'POST', base + '/backups', {} ];
 			case 'restore':

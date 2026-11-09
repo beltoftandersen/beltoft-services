@@ -146,13 +146,20 @@ final class HostingAccount {
 		printf(
 			'<p>%s</p>',
 			esc_html(
-				sprintf(
-					/* translators: 1: websites used, 2: websites allowed, 3: PHP workers allowed. */
-					__( '%1$d of %2$d websites. Up to %3$d PHP workers for all websites together.', 'beltoft-services' ),
-					$limits['sites_used'],
-					$limits['sites'],
-					$limits['php_workers']
-				)
+				0 === $limits['sites']
+					? sprintf(
+						/* translators: 1: websites in the account, 2: PHP workers allowed. */
+						_n( '%1$d website. Unlimited websites and subdomains. Up to %2$d PHP workers for all websites together.', '%1$d websites. Unlimited websites and subdomains. Up to %2$d PHP workers for all websites together.', $limits['sites_used'], 'beltoft-services' ),
+						$limits['sites_used'],
+						$limits['php_workers']
+					)
+					: sprintf(
+						/* translators: 1: websites used, 2: websites allowed, 3: PHP workers allowed. */
+						__( '%1$d of %2$d websites. Up to %3$d PHP workers for all websites together.', 'beltoft-services' ),
+						$limits['sites_used'],
+						$limits['sites'],
+						$limits['php_workers']
+					)
 			)
 		);
 
@@ -236,12 +243,29 @@ final class HostingAccount {
 		echo '<p>';
 
 		if ( $mail ) {
-			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) );
+			$mail_domain = (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN );
+
+			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), $mail_domain ) );
+			echo ' ' . esc_html(
+				sprintf(
+					/* translators: %s: the mail domain. */
+					__( 'Email lite stays on %s. It does not move when the main domain changes.', 'beltoft-services' ),
+					$mail_domain
+				)
+			);
+		} elseif ( null === LiteMail::own_domain( $r ) ) {
+			echo esc_html__( 'Connect your own domain to a website to set up Email lite. It is included with your plan and uses that domain.', 'beltoft-services' );
 		} else {
-			echo esc_html__( 'Set up Email lite so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' );
+			echo esc_html(
+				sprintf(
+					/* translators: %s: the account's own domain. */
+					__( 'Set up Email lite on %s so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' ),
+					(string) LiteMail::own_domain( $r )
+				)
+			);
 
 			if ( $ready ) {
-				echo ' <input type="text" data-hosting-field="mail_domain" placeholder="example.com" aria-label="' . esc_attr__( 'Domain for email', 'beltoft-services' ) . '"> <button type="button" data-hosting-action="enable_mail">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</button>';
+				echo ' <button type="button" data-hosting-action="enable_mail">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</button>';
 			}
 		}
 
@@ -331,7 +355,7 @@ final class HostingAccount {
 	private static function print_forms( array $limits, array $sites ): void {
 		echo '<div class="beltoft-hosting-add">';
 
-		if ( $limits['sites_used'] < $limits['sites'] ) {
+		if ( 0 === $limits['sites'] || $limits['sites_used'] < $limits['sites'] ) {
 			echo '<p><input type="text" data-hosting-field="slug" maxlength="32" placeholder="' . esc_attr__( 'Website name', 'beltoft-services' ) . '" aria-label="' . esc_attr__( 'Website name', 'beltoft-services' ) . '"> ';
 			echo '<select data-hosting-field="php" aria-label="' . esc_attr__( 'PHP version', 'beltoft-services' ) . '">';
 

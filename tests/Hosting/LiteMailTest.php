@@ -95,7 +95,7 @@ class LiteMailTest extends HostingCase {
 	public function test_enable_makes_a_linked_mail_child_with_the_plan_limits(): void {
 		$parent = $this->account();
 
-		$child = LiteMail::enable( $parent, 'Customer.Example' );
+		$child = $this->lite( $parent, 'Customer.Example' );
 
 		$this->assertInstanceOf( Resource::class, $child );
 		$this->assertSame( 'mail', $child->get( 'driver' ) );
@@ -116,23 +116,78 @@ class LiteMailTest extends HostingCase {
 		$this->assertSame( array( 'value' => 60, 'frame' => 'm' ), $domain['rl'], 'The plan limit, not the global 30.' );
 	}
 
+	public function test_email_lite_follows_the_accounts_own_domain_never_the_preview_address(): void {
+		$parent = $this->account();
+		$slug   = 'w' . $parent->id();
+
+		// Only the preview address: no own domain, so nothing is offered or made.
+		$this->assertNull( LiteMail::own_domain( $parent ) );
+		$preview = $slug . '.preview.example.test';
+		$this->assertSame( 'no_domain', LiteMail::enable( $parent, $preview )->get_error_code() );
+		$this->assertSame( 'no_domain', LiteMail::enable( $parent, '' )->get_error_code() );
+
+		// An outside name that is still waiting is not connected yet.
+		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, 'waiting.example', 'external' );
+		$this->assertNull( LiteMail::own_domain( $parent ) );
+
+		// The own domain, found after the preview row; another domain and the preview address are refused.
+		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, $preview, 'preview' );
+		\BeltoftServices\Hosting\SiteDomains::set_state( $preview, 'active' );
+		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, 'main.example', 'ours' );
+		\BeltoftServices\Hosting\SiteDomains::set_state( 'main.example', 'active' );
+		$this->assertSame( 'main.example', LiteMail::own_domain( $parent ) );
+		$this->assertSame( 'not_own_domain', LiteMail::enable( $parent, $preview )->get_error_code() );
+		$this->assertSame( 'not_own_domain', LiteMail::enable( $parent, 'other.example' )->get_error_code() );
+
+		$child = LiteMail::enable( $parent, '' );
+		$this->assertInstanceOf( Resource::class, $child, 'Empty means the account\'s own domain.' );
+		$this->assertSame( 'main.example', $child->get( MailDomain::META_DOMAIN ) );
+		$this->assertSame( 1, (int) ( $child->get( 'plan' )['domains'] ?? 0 ), 'One mail domain, no multi-domain.' );
+
+		// The main domain changes later: Email lite stays on its first domain, and the page says so.
+		\BeltoftServices\Hosting\SiteDomains::remove( 'main.example' );
+		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, 'new.example', 'ours' );
+		\BeltoftServices\Hosting\SiteDomains::set_state( 'new.example', 'active' );
+		ob_start();
+		\BeltoftServices\Hosting\HostingAccount::render( Resource::find( $parent->id() ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Email lite stays on main.example. It does not move when the main domain changes.', $html );
+	}
+
+	public function test_the_account_page_offers_email_lite_only_with_a_connected_domain(): void {
+		$parent = $this->account();
+		ob_start();
+		\BeltoftServices\Hosting\HostingAccount::render( $parent );
+		$none = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'data-hosting-action="enable_mail"', $none );
+
+		$this->connect_domain( $parent, 'offer.example' );
+		ob_start();
+		\BeltoftServices\Hosting\HostingAccount::render( Resource::find( $parent->id() ) );
+		$with = (string) ob_get_clean();
+		$this->assertStringContainsString( 'data-hosting-action="enable_mail"', $with );
+		$this->assertStringContainsString( 'Set up Email lite on offer.example', $with );
+	}
+
 	public function test_the_hosting_account_is_ready_without_email_and_enable_has_rules(): void {
 		$parent = $this->account();
 		$this->assertSame( array(), Children::of( $parent ) );
 
+		$this->assertSame( 'no_domain', LiteMail::enable( $parent, 'a.example' )->get_error_code(), 'No own domain connected yet.' );
+		$this->connect_domain( $parent, 'own.example' );
 		$this->assertSame( 'bad_domain', LiteMail::enable( $parent, 'not a domain' )->get_error_code() );
-		$this->assertSame( 'no_mail', LiteMail::enable( $this->account( array( 'mail_mailboxes' => 0 ) ), 'a.example' )->get_error_code() );
+		$this->assertSame( 'no_mail', $this->lite( $this->account( array( 'mail_mailboxes' => 0 ) ), 'a.example' )->get_error_code() );
 
 		$unbuilt = $this->resource();
-		$this->assertSame( 'not_hosting', LiteMail::enable( $unbuilt, 'b.example' )->get_error_code(), 'No container yet.' );
+		$this->assertSame( 'not_hosting', $this->lite( $unbuilt, 'b.example' )->get_error_code(), 'No container yet.' );
 
-		$this->assertInstanceOf( Resource::class, LiteMail::enable( $parent, 'one.example' ) );
-		$this->assertSame( 'exists', LiteMail::enable( $parent, 'two.example' )->get_error_code(), 'One Email lite domain per account.' );
+		$this->assertInstanceOf( Resource::class, $this->lite( $parent, 'own.example' ) );
+		$this->assertSame( 'exists', $this->lite( $parent, 'two.example' )->get_error_code(), 'One Email lite domain per account.' );
 	}
 
 	public function test_the_child_follows_the_parent_through_pause_resume_and_delete(): void {
 		$parent = $this->account();
-		$child  = $this->make_ready( LiteMail::enable( $parent, 'follow.example' ) );
+		$child  = $this->make_ready( $this->lite( $parent, 'follow.example' ) );
 
 		Reconciler::notify( Resource::find( $parent->id() ), 'ready', 'paused' );
 		$paused = Resource::find( $child->id() );
@@ -150,7 +205,7 @@ class LiteMailTest extends HostingCase {
 
 	public function test_a_child_paused_for_its_own_reason_is_not_resumed_by_the_parent(): void {
 		$parent = $this->account();
-		$child  = $this->make_ready( LiteMail::enable( $parent, 'own.example' ) );
+		$child  = $this->make_ready( $this->lite( $parent, 'own.example' ) );
 		$child->desire( 'paused', 'The customer paused it' );
 
 		Reconciler::notify( Resource::find( $parent->id() ), 'paused', 'ready' );
@@ -166,14 +221,14 @@ class LiteMailTest extends HostingCase {
 		Children::follow( 'not a resource', 'a', 'b' );
 		$this->assertSame( array(), Children::of( $parent ) );
 
-		$child = LiteMail::enable( $parent, 'stray.example' );
+		$child = $this->lite( $parent, 'stray.example' );
 		$child->set( array( Children::PARENT => 999999 ) );
 		$this->assertSame( array(), Children::of( Resource::find( $parent->id() ) ), 'A child that points elsewhere is not followed.' );
 	}
 
 	public function test_a_deleted_parent_runs_the_child_delete_through_the_mail_driver(): void {
 		$parent = $this->account();
-		$child  = $this->make_ready( LiteMail::enable( $parent, 'bye.example' ) );
+		$child  = $this->make_ready( $this->lite( $parent, 'bye.example' ) );
 		$this->assertNotNull( $this->mailcow->domain( 'bye.example' ) );
 
 		Reconciler::notify( Resource::find( $parent->id() ), 'deleting', 'deleted' );
@@ -189,7 +244,7 @@ class LiteMailTest extends HostingCase {
 		$this->assertSame( array( 500, 'd' ), MailSettings::rate_limit() );
 
 		$parent = $this->account();
-		$child  = LiteMail::enable( $parent, 'limits.example' );
+		$child  = $this->lite( $parent, 'limits.example' );
 
 		$this->assertSame( array( 60, 'm' ), MailSettings::domain_rate_limit( $child ) );
 		$this->assertSame( array( 500, 'd' ), MailSettings::rate_limit( $child ), 'A key that is not set leaves the global value.' );
@@ -208,7 +263,7 @@ class LiteMailTest extends HostingCase {
 
 	public function test_a_mailbox_of_the_child_gets_the_child_day_limit(): void {
 		$parent = $this->account();
-		$child  = LiteMail::enable( $parent, 'boxes.example' );
+		$child  = $this->lite( $parent, 'boxes.example' );
 		$child->set( array( 'mail_rl' => array( 'minute' => 60, 'day' => 250 ) ) );
 		$child = $this->make_ready( Resource::find( $child->id() ) );
 

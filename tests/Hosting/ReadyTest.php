@@ -180,6 +180,7 @@ class ReadyTest extends HostingCase {
 
 		$a = new HostingActions( $r );
 		$a->add_domain( 'w' . $r->id(), 'www.elsewhere.example' );
+		$this->connect_domain( $r, 'elsewhere.example' );
 		$a->enable_mail( 'elsewhere.example' );
 		$this->assertSame( array( 'done' => 'build' ), $a->checklist( 'build' ) );
 		$a->checklist( 'build' );
@@ -230,6 +231,7 @@ class ReadyTest extends HostingCase {
 
 	public function test_the_panel_has_action_buttons_only_while_ready_and_the_script_is_enqueued(): void {
 		$r = $this->account();
+		$this->connect_domain( $r, 'ready.example' );
 
 		ob_start();
 		HostingAccount::render( $r );

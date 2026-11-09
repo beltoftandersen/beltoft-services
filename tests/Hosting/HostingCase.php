@@ -244,4 +244,34 @@ abstract class HostingCase extends TestCase {
 
 		return $cts[ (int) $record['vmid'] ];
 	}
+
+	/**
+	 * Gives an account an own domain (an active name in the customer's zone) when it has none, so Email lite can be
+	 * set up on it.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $host Domain.
+	 */
+	protected function connect_domain( Resource $r, string $host ): void {
+		if ( null !== \BeltoftServices\Hosting\LiteMail::own_domain( $r ) ) {
+			return;
+		}
+
+		$site = \BeltoftServices\Hosting\Sites::for_resource( $r->id() )[0]['id'] ?? 0;
+		\BeltoftServices\Hosting\SiteDomains::add( $r->id(), (int) $site, strtolower( $host ), 'ours' );
+		\BeltoftServices\Hosting\SiteDomains::set_state( strtolower( $host ), 'active' );
+	}
+
+	/**
+	 * Email lite on the account's own domain, connecting the domain first when needed.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $host Domain.
+	 * @return Resource|\WP_Error
+	 */
+	protected function lite( Resource $r, string $host ) {
+		$this->connect_domain( $r, $host );
+
+		return \BeltoftServices\Hosting\LiteMail::enable( Resource::find( $r->id() ) ?? $r, $host );
+	}
 }
