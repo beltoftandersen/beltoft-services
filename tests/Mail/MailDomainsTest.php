@@ -371,4 +371,52 @@ final class MailDomainsTest extends MailTestCase {
 		$this->assertSame( 1, preg_match( "/register \. '#([A-Za-z0-9_-]+)'/", $source, $m ), 'The template has a default fragment.' );
 		$this->assertStringContainsString( 'id="' . $m[1] . '"', $default );
 	}
+
+	public function test_a_domain_that_finds_its_plan_busy_joins_on_one_scheduled_retry(): void {
+		global $wpdb;
+		$user = self::factory()->user->create();
+		$root = $this->ready_mail( 'root.example', array(), $user );
+		list( $r, $order ) = $this->bought_domain( $user, 'late.example', 'register', $root->id() );
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $root->id() ) ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		$this->ready_event( $r );
+		$this->ready_event( $r );
+		$this->assertSame( '', (string) Resource::find( $r->id() )->get( MailDomains::ATTACH_DONE ), 'Not final: the plan was only busy.' );
+		$this->assertCount( 1, MailPlan::members( $root ) );
+		$when = as_next_scheduled_action( MailDomains::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
+		$this->assertNotFalse( $when, 'One retry is scheduled.' );
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => MailDomains::RETRY_HOOK, 'args' => array( $r->id() ), 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
+
+		$other->close();
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		MailDomains::retry( $r->id() );
+
+		$this->assertSame( 'joined', Resource::find( $r->id() )->get( MailDomains::ATTACH_DONE ) );
+		$this->assertCount( 2, MailPlan::members( $root ) );
+		unset( $order );
+	}
+
+	public function test_a_plan_that_stays_busy_past_the_window_is_given_up(): void {
+		$user = self::factory()->user->create();
+		$root = $this->ready_mail( 'root.example', array(), $user );
+		list( $r, $order ) = $this->bought_domain( $user, 'late.example', 'register', $root->id() );
+		$r->set( array( MailDomains::ATTACH_UNTIL => time() - 10 ) );
+
+		// Busy again, but the window is over.
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		global $wpdb;
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		$other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $root->id() ) ) );
+		MailDomains::retry( $r->id() );
+		$other->close();
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$this->assertSame( 'refused', Resource::find( $r->id() )->get( MailDomains::ATTACH_DONE ) );
+		$this->assertFalse( as_next_scheduled_action( MailDomains::RETRY_HOOK, array( $r->id() ), 'beltoft-services' ) );
+		unset( $order );
+	}
 }

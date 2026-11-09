@@ -27,11 +27,18 @@ final class MailDomains {
 	/** Resource meta of a domain: set once it joined (or was refused), so a later ready does not try again. */
 	public const ATTACH_DONE = 'mail_attach_done';
 
+	/** A plan that was busy is asked again after this many seconds, until the window after the first try is over. */
+	public const RETRY_HOOK   = 'beltoft_services_mail_attach_retry';
+	public const ATTACH_UNTIL = 'mail_attach_until';
+	public const RETRY_AFTER  = 300;
+	public const RETRY_WINDOW = 7 * DAY_IN_SECONDS;
+
 	/**
 	 * Listens for a registered or transferred domain becoming ready.
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
+		add_action( self::RETRY_HOOK, array( __CLASS__, 'retry' ) );
 		add_filter( 'beltoft_services_domain_cart_attach', array( __CLASS__, 'cart_attach' ), 10, 3 );
 	}
 
@@ -112,6 +119,28 @@ final class MailDomains {
 			return;
 		}
 
+		self::attempt( $r );
+	}
+
+	/**
+	 * Action beltoft_services_mail_attach_retry: the plan was busy when the domain became ready, so it is asked again.
+	 *
+	 * @param mixed $id Domain resource id.
+	 */
+	public static function retry( $id ): void {
+		$r = Resource::find( (int) $id );
+
+		if ( $r && 'domain' === $r->get( 'driver' ) && 'ready' === (string) $r->get( 'state' ) ) {
+			self::attempt( $r );
+		}
+	}
+
+	/**
+	 * Joins a ready domain bought for a plan to that plan (once; a busy plan is asked again, for a week).
+	 *
+	 * @param Resource $r Domain resource.
+	 */
+	private static function attempt( Resource $r ): void {
 		// Read fresh: another run of the same event may have finished already.
 		$r = Resource::find( $r->id() ) ?? $r;
 
@@ -143,12 +172,31 @@ final class MailDomains {
 
 		$why = is_string( $root ) ? $root : ( is_wp_error( $added ) ? $added->get_error_code() : 'unknown' );
 
-		// A busy plan can be tried again at the next ready; anything else is final.
-		if ( ! ( is_wp_error( $added ) && in_array( $added->get_error_code(), array( 'busy', 'not_ready' ), true ) ) ) {
+		// A busy plan is asked again a little later (a domain reaches ready once); anything else is final.
+		$first = true;
+
+		if ( is_wp_error( $added ) && in_array( $added->get_error_code(), array( 'busy', 'not_ready' ), true ) ) {
+			$until = (int) $r->get( self::ATTACH_UNTIL );
+			$first = 0 === $until;
+
+			if ( $first ) {
+				$until = time() + self::RETRY_WINDOW;
+				$r->set( array( self::ATTACH_UNTIL => $until ) );
+			}
+
+			if ( time() + self::RETRY_AFTER <= $until && function_exists( 'as_schedule_single_action' ) ) {
+				if ( ! ( function_exists( 'as_has_scheduled_action' ) && as_has_scheduled_action( self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' ) ) ) {
+					as_schedule_single_action( time() + self::RETRY_AFTER, self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
+				}
+			} else {
+				$r->set( array( self::ATTACH_DONE => 'refused' ) );
+				$first = true;
+			}
+		} else {
 			$r->set( array( self::ATTACH_DONE => 'refused' ) );
 		}
 
-		$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
+		$order = $first ? wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) ) : null;
 
 		if ( $order ) {
 			$order->add_order_note( sprintf( 'The domain %1$s was not added to the email plan: %2$s.', $name, $why ) );
