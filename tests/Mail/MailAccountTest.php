@@ -370,6 +370,10 @@ final class MailAccountTest extends MailTestCase {
 			$this->assertStringNotContainsString( "\u{2014}", $text, $file . ' has no em dash.' );
 		}
 
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/mail.css' );
+		$this->assertStringContainsString( 'summary::after', $css, 'The delete disclosure has no plus sign.' );
+		$this->assertStringContainsString( 'p.beltoft-services-panel__notice { margin: 16px 0; }', $css );
+
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/mail.js' );
 		$this->assertStringNotContainsString( 'localStorage', $js, 'A password is not stored in the browser.' );
 		$this->assertStringNotContainsString( 'sessionStorage', $js );

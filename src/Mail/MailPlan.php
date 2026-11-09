@@ -274,6 +274,6 @@ final class MailPlan {
 			}
 		}
 
-		return null === $best ? '' : \BeltoftServices\Proxmox\Backups::switch_to( $root, $best['variation'] );
+		return null === $best ? '' : \BeltoftServices\SwitchLink::to( $root, $best['variation'] );
 	}
 }

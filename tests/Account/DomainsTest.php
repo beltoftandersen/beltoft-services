@@ -486,4 +486,22 @@ class DomainsTest extends TestCase {
 		}
 		$this->assertStringNotContainsString( 'beltoft-dns-claim__error', $this->render( array(), 'add' ) );
 	}
+
+	public function test_a_domain_that_is_not_registered_shows_no_registered_or_renewal_wording(): void {
+		$failed = $this->service( $this->user, 'notyet.example', 'domain', array( 'expires_at' => '2027-11-02 00:00:00' ) );
+		$failed->set( array( 'state' => 'failed', 'steps' => array( 'owner', 'zone_prepared' ) ) );
+		$failed = Resource::find( $failed->id() );
+		$view   = $this->views( $failed )[0];
+		$row    = DomainRows::row( $view, $failed );
+
+		$this->assertSame( 'Domain registration', $row['sub'] );
+		$this->assertSame( '', $row['renews'] );
+		$this->assertSame( '', DomainRows::renewal( $failed ) );
+
+		$this->assertTrue( DomainRows::registered( $this->service( $this->user, 'there.example' ) ) );
+		$active = Resource::find( $failed->id() );
+		$active->set( array( 'steps' => array( 'owner', 'order', 'active' ) ) );
+		$this->assertTrue( DomainRows::registered( Resource::find( $failed->id() ) ) );
+		$this->assertSame( 'Registered and DNS with us', DomainRows::kind( Resource::find( $failed->id() ) ) );
+	}
 }
