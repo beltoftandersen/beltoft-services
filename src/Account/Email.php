@@ -112,7 +112,7 @@ final class Email extends ServiceArea {
 		foreach ( Licenses::where( 'user_id', $user_id ) as $license ) {
 			$r = Resource::for_license( (int) $license['id'] );
 
-			if ( $r && MailDriver::ID === $r->get( 'driver' ) && $r->accepts_actions() && 'ready' === (string) $r->get( 'desired' ) && MailPlan::root( $r )->id() === $r->id() && count( MailPlan::members( $r ) ) < MailPlan::limits( $r )['domains'] ) {
+			if ( $r && MailDriver::ID === $r->get( 'driver' ) && $r->accepts_actions() && 'ready' === (string) $r->get( 'desired' ) && MailPlan::root( $r )->id() === $r->id() && count( MailPlan::counted( $r ) ) < MailPlan::limits( $r )['domains'] ) {
 				return $r;
 			}
 		}

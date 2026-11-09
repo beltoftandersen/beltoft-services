@@ -151,6 +151,10 @@ final class Panel {
 			return \BeltoftServices\Mail\MailField::wait_text();
 		}
 
+		if ( $r && 'getting-ready' === self::group( $state ) && \BeltoftServices\Mail\MailField::waiting_for_proof( $r ) ) {
+			return \BeltoftServices\Mail\MailField::proof_text();
+		}
+
 		$app = $r ? \BeltoftServices\Proxmox\AppProgress::message( $r ) : '';
 
 		if ( '' !== $app ) {

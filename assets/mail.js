@@ -194,6 +194,13 @@
 			guarded( box, target, strings.creating, function ( h ) {
 				return call( box, 'POST', '/mail/mailboxes', body ).then( function ( result ) {
 					if ( ! result.ok ) {
+						// The plan is full: the page shows the way on (delete a mailbox, change plan), so the message is said once, on the bar.
+						if ( result.data && 'beltoft_services_mail_limit' === result.data.code ) {
+							S.fail( h, problem( result ) );
+
+							return redraw( box );
+						}
+
 						S.fail( h, problem( result ), localField );
 
 						return null;
@@ -318,6 +325,20 @@
 							S.fail( h, problem( result ) );
 						}
 					} );
+				} );
+			} );
+
+			return;
+		}
+
+		if ( target.hasAttribute( 'data-mail-proof-check' ) ) {
+			guarded( box, target, strings.checking, function ( h ) {
+				return call( box, 'POST', '/mail/proof/check' ).then( function ( result ) {
+					if ( result.ok ) {
+						fresh( box );
+					} else {
+						S.fail( h, problem( result ) );
+					}
 				} );
 			} );
 

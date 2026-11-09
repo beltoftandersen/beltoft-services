@@ -198,7 +198,8 @@ final class MailAccountTest extends MailTestCase {
 
 		$html = $this->page( Resource::find( $r->id() ) );
 
-		$this->assertStringContainsString( 'Your plan has no room for more mailboxes.', $html );
+		$this->assertStringContainsString( 'Your plan has no room for more mailboxes. Delete a mailbox or change to a larger plan.', $html );
+		$this->assertSame( 1, substr_count( $html, 'has no room for more mailboxes' ) );
 		$this->assertStringNotContainsString( 'data-mail-create-submit', $html );
 	}
 
@@ -491,6 +492,51 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( '3 of 3 domains', $html );
 		$this->assertStringContainsString( 'Your plan has no room for another domain.', $html );
 		$this->assertStringNotContainsString( 'data-mail-domain-add', $html );
+	}
+
+	public function test_the_mailbox_counter_is_plan_wide_and_the_form_follows_the_plan_not_the_domain(): void {
+		$root = $this->ready_mail( 'wide.example', array( 'mailboxes' => 3 ), $this->user );
+		$kid  = $this->child_of( $root, 'wide-two.example' );
+		Mailboxes::create( Resource::find( $root->id() ), 'a' );
+		Mailboxes::create( Resource::find( $root->id() ), 'b' );
+		Mailboxes::create( Resource::find( $kid->id() ), 'c' );
+
+		$html = $this->page( Resource::find( $kid->id() ) );
+		$this->assertStringContainsString( '3 of 3 mailboxes in your plan', $html );
+		$this->assertStringContainsString( 'On this domain', $html );
+		$this->assertStringNotContainsString( 'data-mail-create-submit', $html, 'One mailbox on this domain, but the plan is full.' );
+
+		$solo = $this->ready_mail( 'solo-box.example', array( 'mailboxes' => 5, 'domains' => 1 ), $this->user );
+		$html = $this->page( $solo );
+		$this->assertStringContainsString( '0 of 5 mailboxes in your plan', $html );
+		$this->assertStringNotContainsString( 'On this domain', $html );
+	}
+
+	public function test_a_domain_being_removed_is_gone_from_the_page_at_once(): void {
+		$root = $this->ready_mail( 'gone.example', array(), $this->user );
+		$this->child_of( $root, 'b-gone.example' );
+		$third = $this->child_of( $root, 'c-gone.example' );
+		$this->assertStringContainsString( '3 of 3 domains', $this->page( Resource::find( $root->id() ) ) );
+
+		$this->assertTrue( \BeltoftServices\Mail\MailDomains::remove( $third ) );
+		$html = $this->page( Resource::find( $root->id() ) );
+		$this->assertStringContainsString( '2 of 3 domains', $html );
+		$this->assertStringNotContainsString( 'c-gone.example', $html );
+		$this->assertStringContainsString( 'data-mail-domain-add', $html, 'There is room again.' );
+		$this->assertSame( 2, \BeltoftServices\Mail\MailPlan::used( Resource::find( $root->id() ) )['domains'] );
+	}
+
+	public function test_a_proof_wait_offers_check_now_and_the_files_use_the_route(): void {
+		$r = $this->mail_resource( 'proofbtn.example', array(), array(), $this->user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'We are waiting for the proof that the domain is yours.', $html );
+		$this->assertStringContainsString( 'data-mail-proof-check', $html );
+		$this->assertStringContainsString( '/mail/proof/check', (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail.js' ) );
+
+		$ready = $this->ready_mail( 'noproofbtn.example', array(), $this->user );
+		$this->assertStringNotContainsString( 'data-mail-proof-check', $this->page( $ready ) );
 	}
 
 	public function test_a_child_page_names_its_plan_and_offers_remove_only_without_mailboxes(): void {

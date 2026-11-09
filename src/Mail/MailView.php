@@ -98,10 +98,11 @@ final class MailView {
 	 */
 	private static function plan( Resource $r ): array {
 		$root    = MailPlan::root( $r );
-		$members = MailPlan::members( $root );
+		$members = MailPlan::counted( $root );
 
 		return array(
 			'used'       => MailPlan::cached( $root ),
+			'upgrade'    => MailPlan::larger_plan_url( $root ),
 			'limits'     => MailPlan::limits( $r ),
 			'domains'    => array_values( array_filter( array_map( array( MailGuard::class, 'domain' ), $members ) ) ),
 			'is_root'    => $root->id() === $r->id(),

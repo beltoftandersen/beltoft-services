@@ -326,8 +326,8 @@ final class Progress {
 		}
 
 		/**
-		 * What a service waits for at its current step, for the customer: an array with step_label, text, leave, note, hosts, link
-		 * and eta (any of them), or empty. The domain feature answers for a transfer.
+		 * What a service waits for at its current step, for the customer: an array with step_label, text, leave, note, hosts, link,
+		 * eta and no_eta (true: no time estimate; any of them), or empty. The domain feature answers for a transfer.
 		 *
 		 * @param array    $wait    Empty by default.
 		 * @param Resource $r       Resource.
@@ -335,7 +335,7 @@ final class Progress {
 		 * @param string   $current Key of the current step.
 		 */
 		$wait = 'build' === $kind && 'running' === $phase ? (array) apply_filters( 'beltoft_services_progress_wait', array(), $r, $driver, $current ) : array();
-		$wait = $wait + array( 'step_label' => '', 'text' => '', 'leave' => '', 'note' => '', 'hosts' => array(), 'link' => array(), 'eta' => '', 'steps' => array() );
+		$wait = $wait + array( 'step_label' => '', 'text' => '', 'leave' => '', 'note' => '', 'hosts' => array(), 'link' => array(), 'eta' => '', 'no_eta' => false, 'steps' => array() );
 
 		// A service may show its own list of steps for the customer instead of the driver's.
 		if ( $wait['steps'] ) {
@@ -360,7 +360,7 @@ final class Progress {
 			}
 		}
 
-		$minutes = '' === $kind || '' !== $wait['eta'] ? 0 : self::minutes( $kind, $driver );
+		$minutes = '' === $kind || '' !== $wait['eta'] || $wait['no_eta'] ? 0 : self::minutes( $kind, $driver );
 		$eta     = '' !== $wait['eta'] ? $wait['eta'] : ( $minutes ? sprintf(
 			/* translators: %d: minutes. */
 			_n( 'Usually about %d minute.', 'Usually about %d minutes.', $minutes, 'beltoft-services' ),
