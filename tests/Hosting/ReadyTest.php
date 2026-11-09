@@ -181,7 +181,7 @@ class ReadyTest extends HostingCase {
 		$a = new HostingActions( $r );
 		$a->add_domain( 'w' . $r->id(), 'www.elsewhere.example' );
 		$this->connect_domain( $r, 'elsewhere.example' );
-		$a->enable_mail( 'elsewhere.example' );
+		$a->enable_mail( 'www.elsewhere.example' );
 		$this->assertSame( array( 'done' => 'build' ), $a->checklist( 'build' ) );
 		$a->checklist( 'build' );
 		$this->assertSame( array( 'domain' => true, 'email' => true, 'build' => true, 'backups' => false ), HostingAccount::checklist( Resource::find( $r->id() ) ) );

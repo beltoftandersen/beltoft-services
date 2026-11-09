@@ -126,16 +126,21 @@ class LiteMailTest extends HostingCase {
 		$this->assertSame( 'no_domain', LiteMail::enable( $parent, $preview )->get_error_code() );
 		$this->assertSame( 'no_domain', LiteMail::enable( $parent, '' )->get_error_code() );
 
-		// An outside name that is still waiting is not connected yet.
+		// The main domain is the oldest non-preview name, whatever its state: a waiting outside name is not connected yet,
+		// and a younger active name does not take its place.
 		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, 'waiting.example', 'external' );
-		$this->assertNull( LiteMail::own_domain( $parent ) );
-
-		// The own domain, found after the preview row; another domain and the preview address are refused.
 		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, $preview, 'preview' );
 		\BeltoftServices\Hosting\SiteDomains::set_state( $preview, 'active' );
 		\BeltoftServices\Hosting\SiteDomains::add( $parent->id(), 0, 'main.example', 'ours' );
 		\BeltoftServices\Hosting\SiteDomains::set_state( 'main.example', 'active' );
+		$this->assertSame( 'waiting.example', LiteMail::own_domain( $parent ) );
+		$this->assertNull( LiteMail::ready_domain( $parent ) );
+		$this->assertSame( 'no_domain', LiteMail::enable( $parent, 'main.example' )->get_error_code(), 'Not offered until the main domain is active.' );
+
+		// Once the oldest name is gone, the next oldest is the main domain; the preview address and other names are refused.
+		\BeltoftServices\Hosting\SiteDomains::remove( 'waiting.example' );
 		$this->assertSame( 'main.example', LiteMail::own_domain( $parent ) );
+		$this->assertSame( 'main.example', LiteMail::ready_domain( $parent ) );
 		$this->assertSame( 'not_own_domain', LiteMail::enable( $parent, $preview )->get_error_code() );
 		$this->assertSame( 'not_own_domain', LiteMail::enable( $parent, 'other.example' )->get_error_code() );
 

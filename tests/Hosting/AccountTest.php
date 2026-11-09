@@ -391,7 +391,7 @@ class AccountTest extends HostingCase {
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 
 		$this->connect_domain( $r, 'mine.example' );
-		$a->enable_mail( 'mine.example' );
+		$a->enable_mail( '' );
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$this->assertStringContainsString( 'Included with Service', (string) ob_get_clean() );

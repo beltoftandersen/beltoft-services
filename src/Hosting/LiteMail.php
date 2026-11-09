@@ -31,19 +31,31 @@ defined( 'ABSPATH' ) || exit;
 final class LiteMail {
 
 	/**
-	 * The account's own domain: the oldest connected name that is not a temporary preview address. A name counts once
-	 * it is active (a domain in the customer's zone, or an outside domain proved and pointing at us). Null when none.
+	 * The account's own domain: the oldest name that is not a temporary preview address, in whatever state. The main
+	 * domain is anchored on that name; whether it is connected yet is a separate question (see ready_domain()).
 	 *
 	 * @param Resource $parent Hosting resource.
 	 */
 	public static function own_domain( Resource $parent ): ?string {
 		foreach ( SiteDomains::for_resource( $parent->id() ) as $row ) {
-			if ( 'preview' !== $row['kind'] && 'active' === $row['state'] ) {
+			if ( 'preview' !== $row['kind'] ) {
 				return MailDomain::normalise( $row['host'] );
 			}
 		}
 
 		return null;
+	}
+
+	/**
+	 * The own domain once it is connected (active), else null: Email lite is offered and set up only then.
+	 *
+	 * @param Resource $parent Hosting resource.
+	 */
+	public static function ready_domain( Resource $parent ): ?string {
+		$own = self::own_domain( $parent );
+		$row = null === $own ? null : SiteDomains::find( $own );
+
+		return null !== $row && 'active' === $row['state'] ? $own : null;
 	}
 
 	/**
@@ -66,7 +78,7 @@ final class LiteMail {
 			}
 		}
 
-		$own = self::own_domain( $parent );
+		$own = self::ready_domain( $parent );
 
 		if ( null === $own ) {
 			return new \WP_Error( 'no_domain', __( 'Connect your own domain to a website first. Email lite uses that domain.', 'beltoft-services' ) );

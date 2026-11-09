@@ -253,13 +253,15 @@ abstract class HostingCase extends TestCase {
 	 * @param string   $host Domain.
 	 */
 	protected function connect_domain( Resource $r, string $host ): void {
-		if ( null !== \BeltoftServices\Hosting\LiteMail::own_domain( $r ) ) {
-			return;
+		$own = \BeltoftServices\Hosting\LiteMail::own_domain( $r );
+
+		if ( null === $own ) {
+			$site = \BeltoftServices\Hosting\Sites::for_resource( $r->id() )[0]['id'] ?? 0;
+			\BeltoftServices\Hosting\SiteDomains::add( $r->id(), (int) $site, strtolower( $host ), 'ours' );
+			$own = strtolower( $host );
 		}
 
-		$site = \BeltoftServices\Hosting\Sites::for_resource( $r->id() )[0]['id'] ?? 0;
-		\BeltoftServices\Hosting\SiteDomains::add( $r->id(), (int) $site, strtolower( $host ), 'ours' );
-		\BeltoftServices\Hosting\SiteDomains::set_state( strtolower( $host ), 'active' );
+		\BeltoftServices\Hosting\SiteDomains::set_state( $own, 'active' );
 	}
 
 	/**

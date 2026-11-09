@@ -291,6 +291,11 @@ class DnsTest extends HostingCase {
 		$this->lookups( array( '203.0.113.50' ), array() );
 		$this->assertSame( 'waiting', SiteDns::check_external( $under, $node ), 'It still has to point at us.' );
 
+		// A preview name never makes its subdomains free.
+		$preview = 'w' . $r->id() . '.preview.example.test';
+		$this->assertFalse( SiteDns::under_verified_domain( $r->id(), 'deep.' . $preview ) );
+		$this->assertFalse( SiteDns::under_verified_domain( $r->id(), 'www.unrelated.example' ), 'No verified parent.' );
+
 		// Someone else's domain: no free pass, and a name another account holds is refused.
 		list( $other ) = $this->account();
 		$this->assertFalse( SiteDns::under_verified_domain( $other->id(), 'www.outside.example' ) );

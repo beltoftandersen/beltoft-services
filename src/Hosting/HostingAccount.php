@@ -253,14 +253,14 @@ final class HostingAccount {
 					$mail_domain
 				)
 			);
-		} elseif ( null === LiteMail::own_domain( $r ) ) {
+		} elseif ( null === LiteMail::ready_domain( $r ) ) {
 			echo esc_html__( 'Connect your own domain to a website to set up Email lite. It is included with your plan and uses that domain.', 'beltoft-services' );
 		} else {
 			echo esc_html(
 				sprintf(
 					/* translators: %s: the account's own domain. */
 					__( 'Set up Email lite on %s so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' ),
-					(string) LiteMail::own_domain( $r )
+					(string) LiteMail::ready_domain( $r )
 				)
 			);
 

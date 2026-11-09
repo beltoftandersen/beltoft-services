@@ -680,15 +680,16 @@ final class HostingActions {
 		$child = LiteMail::enable( $this->r, $domain );
 
 		if ( is_wp_error( $child ) ) {
-			$texts = array(
-				'exists'     => __( 'Your account has Email lite already.', 'beltoft-services' ),
-				'bad_domain' => __( 'That domain name is not valid.', 'beltoft-services' ),
-				'no_domain'  => __( 'Connect your own domain to a website first. Email lite uses that domain.', 'beltoft-services' ),
-				'not_own_domain' => __( 'Email lite uses the domain connected to your hosting account.', 'beltoft-services' ),
-				'no_mail'    => __( 'Your plan has no mailboxes.', 'beltoft-services' ),
+			$map   = array(
+				'exists'         => array( 'exists', __( 'Your account has Email lite already.', 'beltoft-services' ) ),
+				'bad_domain'     => array( 'invalid', __( 'That domain name is not valid.', 'beltoft-services' ) ),
+				'no_domain'      => array( 'invalid', __( 'Connect your own domain to a website first. Email lite uses that domain.', 'beltoft-services' ) ),
+				'not_own_domain' => array( 'invalid', __( 'Email lite uses the domain connected to your hosting account.', 'beltoft-services' ) ),
+				'no_mail'        => array( 'failed', __( 'Your plan has no mailboxes.', 'beltoft-services' ) ),
 			);
+			$known = $map[ $child->get_error_code() ] ?? array( 'failed', __( 'Email lite could not be set up.', 'beltoft-services' ) );
 
-			return $this->error( 'exists' === $child->get_error_code() ? 'exists' : ( in_array( $child->get_error_code(), array( 'bad_domain', 'no_domain', 'not_own_domain' ), true ) ? 'invalid' : 'failed' ), $texts[ $child->get_error_code() ] ?? __( 'Email lite could not be set up.', 'beltoft-services' ) );
+			return $this->error( $known[0], $known[1] );
 		}
 
 		return array( 'mail_resource' => $child->id(), 'domain' => (string) $child->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );
