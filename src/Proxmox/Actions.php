@@ -923,6 +923,7 @@ final class Actions {
 			return StepResult::retry( 0, 'reinstall: the request could not be stored' );
 		}
 
+		// Silent on purpose: no listener acts on provisioning (see Resource::transition()).
 		if ( ! $this->r->transition( 'provisioning', 'Reinstall started by the customer' ) ) {
 			return StepResult::retry( 0, 'reinstall: the state could not be stored' );
 		}

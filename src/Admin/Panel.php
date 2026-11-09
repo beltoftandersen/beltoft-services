@@ -372,6 +372,7 @@ final class Panel {
 					)
 				);
 
+				// Silent on purpose: the notify below follows the close (see Resource::transition()).
 				if ( ! $cleared || ! $r->transition( 'deleted', sprintf( 'Marked deleted by %s, without calling the service', $who ) ) ) {
 					return false;
 				}

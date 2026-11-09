@@ -195,6 +195,7 @@ final class SnapshotMeta {
 			return;
 		}
 		foreach ( self::for_server( $resource ) as $pack ) {
+			// Silent on purpose: the parent's own email covers the customer (see Resource::transition()).
 			if ( 'deleted' !== $pack->get( 'state' ) && $pack->transition( 'deleted', 'Parent server deleted; snapshot slots no longer available' ) ) {
 				$pack->close();
 				\BeltoftServices\Alerts::admin( $pack, 'The parent server was deleted while the snapshot slots subscription may still bill. Check subscription #' . (int) ( $pack->license()['subscription_id'] ?? 0 ) . '.' );

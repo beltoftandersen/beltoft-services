@@ -1086,6 +1086,15 @@ final class Resource {
 	/**
 	 * Moves to a state and writes a history event, only when the change was stored.
 	 *
+	 * This fires nothing: no beltoft_services_state_changed, so no email, cascade or secret wipe follows (see
+	 * ResourceTest::test_transition_fires_no_state_changed_action). Reconciler::move() is the path that tells
+	 * listeners (transition, then Reconciler::notify()). Direct callers stay silent on purpose, and
+	 * Structure\TransitionCallersTest lists them with the reason: Admin\Panel (forced delete; it calls
+	 * Reconciler::notify() itself after the transition and the close), Proxmox\AppLicence (announces
+	 * "cancelled" itself), Proxmox\DiskMeta (releases the disk capacity itself), Proxmox\SnapshotMeta (the
+	 * parent's own email covers the customer), Proxmox\RestoreSteps (a failed disk keeps its volume, so no
+	 * capacity release) and Proxmox\Actions (a reinstall to provisioning, which no listener acts on).
+	 *
 	 * @param string $state ready, paused, etc. (see STATES).
 	 * @param string $event What happened, for the history.
 	 * @return bool Whether it was stored.
