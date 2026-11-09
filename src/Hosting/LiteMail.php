@@ -136,6 +136,9 @@ final class LiteMail {
 		);
 
 		if ( is_wp_error( $child ) ) {
+			// No active license without a service.
+			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
+
 			return $child;
 		}
 
