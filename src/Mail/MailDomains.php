@@ -185,7 +185,7 @@ final class MailDomains {
 			}
 
 			if ( time() + self::RETRY_AFTER <= $until && function_exists( 'as_schedule_single_action' ) ) {
-				if ( ! ( function_exists( 'as_has_scheduled_action' ) && as_has_scheduled_action( self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' ) ) ) {
+				if ( ! \BeltoftServices\Jobs::pending_action( self::RETRY_HOOK, array( $r->id() ) ) ) {
 					as_schedule_single_action( time() + self::RETRY_AFTER, self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
 				}
 			} else {

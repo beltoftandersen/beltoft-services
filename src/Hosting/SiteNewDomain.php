@@ -141,7 +141,7 @@ final class SiteNewDomain {
 
 		// Busy or not ready yet: try again until the deadline, one pending retry at a time. Anything else is final.
 		if ( in_array( $code, array( 'busy', 'not_ready', 'no_site' ), true ) && function_exists( 'as_schedule_single_action' ) ) {
-			if ( time() + 600 <= (int) $r->get( self::META_UNTIL ) && ! ( function_exists( 'as_has_scheduled_action' ) && as_has_scheduled_action( self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' ) ) ) {
+			if ( time() + 600 <= (int) $r->get( self::META_UNTIL ) && ! \BeltoftServices\Jobs::pending_action( self::RETRY_HOOK, array( $r->id() ) ) ) {
 				as_schedule_single_action( time() + 600, self::RETRY_HOOK, array( $r->id() ), 'beltoft-services' );
 			}
 
