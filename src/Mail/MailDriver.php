@@ -496,7 +496,12 @@ final class MailDriver implements Driver, NeedsBilling {
 			}
 		}
 
-		\BeltoftServices\Hosting\MailPacks::reapply( $r );
+		/**
+		 * The domain's limits are now the plan's: whoever adds to them (extra storage packs) puts its part back.
+		 *
+		 * @param \BeltoftServices\Resource $r Email resource.
+		 */
+		do_action( 'beltoft_services_mail_limits_applied', $r );
 
 		return StepResult::done( array( 'mail_limits' => $next ), 'Email plan updated' );
 	}

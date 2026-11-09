@@ -53,8 +53,8 @@ final class Addons {
 	public const ACTIVATE_RETRY_HOOK = 'beltoft_services_addon_activate_retry';
 
 	/** Storage of one pack, MB, and the most packs one mailbox can have. */
-	public const PACK_MB   = 5120;
-	public const MAX_PACKS = 4;
+	public const PACK_MB   = \BeltoftServices\Mail\MailPacks::PACK_MB;
+	public const MAX_PACKS = \BeltoftServices\Mail\MailPacks::MAX_PACKS;
 
 	/**
 	 * True while the saved card is charged in buy(): a payment made then is answered to the page, which adds the domain.
@@ -977,6 +977,6 @@ final class Addons {
 	public static function apply( Resource $r ): bool {
 		$child = SiteMail::child_of( $r );
 
-		return $child ? MailPacks::apply( $child, self::packs( $r ) ) : true;
+		return $child ? \BeltoftServices\Mail\MailPacks::apply( $child, self::packs( $r ) ) : true;
 	}
 }
