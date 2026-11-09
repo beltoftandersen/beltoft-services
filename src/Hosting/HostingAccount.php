@@ -44,7 +44,7 @@ final class HostingAccount {
 		$handle = \BeltoftServices\Account\Panel::HANDLE;
 
 		self::style();
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/hosting.js', BELTOFT_SERVICES_FILE ), array( $handle, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/hosting.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/hosting.js', BELTOFT_SERVICES_FILE ), array( $handle, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/hosting.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftHosting',

@@ -19,6 +19,9 @@ final class Status {
 
 	public const HANDLE = 'beltoft-services-status';
 
+	/** The shared REST and copy helper (assets/api.js, window.beltoftApi). */
+	public const API_HANDLE = 'beltoft-services-api';
+
 	/**
 	 * Hooks.
 	 */
@@ -31,6 +34,7 @@ final class Status {
 	 */
 	public static function assets(): void {
 		wp_register_script( self::HANDLE, plugins_url( 'assets/status.js', BELTOFT_SERVICES_FILE ), array(), Assets::version( 'assets/status.js' ), true );
+		wp_register_script( self::API_HANDLE, plugins_url( 'assets/api.js', BELTOFT_SERVICES_FILE ), array(), Assets::version( 'assets/api.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftStatusConfig', array( 'strings' => self::strings() ) );
 
 		$account  = function_exists( 'is_account_page' ) && is_account_page();

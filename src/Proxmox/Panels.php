@@ -104,8 +104,8 @@ final class Panels {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
-		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status' ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
+		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
 		wp_enqueue_style( 'beltoft-services-metrics', plugins_url( 'assets/metrics.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.css' ) );
 		wp_localize_script( 'beltoft-services-metrics', 'beltoftServicesMetrics', array( 'strings' => array(
 			'loading' => __( 'Loading usage…', 'beltoft-services' ),

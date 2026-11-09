@@ -6,54 +6,23 @@
  * settles the page reloads to show the service's controls. Action buttons queue the action.
  * Uses the WordPress REST API with the wp_rest nonce, kept fresh from each response's
  * X-WP-Nonce header; after a queued action the button stays off for about ten seconds, then the page reloads; an Open link gets a fresh nonce from WordPress's rest-nonce action when it
- * is clicked, so a page left open for a day still works. No dependencies.
+ * is clicked, so a page left open for a day still works. Needs assets/api.js (window.beltoftApi).
  */
 ( function () {
 	'use strict';
 
 	var config = window.beltoftServicesAccount;
 
-	if ( ! config || ! window.fetch ) {
+	if ( ! config || ! window.fetch || ! window.beltoftApi ) {
 		return;
 	}
 
-	function remember( response ) {
-		var nonce = response.headers.get( 'X-WP-Nonce' );
-
-		if ( nonce ) {
-			config.nonce = nonce;
-		}
-
-		return response;
-	}
-
 	function request( method, path ) {
-		return window.fetch( config.root + path, {
-			method: method,
-			credentials: 'same-origin',
-			headers: {
-				'X-WP-Nonce': config.nonce,
-				'Content-Type': 'application/json'
-			},
-			body: 'POST' === method ? '{}' : undefined
-		} ).then( remember );
+		return window.beltoftApi.call( config.root + path, { method: method, body: 'POST' === method ? '{}' : undefined, holder: config } );
 	}
 
-	// Resolves to true when a 403 is WordPress refusing a stale nonce.
-	function expired( response ) {
-		if ( 403 !== response.status ) {
-			return Promise.resolve( false );
-		}
-
-		return response.json().then( function ( body ) {
-			return !! body && 'rest_cookie_invalid_nonce' === body.code;
-		}, function () {
-			return false;
-		} );
-	}
-
-	function retryAfter( response ) {
-		var seconds = parseInt( response.headers.get( 'Retry-After' ), 10 );
+	function retryAfter( result ) {
+		var seconds = parseInt( result.response.headers.get( 'Retry-After' ), 10 );
 
 		return ( isNaN( seconds ) ? 60 : Math.max( 1, seconds ) ) * 1000;
 	}
@@ -117,27 +86,27 @@
 		panel.beltoftActive = panel.beltoftActive || ( !! block && /^(queued|running)$/.test( block.getAttribute( 'data-phase' ) ) );
 		// Back on the page after a while: look at once.
 
-		request( 'GET', id ).then( function ( response ) {
-			if ( 429 === response.status ) {
+		request( 'GET', id ).then( function ( result ) {
+			if ( 429 === result.status ) {
 				later( function () {
 					if ( run === panel.beltoftRun ) {
 						poll( panel );
 					}
-				}, retryAfter( response ) );
+				}, retryAfter( result ) );
 				return null;
 			}
 
-			if ( response.ok ) {
-				return response.json();
+			if ( result.ok ) {
+				// A body that is not JSON ends the polling, as it always has.
+				return result.parsed ? result.data : null;
 			}
 
 			// Refused (paused, no longer active, or a stale session): stop asking.
-			return expired( response ).then( function ( stale ) {
-				if ( stale ) {
-					notice( panel, config.strings.expired );
-				}
-				return null;
-			} );
+			if ( result.expired ) {
+				notice( panel, config.strings.expired );
+			}
+
+			return null;
 		} ).then( function ( data ) {
 			var active;
 
@@ -178,8 +147,12 @@
 
 			rounds -= 1;
 
-			request( 'GET', id ).then( function ( response ) {
-				return response.ok ? response.json() : null;
+			request( 'GET', id ).then( function ( result ) {
+				if ( result.ok && ! result.parsed ) {
+					throw new Error( 'json' );
+				}
+
+				return result.ok ? result.data : null;
 			} ).then( function ( data ) {
 				if ( data && ! data.power_pending && ( data.state !== first || false === data.working ) ) {
 					window.location.reload();
@@ -208,27 +181,25 @@
 
 		handle = bs.busy( own[ action + 'Start' ] || config.strings.working, id, button );
 
-		request( 'POST', id + '/actions/' + encodeURIComponent( action ) ).then( function ( response ) {
-			if ( 202 === response.status ) {
+		request( 'POST', id + '/actions/' + encodeURIComponent( action ) ).then( function ( result ) {
+			var message;
+
+			if ( 202 === result.status ) {
 				// The bar keeps saying so, and the buttons stay locked, until the page reloads at the end.
 				panel.beltoftWork = handle;
 				settle( panel, 5 );
 				return;
 			}
 
-			return expired( response ).then( function ( stale ) {
-				var message;
+			if ( result.expired ) {
+				message = config.strings.expired;
+			} else if ( 429 === result.status ) {
+				message = config.strings.tooMany;
+			} else {
+				message = 403 === result.status ? config.strings.refused : config.strings.failed;
+			}
 
-				if ( stale ) {
-					message = config.strings.expired;
-				} else if ( 429 === response.status ) {
-					message = config.strings.tooMany;
-				} else {
-					message = 403 === response.status ? config.strings.refused : config.strings.failed;
-				}
-
-				bs.fail( handle, message );
-			} );
+			bs.fail( handle, message );
 		} ).catch( function () {
 			bs.fail( handle, config.strings.failed );
 		} );

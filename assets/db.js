@@ -8,7 +8,7 @@
 	var account = window.beltoftServicesAccount;
 	var db = window.beltoftServicesDb;
 
-	if ( ! account || ! db || ! window.fetch || ! window.beltoftStatus ) {
+	if ( ! account || ! db || ! window.fetch || ! window.beltoftApi || ! window.beltoftStatus ) {
 		return;
 	}
 
@@ -19,29 +19,12 @@
 	}
 
 	// The server's own refusal text is written for the customer; anything else gets a fixed line.
-	function refusal( response ) {
-		return response.json().then( function ( data ) {
-			return 429 === response.status ? db.strings.limit : ( data && data.message ? data.message : db.strings.failed );
-		}, function () {
-			return db.strings.failed;
-		} );
+	function refusal( reply ) {
+		return 429 === reply.status ? db.strings.limit : ( reply.data.message ? reply.data.message : db.strings.failed );
 	}
 
 	function post( panel, path, body ) {
-		return window.fetch( account.root + panel.getAttribute( 'data-resource' ) + path, {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
-			body: body
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
-			return response;
-		} );
+		return window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ) + path, { method: 'POST', body: body, holder: account } );
 	}
 
 	function reveal( box, panel, button ) {
@@ -52,33 +35,35 @@
 		}
 
 		h = S.busy( db.strings.revealing, scopeOf( panel ), button );
-		post( panel, '/db-reveal', '{}' ).then( function ( response ) {
-			if ( ! response.ok ) {
-				S.fail( h, 409 === response.status ? db.strings.gone : db.strings.failed );
-				button.disabled = 409 === response.status;
+		post( panel, '/db-reveal', {} ).then( function ( reply ) {
+			if ( ! reply.ok ) {
+				S.fail( h, 409 === reply.status ? db.strings.gone : db.strings.failed );
+				button.disabled = 409 === reply.status;
 
 				return null;
 			}
 
-			return response.json().then( function ( data ) {
-				if ( data && data.password ) {
-					var own = box.querySelector( '[data-db-password]' );
+			if ( ! reply.parsed ) {
+				throw new Error( 'json' );
+			}
 
-					Array.prototype.forEach.call( box.querySelectorAll( '[data-db-conn]' ), function ( code ) {
-						code.textContent = code.textContent.replace( 'PASSWORD', data.password );
-					} );
+			if ( reply.data.password ) {
+				var own = box.querySelector( '[data-db-password]' );
 
-					// The password on its own line too: inside a long connection line it is easy to miss.
-					if ( own ) {
-						own.querySelector( '[data-db-password-value]' ).textContent = data.password;
-						own.hidden = false;
-					}
-					S.done( h, db.strings.once );
-					button.hidden = true;
-				} else {
-					S.fail( h, db.strings.failed );
+				Array.prototype.forEach.call( box.querySelectorAll( '[data-db-conn]' ), function ( code ) {
+					code.textContent = code.textContent.replace( 'PASSWORD', reply.data.password );
+				} );
+
+				// The password on its own line too: inside a long connection line it is easy to miss.
+				if ( own ) {
+					own.querySelector( '[data-db-password-value]' ).textContent = reply.data.password;
+					own.hidden = false;
 				}
-			} );
+				S.done( h, db.strings.once );
+				button.hidden = true;
+			} else {
+				S.fail( h, db.strings.failed );
+			}
 		} ).catch( function () {
 			S.fail( h, db.strings.failed );
 		} );
@@ -96,8 +81,12 @@
 	// h: the handle of the request that is waited for; it stays busy (and the service locked) until the page is read again.
 	function waitForAction( panel, action, since, tries, after, h ) {
 		window.setTimeout( function () {
-			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
-				return response.ok ? response.json() : null;
+			window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ), { holder: account } ).then( function ( reply ) {
+				if ( reply.ok && ! reply.parsed ) {
+					throw new Error( 'json' );
+				}
+
+				return reply.ok ? reply.data : null;
 			} ).then( function ( data ) {
 				var last = data && data.last_result;
 
@@ -134,16 +123,14 @@
 		}
 
 		h = S.busy( text, scopeOf( panel ), button );
-		post( panel, path, body ).then( function ( response ) {
-			if ( 202 === response.status ) {
+		post( panel, path, body ).then( function ( reply ) {
+			if ( 202 === reply.status ) {
 				waitForAction( panel, action, since, 0, after, h );
 
 				return null;
 			}
 
-			return refusal( response ).then( function ( message ) {
-				S.fail( h, message, field );
-			} );
+			S.fail( h, refusal( reply ), field );
 		} ).catch( function () {
 			S.fail( h, db.strings.failed );
 		} );
@@ -199,36 +186,6 @@
 		run( panel, button, db.strings.restoring, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ), 'restore', undefined, input );
 	}
 
-	function copyText( text ) {
-		var area;
-
-		if ( window.navigator.clipboard && window.navigator.clipboard.writeText ) {
-			return window.navigator.clipboard.writeText( text );
-		}
-
-		return new Promise( function ( resolve, reject ) {
-			area = document.createElement( 'textarea' );
-			area.value = text;
-			area.setAttribute( 'readonly', '' );
-			area.style.position = 'fixed';
-			area.style.opacity = '0';
-			document.body.appendChild( area );
-			area.select();
-
-			try {
-				if ( document.execCommand( 'copy' ) ) {
-					resolve();
-				} else {
-					reject( new Error( 'copy' ) );
-				}
-			} catch ( e ) {
-				reject( e );
-			}
-
-			document.body.removeChild( area );
-		} );
-	}
-
 	// Copy: the text of the code block next to the button, read when it is clicked (it holds the password once that is shown).
 	function copy( box, button ) {
 		var code = button.parentNode ? button.parentNode.querySelector( 'code' ) : null;
@@ -238,7 +195,7 @@
 			return;
 		}
 
-		copyText( code.textContent ).then( function () {
+		window.beltoftApi.copy( code.textContent ).then( function () {
 			button.textContent = button.getAttribute( 'data-copied' ) || label;
 			window.setTimeout( function () {
 				button.textContent = label;
@@ -251,8 +208,12 @@
 	// Access tab: one change to the allow-list, then wait until it is applied.
 	function waitForAccess( panel, tries, h ) {
 		window.setTimeout( function () {
-			window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/db-access', { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
-				return response.ok ? response.json() : null;
+			window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ) + '/db-access', { holder: account } ).then( function ( reply ) {
+				if ( reply.ok && ! reply.parsed ) {
+					throw new Error( 'json' );
+				}
+
+				return reply.ok ? reply.data : null;
 			} ).then( function ( data ) {
 				if ( data && 'applying' !== data.state ) {
 					if ( 'failed' === data.state ) {
@@ -284,16 +245,14 @@
 		}
 
 		h = S.busy( db.strings.applying, scopeOf( panel ), button );
-		post( panel, '/db-access', JSON.stringify( body ) ).then( function ( response ) {
-			if ( response.status === 202 ) {
+		post( panel, '/db-access', body ).then( function ( reply ) {
+			if ( reply.status === 202 ) {
 				waitForAccess( panel, 0, h );
 
 				return null;
 			}
 
-			return refusal( response ).then( function ( message ) {
-				S.fail( h, message, field );
-			} );
+			S.fail( h, refusal( reply ), field );
 		} ).catch( function () {
 			S.fail( h, db.strings.failed );
 		} );

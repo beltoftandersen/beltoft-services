@@ -41,7 +41,7 @@ final class Panels {
 	 */
 	public static function assets(): void {
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/ssl.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/ssl.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/ssl.js', BELTOFT_SERVICES_FILE ), array( Panel::HANDLE, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/ssl.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/ssl.js', BELTOFT_SERVICES_FILE ), array( Panel::HANDLE, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/ssl.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesSsl',

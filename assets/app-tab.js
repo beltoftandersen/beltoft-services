@@ -10,7 +10,7 @@
 	var app = window.beltoftServicesApp;
 	var labels = { admin_user: 'user', admin_password: 'pass', root_email: 'email', root_password: 'pass', encryption_key: 'key', master_password: 'master' };
 
-	if ( ! account || ! app || ! window.fetch ) {
+	if ( ! account || ! app || ! window.fetch || ! window.beltoftApi ) {
 		return;
 	}
 
@@ -49,34 +49,25 @@
 		}
 
 		handle = bs.busy( app.strings.revealing, panel.getAttribute( 'data-resource' ), button );
-		window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/app-reveal', {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
-			body: '{}'
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
+		window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ) + '/app-reveal', { method: 'POST', body: {}, holder: account } ).then( function ( reply ) {
+			if ( ! reply.ok ) {
+				bs.fail( handle, 409 === reply.status ? app.strings.gone : app.strings.failed );
+				button.disabled = 409 === reply.status;
 
-			if ( nonce ) {
-				account.nonce = nonce;
+				return;
 			}
 
-			if ( ! response.ok ) {
-				bs.fail( handle, 409 === response.status ? app.strings.gone : app.strings.failed );
-				button.disabled = 409 === response.status;
-
-				return null;
+			if ( ! reply.parsed ) {
+				throw new Error( 'json' );
 			}
 
-			return response.json().then( function ( body ) {
-				if ( body && body.credentials ) {
-					show( box, body.credentials );
-					button.hidden = true;
-					bs.done( handle, app.strings.revealed );
-				} else {
-					bs.fail( handle, app.strings.failed );
-				}
-			} );
+			if ( reply.data.credentials ) {
+				show( box, reply.data.credentials );
+				button.hidden = true;
+				bs.done( handle, app.strings.revealed );
+			} else {
+				bs.fail( handle, app.strings.failed );
+			}
 		} ).catch( function () {
 			bs.fail( handle, app.strings.failed );
 		} );
@@ -84,8 +75,12 @@
 
 	function waitForRestart( box, button, panel, tries ) {
 		window.setTimeout( function () {
-			window.fetch( account.root + panel.getAttribute( 'data-resource' ), { credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce } } ).then( function ( response ) {
-				return response.ok ? response.json() : null;
+			window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ), { holder: account } ).then( function ( reply ) {
+				if ( reply.ok && ! reply.parsed ) {
+					throw new Error( 'json' );
+				}
+
+				return reply.ok ? reply.data : null;
 			} ).then( function ( data ) {
 				if ( data && 'failed' !== data.app_state && 'unknown' !== data.app_state ) {
 					window.location.reload();
@@ -112,18 +107,7 @@
 		}
 
 		handle = bs.busy( app.strings.retrying, panel.getAttribute( 'data-resource' ), button );
-		window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/actions/app_retry', {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
-			body: '{"args":{}}'
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
+		window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ) + '/actions/app_retry', { method: 'POST', body: { args: {} }, holder: account } ).then( function ( response ) {
 			if ( ! response.ok ) {
 				bs.fail( handle, 429 === response.status ? app.strings.limit : app.strings.failed );
 
