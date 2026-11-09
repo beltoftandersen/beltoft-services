@@ -201,6 +201,12 @@ final class Emails {
 		return 'transfer' === $r->get( 'mode' ) ? 'beltoft_services_domain_transferred' : 'beltoft_services_domain_registered';
 	}
 
+	/** Driver kinds whose setup a customer is told is delayed. */
+	public const DELAY_KINDS = array( 'vm', 'domain', 'dns', 'hosting' );
+
+	/** Failed attempts of a running setup after which the customer is told of a delay. */
+	public const DELAY_AFTER_ATTEMPTS = 2;
+
 	/**
 	 * Did setting the service up fail so that the customer is told of a delay? Only a server,
 	 * domain or DNS hosting (driver kind vm, domain or dns) whose provision ended failed; a
@@ -215,7 +221,24 @@ final class Emails {
 
 		$driver = Registry::get( $r->get( 'driver' ) );
 
-		return $driver && in_array( $driver->kind(), array( 'vm', 'domain', 'dns' ), true );
+		return $driver && in_array( $driver->kind(), self::DELAY_KINDS, true );
+	}
+
+	/**
+	 * Is the setup still running but has it already failed this many times in a row? The customer is told of a delay
+	 * from the second failed attempt (about six minutes after the start with the reconciler's backoff), not only when
+	 * the last attempt has failed hours later. Same kinds of service as delay_applies().
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function delay_running( Resource $r ): bool {
+		if ( ! $r->is_valid() || ! in_array( (string) $r->get( 'state' ), array( 'requested', 'provisioning' ), true ) || 'provision' !== $r->get( 'op' ) || (int) $r->get( 'attempts' ) < self::DELAY_AFTER_ATTEMPTS ) {
+			return false;
+		}
+
+		$driver = Registry::get( $r->get( 'driver' ) );
+
+		return $driver && in_array( $driver->kind(), self::DELAY_KINDS, true );
 	}
 
 	/**

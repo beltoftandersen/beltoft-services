@@ -88,6 +88,23 @@ final class HostingAccount {
 
 
 	/**
+	 * How a website is named to the customer: its title, with the website name after it when the customer chose that
+	 * name; a name made from the domain is internal and not shown.
+	 *
+	 * @param array<string, mixed> $site Site row.
+	 */
+	public static function site_name( array $site ): string {
+		$label = (string) $site['label'];
+		$name  = (string) $site['slug'];
+
+		if ( '' === $label || $label === $name ) {
+			return $name;
+		}
+
+		return SiteField::slug_is_made( $name, $label ) ? $label : $label . ' (' . $name . ')';
+	}
+
+	/**
 	 * "Included with <hosting product name>" for a mail resource that is a child of a hosting account, else ''.
 	 *
 	 * @param Resource $r Resource.
@@ -180,7 +197,7 @@ final class HostingAccount {
 
 			printf(
 				'<tr><td>%1$s</td><td>%2$s</td><td>%3$s</td>',
-				esc_html( '' !== $site['label'] ? $site['label'] . ' (' . $site['slug'] . ')' : $site['slug'] ),
+				esc_html( self::site_name( $site ) ),
 				esc_html( $site['php'] ),
 				esc_html( implode( ', ', $names ) )
 			);
@@ -419,7 +436,7 @@ final class HostingAccount {
 				echo '<select data-hosting-field="restore_slug" aria-label="' . esc_attr__( 'Website to restore', 'beltoft-services' ) . '">';
 
 				foreach ( $sites as $site ) {
-					echo '<option value="' . esc_attr( $site['slug'] ) . '">' . esc_html( $site['slug'] ) . '</option>';
+					echo '<option value="' . esc_attr( $site['slug'] ) . '">' . esc_html( self::site_name( $site ) ) . '</option>';
 				}
 
 				echo '</select> ';
@@ -459,7 +476,7 @@ final class HostingAccount {
 			echo '<p><select data-hosting-field="domain_slug" aria-label="' . esc_attr__( 'Website', 'beltoft-services' ) . '">';
 
 			foreach ( $sites as $site ) {
-				echo '<option value="' . esc_attr( $site['slug'] ) . '">' . esc_html( $site['slug'] ) . '</option>';
+				echo '<option value="' . esc_attr( $site['slug'] ) . '">' . esc_html( self::site_name( $site ) ) . '</option>';
 			}
 
 			echo '</select> <input type="text" data-hosting-field="host" placeholder="www.example.com" aria-label="' . esc_attr__( 'Domain name', 'beltoft-services' ) . '"> <button type="button" data-hosting-action="add_domain">' . esc_html__( 'Add domain', 'beltoft-services' ) . '</button></p>';

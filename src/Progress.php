@@ -376,7 +376,7 @@ final class Progress {
 			'current' => $current,
 			'minutes' => $minutes,
 			'eta'     => $eta,
-			'text'    => 'app' === $kind ? trim( AppProgress::line( $r ) . '. ' . $eta ) : ( '' !== $wait['text'] ? $wait['text'] : self::text( $kind, $phase, $marker, $eta, $driver ) ),
+			'text'    => 'app' === $kind ? trim( AppProgress::line( $r ) . '. ' . $eta ) : ( 'running' === $phase && 'build' === $kind && \BeltoftServices\Emails\Emails::delay_running( $r ) ? __( "There's a delay setting up your service. We're on it.", 'beltoft-services' ) : ( '' !== $wait['text'] ? $wait['text'] : self::text( $kind, $phase, $marker, $eta, $driver ) ) ),
 			'leave'   => in_array( $phase, array( 'queued', 'running' ), true ) ? ( '' !== $wait['leave'] ? $wait['leave'] : self::leave() ) : '',
 			'started' => self::started( $r, $kind, $marker ),
 			'note'    => $wait['note'],

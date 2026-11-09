@@ -463,6 +463,19 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( 'site_slug', SiteField::resolve( array( 'mode' => 'preview' ), 0 )->get_error_code() );
 	}
 
+	public function test_a_name_held_by_the_guest_session_stays_the_signed_in_customers_after_the_account_is_made(): void {
+		$guest = SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), 0 );
+		$this->assertSame( 'ux-shop-example-com', $guest['slug'] );
+
+		// The same checkout again, now as the new customer: the guest hold is not another person's.
+		$user = $this->factory()->user->create();
+		$this->assertSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $user )['slug'] );
+
+		// A hold of another signed-in customer still counts.
+		$other = $this->factory()->user->create();
+		$this->assertSame( 'ux-shop-example-com-2', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $other )['slug'] );
+	}
+
 	public function test_each_address_option_posts_its_own_inputs(): void {
 		$key = $this->in_cart( $this->product() );
 		$this->post( $key, array( 'mode' => 'own', 'host' => 'posted.example.com', 'slug' => 'ignored', 'slug_domain' => '' ) );

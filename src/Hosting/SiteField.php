@@ -335,24 +335,50 @@ final class SiteField {
 	}
 
 	/**
+	 * The name a domain gives before any number is added: example.com is example-com.
+	 *
+	 * @param string $domain Domain.
+	 */
+	public static function slug_base( string $domain ): string {
+		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
+		$base = trim( substr( $base, 0, 28 ), '-' );
+
+		return '' === $base ? 'site' : $base;
+	}
+
+	/**
+	 * Is the name one that was made from the website's title (a domain order), so the customer never chose it? Then it
+	 * is an internal name and the account page shows the title only.
+	 *
+	 * @param string $slug  Name of the site.
+	 * @param string $label Title of the site.
+	 */
+	public static function slug_is_made( string $slug, string $label ): bool {
+		if ( '' === $label ) {
+			return false;
+		}
+
+		$base = self::slug_base( $label );
+
+		return $slug === $base || 1 === preg_match( '/^' . preg_quote( $base, '/' ) . '-[0-9]{1,2}$/', $slug );
+	}
+
+	/**
 	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
-	 * first is used. The name is only the temporary address, so the customer is not asked for it.
+	 * first is used. The name is only the temporary address, so the customer is not asked for it. A hold left by the
+	 * same person as a guest (the cart session changes when the account is made at the checkout) does not count as
+	 * another person's, so the second pass of the checkout keeps the first name.
 	 *
 	 * @param string $domain Domain.
 	 * @param string $owner  Who holds the name (see owner()).
 	 */
 	private static function free_slug( string $domain, string $owner ): string {
-		$base = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) preg_replace( '/^www\./', '', $domain ) ) ), '-' );
-		$base = trim( substr( $base, 0, 28 ), '-' );
-
-		if ( '' === $base ) {
-			$base = 'site';
-		}
+		$base = self::slug_base( $domain );
 
 		for ( $n = 1; $n <= 50; $n++ ) {
 			$slug = 1 === $n ? $base : $base . '-' . $n;
 
-			if ( Sites::valid_slug( $slug ) && ! Sites::taken( $slug ) && Sites::reserve( $slug, $owner ) ) {
+			if ( Sites::valid_slug( $slug ) && ! Sites::taken( $slug ) && Sites::reserve( $slug, $owner, true ) ) {
 				return $slug;
 			}
 		}

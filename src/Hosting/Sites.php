@@ -110,9 +110,12 @@ final class Sites {
 	 *
 	 * @param string $slug  Slug.
 	 * @param string $owner Who holds it: the customer's id, or the cart's session id for a guest.
+	 * @param bool   $guest_yields A signed-in customer (owner u<id>) takes a name a guest holds. The cart's session id
+	 *                             changes when a guest's account is made at the checkout, so the guest hold may be the
+	 *                             same person's own.
 	 * @return bool True when the name is the owner's now.
 	 */
-	public static function reserve( string $slug, string $owner ): bool {
+	public static function reserve( string $slug, string $owner, bool $guest_yields = false ): bool {
 		$name = 'beltoft_services_slug_hold_' . substr( md5( $slug ), 0, 20 );
 		$now  = time();
 
@@ -124,7 +127,11 @@ final class Sites {
 		$held = get_option( $name );
 
 		if ( is_array( $held ) && (string) ( $held['o'] ?? '' ) !== $owner && (int) ( $held['t'] ?? 0 ) > $now ) {
-			return false;
+			$yields = $guest_yields && 0 === strpos( $owner, 'u' ) && 0 === strpos( (string) ( $held['o'] ?? '' ), 'g' );
+
+			if ( ! $yields ) {
+				return false;
+			}
 		}
 
 		update_option( $name, array( 'o' => $owner, 't' => $now + self::RESERVE_TTL ), false );

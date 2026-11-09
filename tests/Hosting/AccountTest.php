@@ -372,6 +372,36 @@ class AccountTest extends HostingCase {
 		$this->assertSame( $label, MailView::data( $child, array() )['included'] );
 	}
 
+	public function test_a_setup_that_keeps_failing_shows_the_delay_text_like_other_services(): void {
+		$r = $this->resource();
+		$r->set( array( 'state' => 'provisioning', 'desired' => 'ready', 'op' => 'provision', 'attempts' => 1, 'last_error' => 'site_create: nginx -t failed: secret detail' ) );
+		$r = Resource::find( $r->id() );
+
+		$early = \BeltoftServices\Progress::build( $r );
+		$this->assertStringContainsString( 'Usually about', $early['text'], 'One failed attempt is still normal.' );
+		$this->assertSame( 'Getting ready', \BeltoftServices\Account\Panel::label( 'provisioning', $r ) );
+
+		$r->set( array( 'attempts' => 2 ) );
+		$r = Resource::find( $r->id() );
+		$late = \BeltoftServices\Progress::build( $r );
+		$this->assertSame( "There's a delay setting up your service. We're on it.", $late['text'] );
+		$this->assertStringNotContainsString( 'Usually about', $late['text'] );
+		$this->assertSame( 'Delayed', \BeltoftServices\Account\Panel::label( 'provisioning', $r ) );
+		$this->assertSame( "There's a delay setting up your service. We're on it.", \BeltoftServices\Account\Panel::message( 'provisioning', $r ) );
+		$this->assertStringNotContainsString( 'secret', wp_json_encode( $late ) );
+
+		// The final failure after the last attempt reads the same.
+		$r->set( array( 'state' => 'failed', 'failed_op' => 'provision' ) );
+		$this->assertSame( 'Delayed', \BeltoftServices\Account\Panel::label( 'failed', Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_website_named_from_its_domain_shows_its_title_only(): void {
+		$this->assertSame( 'ux-shop.example.com', HostingAccount::site_name( array( 'label' => 'ux-shop.example.com', 'slug' => 'ux-shop-example-com-2' ) ) );
+		$this->assertSame( 'www.ux-shop.example.com', HostingAccount::site_name( array( 'label' => 'www.ux-shop.example.com', 'slug' => 'ux-shop-example-com' ) ) );
+		$this->assertSame( 'My shop (myshop)', HostingAccount::site_name( array( 'label' => 'My shop', 'slug' => 'myshop' ) ), 'A name the customer chose stays.' );
+		$this->assertSame( 'blog', HostingAccount::site_name( array( 'label' => '', 'slug' => 'blog' ) ) );
+	}
+
 	public function test_the_panel_lists_sites_names_and_the_email_line_escaped(): void {
 		$r = $this->account();
 		$a = new HostingActions( $r );
@@ -385,7 +415,7 @@ class AccountTest extends HostingCase {
 		$this->assertStringContainsString( '2 of 3 websites', $html );
 		$this->assertStringContainsString( 'blog.preview.example.test', $html );
 		$this->assertStringContainsString( 'www.outside.example (waiting for DNS)', $html );
-		$this->assertStringContainsString( 'Blog (blog)', $html );
+		$this->assertStringContainsString( '<td>Blog</td>', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( 'Connect your own domain to a website to set up Email lite', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
