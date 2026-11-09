@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-09T17:54:30+00:00\n"
+"POT-Creation-Date: 2026-11-09T18:34:33+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -179,8 +179,8 @@ msgid "Payment methods"
 msgstr ""
 
 #: src/Account/Billing.php:318
-#: src/Hosting/HostingAccount.php:211
-#: src/Hosting/HostingAccount.php:227
+#: src/Hosting/HostingAccount.php:224
+#: src/Hosting/HostingAccount.php:244
 msgid "Addresses"
 msgstr ""
 
@@ -229,7 +229,7 @@ msgid "Access"
 msgstr ""
 
 #: src/Account/Databases.php:146
-#: src/Hosting/HostingAccount.php:423
+#: src/Hosting/HostingAccount.php:440
 #: src/Proxmox/EmailDetails.php:46
 #: src/Proxmox/Panels.php:506
 #: src/Proxmox/Panels.php:573
@@ -570,7 +570,7 @@ msgstr ""
 
 #: src/Account/Email.php:207
 #: src/Mail/MailDriver.php:62
-#: src/Mail/MailDriver.php:637
+#: src/Mail/MailDriver.php:638
 #: templates/account/mail.php:257
 #: templates/account/mail.php:405
 msgid "Aliases"
@@ -578,7 +578,7 @@ msgstr ""
 
 #: src/Account/Email.php:208
 #: src/Api/Reference.php:177
-#: src/Mail/MailDriver.php:634
+#: src/Mail/MailDriver.php:635
 #: templates/account/domain-page.php:63
 msgid "DNS"
 msgstr ""
@@ -589,7 +589,7 @@ msgstr ""
 
 #: src/Account/Email.php:219
 #: src/Mail/MailDriver.php:60
-#: src/Mail/MailDriver.php:635
+#: src/Mail/MailDriver.php:636
 #: templates/account/mail.php:58
 #: templates/account/mail.php:168
 #: templates/account/mail.php:403
@@ -598,7 +598,7 @@ msgstr ""
 
 #: src/Account/Email.php:250
 #: src/Mail/MailDriver.php:43
-#: src/Mail/MailDriver.php:653
+#: src/Mail/MailDriver.php:654
 #: src/Mail/MailField.php:369
 msgid "Business email"
 msgstr ""
@@ -2177,7 +2177,7 @@ msgstr ""
 #: src/Domains/Panels.php:142
 #: src/Hosting/SiteField.php:443
 #: src/Hosting/SiteField.php:457
-#: src/Mail/MailDriver.php:633
+#: src/Mail/MailDriver.php:634
 #: src/Proxmox/AppField.php:433
 #: src/Proxmox/AppReinstall.php:466
 #: src/Proxmox/AppReinstall.php:477
@@ -2492,7 +2492,7 @@ msgstr ""
 #: src/Bricks/DomainSearchElement.php:136
 #: src/Domains/DkAgreement.php:78
 #: src/Domains/DomainDriver.php:19
-#: src/Hosting/HostingAccount.php:508
+#: src/Hosting/HostingAccount.php:525
 #: src/Hosting/SiteField.php:470
 #: src/Ssl/SslField.php:451
 #: templates/account/dns-claim.php:15
@@ -2755,14 +2755,28 @@ msgstr ""
 msgid "You have already used the trial for %s."
 msgstr ""
 
-#. translators: 1: mailboxes, 2: size of each in GB, 3: aliases, 4: domains.
-#: src/Cli/MailProductsCommand.php:61
+#. translators: %s: size in GB, such as 5 or 2.5
+#: src/Cli/MailProductsCommand.php:59
+#: templates/account/mail.php:35
 #, php-format
-msgid "%1$s of %2$d GB, %3$s, %4$s"
+msgid "%s GB"
+msgstr ""
+
+#. translators: %d: size in MB
+#: src/Cli/MailProductsCommand.php:60
+#: templates/account/mail.php:35
+#, php-format
+msgid "%d MB"
+msgstr ""
+
+#. translators: 1: mailboxes, 2: size of each, such as 10 GB or 512 MB, 3: aliases, 4: domains.
+#: src/Cli/MailProductsCommand.php:64
+#, php-format
+msgid "%1$s of %2$s, %3$s, %4$s"
 msgstr ""
 
 #. translators: %d: number of mailboxes.
-#: src/Cli/MailProductsCommand.php:62
+#: src/Cli/MailProductsCommand.php:65
 #, php-format
 msgid "%d mailbox"
 msgid_plural "%d mailboxes"
@@ -2770,7 +2784,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: number of aliases.
-#: src/Cli/MailProductsCommand.php:64
+#: src/Cli/MailProductsCommand.php:67
 #, php-format
 msgid "%d alias"
 msgid_plural "%d aliases"
@@ -2778,7 +2792,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: number of domains.
-#: src/Cli/MailProductsCommand.php:65
+#: src/Cli/MailProductsCommand.php:68
 #: src/Domains/DomainDriver.php:23
 #, php-format
 msgid "%d domain"
@@ -5255,51 +5269,55 @@ msgstr ""
 msgid "making a Full access API token"
 msgstr ""
 
-#: src/Hosting/Addons.php:181
+#: src/Hosting/Addons.php:106
+msgid "Extra domains and mailbox storage are bought from your hosting account page."
+msgstr ""
+
+#: src/Hosting/Addons.php:224
 msgid "An extra domain"
 msgstr ""
 
-#: src/Hosting/Addons.php:182
+#: src/Hosting/Addons.php:225
 msgid "5 GB of extra storage for one mailbox"
 msgstr ""
 
 #. translators: 1: what is bought, 2: price per month, 3: amount charged now, 4: number of months until the next renewal, 5: price per billing period.
-#: src/Hosting/Addons.php:186
+#: src/Hosting/Addons.php:229
 #, php-format
 msgid "%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded."
 msgid_plural "%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Hosting/Addons.php:336
+#: src/Hosting/Addons.php:425
 msgid "Your payment is being processed."
 msgstr ""
 
-#: src/Hosting/Addons.php:357
-#: src/Hosting/HostingActions.php:546
+#: src/Hosting/Addons.php:447
+#: src/Hosting/HostingActions.php:561
 msgid "This add-on cannot be bought online right now. Contact support."
 msgstr ""
 
-#: src/Hosting/Addons.php:361
+#: src/Hosting/Addons.php:451
 msgid "This mailbox has the most extra storage it can have."
 msgstr ""
 
-#: src/Hosting/Addons.php:365
+#: src/Hosting/Addons.php:455
 msgid "This domain is paid for already."
 msgstr ""
 
-#: src/Hosting/Addons.php:378
+#: src/Hosting/Addons.php:468
 msgid "The order could not be made. Try again in a moment."
 msgstr ""
 
 #. translators: %d: subscription number.
-#: src/Hosting/Addons.php:421
+#: src/Hosting/Addons.php:513
 #, php-format
 msgid "Hosting add-on for subscription #%d."
 msgstr ""
 
 #. translators: %d: order number.
-#: src/Hosting/Addons.php:428
+#: src/Hosting/Addons.php:520
 #, php-format
 msgid "Add-on order #%d was made for this subscription."
 msgstr ""
@@ -5373,18 +5391,24 @@ msgstr[1] ""
 msgid "%1$d of %2$d websites. Up to %3$d PHP workers for all websites together."
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:211
-#: src/Hosting/HostingAccount.php:225
-#: src/Hosting/HostingAccount.php:502
+#. translators: %s: domain name.
+#: src/Hosting/HostingAccount.php:217
+#, php-format
+msgid "Your extra domain %s is paid. It is being connected."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:224
+#: src/Hosting/HostingAccount.php:242
+#: src/Hosting/HostingAccount.php:519
 msgid "Website"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:211
-#: src/Hosting/HostingAccount.php:226
+#: src/Hosting/HostingAccount.php:224
+#: src/Hosting/HostingAccount.php:243
 msgid "PHP"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:211
+#: src/Hosting/HostingAccount.php:224
 #: templates/account/api-tokens.php:149
 #: templates/account/api-tokens.php:150
 #: templates/account/domain-page.php:115
@@ -5392,29 +5416,33 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:217
+#: src/Hosting/HostingAccount.php:233
 msgid "waiting for DNS"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:217
+#: src/Hosting/HostingAccount.php:233
 msgid "pending"
 msgstr ""
 
+#: src/Hosting/HostingAccount.php:234
+msgid "ends at the next renewal"
+msgstr ""
+
 #. translators: %s: PHP version.
-#: src/Hosting/HostingAccount.php:232
+#: src/Hosting/HostingAccount.php:249
 #, php-format
 msgid "Go back to PHP %s"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:237
+#: src/Hosting/HostingAccount.php:254
 msgid "Open WordPress admin"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:238
+#: src/Hosting/HostingAccount.php:255
 msgid "Clear cache"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:239
+#: src/Hosting/HostingAccount.php:256
 #: src/Proxmox/FirewallTab.php:110
 #: templates/account/db.php:232
 #: templates/account/domain.php:125
@@ -5424,104 +5452,104 @@ msgid "Remove"
 msgstr ""
 
 #. translators: 1: domain name, 2: DNS records.
-#: src/Hosting/HostingAccount.php:264
+#: src/Hosting/HostingAccount.php:281
 #, php-format
 msgid "To use %1$s, add these DNS records at your DNS provider: %2$s. The website goes live when both are found."
 msgstr ""
 
 #. translators: 1: website name, 2: PHP version.
-#: src/Hosting/HostingAccount.php:269
+#: src/Hosting/HostingAccount.php:286
 #, php-format
 msgid "The website %1$s runs on PHP %2$s, which no longer gets security updates. Move it to a supported version as soon as you can."
 msgstr ""
 
 #. translators: 1: website name, 2: state.
-#: src/Hosting/HostingAccount.php:277
+#: src/Hosting/HostingAccount.php:294
 #, php-format
 msgid "The website %1$s needs the hosting loader file for the sign-in link and website mail (%2$s). Contact support if it keeps showing."
 msgstr ""
 
 #. translators: %s: the mail domain.
-#: src/Hosting/HostingAccount.php:301
+#: src/Hosting/HostingAccount.php:318
 #, php-format
 msgid "Email lite stays on %s. It does not move when the main domain changes."
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:310
+#: src/Hosting/HostingAccount.php:327
 msgid "Manage mailboxes"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:313
+#: src/Hosting/HostingAccount.php:330
 msgid "Connect your own domain to a website to set up Email lite. It is included with your plan and uses that domain."
 msgstr ""
 
 #. translators: %s: the account's own domain.
-#: src/Hosting/HostingAccount.php:318
+#: src/Hosting/HostingAccount.php:335
 #, php-format
 msgid "Set up Email lite on %s so your websites can send mail. Email is included with your plan; without it a website cannot send mail."
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:324
-#: src/Hosting/HostingAccount.php:523
+#: src/Hosting/HostingAccount.php:341
+#: src/Hosting/HostingAccount.php:540
 msgid "Set up email"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:352
-#: src/Hosting/HostingAccount.php:360
+#: src/Hosting/HostingAccount.php:369
+#: src/Hosting/HostingAccount.php:377
 msgid "Extra mailbox storage"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:352
+#: src/Hosting/HostingAccount.php:369
 msgid "Create a mailbox first. Extra storage is added to a mailbox."
 msgstr ""
 
 #. translators: 1: price per month and pack, 2: most packs on one mailbox.
-#: src/Hosting/HostingAccount.php:363
+#: src/Hosting/HostingAccount.php:380
 #, php-format
 msgid "Add 5 GB to a mailbox for %1$s per month, up to %2$d packs for each mailbox."
 msgstr ""
 
 #. translators: 1: mailbox address, 2: size in GB.
-#: src/Hosting/HostingAccount.php:377
+#: src/Hosting/HostingAccount.php:394
 #, php-format
 msgid "%1$s: %2$s GB"
 msgstr ""
 
 #. translators: %d: packs that end at the next renewal.
-#: src/Hosting/HostingAccount.php:387
+#: src/Hosting/HostingAccount.php:404
 #, php-format
 msgid "(%d pack ends at the next renewal)"
 msgid_plural "(%d packs end at the next renewal)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Hosting/HostingAccount.php:394
+#: src/Hosting/HostingAccount.php:411
 msgid "Add 5 GB"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:398
+#: src/Hosting/HostingAccount.php:415
 msgid "Remove a pack"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:426
+#: src/Hosting/HostingAccount.php:443
 msgid "A backup or a restore is running."
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:430
+#: src/Hosting/HostingAccount.php:447
 msgid "No backups yet. The first one is made tonight."
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:432
+#: src/Hosting/HostingAccount.php:449
 #: templates/account/credit.php:109
 msgid "Date"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:432
+#: src/Hosting/HostingAccount.php:449
 #: src/Licences/KeyDriver.php:43
 msgid "Kind"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:432
+#: src/Hosting/HostingAccount.php:449
 #: src/Proxmox/DiskPanels.php:185
 #: src/Proxmox/EmailDetails.php:92
 #: src/Proxmox/Panels.php:565
@@ -5531,96 +5559,96 @@ msgstr ""
 msgid "Size"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:438
+#: src/Hosting/HostingAccount.php:455
 msgid "Manual"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:438
+#: src/Hosting/HostingAccount.php:455
 msgid "Nightly"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:446
+#: src/Hosting/HostingAccount.php:463
 msgid "Restore everything"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:447
+#: src/Hosting/HostingAccount.php:464
 msgid "Restore files"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:448
+#: src/Hosting/HostingAccount.php:465
 msgid "Restore database"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:462
+#: src/Hosting/HostingAccount.php:479
 msgid "Website to restore"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:471
+#: src/Hosting/HostingAccount.php:488
 msgid "Back up now"
 msgstr ""
 
 #. translators: %s: time the safety copy is kept until.
-#: src/Hosting/HostingAccount.php:474
+#: src/Hosting/HostingAccount.php:491
 #, php-format
 msgid "A safety copy from before your last restore is kept until %s."
 msgstr ""
 
 #. translators: %s: time the safety copy is kept until.
-#: src/Hosting/HostingAccount.php:474
+#: src/Hosting/HostingAccount.php:491
 msgid "Undo the last restore"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:491
+#: src/Hosting/HostingAccount.php:508
 #: src/Hosting/SiteField.php:432
 msgid "Website name"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:492
+#: src/Hosting/HostingAccount.php:509
 msgid "PHP version"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:498
+#: src/Hosting/HostingAccount.php:515
 msgid "Add website"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:508
+#: src/Hosting/HostingAccount.php:525
 #: templates/account/dns-claim.php:18
 #: templates/account/mail.php:130
 msgid "Add domain"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:522
+#: src/Hosting/HostingAccount.php:539
 #: templates/emails/beltoft-services-hosting-ready.php:55
 #: templates/emails/plain/beltoft-services-hosting-ready.php:52
 msgid "Connect your domain"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:524
+#: src/Hosting/HostingAccount.php:541
 msgid "Build or upload your site"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:525
+#: src/Hosting/HostingAccount.php:542
 msgid "Check your backups"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:528
+#: src/Hosting/HostingAccount.php:545
 #: templates/account/app.php:310
 msgid "Getting started"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:531
+#: src/Hosting/HostingAccount.php:548
 msgid "Done:"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:531
+#: src/Hosting/HostingAccount.php:548
 msgid "To do:"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:534
+#: src/Hosting/HostingAccount.php:551
 msgid "Mark as done"
 msgstr ""
 
-#: src/Hosting/HostingAccount.php:543
+#: src/Hosting/HostingAccount.php:560
 msgid "Hide this list"
 msgstr ""
 
@@ -5633,7 +5661,7 @@ msgid "The site name can have lowercase letters, numbers and dashes, and must st
 msgstr ""
 
 #: src/Hosting/HostingActions.php:156
-#: src/Hosting/HostingActions.php:623
+#: src/Hosting/HostingActions.php:648
 msgid "That PHP version is not offered."
 msgstr ""
 
@@ -5656,9 +5684,9 @@ msgid "The website was made but its address could not be set up yet. Try again i
 msgstr ""
 
 #: src/Hosting/HostingActions.php:326
-#: src/Hosting/HostingActions.php:619
-#: src/Hosting/HostingActions.php:734
-#: src/Hosting/HostingActions.php:939
+#: src/Hosting/HostingActions.php:644
+#: src/Hosting/HostingActions.php:759
+#: src/Hosting/HostingActions.php:964
 #: src/Hosting/HostingRestore.php:166
 #: src/Mcp/HostingTools.php:147
 msgid "That website does not exist."
@@ -5682,121 +5710,125 @@ msgid "Your account has its domain. Another domain cannot be added online right 
 msgstr ""
 
 #: src/Hosting/HostingActions.php:413
-#: src/Hosting/HostingActions.php:491
+#: src/Hosting/HostingActions.php:497
 msgid "The DNS could not be changed right now. Try again in a moment."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:466
+#: src/Hosting/HostingActions.php:472
 msgid "That domain is not on your account."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:470
+#: src/Hosting/HostingActions.php:476
 msgid "The temporary address cannot be removed."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:533
+#: src/Hosting/HostingActions.php:543
 #: src/Hosting/SiteDns.php:341
 msgid "The domain name is not valid."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:537
+#: src/Hosting/HostingActions.php:548
+msgid "That domain needs no add-on."
+msgstr ""
+
+#: src/Hosting/HostingActions.php:552
 msgid "That mailbox is not on your Email lite."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:540
+#: src/Hosting/HostingActions.php:555
 msgid "That add-on does not exist."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:570
+#: src/Hosting/HostingActions.php:595
 msgid "That mailbox has no extra storage to remove."
 msgstr ""
 
 #. translators: %d: the plan's memory_limit ceiling in MB.
-#: src/Hosting/HostingActions.php:631
+#: src/Hosting/HostingActions.php:656
 #, php-format
 msgid "PHP memory can be set from 64 MB up to %d MB on your plan."
 msgstr ""
 
 #. translators: %d: the plan's upload size ceiling in MB.
-#: src/Hosting/HostingActions.php:636
+#: src/Hosting/HostingActions.php:661
 #, php-format
 msgid "The upload size can be set from 1 MB up to %d MB on your plan."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:688
+#: src/Hosting/HostingActions.php:713
 msgid "There is nothing to go back to for this website."
 msgstr ""
 
 #. translators: %d: PHP workers the account may spread over its websites.
-#: src/Hosting/HostingActions.php:741
+#: src/Hosting/HostingActions.php:766
 #, php-format
 msgid "A website needs at least 2 PHP workers, and your websites together can have up to %d."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:781
+#: src/Hosting/HostingActions.php:806
 msgid "The sign-in link could not be made."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:805
+#: src/Hosting/HostingActions.php:830
 msgid "Your account has Email lite already."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:806
+#: src/Hosting/HostingActions.php:831
 msgid "That domain name is not valid."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:807
+#: src/Hosting/HostingActions.php:832
 #: src/Hosting/LiteMail.php:84
 msgid "Connect your own domain to a website first. Email lite uses that domain."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:808
+#: src/Hosting/HostingActions.php:833
 #: src/Hosting/LiteMail.php:95
 msgid "Email lite uses the domain connected to your hosting account."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:809
+#: src/Hosting/HostingActions.php:834
 msgid "Your plan has no mailboxes."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:811
+#: src/Hosting/HostingActions.php:836
 msgid "Email lite could not be set up."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:832
+#: src/Hosting/HostingActions.php:857
 msgid "Set up Email lite first."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:838
+#: src/Hosting/HostingActions.php:863
 msgid "Email lite is not ready yet. Try again in a moment."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:838
+#: src/Hosting/HostingActions.php:863
 msgid "The mail server is busy. Try again in a moment."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:908
-#: src/Hosting/HostingActions.php:917
+#: src/Hosting/HostingActions.php:933
+#: src/Hosting/HostingActions.php:942
 msgid "That could not be saved. Try again."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:912
+#: src/Hosting/HostingActions.php:937
 msgid "Unknown item."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:1037
+#: src/Hosting/HostingActions.php:1062
 msgid "The server is busy. Try again in a moment."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:1038
+#: src/Hosting/HostingActions.php:1063
 msgid "That did not work. Try again in a moment, or contact support if it keeps happening."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:1050
+#: src/Hosting/HostingActions.php:1075
 msgid "Your hosting is not ready for changes."
 msgstr ""
 
-#: src/Hosting/HostingActions.php:1057
+#: src/Hosting/HostingActions.php:1082
 msgid "Your hosting cannot be changed right now."
 msgstr ""
 
@@ -5897,11 +5929,11 @@ msgstr ""
 msgid "The undo could not be started. Try again."
 msgstr ""
 
-#: src/Hosting/HostingRoutes.php:178
+#: src/Hosting/HostingRoutes.php:180
 msgid "This is not a hosting account."
 msgstr ""
 
-#: src/Hosting/HostingRoutes.php:182
+#: src/Hosting/HostingRoutes.php:184
 #: src/Mail/MailRoutes.php:214
 #: src/Proxmox/DbPolicy.php:140
 msgid "Too many changes. Please try again later."
@@ -7892,51 +7924,52 @@ msgstr ""
 msgid "That domain already has email here."
 msgstr ""
 
-#: src/Mail/MailDomains.php:170
+#: src/Mail/MailDomains.php:218
 msgid "You can add a domain when the plan is active."
 msgstr ""
 
-#: src/Mail/MailDomains.php:189
+#: src/Mail/MailDomains.php:237
 msgid "The plan is busy. Try again in a moment."
 msgstr ""
 
-#: src/Mail/MailDomains.php:208
+#: src/Mail/MailDomains.php:256
 msgid "That domain is already in your plan."
 msgstr ""
 
-#: src/Mail/MailDomains.php:213
+#: src/Mail/MailDomains.php:261
 #: templates/account/mail.php:112
 msgid "Your plan has no room for another domain."
 msgstr ""
 
-#: src/Mail/MailDomains.php:238
+#: src/Mail/MailDomains.php:286
 msgid "The domain could not be added."
 msgstr ""
 
-#: src/Mail/MailDomains.php:255
+#: src/Mail/MailDomains.php:303
 msgid "The domain could not be linked to your plan."
 msgstr ""
 
-#: src/Mail/MailDomains.php:282
+#: src/Mail/MailDomains.php:330
 msgid "The first domain of the plan cannot be removed."
 msgstr ""
 
-#: src/Mail/MailDomains.php:286
+#: src/Mail/MailDomains.php:334
 #: templates/account/mail.php:104
 msgid "You can remove a domain when the plan is active again."
 msgstr ""
 
-#: src/Mail/MailDomains.php:298
-#: src/Mail/MailDomains.php:322
+#: src/Mail/MailDomains.php:346
+#: src/Mail/MailDomains.php:370
 msgid "The domain could not be removed. Try again in a moment."
 msgstr ""
 
-#: src/Mail/MailDomains.php:313
+#: src/Mail/MailDomains.php:361
 msgid "Try again in a moment."
 msgstr ""
 
-#: src/Mail/MailDomains.php:317
-msgid "Delete the mailboxes of this domain first."
+#: src/Mail/MailDomains.php:365
+#: templates/account/mail.php:106
+msgid "Delete the mailboxes on this domain first."
 msgstr ""
 
 #. translators: 1: email domains used, 2: email domains allowed
@@ -7971,11 +8004,11 @@ msgstr ""
 msgid "How many email domains the plan allows. Each domain is one service."
 msgstr ""
 
-#: src/Mail/MailDriver.php:636
+#: src/Mail/MailDriver.php:637
 msgid "Size (MB)"
 msgstr ""
 
-#: src/Mail/MailDriver.php:650
+#: src/Mail/MailDriver.php:651
 msgid "Plan domains"
 msgstr ""
 
@@ -16606,18 +16639,6 @@ msgstr ""
 msgid "This email service has been removed."
 msgstr ""
 
-#. translators: %s: size in GB, such as 5 or 2.5
-#: templates/account/mail.php:35
-#, php-format
-msgid "%s GB"
-msgstr ""
-
-#. translators: %d: size in MB
-#: templates/account/mail.php:35
-#, php-format
-msgid "%d MB"
-msgstr ""
-
 #: templates/account/mail.php:44
 msgid "Email sections"
 msgstr ""
@@ -16664,10 +16685,6 @@ msgstr[1] ""
 #: templates/account/mail.php:103
 #: templates/account/mail.php:108
 msgid "Remove this domain"
-msgstr ""
-
-#: templates/account/mail.php:106
-msgid "Delete the mailboxes on this domain first."
 msgstr ""
 
 #: templates/account/mail.php:128
@@ -16764,8 +16781,10 @@ msgstr ""
 #. translators: 1: aliases in use, 2: aliases the plan allows
 #: templates/account/mail.php:279
 #, php-format
-msgid "%1$d of %2$d aliases used."
-msgstr ""
+msgid "%1$d of %2$d alias used."
+msgid_plural "%1$d of %2$d aliases used."
+msgstr[0] ""
+msgstr[1] ""
 
 #: templates/account/mail.php:282
 msgid "New alias"
