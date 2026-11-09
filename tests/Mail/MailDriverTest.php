@@ -318,10 +318,12 @@ final class MailDriverTest extends MailTestCase {
 		}
 		$this->assertSame( 'conflict', $by['mx']['status'] );
 		$this->assertSame( 'conflict', $by['spf']['status'] );
-		$this->assertStringContainsString( 'include:_spf.mail.example.net', $by['spf']['reason'] );
+		$this->assertSame( 'spf_exists', $by['spf']['reason'], 'A stable code is stored, not text in the job locale.' );
+		$this->assertStringContainsString( 'include:_spf.mail.example.net', \BeltoftServices\Mail\MailDns::reason_text( $by['spf']['reason'] ) );
 		$this->assertSame( 'ok', $by['dkim']['status'], 'The free name got its record.' );
 		$this->assertSame( 'ok', $by['dmarc']['status'] );
-		$this->assertSame( 'Your own DMARC record was kept.', $by['dmarc']['reason'] );
+		$this->assertSame( 'dmarc_kept', $by['dmarc']['reason'] );
+		$this->assertSame( 'Your own DMARC record was kept.', \BeltoftServices\Mail\MailDns::reason_text( $by['dmarc']['reason'] ) );
 		$this->assertSame( 'conflict', $by['autoconfig']['status'] );
 		$this->assertSame( 'ok', $by['autodiscover']['status'] );
 		$this->assertSame( 'waiting', $res->meta()['mail_dns'] );

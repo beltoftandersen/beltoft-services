@@ -78,8 +78,16 @@ tests_add_filter(
 		$items = $wpdb->prefix . 'woocommerce_order_items';
 		$meta  = $wpdb->prefix . 'woocommerce_order_itemmeta';
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test database reset, fixed table names.
-		$wpdb->query( "DELETE m FROM {$meta} m LEFT JOIN {$items} i ON i.order_item_id = m.order_item_id LEFT JOIN {$wpdb->posts} p ON p.ID = i.order_id WHERE p.ID IS NULL" );
-		$wpdb->query( "DELETE i FROM {$items} i LEFT JOIN {$wpdb->posts} p ON p.ID = i.order_id WHERE p.ID IS NULL" );
+		// An item is an orphan when its order is in neither the posts table nor, where the table exists, the HPOS orders table.
+		$hpos = $wpdb->prefix . 'wc_orders';
+		$join = "LEFT JOIN {$wpdb->posts} p ON p.ID = i.order_id";
+		$none = 'p.ID IS NULL';
+		if ( $hpos === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $hpos ) ) ) {
+			$join .= " LEFT JOIN {$hpos} h ON h.id = i.order_id";
+			$none .= ' AND h.id IS NULL';
+		}
+		$wpdb->query( "DELETE m FROM {$meta} m LEFT JOIN {$items} i ON i.order_item_id = m.order_item_id {$join} WHERE {$none}" );
+		$wpdb->query( "DELETE i FROM {$items} i {$join} WHERE {$none}" );
 		$wpdb->query( 'COMMIT' );
 		// phpcs:enable
 	},

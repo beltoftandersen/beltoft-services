@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Brand;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -26,12 +28,6 @@ defined( 'ABSPATH' ) || exit;
  * condition "dynamic data is not empty".
  */
 final class Catalog {
-
-	public const TAGS = array(
-		'beltoft_usage_line' => 'beltoft_usage_line',
-		'beltoft_usage_hourly' => 'beltoft_usage_hourly',
-		'beltoft_usage_cap' => 'beltoft_usage_cap',
-	);
 
 	/** Tag name => translated label. */
 	private static function labels(): array {
@@ -109,7 +105,7 @@ final class Catalog {
 			$tags[] = array(
 				'name'  => '{' . $name . '}',
 				'label' => $label,
-				'group' => 'Beltoft',
+				'group' => Brand::name(),
 			);
 		}
 

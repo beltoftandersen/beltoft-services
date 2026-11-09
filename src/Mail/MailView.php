@@ -131,7 +131,7 @@ final class MailView {
 				'priority' => isset( $row['priority'] ) ? (int) $row['priority'] : null,
 				'value'    => (string) ( $row['value'] ?? '' ),
 				'status'   => in_array( $row['status'] ?? '', array( 'ok', 'conflict' ), true ) ? (string) $row['status'] : 'missing',
-				'reason'   => (string) ( $row['reason'] ?? '' ),
+				'reason'   => MailDns::reason_text( (string) ( $row['reason'] ?? '' ) ),
 			);
 		}
 

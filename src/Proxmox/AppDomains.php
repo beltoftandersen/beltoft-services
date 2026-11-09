@@ -143,7 +143,7 @@ final class AppDomains {
 					}
 				}
 				if ( Records::paused( $zone, $zone_data ) ) {
-					return 'DNS hosting is paused for this domain.';
+					return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
 				}
 				$sets = self::types_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
 				if ( array( 'A' => array( $ip ) ) === $have && ( ! $strict || 1 === $sets ) ) {

@@ -227,4 +227,20 @@ class RenewalTest extends UsageTestCase {
 		do_action( 'woocommerce_subscription_renewal_payment_complete', $sub, $order );
 		$this->assertTrue( Account::charged( wcs_get_subscription( $sub->get_id() ) ) );
 	}
+
+	public function test_line_wording_uses_plural_forms_and_translatable_units(): void {
+		$call = static function ( string $method, ...$args ) {
+			$m = new \ReflectionMethod( \BeltoftServices\Usage\Renewal::class, $method );
+			$m->setAccessible( true );
+			return $m->invoke( null, ...$args );
+		};
+		$this->assertSame( '1 hour', $call( 'hours_text', 1 ) );
+		$this->assertSame( '600 hours', $call( 'hours_text', 600 ) );
+		$this->assertSame( '', $call( 'quantity_note', 1.0, 'hour' ) );
+		$this->assertSame( ' (2.5 GB)', $call( 'quantity_note', 2.5, 'GB' ) );
+		$this->assertSame( ' (1 pack)', $call( 'quantity_note', 1.0, 'pack' ) );
+		$this->assertSame( ' (3 packs)', $call( 'quantity_note', 3.0, 'pack' ) );
+		$this->assertSame( 'GB', $call( 'unit_name', 'GB' ) );
+		$this->assertSame( 'other', $call( 'unit_name', 'other' ) );
+	}
 }

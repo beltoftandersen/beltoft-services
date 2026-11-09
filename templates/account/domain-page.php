@@ -248,7 +248,7 @@ if ( $d['dns_only'] ) {
 						</form>
 					<?php else : ?>
 						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your records are in place. Switching sets our name servers at your registrar. You can switch back in Name servers.', 'beltoft-services' ); ?></p>
-						<form class="beltoft-services-domain-form" data-dns-adopt="switch" data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Switching…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php esc_html_e( 'Switch to Beltoft DNS', 'beltoft-services' ); ?></button></form>
+						<form class="beltoft-services-domain-form" data-dns-adopt="switch" data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-busy="<?php esc_attr_e( 'Switching…', 'beltoft-services' ); ?>"><button type="submit" class="button"><?php /* translators: %s: name of this shop. */ echo esc_html( sprintf( __( 'Switch to %s DNS', 'beltoft-services' ), \BeltoftServices\Brand::name() ) ); ?></button></form>
 					<?php endif; ?>
 				</div>
 			<?php endif; ?>

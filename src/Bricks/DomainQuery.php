@@ -25,21 +25,6 @@ final class DomainQuery {
 	public const TYPE   = 'beltoft_domains';
 	public const ACTION = 'beltoft_domain_add';
 
-	/** Tag name => label. */
-	public const TAGS = array(
-		'bds_domain' => 'bds_domain',
-		'bds_tld' => 'bds_tld',
-		'bds_status' => 'bds_status',
-		'bds_status_text' => 'bds_status_text',
-		'bds_row_class' => 'bds_row_class',
-		'bds_available' => 'bds_available',
-		'bds_price' => 'bds_price',
-		'bds_renewal_price' => 'bds_renewal_price',
-		'bds_add_url' => 'bds_add_url',
-		'bds_search_term' => 'bds_search_term',
-		'bds_error' => 'bds_error',
-	);
-
 	/** Tag name => translated label. */
 	private static function labels(): array {
 		return array(
@@ -218,7 +203,7 @@ final class DomainQuery {
 		unset( $post, $context );
 		if ( ! is_string( $value ) ) { return $value; }
 		$name = trim( $value, '{}' );
-		return isset( self::TAGS[ $name ] ) ? self::value( $name ) : $value;
+		return isset( self::labels()[ $name ] ) ? self::value( $name ) : $value;
 	}
 
 	public static function render_content( $content, $post = null, $context = 'text' ) {
@@ -227,7 +212,7 @@ final class DomainQuery {
 		return (string) preg_replace_callback(
 			'/\{(bds_[a-z_]+)\}/',
 			static function ( $m ) use ( $context ) {
-				if ( ! isset( self::TAGS[ $m[1] ] ) ) { return $m[0]; }
+				if ( ! isset( self::labels()[ $m[1] ] ) ) { return $m[0]; }
 				$value = self::value( $m[1] );
 				return 'link' === $context ? esc_url_raw( $value ) : esc_html( $value );
 			},

@@ -3,13 +3,13 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Beltoft Services for WooCommerce 0.7.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services-wt-i18n\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-09T09:36:25+00:00\n"
+"POT-Creation-Date: 2026-11-09T12:11:23+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -232,7 +232,7 @@ msgstr ""
 #: src/Proxmox/EmailDetails.php:46
 #: src/Proxmox/Panels.php:506
 #: src/Proxmox/Panels.php:573
-#: src/Usage/Renewal.php:184
+#: src/Usage/Renewal.php:235
 #: templates/account/db.php:46
 #: templates/account/db.php:280
 #: templates/account/vm.php:50
@@ -2154,11 +2154,11 @@ msgstr ""
 msgid "DELETE colour"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:46
+#: src/Bricks/DomainQuery.php:31
 #: src/Domains/Cart.php:451
 #: src/Domains/Cart.php:464
 #: src/Domains/EmailDetails.php:13
-#: src/Domains/Panels.php:133
+#: src/Domains/Panels.php:142
 #: src/Hosting/SiteField.php:384
 #: src/Mail/MailDriver.php:602
 #: src/Proxmox/AppField.php:433
@@ -2167,52 +2167,52 @@ msgstr ""
 msgid "Domain"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:47
+#: src/Bricks/DomainQuery.php:32
 msgid "Extension"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:48
+#: src/Bricks/DomainQuery.php:33
 msgid "Status (available, taken, unknown)"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:49
+#: src/Bricks/DomainQuery.php:34
 msgid "Status as a sentence"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:50
+#: src/Bricks/DomainQuery.php:35
 msgid "Class of the main result (add it to the row)"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:51
+#: src/Bricks/DomainQuery.php:36
 msgid "Available (1 or 0)"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:52
+#: src/Bricks/DomainQuery.php:37
 msgid "Price per year"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:53
+#: src/Bricks/DomainQuery.php:38
 msgid "Renewal price"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:54
+#: src/Bricks/DomainQuery.php:39
 msgid "Add to order link"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:55
+#: src/Bricks/DomainQuery.php:40
 msgid "Search term"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:56
+#: src/Bricks/DomainQuery.php:41
 msgid "Search error message"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:96
+#: src/Bricks/DomainQuery.php:81
 msgid "Domain availability"
 msgstr ""
 
 #. translators: %s: price in euro
-#: src/Bricks/DomainQuery.php:135
+#: src/Bricks/DomainQuery.php:120
 #: assets/domain-search.js:113
 #: assets/domain-search.js:309
 #: assets/domain-search.js:319
@@ -2221,46 +2221,46 @@ msgid "€%s / year"
 msgstr ""
 
 #. translators: %s: price in euro
-#: src/Bricks/DomainQuery.php:136
+#: src/Bricks/DomainQuery.php:121
 #: assets/domain-search.js:115
 #, php-format,js-format
 msgid "Renews at €%s / year"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:150
+#: src/Bricks/DomainQuery.php:135
 #: assets/domain-search.js:103
 msgid "Available to register"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:151
+#: src/Bricks/DomainQuery.php:136
 msgid "Already registered"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:152
+#: src/Bricks/DomainQuery.php:137
 #: assets/domain-search.js:105
 msgid "Premium domain. Online ordering is unavailable."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:153
+#: src/Bricks/DomainQuery.php:138
 #: assets/domain-search.js:106
 msgid "This domain extension is not available to order here."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:155
+#: src/Bricks/DomainQuery.php:140
 #: assets/domain-search.js:108
 msgid "Availability could not be confirmed."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:202
+#: src/Bricks/DomainQuery.php:187
 #: src/Bricks/DomainSearchElement.php:28
 msgid "Domain search"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:245
+#: src/Bricks/DomainQuery.php:230
 msgid "This link has expired. Go back, search again and try again."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:248
+#: src/Bricks/DomainQuery.php:233
 #: src/Domains/Cart.php:75
 #: src/Domains/TransferDns.php:482
 #: src/Mcp/Confirmations.php:86
@@ -3968,138 +3968,150 @@ msgstr ""
 msgid "Domain DNS health needs attention"
 msgstr ""
 
-#: src/Domains/Panels.php:75
+#: src/Domains/Panels.php:76
 msgid "Claim"
 msgstr ""
 
-#: src/Domains/Panels.php:79
+#. translators: 1: claim number, 2: verification date and time.
+#: src/Domains/Panels.php:78
+#, php-format
+msgid "#%1$d, verified %2$s UTC"
+msgstr ""
+
+#: src/Domains/Panels.php:83
 msgid "Assignment status"
 msgstr ""
 
-#: src/Domains/Panels.php:81
+#: src/Domains/Panels.php:85
 msgid "First clear check"
 msgstr ""
 
-#: src/Domains/Panels.php:84
+#: src/Domains/Panels.php:88
 msgid "Order"
 msgstr ""
 
-#: src/Domains/Panels.php:89
+#: src/Domains/Panels.php:93
 msgid "Parent DS"
 msgstr ""
 
 #. translators: 1: server name or "chosen for you", 2: "yes" or "none".
-#: src/Domains/Panels.php:89
-#: src/Domains/Panels.php:92
+#: src/Domains/Panels.php:93
+#: src/Domains/Panels.php:96
 #: src/Mcp/Purchase.php:417
 #: src/Ssl/Panels.php:372
 #: src/Ssl/Panels.php:373
 msgid "yes"
 msgstr ""
 
-#: src/Domains/Panels.php:89
+#: src/Domains/Panels.php:93
 msgid "no"
 msgstr ""
 
-#: src/Domains/Panels.php:92
+#: src/Domains/Panels.php:96
 msgid "Records off"
 msgstr ""
 
-#: src/Domains/Panels.php:95
+#: src/Domains/Panels.php:99
 msgid "Import error"
 msgstr ""
 
-#: src/Domains/Panels.php:108
-msgid "Move the DNS to Beltoft first (import and name servers before the transfer)"
+#. translators: %s: name of this shop.
+#: src/Domains/Panels.php:113
+#, php-format
+msgid "Move the DNS to %s first (import and name servers before the transfer)"
 msgstr ""
 
-#: src/Domains/Panels.php:109
-msgid "Move my DNS to Beltoft when the transfer is done"
+#. translators: %s: name of this shop.
+#: src/Domains/Panels.php:115
+#, php-format
+msgid "Move my DNS to %s when the transfer is done"
 msgstr ""
 
-#: src/Domains/Panels.php:110
+#: src/Domains/Panels.php:116
 msgid "Keep my DNS where it is"
 msgstr ""
 
-#: src/Domains/Panels.php:116
-#: src/Domains/Panels.php:118
+#: src/Domains/Panels.php:122
+#: src/Domains/Panels.php:124
 msgid "Transfer DNS"
 msgstr ""
 
-#: src/Domains/Panels.php:116
+#: src/Domains/Panels.php:122
 msgid "Our DNS already serves the domain for this customer (no choice)"
 msgstr ""
 
-#: src/Domains/Panels.php:118
-msgid " (no choice stored: an older order)"
+#. translators: %s: the DNS choice.
+#: src/Domains/Panels.php:126
+#, php-format
+msgid "%s (no choice stored: an older order)"
 msgstr ""
 
-#: src/Domains/Panels.php:121
+#: src/Domains/Panels.php:130
 msgid "Waiting for"
 msgstr ""
 
-#: src/Domains/Panels.php:122
+#: src/Domains/Panels.php:131
 msgid "DNS records checked"
 msgstr ""
 
-#: src/Domains/Panels.php:122
+#: src/Domains/Panels.php:131
 msgid "Imported a zone file"
 msgstr ""
 
-#: src/Domains/Panels.php:122
+#: src/Domains/Panels.php:131
 msgid "Acknowledged that records we could not find are missing"
 msgstr ""
 
-#: src/Domains/Panels.php:123
+#: src/Domains/Panels.php:132
 msgid "How the DNS was chosen"
 msgstr ""
 
-#: src/Domains/Panels.php:123
+#: src/Domains/Panels.php:132
 msgid "Detected: the current name servers are a registrar's own"
 msgstr ""
 
-#: src/Domains/Panels.php:124
+#: src/Domains/Panels.php:133
 msgid "Current name servers"
 msgstr ""
 
-#: src/Domains/Panels.php:125
+#: src/Domains/Panels.php:134
 msgid "Delegation checked by customer"
 msgstr ""
 
-#: src/Domains/Panels.php:126
+#: src/Domains/Panels.php:135
 msgid "Records copied"
 msgstr ""
 
-#: src/Domains/Panels.php:127
+#: src/Domains/Panels.php:136
 msgid "Not copied"
 msgstr ""
 
-#: src/Domains/Panels.php:134
+#: src/Domains/Panels.php:143
 msgid "Registrar id"
 msgstr ""
 
-#: src/Domains/Panels.php:135
+#: src/Domains/Panels.php:144
 msgid "Registrar status"
 msgstr ""
 
-#: src/Domains/Panels.php:136
+#: src/Domains/Panels.php:145
 #: templates/account/domain.php:82
 msgid "Expires"
 msgstr ""
 
-#: src/Domains/Panels.php:137
+#: src/Domains/Panels.php:146
 msgid "Delegation"
 msgstr ""
 
-#: src/Domains/Panels.php:138
+#: src/Domains/Panels.php:147
 msgid "Delegation checked"
 msgstr ""
 
-#: src/Domains/Panels.php:139
+#: src/Domains/Panels.php:148
 msgid "Last sync"
 msgstr ""
 
-#: src/Domains/Panels.php:149
+#: src/Domains/Panels.php:158
 #: src/Ssl/Panels.php:390
 msgid "Subscription"
 msgstr ""
@@ -4168,6 +4180,9 @@ msgstr ""
 #: src/Domains/RecordRoutes.php:372
 #: src/Domains/Records.php:350
 #: src/Domains/Records.php:418
+#: src/Hosting/SiteDns.php:226
+#: src/Mail/MailDns.php:243
+#: src/Proxmox/AppDomains.php:146
 #: src/Proxmox/AppTab.php:243
 msgid "DNS hosting is paused for this domain."
 msgstr ""
@@ -4183,6 +4198,7 @@ msgstr ""
 #: src/Domains/RecordRoutes.php:427
 #: src/Domains/Records.php:215
 #: src/Hosting/SiteDns.php:222
+#: src/Mail/MailDns.php:241
 #: src/Proxmox/AppDomains.php:137
 msgid "The DNS zone does not exist."
 msgstr ""
@@ -7393,7 +7409,7 @@ msgstr ""
 #. translators: 1: item (Backups, Extra disk), 2: server name.
 #: src/LineNames.php:169
 #: src/Usage/Emails.php:137
-#: src/Usage/Renewal.php:191
+#: src/Usage/Renewal.php:242
 #, php-format
 msgid "%1$s for %2$s"
 msgstr ""
@@ -7573,40 +7589,49 @@ msgstr ""
 msgid "The DNS zone is being changed."
 msgstr ""
 
-#: src/Mail/MailDns.php:248
+#: src/Mail/MailDns.php:237
+#: src/Proxmox/AppDomains.php:121
+msgid "The domain is not one of your domains on our name servers."
+msgstr ""
+
+#: src/Mail/MailDns.php:239
+msgid "The record is not valid for this domain."
+msgstr ""
+
+#: src/Mail/MailDns.php:245
 #: src/Proxmox/AppDomains.php:153
 #: src/Proxmox/AppDomains.php:156
 #: src/Proxmox/AppTab.php:242
 msgid "The name already has a DNS record."
 msgstr ""
 
-#: src/Mail/MailDns.php:252
+#: src/Mail/MailDns.php:247
 msgid "The name is an alias (CNAME) and cannot also hold this record."
 msgstr ""
 
-#: src/Mail/MailDns.php:266
+#: src/Mail/MailDns.php:249
 msgid "The domain already has other MX records."
 msgstr ""
 
 #. translators: %s: SPF include to add
-#: src/Mail/MailDns.php:282
+#: src/Mail/MailDns.php:252
 #, php-format
 msgid "The domain already has an SPF record. It was not changed: add include:%s to it."
 msgstr ""
 
-#: src/Mail/MailDns.php:291
+#: src/Mail/MailDns.php:254
 msgid "The name already holds another DKIM key."
 msgstr ""
 
-#: src/Mail/MailDns.php:299
+#: src/Mail/MailDns.php:256
 msgid "Your own DMARC record was kept."
 msgstr ""
 
-#: src/Mail/MailDns.php:302
+#: src/Mail/MailDns.php:258
 msgid "The record could not be placed."
 msgstr ""
 
-#: src/Mail/MailDns.php:432
+#: src/Mail/MailDns.php:469
 msgid "The name did not resolve."
 msgstr ""
 
@@ -9643,10 +9668,6 @@ msgstr ""
 msgid "The server address is not known yet."
 msgstr ""
 
-#: src/Proxmox/AppDomains.php:121
-msgid "The domain is not one of your domains on our name servers."
-msgstr ""
-
 #: src/Proxmox/AppDomains.php:189
 #: src/Proxmox/AppOwnDomain.php:54
 #: src/Proxmox/AppReinstall.php:561
@@ -9829,7 +9850,7 @@ msgstr ""
 #: src/Proxmox/AppLicenceDriver.php:35
 #: src/Proxmox/AppLicenceDriver.php:238
 #: src/Proxmox/EmailDetails.php:51
-#: src/Usage/Renewal.php:187
+#: src/Usage/Renewal.php:238
 msgid "App licence"
 msgstr ""
 
@@ -11301,7 +11322,7 @@ msgstr ""
 #: src/Proxmox/DiskPanels.php:196
 #: src/Proxmox/EmailDetails.php:42
 #: src/Usage/Breakdown.php:236
-#: src/Usage/Renewal.php:185
+#: src/Usage/Renewal.php:236
 msgid "Extra disk"
 msgstr ""
 
@@ -11446,7 +11467,7 @@ msgstr ""
 #: src/Proxmox/SnapshotDriver.php:39
 #: src/Proxmox/SnapshotDriver.php:134
 #: src/Proxmox/SnapshotDriver.php:137
-#: src/Usage/Renewal.php:186
+#: src/Usage/Renewal.php:237
 msgid "Snapshot slots"
 msgstr ""
 
@@ -14268,15 +14289,15 @@ msgid_plural "A new account can run %d pay as you go services until its first us
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Usage/Catalog.php:39
+#: src/Usage/Catalog.php:35
 msgid "Pay as you go: hourly price and monthly cap as one line"
 msgstr ""
 
-#: src/Usage/Catalog.php:40
+#: src/Usage/Catalog.php:36
 msgid "Pay as you go: price per hour"
 msgstr ""
 
-#: src/Usage/Catalog.php:41
+#: src/Usage/Catalog.php:37
 msgid "Pay as you go: monthly cap"
 msgstr ""
 
@@ -14401,7 +14422,7 @@ msgstr ""
 
 #. translators: %s: amount with currency.
 #: src/Usage/InvoiceView.php:109
-#: src/Usage/Renewal.php:256
+#: src/Usage/Renewal.php:308
 #, php-format
 msgid ", capped at %s"
 msgstr ""
@@ -14525,44 +14546,77 @@ msgstr ""
 msgid "app licence"
 msgstr ""
 
+#. translators: %s: number of hours.
+#: src/Usage/Renewal.php:173
+#, php-format
+msgid "%s hour"
+msgid_plural "%s hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Usage/Renewal.php:184
+msgid "hour"
+msgstr ""
+
+#: src/Usage/Renewal.php:186
+msgctxt "unit symbol for gigabyte"
+msgid "GB"
+msgstr ""
+
+#: src/Usage/Renewal.php:188
+msgctxt "unit name, singular, as in \"per pack and hour\""
+msgid "pack"
+msgstr ""
+
+#. translators: %s: number of snapshot packs.
+#: src/Usage/Renewal.php:211
+#, php-format
+msgid "%s pack"
+msgid_plural "%s packs"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: quantity, 2: unit symbol (GB).
+#: src/Usage/Renewal.php:214
+#, php-format
+msgctxt "quantity with unit"
+msgid "%1$s %2$s"
+msgstr ""
+
 #. translators: %s: server name.
-#: src/Usage/Renewal.php:175
+#: src/Usage/Renewal.php:226
 #, php-format
 msgid "Server %s"
 msgstr ""
 
 #. translators: %s: database name.
-#: src/Usage/Renewal.php:180
+#: src/Usage/Renewal.php:231
 #, php-format
 msgid "Database %s"
 msgstr ""
 
-#: src/Usage/Renewal.php:226
-msgid "hour"
-msgstr ""
-
 #. translators: %s: unit (GB, pack).
-#: src/Usage/Renewal.php:226
+#: src/Usage/Renewal.php:277
 #, php-format
 msgid "%s and hour"
 msgstr ""
 
-#. translators: 1: what is billed ("Server web1"), 2: month and year, 3: hours, 4: quantity note, 5: rate with currency, 6: unit, 7: cap note.
-#: src/Usage/Renewal.php:234
+#. translators: 1: what is billed ("Server web1"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: quantity note (" (2.5 GB)" or empty), 5: rate with currency, 6: unit, 7: cap note.
+#: src/Usage/Renewal.php:286
 #, php-format
-msgid "%1$s, %2$s: %3$s hours%4$s at %5$s per %6$s (excl. VAT)%7$s"
+msgid "%1$s, %2$s: %3$s%4$s at %5$s per %6$s (excl. VAT)%7$s"
 msgstr ""
 
 #. translators: %s: amount with currency.
-#: src/Usage/Renewal.php:241
+#: src/Usage/Renewal.php:293
 #, php-format
 msgid ", capped at %s a month"
 msgstr ""
 
-#. translators: 1: month and year, 2: hours, 3: quantity note, 4: rate with currency, 5: unit, 6: cap note.
-#: src/Usage/Renewal.php:250
+#. translators: 1: month and year, 2: number of hours with the word ("600 hours"), 3: quantity note (" (2.5 GB)" or empty), 4: rate with currency, 5: unit, 6: cap note.
+#: src/Usage/Renewal.php:302
 #, php-format
-msgid "%1$s: %2$s hours%3$s at %4$s per %5$s%6$s"
+msgid "%1$s: %2$s%3$s at %4$s per %5$s%6$s"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55
@@ -15983,8 +16037,10 @@ msgstr ""
 msgid "Switching…"
 msgstr ""
 
+#. translators: %s: name of this shop.
 #: templates/account/domain-page.php:251
-msgid "Switch to Beltoft DNS"
+#, php-format
+msgid "Switch to %s DNS"
 msgstr ""
 
 #: templates/account/domain-page.php:259

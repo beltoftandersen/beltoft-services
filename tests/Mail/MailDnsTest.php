@@ -67,6 +67,17 @@ final class MailDnsTest extends MailTestCase {
 		$this->assertSame( array( 'ok' ), array_values( array_unique( array_column( MailDns::apply( Resource::find( $r->id() ) ), 'status' ) ) ) );
 	}
 
+	public function test_stored_reasons_are_codes_shown_in_words_and_old_text_is_kept(): void {
+		$mx = array( 'key' => 'mx', 'type' => 'MX', 'value' => 'mail.example.net', 'name' => '@' );
+		$set = array( 'MX' => array( 'name' => 'z.example.', 'type' => 'MX', 'ttl' => 60, 'records' => array( array( 'content' => '20 other.example.', 'disabled' => false ) ) ) );
+		$this->assertSame( 'mx_other', MailDns::plan( $mx, $set, 'z.example' )['reason'] );
+		$this->assertSame( 'The domain already has other MX records.', MailDns::reason_text( 'mx_other' ) );
+		$this->assertSame( 'DNS hosting is paused for this domain.', MailDns::reason_text( 'paused' ) );
+		$this->assertStringContainsString( 'include:', MailDns::reason_text( 'spf_exists' ) );
+		$this->assertSame( '', MailDns::reason_text( '' ) );
+		$this->assertSame( 'A sentence stored before codes existed.', MailDns::reason_text( 'A sentence stored before codes existed.' ) );
+	}
+
 	public function test_plan_decisions(): void {
 		$mx    = array( 'key' => 'mx', 'type' => 'MX', 'value' => 'mail.example.net', 'name' => '@' );
 		$mxset = static fn( $content ) => array( 'MX' => array( 'name' => 'z.example.', 'type' => 'MX', 'ttl' => 60, 'records' => array( array( 'content' => $content, 'disabled' => false ) ) ) );

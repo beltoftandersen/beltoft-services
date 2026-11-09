@@ -50,6 +50,9 @@ abstract class TestCase extends \WP_UnitTestCase {
 			as_unschedule_all_actions( $hook, array(), 'beltoft-services' );
 		}
 
+		$this->order_floor = $this->highest_order_id();
+		$this->licence_floor = $this->highest_licence_ids();
+
 		$this->http_calls     = array();
 		$this->http_responder = null;
 
@@ -75,6 +78,94 @@ abstract class TestCase extends \WP_UnitTestCase {
 		remove_filter( 'pre_http_request', array( $this, 'record_http' ), 10 );
 
 		parent::tear_down();
+
+		// After the rollback: only what a test committed is left to delete.
+		$this->purge_committed_orders();
+	}
+
+	/** Highest order or subscription id when the test started. */
+	private int $order_floor = 0;
+
+	/** @var array<string, int> Highest id per beltoft-licenses table when the test started. */
+	private array $licence_floor = array();
+
+	/**
+	 * The licence and activation tables that a committed test leaves rows in.
+	 *
+	 * @return array<string, string> Name => table.
+	 */
+	private function licence_tables(): array {
+		$tables = \BeltoftLicenses\Install::tables();
+
+		return array_intersect_key( $tables, array_flip( array( 'licenses', 'activations' ) ) );
+	}
+
+	/**
+	 * @return array<string, int>
+	 */
+	private function highest_licence_ids(): array {
+		global $wpdb;
+		$out = array();
+		foreach ( $this->licence_tables() as $name => $table ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture bookkeeping, fixed names.
+			$out[ $name ] = (int) $wpdb->get_var( "SELECT MAX(id) FROM `{$table}`" );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The highest id in the orders tables (posts and, where it exists, HPOS).
+	 */
+	private function highest_order_id(): int {
+		global $wpdb;
+		$types = "'shop_order','shop_subscription','shop_order_refund','shop_order_placehold'";
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture bookkeeping, fixed names.
+		$high = (int) $wpdb->get_var( "SELECT MAX(ID) FROM {$wpdb->posts} WHERE post_type IN ({$types})" );
+		$hpos = $wpdb->prefix . 'wc_orders';
+		if ( $hpos === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $hpos ) ) ) {
+			$high = max( $high, (int) $wpdb->get_var( "SELECT MAX(id) FROM {$hpos}" ) );
+		}
+		// phpcs:enable
+
+		return $high;
+	}
+
+	/**
+	 * Force-deletes the orders and subscriptions this test made, so their lines go with them. wcs_create_renewal_order()
+	 * commits the test's transaction, and what is committed survives the rollback: without this the order lines of
+	 * every such test pile up in the shared test database.
+	 */
+	private function purge_committed_orders(): void {
+		global $wpdb;
+		$types = "'shop_order','shop_subscription','shop_order_refund','shop_order_placehold'";
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture cleanup.
+		$ids  = array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type IN ({$types}) AND ID > %d", $this->order_floor ) ) );
+		$hpos = $wpdb->prefix . 'wc_orders';
+		if ( $hpos === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $hpos ) ) ) {
+			$ids = array_merge( $ids, array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$hpos} WHERE id > %d", $this->order_floor ) ) ) );
+		}
+		// phpcs:enable
+
+		// Newest first: refunds and renewals before the parents they point at.
+		rsort( $ids );
+
+		foreach ( array_unique( $ids ) as $id ) {
+			$order = wc_get_order( $id );
+
+			if ( $order ) {
+				$order->delete( true );
+			}
+		}
+
+		foreach ( $this->licence_tables() as $name => $table ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture cleanup, fixed names.
+			$wpdb->query( $wpdb->prepare( "DELETE FROM `{$table}` WHERE id > %d", $this->licence_floor[ $name ] ?? 0 ) );
+		}
+
+		// The test transaction runs with autocommit off: make the deletes stick (nothing else is pending after the rollback)
+		// and release the table locks the reads above took, or a test that installs the schema in another process waits for them.
+		$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture cleanup.
 	}
 
 	/**

@@ -146,7 +146,7 @@ class TransferDnsPageTest extends TestCase {
 		( new DomainDriver() )->render_admin( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Transfer DNS', $html );
-		$this->assertStringContainsString( 'Move the DNS to Beltoft first', $html );
+		$this->assertStringContainsString( 'Move the DNS to ' . \BeltoftServices\Brand::name() . ' first', $html );
 		$this->assertStringContainsString( 'Waiting until the domain uses our name servers', $html );
 		$this->assertStringContainsString( 'ns1.old-host.example', $html );
 		$this->assertStringContainsString( 'could not be read', $html );

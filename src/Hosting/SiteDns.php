@@ -223,7 +223,7 @@ final class SiteDns {
 				}
 
 				if ( $customer && Records::paused( $zone, $data ) ) {
-					return 'DNS hosting is paused for this domain.';
+					return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
 				}
 
 				foreach ( (array) ( $data['rrsets'] ?? array() ) as $set ) {

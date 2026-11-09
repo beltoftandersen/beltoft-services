@@ -164,6 +164,57 @@ final class Renewal {
 	}
 
 	/**
+	 * "1 hour", "600 hours": the count in the site's number format, the word by plural form.
+	 *
+	 * @param int $hours Hours.
+	 */
+	private static function hours_text( int $hours ): string {
+		/* translators: %s: number of hours. */
+		return sprintf( _n( '%s hour', '%s hours', $hours, 'beltoft-services' ), number_format_i18n( $hours ) );
+	}
+
+	/**
+	 * The name of a billing unit, translated, for "per %s and hour".
+	 *
+	 * @param string $unit Unit as stored (hour, GB, pack).
+	 */
+	private static function unit_name( string $unit ): string {
+		switch ( $unit ) {
+			case 'hour':
+				return __( 'hour', 'beltoft-services' );
+			case 'GB':
+				return _x( 'GB', 'unit symbol for gigabyte', 'beltoft-services' );
+			case 'pack':
+				return _x( 'pack', 'unit name, singular, as in "per pack and hour"', 'beltoft-services' );
+		}
+
+		return $unit;
+	}
+
+	/**
+	 * The quantity of a line as a note: " (2.5 GB)", " (2 packs)", empty for hours.
+	 *
+	 * @param float  $quantity Quantity.
+	 * @param string $unit     Unit as stored.
+	 */
+	private static function quantity_note( float $quantity, string $unit ): string {
+		if ( 'hour' === $unit ) {
+			return '';
+		}
+
+		$text = self::quantity_text( $quantity );
+
+		if ( 'pack' === $unit ) {
+			$count = floor( $quantity ) === $quantity ? (int) $quantity : 2;
+
+			/* translators: %s: number of snapshot packs. */
+			return ' (' . sprintf( _n( '%s pack', '%s packs', $count, 'beltoft-services' ), $text ) . ')';
+		}
+
+		return ' (' . sprintf( /* translators: 1: quantity, 2: unit symbol (GB). */ _x( '%1$s %2$s', 'quantity with unit', 'beltoft-services' ), $text, self::unit_name( $unit ) ) . ')';
+	}
+
+	/**
 	 * What a usage fee line is about, in words for the customer: "Server web1", "Backups for web1".
 	 *
 	 * @param string $item  Item.
@@ -223,18 +274,19 @@ final class Renewal {
 
 		foreach ( $statement['lines'] as $line ) {
 			$fee = new \WC_Order_Item_Fee();
-			$per = 'hour' === $line['unit'] ? __( 'hour', 'beltoft-services' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), $line['unit'] );
-			$qty = 'hour' === $line['unit'] ? '' : sprintf( ' (%s %s)', self::quantity_text( (float) $line['quantity'] ), $line['unit'] );
+			$per   = 'hour' === $line['unit'] ? self::unit_name( 'hour' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), self::unit_name( (string) $line['unit'] ) );
+			$qty   = self::quantity_note( (float) $line['quantity'], (string) $line['unit'] );
+			$hours = self::hours_text( (int) $line['hours'] );
 			$subject = self::line_subject( (string) $line['item'], self::label( $line['resource_id'] ) );
 			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
 			$rate    = Rates::money( (float) $line['rate'], 4, $currency );
 			$fee->set_name(
 				sprintf(
-					/* translators: 1: what is billed ("Server web1"), 2: month and year, 3: hours, 4: quantity note, 5: rate with currency, 6: unit, 7: cap note. */
-					__( '%1$s, %2$s: %3$s hours%4$s at %5$s per %6$s (excl. VAT)%7$s', 'beltoft-services' ),
+					/* translators: 1: what is billed ("Server web1"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: quantity note (" (2.5 GB)" or empty), 5: rate with currency, 6: unit, 7: cap note. */
+					__( '%1$s, %2$s: %3$s%4$s at %5$s per %6$s (excl. VAT)%7$s', 'beltoft-services' ),
 					$subject,
 					$month,
-					(string) $line['hours'],
+					$hours,
 					$qty,
 					$rate,
 					$per,
@@ -246,10 +298,10 @@ final class Renewal {
 			$fee->add_meta_data(
 				InvoiceView::META_DETAIL,
 				sprintf(
-					/* translators: 1: month and year, 2: hours, 3: quantity note, 4: rate with currency, 5: unit, 6: cap note. */
-					__( '%1$s: %2$s hours%3$s at %4$s per %5$s%6$s', 'beltoft-services' ),
+					/* translators: 1: month and year, 2: number of hours with the word ("600 hours"), 3: quantity note (" (2.5 GB)" or empty), 4: rate with currency, 5: unit, 6: cap note. */
+					__( '%1$s: %2$s%3$s at %4$s per %5$s%6$s', 'beltoft-services' ),
 					$month,
-					(string) $line['hours'],
+					$hours,
 					$qty,
 					$rate,
 					$per,

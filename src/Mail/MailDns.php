@@ -176,14 +176,14 @@ final class MailDns {
 	 */
 	public static function publish( int $user_id, string $zone, array $row ) {
 		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) ) {
-			return array( 'conflict', 'The domain is not one of your domains on our name servers.' );
+			return array( 'conflict', 'not_ours' );
 		}
 
 		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
 		$set  = Records::validate( $zone, array( array_intersect_key( $row + array( 'name' => '@' ), array_flip( array( 'name', 'type', 'ttl', 'value', 'priority' ) ) ) ) );
 
 		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
-			return array( 'conflict', 'The record is not valid for this domain.' );
+			return array( 'conflict', 'invalid' );
 		}
 
 		$locked = Records::locked(
@@ -197,11 +197,11 @@ final class MailDns {
 				}
 
 				if ( ! is_array( $zone_data ) ) {
-					return array( 'conflict', 'The DNS zone does not exist.' );
+					return array( 'conflict', 'no_zone' );
 				}
 
 				if ( Records::paused( $zone, $zone_data ) ) {
-					return array( 'conflict', 'DNS hosting is paused for this domain.' );
+					return array( 'conflict', 'paused' );
 				}
 
 				$here = self::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
@@ -225,6 +225,43 @@ final class MailDns {
 	}
 
 	/**
+	 * The customer-facing text of a stored record reason, in the current locale. Reasons are stored as stable codes so they
+	 * do not freeze in the locale of the job that made them; a row stored before that holds plain text, shown as it is.
+	 *
+	 * @param string $stored The stored reason.
+	 * @return string
+	 */
+	public static function reason_text( string $stored ): string {
+		switch ( $stored ) {
+			case 'not_ours':
+				return __( 'The domain is not one of your domains on our name servers.', 'beltoft-services' );
+			case 'invalid':
+				return __( 'The record is not valid for this domain.', 'beltoft-services' );
+			case 'no_zone':
+				return __( 'The DNS zone does not exist.', 'beltoft-services' );
+			case 'paused':
+				return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
+			case 'name_taken':
+				return __( 'The name already has a DNS record.', 'beltoft-services' );
+			case 'name_alias':
+				return __( 'The name is an alias (CNAME) and cannot also hold this record.', 'beltoft-services' );
+			case 'mx_other':
+				return __( 'The domain already has other MX records.', 'beltoft-services' );
+			case 'spf_exists':
+				/* translators: %s: SPF include to add */
+				return sprintf( __( 'The domain already has an SPF record. It was not changed: add include:%s to it.', 'beltoft-services' ), MailSettings::spf_include() );
+			case 'dkim_other':
+				return __( 'The name already holds another DKIM key.', 'beltoft-services' );
+			case 'dmarc_kept':
+				return __( 'Your own DMARC record was kept.', 'beltoft-services' );
+			case 'unplaced':
+				return __( 'The record could not be placed.', 'beltoft-services' );
+		}
+
+		return $stored;
+	}
+
+	/**
 	 * What to do for one record given what the name holds. Pure: no I/O.
 	 *
 	 * @param array<string, mixed>                 $row  The wanted record.
@@ -245,11 +282,11 @@ final class MailDns {
 
 			return isset( $here['CNAME'] ) && 1 === count( $here ) && array( strtolower( (string) $row['value'] ) ) === $have
 				? $none
-				: array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The name already has a DNS record.', 'beltoft-services' ) ) );
+				: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'name_taken' ) );
 		}
 
 		if ( isset( $here['CNAME'] ) ) {
-			return array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The name is an alias (CNAME) and cannot also hold this record.', 'beltoft-services' ) ) );
+			return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'name_alias' ) );
 		}
 
 		$set  = $here[ $type ] ?? null;
@@ -263,7 +300,7 @@ final class MailDns {
 
 			return array( '10 ' . strtolower( (string) $row['value'] ) ) === $have
 				? $none
-				: array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The domain already has other MX records.', 'beltoft-services' ) ) );
+				: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'mx_other' ) );
 		}
 
 		// TXT from here.
@@ -279,7 +316,7 @@ final class MailDns {
 
 				return 1 === count( $spf ) && false !== stripos( $spf[0], 'include:' . MailSettings::spf_include() )
 					? $none
-					: array_merge( $none, array( 'status' => 'conflict', 'reason' => sprintf( /* translators: %s: SPF include to add */ __( 'The domain already has an SPF record. It was not changed: add include:%s to it.', 'beltoft-services' ), MailSettings::spf_include() ) ) );
+					: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'spf_exists' ) );
 
 			case 'dkim':
 				if ( array() === $have ) {
@@ -288,7 +325,7 @@ final class MailDns {
 
 				return in_array( preg_replace( '/\s+/', '', (string) $row['value'] ), array_map( static fn( $v ) => preg_replace( '/\s+/', '', $v ), $have ), true )
 					? $none
-					: array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The name already holds another DKIM key.', 'beltoft-services' ) ) );
+					: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'dkim_other' ) );
 
 			case 'dmarc':
 				if ( array() === $have ) {
@@ -296,10 +333,10 @@ final class MailDns {
 				}
 
 				// A policy the customer chose is theirs: kept.
-				return array_merge( $none, array( 'reason' => __( 'Your own DMARC record was kept.', 'beltoft-services' ) ) );
+				return array_merge( $none, array( 'reason' => 'dmarc_kept' ) );
 		}
 
-		return array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The record could not be placed.', 'beltoft-services' ) ) );
+		return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'unplaced' ) );
 	}
 
 	/**

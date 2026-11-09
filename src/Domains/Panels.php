@@ -2,6 +2,7 @@
 /** Customer and admin domain details. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Brand;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -72,7 +73,10 @@ final class Panels {
 		$rows  = array();
 		$claim = (int) $r->get( 'claim_id' ) > 0 ? DnsClaims::get( (int) $r->get( 'claim_id' ) ) : null;
 		if ( $claim ) {
-			$rows[ __( 'Claim', 'beltoft-services' ) ] = '#' . $claim['id'] . ( ! empty( $claim['verified_at'] ) ? ', verified ' . $claim['verified_at'] . ' UTC' : '' );
+			$rows[ __( 'Claim', 'beltoft-services' ) ] = ! empty( $claim['verified_at'] )
+				/* translators: 1: claim number, 2: verification date and time. */
+				? sprintf( __( '#%1$d, verified %2$s UTC', 'beltoft-services' ), (int) $claim['id'], $claim['verified_at'] )
+				: '#' . (int) $claim['id'];
 		}
 		$row = DnsAssignments::get( (string) $r->get( 'domain' ) );
 		if ( $row ) {
@@ -105,8 +109,10 @@ final class Panels {
 	 */
 	private static function transfer_rows( Resource $r ): array {
 		$labels = array(
-			TransferDns::FIRST => __( 'Move the DNS to Beltoft first (import and name servers before the transfer)', 'beltoft-services' ),
-			TransferDns::AFTER => __( 'Move my DNS to Beltoft when the transfer is done', 'beltoft-services' ),
+			/* translators: %s: name of this shop. */
+			TransferDns::FIRST => sprintf( __( 'Move the DNS to %s first (import and name servers before the transfer)', 'beltoft-services' ), Brand::name() ),
+			/* translators: %s: name of this shop. */
+			TransferDns::AFTER => sprintf( __( 'Move my DNS to %s when the transfer is done', 'beltoft-services' ), Brand::name() ),
 			TransferDns::KEEP  => __( 'Keep my DNS where it is', 'beltoft-services' ),
 		);
 		$plan   = TransferDns::plan( $r );
@@ -115,7 +121,10 @@ final class Panels {
 		if ( 'served' === $plan ) {
 			$rows[ __( 'Transfer DNS', 'beltoft-services' ) ] = __( 'Our DNS already serves the domain for this customer (no choice)', 'beltoft-services' );
 		} else {
-			$rows[ __( 'Transfer DNS', 'beltoft-services' ) ] = $labels[ TransferDns::choice( $r ) ] . ( '' === (string) $r->get( 'transfer_dns' ) ? __( ' (no choice stored: an older order)', 'beltoft-services' ) : '' );
+			$rows[ __( 'Transfer DNS', 'beltoft-services' ) ] = '' === (string) $r->get( 'transfer_dns' )
+				/* translators: %s: the DNS choice. */
+				? sprintf( __( '%s (no choice stored: an older order)', 'beltoft-services' ), $labels[ TransferDns::choice( $r ) ] )
+				: $labels[ TransferDns::choice( $r ) ];
 		}
 
 		$rows[ __( 'Waiting for', 'beltoft-services' ) ]          = TransferDns::waiting_reason( $r );
