@@ -727,4 +727,29 @@ class AddonsTest extends HostingCase {
 		$this->assertStringContainsString( 'host: offer.host', $js );
 		$this->assertStringContainsString( 'slug: offer.slug', $js );
 	}
+
+	public function test_a_renewal_that_cannot_take_the_storage_back_alerts_the_owner(): void {
+		$this->card_pays();
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$mails = array();
+		add_filter( 'wp_mail', static function ( $args ) use ( &$mails ) {
+			if ( str_contains( (string) $args['subject'], 'Add-on change needs a look' ) ) {
+				$mails[] = $args;
+			}
+			return $args;
+		} );
+		$r = $this->account();
+		$this->with_mailbox( $r );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$a->buy_addon( 'mail_pack', 'info@mail.customer.example', 100 );
+		$a->remove_pack( 'info@mail.customer.example' );
+
+		$this->mailcow->fail_next( 'list_mailboxes', new \WP_Error( 'down', 'The mail server is down.' ) );
+		wcs_create_renewal_order( $this->sub( $r ) );
+
+		$this->assertFalse( Addons::has( $r, Addons::KIND_PACK, 'info@mail.customer.example' ), 'The line is gone.' );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'info@mail.customer.example', $mails[0]['message'] );
+		remove_all_filters( 'wp_mail' );
+	}
 }

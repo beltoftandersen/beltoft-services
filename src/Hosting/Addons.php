@@ -860,11 +860,14 @@ final class Addons {
 			$r = Resource::find( $one[0] );
 
 			if ( $r ) {
-				if ( self::KIND_DOMAIN === $one[1] ) {
-					self::drop_domain( $r, $one[2] );
-				}
+				$ok = self::KIND_DOMAIN !== $one[1] || self::drop_domain( $r, $one[2] );
+				$ok = self::apply( $r ) && $ok;
 
-				self::apply( $r );
+				// The line is gone for good, but what it gave stays until somebody looks: never silent.
+				if ( ! $ok ) {
+					$sub->add_order_note( sprintf( 'Add-on %1$s (%2$s) ended at the renewal, but what it gave could not be taken back.', $one[1], $one[2] ) );
+					self::alert( 'Add-on change needs a look', sprintf( "Subscription #%1\$d: the add-on %2\$s (%3\$s) ended at the renewal, but the domain or storage it gave could not be taken back (the server did not answer).\n\nTake it back by hand, or run the change again from the account.", $sub->get_id(), $one[1], $one[2] ) );
+				}
 			}
 		}
 
@@ -876,27 +879,30 @@ final class Addons {
 	 *
 	 * @param Resource $r   Hosting resource.
 	 * @param string   $reg Registrable domain.
+	 * @return bool False when a name could not be removed.
 	 */
-	private static function drop_domain( Resource $r, string $reg ): void {
+	private static function drop_domain( Resource $r, string $reg ): bool {
 		$actions = new HostingActions( $r );
+		$ok      = true;
 
 		foreach ( SiteDomains::for_resource( $r->id() ) as $row ) {
-			if ( 'preview' !== $row['kind'] && self::registrable( $row['host'] ) === $reg ) {
-				$actions->remove_domain( $row['host'], true );
+			if ( 'preview' !== $row['kind'] && self::registrable( $row['host'] ) === $reg && is_wp_error( $actions->remove_domain( $row['host'], true ) ) ) {
+				$ok = false;
 			}
 		}
+
+		return $ok;
 	}
 
 	/**
 	 * Brings what the add-ons give in line with the lines now: the Email lite storage of each mailbox.
 	 *
 	 * @param Resource $r Hosting resource.
+	 * @return bool False when the mail server could not be changed.
 	 */
-	public static function apply( Resource $r ): void {
+	public static function apply( Resource $r ): bool {
 		$child = SiteMail::child_of( $r );
 
-		if ( $child ) {
-			MailPacks::apply( $child, self::packs( $r ) );
-		}
+		return $child ? MailPacks::apply( $child, self::packs( $r ) ) : true;
 	}
 }
