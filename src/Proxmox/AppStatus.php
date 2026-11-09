@@ -55,13 +55,7 @@ final class AppStatus {
 
 	/** Narrow the sweep in SQL before loading resources. Verify each match after reading it. */
 	public static function candidates(): array {
-		global $wpdb;
-		$table = \BeltoftLicenses\Install::tables()['activations'];
-		$installing = '%' . $wpdb->esc_like( '"app_state":"installing"' ) . '%';
-		$unknown = '%' . $wpdb->esc_like( '"app_state":"unknown"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- bounded custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND (meta LIKE %s OR meta LIKE %s)", $table, $installing, $unknown ) );
-		return array_map( 'intval', (array) $ids );
+		return Resource::find_by_meta( 'vm', 'app_state', array( 'installing', 'unknown' ) );
 	}
 
 	public static function run( int $id ): void {

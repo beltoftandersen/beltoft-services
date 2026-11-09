@@ -155,13 +155,7 @@ final class AppWww {
 
 	/** Recovers a look that was lost (a worker stopped, an action removed). */
 	public static function sweep(): void {
-		global $wpdb;
-		$table = \BeltoftLicenses\Install::tables()['activations'];
-		$wait  = '%' . $wpdb->esc_like( '"app_www":"waiting"' ) . '%';
-		$apply = '%' . $wpdb->esc_like( '"app_www":"applying"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND (meta LIKE %s OR meta LIKE %s)", $table, $wait, $apply ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'vm', 'app_www', array( 'waiting', 'applying' ) ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'app_state' ) ) {
 				self::schedule( (int) $id, 0 );

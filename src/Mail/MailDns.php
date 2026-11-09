@@ -559,13 +559,7 @@ final class MailDns {
 	 * Recovers reads that were lost (a worker stopped, an action removed).
 	 */
 	public static function sweep(): void {
-		global $wpdb;
-
-		$like = '%' . $wpdb->esc_like( '"mail_dns":"waiting"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL AND meta LIKE %s', \BeltoftLicenses\Install::tables()['activations'], MailDriver::KIND, $like ) );
-
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'waiting' ) as $id ) {
 			self::schedule( (int) $id, 0 );
 		}
 	}

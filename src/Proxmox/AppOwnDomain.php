@@ -153,12 +153,7 @@ final class AppOwnDomain {
 
 	/** Recovers a read that was lost (a worker stopped, an action removed). */
 	public static function sweep(): void {
-		global $wpdb;
-		$table   = \BeltoftLicenses\Install::tables()['activations'];
-		$pending = '%' . $wpdb->esc_like( '"app_domain_dns":"waiting"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND meta LIKE %s", $table, $pending ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'vm', 'app_domain_dns', 'waiting' ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && self::waiting( $r ) ) {
 				self::start( $r );

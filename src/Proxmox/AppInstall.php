@@ -38,12 +38,7 @@ final class AppInstall {
 
 	/** Recover an install action lost after the server became ready. */
 	public static function sweep(): void {
-		global $wpdb;
-		$table = \BeltoftLicenses\Install::tables()['activations'];
-		$pending = '%' . $wpdb->esc_like( '"app_state":"pending"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND meta LIKE %s", $table, $pending ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'vm', 'app_state', 'pending' ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && 'pending' === $r->get( 'app_state' ) ) {
 				self::schedule( (int) $id );

@@ -8,7 +8,6 @@
 namespace BeltoftServices;
 
 use BeltoftLicenses\Events;
-use BeltoftLicenses\Install;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 
@@ -102,10 +101,7 @@ final class Retention {
 	 * costs nothing while deletion is off and nothing is held.
 	 */
 	private static function any_held(): bool {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE deactivated_at IS NULL AND meta LIKE %s AND meta NOT LIKE %s', Install::tables()['activations'], '%"breach_at":%', '%"breach_at":null%' ) ) > 0;
+		return Resource::any_meta_set( 'breach_at' );
 	}
 
 	/**
@@ -116,12 +112,7 @@ final class Retention {
 	 * @return int[]
 	 */
 	private static function batch( string $kind, int $after ): array {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL AND id > %d ORDER BY id ASC LIMIT %d', Install::tables()['activations'], $kind, $after, self::BATCH ) );
-
-		return array_map( 'intval', (array) $rows );
+		return Resource::live_ids( $kind, $after, self::BATCH );
 	}
 
 	/**

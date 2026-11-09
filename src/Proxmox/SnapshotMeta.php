@@ -89,16 +89,13 @@ final class SnapshotMeta {
 
 	/** Live pack resources linked to one server, whatever their state (the cascade and the card use this). */
 	public static function for_server( Resource $server ): array {
-		global $wpdb;
 		$license_id = (int) ( $server->license()['id'] ?? 0 );
 		$out        = array();
 		if ( $license_id < 1 ) {
 			return $out;
 		}
 		// One query for the candidates (the license id is in the meta text), then the exact check on each: no loading of every pack of every customer.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'snapshot' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id ASC", \BeltoftLicenses\Install::tables()['activations'], '%\"server_license\":%' . $wpdb->esc_like( (string) $license_id ) . '%' ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'snapshot', 'server_license', $license_id ) as $id ) {
 			$pack = Resource::find( (int) $id );
 			if ( $pack && SnapshotDriver::ID === $pack->get( 'driver' ) && (int) $pack->get( 'server_license' ) === $license_id ) {
 				$out[] = $pack;

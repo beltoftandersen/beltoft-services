@@ -8,7 +8,6 @@
 namespace BeltoftServices\Emails;
 
 use BeltoftLicenses\Import;
-use BeltoftLicenses\Install;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
@@ -409,11 +408,6 @@ final class Emails {
 	 * @return int[]
 	 */
 	private static function batch( string $kind, int $after ): array {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL AND id > %d ORDER BY id ASC LIMIT %d', Install::tables()['activations'], $kind, $after, self::BATCH ) );
-
-		return array_map( 'intval', (array) $rows );
+		return Resource::live_ids( $kind, $after, self::BATCH );
 	}
 }

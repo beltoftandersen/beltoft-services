@@ -39,12 +39,7 @@ final class AppDomainRelease {
 
 	/** Recover an old pending request if its scheduled action was lost. */
 	public static function sweep(): void {
-		global $wpdb;
-		$table = \BeltoftLicenses\Install::tables()['activations'];
-		$pending = '%' . $wpdb->esc_like( '"app_domain_old":[' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND meta LIKE %s", $table, $pending ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_with_list( 'vm', 'app_domain_old' ) as $id ) {
 			$r = Resource::find( (int) $id );
 			$old = $r ? (array) $r->get( 'app_domain_old' ) : array();
 			if ( $r && $r->is_live() && $old && time() - (int) ( $old[0]['at'] ?? 0 ) >= ( empty( $old[0]['in_progress'] ) ? MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS ) ) {
