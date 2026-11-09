@@ -105,6 +105,20 @@
 		window.location.reload();
 	}
 
+	// Draws the card again from the server (counts, mailbox list and limits) without leaving the page, so a password panel
+	// can be shown over fresh numbers. Any failure keeps the page as it is.
+	function redraw( box ) {
+		return window.fetch( window.location.href, { credentials: 'same-origin', headers: { Accept: 'text/html' } } ).then( function ( response ) {
+			return response.ok ? response.text() : '';
+		} ).then( function ( html ) {
+			var next = html ? new window.DOMParser().parseFromString( html, 'text/html' ).querySelector( '[data-mail-card]' ) : null;
+
+			if ( next ) {
+				box.innerHTML = next.innerHTML;
+			}
+		} ).catch( function () {} );
+	}
+
 	function lines( text ) {
 		return ( text || '' ).split( /[\n,;]+/ ).map( function ( part ) {
 			return part.trim();
@@ -185,7 +199,9 @@
 						return null;
 					}
 
-					return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+					return redraw( box ).then( function () {
+						return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+					} );
 				} );
 			} );
 

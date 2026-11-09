@@ -34,10 +34,10 @@ final class MailDnsTest extends MailTestCase {
 	}
 
 	public function test_settings_drive_the_records(): void {
-		$this->settings( array( 'mail_dmarc_rua' => '', 'mail_spf_include' => '' ) );
+		$this->settings( array( 'mail_dmarc_rua' => '', 'mail_spf_include' => '', 'admin_email' => 'admin@example.org' ) );
 		$by = array_column( MailDns::records( 'a.example', '' ), null, 'key' );
 
-		$this->assertSame( 'v=DMARC1; p=quarantine', $by['dmarc']['value'], 'No report address.' );
+		$this->assertSame( 'v=DMARC1; p=quarantine; rua=mailto:admin@example.org', $by['dmarc']['value'], 'No report address: the admin email.' );
 		$this->assertSame( 'v=spf1 include:mail.example.net ~all', $by['spf']['value'], 'The mail host when no include name is set.' );
 		$this->assertArrayNotHasKey( 'dkim', $by, 'No key, no DKIM record.' );
 

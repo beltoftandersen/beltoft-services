@@ -56,6 +56,8 @@ final class MailField {
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
+		add_filter( 'beltoft_services_progress_wait', array( __CLASS__, 'progress_wait' ), 10, 4 );
+		add_filter( 'woocommerce_order_item_get_formatted_meta_data', array( __CLASS__, 'show_item_domain' ), 10, 2 );
 	}
 
 	/**
@@ -300,7 +302,7 @@ final class MailField {
 		}
 
 		if ( $have ) {
-			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OURS ) . '"' . checked( $mode, self::MODE_OURS, false ) . '> ' . esc_html__( 'A domain on our name servers', 'beltoft-services' ) . '</label>';
+			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OURS ) . '"' . checked( $mode, self::MODE_OURS, false ) . '> ' . esc_html__( 'One of your domains with us', 'beltoft-services' ) . '</label>';
 			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone" aria-label="' . esc_attr__( 'Domain on our name servers', 'beltoft-services' ) . '">';
 
 			foreach ( $zones as $option ) {
@@ -312,7 +314,7 @@ final class MailField {
 		}
 
 		if ( $have || $news ) {
-			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OWN ) . '"' . checked( $mode, self::MODE_OWN, false ) . '> ' . esc_html__( 'A domain hosted elsewhere', 'beltoft-services' ) . '</label>';
+			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OWN ) . '"' . checked( $mode, self::MODE_OWN, false ) . '> ' . esc_html__( 'A domain at another provider', 'beltoft-services' ) . '</label>';
 		} else {
 			echo '<input type="hidden" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OWN ) . '">';
 			echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_own">' . esc_html__( 'Domain you want email for', 'beltoft-services' ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
@@ -414,6 +416,62 @@ final class MailField {
 	}
 
 	// -- Hand-over to the resource --------------------------------------------------------------
+
+	/**
+	 * True while the domain of the same order is still being registered or transferred and no proof step has run.
+	 *
+	 * @param Resource $r Mail resource.
+	 */
+	public static function waiting_for_registration( Resource $r ): bool {
+		return MailDriver::ID === $r->get( 'driver' ) && (int) $r->get( self::META_WAIT_UNTIL ) > time() && ! in_array( 'proof', (array) $r->get( 'steps' ), true );
+	}
+
+	/**
+	 * The customer's wait text while the domain of the order is being registered or transferred.
+	 *
+	 * @param mixed    $wait    Earlier answer.
+	 * @param Resource $r       Resource.
+	 * @param string   $driver  Driver id.
+	 * @param string   $current Current step (unused).
+	 * @return array<string, mixed>
+	 */
+	public static function progress_wait( $wait, $r, $driver, $current = '' ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		$wait = (array) $wait;
+
+		if ( $r instanceof Resource && MailDriver::ID === $driver && self::waiting_for_registration( $r ) ) {
+			$wait['text'] = self::wait_text();
+		}
+
+		return $wait;
+	}
+
+	/**
+	 * Shows the chosen domain on the order line as "Email domain: name" (the stored meta is hidden by its underscore).
+	 *
+	 * @param mixed $formatted Formatted meta rows.
+	 * @param mixed $item      Order item.
+	 * @return mixed
+	 */
+	public static function show_item_domain( $formatted, $item ) {
+		if ( ! is_array( $formatted ) || ! $item instanceof \WC_Order_Item_Product ) {
+			return $formatted;
+		}
+
+		$name = MailDomain::normalise( $item->get_meta( self::ITEM_META, true ) );
+
+		if ( null !== $name ) {
+			$formatted[] = (object) array( 'id' => 0, 'key' => self::ITEM_META, 'value' => $name, 'display_key' => __( 'Email domain', 'beltoft-services' ), 'display_value' => '<p>' . esc_html( $name ) . '</p>' );
+		}
+
+		return $formatted;
+	}
+
+	/**
+	 * Fixed text for a domain still being registered.
+	 */
+	public static function wait_text(): string {
+		return __( 'Waiting for your domain registration to finish.', 'beltoft-services' );
+	}
 
 	/**
 	 * A new email domain starts with the domain its order line carries. When an order has several lines of one plan, each

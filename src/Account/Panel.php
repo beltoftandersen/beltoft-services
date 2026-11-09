@@ -147,6 +147,10 @@ final class Panel {
 			return __( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
 		}
 
+		if ( $r && 'getting-ready' === self::group( $state ) && \BeltoftServices\Mail\MailField::waiting_for_registration( $r ) ) {
+			return \BeltoftServices\Mail\MailField::wait_text();
+		}
+
 		$app = $r ? \BeltoftServices\Proxmox\AppProgress::message( $r ) : '';
 
 		if ( '' !== $app ) {

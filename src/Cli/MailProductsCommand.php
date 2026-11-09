@@ -46,6 +46,27 @@ final class MailProductsCommand {
 	}
 
 	/**
+	 * The variation description of a plan, for example "5 mailboxes of 10 GB, 50 aliases, 3 domains".
+	 *
+	 * @param array<string, mixed> $plan Plan with mailboxes, quota_mb, aliases and domains.
+	 */
+	public static function plan_description( array $plan ): string {
+		$mailboxes = (int) $plan['mailboxes'];
+		$aliases   = (int) $plan['aliases'];
+		$domains   = (int) $plan['domains'];
+		$gb        = (int) $plan['quota_mb'] / 1024;
+
+		return sprintf(
+			/* translators: 1: mailboxes, 2: size of each in GB, 3: aliases, 4: domains. */
+			__( '%1$s of %2$d GB, %3$s, %4$s', 'beltoft-services' ),
+			sprintf( /* translators: %d: number of mailboxes. */ _n( '%d mailbox', '%d mailboxes', $mailboxes, 'beltoft-services' ), $mailboxes ),
+			$gb,
+			sprintf( /* translators: %d: number of aliases. */ _n( '%d alias', '%d aliases', $aliases, 'beltoft-services' ), $aliases ),
+			sprintf( /* translators: %d: number of domains. */ _n( '%d domain', '%d domains', $domains, 'beltoft-services' ), $domains )
+		);
+	}
+
+	/**
 	 * The id of a product with the mail driver, 0 when there is none.
 	 */
 	public static function existing(): int {
@@ -111,7 +132,7 @@ final class MailProductsCommand {
 			$variation->set_virtual( true );
 			$variation->set_status( 'publish' );
 			$variation->set_tax_class( 'parent' );
-			$variation->set_description( sprintf( '%d mailbox(es) of %d GB, %d aliases, %d domain(s)', (int) $plan['mailboxes'], (int) $plan['quota_mb'] / 1024, (int) $plan['aliases'], (int) $plan['domains'] ) );
+			$variation->set_description( self::plan_description( $plan ) );
 			$vid = $variation->save();
 
 			$meta = array(
