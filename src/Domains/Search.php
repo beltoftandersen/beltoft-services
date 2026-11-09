@@ -204,7 +204,8 @@ final class Search {
 	public static function enqueue_assets(): void {
 		$asset_dir = plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'assets/';
 		self::enqueue_style();
-		wp_enqueue_script( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.js', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( $asset_dir . 'domain-search.js' ), true );
+		wp_enqueue_script( 'beltoft-services-domain-search', plugins_url( 'assets/domain-search.js', BELTOFT_SERVICES_FILE ), array( 'wp-i18n' ), (string) filemtime( $asset_dir . 'domain-search.js' ), true );
+		wp_set_script_translations( 'beltoft-services-domain-search', 'beltoft-services', plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'languages' );
 	}
 
 	/** Only the stylesheet: the search form that submits to the page needs no script. */

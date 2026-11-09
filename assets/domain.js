@@ -1,13 +1,14 @@
 /* Domain actions use the same REST nonce and resource id as the service account panel. */
 ( function () {
 	'use strict';
+	var __ = window.wp.i18n.__;
 	var config = window.beltoftServicesAccount;
 	if ( ! config ) { return; }
 	function request( method, path, args ) {
 		return window.fetch( config.root + path, { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: args ? JSON.stringify( { args: args } ) : undefined } ).then( function ( response ) {
 			var nonce = response.headers.get( 'X-WP-Nonce' );
 			if ( nonce ) { config.nonce = nonce; }
-			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
+			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || __( 'Request failed', 'beltoft-services' ) ); } return body; } );
 		} );
 	}
 	window.beltoftDomainRequest = request;
@@ -41,7 +42,7 @@
 		cells[ 0 ].appendChild( name );
 		var type = document.createElement( 'select' );
 		type.setAttribute( 'data-f', 'type' );
-		type.setAttribute( 'aria-label', 'Type' );
+		type.setAttribute( 'aria-label', __( 'Type', 'beltoft-services' ) );
 		TYPES.forEach( function ( value ) { var o = document.createElement( 'option' ); o.value = o.textContent = value; type.appendChild( o ); } );
 		type.value = row.type || 'A';
 		type.addEventListener( 'change', function () { showExtras( tr ); } );
@@ -208,11 +209,11 @@
 		var ask = form.querySelector( '.beltoft-services-domain-stepup__ask' );
 		var scope = form.closest( '[data-domain-resource]' ).dataset.domainResource;
 		if ( bs && bs.locked( scope ) ) { return; }
-		var handle = bs.busy( form.getAttribute( 'data-sending' ) || 'Sending the code…', scope, send );
+		var handle = bs.busy( form.getAttribute( 'data-sending' ) || __( 'Sending the code…', 'beltoft-services' ), scope, send );
 		window.fetch( config.root + 'step-up/send', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { purpose: 'transfer_code' } ) } ).then( function ( response ) {
 			var nonce = response.headers.get( 'X-WP-Nonce' );
 			if ( nonce ) { config.nonce = nonce; }
-			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
+			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || __( 'Request failed', 'beltoft-services' ) ); } return body; } );
 		} ).then( function () {
 			if ( ask ) { ask.hidden = true; }
 			enter.hidden = false;
@@ -233,12 +234,12 @@
 		var submit = form.querySelector( 'button[type="submit"]' );
 		var scope = panel.dataset.domainResource;
 		if ( bs && bs.locked( scope ) ) { return; }
-		if ( ! input.value ) { bs.fail( null, form.getAttribute( 'data-empty' ) || 'Enter the code.', input ); return; }
-		var handle = bs.busy( form.getAttribute( 'data-checking' ) || 'Checking the code…', scope, submit );
+		if ( ! input.value ) { bs.fail( null, form.getAttribute( 'data-empty' ) || __( 'Enter the code.', 'beltoft-services' ), input ); return; }
+		var handle = bs.busy( form.getAttribute( 'data-checking' ) || __( 'Checking the code…', 'beltoft-services' ), scope, submit );
 		window.fetch( config.root + panel.dataset.domainResource + '/domain-authcode', { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( { secret: input.value } ) } ).then( function ( response ) {
 			var nonce = response.headers.get( 'X-WP-Nonce' );
 			if ( nonce ) { config.nonce = nonce; }
-			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || 'Request failed' ); } return body; } );
+			return response.json().then( function ( body ) { if ( ! response.ok ) { throw new Error( body.message || __( 'Request failed', 'beltoft-services' ) ); } return body; } );
 		} ).then( function ( body ) {
 			var code = panel.querySelector( '.beltoft-services-domain-code' );
 			input.value = '';
@@ -247,7 +248,7 @@
 			code.closest( '.beltoft-services-domain__code' ).hidden = false;
 			code.focus();
 			code.select();
-			bs.done( handle, form.getAttribute( 'data-shown' ) || 'Your transfer code is shown below.' );
+			bs.done( handle, form.getAttribute( 'data-shown' ) || __( 'Your transfer code is shown below.', 'beltoft-services' ) );
 		} ).catch( function ( failure ) {
 			input.value = '';
 			bs.fail( handle, failure.message, input );
@@ -298,8 +299,8 @@
 		var code = input ? input.value.trim() : '';
 		var scope = form.closest( '[data-domain-resource]' ) ? form.closest( '[data-domain-resource]' ).dataset.domainResource : 'page';
 		if ( bs.locked( scope ) ) { return; }
-		if ( ! code ) { bs.fail( null, form.getAttribute( 'data-empty' ) || 'Enter the transfer code.', input ); return; }
-		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, button );
+		if ( ! code ) { bs.fail( null, form.getAttribute( 'data-empty' ) || __( 'Enter the transfer code.', 'beltoft-services' ), input ); return; }
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || __( 'Working…', 'beltoft-services' ), scope, button );
 		window.fetch( form.getAttribute( 'data-cart' ), {
 			method: 'POST',
 			credentials: 'same-origin',
@@ -312,7 +313,7 @@
 				window.location.assign( result.data.checkout_url );
 				return;
 			}
-			throw new Error( ( result.data && result.data.message ) || 'Error' );
+			throw new Error( ( result.data && result.data.message ) || __( 'Error', 'beltoft-services' ) );
 		} ).catch( function ( failure ) {
 			bs.fail( handle, failure.message, input );
 		} );
@@ -330,7 +331,7 @@
 		event.preventDefault();
 		var scope = form.getAttribute( 'data-resource' ) || 'page';
 		if ( bs.locked( scope ) ) { return; }
-		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || __( 'Working…', 'beltoft-services' ), scope, form.querySelector( 'button[type="submit"]' ) );
 		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-check' ).then( function ( data ) {
 			if ( data && data.message ) {
 				bs.done( handle, data.message );
@@ -355,7 +356,7 @@
 		event.preventDefault();
 		var scope = form.getAttribute( 'data-resource' ) || 'page';
 		if ( bs.locked( scope ) ) { return; }
-		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || __( 'Working…', 'beltoft-services' ), scope, form.querySelector( 'button[type="submit"]' ) );
 		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-registry-check' ).then( function ( data ) {
 			bs.done( handle, ( data && data.message ) || '' );
 			if ( data && 'done' === data.status ) { window.setTimeout( function () { window.location.reload(); }, 3000 ); }
@@ -377,7 +378,7 @@
 		var scope = form.getAttribute( 'data-resource' ) || 'page';
 		if ( bs.locked( scope ) ) { return; }
 		var input = form.querySelector( 'input[name="auth_code"]' );
-		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || __( 'Working…', 'beltoft-services' ), scope, form.querySelector( 'button[type="submit"]' ) );
 		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-code', { auth_code: input ? input.value : '' } ).then( function ( data ) {
 			if ( input ) { input.value = ''; }
 			bs.done( handle, ( data && data.message ) || '' );
@@ -517,7 +518,7 @@
 		var scope = form.getAttribute( 'data-resource' ) || 'page';
 		if ( bs.locked( scope ) ) { return; }
 		var box = form.querySelector( 'input[name="ack"]' );
-		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || __( 'Working…', 'beltoft-services' ), scope, form.querySelector( 'button[type="submit"]' ) );
 		request( 'POST', form.getAttribute( 'data-resource' ) + '/transfer-dns-confirm', { ack: !! ( box && box.checked ) } ).then( function () {
 			window.location.reload();
 		} ).catch( function ( failure ) {
@@ -538,7 +539,7 @@
 		var scope = form.getAttribute( 'data-resource' ) || 'page';
 		if ( bs.locked( scope ) ) { return; }
 		var box = form.querySelector( 'input[name="ack"]' );
-		var handle = bs.busy( form.getAttribute( 'data-busy' ) || 'Working…', scope, form.querySelector( 'button[type="submit"]' ) );
+		var handle = bs.busy( form.getAttribute( 'data-busy' ) || __( 'Working…', 'beltoft-services' ), scope, form.querySelector( 'button[type="submit"]' ) );
 		request( 'POST', form.getAttribute( 'data-resource' ) + '/dns-adopt', { step: form.getAttribute( 'data-dns-adopt' ), ack: !! ( box && box.checked ) } ).then( function ( data ) {
 			bs.done( handle, ( data && data.message ) || '' );
 			window.setTimeout( function () { window.location.reload(); }, 1500 );

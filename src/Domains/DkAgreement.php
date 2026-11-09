@@ -69,7 +69,8 @@ final class DkAgreement {
 	public static function render(): void {
 		$names = self::cart_domains();
 		if ( ! self::ready() || ! $names ) { return; }
-		wp_enqueue_script( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dk-agreement.js' ), true );
+		wp_enqueue_script( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.js', BELTOFT_SERVICES_FILE ), array( 'wp-i18n' ), \BeltoftServices\Assets::version( 'assets/dk-agreement.js' ), true );
+		wp_set_script_translations( 'beltoft-services-dk-agreement', 'beltoft-services', plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'languages' );
 		wp_enqueue_style( 'beltoft-services-dk-agreement', plugins_url( 'assets/dk-agreement.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dk-agreement.css' ) );
 		$seller = self::seller();
 		echo '<section class="beltoft-dk-agreement"><h3>' . esc_html__( '.dk registration agreement', 'beltoft-services' ) . '</h3>';
