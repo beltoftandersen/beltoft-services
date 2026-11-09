@@ -41,6 +41,14 @@ final class ResourceQueryTest extends TestCase {
 		$this->assertSame( array(), Resource::find_by_meta( 'fake', 'server_license', 2 ) );
 	}
 
+	public function test_a_server_licence_stored_as_a_string_is_found_with_the_number_and_string_list(): void {
+		$int = $this->make( array( 'server_license' => 12 ) );
+		$str = $this->make( array( 'server_license' => '12' ) );
+		$this->make( array( 'server_license' => '112' ) );
+
+		$this->assertSame( array( $int->id(), $str->id() ), Resource::find_by_meta( 'fake', 'server_license', array( 12, '12' ) ) );
+	}
+
 	public function test_find_by_meta_string_matches_the_whole_value(): void {
 		$a = $this->make( array( 'lic_ip' => '10.0.0.1' ) );
 		$this->make( array( 'lic_ip' => '10.0.0.12' ) );

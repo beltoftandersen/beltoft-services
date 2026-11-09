@@ -297,7 +297,7 @@ final class AppLicence {
 		}
 
 		// One query for the candidates (the license id is in the meta text), then the exact check on each.
-		foreach ( Resource::find_by_meta( 'applic', 'server_license', $license_id, 'DESC' ) as $id ) {
+		foreach ( Resource::find_by_meta( 'applic', 'server_license', array( $license_id, (string) $license_id ), 'DESC' ) as $id ) {
 			$licence = Resource::find( (int) $id );
 
 			if ( $licence && AppLicenceDriver::ID === $licence->get( 'driver' ) && (int) $licence->get( 'server_license' ) === $license_id ) {

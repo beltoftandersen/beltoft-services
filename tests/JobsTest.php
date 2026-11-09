@@ -377,4 +377,13 @@ final class JobsTest extends TestCase {
 		$this->assertFalse( Jobs::pending_action( 'beltoft_services_test_retry', array( 7 ) ), 'A running action is not pending.' );
 		as_unschedule_all_actions( 'beltoft_services_test_retry' );
 	}
+
+	public function test_a_pending_action_counts_while_another_copy_is_running(): void {
+		$running = as_schedule_single_action( time() - 10, 'beltoft_services_test_retry', array( 8 ), Jobs::GROUP );
+		\ActionScheduler::store()->log_execution( $running );
+		as_schedule_single_action( time() + 600, 'beltoft_services_test_retry', array( 8 ), Jobs::GROUP );
+		$this->assertTrue( Jobs::pending_action( 'beltoft_services_test_retry', array( 8 ) ), 'The waiting copy is pending even while one runs.' );
+		$this->assertFalse( Jobs::schedule_once( time() + 900, 'beltoft_services_test_retry', array( 8 ) ), 'No duplicate next to a waiting copy.' );
+		as_unschedule_all_actions( 'beltoft_services_test_retry' );
+	}
 }

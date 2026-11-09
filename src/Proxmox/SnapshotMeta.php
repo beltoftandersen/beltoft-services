@@ -95,7 +95,7 @@ final class SnapshotMeta {
 			return $out;
 		}
 		// One query for the candidates (the license id is in the meta text), then the exact check on each: no loading of every pack of every customer.
-		foreach ( Resource::find_by_meta( 'snapshot', 'server_license', $license_id ) as $id ) {
+		foreach ( Resource::find_by_meta( 'snapshot', 'server_license', array( $license_id, (string) $license_id ) ) as $id ) {
 			$pack = Resource::find( (int) $id );
 			if ( $pack && SnapshotDriver::ID === $pack->get( 'driver' ) && (int) $pack->get( 'server_license' ) === $license_id ) {
 				$out[] = $pack;
