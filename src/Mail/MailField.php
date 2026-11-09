@@ -406,7 +406,7 @@ final class MailField {
 		if ( is_string( $found ) ) {
 			$item->add_meta_data( self::ITEM_META, $found, true );
 
-			// The name is registered or transferred in this same order: the service waits for it.
+			// The wait meta is set whenever the chosen name is a register or transfer line in the cart, whatever mode was picked.
 			if ( in_array( $found, self::cart_domains(), true ) ) {
 				$item->add_meta_data( self::WAIT_META, '1', true );
 			}

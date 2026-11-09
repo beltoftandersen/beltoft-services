@@ -304,7 +304,28 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->our_zone( $user, 'waiting.example' );
 		$res = Registry::get( 'mail' )->provision( Resource::find( $r->id() ) );
 		$this->assertTrue( $res->is_done(), $res->error() );
-		$this->assertSame( 'ours', $res->meta()['mail_mode'] ?? ( Resource::find( $r->id() )->get( 'mail_mode' ) ) );
+		$this->assertSame( 'ours', Resource::find( $r->id() )->get( 'mail_mode' ) );
+	}
+
+	public function test_waiting_for_a_registration_survives_many_runs_and_then_proves_ours(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'slow.example', array( 'mail_wait_until' => time() + 6 * DAY_IN_SECONDS ), array(), $user );
+
+		for ( $i = 0; $i < 20; $i++ ) {
+			Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
+			\BeltoftServices\Reconciler::step( Resource::find( $r->id() ) );
+			$this->assertNotSame( 'failed', Resource::find( $r->id() )->get( 'state' ), 'Run ' . $i );
+		}
+
+		$this->assertStringContainsString( 'Waiting for the domain registration', (string) Resource::find( $r->id() )->get( 'last_error' ) );
+		$this->assertNotContains( 'proof', (array) Resource::find( $r->id() )->get( 'steps' ) );
+
+		$this->our_zone( $user, 'slow.example' );
+		Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
+		\BeltoftServices\Reconciler::step( Resource::find( $r->id() ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'ours', $fresh->get( 'mail_mode' ) );
+		$this->assertSame( 'ready', $fresh->get( 'state' ) );
 	}
 
 	public function test_a_registration_that_never_arrives_falls_back_to_the_txt_proof_after_seven_days(): void {
