@@ -12,7 +12,7 @@ use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
-use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Domains\ZoneWriter;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -177,53 +177,43 @@ final class MailDns {
 	 * @return array{0:string,1:string}|\WP_Error [ status (ok or conflict), reason ], or a transient error.
 	 */
 	public static function publish( int $user_id, string $zone, array $row ) {
-		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) ) {
-			return array( 'conflict', 'not_ours' );
-		}
-
 		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
-		$set  = Records::validate( $zone, array( array_intersect_key( $row + array( 'name' => '@' ), array_flip( array( 'name', 'type', 'ttl', 'value', 'priority' ) ) ) ) );
+		$rows = array( array_intersect_key( $row + array( 'name' => '@' ), array_flip( array( 'name', 'type', 'ttl', 'value', 'priority' ) ) ) );
 
-		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
-			return array( 'conflict', 'invalid' );
-		}
-
-		$locked = Records::locked(
+		$result = ZoneWriter::write(
+			$user_id,
 			$zone,
-			static function () use ( $zone, $fqdn, $row, $set ) {
-				// Read immediately before the write: what is at the name now decides.
-				$zone_data = DnsClients::dns()->zone( $zone );
-
-				if ( is_wp_error( $zone_data ) ) {
-					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
-				}
-
-				if ( ! is_array( $zone_data ) ) {
-					return array( 'conflict', 'no_zone' );
-				}
-
-				if ( Records::paused( $zone, $zone_data ) ) {
-					return array( 'conflict', 'paused' );
-				}
-
-				$here = self::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
+			$rows,
+			static function ( array $zone_data, array $sets ) use ( $zone, $fqdn, $row ) {
+				$here = Records::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
 				$plan = self::plan( $row, $here, $zone );
 
 				if ( null === $plan['write'] ) {
-					return array( $plan['status'], $plan['reason'] );
+					return $plan['status'] . ':' . $plan['reason'];
 				}
 
-				$write                = $set[0];
-				$write['changetype']  = 'REPLACE';
-				$write['records']     = array_merge( $plan['keep'], $write['records'] );
-				$write['ttl']         = $plan['ttl'] ?? $write['ttl'];
-				$done                 = DnsClients::dns()->replace_rrsets( $zone, array( $write ) );
+				$write               = $sets[0];
+				$write['changetype'] = 'REPLACE';
+				$write['records']    = array_merge( $plan['keep'], $write['records'] );
+				$write['ttl']        = $plan['ttl'] ?? $write['ttl'];
 
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : array( 'ok', '' );
+				return array( $write );
 			}
 		);
 
-		return is_wp_error( $locked ) ? new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) ) : $locked;
+		if ( is_wp_error( $result ) ) {
+			return new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) );
+		}
+
+		if ( 'ok' === $result['status'] ) {
+			return array( 'ok', '' );
+		}
+
+		if ( in_array( $result['reason'], array( 'not_ours', 'invalid', 'no_zone', 'paused' ), true ) ) {
+			return array( 'conflict', $result['reason'] );
+		}
+
+		return explode( ':', $result['reason'], 2 );
 	}
 
 	/**
@@ -339,35 +329,6 @@ final class MailDns {
 		}
 
 		return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'unplaced' ) );
-	}
-
-	/**
-	 * The raw RRsets at a name, by type.
-	 *
-	 * @param string                             $zone   Zone.
-	 * @param string                             $fqdn   Name.
-	 * @param array<int, array<string, mixed>> $rrsets Raw RRsets.
-	 * @return array<string, array<string, mixed>>
-	 */
-	private static function sets_at( string $zone, string $fqdn, array $rrsets ): array {
-		$out = array();
-
-		foreach ( $rrsets as $set ) {
-			if ( ! is_array( $set ) ) {
-				continue;
-			}
-
-			$name = strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) );
-
-			if ( ( '' === $name || '@' === $name ? $zone : ( str_ends_with( $name, '.' . $zone ) || $name === $zone ? $name : $name . '.' . $zone ) ) === $fqdn ) {
-				$out[ strtoupper( (string) ( $set['type'] ?? '' ) ) ] = $set;
-			}
-		}
-
-		// SOA and NS are the zone's own and never ours to judge.
-		unset( $out['SOA'], $out['NS'] );
-
-		return $out;
 	}
 
 	/**
