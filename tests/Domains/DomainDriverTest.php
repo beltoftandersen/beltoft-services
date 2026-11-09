@@ -559,6 +559,34 @@ class DomainDriverTest extends TestCase {
 		$this->assertCount( 0, array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] ), 'Nothing is ordered without the agreement.' );
 	}
 
+	public function test_an_idn_order_sends_the_punycode_name_with_the_registrys_language_tag(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 322, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$r = $this->resource( 'register', 'xn--blegrd-ux1109-2fb9y.com' );
+		( new DomainDriver() )->provision( $r );
+		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains' === $c['path'] ) );
+		$this->assertSame( 'xn--blegrd-ux1109-2fb9y', $posts[0]['body']['domain']['name'] );
+		$this->assertSame( array( 'idn_script' => 'DAN' ), $posts[0]['body']['additional_data'] );
+	}
+
+	public function test_an_ascii_order_has_no_language_tag_and_the_tag_can_be_changed_by_a_filter(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );
+		$fake->reply( 'POST', '/domains', array( 'id' => 323, 'status' => 'ACT', 'expiration_date' => '2027-10-26 00:00:00' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		( new DomainDriver() )->provision( $this->resource() );
+		$posts = array_values( array_filter( $fake->calls(), static fn( $c ) => 'POST' === $c['method'] && '/domains' === $c['path'] ) );
+		$this->assertArrayNotHasKey( 'additional_data', $posts[0]['body'] );
+		$this->assertSame( 'DAN', \BeltoftServices\Domains\IdnScript::for_name( 'xn--blegrd-ux1109-2fb9y.com' ) );
+		$this->assertSame( 'GER', \BeltoftServices\Domains\IdnScript::for_name( \idn_to_ascii( 'müller.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) ) );
+		$this->assertSame( 'FRE', \BeltoftServices\Domains\IdnScript::for_name( \idn_to_ascii( 'café.com', IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) ) );
+		add_filter( 'beltoft_services_domain_idn_script', static fn() => 'SWE' );
+		$this->assertSame( 'SWE', \BeltoftServices\Domains\IdnScript::for_name( 'xn--blegrd-ux1109-2fb9y.com' ) );
+		$this->assertSame( '', \BeltoftServices\Domains\IdnScript::for_name( 'plain.com' ) );
+	}
+
 	public function test_a_eu_domain_is_not_registered_for_a_registrant_outside_the_eu(): void {
 		$r = $this->resource( 'register', 'eligible-' . wp_generate_password( 6, false, false ) . '.eu' );
 		$user = (int) $r->license()['user_id'];
