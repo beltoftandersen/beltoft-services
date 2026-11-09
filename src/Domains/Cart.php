@@ -487,7 +487,7 @@ final class Cart {
 		if ( in_array( $key, array( 'Domain', __( 'Domain', 'beltoft-services' ) ), true ) ) {
 			return true;
 		}
-		return 1 === preg_match( '/^\s*(?:<p>)?\s*(?:[a-z0-9-]+\.)*xn--[a-z0-9-]+(?:\.[a-z0-9-]+)+\s*(?:<\/p>)?\s*$/i', (string) ( $meta->value ?? '' ) );
+		return 1 === preg_match( '/^\s*(?:<p>)?\s*(?:[a-z0-9-]+\.)*xn--[a-z0-9-]+(?:\.[a-z0-9-]+)+\s*(?:<\/p>)?\s*$/iD', (string) ( $meta->value ?? '' ) );
 	}
 
 	/** The domain meta line of an order item in Unicode letters (the stored value stays punycode). */
