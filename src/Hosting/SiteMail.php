@@ -142,7 +142,7 @@ final class SiteMail {
 		);
 
 		$done = null === $box
-			? $client->add_mailbox( array_merge( $attrs, array( 'local_part' => $local, 'domain' => $domain, 'name' => 'Website mail', 'quota' => (string) min( self::SYSTEM_QUOTA_MB, $limits['quota_mb'] ), 'active' => '1' ) ) )
+			? $client->add_mailbox( array_merge( $attrs, array( 'local_part' => $local, 'domain' => $domain, 'name' => __( 'Website mail', 'beltoft-services' ), 'quota' => (string) min( self::SYSTEM_QUOTA_MB, $limits['quota_mb'] ), 'active' => '1' ) ) )
 			: $client->edit_mailbox( $address, $attrs );
 
 		if ( is_wp_error( $done ) ) {

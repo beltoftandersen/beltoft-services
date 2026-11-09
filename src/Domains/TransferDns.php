@@ -939,13 +939,18 @@ final class TransferDns {
 		$view = self::view( $r );
 
 		if ( $view && $view['review'] ) {
-			return 'Waiting for the customer to import or check the copied DNS records';
+			return __( 'Waiting for the customer to import or check the copied DNS records', 'beltoft-services' );
 		}
 
 		if ( ! $view || ! $view['waiting'] ) {
 			return '';
 		}
 
-		return 'Waiting until the domain uses our name servers' . ( $view['since'] > 0 ? ' (since ' . wp_date( 'Y-m-d H:i', $view['since'] ) . ')' : '' );
+		if ( $view['since'] > 0 ) {
+			/* translators: %s: date and time. */
+			return sprintf( __( 'Waiting until the domain uses our name servers (since %s)', 'beltoft-services' ), wp_date( 'Y-m-d H:i', $view['since'] ) );
+		}
+
+		return __( 'Waiting until the domain uses our name servers', 'beltoft-services' );
 	}
 }

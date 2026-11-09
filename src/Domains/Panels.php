@@ -72,27 +72,27 @@ final class Panels {
 		$rows  = array();
 		$claim = (int) $r->get( 'claim_id' ) > 0 ? DnsClaims::get( (int) $r->get( 'claim_id' ) ) : null;
 		if ( $claim ) {
-			$rows['Claim'] = '#' . $claim['id'] . ( ! empty( $claim['verified_at'] ) ? ', verified ' . $claim['verified_at'] . ' UTC' : '' );
+			$rows[ __( 'Claim', 'beltoft-services' ) ] = '#' . $claim['id'] . ( ! empty( $claim['verified_at'] ) ? ', verified ' . $claim['verified_at'] . ' UTC' : '' );
 		}
 		$row = DnsAssignments::get( (string) $r->get( 'domain' ) );
 		if ( $row ) {
-			$rows['Assignment status'] = (string) $row['status'];
+			$rows[ __( 'Assignment status', 'beltoft-services' ) ] = (string) $row['status'];
 			if ( 'release_pending' === $row['status'] && ! empty( $row['reserved_until'] ) ) {
-				$rows['First clear check'] = $row['reserved_until'] . ' UTC';
+				$rows[ __( 'First clear check', 'beltoft-services' ) ] = $row['reserved_until'] . ' UTC';
 			}
 			if ( ! empty( $row['order_id'] ) ) {
-				$rows['Order'] = '#' . (int) $row['order_id'];
+				$rows[ __( 'Order', 'beltoft-services' ) ] = '#' . (int) $row['order_id'];
 			}
 		}
 		$ds = $r->get( 'parent_ds' );
 		if ( is_bool( $ds ) ) {
-			$rows['Parent DS'] = $ds ? 'yes' : 'no';
+			$rows[ __( 'Parent DS', 'beltoft-services' ) ] = $ds ? __( 'yes', 'beltoft-services' ) : __( 'no', 'beltoft-services' );
 		}
 		if ( $r->get( 'records_off' ) ) {
-			$rows['Records off'] = 'yes';
+			$rows[ __( 'Records off', 'beltoft-services' ) ] = __( 'yes', 'beltoft-services' );
 		}
 		if ( '' !== (string) $r->get( 'import_error' ) ) {
-			$rows['Import error'] = (string) $r->get( 'import_error' );
+			$rows[ __( 'Import error', 'beltoft-services' ) ] = (string) $r->get( 'import_error' );
 		}
 		return $rows;
 	}
@@ -105,38 +105,38 @@ final class Panels {
 	 */
 	private static function transfer_rows( Resource $r ): array {
 		$labels = array(
-			TransferDns::FIRST => 'Move the DNS to Beltoft first (import and name servers before the transfer)',
-			TransferDns::AFTER => 'Move my DNS to Beltoft when the transfer is done',
-			TransferDns::KEEP  => 'Keep my DNS where it is',
+			TransferDns::FIRST => __( 'Move the DNS to Beltoft first (import and name servers before the transfer)', 'beltoft-services' ),
+			TransferDns::AFTER => __( 'Move my DNS to Beltoft when the transfer is done', 'beltoft-services' ),
+			TransferDns::KEEP  => __( 'Keep my DNS where it is', 'beltoft-services' ),
 		);
 		$plan   = TransferDns::plan( $r );
 		$rows   = array();
 
 		if ( 'served' === $plan ) {
-			$rows['Transfer DNS'] = 'Our DNS already serves the domain for this customer (no choice)';
+			$rows[ __( 'Transfer DNS', 'beltoft-services' ) ] = __( 'Our DNS already serves the domain for this customer (no choice)', 'beltoft-services' );
 		} else {
-			$rows['Transfer DNS'] = $labels[ TransferDns::choice( $r ) ] . ( '' === (string) $r->get( 'transfer_dns' ) ? ' (no choice stored: an older order)' : '' );
+			$rows[ __( 'Transfer DNS', 'beltoft-services' ) ] = $labels[ TransferDns::choice( $r ) ] . ( '' === (string) $r->get( 'transfer_dns' ) ? __( ' (no choice stored: an older order)', 'beltoft-services' ) : '' );
 		}
 
-		$rows['Waiting for']          = TransferDns::waiting_reason( $r );
-		$rows['DNS records checked']  = (int) $r->get( 'dns_reviewed_at' ) > 0 ? ( 'imported' === (string) $r->get( 'dns_reviewed_path' ) ? 'Imported a zone file' : 'Acknowledged that records we could not find are missing' ) . ' (' . wp_date( 'Y-m-d H:i', (int) $r->get( 'dns_reviewed_at' ) ) . ')' : '';
-		$rows['How the DNS was chosen'] = $r->get( 'transfer_dns_detected' ) ? 'Detected: the current name servers are a registrar\'s own' : '';
-		$rows['Current name servers'] = implode( ', ', DomainDriver::stored_nameservers( $r ) );
-		$rows['Delegation checked by customer'] = $r->get( 'transfer_dns_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'transfer_dns_checked' ) ) : '';
-		$rows['Records copied']       = null !== $r->get( 'records_copied' ) ? (string) (int) $r->get( 'records_copied' ) : '';
-		$rows['Not copied']           = (string) $r->get( 'import_error' );
+		$rows[ __( 'Waiting for', 'beltoft-services' ) ]          = TransferDns::waiting_reason( $r );
+		$rows[ __( 'DNS records checked', 'beltoft-services' ) ]  = (int) $r->get( 'dns_reviewed_at' ) > 0 ? ( 'imported' === (string) $r->get( 'dns_reviewed_path' ) ? __( 'Imported a zone file', 'beltoft-services' ) : __( 'Acknowledged that records we could not find are missing', 'beltoft-services' ) ) . ' (' . wp_date( 'Y-m-d H:i', (int) $r->get( 'dns_reviewed_at' ) ) . ')' : '';
+		$rows[ __( 'How the DNS was chosen', 'beltoft-services' ) ] = $r->get( 'transfer_dns_detected' ) ? __( 'Detected: the current name servers are a registrar\'s own', 'beltoft-services' ) : '';
+		$rows[ __( 'Current name servers', 'beltoft-services' ) ] = implode( ', ', DomainDriver::stored_nameservers( $r ) );
+		$rows[ __( 'Delegation checked by customer', 'beltoft-services' ) ] = $r->get( 'transfer_dns_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'transfer_dns_checked' ) ) : '';
+		$rows[ __( 'Records copied', 'beltoft-services' ) ]       = null !== $r->get( 'records_copied' ) ? (string) (int) $r->get( 'records_copied' ) : '';
+		$rows[ __( 'Not copied', 'beltoft-services' ) ]           = (string) $r->get( 'import_error' );
 
 		return $rows;
 	}
 	public static function admin( Resource $r ): void {
 		$details = array_filter( array(
-			'Domain' => $r->get( 'domain' ),
-			'Registrar id' => $r->get( 'remote_id' ),
-			'Registrar status' => $r->get( 'registrar_status' ),
-			'Expires' => $r->get( 'expires_at' ),
-			'Delegation' => $r->get( 'delegation' ),
-			'Delegation checked' => $r->get( 'delegation_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'delegation_checked' ) ) : '',
-			'Last sync' => $r->get( 'last_sync' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'last_sync' ) ) : '',
+			__( 'Domain', 'beltoft-services' ) => $r->get( 'domain' ),
+			__( 'Registrar id', 'beltoft-services' ) => $r->get( 'remote_id' ),
+			__( 'Registrar status', 'beltoft-services' ) => $r->get( 'registrar_status' ),
+			__( 'Expires', 'beltoft-services' ) => $r->get( 'expires_at' ),
+			__( 'Delegation', 'beltoft-services' ) => $r->get( 'delegation' ),
+			__( 'Delegation checked', 'beltoft-services' ) => $r->get( 'delegation_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'delegation_checked' ) ) : '',
+			__( 'Last sync', 'beltoft-services' ) => $r->get( 'last_sync' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'last_sync' ) ) : '',
 		) );
 		if ( 'dns' === $r->get( 'driver' ) ) {
 			$details = array_merge( $details, self::dns_rows( $r ) );

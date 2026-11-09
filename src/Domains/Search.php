@@ -59,7 +59,7 @@ final class Search {
 			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 		if ( strlen( $name ) > 253 ) {
-			return new \WP_Error( 'bad_domain', 'A valid domain name is required.', array( 'status' => 400 ) );
+			return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ), array( 'status' => 400 ) );
 		}
 		return self::find( $name );
 	}
@@ -67,13 +67,13 @@ final class Search {
 	/** IDNA and DNS label validation for a full name. */
 	public static function normalise( string $name ): string|\WP_Error {
 		$name = trim( rtrim( $name, '.' ) );
-		if ( '' === $name || ! function_exists( 'idn_to_ascii' ) ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
+		if ( '' === $name || ! function_exists( 'idn_to_ascii' ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
 		$ascii = idn_to_ascii( $name, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 );
-		if ( false === $ascii ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
+		if ( false === $ascii ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
 		$ascii = strtolower( $ascii );
-		if ( strlen( $ascii ) > 253 || ! str_contains( $ascii, '.' ) ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
+		if ( strlen( $ascii ) > 253 || ! str_contains( $ascii, '.' ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
 		foreach ( explode( '.', $ascii ) as $label ) {
-			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
+			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
 		}
 		return $ascii;
 	}
@@ -152,7 +152,7 @@ final class Search {
 		} else {
 			$ascii = function_exists( 'idn_to_ascii' ) ? idn_to_ascii( $input, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) : false;
 			$label = false === $ascii ? '' : strtolower( $ascii );
-			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', 'A valid domain label is required.' ); }
+			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain label is required.', 'beltoft-services' ) ); }
 		}
 		$domains = array();
 		$check = array();
@@ -162,7 +162,7 @@ final class Search {
 			$domains[] = array( 'domain' => $full, 'tld' => $tld );
 			if ( Prices::sellable( $tld ) && ( 'dk' !== $tld || DkAgreement::ready() ) ) { $check[] = array( 'name' => $label, 'extension' => $tld ); }
 		}
-		if ( ! $domains ) { return new \WP_Error( 'bad_domain', 'A valid domain name is required.' ); }
+		if ( ! $domains ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
 		$found = array();
 		if ( $check ) {
 			$reply = self::availability( $check, $fresh );

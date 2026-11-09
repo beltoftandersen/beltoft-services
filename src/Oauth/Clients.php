@@ -35,26 +35,26 @@ final class Clients {
 		$uris = isset( $meta['redirect_uris'] ) && is_array( $meta['redirect_uris'] ) ? array_values( $meta['redirect_uris'] ) : array();
 
 		if ( ! $uris || count( $uris ) > 5 ) {
-			return new \WP_Error( 'invalid_redirect_uri', 'Send between one and five redirect_uris.' );
+			return new \WP_Error( 'invalid_redirect_uri', __( 'Send between one and five redirect_uris.', 'beltoft-services' ) );
 		}
 
 		$allowed = Access::redirect_allowlist();
 
 		foreach ( $uris as $uri ) {
 			if ( ! is_string( $uri ) || ! in_array( $uri, $allowed, true ) ) {
-				return new \WP_Error( 'invalid_redirect_uri', 'A redirect_uri is not allowed on this site.' );
+				return new \WP_Error( 'invalid_redirect_uri', __( 'A redirect_uri is not allowed on this site.', 'beltoft-services' ) );
 			}
 		}
 
 		$method = isset( $meta['token_endpoint_auth_method'] ) ? (string) $meta['token_endpoint_auth_method'] : 'none';
 
 		if ( 'none' !== $method ) {
-			return new \WP_Error( 'invalid_client_metadata', 'Only public clients (token_endpoint_auth_method none) are supported.' );
+			return new \WP_Error( 'invalid_client_metadata', __( 'Only public clients (token_endpoint_auth_method none) are supported.', 'beltoft-services' ) );
 		}
 
 		foreach ( array( 'grant_types' => array( 'authorization_code', 'refresh_token' ), 'response_types' => array( 'code' ) ) as $key => $ok ) {
 			if ( isset( $meta[ $key ] ) && ( ! is_array( $meta[ $key ] ) || array_diff( $meta[ $key ], $ok ) ) ) {
-				return new \WP_Error( 'invalid_client_metadata', 'Unsupported ' . $key . '.' );
+				return new \WP_Error( 'invalid_client_metadata', sprintf( /* translators: %s: client metadata field name */ __( 'Unsupported %s.', 'beltoft-services' ), $key ) );
 			}
 		}
 
@@ -62,7 +62,7 @@ final class Clients {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 		if ( (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Schema::tables()['clients'] ) ) >= self::MAX && ! self::evict() ) {
-			return new \WP_Error( 'temporarily_unavailable', 'Too many registrations. Try again later.' );
+			return new \WP_Error( 'temporarily_unavailable', __( 'Too many registrations. Try again later.', 'beltoft-services' ) );
 		}
 
 		$name = isset( $meta['client_name'] ) && is_string( $meta['client_name'] ) ? $meta['client_name'] : '';

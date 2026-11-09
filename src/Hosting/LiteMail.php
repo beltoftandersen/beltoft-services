@@ -41,25 +41,25 @@ final class LiteMail {
 		$parent = Resource::find( $parent->id() ) ?? $parent; // The links are read fresh.
 
 		if ( HostingDriver::ID !== $parent->get( 'driver' ) || ! $parent->is_live() || null === Records::for_resource( $parent->id() ) ) {
-			return new \WP_Error( 'not_hosting', 'This is not a live hosting account.' );
+			return new \WP_Error( 'not_hosting', __( 'This is not a live hosting account.', 'beltoft-services' ) );
 		}
 
 		foreach ( Children::of( $parent ) as $child ) {
 			if ( MailDriver::ID === $child->get( 'driver' ) && 'deleted' !== $child->get( 'state' ) ) {
-				return new \WP_Error( 'exists', 'This account has Email lite already.' );
+				return new \WP_Error( 'exists', __( 'This account has Email lite already.', 'beltoft-services' ) );
 			}
 		}
 
 		$name = MailDomain::normalise( $domain );
 
 		if ( null === $name ) {
-			return new \WP_Error( 'bad_domain', 'The domain is not valid.' );
+			return new \WP_Error( 'bad_domain', __( 'The domain is not valid.', 'beltoft-services' ) );
 		}
 
 		$plan = Plan::typed( (array) $parent->get( 'plan' ) );
 
 		if ( (int) $plan['mail_mailboxes'] < 1 ) {
-			return new \WP_Error( 'no_mail', 'The plan has no mailboxes.' );
+			return new \WP_Error( 'no_mail', __( 'The plan has no mailboxes.', 'beltoft-services' ) );
 		}
 
 		$parent_license = $parent->license();
@@ -78,7 +78,7 @@ final class LiteMail {
 		);
 
 		if ( ! is_array( $license ) ) {
-			return new \WP_Error( 'license', 'The Email lite license could not be made.' );
+			return new \WP_Error( 'license', __( 'The Email lite license could not be made.', 'beltoft-services' ) );
 		}
 
 		$child = Resource::create(
@@ -105,7 +105,7 @@ final class LiteMail {
 			$child->set( array( 'state' => 'deleted', 'desired' => 'deleted' ) );
 			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
 
-			return new \WP_Error( 'link', 'The Email lite service could not be linked to the account.' );
+			return new \WP_Error( 'link', __( 'The Email lite service could not be linked to the account.', 'beltoft-services' ) );
 		}
 
 		Jobs::enqueue( $child->id() );

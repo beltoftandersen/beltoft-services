@@ -440,11 +440,11 @@ final class Backups {
 		$record = VmRecords::for_resource( $this->r->id() );
 
 		if ( null === $record ) {
-			return new \WP_Error( 'beltoft_services_backups', 'No VM is recorded for this service.' );
+			return new \WP_Error( 'beltoft_services_backups', __( 'No VM is recorded for this service.', 'beltoft-services' ) );
 		}
 
 		if ( null !== $this->prepare( $record ) ) {
-			return new \WP_Error( 'beltoft_services_backups', 'The cluster is not available.' );
+			return new \WP_Error( 'beltoft_services_backups', __( 'The cluster is not available.', 'beltoft-services' ) );
 		}
 
 		$storage = (string) $this->cluster['backup_storage'];

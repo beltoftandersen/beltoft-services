@@ -150,7 +150,7 @@ final class SiteDns {
 		$host = EdgeMap::preview_host( $slug );
 
 		if ( '' === $zone || '' === $host ) {
-			return 'The hosting preview zone is not set.';
+			return __( 'The hosting preview zone is not set.', 'beltoft-services' );
 		}
 
 		return self::publish( $zone, $host, $node, false );
@@ -168,7 +168,7 @@ final class SiteDns {
 		$zone = self::zone_for( $user_id, $host );
 
 		if ( null === $zone ) {
-			return 'The name is not in one of your domains on our name servers.';
+			return __( 'The name is not in one of your domains on our name servers.', 'beltoft-services' );
 		}
 
 		return self::publish( $zone, $host, $node, true );
@@ -187,7 +187,7 @@ final class SiteDns {
 		$edge = self::edge( $node );
 
 		if ( '' === $edge['A'] ) {
-			return 'The node has no edge address.';
+			return __( 'The node has no edge address.', 'beltoft-services' );
 		}
 
 		$rows = array();
@@ -206,7 +206,7 @@ final class SiteDns {
 		$sets = Records::validate( $zone, $rows );
 
 		if ( is_wp_error( $sets ) ) {
-			return 'The name is not valid for a DNS record.';
+			return __( 'The name is not valid for a DNS record.', 'beltoft-services' );
 		}
 
 		$result = Records::locked(
@@ -215,11 +215,11 @@ final class SiteDns {
 				$data = DnsClients::dns()->zone( $zone );
 
 				if ( is_wp_error( $data ) ) {
-					return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
+					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
 				}
 
 				if ( ! is_array( $data ) ) {
-					return 'The DNS zone does not exist.';
+					return __( 'The DNS zone does not exist.', 'beltoft-services' );
 				}
 
 				if ( $customer && Records::paused( $zone, $data ) ) {
@@ -228,7 +228,7 @@ final class SiteDns {
 
 				foreach ( (array) ( $data['rrsets'] ?? array() ) as $set ) {
 					if ( is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $host && 'CNAME' === strtoupper( (string) ( $set['type'] ?? '' ) ) ) {
-						return 'The name is an alias (CNAME). Remove it first.';
+						return __( 'The name is an alias (CNAME). Remove it first.', 'beltoft-services' );
 					}
 
 					// A preview name is ours to make and nobody else's to lose: any other record at the name (a mail host, a name server, a
@@ -247,14 +247,14 @@ final class SiteDns {
 						}
 
 						if ( ! in_array( $type, array( 'A', 'AAAA' ), true ) || array() !== array_diff( $values, $ours ) ) {
-							return 'That temporary address is already in use.';
+							return __( 'That temporary address is already in use.', 'beltoft-services' );
 						}
 					}
 				}
 
 				$done = DnsClients::dns()->replace_rrsets( $zone, $sets );
 
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : true;
+				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : true;
 			}
 		);
 
@@ -279,7 +279,7 @@ final class SiteDns {
 				$data = DnsClients::dns()->zone( $zone );
 
 				if ( is_wp_error( $data ) ) {
-					return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
+					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
 				}
 
 				if ( ! is_array( $data ) ) {
@@ -312,7 +312,7 @@ final class SiteDns {
 
 				$done = DnsClients::dns()->replace_rrsets( $zone, $delete );
 
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be removed.' ) : true;
+				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be removed.', 'beltoft-services' ) ) : true;
 			}
 		);
 
@@ -334,27 +334,27 @@ final class SiteDns {
 		$site = Sites::find( $r->id(), $slug );
 
 		if ( null === $site ) {
-			return 'The website does not exist.';
+			return __( 'The website does not exist.', 'beltoft-services' );
 		}
 
 		if ( ! SiteDomains::valid_host( $host ) ) {
-			return 'The domain name is not valid.';
+			return __( 'The domain name is not valid.', 'beltoft-services' );
 		}
 
 		$zone = Config::preview_zone();
 
 		if ( '' !== $zone && ( $host === $zone || str_ends_with( $host, '.' . $zone ) ) ) {
-			return 'That name belongs to the preview zone.';
+			return __( 'That name belongs to the preview zone.', 'beltoft-services' );
 		}
 
 		if ( self::denied( $host ) ) {
-			return 'That domain cannot be used for hosting.';
+			return __( 'That domain cannot be used for hosting.', 'beltoft-services' );
 		}
 
 		$existing = SiteDomains::find( $host );
 
 		if ( null !== $existing && $existing['resource_id'] !== $r->id() ) {
-			return 'The domain is already used by another account.';
+			return __( 'The domain is already used by another account.', 'beltoft-services' );
 		}
 
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
@@ -362,7 +362,7 @@ final class SiteDns {
 		$kind = $ours ? 'ours' : 'external';
 
 		if ( ! SiteDomains::add( $r->id(), (int) $site['id'], $host, $kind ) ) {
-			return 'The domain could not be recorded.';
+			return __( 'The domain could not be recorded.', 'beltoft-services' );
 		}
 
 		if ( $ours ) {

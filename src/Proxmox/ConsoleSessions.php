@@ -74,14 +74,14 @@ final class ConsoleSessions {
 	 */
 	public static function create( int $user_id, int $resource_id, string $ip, string $cluster, string $node, int $vmid, int $port, string $ticket ) {
 		if ( $user_id < 1 || $resource_id < 1 || $vmid < 1 || $port < 1 || '' === $ticket || ! Crypto::available() ) {
-			return new \WP_Error( 'console_unavailable', 'The console is not available.' );
+			return new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ) );
 		}
 		list( $locked, $result ) = Locks::with(
 			Locks::name( 'console', 0 ),
 			3,
 			static function () use ( $user_id, $resource_id, $ip, $cluster, $node, $vmid, $port, $ticket ) {
 				if ( self::at_limit( $user_id, $resource_id ) ) {
-					return new \WP_Error( 'console_busy', 'A console is already being opened. Please wait a moment.' );
+					return new \WP_Error( 'console_busy', __( 'A console is already being opened. Please wait a moment.', 'beltoft-services' ) );
 				}
 				$token = bin2hex( random_bytes( 32 ) );
 				$name = self::PREFIX . hash( 'sha256', $token );
@@ -96,10 +96,10 @@ final class ConsoleSessions {
 					'ticket' => Crypto::encrypt( $ticket ),
 					'created' => time(),
 				);
-				return add_option( $name, wp_json_encode( $record ), '', false ) ? $token : new \WP_Error( 'console_unavailable', 'The console is not available.' );
+				return add_option( $name, wp_json_encode( $record ), '', false ) ? $token : new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ) );
 			}
 		);
-		return $locked ? $result : new \WP_Error( 'console_busy', 'A console is already being opened. Please wait a moment.' );
+		return $locked ? $result : new \WP_Error( 'console_busy', __( 'A console is already being opened. Please wait a moment.', 'beltoft-services' ) );
 	}
 
 	/** Read a browser token. Only the server-side caller receives the encrypted record. */

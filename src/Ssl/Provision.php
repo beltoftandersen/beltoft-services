@@ -553,24 +553,24 @@ final class Provision {
 	 */
 	public static function resolve_marker( Resource $r, int $order_id ) {
 		if ( '' !== $r->get( 'remote_id' ) ) {
-			return new \WP_Error( 'has_order', 'This service already has a registrar order.' );
+			return new \WP_Error( 'has_order', __( 'This service already has a registrar order.', 'beltoft-services' ) );
 		}
 
 		if ( 0 === $order_id ) {
-			return $r->set( array( 'ssl_post_attempted' => null ) ) ? true : new \WP_Error( 'save', 'Could not save.' );
+			return $r->set( array( 'ssl_post_attempted' => null ) ) ? true : new \WP_Error( 'save', __( 'Could not save.', 'beltoft-services' ) );
 		}
 
 		$detail = Clients::registrar()->request( 'GET', '/ssl/orders/' . $order_id );
 
 		if ( is_wp_error( $detail ) ) {
-			return new \WP_Error( 'registrar', 'The registrar order could not be read: ' . $detail->get_error_code() );
+			return new \WP_Error( 'registrar', sprintf( /* translators: %s: error code */ __( 'The registrar order could not be read: %s', 'beltoft-services' ), $detail->get_error_code() ) );
 		}
 
 		// An S/MIME order is named after the person in its request, so it is recognised by the request text.
 		$same = self::is_smime( $r ) ? trim( (string) ( $detail['csr'] ?? '' ) ) === trim( (string) $r->get( 'ssl_csr' ) ) : strtolower( (string) ( $detail['common_name'] ?? '' ) ) === strtolower( (string) $r->get( 'ssl_name' ) );
 
 		if ( ! $same || in_array( (string) ( $detail['status'] ?? '' ), self::DEAD, true ) ) {
-			return new \WP_Error( 'mismatch', 'That order is not a live order for this name.' );
+			return new \WP_Error( 'mismatch', __( 'That order is not a live order for this name.', 'beltoft-services' ) );
 		}
 
 		// A certificate for several names must carry exactly the ordered names, not only the same common name.
@@ -580,12 +580,12 @@ final class Provision {
 		sort( $have );
 
 		if ( count( $wanted ) > 1 && $wanted !== $have ) {
-			return new \WP_Error( 'mismatch', 'That order does not cover exactly the names of this certificate.' );
+			return new \WP_Error( 'mismatch', __( 'That order does not cover exactly the names of this certificate.', 'beltoft-services' ) );
 		}
 
 		$steps = array_values( array_unique( array_merge( (array) $r->get( 'steps' ), array( 'order' ) ) ) );
 
-		return $r->set( array( 'remote_id' => (string) $order_id, 'steps' => $steps, 'ordered_at' => time(), 'ssl_post_attempted' => null, 'ssl_csr' => (string) ( $detail['csr'] ?? $r->get( 'ssl_csr' ) ) ) ) ? true : new \WP_Error( 'save', 'Could not save.' );
+		return $r->set( array( 'remote_id' => (string) $order_id, 'steps' => $steps, 'ordered_at' => time(), 'ssl_post_attempted' => null, 'ssl_csr' => (string) ( $detail['csr'] ?? $r->get( 'ssl_csr' ) ) ) ) ? true : new \WP_Error( 'save', __( 'Could not save.', 'beltoft-services' ) );
 	}
 
 	/**

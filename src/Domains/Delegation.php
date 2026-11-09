@@ -29,7 +29,7 @@ final class Delegation {
 	public static function refresh( Resource $resource, bool $rate_limit = false ): string|\WP_Error {
 		$checked = (int) $resource->get( 'delegation_checked' );
 		if ( $rate_limit && $checked > time() - MINUTE_IN_SECONDS ) {
-			return new \WP_Error( 'rate_limited', 'Check again in a minute.' );
+			return new \WP_Error( 'rate_limited', __( 'Check again in a minute.', 'beltoft-services' ) );
 		}
 		if ( 'dns' === $resource->get( 'driver' ) ) {
 			$result = self::parent_result( (string) $resource->get( 'domain' ) );

@@ -145,14 +145,14 @@ final class Cart {
 	public static function line_data( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
 		$domain = Search::normalise( $domain );
 		if ( is_wp_error( $domain ) ) { return $domain; }
-		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', 'Choose registration, transfer or DNS hosting.' ); }
+		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', __( 'Choose registration, transfer or DNS hosting.', 'beltoft-services' ) ); }
 		if ( 'dns' === $mode ) { return new \WP_Error( 'dns_verification_required', __( 'DNS hosting for a domain registered elsewhere requires ownership verification. This option is temporarily unavailable.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		if ( 'dns' !== $mode && str_ends_with( $domain, '.dk' ) && ! DkAgreement::ready() ) { return new \WP_Error( 'dk_pending', __( '.dk orders are not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ); }
 		$parts = explode( '.', $domain );
 		if ( 'dns' === $mode && count( $parts ) > 2 ) {
 			$table = get_option( Prices::OPTION, array() );
 			$suffix = implode( '.', array_slice( $parts, 1 ) );
-			if ( ! is_array( $table ) || ! isset( $table[ $suffix ] ) ) { return new \WP_Error( 'subdomain', 'Enter the main domain, without a subdomain.' ); }
+			if ( ! is_array( $table ) || ! isset( $table[ $suffix ] ) ) { return new \WP_Error( 'subdomain', __( 'Enter the main domain, without a subdomain.', 'beltoft-services' ) ); }
 		}
 		if ( 'transfer' === $mode && '' === trim( $auth_code ) ) { return new \WP_Error( 'auth_required', __( 'Enter the transfer code.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		if ( 'transfer' === $mode && ! self::auth_code_valid( trim( $auth_code ) ) ) { return new \WP_Error( 'auth_invalid', __( 'The transfer code must be 6 to 64 characters, letters, digits and common symbols only.', 'beltoft-services' ), array( 'status' => 400 ) ); }
@@ -162,7 +162,7 @@ final class Cart {
 		if ( 'transfer' === $mode && '' !== $dns ) { $data['beltoft_services_domain']['dns'] = $dns; }
 		if ( 'transfer' === $mode ) {
 			try { $data['beltoft_services_domain_auth'] = Crypto::encrypt( trim( $auth_code ) ); }
-			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', 'Transfer cannot start until secure storage is configured.' ); }
+			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', __( 'Transfer cannot start until secure storage is configured.', 'beltoft-services' ) ); }
 		}
 		return $data;
 	}

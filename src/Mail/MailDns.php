@@ -193,7 +193,7 @@ final class MailDns {
 				$zone_data = DnsClients::dns()->zone( $zone );
 
 				if ( is_wp_error( $zone_data ) ) {
-					return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
+					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
 				}
 
 				if ( ! is_array( $zone_data ) ) {
@@ -217,11 +217,11 @@ final class MailDns {
 				$write['ttl']         = $plan['ttl'] ?? $write['ttl'];
 				$done                 = DnsClients::dns()->replace_rrsets( $zone, array( $write ) );
 
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : array( 'ok', '' );
+				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : array( 'ok', '' );
 			}
 		);
 
-		return is_wp_error( $locked ) ? new \WP_Error( 'transient', 'The DNS zone is being changed.' ) : $locked;
+		return is_wp_error( $locked ) ? new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) ) : $locked;
 	}
 
 	/**
@@ -245,11 +245,11 @@ final class MailDns {
 
 			return isset( $here['CNAME'] ) && 1 === count( $here ) && array( strtolower( (string) $row['value'] ) ) === $have
 				? $none
-				: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'The name already has a DNS record.' ) );
+				: array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The name already has a DNS record.', 'beltoft-services' ) ) );
 		}
 
 		if ( isset( $here['CNAME'] ) ) {
-			return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'The name is an alias (CNAME) and cannot also hold this record.' ) );
+			return array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The name is an alias (CNAME) and cannot also hold this record.', 'beltoft-services' ) ) );
 		}
 
 		$set  = $here[ $type ] ?? null;
@@ -263,7 +263,7 @@ final class MailDns {
 
 			return array( '10 ' . strtolower( (string) $row['value'] ) ) === $have
 				? $none
-				: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'The domain already has other MX records.' ) );
+				: array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The domain already has other MX records.', 'beltoft-services' ) ) );
 		}
 
 		// TXT from here.
@@ -279,7 +279,7 @@ final class MailDns {
 
 				return 1 === count( $spf ) && false !== stripos( $spf[0], 'include:' . MailSettings::spf_include() )
 					? $none
-					: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'The domain already has an SPF record. It was not changed: add include:' . MailSettings::spf_include() . ' to it.' ) );
+					: array_merge( $none, array( 'status' => 'conflict', 'reason' => sprintf( /* translators: %s: SPF include to add */ __( 'The domain already has an SPF record. It was not changed: add include:%s to it.', 'beltoft-services' ), MailSettings::spf_include() ) ) );
 
 			case 'dkim':
 				if ( array() === $have ) {
@@ -288,7 +288,7 @@ final class MailDns {
 
 				return in_array( preg_replace( '/\s+/', '', (string) $row['value'] ), array_map( static fn( $v ) => preg_replace( '/\s+/', '', $v ), $have ), true )
 					? $none
-					: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'The name already holds another DKIM key.' ) );
+					: array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The name already holds another DKIM key.', 'beltoft-services' ) ) );
 
 			case 'dmarc':
 				if ( array() === $have ) {
@@ -296,10 +296,10 @@ final class MailDns {
 				}
 
 				// A policy the customer chose is theirs: kept.
-				return array_merge( $none, array( 'reason' => 'Your own DMARC record was kept.' ) );
+				return array_merge( $none, array( 'reason' => __( 'Your own DMARC record was kept.', 'beltoft-services' ) ) );
 		}
 
-		return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'The record could not be placed.' ) );
+		return array_merge( $none, array( 'status' => 'conflict', 'reason' => __( 'The record could not be placed.', 'beltoft-services' ) ) );
 	}
 
 	/**
@@ -429,7 +429,7 @@ final class MailDns {
 		$records = @dns_get_record( rtrim( $fqdn, '.' ) . '.', $flag ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
 
 		if ( false === $records ) {
-			return new \WP_Error( 'dns_transport', 'The name did not resolve.' );
+			return new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
 		}
 
 		$out = array();

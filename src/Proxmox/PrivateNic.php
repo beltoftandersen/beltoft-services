@@ -40,7 +40,7 @@ final class PrivateNic {
 		$cidr = (string) ( $net['cidr'] ?? '' );
 		$vlan = (int) ( $net['vlan'] ?? 0 );
 		if ( ! preg_match( Clusters::BRIDGE_PATTERN, $bridge ) || $vlan < 1 || $vlan > 4094 || PrivateNets::public_vlan_in_use( $vlan ) || ! PrivateNets::contains_host( $cidr, $address ) ) {
-			return new \WP_Error( 'invalid_private_network', 'The private network is not configured.' );
+			return new \WP_Error( 'invalid_private_network', __( 'The private network is not configured.', 'beltoft-services' ) );
 		}
 		return array( 'net1' => 'virtio,bridge=' . $bridge . ',tag=' . $vlan . ',firewall=1' );
 	}
@@ -62,89 +62,89 @@ final class PrivateNic {
 			$result = self::attach_locked( $resource, $client, $ipconfig );
 			return true;
 		} );
-		return null === $locked ? new \WP_Error( 'network_busy', 'The VM resource is busy.' ) : $result;
+		return null === $locked ? new \WP_Error( 'network_busy', __( 'The VM resource is busy.', 'beltoft-services' ) ) : $result;
 	}
 
 	/** Called only while holding the resource lock. */
 	private static function attach_locked( Resource $resource, Client $client, bool $ipconfig ) {
 		if ( ! $resource->is_valid() || 'deleted' === $resource->get( 'state' ) ) {
-			return new \WP_Error( 'invalid_resource', 'The VM resource is not active.' );
+			return new \WP_Error( 'invalid_resource', __( 'The VM resource is not active.', 'beltoft-services' ) );
 		}
 		$record = VmRecords::for_resource( $resource->id() );
 		if ( null === $record ) {
-			return new \WP_Error( 'not_recorded', 'The VM is not recorded for this service.' );
+			return new \WP_Error( 'not_recorded', __( 'The VM is not recorded for this service.', 'beltoft-services' ) );
 		}
 		$cluster = Clusters::get( (string) $record['cluster'] );
 		$bridge  = is_array( $cluster ) ? (string) ( $cluster['private_bridge'] ?? '' ) : '';
 		if ( '' === $bridge ) {
-			return new \WP_Error( 'private_bridge_missing', 'The cluster has no private network bridge configured.' );
+			return new \WP_Error( 'private_bridge_missing', __( 'The cluster has no private network bridge configured.', 'beltoft-services' ) );
 		}
 		if ( $bridge === (string) ( $cluster['bridge'] ?? '' ) ) {
-			return new \WP_Error( 'private_bridge_public', 'The private bridge matches the public bridge.' );
+			return new \WP_Error( 'private_bridge_public', __( 'The private bridge matches the public bridge.', 'beltoft-services' ) );
 		}
 		$verified = Ownership::verify( $client, $record, $resource );
 		if ( is_wp_error( $verified ) ) {
 			return $verified;
 		}
 		if ( '' !== $verified['lock'] ) {
-			return new \WP_Error( 'vm_locked', 'The VM has a Proxmox task lock.' );
+			return new \WP_Error( 'vm_locked', __( 'The VM has a Proxmox task lock.', 'beltoft-services' ) );
 		}
 		$license = $resource->license();
 		$user_id = (int) ( $license['user_id'] ?? 0 );
 		if ( $user_id < 1 ) {
-			return new \WP_Error( 'no_owner', 'The VM has no customer owner.' );
+			return new \WP_Error( 'no_owner', __( 'The VM has no customer owner.', 'beltoft-services' ) );
 		}
 		$config = $verified['config'];
 		$occupied = ! empty( $config['net1'] ) || ! empty( $config['ipconfig1'] );
 		$reservation = PrivateNets::for_resource( $resource->id() );
 		if ( null !== $reservation && $reservation['user_id'] !== $user_id ) {
 			if ( 'stopped' !== $verified['status'] ) {
-				return new \WP_Error( 'private_transfer_requires_stop', 'Stop the VM before moving its private network to the new owner.' );
+				return new \WP_Error( 'private_transfer_requires_stop', __( 'Stop the VM before moving its private network to the new owner.', 'beltoft-services' ) );
 			}
 			if ( $occupied ) {
 				$old_params = self::params( $reservation, $reservation['address'], $bridge );
 				if ( is_wp_error( $old_params ) || ! self::matches( $config, $old_params ) ) {
-					return new \WP_Error( 'private_transfer_mismatch', 'The existing private NIC does not match the old owner reservation.' );
+					return new \WP_Error( 'private_transfer_mismatch', __( 'The existing private NIC does not match the old owner reservation.', 'beltoft-services' ) );
 				}
 			}
 			// This read-only check avoids disconnecting the old NIC when the new owner has no
 			// network/address at all. The later atomic reserve still handles a concurrent claim.
 			if ( ! PrivateNets::capacity_for_user( $user_id ) ) {
-				return new \WP_Error( 'network_unavailable', 'No private network is available for the new owner.' );
+				return new \WP_Error( 'network_unavailable', __( 'No private network is available for the new owner.', 'beltoft-services' ) );
 			}
 			if ( $occupied ) {
 				$path = '/nodes/' . rawurlencode( $verified['node'] ) . '/qemu/' . $record['vmid'] . '/config';
 				$removed = $client->request( 'PUT', $path, array( 'delete' => 'net1,ipconfig1', 'digest' => (string) ( $config['digest'] ?? '' ) ) );
 				$after_remove = Ownership::verify( $client, $record, $resource );
 				if ( is_wp_error( $after_remove ) || ! empty( $after_remove['config']['net1'] ) || ! empty( $after_remove['config']['ipconfig1'] ) ) {
-					return is_wp_error( $removed ) ? $removed : new \WP_Error( 'private_transfer_unconfirmed', 'The old private NIC could not be confirmed removed.' );
+					return is_wp_error( $removed ) ? $removed : new \WP_Error( 'private_transfer_unconfirmed', __( 'The old private NIC could not be confirmed removed.', 'beltoft-services' ) );
 				}
 				$config = $after_remove['config'];
 				$occupied = false;
 			}
 			try {
 				if ( ! PrivateNets::release_and_retire( $resource->id() ) ) {
-					return new \WP_Error( 'network_busy', 'The old private reservation could not be released.' );
+					return new \WP_Error( 'network_busy', __( 'The old private reservation could not be released.', 'beltoft-services' ) );
 				}
 			} catch ( \RuntimeException $e ) {
-				return new \WP_Error( 'network_busy', 'The private network pool is busy.' );
+				return new \WP_Error( 'network_busy', __( 'The private network pool is busy.', 'beltoft-services' ) );
 			}
 		}
 		if ( $ipconfig && ! $occupied && 'stopped' !== $verified['status'] ) {
-			return new \WP_Error( $reservation ? 'private_nic_pending' : 'vm_running', 'Stop the VM before attaching its private network.' );
+			return new \WP_Error( $reservation ? 'private_nic_pending' : 'vm_running', __( 'Stop the VM before attaching its private network.', 'beltoft-services' ) );
 		}
 		// A pre-existing, foreign net1 must not consume a fresh customer VLAN or address.
 		// Only a retry of a prior attach can already have our address reservation.
 		if ( $occupied && null === PrivateNets::address_for_resource( $resource->id() ) ) {
-			return new \WP_Error( 'private_nic_occupied', 'The VM already has a different second network interface.' );
+			return new \WP_Error( 'private_nic_occupied', __( 'The VM already has a different second network interface.', 'beltoft-services' ) );
 		}
 		try {
 			$reserved = PrivateNets::reserve( $user_id, $resource->id() );
 		} catch ( \RuntimeException $e ) {
-			return new \WP_Error( 'network_busy', 'The private network pool is busy.' );
+			return new \WP_Error( 'network_busy', __( 'The private network pool is busy.', 'beltoft-services' ) );
 		}
 		if ( null === $reserved ) {
-			return new \WP_Error( 'network_unavailable', 'No private network or address is available.' );
+			return new \WP_Error( 'network_unavailable', __( 'No private network or address is available.', 'beltoft-services' ) );
 		}
 		$net = $reserved['network'];
 		$address = $reserved['address'];
@@ -154,12 +154,12 @@ final class PrivateNic {
 		}
 		if ( self::matches( $config, $params ) ) {
 			if ( $resource->get( 'private_nic_pending' ) && 'stopped' !== $verified['status'] ) {
-				return new \WP_Error( 'private_nic_pending', 'The private NIC change waits for the VM to stop and boot again.' );
+				return new \WP_Error( 'private_nic_pending', __( 'The private NIC change waits for the VM to stop and boot again.', 'beltoft-services' ) );
 			}
 			if ( 'stopped' !== $verified['status'] ) {
 				$current = $client->request( 'GET', '/nodes/' . rawurlencode( $verified['node'] ) . '/qemu/' . $record['vmid'] . '/config', array( 'current' => 1 ) );
 				if ( is_wp_error( $current ) || ! self::matches( $current, $params ) ) {
-					return new \WP_Error( 'private_nic_pending', 'The private NIC change waits for the VM to stop and boot again.' );
+					return new \WP_Error( 'private_nic_pending', __( 'The private NIC change waits for the VM to stop and boot again.', 'beltoft-services' ) );
 				}
 			}
 			if ( $resource->get( 'private_nic_pending' ) ) {
@@ -168,7 +168,7 @@ final class PrivateNic {
 			return array( 'network' => $net, 'address' => $address, 'changed' => false );
 		}
 		if ( ! empty( $config['net1'] ) || ! empty( $config['ipconfig1'] ) ) {
-			return new \WP_Error( 'private_nic_occupied', 'The VM already has a different second network interface.' );
+			return new \WP_Error( 'private_nic_occupied', __( 'The VM already has a different second network interface.', 'beltoft-services' ) );
 		}
 		$path = '/nodes/' . rawurlencode( $verified['node'] ) . '/qemu/' . $record['vmid'] . '/config';
 		$answer = $client->request( 'PUT', $path, $params + array( 'digest' => (string) ( $config['digest'] ?? '' ) ) );
@@ -176,7 +176,7 @@ final class PrivateNic {
 		$after = Ownership::verify( $client, $record, $resource );
 		if ( $ipconfig && ! is_wp_error( $after ) && 'stopped' !== $after['status'] ) {
 			$resource->set( array( 'private_nic_pending' => 1 ) );
-			return new \WP_Error( 'private_nic_pending', 'The VM started during the private NIC change; stop it before retrying.' );
+			return new \WP_Error( 'private_nic_pending', __( 'The VM started during the private NIC change; stop it before retrying.', 'beltoft-services' ) );
 		}
 		if ( ! is_wp_error( $after ) && self::matches( $after['config'], $params ) ) {
 			if ( $resource->get( 'private_nic_pending' ) ) {
@@ -189,10 +189,10 @@ final class PrivateNic {
 		if ( ! $resource->get( 'private_nic_pending' ) && is_wp_error( $answer ) && in_array( $answer->get_error_code(), array( 'http_400', 'http_403', 'http_404', 'http_422' ), true ) && ! is_wp_error( $after ) && empty( $after['config']['net1'] ) && empty( $after['config']['ipconfig1'] ) ) {
 			try {
 				if ( ! PrivateNets::abandon_address( $user_id, $resource->id() ) ) {
-					return new \WP_Error( 'network_busy', 'The rejected private NIC reservation could not be released yet.' );
+					return new \WP_Error( 'network_busy', __( 'The rejected private NIC reservation could not be released yet.', 'beltoft-services' ) );
 				}
 			} catch ( \RuntimeException $e ) {
-				return new \WP_Error( 'network_busy', 'The rejected private NIC reservation could not be released yet.' );
+				return new \WP_Error( 'network_busy', __( 'The rejected private NIC reservation could not be released yet.', 'beltoft-services' ) );
 			}
 			if ( $resource->get( 'private_nic_pending' ) ) {
 				$resource->set( array( 'private_nic_pending' => null ) );
@@ -201,7 +201,7 @@ final class PrivateNic {
 			// Ambiguous replies retain the reservation and make the retry obligation explicit.
 			$resource->set( array( 'private_nic_pending' => 1 ) );
 		}
-		return is_wp_error( $answer ) ? $answer : new \WP_Error( 'private_nic_unconfirmed', 'The private NIC change could not be verified.' );
+		return is_wp_error( $answer ) ? $answer : new \WP_Error( 'private_nic_unconfirmed', __( 'The private NIC change could not be verified.', 'beltoft-services' ) );
 	}
 
 	/** PVE may fill in the generated VirtIO MAC, so compare the effective properties. */

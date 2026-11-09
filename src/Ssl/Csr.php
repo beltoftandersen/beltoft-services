@@ -60,7 +60,7 @@ final class Csr {
 				$key = openssl_pkey_new( array( 'private_key_bits' => self::MIN_BITS, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $config ) );
 
 				if ( ! $key ) {
-					return new \WP_Error( 'ssl_key', 'The key could not be made.' );
+					return new \WP_Error( 'ssl_key', __( 'The key could not be made.', 'beltoft-services' ) );
 				}
 
 				$dn = array( 'commonName' => $name );
@@ -74,7 +74,7 @@ final class Csr {
 				$request = openssl_csr_new( $dn, $key, array( 'digest_alg' => 'sha256', 'config' => $config ) );
 
 				if ( ! $request || ! openssl_csr_export( $request, $csr ) || ! openssl_pkey_export( $key, $pem, null, array( 'config' => $config ) ) ) {
-					return new \WP_Error( 'ssl_csr', 'The certificate request could not be made.' );
+					return new \WP_Error( 'ssl_csr', __( 'The certificate request could not be made.', 'beltoft-services' ) );
 				}
 
 				return array( 'key' => (string) $pem, 'csr' => (string) $csr );
@@ -96,7 +96,7 @@ final class Csr {
 		$mailbox = strtolower( trim( $mailbox ) );
 
 		if ( ! is_email( $mailbox ) || 1 !== preg_match( '/^[^\s,;:]+$/D', $mailbox ) ) {
-			return new \WP_Error( 'ssl_mailbox', 'The mailbox is not a valid email address.' );
+			return new \WP_Error( 'ssl_mailbox', __( 'The mailbox is not a valid email address.', 'beltoft-services' ) );
 		}
 
 		return self::with_config(
@@ -104,7 +104,7 @@ final class Csr {
 				$key = openssl_pkey_new( array( 'private_key_bits' => self::MIN_BITS, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $config ) );
 
 				if ( ! $key ) {
-					return new \WP_Error( 'ssl_key', 'The key could not be made.' );
+					return new \WP_Error( 'ssl_key', __( 'The key could not be made.', 'beltoft-services' ) );
 				}
 
 				$dn     = array();
@@ -123,7 +123,7 @@ final class Csr {
 				$request = openssl_csr_new( $dn, $key, array( 'digest_alg' => 'sha256', 'config' => $config ) );
 
 				if ( ! $request || ! openssl_csr_export( $request, $csr ) || ! openssl_pkey_export( $key, $pem, null, array( 'config' => $config ) ) ) {
-					return new \WP_Error( 'ssl_csr', 'The certificate request could not be made.' );
+					return new \WP_Error( 'ssl_csr', __( 'The certificate request could not be made.', 'beltoft-services' ) );
 				}
 
 				return array( 'key' => (string) $pem, 'csr' => (string) $csr );
@@ -477,7 +477,7 @@ final class Csr {
 		$detail = $public ? openssl_pkey_get_details( $public ) : false;
 
 		if ( ! is_array( $parsed ) || ! $detail || empty( $parsed['serialNumberHex'] ) ) {
-			return new \WP_Error( 'ssl_cert', 'The certificate could not be read.' );
+			return new \WP_Error( 'ssl_cert', __( 'The certificate could not be read.', 'beltoft-services' ) );
 		}
 
 		return array(

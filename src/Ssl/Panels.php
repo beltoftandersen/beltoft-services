@@ -343,7 +343,7 @@ final class Panels {
 
 		if ( isset( $actions['ssl_cancel'] ) ) {
 			/* translators: %d: days. */
-			$note = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( __( 'You can cancel for a refund until %d days after the certificate was issued.', 'beltoft-services' ), SslSettings::refund_days() ) : '';
+			$note = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( _n( 'You can cancel for a refund until %d day after the certificate was issued.', 'You can cancel for a refund until %d days after the certificate was issued.', SslSettings::refund_days(), 'beltoft-services' ), SslSettings::refund_days() ) : '';
 			echo '<button type="button" class="button woocommerce-button" data-ssl-cancel>' . esc_html( $actions['ssl_cancel'] ) . '</button> <span class="description">' . esc_html( $note ) . '</span>';
 		}
 
@@ -358,26 +358,26 @@ final class Panels {
 	public static function admin( Resource $r ): void {
 		$details = array_filter(
 			array(
-				'Name'               => $r->get( 'ssl_name' ),
-				'Profile'            => Provision::is_smime( $r ) ? 'S/MIME' : '',
-				'Names'              => SslNames::is_multi( $r ) ? implode( ', ', array_column( SslNames::entries( $r ), 'name' ) ) : '',
-				'Registrar order'    => $r->get( 'remote_id' ),
-				'Registrar product'  => ( (array) $r->get( 'plan' ) )['ssl_product'] ?? '',
-				'Status'             => $r->get( 'ssl_status' ),
-				'Validation'         => $r->get( 'ssl_validation' ),
-				'Key'                => $r->get( 'ssl_key_mode' ),
-				'Serial'             => $r->get( 'ssl_serial' ),
-				'Valid to'           => $r->get( 'ssl_valid_to' ),
-				'Service ends'       => $r->get( 'ssl_order_expires' ),
-				'Reissue pending'    => $r->get( 'ssl_reissue_pending' ) ? 'yes' : '',
-				'Cancelled'          => $r->get( 'ssl_cancelled' ) ? 'yes' : '',
+				__( 'Name', 'beltoft-services' )               => $r->get( 'ssl_name' ),
+				__( 'Profile', 'beltoft-services' )            => Provision::is_smime( $r ) ? 'S/MIME' : '',
+				__( 'Names', 'beltoft-services' )              => SslNames::is_multi( $r ) ? implode( ', ', array_column( SslNames::entries( $r ), 'name' ) ) : '',
+				__( 'Registrar order', 'beltoft-services' )    => $r->get( 'remote_id' ),
+				__( 'Registrar product', 'beltoft-services' )  => ( (array) $r->get( 'plan' ) )['ssl_product'] ?? '',
+				__( 'Status', 'beltoft-services' )             => $r->get( 'ssl_status' ),
+				__( 'Validation', 'beltoft-services' )         => $r->get( 'ssl_validation' ),
+				__( 'Key', 'beltoft-services' )                => $r->get( 'ssl_key_mode' ),
+				__( 'Serial', 'beltoft-services' )             => $r->get( 'ssl_serial' ),
+				__( 'Valid to', 'beltoft-services' )           => $r->get( 'ssl_valid_to' ),
+				__( 'Service ends', 'beltoft-services' )       => $r->get( 'ssl_order_expires' ),
+				__( 'Reissue pending', 'beltoft-services' )    => $r->get( 'ssl_reissue_pending' ) ? __( 'yes', 'beltoft-services' ) : '',
+				__( 'Cancelled', 'beltoft-services' )          => $r->get( 'ssl_cancelled' ) ? __( 'yes', 'beltoft-services' ) : '',
 			)
 		);
 
 		$cost = SslCatalog::cost( (int) ( ( (array) $r->get( 'plan' ) )['ssl_product'] ?? 0 ) );
 
 		if ( null !== $cost ) {
-			$details['Registrar cost per year (EUR)'] = number_format( $cost, 2 );
+			$details[ __( 'Registrar cost per year (EUR)', 'beltoft-services' ) ] = number_format( $cost, 2 );
 		}
 
 		foreach ( $details as $label => $value ) {

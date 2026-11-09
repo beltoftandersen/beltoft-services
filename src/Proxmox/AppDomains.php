@@ -98,10 +98,10 @@ final class AppDomains {
 	public static function dry_run( string $zone, string $fqdn ): ?string {
 		$labels = explode( '.', $fqdn );
 		if ( strlen( $fqdn ) > 253 || count( array_filter( $labels, static fn( $l ) => strlen( $l ) > 63 || '' === $l ) ) > 0 ) {
-			return 'The domain name is too long.';
+			return __( 'The domain name is too long.', 'beltoft-services' );
 		}
 		$set = Records::validate( $zone, array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => '192.0.2.1' ) ) );
-		return is_wp_error( $set ) ? 'The domain name is not valid for a DNS record.' : null;
+		return is_wp_error( $set ) ? __( 'The domain name is not valid for a DNS record.', 'beltoft-services' ) : null;
 	}
 
 	/**
@@ -115,14 +115,14 @@ final class AppDomains {
 	public static function publish( int $user_id, string $zone, string $fqdn, string $ip, ?bool &$wrote = null, bool $strict = false ) {
 		$wrote = false;
 		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-			return 'The server address is not known yet.';
+			return __( 'The server address is not known yet.', 'beltoft-services' );
 		}
 		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) || ( $fqdn !== $zone && ! str_ends_with( $fqdn, '.' . $zone ) ) ) {
-			return 'The domain is not one of your domains on our name servers.';
+			return __( 'The domain is not one of your domains on our name servers.', 'beltoft-services' );
 		}
 		$set = Records::validate( $zone, array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => $ip ) ) );
 		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
-			return 'The domain name is not valid for a DNS record.';
+			return __( 'The domain name is not valid for a DNS record.', 'beltoft-services' );
 		}
 		// The zone lock covers the read and the write, so an editor save or a pause cannot slip in between.
 		$locked = Records::locked(
@@ -131,10 +131,10 @@ final class AppDomains {
 				// Read immediately before the write: what is at the name now decides.
 				$zone_data = DnsClients::dns()->zone( $zone );
 				if ( is_wp_error( $zone_data ) ) {
-					return new \WP_Error( 'transient', 'The DNS zone could not be read.' );
+					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
 				}
 				if ( ! is_array( $zone_data ) ) {
-					return 'The DNS zone does not exist.';
+					return __( 'The DNS zone does not exist.', 'beltoft-services' );
 				}
 				$have = array();
 				foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
@@ -150,20 +150,20 @@ final class AppDomains {
 					return true;
 				}
 				if ( $strict && 0 !== $sets ) {
-					return 'The name already has a DNS record.';
+					return __( 'The name already has a DNS record.', 'beltoft-services' );
 				}
 				if ( array() !== $have ) {
-					return 'The name already has a DNS record.';
+					return __( 'The name already has a DNS record.', 'beltoft-services' );
 				}
 				$set[0]['changetype'] = 'REPLACE';
 				$done = DnsClients::dns()->replace_rrsets( $zone, $set );
 				if ( ! is_wp_error( $done ) ) {
 					$wrote = true;
 				}
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', 'The DNS record could not be saved.' ) : true;
+				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : true;
 			}
 		);
-		return is_wp_error( $locked ) ? new \WP_Error( 'transient', 'The DNS zone is being changed.' ) : $locked;
+		return is_wp_error( $locked ) ? new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) ) : $locked;
 	}
 
 	/** How many record sets of any type a name has in the raw rrsets of a zone. */

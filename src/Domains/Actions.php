@@ -32,32 +32,32 @@ final class Actions {
 	}
 
 	private static function validate( Resource $r, string $action, array $args ): bool|\WP_Error {
-		if ( 'set_records' === $action && $r->get( 'dns_external' ) ) { return new \WP_Error( 'dns_external', 'This domain\'s DNS is hosted elsewhere.' ); }
-		if ( 'set_records' === $action && $r->get( 'records_off' ) ) { return new \WP_Error( 'paused', 'DNS hosting is paused.' ); }
-		if ( ! isset( self::offered( $r )[ $action ] ) ) { return new \WP_Error( 'unavailable', 'This action is unavailable.' ); }
+		if ( 'set_records' === $action && $r->get( 'dns_external' ) ) { return new \WP_Error( 'dns_external', __( 'This domain\'s DNS is hosted elsewhere.', 'beltoft-services' ) ); }
+		if ( 'set_records' === $action && $r->get( 'records_off' ) ) { return new \WP_Error( 'paused', __( 'DNS hosting is paused.', 'beltoft-services' ) ); }
+		if ( ! isset( self::offered( $r )[ $action ] ) ) { return new \WP_Error( 'unavailable', __( 'This action is unavailable.', 'beltoft-services' ) ); }
 		if ( 'set_records' === $action ) {
-			if ( strlen( (string) ( $args['records'] ?? '' ) ) > 100000 ) { return new \WP_Error( 'bad_records', 'Enter a valid DNS record list.' ); }
+			if ( strlen( (string) ( $args['records'] ?? '' ) ) > 100000 ) { return new \WP_Error( 'bad_records', __( 'Enter a valid DNS record list.', 'beltoft-services' ) ); }
 			$records = json_decode( (string) ( $args['records'] ?? '' ), true );
-			if ( ! is_array( $records ) || ! array_is_list( $records ) ) { return new \WP_Error( 'bad_records', 'Enter a valid DNS record list.' ); }
+			if ( ! is_array( $records ) || ! array_is_list( $records ) ) { return new \WP_Error( 'bad_records', __( 'Enter a valid DNS record list.', 'beltoft-services' ) ); }
 			$checked = Records::validate( (string) $r->get( 'domain' ), $records );
 			return is_wp_error( $checked ) ? $checked : true;
 		}
 		if ( 'set_nameservers' === $action ) {
 			$mode = (string) ( $args['mode'] ?? '' );
 			// Moving DNS here needs the zone built and the records in it before the switch: not offered while the DNS is hosted elsewhere.
-			if ( 'ours' === $mode ) { return $r->get( 'dns_external' ) ? new \WP_Error( 'dns_external', 'This domain\'s DNS is hosted elsewhere. Contact support to move it here.' ) : true; }
+			if ( 'ours' === $mode ) { return $r->get( 'dns_external' ) ? new \WP_Error( 'dns_external', __( 'This domain\'s DNS is hosted elsewhere. Contact support to move it here.', 'beltoft-services' ) ) : true; }
 			$hosts = self::hosts( (string) ( $args['hosts'] ?? '' ) );
-			return 'custom' === $mode && ! is_wp_error( $hosts ) ? true : new \WP_Error( 'bad_nameservers', 'Enter two to six valid name servers.' );
+			return 'custom' === $mode && ! is_wp_error( $hosts ) ? true : new \WP_Error( 'bad_nameservers', __( 'Enter two to six valid name servers.', 'beltoft-services' ) );
 		}
-		if ( 'check_delegation' === $action && (int) $r->get( 'delegation_checked' ) > time() - MINUTE_IN_SECONDS ) { return new \WP_Error( 'rate_limited', 'Check again in a minute.' ); }
+		if ( 'check_delegation' === $action && (int) $r->get( 'delegation_checked' ) > time() - MINUTE_IN_SECONDS ) { return new \WP_Error( 'rate_limited', __( 'Check again in a minute.', 'beltoft-services' ) ); }
 		return true;
 	}
 
 	private static function hosts( string $raw ): array|\WP_Error {
 		$hosts = preg_split( '/[\s,]+/', strtolower( trim( $raw ) ) );
 		$hosts = array_values( array_unique( array_map( static fn( $host ) => rtrim( $host, '.' ), $hosts ) ) );
-		if ( count( $hosts ) < 2 || count( $hosts ) > 6 ) { return new \WP_Error( 'bad_nameservers', 'Enter two to six valid name servers.' ); }
-		foreach ( $hosts as $host ) { if ( is_wp_error( Search::normalise( $host ) ) ) { return new \WP_Error( 'bad_nameservers', 'Enter two to six valid name servers.' ); } }
+		if ( count( $hosts ) < 2 || count( $hosts ) > 6 ) { return new \WP_Error( 'bad_nameservers', __( 'Enter two to six valid name servers.', 'beltoft-services' ) ); }
+		foreach ( $hosts as $host ) { if ( is_wp_error( Search::normalise( $host ) ) ) { return new \WP_Error( 'bad_nameservers', __( 'Enter two to six valid name servers.', 'beltoft-services' ) ); } }
 		return $hosts;
 	}
 

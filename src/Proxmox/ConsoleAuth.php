@@ -25,32 +25,32 @@ final class ConsoleAuth {
 	 */
 	public static function authorize( string $token, int $user_id, string $ip ) {
 		if ( ! Console::enabled() ) {
-			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
+			return new \WP_Error( 'console_forbidden', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
 		$entry = ConsoleSessions::peek( $token, $user_id, $ip );
 		if ( null === $entry ) {
-			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
+			return new \WP_Error( 'console_forbidden', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
 		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
 		if ( ! self::same_origin( $origin ) ) {
-			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
+			return new \WP_Error( 'console_forbidden', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
 		$r = Resource::find( (int) $entry['resource'] );
 		$license = $r ? $r->license() : array();
 		$record = $r ? VmRecords::for_resource( $r->id() ) : null;
 		if ( ! $r || ! $r->shows_status() || ! $r->accepts_actions() || (int) ( $license['user_id'] ?? 0 ) !== $user_id || ! $record || (string) $record['cluster'] !== (string) $entry['cluster'] || (string) $record['node'] !== (string) $entry['node'] || (int) $record['vmid'] !== (int) $entry['vmid'] ) {
-			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
+			return new \WP_Error( 'console_forbidden', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
 		$cluster = Clusters::get( (string) $record['cluster'] );
 		if ( ! $cluster || null !== Clients::gate( (string) $record['cluster'], $cluster, Clients::live_allowed() ) ) {
-			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
+			return new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 503 ) );
 		}
 		$live = 'live' === ( $cluster['client'] ?? 'fake' );
 		if ( $live && ! ConsoleClient::configured( $cluster ) ) {
-			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
+			return new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 503 ) );
 		}
 		if ( $live && ( '' === (string) ( $cluster['ca_file'] ?? '' ) && '' === (string) ( $cluster['pin_sha256'] ?? '' ) ) ) {
-			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
+			return new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 503 ) );
 		}
 		$url = wp_parse_url( (string) ( $cluster['api_url'] ?? '' ) );
 		$host = is_array( $url ) ? (string) ( $url['host'] ?? '' ) : '';
@@ -58,14 +58,14 @@ final class ConsoleAuth {
 		$dns_host = 1 === preg_match( '/^[A-Za-z0-9.-]+$/D', $host );
 		$ipv6_host = 1 === preg_match( '/^\[[a-fA-F0-9:]+\]$/D', $host ) && false !== filter_var( trim( $host, '[]' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 );
 		if ( ( $live && 'https' !== ( $url['scheme'] ?? '' ) ) || ( ! $dns_host && ! $ipv6_host ) || $port < 1 || $port > 65535 || isset( $url['user'] ) || isset( $url['pass'] ) || isset( $url['query'] ) || isset( $url['fragment'] ) || ( isset( $url['path'] ) && ! in_array( $url['path'], array( '', '/' ), true ) ) ) {
-			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
+			return new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 503 ) );
 		}
 		if ( $live && preg_match( '/[\r\n]/', (string) $cluster['console_token_id'] . (string) $cluster['console_token_secret'] ) ) {
-			return new \WP_Error( 'console_unavailable', 'The console is not available.', array( 'status' => 503 ) );
+			return new \WP_Error( 'console_unavailable', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 503 ) );
 		}
 		$ticket = ConsoleSessions::consume( $entry );
 		if ( null === $ticket ) {
-			return new \WP_Error( 'console_forbidden', 'The console is not available.', array( 'status' => 403 ) );
+			return new \WP_Error( 'console_forbidden', __( 'The console is not available.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
 		$uri = '/api2/json/nodes/' . rawurlencode( (string) $entry['node'] ) . '/qemu/' . (int) $entry['vmid'] . '/vncwebsocket?port=' . (int) $entry['port'] . '&vncticket=' . rawurlencode( $ticket );
 		return array(

@@ -32,7 +32,7 @@ final class Contacts {
 		$result = Clients::registrar()->request( 'POST', '/customers', $read['body'] );
 		if ( is_wp_error( $result ) ) { return $result; }
 		$handle = (string) ( $result['handle'] ?? '' );
-		if ( '' === $handle ) { return new \WP_Error( 'bad_response', 'Registrar did not return a contact handle.' ); }
+		if ( '' === $handle ) { return new \WP_Error( 'bad_response', __( 'Registrar did not return a contact handle.', 'beltoft-services' ) ); }
 		update_user_meta( $user_id, self::META_HANDLE, $handle );
 		self::remember( $user_id, $handle, $hash, $read );
 		return $handle;
@@ -63,10 +63,10 @@ final class Contacts {
 	public static function eligible( string $domain, array $details ): bool|\WP_Error {
 		if ( array() === $details ) { return true; }
 		if ( str_ends_with( $domain, '.eu' ) && ! TldRules::eu_country( (string) ( $details['country'] ?? '' ) ) ) {
-			return new \WP_Error( 'eu_registrant', 'A .eu domain needs a registrant in the EU; the registrant on this order is outside it.' );
+			return new \WP_Error( 'eu_registrant', __( 'A .eu domain needs a registrant in the EU; the registrant on this order is outside it.', 'beltoft-services' ) );
 		}
 		if ( str_ends_with( $domain, '.dk' ) && empty( $details['private'] ) && empty( $details['vat'] ) ) {
-			return new \WP_Error( 'dk_registrant', 'A .dk domain ordered by a business needs a VAT number; the registrant on this order has none.' );
+			return new \WP_Error( 'dk_registrant', __( 'A .dk domain ordered by a business needs a VAT number; the registrant on this order has none.', 'beltoft-services' ) );
 		}
 		return true;
 	}
@@ -90,7 +90,7 @@ final class Contacts {
 		$street = trim( (string) $order->get_billing_address_1() );
 		$phone = preg_replace( '/\D+/', '', (string) $order->get_billing_phone() );
 		if ( '' === $first || '' === $last || ! is_email( $email ) || '' === $country || '' === $street || strlen( $phone ) < 6 ) {
-			return new \WP_Error( 'contact_incomplete', 'The billing contact needs a name, email, address, country and phone number.' );
+			return new \WP_Error( 'contact_incomplete', __( 'The billing contact needs a name, email, address, country and phone number.', 'beltoft-services' ) );
 		}
 		$full_street = $street;
 		$number = '';

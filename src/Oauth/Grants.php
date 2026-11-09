@@ -81,22 +81,22 @@ final class Grants {
 		$row = self::find( 'code', $code );
 
 		if ( null === $row || ! hash_equals( (string) $row['client_id'], $client_id ) ) {
-			return new \WP_Error( 'invalid_grant', 'The code is not valid.' );
+			return new \WP_Error( 'invalid_grant', __( 'The code is not valid.', 'beltoft-services' ) );
 		}
 
 		// The first use takes the row; any later use is a replay and ends what the first one made.
 		if ( ! self::take( (int) $row['id'] ) ) {
 			self::revoke_family( (string) $row['family'] );
 
-			return new \WP_Error( 'invalid_grant', 'The code is not valid.' );
+			return new \WP_Error( 'invalid_grant', __( 'The code is not valid.', 'beltoft-services' ) );
 		}
 
 		if ( (int) $row['expires_at'] < time() || ! hash_equals( (string) $row['redirect_uri'], $redirect ) || ! self::verifies( $verifier, (string) $row['challenge'] ) ) {
-			return new \WP_Error( 'invalid_grant', 'The code is not valid.' );
+			return new \WP_Error( 'invalid_grant', __( 'The code is not valid.', 'beltoft-services' ) );
 		}
 
 		if ( ! self::allowed( (int) $row['user_id'] ) ) {
-			return new \WP_Error( 'access_denied', 'This account does not allow this connection.' );
+			return new \WP_Error( 'access_denied', __( 'This account does not allow this connection.', 'beltoft-services' ) );
 		}
 
 		return self::issue_tokens( (string) $row['family'], $client_id, (int) $row['user_id'], (string) $row['scope'], (int) $row['connected_at'] );
@@ -113,7 +113,7 @@ final class Grants {
 		$row = self::find( 'refresh', $token );
 
 		if ( null === $row || ! hash_equals( (string) $row['client_id'], $client_id ) ) {
-			return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
+			return new \WP_Error( 'invalid_grant', __( 'The refresh token is not valid.', 'beltoft-services' ) );
 		}
 
 		$retry = false;
@@ -127,20 +127,20 @@ final class Grants {
 			if ( null === $again || $used <= 0 || time() - $used > self::RETRY_WINDOW ) {
 				self::revoke_family( (string) $row['family'] );
 
-				return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
+				return new \WP_Error( 'invalid_grant', __( 'The refresh token is not valid.', 'beltoft-services' ) );
 			}
 
 			$retry = true;
 		}
 
 		if ( (int) $row['expires_at'] < time() ) {
-			return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
+			return new \WP_Error( 'invalid_grant', __( 'The refresh token is not valid.', 'beltoft-services' ) );
 		}
 
 		if ( ! self::allowed( (int) $row['user_id'] ) ) {
 			self::revoke_family( (string) $row['family'] );
 
-			return new \WP_Error( 'invalid_grant', 'The refresh token is not valid.' );
+			return new \WP_Error( 'invalid_grant', __( 'The refresh token is not valid.', 'beltoft-services' ) );
 		}
 
 		self::drop_live( (string) $row['family'], $retry );
