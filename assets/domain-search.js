@@ -17,13 +17,19 @@
     container.prepend(error);
   }
 
+  // Arrived from the email page of an account: the domain is for that email plan. The server checks the plan again.
+  function mailFor() {
+    const id = parseInt(new URLSearchParams(window.location.search).get('mail_for') || '', 10);
+    return id > 0 ? id : 0;
+  }
+
   // Adds a domain to the order and goes on to the checkout. The root holds the endpoints and nonces.
   async function add(root, domain, mode, authCode, dns) {
     const response = await fetch(root.dataset.cart, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
-      body: JSON.stringify({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' })
+      body: JSON.stringify(Object.assign({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' }, mailFor() ? { mail_for: mailFor() } : {}))
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || __('Could not add this domain.', 'beltoft-services'));
@@ -88,6 +94,7 @@
     function transferHref(domain) {
       const url = new URL(transferLink.getAttribute('href'), window.location.href);
       url.searchParams.set('transfer', domain);
+      if (mailFor() && !url.searchParams.has('mail_for')) url.searchParams.set('mail_for', String(mailFor()));
       return url.toString();
     }
 

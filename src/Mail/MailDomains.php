@@ -21,6 +21,114 @@ defined( 'ABSPATH' ) || exit;
  */
 final class MailDomains {
 
+	/** Order line meta: the plan root a bought domain joins. */
+	public const ITEM_META = '_beltoft_services_mail_attach';
+
+	/** Resource meta of a domain: set once it joined (or was refused), so a later ready does not try again. */
+	public const ATTACH_DONE = 'mail_attach_done';
+
+	/**
+	 * Listens for a registered or transferred domain becoming ready.
+	 */
+	public static function register(): void {
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
+		add_filter( 'beltoft_services_domain_cart_attach', array( __CLASS__, 'cart_attach' ), 10, 3 );
+	}
+
+	/**
+	 * Filter beltoft_services_domain_cart_attach: the root id when the customer may add a domain to it.
+	 *
+	 * @param mixed $attach  Current answer.
+	 * @param mixed $mail_for Asked root id.
+	 * @param mixed $user_id Customer.
+	 */
+	public static function cart_attach( $attach, $mail_for, $user_id ) {
+		$root = self::attachable( (int) $mail_for, (int) $user_id );
+
+		return $root ? $root->id() : $attach;
+	}
+
+	/**
+	 * The plan root a user may add a domain to now: theirs, a mail plan root, live, with room. Null otherwise.
+	 *
+	 * @param int $root_id Resource id the cart or order line names.
+	 * @param int $user_id Customer.
+	 */
+	public static function attachable( int $root_id, int $user_id ): ?Resource {
+		$root = self::attach_check( $root_id, $user_id );
+
+		return $root instanceof Resource ? $root : null;
+	}
+
+	/**
+	 * @return Resource|string The root, or a short reason (English, for an order note).
+	 */
+	private static function attach_check( int $root_id, int $user_id ) {
+		$root = $root_id > 0 && $user_id > 0 ? Resource::find( $root_id ) : null;
+
+		if ( ! $root || MailDriver::ID !== $root->get( 'driver' ) || MailPlan::root( $root )->id() !== $root->id() || (int) ( $root->license()['user_id'] ?? 0 ) !== $user_id ) {
+			return 'the email plan is not available to this customer';
+		}
+
+		if ( 'ready' !== (string) $root->get( 'state' ) || 'ready' !== (string) $root->get( 'desired' ) ) {
+			return 'the email plan is not active';
+		}
+
+		if ( count( MailPlan::members( $root ) ) >= MailPlan::limits( $root )['domains'] ) {
+			return 'the email plan has no room for another domain';
+		}
+
+		return $root;
+	}
+
+	/**
+	 * Action beltoft_services_state_changed: a domain bought from the email area joins the plan when it is ready.
+	 * The root named on the order line is checked again here: owner, live, room. Otherwise an order note, nothing else.
+	 *
+	 * @param mixed  $r   Resource.
+	 * @param string $old Old state.
+	 * @param string $new New state.
+	 */
+	public static function on_state_changed( $r, $old, $new ): void {
+		unset( $old );
+
+		if ( 'ready' !== $new || ! $r instanceof Resource || 'domain' !== $r->get( 'driver' ) || $r->get( self::ATTACH_DONE ) ) {
+			return;
+		}
+
+		$item_id = (int) $r->get( 'order_item_id' );
+		$item    = $item_id > 0 ? \WC_Order_Factory::get_order_item( $item_id ) : null;
+		$root_id = $item ? (int) $item->get_meta( self::ITEM_META, true ) : 0;
+
+		if ( $root_id <= 0 ) {
+			return;
+		}
+
+		$name  = (string) $r->get( 'domain' );
+		$user  = (int) ( $r->license()['user_id'] ?? 0 );
+		$root  = self::attach_check( $root_id, $user );
+		$added = $root instanceof Resource ? self::add( $root, $name, array( 'mail_mode_hint' => 'ours' ) ) : null;
+
+		if ( $added instanceof Resource ) {
+			$r->set( array( self::ATTACH_DONE => 'joined' ) );
+
+			return;
+		}
+
+		$why = is_string( $root ) ? $root : ( is_wp_error( $added ) ? $added->get_error_code() : 'unknown' );
+
+		// A busy plan can be tried again at the next ready; anything else is final.
+		if ( ! ( is_wp_error( $added ) && in_array( $added->get_error_code(), array( 'busy', 'not_ready' ), true ) ) ) {
+			$r->set( array( self::ATTACH_DONE => 'refused' ) );
+		}
+
+		$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
+
+		if ( $order ) {
+			$order->add_order_note( sprintf( 'The domain %1$s was not added to the email plan: %2$s.', $name, $why ) );
+		}
+	}
+
 	/**
 	 * Adds a domain to the plan of a root.
 	 *

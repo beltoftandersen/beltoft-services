@@ -472,6 +472,8 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'You add a few DNS records at your provider. We show you which ones, starting with one that proves the domain is yours.', $html );
 		$this->assertStringContainsString( 'Register a new domain', $html );
 		$this->assertStringContainsString( 'Transfer a domain to us', $html );
+		$this->assertStringContainsString( '/domains/?mail_for=' . $root->id() . '"', $html );
+		$this->assertStringContainsString( '/domains/?mail_for=' . $root->id() . '#transfer"', $html, 'The transfer link keeps its anchor after the plan.' );
 		$this->assertStringNotContainsString( 'data-mail-domain-remove', $html, 'The first domain cannot be removed.' );
 		$this->assertStringNotContainsString( '—', $html );
 		$this->assertStringNotContainsString( '·', $html );

@@ -93,6 +93,7 @@ final class Plugin {
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
 		Mail\MailAccess::register();
+		Mail\MailDomains::register();
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Ssl::class, 'menu' ), 101 );

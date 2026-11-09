@@ -63,7 +63,7 @@ final class Cart {
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => array( __CLASS__, 'rest_add' ),
 			'permission_callback' => '__return_true',
-			'args' => array( 'domain' => array( 'type' => 'string', 'required' => true ), 'mode' => array( 'type' => 'string', 'required' => true ), 'auth_code' => array( 'type' => 'string' ), 'dns' => array( 'type' => 'string' ) ),
+			'args' => array( 'domain' => array( 'type' => 'string', 'required' => true ), 'mode' => array( 'type' => 'string', 'required' => true ), 'auth_code' => array( 'type' => 'string' ), 'dns' => array( 'type' => 'string' ), 'mail_for' => array( 'type' => 'integer' ) ),
 		) );
 	}
 
@@ -74,7 +74,7 @@ final class Cart {
 		if ( \BeltoftServices\RateLimit::exceeded( \BeltoftServices\RateLimit::visitor(), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
-		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ), (string) ( $request['dns'] ?? '' ) );
+		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ), (string) ( $request['dns'] ?? '' ), (int) ( $request['mail_for'] ?? 0 ) );
 		if ( is_wp_error( $result ) ) { return $result; }
 		return new \WP_REST_Response( $result, ! empty( $result['added'] ) ? 201 : 200 );
 	}
@@ -85,13 +85,13 @@ final class Cart {
 	 *
 	 * @return array{added: bool, already_in_cart?: bool, checkout_url: string}|\WP_Error
 	 */
-	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
+	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0 ): array|\WP_Error {
 		// A locked domain cannot be transferred: asked again now (a few seconds at most); the cached answer stands in when that fails.
 		if ( 'transfer' === $mode ) {
 			$known = TransferDns::fresh_registrar( $domain );
 			if ( ! empty( $known['locked'] ) ) { return new \WP_Error( 'domain_locked', TransferDns::locked_message( $domain ), array( 'status' => 422 ) ); }
 		}
-		$data = self::line_data( $domain, $mode, $auth_code, $dns );
+		$data = self::line_data( $domain, $mode, $auth_code, $dns, $mail_for );
 		if ( is_wp_error( $data ) ) { return $data; }
 		// WooCommerce leaves its cart unloaded on custom REST routes.
 		if ( ! WC()->cart && function_exists( 'wc_load_cart' ) ) { wc_load_cart(); }
@@ -142,7 +142,7 @@ final class Cart {
 		return array( 'added' => true, 'checkout_url' => wc_get_checkout_url() );
 	}
 
-	public static function line_data( string $domain, string $mode, string $auth_code = '', string $dns = '' ): array|\WP_Error {
+	public static function line_data( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0 ): array|\WP_Error {
 		$domain = Search::normalise( $domain );
 		if ( is_wp_error( $domain ) ) { return $domain; }
 		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', __( 'Choose registration, transfer or DNS hosting.', 'beltoft-services' ) ); }
@@ -163,6 +163,19 @@ final class Cart {
 		if ( 'transfer' === $mode ) {
 			try { $data['beltoft_services_domain_auth'] = Crypto::encrypt( trim( $auth_code ) ); }
 			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', __( 'Transfer cannot start until secure storage is configured.', 'beltoft-services' ) ); }
+		}
+		// A domain bought for an email plan: the Mail layer takes the plan only when it is the customer's own, live and has room
+		// (the order checks again when the domain is ready).
+		if ( $mail_for > 0 && in_array( $mode, array( 'register', 'transfer' ), true ) ) {
+			/**
+			 * The email plan a domain line is bought for, or 0.
+			 *
+			 * @param int $attach  0.
+			 * @param int $mail_for Resource id the page asked for.
+			 * @param int $user_id Current customer.
+			 */
+			$attach = (int) apply_filters( 'beltoft_services_domain_cart_attach', 0, $mail_for, get_current_user_id() );
+			if ( $attach > 0 ) { $data['beltoft_services_mail_attach'] = $attach; }
 		}
 		return $data;
 	}
@@ -450,6 +463,7 @@ final class Cart {
 			if ( ! empty( $values['beltoft_services_domain']['claim_id'] ) ) { $item->add_meta_data( '_beltoft_services_dns_claim', (int) $values['beltoft_services_domain']['claim_id'], true ); }
 			$item->add_meta_data( __( 'Domain', 'beltoft-services' ), (string) ( $values['beltoft_services_domain']['domain'] ?? '' ), true );
 		}
+		if ( isset( $values['beltoft_services_mail_attach'] ) ) { $item->add_meta_data( '_beltoft_services_mail_attach', (int) $values['beltoft_services_mail_attach'], true ); }
 		if ( isset( $values['beltoft_services_domain_auth'] ) ) { $item->add_meta_data( '_beltoft_services_domain_auth', $values['beltoft_services_domain_auth'], true ); }
 	}
 
