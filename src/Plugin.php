@@ -66,6 +66,7 @@ final class Plugin {
 		Hosting\Languages::register();
 		Hosting\HostingSwitch::register();
 		Hosting\Addons::register();
+		Hosting\HostingAccount::register();
 		Children::register();
 		Domains\DomainSettings::register();
 		Ssl\SslSettings::register();
@@ -79,6 +80,7 @@ final class Plugin {
 		Licences\KeyOrder::register();
 		Licences\KeyField::register();
 		Mail\MailSettings::register();
+		Mail\MailPacks::register();
 		Mail\MailSetup::register();
 		Bricks\DocsElements::register();
 		Mail\MailDns::register();

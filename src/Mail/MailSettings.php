@@ -273,7 +273,7 @@ final class MailSettings {
 	 * @param int                             $default The global value.
 	 */
 	public static function override( ?\BeltoftServices\Resource $r, string $key, int $default ): int {
-		$set = null === $r ? null : $r->get( 'mail_rl' );
+		$set = null === $r ? null : $r->get( MailMeta::RATE_LIMIT );
 
 		return is_array( $set ) && isset( $set[ $key ] ) && is_numeric( $set[ $key ] ) ? max( 0, (int) $set[ $key ] ) : $default;
 	}

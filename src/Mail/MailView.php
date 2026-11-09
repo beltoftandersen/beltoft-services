@@ -39,7 +39,7 @@ final class MailView {
 		$out    = array(
 			'id'        => $r->id(),
 			'domain'    => MailGuard::domain( $r ),
-			'included'  => \BeltoftServices\Hosting\HostingAccount::included_label( $r ),
+			'included'  => (string) apply_filters( 'beltoft_services_mail_included_label', '', $r ),
 			'kind'      => $kind,
 			'ready'     => $ready,
 			'limits'    => $limits,

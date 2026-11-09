@@ -5,11 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Hosting;
+namespace BeltoftServices\Mail;
 
-use BeltoftServices\Mail\MailClients;
-use BeltoftServices\Mail\MailDriver;
-use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,9 +15,20 @@ defined( 'ABSPATH' ) || exit;
  * Sets the size of each mailbox to the plan's size plus one pack for each pack it has, and gives the domain room for
  * the biggest mailbox and the total. Idempotent: it reads what the mail server has and changes only what differs, so
  * it raises storage when a pack is paid and lowers it again once the line has left at a renewal. The packs are kept
- * on the Email lite resource (`mail_packs`) so a plan change of the mail driver can put them back.
+ * on the Email lite resource (`MailMeta::PACKS`) so a plan change of the mail driver can put them back.
  */
 final class MailPacks {
+
+	/** Storage of one pack, MB, and the most packs one mailbox can have. */
+	public const PACK_MB   = 5120;
+	public const MAX_PACKS = 4;
+
+	/**
+	 * Puts the stored packs back whenever the mail driver has changed a domain's limits.
+	 */
+	public static function register(): void {
+		add_action( 'beltoft_services_mail_limits_applied', array( self::class, 'reapply' ) );
+	}
 
 	/**
 	 * Applies the packs.
@@ -58,10 +66,10 @@ final class MailPacks {
 				continue;
 			}
 
-			$n       = min( Addons::MAX_PACKS, (int) ( $packs[ $email ] ?? 0 ) );
-			$want    = $limits['quota_mb'] + $n * Addons::PACK_MB;
+			$n       = min( self::MAX_PACKS, (int) ( $packs[ $email ] ?? 0 ) );
+			$want    = $limits['quota_mb'] + $n * self::PACK_MB;
 			$now     = (int) round( (int) ( $box['quota'] ?? 0 ) / 1048576 );
-			$extra  += $n * Addons::PACK_MB;
+			$extra  += $n * self::PACK_MB;
 			$biggest = max( $biggest, $n );
 
 			if ( $want > $now ) {
@@ -79,7 +87,7 @@ final class MailPacks {
 		}
 
 		$attrs             = MailDriver::domain_attrs( $limits, '' !== $system ? 1 : 0 );
-		$attrs['maxquota'] = (string) ( $limits['quota_mb'] + $biggest * Addons::PACK_MB );
+		$attrs['maxquota'] = (string) ( $limits['quota_mb'] + $biggest * self::PACK_MB );
 		$attrs['quota']    = (string) ( (int) $attrs['quota'] + $extra );
 
 		if ( is_wp_error( $client->edit_domain( $domain, $attrs ) ) ) {
@@ -92,7 +100,7 @@ final class MailPacks {
 			}
 		}
 
-		$child->set( array( 'mail_packs' => $packs ) );
+		$child->set( array( MailMeta::PACKS => $packs ) );
 
 		return true;
 	}
@@ -103,7 +111,7 @@ final class MailPacks {
 	 * @param Resource $child Email lite resource.
 	 */
 	public static function reapply( Resource $child ): void {
-		$packs = $child->get( 'mail_packs' );
+		$packs = $child->get( MailMeta::PACKS );
 
 		if ( is_array( $packs ) && array() !== $packs ) {
 			self::apply( $child, $packs );
