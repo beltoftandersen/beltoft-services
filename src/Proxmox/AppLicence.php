@@ -288,7 +288,6 @@ final class AppLicence {
 	 * @return Resource[]
 	 */
 	public static function for_server( Resource $server ): array {
-		global $wpdb;
 
 		$license_id = (int) ( $server->license()['id'] ?? 0 );
 		$out        = array();
@@ -298,10 +297,7 @@ final class AppLicence {
 		}
 
 		// One query for the candidates (the license id is in the meta text), then the exact check on each.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'applic' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id DESC", \BeltoftLicenses\Install::tables()['activations'], '%\"server_license\":%' . $wpdb->esc_like( (string) $license_id ) . '%' ) );
-
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'applic', 'server_license', $license_id, 'DESC' ) as $id ) {
 			$licence = Resource::find( (int) $id );
 
 			if ( $licence && AppLicenceDriver::ID === $licence->get( 'driver' ) && (int) $licence->get( 'server_license' ) === $license_id ) {

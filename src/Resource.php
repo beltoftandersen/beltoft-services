@@ -234,16 +234,115 @@ final class Resource {
 	}
 
 	/**
-	 * Ids of the live resources of a kind.
+	 * Ids of the live resources of a kind, oldest first unless told otherwise. The one query behind every
+	 * sweep, so the licences table is read in this class only.
 	 *
-	 * @param string $kind Activation kind.
+	 * @param string $kind  Activation kind.
+	 * @param int    $after Only ids above this one (0 = all), for a paged run.
+	 * @param int    $limit At most this many (0 = no limit).
+	 * @param string $order 'ASC' (default) or 'DESC'.
 	 * @return int[]
 	 */
-	public static function live_ids( string $kind ): array {
+	public static function live_ids( string $kind, int $after = 0, int $limit = 0, string $order = 'ASC' ): array {
+		return self::query_ids( $kind, array(), $after, $limit, $order );
+	}
+
+	/**
+	 * Ids of the live resources of a kind whose stored meta has a key set to a value. A fast first filter in
+	 * SQL: it looks at the meta text, so the caller still reads the resource and checks the value it needs.
+	 * The match is exact: 12 does not find 112, and a text value is JSON-encoded and escaped as stored.
+	 * Pass a list of values to find any of them.
+	 *
+	 * @param string                                       $kind  Activation kind.
+	 * @param string                                       $key   Meta key.
+	 * @param string|int|float|bool|null|array<int, mixed> $value One scalar, or a list of scalars (any of them).
+	 * @param string                                       $order 'ASC' (default) or 'DESC'.
+	 * @return int[]
+	 */
+	public static function find_by_meta( string $kind, string $key, $value, string $order = 'ASC' ): array {
 		global $wpdb;
 
+		$likes = array();
+
+		foreach ( is_array( $value ) ? $value : array( $value ) as $one ) {
+			$needle = wp_json_encode( $key ) . ':' . wp_json_encode( $one );
+
+			if ( is_string( $one ) ) {
+				// A closing quote ends the value.
+				$likes[] = '%' . $wpdb->esc_like( $needle ) . '%';
+			} else {
+				// A number, true, false or null ends at a comma or the closing brace.
+				$likes[] = '%' . $wpdb->esc_like( $needle . ',' ) . '%';
+				$likes[] = '%' . $wpdb->esc_like( $needle . '}' ) . '%';
+			}
+		}
+
+		return $likes ? self::query_ids( $kind, $likes, 0, 0, $order ) : array();
+	}
+
+	/**
+	 * Ids of the live resources of a kind whose meta holds a list under a key (stored as `"key":[`, empty or not).
+	 *
+	 * @param string $kind  Activation kind.
+	 * @param string $key   Meta key.
+	 * @param string $order 'ASC' (default) or 'DESC'.
+	 * @return int[]
+	 */
+	public static function find_with_list( string $kind, string $key, string $order = 'ASC' ): array {
+		global $wpdb;
+
+		return self::query_ids( $kind, array( '%' . $wpdb->esc_like( wp_json_encode( $key ) . ':[' ) . '%' ), 0, 0, $order );
+	}
+
+	/**
+	 * Is any live resource (of any kind) holding a value under a key? Set means present and not null.
+	 *
+	 * @param string $key Meta key.
+	 */
+	public static function any_meta_set( string $key ): bool {
+		global $wpdb;
+
+		$needle = wp_json_encode( $key ) . ':';
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL ORDER BY id ASC', \BeltoftLicenses\Install::tables()['activations'], $kind ) );
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE deactivated_at IS NULL AND meta LIKE %s AND meta NOT LIKE %s', \BeltoftLicenses\Install::tables()['activations'], '%' . $wpdb->esc_like( $needle ) . '%', '%' . $wpdb->esc_like( $needle . 'null' ) . '%' ) ) > 0;
+	}
+
+	/**
+	 * The one select on the live activations of a kind, in one query whatever the number of resources.
+	 *
+	 * @param string   $kind  Activation kind.
+	 * @param string[] $likes Ready LIKE patterns on the meta column; any of them (empty = no meta filter).
+	 * @param int      $after Only ids above this one (0 = all).
+	 * @param int      $limit At most this many (0 = no limit).
+	 * @param string   $order 'ASC' or 'DESC'.
+	 * @return int[]
+	 */
+	private static function query_ids( string $kind, array $likes, int $after, int $limit, string $order ): array {
+		global $wpdb;
+
+		$sql  = 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL';
+		$args = array( \BeltoftLicenses\Install::tables()['activations'], $kind );
+
+		if ( $likes ) {
+			$sql .= ' AND (' . implode( ' OR ', array_fill( 0, count( $likes ), 'meta LIKE %s' ) ) . ')';
+			$args = array_merge( $args, $likes );
+		}
+
+		if ( $after > 0 ) {
+			$sql   .= ' AND id > %d';
+			$args[] = $after;
+		}
+
+		$sql .= 'DESC' === strtoupper( $order ) ? ' ORDER BY id DESC' : ' ORDER BY id ASC';
+
+		if ( $limit > 0 ) {
+			$sql   .= ' LIMIT %d';
+			$args[] = $limit;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, always fresh; the pieces are fixed text and placeholders.
+		$rows = $wpdb->get_col( $wpdb->prepare( $sql, $args ) );
 
 		return array_map( 'intval', (array) $rows );
 	}

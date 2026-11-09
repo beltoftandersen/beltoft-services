@@ -257,14 +257,10 @@ final class KeyOrder {
 	 * @return Resource[]
 	 */
 	public static function live( string $ip ): array {
-		global $wpdb;
 
 		$out = array();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'lickey' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id DESC", \BeltoftLicenses\Install::tables()['activations'], '%\"lic_ip\":\"' . $wpdb->esc_like( $ip ) . '\"%' ) );
-
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'lickey', 'lic_ip', $ip, 'DESC' ) as $id ) {
 			$found = Resource::find( (int) $id );
 
 			if ( $found && KeyDriver::ID === $found->get( 'driver' ) && $ip === (string) $found->get( 'lic_ip' ) && ! in_array( (string) $found->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {

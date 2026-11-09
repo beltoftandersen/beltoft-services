@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Admin;
 
-use BeltoftLicenses\Install;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Resource;
 
@@ -115,8 +114,6 @@ final class Screen {
 	 * @return Resource[]
 	 */
 	public static function resources( array $filters ): array {
-		global $wpdb;
-
 		$driver = (string) ( $filters['driver'] ?? '' );
 		$state  = (string) ( $filters['state'] ?? '' );
 		$failed = ! empty( $filters['failed'] );
@@ -131,10 +128,7 @@ final class Screen {
 		$resources = array();
 
 		foreach ( $kinds as $kind ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, admin screen, always fresh.
-			$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL ORDER BY id DESC', Install::tables()['activations'], $kind ) );
-
-			foreach ( array_map( 'intval', (array) $ids ) as $id ) {
+			foreach ( Resource::live_ids( $kind, 0, 0, 'DESC' ) as $id ) {
 				$r = Resource::find( $id );
 
 				if ( ! $r ) {
