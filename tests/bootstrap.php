@@ -70,6 +70,18 @@ tests_add_filter(
 		\BeltoftLicenses\Install::ensure_secret();
 		\BeltoftServices\Proxmox\Schema::create_tables();
 		\BeltoftServices\Hosting\Schema::create_tables();
+
+		// The WordPress test installer empties the posts table on every run (so order ids start low again) but not
+		// WooCommerce's order item tables. Lines that a test committed (wcs_create_renewal_order() commits) outlive
+		// their order and would join a later order or subscription that gets the same id. Drop those orphans.
+		global $wpdb;
+		$items = $wpdb->prefix . 'woocommerce_order_items';
+		$meta  = $wpdb->prefix . 'woocommerce_order_itemmeta';
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test database reset, fixed table names.
+		$wpdb->query( "DELETE m FROM {$meta} m LEFT JOIN {$items} i ON i.order_item_id = m.order_item_id LEFT JOIN {$wpdb->posts} p ON p.ID = i.order_id WHERE p.ID IS NULL" );
+		$wpdb->query( "DELETE i FROM {$items} i LEFT JOIN {$wpdb->posts} p ON p.ID = i.order_id WHERE p.ID IS NULL" );
+		$wpdb->query( 'COMMIT' );
+		// phpcs:enable
 	},
 	20
 );
