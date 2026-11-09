@@ -182,10 +182,10 @@ final class Addons {
 			: __( '5 GB of extra storage for one mailbox', 'beltoft-services' );
 
 		return sprintf(
-			/* translators: 1: what is bought, 2: price per month, 3: amount charged now, 4: number of started months, 5: price per billing period. */
+			/* translators: 1: what is bought, 2: price per month, 3: amount charged now, 4: number of months until the next renewal, 5: price per billing period. */
 			_n(
-				'%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the time until your next renewal (%4$d month started), and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
-				'%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the time until your next renewal (%4$d months started), and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
+				'%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
+				'%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
 				(int) $quote['months_now'],
 				'beltoft-services'
 			),
@@ -412,6 +412,23 @@ final class Addons {
 		);
 		$order->calculate_totals( true );
 		$order->save();
+
+		// The order is not linked as a renewal (WooCommerce Subscriptions would treat its payment as one and move the
+		// subscription's dates), so notes on both sides tie the order to the subscription.
+		$order->add_order_note(
+			sprintf(
+				/* translators: %d: subscription number. */
+				__( 'Hosting add-on for subscription #%d.', 'beltoft-services' ),
+				$sub->get_id()
+			)
+		);
+		$sub->add_order_note(
+			sprintf(
+				/* translators: %d: order number. */
+				__( 'Add-on order #%d was made for this subscription.', 'beltoft-services' ),
+				$order->get_id()
+			)
+		);
 
 		if ( ! $sub->is_manual() && '' !== (string) $sub->get_payment_method() && function_exists( 'wcs_copy_payment_method_to_order' ) ) {
 			wcs_copy_payment_method_to_order( $sub, $order );

@@ -34,7 +34,7 @@ final class HostingAccount {
 	public static function enqueue(): void {
 		$handle = \BeltoftServices\Account\Panel::HANDLE;
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/hosting.js', BELTOFT_SERVICES_FILE ), array( $handle ), \BeltoftServices\Assets::version( 'assets/hosting.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/hosting.js', BELTOFT_SERVICES_FILE ), array( $handle, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/hosting.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftHosting',
@@ -44,6 +44,7 @@ final class HostingAccount {
 					'done'      => __( 'Done.', 'beltoft-services' ),
 					'failed'    => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'confirm'   => __( 'Type the website name to remove it. Its files and database are deleted.', 'beltoft-services' ),
+					'buy'       => __( 'Buy and add', 'beltoft-services' ),
 					'opening'   => __( 'Opening WordPress...', 'beltoft-services' ),
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
 					'confirmPack' => __( 'Remove one extra storage pack from this mailbox? It ends at your next renewal, the storage stays until then, and nothing is refunded.', 'beltoft-services' ),

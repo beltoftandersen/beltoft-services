@@ -176,6 +176,38 @@ class AddonsTest extends HostingCase {
 		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN, 'second.example' ), 'A second signal adds nothing.' );
 	}
 
+	public function test_the_order_is_tied_to_the_subscription_by_notes_and_never_as_a_renewal(): void {
+		$r      = $this->account();
+		$bought = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
+		$order  = wc_get_order( $bought['order'] );
+		$sub    = $this->sub( $r );
+
+		$this->assertSame( '', (string) $order->get_meta( '_subscription_renewal' ), 'A renewal link would make WooCommerce Subscriptions treat the payment as a renewal.' );
+		$this->assertSame( $sub->get_id(), (int) $order->get_meta( Addons::ORDER_META )['sub'] );
+
+		$on_order = implode( ' ', wp_list_pluck( wc_get_order_notes( array( 'order_id' => $order->get_id() ) ), 'content' ) );
+		$on_sub   = implode( ' ', wp_list_pluck( wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ), 'content' ) );
+		$this->assertStringContainsString( '#' . $sub->get_id(), $on_order );
+		$this->assertStringContainsString( '#' . $order->get_id(), $on_sub );
+	}
+
+	public function test_the_confirm_text_names_months_in_plain_words(): void {
+		$text = Addons::confirm_text( Addons::KIND_DOMAIN, array( 'unit' => 1.0, 'now' => 6.0, 'recurring' => 12.0, 'months_now' => 6 ) );
+		$this->assertStringContainsString( '6 months until your next renewal', $text );
+		$this->assertStringNotContainsString( 'started', $text );
+		$one = Addons::confirm_text( Addons::KIND_DOMAIN, array( 'unit' => 1.0, 'now' => 1.0, 'recurring' => 12.0, 'months_now' => 1 ) );
+		$this->assertStringContainsString( '1 month until your next renewal', $one );
+	}
+
+	public function test_the_hosting_script_reads_the_nested_error_data_and_uses_the_account_dialog(): void {
+		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/hosting.js' );
+		$this->assertStringContainsString( 'result.data.data', $js );
+		$this->assertStringNotContainsString( 'result.data.target', $js );
+		$this->assertStringNotContainsString( 'result.data.amount_cents', $js );
+		$this->assertStringContainsString( 'S.confirm', $js );
+		$this->assertSame( 1, substr_count( $js, 'window.confirm' ), 'Only the fallback when the dialog script is missing.' );
+	}
+
 	public function test_a_saved_card_pays_at_once(): void {
 		$this->card_pays();
 		$r      = $this->account();
