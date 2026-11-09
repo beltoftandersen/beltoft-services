@@ -1060,7 +1060,40 @@ final class Resource {
 	}
 
 	/**
+	 * The four keys that clear a retry: the operation, its attempts, the next attempt and the admin alert mark.
+	 * Merge it into a larger write when the same write changes more.
+	 *
+	 * @return array{op: string, attempts: int, next_attempt_at: null, alerted: string}
+	 */
+	public static function retry_reset(): array {
+		return array(
+			'op'              => '',
+			'attempts'        => 0,
+			'next_attempt_at' => null,
+			'alerted'         => '',
+		);
+	}
+
+	/**
+	 * Clears the retry bookkeeping (see retry_reset()): the next run starts the operation afresh.
+	 *
+	 * @return bool Whether it was stored.
+	 */
+	public function reset_retries(): bool {
+		return $this->set( self::retry_reset() );
+	}
+
+	/**
 	 * Moves to a state and writes a history event, only when the change was stored.
+	 *
+	 * This fires nothing: no beltoft_services_state_changed, so no email, cascade or secret wipe follows (see
+	 * ResourceTest::test_transition_fires_no_state_changed_action). Reconciler::move() is the path that tells
+	 * listeners (transition, then Reconciler::notify()). Direct callers stay silent on purpose, and
+	 * Structure\TransitionCallersTest lists them with the reason: Admin\Panel (forced delete; it calls
+	 * Reconciler::notify() itself after the transition and the close), Proxmox\AppLicence (announces
+	 * "cancelled" itself), Proxmox\DiskMeta (releases the disk capacity itself), Proxmox\SnapshotMeta (the
+	 * parent's own email covers the customer), Proxmox\RestoreSteps (a failed disk keeps its volume, so no
+	 * capacity release) and Proxmox\Actions (a reinstall to provisioning, which no listener acts on).
 	 *
 	 * @param string $state ready, paused, etc. (see STATES).
 	 * @param string $event What happened, for the history.

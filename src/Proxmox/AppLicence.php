@@ -423,6 +423,7 @@ final class AppLicence {
 
 		// A pay-as-you-go licence has no subscription of its own (the usage account bills it): closing it stops the meter.
 		if ( self::usage_billed( $licence ) ) {
+			// Silent on purpose: announce() below is the customer notice (see Resource::transition()).
 			if ( 'deleted' !== $licence->get( 'state' ) && $licence->transition( 'deleted', $reason ) ) {
 				self::announce( $licence, 'cancelled' );
 				$licence->close();
@@ -613,6 +614,7 @@ final class AppLicence {
 
 			$id = (int) ( $licence->license()['subscription_id'] ?? 0 );
 
+			// Silent on purpose: announce() below is the customer notice (see Resource::transition()).
 			if ( $licence->transition( 'deleted', 'Parent server deleted; app licence no longer available' ) ) {
 				self::announce( $licence, 'cancelled' );
 				DiskCascade::cancel_undelivered( $licence, 'The server was deleted, so its app licence ends.' );

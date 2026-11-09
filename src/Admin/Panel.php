@@ -104,14 +104,7 @@ final class Panel {
 			case 'retry':
 				$stored = $r->locked(
 					static function () use ( $r, $who, $license_id ): bool {
-						if ( ! $r->set(
-							array(
-								'op'              => '',
-								'attempts'        => 0,
-								'next_attempt_at' => null,
-								'alerted'         => '',
-							)
-						) ) {
+						if ( ! $r->reset_retries() ) {
 							return false;
 						}
 
@@ -367,19 +360,19 @@ final class Panel {
 				$old = $r->get( 'state' );
 
 				$cleared = $r->set(
-					array(
-						'desired'              => 'deleted',
-						'desired_at'           => microtime( true ),
-						'replace_after_delete' => false,
-						'op'                   => '',
-						'attempts'             => 0,
-						'next_attempt_at'      => null,
-						'failed_op'            => '',
-						'failed_desired'       => '',
-						'alerted'              => '',
+					array_merge(
+						Resource::retry_reset(),
+						array(
+							'desired'              => 'deleted',
+							'desired_at'           => microtime( true ),
+							'replace_after_delete' => false,
+							'failed_op'            => '',
+							'failed_desired'       => '',
+						)
 					)
 				);
 
+				// Silent on purpose: the notify below follows the close (see Resource::transition()).
 				if ( ! $cleared || ! $r->transition( 'deleted', sprintf( 'Marked deleted by %s, without calling the service', $who ) ) ) {
 					return false;
 				}

@@ -218,6 +218,7 @@ final class DiskMeta {
 			return;
 		}
 		foreach ( self::for_server( $resource ) as $disk ) {
+			// Silent on purpose: the capacity is released below (see Resource::transition()).
 			if ( $disk->transition( 'deleted', 'Parent server deleted; extra disk no longer available' ) ) {
 				$disk->close();
 				DiskCapacity::release( $disk );

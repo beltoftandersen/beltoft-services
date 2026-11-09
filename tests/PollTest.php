@@ -166,6 +166,59 @@ final class PollTest extends TestCase {
 		$this->assertNotEmpty( $this->mails, 'The admin is told.' );
 	}
 
+	public function test_a_poll_episode_counts_the_same_through_a_step_and_an_action(): void {
+		$clock = 1800000000;
+		add_filter(
+			'beltoft_services_now',
+			static function () use ( &$clock ) {
+				return $clock;
+			}
+		);
+		add_filter(
+			'beltoft_services_poll_budget_max',
+			static function () {
+				return 100;
+			}
+		);
+
+		list( $step, $driver ) = $this->resource();
+		$driver->will( 'provision', StepResult::poll( 30, 'waiting', 100 ) );
+		$driver->will( 'act', StepResult::poll( 30, 'waiting', 100 ) );
+		$product = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+		$acted   = Resource::create( $this->service_license( $product, array( 'fire' => false ) ), $driver, array(), array( 'state' => 'ready' ) );
+		$this->assertInstanceOf( Resource::class, $acted );
+
+		$first = $clock;
+		$this->make_due( $step );
+		Jobs::run( $step->id() );
+		Jobs::act( $acted->id(), 'restart', array() );
+
+		$this->assertSame( $first, (int) Resource::find( $step->id() )->get( 'wait_since' ) );
+		$this->assertSame( $first, (int) Resource::find( $acted->id() )->get( 'act_wait_since' )['restart']['since'] );
+		$this->assertSame( 0, (int) Resource::find( $step->id() )->get( 'attempts' ) );
+		$this->assertSame( 0, (int) Resource::find( $acted->id() )->get( 'act_attempts' ) );
+
+		// Within the budget neither counts; past it each counts exactly one attempt, on the first poll's episode.
+		$clock = $first + 90;
+		$this->make_due( $step );
+		Jobs::run( $step->id() );
+		Jobs::act( $acted->id(), 'restart', array() );
+		$this->assertSame( 0, (int) Resource::find( $step->id() )->get( 'attempts' ) );
+		$this->assertSame( 0, (int) Resource::find( $acted->id() )->get( 'act_attempts' ) );
+
+		$clock = $first + 101;
+		$this->make_due( $step );
+		Jobs::run( $step->id() );
+		Jobs::act( $acted->id(), 'restart', array() );
+
+		$fresh_step  = Resource::find( $step->id() );
+		$fresh_acted = Resource::find( $acted->id() );
+		$this->assertSame( 1, (int) $fresh_step->get( 'attempts' ) );
+		$this->assertSame( 1, (int) $fresh_acted->get( 'act_attempts' ) );
+		$this->assertSame( $first, (int) $fresh_step->get( 'wait_since' ) );
+		$this->assertSame( $first, (int) $fresh_acted->get( 'act_wait_since' )['restart']['since'] );
+	}
+
 	public function test_progress_starts_the_wait_again_but_only_up_to_the_cap(): void {
 		list( $resource, $driver ) = $this->resource();
 		$driver->will( 'provision', StepResult::poll( 5, 'Moving', 100 )->with_progress() );
