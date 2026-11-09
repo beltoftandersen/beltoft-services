@@ -285,6 +285,25 @@ class DbIpFieldTest extends BackupTestCase {
 		$this->assertTrue( $answer[0]['with'] );
 	}
 
+	public function test_the_endpoint_saves_the_session_under_the_cart_lock(): void {
+		$v = $this->db_variations();
+		wp_set_current_user( self::factory()->user->create() );
+		WC()->session->init_session_cookie();
+		WC()->cart->empty_cart();
+		$this->add( $v['Small-No'] );
+		WC()->session->save_data();
+
+		$_POST['nonce']    = wp_create_nonce( DbIpField::NONCE );
+		$_REQUEST['nonce'] = $_POST['nonce'];
+		$_POST['with']     = '1';
+		$this->assertSame( 200, DbIpField::respond()[1] );
+
+		$saved = WC()->session->get_session( WC()->session->get_customer_id(), array() );
+		$cart  = maybe_unserialize( $saved['cart'] ?? '' );
+		$this->assertIsArray( $cart, wp_json_encode( array_keys( $saved ) ) );
+		$this->assertSame( $v['Small-Yes']->get_id(), (int) reset( $cart )['variation_id'], 'The swap is saved before the lock is let go, so a second swap starts from it.' );
+	}
+
 	public function test_the_new_database_page_lists_each_plan_once_and_a_plan_change_keeps_the_address(): void {
 		$v     = $this->db_variations();
 		$plans = DbPicker::plans();

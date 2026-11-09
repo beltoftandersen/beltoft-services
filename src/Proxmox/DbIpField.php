@@ -262,7 +262,8 @@ final class DbIpField {
 		}
 
 		$with   = isset( $_POST['with'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$result = self::swap( $with );
+		// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
+		$result = CartSwap::locked( static fn(): array => self::swap( $with ) ) ?? array( 'ok' => false, 'with' => $with, 'variation_id' => 0 );
 
 		return array( $result, $result['ok'] ? 200 : 409 );
 	}
