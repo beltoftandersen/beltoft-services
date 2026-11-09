@@ -237,13 +237,14 @@ class SslOperationsTest extends SslTestCase {
 		$r = $this->built();
 		$first = (int) $r->get( 'ssl_first_issued_at' );
 		$this->assertGreaterThan( 0, $first );
-		$r->set( array( 'ssl_first_issued_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$set = time() - 40 * DAY_IN_SECONDS;
+		$r->set( array( 'ssl_first_issued_at' => $set ) );
 		// The authority reissues: the newest certificate is dated now, the window is not.
 		$this->now += 200 * DAY_IN_SECONDS;
 		$result = Operations::refresh( Resource::find( $r->id() ) );
 		$fresh = Resource::find( $r->id() );
 		$this->assertGreaterThan( time() - 5, (int) $fresh->get( 'ssl_issued_at' ) );
-		$this->assertSame( time() - 40 * DAY_IN_SECONDS, (int) $fresh->get( 'ssl_first_issued_at' ), 'The first issue date never changes.' );
+		$this->assertSame( $set, (int) $fresh->get( 'ssl_first_issued_at' ), 'The first issue date never changes.' );
 		$this->assertFalse( Operations::cancellable( $fresh ) );
 		$this->assertTrue( Operations::cancel( $fresh, array( 'confirm' => 'CANCEL' ) )->is_failed() );
 		$this->assertTrue( $result->is_done() );
