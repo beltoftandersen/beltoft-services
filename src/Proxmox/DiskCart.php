@@ -270,18 +270,7 @@ final class DiskCart {
 			if ( (int) $item->get_product_id() !== (int) $license['product_id'] || ! \WC_Subscriptions_Switcher::can_item_be_switched_by_user( $item, $subscription ) ) {
 				continue;
 			}
-			$query = array();
-			wp_parse_str( (string) wp_parse_url( \WC_Subscriptions_Switcher::get_switch_url( $item_id, $item, $subscription ), PHP_URL_QUERY ), $query );
-			$args = array_intersect_key( $query, array_flip( array( 'switch-subscription', 'item', '_wcsnonce' ) ) );
-			if ( 3 !== count( $args ) ) {
-				return '';
-			}
-			$args['add-to-cart'] = $next['variation']->get_parent_id();
-			$args['variation_id'] = $next['variation']->get_id();
-			foreach ( $next['variation']->get_attributes() as $name => $value ) {
-				$args[ 'attribute_' . $name ] = $value;
-			}
-			return add_query_arg( $args, wc_get_checkout_url() );
+			return \BeltoftServices\SwitchLink::for_item( (int) $item_id, $item, $subscription, $next['variation'] );
 		}
 		return '';
 	}
