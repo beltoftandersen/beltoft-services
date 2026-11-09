@@ -236,7 +236,7 @@ final class HostingAccount {
 		echo '<p>';
 
 		if ( $mail ) {
-			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), (string) \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) ) );
+			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) ) );
 		} else {
 			echo esc_html__( 'Set up Email lite so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' );
 

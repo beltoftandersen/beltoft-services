@@ -297,7 +297,7 @@
       out.replaceChildren();
       const card = element('div', 'beltoft-domain-result beltoft-domain-result--primary beltoft-domain-result--' + item.status, '');
       const information = element('div', 'beltoft-domain-result__information', '');
-      information.appendChild(element('strong', 'beltoft-domain-result__name', item.domain));
+      information.appendChild(element('strong', 'beltoft-domain-result__name', item.display || item.domain));
       card.appendChild(information);
       const actions = element('div', 'beltoft-domain-result__actions', '');
       card.appendChild(actions);

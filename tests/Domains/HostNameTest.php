@@ -59,7 +59,10 @@ final class HostNameTest extends TestCase {
 
 		$meta = (object) array( 'key' => __( 'Domain', 'beltoft-services' ) );
 		$this->assertStringContainsString( self::UNICODE, Cart::meta_display( '<p>' . self::ASCII . "</p>\n", $meta ) );
-		$this->assertSame( '<p>' . self::ASCII . '</p>', Cart::meta_display( '<p>' . self::ASCII . '</p>', (object) array( 'key' => 'Other' ) ) );
+		// A key stored in another language is still recognised.
+		$this->assertStringContainsString( self::UNICODE, Cart::meta_display( '<p>' . self::ASCII . '</p>', (object) array( 'key' => 'Dom\u{e6}ne', 'value' => self::ASCII ) ) );
+		// Other lines are left alone.
+		$this->assertSame( '<p>' . self::ASCII . ' and text</p>', Cart::meta_display( '<p>' . self::ASCII . ' and text</p>', (object) array( 'key' => 'Other', 'value' => self::ASCII . ' and text' ) ) );
 	}
 
 	public function test_search_results_carry_a_display_form_next_to_the_stored_one(): void {

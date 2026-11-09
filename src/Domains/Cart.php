@@ -467,9 +467,18 @@ final class Cart {
 		return $data;
 	}
 
+	/** Is this the domain line of an order item? The key was stored in the locale of the order, so the value is checked as well. */
+	private static function is_domain_meta( object $meta ): bool {
+		$key = (string) ( $meta->key ?? '' );
+		if ( in_array( $key, array( 'Domain', __( 'Domain', 'beltoft-services' ) ), true ) ) {
+			return true;
+		}
+		return 1 === preg_match( '/^\s*(?:<p>)?\s*(?:[a-z0-9-]+\.)*xn--[a-z0-9-]+(?:\.[a-z0-9-]+)+\s*(?:<\/p>)?\s*$/i', (string) ( $meta->value ?? '' ) );
+	}
+
 	/** The domain meta line of an order item in Unicode letters (the stored value stays punycode). */
 	public static function meta_display( $value, $meta ) {
-		return is_object( $meta ) && isset( $meta->key ) && __( 'Domain', 'beltoft-services' ) === $meta->key && is_string( $value ) ? (string) preg_replace_callback( '/(?:[a-z0-9-]+\\.)*xn--[a-z0-9-]+(?:\\.[a-z0-9-]+)*/i', static fn ( array $m ): string => esc_html( HostName::display( $m[0] ) ), $value ) : $value;
+		return is_object( $meta ) && is_string( $value ) && false !== stripos( $value, 'xn--' ) && ( ! isset( $meta->key ) || ! str_starts_with( (string) $meta->key, '_' ) ) && self::is_domain_meta( $meta ) ? (string) preg_replace_callback( '/(?:[a-z0-9-]+\\.)*xn--[a-z0-9-]+(?:\\.[a-z0-9-]+)*/i', static fn ( array $m ): string => esc_html( HostName::display( $m[0] ) ), $value ) : $value;
 	}
 
 	/** Keep each domain on its own subscription, so each gets its own license and renewal date. */

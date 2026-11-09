@@ -180,6 +180,16 @@ class DomainDangerTest extends TestCase {
 		$this->assertSame( Domains::url_list(), $done['redirect'] );
 	}
 
+	public function test_stop_hosting_accepts_the_unicode_or_the_punycode_name(): void {
+		$sub = $this->subscription( $this->user, '0', true );
+		$r   = $this->service( $this->user, 'xn--blegrd-ster-78ab1xc.dk', 'dns', $sub );
+
+		$this->assertStringContainsString( 'data-danger-domain="' . "\u{e6}blegr\u{f8}d-\u{f8}ster\u{e5}.dk" . '"', $this->page( $r ) );
+		$this->assertStringContainsString( 'data-danger-ascii="xn--blegrd-ster-78ab1xc.dk"', $this->page( $r ) );
+		$done = $this->post( $r, 'stop_hosting', array( 'confirm' => " \u{c6}blegr\u{f8}d-\u{f8}ster\u{e5}.DK " ) );
+		$this->assertTrue( $done['ok'] );
+	}
+
 	public function test_a_paid_dns_service_has_no_stop_button(): void {
 		$sub = $this->subscription( $this->user, '5.00', true );
 		$r   = $this->service( $this->user, 'paid.example', 'dns', $sub );

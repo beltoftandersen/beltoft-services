@@ -667,8 +667,9 @@
 	} );
 	function matches( form ) {
 		var input = form.querySelector( 'input[name="confirm"]' );
-		var typed = input ? input.value.trim().toLowerCase() : '';
-		return typed !== '' && ( typed === form.getAttribute( 'data-danger-domain' ) || typed === form.getAttribute( 'data-danger-ascii' ) );
+		var fold = function ( text ) { return ( text || '' ).normalize ? text.normalize( 'NFC' ) : ( text || '' ); };
+		var typed = fold( input ? input.value.trim().toLowerCase() : '' );
+		return typed !== '' && ( typed === fold( form.getAttribute( 'data-danger-domain' ) ) || typed === fold( form.getAttribute( 'data-danger-ascii' ) ) );
 	}
 	document.addEventListener( 'input', function ( event ) {
 		var form = event.target.closest ? event.target.closest( 'form[data-danger-domain]' ) : null;
