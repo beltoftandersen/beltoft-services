@@ -2,8 +2,8 @@
 /** The yearly renewal of a certificate order: billing date, paid renewal, sweep. @package BeltoftServices */
 namespace BeltoftServices\Ssl;
 
-use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
+use BeltoftServices\Billing\RenewalSweep;
 use BeltoftServices\Domains\Clients;
 use BeltoftServices\Domains\LiveClient;
 use BeltoftServices\Domains\Renewals;
@@ -53,10 +53,7 @@ final class SslRenewals {
 	 * @param int|null $now    Now.
 	 */
 	public static function next_payment_at( string $expiry, ?int $now = null ): int {
-		$now     = $now ?? time();
-		$expires = strtotime( $expiry . ' UTC' );
-
-		return false === $expires ? 0 : max( $now + HOUR_IN_SECONDS, $expires - SslSettings::renew_days() * DAY_IN_SECONDS );
+		return RenewalSweep::next_payment_at( $expiry, SslSettings::renew_days(), $now );
 	}
 
 	/**
@@ -65,31 +62,7 @@ final class SslRenewals {
 	 * @param Resource $r Resource.
 	 */
 	public static function set_dates( Resource $r ): StepResult {
-		$subscription_id = (int) ( $r->license()['subscription_id'] ?? 0 );
-
-		if ( ! $subscription_id ) {
-			return StepResult::done();
-		}
-
-		$sub = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $subscription_id ) : false;
-
-		if ( ! $sub ) {
-			return StepResult::retry( 3600, 'The certificate subscription is unavailable.' );
-		}
-
-		$next = self::next_payment_at( (string) $r->get( 'ssl_order_expires' ) );
-
-		if ( ! $next ) {
-			return StepResult::retry( 3600, 'The order expiry date is unavailable.' );
-		}
-
-		try {
-			$saved = $sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', $next ) ), 'gmt' );
-		} catch ( \Exception $e ) {
-			return StepResult::retry( 3600, 'The subscription billing date could not be set.' );
-		}
-
-		return $saved ? StepResult::done( array( 'next_payment_at' => $next ) ) : StepResult::retry( 3600, 'The subscription billing date could not be set.' );
+		return RenewalSweep::set_dates( $r, (string) $r->get( 'ssl_order_expires' ), 'The certificate subscription is unavailable.', 'The order expiry date is unavailable.', SslSettings::renew_days() );
 	}
 
 	/**
@@ -99,17 +72,7 @@ final class SslRenewals {
 	 * @param mixed $order        Renewal order.
 	 */
 	public static function on_paid( $subscription, $order ): void {
-		if ( ! $subscription instanceof \WC_Subscription || ! $order instanceof \WC_Order || ! $order->is_paid() ) {
-			return;
-		}
-
-		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
-			$r = Resource::for_license( (int) $license['id'] );
-
-			if ( $r && SslDriver::ID === $r->get( 'driver' ) ) {
-				Jobs::queue_act( $r->id(), 'renew', array( 'order' => (string) $order->get_id() ) );
-			}
-		}
+		RenewalSweep::on_paid( $subscription, $order, SslDriver::ID );
 	}
 
 	/**
@@ -118,52 +81,7 @@ final class SslRenewals {
 	 * @return int How many were queued.
 	 */
 	public static function sweep(): int {
-		$queued = 0;
-		$since  = time() - 30 * DAY_IN_SECONDS;
-
-		foreach ( Resource::live_ids( SslDriver::KIND ) as $id ) {
-			$r   = Resource::find( $id );
-			$sub = $r && $r->is_live() && SslDriver::ID === $r->get( 'driver' ) && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $r->license()['subscription_id'] ?? 0 ) ) : false;
-
-			if ( ! $sub ) {
-				continue;
-			}
-
-			$done = array_map( 'strval', (array) $r->get( 'renewed_orders' ) );
-
-			foreach ( (array) $sub->get_related_orders( 'ids', 'renewal' ) as $order_id ) {
-				$order   = wc_get_order( (int) $order_id );
-				$created = $order ? $order->get_date_created() : null;
-
-				if ( ! $order || ! $order->is_paid() || ! $created || $created->getTimestamp() < $since || in_array( (string) $order_id, $done, true ) || self::open( $r->id(), (string) $order_id ) ) {
-					continue;
-				}
-
-				Jobs::queue_act( $r->id(), 'renew', array( 'order' => (string) $order_id ) );
-
-				if ( ++$queued >= self::SWEEP_LIMIT ) {
-					return $queued;
-				}
-			}
-		}
-
-		return $queued;
-	}
-
-	/**
-	 * Is a renew job for this order waiting or running?
-	 *
-	 * @param int    $resource_id Resource.
-	 * @param string $order_id    Renewal order.
-	 */
-	private static function open( int $resource_id, string $order_id ): bool {
-		foreach ( array( \ActionScheduler_Store::STATUS_PENDING, \ActionScheduler_Store::STATUS_RUNNING ) as $status ) {
-			if ( as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'args' => array( $resource_id, 'renew', array( 'order' => $order_id ) ), 'group' => Jobs::GROUP, 'status' => $status, 'per_page' => 1 ), 'ids' ) ) {
-				return true;
-			}
-		}
-
-		return false;
+		return RenewalSweep::sweep( SslDriver::KIND, SslDriver::ID, self::SWEEP_LIMIT );
 	}
 
 	/**
