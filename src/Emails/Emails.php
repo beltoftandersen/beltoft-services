@@ -205,11 +205,11 @@ final class Emails {
 	public const DELAY_KINDS = array( 'vm', 'domain', 'dns', 'hosting' );
 
 	/** Failed attempts of a running setup after which the customer is told of a delay. */
-	public const DELAY_AFTER_ATTEMPTS = 2;
+	public const DELAY_AFTER_ATTEMPTS = 3;
 
 	/**
 	 * Did setting the service up fail so that the customer is told of a delay? Only a server,
-	 * domain or DNS hosting (driver kind vm, domain or dns) whose provision ended failed; a
+	 * domain, DNS hosting or website hosting (driver kind vm, domain, dns or hosting) whose provision ended failed; a
 	 * failed pause or deletion is not the customer's business.
 	 *
 	 * @param Resource $r Resource.
@@ -226,8 +226,9 @@ final class Emails {
 
 	/**
 	 * Is the setup still running but has it already failed this many times in a row? The customer is told of a delay
-	 * from the second failed attempt (about six minutes after the start with the reconciler's backoff), not only when
-	 * the last attempt has failed hours later. Same kinds of service as delay_applies().
+	 * from the third failed attempt in a row (with the reconciler's 60 and 300 second backoff the third failure comes
+	 * about six minutes after the first), not only when the last attempt has failed hours
+	 * later. Same kinds of service as delay_applies().
 	 *
 	 * @param Resource $r Resource.
 	 */

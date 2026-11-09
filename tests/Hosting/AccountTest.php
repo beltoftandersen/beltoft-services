@@ -374,14 +374,14 @@ class AccountTest extends HostingCase {
 
 	public function test_a_setup_that_keeps_failing_shows_the_delay_text_like_other_services(): void {
 		$r = $this->resource();
-		$r->set( array( 'state' => 'provisioning', 'desired' => 'ready', 'op' => 'provision', 'attempts' => 1, 'last_error' => 'site_create: nginx -t failed: secret detail' ) );
+		$r->set( array( 'state' => 'provisioning', 'desired' => 'ready', 'op' => 'provision', 'attempts' => 2, 'last_error' => 'site_create: nginx -t failed: secret detail' ) );
 		$r = Resource::find( $r->id() );
 
 		$early = \BeltoftServices\Progress::build( $r );
-		$this->assertStringContainsString( 'Usually about', $early['text'], 'One failed attempt is still normal.' );
+		$this->assertStringContainsString( 'Usually about', $early['text'], 'Two failed attempts is still normal.' );
 		$this->assertSame( 'Getting ready', \BeltoftServices\Account\Panel::label( 'provisioning', $r ) );
 
-		$r->set( array( 'attempts' => 2 ) );
+		$r->set( array( 'attempts' => 3 ) );
 		$r = Resource::find( $r->id() );
 		$late = \BeltoftServices\Progress::build( $r );
 		$this->assertSame( "There's a delay setting up your service. We're on it.", $late['text'] );
@@ -393,6 +393,47 @@ class AccountTest extends HostingCase {
 		// The final failure after the last attempt reads the same.
 		$r->set( array( 'state' => 'failed', 'failed_op' => 'provision' ) );
 		$this->assertSame( 'Delayed', \BeltoftServices\Account\Panel::label( 'failed', Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_failed_hosting_setup_tells_the_customer_of_a_delay_once(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+
+		$r = $this->resource();
+		$r->set( array( 'state' => 'failed', 'failed_op' => 'provision', 'desired' => 'ready' ) );
+		$r = Resource::find( $r->id() );
+		$this->assertTrue( \BeltoftServices\Emails\Emails::delay_applies( $r ) );
+
+		do_action( 'beltoft_services_state_changed', $r, 'provisioning', 'failed' );
+		do_action( 'beltoft_services_state_changed', Resource::find( $r->id() ), 'provisioning', 'failed' );
+
+		$delay = array_values( array_filter( $mails, static fn( $m ) => false !== stripos( (string) $m['subject'], 'delay' ) ) );
+		$this->assertCount( 1, $delay, 'Told once, not on every failure.' );
+		$this->assertStringNotContainsString( '{', (string) $delay[0]['subject'], 'The product name placeholder is filled.' );
+		$this->assertStringNotContainsString( 'nginx', (string) $delay[0]['message'] );
+		remove_all_filters( 'pre_wp_mail' );
+	}
+
+	public function test_the_panel_loads_its_stylesheet_and_notices_use_the_customers_site_name(): void {
+		$r = $this->account();
+		wp_dequeue_style( HostingAccount::HANDLE );
+		ob_start();
+		HostingAccount::render( $r );
+		ob_end_clean();
+		$this->assertTrue( wp_style_is( HostingAccount::HANDLE, 'enqueued' ) );
+		$this->assertStringContainsString( 'assets/hosting.css', (string) wp_styles()->registered[ HostingAccount::HANDLE ]->src );
+
+		\BeltoftServices\Hosting\Sites::add( $r->id(), 'shop-example-com-2', 'shop.example.com', '8.3', 2 );
+		$this->assertSame( 'shop.example.com', HostingAccount::site_name_of( $r, 'shop-example-com-2' ) );
+		$this->assertSame( 'unknown', HostingAccount::site_name_of( $r, 'unknown' ) );
 	}
 
 	public function test_a_website_named_from_its_domain_shows_its_title_only(): void {

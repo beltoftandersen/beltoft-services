@@ -55,6 +55,7 @@ final class SiteField {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
+		add_action( 'woocommerce_created_customer', array( __CLASS__, 'customer_made' ), 5 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
 	}
@@ -335,6 +336,17 @@ final class SiteField {
 	}
 
 	/**
+	 * A guest's account was made at the checkout: the names the guest's cart holds are the new customer's now.
+	 *
+	 * @param mixed $customer_id New customer id.
+	 */
+	public static function customer_made( $customer_id ): void {
+		if ( (int) $customer_id > 0 ) {
+			Sites::rekey_holds( self::owner( 0 ), self::owner( (int) $customer_id ) );
+		}
+	}
+
+	/**
 	 * The name a domain gives before any number is added: example.com is example-com.
 	 *
 	 * @param string $domain Domain.
@@ -365,10 +377,7 @@ final class SiteField {
 
 	/**
 	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
-	 * first is used. The name is only the temporary address, so the customer is not asked for it. A hold left by the
-	 * same person as a guest (the cart session changes when the account is made at the checkout) does not count as
-	 * another person's, so the second pass of the checkout keeps the first name.
-	 *
+	 * first is used. The name is only the temporary address, so the customer is not asked for it.	 *
 	 * @param string $domain Domain.
 	 * @param string $owner  Who holds the name (see owner()).
 	 */
@@ -378,7 +387,7 @@ final class SiteField {
 		for ( $n = 1; $n <= 50; $n++ ) {
 			$slug = 1 === $n ? $base : $base . '-' . $n;
 
-			if ( Sites::valid_slug( $slug ) && ! Sites::taken( $slug ) && Sites::reserve( $slug, $owner, true ) ) {
+			if ( Sites::valid_slug( $slug ) && ! Sites::taken( $slug ) && Sites::reserve( $slug, $owner ) ) {
 				return $slug;
 			}
 		}

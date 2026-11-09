@@ -123,6 +123,10 @@ class LiteMailTest extends HostingCase {
 
 		$this->assertTrue( $area->is_member( $child->license() ), 'The licence is grouped under Email, so the Licenses tab does not list it as a separate key.' );
 
+		$matching = array_values( array_filter( \BeltoftServices\Account\Tabs::groups( array() ), static fn( $g ) => isset( $g['match'] ) && $g['match']( $child->license() ) ) );
+		$this->assertCount( 1, $matching, 'One tab claims it, so the generic Licenses tab leaves it out.' );
+		$this->assertSame( $area->slug(), $matching[0]['slug'] );
+
 		wp_set_current_user( (int) $child->license()['user_id'] );
 		$view = \BeltoftLicenses\Account\View::license( $child->license() );
 

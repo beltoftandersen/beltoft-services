@@ -463,17 +463,22 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( 'site_slug', SiteField::resolve( array( 'mode' => 'preview' ), 0 )->get_error_code() );
 	}
 
-	public function test_a_name_held_by_the_guest_session_stays_the_signed_in_customers_after_the_account_is_made(): void {
+	public function test_a_guest_hold_moves_to_the_customer_the_checkout_makes_and_to_nobody_else(): void {
 		$guest = SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), 0 );
 		$this->assertSame( 'ux-shop-example-com', $guest['slug'] );
 
-		// The same checkout again, now as the new customer: the guest hold is not another person's.
+		// Another signed-in customer does not take the guest's hold.
+		$stranger = $this->factory()->user->create();
+		$this->assertSame( 'ux-shop-example-com-2', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $stranger )['slug'] );
+
+		// The checkout makes an account of that guest: the guest's holds become theirs.
 		$user = $this->factory()->user->create();
+		do_action( 'woocommerce_created_customer', $user, array(), false );
 		$this->assertSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $user )['slug'] );
 
-		// A hold of another signed-in customer still counts.
+		// And it is theirs alone from then on.
 		$other = $this->factory()->user->create();
-		$this->assertSame( 'ux-shop-example-com-2', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $other )['slug'] );
+		$this->assertNotSame( 'ux-shop-example-com', SiteField::resolve( array( 'mode' => 'own', 'host' => 'ux-shop.example.com' ), $other )['slug'] );
 	}
 
 	public function test_each_address_option_posts_its_own_inputs(): void {

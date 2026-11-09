@@ -115,6 +115,18 @@ final class HostingAccount {
 	}
 
 	/**
+	 * The customer's name for a website of an account, from its slug.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $slug Website name (slug).
+	 */
+	public static function site_name_of( Resource $r, string $slug ): string {
+		$site = Sites::find( $r->id(), $slug );
+
+		return null === $site ? $slug : self::site_name( $site );
+	}
+
+	/**
 	 * "Included with <hosting product name>" for a mail resource that is a child of a hosting account, else ''.
 	 *
 	 * @param Resource $r Resource.
@@ -220,13 +232,14 @@ final class HostingAccount {
 				$back   = is_array( $marker ) && (int) ( $marker['until'] ?? 0 ) > \BeltoftServices\Jobs::now() ? ' <button type="button" class="beltoft-hosting-btn" data-hosting-action="php_rollback" data-slug="' . esc_attr( $site['slug'] ) . '">' . esc_html( sprintf( /* translators: %s: PHP version. */ __( 'Go back to PHP %s', 'beltoft-services' ), (string) $marker['from'] ) ) . '</button>' : '';
 
 				printf(
-					'<td class="beltoft-hosting-actions"><button type="button" class="beltoft-hosting-btn" data-hosting-action="login" data-slug="%1$s">%2$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="%1$s">%3$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="remove_site" data-slug="%1$s">%4$s</button></td>',
+					'<td><div class="beltoft-hosting-actions"><button type="button" class="beltoft-hosting-btn" data-hosting-action="login" data-slug="%1$s">%2$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="%1$s">%3$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="remove_site" data-slug="%1$s">%4$s</button>',
 					esc_attr( $site['slug'] ),
 					esc_html__( 'Open WordPress admin', 'beltoft-services' ),
 					esc_html__( 'Clear cache', 'beltoft-services' ),
 					esc_html__( 'Remove', 'beltoft-services' )
 				);
 				echo wp_kses( $back, array( 'button' => array( 'type' => true, 'class' => true, 'data-hosting-action' => true, 'data-slug' => true ) ) );
+				echo '</div></td>';
 			}
 
 			echo '</tr>';
@@ -253,7 +266,7 @@ final class HostingAccount {
 
 		foreach ( (array) $r->get( 'php_pinned' ) as $slug => $version ) {
 			if ( null !== Sites::find( $r->id(), (string) $slug ) && Config::php_end( (string) $version ) !== null && (int) Config::php_end( (string) $version ) < \BeltoftServices\Jobs::now() ) {
-				echo '<p class="beltoft-hosting-warning">' . esc_html( sprintf( /* translators: 1: website name, 2: PHP version. */ __( 'The website %1$s runs on PHP %2$s, which no longer gets security updates. Move it to a supported version as soon as you can.', 'beltoft-services' ), (string) $slug, (string) $version ) ) . '</p>';
+				echo '<p class="beltoft-hosting-warning">' . esc_html( sprintf( /* translators: 1: website name, 2: PHP version. */ __( 'The website %1$s runs on PHP %2$s, which no longer gets security updates. Move it to a supported version as soon as you can.', 'beltoft-services' ), self::site_name_of( $r, (string) $slug ), (string) $version ) ) . '</p>';
 			}
 		}
 
@@ -262,7 +275,7 @@ final class HostingAccount {
 				sprintf(
 					/* translators: 1: website name, 2: state. */
 					__( 'The website %1$s needs the hosting loader file for the sign-in link and website mail (%2$s). Contact support if it keeps showing.', 'beltoft-services' ),
-					$slug,
+					self::site_name_of( $r, (string) $slug ),
 					$state
 				)
 			) . '</p>';
@@ -428,7 +441,7 @@ final class HostingAccount {
 
 				if ( $ready && ! $busy ) {
 					printf(
-						'<td><button type="button" class="beltoft-hosting-btn" data-hosting-action="restore" data-scope="account" data-volid="%1$s">%2$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="restore" data-scope="files" data-volid="%1$s">%3$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="restore" data-scope="database" data-volid="%1$s">%4$s</button></td>',
+						'<td><div class="beltoft-hosting-actions"><button type="button" class="beltoft-hosting-btn" data-hosting-action="restore" data-scope="account" data-volid="%1$s">%2$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="restore" data-scope="files" data-volid="%1$s">%3$s</button> <button type="button" class="beltoft-hosting-btn" data-hosting-action="restore" data-scope="database" data-volid="%1$s">%4$s</button></div></td>',
 						esc_attr( (string) $b['volid'] ),
 						esc_html__( 'Restore everything', 'beltoft-services' ),
 						esc_html__( 'Restore files', 'beltoft-services' ),

@@ -90,7 +90,7 @@
 			case 'add_domain':
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
 			case 'add_pack':
-				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: parseInt( button.getAttribute( 'data-cents' ) || '0', 10 ) } ], true );
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: parseInt( button.getAttribute( 'data-cents' ) || '0', 10 ) } ], false );
 			case 'remove_pack':
 				return ask( text.confirmPack || '', button, [ 'DELETE', base + '/addons?target=' + encodeURIComponent( button.getAttribute( 'data-mailbox' ) || '' ), undefined ], true );
 			case 'enable_mail':
