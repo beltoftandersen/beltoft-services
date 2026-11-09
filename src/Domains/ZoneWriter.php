@@ -126,6 +126,61 @@ final class ZoneWriter {
 	}
 
 	/**
+	 * What to do with a CNAME given what its name holds. The one rule for every CNAME we publish: a free name is written,
+	 * a name that already holds exactly this one alias is left as it is, anything else at the name is somebody's and is
+	 * never touched.
+	 *
+	 * @param string                              $value Wanted target.
+	 * @param array<string, array<string, mixed>> $here  The raw RRsets at the name, by upper-case type (SOA and NS left out).
+	 * @return string write, present or name_taken.
+	 */
+	public static function cname_verdict( string $value, array $here ): string {
+		if ( array() === $here ) {
+			return 'write';
+		}
+
+		$have = array();
+
+		foreach ( (array) ( $here['CNAME']['records'] ?? array() ) as $record ) {
+			if ( empty( $record['disabled'] ) ) {
+				$have[] = strtolower( rtrim( trim( (string) ( $record['content'] ?? '' ) ), '.' ) );
+			}
+		}
+
+		return isset( $here['CNAME'] ) && 1 === count( $here ) && array( strtolower( $value ) ) === $have ? 'present' : 'name_taken';
+	}
+
+	/**
+	 * The write policy for one CNAME row: writes only the CNAME RRset at its name, and only when the name is free; an
+	 * identical alias is already right; any other record at the name refuses with conflict:name_taken.
+	 *
+	 * @param string $value Wanted target.
+	 * @return callable(array, array): (array<int, array<string, mixed>>|true|string)
+	 */
+	public static function cname_policy( string $value ): callable {
+		return static function ( array $zone_data, array $sets ) use ( $value ) {
+			$name = strtolower( rtrim( (string) ( $sets[0]['name'] ?? '' ), '.' ) );
+			$here = array();
+
+			foreach ( (array) ( $zone_data['rrsets'] ?? array() ) as $set ) {
+				if ( is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $name ) {
+					$here[ strtoupper( (string) ( $set['type'] ?? '' ) ) ] = $set;
+				}
+			}
+
+			unset( $here['SOA'], $here['NS'] );
+
+			$verdict = self::cname_verdict( $value, $here );
+
+			if ( 'write' === $verdict ) {
+				return array( $sets[0] );
+			}
+
+			return 'present' === $verdict ? true : 'conflict:name_taken';
+		};
+	}
+
+	/**
 	 * A refusal.
 	 *
 	 * @param string $reason Reason code.

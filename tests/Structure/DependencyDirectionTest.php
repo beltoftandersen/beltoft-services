@@ -24,6 +24,7 @@ class DependencyDirectionTest extends TestCase {
 	private const FORBIDDEN = array(
 		'core'    => self::FEATURES,
 		'Mail'    => array( 'Proxmox', 'Hosting' ),
+		'Ssl'     => array( 'Mail' ),
 		'Proxmox' => array( 'Mcp' ),
 		'Domains' => array( 'Proxmox', 'Mail', 'Mcp' ),
 	);
