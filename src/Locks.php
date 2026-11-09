@@ -135,7 +135,7 @@ final class Locks {
 	 * @param string $name    Lock name.
 	 * @param int    $timeout Seconds to wait.
 	 */
-	private static function acquire( string $name, int $timeout ): bool {
+	public static function acquire( string $name, int $timeout ): bool {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
@@ -147,7 +147,7 @@ final class Locks {
 	 *
 	 * @param string $name Lock name.
 	 */
-	private static function release( string $name ): void {
+	public static function release( string $name ): void {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.

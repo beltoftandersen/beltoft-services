@@ -119,13 +119,9 @@ final class Slugs {
 	 * @param string               $type     Type of service (see type_of()).
 	 */
 	public static function assign( Resource $resource, array $license, string $type ): string {
-		global $wpdb;
-
 		$user = (int) ( $license['user_id'] ?? 0 );
 		$lock = Locks::name( 'slugs', $user );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		$held = 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, %d )', $lock, 5 ) );
+		$held = Locks::acquire( $lock, 5 );
 
 		try {
 			// Another request may have made it while this one waited.
@@ -146,8 +142,7 @@ final class Slugs {
 			return $resource->set( array( self::META => $slug ) ) ? $slug : '';
 		} finally {
 			if ( $held ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-				$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $lock ) );
+				Locks::release( $lock );
 			}
 		}
 	}
