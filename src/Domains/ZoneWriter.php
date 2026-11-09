@@ -92,11 +92,11 @@ final class ZoneWriter {
 	 * @param int|null                                  $user_id Customer; when given, the zone must be one of theirs.
 	 * @param string                                    $zone    Zone.
 	 * @param callable(array): array<int, array<string, mixed>> $policy  Gets the zone, returns DELETE RRsets; an empty array is nothing to do.
-	 * @return bool|\WP_Error True when done, nothing was to do or the zone is gone; a transient error on a failed read or write; the lock error as it is.
+	 * @return bool|\WP_Error True when done, nothing was to do or the zone is gone; a not_ours error when a given customer does not own the zone; a transient error on a failed read or write; the lock error as it is.
 	 */
 	public static function remove( ?int $user_id, string $zone, callable $policy ) {
 		if ( null !== $user_id && ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) ) {
-			return true;
+			return new \WP_Error( 'not_ours', __( 'The domain is not one of your domains on our name servers.', 'beltoft-services' ) );
 		}
 
 		return Records::locked(

@@ -136,6 +136,14 @@ class ZoneWriterTest extends MailTestCase {
 		$this->assertTrue( ZoneWriter::remove( null, 'gone.example', static fn() => array( array( 'x' ) ) ), 'a missing zone is nothing to remove' );
 	}
 
+	public function test_remove_for_a_user_who_does_not_own_the_zone_is_an_error_and_writes_nothing(): void {
+		$before = count( Clients::dns()->calls() );
+		$r      = ZoneWriter::remove( $this->user + 1000, 'writer.example', static fn() => array( array( 'name' => 'www.writer.example.', 'type' => 'A', 'changetype' => 'DELETE' ) ) );
+		$this->assertWPError( $r );
+		$this->assertSame( 'not_ours', $r->get_error_code() );
+		$this->assertCount( $before, Clients::dns()->calls() );
+	}
+
 	public function test_sets_at_normalises_trailing_dots_case_and_the_apex(): void {
 		$rrsets = array(
 			array( 'name' => 'Www.Z.example.', 'type' => 'a' ),
