@@ -392,6 +392,15 @@ class CheckoutTest extends HostingCase {
 		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array() ) ), 'No growth, no refusal.' );
 	}
 
+	public function test_a_plan_without_a_website_count_is_never_refused_for_websites(): void {
+		$r = $this->account( array( 'sites' => 3 ) );
+		Sites::add( $r->id(), 'second', 'S', '8.3', 2 );
+		Sites::add( $r->id(), 'third', 'T', '8.3', 2 );
+		Sites::add( $r->id(), 'fourth', 'F', '8.3', 2 );
+
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'sites' => 0 ) ) ), 'Unlimited is never fewer.' );
+	}
+
 	public function test_fewer_websites_than_in_use_is_refused(): void {
 		$r = $this->account( array( 'sites' => 3 ) );
 		Sites::add( $r->id(), 'second', 'S', '8.3', 2 );

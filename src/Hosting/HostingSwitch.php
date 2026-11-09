@@ -95,7 +95,7 @@ final class HostingSwitch {
 			}
 		}
 
-		if ( count( Sites::for_resource( $resource->id() ) ) > (int) $target['sites'] ) {
+		if ( (int) $target['sites'] > 0 && count( Sites::for_resource( $resource->id() ) ) > (int) $target['sites'] ) {
 			return __( 'This plan has fewer websites than you have now. Remove a website first, or choose a larger plan.', 'beltoft-services' );
 		}
 

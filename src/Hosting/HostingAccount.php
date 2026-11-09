@@ -46,6 +46,7 @@ final class HostingAccount {
 					'confirm'   => __( 'Type the website name to remove it. Its files and database are deleted.', 'beltoft-services' ),
 					'opening'   => __( 'Opening WordPress...', 'beltoft-services' ),
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
+					'confirmPack' => __( 'Remove one extra storage pack from this mailbox? It ends at your next renewal, the storage stays until then, and nothing is refunded.', 'beltoft-services' ),
 					'confirmUndo' => __( 'Go back to the safety copy? Changes made since the restore are lost.', 'beltoft-services' ),
 				),
 			)
@@ -146,13 +147,20 @@ final class HostingAccount {
 		printf(
 			'<p>%s</p>',
 			esc_html(
-				sprintf(
-					/* translators: 1: websites used, 2: websites allowed, 3: PHP workers allowed. */
-					__( '%1$d of %2$d websites. Up to %3$d PHP workers for all websites together.', 'beltoft-services' ),
-					$limits['sites_used'],
-					$limits['sites'],
-					$limits['php_workers']
-				)
+				0 === $limits['sites']
+					? sprintf(
+						/* translators: 1: websites in the account, 2: PHP workers allowed. */
+						_n( '%1$d website. Unlimited websites and subdomains. Up to %2$d PHP workers for all websites together.', '%1$d websites. Unlimited websites and subdomains. Up to %2$d PHP workers for all websites together.', $limits['sites_used'], 'beltoft-services' ),
+						$limits['sites_used'],
+						$limits['php_workers']
+					)
+					: sprintf(
+						/* translators: 1: websites used, 2: websites allowed, 3: PHP workers allowed. */
+						__( '%1$d of %2$d websites. Up to %3$d PHP workers for all websites together.', 'beltoft-services' ),
+						$limits['sites_used'],
+						$limits['sites'],
+						$limits['php_workers']
+					)
 			)
 		);
 
@@ -236,16 +244,103 @@ final class HostingAccount {
 		echo '<p>';
 
 		if ( $mail ) {
-			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) ) ) );
+			$mail_domain = \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );
+
+			echo esc_html( sprintf( '%s: %s', self::included_label( $mail ), $mail_domain ) );
+			echo ' ' . esc_html(
+				sprintf(
+					/* translators: %s: the mail domain. */
+					__( 'Email lite stays on %s. It does not move when the main domain changes.', 'beltoft-services' ),
+					$mail_domain
+				)
+			);
+		} elseif ( null === LiteMail::ready_domain( $r ) ) {
+			echo esc_html__( 'Connect your own domain to a website to set up Email lite. It is included with your plan and uses that domain.', 'beltoft-services' );
 		} else {
-			echo esc_html__( 'Set up Email lite so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' );
+			echo esc_html(
+				sprintf(
+					/* translators: %s: the account's own domain. */
+					__( 'Set up Email lite on %s so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' ),
+					\BeltoftServices\Domains\HostName::display( (string) LiteMail::ready_domain( $r ) )
+				)
+			);
 
 			if ( $ready ) {
-				echo ' <input type="text" data-hosting-field="mail_domain" placeholder="example.com" aria-label="' . esc_attr__( 'Domain for email', 'beltoft-services' ) . '"> <button type="button" data-hosting-action="enable_mail">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</button>';
+				echo ' <button type="button" data-hosting-action="enable_mail">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</button>';
 			}
 		}
 
-		echo '</p><p class="beltoft-hosting-message" role="status" aria-live="polite"></p></div>';
+		echo '</p>';
+
+		if ( $mail && $ready ) {
+			self::print_packs( $r, $mail );
+		}
+
+		echo '<p class="beltoft-hosting-message" role="status" aria-live="polite"></p></div>';
+	}
+
+	/**
+	 * Extra storage per Email lite mailbox: packs of 5 GB, up to four for each, added and ended here.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param Resource $mail Email lite resource.
+	 */
+	private static function print_packs( Resource $r, Resource $mail ): void {
+		$quote = Addons::quote( $r, Addons::KIND_PACK );
+		$boxes = \BeltoftServices\Mail\Mailboxes::all( $mail );
+
+		if ( null === $quote || ! is_array( $boxes ) || array() === $boxes ) {
+			return;
+		}
+
+		$confirm = Addons::confirm_text( Addons::KIND_PACK, $quote );
+		$packs   = Addons::packs( $r );
+
+		echo '<div class="beltoft-hosting-packs"><h4>' . esc_html__( 'Extra mailbox storage', 'beltoft-services' ) . '</h4><p>' . esc_html(
+			sprintf(
+				/* translators: 1: price per month and pack, 2: most packs on one mailbox. */
+				__( 'Add 5 GB to a mailbox for %1$s per month, up to %2$d packs for each mailbox.', 'beltoft-services' ),
+				Addons::money( (float) $quote['unit'] ),
+				Addons::MAX_PACKS
+			)
+		) . '</p><ul>';
+
+		foreach ( $boxes as $box ) {
+			$email = (string) $box['email'];
+			$n     = (int) ( $packs[ $email ] ?? 0 );
+			$ending = count( array_filter( Addons::lines( $r, Addons::KIND_PACK, $email ), static fn( $i ) => 'yes' === (string) $i->get_meta( Addons::I_ENDING ) ) );
+
+			echo '<li>' . esc_html(
+				sprintf(
+					/* translators: 1: mailbox address, 2: size in GB. */
+					__( '%1$s: %2$s GB', 'beltoft-services' ),
+					$email,
+					(string) round( (int) $box['quota_mb'] / 1024, 1 )
+				)
+			);
+
+			if ( $ending > 0 ) {
+				echo ' ' . esc_html(
+					sprintf(
+						/* translators: %d: packs that end at the next renewal. */
+						_n( '(%d pack ends at the next renewal)', '(%d packs end at the next renewal)', $ending, 'beltoft-services' ),
+						$ending
+					)
+				);
+			}
+
+			if ( $n < Addons::MAX_PACKS ) {
+				echo ' <button type="button" data-hosting-action="add_pack" data-mailbox="' . esc_attr( $email ) . '" data-confirm="' . esc_attr( $confirm ) . '" data-cents="' . (int) round( $quote['now'] * 100 ) . '">' . esc_html__( 'Add 5 GB', 'beltoft-services' ) . '</button>';
+			}
+
+			if ( $n - $ending > 0 ) {
+				echo ' <button type="button" data-hosting-action="remove_pack" data-mailbox="' . esc_attr( $email ) . '">' . esc_html__( 'Remove a pack', 'beltoft-services' ) . '</button>';
+			}
+
+			echo '</li>';
+		}
+
+		echo '</ul></div>';
 	}
 
 	/**
@@ -331,7 +426,7 @@ final class HostingAccount {
 	private static function print_forms( array $limits, array $sites ): void {
 		echo '<div class="beltoft-hosting-add">';
 
-		if ( $limits['sites_used'] < $limits['sites'] ) {
+		if ( 0 === $limits['sites'] || $limits['sites_used'] < $limits['sites'] ) {
 			echo '<p><input type="text" data-hosting-field="slug" maxlength="32" placeholder="' . esc_attr__( 'Website name', 'beltoft-services' ) . '" aria-label="' . esc_attr__( 'Website name', 'beltoft-services' ) . '"> ';
 			echo '<select data-hosting-field="php" aria-label="' . esc_attr__( 'PHP version', 'beltoft-services' ) . '">';
 

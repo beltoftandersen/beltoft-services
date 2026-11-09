@@ -64,6 +64,7 @@ final class Plugin {
 		Hosting\CartRule::register();
 		Hosting\Languages::register();
 		Hosting\HostingSwitch::register();
+		Hosting\Addons::register();
 		Children::register();
 		Domains\DomainSettings::register();
 		Ssl\SslSettings::register();

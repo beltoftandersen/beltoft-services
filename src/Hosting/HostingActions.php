@@ -165,7 +165,7 @@ final class HostingActions {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
-		if ( ! $resuming && count( $existing ) >= (int) $this->plan['sites'] ) {
+		if ( ! $resuming && (int) $this->plan['sites'] > 0 && count( $existing ) >= (int) $this->plan['sites'] ) {
 			return $this->error( 'limit', __( 'Your plan has no room for another website.', 'beltoft-services' ) );
 		}
 
@@ -394,6 +394,19 @@ final class HostingActions {
 			return $ready;
 		}
 
+		$needs = SiteDomains::valid_host( strtolower( rtrim( trim( $host ), '.' ) ) ) ? Addons::domain_needing_addon( $this->r, $host ) : null;
+
+		// A second registrable domain is a paid add-on (subdomains of the account's domains never are).
+		if ( null !== $needs && ! Addons::has( $this->r, Addons::KIND_DOMAIN, $needs ) ) {
+			$quote = Addons::quote( $this->r, Addons::KIND_DOMAIN );
+
+			if ( null === $quote ) {
+				return $this->error( 'failed', __( 'Your account has its domain. Another domain cannot be added online right now. Contact support.', 'beltoft-services' ) );
+			}
+
+			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
+		}
+
 		$added = SiteDns::add_domain( $this->r, $slug, $host, $this->node );
 
 		if ( is_wp_error( $added ) ) {
@@ -427,11 +440,12 @@ final class HostingActions {
 	/**
 	 * Removes a domain from a website (the preview name stays).
 	 *
-	 * @param string $host Domain name.
+	 * @param string $host  Domain name.
+	 * @param bool   $final True when its paid add-on has ended (the renewal): the names go now, whatever the line says.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function remove_domain( string $host ) {
-		return $this->locked( fn() => $this->remove_domain_locked( $host ) );
+	public function remove_domain( string $host, bool $final = false ) {
+		return $this->locked( fn() => $this->remove_domain_locked( $host, $final ) );
 	}
 
 	/**
@@ -439,7 +453,7 @@ final class HostingActions {
 	 *
 	 * @return mixed
 	 */
-	private function remove_domain_locked( string $host ) {
+	private function remove_domain_locked( string $host, bool $final = false ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -456,6 +470,21 @@ final class HostingActions {
 			return $this->error( 'invalid', __( 'The temporary address cannot be removed.', 'beltoft-services' ) );
 		}
 
+		// The last name of a paid extra domain stays until the renewal: it was paid for, and no money comes back.
+		if ( ! $final ) {
+			$reg    = Addons::registrable( $row['host'] );
+			$others = array_filter(
+				SiteDomains::for_resource( $this->r->id() ),
+				static fn( $d ) => 'preview' !== $d['kind'] && $d['host'] !== $row['host'] && Addons::registrable( $d['host'] ) === $reg
+			);
+
+			if ( array() === $others && Addons::has( $this->r, Addons::KIND_DOMAIN, $reg ) ) {
+				Addons::end( $this->r, Addons::KIND_DOMAIN, $reg );
+
+				return array( 'removed' => $row['host'], 'at_renewal' => true );
+			}
+		}
+
 		$gone = SiteDns::remove_domain( $this->r, $row['host'], $this->node );
 
 		if ( is_wp_error( $gone ) ) {
@@ -465,6 +494,98 @@ final class HostingActions {
 		$edge = $this->edge();
 
 		return is_wp_error( $edge ) ? $edge : array( 'removed' => $row['host'] );
+	}
+
+	/**
+	 * Buys an add-on: an extra domain or 5 GB of storage for one Email lite mailbox. Nothing is bought until the
+	 * customer has confirmed the price; the line is added once the order for the time until the renewal is paid.
+	 *
+	 * @param string $kind    domain or mail_pack.
+	 * @param string $target  The domain name, or the mailbox address.
+	 * @param int    $confirm_cents The amount charged now that the customer saw and accepted, in cents; 0 when not confirmed.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function buy_addon( string $kind, string $target, int $confirm_cents ) {
+		return $this->locked( fn() => $this->buy_addon_locked( $kind, $target, $confirm_cents ) );
+	}
+
+	/**
+	 * buy_addon with the site lock held.
+	 *
+	 * @param string $kind    Kind.
+	 * @param string $target  Target.
+	 * @param int    $confirm_cents Accepted amount in cents.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function buy_addon_locked( string $kind, string $target, int $confirm_cents ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$target = strtolower( trim( $target ) );
+
+		if ( Addons::KIND_DOMAIN === $kind ) {
+			$target = Addons::registrable( $target );
+
+			if ( ! SiteDomains::valid_host( $target ) ) {
+				return $this->error( 'invalid', __( 'The domain name is not valid.', 'beltoft-services' ) );
+			}
+		} elseif ( Addons::KIND_PACK === $kind ) {
+			if ( ! $this->mailbox_exists( $target ) ) {
+				return $this->error( 'not_found', __( 'That mailbox is not on your Email lite.', 'beltoft-services' ) );
+			}
+		} else {
+			return $this->error( 'invalid', __( 'That add-on does not exist.', 'beltoft-services' ) );
+		}
+
+		$quote = Addons::quote( $this->r, $kind );
+
+		if ( null === $quote ) {
+			return $this->error( 'failed', __( 'This add-on cannot be bought online right now. Contact support.', 'beltoft-services' ) );
+		}
+
+		// Nothing is bought unless the customer accepted this very amount: a price that changed since is shown again.
+		if ( $confirm_cents <= 0 || $confirm_cents !== (int) round( $quote['now'] * 100 ) ) {
+			return new \WP_Error( 'confirm', Addons::confirm_text( $kind, $quote ), array( 'kind' => $kind, 'target' => $target, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
+		}
+
+		$bought = Addons::buy( $this->r, $kind, $target );
+
+		return is_wp_error( $bought ) ? $this->error( $bought->get_error_code(), $bought->get_error_message() ) : $bought;
+	}
+
+	/**
+	 * Ends one storage pack of a mailbox: it leaves at the next renewal and the storage stays until then.
+	 *
+	 * @param string $mailbox Mailbox address.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function remove_pack( string $mailbox ) {
+		return $this->locked(
+			function () use ( $mailbox ) {
+				$ready = $this->ready();
+
+				return is_wp_error( $ready ) ? $ready : ( Addons::end( $this->r, Addons::KIND_PACK, strtolower( trim( $mailbox ) ) ) ? array( 'at_renewal' => true ) : $this->error( 'not_found', __( 'That mailbox has no extra storage to remove.', 'beltoft-services' ) ) );
+			}
+		);
+	}
+
+	/**
+	 * Is the address a mailbox of the account's Email lite (the hidden website mailbox is not one)?
+	 *
+	 * @param string $email Address.
+	 */
+	private function mailbox_exists( string $email ): bool {
+		$child = SiteMail::child_of( $this->r );
+		$rows  = $child ? \BeltoftServices\Mail\Mailboxes::all( $child ) : array();
+
+		if ( ! is_array( $rows ) ) {
+			return false;
+		}
+
+		return in_array( $email, array_map( static fn( $row ) => strtolower( (string) $row['email'] ), $rows ), true );
 	}
 
 	/**
@@ -680,13 +801,16 @@ final class HostingActions {
 		$child = LiteMail::enable( $this->r, $domain );
 
 		if ( is_wp_error( $child ) ) {
-			$texts = array(
-				'exists'     => __( 'Your account has Email lite already.', 'beltoft-services' ),
-				'bad_domain' => __( 'That domain name is not valid.', 'beltoft-services' ),
-				'no_mail'    => __( 'Your plan has no mailboxes.', 'beltoft-services' ),
+			$map   = array(
+				'exists'         => array( 'exists', __( 'Your account has Email lite already.', 'beltoft-services' ) ),
+				'bad_domain'     => array( 'invalid', __( 'That domain name is not valid.', 'beltoft-services' ) ),
+				'no_domain'      => array( 'invalid', __( 'Connect your own domain to a website first. Email lite uses that domain.', 'beltoft-services' ) ),
+				'not_own_domain' => array( 'invalid', __( 'Email lite uses the domain connected to your hosting account.', 'beltoft-services' ) ),
+				'no_mail'        => array( 'failed', __( 'Your plan has no mailboxes.', 'beltoft-services' ) ),
 			);
+			$known = $map[ $child->get_error_code() ] ?? array( 'failed', __( 'Email lite could not be set up.', 'beltoft-services' ) );
 
-			return $this->error( in_array( $child->get_error_code(), array( 'exists', 'bad_domain' ), true ) ? ( 'exists' === $child->get_error_code() ? 'exists' : 'invalid' ) : 'failed', $texts[ $child->get_error_code() ] ?? __( 'Email lite could not be set up.', 'beltoft-services' ) );
+			return $this->error( $known[0], $known[1] );
 		}
 
 		return array( 'mail_resource' => $child->id(), 'domain' => (string) $child->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );

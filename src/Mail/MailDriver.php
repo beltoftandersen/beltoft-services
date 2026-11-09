@@ -496,6 +496,8 @@ final class MailDriver implements Driver, NeedsBilling {
 			}
 		}
 
+		\BeltoftServices\Hosting\MailPacks::reapply( $r );
+
 		return StepResult::done( array( 'mail_limits' => $next ), 'Email plan updated' );
 	}
 

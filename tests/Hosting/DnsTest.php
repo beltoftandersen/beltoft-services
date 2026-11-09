@@ -264,6 +264,48 @@ class DnsTest extends HostingCase {
 		$this->assertNull( SiteDns::check_external( 'unknown.example', $node ) );
 	}
 
+	public function test_subdomains_of_a_held_or_verified_domain_are_unlimited_and_need_no_proof_of_their_own(): void {
+		list( $r, $user, $node ) = $this->account();
+		$slug = 'w' . $r->id();
+
+		// A domain in the customer's zone: any number of subdomains, all active at once.
+		$this->domain( $user, 'shop.example' );
+		for ( $i = 1; $i <= 12; $i++ ) {
+			$this->assertSame( array( 'kind' => 'ours', 'state' => 'active' ), SiteDns::add_domain( $r, $slug, 'sub' . $i . '.shop.example', $node ) );
+		}
+
+		// An outside domain: the domain itself needs the proof, a subdomain of it does not once it is active.
+		$apex  = 'outside.example';
+		$under = 'blog.outside.example';
+		SiteDns::add_domain( $r, $slug, $apex, $node );
+		SiteDns::add_domain( $r, $slug, $under, $node );
+		$this->lookups( array( '198.51.100.7' ), array() );
+		$this->assertSame( 'waiting', SiteDns::check_external( $under, $node ), 'Not verified yet, so the subdomain gets no free pass.' );
+		$this->assertFalse( SiteDns::under_verified_domain( $r->id(), $under ) );
+
+		$this->lookups( array( '198.51.100.7' ), array( SiteDns::proof_token( $r->id(), $apex ) ) );
+		$this->assertSame( 'active', SiteDns::check_external( $apex, $node ) );
+		$this->lookups( array( '198.51.100.7' ), array() );
+		$this->assertTrue( SiteDns::under_verified_domain( $r->id(), $under ) );
+		$this->assertSame( 'active', SiteDns::check_external( $under, $node ), 'A subdomain of a verified domain only has to point at us.' );
+		$this->lookups( array( '203.0.113.50' ), array() );
+		$this->assertSame( 'waiting', SiteDns::check_external( $under, $node ), 'It still has to point at us.' );
+
+		// A preview name never makes its subdomains free.
+		$preview = 'w' . $r->id() . '.preview.example.test';
+		$this->assertFalse( SiteDns::under_verified_domain( $r->id(), 'deep.' . $preview ) );
+		$this->assertFalse( SiteDns::under_verified_domain( $r->id(), 'www.unrelated.example' ), 'No verified parent.' );
+
+		// Someone else's domain: no free pass, and a name another account holds is refused.
+		list( $other ) = $this->account();
+		$this->assertFalse( SiteDns::under_verified_domain( $other->id(), 'www.outside.example' ) );
+		$this->assertStringContainsString( 'another account', (string) SiteDns::add_domain( $other, 'w' . $other->id(), $under, $node ) );
+		$this->lookups( array( '198.51.100.7' ), array() );
+		SiteDns::add_domain( $other, 'w' . $other->id(), 'www.outside.example', $node );
+		$this->assertSame( 'waiting', SiteDns::check_external( 'www.outside.example', $node ), 'The other account never proved outside.example.' );
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+	}
+
 	public function test_the_sweep_activates_and_deactivates_external_names_and_sends_the_routes(): void {
 		list( $r, , $node ) = $this->account();
 		$r->set( array( 'state' => 'ready', 'desired' => 'ready', 'steps' => array( 'ready' ) ) );
