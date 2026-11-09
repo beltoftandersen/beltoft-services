@@ -537,4 +537,66 @@ class AddonsTest extends HostingCase {
 		$this->assertSame( $one['order'], $two['order'] );
 		$this->assertCount( 1, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
 	}
+
+	private function addon_product_id( string $kind ): int {
+		$ids = get_posts( array( 'post_type' => 'product', 'fields' => 'ids', 'meta_key' => Addons::PRODUCT_KEY, 'meta_value' => $kind, 'post_status' => 'publish' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+		return (int) $ids[0];
+	}
+
+	public function test_an_add_on_product_cannot_be_added_to_the_cart_directly(): void {
+		$this->products();
+		WC()->cart->empty_cart();
+		wc_clear_notices();
+
+		foreach ( array( Addons::KIND_DOMAIN, Addons::KIND_PACK ) as $kind ) {
+			$id = $this->addon_product_id( $kind );
+			// The add-to-cart form, the AJAX add and the Store API all run this filter (the cart object itself does not).
+			$this->assertFalse( apply_filters( 'woocommerce_add_to_cart_validation', true, $id, 1 ), $kind );
+		}
+
+		$notices = array_map( static fn( $n ) => is_array( $n ) ? (string) $n['notice'] : (string) $n, wc_get_notices( 'error' ) );
+		$this->assertContains( 'Extra domains and mailbox storage are bought from your hosting account page.', $notices );
+
+		// The renewal and resubscribe carts of WooCommerce Subscriptions carry the lines and pass.
+		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $flag ) {
+			$this->assertTrue( Addons::refuse_direct_add( true, $this->addon_product_id( Addons::KIND_DOMAIN ), 1, 0, array(), array( $flag => array( 'x' => 1 ) ) ), $flag );
+		}
+		$this->assertTrue( Addons::refuse_direct_add( true, 0, 1 ), 'Not an add-on product.' );
+		$this->assertFalse( Addons::refuse_direct_add( false, 0, 1 ), 'An earlier refusal stays.' );
+		wc_clear_notices();
+	}
+
+	public function test_a_paid_order_of_an_add_on_product_that_was_not_made_here_alerts_the_owner(): void {
+		$this->products();
+		$mails = array();
+		add_filter( 'wp_mail', static function ( $args ) use ( &$mails ) {
+			if ( str_contains( (string) $args['subject'], 'Add-on payment needs a look' ) ) {
+				$mails[] = $args;
+			}
+			return $args;
+		} );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+
+		$order = wc_create_order( array( 'created_via' => 'checkout' ) );
+		$order->add_product( wc_get_product( $this->addon_product_id( Addons::KIND_DOMAIN ) ), 1 );
+		$order->calculate_totals();
+		$order->save();
+		$order->payment_complete();
+
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'Add-on payment needs a look', (string) $mails[0]['subject'] );
+		$this->assertSame( 'yes', (string) wc_get_order( $order->get_id() )->get_meta( '_beltoft_services_addon_stray_alerted' ) );
+
+		$order->update_status( 'completed' );
+		$this->assertCount( 1, $mails, 'Once.' );
+
+		// A renewal order carries the add-on lines on purpose.
+		$this->card_pays();
+		$r = $this->account();
+		Addons::buy( $r, Addons::KIND_DOMAIN, 'keep.example' );
+		$before = count( $mails );
+		$renewal = wcs_create_renewal_order( $this->sub( $r ) );
+		$renewal->payment_complete();
+		$this->assertCount( $before, $mails, 'A renewal is not a stray order.' );
+	}
 }

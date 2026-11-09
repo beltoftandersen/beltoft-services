@@ -34,6 +34,7 @@ final class Addons {
 	public const PRODUCT_KEY = '_beltoft_services_plan_addon';
 	public const ORDER_META  = '_beltoft_services_addon_order';
 	public const ORDER_DONE  = '_beltoft_services_addon_done';
+	public const ORDER_STRAY = '_beltoft_services_addon_stray_alerted';
 	public const I_KIND      = '_beltoft_services_addon_kind';
 	public const I_RESOURCE  = '_beltoft_services_addon_resource';
 	public const I_TARGET    = '_beltoft_services_addon_target';
@@ -52,6 +53,7 @@ final class Addons {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'refuse_direct_add' ), 5, 6 );
 		add_action( 'woocommerce_payment_complete', array( __CLASS__, 'activate' ), 20 );
 		add_action( 'woocommerce_order_status_processing', array( __CLASS__, 'activate' ), 20 );
 		add_action( 'woocommerce_order_status_completed', array( __CLASS__, 'activate' ), 20 );
@@ -64,6 +66,39 @@ final class Addons {
 		if ( function_exists( 'wp_next_scheduled' ) && ! wp_next_scheduled( self::SWEEP_HOOK ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::SWEEP_HOOK );
 		}
+	}
+
+	/**
+	 * Filter woocommerce_add_to_cart_validation (also run by the Store API): an add-on product is bought from the
+	 * hosting account page, never through the cart, where it would charge the unit price and give nothing.
+	 *
+	 * @param mixed $valid        Whether the add is valid so far.
+	 * @param mixed $product_id   Product being added.
+	 * @param mixed $quantity     Quantity.
+	 * @param mixed $variation_id Variation being added.
+	 * @param mixed $variation    Variation attributes.
+	 * @param mixed $data         Cart item data.
+	 * @return bool
+	 */
+	public static function refuse_direct_add( $valid, $product_id = 0, $quantity = 1, $variation_id = 0, $variation = array(), $data = array() ): bool {
+		unset( $quantity, $variation_id, $variation );
+
+		if ( ! $valid || '' === (string) get_post_meta( (int) $product_id, self::PRODUCT_KEY, true ) ) {
+			return (bool) $valid;
+		}
+
+		// The renewal, resubscribe and switch carts of WooCommerce Subscriptions legitimately carry the lines.
+		$data = is_array( $data ) ? $data : array();
+
+		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
+			if ( ! empty( $data[ $key ] ) ) {
+				return true;
+			}
+		}
+
+		wc_add_notice( __( 'Extra domains and mailbox storage are bought from your hosting account page.', 'beltoft-services' ), 'error' );
+
+		return false;
 	}
 
 	/**
@@ -465,6 +500,12 @@ final class Addons {
 		$order = wc_get_order( (int) $order_id );
 		$meta  = $order instanceof \WC_Order ? $order->get_meta( self::ORDER_META ) : null;
 
+		if ( $order instanceof \WC_Order && ! is_array( $meta ) && $order->has_status( array( 'processing', 'completed' ) ) ) {
+			self::stray( $order );
+
+			return;
+		}
+
 		if ( ! is_array( $meta ) || '' !== (string) $order->get_meta( self::ORDER_DONE ) || isset( $busy[ $order->get_id() ] ) || ! $order->has_status( array( 'processing', 'completed' ) ) ) {
 			return;
 		}
@@ -475,6 +516,29 @@ final class Addons {
 			self::add_line( $order, $meta );
 		} finally {
 			unset( $busy[ $order->get_id() ] );
+		}
+	}
+
+	/**
+	 * A paid order with an add-on product that this plugin did not make: nothing is delivered, so say so, once.
+	 *
+	 * @param \WC_Order $order Paid order.
+	 */
+	private static function stray( \WC_Order $order ): void {
+		// Renewal, resubscribe and switch orders carry the add-on lines of the subscription on purpose.
+		if ( '' !== (string) $order->get_meta( self::ORDER_STRAY ) || ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order, array( 'parent', 'renewal', 'resubscribe', 'switch' ) ) ) ) {
+			return;
+		}
+
+		foreach ( $order->get_items() as $item ) {
+			if ( $item instanceof \WC_Order_Item_Product && '' !== (string) get_post_meta( (int) $item->get_product_id(), self::PRODUCT_KEY, true ) ) {
+				$order->update_meta_data( self::ORDER_STRAY, 'yes' );
+				$order->add_order_note( 'Paid order with an add-on product that was not bought from the hosting account page: nothing was delivered. Check it and refund if needed.' );
+				$order->save();
+				self::alert( 'Add-on payment needs a look', sprintf( "Order #%d was paid with an add-on product, but it was not bought from the hosting account page, so nothing was delivered.\n\nCheck the order and refund it if needed.", $order->get_id() ) );
+
+				return;
+			}
 		}
 	}
 
