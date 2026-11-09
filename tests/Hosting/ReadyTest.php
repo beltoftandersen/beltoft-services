@@ -200,7 +200,7 @@ class ReadyTest extends HostingCase {
 		HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Getting started', $html );
-		$this->assertStringContainsString( '[ ] Connect your domain', $html );
+		$this->assertStringContainsString( 'To do:</span><span class="beltoft-hosting-check-label">Connect your domain', $html );
 		$this->assertStringContainsString( 'data-hosting-action="check_item" data-item="build"', $html );
 		$this->assertStringContainsString( 'data-hosting-resource="' . $r->id() . '"', $html );
 

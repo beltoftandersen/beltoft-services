@@ -1,0 +1,64 @@
+/* My Account: the hosting panel. Uses the account page tokens (account.css) and its button look: navy 1px outline
+   secondary, navy filled primary, 32px compact buttons (40px on a phone), 44px inputs. Square corners like every
+   other account page. */
+.beltoft-hosting { --bsh-ink: var(--navy, #0c1535); --bsh-soft: var(--ink-soft, #5e7080); --bsh-rule: var(--rule, #d6d2c8); --bsh-warm: var(--bg-warm, #eeece6); font-size: var(--bs-fs-body, 15px); line-height: var(--bs-lh-text, 1.5); min-width: 0; }
+.beltoft-hosting > * { min-width: 0; }
+.beltoft-hosting p { margin: 0 0 var(--bs-space-3, 12px); }
+.beltoft-hosting h4 { margin: 0 0 var(--bs-space-3, 12px); color: var(--bsh-ink); font-size: var(--bs-fs-heading, 18px); font-weight: var(--bs-fw-strong, 600); line-height: var(--bs-lh-heading, 1.3); }
+.beltoft-hosting > div { margin: var(--bs-space-5, 24px) 0 0; }
+.beltoft-hosting .beltoft-hosting-summary { margin-top: var(--bs-space-5, 24px); }
+.beltoft-hosting .beltoft-hosting-message { min-height: 1.5em; margin: var(--bs-space-3, 12px) 0 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+
+/* Notices */
+.beltoft-hosting .beltoft-hosting-notice, .beltoft-hosting .beltoft-hosting-warning { padding: var(--bs-space-3, 12px) var(--bs-space-4, 16px); border-left: 3px solid var(--bs-status-warn, #8a5a00); background: var(--bsh-warm); overflow-wrap: anywhere; }
+.beltoft-hosting .beltoft-hosting-warning { border-left-color: var(--bs-status-fail, #a4372a); color: var(--bs-status-fail, #a4372a); }
+
+/* Checklist: a real mark in front of each item */
+.beltoft-hosting .beltoft-hosting-checklist ul { margin: 0 0 var(--bs-space-3, 12px); padding: 0; list-style: none; }
+.beltoft-hosting .beltoft-hosting-checklist li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-1, 4px) var(--bs-space-3, 12px); margin: 0; padding: var(--bs-space-2, 8px) 0; }
+.beltoft-hosting .beltoft-hosting-mark { flex: none; box-sizing: border-box; width: 18px; height: 18px; border: 2px solid var(--bs-input-border, #7d8b99); background: transparent; }
+.beltoft-hosting li[data-done="1"] .beltoft-hosting-mark { border-color: var(--bs-status-ok, #28513e); background: var(--bs-status-ok, #28513e) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 9.5l3.2 3.2L14 5.8' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+.beltoft-hosting li[data-done="1"] .beltoft-hosting-check-label { color: var(--bsh-soft); }
+
+/* Websites table */
+.beltoft-hosting table { width: 100%; max-width: none; margin: 0 0 var(--bs-space-4, 16px); border-collapse: collapse; table-layout: auto; }
+.beltoft-hosting th { padding: 0 var(--bs-space-2, 8px) var(--bs-space-2, 8px) 0; border: 0; border-bottom: 1px solid var(--bsh-rule); background: none; color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); font-weight: var(--bs-fw-medium, 500); text-align: left; }
+.beltoft-hosting td { padding: var(--bs-space-3, 12px) var(--bs-space-2, 8px) var(--bs-space-3, 12px) 0; border: 0; border-bottom: 1px solid var(--bsh-rule); background: none; vertical-align: top; overflow-wrap: anywhere; }
+.beltoft-hosting tr:last-child td { border-bottom: 0; }
+.beltoft-hosting td.beltoft-hosting-actions { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); border-bottom: 0; }
+.beltoft-hosting tr { border-bottom: 1px solid var(--bsh-rule); }
+.beltoft-hosting tr:last-child { border-bottom: 0; }
+
+/* Forms: a visible label over each field, fields and button on one line when there is room */
+.beltoft-hosting .beltoft-hosting-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--bs-space-3, 12px); margin: 0 0 var(--bs-space-4, 16px); }
+.beltoft-hosting .beltoft-hosting-field { display: flex; flex-direction: column; gap: var(--bs-space-1, 4px); flex: 1 1 180px; min-width: 0; margin: 0; }
+.beltoft-hosting .beltoft-hosting-field > span { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting input[type="text"], .beltoft-hosting select { box-sizing: border-box; width: 100%; max-width: 100%; height: var(--bs-input-h, 44px); margin: 0; padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border, #7d8b99); background: #fff; box-shadow: none; color: var(--bsh-ink); font: inherit; font-size: var(--bs-fs-body, 15px); }
+
+/* Buttons and links */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: auto; min-height: var(--bs-btn-h-sm, 32px); margin: 0; padding: 0 14px; border: 1px solid var(--bsh-ink); background: transparent; box-shadow: none; color: var(--bsh-ink); font-family: inherit; font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); line-height: 1.3; text-decoration: none; white-space: normal; text-align: center; cursor: pointer; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn:hover { background: var(--bsh-warm); color: var(--bsh-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn--primary { min-height: var(--bs-btn-h, 40px); background: var(--bsh-ink); color: #fff; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn--primary:hover { background: var(--ink-mid, #2d4060); border-color: var(--ink-mid, #2d4060); color: #fff; }
+.beltoft-hosting button.beltoft-hosting-btn:focus-visible, .beltoft-hosting a:focus-visible, .beltoft-hosting input:focus-visible, .beltoft-hosting select:focus-visible { outline: 2px solid var(--bs-focus, #0c1535); outline-offset: 2px; }
+.beltoft-hosting button.beltoft-hosting-btn:disabled { opacity: .5; cursor: default; }
+.beltoft-hosting a.beltoft-hosting-link { color: var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Extra storage */
+.beltoft-hosting .beltoft-hosting-pack-list { margin: 0; padding: 0; list-style: none; }
+.beltoft-hosting .beltoft-hosting-pack-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-3, 12px); padding: var(--bs-space-2, 8px) 0; }
+.beltoft-hosting .beltoft-hosting-pack-name { flex: 1 1 100%; overflow-wrap: anywhere; }
+
+/* Backups list */
+.beltoft-hosting .beltoft-hosting-backup-list td:last-child { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); }
+
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn { min-height: var(--bs-btn-h, 40px); }
+	.beltoft-hosting .beltoft-hosting-field { flex-basis: 100%; }
+	/* A row of a table is a block on a phone: the label over each value. */
+	.beltoft-hosting table, .beltoft-hosting tbody, .beltoft-hosting tr, .beltoft-hosting td { display: block; width: auto; }
+	.beltoft-hosting thead { display: none; }
+	.beltoft-hosting td { padding: var(--bs-space-1, 4px) 0; border: 0; }
+	.beltoft-hosting td[data-label]::before { content: attr(data-label); display: block; color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); }
+	.beltoft-hosting tr { padding: var(--bs-space-3, 12px) 0; }
+}

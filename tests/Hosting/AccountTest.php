@@ -415,7 +415,7 @@ class AccountTest extends HostingCase {
 		$this->assertStringContainsString( '2 of 3 websites', $html );
 		$this->assertStringContainsString( 'blog.preview.example.test', $html );
 		$this->assertStringContainsString( 'www.outside.example (waiting for DNS)', $html );
-		$this->assertStringContainsString( '<td>Blog</td>', $html );
+		$this->assertStringContainsString( '>Blog</td>', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( 'Connect your own domain to a website to set up Email lite', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );

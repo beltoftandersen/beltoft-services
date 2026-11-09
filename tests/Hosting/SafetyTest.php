@@ -318,7 +318,7 @@ class SafetyTest extends HostingCase {
 		HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'no longer gets security updates', $html );
-		$this->assertStringContainsString( 'color:#b32d2e', $html );
+		$this->assertStringContainsString( 'beltoft-hosting-warning', $html );
 
 		$this->sample( $r );
 		$this->assertSame( '8.3', Sites::find( $r->id(), $slug )['php'], 'It is not switched a second time.' );
