@@ -50,6 +50,13 @@ final class Addons {
 	public const MAX_PACKS = 4;
 
 	/**
+	 * True while the saved card is charged in buy(): a payment made then is answered to the page, which adds the domain.
+	 *
+	 * @var bool
+	 */
+	private static $buying = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -428,9 +435,10 @@ final class Addons {
 	 * @param string   $kind   Kind.
 	 * @param string   $target Registrable domain, or mailbox address.
 	 * @param int|null $now    Time (tests).
+	 * @param array    $connect For a domain: host and slug to add to the website once the order is paid later (the pay link).
 	 * @return array{status: string, order: int, total: float, pay_url: string, message: string}|\WP_Error status is paid, pending or pay.
 	 */
-	public static function buy( Resource $r, string $kind, string $target, ?int $now = null ) {
+	public static function buy( Resource $r, string $kind, string $target, ?int $now = null, array $connect = array() ) {
 		$sub     = self::subscription( $r );
 		$product = self::product( $kind );
 		$quote   = self::quote( $r, $kind, $now );
@@ -490,6 +498,8 @@ final class Addons {
 				'target'   => $target,
 				'period'   => $quote['period'],
 				'next'     => (int) $sub->get_time( 'next_payment' ),
+				'host'     => (string) ( $connect['host'] ?? '' ),
+				'slug'     => (string) ( $connect['slug'] ?? '' ),
 			)
 		);
 		$order->calculate_totals( true );
@@ -515,7 +525,15 @@ final class Addons {
 		if ( ! $sub->is_manual() && '' !== (string) $sub->get_payment_method() && function_exists( 'wcs_copy_payment_method_to_order' ) ) {
 			wcs_copy_payment_method_to_order( $sub, $order );
 			$order->save();
-			\WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook( $order );
+
+			// Paid on the spot: the page that asked adds the domain right after, so it is not added here too.
+			self::$buying = true;
+
+			try {
+				\WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook( $order );
+			} finally {
+				self::$buying = false;
+			}
 		}
 
 		return self::outcome( wc_get_order( $order->get_id() ) );
@@ -641,6 +659,11 @@ final class Addons {
 				$order->save();
 				self::apply( $r );
 
+				// Paid later (the pay link, a payment that was on hold): nobody is on the page, so the domain joins its website now.
+				if ( self::KIND_DOMAIN === $kind && ! self::$buying ) {
+					self::connect( $order, $r, $meta );
+				}
+
 				return;
 			}
 
@@ -651,6 +674,57 @@ final class Addons {
 		$order->add_order_note( 'Paid add-on order, but no line was added: ' . $problem . '. Check it and refund if needed.' );
 		$order->save();
 		self::alert( 'Add-on payment needs a look', sprintf( "Order #%1\$d (%2\$s, %3\$s) was paid but no line was added: %4\$s.\n\nCheck the order and refund it if needed.", $order->get_id(), $kind, $target, $problem ) );
+	}
+
+	/**
+	 * Adds the domain a paid add-on order was for to its website, or says that it could not be (the line is paid and stays).
+	 *
+	 * @param \WC_Order            $order Paid order.
+	 * @param Resource             $r     Hosting resource.
+	 * @param array<string, mixed> $meta  Order meta of the add-on.
+	 */
+	private static function connect( \WC_Order $order, Resource $r, array $meta ): void {
+		$host = (string) ( $meta['host'] ?? '' );
+		$slug = (string) ( $meta['slug'] ?? '' );
+
+		if ( '' === $host || '' === $slug ) {
+			return;
+		}
+
+		$added = ( new HostingActions( $r ) )->add_domain( $slug, $host );
+
+		if ( is_wp_error( $added ) ) {
+			$order->add_order_note( 'The domain ' . $host . ' is paid but could not be added to the website: ' . $added->get_error_message() );
+			self::alert( 'Paid domain was not connected', sprintf( "Order #%1\$d paid for the extra domain %2\$s, but it could not be added to the website: %3\$s.\n\nAdd it by hand or ask the customer to add it from the hosting page.", $order->get_id(), $host, $added->get_error_message() ) );
+		}
+	}
+
+	/**
+	 * Paid extra domains that are not on a website yet (the customer has not added them, or they are being connected).
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<int, string> Registrable domains.
+	 */
+	public static function unconnected_domains( Resource $r ): array {
+		$have = array();
+
+		foreach ( SiteDomains::for_resource( $r->id() ) as $row ) {
+			if ( 'preview' !== $row['kind'] ) {
+				$have[] = self::registrable( $row['host'] );
+			}
+		}
+
+		$out = array();
+
+		foreach ( self::lines( $r, self::KIND_DOMAIN ) as $item ) {
+			$target = (string) $item->get_meta( self::I_TARGET );
+
+			if ( '' === (string) $item->get_meta( self::I_ENDING ) && ! in_array( $target, $have, true ) ) {
+				$out[] = $target;
+			}
+		}
+
+		return $out;
 	}
 
 	/**

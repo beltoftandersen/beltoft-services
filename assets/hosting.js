@@ -187,7 +187,7 @@
 					}
 
 					button.disabled = true;
-					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: offer.target, confirm: offer.amount_cents } ).then( function ( bought ) {
+					call( 'POST', id + '/hosting/addons', { kind: 'domain', target: offer.target, confirm: offer.amount_cents, host: offer.host, slug: offer.slug } ).then( function ( bought ) {
 						button.disabled = false;
 						pay( panel, bought, function () {
 							button.click();

@@ -138,6 +138,8 @@ final class HostingRoutes {
 				'args'                => $id + array(
 					'kind'    => array( 'type' => 'string', 'required' => true, 'description' => 'domain (an extra domain) or mail_pack (5 GB for one Email lite mailbox).' ),
 					'target'  => array( 'type' => 'string', 'required' => true, 'description' => 'The domain name, or the mailbox address.' ),
+					'host'    => array( 'type' => 'string', 'default' => '', 'description' => 'For an extra domain: the name the customer typed. When the order is paid through the pay link, it is added to the website.' ),
+					'slug'    => array( 'type' => 'string', 'default' => '', 'description' => 'For an extra domain: the website the name is for.' ),
 					'confirm' => array( 'type' => 'integer', 'description' => 'The amount charged now, in cents, that the customer accepted (amount_cents of the 402 answer). Without it, or when the price has changed, nothing is bought and the price is returned as the error message.' ),
 				),
 			),
@@ -305,7 +307,7 @@ final class HostingRoutes {
 	}
 
 	public static function buy_addon( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->buy_addon( (string) $request['kind'], (string) $request['target'], (int) $request['confirm'] ), 201 );
+		return self::change( $request, static fn( HostingActions $a ) => $a->buy_addon( (string) $request['kind'], (string) $request['target'], (int) $request['confirm'], (string) $request['host'], (string) $request['slug'] ), 201 );
 	}
 
 	public static function remove_pack( \WP_REST_Request $request ): \WP_REST_Response {

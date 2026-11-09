@@ -208,6 +208,19 @@ final class HostingAccount {
 			)
 		);
 
+		foreach ( Addons::unconnected_domains( $r ) as $paid ) {
+			printf(
+				'<p class="beltoft-hosting-notice">%s</p>',
+				esc_html(
+					sprintf(
+						/* translators: %s: domain name. */
+						__( 'Your extra domain %s is paid. It is being connected.', 'beltoft-services' ),
+						\BeltoftServices\Domains\HostName::display( $paid )
+					)
+				)
+			);
+		}
+
 		echo '<table class="beltoft-hosting-sites"><thead><tr><th>' . esc_html__( 'Website', 'beltoft-services' ) . '</th><th>' . esc_html__( 'PHP', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Addresses', 'beltoft-services' ) . '</th>' . ( $ready ? '<th><span class="screen-reader-text">' . esc_html__( 'Actions', 'beltoft-services' ) . '</span></th>' : '' ) . '</tr></thead><tbody>';
 
 		$ending = Addons::ending_domains( $r );

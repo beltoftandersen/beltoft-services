@@ -509,10 +509,12 @@ final class HostingActions {
 	 * @param string $kind    domain or mail_pack.
 	 * @param string $target  The domain name, or the mailbox address.
 	 * @param int    $confirm_cents The amount charged now that the customer saw and accepted, in cents; 0 when not confirmed.
+	 * @param string $host    For a domain: the name to add once the order is paid through the pay link.
+	 * @param string $slug    For a domain: the website of that name.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function buy_addon( string $kind, string $target, int $confirm_cents ) {
-		return $this->locked( fn() => $this->buy_addon_locked( $kind, $target, $confirm_cents ) );
+	public function buy_addon( string $kind, string $target, int $confirm_cents, string $host = '', string $slug = '' ) {
+		return $this->locked( fn() => $this->buy_addon_locked( $kind, $target, $confirm_cents, $host, $slug ) );
 	}
 
 	/**
@@ -521,9 +523,11 @@ final class HostingActions {
 	 * @param string $kind    Kind.
 	 * @param string $target  Target.
 	 * @param int    $confirm_cents Accepted amount in cents.
+	 * @param string $host    For a domain: the name to add once the order is paid through the pay link.
+	 * @param string $slug    For a domain: the website of that name.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function buy_addon_locked( string $kind, string $target, int $confirm_cents ) {
+	private function buy_addon_locked( string $kind, string $target, int $confirm_cents, string $host = '', string $slug = '' ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -562,7 +566,17 @@ final class HostingActions {
 			return new \WP_Error( 'confirm', Addons::confirm_text( $kind, $quote ), array( 'kind' => $kind, 'target' => $target, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
 		}
 
-		$bought = Addons::buy( $this->r, $kind, $target );
+		$connect = array();
+
+		if ( Addons::KIND_DOMAIN === $kind ) {
+			$host = strtolower( rtrim( trim( $host ), '.' ) );
+
+			if ( '' !== $host && SiteDomains::valid_host( $host ) && Addons::registrable( $host ) === $target && '' !== $slug ) {
+				$connect = array( 'host' => $host, 'slug' => $slug );
+			}
+		}
+
+		$bought = Addons::buy( $this->r, $kind, $target, null, $connect );
 
 		return is_wp_error( $bought ) ? $this->error( $bought->get_error_code(), $bought->get_error_message() ) : $bought;
 	}

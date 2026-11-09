@@ -673,4 +673,58 @@ class AddonsTest extends HostingCase {
 		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ) );
 		$this->assertCount( 1, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
 	}
+
+	public function test_a_domain_paid_through_the_pay_link_is_connected_after_payment(): void {
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a    = new HostingActions( Resource::find( $r->id() ) );
+		$slug = 'w' . $r->id();
+
+		$bought = $a->buy_addon( 'domain', 'other.example', 100, 'www.other.example', $slug );
+		$this->assertIsArray( $bought );
+		$this->assertSame( 'pay', $bought['status'] );
+		$this->assertNull( SiteDomains::find( 'www.other.example' ) );
+
+		wc_get_order( $bought['order'] )->payment_complete();
+
+		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ) );
+		$row = SiteDomains::find( 'www.other.example' );
+		$this->assertNotNull( $row, 'The paid domain joins the website.' );
+		$this->assertSame( $r->id(), $row['resource_id'] );
+	}
+
+	public function test_a_domain_paid_with_the_saved_card_is_left_to_the_page_that_adds_it(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+
+		$bought = $a->buy_addon( 'domain', 'other.example', 100, 'www.other.example', 'w' . $r->id() );
+		$this->assertSame( 'paid', $bought['status'] );
+		$this->assertNull( SiteDomains::find( 'www.other.example' ), 'The page adds it right after, so it is not added twice.' );
+		$this->assertIsArray( $a->add_domain( 'w' . $r->id(), 'www.other.example' ) );
+	}
+
+	public function test_the_hosting_page_shows_a_paid_domain_that_is_not_on_a_website_yet(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		Addons::buy( $r, Addons::KIND_DOMAIN, 'other.example' );
+
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'Your extra domain other.example is paid. It is being connected.', (string) ob_get_clean() );
+
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$a->add_domain( 'w' . $r->id(), 'www.other.example' );
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$this->assertStringNotContainsString( 'is being connected', (string) ob_get_clean() );
+	}
+
+	public function test_the_hosting_script_sends_the_typed_domain_with_the_purchase(): void {
+		$js = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/hosting.js' );
+		$this->assertStringContainsString( 'host: offer.host', $js );
+		$this->assertStringContainsString( 'slug: offer.slug', $js );
+	}
 }
