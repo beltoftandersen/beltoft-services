@@ -1060,6 +1060,30 @@ final class Resource {
 	}
 
 	/**
+	 * The four keys that clear a retry: the operation, its attempts, the next attempt and the admin alert mark.
+	 * Merge it into a larger write when the same write changes more.
+	 *
+	 * @return array{op: string, attempts: int, next_attempt_at: null, alerted: string}
+	 */
+	public static function retry_reset(): array {
+		return array(
+			'op'              => '',
+			'attempts'        => 0,
+			'next_attempt_at' => null,
+			'alerted'         => '',
+		);
+	}
+
+	/**
+	 * Clears the retry bookkeeping (see retry_reset()): the next run starts the operation afresh.
+	 *
+	 * @return bool Whether it was stored.
+	 */
+	public function reset_retries(): bool {
+		return $this->set( self::retry_reset() );
+	}
+
+	/**
 	 * Moves to a state and writes a history event, only when the change was stored.
 	 *
 	 * @param string $state ready, paused, etc. (see STATES).

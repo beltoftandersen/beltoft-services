@@ -345,4 +345,49 @@ final class ResourceTest extends TestCase {
 		update_post_meta( $b->get_id(), Product::META_DRIVER, 'fake' );
 		$this->assertContains( 'order-b', Product::service_slugs() );
 	}
+
+	/**
+	 * Resource::transition() is silent: it stores the state and writes a history event, nothing else. The
+	 * path that tells listeners is Reconciler::move() (Reconciler::notify() after a direct transition).
+	 * Resource::transition() documents each caller that stays silent on purpose.
+	 */
+	public function test_transition_fires_no_state_changed_action(): void {
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::create( $license, $this->fake_driver(), array(), array() );
+		$this->assertInstanceOf( Resource::class, $resource );
+
+		$before = did_action( 'beltoft_services_state_changed' );
+
+		$this->assertTrue( $resource->transition( 'paused', 'A test move' ) );
+
+		$this->assertSame( 'paused', Resource::find( $resource->id() )->get( 'state' ) );
+		$this->assertSame( $before, did_action( 'beltoft_services_state_changed' ) );
+	}
+
+	public function test_retry_reset_clears_exactly_the_four_retry_keys(): void {
+		$this->assertSame(
+			array(
+				'op'              => '',
+				'attempts'        => 0,
+				'next_attempt_at' => null,
+				'alerted'         => '',
+			),
+			Resource::retry_reset()
+		);
+
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::create( $license, $this->fake_driver(), array(), array( 'op' => 'delete', 'attempts' => 3, 'next_attempt_at' => 99, 'alerted' => 'x', 'last_error' => 'kept' ) );
+		$this->assertInstanceOf( Resource::class, $resource );
+
+		$this->assertTrue( $resource->reset_retries() );
+
+		$fresh = Resource::find( $resource->id() );
+		$this->assertSame( '', $fresh->get( 'op' ) );
+		$this->assertSame( 0, (int) $fresh->get( 'attempts' ) );
+		$this->assertEmpty( $fresh->get( 'next_attempt_at' ) );
+		$this->assertSame( '', $fresh->get( 'alerted' ) );
+		$this->assertSame( 'kept', $fresh->get( 'last_error' ) );
+	}
 }
