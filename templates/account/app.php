@@ -129,7 +129,7 @@ $beltoft_services_status_text = array(
 				echo esc_html(
 					sprintf(
 						/* translators: 1: number of days, 2: date */
-						__( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', 'beltoft-services' ),
+						_n( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d day after the server started), the app is installed on the server address instead.', 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', (int) $view['own']['days'], 'beltoft-services' ),
 						(int) $view['own']['days'],
 						(string) $view['own']['deadline']
 					)
@@ -269,7 +269,7 @@ $beltoft_services_status_text = array(
 			echo esc_html(
 				sprintf(
 					/* translators: 1: domain name, 2: number of days */
-					__( 'The name %1$s did not point to this server within %2$d days, so the app was installed on the server address, without HTTPS. You can reinstall the server and choose the domain again.', 'beltoft-services' ),
+					_n( 'The name %1$s did not point to this server within %2$d day, so the app was installed on the server address, without HTTPS. You can reinstall the server and choose the domain again.', 'The name %1$s did not point to this server within %2$d days, so the app was installed on the server address, without HTTPS. You can reinstall the server and choose the domain again.', (int) $view['own']['days'], 'beltoft-services' ),
 					(string) $view['own']['name'],
 					(int) $view['own']['days']
 				)

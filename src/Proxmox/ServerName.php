@@ -127,7 +127,7 @@ final class ServerName {
 	 */
 	public static function invalid_message(): string {
 		/* translators: %d: the longest name, in characters. */
-		return sprintf( __( 'The server name is used as the hostname. Use up to %d letters (a to z), digits and hyphens, starting and ending with a letter or digit.', 'beltoft-services' ), self::MAX );
+		return sprintf( _n( 'The server name is used as the hostname. Use up to %d letter (a to z), digits and hyphens, starting and ending with a letter or digit.', 'The server name is used as the hostname. Use up to %d letters (a to z), digits and hyphens, starting and ending with a letter or digit.', self::MAX, 'beltoft-services' ), self::MAX );
 	}
 
 	// -- Display ------------------------------------------------------------------------------

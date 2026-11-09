@@ -212,7 +212,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<?php if ( 'ours' === $beltoft_services_dns['mode'] ) : ?>
 					<p><?php esc_html_e( 'The DNS of this domain is on our name servers, so we add these records for you. A record marked Conflict was not added because something else is already there. Change or remove that record, then check again.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
-					<p><?php echo esc_html( sprintf( /* translators: %d: days */ __( 'The DNS of this domain is managed somewhere else. Add these records there. We look for them every ten minutes for %d days.', 'beltoft-services' ), (int) $beltoft_services_dns['days'] ) ); ?></p>
+					<p><?php echo esc_html( sprintf( /* translators: %d: days */ _n( 'The DNS of this domain is managed somewhere else. Add these records there. We look for them every ten minutes for %d day.', 'The DNS of this domain is managed somewhere else. Add these records there. We look for them every ten minutes for %d days.', (int) $beltoft_services_dns['days'], 'beltoft-services' ), (int) $beltoft_services_dns['days'] ) ); ?></p>
 				<?php endif; ?>
 				<?php if ( 'timeout' === $beltoft_services_dns['status'] ) : ?>
 					<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'We stopped looking for the records. Add them, then check again.', 'beltoft-services' ); ?></p>

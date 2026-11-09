@@ -152,6 +152,18 @@ final class Renewal {
 	}
 
 	/**
+	 * A billed quantity for the customer: up to four decimals, no trailing zeros, in the site's number format.
+	 *
+	 * @param float $quantity Quantity.
+	 */
+	private static function quantity_text( float $quantity ): string {
+		$plain    = rtrim( rtrim( number_format( $quantity, 4, '.', '' ), '0' ), '.' );
+		$position = strpos( $plain, '.' );
+
+		return number_format_i18n( $quantity, false === $position ? 0 : strlen( $plain ) - $position - 1 );
+	}
+
+	/**
 	 * What a usage fee line is about, in words for the customer: "Server web1", "Backups for web1".
 	 *
 	 * @param string $item  Item.
@@ -212,7 +224,7 @@ final class Renewal {
 		foreach ( $statement['lines'] as $line ) {
 			$fee = new \WC_Order_Item_Fee();
 			$per = 'hour' === $line['unit'] ? __( 'hour', 'beltoft-services' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), $line['unit'] );
-			$qty = 'hour' === $line['unit'] ? '' : sprintf( ' (%s %s)', rtrim( rtrim( number_format( $line['quantity'], 4, '.', '' ), '0' ), '.' ), $line['unit'] );
+			$qty = 'hour' === $line['unit'] ? '' : sprintf( ' (%s %s)', self::quantity_text( (float) $line['quantity'] ), $line['unit'] );
 			$subject = self::line_subject( (string) $line['item'], self::label( $line['resource_id'] ) );
 			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
 			$rate    = Rates::money( (float) $line['rate'], 4, $currency );

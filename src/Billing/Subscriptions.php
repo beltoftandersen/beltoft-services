@@ -201,7 +201,7 @@ final class Subscriptions {
 		if ( in_array( 'vm', $kinds, true ) || in_array( 'db', $kinds, true ) ) {
 			$text .= ' ' . ( $days > 0 && 'on' === Settings::get( 'deletion_mode' )
 				/* translators: %d: number of days. */
-				? sprintf( __( 'When it has ended, the server or database stops, and its data is deleted %d days later. It cannot be brought back after that.', 'beltoft-services' ), $days )
+				? sprintf( _n( 'When it has ended, the server or database stops, and its data is deleted %d day later. It cannot be brought back after that.', 'When it has ended, the server or database stops, and its data is deleted %d days later. It cannot be brought back after that.', $days, 'beltoft-services' ), $days )
 				: __( 'When it has ended, the server or database stops. Its data is not kept for you after it is removed.', 'beltoft-services' ) );
 		}
 

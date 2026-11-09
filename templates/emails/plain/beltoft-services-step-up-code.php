@@ -12,7 +12,7 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 echo wp_strip_all_tags( sprintf( __( 'Your code for %s is:', 'beltoft-services' ), $purpose_text ) ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 echo wp_strip_all_tags( $code ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 /* translators: %d: minutes the code works. */
-echo wp_strip_all_tags( sprintf( __( 'It works once and expires in %d minutes.', 'beltoft-services' ), (int) $minutes ) ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+echo wp_strip_all_tags( sprintf( _n( 'It works once and expires in %d minute.', 'It works once and expires in %d minutes.', (int) $minutes, 'beltoft-services' ), (int) $minutes ) ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 /* translators: %s: name of the site. */
 echo wp_strip_all_tags( sprintf( __( 'Nobody from %s will ever ask you for this code. If you did not ask for it, ignore this email.', 'beltoft-services' ), $site_name ) ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 if ( $additional_content ) {

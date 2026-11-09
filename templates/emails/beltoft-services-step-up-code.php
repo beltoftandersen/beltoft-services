@@ -17,7 +17,7 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 <p><?php echo esc_html( sprintf( __( 'Your code for %s is:', 'beltoft-services' ), $purpose_text ) ); ?></p>
 <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;"><?php echo esc_html( $code ); ?></p>
 <?php /* translators: %d: minutes the code works. */ ?>
-<p><?php echo esc_html( sprintf( __( 'It works once and expires in %d minutes.', 'beltoft-services' ), (int) $minutes ) ); ?></p>
+<p><?php echo esc_html( sprintf( _n( 'It works once and expires in %d minute.', 'It works once and expires in %d minutes.', (int) $minutes, 'beltoft-services' ), (int) $minutes ) ); ?></p>
 <?php /* translators: %s: name of the site. */ ?>
 <p><?php echo esc_html( sprintf( __( 'Nobody from %s will ever ask you for this code. If you did not ask for it, ignore this email.', 'beltoft-services' ), $site_name ) ); ?></p>
 <?php

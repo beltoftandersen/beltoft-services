@@ -249,7 +249,7 @@ final class DbAccess {
 
 			if ( count( $entries ) >= self::MAX_ENTRIES ) {
 				/* translators: %d: the most entries, 20 */
-				return new \WP_Error( 'beltoft_services_cidr_full', sprintf( __( 'The list holds at most %d addresses. Remove one first, or use a range.', 'beltoft-services' ), self::MAX_ENTRIES ) );
+				return new \WP_Error( 'beltoft_services_cidr_full', sprintf( _n( 'The list holds at most %d address. Remove one first, or use a range.', 'The list holds at most %d addresses. Remove one first, or use a range.', self::MAX_ENTRIES, 'beltoft-services' ), self::MAX_ENTRIES ) );
 			}
 
 			$entries[] = array( 'cidr' => $cidr, 'label' => self::clean_label( is_string( $body['label'] ?? null ) ? $body['label'] : '' ), 'added' => time() );

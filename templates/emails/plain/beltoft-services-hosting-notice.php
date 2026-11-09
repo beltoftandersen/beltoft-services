@@ -51,12 +51,12 @@ if ( 'storage_warning' === $beltoft_services_k ) {
 	/* translators: 1: website, 2: PHP version, 3: date. */
 	echo wp_strip_all_tags( sprintf( __( 'The website %1$s runs on PHP %2$s, which gets no more security updates after %3$s.', 'beltoft-services' ), $beltoft_services_n['site'], $beltoft_services_n['php'], $beltoft_services_n['php_end'] ) ) . "\n\n";
 	/* translators: 1: PHP version, 2: days. */
-	echo wp_strip_all_tags( sprintf( __( 'Please change it to PHP %1$s in My Account within %2$d days. On that date we move it ourselves, after a safety copy, and you can go back for 7 days.', 'beltoft-services' ), $beltoft_services_n['php_default'], (int) $beltoft_services_n['days'] ) ) . "\n\n";
+	echo wp_strip_all_tags( sprintf( _n( 'Please change it to PHP %1$s in My Account within %2$d day. On that date we move it ourselves, after a safety copy, and you can go back for 7 days.', 'Please change it to PHP %1$s in My Account within %2$d days. On that date we move it ourselves, after a safety copy, and you can go back for 7 days.', (int) $beltoft_services_n['days'], 'beltoft-services' ), $beltoft_services_n['php_default'], (int) $beltoft_services_n['days'] ) ) . "\n\n";
 } elseif ( 'php_switched' === $beltoft_services_k ) {
 	/* translators: 1: website, 2: old PHP version, 3: new PHP version. */
 	echo wp_strip_all_tags( sprintf( __( 'PHP %2$s lost security support, so the website %1$s now runs on PHP %3$s.', 'beltoft-services' ), $beltoft_services_n['site'], $beltoft_services_n['php'], $beltoft_services_n['php_default'] ) ) . "\n\n";
 	/* translators: %d: days. */
-	echo wp_strip_all_tags( sprintf( __( 'If something does not work, you can go back to the old version in My Account for %d days.', 'beltoft-services' ), (int) $beltoft_services_n['days'] ) ) . "\n\n";
+	echo wp_strip_all_tags( sprintf( _n( 'If something does not work, you can go back to the old version in My Account for %d day.', 'If something does not work, you can go back to the old version in My Account for %d days.', (int) $beltoft_services_n['days'], 'beltoft-services' ), (int) $beltoft_services_n['days'] ) ) . "\n\n";
 }
 
 echo __( 'Open your hosting in My Account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";

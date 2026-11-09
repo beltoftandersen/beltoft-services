@@ -46,10 +46,10 @@ if ( '' !== $customer_name ) {
 <p><?php esc_html_e( 'Your hosting storage is back within your plan, and your websites can save new content again.', 'beltoft-services' ); ?></p>
 <?php elseif ( 'php_ending' === $beltoft_services_k ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: 1: website, 2: PHP version, 3: date. */ __( 'The website %1$s runs on PHP %2$s, which gets no more security updates after %3$s.', 'beltoft-services' ), $beltoft_services_n['site'], $beltoft_services_n['php'], $beltoft_services_n['php_end'] ) ); ?></p>
-<p><?php echo esc_html( sprintf( /* translators: 1: PHP version, 2: days. */ __( 'Please change it to PHP %1$s in My Account within %2$d days. On that date we move it ourselves, after a safety copy, and you can go back for 7 days.', 'beltoft-services' ), $beltoft_services_n['php_default'], (int) $beltoft_services_n['days'] ) ); ?></p>
+<p><?php echo esc_html( sprintf( /* translators: 1: PHP version, 2: days. */ _n( 'Please change it to PHP %1$s in My Account within %2$d day. On that date we move it ourselves, after a safety copy, and you can go back for 7 days.', 'Please change it to PHP %1$s in My Account within %2$d days. On that date we move it ourselves, after a safety copy, and you can go back for 7 days.', (int) $beltoft_services_n['days'], 'beltoft-services' ), $beltoft_services_n['php_default'], (int) $beltoft_services_n['days'] ) ); ?></p>
 <?php elseif ( 'php_switched' === $beltoft_services_k ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: 1: website, 2: old PHP version, 3: new PHP version. */ __( 'PHP %2$s lost security support, so the website %1$s now runs on PHP %3$s.', 'beltoft-services' ), $beltoft_services_n['site'], $beltoft_services_n['php'], $beltoft_services_n['php_default'] ) ); ?></p>
-<p><?php echo esc_html( sprintf( /* translators: %d: days. */ __( 'If something does not work, you can go back to the old version in My Account for %d days.', 'beltoft-services' ), (int) $beltoft_services_n['days'] ) ); ?></p>
+<p><?php echo esc_html( sprintf( /* translators: %d: days. */ _n( 'If something does not work, you can go back to the old version in My Account for %d day.', 'If something does not work, you can go back to the old version in My Account for %d days.', (int) $beltoft_services_n['days'], 'beltoft-services' ), (int) $beltoft_services_n['days'] ) ); ?></p>
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your hosting in My Account', 'beltoft-services' ); ?></a></p>
 <?php

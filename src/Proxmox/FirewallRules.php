@@ -280,7 +280,7 @@ final class FirewallRules {
 		}
 
 		if ( count( $input ) > self::max_rules( $r ) ) {
-			return new \WP_Error( 'beltoft_services_refused', sprintf( /* translators: %d: most rules */ __( 'A server can have up to %d rules.', 'beltoft-services' ), self::max_rules( $r ) ), array( 'status' => 422 ) );
+			return new \WP_Error( 'beltoft_services_refused', sprintf( /* translators: %d: most rules */ _n( 'A server can have up to %d rule.', 'A server can have up to %d rules.', self::max_rules( $r ), 'beltoft-services' ), self::max_rules( $r ) ), array( 'status' => 422 ) );
 		}
 
 		$before = array();
@@ -323,7 +323,7 @@ final class FirewallRules {
 			$sources = is_string( $sources ) ? preg_split( '/[\s,]+/', trim( $sources ), -1, PREG_SPLIT_NO_EMPTY ) : $sources;
 
 			if ( ! is_array( $sources ) || count( $sources ) > Firewall::MAX_SOURCES ) {
-				return self::rule_error( sprintf( /* translators: %d: most addresses */ __( 'Up to %d addresses can be named in one rule.', 'beltoft-services' ), Firewall::MAX_SOURCES ), $i );
+				return self::rule_error( sprintf( /* translators: %d: most addresses */ _n( 'Up to %d address can be named in one rule.', 'Up to %d addresses can be named in one rule.', Firewall::MAX_SOURCES, 'beltoft-services' ), Firewall::MAX_SOURCES ), $i );
 			}
 
 			$clean = array();
