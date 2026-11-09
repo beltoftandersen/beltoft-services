@@ -188,6 +188,37 @@ class DnsTest extends HostingCase {
 		$this->assertContains( 'w' . $r->id() . '.preview.example.test', $hosts );
 	}
 
+	public function test_the_site_policy_touches_only_the_address_sets_at_the_name(): void {
+		list( $r, $user, $node ) = $this->account();
+		$this->domain( $user, 'only.example' );
+		$this->assertTrue( DnsRecords::replace( 'only.example', array(
+			array( 'name' => '@', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'keep me' ),
+			array( 'name' => 'www', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'also kept' ),
+			array( 'name' => 'other', 'type' => 'A', 'ttl' => 3600, 'value' => '203.0.113.5' ),
+		) ) );
+		$calls = count( $this->dns->calls() );
+
+		$this->assertTrue( SiteDns::publish_ours( $user, 'www.only.example', $node ) );
+
+		$writes = array_values( array_filter( array_slice( $this->dns->calls(), $calls ), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+		$this->assertCount( 1, $writes );
+		$keys = array_map( static fn( $s ) => $s['name'] . '|' . $s['type'], $writes[0][2] );
+		sort( $keys );
+		$this->assertSame( array( 'www.only.example.|A', 'www.only.example.|AAAA' ), $keys );
+		$this->assertSame( array( 'also kept' ), array_map( static fn( $c ) => trim( $c, '"' ), $this->contents( 'only.example', 'www.only.example', 'TXT' ) ) );
+		$this->assertSame( array( '203.0.113.5' ), $this->contents( 'only.example', 'other.only.example', 'A' ) );
+
+		$calls = count( $this->dns->calls() );
+		$this->assertTrue( SiteDns::unpublish( 'only.example', 'www.only.example', $node ) );
+		$writes = array_values( array_filter( array_slice( $this->dns->calls(), $calls ), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+		$this->assertCount( 1, $writes );
+		$keys = array_map( static fn( $s ) => $s['name'] . '|' . $s['type'] . '|' . $s['changetype'], $writes[0][2] );
+		sort( $keys );
+		$this->assertSame( array( 'www.only.example.|AAAA|DELETE', 'www.only.example.|A|DELETE' ), $keys );
+		$this->assertNotSame( array(), $this->contents( 'only.example', 'www.only.example', 'TXT' ) );
+		$this->assertNotSame( array(), $this->contents( 'only.example', 'only.example', 'TXT' ) );
+	}
+
 	public function test_our_zone_refusals(): void {
 		list( $r, $user, $node ) = $this->account();
 		$slug  = 'w' . $r->id();
