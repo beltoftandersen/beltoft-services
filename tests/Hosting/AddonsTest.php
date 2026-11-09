@@ -599,4 +599,33 @@ class AddonsTest extends HostingCase {
 		$renewal->payment_complete();
 		$this->assertCount( $before, $mails, 'A renewal is not a stray order.' );
 	}
+
+	public function test_a_removed_domain_that_is_added_again_stays_at_the_renewal(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$s = 'w' . $r->id();
+		$a->buy_addon( 'domain', 'www.other.example', 100 );
+		$this->assertIsArray( $a->add_domain( $s, 'www.other.example' ) );
+		$this->assertTrue( $a->remove_domain( 'www.other.example' )['at_renewal'] );
+
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$this->assertMatchesRegularExpression( '/www\.other\.example[^,<]*\(ends at the next renewal\)/', (string) ob_get_clean() );
+
+		// Added again before the renewal: the line bills again and the domain stays.
+		$this->assertIsArray( $a->add_domain( $s, 'shop.other.example' ) );
+		foreach ( Addons::lines( $r, Addons::KIND_DOMAIN, 'other.example' ) as $item ) {
+			$this->assertSame( '', (string) $item->get_meta( Addons::I_ENDING ) );
+		}
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+		$this->assertStringNotContainsString( 'ends at the next renewal)', (string) ob_get_clean() );
+
+		wcs_create_renewal_order( $this->sub( $r ) );
+		$this->assertNotNull( SiteDomains::find( 'www.other.example' ) );
+		$this->assertNotNull( SiteDomains::find( 'shop.other.example' ) );
+		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ) );
+	}
 }

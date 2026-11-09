@@ -299,6 +299,52 @@ final class Addons {
 	}
 
 	/**
+	 * Registrable domains whose add-on line ends at the next renewal.
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<int, string>
+	 */
+	public static function ending_domains( Resource $r ): array {
+		$out = array();
+
+		foreach ( self::lines( $r, self::KIND_DOMAIN ) as $item ) {
+			if ( 'yes' === (string) $item->get_meta( self::I_ENDING ) ) {
+				$out[] = (string) $item->get_meta( self::I_TARGET );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Takes back the ending mark of a line (the customer wants the domain again before the renewal): it bills again.
+	 *
+	 * @param Resource $r      Hosting resource.
+	 * @param string   $kind   Kind.
+	 * @param string   $target Target.
+	 * @return bool Whether a line was kept.
+	 */
+	public static function keep( Resource $r, string $kind, string $target ): bool {
+		$kept = false;
+
+		foreach ( self::lines( $r, $kind, $target ) as $item ) {
+			if ( 'yes' === (string) $item->get_meta( self::I_ENDING ) ) {
+				$item->delete_meta_data( self::I_ENDING );
+				$item->save();
+				$kept = true;
+			}
+		}
+
+		$sub = $kept ? self::subscription( $r ) : null;
+
+		if ( $sub ) {
+			$sub->add_order_note( sprintf( 'Add-on %1$s (%2$s) was wanted again and stays at the next renewal.', $kind, $target ) );
+		}
+
+		return $kept;
+	}
+
+	/**
 	 * Packs of each Email lite mailbox, lines that are ending included (they still hold the storage).
 	 *
 	 * @param Resource $r Hosting resource.

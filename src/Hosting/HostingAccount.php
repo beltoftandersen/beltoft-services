@@ -210,11 +210,15 @@ final class HostingAccount {
 
 		echo '<table class="beltoft-hosting-sites"><thead><tr><th>' . esc_html__( 'Website', 'beltoft-services' ) . '</th><th>' . esc_html__( 'PHP', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Addresses', 'beltoft-services' ) . '</th>' . ( $ready ? '<th><span class="screen-reader-text">' . esc_html__( 'Actions', 'beltoft-services' ) . '</span></th>' : '' ) . '</tr></thead><tbody>';
 
+		$ending = Addons::ending_domains( $r );
+
 		foreach ( $sites as $site ) {
 			$names = array();
 
 			foreach ( $site['domains'] as $d ) {
-				$names[] = \BeltoftServices\Domains\HostName::display( $d['host'] ) . ( 'active' === $d['state'] ? '' : ' (' . ( 'waiting' === $d['state'] ? __( 'waiting for DNS', 'beltoft-services' ) : __( 'pending', 'beltoft-services' ) ) . ')' );
+				$names[] = \BeltoftServices\Domains\HostName::display( $d['host'] )
+					. ( 'active' === $d['state'] ? '' : ' (' . ( 'waiting' === $d['state'] ? __( 'waiting for DNS', 'beltoft-services' ) : __( 'pending', 'beltoft-services' ) ) . ')' )
+					. ( 'preview' !== $d['kind'] && in_array( Addons::registrable( $d['host'] ), $ending, true ) ? ' (' . __( 'ends at the next renewal', 'beltoft-services' ) . ')' : '' );
 			}
 
 			printf(

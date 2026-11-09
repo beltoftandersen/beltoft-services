@@ -404,7 +404,7 @@ final class HostingActions {
 				return $this->error( 'failed', __( 'Your account has its domain. Another domain cannot be added online right now. Contact support.', 'beltoft-services' ) );
 			}
 
-			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
+			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ), 'host' => strtolower( rtrim( trim( $host ), '.' ) ), 'slug' => $slug ) );
 		}
 
 		$added = SiteDns::add_domain( $this->r, $slug, $host, $this->node );
@@ -415,6 +415,12 @@ final class HostingActions {
 
 		if ( is_string( $added ) ) {
 			return $this->error( 'invalid', $this->customer_text( $added ) );
+		}
+
+		// The customer wants a domain back that was to leave at the renewal (the name stayed, so a new name of it needs no
+		// add-on): its line bills again.
+		if ( SiteDomains::valid_host( strtolower( rtrim( trim( $host ), '.' ) ) ) ) {
+			Addons::keep( $this->r, Addons::KIND_DOMAIN, Addons::registrable( $host ) );
 		}
 
 		$edge = $this->edge();
