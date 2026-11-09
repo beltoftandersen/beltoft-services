@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\PublicSuffix;
+use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 
@@ -46,6 +47,9 @@ final class Addons {
 	public const STALE_AFTER = 2 * DAY_IN_SECONDS;
 	public const SWEEP_HOOK  = 'beltoft_services_addon_sweep';
 
+	/** One later attempt at an order whose activation lock was busy (the holder may stop half way). */
+	public const ACTIVATE_RETRY_HOOK = 'beltoft_services_addon_activate_retry';
+
 	/** Storage of one pack, MB, and the most packs one mailbox can have. */
 	public const PACK_MB   = 5120;
 	public const MAX_PACKS = 4;
@@ -70,6 +74,7 @@ final class Addons {
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'reverse' ), 20 );
 		add_action( 'woocommerce_subscriptions_switch_completed', array( __CLASS__, 'after_switch' ), 20 );
 		add_action( self::SWEEP_HOOK, array( __CLASS__, 'cancel_stale' ) );
+		add_action( self::ACTIVATE_RETRY_HOOK, array( __CLASS__, 'activate' ) );
 
 		if ( function_exists( 'wp_next_scheduled' ) && ! wp_next_scheduled( self::SWEEP_HOOK ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::SWEEP_HOOK );
@@ -596,7 +601,7 @@ final class Addons {
 
 		try {
 			// One process at a time for an order: the payment webhook and the customer's return page can fire together.
-			Locks::with(
+			list( $taken ) = Locks::with(
 				Locks::name( 'addon_order', $id ),
 				self::lock_wait(),
 				static function () use ( $id ): void {
@@ -617,6 +622,11 @@ final class Addons {
 					self::add_line( $order, $meta );
 				}
 			);
+
+			// Another process holds the order. If it stops half way nothing would call this again, so look once more later.
+			if ( ! $taken && function_exists( 'as_schedule_single_action' ) && ! Jobs::pending_action( self::ACTIVATE_RETRY_HOOK, array( $id ) ) ) {
+				as_schedule_single_action( time() + 120, self::ACTIVATE_RETRY_HOOK, array( $id ), Jobs::GROUP );
+			}
 		} finally {
 			unset( $busy[ $id ] );
 		}

@@ -789,9 +789,10 @@ class AddonsTest extends HostingCase {
 
 		wc_get_order( $bought['order'] )->payment_complete();
 		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ), 'The other process owns this order, so no line is added here.' );
+		$this->assertTrue( \BeltoftServices\Jobs::pending_action( Addons::ACTIVATE_RETRY_HOOK, array( (int) $bought['order'] ) ), 'One retry is queued in case the other process stops half way.' );
 
 		$other->close();
-		Addons::activate( $bought['order'] );
+		do_action( Addons::ACTIVATE_RETRY_HOOK, (int) $bought['order'] );
 		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ), 'Free again: it is added once.' );
 		remove_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
 	}
