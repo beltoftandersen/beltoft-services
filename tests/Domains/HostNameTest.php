@@ -19,6 +19,39 @@ final class HostNameTest extends TestCase {
 	private const UNICODE = "\u{e6}blegr\u{f8}d-\u{f8}ster\u{e5}.dk";
 	private const ASCII   = 'xn--blegrd-ster-78ab1xc.dk';
 
+	public function test_label_table(): void {
+		$this->assertTrue( HostName::label( 'a' ) );
+		$this->assertTrue( HostName::label( str_repeat( 'a', 63 ) ) );
+		foreach ( array( '', str_repeat( 'a', 64 ), '-a', 'a-', 'A' ) as $bad ) {
+			$this->assertFalse( HostName::label( $bad ), $bad );
+		}
+	}
+
+	/**
+	 * @dataProvider host_rows
+	 */
+	public function test_is_host_table( string $host, int $max, bool $letters_tld, bool $expected ): void {
+		$this->assertSame( $expected, HostName::is_host( $host, $max, $letters_tld ), $host );
+	}
+
+	public static function host_rows(): array {
+		$long = implode( '.', array_fill( 0, 3, str_repeat( 'a', 63 ) ) ) . '.' . str_repeat( 'b', 16 ) . '.com';
+		return array(
+			array( 'example.com', 253, false, true ),
+			array( 'example', 253, false, false ),
+			array( 'foo.123', 253, false, true ),
+			array( 'foo.123', 253, true, false ),
+			array( 'Example.com', 253, false, false ),
+			array( 'example.com.', 253, false, false ),
+			array( str_repeat( 'a', 63 ) . '.com', 253, false, true ),
+			array( str_repeat( 'a', 64 ) . '.com', 253, false, false ),
+			array( $long, 200, false, false ),
+			array( $long, 0, false, true ),
+			array( 'a.b', 253, true, false ),
+			array( 'ns1.example.net', 253, true, true ),
+		);
+	}
+
 	public function test_unicode_input_becomes_punycode(): void {
 		$this->assertSame( self::ASCII, HostName::normalise( self::UNICODE ) );
 		$this->assertSame( self::ASCII, HostName::normalise( ' ' . mb_strtoupper( self::UNICODE ) . '. ' ) );

@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Domains\HostName;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -25,7 +27,7 @@ final class SiteDomains {
 	 * @param string $host Host name.
 	 */
 	public static function valid_host( string $host ): bool {
-		return 1 === preg_match( '/^(?=.{3,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/D', $host );
+		return HostName::is_host( $host, 253 );
 	}
 
 	/**

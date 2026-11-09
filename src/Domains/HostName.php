@@ -18,6 +18,39 @@ final class HostName {
 	private const REFUSED_TLDS = array( 'localhost', 'local', 'internal', 'invalid', 'onion', 'lan', 'home' );
 
 	/**
+	 * One DNS label: lowercase letters, digits and inner hyphens, 1 to 63 characters.
+	 *
+	 * @param string $label Label, already lowercased.
+	 */
+	public static function label( string $label ): bool {
+		return 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label );
+	}
+
+	/**
+	 * Whether a string is a host name of at least two valid labels. No trimming and no lowercasing: callers do both.
+	 *
+	 * @param string $host        Host name.
+	 * @param int    $max_length  Longest allowed total length, 0 for no limit.
+	 * @param bool   $letters_tld Require the last label to be 2 to 63 letters.
+	 */
+	public static function is_host( string $host, int $max_length = 253, bool $letters_tld = false ): bool {
+		if ( $max_length > 0 && strlen( $host ) > $max_length ) {
+			return false;
+		}
+		$labels = explode( '.', $host );
+		if ( count( $labels ) < 2 ) {
+			return false;
+		}
+		foreach ( $labels as $label ) {
+			if ( ! self::label( $label ) ) {
+				return false;
+			}
+		}
+
+		return ! $letters_tld || 1 === preg_match( '/^[a-z]{2,63}$/D', end( $labels ) );
+	}
+
+	/**
 	 * A host name as it would be typed into DNS: lowercase ASCII letters, digits and hyphens in labels, at least two labels.
 	 *
 	 * @param mixed $raw Typed value.
@@ -50,7 +83,7 @@ final class HostName {
 			return null;
 		}
 		foreach ( $labels as $label ) {
-			if ( 1 !== preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) {
+			if ( ! self::label( $label ) ) {
 				return null;
 			}
 		}

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -155,7 +156,7 @@ final class HostingSettings {
 		if ( array_key_exists( 'hosting_preview_zone', $value ) ) {
 			$zone = strtolower( trim( (string) $value['hosting_preview_zone'] ) );
 
-			$value['hosting_preview_zone'] = 1 === preg_match( '/^(?=.{1,200}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/D', $zone ) ? $zone : '';
+			$value['hosting_preview_zone'] = HostName::is_host( $zone, 200 ) ? $zone : '';
 		}
 
 		if ( array_key_exists( 'hosting_php_default', $value ) && 1 !== preg_match( '/^\d\.\d{1,2}$/D', (string) $value['hosting_php_default'] ) ) {
