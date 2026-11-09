@@ -42,6 +42,8 @@ final class MailProductsTest extends MailTestCase {
 
 	public function test_variation_descriptions_read_in_plain_words(): void {
 		$this->assertSame( '5 mailboxes of 10 GB, 50 aliases, 3 domains', MailProductsCommand::plan_description( array( 'mailboxes' => 5, 'quota_mb' => 10240, 'aliases' => 50, 'domains' => 3 ) ) );
+		$this->assertSame( '2 mailboxes of 512 MB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 2, 'quota_mb' => 512, 'aliases' => 1, 'domains' => 1 ) ) );
+		$this->assertSame( '1 mailbox of 1.5 GB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 1, 'quota_mb' => 1536, 'aliases' => 1, 'domains' => 1 ) ) );
 		$this->assertSame( '1 mailbox of 5 GB, 1 alias, 1 domain', MailProductsCommand::plan_description( array( 'mailboxes' => 1, 'quota_mb' => 5120, 'aliases' => 1, 'domains' => 1 ) ) );
 	}
 

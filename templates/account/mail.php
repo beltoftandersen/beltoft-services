@@ -276,7 +276,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						</tbody>
 					</table>
 				<?php endif; ?>
-				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use, 2: aliases the plan allows */ __( '%1$d of %2$d aliases used.', 'beltoft-services' ), (int) $view['counts']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
+				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use, 2: aliases the plan allows */ _n( '%1$d of %2$d alias used.', '%1$d of %2$d aliases used.', (int) $beltoft_services_limits['aliases'], 'beltoft-services' ), (int) $view['counts']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
 			</div>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New alias', 'beltoft-services' ); ?></h4>

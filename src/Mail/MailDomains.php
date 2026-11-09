@@ -362,7 +362,7 @@ final class MailDomains {
 			}
 
 			if ( $boxes > 0 || count( $aliases ) > 0 ) {
-				return new \WP_Error( 'has_mailboxes', __( 'Delete the mailboxes of this domain first.', 'beltoft-services' ) );
+				return new \WP_Error( 'has_mailboxes', __( 'Delete the mailboxes on this domain first.', 'beltoft-services' ) );
 			}
 		}
 

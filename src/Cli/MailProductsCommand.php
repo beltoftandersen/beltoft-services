@@ -54,13 +54,16 @@ final class MailProductsCommand {
 		$mailboxes = (int) $plan['mailboxes'];
 		$aliases   = (int) $plan['aliases'];
 		$domains   = (int) $plan['domains'];
-		$gb        = (int) $plan['quota_mb'] / 1024;
+		$mb        = (int) $plan['quota_mb'];
+		$size      = $mb >= 1024
+			? sprintf( /* translators: %s: size in GB, such as 5 or 2.5 */ __( '%s GB', 'beltoft-services' ), (string) round( $mb / 1024, 1 ) )
+			: sprintf( /* translators: %d: size in MB */ __( '%d MB', 'beltoft-services' ), $mb );
 
 		return sprintf(
-			/* translators: 1: mailboxes, 2: size of each in GB, 3: aliases, 4: domains. */
-			__( '%1$s of %2$d GB, %3$s, %4$s', 'beltoft-services' ),
+			/* translators: 1: mailboxes, 2: size of each, such as 10 GB or 512 MB, 3: aliases, 4: domains. */
+			__( '%1$s of %2$s, %3$s, %4$s', 'beltoft-services' ),
 			sprintf( /* translators: %d: number of mailboxes. */ _n( '%d mailbox', '%d mailboxes', $mailboxes, 'beltoft-services' ), $mailboxes ),
-			$gb,
+			$size,
 			sprintf( /* translators: %d: number of aliases. */ _n( '%d alias', '%d aliases', $aliases, 'beltoft-services' ), $aliases ),
 			sprintf( /* translators: %d: number of domains. */ _n( '%d domain', '%d domains', $domains, 'beltoft-services' ), $domains )
 		);

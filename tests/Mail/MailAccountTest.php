@@ -588,4 +588,10 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertSame( $this->area()->url_add(), $b[0]['url'] );
 		$this->assertNotSame( '', $b[0]['url'] );
 	}
+
+	public function test_a_plan_of_one_alias_says_alias_and_the_copy_says_on_this_domain(): void {
+		$r = $this->ready_mail( 'oa.example', array( 'aliases' => 1 ), $this->user );
+		$this->assertStringContainsString( '0 of 1 alias used.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
+		$this->assertStringNotContainsString( 'of this domain first', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Mail/MailDomains.php' ) );
+	}
 }
