@@ -204,7 +204,7 @@ final class Actions {
 	 * @return mixed
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
-		if ( is_array( $actions ) && $resource instanceof Resource && SshKeyField::DRIVER === $resource->get( 'driver' ) ) {
+		if ( is_array( $actions ) && $resource instanceof Resource && ProxmoxDriver::ID === $resource->get( 'driver' ) ) {
 			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ] );
 
 			if ( 'page' === $context ) {
@@ -431,7 +431,7 @@ final class Actions {
 	 * @return mixed
 	 */
 	public static function refusal( $refusal, $resource, $action, $args ) {
-		if ( null !== $refusal || ! $resource instanceof Resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || ! is_string( $action ) || ! is_array( $args ) ) {
+		if ( null !== $refusal || ! $resource instanceof Resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || ! is_string( $action ) || ! is_array( $args ) ) {
 			return $refusal;
 		}
 

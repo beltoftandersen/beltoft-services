@@ -10,6 +10,7 @@ namespace BeltoftServices;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Http\Connections;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -425,7 +426,7 @@ final class Product {
 				'value'       => $driver_id,
 			)
 		);
-		if ( 'proxmox' === $driver_id ) {
+		if ( ProxmoxDriver::ID === $driver_id ) {
 			woocommerce_wp_checkbox(
 				array(
 					'id'          => self::META_PICKER,

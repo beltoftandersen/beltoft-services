@@ -83,7 +83,7 @@ final class DiskMeta {
 
 	private static function is_server( array $license ): bool {
 		$driver = Product::driver_for( (int) ( $license['product_id'] ?? 0 ) );
-		return $driver && SshKeyField::DRIVER === $driver->id();
+		return $driver && ProxmoxDriver::ID === $driver->id();
 	}
 
 	/** Live disk resources linked to one server license, including paused disks awaiting retention. */
@@ -214,7 +214,7 @@ final class DiskMeta {
 			DiskCapacity::release( $resource );
 			return;
 		}
-		if ( 'deleted' !== $new || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+		if ( 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 			return;
 		}
 		foreach ( self::for_server( $resource ) as $disk ) {

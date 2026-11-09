@@ -69,7 +69,7 @@ final class LinkVm {
 
 		$driver = Product::driver_for( (int) $license['product_id'] );
 
-		if ( ! $driver || 'proxmox' !== $driver->id() ) {
+		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return self::error( "The license's product is not a Proxmox service." );
 		}
 

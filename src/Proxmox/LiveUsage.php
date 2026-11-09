@@ -109,7 +109,7 @@ final class LiveUsage {
 
 			$resource = Resource::for_license( (int) $license['id'] );
 
-			if ( ! $resource || 'proxmox' !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
 				continue;
 			}
 

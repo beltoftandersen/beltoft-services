@@ -11,7 +11,7 @@ use BeltoftServices\Proxmox\AppProgress;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -93,7 +93,7 @@ final class Progress {
 	 */
 	private static function build_steps(): array {
 		return array(
-			SshKeyField::DRIVER => array(
+			ProxmoxDriver::ID => array(
 				'ip'        => __( 'Reserve an IP address', 'beltoft-services' ),
 				'vmid'      => __( 'Prepare the server', 'beltoft-services' ),
 				'clone'     => __( 'Create the server', 'beltoft-services' ),
@@ -201,7 +201,7 @@ final class Progress {
 	 */
 	private static function title( string $kind, string $driver, ?array $marker = null ): string {
 		$disk   = DiskDriver::ID === $driver;
-		$server = SshKeyField::DRIVER === $driver;
+		$server = ProxmoxDriver::ID === $driver;
 
 		switch ( $kind ) {
 			case 'reinstall':
@@ -519,17 +519,17 @@ final class Progress {
 	private static function steps( Resource $r, string $kind, string $driver, string $phase ): array {
 		$done = array();
 
-		if ( 'reinstall' === $kind && SshKeyField::DRIVER === $driver ) {
+		if ( 'reinstall' === $kind && ProxmoxDriver::ID === $driver ) {
 			$labels = self::server_steps( 'reinstall' );
 			$done   = array_merge( array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) ), $r->get( 'wipe' ) ? array() : array( 'wipe' ) );
-		} elseif ( 'restore' === $kind && SshKeyField::DRIVER === $driver ) {
+		} elseif ( 'restore' === $kind && ProxmoxDriver::ID === $driver ) {
 			$labels = self::server_steps( 'restore' );
 			$state  = $r->get( 'restore' );
 			$phase  = is_array( $state ) ? (string) ( $state['phase'] ?? '' ) : '';
 			$order  = array( 'restored' => 1, 'planned' => 2 );
 			$count  = $order[ $phase ] ?? 0;
 			$done   = array_slice( array_keys( $labels ), 0, $count );
-		} elseif ( 'rollback' === $kind && SshKeyField::DRIVER === $driver ) {
+		} elseif ( 'rollback' === $kind && ProxmoxDriver::ID === $driver ) {
 			$labels = self::server_steps( 'rollback' );
 			$state  = $r->get( 'snapshot_rollback' );
 			// No marker: the rollback itself is over and only its plan change is left.
@@ -591,7 +591,7 @@ final class Progress {
 		}
 
 		// A server that will get an app lists the app's steps after its own, all still to do.
-		if ( in_array( $kind, array( 'build', 'reinstall' ), true ) && SshKeyField::DRIVER === $driver && AppProgress::planned( $r ) ) {
+		if ( in_array( $kind, array( 'build', 'reinstall' ), true ) && ProxmoxDriver::ID === $driver && AppProgress::planned( $r ) ) {
 			foreach ( AppProgress::steps( $r )['codes'] as $code ) {
 				$out[] = array(
 					'key'          => 'app_' . $code,

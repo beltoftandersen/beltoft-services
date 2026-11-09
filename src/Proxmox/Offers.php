@@ -43,7 +43,7 @@ final class Offers {
 	public static function is_offered( int $product_id ): bool {
 		$driver = Product::driver_for( $product_id );
 
-		if ( ! $driver || SshKeyField::DRIVER !== $driver->id() || 'publish' !== get_post_status( $product_id ) || 'no' === get_post_meta( $product_id, Product::META_PICKER, true ) ) {
+		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() || 'publish' !== get_post_status( $product_id ) || 'no' === get_post_meta( $product_id, Product::META_PICKER, true ) ) {
 			return false;
 		}
 
@@ -67,7 +67,7 @@ final class Offers {
 				'order'          => 'ASC',
 				'no_found_rows'  => true,
 				'meta_key'       => Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- the catalogue of servers is small and bounded.
-				'meta_value'     => SshKeyField::DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+				'meta_value'     => ProxmoxDriver::ID, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 			)
 		);
 		$ids = array_values( array_filter( array_map( 'intval', $ids ), array( __CLASS__, 'is_offered' ) ) );

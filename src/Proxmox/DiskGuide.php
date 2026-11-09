@@ -176,7 +176,7 @@ final class DiskGuide {
 		}
 
 		$license = $target->license();
-		$base    = $license && SshKeyField::DRIVER === (string) $target->get( 'driver' )
+		$base    = $license && ProxmoxDriver::ID === (string) $target->get( 'driver' )
 			? ServerLinks::url( $license, $tab )
 			: Endpoint::url_for_license( $license ? $license : $r->license() );
 

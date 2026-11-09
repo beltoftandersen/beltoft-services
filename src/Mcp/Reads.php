@@ -31,6 +31,7 @@ use BeltoftServices\Resource;
 use BeltoftServices\Usage\Estimate;
 use BeltoftServices\Usage\Rates;
 use BeltoftServices\Usage\Renewal;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -283,7 +284,7 @@ final class Reads {
 
 		$driver = (string) $r->get( 'driver' );
 
-		if ( 'proxmox' !== $driver && DbDriver::ID !== $driver ) {
+		if ( ProxmoxDriver::ID !== $driver && DbDriver::ID !== $driver ) {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This service has no snapshots or backups.', 'beltoft-services' ) );
 		}
 
@@ -297,7 +298,7 @@ final class Reads {
 			),
 		);
 
-		if ( 'proxmox' === $driver ) {
+		if ( ProxmoxDriver::ID === $driver ) {
 			$panel = Snapshots::panel( $r );
 
 			$out['snapshots'] = null === $panel ? null : array(
@@ -624,7 +625,7 @@ final class Reads {
 		);
 		$current  = wc_get_product( (int) ( $r->license()['variation_id'] ?? 0 ) );
 
-		if ( 'proxmox' === $driver ) {
+		if ( ProxmoxDriver::ID === $driver ) {
 			$out['snapshot_packs'] = array_values(
 				array_map(
 					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'slots' => SnapshotCart::slots_of( $v ), 'price' => Pricing::variation_price( $v ) ),
@@ -639,7 +640,7 @@ final class Reads {
 			);
 		}
 
-		if ( 'proxmox' === $driver || DbDriver::ID === $driver ) {
+		if ( ProxmoxDriver::ID === $driver || DbDriver::ID === $driver ) {
 			$with           = $current instanceof \WC_Product_Variation && ! Backups::enabled( $r ) ? Backups::sibling( $current, true ) : null;
 			$out['backups'] = Backups::enabled( $r ) ? array( 'enabled' => true ) : array( 'enabled' => false, 'adds' => $with ? Pricing::addon_between( $current, $with ) : null );
 		}

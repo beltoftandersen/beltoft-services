@@ -220,7 +220,7 @@ final class Flows {
 
 		$r = Resource::find( (int) $row['resource_id'] );
 
-		if ( ! $r || SshKeyField::DRIVER !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) ) {
+		if ( ! $r || ProxmoxDriver::ID !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) ) {
 			return null;
 		}
 

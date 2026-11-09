@@ -58,7 +58,7 @@ final class GuestDisk {
 	public static function read( Resource $r, bool $force = false ): ?array {
 		$disk = null;
 		$r->locked( static function () use ( $r, &$disk, $force ): bool {
-			if ( 'proxmox' !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || $r->get( 'task' ) ) {
+			if ( ProxmoxDriver::ID !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || $r->get( 'task' ) ) {
 				return false;
 			}
 

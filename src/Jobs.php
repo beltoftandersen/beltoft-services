@@ -212,7 +212,7 @@ final class Jobs {
 
 		$lock = Locks::name( 'resource', $activation_id );
 
-		if ( ! self::acquire( $lock ) ) {
+		if ( ! Locks::acquire( $lock, 0 ) ) {
 			self::enqueue( $activation_id, self::LOCKED_DELAY );
 			return;
 		}
@@ -229,7 +229,7 @@ final class Jobs {
 			}
 		} finally {
 			self::$run_started = $outer;
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 	}
 
@@ -458,7 +458,7 @@ final class Jobs {
 
 		$lock = Locks::name( 'resource', $activation_id );
 
-		if ( ! self::acquire( $lock ) ) {
+		if ( ! Locks::acquire( $lock, 0 ) ) {
 			self::queue_act( $activation_id, $action, $args, self::LOCKED_DELAY );
 			return;
 		}
@@ -504,7 +504,7 @@ final class Jobs {
 			self::acted( Resource::find( $activation_id ) ?? $resource, $action, $args, $result );
 		} finally {
 			self::$run_started = $outer;
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 	}
 
@@ -907,29 +907,5 @@ final class Jobs {
 				self::enqueue( $id );
 			}
 		}
-	}
-
-	/**
-	 * Takes the resource lock without waiting.
-	 *
-	 * @param string $name Lock name.
-	 */
-	private static function acquire( string $name ): bool {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, 0 )', $name ) );
-	}
-
-	/**
-	 * Releases the resource lock.
-	 *
-	 * @param string $name Lock name.
-	 */
-	private static function release( string $name ): void {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $name ) );
 	}
 }

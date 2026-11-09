@@ -154,7 +154,7 @@ final class Snapshots {
 	 * @param Resource $r Resource.
 	 */
 	public static function eligible( Resource $r ): bool {
-		if ( ! self::switched_on() || true === $r->get( 'linked' ) || SshKeyField::DRIVER !== $r->get( 'driver' ) || null === VmRecords::for_resource( $r->id() ) ) {
+		if ( ! self::switched_on() || true === $r->get( 'linked' ) || ProxmoxDriver::ID !== $r->get( 'driver' ) || null === VmRecords::for_resource( $r->id() ) ) {
 			return false;
 		}
 

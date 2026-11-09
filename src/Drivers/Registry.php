@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Drivers;
 
+use BeltoftServices\Proxmox\ProxmoxDriver;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -29,7 +31,7 @@ final class Registry {
 			'beltoft_services_drivers',
 			array(
 				'http'    => new \BeltoftServices\Http\HttpDriver(),
-				'proxmox' => new \BeltoftServices\Proxmox\ProxmoxDriver(),
+				ProxmoxDriver::ID => new \BeltoftServices\Proxmox\ProxmoxDriver(),
 				'proxmox-db' => new \BeltoftServices\Proxmox\DbDriver(),
 				'proxmox-disk' => new \BeltoftServices\Proxmox\DiskDriver(),
 				'proxmox-snapshots' => new \BeltoftServices\Proxmox\SnapshotDriver(),

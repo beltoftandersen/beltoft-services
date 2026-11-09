@@ -42,7 +42,7 @@ final class MetricsRoute {
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
 		}
-		if ( 'proxmox' !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) ) {
+		if ( ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) ) {
 			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 		}
 		$on = (bool) $request['on'];
@@ -61,7 +61,7 @@ final class MetricsRoute {
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
 		}
-		if ( 'proxmox' !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || null === VmRecords::for_resource( $resource->id() ) ) {
+		if ( ProxmoxDriver::ID !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || null === VmRecords::for_resource( $resource->id() ) ) {
 			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 		}
 		$range = (string) $request['range'];

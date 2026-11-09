@@ -18,6 +18,7 @@ use BeltoftServices\Proxmox\VmRecords;
 use BeltoftLicenses\Events;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,7 +52,7 @@ final class PowerJobs {
 	public static function after( $resource_id ): void {
 		$r = Resource::find( (int) $resource_id );
 
-		if ( ! $r || 'proxmox' !== $r->get( 'driver' ) && ! DbActions::is_db( $r ) ) {
+		if ( ! $r || ProxmoxDriver::ID !== $r->get( 'driver' ) && ! DbActions::is_db( $r ) ) {
 			return;
 		}
 

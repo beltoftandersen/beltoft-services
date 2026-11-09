@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftLicenses\Licenses;
 use BeltoftServices\Children;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
@@ -269,42 +268,19 @@ final class MailDomains {
 
 		$parent_license = $root->license();
 		$slug           = sanitize_title( (string) ( $parent_license['product_slug'] ?? 'mail' ) ) . '-domain';
-
-		// A license without a service product (its slug is not a registered service slug, on purpose): the lifecycle
-		// listeners leave it alone, the root decides.
-		$license = Licenses::create(
-			array(
-				'product_slug'    => $slug,
-				'email'           => (string) ( $parent_license['email'] ?? '' ),
-				'user_id'         => (int) ( $parent_license['user_id'] ?? 0 ),
-				'max_activations' => 1,
-				'source'          => 'child',
-			)
+		$child          = Children::spawn(
+			$root,
+			$slug,
+			Registry::get( MailDriver::ID ),
+			$limits,
+			array_merge( $meta, array( MailDomain::META_DOMAIN => $name ) ),
+			__( 'The domain could not be added.', 'beltoft-services' ),
+			__( 'The domain could not be linked to your plan.', 'beltoft-services' )
 		);
 
-		if ( ! is_array( $license ) ) {
-			return new \WP_Error( 'license', __( 'The domain could not be added.', 'beltoft-services' ) );
-		}
-
-		$child = Resource::create( $license, Registry::get( MailDriver::ID ), $limits, array_merge( $meta, array( MailDomain::META_DOMAIN => $name ) ) );
-
 		if ( is_wp_error( $child ) ) {
-			// No active license without a service.
-			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
-
 			return $child;
 		}
-
-		if ( ! Children::attach( $root, $child ) ) {
-			// No half-made child: the service never started, so it is closed and its license revoked, and a retry starts clean.
-			$child->set( array( 'state' => 'deleted', 'desired' => 'deleted' ) );
-			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
-
-			return new \WP_Error( 'link', __( 'The domain could not be linked to your plan.', 'beltoft-services' ) );
-		}
-
-		Jobs::enqueue( $child->id() );
-		$child = Resource::find( $child->id() ) ?? $child;
 
 		/**
 		 * Fires when a domain was added to a mail plan.

@@ -69,7 +69,7 @@ final class EmailDetails {
 		if ( DbDriver::ID === $r->get( 'driver' ) ) {
 			return self::database( $details, $r );
 		}
-		if ( SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+		if ( ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
 			return $details;
 		}
 

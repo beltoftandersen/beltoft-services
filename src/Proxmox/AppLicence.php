@@ -350,7 +350,7 @@ final class AppLicence {
 
 		$server = Resource::for_license( $id );
 
-		return $server && SshKeyField::DRIVER === $server->get( 'driver' ) ? $server : null;
+		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) ? $server : null;
 	}
 
 	/**
@@ -585,7 +585,7 @@ final class AppLicence {
 			$server = Licenses::find( (int) $link );
 			$driver = $server ? Product::driver_for( (int) ( $server['product_id'] ?? 0 ) ) : null;
 
-			if ( $server && (int) ( $server['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && $driver && SshKeyField::DRIVER === $driver->id() ) {
+			if ( $server && (int) ( $server['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && $driver && ProxmoxDriver::ID === $driver->id() ) {
 				$meta['server_license'] = (int) $link;
 			}
 		}
@@ -606,7 +606,7 @@ final class AppLicence {
 	public static function state_changed( $resource, $old, $new ): void {
 		unset( $old );
 
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 			return;
 		}
 
@@ -640,7 +640,7 @@ final class AppLicence {
 	public static function reinstalled( $r, $args = array() ): void {
 		unset( $args );
 
-		if ( ! $r instanceof Resource || SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+		if ( ! $r instanceof Resource || ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
 			return;
 		}
 

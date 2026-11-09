@@ -173,7 +173,7 @@ final class AppReinstallPaid {
 		$license = Licenses::find( $license_id );
 		$server  = $license ? Resource::for_license( $license_id ) : null;
 
-		if ( ! $server || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || SshKeyField::DRIVER !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
+		if ( ! $server || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || ProxmoxDriver::ID !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
 			return null;
 		}
 
@@ -211,7 +211,7 @@ final class AppReinstallPaid {
 	 * @return mixed A checkout URL, a WP_Error (a refusal), or the value unchanged.
 	 */
 	public static function redirect( $url, $resource, $action, $args ) {
-		if ( ! is_string( $url ) || '' !== $url || 'reinstall' !== $action || ! $resource instanceof Resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || ! is_array( $args ) ) {
+		if ( ! is_string( $url ) || '' !== $url || 'reinstall' !== $action || ! $resource instanceof Resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || ! is_array( $args ) ) {
 			return $url;
 		}
 

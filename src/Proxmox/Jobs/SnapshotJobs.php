@@ -12,7 +12,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -35,7 +35,7 @@ final class SnapshotJobs {
 			return;
 		}
 
-		$driver = Registry::get( SshKeyField::DRIVER );
+		$driver = Registry::get( ProxmoxDriver::ID );
 
 		if ( ! $driver ) {
 			return;
@@ -52,7 +52,7 @@ final class SnapshotJobs {
 		foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
 			$resource = Resource::find( $id );
 
-			if ( ! $resource || SshKeyField::DRIVER !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! Snapshots::tracked( $resource ) ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! Snapshots::tracked( $resource ) ) {
 				continue;
 			}
 

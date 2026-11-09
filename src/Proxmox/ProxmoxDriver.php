@@ -25,6 +25,11 @@ defined( 'ABSPATH' ) || exit;
 class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions {
 
 	/**
+	 * Driver id of the Proxmox driver.
+	 */
+	public const ID = 'proxmox';
+
+	/**
 	 * Days a VM product is kept after its license ends, unless the product says otherwise.
 	 */
 	public const DEFAULT_RETENTION_DAYS = 3;
@@ -33,7 +38,7 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return SshKeyField::DRIVER;
+		return self::ID;
 	}
 
 	/**
@@ -146,7 +151,7 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	public static function default_retention( $days, $product_id ) {
 		$driver = Product::driver_for( (int) $product_id );
 
-		return $driver && SshKeyField::DRIVER === $driver->id() ? self::DEFAULT_RETENTION_DAYS : $days;
+		return $driver && self::ID === $driver->id() ? self::DEFAULT_RETENTION_DAYS : $days;
 	}
 
 	/**

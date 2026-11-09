@@ -95,7 +95,7 @@ final class Resource {
 		 */
 		$timeout = max( 0, (int) apply_filters( 'beltoft_services_lock_timeout', 5 ) );
 
-		if ( ! self::acquire( $lock, $timeout ) ) {
+		if ( ! Locks::acquire( $lock, $timeout ) ) {
 			return new \WP_Error( 'locked', 'Another request is creating this resource' );
 		}
 
@@ -115,7 +115,7 @@ final class Resource {
 
 			$result = Licenses::add_resource( $license, $driver->kind(), $uuid, $meta );
 		} finally {
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 
 		if ( empty( $result['success'] ) || empty( $result['activation_id'] ) ) {
@@ -161,31 +161,6 @@ final class Resource {
 	 */
 	private static function lock_name( int $license_id ): string {
 		return Locks::name( 'license', $license_id );
-	}
-
-	/**
-	 * Takes a named database lock.
-	 *
-	 * @param string $name    Lock name.
-	 * @param int    $timeout Seconds to wait.
-	 */
-	private static function acquire( string $name, int $timeout ): bool {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, %d )', $name, $timeout ) );
-	}
-
-	/**
-	 * Releases a named database lock.
-	 *
-	 * @param string $name Lock name.
-	 */
-	private static function release( string $name ): void {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $name ) );
 	}
 
 	/**
@@ -546,7 +521,7 @@ final class Resource {
 		 */
 		$wait = max( 0, (int) apply_filters( 'beltoft_services_desire_lock_wait', self::DESIRE_LOCK_WAIT ) );
 
-		if ( ! self::acquire( $lock, $wait ) ) {
+		if ( ! Locks::acquire( $lock, $wait ) ) {
 			$this->queue( $state, $reason, $replace, $at );
 			return false;
 		}
@@ -645,7 +620,7 @@ final class Resource {
 			// Stored: a pending desire requested up to now is done (a newer one stays).
 			$this->forget_pending( $at );
 		} finally {
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 
 		Events::add( (int) $this->row['license_id'], 'service', $event );
@@ -968,7 +943,7 @@ final class Resource {
 		/** This filter is documented in src/Resource.php (store_desire()). */
 		$wait = max( 0, (int) apply_filters( 'beltoft_services_desire_lock_wait', self::DESIRE_LOCK_WAIT ) );
 
-		if ( ! self::acquire( $lock, $wait ) ) {
+		if ( ! Locks::acquire( $lock, $wait ) ) {
 			return null;
 		}
 
@@ -981,7 +956,7 @@ final class Resource {
 
 			return (bool) $callback();
 		} finally {
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 	}
 

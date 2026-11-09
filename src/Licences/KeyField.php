@@ -14,7 +14,7 @@ use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\PleskLicence;
 use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -139,7 +139,7 @@ final class KeyField {
 		foreach ( $user_id > 0 ? Licenses::where( 'user_id', $user_id ) : array() as $license ) {
 			$server = Resource::for_license( (int) $license['id'] );
 
-			if ( ! $server || SshKeyField::DRIVER !== $server->get( 'driver' ) || PleskLicence::APP !== (string) $server->get( 'app_id' ) || in_array( (string) $server->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {
+			if ( ! $server || ProxmoxDriver::ID !== $server->get( 'driver' ) || PleskLicence::APP !== (string) $server->get( 'app_id' ) || in_array( (string) $server->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {
 				continue;
 			}
 

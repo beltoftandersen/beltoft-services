@@ -91,7 +91,7 @@ final class OsField {
 	private static function cluster_of( int $product_id, int $variation_id = 0 ): string {
 		$driver = Product::driver_for( $product_id );
 
-		if ( ! $driver || SshKeyField::DRIVER !== $driver->id() ) {
+		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return '';
 		}
 
@@ -497,7 +497,7 @@ final class OsField {
 	 * @return mixed
 	 */
 	public static function initial_meta( $meta, $license, $driver ) {
-		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || SshKeyField::DRIVER !== $driver->id() ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return $meta;
 		}
 

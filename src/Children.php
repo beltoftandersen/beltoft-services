@@ -7,6 +7,9 @@
 
 namespace BeltoftServices;
 
+use BeltoftLicenses\Licenses;
+use BeltoftServices\Drivers\Driver;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -31,6 +34,60 @@ final class Children {
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'follow' ), 10, 3 );
+	}
+
+	/**
+	 * Makes a child service for a parent: a license of its own (no service product, source `child`), the
+	 * resource, the link to the parent and the first job. Nothing is left half made: when the resource cannot
+	 * be created the license is revoked, and when the link cannot be stored the child is closed and its license
+	 * revoked, so a retry starts clean. The caller does its own checks and its own locking first.
+	 *
+	 * @param Resource             $parent        Parent.
+	 * @param string               $slug          Product slug of the child license (not a registered service slug, on purpose: the lifecycle listeners leave it alone, the parent decides).
+	 * @param Driver               $driver        Driver of the child.
+	 * @param array<string, mixed> $plan          Plan snapshot of the child.
+	 * @param array<string, mixed> $meta          Initial meta of the child.
+	 * @param string               $license_error Message when the license cannot be made.
+	 * @param string               $link_error    Message when the link cannot be stored.
+	 * @return Resource|\WP_Error The child, read fresh after its job was queued.
+	 */
+	public static function spawn( Resource $parent, string $slug, Driver $driver, array $plan, array $meta, string $license_error, string $link_error ) {
+		$parent_license = $parent->license();
+
+		$license = Licenses::create(
+			array(
+				'product_slug'    => $slug,
+				'email'           => (string) ( $parent_license['email'] ?? '' ),
+				'user_id'         => (int) ( $parent_license['user_id'] ?? 0 ),
+				'max_activations' => 1,
+				'source'          => 'child',
+			)
+		);
+
+		if ( ! is_array( $license ) ) {
+			return new \WP_Error( 'license', $license_error );
+		}
+
+		$child = Resource::create( $license, $driver, $plan, $meta );
+
+		if ( is_wp_error( $child ) ) {
+			// No active license without a service.
+			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
+
+			return $child;
+		}
+
+		if ( ! self::attach( $parent, $child ) ) {
+			// No half-made child: the service never started, so it is closed and its license revoked, and a retry starts clean.
+			$child->set( array( 'state' => 'deleted', 'desired' => 'deleted' ) );
+			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
+
+			return new \WP_Error( 'link', $link_error );
+		}
+
+		Jobs::enqueue( $child->id() );
+
+		return Resource::find( $child->id() ) ?? $child;
 	}
 
 	/**

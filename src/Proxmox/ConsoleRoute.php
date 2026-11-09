@@ -49,7 +49,7 @@ final class ConsoleRoute {
 			$r->header( 'Cache-Control', 'no-store' );
 			return $r;
 		}
-		if ( ! Console::enabled() || 'proxmox' !== $r->get( 'driver' ) ) {
+		if ( ! Console::enabled() || ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
 			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
 		}
 		if ( ConsoleSessions::at_limit( $user_id, $r->id() ) ) {
