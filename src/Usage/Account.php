@@ -8,7 +8,6 @@
 namespace BeltoftServices\Usage;
 
 use BeltoftLicenses\Events;
-use BeltoftLicenses\Install;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Resource;
 
@@ -210,8 +209,7 @@ final class Account {
 
 	/**
 	 * A license of a pay-as-you-go variation: source usage, on the customer's account (the one made by this
-	 * license's order when it is the first). Licenses::update() cannot change the source, so it is written
-	 * to the license row here, before any listener acts on it.
+	 * license's order when it is the first). The source is written first, before any listener acts on it.
 	 *
 	 * @param mixed $license License row.
 	 */
@@ -220,11 +218,8 @@ final class Account {
 			return;
 		}
 
-		global $wpdb;
-
 		if ( 'usage' !== $license['source'] ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the license table has no API for the source.
-			$wpdb->update( Install::tables()['licenses'], array( 'source' => 'usage' ), array( 'id' => (int) $license['id'] ) );
+			Licenses::update( (int) $license['id'], array( 'source' => 'usage' ) );
 		}
 
 		$account = self::for_user( (int) ( $license['user_id'] ?? 0 ) );

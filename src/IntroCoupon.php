@@ -201,8 +201,6 @@ final class IntroCoupon {
 	 * @param string $email      Billing email, '' when not known yet.
 	 */
 	public static function held( int $product_id, int $user_id, string $email = '' ): bool {
-		global $wpdb;
-
 		$slug = sanitize_title( (string) get_post_meta( Product::parent_id( $product_id ), \BeltoftLicenses\Software::META_SLUG, true ) );
 
 		if ( '' === $slug ) {
@@ -211,16 +209,30 @@ final class IntroCoupon {
 
 		$want = self::normalise_email( sanitize_email( $email ) );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the licenses table of beltoft-licenses, read fresh.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT user_id, email FROM %i WHERE product_slug = %s', \BeltoftLicenses\Install::tables()['licenses'], $slug ), ARRAY_A );
+		// The licences list for one product, a page at a time.
+		for ( $page = 1, $seen = 0; ; ++$page ) {
+			list( $rows, $total ) = \BeltoftLicenses\Licenses::query(
+				array(
+					'product_slug' => $slug,
+					'per_page'     => 200,
+					'page'         => $page,
+				)
+			);
 
-		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
-			if ( $user_id > 0 && (int) $row['user_id'] === $user_id ) {
-				return true;
+			foreach ( $rows as $row ) {
+				if ( $user_id > 0 && (int) $row['user_id'] === $user_id ) {
+					return true;
+				}
+
+				if ( '' !== $want && self::normalise_email( (string) $row['email'] ) === $want ) {
+					return true;
+				}
 			}
 
-			if ( '' !== $want && self::normalise_email( (string) $row['email'] ) === $want ) {
-				return true;
+			$seen += count( $rows );
+
+			if ( ! $rows || $seen >= $total ) {
+				break;
 			}
 		}
 
