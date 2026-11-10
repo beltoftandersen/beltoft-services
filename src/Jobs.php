@@ -52,6 +52,12 @@ final class Jobs {
 	public const ENSURE_PERIOD = 6 * HOUR_IN_SECONDS;
 
 	/**
+	 * Seconds the stored stamp is left alone. The admin, WP-CLI and cron check on every request (every minute under the
+	 * system cron); the value always differs, so writing it each time would be a real UPDATE of an autoloaded option.
+	 */
+	public const STAMP_REFRESH = 5 * MINUTE_IN_SECONDS;
+
+	/**
 	 * Callbacks that make their recurring jobs exist (each calls ensure_cron()), in registration order.
 	 *
 	 * @var array<string, callable>
@@ -156,8 +162,13 @@ final class Jobs {
 	}
 
 	/**
-	 * The key a stored check must match: plugin version and the set of callbacks. A plugin update or a changed job list
-	 * checks again at once.
+	 * The key a stored check must match: plugin version and the set of callback names. A plugin update or a changed
+	 * list of callbacks checks again at once.
+	 *
+	 * Limit: a job added inside an existing callback, without a version bump, is not in the key, so a front-end
+	 * request notices it only when the period (ENSURE_PERIOD) is over. What the callbacks declare (declared()) is known
+	 * only after they have run, and running them on every request is the cost this key exists to avoid. The admin, WP-CLI
+	 * and cron check on every request, so on a live site the job appears within minutes; a release bumps the version.
 	 */
 	private static function ensure_key(): string {
 		return ( defined( 'BELTOFT_SERVICES_VERSION' ) ? BELTOFT_SERVICES_VERSION : '' ) . '|' . md5( implode( ',', array_keys( self::$callbacks ) ) );
@@ -168,7 +179,7 @@ final class Jobs {
 	 * check is missing, of another version or job list, or older than ENSURE_PERIOD.
 	 */
 	private static function ensure_due(): bool {
-		if ( ( is_admin() && ! wp_doing_ajax() ) || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		if ( ( is_admin() && ! wp_doing_ajax() ) || wp_doing_cron() || self::cli() ) {
 			return true;
 		}
 
@@ -177,6 +188,19 @@ final class Jobs {
 		return ! is_array( $stamp )
 			|| ( $stamp['v'] ?? '' ) !== self::ensure_key()
 			|| (int) ( $stamp['at'] ?? 0 ) + self::ENSURE_PERIOD <= time();
+	}
+
+	/**
+	 * Whether this is a WP-CLI run. A filter (beltoft_services_doing_cli) so a test can say so: the WP_CLI constant
+	 * cannot be set and unset in the suite.
+	 */
+	private static function cli(): bool {
+		/**
+		 * Whether the request is a WP-CLI run.
+		 *
+		 * @param bool $cli True when the WP_CLI constant is set.
+		 */
+		return (bool) apply_filters( 'beltoft_services_doing_cli', defined( 'WP_CLI' ) && WP_CLI );
 	}
 
 	/**
@@ -199,16 +223,27 @@ final class Jobs {
 			call_user_func( $callback );
 		}
 
-		if ( function_exists( 'as_has_scheduled_action' ) ) {
-			update_option(
-				self::ENSURE_OPTION,
-				array(
-					'v'  => self::ensure_key(),
-					'at' => time(),
-				),
-				true
-			);
+		if ( ! function_exists( 'as_has_scheduled_action' ) ) {
+			return;
 		}
+
+		$key    = self::ensure_key();
+		$stored = get_option( self::ENSURE_OPTION );
+		$age    = is_array( $stored ) ? time() - (int) ( $stored['at'] ?? 0 ) : -1;
+
+		// Same key and a young stamp: nothing to say that the stored one does not say already.
+		if ( is_array( $stored ) && ( $stored['v'] ?? '' ) === $key && $age >= 0 && $age < self::STAMP_REFRESH ) {
+			return;
+		}
+
+		update_option(
+			self::ENSURE_OPTION,
+			array(
+				'v'  => $key,
+				'at' => time(),
+			),
+			true
+		);
 	}
 
 	/**

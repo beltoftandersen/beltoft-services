@@ -41,9 +41,11 @@ final class Stock {
 		// After WooCommerce Subscriptions' own item-data filters, so the keys are in place.
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'note_flow' ), 999, 3 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'clear_flow' ) );
-		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validation' ), 1 );
+		// Priority 0, not 1: WooCommerce checks the cart on woocommerce_check_cart_items at priority 1, and a forget at the
+		// same priority would run before or after that check depending on registration order. At 0 it always runs first.
+		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validation' ), 0 );
 		// Adding to the cart and checking it decide whether an order is accepted: they read the records afresh.
-		add_action( 'woocommerce_check_cart_items', array( HostingCapacity::class, 'forget' ), 1 );
+		add_action( 'woocommerce_check_cart_items', array( HostingCapacity::class, 'forget' ), 0 );
 		add_action( 'woocommerce_checkout_process', array( HostingCapacity::class, 'forget' ), 1 );
 		add_action( 'shutdown', array( __CLASS__, 'clear_flow' ) );
 		// A cart loaded from the session checks is_purchasable() before the item data is applied.
@@ -67,7 +69,7 @@ final class Stock {
 	}
 
 	/**
-	 * Filter woocommerce_add_to_cart_validation, first in line: a new add starts, so a flag left by an add that aborted is closed.
+	 * Filter woocommerce_add_to_cart_validation, first in line (priority 0): a new add starts, so a flag left by an add that aborted is closed.
 	 *
 	 * @param mixed $valid Whether the add is valid so far.
 	 * @return mixed

@@ -179,18 +179,22 @@ final class Resource {
 	}
 
 	/**
-	 * Several resources in one query, keyed by activation id. An id that is unknown or names a site
+	 * Several resources in one query, keyed by activation id, in the order of the ids given (each once). An id that is unknown or names a site
 	 * activation is left out.
 	 *
 	 * @param int[] $activation_ids Activation ids.
 	 * @return array<int, Resource>
 	 */
 	public static function find_many( array $activation_ids ): array {
-		$out = array();
+		$out  = array();
+		$rows = Licenses::activations( $activation_ids );
 
-		foreach ( Licenses::activations( $activation_ids ) as $id => $row ) {
-			if ( 'site' !== $row['kind'] ) {
-				$out[ (int) $id ] = new self( $row );
+		// In the order of the ids given (a sum of floats over the result depends on its order), each id once.
+		foreach ( $activation_ids as $id ) {
+			$id = (int) $id;
+
+			if ( isset( $rows[ $id ] ) && ! isset( $out[ $id ] ) && 'site' !== $rows[ $id ]['kind'] ) {
+				$out[ $id ] = new self( $rows[ $id ] );
 			}
 		}
 
