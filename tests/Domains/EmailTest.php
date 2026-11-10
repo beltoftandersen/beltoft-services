@@ -12,7 +12,7 @@ use BeltoftServices\Tests\TestCase;
 class EmailTest extends TestCase {
 	public function test_action_needed_registered_and_ready_details_include_domain(): void {
 		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
-		$this->assertContains( 'beltoft_services_domain_action_needed', Emails::IDS );
+		$this->assertContains( 'beltoft_services_domain_action_needed', Emails::ids() );
 		$this->assertInstanceOf( DomainActionNeeded::class, Emails::get( 'beltoft_services_domain_action_needed' ) );
 		$product = $this->service_product( 'domain' );
 		$license = $this->service_license( $product, array( 'fire' => false ) );

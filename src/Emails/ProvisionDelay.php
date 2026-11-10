@@ -15,30 +15,5 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ProvisionDelay extends ServiceEmail {
 
-	/**
-	 * Set up.
-	 */
-	public function __construct() {
-		$this->id             = 'beltoft_services_provision_delay';
-		$this->title          = __( 'Service setup delayed', 'beltoft-services' );
-		$this->description    = __( 'Sent once to the customer when setting up their server, domain, DNS hosting or website hosting failed and needs attention.', 'beltoft-services' );
-		$this->template_html  = 'emails/beltoft-services-provision-delay.php';
-		$this->template_plain = 'emails/plain/beltoft-services-provision-delay.php';
-
-		parent::__construct();
-	}
-
-	/**
-	 * Default subject.
-	 */
-	public function get_default_subject() {
-		return __( 'A delay setting up your {product_name}', 'beltoft-services' );
-	}
-
-	/**
-	 * Default heading.
-	 */
-	public function get_default_heading() {
-		return __( 'There is a delay setting up your service', 'beltoft-services' );
-	}
+	protected const ID = 'beltoft_services_provision_delay';
 }

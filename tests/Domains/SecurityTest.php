@@ -195,7 +195,7 @@ class SecurityTest extends TestCase {
 	}
 
 	public function test_the_security_email_is_registered_and_never_carries_the_code(): void {
-		$this->assertContains( 'beltoft_services_domain_security', Emails::IDS );
+		$this->assertContains( 'beltoft_services_domain_security', Emails::ids() );
 		$this->assertInstanceOf( \BeltoftServices\Emails\DomainSecurity::class, Emails::get( 'beltoft_services_domain_security' ) );
 	}
 

@@ -5,6 +5,9 @@ namespace BeltoftServices\Emails;
 defined( 'ABSPATH' ) || exit;
 
 final class Notice extends ServiceEmail {
+
+	protected const ID = 'beltoft_services_notice';
+
 	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app', 'reveal_mailbox', 'app_action' );
 
 	/**
@@ -18,15 +21,6 @@ final class Notice extends ServiceEmail {
 	 */
 	public function is_enabled() {
 		return in_array( (string) ( $this->values['notice_kind'] ?? '' ), self::ALWAYS, true ) || parent::is_enabled();
-	}
-
-	public function __construct() {
-		$this->id = 'beltoft_services_notice';
-		$this->title = __( 'Service notice', 'beltoft-services' );
-		$this->description = __( 'Sent when the access list of a database changes, when a connected app showed a password, or when a restore of a server from a backup or a rollback to a snapshot did not finish.', 'beltoft-services' );
-		$this->template_html = 'emails/beltoft-services-notice.php';
-		$this->template_plain = 'emails/plain/beltoft-services-notice.php';
-		parent::__construct();
 	}
 
 	/**

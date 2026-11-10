@@ -73,7 +73,7 @@ class OpsTest extends HostingCase {
 	// -- HostingRestoreDone ----------------------------------------------------------------------
 
 	public function test_the_customer_is_told_when_a_restore_has_finished_with_the_undo_time_and_no_detail(): void {
-		$this->assertContains( 'beltoft_services_hosting_restore_done', Emails::IDS );
+		$this->assertContains( 'beltoft_services_hosting_restore_done', Emails::ids() );
 		$r      = $this->with_backup();
 		$volid  = HostingBackups::stored( $r )[0]['volid'];
 		$slug   = 'w' . $r->id();
