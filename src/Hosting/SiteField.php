@@ -8,7 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Mail\MailField;
@@ -78,25 +78,7 @@ final class SiteField {
 	 * @return array<string, array<string, mixed>> Cart item key => cart item.
 	 */
 	public static function cart_lines(): array {
-		$cart = function_exists( 'WC' ) ? WC()->cart : null;
-		$out  = array();
-
-		if ( ! $cart ) {
-			return $out;
-		}
-
-		foreach ( $cart->get_cart() as $key => $item ) {
-			// A renewal or a switch pays for an account that exists.
-			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
-				continue;
-			}
-
-			if ( self::is_hosting_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
-				$out[ (string) $key ] = $item;
-			}
-		}
-
-		return $out;
+		return LineField::cart_lines( array( __CLASS__, 'is_hosting_product' ) );
 	}
 
 	/**
@@ -236,9 +218,7 @@ final class SiteField {
 	 * @throws \Automattic\WooCommerce\StoreApi\Exceptions\RouteException When the cart has a hosting line.
 	 */
 	public static function block_store_api( \WC_Order $order, \WP_REST_Request $request ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( array() !== self::cart_lines() ) {
-			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'beltoft_services_site_checkout_required', esc_html__( 'Hosting is ordered at the website checkout, where you name your website. Please use the checkout page of the website.', 'beltoft-services' ), 400 );
-		}
+		LineField::refuse_store_api( array( __CLASS__, 'is_hosting_product' ), 'beltoft_services_site_checkout_required', __( 'Hosting is ordered at the website checkout, where you name your website. Please use the checkout page of the website.', 'beltoft-services' ) );
 	}
 
 	/**
@@ -262,15 +242,7 @@ final class SiteField {
 	 * @return array<string, string>
 	 */
 	private static function read_post( string $key ): array {
-		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce (or the form is only refilled); every value is checked in resolve().
-		$all = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : array();
-		// phpcs:enable
-		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
-		$out = array();
-
-		foreach ( array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'host_new', 'zone', 'install', 'language', 'email' ) as $field ) {
-			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
-		}
+		$out = LineField::read_post( self::POST_KEY, $key, array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'host_new', 'zone', 'install', 'language', 'email' ) );
 
 		// Each mode has its own inputs; only the chosen mode's inputs count.
 		if ( '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ) {

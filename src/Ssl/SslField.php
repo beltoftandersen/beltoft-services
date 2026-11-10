@@ -8,7 +8,7 @@
 namespace BeltoftServices\Ssl;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Drivers\Driver;
@@ -66,25 +66,7 @@ final class SslField {
 	 * @return array<string, array<string, mixed>> Cart item key => cart item.
 	 */
 	public static function cart_lines(): array {
-		$cart = function_exists( 'WC' ) ? WC()->cart : null;
-		$out  = array();
-
-		if ( ! $cart ) {
-			return $out;
-		}
-
-		foreach ( $cart->get_cart() as $key => $item ) {
-			// A renewal or a switch pays for a certificate that exists.
-			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
-				continue;
-			}
-
-			if ( self::is_ssl_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
-				$out[ (string) $key ] = $item;
-			}
-		}
-
-		return $out;
+		return LineField::cart_lines( array( __CLASS__, 'is_ssl_product' ) );
 	}
 
 	/**
@@ -337,9 +319,7 @@ final class SslField {
 	 * @throws \Automattic\WooCommerce\StoreApi\Exceptions\RouteException When the cart has a certificate line.
 	 */
 	public static function block_store_api( \WC_Order $order, \WP_REST_Request $request ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( array() !== self::cart_lines() ) {
-			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'beltoft_services_ssl_checkout_required', esc_html__( 'SSL certificates are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website.', 'beltoft-services' ), 400 );
-		}
+		LineField::refuse_store_api( array( __CLASS__, 'is_ssl_product' ), 'beltoft_services_ssl_checkout_required', __( 'SSL certificates are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website.', 'beltoft-services' ) );
 	}
 
 	/**
@@ -359,15 +339,8 @@ final class SslField {
 	 * @return array<string, mixed>
 	 */
 	private static function read_post( string $key ): array {
-		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce (or the form is only refilled); every value is checked in resolve().
-		$all = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : array();
-		// phpcs:enable
-		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
-		$out = array();
-
-		foreach ( array( 'domain', 'validation', 'approver', 'key_mode', 'csr', 'mailbox', 'person' ) as $field ) {
-			$out[ $field ] = isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
-		}
+		$out = LineField::read_post( self::POST_KEY, $key, array( 'domain', 'validation', 'approver', 'key_mode', 'csr', 'mailbox', 'person' ) );
+		$one = LineField::posted_line( self::POST_KEY, $key );
 
 		$out['names'] = array();
 
