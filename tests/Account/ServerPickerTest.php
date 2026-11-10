@@ -239,7 +239,7 @@ class ServerPickerTest extends BackupTestCase {
 		$_POST = array();
 	}
 
-	public function test_stock_follows_the_shop_status_and_the_room_for_a_machine(): void {
+	public function test_stock_follows_the_shop_status_not_the_room_for_a_machine(): void {
 		$this->v['b-None']->set_stock_status( 'outofstock' );
 		$this->v['b-None']->save();
 		Offers::reset();
@@ -253,29 +253,36 @@ class ServerPickerTest extends BackupTestCase {
 		delete_transient( 'beltoft_services_proxmox_capacity_lab' );
 		Offers::reset();
 		$plan = Offers::plans()[ $this->v['a-None']->get_id() ];
-		$this->assertTrue( $plan['in_stock'], 'No cached capacity is unknown, not no room: checkout lets it through too.' );
-		$this->assertTrue( $plan['unknown'] );
+		$this->assertTrue( $plan['in_stock'], 'Changed on purpose (stock policy 2026-11-11): no cached capacity changes nothing, capacity is not asked.' );
+		$this->assertArrayNotHasKey( 'unknown', $plan );
 	}
-
-	public function test_unknown_stock_shows_selectable_plans_and_a_line_while_a_full_cluster_stays_closed(): void {
+	public function test_capacity_never_closes_the_picker_and_only_the_shop_status_does(): void {
+		// Changed on purpose (stock policy 2026-11-11): no cache and a really full cluster both leave every plan selectable, with no availability line.
 		delete_transient( 'beltoft_services_proxmox_capacity_lab' );
 		$html = $this->page();
 		$this->assertStringNotContainsString( 'out of stock', strtolower( $html ) );
-		$this->assertStringContainsString( 'Availability is checked again at checkout.', $html );
+		$this->assertStringNotContainsString( 'Availability is checked again', $html );
 		$this->assertDoesNotMatchRegularExpression( '#<input[^>]*name="' . ServerPicker::PLAN . '"[^>]*disabled#', $html );
 		$this->assertMatchesRegularExpression( '#<input[^>]*value="' . $this->v['a-None']->get_id() . '"[^>]*checked#', $html );
-		$this->assertTrue( wc_get_product( $this->v['a-None']->get_id() )->is_in_stock(), 'Checkout treats a missing cache as it did: the stored status stands.' );
 		$this->assertSame( array(), $this->send()['errors'] );
 
 		WC()->cart->empty_cart();
 		set_transient( 'beltoft_services_proxmox_capacity_lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 68719476736 ) ), HOUR_IN_SECONDS );
 		$html = $this->page();
-		$this->assertStringContainsString( 'Every plan is out of stock', $html );
-		$this->assertStringNotContainsString( 'Availability is checked again', $html );
-		$this->assertFalse( wc_get_product( $this->v['a-None']->get_id() )->is_in_stock(), 'A really full cluster is still refused by the shop.' );
+		$this->assertStringNotContainsString( 'Every plan is out of stock', $html );
+		$this->assertTrue( wc_get_product( $this->v['a-None']->get_id() )->is_in_stock(), 'A really full cluster is on sale.' );
+		$this->assertSame( array(), $this->send()['errors'] );
+
+		// Every plan set out of stock by hand: the picker says so.
+		WC()->cart->empty_cart();
+		foreach ( $this->v as $variation ) {
+			$variation->set_stock_status( 'outofstock' );
+			$variation->save();
+		}
+		Offers::reset();
+		$this->assertStringContainsString( 'Every plan is out of stock', $this->page() );
 		$this->assertArrayHasKey( 'plan', $this->send()['errors'] );
 	}
-
 	private function fake_line( array $item ): string {
 		$key  = md5( wp_json_encode( $item ) );
 		$cart = WC()->cart->get_cart_contents();
