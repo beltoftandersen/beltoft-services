@@ -90,6 +90,9 @@ final class HostingSwitch {
 
 		$record = Records::for_resource( $resource->id() );
 
+		// An upgrade is a decision on capacity: read the records now.
+		HostingCapacity::forget();
+
 		if ( $record && ! HostingCapacity::fits_upgrade( (string) $record['node'], $have, $target ) ) {
 			return __( 'This plan cannot be added to your server right now. Contact support and we will move your hosting.', 'beltoft-services' );
 		}

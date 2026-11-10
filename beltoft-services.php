@@ -85,6 +85,8 @@ register_activation_hook( __FILE__, array( \BeltoftServices\Proxmox\Vm\Schema::c
 // Clusters that are saved already get their capacity cached at once, so the stock is not closed for an hour.
 register_activation_hook( __FILE__, array( \BeltoftServices\Proxmox\Pve\CapacityJobs::class, 'activate' ) );
 
+register_activation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'activate' ) );
+
 // The sweep, the retention run and the usage check stop with the plugin; pending reconcile jobs keep their place.
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 'unschedule' ) );

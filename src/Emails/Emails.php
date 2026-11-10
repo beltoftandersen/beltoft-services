@@ -90,7 +90,7 @@ final class Emails {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
 		add_action( Retention::WARNING_HOOK, array( __CLASS__, 'on_deletion_warning' ), 10, 2 );
 		add_action( self::USAGE_HOOK, array( __CLASS__, 'usage' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
 	/**

@@ -179,6 +179,29 @@ final class Resource {
 	}
 
 	/**
+	 * Several resources in one query, keyed by activation id, in the order of the ids given (each once). An id that is unknown or names a site
+	 * activation is left out.
+	 *
+	 * @param int[] $activation_ids Activation ids.
+	 * @return array<int, Resource>
+	 */
+	public static function find_many( array $activation_ids ): array {
+		$out  = array();
+		$rows = Licenses::activations( $activation_ids );
+
+		// In the order of the ids given (a sum of floats over the result depends on its order), each id once.
+		foreach ( $activation_ids as $id ) {
+			$id = (int) $id;
+
+			if ( isset( $rows[ $id ] ) && ! isset( $out[ $id ] ) && 'site' !== $rows[ $id ]['kind'] ) {
+				$out[ $id ] = new self( $rows[ $id ] );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * The license's live resource, or null.
 	 *
 	 * @param int $license_id License id.
@@ -438,6 +461,15 @@ final class Resource {
 		if ( $fresh ) {
 			$this->row = $fresh;
 		}
+
+		/**
+		 * Values were stored in a resource's meta (the one writer of a state or a plan). Features that remember
+		 * something derived from the meta, such as a capacity total, forget it here.
+		 *
+		 * @param Resource             $resource The resource.
+		 * @param array<string, mixed> $meta     The values stored.
+		 */
+		do_action( 'beltoft_services_resource_saved', $this, $meta );
 
 		return true;
 	}

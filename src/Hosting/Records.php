@@ -81,6 +81,7 @@ final class Records {
 			array( '%d', '%s', '%s', '%s' )
 		);
 		$wpdb->suppress_errors( $suppress );
+		HostingCapacity::forget();
 
 		return self::for_resource( $resource_id );
 	}
@@ -265,6 +266,9 @@ final class Records {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own table.
-		return false !== $wpdb->delete( Schema::tables()['hosting'], array( 'resource_id' => $resource_id ), array( '%d' ) );
+		$done = false !== $wpdb->delete( Schema::tables()['hosting'], array( 'resource_id' => $resource_id ), array( '%d' ) );
+		HostingCapacity::forget();
+
+		return $done;
 	}
 }

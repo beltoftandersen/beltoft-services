@@ -39,6 +39,8 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// The hosting usage memo outlives a test; the tables and options behind it are reset around each one.
+		\BeltoftServices\Hosting\HostingCapacity::forget();
 		// The licenses activation table is outside WordPress' per-test rollback. A domain resource
 		// from an earlier test would be picked up by the daily sync during unrelated alert tests.
 		global $wpdb;

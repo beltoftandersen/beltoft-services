@@ -21,7 +21,7 @@ final class Renewals {
 		add_action( 'woocommerce_subscription_renewal_payment_complete', array( __CLASS__, 'on_paid' ), 20, 2 );
 		add_action( self::TRANSFER_HOOK, array( __CLASS__, 'on_transfer_due' ) );
 		add_action( self::SWEEP_HOOK, array( __CLASS__, 'sweep' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
 	/** Schedules the daily sweep for stuck paid renewals, once. */

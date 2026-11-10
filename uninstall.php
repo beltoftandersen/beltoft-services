@@ -15,6 +15,7 @@ if ( empty( $beltoft_services_settings['delete_data'] ) ) {
 
 delete_option( 'beltoft_services_settings' );
 delete_option( 'beltoft_services_alert_problem' );
+delete_option( 'beltoft_services_recurring_ensured' );
 
 // Left on purpose: the option 'beltoft_services_service_slugs' (it keeps service license keys hidden
 // from the public license API while the plugin is gone, and is harmless), and the Action Scheduler

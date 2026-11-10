@@ -35,7 +35,7 @@ final class DnsClaimJobs {
 		add_action( self::CHECK, array( __CLASS__, 'check' ) );
 		add_action( self::SCAN, array( __CLASS__, 'scan' ) );
 		add_action( self::CLEANUP, array( __CLASS__, 'cleanup' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
 	/**

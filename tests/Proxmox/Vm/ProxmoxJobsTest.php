@@ -692,7 +692,7 @@ class ProxmoxJobsTest extends TestCase {
 		}
 
 		$this->assertNotFalse( has_action( ProxmoxJobs::POWER, array( PowerJobs::class, 'power' ) ) );
-		$this->assertNotFalse( has_action( 'action_scheduler_init', array( ProxmoxJobs::class, 'schedule' ) ) );
+		$this->assertNotFalse( in_array( array( ProxmoxJobs::class, 'schedule' ), Jobs::callbacks(), true ) );
 		$this->assertNotFalse( has_action( 'deactivate_beltoft-services/beltoft-services.php' ) || has_action( 'deactivate_' . plugin_basename( BELTOFT_SERVICES_FILE ) ) );
 
 		ProxmoxJobs::unschedule();

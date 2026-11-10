@@ -9,6 +9,7 @@
 namespace BeltoftServices\Card;
 
 use BeltoftServices\Account\Panel;
+use BeltoftServices\Jobs;
 use BeltoftServices\Usage\Account;
 
 defined( 'ABSPATH' ) || exit;
@@ -36,7 +37,7 @@ final class Card {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		add_action( 'action_scheduler_init', array( __CLASS__, 'unschedule' ) );
+		Jobs::recurring( array( __CLASS__, 'unschedule' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
 		add_action( 'woocommerce_before_account_payment_methods', array( __CLASS__, 'note' ) );
 		add_filter( 'wc_subscriptions_allow_subscription_token_deletion', array( __CLASS__, 'allow_deletion' ), 10, 2 );

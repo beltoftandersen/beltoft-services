@@ -338,7 +338,7 @@ final class JobsTest extends TestCase {
 	public function test_hooks_are_registered(): void {
 		$this->assertNotFalse( has_action( Jobs::HOOK, array( Jobs::class, 'run' ) ) );
 		$this->assertNotFalse( has_action( Jobs::SWEEP, array( Jobs::class, 'sweep' ) ) );
-		$this->assertNotFalse( has_action( 'action_scheduler_init', array( Jobs::class, 'schedule' ) ) );
+		$this->assertNotFalse( in_array( array( Jobs::class, 'schedule' ), Jobs::callbacks(), true ) );
 	}
 
 	public function test_run_jobs_fails_on_a_failed_action(): void {

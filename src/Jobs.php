@@ -39,6 +39,39 @@ final class Jobs {
 	public const USAGE_INTERVAL = 300;
 
 	/**
+	 * Option holding when the recurring jobs were last checked and against which plugin version and job list.
+	 */
+	public const ENSURE_OPTION = 'beltoft_services_recurring_ensured';
+
+	/**
+	 * Seconds a front-end request trusts the last check of the recurring jobs. The admin, WP-CLI and every cron
+	 * request check each time, so on a live site a lost job is back within minutes; this period only bounds a
+	 * site where nobody uses the admin and the queue runner is not a cron request. Six hours: the jobs run every
+	 * few minutes to daily, and none is lost often enough to justify a query on every page view.
+	 */
+	public const ENSURE_PERIOD = 6 * HOUR_IN_SECONDS;
+
+	/**
+	 * Seconds the stored stamp is left alone. The admin, WP-CLI and cron check on every request (every minute under the
+	 * system cron); the value always differs, so writing it each time would be a real UPDATE of an autoloaded option.
+	 */
+	public const STAMP_REFRESH = 5 * MINUTE_IN_SECONDS;
+
+	/**
+	 * Callbacks that make their recurring jobs exist (each calls ensure_cron()), in registration order.
+	 *
+	 * @var array<string, callable>
+	 */
+	private static $callbacks = array();
+
+	/**
+	 * The jobs the last full check looked at, by key.
+	 *
+	 * @var array<string, array{hook: string, cron: string, args: array<int, mixed>}>
+	 */
+	private static $declared = array();
+
+	/**
 	 * Seconds a job waits while the kill switch is on.
 	 */
 	public const PAUSED_DELAY = 900;
@@ -71,7 +104,10 @@ final class Jobs {
 		add_action( self::SWEEP, array( __CLASS__, 'sweep' ) );
 		add_action( self::ACT, array( __CLASS__, 'act' ), 10, 3 );
 		add_action( self::USAGE, array( __CLASS__, 'refresh_usage' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		self::recurring( array( __CLASS__, 'schedule' ) );
+		add_action( 'action_scheduler_init', array( __CLASS__, 'ensure_recurring' ) );
+		// Action Scheduler fires this once a day so a plugin can bring back a recurring action that was lost.
+		add_action( 'action_scheduler_ensure_recurring_actions', array( __CLASS__, 'force_recurring' ) );
 		add_action( 'update_option_' . Settings::OPTION, array( __CLASS__, 'settings_updated' ), 10, 2 );
 		add_action( 'add_option_' . Settings::OPTION, array( __CLASS__, 'settings_added' ), 10, 2 );
 	}
@@ -84,9 +120,145 @@ final class Jobs {
 	}
 
 	/**
+	 * The one owner of "the recurring jobs exist": a feature registers the method that calls ensure_cron() here, in its
+	 * register(), instead of hooking action_scheduler_init itself. Every request that boots would otherwise ask Action
+	 * Scheduler about each job (about 36 queries); ensure_recurring() runs the callbacks only when a check is due.
+	 *
+	 * @param callable $callback Array callable, for example array( __CLASS__, 'schedule' ).
+	 */
+	public static function recurring( $callback ): void {
+		self::$callbacks[ self::callback_name( $callback ) ] = $callback;
+	}
+
+	/**
+	 * The registered callbacks, by name.
+	 *
+	 * @return array<string, callable>
+	 */
+	public static function callbacks(): array {
+		return self::$callbacks;
+	}
+
+	/**
+	 * The recurring jobs the last full check looked at.
+	 *
+	 * @return array<int, array{hook: string, cron: string, args: array<int, mixed>}>
+	 */
+	public static function declared(): array {
+		return array_values( self::$declared );
+	}
+
+	/**
+	 * Name of a callback, stable between requests.
+	 *
+	 * @param mixed $callback Callback.
+	 */
+	private static function callback_name( $callback ): string {
+		if ( is_array( $callback ) ) {
+			return ( is_object( $callback[0] ) ? get_class( $callback[0] ) : (string) $callback[0] ) . '::' . $callback[1];
+		}
+
+		return is_string( $callback ) ? $callback : 'callback-' . count( self::$callbacks );
+	}
+
+	/**
+	 * The key a stored check must match: plugin version and the set of callback names. A plugin update or a changed
+	 * list of callbacks checks again at once.
+	 *
+	 * Limit: a job added inside an existing callback, without a version bump, is not in the key, so a front-end
+	 * request notices it only when the period (ENSURE_PERIOD) is over. What the callbacks declare (declared()) is known
+	 * only after they have run, and running them on every request is the cost this key exists to avoid. The admin, WP-CLI
+	 * and cron check on every request, so on a live site the job appears within minutes; a release bumps the version.
+	 */
+	private static function ensure_key(): string {
+		return ( defined( 'BELTOFT_SERVICES_VERSION' ) ? BELTOFT_SERVICES_VERSION : '' ) . '|' . md5( implode( ',', array_keys( self::$callbacks ) ) );
+	}
+
+	/**
+	 * Whether the recurring jobs are due for a check: always in the admin, WP-CLI and cron, otherwise when the stored
+	 * check is missing, of another version or job list, or older than ENSURE_PERIOD.
+	 */
+	private static function ensure_due(): bool {
+		if ( ( is_admin() && ! wp_doing_ajax() ) || wp_doing_cron() || self::cli() ) {
+			return true;
+		}
+
+		$stamp = get_option( self::ENSURE_OPTION );
+
+		return ! is_array( $stamp )
+			|| ( $stamp['v'] ?? '' ) !== self::ensure_key()
+			|| (int) ( $stamp['at'] ?? 0 ) + self::ENSURE_PERIOD <= time();
+	}
+
+	/**
+	 * Whether this is a WP-CLI run. A filter (beltoft_services_doing_cli) so a test can say so: the WP_CLI constant
+	 * cannot be set and unset in the suite.
+	 */
+	private static function cli(): bool {
+		/**
+		 * Whether the request is a WP-CLI run.
+		 *
+		 * @param bool $cli True when the WP_CLI constant is set.
+		 */
+		return (bool) apply_filters( 'beltoft_services_doing_cli', defined( 'WP_CLI' ) && WP_CLI );
+	}
+
+	/**
+	 * Hooked on action_scheduler_init: makes the recurring jobs exist when a check is due, and does nothing (no
+	 * Action Scheduler query) otherwise.
+	 */
+	public static function ensure_recurring(): void {
+		if ( self::ensure_due() ) {
+			self::force_recurring();
+		}
+	}
+
+	/**
+	 * Makes the recurring jobs exist now, whatever the stored check says.
+	 */
+	public static function force_recurring(): void {
+		self::$declared = array();
+
+		foreach ( self::$callbacks as $callback ) {
+			call_user_func( $callback );
+		}
+
+		if ( ! function_exists( 'as_has_scheduled_action' ) ) {
+			return;
+		}
+
+		$key    = self::ensure_key();
+		$stored = get_option( self::ENSURE_OPTION );
+		$age    = is_array( $stored ) ? time() - (int) ( $stored['at'] ?? 0 ) : -1;
+
+		// Same key and a young stamp: nothing to say that the stored one does not say already.
+		if ( is_array( $stored ) && ( $stored['v'] ?? '' ) === $key && $age >= 0 && $age < self::STAMP_REFRESH ) {
+			return;
+		}
+
+		update_option(
+			self::ENSURE_OPTION,
+			array(
+				'v'  => $key,
+				'at' => time(),
+			),
+			true
+		);
+	}
+
+	/**
+	 * Plugin activation: the next request checks the recurring jobs.
+	 */
+	public static function activate(): void {
+		delete_option( self::ENSURE_OPTION );
+	}
+
+	/**
 	 * Removes the sweep (plugin deactivation). Pending reconcile jobs keep their place.
 	 */
 	public static function unschedule(): void {
+		delete_option( self::ENSURE_OPTION );
+
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( self::SWEEP, array(), self::GROUP );
 		}
@@ -167,7 +339,7 @@ final class Jobs {
 	}
 
 	/**
-	 * Schedules a recurring plugin action, unless one is scheduled already (a running one counts, so a sweep that is
+	 * Schedules a recurring plugin action (call it from a callback registered with recurring(), not on every request), unless one is scheduled already (a running one counts, so a sweep that is
 	 * running now is not scheduled a second time).
 	 *
 	 * @param string            $hook  Action hook.
@@ -176,6 +348,12 @@ final class Jobs {
 	 * @param int               $delay Seconds from now to the first run.
 	 */
 	public static function ensure_cron( string $hook, string $cron, array $args = array(), int $delay = 0 ): void {
+		self::$declared[ md5( $hook . '|' . $cron . '|' . wp_json_encode( $args ) ) ] = array(
+			'hook' => $hook,
+			'cron' => $cron,
+			'args' => $args,
+		);
+
 		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( $hook, $args, self::GROUP ) ) {
 			as_schedule_cron_action( time() + $delay, $cron, $hook, $args, self::GROUP );
 		}
