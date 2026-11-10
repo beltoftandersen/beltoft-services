@@ -165,6 +165,7 @@ class NamespaceMoveTest extends TestCase {
 		'AppTab' => array( 'Proxmox', 'Apps' ),
 		'AppWww' => array( 'Proxmox', 'Apps' ),
 		'Apps' => array( 'Proxmox', 'Apps' ),
+		'ServerProgress' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'PleskLicence' => array( 'Proxmox', 'Apps' ),
 	);
 

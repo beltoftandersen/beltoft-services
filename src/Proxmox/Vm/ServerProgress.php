@@ -1,10 +1,9 @@
 <?php
 /** The steps and titles of a server's and a disk's work, for the progress. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Proxmox\Disk\DiskDriver;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

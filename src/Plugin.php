@@ -130,7 +130,7 @@ final class Plugin {
 		Domains\Security::register();
 		Domains\EmailDetails::register();
 		Proxmox\Pve\ClustersScreen::register();
-		Proxmox\ServerProgress::register();
+		Proxmox\Vm\ServerProgress::register();
 		Apps\AppProgress::register();
 		Status::register();
 		Checkout::register();
