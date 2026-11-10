@@ -58,7 +58,7 @@ final class ThankYou {
 	 */
 	public static function routes(): void {
 		register_rest_route(
-			Api\Routes::NAMESPACE,
+			Plugin::REST_NAMESPACE,
 			'/orders/(?P<id>\d+)/progress',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -153,8 +153,19 @@ final class ThankYou {
 	 * @return array<string, mixed>
 	 */
 	public static function row( Resource $r ): array {
-		$state   = (string) $r->get( 'state' );
-		$group   = Account\Panel::group( $state, $r );
+		$state = (string) $r->get( 'state' );
+
+		/**
+		 * How the customer sees the state of one service: its group (getting-ready, ready, failed or removed), the
+		 * label of the state and, for a failed service, the message. The account area says it.
+		 *
+		 * @param array{group: string, label: string, message: string} $view  Empty until the account area fills it.
+		 * @param string                                                $state The stored state.
+		 * @param Resource                                              $r     The service.
+		 */
+		$view  = apply_filters( 'beltoft_services_thankyou_state', array( 'group' => '', 'label' => '', 'message' => '' ), $state, $r );
+		$view  = is_array( $view ) ? $view + array( 'group' => '', 'label' => '', 'message' => '' ) : array( 'group' => '', 'label' => '', 'message' => '' );
+		$group = (string) $view['group'];
 		$driver  = Registry::get( (string) $r->get( 'driver' ) );
 		$kind    = $driver ? $driver->kind() : '';
 		$license = $r->license();
@@ -166,8 +177,8 @@ final class ThankYou {
 			'name'     => $license ? View::product_name( $license ) : '',
 			'group'    => $group,
 			'ready'    => 'ready' === $group,
-			'label'    => Account\Panel::label( $state, $r ),
-			'message'  => 'failed' === $group ? Account\Panel::message( $state, $r ) : '',
+			'label'    => (string) $view['label'],
+			'message'  => 'failed' === $group ? (string) $view['message'] : '',
 			'progress' => Progress::build( $r ),
 			'url'      => '',
 		);
@@ -222,7 +233,13 @@ final class ThankYou {
 
 			// A server is the one service whose kind is "vm".
 			if ( $license && 'vm' === ( $rows[ $index ]['kind'] ?? '' ) ) {
-				return Account\ServerLinks::url( $license );
+				/**
+				 * The address of the page of the new server, for "Go to your dashboard".
+				 *
+				 * @param string               $url     Empty until the server feature says it.
+				 * @param array<string, mixed> $license The server's licence row.
+				 */
+				return (string) apply_filters( 'beltoft_services_thankyou_dashboard_url', '', $license );
 			}
 		}
 
@@ -301,7 +318,7 @@ final class ThankYou {
 
 		self::$printed[ $order_id ] = true;
 
-		$url = add_query_arg( 'key', rawurlencode( (string) $order->get_order_key() ), rest_url( Api\Routes::NAMESPACE . '/orders/' . $order_id . '/progress' ) );
+		$url = add_query_arg( 'key', rawurlencode( (string) $order->get_order_key() ), rest_url( Plugin::REST_NAMESPACE . '/orders/' . $order_id . '/progress' ) );
 
 		wc_get_template(
 			'order/next.php',

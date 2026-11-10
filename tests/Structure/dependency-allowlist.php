@@ -18,8 +18,4 @@ return array(
 	'Product.php -> Http\Connections',
 	'Product.php -> Usage\Rates',
 	'Product.php -> Proxmox\Vm\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
-	'Proxmox/Network/FirewallRoute.php -> Mcp\Endpoint',
-	'ThankYou.php -> Account\Panel',
-	'ThankYou.php -> Account\ServerLinks',
-	'ThankYou.php -> Api\Routes',
 );

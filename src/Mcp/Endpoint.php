@@ -47,6 +47,16 @@ final class Endpoint {
 	 */
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+		add_filter( 'beltoft_services_connected_app_call', array( __CLASS__, 'app_call' ) );
+	}
+
+	/**
+	 * Is the request a connected app's own tool call? Answers the core question of the features that must not name this feature.
+	 *
+	 * @param mixed $inside What an earlier listener said.
+	 */
+	public static function app_call( $inside = false ): bool {
+		return (bool) $inside || self::inside();
 	}
 
 	/**

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
@@ -38,6 +39,18 @@ final class CoreHooks {
 		add_filter( 'beltoft_services_park_action', array( __CLASS__, 'park_action' ), 10, 3 );
 		add_filter( 'beltoft_services_failure_alert_lines', array( DiskDriver::class, 'failure_alert_lines' ), 10, 3 );
 		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'thankyou_row' ), 10, 3 );
+		add_filter( 'beltoft_services_thankyou_dashboard_url', array( __CLASS__, 'dashboard_url' ), 10, 2 );
+	}
+
+	/**
+	 * Where "Go to your dashboard" leads for a server: the page of the new server.
+	 *
+	 * @param mixed $url     The address so far.
+	 * @param mixed $license The server's licence row.
+	 * @return mixed
+	 */
+	public static function dashboard_url( $url, $license = null ) {
+		return is_array( $license ) ? ServerLinks::url( $license ) : $url;
 	}
 
 	/**

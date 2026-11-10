@@ -15,6 +15,11 @@ defined( 'ABSPATH' ) || exit;
 final class Plugin {
 
 	/**
+	 * The REST namespace of this plugin's routes (the core pages that name a route use it; Api\Routes::NAMESPACE is the same value).
+	 */
+	public const REST_NAMESPACE = 'beltoft-services/v1';
+
+	/**
 	 * Whether the last boot registered the plugin's parts.
 	 *
 	 * @var bool
