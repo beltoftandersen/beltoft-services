@@ -7,6 +7,9 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Checkout\BlockField;
+use BeltoftServices\Checkout\ClassicPost;
+use BeltoftServices\Checkout\OrderFieldMeta;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Resource;
@@ -281,15 +284,8 @@ final class ServerName {
 	 * The submitted classic value, only inside WooCommerce's own checkout run.
 	 */
 	private static function posted(): string {
-		if ( ! did_action( 'woocommerce_checkout_process' ) ) {
-			return '';
-		}
-
 		// A form that does not carry the field at all (the step was not shown) uses what the picker carried. A posted value, even an empty one, wins.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce; the value is only used through normalise().
-		$value = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : Picked::get( 'name' );
-
-		return is_string( $value ) ? $value : '';
+		return ClassicPost::raw( self::POST_KEY, Picked::get( 'name' ) );
 	}
 
 	/**
@@ -360,15 +356,7 @@ final class ServerName {
 	 * Registers the block field when this WooCommerce has the API.
 	 */
 	public static function register_block_field(): void {
-		if ( ! function_exists( 'woocommerce_register_additional_checkout_field' ) ) {
-			return;
-		}
-
-		try {
-			woocommerce_register_additional_checkout_field( self::block_field_args() );
-		} catch ( \Exception $e ) {
-			unset( $e ); // The classic checkout still works; WooCommerce already reported why.
-		}
+		BlockField::register( self::block_field_args() );
 	}
 
 	/**
@@ -418,15 +406,8 @@ final class ServerName {
 			return $meta;
 		}
 
-		$candidates = array();
 		$product_id = (int) ( $license['product_id'] ?? 0 );
 		$variation  = (int) ( $license['variation_id'] ?? 0 );
-
-		foreach ( $order->get_items() as $item ) {
-			if ( $item instanceof \WC_Order_Item_Product && (int) $item->get_product_id() === $product_id && ( 0 === $variation || (int) $item->get_variation_id() === $variation ) ) {
-				$candidates[] = $item->get_meta( self::ITEM_META, true );
-			}
-		}
 
 		// The block checkout's field belongs to the order, not to a line: it names a server only when the order has exactly one.
 		$servers = 0;
@@ -437,9 +418,10 @@ final class ServerName {
 			}
 		}
 
-		$prefix       = class_exists( \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::class ) ? \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::get_group_key( 'other' ) : '_wc_other/';
-		if ( 1 === $servers ) {
-			$candidates[] = $order->get_meta( $prefix . self::BLOCK_FIELD_ID, true );
+		$candidates = OrderFieldMeta::candidates( $order, $product_id, $variation, self::ITEM_META, self::BLOCK_FIELD_ID );
+
+		if ( 1 !== $servers ) {
+			array_pop( $candidates ); // The block field is the last candidate.
 		}
 
 		foreach ( $candidates as $candidate ) {
