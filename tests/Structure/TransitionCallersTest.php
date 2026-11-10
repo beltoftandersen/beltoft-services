@@ -28,7 +28,7 @@ class TransitionCallersTest extends TestCase {
 		'Proxmox/DiskMeta.php'      => 'Releases the disk capacity itself; a notify would release twice through DiskMeta::state_changed.',
 		'Proxmox/SnapshotMeta.php'  => 'The parent server\'s own deleted email covers the customer; the pack has no secrets or children.',
 		'Proxmox/RestoreSteps.php'  => 'A failed disk keeps its volume; a notify would release capacity for a volume left in place. It alerts the admin.',
-		'Proxmox/Actions.php'       => 'The reinstall moves to provisioning; no listener acts on it and the later ready does not mail twice.',
+		'Proxmox/Vm/Reinstall.php'   => 'The reinstall moves to provisioning; no listener acts on it and the later ready does not mail twice.',
 	);
 
 	public function test_transition_is_called_only_where_listed(): void {
