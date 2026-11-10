@@ -281,7 +281,7 @@ final class Acts {
 			return new \WP_Error( 'beltoft_services_tool', __( 'The dashboard does not offer reactivation for this subscription.', 'beltoft-services' ) );
 		}
 
-		$said = Notices::capture( static fn() => \WCS_User_Change_Status_Handler::change_users_subscription( $s, 'active' ) );
+		$said = Notices::capture( static fn() => Subscriptions::change_status( $s, 'active' ) );
 		$now  = wcs_get_subscription( $id );
 		$ok   = $now instanceof \WC_Subscription && $now->has_status( 'active' );
 

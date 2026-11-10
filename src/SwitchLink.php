@@ -15,6 +15,23 @@ defined( 'ABSPATH' ) || exit;
 final class SwitchLink {
 
 	/**
+	 * The switch WooCommerce Subscriptions named in the request: the subscription and the item ids, 0 when absent. Only
+	 * read, never trusted: WooCommerce Subscriptions checks the nonce, and callers check ownership.
+	 *
+	 * @param bool $any_source True reads the subscription from the whole request (query or form), false from the query only. The item is always read from the query.
+	 * @return array{subscription: int, item: int}
+	 */
+	public static function requested( bool $any_source = false ): array {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Only ids are read; WooCommerce Subscriptions validates the switch and callers check ownership.
+		$source       = $any_source ? $_REQUEST : $_GET;
+		$subscription = isset( $source['switch-subscription'] ) ? absint( wp_unslash( $source['switch-subscription'] ) ) : 0;
+		$item         = isset( $_GET['item'] ) ? absint( wp_unslash( $_GET['item'] ) ) : 0;
+		// phpcs:enable
+
+		return array( 'subscription' => $subscription, 'item' => $item );
+	}
+
+	/**
 	 * The WooCommerce Subscriptions switch link of the service's subscription item to another variation of the same
 	 * product. Empty when Subscriptions is inactive, the item cannot be switched by this customer, or the service has no
 	 * subscription item.

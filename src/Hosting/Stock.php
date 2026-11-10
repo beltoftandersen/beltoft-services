@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\SwitchLink;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -170,7 +171,7 @@ final class Stock {
 	 */
 	private static function existing_customer_flow( \WC_Product $product ): bool {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Only presence is read, to let an existing customer through; WooCommerce Subscriptions verifies its own nonces.
-		if ( ! empty( $_REQUEST['switch-subscription'] ) || ! empty( $_GET['resubscribe'] ) ) {
+		if ( SwitchLink::requested( true )['subscription'] > 0 || ! empty( $_GET['resubscribe'] ) ) {
 			return true;
 		}
 		// phpcs:enable

@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox\Addon;
 
 use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\SwitchLink;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -69,8 +70,9 @@ final class AddonCart {
 	 * @param int $product_id Product id.
 	 */
 	public static function valid_switch( int $product_id ): bool {
-		$subscription_id = isset( $_GET['switch-subscription'] ) ? absint( wp_unslash( $_GET['switch-subscription'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validates the switch before this hook.
-		$item_id         = isset( $_GET['item'] ) ? absint( wp_unslash( $_GET['item'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- ownership and WCS ability checked below.
+		$requested       = SwitchLink::requested();
+		$subscription_id = $requested['subscription'];
+		$item_id         = $requested['item'];
 		if ( ! $subscription_id || ! $item_id || ! function_exists( 'wcs_get_subscription' ) || ! class_exists( '\\WC_Subscriptions_Switcher' ) ) {
 			return false;
 		}

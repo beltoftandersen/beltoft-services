@@ -12,6 +12,7 @@ use BeltoftServices\Proxmox\Addon\AddonCart;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\SwitchLink;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -73,8 +74,8 @@ final class SnapshotCart {
 	 */
 	private static function switching( array $data ): ?array {
 		$id = (int) ( $data[ CartFlow::SWITCH ]['subscription_id'] ?? 0 );
-		if ( $id < 1 && isset( $_GET['switch-subscription'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validated the switch.
-			$id = absint( wp_unslash( $_GET['switch-subscription'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( $id < 1 ) {
+			$id = SwitchLink::requested()['subscription'];
 		}
 		foreach ( $id > 0 ? Licenses::where( 'subscription_id', $id ) : array() as $license ) {
 			$pack   = Resource::for_license( (int) $license['id'] );
