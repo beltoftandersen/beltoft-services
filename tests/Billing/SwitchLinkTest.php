@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Billing;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\DiskCart;
 use BeltoftServices\Resource;
 use BeltoftServices\SwitchLink;

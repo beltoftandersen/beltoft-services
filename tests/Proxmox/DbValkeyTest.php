@@ -12,7 +12,7 @@ use BeltoftServices\Account\Databases;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbBuild;
@@ -23,7 +23,7 @@ use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbMonitor;
 use BeltoftServices\Proxmox\DbPolicy;
 use BeltoftServices\Proxmox\DbEngineEviction;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\PostgresEngine;
 use BeltoftServices\Proxmox\PrivateNets;
@@ -137,7 +137,7 @@ class DbValkeyTest extends TestCase {
 			)
 		);
 		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
-		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
 
 		as_unschedule_all_actions( \BeltoftServices\Jobs::SWEEP, array(), \BeltoftServices\Jobs::GROUP );
 	}

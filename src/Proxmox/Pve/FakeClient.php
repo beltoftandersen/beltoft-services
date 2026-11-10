@@ -5,7 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Pve;
+
+use BeltoftServices\Proxmox\Apps;
 
 defined( 'ABSPATH' ) || exit;
 

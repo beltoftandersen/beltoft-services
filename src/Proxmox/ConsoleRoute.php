@@ -5,6 +5,10 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 

@@ -11,6 +11,10 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\Prepares;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

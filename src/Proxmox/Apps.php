@@ -3,6 +3,8 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Pve\Client;
+
 defined( 'ABSPATH' ) || exit;
 
 final class Apps {

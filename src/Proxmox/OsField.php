@@ -13,6 +13,7 @@ use BeltoftServices\Checkout\ClassicPost;
 use BeltoftServices\Checkout\OrderFieldMeta;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clusters;
 
 defined( 'ABSPATH' ) || exit;
 

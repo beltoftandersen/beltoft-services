@@ -15,7 +15,7 @@ use BeltoftServices\Hosting\Clients;
 use BeltoftServices\Hosting\FakeNode;
 use BeltoftServices\Hosting\Nodes;
 use BeltoftServices\Hosting\ReadOnlyClient;
-use BeltoftServices\Proxmox\LiveClient;
+use BeltoftServices\Proxmox\Pve\LiveClient;
 
 /**
  * Clients::build_node and ReadOnlyClient.

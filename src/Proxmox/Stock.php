@@ -11,6 +11,9 @@ use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
+use BeltoftServices\Proxmox\Pve\Capacity;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 
 defined( 'ABSPATH' ) || exit;
 

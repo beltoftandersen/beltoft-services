@@ -10,6 +10,9 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Lifecycle;
+use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Pve\Prepares;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

@@ -7,7 +7,7 @@ use BeltoftServices\Cli\Commands;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Resource;
 

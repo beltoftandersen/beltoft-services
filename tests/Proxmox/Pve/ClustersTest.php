@@ -5,12 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Pve;
 
 use BeltoftServices\Crypto;
-use BeltoftServices\Proxmox\Clients;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
@@ -282,7 +282,7 @@ class ClustersTest extends TestCase {
 		update_option( Settings::OPTION, array( 'site_tag' => 'shop-main' ) );
 		$this->assertFalse( Clients::untagged( $live, true ) );
 		$this->assertNull( Clients::gate( 'lab', $live, true ) );
-		$this->assertInstanceOf( \BeltoftServices\Proxmox\LiveClient::class, Clients::build( array_merge( $live, array( 'api_url' => 'https://pve.example.invalid:8006', 'token_id' => 'a@pve!b', 'token_secret' => 'secret-secret-secret-1' ) ), true ) );
+		$this->assertInstanceOf( \BeltoftServices\Proxmox\Pve\LiveClient::class, Clients::build( array_merge( $live, array( 'api_url' => 'https://pve.example.invalid:8006', 'token_id' => 'a@pve!b', 'token_secret' => 'secret-secret-secret-1' ) ), true ) );
 	}
 
 	public function test_the_untagged_notice_shows_to_admins_on_any_page(): void {
@@ -489,7 +489,7 @@ class ClustersTest extends TestCase {
 		$_GET['edit'] = 'lab';
 
 		ob_start();
-		\BeltoftServices\Proxmox\ClustersScreen::render();
+		\BeltoftServices\Proxmox\Pve\ClustersScreen::render();
 		$html = (string) ob_get_clean();
 		unset( $_GET['edit'] );
 

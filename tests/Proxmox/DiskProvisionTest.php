@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Cli\Commands;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Actions;
 use BeltoftServices\Proxmox\DiskMeta;
 use BeltoftServices\Proxmox\DiskPanels;

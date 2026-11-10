@@ -4,8 +4,8 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Crypto;
-use BeltoftServices\Proxmox\Clients;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\ConsoleAuth;
 use BeltoftServices\Proxmox\ConsoleSessions;
 use BeltoftServices\Proxmox\VmRecords;

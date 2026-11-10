@@ -10,6 +10,9 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\Prepares;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

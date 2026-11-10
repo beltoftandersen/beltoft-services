@@ -4,6 +4,9 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Crypto;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

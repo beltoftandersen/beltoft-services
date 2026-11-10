@@ -9,7 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 

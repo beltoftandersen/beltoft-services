@@ -12,7 +12,7 @@ use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\Panel;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Resource;

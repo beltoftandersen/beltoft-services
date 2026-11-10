@@ -129,7 +129,7 @@ class AccessTest extends TestCase {
 		// A client that is sent the password records it scrubbed.
 		list( $other ) = $this->resource();
 		$password      = Access::pending_password( $other );
-		$client        = new \BeltoftServices\Proxmox\FakeClient();
+		$client        = new \BeltoftServices\Proxmox\Pve\FakeClient();
 		$client->add_node( 'n1' );
 		$client->add_vm( array( 'vmid' => 100, 'node' => 'n1', 'name' => 'x' ) );
 		$client->request( 'PUT', '/nodes/n1/qemu/100/config', array( 'cipassword' => $password, 'sshkeys' => rawurlencode( 'ssh-ed25519 AAAA' ) ) );

@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Tests\TestCase;

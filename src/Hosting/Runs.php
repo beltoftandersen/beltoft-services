@@ -9,7 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Steps;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Connecting to the node of a record, the container checks, power, limits and the agent jobs, written once for
  * Provision and Operations. The task polling, the error classification and the secret scrubbing are the
- * Proxmox\Steps trait (it is not changed; its two virtual machine methods are not used here, and verified() is
+ * Proxmox\Pve\Steps trait (it is not changed; its two virtual machine methods are not used here, and verified() is
  * replaced by the container version below).
  */
 trait Runs {

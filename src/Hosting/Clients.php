@@ -8,12 +8,12 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\LiveGate;
-use BeltoftServices\Proxmox\Client;
+use BeltoftServices\Proxmox\Pve\Client;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The only place a client of a node is built. Gated exactly like Proxmox\Clients::for(): a live client needs the
+ * The only place a client of a node is built. Gated exactly like Proxmox\Pve\Clients::for(): a live client needs the
  * node to say "live" AND the constant BELTOFT_SERVICES_HOSTING_LIVE to be true in wp-config.php AND an explicit
  * site tag. No filter can switch it on.
  *
@@ -103,10 +103,10 @@ final class Clients {
 		}
 
 		// The only place a live node API client is built: the node says live, the constant allows it and the site
-		// tag is set. It is the path-agnostic Proxmox\LiveClient (token, CA file, public key pin, timeouts), which
+		// tag is set. It is the path-agnostic Proxmox\Pve\LiveClient (token, CA file, public key pin, timeouts), which
 		// asks for the allowance again and refuses bad settings; the lxc paths are the callers'.
 		if ( 'live' === self::kind( $node, $allowed ) ) {
-			return new \BeltoftServices\Proxmox\LiveClient(
+			return new \BeltoftServices\Proxmox\Pve\LiveClient(
 				array(
 					'api_url'      => (string) ( $node['api_url'] ?? '' ),
 					'token_id'     => (string) ( $node['token_id'] ?? '' ),

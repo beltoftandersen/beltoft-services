@@ -7,6 +7,9 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

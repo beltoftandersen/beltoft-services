@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFieldsSchema\DocumentObject;
 use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFieldsSchema\Validation;
 use BeltoftServices\Lifecycle;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;

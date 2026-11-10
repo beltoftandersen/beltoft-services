@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 

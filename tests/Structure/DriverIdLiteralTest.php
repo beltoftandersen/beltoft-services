@@ -21,7 +21,7 @@ class DriverIdLiteralTest extends TestCase {
 	 */
 	private const ALLOWED = array(
 		'src/Proxmox/ProxmoxDriver.php'   => 'defines the id',
-		'src/Proxmox/ProxmoxSettings.php' => 'the settings tab slug, not the driver id',
+		'src/Proxmox/Pve/ProxmoxSettings.php' => 'the settings tab slug, not the driver id',
 		'src/Drivers/Driver.php'          => 'a docblock example',
 	);
 

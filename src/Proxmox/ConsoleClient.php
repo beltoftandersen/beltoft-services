@@ -3,6 +3,9 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clients;
+
 defined( 'ABSPATH' ) || exit;
 
 final class ConsoleClient {

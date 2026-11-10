@@ -10,6 +10,10 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

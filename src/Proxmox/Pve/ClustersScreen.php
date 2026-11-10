@@ -5,8 +5,10 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Pve;
 
+use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;

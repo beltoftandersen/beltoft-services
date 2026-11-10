@@ -12,7 +12,7 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbBuild;
 use BeltoftServices\Proxmox\DbCard;
@@ -20,7 +20,7 @@ use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbTermsField;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\MssqlEngine;
 use BeltoftServices\Proxmox\PostgresEngine;
@@ -116,7 +116,7 @@ class DbMssqlTest extends TestCase {
 		update_option( Clusters::OPTION, $stored, false );
 
 		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
-		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
 
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();

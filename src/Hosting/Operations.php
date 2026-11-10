@@ -8,7 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

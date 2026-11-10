@@ -14,6 +14,11 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\LiveClient;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Jobs\PowerJobs;
 

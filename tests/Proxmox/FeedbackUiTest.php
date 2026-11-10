@@ -59,7 +59,7 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		$sub     = $this->subscription( $user );
 		$sub->add_product( $product, 1, array( 'subtotal' => '5', 'total' => '5' ) );
 		$sub->save();
-		$this->assertTrue( \BeltoftServices\Proxmox\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
 		$disk    = Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $server->license()['id'] ) );
 		$this->assertInstanceOf( Resource::class, $disk );

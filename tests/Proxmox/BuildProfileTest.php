@@ -11,8 +11,8 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\BuildProfile;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\Profiles;
 use BeltoftServices\Proxmox\ProxmoxDriver;
@@ -153,7 +153,7 @@ class BuildProfileTest extends TestCase {
 			)
 		);
 		set_transient(
-			\BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab',
+			\BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab',
 			array(
 				array(
 					'node'   => 'node-a',

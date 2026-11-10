@@ -328,7 +328,7 @@ class FirewallRouteTest extends FirewallTestCase {
 		list( $other, $them ) = $this->ready();
 		$this->save_cluster( array( 'fw_enabled' => '0', 'fw_pilot' => ' ' . $pilot->license()['id'] . ', x, 0' ) );
 
-		$this->assertSame( array( (int) $pilot->license()['id'] ), \BeltoftServices\Proxmox\Clusters::get( 'lab' )['fw_pilot'], 'Only real license IDs are kept.' );
+		$this->assertSame( array( (int) $pilot->license()['id'] ), \BeltoftServices\Proxmox\Pve\Clusters::get( 'lab' )['fw_pilot'], 'Only real license IDs are kept.' );
 		$this->assertTrue( \BeltoftServices\Proxmox\FirewallRules::editable( Resource::find( $pilot->id() ) ) );
 		$this->assertFalse( \BeltoftServices\Proxmox\FirewallRules::editable( Resource::find( $other->id() ) ) );
 		$this->assertSame( 200, $this->route( 'GET', $pilot->id(), $user )->get_status() );

@@ -6,12 +6,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\Clients;
-use BeltoftServices\Proxmox\FakeClient;
-use BeltoftServices\Proxmox\LiveClient;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\FakeClient;
+use BeltoftServices\Proxmox\Pve\LiveClient;
 use BeltoftServices\Tests\TestCase;
 
 /**
@@ -276,7 +276,7 @@ class ClientTest extends TestCase {
 
 	public function test_new_live_client_is_built_only_by_the_factory(): void {
 		$hits = array();
-		$dir  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src/Proxmox', \FilesystemIterator::SKIP_DOTS ) );
+		$dir  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 3 ) . '/src/Proxmox', \FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $dir as $file ) {
 			if ( 'php' === $file->getExtension() && false !== strpos( (string) file_get_contents( $file->getPathname() ), 'new LiveClient' ) ) {
 				$hits[] = $file->getFilename();
@@ -638,7 +638,7 @@ class ClientTest extends TestCase {
 		);
 		$this->assertStringContainsString( 'UPID%3Apve1%3A0000ABCD', $this->http_calls()[0]['url'] );
 
-		$this->assertSame( 'pve-node.2', \BeltoftServices\Proxmox\FakeClient::upid_node( 'UPID:pve-node.2:1:2:3:t:1:u:' ) );
+		$this->assertSame( 'pve-node.2', \BeltoftServices\Proxmox\Pve\FakeClient::upid_node( 'UPID:pve-node.2:1:2:3:t:1:u:' ) );
 		$this->assertNull( FakeClient::upid_node( 'UPID::1' ) );
 		$this->assertNull( FakeClient::upid_node( 'XPID:pve1:1' ) );
 	}
@@ -860,7 +860,7 @@ class ClientTest extends TestCase {
 	}
 
 	public function test_file_write_content_is_scrubbed_from_errors(): void {
-		$this->assertContains( 'content', \BeltoftServices\Proxmox\LiveClient::SENSITIVE );
+		$this->assertContains( 'content', \BeltoftServices\Proxmox\Pve\LiveClient::SENSITIVE );
 		$this->respond_with( fn() => new \WP_Error( 'http_request_failed', 'bad content=s3cret-file-body done' ) );
 		$error = $this->live()->request( 'POST', '/nodes/pve1/qemu/1/agent/file-write', array( 'file' => '/tmp/x', 'content' => 's3cret-file-body' ) );
 		$this->assertStringNotContainsString( 's3cret-file-body', $error->get_error_message() );

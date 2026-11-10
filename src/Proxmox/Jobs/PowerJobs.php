@@ -7,12 +7,13 @@
 
 namespace BeltoftServices\Proxmox\Jobs;
 
-use BeltoftServices\Proxmox\Client;
+use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbMonitor;
 use BeltoftServices\Proxmox\Monitor;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftLicenses\Events;

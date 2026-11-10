@@ -11,8 +11,8 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\LinkVm;
 use BeltoftServices\Proxmox\ProxmoxDriver;
@@ -97,7 +97,7 @@ class LiveWiringTest extends TestCase {
 		$this->wipe_tables();
 		delete_option( Clusters::OPTION );
 		$this->settings( array( 'admin_email' => 'ops@example.com', 'task_wait' => 5 ) );
-		$this->assertTrue( \BeltoftServices\Proxmox\Clients::live_allowed() );
+		$this->assertTrue( \BeltoftServices\Proxmox\Pve\Clients::live_allowed() );
 
 		// A fake cluster builds a running VM and has a license waiting for its service.
 		$this->fake = new FakeClient();

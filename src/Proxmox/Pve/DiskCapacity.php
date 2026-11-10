@@ -1,9 +1,12 @@
 <?php
 /** Capacity accounting for node-local extra disks. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Pve;
 
 use BeltoftServices\Locks;
+use BeltoftServices\Proxmox\DbDisk;
+use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

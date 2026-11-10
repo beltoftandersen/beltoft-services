@@ -9,10 +9,11 @@ namespace BeltoftServices\Proxmox\Jobs;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\DiskCapacity;
-use BeltoftServices\Proxmox\Placement;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\JobScope;
+use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\Stock;
 use BeltoftServices\Proxmox\VmRecords;

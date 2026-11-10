@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\AppDomainRelease;
 use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Domains\Records;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\Schema;

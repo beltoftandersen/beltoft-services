@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Tests\TestCase;
 
 class FakeClientDiskTest extends TestCase {

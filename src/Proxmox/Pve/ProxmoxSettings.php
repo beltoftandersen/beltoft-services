@@ -5,8 +5,10 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Pve;
 
+use BeltoftServices\Proxmox\IpPoolScreen;
+use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;

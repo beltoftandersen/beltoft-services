@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Proxmox\Pve\Clusters;
 
 defined( 'ABSPATH' ) || exit;
 
