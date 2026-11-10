@@ -6,7 +6,8 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Lifecycle;
-use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
+use BeltoftServices\Proxmox\Addon\AddonLink;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,60 +21,15 @@ final class SnapshotMeta {
 
 	/** The server chosen at checkout, from the order line (the line says which server; the nonce was checked at add to cart). */
 	public static function initial_meta( array $meta, array $license, Driver $driver ): array {
-		if ( SnapshotDriver::ID !== $driver->id() ) {
-			return $meta;
-		}
-		$order_id = (int) ( $license['order_id'] ?? 0 );
-		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
-		if ( ! $order || (int) ( $license['user_id'] ?? 0 ) < 1 ) {
-			return $meta;
-		}
-		$uid             = '';
-		$subscription_id = (int) ( $license['subscription_id'] ?? 0 );
-		if ( $subscription_id > 0 && function_exists( 'wcs_get_subscription' ) ) {
-			$subscription = wcs_get_subscription( $subscription_id );
-			if ( $subscription ) {
-				foreach ( $subscription->get_items() as $item ) {
-					if ( (int) $item->get_product_id() === (int) $license['product_id'] ) {
-						$uid = (string) $item->get_meta( '_beltoft_services_snapshot_uid', true );
-						break;
-					}
-				}
-			}
-		}
-		$matches = array();
-		foreach ( $order->get_items() as $item ) {
-			if ( (int) $item->get_product_id() !== (int) $license['product_id'] ) {
-				continue;
-			}
-			$item_uid = (string) $item->get_meta( '_beltoft_services_snapshot_uid', true );
-			if ( '' !== $uid && $uid !== $item_uid ) {
-				continue;
-			}
-			$matches[] = $item;
-		}
-		if ( 1 !== count( $matches ) ) {
-			return $meta;
-		}
-		$link = $matches[0]->get_meta( '_beltoft_services_snapshot_server', true );
-		if ( is_numeric( $link ) && (int) $link > 0 ) {
-			$server = Licenses::find( (int) $link );
-			if ( $server && (int) $server['user_id'] === (int) $license['user_id'] && self::is_server( $server ) ) {
-				$resource = Resource::for_license( (int) $link );
-				if ( $resource && true !== $resource->get( 'linked' ) && ! in_array( $resource->get( 'state' ), array( 'failed', 'deleted' ), true ) ) {
-					$meta['server_license'] = (int) $link;
-				}
-			}
-		}
-		$meta['order_item_id'] = (int) $matches[0]->get_id();
-
-		return $meta;
+		return AddonLink::initial_meta( self::addon(), $meta, $license, $driver );
 	}
 
 	private static function is_server( array $license ): bool {
-		$driver = Product::driver_for( (int) ( $license['product_id'] ?? 0 ) );
+		return AddonLink::is_server( $license );
+	}
 
-		return $driver && ProxmoxDriver::ID === $driver->id();
+	private static function addon(): Addon {
+		return Addon::for_driver( SnapshotDriver::ID );
 	}
 
 	/** The server resource a pack belongs to, or null. */
@@ -89,20 +45,7 @@ final class SnapshotMeta {
 
 	/** Live pack resources linked to one server, whatever their state (the cascade and the card use this). */
 	public static function for_server( Resource $server ): array {
-		$license_id = (int) ( $server->license()['id'] ?? 0 );
-		$out        = array();
-		if ( $license_id < 1 ) {
-			return $out;
-		}
-		// One query for the candidates (the license id is in the meta text), then the exact check on each: no loading of every pack of every customer.
-		foreach ( Resource::find_by_meta( 'snapshot', 'server_license', array( $license_id, (string) $license_id ) ) as $id ) {
-			$pack = Resource::find( (int) $id );
-			if ( $pack && SnapshotDriver::ID === $pack->get( 'driver' ) && (int) $pack->get( 'server_license' ) === $license_id ) {
-				$out[] = $pack;
-			}
-		}
-
-		return $out;
+		return AddonLink::for_server( self::addon(), $server );
 	}
 
 	/** Packs that hold a place for a purchase check: every live pack that is not failed, deleted, revoked or suspended for good, in any state (requested, provisioning, paused, on hold). */

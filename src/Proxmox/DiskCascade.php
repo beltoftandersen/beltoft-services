@@ -6,6 +6,8 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
+use BeltoftServices\Proxmox\Addon\AddonLink;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -27,7 +29,13 @@ final class DiskCascade {
 
 	/** Add-on resources linked to a server: its extra disks and its snapshot packs, live, whatever their state. */
 	public static function addons( Resource $server ): array {
-		return array_merge( DiskMeta::for_server( $server ), SnapshotMeta::for_server( $server ), AppLicence::for_server( $server ) );
+		$out = array();
+
+		foreach ( Addon::all() as $addon ) {
+			$out = array_merge( $out, AddonLink::for_server( $addon, $server ) );
+		}
+
+		return $out;
 	}
 
 	/**
