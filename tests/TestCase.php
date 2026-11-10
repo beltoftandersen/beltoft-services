@@ -444,7 +444,7 @@ abstract class TestCase extends \WP_UnitTestCase {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', \BeltoftServices\Proxmox\Vm\Schema::tables()['private_nets'] ) );
 
 		for ( $i = 1; $i <= $count; $i++ ) {
-			\BeltoftServices\Proxmox\PrivateNets::add( 3000 + $i, '10.77.' . $i . '.0/28' );
+			\BeltoftServices\Proxmox\Network\PrivateNets::add( 3000 + $i, '10.77.' . $i . '.0/28' );
 		}
 	}
 }

@@ -51,7 +51,7 @@ final class ToolsMapTest extends McpTestCase {
 	}
 
 	private function find_class( string $short ): ?string {
-		foreach ( array( 'Proxmox', 'Proxmox\\Vm', 'Proxmox\\Disk', 'Proxmox\\Snapshot', 'Proxmox\\Backup', 'Domains' ) as $ns ) {
+		foreach ( array( 'Proxmox', 'Proxmox\\Vm', 'Proxmox\\Disk', 'Proxmox\\Snapshot', 'Proxmox\\Backup', 'Proxmox\\Network', 'Proxmox\\Console', 'Proxmox\\Db', 'Domains' ) as $ns ) {
 			if ( class_exists( 'BeltoftServices\\' . $ns . '\\' . $short ) ) {
 				return 'BeltoftServices\\' . $ns . '\\' . $short;
 			}
@@ -64,8 +64,8 @@ final class ToolsMapTest extends McpTestCase {
 		$classes = array(
 			'BeltoftServices\Proxmox\Vm\Actions',
 			'BeltoftServices\Proxmox\Snapshot\Policy',
-			'BeltoftServices\Proxmox\FirewallRules',
-			'BeltoftServices\Proxmox\PrivateAttach',
+			'BeltoftServices\Proxmox\Network\FirewallRules',
+			'BeltoftServices\Proxmox\Network\PrivateAttach',
 			'BeltoftServices\Proxmox\DbActions',
 			'BeltoftServices\Domains\Actions',
 			'BeltoftServices\Ssl\Operations',

@@ -13,7 +13,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Vm\Access;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;

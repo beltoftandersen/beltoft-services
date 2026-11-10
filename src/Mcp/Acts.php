@@ -17,7 +17,7 @@ use BeltoftServices\Account\Cards;
 use BeltoftServices\Account\DomainDanger;
 use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Proxmox\DbAccess;
-use BeltoftServices\Proxmox\PrivateAttach;
+use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

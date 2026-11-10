@@ -177,7 +177,7 @@ final class PurchaseDbTest extends UsageTestCase {
 	}
 
 	public function test_a_public_ipv4_is_refused_while_no_address_is_free(): void {
-		set_transient( \BeltoftServices\Proxmox\IpPool::FREE_TRANSIENT, 0, MINUTE_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Network\IpPool::FREE_TRANSIENT, 0, MINUTE_IN_SECONDS );
 		$out = $this->tool( 'order_database', $this->args( array( 'public_ipv4' => true ) ), $this->oauth( $this->user, Tokens::FULL ) );
 
 		$this->assertTrue( $out['isError'] );

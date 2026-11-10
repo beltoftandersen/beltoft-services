@@ -8,6 +8,10 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Resource;
 

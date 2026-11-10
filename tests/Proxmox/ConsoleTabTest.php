@@ -10,8 +10,9 @@ use BeltoftServices\Proxmox\Console;
 use BeltoftServices\Proxmox\ConsoleTab;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 class ConsoleTabTest extends MonitoringTestCase {
 	public function set_up(): void {

@@ -11,7 +11,7 @@ use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskGuide;
-use BeltoftServices\Proxmox\PrivateAttach;
+use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
 use BeltoftServices\Resource;

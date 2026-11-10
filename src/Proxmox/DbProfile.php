@@ -7,6 +7,9 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Vm\BuildProfile;
 use BeltoftServices\Resource;
 

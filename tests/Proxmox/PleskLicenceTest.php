@@ -165,7 +165,7 @@ final class PleskLicenceTest extends PaidAppCase {
 	public function test_a_server_without_an_address_waits_and_orders_nothing(): void {
 		$o = $this->plesk_order( 'pro' );
 		global $wpdb;
-		\BeltoftServices\Proxmox\IpPool::release( $o['server']->id() );
+		\BeltoftServices\Proxmox\Network\IpPool::release( $o['server']->id() );
 
 		Jobs::run( $o['licence']->id() );
 

@@ -177,12 +177,12 @@ final class Plugin {
 		Proxmox\AppOwnDomain::register();
 		Proxmox\AppWww::register();
 		Proxmox\AppStatus::register();
-		Proxmox\MetricsRoute::register();
-		Proxmox\Flows::register();
-		Proxmox\LiveUsage::register();
-		Proxmox\FirewallRoute::register();
-		Proxmox\FirewallTab::register();
-		Proxmox\NetworkTab::register();
+		Proxmox\Network\MetricsRoute::register();
+		Proxmox\Network\Flows::register();
+		Proxmox\Network\LiveUsage::register();
+		Proxmox\Network\FirewallRoute::register();
+		Proxmox\Network\FirewallTab::register();
+		Proxmox\Network\NetworkTab::register();
 		Proxmox\Vm\Switches::register();
 		Proxmox\Vm\Upgrades::register();
 		Proxmox\Vm\Credentials::register();
@@ -218,7 +218,7 @@ final class Plugin {
 		Proxmox\Vm\EmailDetails::register();
 		Proxmox\Vm\ProxmoxJobs::register();
 		Proxmox\Vm\Stock::register();
-		Proxmox\IpPoolScreen::register();
+		Proxmox\Network\IpPoolScreen::register();
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Emails\Emails::register();

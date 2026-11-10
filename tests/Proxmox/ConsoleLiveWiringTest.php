@@ -9,8 +9,9 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\ConsoleAuth;
 use BeltoftServices\Proxmox\ConsoleSessions;
 use BeltoftServices\Proxmox\Vm\VmRecords;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 class ConsoleLiveWiringTest extends MonitoringTestCase {
 	public function set_up(): void {

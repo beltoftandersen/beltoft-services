@@ -452,10 +452,10 @@ final class Panel {
 			$rows[ __( 'App error', 'beltoft-services' ) ] = (string) $r->get( 'app_error' );
 		}
 
-		$quarantine = $r->get( \BeltoftServices\Proxmox\Quarantine::META );
+		$quarantine = $r->get( \BeltoftServices\Proxmox\Network\Quarantine::META );
 
 		if ( is_array( $quarantine ) ) {
-			$rows[ __( 'Network quarantine', 'beltoft-services' ) ] = \BeltoftServices\Proxmox\Quarantine::describe( $quarantine );
+			$rows[ __( 'Network quarantine', 'beltoft-services' ) ] = \BeltoftServices\Proxmox\Network\Quarantine::describe( $quarantine );
 		}
 
 		if ( $r->on_hold() ) {
@@ -488,7 +488,7 @@ final class Panel {
 			}
 		}
 
-		if ( \BeltoftServices\Proxmox\Quarantine::active( $r ) ) {
+		if ( \BeltoftServices\Proxmox\Network\Quarantine::active( $r ) ) {
 			self::button( $r, 'quarantine_lift', __( 'Lift network quarantine', 'beltoft-services' ) );
 		}
 

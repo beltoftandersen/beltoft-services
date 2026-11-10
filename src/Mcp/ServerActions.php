@@ -19,7 +19,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbPolicy;
-use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\SshKeyField;

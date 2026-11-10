@@ -11,9 +11,9 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Pve\Client;
-use BeltoftServices\Proxmox\Monitor;
+use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\JobScope;
-use BeltoftServices\Proxmox\Traffic;
+use BeltoftServices\Proxmox\Network\Traffic;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Cli;
 
-use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 
 defined( 'ABSPATH' ) || exit;
 

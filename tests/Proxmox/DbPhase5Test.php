@@ -20,7 +20,7 @@ use BeltoftServices\Proxmox\DbMonitor;
 use BeltoftServices\Proxmox\DbPower;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\FakeClient;
-use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Vm\Schema;

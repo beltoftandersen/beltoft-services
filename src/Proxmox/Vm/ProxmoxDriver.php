@@ -14,7 +14,7 @@ use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;

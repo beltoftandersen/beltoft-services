@@ -19,13 +19,14 @@ use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\AppWww;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 /** Documentation names and addresses only. DNS is FakeDns (ours) or a filter (public), Proxmox is FakeClient. */
 final class AppWwwTest extends MonitoringTestCase {

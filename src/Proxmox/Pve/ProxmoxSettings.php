@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\IpPoolScreen;
+use BeltoftServices\Proxmox\Network\IpPoolScreen;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Settings;
 

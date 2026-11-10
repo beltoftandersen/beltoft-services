@@ -17,14 +17,14 @@ use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbIp;
 use BeltoftServices\Proxmox\DbNeedsServer;
-use BeltoftServices\Proxmox\Firewall;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Proxmox\DbProfile;
 use BeltoftServices\Proxmox\Vm\Profiles;
 use BeltoftServices\Proxmox\Pve\FakeClient;
-use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Api\Routes;
@@ -1018,7 +1018,7 @@ class DbDiskTest extends TestCase {
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched_by_user', '__return_true' );
 		$r = $this->db_on_ladder( 'e0-0', false );
 		$this->settings( array( 'monitor_alerts' => 'on' ) );
-		$sent = \BeltoftServices\Emails\Emails::send( \BeltoftServices\Proxmox\Monitor::EMAIL_ID, $r, array( 'reason' => 'db_disk', 'disk_percent' => 90 ) );
+		$sent = \BeltoftServices\Emails\Emails::send( \BeltoftServices\Proxmox\Network\Monitor::EMAIL_ID, $r, array( 'reason' => 'db_disk', 'disk_percent' => 90 ) );
 
 		$this->assertTrue( (bool) $sent );
 		$mail = end( $this->mails );

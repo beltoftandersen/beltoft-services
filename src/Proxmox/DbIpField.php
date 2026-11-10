@@ -12,6 +12,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Backup\CartSwap;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\OsField;
 
 defined( 'ABSPATH' ) || exit;

@@ -8,6 +8,8 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Proxmox\Vm\VmRecords;

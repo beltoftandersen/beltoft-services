@@ -18,7 +18,7 @@ use BeltoftServices\Proxmox\AppReveal;
 use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;

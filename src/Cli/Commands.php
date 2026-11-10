@@ -17,11 +17,11 @@ use BeltoftServices\Domains\Health as DomainHealth;
 use BeltoftServices\Jobs;
 use BeltoftServices\Plugin;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\IpfilterReport;
-use BeltoftServices\Proxmox\IpWho;
+use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\IpfilterReport;
+use BeltoftServices\Proxmox\Network\IpWho;
 use BeltoftServices\Proxmox\Vm\LinkVm;
-use BeltoftServices\Proxmox\Metrics;
+use BeltoftServices\Proxmox\Network\Metrics;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
@@ -29,7 +29,7 @@ use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Ownership;
-use BeltoftServices\Proxmox\Quarantine;
+use BeltoftServices\Proxmox\Network\Quarantine;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
@@ -502,7 +502,7 @@ final class Commands {
 	 * @param array<string, string> $assoc_args Flags.
 	 */
 	public function ip_pool_release( array $args, array $assoc_args ): void {
-		$result = \BeltoftServices\Proxmox\IpPoolScreen::apply(
+		$result = \BeltoftServices\Proxmox\Network\IpPoolScreen::apply(
 			'release',
 			array(
 				'address' => (string) ( $args[0] ?? '' ),

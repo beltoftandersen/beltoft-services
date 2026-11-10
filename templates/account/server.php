@@ -15,9 +15,9 @@ defined( 'ABSPATH' ) || exit;
 <div class="beltoft-services-server">
 	<?php
 	$beltoft_services_quarantined = \BeltoftServices\Resource::for_license( (int) ( $view['license']['id'] ?? 0 ) );
-	if ( $beltoft_services_quarantined && \BeltoftServices\Proxmox\Quarantine::active( $beltoft_services_quarantined ) ) :
+	if ( $beltoft_services_quarantined && \BeltoftServices\Proxmox\Network\Quarantine::active( $beltoft_services_quarantined ) ) :
 		?>
-		<p class="beltoft-services-notice" role="status"><?php echo esc_html( \BeltoftServices\Proxmox\Quarantine::notice() ); ?></p>
+		<p class="beltoft-services-notice" role="status"><?php echo esc_html( \BeltoftServices\Proxmox\Network\Quarantine::notice() ); ?></p>
 	<?php endif; ?>
 	<?php
 	// The head prints the back link on the row of its buttons; any other page prints it above.

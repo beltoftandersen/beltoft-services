@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 
 defined( 'ABSPATH' ) || exit;
 

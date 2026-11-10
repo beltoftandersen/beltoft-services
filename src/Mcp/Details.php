@@ -17,12 +17,12 @@ use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\Firewall;
-use BeltoftServices\Proxmox\FirewallRules;
+use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
-use BeltoftServices\Proxmox\LiveUsage;
+use BeltoftServices\Proxmox\Network\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
-use BeltoftServices\Proxmox\PrivateAttach;
+use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 

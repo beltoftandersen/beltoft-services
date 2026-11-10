@@ -205,8 +205,8 @@ final class DbPicker {
 			return $fail( 'plan', __( 'Choose a plan.', 'beltoft-services' ) );
 		}
 
-		if ( ! \BeltoftServices\Proxmox\PrivateNets::available_for( $user, (string) $plan['cluster'] ) ) {
-			return $fail( 'plan', \BeltoftServices\Proxmox\PrivateNets::unavailable_message() );
+		if ( ! \BeltoftServices\Proxmox\Network\PrivateNets::available_for( $user, (string) $plan['cluster'] ) ) {
+			return $fail( 'plan', \BeltoftServices\Proxmox\Network\PrivateNets::unavailable_message() );
 		}
 
 		if ( ! $plan['in_stock'] ) {
@@ -360,10 +360,10 @@ final class DbPicker {
 
 		echo '<p class="beltoft-services-picker__intro">' . esc_html__( 'Choose a plan. You pay on the next page.', 'beltoft-services' ) . '</p>';
 
-		$unavailable = ! \BeltoftServices\Proxmox\PrivateNets::available_for( get_current_user_id() );
+		$unavailable = ! \BeltoftServices\Proxmox\Network\PrivateNets::available_for( get_current_user_id() );
 
 		if ( $unavailable ) {
-			echo '<p class="beltoft-services-notice" role="status">' . esc_html( \BeltoftServices\Proxmox\PrivateNets::unavailable_message() ) . '</p>';
+			echo '<p class="beltoft-services-notice" role="status">' . esc_html( \BeltoftServices\Proxmox\Network\PrivateNets::unavailable_message() ) . '</p>';
 		}
 
 		// The private network notice, for the engines whose plans need it (one engine: one notice, as before).

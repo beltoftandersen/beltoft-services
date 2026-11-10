@@ -20,8 +20,9 @@ use BeltoftServices\Proxmox\Pve\ClustersScreen;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 /**
  * Documentation values only; the fake client answers every call.

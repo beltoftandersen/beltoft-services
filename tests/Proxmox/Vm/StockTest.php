@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox\Vm;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Pve\Capacity;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Vm\Schema;

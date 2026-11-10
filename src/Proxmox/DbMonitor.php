@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Emails\Emails;
+use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

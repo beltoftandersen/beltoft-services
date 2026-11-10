@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbIpField;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
 require_once __DIR__ . '/Backup/BackupTestCase.php';

@@ -13,8 +13,9 @@ use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Crypto;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 class ConsoleBackendTest extends MonitoringTestCase {
 	public function set_up(): void {

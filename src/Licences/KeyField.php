@@ -12,7 +12,7 @@ use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\PleskLicence;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
