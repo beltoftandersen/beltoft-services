@@ -137,6 +137,19 @@ class OpsTest extends HostingCase {
 		$this->assertCount( 1, $this->agent->calls_of( 'agent.health' ) );
 	}
 
+	public function test_the_health_job_is_quiet_when_the_real_free_memory_and_disk_are_fine(): void {
+		$this->agent->set_health_extra( array( 'host' => array( 'mem_total_mb' => 32768, 'mem_free_mb' => 8000, 'disk_total_gb' => 1000, 'disk_free_gb' => 500 ) ) );
+		NodeHealth::run();
+		$this->assertSame( array(), $this->admin_mails( 'is low' ), 'Plenty free: quiet.' );
+	}
+
+	public function test_the_health_job_cross_checks_the_real_free_memory_the_agent_reports(): void {
+		$this->agent->set_health_extra( array( 'host' => array( 'mem_total_mb' => 32768, 'mem_free_mb' => 900, 'disk_total_gb' => 1000, 'disk_free_gb' => 500 ) ) );
+		NodeHealth::run();
+		NodeHealth::run();
+		$this->assertCount( 1, $this->admin_mails( 'is low' ), 'Low real free memory is mailed, once a day.' );
+	}
+
 	public function test_an_unreachable_agent_is_mailed_once_a_day(): void {
 		$this->agent->fail_next( 'agent.health', 'down' );
 

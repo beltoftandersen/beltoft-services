@@ -48,7 +48,8 @@ final class ProxmoxSettings {
 		'flow_udp_dsts' => array( 1, 10000000 ),
 		'host_reserve_gb'  => array( 0, 1024 ),
 		'disk_reserve_gb' => array( 0, 10000 ),
-		'disk_promise_percent' => array( 1, 100 ),
+		'capacity_free_memory_percent' => array( 1, 90 ),
+		'capacity_free_disk_percent' => array( 1, 90 ),
 		'disk_max_extra' => array( 1, 30 ),
 		'snapshot_free_slots' => array( 0, 50 ),
 		'snapshot_free_days' => array( 1, 365 ),
@@ -257,7 +258,20 @@ final class ProxmoxSettings {
 			'desc'    => __( 'The extra storage of a database variation must be a multiple of this, or it is not offered and a switch to it is refused.', 'beltoft-services' ),
 		);
 		$fields['disk_reserve_gb'] = $base + array( 'type' => 'number', 'default' => 200, 'min' => 0, 'label' => __( 'Storage kept free on each node (GB)', 'beltoft-services' ) );
-		$fields['disk_promise_percent'] = $base + array( 'type' => 'number', 'default' => 100, 'min' => 1, 'label' => __( 'Maximum promised storage (%)', 'beltoft-services' ) );
+		$fields['capacity_free_memory_percent'] = $base + array(
+			'type'    => 'number',
+			'default' => 10,
+			'min'     => self::RANGES['capacity_free_memory_percent'][0],
+			'label'   => __( 'Alert when real free memory is under (%)', 'beltoft-services' ),
+			'desc'    => __( 'Each night the memory a node really has free (virtual machine nodes, and hosting nodes whose agent reports it) is compared with what this plugin counts as committed. You are mailed when it is under this share. Nothing is stopped: capacity never blocks a sale.', 'beltoft-services' ),
+		);
+		$fields['capacity_free_disk_percent'] = $base + array(
+			'type'    => 'number',
+			'default' => 10,
+			'min'     => self::RANGES['capacity_free_disk_percent'][0],
+			'label'   => __( 'Alert when real free disk is under (%)', 'beltoft-services' ),
+			'desc'    => __( 'The same for the disk of a node: you are mailed when the free share of the storage is under this share.', 'beltoft-services' ),
+		);
 		$fields['disk_max_extra'] = $base + array( 'type' => 'number', 'default' => 4, 'min' => 1, 'label' => __( 'Maximum extra disks per server', 'beltoft-services' ) );
 		$fields['snapshots_enabled'] = $base + array(
 			'type'    => 'checkbox',

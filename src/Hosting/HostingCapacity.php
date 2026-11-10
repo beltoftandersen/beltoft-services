@@ -23,7 +23,9 @@ defined( 'ABSPATH' ) || exit;
  *   overcommit factor. The database size is part of the plan storage, so it is already inside the disk. The
  *   hourly measured database disk of the plan comes with the usage job (not in this slice).
  * - A plan fits a node when its own committed memory and disk fit in what is free.
- * - Placement: the enabled node of the plan's group with the most free memory that fits.
+ * - Placement: the enabled node of the plan's group with the most free memory that fits. When no node fits, the one
+ *   with the most room left (the least over its budget): capacity never stops a sale or a placement (owner decision
+ *   2026-11-11, hosting is oversold on purpose). What is over budget is reported to the admin (overage_alerts()).
  */
 final class HostingCapacity {
 
@@ -62,9 +64,8 @@ final class HostingCapacity {
 	 * PHP process is the one writer this process cannot see, so the memo also dies with the request, and
 	 * action_scheduler_before_execute empties it before each job of a long-lived worker. A decision that reserves
 	 * capacity must not rest on an answer older than its own lock: Provision places inside the placement lock after
-	 * forget(), HostingSwitch::refusal() forgets first, and Stock forgets when an item is added to the cart and when
-	 * the cart is checked, so what a page showed earlier in the request never decides an order. A display (a label or
-	 * a sold-out state) may use the memo: it was true when the request started, as before.
+	 * forget(). Nothing else decides on it: since 2026-11-11 no page, cart or checkout asks for capacity, so only the
+	 * placement and the alerts read usage(), and a page render reads nothing of it at all.
 	 */
 	public static function forget(): void {
 		self::$memo = array();
@@ -192,66 +193,57 @@ final class HostingCapacity {
 	}
 
 	/**
-	 * Does an upgrade fit on the node the account is on? Only the growth counts (the account already holds the old plan).
-	 *
-	 * @param string                         $node_id Node record id.
-	 * @param array<string, int|string|bool> $have    Typed current plan.
-	 * @param array<string, int|string|bool> $target  Typed target plan.
-	 */
-	public static function fits_upgrade( string $node_id, array $have, array $target ): bool {
-		$u = self::usage( $node_id );
-
-		if ( null === $u ) {
-			return false;
-		}
-
-		$old = self::cost( $have );
-		$new = self::cost( $target );
-
-		$memory = $new['memory'] - $old['memory'];
-		$disk   = $new['disk'] - $old['disk'];
-
-		return ( $memory <= 0 || $u['memory_budget'] - $u['memory_committed'] >= $memory ) && ( $disk <= 0 || $u['disk_budget'] - $u['disk_committed'] >= $disk );
-	}
-
-	/**
-	 * The node for a new account: of the plan's group, enabled, with room, and the most free memory (the first
-	 * in stored order on a tie).
+	 * The node for a new account: of the plan's group and enabled, the one with the most free memory among those where
+	 * the plan fits (the first in stored order on a tie). When none fits, the one with the most room left once the plan
+	 * is added (the least over its budget, the worse of memory and disk), so a new account is always placed while the
+	 * group has a node. Null only when the group has no enabled node.
 	 *
 	 * @param array<string, int|string|bool> $plan Typed plan.
-	 * @return string|null Node id, or null when no node has room.
+	 * @return string|null Node id.
 	 */
 	public static function place( array $plan ): ?string {
 		$best = null;
 		$most = -1.0;
+		$over = null;
+		$room = null;
+		$cost = self::cost( $plan );
 
 		foreach ( Nodes::in_group( (string) $plan['node_group'] ) as $id ) {
-			if ( ! self::fits( $id, $plan ) ) {
+			$u = self::usage( $id );
+
+			if ( null === $u ) {
 				continue;
 			}
 
-			$free = self::free_memory( $id );
+			if ( self::fits( $id, $plan ) ) {
+				$free = self::free_memory( $id );
 
-			if ( $free > $most ) {
-				$best = $id;
-				$most = $free;
+				if ( $free > $most ) {
+					$best = $id;
+					$most = $free;
+				}
+
+				continue;
+			}
+
+			// Share of the budget left after this plan (negative when over); the worse of memory and disk.
+			$left = min(
+				$u['memory_budget'] > 0 ? ( $u['memory_budget'] - $u['memory_committed'] - $cost['memory'] ) / $u['memory_budget'] : -1.0,
+				$u['disk_budget'] > 0 ? ( $u['disk_budget'] - $u['disk_committed'] - $cost['disk'] ) / $u['disk_budget'] : -1.0
+			);
+
+			if ( null === $room || $left > $room ) {
+				$over = $id;
+				$room = $left;
 			}
 		}
 
-		return $best;
+		return $best ?? $over;
 	}
 
 	/**
-	 * Can a new account of this plan be built now? (The stock rule.)
-	 *
-	 * @param array<string, int|string|bool> $plan Typed plan.
-	 */
-	public static function available( array $plan ): bool {
-		return null !== self::place( $plan );
-	}
-
-	/**
-	 * Mails the admin once a day per node when committed memory or disk reaches the alert share (plan 15.1).
+	 * Mails the admin once a day per node when committed memory or disk reaches the alert share (plan 15.1). An early
+	 * warning only: nothing is stopped at that share, or at 100 percent (see overage_alerts()).
 	 *
 	 * @return string[] Node ids an alert was sent for.
 	 */
@@ -279,7 +271,7 @@ final class HostingCapacity {
 				sprintf( 'Hosting node %s is filling up', $id ),
 				array(
 					sprintf( 'Hosting node %s has committed %d%% of its memory budget and %d%% of its disk.', $id, (int) round( $mem * 100 ), (int) round( $disk * 100 ) ),
-					'Add a node or raise the capacity before more accounts are sold.',
+					'Add a node or raise the capacity. New accounts are still placed, on the node with the most room.',
 				),
 				null,
 				$key
@@ -290,6 +282,105 @@ final class HostingCapacity {
 			}
 
 			$sent[] = (string) $id;
+		}
+
+		return $sent;
+	}
+
+	/**
+	 * Mails the admin when the memory or the disk committed on a node passes its budget (100 percent), and again at each
+	 * further 10 percent, once per step, forgotten when the share falls back under the step (Alerts::overage()).
+	 *
+	 * @param string|null $only One node id, or null for every node.
+	 * @return string[] Keys ("node:memory" or "node:disk") a mail was sent for.
+	 */
+	public static function overage_alerts( ?string $only = null ): array {
+		$sent = array();
+
+		foreach ( array_keys( Nodes::all() ) as $id ) {
+			$id = (string) $id;
+			$u  = ( null === $only || $only === $id ) ? self::usage( $id ) : null;
+
+			if ( null === $u ) {
+				continue;
+			}
+
+			$reserve = Config::number( 'reserve_gb' );
+			$node    = Nodes::all()[ $id ];
+
+			$kinds = array(
+				'memory' => array(
+					$u['memory_committed'],
+					$u['memory_budget'],
+					sprintf(
+						/* translators: 1: node memory in GB, 2: reserve in GB. */
+						__( 'The budget is the memory of the node (%1$d GB) minus the reserve (%2$s GB). It is set by the node size on the Hosting nodes screen and by the setting "Memory reserve per node, in GB"; the setting "Memory overcommit" divides what each account commits.', 'beltoft-services' ),
+						(int) $node['mem_gb'],
+						(string) $reserve
+					),
+				),
+				'disk'   => array(
+					$u['disk_committed'],
+					$u['disk_budget'],
+					sprintf(
+						/* translators: %d: node disk in GB. */
+						__( 'The budget is the disk of the node (%d GB), set on the Hosting nodes screen; the setting "Disk overcommit" divides what each account commits.', 'beltoft-services' ),
+						(int) $node['disk_gb']
+					),
+				),
+			);
+
+			foreach ( $kinds as $kind => $row ) {
+				if ( $row[1] <= 0 ) {
+					continue;
+				}
+
+				$ok = Alerts::overage(
+					'hosting:' . $id . ':' . $kind,
+					$row[0] / $row[1],
+					/* translators: 1: node id, 2: memory or disk. */
+					sprintf( __( 'Hosting node %1$s is over its committed %2$s budget', 'beltoft-services' ), $id, $kind ),
+					array(
+						/* translators: 1: node id, 2: memory or disk, 3: committed in GB, 4: budget in GB. */
+						sprintf( __( 'Hosting node %1$s has %2$s committed to accounts: %3$.1f GB of a budget of %4$.1f GB.', 'beltoft-services' ), $id, $kind, $row[0] / 1024, $row[1] / 1024 ),
+						$row[2],
+						__( 'Nothing is stopped: new accounts are placed on the node with the most room left. Add a node or raise the capacity.', 'beltoft-services' ),
+					)
+				);
+
+				if ( $ok ) {
+					$sent[] = $id . ':' . $kind;
+				}
+			}
+		}
+
+		return $sent;
+	}
+
+	/**
+	 * What the plugin counts as committed on a node, next to what the node reports itself, mailed when the real free
+	 * memory or disk is under the threshold. $host comes from the agent's health answer (member `host`, see
+	 * NodeHealth::check()); a member that is missing is not checked.
+	 *
+	 * @param string               $id   Node id.
+	 * @param array<string, mixed> $host mem_total_mb, mem_free_mb, disk_total_gb, disk_free_gb.
+	 * @return string[] Kinds a mail was sent for.
+	 */
+	public static function cross_check( string $id, array $host ): array {
+		$u = self::usage( $id );
+
+		if ( null === $u ) {
+			return array();
+		}
+
+		$sent = array();
+
+		if ( isset( $host['mem_total_mb'], $host['mem_free_mb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( 'Hosting node %s', $id ), 'memory', (float) $host['mem_total_mb'], (float) $host['mem_free_mb'], $u['memory_committed'], $u['memory_budget'] ) ) {
+			$sent[] = 'memory';
+		}
+
+		if ( isset( $host['disk_total_gb'], $host['disk_free_gb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( 'Hosting node %s', $id ), 'disk', (float) $host['disk_total_gb'] * 1024, (float) $host['disk_free_gb'] * 1024, $u['disk_committed'], $u['disk_budget'] ) ) {
+			$sent[] = 'disk';
 		}
 
 		return $sent;

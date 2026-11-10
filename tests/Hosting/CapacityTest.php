@@ -17,6 +17,10 @@ use BeltoftServices\Resource;
 
 /**
  * HostingCapacity and Stock.
+ *
+ * Changed on purpose with the stock policy of 2026-11-11 (capacity never stops a sale, owner decision): placement
+ * picks the node with the most room left instead of waiting when none fits, and the stock tests now prove that only
+ * WooCommerce's own stock status closes a plan.
  */
 class CapacityTest extends HostingCase {
 
@@ -91,15 +95,26 @@ class CapacityTest extends HostingCase {
 		$this->save_node( array( 'label' => 'Other group', 'mem_gb' => 128, 'node_group' => 'g2' ), 'n5' );
 
 		$this->assertSame( 'n3', HostingCapacity::place( $this->plan() ) );
-		$this->assertTrue( HostingCapacity::available( $this->plan() ) );
-		$this->assertNull( HostingCapacity::place( $this->plan( array( 'node_group' => 'none' ) ) ) );
+		$this->assertNull( HostingCapacity::place( $this->plan( array( 'node_group' => 'none' ) ) ), 'No node in the group: nothing to place on.' );
 
 		$this->settings( array( 'hosting_reserve_gb' => '12', 'hosting_mem_overcommit' => '1' ) );
 		$this->assertSame( 'n3', HostingCapacity::place( $this->plan( array( 'memory_mb' => 10000 ) ) ), 'Only the big node has room.' );
-		$this->assertNull( HostingCapacity::place( $this->plan( array( 'memory_mb' => 90000 ) ) ) );
+		$this->assertSame( 'n3', HostingCapacity::place( $this->plan( array( 'memory_mb' => 90000 ) ) ), 'No node has room: the one with the most room left (the least over) takes it, never null.' );
 	}
 
-	public function test_new_accounts_spread_by_free_room_and_a_full_group_waits(): void {
+	public function test_placement_on_full_nodes_picks_the_least_over_node_and_skips_disabled_ones(): void {
+		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '0' ) );
+		$this->save_node( array( 'label' => 'Small', 'mem_gb' => 4 ), 'n2' );
+		$this->save_node( array( 'label' => 'Off', 'mem_gb' => 512, 'enabled' => '' ), 'n4' );
+		// n1 has 32 GB, n2 has 4 GB, n4 is off. A 40 GB plan fits nowhere.
+		$plan = $this->plan( array( 'memory_mb' => 40000, 'db_buffer_mb' => 0 ) );
+
+		$this->assertFalse( HostingCapacity::fits( 'n1', $plan ) );
+		$this->assertFalse( HostingCapacity::fits( 'n2', $plan ) );
+		$this->assertSame( 'n1', HostingCapacity::place( $plan ), 'n1 is over by 8 GB, n2 by 36 GB, the disabled node is skipped whatever its room.' );
+	}
+
+	public function test_new_accounts_spread_by_free_room_and_a_full_group_still_places(): void {
 		$this->save_node( array( 'label' => 'Two', 'mem_gb' => 32 ), 'n2' );
 		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '20' ) );
 		// Each node has 12 GB of budget. Accounts of 5 GB: two fit on each node, the fifth has no room.
@@ -114,18 +129,18 @@ class CapacityTest extends HostingCase {
 
 		$this->assertSame( array( 'n1', 'n2', 'n1', 'n2' ), $nodes );
 
-		$fifth  = $this->resource( $plan );
-		$result = $this->provision( $fifth );
-
-		$this->assertTrue( $result->is_retry() );
-		$this->assertStringContainsString( 'has room', $result->error() );
-		$this->assertNull( Records::for_resource( $fifth->id() ), 'No node was taken.' );
-		$this->assertCount( 4, $this->node->calls_to( '#/clone$#', 'POST' ), 'Nothing was cloned for the fifth.' );
-
-		// A node is added: the waiting account goes on.
-		$this->save_node( array( 'label' => 'Three', 'mem_gb' => 32 ), 'n3' );
+		// Both nodes are at 10 of 12 GB: the fifth account does not fit anywhere, and is placed all the same (least over: the first on a tie).
+		$fifth = $this->resource( $plan );
 		$this->provision_fully( $fifth );
-		$this->assertSame( 'n3', Records::for_resource( $fifth->id() )['node'] );
+
+		$this->assertSame( 'n1', Records::for_resource( $fifth->id() )['node'], 'Capacity never stops a placement.' );
+		$this->assertCount( 5, $this->node->calls_to( '#/clone$#', 'POST' ), 'The fifth was cloned.' );
+
+		// A node is added: the next account goes there.
+		$this->save_node( array( 'label' => 'Three', 'mem_gb' => 32 ), 'n3' );
+		$sixth = $this->resource( $plan );
+		$this->provision_fully( $sixth );
+		$this->assertSame( 'n3', Records::for_resource( $sixth->id() )['node'] );
 	}
 
 	public function test_a_deleted_account_gives_its_room_back(): void {
@@ -165,7 +180,7 @@ class CapacityTest extends HostingCase {
 		$this->assertStringNotContainsString( "\u{2014}", $mails[0]['message'] );
 	}
 
-	public function test_stock_closes_a_plan_with_no_room_and_never_blocks_an_existing_customer(): void {
+	public function test_a_plan_is_sold_out_only_by_the_woocommerce_stock_status_whatever_the_capacity(): void {
 		$product = $this->service_product(
 			'hosting',
 			array( 'node_group' => 'g1', 'memory_mb' => 2048, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ),
@@ -173,26 +188,33 @@ class CapacityTest extends HostingCase {
 		);
 		Stock::register();
 
-		$this->assertTrue( Stock::available( $product ) );
 		$this->assertTrue( $product->is_in_stock() );
 		$this->assertTrue( $product->is_purchasable() );
 
-		// No node of the group: sold out.
+		// Capacity exhausted (no memory budget at all): still on sale.
 		$this->settings( array( 'hosting_reserve_gb' => '1000' ) );
 		$fresh = wc_get_product( $product->get_id() );
-		$this->assertFalse( Stock::available( $fresh ) );
-		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', true, $fresh ) );
-		$this->assertFalse( apply_filters( 'woocommerce_is_purchasable', true, $fresh ) );
-		$this->assertFalse( apply_filters( 'woocommerce_is_purchasable', false, $fresh ), 'It only closes.' );
-
-		// A switch or resubscribe request passes.
-		$_REQUEST['switch-subscription'] = '5';
+		$this->assertTrue( $fresh->is_in_stock() );
+		$this->assertTrue( $fresh->is_purchasable() );
 		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', true, $fresh ) );
+		$this->assertTrue( apply_filters( 'woocommerce_is_purchasable', true, $fresh ) );
+
+		// Set out of stock by hand: sold out, as WooCommerce does it.
+		$fresh->set_stock_status( 'outofstock' );
+		$fresh->save();
+		$sold = wc_get_product( $product->get_id() );
+		$this->assertFalse( $sold->is_in_stock() );
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', $sold->is_in_stock(), $sold ) );
+
+		// A switch or resubscribe request of an existing customer passes.
+		$_REQUEST['switch-subscription'] = '5';
+		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ) );
 		unset( $_REQUEST['switch-subscription'] );
 
 		// Another product is left alone.
 		$other = $this->service_product( 'fake' );
 		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', true, $other ) );
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $other ) );
 	}
 
 	public function test_a_renewal_of_a_sold_out_plan_can_be_added_to_the_cart_reloaded_and_paid(): void {
@@ -210,25 +232,146 @@ class CapacityTest extends HostingCase {
 		$renewal = wcs_create_renewal_order( $sub );
 		$plain   = wc_create_order( array( 'customer_id' => $user ) );
 		$plain->add_product( $product );
-		$this->settings( array( 'hosting_reserve_gb' => '1000' ) );
+		$product->set_stock_status( 'outofstock' );
+		$product->save();
 		$fresh = wc_get_product( $product->get_id() );
-		$this->assertFalse( $fresh->is_purchasable(), 'Sold out for a new customer.' );
+		$this->assertFalse( $fresh->is_in_stock(), 'Sold out for a new customer.' );
 
 		// WooCommerce Subscriptions adds a renewal with its key in the item data; the check runs before the item is in the cart.
 		apply_filters( 'woocommerce_add_cart_item_data', array( 'subscription_renewal' => array( 'renewal_order_id' => 1 ) ), $product->get_id(), 0 );
-		$this->assertTrue( wc_get_product( $product->get_id() )->is_purchasable(), 'The renewal being added passes.' );
+		$this->assertTrue( wc_get_product( $product->get_id() )->is_in_stock(), 'The renewal being added passes.' );
 		Stock::clear_flow();
-		$this->assertFalse( wc_get_product( $product->get_id() )->is_purchasable(), 'Only while it is being added.' );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'Only while it is being added.' );
 
 		apply_filters( 'woocommerce_add_cart_item_data', array(), $product->get_id(), 0 );
-		$this->assertFalse( wc_get_product( $product->get_id() )->is_purchasable(), 'A new purchase is not let through.' );
-
-		// A cart reloaded from the session.
-		$this->assertTrue( apply_filters( 'woocommerce_cart_item_is_purchasable', false, 'k', array( 'subscription_renewal' => array() ), $fresh ) );
-		$this->assertFalse( apply_filters( 'woocommerce_cart_item_is_purchasable', false, 'k', array(), $fresh ) );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'A new purchase is not let through.' );
 
 		// Paying the renewal order.
 		$this->assertTrue( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $fresh->is_in_stock(), $fresh, $renewal ) );
 		$this->assertFalse( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $fresh->is_in_stock(), $fresh, $plain ) );
+	}
+
+	public function test_a_product_out_of_stock_by_hand_cannot_be_added_to_the_cart_and_a_capacity_exhausted_one_can(): void {
+		Stock::register();
+		$this->settings( array( 'hosting_reserve_gb' => '1000' ) ); // No room anywhere.
+		$open   = $this->service_product( 'hosting', array( 'node_group' => 'g1', 'memory_mb' => 2048, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ), array( 'max' => 3 ) );
+		$closed = $this->service_product( 'hosting', array( 'node_group' => 'g1', 'memory_mb' => 2048, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ), array( 'max' => 3 ) );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
+
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $open->get_id() ), 'No room on any node: still sold.' );
+		WC()->cart->empty_cart();
+		wc_clear_notices();
+		$this->assertFalse( WC()->cart->add_to_cart( $closed->get_id() ), 'Out of stock by hand: WooCommerce refuses.' );
+		wc_clear_notices();
+		WC()->cart->empty_cart();
+	}
+
+	public function test_the_admin_is_told_at_100_percent_and_at_each_further_10_percent_once_and_it_resets(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		// 12 GB memory budget on n1 (32 GB minus 20), no overcommit.
+		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '20', 'hosting_alert_percent' => '100' ) );
+		$put = function ( int $mb ): \BeltoftServices\Resource {
+			$r = $this->resource( array( 'memory_mb' => $mb, 'db_buffer_mb' => 0, 'disk_gb' => 1 ) );
+			Records::open( $r->id(), 'n1' );
+
+			return $r;
+		};
+
+		$a = $put( 11000 ); // 91 percent.
+		$this->assertSame( array(), HostingCapacity::overage_alerts(), 'Under the budget: no mail.' );
+
+		$b = $put( 2000 ); // 13000 of 12288 MB: 105 percent.
+		$this->assertSame( array( 'n1:memory' ), HostingCapacity::overage_alerts() );
+		$this->assertCount( 1, $mails );
+		$this->assertSame( 'christian.beltoft@gmail.com', $mails[0]['to'] );
+		$this->assertStringContainsString( 'committed', $mails[0]['message'] );
+		$this->assertStringContainsString( '12.0 GB', $mails[0]['message'], 'The budget is named.' );
+		$this->assertStringContainsString( 'Memory reserve per node', $mails[0]['message'], 'The setting that defines it is named.' );
+		$this->assertStringNotContainsString( 'stopped selling', $mails[0]['message'] );
+		$this->assertSame( array(), HostingCapacity::overage_alerts(), 'Once per step.' );
+
+		$c = $put( 1500 ); // 14500: 118 percent, step 110.
+		$this->assertSame( array( 'n1:memory' ), HostingCapacity::overage_alerts() );
+		$this->assertCount( 2, $mails );
+		$this->assertSame( array(), HostingCapacity::overage_alerts() );
+
+		// Falls back to 105 percent: no mail, the 110 step is forgotten.
+		$this->assertTrue( $c->transition( 'deleted', 'test' ) );
+		$this->assertSame( array(), HostingCapacity::overage_alerts() );
+		$this->assertCount( 2, $mails );
+
+		$d = $put( 1500 ); // 118 percent again.
+		$this->assertSame( array( 'n1:memory' ), HostingCapacity::overage_alerts(), 'Crossing the step again mails again.' );
+		$this->assertCount( 3, $mails );
+
+		// Under 100: forgotten, and the first pass mails again.
+		$this->assertTrue( $d->transition( 'deleted', 'test' ) );
+		$this->assertTrue( $b->transition( 'deleted', 'test' ) );
+		$this->assertSame( array(), HostingCapacity::overage_alerts() );
+		$put( 2000 );
+		$this->assertSame( array( 'n1:memory' ), HostingCapacity::overage_alerts() );
+		$this->assertCount( 4, $mails );
+		unset( $a );
+	}
+
+	public function test_a_placement_over_the_budget_mails_the_admin(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '27' ) ); // 5 GB budget.
+		$this->provision_fully( $this->resource( array( 'memory_mb' => 4000, 'db_buffer_mb' => 0, 'disk_gb' => 5 ) ) );
+		$this->assertCount( 0, $mails );
+		$this->provision_fully( $this->resource( array( 'memory_mb' => 4000, 'db_buffer_mb' => 0, 'disk_gb' => 5 ) ) );
+		$this->assertCount( 1, $mails, 'The second account is placed over the budget and the admin is told.' );
+	}
+
+	public function test_the_cross_check_mails_on_low_real_free_memory_or_disk_and_is_quiet_otherwise(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'capacity_free_memory_percent' => 10, 'capacity_free_disk_percent' => 10 ) );
+
+		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 8000, 'disk_total_gb' => 1000, 'disk_free_gb' => 400 ) ) );
+		$this->assertCount( 0, $mails, 'Plenty free: quiet.' );
+
+		$this->assertSame( array( 'memory' ), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 1000, 'disk_total_gb' => 1000, 'disk_free_gb' => 400 ) ) );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'free memory', $mails[0]['subject'] );
+		$this->assertStringContainsString( 'committed', $mails[0]['message'] );
+		$this->assertStringContainsString( 'budget', $mails[0]['message'] );
+
+		$this->assertSame( array( 'disk' ), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 8000, 'disk_total_gb' => 1000, 'disk_free_gb' => 50 ) ) );
+		$this->assertCount( 2, $mails );
+
+		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 1000 ) ), 'Once a day per node and kind.' );
+		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array() ), 'A member that is missing is not checked.' );
 	}
 }

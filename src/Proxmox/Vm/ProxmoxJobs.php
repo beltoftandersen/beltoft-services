@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backup\BackupJobs;
+use BeltoftServices\Proxmox\Pve\CapacityCheck;
 use BeltoftServices\Proxmox\Pve\CapacityJobs;
 use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
 use BeltoftServices\Proxmox\Network\PrivateNets;
@@ -42,6 +43,7 @@ final class ProxmoxJobs {
 
 	public const CAPACITY     = 'beltoft_services_proxmox_capacity';
 	public const CAPACITY_NOW = 'beltoft_services_proxmox_capacity_now';
+	public const CAPACITY_CHECK = 'beltoft_services_proxmox_capacity_check';
 	public const POWER        = 'beltoft_services_proxmox_power';
 	public const POWER_AFTER  = 'beltoft_services_proxmox_power_after';
 	public const ABUSE        = 'beltoft_services_proxmox_abuse';
@@ -84,6 +86,7 @@ final class ProxmoxJobs {
 	 */
 	private const CRONS = array(
 		self::CAPACITY => '0 * * * *',
+		self::CAPACITY_CHECK => '50 3 * * *',
 		self::POWER    => '*/15 * * * *',
 		self::ABUSE    => '20 * * * *',
 		self::DISK     => '10 * * * *',
@@ -102,6 +105,7 @@ final class ProxmoxJobs {
 	public static function register(): void {
 		add_action( self::CAPACITY, array( CapacityJobs::class, 'capacity' ) );
 		add_action( self::CAPACITY_NOW, array( CapacityJobs::class, 'capacity_now' ) );
+		add_action( self::CAPACITY_CHECK, array( CapacityCheck::class, 'run' ) );
 		add_action( self::POWER, array( PowerJobs::class, 'power' ) );
 		add_action( self::POWER_AFTER, array( PowerJobs::class, 'after' ) );
 		add_action( self::ABUSE, array( AbuseJobs::class, 'abuse' ) );

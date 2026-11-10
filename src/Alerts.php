@@ -496,6 +496,66 @@ final class Alerts {
 		return $sent;
 	}
 
+	/** Option holding the last mailed step of each committed budget, by key (see overage()). */
+	public const OVERAGE_OPTION = 'beltoft_services_overage_steps';
+
+	/**
+	 * The step of a committed share: 0 under 100 percent, then 100, 110, 120 and so on.
+	 *
+	 * @param float $ratio Committed divided by budget (1.0 is 100 percent).
+	 */
+	public static function overage_step( float $ratio ): int {
+		$percent = (int) floor( $ratio * 100 + 0.000001 );
+
+		return $percent >= 100 ? 100 + 10 * intdiv( $percent - 100, 10 ) : 0;
+	}
+
+	/**
+	 * Tells the admin when something is committed beyond its budget: once when the share first passes 100 percent and
+	 * again at each further 10 percent step (110, 120 and so on). A step is mailed once. When the share falls back under
+	 * a step it is forgotten, so crossing it again mails again. Nothing is remembered while no mail could be sent (no
+	 * valid alert address), so the mail follows once the address is fixed.
+	 *
+	 * @param string             $key     What is measured, for example "hosting:node-1:memory".
+	 * @param float              $ratio   Committed divided by budget.
+	 * @param string             $subject Subject, after the site name.
+	 * @param array<int, string> $lines   Body lines (the step is added).
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function overage( string $key, float $ratio, string $subject, array $lines ): bool {
+		$step  = self::overage_step( $ratio );
+		$all   = (array) get_option( self::OVERAGE_OPTION, array() );
+		$known = (int) ( $all[ $key ] ?? 0 );
+
+		if ( $step === $known ) {
+			return false;
+		}
+
+		if ( $step < $known ) {
+			// Back under a step: forget it, no mail.
+			if ( $step > 0 ) {
+				$all[ $key ] = $step;
+			} else {
+				unset( $all[ $key ] );
+			}
+
+			update_option( self::OVERAGE_OPTION, $all, false );
+
+			return false;
+		}
+
+		$lines[] = sprintf( 'Committed share now: at least %d%% (this mail is sent at 100%% and at each further 10%%).', $step );
+
+		if ( ! self::notify( $subject, $lines ) ) {
+			return false;
+		}
+
+		$all[ $key ] = $step;
+		update_option( self::OVERAGE_OPTION, $all, false );
+
+		return true;
+	}
+
 	/**
 	 * Alerts the admin that a license's service could not be created (there is no resource to
 	 * hang the alert on). Sent once per call: a creation happens once per license event.

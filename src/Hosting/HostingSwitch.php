@@ -88,15 +88,9 @@ final class HostingSwitch {
 			return __( 'This plan has fewer websites than you have now. Remove a website first, or choose a larger plan.', 'beltoft-services' );
 		}
 
-		$record = Records::for_resource( $resource->id() );
-
-		// An upgrade is a decision on capacity: read the records now.
-		HostingCapacity::forget();
-
-		if ( $record && ! HostingCapacity::fits_upgrade( (string) $record['node'], $have, $target ) ) {
-			return __( 'This plan cannot be added to your server right now. Contact support and we will move your hosting.', 'beltoft-services' );
-		}
-
+		// Room on the node is not asked: capacity never stops an upgrade (owner decision 2026-11-11). The new plan counts
+		// against the node as soon as it is stored (the memo forgets on every plan write), and the admin is told when a
+		// node is over its budget (HostingCapacity::overage_alerts()).
 		return null;
 	}
 }

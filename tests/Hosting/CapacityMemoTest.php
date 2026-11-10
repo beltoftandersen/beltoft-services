@@ -16,6 +16,12 @@ use BeltoftServices\Hosting\Schema;
 
 /**
  * The memo and its invalidation.
+ *
+ * Changed on purpose with the stock policy of 2026-11-11 (capacity never stops a sale, owner decision):
+ * the tests that proved the cart, the cart check and the checkout read the records afresh for a sold-out decision
+ * are gone (there is no such decision any more) and one test proves the display and cart path makes no capacity
+ * query at all; a placement that found "no room" now picks the node with the most room; a switch is no longer refused
+ * for capacity.
  */
 class CapacityMemoTest extends HostingCase {
 
@@ -52,41 +58,73 @@ class CapacityMemoTest extends HostingCase {
 		return $wpdb->num_queries - $before;
 	}
 
-	public function test_stock_for_many_plans_costs_what_one_plan_costs(): void {
+	/**
+	 * The SQL the shop runs while a closure runs, as a list.
+	 *
+	 * @param callable $fn What to run.
+	 * @return string[]
+	 */
+	private function sql( callable $fn ): array {
+		$seen = array();
+		$grab = static function ( $query ) use ( &$seen ) {
+			$seen[] = (string) $query;
+
+			return $query;
+		};
+		add_filter( 'query', $grab );
+		$fn();
+		remove_filter( 'query', $grab );
+
+		return $seen;
+	}
+
+	public function test_showing_stock_for_many_plans_makes_no_capacity_query(): void {
+		global $wpdb;
+		\BeltoftServices\Hosting\Stock::register();
 		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '2' ) );
 		$this->accounts( 6, array( 'memory_mb' => 512, 'db_buffer_mb' => 0 ) );
-
+		$products = array();
+		for ( $i = 1; $i <= 12; $i++ ) {
+			$products[] = $this->service_product( 'hosting', array( 'node_group' => 'g1', 'memory_mb' => 256 * $i, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ), array( 'max' => 3 ) );
+		}
 		HostingCapacity::forget();
-		$one = $this->queries( fn() => HostingCapacity::available( $this->plan() ) );
 
-		HostingCapacity::forget();
-		$many = $this->queries( function () {
-			for ( $i = 1; $i <= 40; $i++ ) {
-				HostingCapacity::available( $this->plan( array( 'memory_mb' => 256 * $i ) ) );
+		$queries = $this->sql(
+			function () use ( $products ) {
+				foreach ( $products as $product ) {
+					$fresh = wc_get_product( $product->get_id() );
+					$fresh->is_purchasable();
+					$fresh->is_in_stock();
+					apply_filters( 'woocommerce_add_to_cart_validation', true, $product->get_id(), 1 );
+				}
+				do_action( 'woocommerce_check_cart_items' );
+				do_action( 'woocommerce_checkout_process' );
 			}
-		} );
+		);
 
-		$this->assertSame( $one, $many, 'Forty plans on the node cost the same queries as one.' );
-		// One read of the records and one read of every account, however many accounts there are.
-		$this->assertLessThanOrEqual( 3, $one );
+		$tables = array( Schema::tables()['hosting'], $wpdb->prefix . 'beltoft_licenses_activations' );
+		foreach ( $queries as $sql ) {
+			foreach ( $tables as $table ) {
+				$this->assertStringNotContainsString( $table, $sql, 'A page, the cart or the checkout read capacity: ' . $sql );
+			}
+		}
 	}
 
 	public function test_two_sequential_placements_see_each_others_commitment(): void {
 		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '27' ) );
-		// 5 GB budget; the plan commits 3172 MB and an account 2098 MB, so one account fits and a second does not.
+		$this->save_node( array( 'label' => 'Two', 'mem_gb' => 32 ), 'n2' );
+		// 5 GB budget on each node; the plan commits 3172 MB and an account 2098 MB, so one account fits on a node and a second does not.
 		$plan = $this->plan();
 		$a    = $this->resource();
-		$b    = $this->resource();
 
 		$this->assertSame( 'n1', HostingCapacity::place( $plan ) );
 		Records::open( $a->id(), 'n1' );
 
-		$this->assertNull( HostingCapacity::place( $plan ), 'The second placement sees the first one without a forget() call.' );
+		$this->assertSame( 'n2', HostingCapacity::place( $plan ), 'The second placement sees the first one without a forget() call.' );
 		$this->assertFalse( HostingCapacity::fits( 'n1', $plan ) );
 
 		Records::remove( $a->id() );
 		$this->assertSame( 'n1', HostingCapacity::place( $plan ), 'A removed record frees its room at once.' );
-		unset( $b );
 	}
 
 	public function test_a_state_change_to_deleted_frees_capacity_in_the_same_process(): void {
@@ -176,72 +214,34 @@ class CapacityMemoTest extends HostingCase {
 	}
 
 	public function test_a_placement_reads_the_records_inside_its_lock(): void {
+		$this->save_node( array( 'label' => 'Two', 'mem_gb' => 32 ), 'n2' );
 		$plan = $this->fill_the_node_behind_the_memo();
 		$b    = $this->resource( $plan );
 
-		$result = $this->provision( $b );
+		$this->provision( $b );
 
-		$this->assertTrue( $result->is_retry(), 'The node is full: the placement waits.' );
-		$this->assertNull( Records::for_resource( $b->id() ), 'No second account was placed on the full node.' );
+		$this->assertSame( 'n2', Records::for_resource( $b->id() )['node'], 'The memo said both nodes are empty; inside the lock the records say n1 holds an account, so the account goes to n2.' );
 	}
 
-	public function test_a_switch_refusal_reads_the_records_afresh(): void {
+	public function test_a_switch_is_not_refused_for_capacity(): void {
 		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '27' ) );
 		$r = $this->resource( array( 'node_group' => 'g1', 'memory_mb' => 1024, 'db_buffer_mb' => 0, 'disk_gb' => 10, 'sites' => 3 ) );
 		Records::open( $r->id(), 'n1' );
 		$target = Plan::typed( array_merge( (array) $r->get( 'plan' ), array( 'memory_mb' => 2048 ) ) );
 
-		$this->assertNull( \BeltoftServices\Hosting\HostingSwitch::refusal( $r, $target ), 'Room on the node: this also warms the memo.' );
-
 		$filler = $this->resource( array( 'node_group' => 'g1', 'memory_mb' => 3500, 'db_buffer_mb' => 0, 'disk_gb' => 10 ) );
 		$this->raw_record( $filler );
+		HostingCapacity::forget();
 
-		$this->assertStringContainsString( 'cannot be added to your server', (string) \BeltoftServices\Hosting\HostingSwitch::refusal( $r, $target ) );
+		$this->assertNull( \BeltoftServices\Hosting\HostingSwitch::refusal( $r, $target ), 'The node is over its budget with the upgrade; the upgrade goes through all the same.' );
 	}
 
-	private function stock_product(): \WC_Product {
-		return $this->service_product( 'hosting', array( 'node_group' => 'g1', 'cores' => 2, 'memory_mb' => 3072, 'disk_gb' => 20, 'sites' => 1, 'db_buffer_mb' => 100 ), array( 'max' => 3 ) );
-	}
-
-	public function test_adding_to_the_cart_reads_the_records_afresh(): void {
-		\BeltoftServices\Hosting\Stock::register();
-		$this->fill_the_node_behind_the_memo();
-		$product = $this->stock_product();
-
-		apply_filters( 'woocommerce_add_to_cart_validation', true, $product->get_id(), 1 );
-
-		$this->assertFalse( \BeltoftServices\Hosting\Stock::available( $product ), 'The add decides on the records, not on the memo.' );
-	}
-
-	public function test_checking_the_cart_reads_the_records_afresh(): void {
-		\BeltoftServices\Hosting\Stock::register();
-		$this->fill_the_node_behind_the_memo();
-		$product = $this->stock_product();
-
-		do_action( 'woocommerce_check_cart_items' );
-
-		$this->assertFalse( \BeltoftServices\Hosting\Stock::available( $product ) );
-	}
-
-	public function test_the_checkout_reads_the_records_afresh(): void {
-		\BeltoftServices\Hosting\Stock::register();
-		$this->fill_the_node_behind_the_memo();
-		$product = $this->stock_product();
-
-		do_action( 'woocommerce_checkout_process' );
-
-		$this->assertFalse( \BeltoftServices\Hosting\Stock::available( $product ) );
-	}
-
-	public function test_the_cart_forgets_run_before_woocommerces_own_cart_check(): void {
+	public function test_the_cart_no_longer_hooks_capacity_and_the_validation_still_runs_first(): void {
 		\BeltoftServices\Hosting\Stock::register();
 
-		$check = has_action( 'woocommerce_check_cart_items', array( WC()->cart, 'check_cart_items' ) );
-		$this->assertNotFalse( $check, 'WooCommerce checks the cart on this action.' );
-
-		$forget = has_action( 'woocommerce_check_cart_items', array( HostingCapacity::class, 'forget' ) );
-		$this->assertNotFalse( $forget );
-		$this->assertLessThan( (int) $check, (int) $forget, 'The forget runs before the cart check, whatever the registration order.' );
+		$this->assertFalse( has_action( 'woocommerce_check_cart_items', array( HostingCapacity::class, 'forget' ) ), 'No capacity read is tied to the cart check any more.' );
+		$this->assertFalse( has_action( 'woocommerce_checkout_process', array( HostingCapacity::class, 'forget' ) ) );
+		$this->assertFalse( has_filter( 'woocommerce_is_purchasable', array( \BeltoftServices\Hosting\Stock::class, 'filter' ) ) );
 
 		$validation = has_filter( 'woocommerce_add_to_cart_validation', array( \BeltoftServices\Hosting\Stock::class, 'validation' ) );
 		$this->assertNotFalse( $validation );

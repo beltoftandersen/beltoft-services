@@ -23,7 +23,10 @@ defined( 'ABSPATH' ) || exit;
  *   agent's loop re-asserts it every 30 seconds, so a state other than `ok` that stays is a real problem);
  * - loader problems: sites whose loader file is refused or failed, counted over all accounts of the node (the
  *   customer sees their own in the account);
- * and then the capacity alert (HostingCapacity::alert(): committed memory or disk over the alert share, once a day).
+ * and then the capacity alerts: HostingCapacity::alert() (committed memory or disk over the alert share, once a day) and
+ * HostingCapacity::overage_alerts() (over the budget, at 100 percent and each further 10 percent). The agent's health
+ * answer may also carry a `host` member (mem_total_mb, mem_free_mb, disk_total_gb, disk_free_gb: what the node really has);
+ * when it does, HostingCapacity::cross_check() compares it with what the plugin counts as committed, once a day.
  *
  * The mails carry node ids, container ids and states only: no secret, no customer data beyond ids.
  */
@@ -68,6 +71,7 @@ final class NodeHealth {
 		}
 
 		HostingCapacity::alert();
+		HostingCapacity::overage_alerts();
 
 		return $found;
 	}
@@ -108,6 +112,10 @@ final class NodeHealth {
 		}
 
 		$result = (array) ( $job['result'] ?? array() );
+
+		if ( is_array( $result['host'] ?? null ) ) {
+			HostingCapacity::cross_check( $id, $result['host'] );
+		}
 
 		foreach ( array_slice( (array) ( $result['alerts'] ?? array() ), 0, 10 ) as $alert ) {
 			$text       = is_array( $alert ) ? (string) ( $alert['message'] ?? $alert['kind'] ?? 'alert' ) : (string) $alert;

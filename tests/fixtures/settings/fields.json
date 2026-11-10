@@ -245,13 +245,23 @@
         "min": 0,
         "label": "Storage kept free on each node (GB)"
     },
-    "disk_promise_percent": {
+    "capacity_free_memory_percent": {
         "tab": "proxmox",
         "section": "proxmox",
         "type": "number",
-        "default": 100,
+        "default": 10,
         "min": 1,
-        "label": "Maximum promised storage (%)"
+        "label": "Alert when real free memory is under (%)",
+        "desc": "Each night the memory a node really has free (virtual machine nodes, and hosting nodes whose agent reports it) is compared with what this plugin counts as committed. You are mailed when it is under this share. Nothing is stopped: capacity never blocks a sale."
+    },
+    "capacity_free_disk_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "label": "Alert when real free disk is under (%)",
+        "desc": "The same for the disk of a node: you are mailed when the free share of the storage is under this share."
     },
     "disk_max_extra": {
         "tab": "proxmox",

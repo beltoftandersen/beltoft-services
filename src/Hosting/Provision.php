@@ -154,7 +154,7 @@ final class Provision {
 	// -- Steps -----------------------------------------------------------------------------------
 
 	/**
-	 * Step place: the node of the plan's group with room and the most free memory (HostingCapacity).
+	 * Step place: the node of the plan's group with room and the most free memory, else the one with the most room left (HostingCapacity::place()).
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */
@@ -189,8 +189,11 @@ final class Provision {
 		}
 
 		if ( ! is_array( $record ) ) {
-			return StepResult::retry( 0, 'place: no node of the group "' . $group . '" has room for this plan' );
+			return StepResult::retry( 0, 'place: no usable node in the group "' . $group . '"' );
 		}
+
+		// The account now counts against its node: tell the admin when the node is over its budget (once per step).
+		HostingCapacity::overage_alerts( (string) $record['node'] );
 
 		$err = $this->connect();
 
