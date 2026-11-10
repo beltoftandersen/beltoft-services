@@ -40,7 +40,7 @@ final class Meter {
 	 */
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
 	}
 

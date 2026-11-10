@@ -20,7 +20,7 @@ final class Security {
 	public const BATCH = 50;
 
 	public static function register(): void {
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 		add_action( self::HOOK, array( __CLASS__, 'relock' ) );
 	}
 

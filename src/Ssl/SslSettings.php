@@ -19,7 +19,7 @@ final class SslSettings {
 		add_action( 'beltoft_services_settings_tab_' . self::TAB, array( __CLASS__, 'render' ) );
 		add_action( 'admin_post_beltoft_services_ssl_sync', array( __CLASS__, 'sync_now' ) );
 		add_action( 'beltoft_services_ssl_costs', array( __CLASS__, 'sync_costs' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
 	/**

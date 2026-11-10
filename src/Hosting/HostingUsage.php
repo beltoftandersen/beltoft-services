@@ -48,7 +48,7 @@ final class HostingUsage {
 	 */
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
 	/**

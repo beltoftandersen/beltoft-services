@@ -15,7 +15,7 @@ final class Sync {
 	public const CURSOR = 'beltoft_services_domains_sync_cursor';
 
 	public static function register(): void {
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( self::DELEGATION_HOOK, array( __CLASS__, 'delegation' ) );
 		add_action( self::HEALTH_HOOK, array( Health::class, 'dns_check' ) );

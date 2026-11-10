@@ -71,7 +71,7 @@ final class Addons {
 		add_action( 'woocommerce_subscriptions_switch_completed', array( __CLASS__, 'after_switch' ), 20 );
 		add_action( self::SWEEP_HOOK, array( __CLASS__, 'cancel_stale' ) );
 		add_action( self::ACTIVATE_RETRY_HOOK, array( __CLASS__, 'activate' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
 	/**

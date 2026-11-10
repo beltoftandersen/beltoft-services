@@ -18,7 +18,7 @@ final class ConsoleSessions {
 
 	public static function register(): void {
 		add_action( self::PURGE, array( __CLASS__, 'purge' ) );
-		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 10, 3 );
 	}
 

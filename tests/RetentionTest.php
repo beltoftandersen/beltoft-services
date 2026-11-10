@@ -372,7 +372,7 @@ final class RetentionTest extends TestCase {
 
 	public function test_scheduled_daily_once_and_removed_on_deactivation(): void {
 		$this->assertNotFalse( has_action( Retention::HOOK, array( Retention::class, 'run' ) ) );
-		$this->assertNotFalse( has_action( 'action_scheduler_init', array( Retention::class, 'schedule' ) ) );
+		$this->assertNotFalse( in_array( array( Retention::class, 'schedule' ), \BeltoftServices\Jobs::callbacks(), true ) );
 
 		Retention::schedule();
 		Retention::schedule();
