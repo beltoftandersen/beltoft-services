@@ -5,15 +5,10 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox\Jobs;
+namespace BeltoftServices\Proxmox\Pve;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\Pve\Client;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Pve\JobScope;
-use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Proxmox\Vm\VmRecords;

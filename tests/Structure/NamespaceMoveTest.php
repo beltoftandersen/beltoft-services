@@ -35,6 +35,7 @@ class NamespaceMoveTest extends TestCase {
 		'DiskCapacity'    => array( 'Proxmox', 'Proxmox\\Pve' ),
 		'ProxmoxSettings' => array( 'Proxmox', 'Proxmox\\Pve' ),
 		'JobScope'        => array( 'Proxmox\\Jobs', 'Proxmox\\Pve' ),
+		'CapacityJobs'    => array( 'Proxmox\\Jobs', 'Proxmox\\Pve' ),
 		'ProxmoxDriver' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'Provision' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'Operations' => array( 'Proxmox', 'Proxmox\\Vm' ),
