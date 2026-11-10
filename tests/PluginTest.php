@@ -140,8 +140,8 @@ class PluginTest extends TestCase {
 	}
 
 	public function test_anchored_checks_do_not_let_a_trailing_newline_through(): void {
-		$this->assertNull( \BeltoftServices\Proxmox\AppDomains::sub( "a\n.b" ) );
-		$this->assertSame( 'shop', \BeltoftServices\Proxmox\AppDomains::sub( 'shop' ) );
+		$this->assertNull( \BeltoftServices\Apps\AppDomains::sub( "a\n.b" ) );
+		$this->assertSame( 'shop', \BeltoftServices\Apps\AppDomains::sub( 'shop' ) );
 
 		$found = array();
 		$files = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( BELTOFT_SERVICES_PATH . 'src', \FilesystemIterator::SKIP_DOTS ) );

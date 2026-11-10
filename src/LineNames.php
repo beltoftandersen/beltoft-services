@@ -7,8 +7,8 @@
 
 namespace BeltoftServices;
 
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Usage\Account;
 use BeltoftServices\Usage\Rates;
 

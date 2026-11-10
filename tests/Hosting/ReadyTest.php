@@ -71,7 +71,7 @@ class ReadyTest extends HostingCase {
 	}
 
 	public function test_the_email_is_registered_and_chosen_for_a_hosting_account(): void {
-		$this->assertContains( 'beltoft_services_hosting_ready', Emails::IDS );
+		$this->assertContains( 'beltoft_services_hosting_ready', Emails::ids() );
 		$this->assertInstanceOf( \BeltoftServices\Emails\HostingReady::class, Emails::get( 'beltoft_services_hosting_ready' ) );
 
 		$r = $this->account();

@@ -17,18 +17,29 @@ use PHPUnit\Framework\TestCase;
 class TransitionCallersTest extends TestCase {
 
 	/**
+	 * How many ->transition( calls each listed file has today. A second call in a listed file is a new caller too.
+	 *
+	 * @var array<string, int>
+	 */
+	private const COUNTS = array(
+		'Reconciler.php'                 => 2,
+		'Apps/AppLicence.php'            => 1,
+		'Proxmox/Addon/AddonCascade.php' => 1,
+		'Proxmox/Vm/RestoreSteps.php'    => 2,
+		'Proxmox/Vm/Reinstall.php'       => 1,
+	);
+
+	/**
 	 * Files that call ->transition() and why none of them notifies.
 	 *
 	 * @var array<string, string>
 	 */
 	private const ALLOWED = array(
-		'Reconciler.php'            => 'move() is the path that notifies: it calls transition() and then notify().',
-		'Admin/Panel.php'           => 'The forced delete calls Reconciler::notify() itself right after the transition and the close.',
-		'Proxmox/AppLicence.php'    => 'Announces "cancelled" itself; a notify would add the generic deleted email on top.',
-		'Proxmox/DiskMeta.php'      => 'Releases the disk capacity itself; a notify would release twice through DiskMeta::state_changed.',
-		'Proxmox/SnapshotMeta.php'  => 'The parent server\'s own deleted email covers the customer; the pack has no secrets or children.',
-		'Proxmox/RestoreSteps.php'  => 'A failed disk keeps its volume; a notify would release capacity for a volume left in place. It alerts the admin.',
-		'Proxmox/Actions.php'       => 'The reinstall moves to provisioning; no listener acts on it and the later ready does not mail twice.',
+		'Reconciler.php'            => 'move() is the path that notifies: it calls transition() and then notify(); mark_deleted() calls notify() itself right after the transition and the close.',
+		'Apps/AppLicence.php'       => 'Announces "cancelled" itself; a notify would add the generic deleted email on top.',
+		'Proxmox/Addon/AddonCascade.php' => 'Ends the add-ons of a deleted server; each kind\'s after_parent_deleted does its own notice (a notify would double it or release capacity twice).',
+		'Proxmox/Vm/RestoreSteps.php'  => 'A failed disk keeps its volume; a notify would release capacity for a volume left in place. It alerts the admin.',
+		'Proxmox/Vm/Reinstall.php'   => 'The reinstall moves to provisioning; no listener acts on it and the later ready does not mail twice.',
 	);
 
 	public function test_transition_is_called_only_where_listed(): void {
@@ -41,15 +52,21 @@ class TransitionCallersTest extends TestCase {
 				continue;
 			}
 
-			if ( 1 === preg_match( '/->transition\(/', (string) file_get_contents( $file->getPathname() ) ) ) {
-				$found[] = substr( $file->getPathname(), strlen( $root ) );
+			$count = preg_match_all( '/->transition\(/', (string) file_get_contents( $file->getPathname() ) );
+
+			if ( $count > 0 ) {
+				$found[ substr( $file->getPathname(), strlen( $root ) ) ] = $count;
 			}
 		}
 
-		sort( $found );
+		ksort( $found );
 		$allowed = array_keys( self::ALLOWED );
 		sort( $allowed );
 
-		$this->assertSame( $allowed, $found, 'Resource::transition() fires nothing: new callers must use Reconciler::move() or list their reason here.' );
+		$this->assertSame( $allowed, array_keys( $found ), 'Resource::transition() fires nothing: new callers must use Reconciler::move() or list their reason here.' );
+
+		$counts = self::COUNTS;
+		ksort( $counts );
+		$this->assertSame( $counts, $found, 'The number of ->transition( calls in a listed file changed: a new call needs its reason checked, then the count here updated.' );
 	}
 }

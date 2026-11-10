@@ -16,9 +16,9 @@ use BeltoftServices\Domains\LiveClient;
 use BeltoftServices\Domains\SpendGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\AppLicence;
-use BeltoftServices\Proxmox\PleskLicence;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\PleskLicence;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

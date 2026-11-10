@@ -11,10 +11,10 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DbAccess;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\EmailDetails;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Db\DbAccess;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Vm\EmailDetails;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
 

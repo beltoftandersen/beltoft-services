@@ -62,19 +62,23 @@ final class StepUpCode extends \WC_Email {
 	/**
 	 * What the code is for, in words.
 	 *
-	 * @param string $purpose One of StepUp::PURPOSES.
+	 * @param string $purpose One of StepUp::purposes().
 	 */
 	public static function purpose_text( string $purpose ): string {
-		return StepUp::TRANSFER_CODE === $purpose
-			? __( 'showing a domain transfer code', 'beltoft-services' )
-			: __( 'making a Full access API token', 'beltoft-services' );
+		/**
+		 * What a step-up code is for, in words, after "Your code for". Each purpose registers its own text.
+		 *
+		 * @param string $text    Text so far.
+		 * @param string $purpose The purpose.
+		 */
+		return (string) apply_filters( 'beltoft_services_stepup_text', __( 'confirming this step', 'beltoft-services' ), $purpose );
 	}
 
 	/**
 	 * Sends the code.
 	 *
 	 * @param \WP_User $user    Customer.
-	 * @param string   $purpose One of StepUp::PURPOSES.
+	 * @param string   $purpose One of StepUp::purposes().
 	 * @param string   $code    The code.
 	 */
 	public function trigger( \WP_User $user, string $purpose, string $code ): bool {

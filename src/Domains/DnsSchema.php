@@ -10,7 +10,7 @@ namespace BeltoftServices\Domains;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Creates the two tables the way Proxmox\Schema does: dbDelta, then the keys that the lock
+ * Creates the two tables the way Proxmox\Vm\Schema does: dbDelta, then the keys that the lock
  * relies on are verified in place, and the schema version is stored only when they exist. The
  * feature stays off (see DnsClaimsFeature) until ready() is true.
  */

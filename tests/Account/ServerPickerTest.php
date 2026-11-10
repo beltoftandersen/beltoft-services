@@ -12,17 +12,17 @@ use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppField;
-use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Picked;
-use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\SshKeyField;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Apps\AppField;
+use BeltoftServices\Apps\Apps;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Picked;
+use BeltoftServices\Proxmox\Vm\ServerName;
+use BeltoftServices\Proxmox\Vm\SshKeyField;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Backup/BackupTestCase.php';
 
 class ServerPickerTest extends BackupTestCase {
 
@@ -85,7 +85,7 @@ class ServerPickerTest extends BackupTestCase {
 	public function tear_down(): void {
 		WC()->cart->empty_cart();
 		wc_clear_notices();
-		foreach ( array( ServerPicker::HANDLE, \BeltoftServices\Proxmox\Tiles::HANDLE, AppField::HANDLE ) as $handle ) {
+		foreach ( array( ServerPicker::HANDLE, \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, AppField::HANDLE ) as $handle ) {
 			wp_dequeue_style( $handle );
 			wp_dequeue_script( $handle );
 		}
@@ -754,7 +754,7 @@ class ServerPickerTest extends BackupTestCase {
 	}
 
 	public function test_checkout_with_nothing_carried_is_what_it_was(): void {
-		WC()->cart->add_to_cart( $this->product->get_id(), 1, $this->v['a-None']->get_id(), \BeltoftServices\Proxmox\BackupField::attributes( $this->v['a-None'] ) );
+		WC()->cart->add_to_cart( $this->product->get_id(), 1, $this->v['a-None']->get_id(), \BeltoftServices\Proxmox\Backup\BackupField::attributes( $this->v['a-None'] ) );
 
 		ob_start();
 		OsField::render_classic();
@@ -779,7 +779,7 @@ class ServerPickerTest extends BackupTestCase {
 
 	public function test_the_backups_box_at_checkout_keeps_the_carried_choices(): void {
 		$this->send( array( ServerName::POST_KEY => 'keep' ) );
-		$swap = \BeltoftServices\Proxmox\BackupField::swap( true );
+		$swap = \BeltoftServices\Proxmox\Backup\BackupField::swap( true );
 
 		$this->assertTrue( $swap['ok'] );
 		$this->assertSame( 'keep', $this->server_lines()[0][ Picked::KEY ]['name'] );

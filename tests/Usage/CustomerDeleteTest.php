@@ -12,7 +12,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\CustomerDelete;
 use BeltoftServices\Usage\Ledger;
@@ -255,7 +255,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 
 		// The note next to Shut down and Start on the server's head.
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::page_head( false, $r, $r->license(), array(), array() );
+		\BeltoftServices\Proxmox\Vm\Panels::page_head( false, $r, $r->license(), array(), array() );
 		$head = (string) ob_get_clean();
 		$this->assertStringContainsString( 'A stopped server is still billed. Delete it to stop the charge.', $head );
 		$this->assertStringContainsString( 'data-power-action="shutdown"', $head );

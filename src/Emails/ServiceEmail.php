@@ -8,13 +8,12 @@
 namespace BeltoftServices\Emails;
 
 use BeltoftLicenses\Account\Endpoint;
+use BeltoftLicenses\Account\View;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
 use BeltoftServices\Settings;
-use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,9 +44,23 @@ abstract class ServiceEmail extends \WC_Email {
 	public const DATE_TIME = 'j F Y, H:i';
 
 	/**
+	 * The email's id, as in Definitions. A class that has one is described by its definition.
+	 */
+	protected const ID = '';
+
+	/**
 	 * Set up.
 	 */
 	public function __construct() {
+		if ( '' !== static::ID ) {
+			$definition           = Definitions::get( static::ID );
+			$this->id             = static::ID;
+			$this->title          = $definition['title'];
+			$this->description    = $definition['description'];
+			$this->template_html  = $definition['html'];
+			$this->template_plain = $definition['plain'];
+		}
+
 		$this->customer_email = true;
 		$this->template_base  = BELTOFT_SERVICES_PATH . 'templates/';
 		$this->placeholders   = array(
@@ -57,6 +70,20 @@ abstract class ServiceEmail extends \WC_Email {
 		);
 
 		parent::__construct();
+	}
+
+	/**
+	 * Default subject: the definition's, unless the class follows what it is about.
+	 */
+	public function get_default_subject() {
+		return '' === static::ID ? parent::get_default_subject() : Definitions::get( static::ID )['subject'];
+	}
+
+	/**
+	 * Default heading: the definition's, unless the class follows what it is about.
+	 */
+	public function get_default_heading() {
+		return '' === static::ID ? parent::get_default_heading() : Definitions::get( static::ID )['heading'];
 	}
 
 	/**
@@ -79,95 +106,47 @@ abstract class ServiceEmail extends \WC_Email {
 			$date    = isset( $data['deletes_at'] ) ? wp_date( self::DATE, (int) $data['deletes_at'] ) : '';
 
 			$this->object    = $r;
-			$mail            = 'mail' === $r->get( 'driver' ) ? ( Resource::find( $r->id() ) ?? $r ) : null;
 			// The licence's address, else the customer's own: a mail about what a connected app did must not go nowhere.
 			$this->recipient = (string) ( $license['email'] ?? '' );
 			$this->recipient = '' !== $this->recipient ? $this->recipient : ( $user ? (string) $user->user_email : '' );
-			$this->values    = array(
-				'product_name'  => $license ? ServerName::email_label( $r, $license ) : '',
-				'customer_name' => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
-				'account_url'   => self::account_url( $r, $license, $data ),
-				'deletion_date' => (string) $date,
-				'reason'        => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
-				'held'          => $r->on_hold(),
+			$values          = array(
+				'product_name'   => $license ? View::product_name( $license ) : '',
+				'customer_name'  => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
+				'account_url'    => self::account_url( $r, $license ),
+				'deletion_date'  => (string) $date,
+				'reason'         => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
+				'held'           => $r->on_hold(),
 				'retention_days' => self::retention_days( $r, $license ),
-				'deletes_on'    => self::deletes_on( $r, $license ),
-				'details'       => $this->details( $r ),
-				'extra_disks'   => self::extra_disks( $r ),
-				'disk_server_url' => \BeltoftServices\Proxmox\DiskDriver::ID === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::server_url( $r ) : '',
-				'disk_guide_url'  => \BeltoftServices\Proxmox\DiskDriver::ID === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::guide_url( $r ) : '',
-				'used'          => $used,
-				'limit'         => $limit,
-				'usage'         => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
-				'domain_name'   => \BeltoftServices\Domains\HostName::display( 'ssl' === $r->get( 'driver' ) ? (string) $r->get( 'ssl_name' ) : ( in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ? (string) $r->get( 'domain' ) : ( $mail ? (string) $mail->get( 'mail_domain' ) : '' ) ) ),
-				'mail_domain'   => $mail ? \BeltoftServices\Domains\HostName::display( (string) $mail->get( 'mail_domain' ) ) : '',
-				'mail_external' => $mail && 'external' === (string) $mail->get( 'mail_mode' ),
-				'mail_records'  => $mail ? \BeltoftServices\Mail\MailDns::missing_rows( $mail ) : array(),
-				'mail_host'     => $mail ? \BeltoftServices\Mail\MailSettings::host() : '',
-				'mail_imap'     => \BeltoftServices\Mail\MailView::IMAP_PORT,
-				'mail_smtp'     => \BeltoftServices\Mail\MailView::SMTP_SSL,
-				'mail_guide_url' => \BeltoftServices\Mail\MailSetup::page_url(),
-				'domain_action_reason' => in_array( $data['domain_action_reason'] ?? '', array( 'registrant_check', 'transfer_approval', 'move_dns' ), true ) ? $data['domain_action_reason'] : 'transfer_approval',
-				'transfer_fix_reason' => in_array( $data['transfer_fix_reason'] ?? '', array( 'auth_refused', 'locked' ), true ) ? $data['transfer_fix_reason'] : 'locked',
-				'domain_security_event' => in_array( $data['domain_event'] ?? '', DomainSecurity::EVENTS, true ) ? $data['domain_event'] : 'unlocked',
-				'dns_stays'     => 'domain' === $r->get( 'driver' ) && \BeltoftServices\Domains\Zone::served_for( strtolower( (string) $r->get( 'domain' ) ), (int) ( $license['user_id'] ?? 0 ) ),
-				'domain_renews' => self::domain_renews( $r ),
-				'registrar_name' => 'domain' === $r->get( 'driver' ) ? \BeltoftServices\Domains\TransferDns::registrar_name( (string) $r->get( 'domain' ) ) : '',
-				'domains_url'   => self::domains_url( $r, $license ),
-				'dns_external'  => 'domain' === $r->get( 'driver' ) && (bool) $r->get( 'dns_external' ),
-				'dns_choice'    => 'domain' === $r->get( 'driver' ) && 'transfer' === $r->get( 'mode' ) ? \BeltoftServices\Domains\TransferDns::choice( $r ) : '',
-				'our_nameservers' => 'domain' === $r->get( 'driver' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
-				'nameservers_shown' => 'domain' === $r->get( 'driver' ) && 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
-				'dns_only'      => 'dns' === $r->get( 'driver' ),
-				'nameservers'   => 'dns' === $r->get( 'driver' ) ? \BeltoftServices\Domains\Zone::nameservers() : array(),
-				'monitor_reason' => in_array( $data['reason'] ?? '', array( 'down', 'disk', 'disk_urgent', 'cpu', 'db_down', 'db_disk' ), true ) ? $data['reason'] : 'down',
-				'monitor_disk_percent' => max( 0, min( 100, (int) ( $data['disk_percent'] ?? 0 ) ) ),
-				'monitor_cpu_percent' => max( 0, min( 100, (int) ( $data['cpu_percent'] ?? 0 ) ) ),
-				'monitor_cpu_hours' => max( 0, (int) ( $data['cpu_hours'] ?? 0 ) ),
-				'monitor_upgrade_url' => ProxmoxDriver::ID === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
-				'monitor_grow_url' => 'proxmox-db' === $r->get( 'driver' ) && 'db_disk' === ( $data['reason'] ?? '' ) ? \BeltoftServices\Proxmox\DbDisk::grow_url( $r ) : '',
-				'monitor_disks_url' => ProxmoxDriver::ID === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::card_url( $r ) : '',
-				'monitor_cpu_since' => isset( $data['cpu_since'] ) ? wp_date( 'H:i', (int) $data['cpu_since'] ) : '',
-				'monitor_disk_used' => max( 0, (int) ( $data['disk_used'] ?? 0 ) ),
-				'monitor_disk_total' => max( 0, (int) ( $data['disk_total'] ?? 0 ) ),
-				'quarantine_signal' => in_array( $data['quarantine_signal'] ?? '', array( 'scan', 'syn', 'udp' ), true ) ? $data['quarantine_signal'] : 'scan',
-				'quarantine_counts' => is_array( $data['quarantine_counts'] ?? null ) ? array_map( 'intval', $data['quarantine_counts'] ) : array(),
-				'quarantine_at' => isset( $data['quarantine_at'] ) ? wp_date( self::DATE_TIME, (int) $data['quarantine_at'] ) : '',
-				'notice_kind'   => in_array( $data['notice_kind'] ?? '', Notice::KINDS, true ) ? $data['notice_kind'] : 'db_access',
-				'notice_what'   => isset( $data['notice_what'] ) && is_string( $data['notice_what'] ) ? wp_strip_all_tags( $data['notice_what'] ) : '',
-				'notice_app'    => isset( $data['notice_app'] ) && is_string( $data['notice_app'] ) ? wp_strip_all_tags( $data['notice_app'] ) : '',
-				'app_domain'    => isset( $data['app_domain'] ) && is_string( $data['app_domain'] ) ? \BeltoftServices\Domains\HostName::display( $data['app_domain'] ) : '',
-				'app_www'       => isset( $data['app_www'] ) && is_string( $data['app_www'] ) ? \BeltoftServices\Domains\HostName::display( $data['app_www'] ) : '',
-				'app_www_state' => isset( $data['app_www_state'] ) && is_string( $data['app_www_state'] ) ? $data['app_www_state'] : '',
-				'app_ip'        => isset( $data['app_ip'] ) && is_string( $data['app_ip'] ) && false !== filter_var( $data['app_ip'], FILTER_VALIDATE_IP ) ? $data['app_ip'] : '',
-				'app_name'      => (string) ( \BeltoftServices\Proxmox\Apps::definition( (string) $r->get( 'app_id' ) )['name'] ?? '' ),
-				'hosting_notice' => in_array( $data['hosting_notice'] ?? '', HostingNotice::KINDS, true ) ? array(
-					'kind'        => (string) $data['hosting_notice'],
-					'percent'     => max( 0, (int) ( $data['percent'] ?? 0 ) ),
-					'used'        => max( 0, (int) ( $data['used'] ?? 0 ) ),
-					'limit'       => max( 0, (int) ( $data['limit'] ?? 0 ) ),
-					'days'        => max( 0, (int) ( $data['days'] ?? 0 ) ),
-					'php'         => isset( $data['php'] ) ? sanitize_text_field( (string) $data['php'] ) : '',
-					'php_default' => isset( $data['php_default'] ) ? sanitize_text_field( (string) $data['php_default'] ) : '',
-					'php_end'     => isset( $data['php_end'] ) ? sanitize_text_field( (string) $data['php_end'] ) : '',
-					'site'        => isset( $data['site'] ) ? \BeltoftServices\Domains\HostName::display( sanitize_text_field( (string) $data['site'] ) ) : '',
-				) : array( 'kind' => 'storage_warning', 'percent' => 0, 'used' => 0, 'limit' => 0, 'days' => 0, 'php' => '', 'php_default' => '', 'php_end' => '', 'site' => '' ),
-				'hosting_restore' => in_array( $data['hosting_restore'] ?? '', HostingRestoreDone::KINDS, true ) ? array(
-					'kind'  => (string) $data['hosting_restore'],
-					'ok'    => ! empty( $data['ok'] ),
-					'until' => isset( $data['until'] ) ? sanitize_text_field( (string) $data['until'] ) : '',
-					'site'  => isset( $data['site'] ) ? \BeltoftServices\Domains\HostName::display( sanitize_text_field( (string) $data['site'] ) ) : '',
-				) : array( 'kind' => 'account', 'ok' => true, 'until' => '', 'site' => '' ),
-				'renewal'       => is_array( $data['renewal'] ?? null ) ? array(
+				'deletes_on'     => self::deletes_on( $r, $license ),
+				'details'        => $this->details( $r ),
+				'used'           => $used,
+				'limit'          => $limit,
+				'usage'          => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
+				'domain_name'    => '',
+				'notice_kind'    => in_array( $data['notice_kind'] ?? '', Notice::KINDS, true ) ? $data['notice_kind'] : 'db_access',
+				'notice_what'    => isset( $data['notice_what'] ) && is_string( $data['notice_what'] ) ? wp_strip_all_tags( $data['notice_what'] ) : '',
+				'notice_app'     => isset( $data['notice_app'] ) && is_string( $data['notice_app'] ) ? wp_strip_all_tags( $data['notice_app'] ) : '',
+				'renewal'        => is_array( $data['renewal'] ?? null ) ? array(
 					'date'       => sanitize_text_field( (string) ( $data['renewal']['date'] ?? '' ) ),
 					'plan'       => sanitize_text_field( (string) ( $data['renewal']['plan'] ?? '' ) ),
 					'price_html' => wp_kses_post( (string) ( $data['renewal']['price_html'] ?? '' ) ),
 					'view_url'   => esc_url_raw( (string) ( $data['renewal']['view_url'] ?? '' ) ),
 				) : array( 'date' => '', 'plan' => '', 'price_html' => '', 'view_url' => '' ),
-				'ssl'           => \BeltoftServices\Ssl\SslEmail::values( $r, $data ),
-				'hosting'       => 'hosting' === $r->get( 'driver' ) ? \BeltoftServices\Hosting\HostingEmail::values( $r ) : array(),
-				'snapshot_reason' => in_array( $data['snapshot_reason'] ?? '', \BeltoftServices\Proxmox\SnapshotExpiry::REASONS, true ) ? $data['snapshot_reason'] : 'expired',
 			);
+
+			/**
+			 * The template values of a service email. Each feature adds its own keys here, always all of
+			 * them with their empty defaults, so a template never meets a missing key. Display values only:
+			 * never a secret.
+			 *
+			 * @param array<string, mixed> $values Values so far.
+			 * @param Resource             $r      The resource.
+			 * @param array<string, mixed> $data   Trigger data.
+			 * @param ServiceEmail         $email  The email.
+			 */
+			$values = apply_filters( 'beltoft_services_email_values', $values, $r, $data, $this );
+
+			$this->values = is_array( $values ) ? $values : array();
 
 			$this->placeholders['{product_name}']  = $this->values['product_name'];
 			$this->placeholders['{deletion_date}'] = $this->values['deletion_date'];
@@ -186,122 +165,23 @@ abstract class ServiceEmail extends \WC_Email {
 	}
 
 	/**
-	 * The upgrade link of a usage email: the larger plan for what ran short, '' when there is none.
-	 *
-	 * @param Resource $r      Resource.
-	 * @param string   $reason Monitoring reason.
-	 */
-	private static function upgrade_link( Resource $r, string $reason ): string {
-		$need = array( 'disk' => 'disk', 'disk_urgent' => 'disk', 'cpu' => 'cpu' )[ $reason ] ?? '';
-
-		return '' === $need ? '' : \BeltoftServices\Proxmox\Upgrades::link( $r, $need );
-	}
-
-	/**
-	 * Where the "view in your account" link goes: the page of the server the email is about (Disks tab for an extra
-	 * disk, Snapshots for a snapshot pack or a snapshot notice), else the license's tab. A removed server has no page,
-	 * so its link goes to the tab.
+	 * Where the "view in your account" link goes before a feature has its say (the filter
+	 * beltoft_services_email_values): the licence's tab, the licence-key page for a licence key,
+	 * the Licenses endpoint when there is no licence.
 	 *
 	 * @param Resource                  $r       Resource.
 	 * @param array<string, mixed>|null $license License row.
-	 * @param array<string, mixed>      $data    Trigger data.
 	 */
-	private static function account_url( Resource $r, $license, array $data ): string {
+	private static function account_url( Resource $r, $license ): string {
 		if ( ! $license ) {
 			return wc_get_account_endpoint_url( Endpoint::slug() );
 		}
 
-		$driver = (string) $r->get( 'driver' );
-		$tab    = '';
-		$server = null;
-
-		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $driver || \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver || \BeltoftServices\Proxmox\AppLicenceDriver::ID === $driver ) {
-			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
-			$tab    = \BeltoftServices\Proxmox\DiskDriver::ID === $driver ? 'disks' : ( \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver ? 'snapshots' : 'app' );
-		} elseif ( \BeltoftServices\Proxmox\ProxmoxDriver::ID === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			$server = $r;
-			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : ( isset( $data['app_domain'] ) ? 'app' : '' );
-		}
-
-		$server_license = $server ? $server->license() : null;
-
-		if ( in_array( $driver, array( 'domain', 'dns' ), true ) ) {
-			return self::domains_url( $r, $license );
-		}
-
-		if ( \BeltoftServices\Proxmox\DbDriver::ID === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( $license );
-		}
-
-		if ( 'ssl' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->url( $license );
-		}
-
-		if ( 'licence-key' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+		if ( 'licence-key' === (string) $r->get( 'driver' ) && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Licences::class )->url( $license );
 		}
 
-		if ( 'mail' === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class )->url( $license );
-		}
-
-		return $server_license ? \BeltoftServices\Account\ServerLinks::url( $server_license, $tab ) : Endpoint::url_for_license( $license );
-	}
-
-	/**
-	 * Where a domain email sends the customer: the domain's own page, or the list when there is no license or the service is deleted.
-	 *
-	 * @param Resource                  $r       Resource.
-	 * @param array<string, mixed>|null $license License row.
-	 */
-	private static function domains_url( Resource $r, $license ): string {
-		// A deleted service has no page: its email sends to the list.
-		if ( is_array( $license ) && ! empty( $license['id'] ) && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			return \BeltoftServices\Account\Domains::url( $license );
-		}
-
-		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '';
-	}
-
-	/**
-	 * The next renewal date of a domain, formatted, or ''. A prepaid transfer year counts from the
-	 * prepaid expiry, as the billing dates do.
-	 *
-	 * @param Resource $r Resource.
-	 */
-	private static function domain_renews( Resource $r ): string {
-		if ( 'domain' !== $r->get( 'driver' ) ) {
-			return '';
-		}
-
-		$expiry = (string) ( $r->get( 'prepaid_expiry' ) ?: $r->get( 'expires_at' ) );
-		$time   = '' !== $expiry ? strtotime( $expiry . ' UTC' ) : false;
-
-		return $time ? wp_date( self::DATE, $time ) : '';
-	}
-
-	/**
-	 * Sizes in GB of the extra disks that are deleted with a server, for its deletion warning.
-	 *
-	 * @param Resource $r Resource.
-	 * @return int[]
-	 */
-	private static function extra_disks( Resource $r ): array {
-		if ( \BeltoftServices\Proxmox\ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
-			return array();
-		}
-
-		$sizes = array();
-
-		foreach ( \BeltoftServices\Proxmox\DiskMeta::for_server( $r ) as $disk ) {
-			$size = max( (int) $disk->get( 'size_gb' ), (int) ( ( (array) $disk->get( 'plan' ) )['disk_gb'] ?? 0 ) );
-
-			if ( $size > 0 ) {
-				$sizes[] = $size;
-			}
-		}
-
-		return $sizes;
+		return Endpoint::url_for_license( $license );
 	}
 
 	/**
@@ -424,6 +304,7 @@ abstract class ServiceEmail extends \WC_Email {
 	 */
 	protected function template_args( bool $plain_text ): array {
 		return array_merge(
+			ValueDefaults::all(),
 			$this->values,
 			array(
 				'email_heading'      => $this->get_heading(),

@@ -13,10 +13,19 @@ use PHPUnit\Framework\TestCase;
  * Core (src/*.php) must not depend on feature namespaces; Mail not on Proxmox; Proxmox not on Mcp;
  * Domains not on Proxmox, Mail or Mcp. Today's violations are listed in ALLOWED so the test passes now
  * and stops new ones (Plugin.php, the composition root, is exempt); remove an entry when the leak is fixed (a stale entry fails the test).
+ *
+ * FEATURES lists every feature folder (widened 2026-11 to Hosting, Ssl, Licences, Credit, Card, Admin and Cli; the widening found no new leak).
+ * Drivers, Billing, Checkout and Emails count as core when they are the importing side (CORE_FOLDERS, widened 2026-11-10);
+ * as imported classes they are not features, because core imports Billing\CartFlow and the email registry.
  */
 class DependencyDirectionTest extends TestCase {
 
-	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks' );
+	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'Credit', 'Card', 'Admin', 'Cli', 'Apps' );
+
+	/**
+	 * Folders that belong to the core layer as sources (they may not import a feature). As targets they stay what they are.
+	 */
+	private const CORE_FOLDERS = array( 'Drivers', 'Billing', 'Checkout', 'Emails' );
 
 	/**
 	 * Layer => layers it must not use.
@@ -31,9 +40,21 @@ class DependencyDirectionTest extends TestCase {
 
 	/**
 	 * Layer => single classes it must not use (finer than FORBIDDEN): Proxmox shares ServerLinks with Account, never Servers.
+	 * An entry ending in a backslash is a namespace prefix: Hosting reaches into Proxmox only through Proxmox\Pve, so every
+	 * other Proxmox sub-namespace is out of bounds for it.
 	 */
 	private const FORBIDDEN_CLASSES = array(
 		'Proxmox' => array( 'Account\\Servers' ),
+		'Hosting' => array(
+			'Proxmox\\Vm\\',
+			'Proxmox\\Disk\\',
+			'Proxmox\\Snapshot\\',
+			'Proxmox\\Backup\\',
+			'Proxmox\\Network\\',
+			'Proxmox\\Console\\',
+			'Proxmox\\Db\\',
+			'Proxmox\\Addon\\',
+		),
 	);
 
 	/**
@@ -136,6 +157,11 @@ class DependencyDirectionTest extends TestCase {
 
 			$from = $this->layer( $ns . '\\X' );
 
+			// The target table puts these folders in the core layer (widened 2026-11-10): they follow the core rule.
+			if ( in_array( $from, self::CORE_FOLDERS, true ) ) {
+				$from = 'core';
+			}
+
 			if ( ! isset( self::FORBIDDEN[ $from ] ) && ! isset( self::FORBIDDEN_CLASSES[ $from ] ) ) {
 				continue;
 			}
@@ -143,7 +169,7 @@ class DependencyDirectionTest extends TestCase {
 			foreach ( array_unique( $names ) as $name ) {
 				$to = $this->layer( $name );
 
-				if ( in_array( $to, self::FORBIDDEN[ $from ] ?? array(), true ) || in_array( $this->class_of( $name ), self::FORBIDDEN_CLASSES[ $from ] ?? array(), true ) ) {
+				if ( in_array( $to, self::FORBIDDEN[ $from ] ?? array(), true ) || $this->in_forbidden_classes( $this->class_of( $name ), self::FORBIDDEN_CLASSES[ $from ] ?? array() ) ) {
 					$out[ $rel . ' -> ' . $this->class_of( $name ) ] = true;
 				}
 			}
@@ -187,6 +213,21 @@ class DependencyDirectionTest extends TestCase {
 		}
 
 		return $parts[1];
+	}
+
+	/**
+	 * Whether a class is listed, exactly or by namespace prefix (an entry that ends in a backslash).
+	 *
+	 * @param string[] $list Entries.
+	 */
+	private function in_forbidden_classes( string $class_name, array $list ): bool {
+		foreach ( $list as $entry ) {
+			if ( $class_name === $entry || ( '\\' === substr( $entry, -1 ) && 0 === strpos( $class_name, $entry ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function class_of( string $name ): string {

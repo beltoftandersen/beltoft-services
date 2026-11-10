@@ -366,6 +366,36 @@ abstract class ServiceArea {
 	}
 
 	/**
+	 * Prints the tab strip of a service page: links in the strip the Databases pages use.
+	 *
+	 * Public API for add-on plugins: the OdooWoo portal prints its dashboard tabs with it. Nothing in this
+	 * plugin calls it, so it is pinned by tests/Structure/ExternalApiTest.php and must not be removed as dead code.
+	 *
+	 * @param array<string, array{title: string, url: string, attrs?: array<string, string>, hidden?: bool}> $tabs Tab slug => title, address, and optionally extra attributes and a hidden flag (a script may show it later).
+	 * @param string                                           $active Slug of the tab shown.
+	 * @param string                                           $label  Accessible name of the strip.
+	 */
+	public static function tab_nav( array $tabs, string $active, string $label ): void {
+		if ( ! $tabs ) {
+			return;
+		}
+
+		echo '<nav class="beltoft-services-tabs" aria-label="' . esc_attr( $label ) . '">';
+
+		foreach ( $tabs as $slug => $tab ) {
+			$attrs = '';
+
+			foreach ( isset( $tab['attrs'] ) && is_array( $tab['attrs'] ) ? $tab['attrs'] : array() as $name => $value ) {
+				$attrs .= ' ' . sanitize_key( (string) $name ) . '="' . esc_attr( (string) $value ) . '"';
+			}
+
+			echo '<a href="' . esc_url( $tab['url'] ) . '"' . $attrs . ( ! empty( $tab['hidden'] ) ? ' hidden' : '' ) . ( (string) $slug === $active ? ' aria-current="page"' : '' ) . '>' . esc_html( $tab['title'] ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the attributes are escaped above.
+		}
+
+		echo '</nav>';
+	}
+
+	/**
 	 * Early on a My Account address: a service's page by license id goes to its slug address (301).
 	 */
 	public static function redirect(): void {
@@ -670,7 +700,7 @@ abstract class ServiceArea {
 
 		// A database's head has the state line, the power buttons and no renewal date on a pay as you go service.
 		if ( self::$page['area'] instanceof Databases ) {
-			$card = \BeltoftServices\Proxmox\DbCard::view( $resource );
+			$card = \BeltoftServices\Proxmox\Db\DbCard::view( $resource );
 			$file = 'db-head.php';
 
 			if ( 'usage' === (string) ( self::$page['license']['source'] ?? '' ) ) {

@@ -96,7 +96,7 @@ final class Cart {
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
 			$driver = \BeltoftServices\Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			if ( $driver && \BeltoftServices\Proxmox\DiskDriver::ID === $driver->id() && ! CartFlow::has_value( $item, CartFlow::EXISTING_SERVICE ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
+			if ( $driver && \BeltoftServices\Proxmox\Disk\DiskDriver::ID === $driver->id() && ! CartFlow::has_value( $item, CartFlow::EXISTING_SERVICE ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
 				$disks += (int) $item['quantity'];
 			}
 		}

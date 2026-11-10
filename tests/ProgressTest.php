@@ -7,11 +7,21 @@
 
 namespace BeltoftServices\Tests;
 
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
 use BeltoftLicenses\Account\View;
+
+/**
+ * A fake driver that names its build steps.
+ */
+final class SteppedFakeDriver extends FakeDriver implements ProvisionSteps {
+	public function step_labels(): array {
+		return array( 'one' => 'First thing', 'two' => 'Second thing' );
+	}
+}
 
 /**
  * Progress tests. Nothing here calls a server: only resource meta and the fake driver.
@@ -47,6 +57,99 @@ final class ProgressTest extends TestCase {
 	 */
 	private function statuses( array $payload ): array {
 		return array_column( $payload['steps'], 'status', 'key' );
+	}
+
+	/**
+	 * Every step table, title and text a customer can see, by driver id and state. The fixture was written
+	 * from the code before the steps moved into the drivers; it must not change.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function golden_payloads(): array {
+		$ids   = array( 'proxmox', 'proxmox-db', 'hosting', 'proxmox-disk', 'domain', 'ssl', 'dns', 'proxmox-snapshots', 'proxmox-app', 'whatever' );
+		$steps = array( 'ip', 'vmid', 'clone', 'place', 'contact', 'csr', 'claim', 'order', 'server', 'slot', 'net' );
+		$now   = time();
+		$cases = array(
+			'queued'          => array( 'state' => 'requested' ),
+			'building'        => array( 'state' => 'provisioning', 'steps' => array() ),
+			'building-some'   => array( 'state' => 'provisioning', 'steps' => $steps ),
+			'failed-build'    => array( 'state' => 'failed', 'failed_op' => 'provision', 'steps' => array( 'ip', 'contact' ) ),
+			'failed-update'   => array( 'state' => 'failed', 'failed_op' => 'update_plan' ),
+			'reinstall'       => array( 'state' => 'provisioning', 'wipe' => true, 'steps' => array( 'ip' ), 'last_reinstall_at' => 1700000000 ),
+			'reinstall-wiped' => array( 'state' => 'provisioning', 'steps' => array( 'ip', 'clone' ), 'last_reinstall_at' => 1700000000 ),
+			'restore-start'   => array( 'state' => 'ready', 'restore' => array( 'volid' => 'v', 'phase' => '' ) ),
+			'restore-done'    => array( 'state' => 'ready', 'restore' => array( 'volid' => 'v', 'phase' => 'restored' ) ),
+			'rollback-start'  => array( 'state' => 'ready', 'snapshot_rollback' => array( 'id' => 'a', 'phase' => 'stopping' ) ),
+			'rollback-after'  => array( 'state' => 'ready', 'plan_dirty' => true, 'snapshot_rolled_at' => $now ),
+			'update'          => array( 'state' => 'ready', 'plan_dirty' => true ),
+			'delete'          => array( 'state' => 'ready', 'desired' => 'deleted' ),
+			'pause'           => array( 'state' => 'ready', 'desired' => 'paused' ),
+			'resume'          => array( 'state' => 'paused', 'desired' => 'ready' ),
+			'marker-label'    => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'fw_apply', 'at' => $now, 'label' => 'Apply firewall changes' ) ),
+			'marker-plain'    => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'x', 'at' => $now, 'label' => '' ) ),
+			'marker-restore'  => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'restore', 'at' => $now, 'label' => 'Restore' ) ),
+			'marker-rollback' => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'snapshot_rollback', 'at' => $now, 'label' => 'Go back' ) ),
+			'restore-failed'  => array( 'state' => 'failed', 'failed_op' => 'update_plan', 'restore' => array( 'volid' => 'v', 'phase' => 'restored' ) ),
+			'marker-reinstall' => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'reinstall', 'at' => $now, 'label' => 'Reinstall' ) ),
+			'idle'            => array( 'state' => 'ready' ),
+			'app-installing'  => array( 'state' => 'ready', 'app_id' => 'wordpress', 'app_state' => 'installing', 'app_step' => 'database' ),
+			'app-pending'     => array( 'state' => 'ready', 'app_id' => 'wordpress', 'app_state' => 'pending' ),
+			'app-slow'        => array( 'state' => 'ready', 'app_id' => 'wordpress', 'app_state' => 'unknown', 'app_step' => 'packages' ),
+			'app-failed'      => array( 'state' => 'ready', 'app_id' => 'wordpress', 'app_state' => 'failed', 'app_step' => 'packages' ),
+			'app-ready'       => array( 'state' => 'ready', 'app_id' => 'wordpress', 'app_state' => 'ready' ),
+			'build-with-app'  => array( 'state' => 'provisioning', 'app_id' => 'wordpress', 'app_state' => 'pending', 'steps' => array( 'ip', 'vmid' ) ),
+			'reinstall-app'   => array( 'state' => 'provisioning', 'wipe' => true, 'app_id' => 'wordpress', 'app_state' => 'pending', 'last_reinstall_at' => 1700000000 ),
+			'queued-app'      => array( 'state' => 'requested', 'app_id' => 'wordpress', 'app_state' => 'pending' ),
+		);
+		$out   = array();
+
+		foreach ( $ids as $id ) {
+			foreach ( $cases as $name => $meta ) {
+				list( $r ) = $this->resource( $id, $meta );
+				$payload   = Progress::build( Resource::find( $r->id() ) );
+
+				unset( $payload['started'] );
+				$out[ $id . ' / ' . $name ] = $payload;
+			}
+		}
+
+		return $out;
+	}
+
+	public function test_the_shipped_step_tables_are_unchanged(): void {
+		$file = __DIR__ . '/fixtures/progress-golden.json';
+		$got  = json_decode( (string) wp_json_encode( $this->golden_payloads() ), true );
+
+		if ( getenv( 'BELTOFT_WRITE_GOLDEN' ) ) {
+			file_put_contents( $file, wp_json_encode( $got, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . "\n" );
+		}
+
+		$want = json_decode( (string) file_get_contents( $file ), true );
+
+		$this->assertSame( array_keys( $want ), array_keys( $got ) );
+
+		foreach ( $want as $name => $payload ) {
+			$this->assertSame( $payload, $got[ $name ], $name );
+		}
+	}
+
+	public function test_a_driver_implementing_provision_steps_gets_its_steps_in_the_payload(): void {
+		$stepper = new SteppedFakeDriver( 'stepper' );
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) use ( $stepper ) {
+				$drivers['stepper'] = $stepper;
+				return $drivers;
+			}
+		);
+
+		list( $r ) = $this->resource( 'stepper', array( 'state' => 'provisioning', 'steps' => array( 'one' ) ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertSame( array( 'one' => 'done', 'two' => 'current' ), $this->statuses( $p ) );
+		$this->assertSame( array( 'First thing', 'Second thing' ), array_column( $p['steps'], 'label' ) );
+		$this->assertSame( 'two', $p['current'] );
 	}
 
 	public function test_a_server_build_lists_its_steps_with_the_current_one(): void {
@@ -411,7 +514,7 @@ final class ProgressTest extends TestCase {
 	}
 
 	public function test_the_server_panel_passes_busy_from_the_progress(): void {
-		$this->assertStringContainsString( "Progress::build( \$r )['active']", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/Panels.php' ) );
+		$this->assertStringContainsString( "Progress::build( \$r )['active']", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/Vm/Panels.php' ) );
 	}
 
 	public function test_a_driver_cannot_write_the_marker(): void {

@@ -6,9 +6,10 @@ use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 class ServerPageTest extends MonitoringTestCase {
 	private function as_owner( $r ): array {
@@ -197,11 +198,11 @@ class ServerPageTest extends MonitoringTestCase {
 
 	public function test_the_page_prints_the_power_buttons_itself_and_a_card_keeps_the_generic_ones(): void {
 		$r = $this->ready_vm();
-		$offered = \BeltoftServices\Proxmox\Actions::offered( $r );
-		$page = \BeltoftServices\Proxmox\Actions::buttons( $offered, $r, 'page' );
+		$offered = \BeltoftServices\Proxmox\Vm\Actions::offered( $r );
+		$page = \BeltoftServices\Proxmox\Vm\Actions::buttons( $offered, $r, 'page' );
 		$this->assertArrayNotHasKey( 'reboot', $page );
 		$this->assertArrayNotHasKey( 'shutdown', $page );
-		$card = \BeltoftServices\Proxmox\Actions::buttons( $offered, $r, 'card' );
+		$card = \BeltoftServices\Proxmox\Vm\Actions::buttons( $offered, $r, 'card' );
 		$this->assertArrayHasKey( 'reboot', $card );
 	}
 
@@ -209,7 +210,7 @@ class ServerPageTest extends MonitoringTestCase {
 		$r = $this->ready_vm();
 		wp_set_current_user( (int) $r->license()['user_id'] );
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( $r );
+		\BeltoftServices\Proxmox\Vm\Panels::account( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringNotContainsString( 'beltoft-services-tabs', $html );
 		$this->assertStringNotContainsString( 'class="beltoft-services-tab"', $html );
@@ -221,7 +222,7 @@ class ServerPageTest extends MonitoringTestCase {
 		$r = $this->ready_vm();
 		$r->set( array( 'disk_used' => 15 * 1073741824, 'disk_total' => 30 * 1073741824, 'disk_read_at' => time() ) );
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( \BeltoftServices\Resource::find( $r->id() ) );
+		\BeltoftServices\Proxmox\Vm\Panels::account( \BeltoftServices\Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'beltoft-vm-usage__bar', $html );
 		$this->assertStringContainsString( 'Read every 6 hours', $html );

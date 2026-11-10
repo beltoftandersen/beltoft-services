@@ -61,7 +61,7 @@ class LineNamesTest extends UsageTestCase {
 	public function test_the_meta_list_leaves_out_what_the_name_says_and_adds_the_usage_note(): void {
 		$v    = $this->usage_product();
 		$item = $this->line( $v['u-None'] );
-		$item->add_meta_data( \BeltoftServices\Proxmox\ServerName::ITEM_META, 'web1', true );
+		$item->add_meta_data( \BeltoftServices\Proxmox\Vm\ServerName::ITEM_META, 'web1', true );
 		$item->save();
 		$item = new \WC_Order_Item_Product( $item->get_id() );
 

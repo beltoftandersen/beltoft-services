@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Structure;
 use PHPUnit\Framework\TestCase;
 
 /**
- * A bare 'proxmox' next to a driver check is a second copy of the id. This scans src/ and fails on one outside ProxmoxDriver.
+ * A bare 'proxmox' or "proxmox" next to a driver check is a second copy of the id. This scans src/ and fails on one outside ProxmoxDriver.
  */
 class DriverIdLiteralTest extends TestCase {
 
@@ -20,8 +20,8 @@ class DriverIdLiteralTest extends TestCase {
 	 * @var array<string, string>
 	 */
 	private const ALLOWED = array(
-		'src/Proxmox/ProxmoxDriver.php'   => 'defines the id',
-		'src/Proxmox/ProxmoxSettings.php' => 'the settings tab slug, not the driver id',
+		'src/Proxmox/Vm/ProxmoxDriver.php'   => 'defines the id',
+		'src/Proxmox/Pve/ProxmoxSettings.php' => 'the settings tab slug, not the driver id',
 		'src/Drivers/Driver.php'          => 'a docblock example',
 	);
 
@@ -37,12 +37,12 @@ class DriverIdLiteralTest extends TestCase {
 				continue;
 			}
 
-			if ( preg_match( "/'proxmox'/", (string) file_get_contents( $file->getPathname() ) ) ) {
+			if ( preg_match( '/[\'"]proxmox[\'"]/', (string) file_get_contents( $file->getPathname() ) ) ) {
 				$bad[] = $rel;
 			}
 		}
 
 		$this->assertSame( array(), $bad, "Use ProxmoxDriver::ID instead of the literal 'proxmox'." );
-		$this->assertSame( 'proxmox', \BeltoftServices\Proxmox\ProxmoxDriver::ID );
+		$this->assertSame( 'proxmox', \BeltoftServices\Proxmox\Vm\ProxmoxDriver::ID );
 	}
 }

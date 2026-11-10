@@ -11,14 +11,14 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\GuestDisk;
-use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\SnapshotDriver;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Vm\GuestDisk;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -261,13 +261,13 @@ final class Servers {
 
 		$driver = (string) $resource->get( 'driver' );
 
-		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Proxmox\AppLicenceDriver::ID !== $driver ) {
+		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Apps\AppLicenceDriver::ID !== $driver ) {
 			return null;
 		}
 
 		return array(
 			'license_id' => max( 0, (int) $resource->get( 'server_license' ) ),
-			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : \BeltoftServices\Proxmox\AppTab::SLUG ),
+			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : \BeltoftServices\Apps\AppTab::SLUG ),
 			'resource'   => $resource,
 		);
 	}
@@ -321,7 +321,7 @@ final class Servers {
 			return '';
 		}
 
-		$anchor = 'disks' === $parent['tab'] ? '#' . \BeltoftServices\Proxmox\DiskGuide::anchor( $parent['resource']->id() ) : '';
+		$anchor = 'disks' === $parent['tab'] ? '#' . \BeltoftServices\Proxmox\Disk\DiskGuide::anchor( $parent['resource']->id() ) : '';
 
 		return ServerLinks::url( $server, $parent['tab'] ) . $anchor;
 	}
@@ -355,7 +355,7 @@ final class Servers {
 
 		if ( $rows ) {
 			ServiceArea::actions( $buttons, false );
-			\BeltoftServices\Proxmox\LiveUsage::enqueue();
+			\BeltoftServices\Proxmox\Network\LiveUsage::enqueue();
 			include self::file( 'servers-list.php' );
 		}
 
@@ -473,12 +473,12 @@ final class Servers {
 		$title  = (string) ( $view['product'] ?? '' );
 		$kind   = \BeltoftLicenses\Account\View::product_name( $license );
 
-		$app = $resource->on_hold() ? '' : \BeltoftServices\Proxmox\AppProgress::line( $resource );
+		$app = $resource->on_hold() ? '' : \BeltoftServices\Apps\AppProgress::line( $resource );
 
 		if ( '' !== $app ) {
 			// The server is up but its app is not done: the row says so, never "Running" or "Ready".
 			$text = $app;
-			$tone = 'failed' === \BeltoftServices\Proxmox\AppProgress::state( $resource ) ? 'bad' : 'busy';
+			$tone = 'failed' === \BeltoftServices\Apps\AppProgress::state( $resource ) ? 'bad' : 'busy';
 		} elseif ( $busy ) {
 			$text = __( 'Working', 'beltoft-services' );
 			$tone = 'busy';
@@ -504,7 +504,7 @@ final class Servers {
 
 			$memory = (int) ( $plan['memory_mb'] ?? 0 ) * 1048576;
 			// The guest's own figure (MemAvailable) when a fresh reading is kept: PVE counts page cache as used.
-			$guest = \BeltoftServices\Proxmox\LiveUsage::cached_memory( $resource->id() );
+			$guest = \BeltoftServices\Proxmox\Network\LiveUsage::cached_memory( $resource->id() );
 
 			if ( null !== $guest ) {
 				$bars[] = array(
@@ -555,7 +555,7 @@ final class Servers {
 			'state'   => $text,
 			'tone'    => $tone,
 			'renews'  => ServerLinks::renewal( $license ),
-			'note'    => \BeltoftServices\Proxmox\Quarantine::active( $resource ) ? __( 'Outgoing internet traffic is blocked', 'beltoft-services' ) : '',
+			'note'    => \BeltoftServices\Proxmox\Network\Quarantine::active( $resource ) ? __( 'Outgoing internet traffic is blocked', 'beltoft-services' ) : '',
 			'bars'    => $bars,
 		);
 	}

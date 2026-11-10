@@ -14,7 +14,7 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Mcp\ActionMap;
 use BeltoftServices\Mcp\Secrets;
 use BeltoftServices\Mcp\Tools;
-use BeltoftServices\Proxmox\Access;
+use BeltoftServices\Proxmox\Vm\Access;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/McpTestCase.php';

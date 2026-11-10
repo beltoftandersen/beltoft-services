@@ -47,7 +47,7 @@ final class Panel {
 	public static function group( string $state, ?Resource $r = null ): string {
 		switch ( $state ) {
 			case 'ready':
-				return $r && 'installing' === \BeltoftServices\Proxmox\AppProgress::state( $r ) ? 'getting-ready' : 'ready';
+				return $r && 'installing' === \BeltoftServices\Apps\AppProgress::state( $r ) ? 'getting-ready' : 'ready';
 			case 'failed':
 				return 'failed';
 			case 'paused':
@@ -83,7 +83,7 @@ final class Panel {
 			return self::domain_label( $state, $r );
 		}
 
-		$app = $r ? \BeltoftServices\Proxmox\AppProgress::line( $r ) : '';
+		$app = $r ? \BeltoftServices\Apps\AppProgress::line( $r ) : '';
 
 		if ( '' !== $app ) {
 			return $app;
@@ -155,7 +155,7 @@ final class Panel {
 			return \BeltoftServices\Mail\MailField::proof_text();
 		}
 
-		$app = $r ? \BeltoftServices\Proxmox\AppProgress::message( $r ) : '';
+		$app = $r ? \BeltoftServices\Apps\AppProgress::message( $r ) : '';
 
 		if ( '' !== $app ) {
 			return $app;

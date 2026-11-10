@@ -10,7 +10,7 @@ namespace BeltoftServices\Account;
 use BeltoftLicenses\Licenses;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

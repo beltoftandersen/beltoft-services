@@ -23,10 +23,7 @@ class LicencesTablesTest extends TestCase {
 	 */
 	private static function allowed(): array {
 		return array(
-			'IntroCoupon.php'          => 'selects licenses by product slug and reads user and email; Licenses has no lookup by slug',
-			'Account/Overview.php'     => 'reads the events table for the activity list; licences has no events API',
-			'Usage/Meter.php'          => 'sums usage over licenses and activations in one joined query',
-			'Usage/Account.php'        => 'writes licenses.source = usage; Licenses::update() does not allow source (fix in licences first)',
+			'Account/OverviewActivity.php' => 'licences events history text, final-review item',
 		);
 	}
 

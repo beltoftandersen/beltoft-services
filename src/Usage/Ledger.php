@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 
 defined( 'ABSPATH' ) || exit;
 

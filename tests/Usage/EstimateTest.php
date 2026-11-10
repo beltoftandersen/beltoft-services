@@ -9,8 +9,8 @@ namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\UsageView;
-use BeltoftServices\Proxmox\DbCard;
-use BeltoftServices\Proxmox\Panels;
+use BeltoftServices\Proxmox\Db\DbCard;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Usage\Estimate;
 use BeltoftServices\Usage\Ledger;
 

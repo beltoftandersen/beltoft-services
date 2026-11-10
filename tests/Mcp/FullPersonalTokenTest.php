@@ -72,7 +72,7 @@ final class FullPersonalTokenTest extends McpTestCase {
 	 * Emails a code for a Full token and returns it from the captured mail.
 	 */
 	private function emailed_code( int $user ): string {
-		\BeltoftServices\StepUp::send( $user, \BeltoftServices\StepUp::API_TOKEN );
+		\BeltoftServices\StepUp::send( $user, \BeltoftServices\Account\ApiTokens::PURPOSE );
 		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
 
 		return $m[1];

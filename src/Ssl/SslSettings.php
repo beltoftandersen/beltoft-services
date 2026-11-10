@@ -12,6 +12,7 @@ final class SslSettings {
 
 	/** Hooks. */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 5 );
 		add_filter( 'beltoft_services_settings_tabs', array( __CLASS__, 'tabs' ) );
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'sections' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
@@ -19,6 +20,24 @@ final class SslSettings {
 		add_action( 'admin_post_beltoft_services_ssl_sync', array( __CLASS__, 'sync_now' ) );
 		add_action( 'beltoft_services_ssl_costs', array( __CLASS__, 'sync_costs' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule' ) );
+	}
+
+	/**
+	 * Adds the SSL driver to the registry.
+	 *
+	 * @param mixed $drivers Drivers keyed by id.
+	 * @return mixed
+	 */
+	public static function add_drivers( $drivers ) {
+		if ( ! is_array( $drivers ) ) {
+			return $drivers;
+		}
+
+		if ( ! isset( $drivers[ 'ssl' ] ) ) {
+			$drivers[ 'ssl' ] = new SslDriver();
+		}
+
+		return $drivers;
 	}
 
 	/** The daily cost read. */

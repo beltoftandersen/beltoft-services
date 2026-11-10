@@ -1,32 +1,25 @@
 <?php
 /**
  * Today's forbidden dependencies (see DependencyDirectionTest). Remove entries as leaks are fixed; never add.
+ * 2026-11 widening (FEATURES += Hosting, Ssl, Licences, Credit, Card, Admin, Cli): no new violations, so nothing was added.
  * 2026-11-01: 11 entries (FirewallRoute, ThankYou) were already there but hidden by a namespace parsing bug, now fixed.
+ * 2026-11-10: the core source set widened to Drivers, Billing, Checkout and Emails; the four imports below are known and deferred
+ * (final review M5; Drivers\LiveGate no longer names a feature, its site tag is passed in).
  */
 return array(
-	'LineNames.php -> Proxmox\DiskDriver',
-	'LineNames.php -> Proxmox\ServerName',
+	'Billing/PaymentMethods.php -> Account\Cards', // Known and deferred, 2026-11-10.
+	'Billing/Subscriptions.php -> Usage\Rates', // Known and deferred, 2026-11-10.
+	'Emails/ServiceEmail.php -> Account\Licences', // Known and deferred, 2026-11-10 (the literal 'licence-key').
+	'Emails/ServiceEmail.php -> Account\ServiceArea', // Known and deferred, 2026-11-10.
+	'LineNames.php -> Proxmox\Disk\DiskDriver',
+	'LineNames.php -> Proxmox\Vm\ServerName',
 	'LineNames.php -> Usage\Account',
 	'LineNames.php -> Usage\Rates',
 	'Product.php -> Http\Connections',
 	'Product.php -> Usage\Rates',
-	'Product.php -> Proxmox\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
-	'Progress.php -> Proxmox\AppProgress',
-	'Progress.php -> Proxmox\AppTab',
-	'Progress.php -> Proxmox\DbDriver',
-	'Progress.php -> Proxmox\DiskDriver',
-	'Progress.php -> Proxmox\ProxmoxDriver',
-	'Proxmox/FirewallRoute.php -> Mcp\Endpoint',
-	'Settings.php -> Mcp\Access',
+	'Product.php -> Proxmox\Vm\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
+	'Proxmox/Network/FirewallRoute.php -> Mcp\Endpoint',
 	'ThankYou.php -> Account\Panel',
-	'ThankYou.php -> Domains\HostName',
 	'ThankYou.php -> Account\ServerLinks',
 	'ThankYou.php -> Api\Routes',
-	'ThankYou.php -> Domains\ThankYou',
-	'ThankYou.php -> Proxmox\DiskDriver',
-	'ThankYou.php -> Proxmox\DiskGuide',
-	'ThankYou.php -> Proxmox\ServerName',
-	'ThankYou.php -> Proxmox\SnapshotDriver',
-	'ThankYou.php -> Proxmox\SnapshotMeta',
-	'ThankYou.php -> Proxmox\ProxmoxDriver',
 );

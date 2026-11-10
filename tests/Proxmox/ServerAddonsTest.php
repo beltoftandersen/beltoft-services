@@ -10,11 +10,13 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskGuide;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Disk\DiskGuide;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
+use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class ServerAddonsTest extends SnapshotsTestCase {
 
@@ -34,6 +36,49 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		return $this->fresh( $pack );
 	}
 
+	public function test_a_deleted_server_ends_every_add_on_kind_once_with_its_own_event(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+		$pack   = $this->pack( $server );
+
+		$subscription = wcs_create_subscription( array( 'customer_id' => (int) $server->license()['user_id'], 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$this->assertInstanceOf( \WC_Subscription::class, $subscription );
+		$product = $this->service_product( 'proxmox-app', array(), array( 'slug' => 'app-' . wp_generate_password( 6, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $server->license()['user_id'], 'email' => 'customer@example.com', 'subscription_id' => $subscription->get_id() ) );
+		$app     = Resource::create( $license, Registry::get( 'proxmox-app' ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $server->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $app );
+
+		$this->assertTrue( $server->transition( 'deleted', 'Deleted for the test' ) );
+		Reconciler::notify( $server, 'ready', 'deleted' );
+
+		$expected = array(
+			array( $disk, 'Parent server deleted; extra disk no longer available' ),
+			array( $pack, 'Parent server deleted; snapshot slots no longer available' ),
+			array( $app, 'Parent server deleted; app licence no longer available' ),
+		);
+
+		foreach ( $expected as list( $addon, $event ) ) {
+			$fresh = $this->fresh( $addon );
+			$this->assertSame( 'deleted', $fresh->get( 'state' ) );
+			$this->assertFalse( $fresh->is_live() );
+			$this->assertSame( 1, substr_count( $this->events_of( $fresh ), $event ), $event );
+			$alerts = count( array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'Resource: ' . $fresh->id() . "\n" ) ) );
+
+			if ( $addon === $app ) {
+				// The app licence's subscription holds only that add-on, so it is cancelled instead of alerting.
+				$this->assertSame( 0, $alerts );
+				$this->assertSame( 'cancelled', wcs_get_subscription( $subscription->get_id() )->get_status() );
+				continue;
+			}
+
+			$this->assertSame( 1, $alerts, 'One admin alert for ' . $event );
+		}
+
+		// A second notice changes nothing: the add-ons are already deleted.
+		Reconciler::notify( $server, 'ready', 'deleted' );
+		$this->assertSame( 1, substr_count( $this->events_of( $this->fresh( $disk ) ), $expected[0][1] ) );
+	}
+
 	/** The views of the customer's licenses, as the Servers tab gets them. */
 	private function views( Resource ...$resources ): array {
 		wp_set_current_user( (int) $resources[0]->license()['user_id'] );
@@ -47,6 +92,66 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		Servers::render( $views );
 
 		return (string) ob_get_clean();
+	}
+
+	public function test_a_disk_already_deleted_is_still_closed_and_alerted_when_its_server_is_deleted(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+
+		// The disk went to deleted on its own and its activation is still open (as at 6d95431).
+		$this->assertTrue( $disk->transition( 'deleted', 'Deleted before its server' ) );
+		$this->assertTrue( $this->fresh( $disk )->is_live() );
+
+		$this->assertTrue( $server->transition( 'deleted', 'Deleted for the test' ) );
+		Reconciler::notify( $server, 'ready', 'deleted' );
+
+		$fresh = $this->fresh( $disk );
+		$this->assertFalse( $fresh->is_live() );
+		$alerts = array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'Resource: ' . $fresh->id() . "\n" ) );
+		$this->assertCount( 1, $alerts );
+	}
+
+	public function test_the_add_on_cascade_runs_after_the_servers_own_clean_up(): void {
+		global $wp_filter;
+
+		$hook      = $wp_filter['beltoft_services_state_changed'];
+		$original  = $hook->callbacks[10];
+		$wanted    = array(
+			'access'      => array( \BeltoftServices\Proxmox\Vm\Access::class, 'on_state_changed' ),
+			'operations'  => array( \BeltoftServices\Proxmox\Vm\Operations::class, 'on_state_changed' ),
+			'credentials' => array( \BeltoftServices\Proxmox\Vm\Credentials::class, 'on_state_changed' ),
+			'cascade'     => array( \BeltoftServices\Proxmox\Addon\AddonCascade::class, 'state_changed' ),
+		);
+		$sequence  = array();
+		$recording = array();
+
+		foreach ( $original as $key => $entry ) {
+			$name = array_search( $entry['function'], $wanted, true );
+
+			if ( false === $name ) {
+				$recording[ $key ] = $entry;
+				continue;
+			}
+
+			$recording[ $key ] = array(
+				'function'      => static function () use ( &$sequence, $name ) {
+					$sequence[] = $name;
+				},
+				'accepted_args' => 3,
+			);
+		}
+
+		$hook->callbacks[10] = $recording;
+		$server              = $this->server();
+
+		try {
+			do_action( 'beltoft_services_state_changed', $server, 'ready', 'paused' );
+		} finally {
+			$hook->callbacks[10] = $original;
+		}
+
+		// The test suite boots the plugin more than once, so each listener may be registered several times: the order of first runs counts.
+		$this->assertSame( array( 'access', 'operations', 'credentials', 'cascade' ), array_values( array_unique( $sequence ) ) );
 	}
 
 	public function test_the_list_has_no_card_for_a_disk_or_a_pack_of_a_server_in_the_list(): void {

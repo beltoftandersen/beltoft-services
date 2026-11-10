@@ -48,11 +48,34 @@ final class Billing {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 7 );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 99 );
 		add_filter( 'woocommerce_account_menu_item_classes', array( __CLASS__, 'classes' ), 10, 2 );
 		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'before_bricks_account' ), 10, 2 );
 		add_action( 'woocommerce_account_content', array( __CLASS__, 'in_content' ), 5 );
 		add_shortcode( 'beltoft_billing_tabs', array( __CLASS__, 'shortcode' ) );
+	}
+
+	/**
+	 * The billing grouping switch, as a setting on the General tab.
+	 *
+	 * @param array<string, array<string, mixed>> $fields Field definitions by key.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function settings_fields( array $fields ): array {
+		return array_merge(
+			$fields,
+			array(
+				'account_billing' => array(
+					'tab'     => 'general',
+					'section' => 'account',
+					'type'    => 'checkbox',
+					'default' => 0,
+					'label'   => __( 'Group the billing pages', 'beltoft-services' ),
+					'desc'    => __( 'My Account shows one Billing item instead of Orders, Subscriptions, Payment methods and Addresses, and those pages get a tab bar. Their addresses stay the same.', 'beltoft-services' ),
+				),
+			)
+		);
 	}
 
 	/**

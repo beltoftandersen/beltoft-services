@@ -8,12 +8,12 @@
 namespace BeltoftServices\Usage;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Apps\AppLicenceDriver;
+use BeltoftServices\Proxmox\Backup\Backups;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -11,13 +11,13 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\BillingRequirements;
-use BeltoftServices\Proxmox\AppField;
-use BeltoftServices\Proxmox\AppLicence;
-use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Apps\AppField;
+use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\Apps;
+use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Account;
@@ -614,8 +614,8 @@ final class Purchase {
 		}
 
 		// A database engine with licence terms: the customer said yes to the summary, which showed the link.
-		if ( null !== \BeltoftServices\Proxmox\DbTermsField::cart_terms() ) {
-			$form[ \BeltoftServices\Proxmox\DbTermsField::POST_KEY ] = '1';
+		if ( null !== \BeltoftServices\Proxmox\Db\DbTermsField::cart_terms() ) {
+			$form[ \BeltoftServices\Proxmox\Db\DbTermsField::POST_KEY ] = '1';
 		}
 
 		$_POST    = $form;

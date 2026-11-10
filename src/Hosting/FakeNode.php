@@ -7,8 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\Tasks;
+use BeltoftServices\Proxmox\Pve\FakePve;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -17,52 +16,24 @@ defined( 'ABSPATH' ) || exit;
  * https://pve.proxmox.com/pve-docs/api-viewer/index.html#/nodes/{node}/lxc), with the documented parameter
  * names. Unknown or missing parameters are refused with HTTP 400, as the API's JSON schema does. Behaviour
  * beyond what the docs state is a modelling convenience, marked "modelled", and is no proof of what a real node
- * answers. This is a new file: the virtual machine fake (Proxmox\FakeClient) is not touched and knows no
+ * answers. This is a new file: the virtual machine fake (Proxmox\Pve\FakeClient) is not touched and knows no
  * containers.
  *
  * Seeding: add_node(), add_pool(), add_template(), add_ct(). Scripting: fail_next(), next_task(). Inspection:
  * calls(), state().
  */
-class FakeNode implements Client {
-
-	use Tasks;
+class FakeNode extends FakePve {
 
 	public const OPTION = 'beltoft_services_fake_hosting_node';
 
 	/**
-	 * Persist in the option (staging) instead of in memory.
+	 * The option that keeps the persisted state.
 	 *
-	 * @var bool
+	 * @return string
 	 */
-	private $persist;
-
-	/**
-	 * Node state: nodes, cts, pools, tasks, seq.
-	 *
-	 * @var array<string, mixed>
-	 */
-	private $state;
-
-	/**
-	 * Recorded calls.
-	 *
-	 * @var array<int, array{method: string, path: string, params: array<string, mixed>}>
-	 */
-	private $calls = array();
-
-	/**
-	 * Scripted failures: method, regex, result.
-	 *
-	 * @var array<int, array{0: string, 1: string, 2: \WP_Error|array}>
-	 */
-	private $failures = array();
-
-	/**
-	 * Scripted task outcomes, used by the next tasks created.
-	 *
-	 * @var array<int, array<string, mixed>>
-	 */
-	private $outcomes = array();
+	protected function option_name(): string {
+		return self::OPTION;
+	}
 
 	/**
 	 * Keys the container config accepts (the documented ones the driver uses; modelled as a closed list).
@@ -75,20 +46,11 @@ class FakeNode implements Client {
 	private const FIREWALL_KEYS = array( 'enable', 'ipfilter', 'macfilter', 'policy_in', 'policy_out', 'log_level_in', 'log_level_out', 'dhcp', 'ndp', 'radv', 'digest' );
 
 	/**
-	 * @param bool $persist Keep the state in the option beltoft_services_fake_hosting_node (autoload off).
-	 */
-	public function __construct( bool $persist = false ) {
-		$this->persist = $persist;
-		$this->state   = self::blank();
-		$this->load();
-	}
-
-	/**
 	 * Empty node.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private static function blank(): array {
+	protected static function blank(): array {
 		return array(
 			'nodes' => array(),
 			'storages' => array(),
@@ -136,17 +98,6 @@ class FakeNode implements Client {
 	public function set_clock( int $time ): void {
 		$this->load();
 		$this->state['clock'] = $time;
-		$this->save();
-	}
-
-	/**
-	 * Adds a pool.
-	 *
-	 * @param string $poolid Pool id.
-	 */
-	public function add_pool( string $poolid ): void {
-		$this->load();
-		$this->state['pools'][ $poolid ] = array( 'members' => array() );
 		$this->save();
 	}
 
@@ -209,29 +160,6 @@ class FakeNode implements Client {
 	}
 
 	/**
-	 * Makes the next call matching the method and the path pattern fail. Consumed once. An array is an error
-	 * spec: code (default http_500), message, status (default 500). It applies after the parameters were
-	 * validated.
-	 *
-	 * @param string          $method     Method.
-	 * @param string          $path_regex Regex with delimiters, matched against the path.
-	 * @param \WP_Error|array $result     Error.
-	 */
-	public function fail_next( string $method, string $path_regex, $result ): void {
-		$this->failures[] = array( strtoupper( $method ), $path_regex, $result );
-	}
-
-	/**
-	 * Scripts the next task created: polls (status running that many times, default 0), exitstatus (default OK)
-	 * and effect (apply the change; default: only when OK).
-	 *
-	 * @param array<string, mixed> $outcome Outcome.
-	 */
-	public function next_task( array $outcome ): void {
-		$this->outcomes[] = $outcome;
-	}
-
-	/**
 	 * Sets what GET .../status/current reports besides the state: cpu (0 to 1), mem, maxmem, disk, maxdisk (bytes).
 	 *
 	 * @param int                  $vmid  Container id.
@@ -244,42 +172,6 @@ class FakeNode implements Client {
 			$this->state['cts'][ $vmid ]['usage'] = $usage;
 			$this->save();
 		}
-	}
-
-	/**
-	 * Every call made so far.
-	 *
-	 * @return array<int, array{method: string, path: string, params: array<string, mixed>}>
-	 */
-	public function calls(): array {
-		return $this->calls;
-	}
-
-	/**
-	 * The calls whose path matches a regex, optionally of one method.
-	 *
-	 * @param string $path_regex Regex with delimiters.
-	 * @param string $method     Method, or '' for any.
-	 * @return array<int, array{method: string, path: string, params: array<string, mixed>}>
-	 */
-	public function calls_to( string $path_regex, string $method = '' ): array {
-		return array_values(
-			array_filter(
-				$this->calls,
-				static fn( $c ) => 1 === preg_match( $path_regex, $c['path'] ) && ( '' === $method || strtoupper( $method ) === $c['method'] )
-			)
-		);
-	}
-
-	/**
-	 * A copy of the node state.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function state(): array {
-		$this->load();
-
-		return $this->state;
 	}
 
 	// Client.
@@ -1357,27 +1249,4 @@ class FakeNode implements Client {
 		return new \WP_Error( 'http_' . $status, $message, array_merge( array( 'status' => $status ), $extra ) );
 	}
 
-	/**
-	 * Reads the persisted state.
-	 */
-	private function load(): void {
-		if ( ! $this->persist ) {
-			return;
-		}
-
-		$stored = get_option( self::OPTION, null );
-
-		if ( is_array( $stored ) ) {
-			$this->state = array_merge( self::blank(), $stored );
-		}
-	}
-
-	/**
-	 * Writes the persisted state.
-	 */
-	private function save(): void {
-		if ( $this->persist ) {
-			update_option( self::OPTION, $this->state, false );
-		}
-	}
 }

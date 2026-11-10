@@ -12,8 +12,8 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DbDiskField;
-use BeltoftServices\Proxmox\DbIpField;
+use BeltoftServices\Proxmox\Db\DbDiskField;
+use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Catalog;
@@ -198,8 +198,8 @@ class DatabaseUsageTest extends UsageTestCase {
 
 	public function test_the_bricks_tags_price_a_database_plan_and_its_add_on_variations(): void {
 		$v = $this->db_product();
-		$this->assertTrue( \BeltoftServices\Proxmox\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		\BeltoftServices\Proxmox\Stock::sync( 'lab' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 
 		$this->assertSame( Rates::money( 25 / 730, 4 ), Catalog::value( 'beltoft_usage_hourly', $v['m-0-0']->get_id() ) );
 		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['m-0-0']->get_id() ) );
@@ -232,8 +232,8 @@ class DatabaseUsageTest extends UsageTestCase {
 		$this->assertSame( $v['u-1-0']->get_id(), $this->in_cart(), 'Monthly with the public IP becomes its pay as you go twin.' );
 
 		// The public IP off and extra storage on keep the billing model (storage needs room on a node).
-		$this->assertTrue( \BeltoftServices\Proxmox\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		\BeltoftServices\Proxmox\Stock::sync( 'lab' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 		$this->assertTrue( DbIpField::swap( false )['ok'] );
 		$this->assertSame( $v['u-0-0']->get_id(), $this->in_cart() );
 		$this->assertTrue( DbDiskField::swap( 50 )['ok'] );
@@ -247,8 +247,8 @@ class DatabaseUsageTest extends UsageTestCase {
 	public function test_the_checkout_labels_of_the_add_ons_on_a_usage_line_are_hourly_differences(): void {
 		$v = $this->db_product();
 
-		$this->assertSame( '+' . Rates::money( 8 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backups::price_difference( $v['u-0-0'], $v['u-0-50'] ) );
-		$this->assertSame( '+' . Rates::money( 5 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backups::price_difference( $v['u-0-0'], $v['u-1-0'] ) );
+		$this->assertSame( '+' . Rates::money( 8 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backup\Backups::price_difference( $v['u-0-0'], $v['u-0-50'] ) );
+		$this->assertSame( '+' . Rates::money( 5 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backup\Backups::price_difference( $v['u-0-0'], $v['u-1-0'] ) );
 	}
 
 	// -- The New database page ----------------------------------------------------------------------

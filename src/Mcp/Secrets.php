@@ -9,10 +9,10 @@ namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Mail\MailAccess;
 use BeltoftServices\Mail\MailGuard;
-use BeltoftServices\Proxmox\Access;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DbGuest;
-use BeltoftServices\Proxmox\DbRoutes;
+use BeltoftServices\Proxmox\Vm\Access;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Db\DbGuest;
+use BeltoftServices\Proxmox\Db\DbRoutes;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

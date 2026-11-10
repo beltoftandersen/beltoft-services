@@ -187,7 +187,7 @@ class RenewalReminderTest extends TestCase {
 		$this->assertSame( '', RenewalReminder::clean_days( '0' ) );
 		$this->assertSame( '', RenewalReminder::clean_days( 'abc' ) );
 		$this->assertSame( '365', RenewalReminder::clean_days( '9999' ) );
-		$this->assertContains( 'beltoft_services_renewal_reminder', Emails::IDS );
+		$this->assertContains( 'beltoft_services_renewal_reminder', Emails::ids() );
 		$this->assertNotNull( Emails::get( 'beltoft_services_renewal_reminder' ) );
 		$this->assertSame( 0, RenewalReminder::days( $this->service_product()->get_id() ) );
 	}

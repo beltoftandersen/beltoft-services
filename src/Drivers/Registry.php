@@ -7,8 +7,6 @@
 
 namespace BeltoftServices\Drivers;
 
-use BeltoftServices\Proxmox\ProxmoxDriver;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -23,25 +21,13 @@ final class Registry {
 	 */
 	public static function all(): array {
 		/**
-		 * Filters the registered drivers. The HTTP, Proxmox, domain, DNS and mail drivers are built in.
+		 * Filters the registered drivers. Starts empty: each feature adds its own drivers (priorities 1 to 7, so a plugin adding one at the default priority comes after them).
 		 *
 		 * @param array<string, Driver> $drivers Drivers keyed by id.
 		 */
 		$drivers = apply_filters(
 			'beltoft_services_drivers',
-			array(
-				'http'    => new \BeltoftServices\Http\HttpDriver(),
-				ProxmoxDriver::ID => new \BeltoftServices\Proxmox\ProxmoxDriver(),
-				'proxmox-db' => new \BeltoftServices\Proxmox\DbDriver(),
-				'proxmox-disk' => new \BeltoftServices\Proxmox\DiskDriver(),
-				'proxmox-snapshots' => new \BeltoftServices\Proxmox\SnapshotDriver(),
-				'proxmox-app' => new \BeltoftServices\Proxmox\AppLicenceDriver(),
-				'domain'  => new \BeltoftServices\Domains\DomainDriver(),
-				'dns'     => new \BeltoftServices\Domains\DnsDriver(),
-				'mail'    => new \BeltoftServices\Mail\MailDriver(),
-				'ssl'     => new \BeltoftServices\Ssl\SslDriver(),
-				'licence-key' => new \BeltoftServices\Licences\KeyDriver(),
-			)
+			array()
 		);
 
 		$valid = array();

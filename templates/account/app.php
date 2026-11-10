@@ -1,6 +1,6 @@
 <?php
 /**
- * The App tab of a server page. Printed by BeltoftServices\Proxmox\AppTab::pane().
+ * The App tab of a server page. Printed by BeltoftServices\Apps\AppTab::pane().
  *
  * Variables: $view (see AppTab::view()): name, version, installed, kind (waiting, installing, slow, ready,
  * failed, dns), steps (label and status), position and total, step_label, url, secure, domain, domain_wanted,

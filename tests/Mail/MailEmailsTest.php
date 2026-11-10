@@ -147,7 +147,7 @@ final class MailEmailsTest extends MailTestCase {
 		MailDns::run( $r->id() );
 
 		$this->assertCount( 1, $this->mails );
-		$this->assertSame( 'beltoft_services_mail_dns_reminder', array_values( array_filter( Emails::IDS, static fn( $id ) => 'beltoft_services_mail_dns_reminder' === $id ) )[0] );
+		$this->assertSame( 'beltoft_services_mail_dns_reminder', array_values( array_filter( Emails::ids(), static fn( $id ) => 'beltoft_services_mail_dns_reminder' === $id ) )[0] );
 	}
 
 	public function test_paused_and_deleted_emails_cover_mail_too(): void {

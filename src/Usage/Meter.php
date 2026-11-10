@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
-use BeltoftLicenses\Install;
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
@@ -85,24 +85,12 @@ final class Meter {
 	 * @return int Rows written.
 	 */
 	public static function run( $now = null ): int {
-		global $wpdb;
-
 		$now     = is_int( $now ) ? $now : time();
 		$last    = Ledger::hour( $now ) - HOUR_IN_SECONDS; // The last full hour.
 		$horizon = $last - ( self::BACKFILL_HOURS - 1 ) * HOUR_IN_SECONDS;
-		$tables  = Install::tables();
 		$written = 0;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom tables.
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT a.id, a.activated_at, a.deactivated_at FROM %i a INNER JOIN %i l ON l.id = a.license_id WHERE a.kind <> 'site' AND l.source = 'usage' AND ( a.deactivated_at IS NULL OR a.deactivated_at >= %s ) ORDER BY a.id",
-				$tables['activations'],
-				$tables['licenses'],
-				gmdate( 'Y-m-d H:i:s', $horizon )
-			),
-			ARRAY_A
-		);
+		$rows = Licenses::resources_of_source( 'usage', gmdate( 'Y-m-d H:i:s', $horizon ) );
 
 		foreach ( (array) $rows as $row ) {
 			$written += self::meter( (int) $row['id'], $row, $horizon, $last );

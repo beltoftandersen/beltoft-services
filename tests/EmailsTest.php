@@ -291,14 +291,14 @@ final class EmailsTest extends TestCase {
 		);
 
 		foreach ( array( 'html', 'plain' ) as $type ) {
-			foreach ( Emails::IDS as $id ) {
+			foreach ( Emails::ids() as $id ) {
 				$email             = Emails::get( $id );
 				$email->email_type = $type;
 				$email->trigger( $resource, $data );
 			}
 		}
 
-		$this->assertCount( 2 * count( Emails::IDS ), $this->customer_mails(), 'Every email was rendered and sent.' );
+		$this->assertCount( 2 * count( Emails::ids() ), $this->customer_mails(), 'Every email was rendered and sent.' );
 
 		foreach ( $this->customer_mails() as $mail ) {
 			$text = (string) $mail['subject'] . "\n" . (string) $mail['message'];
@@ -521,7 +521,7 @@ final class EmailsTest extends TestCase {
 	 * The snapshot notice in each reason, as html and plain text: its words, no em dash, no hosting provider, no ids.
 	 */
 	public function test_the_snapshot_notice_reads_right_for_each_reason_in_both_formats(): void {
-		$this->assertContains( 'beltoft_services_snapshot_notice', Emails::IDS );
+		$this->assertContains( 'beltoft_services_snapshot_notice', Emails::ids() );
 		$this->assertInstanceOf( \BeltoftServices\Emails\SnapshotNotice::class, Emails::get( 'beltoft_services_snapshot_notice' ) );
 
 		$this->fake_driver();
@@ -564,5 +564,223 @@ final class EmailsTest extends TestCase {
 		$this->mails = array();
 		Emails::get( 'beltoft_services_snapshot_notice' )->trigger( $resource, array( 'snapshot_reason' => '<script>' ) );
 		$this->assertStringContainsString( 'reached the end of its keeping time', (string) preg_replace( '/\s+/', ' ', (string) $this->customer_mails()[0]['message'] ) );
+	}
+
+	public function test_the_definitions_match_the_fixture_word_for_word(): void {
+		$fixture = require BELTOFT_SERVICES_PATH . 'tests/fixtures/email-definitions.php';
+
+		$this->assertSame( array_keys( $fixture ), \BeltoftServices\Emails\Definitions::ids() );
+
+		foreach ( $fixture as $id => $expected ) {
+			$this->assertSame( $expected, \BeltoftServices\Emails\Definitions::get( $id ), $id );
+		}
+	}
+
+	public function test_every_class_in_the_registry_has_a_definition_and_the_templates_follow_the_id(): void {
+		$classes = ( new \ReflectionClassConstant( Emails::class, 'CLASSES' ) )->getValue();
+		$seen    = array();
+
+		foreach ( $classes as $class ) {
+			if ( \BeltoftServices\Emails\StepUpCode::class === $class ) {
+				continue;
+			}
+
+			$email  = new $class();
+			$def    = \BeltoftServices\Emails\Definitions::get( $email->id );
+			$slug   = str_replace( '_', '-', substr( $email->id, strlen( 'beltoft_services_' ) ) );
+			$seen[] = $email->id;
+
+			$this->assertSame( $def['title'], $email->title, $email->id );
+			$this->assertSame( $def['description'], $email->description, $email->id );
+			$this->assertSame( 'emails/beltoft-services-' . $slug . '.php', $email->template_html );
+			$this->assertSame( 'emails/plain/beltoft-services-' . $slug . '.php', $email->template_plain );
+			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'templates/' . $email->template_html );
+			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'templates/' . $email->template_plain );
+		}
+
+		$this->assertEqualsCanonicalizing( \BeltoftServices\Emails\Definitions::ids(), $seen );
+	}
+
+	/**
+	 * The template values of an email sent about a resource of the given driver id.
+	 *
+	 * @param string $driver Driver id of the resource.
+	 * @param string $id     Email id.
+	 * @return array<string, mixed>
+	 */
+	private function values_for( string $driver, string $id = 'beltoft_services_ready' ): array {
+		$this->fake_driver( $driver );
+		$product  = $this->service_product( $driver );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( $driver ), array(), array( 'state' => 'ready' ) )->id() );
+		$email    = Emails::get( $id );
+
+		$email->trigger( $resource, array() );
+
+		$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
+		$property->setAccessible( true );
+
+		return $property->getValue( $email );
+	}
+
+	public function test_service_email_names_no_feature(): void {
+		$source = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Emails/ServiceEmail.php' );
+
+		foreach ( array( 'Proxmox\\', 'Mail\\', 'Domains\\', 'Hosting\\', 'Ssl\\' ) as $namespace ) {
+			$this->assertStringNotContainsString( $namespace, $source, $namespace );
+		}
+	}
+
+	public function test_every_email_renders_in_html_and_plain_with_the_feature_filters_removed(): void {
+		$this->fake_driver();
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) )->id() );
+
+		remove_all_filters( 'beltoft_services_email_values' );
+
+		foreach ( Emails::ids() as $id ) {
+			$email = Emails::get( $id );
+
+			if ( $email instanceof \BeltoftServices\Emails\StepUpCode ) {
+				continue;
+			}
+
+			$email->trigger( $resource, array( 'deletes_at' => time() + DAY_IN_SECONDS ) );
+
+			$this->assertNotSame( '', trim( (string) $email->get_content_html() ), $id );
+			$this->assertNotSame( '', trim( (string) $email->get_content_plain() ), $id );
+		}
+	}
+
+	/**
+	 * The values array of a "ready" email for one resource of each of five drivers, with the ids that come from the
+	 * test database swapped for tokens. The fixture was made by running this same code on the plugin at 6d95431
+	 * (before the values moved into the feature filters), so it holds the old values, not today's.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function normalised_values(): array {
+		$out = array();
+
+		foreach ( array( 'proxmox', 'domain', 'mail', 'hosting', 'ssl' ) as $driver ) {
+			$this->fake_driver( $driver );
+			$product = $this->service_product( $driver, array(), array( 'slug' => 'values-' . $driver ) );
+			$product->set_name( 'Fixture product' );
+			$product->save();
+			$license = $this->service_license( $product, array( 'fire' => false ) );
+			wp_update_user( array( 'ID' => $license['user_id'], 'display_name' => 'Fixture Customer' ) );
+			$resource = Resource::find( Resource::create( $license, Registry::get( $driver ), array(), array( 'state' => 'ready' ) )->id() );
+			$email    = Emails::get( 'beltoft_services_ready' );
+
+			// The date comes from the data, so the run does not depend on the day it is made.
+			$email->trigger( $resource, array( 'deletes_at' => 1900000000 ) );
+
+			$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
+			$property->setAccessible( true );
+			$values = $property->getValue( $email );
+			ksort( $values );
+
+			$json = (string) wp_json_encode( $values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			$json = (string) preg_replace( '/(?<!\d)' . (int) $resource->id() . '(?!\d)/', '{resource}', $json );
+			$json = (string) preg_replace( '/(?<!\d)' . (int) $license['id'] . '(?!\d)/', '{license}', $json );
+
+			$out[ $driver ] = json_decode( $json, true );
+		}
+
+		return $out;
+	}
+
+	public function test_the_values_are_the_ones_the_old_code_gave(): void {
+		$expected = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'tests/fixtures/email-values.json' ), true );
+
+		$this->assertSame( $expected, $this->normalised_values() );
+	}
+
+	public function test_the_values_array_has_the_same_keys_for_a_vm_a_domain_a_mail_a_hosting_and_an_ssl_resource(): void {
+		$golden = array(
+			'account_url',
+			'app_domain',
+			'app_ip',
+			'app_name',
+			'app_www',
+			'app_www_state',
+			'customer_name',
+			'deletes_on',
+			'deletion_date',
+			'details',
+			'disk_guide_url',
+			'disk_server_url',
+			'dns_choice',
+			'dns_external',
+			'dns_only',
+			'dns_stays',
+			'domain_action_reason',
+			'domain_name',
+			'domain_renews',
+			'domain_security_event',
+			'domains_url',
+			'extra_disks',
+			'held',
+			'hosting',
+			'hosting_notice',
+			'hosting_restore',
+			'limit',
+			'mail_domain',
+			'mail_external',
+			'mail_guide_url',
+			'mail_host',
+			'mail_imap',
+			'mail_records',
+			'mail_smtp',
+			'monitor_cpu_hours',
+			'monitor_cpu_percent',
+			'monitor_cpu_since',
+			'monitor_disk_percent',
+			'monitor_disk_total',
+			'monitor_disk_used',
+			'monitor_disks_url',
+			'monitor_grow_url',
+			'monitor_reason',
+			'monitor_upgrade_url',
+			'nameservers',
+			'nameservers_shown',
+			'notice_app',
+			'notice_kind',
+			'notice_what',
+			'our_nameservers',
+			'product_name',
+			'quarantine_at',
+			'quarantine_counts',
+			'quarantine_signal',
+			'reason',
+			'registrar_name',
+			'renewal',
+			'retention_days',
+			'snapshot_reason',
+			'ssl',
+			'transfer_fix_reason',
+			'usage',
+			'used',
+		);
+
+		foreach ( array( 'proxmox', 'domain', 'mail', 'hosting', 'ssl' ) as $driver ) {
+			$keys = array_keys( $this->values_for( $driver ) );
+			sort( $keys );
+
+			$this->assertSame( $golden, $keys, $driver );
+		}
+	}
+
+	public function test_the_value_defaults_cover_exactly_the_keys_the_features_add(): void {
+		$all   = array_keys( $this->values_for( 'fake' ) );
+		$bare  = array( 'product_name', 'customer_name', 'account_url', 'deletion_date', 'reason', 'held', 'retention_days', 'deletes_on', 'details', 'used', 'limit', 'usage', 'domain_name', 'notice_kind', 'notice_what', 'notice_app', 'renewal' );
+		$added = array_values( array_diff( $all, $bare ) );
+		$have  = array_keys( \BeltoftServices\Emails\ValueDefaults::all() );
+
+		sort( $added );
+		sort( $have );
+
+		$this->assertSame( $added, $have );
 	}
 }

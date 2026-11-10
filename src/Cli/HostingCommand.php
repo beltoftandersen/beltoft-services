@@ -10,7 +10,7 @@ namespace BeltoftServices\Cli;
 use BeltoftServices\Hosting\Clients;
 use BeltoftServices\Hosting\Nodes;
 use BeltoftServices\Hosting\ReadOnlyClient;
-use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Pve\Ownership;
 
 defined( 'ABSPATH' ) || exit;
 

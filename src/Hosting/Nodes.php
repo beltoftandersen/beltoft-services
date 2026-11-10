@@ -9,7 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Http\Connections;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -480,7 +480,7 @@ final class Nodes {
 			return self::error( 'live', __( 'Live hosting calls are switched off. Define BELTOFT_SERVICES_HOSTING_LIVE as true in wp-config.php first.', 'beltoft-services' ) );
 		}
 
-		if ( '' === \BeltoftServices\Proxmox\ProxmoxSettings::explicit_site_tag() ) {
+		if ( '' === \BeltoftServices\Proxmox\Pve\ProxmoxSettings::explicit_site_tag() ) {
 			return self::error( 'site_tag', __( 'Set the site tag in Settings, Proxmox first. A live node needs one you chose: the host name is not used for live nodes.', 'beltoft-services' ) );
 		}
 

@@ -13,7 +13,7 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Mcp\Purchase;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 
 require_once dirname( __DIR__ ) . '/Usage/UsageTestCase.php';
@@ -51,7 +51,7 @@ final class PurchaseDbTest extends UsageTestCase {
 		$this->account = $this->usage_account( $this->user );
 		$this->save_cluster( array( 'templates' => '9000 = Debian 12', 'default_template' => '9000' ) );
 		// A fresh reading of the storage first, so the extra storage steps are in stock when they are saved.
-		$key = ( new \ReflectionMethod( \BeltoftServices\Proxmox\DiskCapacity::class, 'cache_key' ) );
+		$key = ( new \ReflectionMethod( \BeltoftServices\Proxmox\Pve\DiskCapacity::class, 'cache_key' ) );
 		$key->setAccessible( true );
 		set_transient( $key->invoke( null, 'lab', 'node-a', 'disk-store' ), array( 'total' => 5000 * 1073741824, 'avail' => 4000 * 1073741824, 'read_at' => time() ), HOUR_IN_SECONDS );
 		$this->db = $this->database_product();
@@ -177,7 +177,7 @@ final class PurchaseDbTest extends UsageTestCase {
 	}
 
 	public function test_a_public_ipv4_is_refused_while_no_address_is_free(): void {
-		set_transient( \BeltoftServices\Proxmox\IpPool::FREE_TRANSIENT, 0, MINUTE_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Network\IpPool::FREE_TRANSIENT, 0, MINUTE_IN_SECONDS );
 		$out = $this->tool( 'order_database', $this->args( array( 'public_ipv4' => true ) ), $this->oauth( $this->user, Tokens::FULL ) );
 
 		$this->assertTrue( $out['isError'] );

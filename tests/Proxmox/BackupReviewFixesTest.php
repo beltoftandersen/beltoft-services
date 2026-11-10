@@ -8,12 +8,13 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
+use BeltoftServices\Proxmox\Backup\Backups;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 /**
  * One test per finding.

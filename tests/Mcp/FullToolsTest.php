@@ -14,7 +14,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Mcp\Audit;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
 

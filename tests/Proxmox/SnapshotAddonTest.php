@@ -4,20 +4,21 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Jobs;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskCascade;
-use BeltoftServices\Proxmox\Panels;
-use BeltoftServices\Proxmox\SnapshotCart;
-use BeltoftServices\Proxmox\SnapshotDriver;
-use BeltoftServices\Proxmox\SnapshotExpiry;
-use BeltoftServices\Proxmox\SnapshotMeta;
-use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\Stock;
-use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Disk\DiskCascade;
+use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
+use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
+use BeltoftServices\Proxmox\Vm\Panels;
+use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class SnapshotAddonTest extends SnapshotsTestCase {
 
@@ -226,10 +227,10 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 
 		foreach ( WC()->cart->get_cart() as $key => $item ) {
 			$this->assertSame( (int) $server->license()['id'], $item['beltoft_services_snapshot_for'] );
-			$this->assertStringContainsString( '_snapshots_', SnapshotCart::recurring_key( 'base', $item ) );
+			$this->assertStringContainsString( '_snapshots_', apply_filters( 'woocommerce_subscriptions_recurring_cart_key', 'base', $item ) );
 			WC()->cart->cart_contents[ $key ]['quantity'] = 4;
 		}
-		SnapshotCart::one_each( WC()->cart );
+		do_action( 'woocommerce_before_calculate_totals', WC()->cart );
 		foreach ( WC()->cart->get_cart() as $item ) {
 			$this->assertSame( 1, $item['quantity'], 'One line is one purchase.' );
 		}

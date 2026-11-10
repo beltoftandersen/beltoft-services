@@ -10,7 +10,7 @@ namespace BeltoftServices;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Http\Connections;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -36,7 +36,30 @@ final class Reference {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 6 );
 		add_shortcode( self::SHORTCODE, array( __CLASS__, 'shortcode' ) );
+	}
+
+	/**
+	 * The address of the documentation page, as a setting on the General tab.
+	 *
+	 * @param array<string, array<string, mixed>> $fields Field definitions by key.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function settings_fields( array $fields ): array {
+		return array_merge(
+			$fields,
+			array(
+				'api_docs_url' => array(
+					'tab'     => 'general',
+					'section' => 'api',
+					'type'    => 'url',
+					'default' => '',
+					'label'   => __( 'API documentation page', 'beltoft-services' ),
+					'desc'    => __( 'Address of a public page that holds the shortcode [beltoft_services_api_reference]. When set, the Security section in My Account links to it instead of printing its own short guide.', 'beltoft-services' ),
+				),
+			)
+		);
 	}
 
 	/**

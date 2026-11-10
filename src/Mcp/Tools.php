@@ -11,12 +11,12 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Domains\Search;
-use BeltoftServices\Proxmox\DbActions;
-use BeltoftServices\Proxmox\DbCard;
-use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\Db\DbActions;
+use BeltoftServices\Proxmox\Db\DbCard;
+use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

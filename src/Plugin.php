@@ -38,13 +38,10 @@ final class Plugin {
 		// settings API the feature settings screens extend), then Product and Jobs (core), then the drivers'
 		// settings and connections, then the feature parts. Features add to core filters and actions; core
 		// never names a feature.
-		Proxmox\Schema::maybe_upgrade();
+		Proxmox\Vm\Schema::maybe_upgrade();
 		Hosting\Schema::maybe_upgrade();
 		Domains\DnsSchema::maybe_upgrade();
 		Oauth\Schema::maybe_upgrade();
-
-		// The WordPress hosting driver joins the registry through the same filter other plugins use.
-		add_filter( 'beltoft_services_drivers', array( Hosting\HostingDriver::class, 'add' ) );
 
 		Settings::register();
 
@@ -56,7 +53,7 @@ final class Plugin {
 		// Driver settings screens add their tabs to Settings::register()'s filters, so they come after it.
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
-		Proxmox\ProxmoxSettings::register();
+		Proxmox\Pve\ProxmoxSettings::register();
 		Hosting\HostingSettings::register();
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();
@@ -84,6 +81,9 @@ final class Plugin {
 		Mail\MailSetup::register();
 		Bricks\DocsElements::register();
 		Mail\MailDns::register();
+		Mail\EmailValues::register();
+		Hosting\EmailValues::register();
+		Ssl\EmailValues::register();
 		Mail\MailJobs::register();
 		Mail\MailRoutes::register();
 		Hosting\HostingRoutes::register();
@@ -128,7 +128,9 @@ final class Plugin {
 		Domains\Sync::register();
 		Domains\Security::register();
 		Domains\EmailDetails::register();
-		Proxmox\ClustersScreen::register();
+		Proxmox\Pve\ClustersScreen::register();
+		Proxmox\Vm\ServerProgress::register();
+		Apps\AppProgress::register();
 		Status::register();
 		Checkout::register();
 		IntroCoupon::register();
@@ -159,62 +161,65 @@ final class Plugin {
 		Api\Reference::register();
 		Api\Tokens::register();
 		Oauth\Server::register();
+		Mcp\Access::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
 		// Feature hooks into the core's extension points (retention, state_changed, parking, failure mail).
-		Proxmox\CoreHooks::register();
-		Proxmox\RevealRoute::register();
-		Proxmox\ConsoleRoute::register();
-		Proxmox\ConsoleAuth::register();
-		Proxmox\ConsoleTab::register();
-		Proxmox\AppReveal::register();
-		Proxmox\AppInstall::register();
-		Proxmox\AppDomainRelease::register();
-		Proxmox\AppOwnDomain::register();
-		Proxmox\AppWww::register();
-		Proxmox\AppStatus::register();
-		Proxmox\MetricsRoute::register();
-		Proxmox\Flows::register();
-		Proxmox\LiveUsage::register();
-		Proxmox\FirewallRoute::register();
-		Proxmox\FirewallTab::register();
-		Proxmox\NetworkTab::register();
-		Proxmox\Switches::register();
-		Proxmox\Upgrades::register();
-		Proxmox\Credentials::register();
-		Proxmox\ServerName::register();
-		Proxmox\SshKeyField::register();
-		Proxmox\OsField::register();
-		Proxmox\DbTermsField::register();
-		Proxmox\Tiles::register();
-		Proxmox\AppField::register();
-		Proxmox\AppLicence::register();
-		Proxmox\AppLicenceCart::register();
-		Proxmox\PleskLicence::register();
-		Proxmox\AppReinstallPaid::register();
-		Proxmox\AppReinstall::register();
-		Proxmox\AppTab::register();
-		Proxmox\BackupField::register();
-		Proxmox\DbIpField::register();
-		Proxmox\DbDiskField::register();
-		Proxmox\DiskMeta::register();
-		Proxmox\DiskCascade::register();
-		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );
-		Proxmox\DiskCart::register();
-		Proxmox\SnapshotMeta::register();
-		Proxmox\SnapshotCart::register();
-		Proxmox\DiskField::register();
-		Proxmox\Actions::register();
-		Proxmox\DbActions::register();
-		Proxmox\DbRoutes::register();
-		Proxmox\DbAccessRoute::register();
-		Proxmox\DbNeedsServer::register();
-		Proxmox\DbNetGuard::register();
-		Proxmox\Panels::register();
-		Proxmox\EmailDetails::register();
-		Proxmox\ProxmoxJobs::register();
-		Proxmox\Stock::register();
-		Proxmox\IpPoolScreen::register();
+		Proxmox\Vm\CoreHooks::register();
+		Proxmox\Vm\RevealRoute::register();
+		Proxmox\Console\ConsoleRoute::register();
+		Proxmox\Console\ConsoleAuth::register();
+		Proxmox\Console\ConsoleTab::register();
+		Apps\AppReveal::register();
+		Apps\AppInstall::register();
+		Apps\AppDomainRelease::register();
+		Apps\AppOwnDomain::register();
+		Apps\AppWww::register();
+		Apps\AppStatus::register();
+		Proxmox\Network\MetricsRoute::register();
+		Proxmox\Network\Flows::register();
+		Proxmox\Network\LiveUsage::register();
+		Proxmox\Network\FirewallRoute::register();
+		Proxmox\Network\FirewallTab::register();
+		Proxmox\Network\NetworkTab::register();
+		Proxmox\Vm\Switches::register();
+		Proxmox\Vm\Upgrades::register();
+		Proxmox\Vm\Credentials::register();
+		Proxmox\Vm\ServerName::register();
+		Proxmox\Vm\SshKeyField::register();
+		Proxmox\Vm\OsField::register();
+		Proxmox\Db\DbTermsField::register();
+		Proxmox\Vm\Tiles::register();
+		Apps\AppField::register();
+		Apps\AppLicence::register();
+		Apps\AppLicenceCart::register();
+		Apps\PleskLicence::register();
+		Apps\AppReinstallPaid::register();
+		Apps\AppReinstall::register();
+		Apps\AppTab::register();
+		Proxmox\Backup\BackupField::register();
+		Proxmox\Db\DbIpField::register();
+		Proxmox\Db\DbDiskField::register();
+		Proxmox\Disk\DiskMeta::register();
+		// The cascade runs after the server's own clean-up (CoreHooks, Credentials), as the three old cascades did.
+		Proxmox\Addon\AddonCascade::register();
+		Proxmox\Disk\DiskCascade::register();
+		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
+		Proxmox\Disk\DiskCart::register();
+		Proxmox\Snapshot\SnapshotMeta::register();
+		Proxmox\Snapshot\SnapshotCart::register();
+		Proxmox\Disk\DiskField::register();
+		Proxmox\Vm\Actions::register();
+		Proxmox\Db\DbActions::register();
+		Proxmox\Db\DbRoutes::register();
+		Proxmox\Db\DbAccessRoute::register();
+		Proxmox\Db\DbNeedsServer::register();
+		Proxmox\Db\DbNetGuard::register();
+		Proxmox\Vm\Panels::register();
+		Proxmox\Vm\EmailDetails::register();
+		Proxmox\Vm\ProxmoxJobs::register();
+		Proxmox\Vm\Stock::register();
+		Proxmox\Network\IpPoolScreen::register();
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Emails\Emails::register();
@@ -278,8 +283,8 @@ final class Plugin {
 			$missing[] = 'WooCommerce Subscriptions';
 		}
 
-		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.2', '<' ) ) {
-			$missing[] = 'Beltoft Licenses 0.8.2 or newer';
+		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.3', '<' ) ) {
+			$missing[] = 'Beltoft Licenses 0.8.3 or newer';
 		}
 
 		global $wpdb;

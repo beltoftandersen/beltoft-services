@@ -109,8 +109,8 @@ final class Renewal {
 		$product = wc_get_product( (int) ( $resource->license()['product_id'] ?? 0 ) );
 
 		// The licence of an app is shown with its server: "web1 (Plesk)".
-		if ( \BeltoftServices\Proxmox\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
-			$server = \BeltoftServices\Proxmox\AppLicence::server_of( $resource );
+		if ( \BeltoftServices\Apps\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
+			$server = \BeltoftServices\Apps\AppLicence::server_of( $resource );
 			$name   = $server ? (string) $server->get( 'server_name' ) : '';
 			$label  = $product ? $product->get_name() : '#' . $resource_id;
 
@@ -118,7 +118,7 @@ final class Renewal {
 		}
 
 		// An extra disk is shown with its server ("Extra disk for web1"): its own product name says nothing to the customer.
-		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $resource->get( 'driver' ) ) {
+		if ( \BeltoftServices\Proxmox\Disk\DiskDriver::ID === $resource->get( 'driver' ) ) {
 			$server = Resource::for_license( (int) $resource->get( 'server_license' ) );
 			$name   = $server ? (string) $server->get( 'server_name' ) : '';
 			$parent = $server ? wc_get_product( (int) ( $server->license()['product_id'] ?? 0 ) ) : null;

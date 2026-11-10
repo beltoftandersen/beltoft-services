@@ -8,14 +8,14 @@
 namespace BeltoftServices\Account;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DbEngines;
-use BeltoftServices\Proxmox\DbNeedsServer;
-use BeltoftServices\Proxmox\DiskCart;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\PostgresEngine;
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\Backups;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Db\DbEngines;
+use BeltoftServices\Proxmox\Db\DbNeedsServer;
+use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Db\PostgresEngine;
+use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Usage\Rates;
 
@@ -112,7 +112,7 @@ final class DbPicker {
 				$numbers = Product::plan( $product->get_id(), $variation->get_id() );
 
 				// The public IP twin and the extra storage steps of a plan are chosen at checkout: each plan is listed once.
-				if ( \BeltoftServices\Proxmox\DbIp::plan_wants( $numbers ) || \BeltoftServices\Proxmox\DbDisk::extra( $numbers ) > 0 ) {
+				if ( \BeltoftServices\Proxmox\Db\DbIp::plan_wants( $numbers ) || \BeltoftServices\Proxmox\Db\DbDisk::extra( $numbers ) > 0 ) {
 					continue;
 				}
 
@@ -205,8 +205,8 @@ final class DbPicker {
 			return $fail( 'plan', __( 'Choose a plan.', 'beltoft-services' ) );
 		}
 
-		if ( ! \BeltoftServices\Proxmox\PrivateNets::available_for( $user, (string) $plan['cluster'] ) ) {
-			return $fail( 'plan', \BeltoftServices\Proxmox\PrivateNets::unavailable_message() );
+		if ( ! \BeltoftServices\Proxmox\Network\PrivateNets::available_for( $user, (string) $plan['cluster'] ) ) {
+			return $fail( 'plan', \BeltoftServices\Proxmox\Network\PrivateNets::unavailable_message() );
 		}
 
 		if ( ! $plan['in_stock'] ) {
@@ -259,7 +259,7 @@ final class DbPicker {
 
 		foreach ( $cart->get_cart() as $key => $item ) {
 			// A payment for a subscription that exists is never touched or mixed with a new database.
-			if ( DiskCart::flow( (array) $item ) ) {
+			if ( CartFlow::has_value( (array) $item, CartFlow::ALL ) ) {
 				return __( 'Finish or remove the subscription payment in your cart first.', 'beltoft-services' );
 			}
 
@@ -316,9 +316,9 @@ final class DbPicker {
 		}
 
 		// The engine tiles are the tiles of the server picker (tiles.css), so those load first.
-		\BeltoftServices\Proxmox\Tiles::enqueue();
-		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
-		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
+		\BeltoftServices\Proxmox\Vm\Tiles::enqueue();
+		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
+		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
 	}
 
 	// -- The page ----------------------------------------------------------------------------------
@@ -360,10 +360,10 @@ final class DbPicker {
 
 		echo '<p class="beltoft-services-picker__intro">' . esc_html__( 'Choose a plan. You pay on the next page.', 'beltoft-services' ) . '</p>';
 
-		$unavailable = ! \BeltoftServices\Proxmox\PrivateNets::available_for( get_current_user_id() );
+		$unavailable = ! \BeltoftServices\Proxmox\Network\PrivateNets::available_for( get_current_user_id() );
 
 		if ( $unavailable ) {
-			echo '<p class="beltoft-services-notice" role="status">' . esc_html( \BeltoftServices\Proxmox\PrivateNets::unavailable_message() ) . '</p>';
+			echo '<p class="beltoft-services-notice" role="status">' . esc_html( \BeltoftServices\Proxmox\Network\PrivateNets::unavailable_message() ) . '</p>';
 		}
 
 		// The private network notice, for the engines whose plans need it (one engine: one notice, as before).

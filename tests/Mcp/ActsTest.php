@@ -12,7 +12,7 @@ use BeltoftServices\Api\Tokens;
 use BeltoftServices\Jobs;
 use BeltoftServices\Mcp\Audit;
 use BeltoftServices\Mcp\Tools;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/McpTestCase.php';
@@ -145,7 +145,7 @@ final class ActsTest extends McpTestCase {
 
 		// A stopped database offers start, not shutdown.
 		$stopped = $this->database();
-		\BeltoftServices\Proxmox\Operations::remember_power( $stopped->id(), 'stopped' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $stopped->id(), 'stopped' );
 		$stoken = $this->oauth( $this->owner( $stopped ), Tokens::ACTIONS );
 		$this->assertTrue( $this->tool( 'shutdown', array( 'id' => $stopped->id() ), $stoken )['isError'] );
 		$this->assertFalse( $this->tool( 'start', array( 'id' => $stopped->id() ), $stoken )['isError'] );

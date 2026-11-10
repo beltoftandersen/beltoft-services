@@ -1,6 +1,6 @@
 <?php
 /**
- * The Firewall tab of a server page. Printed by BeltoftServices\Proxmox\FirewallTab::pane().
+ * The Firewall tab of a server page. Printed by BeltoftServices\Proxmox\Network\FirewallTab::pane().
  *
  * Variables: $r (the resource) and $view (Firewall::view(): fixed lines, max, app). The rules and the state are
  * filled in by assets/firewall.js from the firewall route; this shell holds the fixed text and the dialog.

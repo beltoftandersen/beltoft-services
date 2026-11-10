@@ -143,8 +143,8 @@ class OperationsTest extends HostingCase {
 		$vmid = (int) Records::for_resource( $r->id() )['vmid'];
 
 		// Two runs that both read the resource before either wrote.
-		$one = new \BeltoftServices\Hosting\HostingActions( Resource::find( $r->id() ) );
-		$two = new \BeltoftServices\Hosting\HostingActions( Resource::find( $r->id() ) );
+		$one = new \BeltoftServices\Hosting\Actions\SiteActions( Resource::find( $r->id() ) );
+		$two = new \BeltoftServices\Hosting\Actions\SiteActions( Resource::find( $r->id() ) );
 
 		$call = static function ( $actions, string $name ) use ( $vmid ) {
 			$m = new \ReflectionMethod( $actions, 'connect' );

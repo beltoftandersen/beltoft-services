@@ -7,14 +7,9 @@
 
 namespace BeltoftServices;
 
+use BeltoftLicenses\Account\View;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\DiskGuide;
-use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\SnapshotDriver;
-use BeltoftServices\Proxmox\SnapshotMeta;
-use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,7 +20,8 @@ defined( 'ABSPATH' ) || exit;
  * - "Your services": a row per service the order created, with the progress component of
  *   Progress::build() while it is set up and "Ready" with a link to its card in My Account when it
  *   is (a server, a domain or a DNS card). An extra disk also says where to find it.
- * - the DNS hosting and transfer blocks of Domains\ThankYou, in the same area and style.
+ * - the blocks that features print through beltoft_services_thankyou_render (the DNS hosting and transfer
+ *   blocks), in the same area and style.
  *
  * The rows poll GET beltoft-services/v1/orders/<id>/progress?key=<order key>. The order key is the
  * credential (also for a guest): it is compared with hash_equals, the route is rate limited per
@@ -48,7 +44,7 @@ final class ThankYou {
 	private static array $printed = array();
 
 	/**
-	 * Hooks. The DNS and transfer blocks of Domains\ThankYou print inside this area, so it owns the hooks.
+	 * Hooks. The blocks of the features print inside this area, so it owns the hooks.
 	 */
 	public static function register(): void {
 		add_action( 'woocommerce_order_details_before_order_table', array( __CLASS__, 'render_details' ), 4 );
@@ -162,47 +158,37 @@ final class ThankYou {
 		$driver  = Registry::get( (string) $r->get( 'driver' ) );
 		$kind    = $driver ? $driver->kind() : '';
 		$license = $r->license();
-		$name    = in_array( $kind, array( 'domain', 'dns' ), true ) && '' !== (string) $r->get( 'domain' )
-			? \BeltoftServices\Domains\HostName::display( (string) $r->get( 'domain' ) )
-			: ServerName::display( $r, $license );
 
+		// The name and the card address are the product name and nothing until a feature says better.
 		$row = array(
 			'id'       => $r->id(),
 			'kind'     => $kind,
-			'name'     => $name,
+			'name'     => $license ? View::product_name( $license ) : '',
 			'group'    => $group,
 			'ready'    => 'ready' === $group,
 			'label'    => Account\Panel::label( $state, $r ),
 			'message'  => 'failed' === $group ? Account\Panel::message( $state, $r ) : '',
 			'progress' => Progress::build( $r ),
-			'url'      => DiskGuide::card_url( $r ),
+			'url'      => '',
 		);
 
-		if ( SnapshotDriver::ID === (string) $r->get( 'driver' ) ) {
-			$row['url']      = DiskGuide::server_url( $r );
-			$row['snapshot'] = array(
-				'slots'      => SnapshotMeta::slots_of( $r ),
-				'server_url' => $row['url'],
-			);
-		}
+		/**
+		 * The row of one service on the thank-you page and in the order progress route. The features set the
+		 * name and the card address of their services and add their own facts (a disk, a snapshot pack, the
+		 * hosting site addresses). Only fixed texts, addresses of the customer's own pages and state: never a
+		 * password, an address of a server or last_error.
+		 *
+		 * Order: the Proxmox features at 10 (name and card address of every row, then their own keys), the
+		 * domain and DNS name at 20 (after Proxmox, so it replaces the name), hosting at 30.
+		 *
+		 * @param array<string, mixed>      $row     The row so far.
+		 * @param Resource                  $r       The service.
+		 * @param array<string, mixed>|null $license Its licence row.
+		 * @param string                    $group   Its group: getting-ready, ready or failed.
+		 */
+		$filtered = apply_filters( 'beltoft_services_thankyou_row', $row, $r, $license, $group );
 
-		if ( DiskDriver::ID === (string) $r->get( 'driver' ) ) {
-			$row['disk'] = array(
-				'server_url' => DiskGuide::server_url( $r ),
-				'guide_url'  => DiskGuide::guide_url( $r ),
-			);
-		}
-
-		if ( \BeltoftServices\Hosting\HostingDriver::ID === (string) $r->get( 'driver' ) && 'ready' === $group ) {
-			$facts = \BeltoftServices\Hosting\HostingEmail::values( $r );
-
-			$row['hosting'] = array(
-				'site_url'  => (string) $facts['site_url'],
-				'admin_url' => (string) $facts['admin_url'],
-			);
-		}
-
-		return $row;
+		return is_array( $filtered ) ? $filtered : $row;
 	}
 
 	/**
@@ -231,10 +217,11 @@ final class ThankYou {
 	 * @param array<int, array<string, mixed>> $rows      Their rows.
 	 */
 	private static function dashboard_url( array $resources, array $rows ): string {
-		foreach ( $resources as $resource ) {
+		foreach ( $resources as $index => $resource ) {
 			$license = $resource->license();
 
-			if ( $license && ProxmoxDriver::ID === (string) $resource->get( 'driver' ) ) {
+			// A server is the one service whose kind is "vm".
+			if ( $license && 'vm' === ( $rows[ $index ]['kind'] ?? '' ) ) {
 				return Account\ServerLinks::url( $license );
 			}
 		}
@@ -299,7 +286,13 @@ final class ThankYou {
 
 		// The DNS and transfer blocks print inside this area, in the same style.
 		ob_start();
-		Domains\ThankYou::render( $order_id );
+		/**
+		 * Prints the blocks of the features that belong in the "What happens next" area, in the same style
+		 * (the DNS hosting and transfer blocks of the domain feature).
+		 *
+		 * @param int $order_id Order id.
+		 */
+		do_action( 'beltoft_services_thankyou_render', $order_id );
 		$domain_blocks = (string) ob_get_clean();
 
 		if ( ! $rows && '' === trim( $domain_blocks ) ) {

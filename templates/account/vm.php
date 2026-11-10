@@ -8,7 +8,7 @@
  * tab, and without script the links still open the right tab. Elsewhere (a card on the Licenses tab)
  * the sections follow each other with no tabs.
  *
- * Variables (set by BeltoftServices\Proxmox\Panels::account()): $ip, $plan (cores, memory_mb,
+ * Variables (set by BeltoftServices\Proxmox\Vm\Panels::account()): $ip, $plan (cores, memory_mb,
  * disk_gb, net_mbit), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_cluster, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
@@ -145,7 +145,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				</dd>
 			</div>
 			<?php if ( ! empty( $plan['net_mbit'] ) ) : ?>
-				<div><dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( \BeltoftServices\Proxmox\Panels::speed_label( (float) $plan['net_mbit'] ) ); ?></dd></div>
+				<div><dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( \BeltoftServices\Proxmox\Vm\Panels::speed_label( (float) $plan['net_mbit'] ) ); ?></dd></div>
 			<?php endif; ?>
 			<?php if ( '' !== $os_label ) : ?>
 				<div><dt><?php esc_html_e( 'System', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $os_label ); ?></dd></div>
@@ -175,7 +175,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			</dd>
 			<?php if ( ! empty( $plan['net_mbit'] ) ) : ?>
 				<dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt>
-				<dd><?php echo esc_html( \BeltoftServices\Proxmox\Panels::speed_label( (float) $plan['net_mbit'] ) ); ?></dd>
+				<dd><?php echo esc_html( \BeltoftServices\Proxmox\Vm\Panels::speed_label( (float) $plan['net_mbit'] ) ); ?></dd>
 			<?php endif; ?>
 			<?php if ( '' !== $os_label ) : ?>
 				<dt><?php esc_html_e( 'Operating system', 'beltoft-services' ); ?></dt>
@@ -783,7 +783,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<?php endif; ?>
 				<?php if ( '' !== $snapshot_warnings['reinstall'] ) : ?><p class="description" data-snapshot-warning><?php echo esc_html( $snapshot_warnings['reinstall'] ); ?></p><?php endif; ?>
 				<?php if ( $os_options ) : ?>
-					<div class="beltoft-services-vm-os"><?php \BeltoftServices\Proxmox\Tiles::print_os( (string) $os_cluster, $os_options, (int) $os_current, 'os', 'beltoft-vm-os' ); ?></div>
+					<div class="beltoft-services-vm-os"><?php \BeltoftServices\Proxmox\Vm\Tiles::print_os( (string) $os_cluster, $os_options, (int) $os_current, 'os', 'beltoft-vm-os' ); ?></div>
 				<?php endif; ?>
 				<?php
 				/**

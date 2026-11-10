@@ -225,7 +225,7 @@ class SslRoutesTest extends SslTestCase {
 		$r = $this->built();
 		$this->mails = array();
 		foreach ( array( 'beltoft_services_ssl_issued', 'beltoft_services_ssl_reissued', 'beltoft_services_ssl_expiring' ) as $id ) {
-			$this->assertContains( $id, Emails::IDS );
+			$this->assertContains( $id, Emails::ids() );
 			$this->assertTrue( Emails::send( $id, $r ), $id );
 		}
 		$r->set( array( 'ssl_validation_rows' => array( array( 'type' => 'CNAME', 'name' => '_abc.example.com', 'value' => 'x.y.fakeca.example', 'status' => 'manual' ) ) ) );

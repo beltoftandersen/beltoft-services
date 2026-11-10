@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\HostName;
+use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -37,11 +38,37 @@ final class HostingSettings {
 	 * Hooks the tabs, the fields and the bounds check.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( HostingDriver::class, 'add' ), 7 );
+		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'thankyou_row' ), 30, 4 );
 		add_filter( 'beltoft_services_settings_tabs', array( __CLASS__, 'add_tab' ) );
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'add_section' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'add_fields' ) );
 		// After Settings::sanitize() (priority 10): the shapes and bounds of the Hosting values.
 		add_filter( 'sanitize_option_' . Settings::OPTION, array( __CLASS__, 'sanitize' ), 20 );
+	}
+
+	/**
+	 * The thank-you row of a hosting account that is ready: the addresses of the site and its admin.
+	 *
+	 * @param mixed $row   The row so far.
+	 * @param mixed $r     Resource.
+	 * @param mixed $license Licence row (unused).
+	 * @param mixed $group Group of the row.
+	 * @return mixed
+	 */
+	public static function thankyou_row( $row, $r, $license = null, $group = '' ) {
+		if ( ! is_array( $row ) || ! $r instanceof Resource || HostingDriver::ID !== (string) $r->get( 'driver' ) || 'ready' !== $group ) {
+			return $row;
+		}
+
+		$facts = HostingEmail::values( $r );
+
+		$row['hosting'] = array(
+			'site_url'  => (string) $facts['site_url'],
+			'admin_url' => (string) $facts['admin_url'],
+		);
+
+		return $row;
 	}
 
 	/**

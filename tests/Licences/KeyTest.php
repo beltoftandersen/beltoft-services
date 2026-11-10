@@ -15,8 +15,8 @@ use BeltoftServices\Licences\KeyField;
 use BeltoftServices\Licences\KeyOrder;
 use BeltoftServices\Licences\KeyPanel;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

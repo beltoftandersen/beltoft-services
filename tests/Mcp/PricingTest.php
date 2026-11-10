@@ -12,7 +12,7 @@ use BeltoftServices\Api\Tokens;
 use BeltoftServices\Credit\Balance;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Rates;

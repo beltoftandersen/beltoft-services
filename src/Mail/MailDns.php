@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\PublicDns;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;

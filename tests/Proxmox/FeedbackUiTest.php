@@ -12,12 +12,13 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\DiskPanels;
-use BeltoftServices\Proxmox\Panels;
+use BeltoftServices\Proxmox\Disk\DiskPanels;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 use BeltoftServices\ThankYou;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class FeedbackUiTest extends SnapshotsTestCase {
 
@@ -59,7 +60,7 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		$sub     = $this->subscription( $user );
 		$sub->add_product( $product, 1, array( 'subtotal' => '5', 'total' => '5' ) );
 		$sub->save();
-		$this->assertTrue( \BeltoftServices\Proxmox\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
 		$disk    = Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $server->license()['id'] ) );
 		$this->assertInstanceOf( Resource::class, $disk );
@@ -285,7 +286,7 @@ class FeedbackUiTest extends SnapshotsTestCase {
 	}
 
 	public function test_the_new_texts_have_no_em_dash_and_no_rounded_corners(): void {
-		foreach ( array( 'assets/vm.js', 'assets/account.css', 'assets/thankyou.css', 'templates/account/vm.php', 'src/Proxmox/DiskPanels.php' ) as $file ) {
+		foreach ( array( 'assets/vm.js', 'assets/account.css', 'assets/thankyou.css', 'templates/account/vm.php', 'src/Proxmox/Disk/DiskPanels.php' ) as $file ) {
 			$this->assertStringNotContainsString( "\u{2014}", (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $file );
 		}
 

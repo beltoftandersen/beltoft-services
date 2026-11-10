@@ -68,7 +68,7 @@ tests_add_filter(
 
 		\BeltoftLicenses\Install::create_tables();
 		\BeltoftLicenses\Install::ensure_secret();
-		\BeltoftServices\Proxmox\Schema::create_tables();
+		\BeltoftServices\Proxmox\Vm\Schema::create_tables();
 		\BeltoftServices\Hosting\Schema::create_tables();
 
 		// The WordPress test installer empties the posts table on every run (so order ids start low again) but not

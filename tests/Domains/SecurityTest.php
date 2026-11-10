@@ -195,7 +195,7 @@ class SecurityTest extends TestCase {
 	}
 
 	public function test_the_security_email_is_registered_and_never_carries_the_code(): void {
-		$this->assertContains( 'beltoft_services_domain_security', Emails::IDS );
+		$this->assertContains( 'beltoft_services_domain_security', Emails::ids() );
 		$this->assertInstanceOf( \BeltoftServices\Emails\DomainSecurity::class, Emails::get( 'beltoft_services_domain_security' ) );
 	}
 
@@ -247,7 +247,7 @@ class SecurityTest extends TestCase {
 	/** Emails a transfer code check code to the domain's owner and returns it from the captured mail. */
 	private function emailed_code( Resource $r ): string {
 		$before = count( $this->mails );
-		$this->assertTrue( \BeltoftServices\StepUp::send( (int) $r->license()['user_id'], \BeltoftServices\StepUp::TRANSFER_CODE ) );
+		$this->assertTrue( \BeltoftServices\StepUp::send( (int) $r->license()['user_id'], \BeltoftServices\Domains\AuthCodeRoute::PURPOSE ) );
 		$this->assertCount( $before + 1, $this->mails );
 		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
 
@@ -282,7 +282,7 @@ class SecurityTest extends TestCase {
 		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
 		$user = (int) $r->license()['user_id'];
 		wp_set_current_user( $user );
-		\BeltoftServices\StepUp::send( $user, \BeltoftServices\StepUp::API_TOKEN );
+		\BeltoftServices\StepUp::send( $user, \BeltoftServices\Account\ApiTokens::PURPOSE );
 		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
 
 		$this->assertSame( 403, $this->code_request( $r, $m[1] )->get_status() );
@@ -311,7 +311,7 @@ class SecurityTest extends TestCase {
 		$ask = static fn() => array( 'kind' => 'code', 'label' => 'Code from your app' );
 		add_filter( 'beltoft_services_step_up_ask', $ask );
 
-		$this->assertSame( 'one-time-code', \BeltoftServices\StepUp::ask( (int) $r->license()['user_id'] )['autocomplete'] );
+		$this->assertSame( 'one-time-code', \BeltoftServices\StepUp::ask( (int) $r->license()['user_id'], \BeltoftServices\Account\ApiTokens::PURPOSE )['autocomplete'] );
 		$this->assertSame( 403, $this->code_request( $r, '123456' )->get_status(), 'Without a check for it nothing is shown.' );
 
 		$check = static fn( $ok, $user, $secret ) => '123456' === $secret;

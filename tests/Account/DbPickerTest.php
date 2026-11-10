@@ -16,11 +16,11 @@ use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DbEngines;
+use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Backup/BackupTestCase.php';
 
 class DbPickerTest extends BackupTestCase {
 
@@ -445,7 +445,7 @@ class DbPickerTest extends BackupTestCase {
 	public function test_engines_come_in_registry_order_whatever_order_the_plans_arrive_in(): void {
 		$plans = array( array( 'engine' => 'mssql' ), array( 'engine' => 'valkey' ), array( 'engine' => 'postgres' ) );
 
-		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), \BeltoftServices\Proxmox\DbEngines::ids() );
+		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), \BeltoftServices\Proxmox\Db\DbEngines::ids() );
 		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), array_keys( DbPicker::engines( $plans ) ) );
 		$this->assertSame( array( 'postgres', 'valkey', 'mssql' ), array_keys( DbPicker::engines( array_reverse( $plans ) ) ) );
 	}

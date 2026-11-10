@@ -531,4 +531,48 @@ class AccountTest extends HostingCase {
 
 		$this->assertSame( 429, $this->call( 'POST', $r->id() . '/hosting/sites/w' . $r->id() . '/cache', $user )->get_status() );
 	}
+
+	public function test_the_facade_forwards_every_public_method(): void {
+		$groups = array(
+			\BeltoftServices\Hosting\Actions\SiteActions::class,
+			\BeltoftServices\Hosting\Actions\PhpActions::class,
+			\BeltoftServices\Hosting\Actions\AddonActions::class,
+			\BeltoftServices\Hosting\Actions\CareActions::class,
+		);
+		$facade = new \ReflectionClass( HostingActions::class );
+
+		foreach ( $facade->getMethods( \ReflectionMethod::IS_PUBLIC ) as $method ) {
+			if ( $method->isConstructor() ) {
+				continue;
+			}
+
+			$found = array();
+
+			foreach ( $groups as $group ) {
+				if ( method_exists( $group, $method->getName() ) && ( new \ReflectionMethod( $group, $method->getName() ) )->isPublic() ) {
+					$found[] = new \ReflectionMethod( $group, $method->getName() );
+				}
+			}
+
+			// Only limits() is shared (it sits in the Base trait every group uses); the facade asks SiteActions.
+			$this->assertCount( 'limits' === $method->getName() ? 4 : 1, $found, $method->getName() );
+
+			$this->assertSame( $this->signature( $method ), $this->signature( $found[0] ), $method->getName() );
+		}
+	}
+
+	/**
+	 * Parameters (name, type, default) and return type of a method.
+	 *
+	 * @param \ReflectionMethod $m Method.
+	 */
+	private function signature( \ReflectionMethod $m ): string {
+		$out = array();
+
+		foreach ( $m->getParameters() as $p ) {
+			$out[] = $p->getName() . ':' . $p->getType() . ':' . ( $p->isDefaultValueAvailable() ? var_export( $p->getDefaultValue(), true ) : '' );
+		}
+
+		return implode( ',', $out ) . '=>' . $m->getReturnType();
+	}
 }

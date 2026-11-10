@@ -1,0 +1,1014 @@
+{
+    "pause_all": {
+        "tab": "general",
+        "section": "general",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Pause all driver activity",
+        "desc": "Jobs keep their place and run when this is turned off."
+    },
+    "deletion_mode": {
+        "tab": "general",
+        "section": "general",
+        "type": "select",
+        "default": "off",
+        "options": {
+            "off": "Off: never delete",
+            "report": "Report only: log what would be deleted",
+            "on": "On: delete"
+        },
+        "label": "Delete paused services after their retention period"
+    },
+    "warning_days": {
+        "tab": "general",
+        "section": "general",
+        "type": "number",
+        "default": 1,
+        "min": 1,
+        "label": "Warn customers this many days before deletion"
+    },
+    "breach_retention_days": {
+        "tab": "general",
+        "section": "general",
+        "type": "number",
+        "default": 14,
+        "min": 1,
+        "max": 365,
+        "label": "Delete a service suspended for breach after this many days",
+        "desc": "Counted from the day the hold was set, and only when deletion above is On. Otherwise you get an alert when the days are over."
+    },
+    "admin_email": {
+        "tab": "general",
+        "section": "general",
+        "type": "email",
+        "default": "(site admin email)",
+        "label": "Send failure alerts to"
+    },
+    "delete_data": {
+        "tab": "general",
+        "section": "general",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Delete the settings when the plugin is deleted",
+        "desc": "This also deletes the plugin's clusters, nodes, connections and other options, and its usage, credit, OAuth and MCP tables. The IP pool, virtual machine records, private network records and hosting records are deleted only when no service that is not deleted still exists, and the DNS assignments only when no name may still point at our servers; otherwise those tables are kept. Machines whose records are deleted can no longer be matched to their services."
+    },
+    "mcp_enabled": {
+        "tab": "general",
+        "section": "api",
+        "type": "checkbox",
+        "default": 1,
+        "label": "Let customers connect apps (Use with Claude)",
+        "desc": "Turns the OAuth server and the MCP endpoint on or off for the whole site. Off, connected apps stop working at once. Personal API tokens are not affected."
+    },
+    "mcp_redirect_uris": {
+        "tab": "general",
+        "section": "api",
+        "type": "textarea",
+        "default": "https://claude.ai/api/mcp/auth_callback\nhttps://claude.com/api/mcp/auth_callback",
+        "label": "Redirect addresses apps may use",
+        "desc": "One address per line, matched exactly. An app can only register and sign in with an address on this list. Empty means the Claude addresses."
+    },
+    "api_docs_url": {
+        "tab": "general",
+        "section": "api",
+        "type": "url",
+        "default": "",
+        "label": "API documentation page",
+        "desc": "Address of a public page that holds the shortcode [beltoft_services_api_reference]. When set, the Security section in My Account links to it instead of printing its own short guide."
+    },
+    "account_billing": {
+        "tab": "general",
+        "section": "account",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Group the billing pages",
+        "desc": "My Account shows one Billing item instead of Orders, Subscriptions, Payment methods and Addresses, and those pages get a tab bar. Their addresses stay the same."
+    },
+    "welcome_servers_url": {
+        "tab": "general",
+        "section": "account",
+        "type": "url",
+        "default": "",
+        "label": "Welcome block: servers link",
+        "desc": "Address of the page where customers buy a server. A customer with no services sees three starting points in My Account; one without an address is left out."
+    },
+    "welcome_domains_url": {
+        "tab": "general",
+        "section": "account",
+        "type": "url",
+        "default": "",
+        "label": "Welcome block: domains link"
+    },
+    "welcome_plugins_url": {
+        "tab": "general",
+        "section": "account",
+        "type": "url",
+        "default": "",
+        "label": "Welcome block: plugins link"
+    },
+    "usage_threshold_new": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "default": 50,
+        "min": 1,
+        "label": "Bill pay as you go early at this amount: new accounts",
+        "desc": "In the store currency, for an account with no paid usage invoice yet. When the unbilled usage reaches it, the usage is charged at once, without waiting for the monthly renewal."
+    },
+    "usage_threshold": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "default": 250,
+        "min": 1,
+        "label": "Bill pay as you go early at this amount: other accounts"
+    },
+    "usage_minimum": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "default": 5,
+        "min": 0,
+        "label": "Minimum amount to charge a card for pay as you go",
+        "desc": "In the store currency, including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month's invoice instead. 0 turns this off."
+    },
+    "offer_monthly": {
+        "tab": "general",
+        "section": "usage",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Show the Monthly option for servers and databases",
+        "desc": "Off: customers only see pay as you go, and a new server or database added to the cart as a monthly plan is changed to its pay as you go plan when it has one. Email plans, plugin licences, renewals, plan changes of existing subscriptions and orders made in the admin are not touched."
+    },
+    "usage_new_limit": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "default": 2,
+        "min": 0,
+        "label": "Pay as you go services before the first paid usage invoice",
+        "desc": "The most services an account may run until a usage invoice has been paid. 0 means no limit."
+    },
+    "credit_enabled": {
+        "tab": "general",
+        "section": "credit",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Account credit for pay as you go",
+        "desc": "Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows."
+    },
+    "credit_min": {
+        "tab": "general",
+        "section": "credit",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "label": "Smallest top-up",
+        "desc": "In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited."
+    },
+    "credit_max": {
+        "tab": "general",
+        "section": "credit",
+        "type": "number",
+        "default": 1000,
+        "min": 1,
+        "label": "Largest top-up",
+        "desc": "In the store currency."
+    },
+    "site_tag": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "text",
+        "default": "",
+        "label": "Site tag",
+        "desc": "Written into the description of every virtual machine this site creates. Only machines that carry this tag are ever changed or deleted. Letters, numbers, dots, dashes and underscores. It cannot be changed while machines exist. A cluster cannot go live until this is set; while it is empty the host name of this site is used, for test clusters only."
+    },
+    "shutdown_timeout": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 120,
+        "min": 10,
+        "label": "Shutdown timeout in seconds",
+        "desc": "How long a pause waits for a clean shutdown before the machine is stopped."
+    },
+    "task_wait": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 25,
+        "min": 1,
+        "label": "Seconds to wait for one Proxmox task",
+        "desc": "A step waits this long, then keeps the task and checks it again later. Keep it below the PHP time limit of this server."
+    },
+    "host_reserve_gb": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 4,
+        "min": 0,
+        "label": "Memory kept free on each node, in GB",
+        "desc": "A node counts as full when the memory promised to the virtual machines of this site, plus this reserve, reaches the memory of the node. It leaves room for Proxmox itself and for machines this site did not create."
+    },
+    "ip_reserve_for_vps": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 1,
+        "min": 0,
+        "label": "Public IP addresses kept for servers",
+        "desc": "A database with a public IP address is sold out while no more than this many addresses are free, so the last address always stays available to a new server. 0 lets databases take the last one."
+    },
+    "db_disk_max_gb": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 1000,
+        "min": 1,
+        "label": "Largest database data disk (GB)",
+        "desc": "A database variation with extra storage that would make the data disk larger than this is not offered and a switch to it is refused."
+    },
+    "db_disk_step_gb": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "label": "Database extra storage step (GB)",
+        "desc": "The extra storage of a database variation must be a multiple of this, or it is not offered and a switch to it is refused."
+    },
+    "disk_reserve_gb": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 200,
+        "min": 0,
+        "label": "Storage kept free on each node (GB)"
+    },
+    "disk_promise_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 100,
+        "min": 1,
+        "label": "Maximum promised storage (%)"
+    },
+    "disk_max_extra": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 4,
+        "min": 1,
+        "label": "Maximum extra disks per server"
+    },
+    "snapshots_enabled": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Customer snapshots",
+        "desc": "Let customers take snapshots of their server and roll back to them. Only servers whose disks are all qcow2 get them. Leave it off until the token has the snapshot privileges and the checks on the cluster have passed."
+    },
+    "snapshot_free_slots": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 1,
+        "min": 0,
+        "label": "Free snapshots per server"
+    },
+    "snapshot_free_days": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 7,
+        "min": 1,
+        "label": "Days a free snapshot is kept"
+    },
+    "snapshot_paid_days": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 30,
+        "min": 1,
+        "label": "Days a snapshot is kept with paid slots"
+    },
+    "snapshot_max_slots": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "label": "Most snapshots per server",
+        "desc": "Free and paid slots together never go above this."
+    },
+    "snapshot_expired_email": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Email when a snapshot expires",
+        "desc": "Tell the customer when a snapshot reached the end of its keeping time and was deleted. The emails about a removed disk and fewer slots are always sent."
+    },
+    "snapshot_reserve_gb": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "label": "Storage kept free for snapshots (GB)",
+        "desc": "A snapshot is refused when the storage of the server has less than this free. 0 uses the storage kept free for extra disks."
+    },
+    "abuse_mode": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "select",
+        "default": "report",
+        "options": {
+            "off": "Off",
+            "report": "Report only: alert, change nothing",
+            "pause": "Pause the service"
+        },
+        "label": "Sustained high CPU"
+    },
+    "abuse_cpu": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 90,
+        "min": 1,
+        "label": "High CPU means above this percent"
+    },
+    "abuse_hours": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 2,
+        "min": 1,
+        "label": "for at least this many hours",
+        "desc": "One reading covers about an hour, so the hours are counted over several hourly readings: with 1 hour the first alert comes with the second reading, with 3 hours after about three."
+    },
+    "monitor_alerts": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "select",
+        "default": "on",
+        "options": {
+            "off": "Off",
+            "on": "On"
+        },
+        "label": "Customer monitoring emails",
+        "desc": "Email the customer when their server stays down unexpectedly, its disk is nearly full or its CPU stays high. Customers can turn the usage emails off per server; the server down email is always sent."
+    },
+    "monitor_disk_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 90,
+        "min": 50,
+        "label": "Disk alert threshold, percent"
+    },
+    "monitor_disk_urgent_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 97,
+        "min": 60,
+        "label": "Urgent disk alert threshold, percent",
+        "desc": "A second, stronger email when the disk is almost completely full. It is sent once per episode and re-arms five points lower."
+    },
+    "monitor_cpu_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 90,
+        "min": 50,
+        "label": "CPU alert threshold, percent"
+    },
+    "monitor_cpu_hours": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 3,
+        "min": 1,
+        "label": "CPU alert after this many hours",
+        "desc": "Counted over several hourly readings, like the abuse check. Re-arms when the CPU falls below 70 percent."
+    },
+    "monitor_cooldown_days": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 7,
+        "min": 1,
+        "label": "Days between two CPU emails for one server"
+    },
+    "traffic_alerts": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "select",
+        "default": "on",
+        "options": {
+            "off": "Off",
+            "on": "On"
+        },
+        "label": "Outgoing traffic alerts",
+        "desc": "Email the alert address when a server sends a lot of traffic for 30 minutes, or ten times its usual hour. The customer is not told and nothing is restricted. Uses the hourly usage reading: no extra call to Proxmox. An alert comes once and re-arms after six quiet hours."
+    },
+    "traffic_alert_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 70,
+        "min": 1,
+        "label": "Sustained traffic, percent of the plan speed",
+        "desc": "Alert when the outgoing traffic averages above this share of the plan speed limit for 30 minutes."
+    },
+    "traffic_alert_mbit": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 300,
+        "min": 1,
+        "label": "Sustained traffic without a plan speed, Mbit/s",
+        "desc": "Used for servers whose plan has no speed limit."
+    },
+    "traffic_jump_factor": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 10,
+        "min": 2,
+        "label": "Traffic jump, times the usual hour",
+        "desc": "Alert when the last hour is this many times the median hour of the last 7 days. Judged once a day of hours is known."
+    },
+    "traffic_jump_floor_mbit": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 20,
+        "min": 1,
+        "label": "Traffic jump floor, Mbit/s",
+        "desc": "A jump under this hourly average is never alerted, so a quiet server going from 0.1 to 2 Mbit/s stays silent."
+    },
+    "monitor_db_bans": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 50,
+        "min": 1,
+        "label": "Database ban alert, banned addresses",
+        "desc": "The admin is told when a database server has this many addresses banned for failed logins. It re-arms when the count falls below it."
+    },
+    "traffic_quarantine": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "select",
+        "default": "report",
+        "options": {
+            "off": "Off",
+            "report": "Report only: alert, change nothing",
+            "on": "Quarantine the network"
+        },
+        "label": "Connection flood and scan detection",
+        "desc": "Reads the per-server connection counts the host sends every minute (route flows, signed with BELTOFT_SERVICES_FLOW_SECRET). Report only emails the alert address. Quarantine also blocks the server's outgoing traffic except DNS to the cluster name servers and answers to incoming connections, tells the customer, and stays until an admin lifts it."
+    },
+    "flow_sources": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "textarea",
+        "default": "10.10.10.1",
+        "label": "Addresses the host sends the counts from",
+        "desc": "IPv4 addresses, separated by commas. A request from any other address is refused."
+    },
+    "flow_minutes": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 5,
+        "min": 1,
+        "label": "A signal counts after this many minutes in a row"
+    },
+    "flow_scan_dsts": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 500,
+        "min": 1,
+        "label": "Scanning: more than this many different destination addresses"
+    },
+    "flow_scan_dports": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 200,
+        "min": 1,
+        "label": "Scanning: or more than this many different destination ports"
+    },
+    "flow_syn_unreplied": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 2000,
+        "min": 1,
+        "label": "SYN flood: more than this many connection attempts never answered"
+    },
+    "flow_udp_dsts": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 5000,
+        "min": 1,
+        "label": "UDP flood: more than this many different UDP destinations"
+    },
+    "hosting_denied_domains": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "textarea",
+        "default": "",
+        "label": "Domains customers may not point at hosting",
+        "desc": "One domain per line. A domain here, and any name under it, is refused: use it for your own domains (the shop, the mail host, the name servers)."
+    },
+    "hosting_restore_test": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "checkbox",
+        "default": 1,
+        "label": "Weekly restore test",
+        "desc": "Once a week one random account backup is restored into a scratch container on the node and checked. Needs a scratch container id on the node."
+    },
+    "hosting_preview_zone": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "",
+        "label": "Preview zone",
+        "desc": "A domain whose DNS zone this site manages. Every site gets a temporary name <name>.<zone>. Hosting provisioning waits until this is set."
+    },
+    "hosting_php_default": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "8.3",
+        "label": "Default PHP version",
+        "desc": "A new site starts on this version, for example 8.3."
+    },
+    "hosting_php_versions": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "8.3,8.4,8.5",
+        "label": "PHP versions offered",
+        "desc": "Versions customers can choose, separated by commas, for example 8.3,8.4,8.5. The end-of-support dates are kept with the plan notes."
+    },
+    "hosting_php_eol": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "8.3=2027-12-31,8.4=2028-12-31,8.5=2029-12-31",
+        "label": "PHP end of support dates",
+        "desc": "Version and the last day of security support, for example 8.3=2027-12-31,8.4=2028-12-31. Customers are told 90 and 30 days before, and on that day their site moves to the default version."
+    },
+    "hosting_prefix": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "c",
+        "label": "Account name prefix",
+        "desc": "Letters and numbers. The account name is this prefix and the license resource id; it names the container, the database user and the edge entry."
+    },
+    "hosting_tag": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "hosting",
+        "label": "Container tag",
+        "desc": "A Proxmox tag put on every hosting container. Lowercase letters, numbers and dashes."
+    },
+    "hosting_admin_user": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "owner",
+        "label": "Default WordPress admin user",
+        "desc": "The administrator name of a new WordPress install when the order named none."
+    },
+    "hosting_mem_overcommit": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "1.5",
+        "label": "Memory overcommit",
+        "desc": "Memory promised to containers may be this many times the memory of a node (1 to 4). Set it from load test results."
+    },
+    "hosting_disk_overcommit": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "2",
+        "label": "Disk overcommit",
+        "desc": "Disk promised to containers may be this many times the real disk of a node (1 to 5), on thin storage."
+    },
+    "hosting_reserve_gb": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "9",
+        "label": "Memory reserve per node, in GB",
+        "desc": "Kept free for the node system, its cache, the edge and the shared database server."
+    },
+    "hosting_alert_percent": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "80",
+        "label": "Capacity alert at, percent",
+        "desc": "The admin is told when committed memory or disk on a node reaches this share."
+    },
+    "hosting_db_account_cpu": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "50",
+        "label": "Database monitor: one account above, percent of CPU",
+        "desc": "Alert when one account uses more than this share of the shared database server for the minutes below."
+    },
+    "hosting_db_total_cpu": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "80",
+        "label": "Database monitor: server above, percent of CPU",
+        "desc": "Alert when the shared database server stays above this CPU share for the minutes below."
+    },
+    "hosting_db_minutes": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "15",
+        "label": "Database monitor: minutes",
+        "desc": ""
+    },
+    "domain_api_mode": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "select",
+        "default": "fake",
+        "options": {
+            "fake": "Fake",
+            "sandbox": "Sandbox",
+            "live": "Live"
+        },
+        "label": "Registrar API mode"
+    },
+    "domain_nameservers": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "",
+        "label": "Name servers",
+        "desc": "Comma separated host names. Leave empty to disable automatic zones."
+    },
+    "domain_markup_percent": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 30,
+        "min": 0,
+        "max": 500,
+        "label": "Markup percent"
+    },
+    "domain_min_margin": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 4,
+        "min": 0,
+        "max": 1000,
+        "label": "Minimum margin in EUR"
+    },
+    "domain_price_overrides": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "textarea",
+        "default": "",
+        "label": "Price overrides",
+        "desc": "One TLD and whole euro price per line, for example com=15."
+    },
+    "domain_restricted_allowlist": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "dk",
+        "label": "Allowed restricted TLDs"
+    },
+    "domain_featured_tlds": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "com,net,org,eu",
+        "label": "Featured TLDs"
+    },
+    "domain_renew_days_before": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 30,
+        "min": 1,
+        "max": 60,
+        "label": "Charge renewals before expiry, in days"
+    },
+    "domain_relock_days": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 60,
+        "label": "Lock an unlocked domain again after, in days",
+        "desc": "A domain left unlocked for transfer is locked again after this many days. 0 turns it off. Turn it on only once you have confirmed how the registrar reports an outgoing transfer, because a transfer under way must not be locked."
+    },
+    "domain_low_balance": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 50,
+        "min": 0,
+        "label": "Low registrar balance in EUR"
+    },
+    "domain_seller_name": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "",
+        "label": "Seller name in the .dk agreement",
+        "desc": "The company that is paid for the registration, as named in the .dk checkout agreement. Empty uses the site name."
+    },
+    "domain_infrastructure_zones": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "",
+        "label": "Own zones on the DNS server",
+        "desc": "Comma separated zones that belong to the site itself, for example its name server domain. The orphan zone check skips them."
+    },
+    "domain_dns_url": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "http://127.0.0.1:8081",
+        "label": "DNS API URL"
+    },
+    "domain_dns_primary_query_address": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "",
+        "label": "Primary DNS query address",
+        "desc": "Local IP address used to check the first name server when its public address cannot be reached from this server."
+    },
+    "domain_dns_claims_enabled": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "checkbox",
+        "default": 0,
+        "label": "DNS hosting for domains registered elsewhere",
+        "desc": "Customers can verify a domain with a TXT record and add DNS hosting for it. Needs at least two name servers below."
+    },
+    "domain_search_url": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "",
+        "label": "Domain search page",
+        "desc": "The address of the page where customers search for and register a domain, for example /domains/. The account shows a Register a domain button when it is set. Leave empty to hide the button."
+    },
+    "dns_claims_max_per_user": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 20,
+        "min": 1,
+        "label": "DNS hosting domains per customer"
+    },
+    "ssl_enabled": {
+        "tab": "ssl",
+        "section": "ssl",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Sell SSL certificates",
+        "desc": "Off: certificate orders are refused at checkout and nothing is ordered at the registrar. The registrar account and mode are set under Domains."
+    },
+    "ssl_renew_days_before": {
+        "tab": "ssl",
+        "section": "ssl",
+        "type": "number",
+        "default": 28,
+        "min": 1,
+        "max": 30,
+        "label": "Charge renewals before expiry, in days",
+        "desc": "The registrar renews an order only within 30 days of its expiry, so this is at most 30."
+    },
+    "ssl_wait_days": {
+        "tab": "ssl",
+        "section": "ssl",
+        "type": "number",
+        "default": 14,
+        "min": 1,
+        "max": 30,
+        "label": "Cancel an order that is not validated after, in days",
+        "desc": "The registrar order is cancelled and staff are told to refund the customer."
+    },
+    "ssl_refund_days": {
+        "tab": "ssl",
+        "section": "ssl",
+        "type": "number",
+        "default": 30,
+        "min": 0,
+        "max": 90,
+        "label": "Refund window after issue, in days",
+        "desc": "A customer can cancel inside this window. Match the registrar, which refunds within 30 days of issue."
+    },
+    "ssl_reissues_per_day": {
+        "tab": "ssl",
+        "section": "ssl",
+        "type": "number",
+        "default": 3,
+        "min": 1,
+        "max": 20,
+        "label": "Reissues per customer and day"
+    },
+    "licence_items": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "textarea",
+        "default": "",
+        "label": "Licence key items",
+        "desc": "One licence key and Openprovider item per line, for example kernelcare=ITEM-ID-1M. The key is an edition (admin, pro, host, or admin-physical, pro-physical, host-physical) or an add-on (cloudlinux-solo, imunify360-1 and so on). The item is the id from the licence item list, not the price list SKU."
+    },
+    "licence_costs": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "textarea",
+        "default": "",
+        "label": "Licence key costs",
+        "desc": "One licence key and what Openprovider charges per month in EUR excluding VAT, for example pro-physical=25.49. A key is only ordered when the paid line covers this. Empty means unknown, and the live client refuses to order."
+    },
+    "mail_client": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "select",
+        "default": "fake",
+        "options": {
+            "fake": "Fake: nothing leaves this site",
+            "live": "Live: call the mail server (also needs BELTOFT_SERVICES_MAIL_LIVE in wp-config.php)"
+        },
+        "label": "Mail server mode"
+    },
+    "mail_api_url": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "url",
+        "default": "",
+        "label": "Mail server API address",
+        "desc": "The https address of the mailcow web interface, without a path."
+    },
+    "mail_api_key": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "secret",
+        "default": "",
+        "label": "Mail server API key",
+        "desc": "A read-write mailcow API key that is allowed from this server only. It is stored encrypted and never shown again."
+    },
+    "mail_host": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "text",
+        "default": "",
+        "label": "Mail host name",
+        "desc": "The name customers point their MX records and their mail programs at, for example mail.example.com. Nothing is provisioned until it is set."
+    },
+    "mail_webmail_url": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "url",
+        "default": "",
+        "label": "Webmail address"
+    },
+    "mail_order_url": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "text",
+        "default": "",
+        "label": "Email order page",
+        "desc": "Where the Create an email domain button in the account goes, for example /business-email/#pricing. Empty uses the product page."
+    },
+    "mail_guide_url": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "url",
+        "default": "",
+        "label": "Setup guide URL",
+        "desc": "Address of a public page that holds the shortcode [beltoft_services_mail_setup]. When set, the Connect tab links to it. Empty means no link."
+    },
+    "mail_dav_url": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "url",
+        "default": "",
+        "label": "Calendar and contacts address",
+        "desc": "The CalDAV and CardDAV address of the mail server, for example https://mail.example.com/dav/. When set, the setup guide and the Connect tab explain how to add the calendar and the contacts. Empty hides them."
+    },
+    "mail_reserved_domains": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "textarea",
+        "default": "",
+        "label": "Domains customers may not add",
+        "desc": "One domain per line. A domain here, and any name under it, is refused: use it for the mail domains the mail server carries for you."
+    },
+    "mail_allow_external_forward": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "checkbox",
+        "default": 1,
+        "label": "Let aliases forward to other domains"
+    },
+    "mail_restart_sogo": {
+        "tab": "mail",
+        "section": "mail",
+        "type": "checkbox",
+        "default": 1,
+        "label": "Restart the calendar and contacts service after a new domain is added",
+        "desc": "Sends restart_sogo with each new domain, as the mail server's own Add domain and restart SOGo does. Without it, calendar and contacts of a new domain work only after the next SOGo restart."
+    },
+    "mail_spf_include": {
+        "tab": "mail",
+        "section": "mail_dns",
+        "type": "text",
+        "default": "",
+        "label": "SPF include name",
+        "desc": "The name in include:<name> of the SPF record, a TXT record of your own that lists the mail server addresses. Empty uses the mail host name."
+    },
+    "mail_dmarc_rua": {
+        "tab": "mail",
+        "section": "mail_dns",
+        "type": "email",
+        "default": "",
+        "label": "DMARC report address",
+        "desc": "Where DMARC reports for customer domains go. Empty: the WordPress admin email."
+    },
+    "mail_rl_minute": {
+        "tab": "mail",
+        "section": "mail_limits",
+        "type": "number",
+        "default": 30,
+        "min": 0,
+        "max": 100000,
+        "label": "Messages per domain per minute",
+        "desc": "The limit for all mailboxes of one email domain together, set on the mail server when the domain is made and when its plan changes. 0 turns it off."
+    },
+    "mail_rl_day": {
+        "tab": "mail",
+        "section": "mail_limits",
+        "type": "number",
+        "default": 500,
+        "min": 0,
+        "max": 1000000,
+        "label": "Messages per mailbox per day",
+        "desc": "The limit of each mailbox, set when the mailbox is made. 0 turns it off. The mail server blocks sending at the limit; nothing is paused by this plugin."
+    },
+    "mail_quota_alert_percent": {
+        "tab": "mail",
+        "section": "mail_limits",
+        "type": "number",
+        "default": 90,
+        "min": 1,
+        "max": 100,
+        "label": "Alert when a mailbox is this full, in percent"
+    },
+    "console": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Customer server console",
+        "desc": "Show a browser console for running servers. Keep this off until the console proxy and its permissions have been configured and checked."
+    },
+    "plesk_items": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "textarea",
+        "default": "",
+        "label": "Plesk licence items",
+        "desc": "One tier key and Openprovider item per line, for example pro=PLESK-12-VPS-WEB-PRO-1M. The three Plesk for VPS items (admin, pro, host) are used when a tier is not listed."
+    },
+    "plesk_costs": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "textarea",
+        "default": "",
+        "label": "Plesk licence costs",
+        "desc": "One tier key and what Openprovider charges per month in EUR excluding VAT, for example pro=12.50. A licence is only ordered when the paid line of the tier covers this. Empty means unknown, and the live client refuses to order."
+    }
+}

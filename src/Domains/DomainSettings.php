@@ -11,6 +11,7 @@ final class DomainSettings {
 	public const TAB = 'domains';
 
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 3 );
 		add_filter( 'beltoft_services_settings_tabs', array( __CLASS__, 'tabs' ) );
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'sections' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
@@ -18,6 +19,28 @@ final class DomainSettings {
 		add_action( 'admin_post_beltoft_services_save_domains_account', array( __CLASS__, 'save_account' ) );
 		add_action( 'beltoft_services_domain_prices', array( __CLASS__, 'sync_prices' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule_prices' ) );
+		ThankYou::register();
+	}
+
+	/**
+	 * Adds the domain and DNS drivers to the registry.
+	 *
+	 * @param mixed $drivers Drivers keyed by id.
+	 * @return mixed
+	 */
+	public static function add_drivers( $drivers ) {
+		if ( ! is_array( $drivers ) ) {
+			return $drivers;
+		}
+
+		if ( ! isset( $drivers[ 'domain' ] ) ) {
+			$drivers[ 'domain' ] = new DomainDriver();
+		}
+		if ( ! isset( $drivers[ 'dns' ] ) ) {
+			$drivers[ 'dns' ] = new DnsDriver();
+		}
+
+		return $drivers;
 	}
 
 	public static function schedule_prices(): void {

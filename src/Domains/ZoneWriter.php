@@ -24,7 +24,7 @@ final class ZoneWriter {
 	 * @param int|null                                                   $user_id       Customer; when given, the zone must be one of theirs on our name servers.
 	 * @param string                                                     $zone          Zone (the domain).
 	 * @param array<int, array<string, mixed>>                           $rows          Editor rows (the shape Records::validate takes).
-	 * @param callable(array, array): (array<int, array<string, mixed>>|true|string) $policy        Decides what is written.
+	 * @param callable(array, array, string): (array<int, array<string, mixed>>|true|string) $policy        Decides what is written; gets the zone data, the validated sets and the zone name.
 	 * @param bool                                                       $check_paused  Refuse a paused zone.
 	 * @return array{status:string,reason:string,wrote:bool}|\WP_Error Refused or ok; a transient error when the zone could not be read or written; the lock error (zone_busy) as it is.
 	 */
@@ -57,7 +57,7 @@ final class ZoneWriter {
 					return self::refused( 'paused' );
 				}
 
-				$decision = $policy( $zone_data, $sets );
+				$decision = $policy( $zone_data, $sets, $zone );
 
 				if ( is_string( $decision ) ) {
 					return self::refused( $decision );
@@ -155,20 +155,12 @@ final class ZoneWriter {
 	 * identical alias is already right; any other record at the name refuses with conflict:name_taken.
 	 *
 	 * @param string $value Wanted target.
-	 * @return callable(array, array): (array<int, array<string, mixed>>|true|string)
+	 * @return callable(array, array, string): (array<int, array<string, mixed>>|true|string)
 	 */
 	public static function cname_policy( string $value ): callable {
-		return static function ( array $zone_data, array $sets ) use ( $value ) {
-			$name = strtolower( rtrim( (string) ( $sets[0]['name'] ?? '' ), '.' ) );
-			$here = array();
-
-			foreach ( (array) ( $zone_data['rrsets'] ?? array() ) as $set ) {
-				if ( is_array( $set ) && strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) === $name ) {
-					$here[ strtoupper( (string) ( $set['type'] ?? '' ) ) ] = $set;
-				}
-			}
-
-			unset( $here['SOA'], $here['NS'] );
+		return static function ( array $zone_data, array $sets, string $zone ) use ( $value ) {
+			$fqdn = Records::fqdn_of_set( $zone, (string) ( $sets[0]['name'] ?? '' ) );
+			$here = Records::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
 
 			$verdict = self::cname_verdict( $value, $here );
 

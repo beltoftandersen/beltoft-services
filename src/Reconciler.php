@@ -864,6 +864,72 @@ final class Reconciler {
 	}
 
 	/**
+	 * Closes a resource as deleted without any driver call, under its lock, and tells listeners
+	 * (the resource is closed first). Returns "ok", "protected" (a protected service is never
+	 * closed this way), "busy" (the lock is taken) or "error" (a write failed).
+	 *
+	 * @param Resource $r   Resource.
+	 * @param string   $who Admin login.
+	 * @return string
+	 */
+	public static function mark_deleted( Resource $r, string $who ): string {
+		$old     = '';
+		$refused = false;
+		$stored  = $r->locked(
+			static function () use ( $r, $who, &$old, &$refused ): bool {
+				if ( $r->get( 'protected' ) ) {
+					$refused = true;
+					return false;
+				}
+
+				$old = $r->get( 'state' );
+
+				$cleared = $r->set(
+					array_merge(
+						Resource::retry_reset(),
+						array(
+							'desired'              => 'deleted',
+							'desired_at'           => microtime( true ),
+							'replace_after_delete' => false,
+							'failed_op'            => '',
+							'failed_desired'       => '',
+						)
+					)
+				);
+
+				// Silent on purpose: the notify below follows the close (see Resource::transition()).
+				if ( ! $cleared || ! $r->transition( 'deleted', sprintf( 'Marked deleted by %s, without calling the service', $who ) ) ) {
+					return false;
+				}
+
+				$r->close();
+				return true;
+			}
+		);
+
+		if ( $refused ) {
+			return 'protected';
+		}
+
+		if ( null === $stored ) {
+			return 'busy';
+		}
+
+		if ( ! $stored ) {
+			return 'error';
+		}
+
+		delete_option( Resource::pending_desire_option( $r->id() ) );
+		Alerts::clear_problem( $r->id() );
+
+		if ( 'deleted' !== $old ) {
+			self::notify( $r, $old, 'deleted' );
+		}
+
+		return 'ok';
+	}
+
+	/**
 	 * Default history text of a completed operation.
 	 *
 	 * @param string $operation Operation.

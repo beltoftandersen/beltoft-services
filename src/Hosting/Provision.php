@@ -9,7 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 
@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Runs HostingDriver::provision(). Every step is recorded in the resource meta (`steps`, and its own values)
  * right after it ran and re-reads the remote state before it acts, so a crash, a timeout or a retry resumes
- * without doing anything twice (the way Proxmox\Provision works).
+ * without doing anything twice (the way Proxmox\Vm\Provision works).
  *
  * Steps (plan 16.4): place (the node of the plan's group), ip (a private address and an SSH port), vmid, clone
  * (linked, tagged with the ownership line), configure (limits, network, firewall options, root disk), start,

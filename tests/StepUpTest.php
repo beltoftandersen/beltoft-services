@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests;
 
 use BeltoftServices\Account\ApiTokens;
 use BeltoftServices\Api\Tokens;
+use BeltoftServices\Domains\AuthCodeRoute;
 use BeltoftServices\StepUp;
 
 /**
@@ -59,7 +60,7 @@ final class StepUpTest extends TestCase {
 	public function test_sending_emails_a_six_digit_code_for_the_purpose_to_the_account_address(): void {
 		$user = $this->customer();
 
-		$this->assertTrue( StepUp::send( $user, StepUp::API_TOKEN ) );
+		$this->assertTrue( StepUp::send( $user, ApiTokens::PURPOSE ) );
 		$this->assertCount( 1, $this->mails );
 		$mail = $this->mails[0];
 		$text = wp_strip_all_tags( (string) $mail['message'] );
@@ -73,13 +74,13 @@ final class StepUpTest extends TestCase {
 		$this->assertStringNotContainsString( '—', (string) $mail['message'] );
 		$this->assertStringNotContainsString( '·', (string) $mail['message'] );
 
-		$this->assertTrue( StepUp::send( $user, StepUp::TRANSFER_CODE ) );
+		$this->assertTrue( StepUp::send( $user, AuthCodeRoute::PURPOSE ) );
 		$this->assertStringContainsString( 'showing a domain transfer code', wp_strip_all_tags( (string) $this->mails[1]['message'] ) );
 	}
 
 	public function test_only_a_hash_is_stored(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 
 		foreach ( get_user_meta( $user ) as $values ) {
@@ -89,110 +90,110 @@ final class StepUpTest extends TestCase {
 
 	public function test_the_right_code_works_once_and_is_then_gone(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 
-		$this->assertTrue( StepUp::verify( $user, $code, StepUp::API_TOKEN ) );
-		$this->assertFalse( StepUp::verify( $user, $code, StepUp::API_TOKEN ), 'Single use.' );
+		$this->assertTrue( StepUp::verify( $user, $code, ApiTokens::PURPOSE ) );
+		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE ), 'Single use.' );
 	}
 
 	public function test_spaces_in_the_typed_code_are_ignored(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 
-		$this->assertTrue( StepUp::verify( $user, substr( $code, 0, 3 ) . ' ' . substr( $code, 3 ), StepUp::API_TOKEN ) );
+		$this->assertTrue( StepUp::verify( $user, substr( $code, 0, 3 ) . ' ' . substr( $code, 3 ), ApiTokens::PURPOSE ) );
 	}
 
 	public function test_a_code_for_one_purpose_does_not_work_for_the_other(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 
-		$this->assertFalse( StepUp::verify( $user, $code, StepUp::TRANSFER_CODE ) );
-		$this->assertTrue( StepUp::verify( $user, $code, StepUp::API_TOKEN ), 'The wrong purpose does not use it up.' );
+		$this->assertFalse( StepUp::verify( $user, $code, AuthCodeRoute::PURPOSE ) );
+		$this->assertTrue( StepUp::verify( $user, $code, ApiTokens::PURPOSE ), 'The wrong purpose does not use it up.' );
 
-		StepUp::send( $user, StepUp::TRANSFER_CODE );
+		StepUp::send( $user, AuthCodeRoute::PURPOSE );
 		$this->assertFalse( StepUp::verify( $user, $this->code(), 'something_else' ) );
 	}
 
 	public function test_a_code_belongs_to_its_customer(): void {
 		$one = $this->customer();
 		$two = $this->customer();
-		StepUp::send( $one, StepUp::API_TOKEN );
+		StepUp::send( $one, ApiTokens::PURPOSE );
 
-		$this->assertFalse( StepUp::verify( $two, $this->code(), StepUp::API_TOKEN ) );
+		$this->assertFalse( StepUp::verify( $two, $this->code(), ApiTokens::PURPOSE ) );
 	}
 
 	public function test_a_code_expires_after_ten_minutes(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 		$meta = get_user_meta( $user, 'beltoft_services_stepup_api_token', true );
 		$this->assertEqualsWithDelta( time() + 600, $meta['expires'], 5 );
 
 		$meta['expires'] = time() - 1;
 		update_user_meta( $user, 'beltoft_services_stepup_api_token', $meta );
-		$this->assertFalse( StepUp::verify( $user, $code, StepUp::API_TOKEN ) );
+		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE ) );
 		$this->assertSame( '', get_user_meta( $user, 'beltoft_services_stepup_api_token', true ) );
 	}
 
 	public function test_five_wrong_tries_burn_the_code_even_for_the_right_one(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 
 		for ( $i = 0; $i < StepUp::MAX_TRIES; $i++ ) {
-			$this->assertFalse( StepUp::verify( $user, $this->wrong( $code ), StepUp::API_TOKEN ) );
+			$this->assertFalse( StepUp::verify( $user, $this->wrong( $code ), ApiTokens::PURPOSE ) );
 		}
 
-		$this->assertFalse( StepUp::verify( $user, $code, StepUp::API_TOKEN ) );
+		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE ) );
 	}
 
 	public function test_four_wrong_tries_leave_the_code_working(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$code = $this->code();
 
 		for ( $i = 0; $i < StepUp::MAX_TRIES - 1; $i++ ) {
-			StepUp::verify( $user, $this->wrong( $code ), StepUp::API_TOKEN );
+			StepUp::verify( $user, $this->wrong( $code ), ApiTokens::PURPOSE );
 		}
 
-		$this->assertTrue( StepUp::verify( $user, $code, StepUp::API_TOKEN ) );
+		$this->assertTrue( StepUp::verify( $user, $code, ApiTokens::PURPOSE ) );
 	}
 
 	public function test_a_new_code_replaces_the_old_one(): void {
 		$user = $this->customer();
-		StepUp::send( $user, StepUp::API_TOKEN );
+		StepUp::send( $user, ApiTokens::PURPOSE );
 		$first = $this->code();
 
 		do {
-			StepUp::send( $user, StepUp::API_TOKEN );
+			StepUp::send( $user, ApiTokens::PURPOSE );
 			$second = $this->code();
 		} while ( $second === $first && count( $this->mails ) < 3 );
 
 		if ( $second !== $first ) {
-			$this->assertFalse( StepUp::verify( $user, $first, StepUp::API_TOKEN ) );
+			$this->assertFalse( StepUp::verify( $user, $first, ApiTokens::PURPOSE ) );
 		}
 	}
 
 	public function test_nothing_sent_means_nothing_to_verify(): void {
-		$this->assertFalse( StepUp::verify( $this->customer(), '123456', StepUp::API_TOKEN ) );
-		$this->assertFalse( StepUp::verify( $this->customer(), '', StepUp::API_TOKEN ) );
+		$this->assertFalse( StepUp::verify( $this->customer(), '123456', ApiTokens::PURPOSE ) );
+		$this->assertFalse( StepUp::verify( $this->customer(), '', ApiTokens::PURPOSE ) );
 	}
 
 	public function test_sending_is_rate_limited_per_customer_and_purpose(): void {
 		$user = $this->customer();
 
 		for ( $i = 0; $i < StepUp::SEND_LIMIT; $i++ ) {
-			$this->assertTrue( StepUp::send( $user, StepUp::API_TOKEN ) );
+			$this->assertTrue( StepUp::send( $user, ApiTokens::PURPOSE ) );
 		}
 
-		$over = StepUp::send( $user, StepUp::API_TOKEN );
+		$over = StepUp::send( $user, ApiTokens::PURPOSE );
 		$this->assertWPError( $over );
 		$this->assertSame( 'rate_limited', $over->get_error_code() );
 		$this->assertCount( StepUp::SEND_LIMIT, $this->mails, 'No mail went out over the limit.' );
-		$this->assertTrue( StepUp::send( $user, StepUp::TRANSFER_CODE ), 'The other purpose counts apart.' );
+		$this->assertTrue( StepUp::send( $user, AuthCodeRoute::PURPOSE ), 'The other purpose counts apart.' );
 	}
 
 	public function test_a_failed_mail_leaves_no_code_behind(): void {
@@ -200,18 +201,41 @@ final class StepUpTest extends TestCase {
 		remove_all_filters( 'pre_wp_mail' );
 		add_filter( 'pre_wp_mail', '__return_false' );
 
-		$this->assertWPError( StepUp::send( $user, StepUp::API_TOKEN ) );
+		$this->assertWPError( StepUp::send( $user, ApiTokens::PURPOSE ) );
 		$this->assertSame( '', get_user_meta( $user, 'beltoft_services_stepup_api_token', true ) );
+	}
+
+	public function test_purposes_are_the_two_registered_ones_and_a_third_can_be_added(): void {
+		$this->assertEqualsCanonicalizing( array( 'api_token', 'transfer_code' ), StepUp::purposes() );
+		$this->assertSame( 'api_token', ApiTokens::PURPOSE );
+		$this->assertSame( 'transfer_code', AuthCodeRoute::PURPOSE );
+
+		$user = $this->customer();
+		$this->assertWPError( StepUp::send( $user, 'third' ), 'Unknown until registered.' );
+
+		$add = static fn( $p ) => array_merge( $p, array( 'third', 'api_token' ) );
+		add_filter( 'beltoft_services_stepup_purposes', $add );
+		$text = static fn( $t, $p ) => 'third' === $p ? 'doing the third thing' : $t;
+		add_filter( 'beltoft_services_stepup_text', $text, 10, 2 );
+
+		$this->assertCount( 3, StepUp::purposes(), 'No duplicates.' );
+		$this->assertTrue( StepUp::send( $user, 'third' ) );
+		$this->assertStringContainsString( 'doing the third thing', wp_strip_all_tags( (string) end( $this->mails )['message'] ) );
+		$this->assertTrue( StepUp::verify( $user, $this->code(), 'third' ) );
+
+		remove_filter( 'beltoft_services_stepup_purposes', $add );
+		remove_filter( 'beltoft_services_stepup_text', $text, 10 );
+		$this->assertWPError( StepUp::send( $user, 'third' ) );
 	}
 
 	public function test_an_unknown_purpose_or_user_cannot_send(): void {
 		$this->assertWPError( StepUp::send( $this->customer(), 'anything' ) );
-		$this->assertWPError( StepUp::send( 999999, StepUp::API_TOKEN ) );
+		$this->assertWPError( StepUp::send( 999999, ApiTokens::PURPOSE ) );
 		$this->assertSame( array(), $this->mails );
 	}
 
 	public function test_the_ask_shows_a_masked_address_and_no_password(): void {
-		$ask = StepUp::ask( $this->customer(), StepUp::API_TOKEN );
+		$ask = StepUp::ask( $this->customer(), ApiTokens::PURPOSE );
 
 		$this->assertSame( 'emailed', $ask['kind'] );
 		$this->assertSame( 'c***@gmail.com', $ask['email'] );
@@ -222,18 +246,18 @@ final class StepUpTest extends TestCase {
 	public function test_a_site_can_plug_in_its_own_factor_and_nothing_is_sent_for_it(): void {
 		$user = $this->customer();
 		$ask  = static fn() => array( 'kind' => 'code', 'label' => 'Code from your app' );
-		$ok   = static fn( $ok, $u, $secret, $kind, $purpose ) => '654321' === $secret && 'code' === $kind && StepUp::TRANSFER_CODE === $purpose ? true : false;
+		$ok   = static fn( $ok, $u, $secret, $kind, $purpose ) => '654321' === $secret && 'code' === $kind && AuthCodeRoute::PURPOSE === $purpose ? true : false;
 		add_filter( 'beltoft_services_step_up_ask', $ask );
 
-		$this->assertSame( 'code', StepUp::ask( $user, StepUp::API_TOKEN )['kind'] );
-		$this->assertSame( 'Code from your app', StepUp::ask( $user, StepUp::API_TOKEN )['label'] );
-		$this->assertWPError( StepUp::send( $user, StepUp::API_TOKEN ) );
+		$this->assertSame( 'code', StepUp::ask( $user, ApiTokens::PURPOSE )['kind'] );
+		$this->assertSame( 'Code from your app', StepUp::ask( $user, ApiTokens::PURPOSE )['label'] );
+		$this->assertWPError( StepUp::send( $user, ApiTokens::PURPOSE ) );
 		$this->assertSame( array(), $this->mails );
-		$this->assertFalse( StepUp::verify( $user, '654321', StepUp::TRANSFER_CODE ), 'Without a verify filter nothing passes.' );
+		$this->assertFalse( StepUp::verify( $user, '654321', AuthCodeRoute::PURPOSE ), 'Without a verify filter nothing passes.' );
 
 		add_filter( 'beltoft_services_step_up_verify', $ok, 10, 5 );
-		$this->assertTrue( StepUp::verify( $user, '654321', StepUp::TRANSFER_CODE ) );
-		$this->assertFalse( StepUp::verify( $user, '654321', StepUp::API_TOKEN ) );
+		$this->assertTrue( StepUp::verify( $user, '654321', AuthCodeRoute::PURPOSE ) );
+		$this->assertFalse( StepUp::verify( $user, '654321', ApiTokens::PURPOSE ) );
 		remove_filter( 'beltoft_services_step_up_verify', $ok, 10 );
 		remove_filter( 'beltoft_services_step_up_ask', $ask );
 	}
@@ -295,7 +319,7 @@ final class StepUpTest extends TestCase {
 		$this->assertSame( 'That code is not right or has expired. Send a new code.', $wrong['message'] );
 		$this->assertSame( array(), Tokens::all( $user ) );
 
-		$this->assertTrue( StepUp::verify( $user, $code, StepUp::TRANSFER_CODE ) === false, 'The api_token code does not open a transfer code.' );
+		$this->assertTrue( StepUp::verify( $user, $code, AuthCodeRoute::PURPOSE ) === false, 'The api_token code does not open a transfer code.' );
 
 		$made = ApiTokens::process( $user, array( 'action' => 'create', 'name' => 'Claude', 'scope' => 'full', 'secret' => $code, 'nonce' => $nonce ) );
 		$this->assertTrue( $made['ok'], $made['message'] );
@@ -308,7 +332,7 @@ final class StepUpTest extends TestCase {
 	public function test_a_code_for_the_transfer_code_does_not_make_a_token(): void {
 		$user  = $this->customer();
 		$nonce = wp_create_nonce( ApiTokens::NONCE );
-		StepUp::send( $user, StepUp::TRANSFER_CODE );
+		StepUp::send( $user, AuthCodeRoute::PURPOSE );
 
 		$result = ApiTokens::process( $user, array( 'action' => 'create', 'name' => 'Claude', 'scope' => 'full', 'secret' => $this->code(), 'nonce' => $nonce ) );
 		$this->assertFalse( $result['ok'] );

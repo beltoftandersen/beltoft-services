@@ -7,13 +7,14 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Drivers\LiveGate;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The only place a client of a node is built. Gated exactly like Proxmox\Clients::for(): a live client needs the
+ * The only place a client of a node is built. Gated exactly like Proxmox\Pve\Clients::for(): a live client needs the
  * node to say "live" AND the constant BELTOFT_SERVICES_HOSTING_LIVE to be true in wp-config.php AND an explicit
  * site tag. No filter can switch it on.
  *
@@ -23,10 +24,17 @@ defined( 'ABSPATH' ) || exit;
 final class Clients {
 
 	/**
+	 * The shared live/fake gate.
+	 */
+	private static function gate_object(): LiveGate {
+		return new LiveGate( 'BELTOFT_SERVICES_HOSTING_LIVE', 'hosting ', 'Set the site tag for hosting node %s', array( ProxmoxSettings::class, 'explicit_site_tag' ) );
+	}
+
+	/**
 	 * Whether wp-config.php allows live hosting calls.
 	 */
 	public static function live_allowed(): bool {
-		return defined( 'BELTOFT_SERVICES_HOSTING_LIVE' ) && true === constant( 'BELTOFT_SERVICES_HOSTING_LIVE' );
+		return self::gate_object()->live_allowed();
 	}
 
 	/**
@@ -37,7 +45,7 @@ final class Clients {
 	 * @param bool                 $allowed Whether wp-config.php allows live calls.
 	 */
 	public static function untagged( array $node, bool $allowed ): bool {
-		return $allowed && 'live' === ( $node['client'] ?? 'fake' ) && '' === ProxmoxSettings::explicit_site_tag();
+		return self::gate_object()->untagged( $node, $allowed );
 	}
 
 	/**
@@ -49,14 +57,7 @@ final class Clients {
 	 * @param bool                 $allowed Whether wp-config.php allows live calls.
 	 */
 	public static function gate( string $id, array $node, bool $allowed ): ?string {
-		if ( ! self::untagged( $node, $allowed ) ) {
-			return null;
-		}
-
-		\BeltoftServices\Alerts::site_tag( 'hosting ' . $id );
-
-		/* Admin text, not shown to customers. */
-		return sprintf( 'Set the site tag for hosting node %s', $id );
+		return self::gate_object()->gate( $id, $node, $allowed );
 	}
 
 	/**
@@ -67,7 +68,7 @@ final class Clients {
 	 * @return string 'live' or 'fake'.
 	 */
 	public static function kind( array $node, bool $allowed ): string {
-		return $allowed && 'live' === ( $node['client'] ?? 'fake' ) ? 'live' : 'fake';
+		return self::gate_object()->kind( $node, $allowed );
 	}
 
 	/**
@@ -103,10 +104,10 @@ final class Clients {
 		}
 
 		// The only place a live node API client is built: the node says live, the constant allows it and the site
-		// tag is set. It is the path-agnostic Proxmox\LiveClient (token, CA file, public key pin, timeouts), which
+		// tag is set. It is the path-agnostic Proxmox\Pve\LiveClient (token, CA file, public key pin, timeouts), which
 		// asks for the allowance again and refuses bad settings; the lxc paths are the callers'.
 		if ( 'live' === self::kind( $node, $allowed ) ) {
-			return new \BeltoftServices\Proxmox\LiveClient(
+			return new \BeltoftServices\Proxmox\Pve\LiveClient(
 				array(
 					'api_url'      => (string) ( $node['api_url'] ?? '' ),
 					'token_id'     => (string) ( $node['token_id'] ?? '' ),
