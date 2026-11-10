@@ -1,6 +1,7 @@
 <?php
 /**
  * Today's forbidden dependencies (see DependencyDirectionTest). Remove entries as leaks are fixed; never add.
+ * 2026-11 widening (FEATURES += Hosting, Ssl, Licences, Credit, Card, Admin, Cli): no new violations, so nothing was added.
  * 2026-11-01: 11 entries (FirewallRoute, ThankYou) were already there but hidden by a namespace parsing bug, now fixed.
  */
 return array(
