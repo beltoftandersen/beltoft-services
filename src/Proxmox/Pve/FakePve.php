@@ -162,6 +162,42 @@ abstract class FakePve implements Client {
 	}
 
 	/**
+	 * Creates a task, applies its effect now (or not, by the scripted outcome) and returns the UPID.
+	 *
+	 * @param string   $node   Node.
+	 * @param string   $type   Task type.
+	 * @param string   $id     Object id.
+	 * @param callable $effect Applies the change.
+	 */
+	protected function new_task( string $node, string $type, string $id, callable $effect ): string {
+		$outcome = array_merge(
+			array(
+				'polls'      => 0,
+				'exitstatus' => 'OK',
+			),
+			(array) array_shift( $this->outcomes )
+		);
+
+		++$this->state['seq'];
+		$seq  = $this->state['seq'];
+		$upid = sprintf( 'UPID:%s:%08X:%08X:%08X:%s:%s:fake@pve!fake:', $node, 1, $seq, 0x5F000000 + $seq, $type, $id );
+
+		$this->state['tasks'][ $upid ] = array(
+			'upid'       => $upid,
+			'node'       => $node,
+			'type'       => $type,
+			'polls'      => (int) $outcome['polls'],
+			'exitstatus' => (string) $outcome['exitstatus'],
+		);
+
+		if ( $outcome['effect'] ?? 'OK' === $outcome['exitstatus'] ) {
+			$effect();
+		}
+
+		return $upid;
+	}
+
+	/**
 	 * Saves the state when persisting (autoload off).
 	 */
 	protected function save(): void {
