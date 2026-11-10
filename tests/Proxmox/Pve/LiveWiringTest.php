@@ -6,7 +6,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Pve;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
