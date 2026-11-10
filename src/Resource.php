@@ -439,6 +439,15 @@ final class Resource {
 			$this->row = $fresh;
 		}
 
+		/**
+		 * Values were stored in a resource's meta (the one writer of a state or a plan). Features that remember
+		 * something derived from the meta, such as a capacity total, forget it here.
+		 *
+		 * @param Resource             $resource The resource.
+		 * @param array<string, mixed> $meta     The values stored.
+		 */
+		do_action( 'beltoft_services_resource_saved', $this, $meta );
+
 		return true;
 	}
 

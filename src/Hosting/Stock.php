@@ -42,6 +42,9 @@ final class Stock {
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'note_flow' ), 999, 3 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'clear_flow' ) );
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validation' ), 1 );
+		// Adding to the cart and checking it decide whether an order is accepted: they read the records afresh.
+		add_action( 'woocommerce_check_cart_items', array( HostingCapacity::class, 'forget' ), 1 );
+		add_action( 'woocommerce_checkout_process', array( HostingCapacity::class, 'forget' ), 1 );
 		add_action( 'shutdown', array( __CLASS__, 'clear_flow' ) );
 		// A cart loaded from the session checks is_purchasable() before the item data is applied.
 		add_filter( 'woocommerce_cart_item_is_purchasable', array( __CLASS__, 'session_item' ), 20, 4 );
@@ -71,6 +74,7 @@ final class Stock {
 	 */
 	public static function validation( $valid ) {
 		self::$adding = null;
+		HostingCapacity::forget();
 
 		return $valid;
 	}

@@ -62,6 +62,7 @@ final class Plugin {
 		Hosting\HostingSettings::register();
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();
+		Hosting\HostingCapacity::register();
 		Hosting\SiteField::register();
 		Hosting\SiteNewDomain::register();
 		Hosting\CartRule::register();

@@ -176,6 +176,8 @@ final class Provision {
 					return $stored; // An account placed before keeps its node, whatever the group holds now.
 				}
 
+				// A decision that reserves capacity reads the records now, whatever this process remembers.
+				HostingCapacity::forget();
 				$best = HostingCapacity::place( $this->plan );
 
 				return null === $best ? null : Records::open( $this->r->id(), $best );

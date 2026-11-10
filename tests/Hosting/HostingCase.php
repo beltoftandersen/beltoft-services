@@ -117,6 +117,7 @@ abstract class HostingCase extends TestCase {
 		}
 
 		delete_option( Nodes::OPTION );
+		\BeltoftServices\Hosting\HostingCapacity::forget();
 	}
 
 	/**

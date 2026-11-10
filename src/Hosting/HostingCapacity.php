@@ -28,6 +28,63 @@ defined( 'ABSPATH' ) || exit;
 final class HostingCapacity {
 
 	/**
+	 * Usage of each node already computed in this process, by node id (null for an unknown node).
+	 *
+	 * @var array<string, array<string, float|int>|null>
+	 */
+	private static $memo = array();
+
+	/**
+	 * Hooks that empty the memo. See forget() for why this list is enough.
+	 */
+	public static function register(): void {
+		// A job starts: one worker process runs many jobs, and another process may have written since the last one.
+		add_action( 'action_scheduler_before_execute', array( __CLASS__, 'forget' ) );
+		// A resource's state or plan was stored (Resource::set(), the one writer of both).
+		add_action( 'beltoft_services_resource_saved', array( __CLASS__, 'resource_saved' ), 10, 2 );
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'forget' ) );
+		// Node settings and hosting settings (reserve, overcommit) are inputs of usage().
+		foreach ( array( Nodes::OPTION, \BeltoftServices\Settings::OPTION ) as $option ) {
+			add_action( 'update_option_' . $option, array( __CLASS__, 'forget' ) );
+			add_action( 'add_option_' . $option, array( __CLASS__, 'forget' ) );
+			add_action( 'delete_option_' . $option, array( __CLASS__, 'forget' ) );
+		}
+	}
+
+	/**
+	 * Empties the memo of usage(), so the next answer is read from the records again.
+	 *
+	 * Why the memo is safe. usage() is a pure function of four inputs: the hosting records (Records), the state and
+	 * plan of each recorded resource, the node settings and the hosting settings. Every writer of an input forgets:
+	 * Records::open() and Records::remove() (records), Resource::set() through beltoft_services_resource_saved when a
+	 * state or plan is stored (so also transition(), which sets the state, and a plan change at a switch), the update,
+	 * add and delete hooks of the node option and the settings option, and beltoft_services_state_changed. Another
+	 * PHP process is the one writer this process cannot see, so the memo also dies with the request, and
+	 * action_scheduler_before_execute empties it before each job of a long-lived worker. A decision that reserves
+	 * capacity must not rest on an answer older than its own lock: Provision places inside the placement lock after
+	 * forget(), HostingSwitch::refusal() forgets first, and Stock forgets when an item is added to the cart and when
+	 * the cart is checked, so what a page showed earlier in the request never decides an order. A display (a label or
+	 * a sold-out state) may use the memo: it was true when the request started, as before.
+	 */
+	public static function forget(): void {
+		self::$memo = array();
+	}
+
+	/**
+	 * Action beltoft_services_resource_saved: a state or plan changed.
+	 *
+	 * @param mixed $resource Resource.
+	 * @param mixed $meta     Values stored.
+	 */
+	public static function resource_saved( $resource = null, $meta = array() ): void {
+		unset( $resource );
+
+		if ( is_array( $meta ) && ( array_key_exists( 'state', $meta ) || array_key_exists( 'plan', $meta ) ) ) {
+			self::forget();
+		}
+	}
+
+	/**
 	 * The mount point size of an account in GB, as Provision::step_configure() makes it.
 	 *
 	 * @param int $disk_gb Plan disk in GB.
@@ -59,6 +116,20 @@ final class HostingCapacity {
 	 * @return array{memory_budget: float, memory_committed: float, disk_budget: float, disk_committed: float, accounts: int}|null Null for an unknown node.
 	 */
 	public static function usage( string $node_id ): ?array {
+		if ( array_key_exists( $node_id, self::$memo ) ) {
+			return self::$memo[ $node_id ];
+		}
+
+		return self::$memo[ $node_id ] = self::compute( $node_id );
+	}
+
+	/**
+	 * The usage of a node, read from the records now.
+	 *
+	 * @param string $node_id Node record id.
+	 * @return array{memory_budget: float, memory_committed: float, disk_budget: float, disk_committed: float, accounts: int}|null
+	 */
+	private static function compute( string $node_id ): ?array {
 		$node = Nodes::all()[ $node_id ] ?? null;
 
 		if ( null === $node ) {
@@ -70,6 +141,8 @@ final class HostingCapacity {
 		$count  = 0;
 
 		foreach ( Records::resource_ids( $node_id ) as $resource_id ) {
+			// One activation read per account: beltoft-licenses has no read of several activations by id yet. When it
+			// has one, this loop becomes a single query (the memo already means it runs once per node and request).
 			$r = Resource::find( $resource_id );
 
 			// A deleted or gone resource commits nothing; its record is released by its delete.
