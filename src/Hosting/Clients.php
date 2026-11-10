@@ -7,8 +7,8 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Drivers\LiveGate;
 use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\ProxmoxSettings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -23,10 +23,17 @@ defined( 'ABSPATH' ) || exit;
 final class Clients {
 
 	/**
+	 * The shared live/fake gate.
+	 */
+	private static function gate_object(): LiveGate {
+		return new LiveGate( 'BELTOFT_SERVICES_HOSTING_LIVE', 'hosting ', 'Set the site tag for hosting node %s' );
+	}
+
+	/**
 	 * Whether wp-config.php allows live hosting calls.
 	 */
 	public static function live_allowed(): bool {
-		return defined( 'BELTOFT_SERVICES_HOSTING_LIVE' ) && true === constant( 'BELTOFT_SERVICES_HOSTING_LIVE' );
+		return self::gate_object()->live_allowed();
 	}
 
 	/**
@@ -37,7 +44,7 @@ final class Clients {
 	 * @param bool                 $allowed Whether wp-config.php allows live calls.
 	 */
 	public static function untagged( array $node, bool $allowed ): bool {
-		return $allowed && 'live' === ( $node['client'] ?? 'fake' ) && '' === ProxmoxSettings::explicit_site_tag();
+		return self::gate_object()->untagged( $node, $allowed );
 	}
 
 	/**
@@ -49,14 +56,7 @@ final class Clients {
 	 * @param bool                 $allowed Whether wp-config.php allows live calls.
 	 */
 	public static function gate( string $id, array $node, bool $allowed ): ?string {
-		if ( ! self::untagged( $node, $allowed ) ) {
-			return null;
-		}
-
-		\BeltoftServices\Alerts::site_tag( 'hosting ' . $id );
-
-		/* Admin text, not shown to customers. */
-		return sprintf( 'Set the site tag for hosting node %s', $id );
+		return self::gate_object()->gate( $id, $node, $allowed );
 	}
 
 	/**
@@ -67,7 +67,7 @@ final class Clients {
 	 * @return string 'live' or 'fake'.
 	 */
 	public static function kind( array $node, bool $allowed ): string {
-		return $allowed && 'live' === ( $node['client'] ?? 'fake' ) ? 'live' : 'fake';
+		return self::gate_object()->kind( $node, $allowed );
 	}
 
 	/**
