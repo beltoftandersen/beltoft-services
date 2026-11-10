@@ -99,6 +99,7 @@ final class Actions {
 	/**
 	 * The timestamps within a window.
 	 *
+	 * @internal Public only so the Vm action classes can call it; not an API.
 	 * @param array<int, mixed> $stamps Timestamps.
 	 * @param int               $window Seconds.
 	 * @return int[]
@@ -554,6 +555,7 @@ final class Actions {
 	/**
 	 * The VM's path.
 	 *
+	 * @internal Public only so the Vm action classes can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
@@ -565,6 +567,7 @@ final class Actions {
 	 * What run() prepared (client, cluster, secrets, task wait, the task that finished), for the Vm classes it hands
 	 * the action to.
 	 *
+	 * @internal Public only so the Vm action classes can call it; not an API.
 	 * @return array<string, mixed>
 	 */
 	public function state(): array {

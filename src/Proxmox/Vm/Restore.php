@@ -58,6 +58,7 @@ final class Restore {
 	 * the backup's. A failed restore may have destroyed the VM: it is left as it is and the
 	 * admin is alerted.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param string               $volid  Backup volume id (shape already checked).
 	 */

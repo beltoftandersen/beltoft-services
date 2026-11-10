@@ -48,6 +48,7 @@ final class PowerActions {
 	/**
 	 * Start (only a VM that is off).
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
@@ -106,6 +107,7 @@ final class PowerActions {
 	 * Graceful shutdown (ACPI). A system that does not power off in time is left running: a plug
 	 * pull is the shop's decision, never a customer button.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
@@ -147,6 +149,7 @@ final class PowerActions {
 	/**
 	 * Graceful reboot of a running VM.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
