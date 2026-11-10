@@ -63,7 +63,7 @@ final class ToolsMapTest extends McpTestCase {
 	public function test_every_action_the_dashboard_offers_has_a_tool_or_a_reason(): void {
 		$classes = array(
 			'BeltoftServices\Proxmox\Actions',
-			'BeltoftServices\Proxmox\Snapshots',
+			'BeltoftServices\Proxmox\Snapshot\Policy',
 			'BeltoftServices\Proxmox\FirewallRules',
 			'BeltoftServices\Proxmox\PrivateAttach',
 			'BeltoftServices\Proxmox\DbActions',

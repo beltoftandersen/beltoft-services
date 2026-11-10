@@ -949,6 +949,31 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertStringContainsString( 'before a rollback', (string) Actions::disk_block( $this->fresh( $server ), 'rollback' ) );
 	}
 
+	public function test_persisted_names_are_unchanged(): void {
+		$this->assertSame(
+			array(
+				'LIST'             => 'snapshots',
+				'OP'               => 'snapshot_op',
+				'ROLLBACK'         => 'snapshot_rollback',
+				'DROP_WAITS'       => 'snapshot_drop_waits',
+				'DROP_WAIT_ROUNDS' => 5,
+				'ERROR'            => 'snapshot_error',
+				'ACTIONS'          => array( 'snapshot_take', 'snapshot_delete', 'snapshot_rollback' ),
+				'INTERNAL'         => array( 'snapshot_expire', 'snapshot_purge', 'snapshot_sync' ),
+				'OP_MAX_AGE'       => 2 * HOUR_IN_SECONDS,
+				'CONFIRM_ROLLBACK' => 'ROLLBACK',
+				'MAX_LABEL'        => 40,
+			),
+			( new \ReflectionClass( Snapshots::class ) )->getConstants()
+		);
+
+		// The phases and the task step are stored in meta; the runner has to keep spelling them the same.
+		$engine = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/Snapshot/Engine.php' );
+		foreach ( array( 'creating', 'sent', 'stopping', 'rolling', 'rolled', 'snapshot' ) as $name ) {
+			$this->assertStringContainsString( "'" . $name . "'", $engine, $name );
+		}
+	}
+
 	public function test_slot_squares_only_when_a_snapshot_is_in_use(): void {
 		$render = static function ( int $used, int $slots ): string {
 			$beltoft_services_strip = array( 'used' => $used, 'slots' => $slots );
