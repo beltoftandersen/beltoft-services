@@ -114,7 +114,7 @@ class DiskRestoreTest extends BackupTestCase {
 		$volid  = $this->backup_of( $server );
 		$this->restore( $server, $volid );
 		$posts = count( $this->calls( 'POST', '/nodes/node-a/qemu/5000/config' ) );
-		$steps = new \BeltoftServices\Proxmox\DiskSteps( Resource::find( $disk->id() ) );
+		$steps = new \BeltoftServices\Proxmox\Disk\DiskSteps( Resource::find( $disk->id() ) );
 		$result = $steps->reattach_after_restore( Resource::find( $server->id() ) );
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$this->assertCount( $posts, $this->calls( 'POST', '/nodes/node-a/qemu/5000/config' ), 'Already attached: no second write.' );

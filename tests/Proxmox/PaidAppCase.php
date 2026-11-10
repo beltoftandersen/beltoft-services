@@ -56,7 +56,7 @@ abstract class PaidAppCase extends MonitoringTestCase {
 		AppField::register();
 		\BeltoftServices\Proxmox\AppLicence::register();
 		\BeltoftServices\Proxmox\AppLicenceCart::register();
-		\BeltoftServices\Proxmox\DiskCascade::register();
+		\BeltoftServices\Proxmox\Disk\DiskCascade::register();
 
 		$this->clear_ips();
 		$this->assertTrue( Clusters::save( 'lab', array(

@@ -9,8 +9,8 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\DiskGuide;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskGuide;
 use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\SnapshotMeta;

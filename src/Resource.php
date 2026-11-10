@@ -1052,7 +1052,7 @@ final class Resource {
 	 * listeners (transition, then Reconciler::notify()). Direct callers stay silent on purpose, and
 	 * Structure\TransitionCallersTest lists them with the reason: Admin\Panel (forced delete; it calls
 	 * Reconciler::notify() itself after the transition and the close), Proxmox\AppLicence (announces
-	 * "cancelled" itself), Proxmox\DiskMeta (releases the disk capacity itself), Proxmox\SnapshotMeta (the
+	 * "cancelled" itself), Proxmox\Disk\DiskMeta (releases the disk capacity itself), Proxmox\SnapshotMeta (the
 	 * parent's own email covers the customer), Proxmox\Vm\RestoreSteps (a failed disk keeps its volume, so no
 	 * capacity release) and Proxmox\Vm\Reinstall (a reinstall to provisioning, which no listener acts on).
 	 *

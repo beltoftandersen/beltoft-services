@@ -1,7 +1,7 @@
 <?php
 /** Safe, retryable operations on an extra Proxmox disk. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\StepResult;
@@ -11,6 +11,8 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\SnapshotExpiry;
+use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;

@@ -11,7 +11,7 @@ use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
 
 defined( 'ABSPATH' ) || exit;
 

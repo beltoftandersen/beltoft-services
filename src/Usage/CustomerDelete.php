@@ -11,7 +11,7 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 

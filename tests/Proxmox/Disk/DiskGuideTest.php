@@ -1,12 +1,12 @@
 <?php
 /** The extra disk setup guide and the disk-ready email. @package BeltoftServices */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Disk;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
-use BeltoftServices\Proxmox\DiskGuide;
-use BeltoftServices\Proxmox\DiskPanels;
+use BeltoftServices\Proxmox\Disk\DiskGuide;
+use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

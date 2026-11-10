@@ -13,7 +13,7 @@ use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 use BeltoftServices\Proxmox\PrivateNets;

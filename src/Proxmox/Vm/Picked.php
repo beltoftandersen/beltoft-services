@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 
 defined( 'ABSPATH' ) || exit;
 

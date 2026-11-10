@@ -10,7 +10,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\AppReinstallPaid;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Estimate;

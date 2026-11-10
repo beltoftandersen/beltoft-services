@@ -5,10 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Account\ServerLinks;
+use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;

@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Structure;
 use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\Vm\CoreHooks;
-use BeltoftServices\Proxmox\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Tests\TestCase;
 

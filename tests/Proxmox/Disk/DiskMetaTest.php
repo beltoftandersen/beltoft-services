@@ -1,15 +1,16 @@
 <?php
 /** Order metadata linking for extra disks. @package BeltoftServices */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Disk;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Lifecycle;
-use BeltoftServices\Proxmox\DiskMeta;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 
 class DiskMetaTest extends BackupTestCase {
 	public function set_up(): void {

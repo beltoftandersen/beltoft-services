@@ -201,13 +201,13 @@ final class Plugin {
 		Proxmox\BackupField::register();
 		Proxmox\DbIpField::register();
 		Proxmox\DbDiskField::register();
-		Proxmox\DiskMeta::register();
-		Proxmox\DiskCascade::register();
+		Proxmox\Disk\DiskMeta::register();
+		Proxmox\Disk\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
-		Proxmox\DiskCart::register();
+		Proxmox\Disk\DiskCart::register();
 		Proxmox\SnapshotMeta::register();
 		Proxmox\SnapshotCart::register();
-		Proxmox\DiskField::register();
+		Proxmox\Disk\DiskField::register();
 		Proxmox\Vm\Actions::register();
 		Proxmox\DbActions::register();
 		Proxmox\DbRoutes::register();

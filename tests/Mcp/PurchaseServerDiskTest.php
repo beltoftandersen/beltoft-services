@@ -13,7 +13,7 @@ use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Purchase;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Usage\Breakdown;

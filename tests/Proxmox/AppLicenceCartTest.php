@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 
 require_once __DIR__ . '/PaidAppCase.php';
 

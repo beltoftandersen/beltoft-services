@@ -12,7 +12,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\DiskPanels;
+use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Resource;
 use BeltoftServices\ThankYou;
@@ -285,7 +285,7 @@ class FeedbackUiTest extends SnapshotsTestCase {
 	}
 
 	public function test_the_new_texts_have_no_em_dash_and_no_rounded_corners(): void {
-		foreach ( array( 'assets/vm.js', 'assets/account.css', 'assets/thankyou.css', 'templates/account/vm.php', 'src/Proxmox/DiskPanels.php' ) as $file ) {
+		foreach ( array( 'assets/vm.js', 'assets/account.css', 'assets/thankyou.css', 'templates/account/vm.php', 'src/Proxmox/Disk/DiskPanels.php' ) as $file ) {
 			$this->assertStringNotContainsString( "\u{2014}", (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $file );
 		}
 

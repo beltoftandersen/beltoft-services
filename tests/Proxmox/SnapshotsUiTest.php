@@ -188,8 +188,8 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$html = $this->card( $r );
 
 		// The warning sits with the Remove link; the test disk has no subscription, so no link and no warning, but the data is there.
-		$this->assertSame( 1, \BeltoftServices\Proxmox\DiskPanels::server( $this->fresh( $r ) )['items'][0]['snapshots_covering'] );
-		$this->assertSame( '', \BeltoftServices\Proxmox\DiskPanels::server( $this->fresh( $r ) )['items'][0]['remove_url'] );
+		$this->assertSame( 1, \BeltoftServices\Proxmox\Disk\DiskPanels::server( $this->fresh( $r ) )['items'][0]['snapshots_covering'] );
+		$this->assertSame( '', \BeltoftServices\Proxmox\Disk\DiskPanels::server( $this->fresh( $r ) )['items'][0]['remove_url'] );
 		$this->assertStringNotContainsString( 'data-snapshot-disk-warning', $html );
 		$this->assertNotNull( $disk );
 	}

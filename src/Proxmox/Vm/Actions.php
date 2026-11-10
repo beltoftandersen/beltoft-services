@@ -11,7 +11,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\PrivateAttach;

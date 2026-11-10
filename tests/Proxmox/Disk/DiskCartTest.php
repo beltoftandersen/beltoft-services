@@ -1,15 +1,16 @@
 <?php
 /** Cart identity and ownership for extra disks. @package BeltoftServices */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Disk;
 
-use BeltoftServices\Proxmox\DiskCart;
-use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Disk\DiskCart;
+use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Tests\Proxmox\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 
 class DiskCartTest extends BackupTestCase {
 	public function set_up(): void {
@@ -57,7 +58,7 @@ class DiskCartTest extends BackupTestCase {
 		$server = $this->ready_vm();
 		wp_set_current_user( (int) $server->license()['user_id'] );
 		$this->variation();
-		$add = \BeltoftServices\Proxmox\DiskPanels::server( $server )['add'];
+		$add = \BeltoftServices\Proxmox\Disk\DiskPanels::server( $server )['add'];
 		$this->assertNotEmpty( $add, 'The 50 GB size fits and is offered.' );
 		ob_start();
 		\BeltoftServices\Proxmox\Vm\Panels::account( \BeltoftServices\Resource::find( $server->id() ) );

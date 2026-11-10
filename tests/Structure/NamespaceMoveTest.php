@@ -69,6 +69,14 @@ class NamespaceMoveTest extends TestCase {
 		'DiskJobs' => array( 'Proxmox\\Jobs', 'Proxmox\\Vm' ),
 		'ProxmoxJobs' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'Schema' => array( 'Proxmox', 'Proxmox\\Vm' ),
+		'DiskDriver' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskSteps' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskMeta' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskCart' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskField' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskPanels' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskGuide' => array( 'Proxmox', 'Proxmox\\Disk' ),
+		'DiskCascade' => array( 'Proxmox', 'Proxmox\\Disk' ),
 	);
 
 	/**

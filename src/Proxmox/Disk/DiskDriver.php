@@ -1,7 +1,7 @@
 <?php
 /** Extra disk service driver. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\ProvisionSteps;

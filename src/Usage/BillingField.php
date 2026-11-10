@@ -11,7 +11,7 @@ use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 

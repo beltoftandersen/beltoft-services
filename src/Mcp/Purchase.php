@@ -14,7 +14,7 @@ use BeltoftServices\BillingRequirements;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;

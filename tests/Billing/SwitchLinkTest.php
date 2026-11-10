@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Billing;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\DiskCart;
+use BeltoftServices\Proxmox\Disk\DiskCart;
 use BeltoftServices\Resource;
 use BeltoftServices\SwitchLink;
 use BeltoftServices\Tests\Proxmox\BackupTestCase;

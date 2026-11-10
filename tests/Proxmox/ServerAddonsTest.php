@@ -11,7 +11,7 @@ use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Reconciler;
-use BeltoftServices\Proxmox\DiskGuide;
+use BeltoftServices\Proxmox\Disk\DiskGuide;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Resource;
 

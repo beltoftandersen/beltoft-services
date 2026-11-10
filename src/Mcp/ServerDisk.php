@@ -8,8 +8,8 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskCart;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskCart;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;
 

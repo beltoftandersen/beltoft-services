@@ -5,6 +5,8 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Disk\DiskCascade;
+use BeltoftServices\Proxmox\Disk\DiskGuide;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

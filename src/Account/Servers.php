@@ -11,7 +11,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\OsField;
@@ -321,7 +321,7 @@ final class Servers {
 			return '';
 		}
 
-		$anchor = 'disks' === $parent['tab'] ? '#' . \BeltoftServices\Proxmox\DiskGuide::anchor( $parent['resource']->id() ) : '';
+		$anchor = 'disks' === $parent['tab'] ? '#' . \BeltoftServices\Proxmox\Disk\DiskGuide::anchor( $parent['resource']->id() ) : '';
 
 		return ServerLinks::url( $server, $parent['tab'] ) . $anchor;
 	}

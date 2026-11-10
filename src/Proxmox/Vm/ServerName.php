@@ -15,8 +15,8 @@ use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbEngines;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -5,8 +5,8 @@ namespace BeltoftServices\Proxmox\Addon;
 
 use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\SnapshotMeta;
 use BeltoftServices\Proxmox\SnapshotDriver;

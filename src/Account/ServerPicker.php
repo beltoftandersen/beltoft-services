@@ -13,7 +13,7 @@ use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Billing\CartFlow;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Picked;

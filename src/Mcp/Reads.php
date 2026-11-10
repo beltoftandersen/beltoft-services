@@ -22,7 +22,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbIp;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Snapshots;

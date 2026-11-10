@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Locks;
+use BeltoftServices\Proxmox\Disk\DiskField;
 
 defined( 'ABSPATH' ) || exit;
 

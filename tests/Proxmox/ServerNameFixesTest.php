@@ -13,7 +13,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Vm\Actions;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 

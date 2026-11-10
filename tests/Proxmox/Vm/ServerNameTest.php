@@ -13,7 +13,7 @@ use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Proxmox\Vm\ServerName;
@@ -444,14 +444,14 @@ class ServerNameTest extends BackupTestCase {
 
 		// The disk's own card too.
 		ob_start();
-		\BeltoftServices\Proxmox\DiskPanels::account( Resource::find( $one->id() ) );
+		\BeltoftServices\Proxmox\Disk\DiskPanels::account( Resource::find( $one->id() ) );
 		$card = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Data disk 1', $card );
 		$this->assertStringNotContainsString( 'scsi1', $card );
 
 		// The admin view keeps the slot.
 		ob_start();
-		\BeltoftServices\Proxmox\DiskPanels::admin( Resource::find( $one->id() ) );
+		\BeltoftServices\Proxmox\Disk\DiskPanels::admin( Resource::find( $one->id() ) );
 		$this->assertStringContainsString( 'scsi1', (string) ob_get_clean() );
 	}
 

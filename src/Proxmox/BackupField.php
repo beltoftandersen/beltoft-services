@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;

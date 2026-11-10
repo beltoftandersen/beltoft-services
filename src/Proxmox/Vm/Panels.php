@@ -11,7 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppProgress;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\DiskPanels;
+use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Monitor;

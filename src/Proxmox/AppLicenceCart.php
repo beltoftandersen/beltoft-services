@@ -7,6 +7,7 @@ use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonCart;
+use BeltoftServices\Proxmox\Disk\DiskField;
 
 defined( 'ABSPATH' ) || exit;
 

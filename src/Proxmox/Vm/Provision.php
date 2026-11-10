@@ -14,7 +14,7 @@ use BeltoftServices\Proxmox\DbBuild;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbProfile;
-use BeltoftServices\Proxmox\DiskSteps;
+use BeltoftServices\Proxmox\Disk\DiskSteps;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\NetConfig;

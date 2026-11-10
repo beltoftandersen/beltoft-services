@@ -1,10 +1,11 @@
 <?php
 /** Extra disk selector for a new-server classic checkout. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\CartSwap;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Usage\Rates;

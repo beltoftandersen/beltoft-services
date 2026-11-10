@@ -1,7 +1,7 @@
 <?php
 /** Link an extra disk license to the server chosen at checkout. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;

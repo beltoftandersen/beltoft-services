@@ -1,11 +1,13 @@
 <?php
 /** Stored extra-disk data for My Account. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;

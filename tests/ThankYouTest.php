@@ -307,8 +307,8 @@ final class ThankYouTest extends TestCase {
 
 		$this->assertStringContainsString( 'Find your disk in My account &gt; VPS &gt; your server &gt; Disks.', $html );
 		$this->assertSame( 1, substr_count( $html, 'Find your disk in' ), 'Once, for the one disk.' );
-		$this->assertStringContainsString( esc_url( \BeltoftServices\Proxmox\DiskGuide::server_url( $disk ) ), $html );
-		$this->assertStringContainsString( esc_url( \BeltoftServices\Proxmox\DiskGuide::guide_url( $disk ) ), $html );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Proxmox\Disk\DiskGuide::server_url( $disk ) ), $html );
+		$this->assertStringContainsString( esc_url( \BeltoftServices\Proxmox\Disk\DiskGuide::guide_url( $disk ) ), $html );
 		$this->assertStringContainsString( 'Disk setup guide', $html );
 	}
 

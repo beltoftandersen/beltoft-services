@@ -357,7 +357,7 @@ final class Account {
 				static function ( int $id ): bool {
 					$r = Resource::find( $id );
 
-					return $r && \BeltoftServices\Proxmox\DiskDriver::ID !== (string) $r->get( 'driver' );
+					return $r && \BeltoftServices\Proxmox\Disk\DiskDriver::ID !== (string) $r->get( 'driver' );
 				}
 			)
 		);

@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Picked;

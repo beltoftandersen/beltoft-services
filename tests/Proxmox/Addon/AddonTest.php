@@ -7,7 +7,7 @@ use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\Stock;
 

@@ -38,7 +38,7 @@ class RegistryTest extends TestCase {
 			'http'              => \BeltoftServices\Http\HttpDriver::class,
 			'proxmox'           => \BeltoftServices\Proxmox\Vm\ProxmoxDriver::class,
 			'proxmox-db'        => \BeltoftServices\Proxmox\DbDriver::class,
-			'proxmox-disk'      => \BeltoftServices\Proxmox\DiskDriver::class,
+			'proxmox-disk'      => \BeltoftServices\Proxmox\Disk\DiskDriver::class,
 			'proxmox-snapshots' => \BeltoftServices\Proxmox\SnapshotDriver::class,
 			'proxmox-app'       => \BeltoftServices\Proxmox\AppLicenceDriver::class,
 			'domain'            => \BeltoftServices\Domains\DomainDriver::class,

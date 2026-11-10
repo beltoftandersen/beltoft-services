@@ -32,6 +32,7 @@ define( 'BELTOFT_SERVICES_VERSION', '0.7.0' );
 define(
 	'BELTOFT_SERVICES_CLASS_ALIASES',
 	array(
+		'BeltoftServices\\Proxmox\\DiskField'    => 'BeltoftServices\\Proxmox\\Disk\\DiskField',
 		'BeltoftServices\\Proxmox\\OsField'      => 'BeltoftServices\\Proxmox\\Vm\\OsField',
 		'BeltoftServices\\Proxmox\\Picked'       => 'BeltoftServices\\Proxmox\\Vm\\Picked',
 		'BeltoftServices\\Proxmox\\ServerName'   => 'BeltoftServices\\Proxmox\\Vm\\ServerName',

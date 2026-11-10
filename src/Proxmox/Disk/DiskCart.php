@@ -1,7 +1,7 @@
 <?php
 /** Add one extra disk per WooCommerce subscription. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Billing\CartFlow;

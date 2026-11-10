@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DiskCascade;
+use BeltoftServices\Proxmox\Disk\DiskCascade;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\SnapshotCart;
 use BeltoftServices\Proxmox\SnapshotDriver;

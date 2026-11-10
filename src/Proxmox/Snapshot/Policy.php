@@ -9,7 +9,7 @@ namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Vm\Actions;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\SnapshotMeta;
 use BeltoftServices\Proxmox\Snapshots;

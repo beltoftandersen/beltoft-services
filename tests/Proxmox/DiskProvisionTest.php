@@ -8,8 +8,8 @@ use BeltoftServices\Cli\Commands;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Vm\Actions;
-use BeltoftServices\Proxmox\DiskMeta;
-use BeltoftServices\Proxmox\DiskPanels;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
+use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 

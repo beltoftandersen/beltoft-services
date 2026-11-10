@@ -5,7 +5,7 @@
  * 2026-11-01: 11 entries (FirewallRoute, ThankYou) were already there but hidden by a namespace parsing bug, now fixed.
  */
 return array(
-	'LineNames.php -> Proxmox\DiskDriver',
+	'LineNames.php -> Proxmox\Disk\DiskDriver',
 	'LineNames.php -> Proxmox\Vm\ServerName',
 	'LineNames.php -> Usage\Account',
 	'LineNames.php -> Usage\Rates',
