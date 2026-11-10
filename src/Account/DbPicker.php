@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbNeedsServer;
-use BeltoftServices\Proxmox\DiskCart;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\PostgresEngine;
 use BeltoftServices\Proxmox\BackupField;
@@ -259,7 +259,7 @@ final class DbPicker {
 
 		foreach ( $cart->get_cart() as $key => $item ) {
 			// A payment for a subscription that exists is never touched or mixed with a new database.
-			if ( DiskCart::flow( (array) $item ) ) {
+			if ( CartFlow::has_value( (array) $item, CartFlow::ALL ) ) {
 				return __( 'Finish or remove the subscription payment in your cart first.', 'beltoft-services' );
 			}
 
