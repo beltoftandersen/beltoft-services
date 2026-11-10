@@ -19,7 +19,7 @@ final class MailClients {
 	 * Whether wp-config.php allows live mailcow calls.
 	 */
 	public static function live_allowed(): bool {
-		return \BeltoftServices\Proxmox\LiveGate::constant_true( 'BELTOFT_SERVICES_MAIL_LIVE' );
+		return \BeltoftServices\Drivers\LiveGate::constant_true( 'BELTOFT_SERVICES_MAIL_LIVE' );
 	}
 
 	/**

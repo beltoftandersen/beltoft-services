@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Clients {
 	public static function live_allowed(): bool {
-		return \BeltoftServices\Proxmox\LiveGate::constant_true( 'BELTOFT_SERVICES_DOMAINS_LIVE' );
+		return \BeltoftServices\Drivers\LiveGate::constant_true( 'BELTOFT_SERVICES_DOMAINS_LIVE' );
 	}
 
 	public static function mode(): string {

@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Drivers\LiveGate;
+
 defined( 'ABSPATH' ) || exit;
 
 /**

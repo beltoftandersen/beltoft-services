@@ -5,7 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Drivers;
+
+use BeltoftServices\Proxmox\ProxmoxSettings;
 
 defined( 'ABSPATH' ) || exit;
 

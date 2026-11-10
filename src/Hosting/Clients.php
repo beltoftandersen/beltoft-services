@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Drivers\LiveGate;
 use BeltoftServices\Proxmox\Client;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,8 +25,8 @@ final class Clients {
 	/**
 	 * The shared live/fake gate.
 	 */
-	private static function gate_object(): \BeltoftServices\Proxmox\LiveGate {
-		return new \BeltoftServices\Proxmox\LiveGate( 'BELTOFT_SERVICES_HOSTING_LIVE', 'hosting ', 'Set the site tag for hosting node %s' );
+	private static function gate_object(): LiveGate {
+		return new LiveGate( 'BELTOFT_SERVICES_HOSTING_LIVE', 'hosting ', 'Set the site tag for hosting node %s' );
 	}
 
 	/**

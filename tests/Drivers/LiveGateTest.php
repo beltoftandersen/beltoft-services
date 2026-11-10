@@ -6,9 +6,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Drivers;
 
-use BeltoftServices\Proxmox\LiveGate;
+use BeltoftServices\Drivers\LiveGate;
 use BeltoftServices\Tests\TestCase;
 
 /**
