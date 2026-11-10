@@ -809,4 +809,55 @@ class AddonsTest extends HostingCase {
 		$this->assertSame( 'pay', Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' )['status'] );
 		remove_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
 	}
+
+	/**
+	 * The billing class holds the money and the subscription lines only: what a paid add-on changes on the account is AddonEffects.
+	 */
+	public function test_the_billing_class_names_no_hosting_effect(): void {
+		$code = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Hosting/AddonBilling.php' );
+
+		foreach ( array( 'HostingActions', 'SiteDomains', 'SiteMail', 'MailPacks', 'Sites' ) as $name ) {
+			$this->assertStringNotContainsString( $name, $code, $name );
+		}
+	}
+
+	/**
+	 * Every public method of the facade is a same-signature delegate of AddonBilling or AddonEffects, and the two parts share no public name.
+	 */
+	public function test_the_facade_forwards_every_public_method(): void {
+		$parts  = array( \BeltoftServices\Hosting\AddonBilling::class, \BeltoftServices\Hosting\AddonEffects::class );
+		$facade = new \ReflectionClass( Addons::class );
+
+		foreach ( $facade->getMethods( \ReflectionMethod::IS_PUBLIC ) as $method ) {
+			if ( in_array( $method->getName(), array( 'register', 'schedule', 'unschedule' ), true ) ) {
+				continue;
+			}
+
+			$found = array();
+
+			foreach ( $parts as $part ) {
+				if ( method_exists( $part, $method->getName() ) && ( new \ReflectionMethod( $part, $method->getName() ) )->isPublic() ) {
+					$found[] = new \ReflectionMethod( $part, $method->getName() );
+				}
+			}
+
+			$this->assertCount( 1, $found, $method->getName() );
+			$this->assertSame( $this->signature( $method ), $this->signature( $found[0] ), $method->getName() );
+		}
+	}
+
+	/**
+	 * Parameters (name, type, default) and return type of a method.
+	 *
+	 * @param \ReflectionMethod $m Method.
+	 */
+	private function signature( \ReflectionMethod $m ): string {
+		$out = array();
+
+		foreach ( $m->getParameters() as $p ) {
+			$out[] = $p->getName() . ':' . $p->getType() . ':' . ( $p->isDefaultValueAvailable() ? var_export( $p->getDefaultValue(), true ) : '' );
+		}
+
+		return implode( ',', $out ) . '=>' . $m->getReturnType();
+	}
 }
