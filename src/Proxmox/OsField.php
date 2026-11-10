@@ -8,6 +8,9 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Checkout\BlockField;
+use BeltoftServices\Checkout\ClassicPost;
+use BeltoftServices\Checkout\OrderFieldMeta;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 
@@ -335,15 +338,8 @@ final class OsField {
 	 * nonce before firing woocommerce_checkout_process).
 	 */
 	private static function posted(): string {
-		if ( ! did_action( 'woocommerce_checkout_process' ) ) {
-			return '';
-		}
-
 		// A form that does not carry the field at all (the step was not shown) uses what the picker carried. A posted value, even an empty one, wins.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WC_Checkout::process_checkout() verified the nonce; the value is only used through pick(), which accepts nothing but a listed VMID.
-		$value = isset( $_POST[ self::POST_KEY ] ) ? wp_unslash( $_POST[ self::POST_KEY ] ) : Picked::get( 'os' );
-
-		return is_string( $value ) ? trim( $value ) : '';
+		return trim( ClassicPost::raw( self::POST_KEY, Picked::get( 'os' ) ) );
 	}
 
 	/**
@@ -435,11 +431,7 @@ final class OsField {
 			return;
 		}
 
-		try {
-			woocommerce_register_additional_checkout_field( self::block_field_args() );
-		} catch ( \Exception $e ) {
-			unset( $e ); // The classic checkout still works; WooCommerce already reported why.
-		}
+		BlockField::register( self::block_field_args() );
 	}
 
 	/**
@@ -498,7 +490,6 @@ final class OsField {
 			return $meta;
 		}
 
-		$candidates = array();
 		$product_id = (int) ( $license['product_id'] ?? 0 );
 		$variation  = (int) ( $license['variation_id'] ?? 0 );
 		$cluster    = self::cluster_of( $product_id, $variation );
@@ -508,14 +499,7 @@ final class OsField {
 			return $meta;
 		}
 
-		foreach ( $order->get_items() as $item ) {
-			if ( $item instanceof \WC_Order_Item_Product && (int) $item->get_product_id() === $product_id && ( 0 === $variation || (int) $item->get_variation_id() === $variation ) ) {
-				$candidates[] = $item->get_meta( self::ITEM_META, true );
-			}
-		}
-
-		$prefix       = class_exists( \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::class ) ? \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::get_group_key( 'other' ) : '_wc_other/';
-		$candidates[] = $order->get_meta( $prefix . self::BLOCK_FIELD_ID, true );
+		$candidates = OrderFieldMeta::candidates( $order, $product_id, $variation, self::ITEM_META, self::BLOCK_FIELD_ID );
 
 		foreach ( $candidates as $candidate ) {
 			if ( is_string( $candidate ) && ctype_digit( $candidate ) && (int) $candidate >= 100 ) {
