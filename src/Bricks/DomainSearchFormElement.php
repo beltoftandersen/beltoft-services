@@ -40,7 +40,7 @@ class DomainSearchFormElement extends DomainSearchElement {
 		parent::set_controls();
 		foreach ( $this->controls as $key => $control ) {
 			// The form has no results, loading bar or transfer part, and one button.
-			if ( ! isset( $this->control_groups[ $control['group'] ] ) || 0 === strpos( $key, 'result' ) || 0 === strpos( $key, 'transfer' ) ) {
+			if ( ! isset( $this->control_groups[ $control['group'] ?? '' ] ) || 0 === strpos( $key, 'result' ) || 0 === strpos( $key, 'transfer' ) ) {
 				unset( $this->controls[ $key ] );
 			}
 		}
