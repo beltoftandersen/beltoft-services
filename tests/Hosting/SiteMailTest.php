@@ -346,7 +346,7 @@ class SiteMailTest extends HostingCase {
 	}
 
 	public function test_the_new_strings_have_no_dash_or_middle_dot(): void {
-		$files = array( 'SiteMail.php', 'HostingSettings.php', 'HostingActions.php' );
+		$files = array( 'SiteMail.php', 'HostingSettings.php', 'HostingActions.php', 'Actions/Base.php', 'Actions/SiteActions.php', 'Actions/PhpActions.php', 'Actions/AddonActions.php', 'Actions/CareActions.php' );
 
 		foreach ( $files as $file ) {
 			$text = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Hosting/' . $file );
