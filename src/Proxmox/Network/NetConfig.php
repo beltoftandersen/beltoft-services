@@ -67,4 +67,24 @@ final class NetConfig {
 		}
 		return implode( ',', $out );
 	}
+
+	/**
+	 * Is the address's gateway on the address's network (address/prefix)?
+	 *
+	 * @param string $address IPv4 address.
+	 * @param string $gateway IPv4 gateway.
+	 * @param int    $prefix  Prefix length.
+	 */
+	public static function gateway_on_network( string $address, string $gateway, int $prefix ): bool {
+		$a = ip2long( $address );
+		$g = ip2long( $gateway );
+
+		if ( false === $a || false === $g || $prefix < 1 || $prefix > 32 ) {
+			return false;
+		}
+
+		$mask = ( 0xFFFFFFFF << ( 32 - $prefix ) ) & 0xFFFFFFFF;
+
+		return ( $a & $mask ) === ( $g & $mask );
+	}
 }

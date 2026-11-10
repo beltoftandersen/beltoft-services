@@ -331,7 +331,7 @@ final class DbIp {
 			return StepResult::fail( 'No free public IP address for this database; the plan has the add-on but the VM was not changed' );
 		}
 
-		if ( null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_ok( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
+		if ( null !== $ip['gateway'] && '' !== $ip['gateway'] && ! NetConfig::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
 			IpPool::release( $this->r->id() );
 			$this->r->set( array( self::OP => null ) );
 
@@ -339,26 +339,6 @@ final class DbIp {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Is the gateway on the address's network?
-	 *
-	 * @param string $address Address.
-	 * @param string $gateway Gateway.
-	 * @param int    $prefix  Prefix.
-	 */
-	private static function gateway_ok( string $address, string $gateway, int $prefix ): bool {
-		$a = ip2long( $address );
-		$g = ip2long( $gateway );
-
-		if ( false === $a || false === $g || $prefix < 1 || $prefix > 32 ) {
-			return false;
-		}
-
-		$mask = ( 0xFFFFFFFF << ( 32 - $prefix ) ) & 0xFFFFFFFF;
-
-		return ( $a & $mask ) === ( $g & $mask );
 	}
 
 	/**
