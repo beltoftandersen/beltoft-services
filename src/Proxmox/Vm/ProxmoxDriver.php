@@ -16,7 +16,7 @@ use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -15,9 +15,10 @@ use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 use BeltoftServices\ThankYou;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class FeedbackUiTest extends SnapshotsTestCase {
 

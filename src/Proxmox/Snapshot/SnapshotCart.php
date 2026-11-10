@@ -1,7 +1,7 @@
 <?php
 /** Add one pack of snapshot slots per WooCommerce subscription. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Billing\CartFlow;

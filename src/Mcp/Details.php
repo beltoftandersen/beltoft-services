@@ -23,7 +23,7 @@ use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\PrivateAttach;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

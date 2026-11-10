@@ -1,7 +1,7 @@
 <?php
 /** Paid snapshot slots service driver. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\StepResult;

@@ -20,7 +20,7 @@ use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\Pve\Capacity;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
 defined( 'ABSPATH' ) || exit;
 

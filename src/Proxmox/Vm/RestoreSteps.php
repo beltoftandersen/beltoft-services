@@ -17,7 +17,7 @@ use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\PrivateNic;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 
 defined( 'ABSPATH' ) || exit;
 

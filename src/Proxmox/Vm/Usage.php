@@ -8,7 +8,6 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
-
 defined( 'ABSPATH' ) || exit;
 
 final class Usage {

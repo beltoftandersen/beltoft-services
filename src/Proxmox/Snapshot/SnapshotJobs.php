@@ -5,13 +5,11 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox\Jobs;
+namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
-use BeltoftServices\Proxmox\SnapshotExpiry;
-use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

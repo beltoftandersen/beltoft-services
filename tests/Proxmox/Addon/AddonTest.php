@@ -8,7 +8,7 @@ use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\Stock;
 
 class AddonTest extends \WP_UnitTestCase {

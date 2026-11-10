@@ -9,7 +9,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonLink;
 use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Resource;

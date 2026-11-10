@@ -10,11 +10,12 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\Actions;
-use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class SnapshotsInteractionTest extends SnapshotsTestCase {
 

@@ -17,8 +17,6 @@ use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Proxmox\Vm\RestoreSteps;
-use BeltoftServices\Proxmox\SnapshotExpiry;
-use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;

@@ -13,7 +13,7 @@ use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

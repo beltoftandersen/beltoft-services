@@ -1,7 +1,7 @@
 <?php
 /** Link a snapshot pack license to its server and count its slots. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;

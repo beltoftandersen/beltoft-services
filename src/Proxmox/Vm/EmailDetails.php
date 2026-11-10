@@ -19,9 +19,9 @@ use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskGuide;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
-use BeltoftServices\Proxmox\SnapshotDriver;
-use BeltoftServices\Proxmox\SnapshotExpiry;
-use BeltoftServices\Proxmox\SnapshotMeta;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
+use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

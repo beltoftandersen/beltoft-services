@@ -5,16 +5,17 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Snapshot;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 
 abstract class SnapshotsTestCase extends BackupTestCase {
 

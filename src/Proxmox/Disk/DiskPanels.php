@@ -7,7 +7,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;

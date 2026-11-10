@@ -5,13 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
-use BeltoftServices\Proxmox\Jobs\SnapshotJobs;
 
 defined( 'ABSPATH' ) || exit;
 

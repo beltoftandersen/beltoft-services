@@ -11,8 +11,6 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
-use BeltoftServices\Proxmox\SnapshotMeta;
-use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

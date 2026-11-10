@@ -17,10 +17,10 @@ use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Monitor;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
-use BeltoftServices\Proxmox\SnapshotCart;
-use BeltoftServices\Proxmox\SnapshotExpiry;
-use BeltoftServices\Proxmox\SnapshotMeta;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
+use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
+use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

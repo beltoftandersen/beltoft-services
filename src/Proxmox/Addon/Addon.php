@@ -8,8 +8,8 @@ use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\AppLicence;
-use BeltoftServices\Proxmox\SnapshotMeta;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -18,7 +18,7 @@ use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 

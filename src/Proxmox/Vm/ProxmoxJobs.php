@@ -10,7 +10,7 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Jobs\BackupJobs;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
-use BeltoftServices\Proxmox\Jobs\SnapshotJobs;
+use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
 use BeltoftServices\Proxmox\PrivateNets;
 
 defined( 'ABSPATH' ) || exit;

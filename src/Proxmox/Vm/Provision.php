@@ -25,7 +25,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\Pve\Steps;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

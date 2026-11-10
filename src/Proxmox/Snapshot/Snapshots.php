@@ -5,12 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Snapshot;
 
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Snapshot\Engine;
-use BeltoftServices\Proxmox\Snapshot\PanelData;
-use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

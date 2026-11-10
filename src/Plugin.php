@@ -205,8 +205,8 @@ final class Plugin {
 		Proxmox\Disk\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
 		Proxmox\Disk\DiskCart::register();
-		Proxmox\SnapshotMeta::register();
-		Proxmox\SnapshotCart::register();
+		Proxmox\Snapshot\SnapshotMeta::register();
+		Proxmox\Snapshot\SnapshotCart::register();
 		Proxmox\Disk\DiskField::register();
 		Proxmox\Vm\Actions::register();
 		Proxmox\DbActions::register();

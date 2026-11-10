@@ -6,15 +6,15 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Snapshot;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
-use BeltoftServices\Proxmox\SnapshotExpiry;
-use BeltoftServices\Proxmox\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\SnapshotJobs;
+use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
 
 require_once __DIR__ . '/SnapshotsTestCase.php';
 

@@ -11,8 +11,9 @@ use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class FirewallRestoreTest extends SnapshotsTestCase {
 

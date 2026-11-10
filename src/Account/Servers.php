@@ -15,7 +15,7 @@ use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\OsField;
-use BeltoftServices\Proxmox\SnapshotDriver;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
