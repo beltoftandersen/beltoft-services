@@ -5,6 +5,7 @@ namespace BeltoftServices\Ssl;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
@@ -15,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * keeps working until it ends; an unpaid renewal lets the order expire), a plan change does nothing (a different certificate is
  * a new order), and delete cancels an order that can still be cancelled for a refund. The customer's actions are Operations.
  */
-final class SslDriver implements Driver, InternalActions, NeedsBilling {
+final class SslDriver implements Driver, InternalActions, NeedsBilling, ProvisionSteps {
 	public const ID   = 'ssl';
 	public const KIND = 'ssl';
 
@@ -24,6 +25,22 @@ final class SslDriver implements Driver, InternalActions, NeedsBilling {
 	 */
 	public function id(): string {
 		return self::ID;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'csr'          => __( 'Make the certificate request', 'beltoft-services' ),
+			'contact'      => __( 'Save the owner details', 'beltoft-services' ),
+			'order'        => __( 'Place the order', 'beltoft-services' ),
+			'request'      => __( 'Send the request to the certificate authority', 'beltoft-services' ),
+			'validate'     => __( 'Validate the domain', 'beltoft-services' ),
+			'active'       => __( 'Wait for the certificate authority', 'beltoft-services' ),
+			'deliver'      => __( 'Collect the certificate', 'beltoft-services' ),
+			'dates'        => __( 'Final checks', 'beltoft-services' ),
+		);
 	}
 
 	/**

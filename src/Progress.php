@@ -7,11 +7,8 @@
 
 namespace BeltoftServices;
 
-use BeltoftServices\Proxmox\AppProgress;
-use BeltoftServices\Proxmox\AppTab;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Drivers\ProvisionSteps;
+use BeltoftServices\Drivers\Registry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -87,110 +84,16 @@ final class Progress {
 	}
 
 	/**
-	 * Steps of a build, by driver id: key => label. A driver without an entry has no step list.
+	 * Steps of a build, key => label: the resource's driver says what they are. A driver that does not
+	 * implement ProvisionSteps (or is not registered) has no step list.
 	 *
-	 * @return array<string, array<string, string>>
-	 */
-	private static function build_steps(): array {
-		return array(
-			ProxmoxDriver::ID => array(
-				'ip'        => __( 'Reserve an IP address', 'beltoft-services' ),
-				'vmid'      => __( 'Prepare the server', 'beltoft-services' ),
-				'clone'     => __( 'Create the server', 'beltoft-services' ),
-				'configure' => __( 'Apply your settings', 'beltoft-services' ),
-				'start'     => __( 'Start the server', 'beltoft-services' ),
-				'ready'     => __( 'Final checks', 'beltoft-services' ),
-			),
-			DbDriver::ID        => array(
-				'ip'        => __( 'Reserve a public IP address', 'beltoft-services' ),
-				'net'       => __( 'Reserve a private address', 'beltoft-services' ),
-				'vmid'      => __( 'Prepare the server', 'beltoft-services' ),
-				'clone'     => __( 'Create the server', 'beltoft-services' ),
-				'configure' => __( 'Apply your settings', 'beltoft-services' ),
-				'start'     => __( 'Start the server', 'beltoft-services' ),
-				'ready'     => __( 'Final checks', 'beltoft-services' ),
-				'db_init'   => __( 'Set up the database', 'beltoft-services' ),
-				'db_ready'  => __( 'Check the database', 'beltoft-services' ),
-			),
-			\BeltoftServices\Hosting\HostingDriver::ID => array(
-				'place'     => __( 'Reserve resources', 'beltoft-services' ),
-				'ip'        => __( 'Reserve an address', 'beltoft-services' ),
-				'vmid'      => __( 'Prepare your container', 'beltoft-services' ),
-				'clone'     => __( 'Create your container', 'beltoft-services' ),
-				'configure' => __( 'Apply your plan', 'beltoft-services' ),
-				'start'     => __( 'Start your container', 'beltoft-services' ),
-				'prepare'   => __( 'Prepare the system', 'beltoft-services' ),
-				'db'        => __( 'Create the database', 'beltoft-services' ),
-				'site'      => __( 'Install WordPress', 'beltoft-services' ),
-				'edge'      => __( 'Connect the web server', 'beltoft-services' ),
-				'dns'       => __( 'Publish the address', 'beltoft-services' ),
-				'verify'    => __( 'Check your website', 'beltoft-services' ),
-				'mail'      => __( 'Set up website mail', 'beltoft-services' ),
-				'ready'     => __( 'Final checks', 'beltoft-services' ),
-			),
-			DiskDriver::ID      => array(
-				'server'   => __( 'Find the server', 'beltoft-services' ),
-				'slot'     => __( 'Choose a slot', 'beltoft-services' ),
-				'allocate' => __( 'Create the disk', 'beltoft-services' ),
-				'attach'   => __( 'Attach it to the server', 'beltoft-services' ),
-				'verify'   => __( 'Final checks', 'beltoft-services' ),
-			),
-			'domain'            => array(
-				'contact'       => __( 'Save the owner details', 'beltoft-services' ),
-				'zone_prepared' => __( 'Prepare the DNS', 'beltoft-services' ),
-				'order'         => __( 'Send the order to the registry', 'beltoft-services' ),
-				'active'        => __( 'Wait for the registry', 'beltoft-services' ),
-				'zone'          => __( 'Set up the DNS', 'beltoft-services' ),
-				'dates'         => __( 'Final checks', 'beltoft-services' ),
-			),
-			'ssl'               => array(
-				'csr'      => __( 'Make the certificate request', 'beltoft-services' ),
-				'contact'  => __( 'Save the owner details', 'beltoft-services' ),
-				'order'    => __( 'Place the order', 'beltoft-services' ),
-				'request'  => __( 'Send the request to the certificate authority', 'beltoft-services' ),
-				'validate' => __( 'Validate the domain', 'beltoft-services' ),
-				'active'   => __( 'Wait for the certificate authority', 'beltoft-services' ),
-				'deliver'  => __( 'Collect the certificate', 'beltoft-services' ),
-				'dates'    => __( 'Final checks', 'beltoft-services' ),
-			),
-			'dns'               => array(
-				'claim'      => __( 'Reserve the domain', 'beltoft-services' ),
-				'zone'       => __( 'Create the DNS zone', 'beltoft-services' ),
-				'delegation' => __( 'Check the name servers', 'beltoft-services' ),
-			),
-		);
-	}
-
-	/**
-	 * The steps of a server reinstall and restore.
-	 *
-	 * @param string $kind reinstall, restore or rollback.
+	 * @param string $driver Driver id.
 	 * @return array<string, string>
 	 */
-	private static function server_steps( string $kind ): array {
-		if ( 'rollback' === $kind ) {
-			return array(
-				'rollback' => __( 'Go back to the snapshot', 'beltoft-services' ),
-				'plan'     => __( 'Apply your plan', 'beltoft-services' ),
-				'start'    => __( 'Start the server', 'beltoft-services' ),
-			);
-		}
+	private static function build_steps( string $driver ): array {
+		$found = Registry::get( $driver );
 
-		if ( 'restore' === $kind ) {
-			return array(
-				'restore' => __( 'Restore the backup', 'beltoft-services' ),
-				'plan'    => __( 'Apply your plan', 'beltoft-services' ),
-				'start'   => __( 'Start the server', 'beltoft-services' ),
-			);
-		}
-
-		return array(
-			'wipe'      => __( 'Erase the old system', 'beltoft-services' ),
-			'clone'     => __( 'Install the system', 'beltoft-services' ),
-			'configure' => __( 'Apply your settings', 'beltoft-services' ),
-			'start'     => __( 'Start the server', 'beltoft-services' ),
-			'ready'     => __( 'Final checks', 'beltoft-services' ),
-		);
+		return $found instanceof ProvisionSteps ? $found->step_labels() : array();
 	}
 
 	/**
@@ -200,9 +103,6 @@ final class Progress {
 	 * @param string $driver Driver id.
 	 */
 	private static function title( string $kind, string $driver, ?array $marker = null ): string {
-		$disk   = DiskDriver::ID === $driver;
-		$server = ProxmoxDriver::ID === $driver;
-
 		switch ( $kind ) {
 			case 'reinstall':
 				return __( 'Reinstalling your server', 'beltoft-services' );
@@ -213,20 +113,27 @@ final class Progress {
 			case 'delete':
 				return __( 'Removing your service', 'beltoft-services' );
 			case 'update':
-				return $disk ? __( 'Making your disk larger', 'beltoft-services' ) : __( 'Applying your change', 'beltoft-services' );
+				$title = __( 'Applying your change', 'beltoft-services' );
+				break;
 			case 'pause':
-				return $disk ? __( 'Detaching your disk', 'beltoft-services' ) : __( 'Pausing your service', 'beltoft-services' );
+				$title = __( 'Pausing your service', 'beltoft-services' );
+				break;
 			case 'resume':
 				return __( 'Starting your service again', 'beltoft-services' );
 			case 'action':
 				return $marker && '' !== $marker['label'] ? $marker['label'] : __( 'Working on your request', 'beltoft-services' );
 			default:
-				if ( $disk ) {
-					return __( 'Adding your disk', 'beltoft-services' );
-				}
-
-				return $server ? __( 'Setting up your server', 'beltoft-services' ) : __( 'Setting up your service', 'beltoft-services' );
+				$title = __( 'Setting up your service', 'beltoft-services' );
 		}
+
+		/**
+		 * The title of an update, a pause or a build of a kind of service (a server and a disk word these differently).
+		 *
+		 * @param string $title  The generic title.
+		 * @param string $kind   update, pause or build (any other kind of work).
+		 * @param string $driver Driver id.
+		 */
+		return (string) apply_filters( 'beltoft_services_progress_title', $title, $kind, $driver );
 	}
 
 	/**
@@ -305,10 +212,19 @@ final class Progress {
 			$phase = 'queued';
 		}
 
-		// The server is ready but its app is still being installed: the build is not over for the customer.
-		if ( '' === $kind && 'installing' === AppProgress::state( $r ) ) {
-			$kind  = 'app';
-			$phase = 'running';
+		if ( '' === $kind ) {
+			/**
+			 * A kind of work a service that looks idle is still doing (the app of a ready server being installed), or empty.
+			 *
+			 * @param string   $kind Empty by default.
+			 * @param Resource $r    Resource.
+			 */
+			$idle_kind = (string) apply_filters( 'beltoft_services_progress_idle_kind', '', $r );
+
+			if ( '' !== $idle_kind ) {
+				$kind  = $idle_kind;
+				$phase = 'running';
+			}
 		}
 
 		if ( '' === $kind ) {
@@ -367,16 +283,31 @@ final class Progress {
 			$minutes
 		) : '' );
 
+		$text  = 'running' === $phase && 'build' === $kind && \BeltoftServices\Emails\Emails::delay_running( $r ) ? __( "There's a delay setting up your service. We're on it.", 'beltoft-services' ) : ( '' !== $wait['text'] ? $wait['text'] : self::text( $kind, $phase, $marker, $eta, $driver ) );
+		$title = '' === $kind ? '' : self::title( $kind, $driver, $marker );
+
+		/**
+		 * The title and the sentence under it, which a kind of work may word itself (the install of an app does).
+		 *
+		 * @param array{title: string, text: string} $words Title and text.
+		 * @param Resource                           $r     Resource.
+		 * @param string                             $kind  Kind of work, empty when idle.
+		 * @param string                             $phase idle, queued, running or failed.
+		 * @param string                             $eta   The "usually about N minutes" sentence, or empty.
+		 */
+		$words = (array) apply_filters( 'beltoft_services_progress_text', array( 'title' => $title, 'text' => $text ), $r, $kind, $phase, $eta );
+		$words = array( 'title' => (string) ( $words['title'] ?? $title ), 'text' => (string) ( $words['text'] ?? $text ) );
+
 		return array(
 			'kind'    => $kind,
 			'phase'   => $phase,
 			'active'  => in_array( $phase, array( 'queued', 'running' ), true ),
-			'title'   => 'app' === $kind ? sprintf( /* translators: %s: app name such as WordPress */ __( 'Installing %s', 'beltoft-services' ), AppProgress::name( $r ) ) : ( '' === $kind ? '' : self::title( $kind, $driver, $marker ) ),
+			'title'   => $words['title'],
 			'steps'   => $steps,
 			'current' => $current,
 			'minutes' => $minutes,
 			'eta'     => $eta,
-			'text'    => 'app' === $kind ? trim( AppProgress::line( $r ) . '. ' . $eta ) : ( 'running' === $phase && 'build' === $kind && \BeltoftServices\Emails\Emails::delay_running( $r ) ? __( "There's a delay setting up your service. We're on it.", 'beltoft-services' ) : ( '' !== $wait['text'] ? $wait['text'] : self::text( $kind, $phase, $marker, $eta, $driver ) ) ),
+			'text'    => $words['text'],
 			'leave'   => in_array( $phase, array( 'queued', 'running' ), true ) ? ( '' !== $wait['leave'] ? $wait['leave'] : self::leave() ) : '',
 			'started' => self::started( $r, $kind, $marker ),
 			'note'    => $wait['note'],
@@ -519,38 +450,24 @@ final class Progress {
 	private static function steps( Resource $r, string $kind, string $driver, string $phase ): array {
 		$done = array();
 
-		if ( 'reinstall' === $kind && ProxmoxDriver::ID === $driver ) {
-			$labels = self::server_steps( 'reinstall' );
-			$done   = array_merge( array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) ), $r->get( 'wipe' ) ? array() : array( 'wipe' ) );
-		} elseif ( 'restore' === $kind && ProxmoxDriver::ID === $driver ) {
-			$labels = self::server_steps( 'restore' );
-			$state  = $r->get( 'restore' );
-			$phase  = is_array( $state ) ? (string) ( $state['phase'] ?? '' ) : '';
-			$order  = array( 'restored' => 1, 'planned' => 2 );
-			$count  = $order[ $phase ] ?? 0;
-			$done   = array_slice( array_keys( $labels ), 0, $count );
-		} elseif ( 'rollback' === $kind && ProxmoxDriver::ID === $driver ) {
-			$labels = self::server_steps( 'rollback' );
-			$state  = $r->get( 'snapshot_rollback' );
-			// No marker: the rollback itself is over and only its plan change is left.
-			$mark   = is_array( $state ) ? (string) ( $state['phase'] ?? '' ) : 'rolled';
-			$done   = array_slice( array_keys( $labels ), 0, 'rolled' === $mark ? 1 : 0 );
+		/**
+		 * The steps of a kind of work that is not a plain build: array( labels => key => label, done => keys done, phase => optional
+		 * phase to judge the steps by ), or null. The server feature answers for a reinstall, a restore, a rollback and an app install.
+		 *
+		 * @param array|null $work   Null by default.
+		 * @param Resource   $r      Resource.
+		 * @param string     $kind   Kind.
+		 * @param string     $driver Driver id.
+		 */
+		$work = apply_filters( 'beltoft_services_progress_work', null, $r, $kind, $driver );
+
+		if ( is_array( $work ) ) {
+			$labels = (array) ( $work['labels'] ?? array() );
+			$done   = (array) ( $work['done'] ?? array() );
+			$phase  = (string) ( $work['phase'] ?? $phase );
 		} elseif ( 'build' === $kind ) {
-			$labels = self::build_steps()[ $driver ] ?? array();
+			$labels = self::build_steps( $driver );
 			$done   = array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) );
-		} elseif ( 'app' === $kind ) {
-			// The server's own steps are over; the app's steps follow them.
-			$labels = self::build_steps()[ $driver ] ?? array();
-			$done   = array_keys( $labels );
-			$info   = AppProgress::steps( $r );
-
-			foreach ( $info['codes'] as $i => $code ) {
-				$labels[ 'app_' . $code ] = self::app_label( $code );
-
-				if ( false !== $info['at'] && $i < $info['at'] ) {
-					$done[] = 'app_' . $code;
-				}
-			}
 		} else {
 			$labels = array();
 		}
@@ -590,28 +507,24 @@ final class Progress {
 			);
 		}
 
-		// A server that will get an app lists the app's steps after its own, all still to do.
-		if ( in_array( $kind, array( 'build', 'reinstall' ), true ) && ProxmoxDriver::ID === $driver && AppProgress::planned( $r ) ) {
-			foreach ( AppProgress::steps( $r )['codes'] as $code ) {
-				$out[] = array(
-					'key'          => 'app_' . $code,
-					'label'        => self::app_label( $code ),
-					'status'       => 'todo',
-					'status_label' => self::status_label( 'todo' ),
-				);
-			}
+		/**
+		 * Steps still to do after the driver's own, key => label (a server that will get an app lists the app's steps).
+		 *
+		 * @param array<string, string> $extra  Empty by default.
+		 * @param Resource              $r      Resource.
+		 * @param string                $kind   Kind.
+		 * @param string                $driver Driver id.
+		 */
+		foreach ( (array) apply_filters( 'beltoft_services_progress_extra_steps', array(), $r, $kind, $driver ) as $key => $label ) {
+			$out[] = array(
+				'key'          => (string) $key,
+				'label'        => (string) $label,
+				'status'       => 'todo',
+				'status_label' => self::status_label( 'todo' ),
+			);
 		}
 
 		return $out;
-	}
-
-	/**
-	 * The words for a step of an app's install.
-	 *
-	 * @param string $code Step code.
-	 */
-	private static function app_label( string $code ): string {
-		return AppTab::step_labels()[ $code ] ?? __( 'Installing', 'beltoft-services' );
 	}
 
 	/**

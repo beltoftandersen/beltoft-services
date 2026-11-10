@@ -4,14 +4,26 @@ namespace BeltoftServices\Domains;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DnsDriver implements Driver, StopsOnDelete {
+final class DnsDriver implements Driver, StopsOnDelete, ProvisionSteps {
 	public function id(): string { return 'dns'; }
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'claim'        => __( 'Reserve the domain', 'beltoft-services' ),
+			'zone'         => __( 'Create the DNS zone', 'beltoft-services' ),
+			'delegation'   => __( 'Check the name servers', 'beltoft-services' ),
+		);
+	}
 	public function label(): string { return __( 'DNS hosting', 'beltoft-services' ); }
 	public function kind(): string { return 'dns'; }
 	public function unit_label( int $used, int $max ): string {

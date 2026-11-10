@@ -30,6 +30,23 @@ class DbDriver extends ProxmoxDriver {
 		return self::ID;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'ip'           => __( 'Reserve a public IP address', 'beltoft-services' ),
+			'net'          => __( 'Reserve a private address', 'beltoft-services' ),
+			'vmid'         => __( 'Prepare the server', 'beltoft-services' ),
+			'clone'        => __( 'Create the server', 'beltoft-services' ),
+			'configure'    => __( 'Apply your settings', 'beltoft-services' ),
+			'start'        => __( 'Start the server', 'beltoft-services' ),
+			'ready'        => __( 'Final checks', 'beltoft-services' ),
+			'db_init'      => __( 'Set up the database', 'beltoft-services' ),
+			'db_ready'     => __( 'Check the database', 'beltoft-services' ),
+		);
+	}
+
 	public function label(): string {
 		return __( 'Managed database', 'beltoft-services' );
 	}

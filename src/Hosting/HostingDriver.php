@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Resource;
@@ -24,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * The delete stops the container itself before it destroys it (StopsOnDelete), like the Proxmox driver.
  */
-class HostingDriver implements Driver, StopsOnDelete, NeedsBilling {
+class HostingDriver implements Driver, StopsOnDelete, NeedsBilling, ProvisionSteps {
 
 	/**
 	 * Driver id.
@@ -55,6 +56,28 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling {
 	 */
 	public function id(): string {
 		return self::ID;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'place'        => __( 'Reserve resources', 'beltoft-services' ),
+			'ip'           => __( 'Reserve an address', 'beltoft-services' ),
+			'vmid'         => __( 'Prepare your container', 'beltoft-services' ),
+			'clone'        => __( 'Create your container', 'beltoft-services' ),
+			'configure'    => __( 'Apply your plan', 'beltoft-services' ),
+			'start'        => __( 'Start your container', 'beltoft-services' ),
+			'prepare'      => __( 'Prepare the system', 'beltoft-services' ),
+			'db'           => __( 'Create the database', 'beltoft-services' ),
+			'site'         => __( 'Install WordPress', 'beltoft-services' ),
+			'edge'         => __( 'Connect the web server', 'beltoft-services' ),
+			'dns'          => __( 'Publish the address', 'beltoft-services' ),
+			'verify'       => __( 'Check your website', 'beltoft-services' ),
+			'mail'         => __( 'Set up website mail', 'beltoft-services' ),
+			'ready'        => __( 'Final checks', 'beltoft-services' ),
+		);
 	}
 
 	/**
