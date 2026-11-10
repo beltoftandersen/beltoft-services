@@ -13,7 +13,6 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
-use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -97,193 +96,44 @@ final class Panel {
 			return self::error( 'closed' );
 		}
 
-		$who        = self::who();
-		$license_id = (int) ( $r->license()['id'] ?? 0 );
+		$who = self::who();
 
 		switch ( $action ) {
 			case 'retry':
-				$stored = $r->locked(
-					static function () use ( $r, $who, $license_id ): bool {
-						if ( ! $r->reset_retries() ) {
-							return false;
-						}
-
-						Events::add( $license_id, 'service', sprintf( 'Retry requested by %s', $who ) );
-						return true;
-					}
-				);
+				$result = Actions::retry( $r, $who );
 				break;
 
 			case 'pause':
 			case 'resume':
-				if ( 'deleted' === $r->get( 'desired' ) ) {
-					return self::error( 'deleting' );
-				}
-
-				if ( 'resume' === $action && $r->on_hold() ) {
-					return self::error( 'hold' );
-				}
-
-				// Stored now, or queued for the next step when the lock is busy.
-				$r->desire( 'pause' === $action ? 'paused' : 'ready', sprintf( 'pause' === $action ? 'Paused by %s' : 'Resumed by %s', $who ) );
-				$stored = true;
+				$result = Actions::pause_resume( $r, $who, $action );
 				break;
 
 			case 'delete':
-				if ( self::CONFIRM !== $confirm ) {
-					return self::error( 'confirm' );
-				}
-
-				$refused = false;
-				$stored  = $r->locked(
-					static function () use ( $r, $who, &$refused ): bool {
-						if ( $r->get( 'protected' ) ) {
-							$refused = true;
-							return false;
-						}
-
-						// The lock is re-entrant within this connection.
-						return $r->desire( 'deleted', sprintf( 'Deletion requested by %s', $who ), false );
-					}
-				);
-
-				if ( $refused ) {
-					return self::error( 'protected' );
-				}
+				$result = Actions::delete( $r, $who, $confirm );
 				break;
 
 			case 'suspend':
-				if ( self::CONFIRM_SUSPEND !== $confirm ) {
-					return self::error( 'confirm_suspend' );
-				}
-
-				$reason = trim( wp_strip_all_tags( $reason ) );
-
-				if ( '' === $reason ) {
-					return self::error( 'reason' );
-				}
-
-				$reason  = function_exists( 'mb_substr' ) ? mb_substr( $reason, 0, self::REASON_MAX ) : substr( $reason, 0, self::REASON_MAX );
-				$refused = '';
-				$stored  = $r->locked(
-					static function () use ( $r, $who, $reason, &$refused ): bool {
-						if ( 'deleted' === $r->get( 'desired' ) ) {
-							$refused = 'deleting';
-							return false;
-						}
-
-						if ( $r->on_hold() ) {
-							$refused = 'held';
-							return false;
-						}
-
-						if ( ! $r->set(
-							array(
-								'breach_at'     => time(),
-								'breach_reason' => $reason,
-							)
-						) ) {
-							return false;
-						}
-
-						// The license is marked too: the mark outlives the service.
-						\BeltoftServices\Breach::mark( (int) ( $r->license()['id'] ?? 0 ), $reason );
-
-						// The lock is re-entrant within this connection. Stored or queued: the hold is
-						// in place either way, so a resume is refused from here on.
-						$r->desire( 'paused', sprintf( 'Suspended for breach by %1$s: %2$s', $who, $reason ) );
-						return true;
-					}
-				);
-
-				if ( '' !== $refused ) {
-					return self::error( $refused );
-				}
+				$result = Actions::suspend( $r, $who, $confirm, $reason );
 				break;
 
 			case 'lift_hold':
-				if ( self::CONFIRM_LIFT !== $confirm ) {
-					return self::error( 'confirm_lift' );
-				}
-
-				$refused = '';
-				$stored  = $r->locked(
-					static function () use ( $r, $who, $license_id, &$refused ): bool {
-						if ( ! $r->on_hold() ) {
-							$refused = 'no_hold';
-							return false;
-						}
-
-						$active = \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $r->license() );
-						$meta   = array(
-							'breach_at'      => null,
-							'breach_reason'  => '',
-							'breach_alerted' => null,
-						);
-
-						// Still paused: the retention period starts now, never from the pause the hold began.
-						if ( ! $active ) {
-							$meta['paused_at'] = time();
-							$meta['warned_at']       = null;
-							$meta['warn_started_at'] = null;
-							$meta['warn_alerted']    = null;
-							$meta['reported']        = '';
-						}
-
-						if ( ! $r->set( $meta ) ) {
-							return false;
-						}
-
-						\BeltoftServices\Breach::clear( $license_id );
-
-						$text = sprintf( 'Breach hold lifted by %s', $who );
-
-						if ( $active ) {
-							$r->desire( 'ready', $text );
-						} else {
-							Events::add( $license_id, 'service', $text );
-						}
-
-						return true;
-					}
-				);
-
-				if ( '' !== $refused ) {
-					return self::error( $refused );
-				}
+				$result = Actions::lift_hold( $r, $who, $confirm );
 				break;
 
 			case 'mark_deleted':
-				if ( self::CONFIRM_MARK !== $confirm ) {
-					return self::error( 'confirm_mark' );
-				}
-
-				return self::mark_deleted( $r, $who );
+				$result = Actions::mark_deleted( $r, $who, $confirm );
+				break;
 
 			case 'quarantine_lift':
-				// Queued: the firewall job restores the outgoing policy and clears the flag when Proxmox shows it.
-				return \BeltoftServices\Proxmox\Quarantine::request_lift( $r, $who ) ? true : self::error( 'no_quarantine' );
+				$result = Actions::quarantine_lift( $r, $who );
+				break;
 
 			default:
-				$protect = 'protect' === $action;
-				$stored  = $r->locked(
-					static function () use ( $r, $who, $license_id, $protect ): bool {
-						if ( ! $r->set( array( 'protected' => $protect ) ) ) {
-							return false;
-						}
-
-						Events::add( $license_id, 'service', sprintf( $protect ? 'Protected by %s' : 'Unprotected by %s', $who ) );
-						return true;
-					}
-				);
+				$result = Actions::protect( $r, $who, 'protect' === $action );
 		}
 
-		if ( null === $stored ) {
-			return self::error( 'busy' );
-		}
-
-		if ( false === $stored ) {
-			return self::error( 'error' );
+		if ( true !== $result ) {
+			return self::error( $result );
 		}
 
 		if ( in_array( $action, array( 'retry', 'pause', 'resume', 'delete', 'suspend', 'lift_hold' ), true ) ) {
@@ -334,71 +184,6 @@ final class Panel {
 		if ( $marked ) {
 			\BeltoftServices\Breach::clear( $license_id );
 			Events::add( $license_id, 'service', sprintf( 'Breach mark cleared by %s', self::who() ) );
-		}
-
-		return true;
-	}
-
-	/**
-	 * Closes a resource as deleted without any driver call, under its lock, and tells
-	 * listeners (the resource is closed first).
-	 *
-	 * @param Resource $r   Resource.
-	 * @param string   $who Admin login.
-	 * @return true|\WP_Error
-	 */
-	private static function mark_deleted( Resource $r, string $who ) {
-		$old     = '';
-		$refused = false;
-		$stored  = $r->locked(
-			static function () use ( $r, $who, &$old, &$refused ): bool {
-				if ( $r->get( 'protected' ) ) {
-					$refused = true;
-					return false;
-				}
-
-				$old = $r->get( 'state' );
-
-				$cleared = $r->set(
-					array_merge(
-						Resource::retry_reset(),
-						array(
-							'desired'              => 'deleted',
-							'desired_at'           => microtime( true ),
-							'replace_after_delete' => false,
-							'failed_op'            => '',
-							'failed_desired'       => '',
-						)
-					)
-				);
-
-				// Silent on purpose: the notify below follows the close (see Resource::transition()).
-				if ( ! $cleared || ! $r->transition( 'deleted', sprintf( 'Marked deleted by %s, without calling the service', $who ) ) ) {
-					return false;
-				}
-
-				$r->close();
-				return true;
-			}
-		);
-
-		if ( $refused ) {
-			return self::error( 'protected' );
-		}
-
-		if ( null === $stored ) {
-			return self::error( 'busy' );
-		}
-
-		if ( ! $stored ) {
-			return self::error( 'error' );
-		}
-
-		delete_option( Resource::pending_desire_option( $r->id() ) );
-		Alerts::clear_problem( $r->id() );
-
-		if ( 'deleted' !== $old ) {
-			Reconciler::notify( $r, $old, 'deleted' );
 		}
 
 		return true;

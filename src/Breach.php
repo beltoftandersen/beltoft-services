@@ -112,4 +112,106 @@ final class Breach {
 
 		return true;
 	}
+
+	/**
+	 * Puts a service on breach hold, under its lock: the license is marked, the service paused
+	 * and nothing but lift() resumes it. Returns true, false when a write failed, null when the
+	 * lock is busy, or the refusal code ("deleting", "held").
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $who    Admin login.
+	 * @param string   $reason Why (already cleaned).
+	 * @return bool|string|null
+	 */
+	public static function suspend( Resource $r, string $who, string $reason ) {
+		$refused = '';
+		$stored  = $r->locked(
+			static function () use ( $r, $who, $reason, &$refused ): bool {
+				if ( 'deleted' === $r->get( 'desired' ) ) {
+					$refused = 'deleting';
+					return false;
+				}
+
+				if ( $r->on_hold() ) {
+					$refused = 'held';
+					return false;
+				}
+
+				if ( ! $r->set(
+					array(
+						'breach_at'     => time(),
+						'breach_reason' => $reason,
+					)
+				) ) {
+					return false;
+				}
+
+				// The license is marked too: the mark outlives the service.
+				self::mark( (int) ( $r->license()['id'] ?? 0 ), $reason );
+
+				// The lock is re-entrant within this connection. Stored or queued: the hold is
+				// in place either way, so a resume is refused from here on.
+				$r->desire( 'paused', sprintf( 'Suspended for breach by %1$s: %2$s', $who, $reason ) );
+				return true;
+			}
+		);
+
+		return '' !== $refused ? $refused : $stored;
+	}
+
+	/**
+	 * Lifts the breach hold, under the resource lock: ready on an active license, otherwise paused
+	 * with the retention counted from now. Returns true, false when a write failed, null when the
+	 * lock is busy, or the refusal code ("no_hold").
+	 *
+	 * @param Resource $r   Resource.
+	 * @param string   $who Admin login.
+	 * @return bool|string|null
+	 */
+	public static function lift( Resource $r, string $who ) {
+		$license_id = (int) ( $r->license()['id'] ?? 0 );
+		$refused    = '';
+		$stored     = $r->locked(
+			static function () use ( $r, $who, $license_id, &$refused ): bool {
+				if ( ! $r->on_hold() ) {
+					$refused = 'no_hold';
+					return false;
+				}
+
+				$active = \BeltoftLicenses\Licenses::STATUS_ACTIVE === \BeltoftLicenses\Licenses::effective_status( $r->license() );
+				$meta   = array(
+					'breach_at'      => null,
+					'breach_reason'  => '',
+					'breach_alerted' => null,
+				);
+
+				// Still paused: the retention period starts now, never from the pause the hold began.
+				if ( ! $active ) {
+					$meta['paused_at']       = time();
+					$meta['warned_at']       = null;
+					$meta['warn_started_at'] = null;
+					$meta['warn_alerted']    = null;
+					$meta['reported']        = '';
+				}
+
+				if ( ! $r->set( $meta ) ) {
+					return false;
+				}
+
+				self::clear( $license_id );
+
+				$text = sprintf( 'Breach hold lifted by %s', $who );
+
+				if ( $active ) {
+					$r->desire( 'ready', $text );
+				} else {
+					Events::add( $license_id, 'service', $text );
+				}
+
+				return true;
+			}
+		);
+
+		return '' !== $refused ? $refused : $stored;
+	}
 }

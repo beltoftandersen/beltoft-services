@@ -22,8 +22,7 @@ class TransitionCallersTest extends TestCase {
 	 * @var array<string, string>
 	 */
 	private const ALLOWED = array(
-		'Reconciler.php'            => 'move() is the path that notifies: it calls transition() and then notify().',
-		'Admin/Panel.php'           => 'The forced delete calls Reconciler::notify() itself right after the transition and the close.',
+		'Reconciler.php'            => 'move() is the path that notifies: it calls transition() and then notify(); mark_deleted() calls notify() itself right after the transition and the close.',
 		'Proxmox/AppLicence.php'    => 'Announces "cancelled" itself; a notify would add the generic deleted email on top.',
 		'Proxmox/DiskMeta.php'      => 'Releases the disk capacity itself; a notify would release twice through DiskMeta::state_changed.',
 		'Proxmox/SnapshotMeta.php'  => 'The parent server\'s own deleted email covers the customer; the pack has no secrets or children.',
