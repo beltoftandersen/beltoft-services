@@ -600,4 +600,143 @@ final class EmailsTest extends TestCase {
 
 		$this->assertEqualsCanonicalizing( \BeltoftServices\Emails\Definitions::ids(), $seen );
 	}
+
+	/**
+	 * The template values of an email sent about a resource of the given driver id.
+	 *
+	 * @param string $driver Driver id of the resource.
+	 * @param string $id     Email id.
+	 * @return array<string, mixed>
+	 */
+	private function values_for( string $driver, string $id = 'beltoft_services_ready' ): array {
+		$this->fake_driver( $driver );
+		$product  = $this->service_product( $driver );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( $driver ), array(), array( 'state' => 'ready' ) )->id() );
+		$email    = Emails::get( $id );
+
+		$email->trigger( $resource, array() );
+
+		$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
+		$property->setAccessible( true );
+
+		return $property->getValue( $email );
+	}
+
+	public function test_service_email_names_no_feature(): void {
+		$source = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Emails/ServiceEmail.php' );
+
+		foreach ( array( 'Proxmox\\', 'Mail\\', 'Domains\\', 'Hosting\\', 'Ssl\\' ) as $namespace ) {
+			$this->assertStringNotContainsString( $namespace, $source, $namespace );
+		}
+	}
+
+	public function test_every_email_renders_in_html_and_plain_with_the_feature_filters_removed(): void {
+		$this->fake_driver();
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) )->id() );
+
+		remove_all_filters( 'beltoft_services_email_values' );
+
+		foreach ( Emails::ids() as $id ) {
+			$email = Emails::get( $id );
+
+			if ( $email instanceof \BeltoftServices\Emails\StepUpCode ) {
+				continue;
+			}
+
+			$email->trigger( $resource, array( 'deletes_at' => time() + DAY_IN_SECONDS ) );
+
+			$this->assertNotSame( '', trim( (string) $email->get_content_html() ), $id );
+			$this->assertNotSame( '', trim( (string) $email->get_content_plain() ), $id );
+		}
+	}
+
+	public function test_the_values_array_is_unchanged_for_a_vm_a_domain_a_mail_a_hosting_and_an_ssl_resource(): void {
+		$golden = array(
+			'account_url',
+			'app_domain',
+			'app_ip',
+			'app_name',
+			'app_www',
+			'app_www_state',
+			'customer_name',
+			'deletes_on',
+			'deletion_date',
+			'details',
+			'disk_guide_url',
+			'disk_server_url',
+			'dns_choice',
+			'dns_external',
+			'dns_only',
+			'dns_stays',
+			'domain_action_reason',
+			'domain_name',
+			'domain_renews',
+			'domain_security_event',
+			'domains_url',
+			'extra_disks',
+			'held',
+			'hosting',
+			'hosting_notice',
+			'hosting_restore',
+			'limit',
+			'mail_domain',
+			'mail_external',
+			'mail_guide_url',
+			'mail_host',
+			'mail_imap',
+			'mail_records',
+			'mail_smtp',
+			'monitor_cpu_hours',
+			'monitor_cpu_percent',
+			'monitor_cpu_since',
+			'monitor_disk_percent',
+			'monitor_disk_total',
+			'monitor_disk_used',
+			'monitor_disks_url',
+			'monitor_grow_url',
+			'monitor_reason',
+			'monitor_upgrade_url',
+			'nameservers',
+			'nameservers_shown',
+			'notice_app',
+			'notice_kind',
+			'notice_what',
+			'our_nameservers',
+			'product_name',
+			'quarantine_at',
+			'quarantine_counts',
+			'quarantine_signal',
+			'reason',
+			'registrar_name',
+			'renewal',
+			'retention_days',
+			'snapshot_reason',
+			'ssl',
+			'transfer_fix_reason',
+			'usage',
+			'used',
+		);
+
+		foreach ( array( 'proxmox', 'domain', 'mail', 'hosting', 'ssl' ) as $driver ) {
+			$keys = array_keys( $this->values_for( $driver ) );
+			sort( $keys );
+
+			$this->assertSame( $golden, $keys, $driver );
+		}
+	}
+
+	public function test_the_value_defaults_cover_exactly_the_keys_the_features_add(): void {
+		$all   = array_keys( $this->values_for( 'fake' ) );
+		$bare  = array( 'product_name', 'customer_name', 'account_url', 'deletion_date', 'reason', 'held', 'retention_days', 'deletes_on', 'details', 'used', 'limit', 'usage', 'domain_name', 'notice_kind', 'notice_what', 'notice_app', 'renewal' );
+		$added = array_values( array_diff( $all, $bare ) );
+		$have  = array_keys( \BeltoftServices\Emails\ValueDefaults::all() );
+
+		sort( $added );
+		sort( $have );
+
+		$this->assertSame( $added, $have );
+	}
 }
