@@ -8,7 +8,7 @@
 namespace BeltoftServices\Usage;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;

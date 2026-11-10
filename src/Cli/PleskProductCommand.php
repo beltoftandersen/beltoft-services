@@ -8,8 +8,8 @@
 namespace BeltoftServices\Cli;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\PleskLicence;
+use BeltoftServices\Apps\AppLicenceDriver;
+use BeltoftServices\Apps\PleskLicence;
 
 defined( 'ABSPATH' ) || exit;
 

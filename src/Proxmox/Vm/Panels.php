@@ -9,7 +9,7 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppProgress;
+use BeltoftServices\Apps\AppProgress;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Proxmox\Network\Firewall;

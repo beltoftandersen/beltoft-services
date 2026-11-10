@@ -71,7 +71,7 @@ class DiskCapacityTest extends BackupTestCase {
 			888888 => array( 'cluster' => 'lab', 'node' => 'node-a', 'storage' => 'disk-store', 'gb' => 50, 'at' => time() ),
 		), false );
 		$this->assertTrue( $live->is_live() );
-		\BeltoftServices\Proxmox\Jobs\CapacityJobs::capacity();
+		\BeltoftServices\Proxmox\Pve\CapacityJobs::capacity();
 		$left = array_keys( (array) get_option( DiskCapacity::RESERVATIONS ) );
 		sort( $left );
 		$expected = array( 888888, $live->id() );

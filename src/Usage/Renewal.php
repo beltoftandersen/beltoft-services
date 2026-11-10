@@ -109,8 +109,8 @@ final class Renewal {
 		$product = wc_get_product( (int) ( $resource->license()['product_id'] ?? 0 ) );
 
 		// The licence of an app is shown with its server: "web1 (Plesk)".
-		if ( \BeltoftServices\Proxmox\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
-			$server = \BeltoftServices\Proxmox\AppLicence::server_of( $resource );
+		if ( \BeltoftServices\Apps\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
+			$server = \BeltoftServices\Apps\AppLicence::server_of( $resource );
 			$name   = $server ? (string) $server->get( 'server_name' ) : '';
 			$label  = $product ? $product->get_name() : '#' . $resource_id;
 

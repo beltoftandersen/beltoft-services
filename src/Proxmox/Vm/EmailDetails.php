@@ -9,9 +9,9 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\ServiceEmail;
-use BeltoftServices\Proxmox\AppLicence;
-use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\AppLicenceDriver;
+use BeltoftServices\Apps\Apps;
 use BeltoftServices\Proxmox\Db\DbAccess;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDriver;

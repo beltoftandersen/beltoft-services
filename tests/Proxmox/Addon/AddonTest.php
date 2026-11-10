@@ -4,9 +4,9 @@
 namespace BeltoftServices\Tests\Proxmox\Addon;
 
 use BeltoftServices\Proxmox\Addon\Addon;
-use BeltoftServices\Proxmox\AppLicence;
-use BeltoftServices\Proxmox\AppLicenceCart;
-use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\AppLicenceCart;
+use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\Stock;

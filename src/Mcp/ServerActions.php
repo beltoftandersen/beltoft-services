@@ -13,7 +13,7 @@ use BeltoftServices\Mail\MailClients;
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Mail\MailRoutes;
 use BeltoftServices\Proxmox\Vm\Actions;
-use BeltoftServices\Proxmox\AppReinstallPaid;
+use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Db\DbAccess;

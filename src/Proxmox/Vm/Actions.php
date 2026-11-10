@@ -9,7 +9,7 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\AppInstall;
+use BeltoftServices\Apps\AppInstall;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Network\Firewall;

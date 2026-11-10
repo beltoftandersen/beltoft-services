@@ -132,12 +132,12 @@ class TilesTest extends TestCase {
 		$this->assertSame( 'ubuntu-24.04', $items[0]['attrs']['data-family'] );
 		$this->assertSame( 'debian-13', $items[1]['attrs']['data-family'] );
 
-		$this->assertSame( array( 'ubuntu-24.04', 'debian-13' ), \BeltoftServices\Proxmox\Apps::families( array( array( 'os' => array( 'ubuntu-24.04' ) ), array( 'os' => array( 'ubuntu-24.04', 'debian-13' ) ), null ) ) );
-		$this->assertSame( 'Runs on Ubuntu 24.04', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'ubuntu-24.04' ) ) );
-		$this->assertSame( 'Runs on Ubuntu 24.04 or Debian 13', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'ubuntu-24.04', 'debian-13' ) ) );
-		$this->assertSame( 'Runs on Rocky 9', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array( 'rocky-9' ) ), 'A family without a template still gets a name.' );
-		$this->assertSame( '', \BeltoftServices\Proxmox\Apps::runs_on( $cluster, array() ) );
-		$this->assertSame( 'WordPress runs on Ubuntu 24.04, so no app is selected now.', \BeltoftServices\Proxmox\Apps::dropped_text( $cluster, array( 'ubuntu-24.04' ), 'WordPress' ) );
+		$this->assertSame( array( 'ubuntu-24.04', 'debian-13' ), \BeltoftServices\Apps\Apps::families( array( array( 'os' => array( 'ubuntu-24.04' ) ), array( 'os' => array( 'ubuntu-24.04', 'debian-13' ) ), null ) ) );
+		$this->assertSame( 'Runs on Ubuntu 24.04', \BeltoftServices\Apps\Apps::runs_on( $cluster, array( 'ubuntu-24.04' ) ) );
+		$this->assertSame( 'Runs on Ubuntu 24.04 or Debian 13', \BeltoftServices\Apps\Apps::runs_on( $cluster, array( 'ubuntu-24.04', 'debian-13' ) ) );
+		$this->assertSame( 'Runs on Rocky 9', \BeltoftServices\Apps\Apps::runs_on( $cluster, array( 'rocky-9' ) ), 'A family without a template still gets a name.' );
+		$this->assertSame( '', \BeltoftServices\Apps\Apps::runs_on( $cluster, array() ) );
+		$this->assertSame( 'WordPress runs on Ubuntu 24.04, so no app is selected now.', \BeltoftServices\Apps\Apps::dropped_text( $cluster, array( 'ubuntu-24.04' ), 'WordPress' ) );
 
 		ob_start();
 		Tiles::print_group(

@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
-use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskGuide;

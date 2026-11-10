@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Proxmox\Network;
 
-use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Apps\Apps;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;

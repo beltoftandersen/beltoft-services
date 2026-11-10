@@ -23,7 +23,7 @@ use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 use BeltoftServices\Proxmox\Vm\AbuseJobs;
-use BeltoftServices\Proxmox\Jobs\CapacityJobs;
+use BeltoftServices\Proxmox\Pve\CapacityJobs;
 use BeltoftServices\Proxmox\Vm\PasswordJobs;
 use BeltoftServices\Proxmox\Vm\PowerJobs;
 

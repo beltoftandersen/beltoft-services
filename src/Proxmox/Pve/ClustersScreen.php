@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Apps\Apps;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Settings;
 

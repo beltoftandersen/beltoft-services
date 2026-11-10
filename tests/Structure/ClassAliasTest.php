@@ -25,6 +25,8 @@ class ClassAliasTest extends TestCase {
 		$old = 'BeltoftServices\\Proxmox\\';
 
 		return array(
+			$old . 'AppField'    => array( 'BeltoftServices\\Apps\\AppField', 'offer_for', 'POST_APP,POST_TIER,POST_VERSION' ),
+			$old . 'AppLicence'  => array( 'BeltoftServices\\Apps\\AppLicence', 'tier', '' ),
 			$old . 'Backups'     => array( 'BeltoftServices\\Proxmox\\Backup\\Backups', 'sibling', '' ),
 			$old . 'DbIpField'   => array( 'BeltoftServices\\Proxmox\\Db\\DbIpField', 'cart_has_new_database', '' ),
 			$old . 'DiskField'   => array( 'BeltoftServices\\Proxmox\\Disk\\DiskField', 'cart_server', '' ),
@@ -64,10 +66,10 @@ class ClassAliasTest extends TestCase {
 			$this->assertSame( $target, ( new \ReflectionClass( $old ) )->getName() );
 			$this->assertTrue( is_callable( array( $old, $method ) ), $old . '::' . $method );
 
-			if ( '' !== $const ) {
+			foreach ( array_filter( explode( ',', $const ) ) as $name ) {
 				// The theme reads constants through the old name; defined() must trigger the autoloader.
-				$this->assertTrue( defined( $old . '::' . $const ), $old . '::' . $const );
-				$this->assertSame( constant( $target . '::' . $const ), constant( $old . '::' . $const ) );
+				$this->assertTrue( defined( $old . '::' . $name ), $old . '::' . $name );
+				$this->assertSame( constant( $target . '::' . $name ), constant( $old . '::' . $name ) );
 			}
 		}
 	}
