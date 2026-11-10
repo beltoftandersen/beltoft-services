@@ -1,6 +1,6 @@
 <?php
 /**
- * Recurring Proxmox jobs (registrar, hook names, schedule; the work is in Proxmox\Jobs\*): capacity cache, power state, abuse report, disk readings, password purge.
+ * Recurring Proxmox jobs (registrar, hook names, schedule; the work is in Proxmox\Pve\CapacityJobs and Proxmox\Vm\PowerJobs, AbuseJobs, DiskJobs and PasswordJobs): capacity cache, power state, abuse report, disk readings, password purge.
  *
  * @package BeltoftServices
  */
