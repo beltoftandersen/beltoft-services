@@ -16,10 +16,17 @@ defined( 'ABSPATH' ) || exit;
 final class Clients {
 
 	/**
+	 * The shared live/fake gate.
+	 */
+	private static function gate_object(): LiveGate {
+		return new LiveGate( 'BELTOFT_SERVICES_PROXMOX_LIVE', '', 'Set the site tag for cluster %s' );
+	}
+
+	/**
 	 * Whether wp-config.php allows live Proxmox calls.
 	 */
 	public static function live_allowed(): bool {
-		return defined( 'BELTOFT_SERVICES_PROXMOX_LIVE' ) && true === constant( 'BELTOFT_SERVICES_PROXMOX_LIVE' );
+		return self::gate_object()->live_allowed();
 	}
 
 	/**
@@ -30,7 +37,7 @@ final class Clients {
 	 * @param bool                 $allowed Whether wp-config.php allows live calls.
 	 */
 	public static function untagged( array $cluster, bool $allowed ): bool {
-		return $allowed && 'live' === ( $cluster['client'] ?? 'fake' ) && '' === ProxmoxSettings::explicit_site_tag();
+		return self::gate_object()->untagged( $cluster, $allowed );
 	}
 
 	/**
@@ -43,14 +50,7 @@ final class Clients {
 	 * @param bool                 $allowed Whether wp-config.php allows live calls.
 	 */
 	public static function gate( string $id, array $cluster, bool $allowed ): ?string {
-		if ( ! self::untagged( $cluster, $allowed ) ) {
-			return null;
-		}
-
-		\BeltoftServices\Alerts::site_tag( $id );
-
-		/* Admin text, not shown to customers. */
-		return sprintf( 'Set the site tag for cluster %s', $id );
+		return self::gate_object()->gate( $id, $cluster, $allowed );
 	}
 
 	/**
@@ -61,7 +61,7 @@ final class Clients {
 	 * @return string 'live' or 'fake'.
 	 */
 	public static function kind( array $cluster, bool $allowed ): string {
-		return $allowed && 'live' === ( $cluster['client'] ?? 'fake' ) ? 'live' : 'fake';
+		return self::gate_object()->kind( $cluster, $allowed );
 	}
 
 	/**
