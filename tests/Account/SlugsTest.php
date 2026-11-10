@@ -306,11 +306,19 @@ class SlugsTest extends TestCase {
 		$this->assertSame( $area->url( $db->license() ), $area->row( $this->views( $db )[0], $db )['url'] );
 		$this->assertSame( Domains::url( $domain->license() ), DomainRows::row( $this->views( $domain )[0], $domain )['url'] );
 
-		$method = new \ReflectionMethod( ServiceEmail::class, 'account_url' );
-		$method->setAccessible( true );
-		$this->assertSame( ServerLinks::url( $server->license() ), $method->invoke( null, $server, $server->license(), array() ) );
-		$this->assertSame( $area->url( $db->license() ), $method->invoke( null, $db, $db->license(), array() ) );
-		$this->assertSame( Domains::url( $domain->license() ), $method->invoke( null, $domain, $domain->license(), array() ) );
+		// The link of the email's "view in your account" button, as the email's template values carry it.
+		$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
+		$property->setAccessible( true );
+		$link = static function ( $resource ) use ( $property ): string {
+			$email = new \BeltoftServices\Emails\Ready();
+			$email->trigger( $resource, array() );
+
+			return (string) $property->getValue( $email )['account_url'];
+		};
+
+		$this->assertSame( ServerLinks::url( $server->license() ), $link( $server ) );
+		$this->assertSame( $area->url( $db->license() ), $link( $db ) );
+		$this->assertSame( Domains::url( $domain->license() ), $link( $domain ) );
 		$this->assertStringNotContainsString( '/' . $server->license()['id'] . '/', ServerLinks::url( $server->license() ) );
 	}
 
