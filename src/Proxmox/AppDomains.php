@@ -111,7 +111,7 @@ final class AppDomains {
 		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			return __( 'The server address is not known yet.', 'beltoft-services' );
 		}
-		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) || ( $fqdn !== $zone && ! str_ends_with( $fqdn, '.' . $zone ) ) ) {
+		if ( $fqdn !== $zone && ! str_ends_with( $fqdn, '.' . $zone ) ) {
 			return __( 'The domain is not one of your domains on our name servers.', 'beltoft-services' );
 		}
 		$rows   = array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => $ip ) );
