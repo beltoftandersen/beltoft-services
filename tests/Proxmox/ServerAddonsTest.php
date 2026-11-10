@@ -94,6 +94,23 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		return (string) ob_get_clean();
 	}
 
+	public function test_a_disk_already_deleted_is_still_closed_and_alerted_when_its_server_is_deleted(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+
+		// The disk went to deleted on its own and its activation is still open (as at 6d95431).
+		$this->assertTrue( $disk->transition( 'deleted', 'Deleted before its server' ) );
+		$this->assertTrue( $this->fresh( $disk )->is_live() );
+
+		$this->assertTrue( $server->transition( 'deleted', 'Deleted for the test' ) );
+		Reconciler::notify( $server, 'ready', 'deleted' );
+
+		$fresh = $this->fresh( $disk );
+		$this->assertFalse( $fresh->is_live() );
+		$alerts = array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'Resource: ' . $fresh->id() . "\n" ) );
+		$this->assertCount( 1, $alerts );
+	}
+
 	public function test_the_add_on_cascade_runs_after_the_servers_own_clean_up(): void {
 		global $wp_filter;
 

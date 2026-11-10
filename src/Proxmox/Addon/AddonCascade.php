@@ -31,7 +31,7 @@ final class AddonCascade {
 
 		foreach ( Addon::all() as $a ) {
 			foreach ( AddonLink::for_server( $a, $resource ) as $addon ) {
-				if ( 'deleted' === $addon->get( 'state' ) ) {
+				if ( $a->skips_deleted && 'deleted' === $addon->get( 'state' ) ) {
 					continue;
 				}
 
