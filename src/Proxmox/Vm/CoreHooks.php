@@ -43,6 +43,53 @@ final class CoreHooks {
 		add_filter( 'beltoft_services_thankyou_dashboard_url', array( __CLASS__, 'dashboard_url' ), 10, 2 );
 		add_action( 'beltoft_services_product_panel_after_driver', array( __CLASS__, 'picker_field' ), 10, 2 );
 		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_picker' ) );
+		add_filter( 'beltoft_services_line_label', array( __CLASS__, 'line_label' ), 10, 3 );
+		add_filter( 'beltoft_services_line_rows', array( __CLASS__, 'line_rows' ), 10, 2 );
+	}
+
+	/**
+	 * The name of an extra disk line says which server it is for.
+	 *
+	 * @param mixed $label          The name so far.
+	 * @param mixed $driver_id      The driver of the product.
+	 * @param mixed $disk_server_id The licence id of the server, when known.
+	 * @return mixed
+	 */
+	public static function line_label( $label, $driver_id = '', $disk_server_id = 0 ) {
+		if ( DiskDriver::ID !== $driver_id || ! $disk_server_id ) {
+			return $label;
+		}
+
+		$server = is_numeric( $disk_server_id ) ? Resource::for_license( (int) $disk_server_id ) : null;
+		$on     = $server ? ServerName::of( $server ) : '';
+
+		if ( '' === $on ) {
+			return $label;
+		}
+
+		/* translators: 1: "Extra disk 50 GB", 2: server name. */
+		return sprintf( __( '%1$s for %2$s', 'beltoft-services' ), $label, $on );
+	}
+
+	/**
+	 * The server name a customer chose is a row of the order line.
+	 *
+	 * @param mixed $rows Label => html.
+	 * @param mixed $item The order line.
+	 * @return mixed
+	 */
+	public static function line_rows( $rows, $item = null ) {
+		if ( ! is_array( $rows ) || ! $item instanceof \WC_Order_Item ) {
+			return $rows;
+		}
+
+		$server = trim( (string) $item->get_meta( ServerName::ITEM_META ) );
+
+		if ( '' !== $server ) {
+			$rows[ __( 'Server name', 'beltoft-services' ) ] = esc_html( $server );
+		}
+
+		return $rows;
 	}
 
 	/**

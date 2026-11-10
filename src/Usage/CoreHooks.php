@@ -20,6 +20,39 @@ final class CoreHooks {
 	public static function register(): void {
 		add_action( 'beltoft_services_product_panel_after_reminder', array( __CLASS__, 'premium_field' ), 10, 2 );
 		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_premium' ), 30, 2 );
+		add_filter( 'beltoft_services_line_is_usage', array( __CLASS__, 'line_is_usage' ), 10, 2 );
+		add_filter( 'beltoft_services_line_usage_note', array( __CLASS__, 'line_usage_note' ) );
+		add_filter( 'beltoft_services_line_account_product_id', array( __CLASS__, 'line_account_product_id' ) );
+	}
+
+	/**
+	 * Is a line billed by use?
+	 *
+	 * @param mixed $usage   What an earlier listener said.
+	 * @param mixed $product Product, variation or id.
+	 * @return mixed
+	 */
+	public static function line_is_usage( $usage, $product = null ) {
+		return Rates::is_usage( $product );
+	}
+
+	/**
+	 * The note under a pay-as-you-go line.
+	 *
+	 * @param mixed $note The note so far.
+	 */
+	public static function line_usage_note( $note = '' ): string {
+		/* translators: %s: how pay as you go is billed */
+		return sprintf( __( '%s, excl. VAT', 'beltoft-services' ), Rates::billed_note() );
+	}
+
+	/**
+	 * The hidden pay-as-you-go account product.
+	 *
+	 * @param mixed $id The id so far.
+	 */
+	public static function line_account_product_id( $id = 0 ): int {
+		return (int) get_option( Account::OPTION_PRODUCT );
 	}
 
 	/**
