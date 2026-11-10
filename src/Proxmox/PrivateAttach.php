@@ -91,7 +91,7 @@ final class PrivateAttach {
 	 * @param Resource $r Resource.
 	 */
 	public static function eligible( Resource $r ): bool {
-		if ( SshKeyField::DRIVER !== $r->get( 'driver' ) || true === $r->get( 'linked' ) || ! Profiles::for_resource( $r ) instanceof VpsProfile ) {
+		if ( ProxmoxDriver::ID !== $r->get( 'driver' ) || true === $r->get( 'linked' ) || ! Profiles::for_resource( $r ) instanceof VpsProfile ) {
 			return false;
 		}
 

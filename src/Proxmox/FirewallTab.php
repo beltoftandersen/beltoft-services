@@ -152,7 +152,7 @@ final class FirewallTab {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/firewall.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/firewall.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/firewall.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/firewall.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/firewall.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/firewall.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesFirewall', array( 'strings' => self::strings() ) );
 	}
 

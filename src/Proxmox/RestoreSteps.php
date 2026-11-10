@@ -38,6 +38,7 @@ trait RestoreSteps {
 			}
 
 			$disk->set( array( 'last_error' => $result->error() ) );
+			// Silent on purpose: the volume stays, so no capacity release; the admin is alerted (see Resource::transition()).
 			$disk->transition( 'failed', 'Extra disk could not be attached again after the restore: ' . $result->error() );
 			Alerts::admin( $disk, 'After the restore of the server the extra disk could not be attached again: ' . $result->error() . ' The volume was left alone.' );
 		}
@@ -63,6 +64,7 @@ trait RestoreSteps {
 			}
 
 			$disk->set( array( 'last_error' => $result->error() ) );
+			// Silent on purpose: the volume stays, so no capacity release; the admin is alerted (see Resource::transition()).
 			$disk->transition( 'failed', 'Extra disk could not be grown again after the rollback: ' . $result->error() );
 			Alerts::admin( $disk, 'After the rollback of the server the extra disk could not be grown to its size again: ' . $result->error() );
 		}

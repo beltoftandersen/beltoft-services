@@ -27,7 +27,7 @@ final class MailCard {
 		static $done = false;
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/mail.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/mail.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/mail.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/mail.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/mail.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/mail.js' ), true );
 
 		if ( $done && false !== wp_scripts()->get_data( self::HANDLE, 'data' ) ) {
 			return;

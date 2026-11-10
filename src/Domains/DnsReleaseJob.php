@@ -8,7 +8,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Settings;
+use BeltoftServices\Alerts;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -41,9 +41,7 @@ final class DnsReleaseJob {
 	 * Schedules the daily job, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::CRON, self::HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::HOOK, self::CRON );
 	}
 
 	/**
@@ -210,22 +208,16 @@ final class DnsReleaseJob {
 	 * @param int    $user_id Customer.
 	 */
 	private static function mail( string $domain, int $user_id ): bool {
-		$to = (string) Settings::get( 'admin_email' );
-
-		if ( ! is_email( $to ) ) {
-			$to = (string) get_option( 'admin_email' );
-		}
-
-		if ( ! is_email( $to ) ) {
-			return false;
-		}
-
-		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
-
-		return (bool) wp_mail(
-			$to,
-			sprintf( '[%s] DNS hosting name still locked after 30 days: %s', $site, $domain ),
-			sprintf( "Domain: %s\nCustomer: %d\nThe name has waited more than 30 days for the parent zone to stop listing our name servers.\n", $domain, $user_id )
+		return Alerts::notify(
+			sprintf( 'DNS hosting name still locked after 30 days: %s', $domain ),
+			array(
+				sprintf( 'Domain: %s', $domain ),
+				sprintf( 'Customer: %d', $user_id ),
+				'The name has waited more than 30 days for the parent zone to stop listing our name servers.',
+			),
+			null,
+			'',
+			array( 'fallback' => true )
 		);
 	}
 }

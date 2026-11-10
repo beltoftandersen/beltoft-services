@@ -18,6 +18,7 @@ use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\Picked;
 use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\SshKeyField;
 use BeltoftServices\Proxmox\Tiles;
 use BeltoftServices\RateLimit;
@@ -420,7 +421,7 @@ final class ServerPicker {
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
 			// The earlier try's server, and the extra disk or app licence that was tied to it.
-			if ( ( $driver && SshKeyField::DRIVER === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) || isset( $item[ AppLicence::CART_UID ] ) ) {
+			if ( ( $driver && ProxmoxDriver::ID === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) || isset( $item[ AppLicence::CART_UID ] ) ) {
 				$old[] = (string) $key;
 			}
 		}

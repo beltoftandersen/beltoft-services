@@ -83,7 +83,7 @@ final class AppLicenceDriver implements Driver {
 		$why    = '';
 
 		// A paid app bought for a server that runs another app (the reinstall form): the kept request is queued now.
-		if ( $owner && $server && '' !== $app && (string) $server->get( 'app_id' ) !== $app && (int) ( $owner['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && SshKeyField::DRIVER === $server->get( 'driver' ) ) {
+		if ( $owner && $server && '' !== $app && (string) $server->get( 'app_id' ) !== $app && (int) ( $owner['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && ProxmoxDriver::ID === $server->get( 'driver' ) ) {
 			$claimed = AppReinstallPaid::claim( $server, $app, $r );
 
 			if ( null !== $claimed ) {
@@ -93,7 +93,7 @@ final class AppLicenceDriver implements Driver {
 
 		if ( $owner && (int) ( $owner['user_id'] ?? 0 ) !== (int) ( $license['user_id'] ?? 0 ) ) {
 			$why = 'The server belongs to another customer.';
-		} elseif ( $server && SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+		} elseif ( $server && ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
 			$why = 'The linked service is not a server.';
 		} elseif ( $server && in_array( $server->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {
 			$why = 'The server failed or was deleted.';

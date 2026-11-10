@@ -10,11 +10,12 @@ return array(
 	'LineNames.php -> Usage\Rates',
 	'Product.php -> Http\Connections',
 	'Product.php -> Usage\Rates',
+	'Product.php -> Proxmox\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
 	'Progress.php -> Proxmox\AppProgress',
 	'Progress.php -> Proxmox\AppTab',
 	'Progress.php -> Proxmox\DbDriver',
 	'Progress.php -> Proxmox\DiskDriver',
-	'Progress.php -> Proxmox\SshKeyField',
+	'Progress.php -> Proxmox\ProxmoxDriver',
 	'Proxmox/FirewallRoute.php -> Mcp\Endpoint',
 	'Settings.php -> Mcp\Access',
 	'ThankYou.php -> Account\Panel',
@@ -27,5 +28,5 @@ return array(
 	'ThankYou.php -> Proxmox\ServerName',
 	'ThankYou.php -> Proxmox\SnapshotDriver',
 	'ThankYou.php -> Proxmox\SnapshotMeta',
-	'ThankYou.php -> Proxmox\SshKeyField',
+	'ThankYou.php -> Proxmox\ProxmoxDriver',
 );

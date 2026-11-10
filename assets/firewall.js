@@ -9,7 +9,7 @@
 	var cfg = window.beltoftServicesFirewall;
 	var root = document.querySelector( '[data-fw]' );
 
-	if ( ! account || ! cfg || ! root || ! window.fetch || ! window.beltoftStatus ) {
+	if ( ! account || ! cfg || ! root || ! window.fetch || ! window.beltoftApi || ! window.beltoftStatus ) {
 		return;
 	}
 
@@ -29,25 +29,7 @@
 	}
 
 	function request( method, path, body ) {
-		var options = { method: method, credentials: 'same-origin', headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' } };
-
-		if ( body ) {
-			options.body = JSON.stringify( body );
-		}
-
-		return window.fetch( path, options ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
-			return response.json().catch( function () {
-				return {};
-			} ).then( function ( json ) {
-				return { ok: response.ok, status: response.status, body: json };
-			} );
-		} );
+		return window.beltoftApi.call( path, { method: method, body: body || undefined, holder: account } );
 	}
 
 	// The state line under the title: loading, and the hint that changes are not applied yet. Messages about what is happening go to the bar.
@@ -313,7 +295,7 @@
 
 			var first = data === null;
 
-			data = reply.body;
+			data = reply.data;
 
 			if ( first || ! dirtyNow() ) {
 				draft = { on: data.on, rules: data.rules.map( copy ) };
@@ -373,7 +355,7 @@
 				return load();
 			}
 
-			var message = reply.body && reply.body.message ? reply.body.message : S.error;
+			var message = reply.data && reply.data.message ? reply.data.message : S.error;
 
 			if ( reply.status === 429 ) {
 				message = account.strings.tooMany;
@@ -459,7 +441,7 @@
 						applyHandle = h;
 						load();
 					} else {
-						B.fail( h, ( reply.body && reply.body.message ) || S.error );
+						B.fail( h, ( reply.data && reply.data.message ) || S.error );
 					}
 				} ).catch( function () {
 					B.fail( h, S.error );

@@ -288,7 +288,6 @@ final class AppLicence {
 	 * @return Resource[]
 	 */
 	public static function for_server( Resource $server ): array {
-		global $wpdb;
 
 		$license_id = (int) ( $server->license()['id'] ?? 0 );
 		$out        = array();
@@ -298,10 +297,7 @@ final class AppLicence {
 		}
 
 		// One query for the candidates (the license id is in the meta text), then the exact check on each.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'applic' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id DESC", \BeltoftLicenses\Install::tables()['activations'], '%\"server_license\":%' . $wpdb->esc_like( (string) $license_id ) . '%' ) );
-
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'applic', 'server_license', array( $license_id, (string) $license_id ), 'DESC' ) as $id ) {
 			$licence = Resource::find( (int) $id );
 
 			if ( $licence && AppLicenceDriver::ID === $licence->get( 'driver' ) && (int) $licence->get( 'server_license' ) === $license_id ) {
@@ -350,7 +346,7 @@ final class AppLicence {
 
 		$server = Resource::for_license( $id );
 
-		return $server && SshKeyField::DRIVER === $server->get( 'driver' ) ? $server : null;
+		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) ? $server : null;
 	}
 
 	/**
@@ -427,6 +423,7 @@ final class AppLicence {
 
 		// A pay-as-you-go licence has no subscription of its own (the usage account bills it): closing it stops the meter.
 		if ( self::usage_billed( $licence ) ) {
+			// Silent on purpose: announce() below is the customer notice (see Resource::transition()).
 			if ( 'deleted' !== $licence->get( 'state' ) && $licence->transition( 'deleted', $reason ) ) {
 				self::announce( $licence, 'cancelled' );
 				$licence->close();
@@ -585,7 +582,7 @@ final class AppLicence {
 			$server = Licenses::find( (int) $link );
 			$driver = $server ? Product::driver_for( (int) ( $server['product_id'] ?? 0 ) ) : null;
 
-			if ( $server && (int) ( $server['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && $driver && SshKeyField::DRIVER === $driver->id() ) {
+			if ( $server && (int) ( $server['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && $driver && ProxmoxDriver::ID === $driver->id() ) {
 				$meta['server_license'] = (int) $link;
 			}
 		}
@@ -606,7 +603,7 @@ final class AppLicence {
 	public static function state_changed( $resource, $old, $new ): void {
 		unset( $old );
 
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 			return;
 		}
 
@@ -617,6 +614,7 @@ final class AppLicence {
 
 			$id = (int) ( $licence->license()['subscription_id'] ?? 0 );
 
+			// Silent on purpose: announce() below is the customer notice (see Resource::transition()).
 			if ( $licence->transition( 'deleted', 'Parent server deleted; app licence no longer available' ) ) {
 				self::announce( $licence, 'cancelled' );
 				DiskCascade::cancel_undelivered( $licence, 'The server was deleted, so its app licence ends.' );
@@ -640,7 +638,7 @@ final class AppLicence {
 	public static function reinstalled( $r, $args = array() ): void {
 		unset( $args );
 
-		if ( ! $r instanceof Resource || SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+		if ( ! $r instanceof Resource || ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
 			return;
 		}
 

@@ -40,6 +40,21 @@ final class ZoneAccess {
 	}
 
 	/**
+	 * The zone of a name among the customer's editable zones: the longest one that equals the name or is a parent of it.
+	 *
+	 * @return string|null Zone name, or null when the name is in none.
+	 */
+	public static function zone_of( int $user_id, string $host ): ?string {
+		$best = null;
+		foreach ( self::zones( $user_id ) as $zone ) {
+			if ( ( $host === $zone || str_ends_with( $host, '.' . $zone ) ) && ( null === $best || strlen( $zone ) > strlen( $best ) ) ) {
+				$best = $zone;
+			}
+		}
+		return $best;
+	}
+
+	/**
 	 * May this customer edit the records of the resource's zone? True for a live, ready domain or DNS service whose
 	 * zone our own DNS serves for them: not paused, not hosted elsewhere, not on custom name servers, and a zone
 	 * that is theirs. The one rule behind the app domain list and the DNS record routes.

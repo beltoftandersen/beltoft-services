@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -41,9 +42,7 @@ final class RestoreTest {
 	 * Schedules the weekly run once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::CRON, self::HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::HOOK, self::CRON );
 	}
 
 	/**
@@ -187,17 +186,15 @@ final class RestoreTest {
 	 * @return array<string, mixed>
 	 */
 	private static function fail( string $id, string $why, ?Resource $r = null ): array {
-		$to  = (string) Settings::get( 'admin_email' );
-		$key = 'beltoft_services_hosting_restore_test_alert_' . md5( $id );
+		$lines = array( $why );
 
-		if ( is_email( $to ) && false === get_transient( $key ) ) {
-			set_transient( $key, 1, DAY_IN_SECONDS );
-			wp_mail(
-				$to,
-				sprintf( '[%s] Hosting restore test failed on node %s', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $id ),
-				$why . ( $r ? sprintf( "\nResource: %d\n", $r->id() ) : "\n" ) . "A backup that cannot be restored is no backup: look at it before the next night.\n"
-			);
+		if ( $r ) {
+			$lines[] = sprintf( 'Resource: %d', $r->id() );
 		}
+
+		$lines[] = 'A backup that cannot be restored is no backup: look at it before the next night.';
+
+		Alerts::notify( sprintf( 'Hosting restore test failed on node %s', $id ), $lines, null, 'beltoft_services_hosting_restore_test_alert_' . md5( $id ) );
 
 		return array( 'ok' => false, 'why' => $why, 'resource' => $r ? $r->id() : 0 );
 	}

@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -25,7 +26,7 @@ final class DiskCart {
 	}
 
 	public static function add_url( Resource $server, \WC_Product_Variation $size ): string {
-		if ( ! function_exists( 'wcs_get_subscription' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) || count( DiskMeta::for_server( $server ) ) >= max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
+		if ( ! function_exists( 'wcs_get_subscription' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) || ProxmoxDriver::ID !== $server->get( 'driver' ) || count( DiskMeta::for_server( $server ) ) >= max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
 			return '';
 		}
 		$parent = $size->get_parent_id();
@@ -55,12 +56,7 @@ final class DiskCart {
 
 	/** A renewal, resubscribe or switch cart: the line was bought before. */
 	public static function flow( array $data ): bool {
-		foreach ( array( 'subscription_renewal', 'subscription_renewal_early', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
-			if ( ! empty( $data[ $key ] ) ) {
-				return true;
-			}
-		}
-		return false;
+		return CartFlow::has_value( $data, CartFlow::ALL );
 	}
 
 	/** Confirm WCS is switching this customer's existing disk line. */
@@ -92,7 +88,7 @@ final class DiskCart {
 		}
 		$license = Licenses::find( $id );
 		$server = $license ? Resource::for_license( $id ) : null;
-		if ( ! $server || ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || SshKeyField::DRIVER !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
+		if ( ! $server || ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || ProxmoxDriver::ID !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
 			return null;
 		}
 		return $id;
@@ -274,18 +270,7 @@ final class DiskCart {
 			if ( (int) $item->get_product_id() !== (int) $license['product_id'] || ! \WC_Subscriptions_Switcher::can_item_be_switched_by_user( $item, $subscription ) ) {
 				continue;
 			}
-			$query = array();
-			wp_parse_str( (string) wp_parse_url( \WC_Subscriptions_Switcher::get_switch_url( $item_id, $item, $subscription ), PHP_URL_QUERY ), $query );
-			$args = array_intersect_key( $query, array_flip( array( 'switch-subscription', 'item', '_wcsnonce' ) ) );
-			if ( 3 !== count( $args ) ) {
-				return '';
-			}
-			$args['add-to-cart'] = $next['variation']->get_parent_id();
-			$args['variation_id'] = $next['variation']->get_id();
-			foreach ( $next['variation']->get_attributes() as $name => $value ) {
-				$args[ 'attribute_' . $name ] = $value;
-			}
-			return add_query_arg( $args, wc_get_checkout_url() );
+			return \BeltoftServices\SwitchLink::for_item( (int) $item_id, $item, $subscription, $next['variation'] );
 		}
 		return '';
 	}

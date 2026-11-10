@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Listens to beltoft-licenses only. Its license statuses already carry WooCommerce
  * Subscriptions' lifecycle (grace while on hold, pending-cancel running to the end of the paid
- * period, expiry, refunds), so nothing here reads WCS. A license event only records what the
+ * period, expiry, refunds), so nothing in this class reads WCS (other classes hook WooCommerce Subscriptions themselves). A license event only records what the
  * service should become (Resource::desire()) and queues the resource: the driver work runs
  * in the reconcile job.
  *
@@ -311,24 +311,7 @@ final class Lifecycle {
 	 * @param int $license_id License id.
 	 */
 	private static function retry_plan( int $license_id ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-
-		$pending = as_get_scheduled_actions(
-			array(
-				'hook'     => self::PLAN_HOOK,
-				'args'     => array( $license_id ),
-				'group'    => Jobs::GROUP,
-				'status'   => \ActionScheduler_Store::STATUS_PENDING,
-				'per_page' => 1,
-			),
-			'ids'
-		);
-
-		if ( ! $pending ) {
-			as_schedule_single_action( time() + self::PLAN_RETRY, self::PLAN_HOOK, array( $license_id ), Jobs::GROUP );
-		}
+		Jobs::schedule_once( time() + self::PLAN_RETRY, self::PLAN_HOOK, array( $license_id ) );
 	}
 
 	/**

@@ -38,12 +38,7 @@ final class AppInstall {
 
 	/** Recover an install action lost after the server became ready. */
 	public static function sweep(): void {
-		global $wpdb;
-		$table = \BeltoftLicenses\Install::tables()['activations'];
-		$pending = '%' . $wpdb->esc_like( '"app_state":"pending"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND meta LIKE %s", $table, $pending ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'vm', 'app_state', 'pending' ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && 'pending' === $r->get( 'app_state' ) ) {
 				self::schedule( (int) $id );
@@ -97,13 +92,7 @@ final class AppInstall {
 	}
 
 	public static function schedule( int $id, int $delay = 0 ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-		$waiting = as_get_scheduled_actions( array( 'hook' => self::HOOK, 'args' => array( $id ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-		if ( ! $waiting ) {
-			as_schedule_single_action( time() + $delay, self::HOOK, array( $id ), Jobs::GROUP );
-		}
+		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
 	/** Run one bounded attempt under the resource lock; app failures never affect server state. */

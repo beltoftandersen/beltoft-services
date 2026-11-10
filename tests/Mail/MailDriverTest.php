@@ -452,6 +452,27 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertSame( 'Email plan change was lower: limits kept', $down->event() );
 	}
 
+	public function test_a_plan_change_fires_the_limits_applied_action_once_after_the_domain_is_edited(): void {
+		$r = $this->ready_mail( 'fires.example', array( 'mailboxes' => 2, 'quota_mb' => 5120, 'aliases' => 20 ) );
+		$r->change_plan( array( 'mailboxes' => 5, 'quota_mb' => 10240, 'aliases' => 50, 'domains' => 3 ), 'Upgrade' );
+
+		$seen   = array();
+		$mailcow = $this->mailcow;
+		$listen = static function ( $resource ) use ( &$seen, $mailcow ): void {
+			$seen[] = array( $resource->id(), count( $mailcow->calls_of( 'edit_domain' ) ) );
+		};
+		add_action( 'beltoft_services_mail_limits_applied', $listen );
+
+		$before = count( $this->mailcow->calls_of( 'edit_domain' ) );
+		$res    = $this->driver()->update_plan( Resource::find( $r->id() ) );
+		remove_action( 'beltoft_services_mail_limits_applied', $listen );
+
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertCount( 1, $seen );
+		$this->assertSame( $r->id(), $seen[0][0] );
+		$this->assertGreaterThan( $before, $seen[0][1], 'The domain was edited before the action ran.' );
+	}
+
 	public function test_the_domain_gets_its_minute_limit_when_made_and_when_the_plan_changes(): void {
 		$r = $this->ready_mail( 'rate.example' );
 		$this->assertSame( array( 'value' => 30, 'frame' => 'm' ), $this->mailcow->domain( 'rate.example' )['rl'] );

@@ -2,8 +2,8 @@
 /** Subscription billing date and paid registry renewals. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
-use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
+use BeltoftServices\Billing\RenewalSweep;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
@@ -26,9 +26,7 @@ final class Renewals {
 
 	/** Schedules the daily sweep for stuck paid renewals, once. */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::SWEEP_HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::SWEEP_CRON, self::SWEEP_HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::SWEEP_HOOK, self::SWEEP_CRON );
 	}
 
 	/** Removes the daily sweep (plugin deactivation). */
@@ -44,63 +42,25 @@ final class Renewals {
 	 */
 	public static function sweep(): int {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) ) { return 0; }
-		$queued = 0;
-		$since = time() - 30 * DAY_IN_SECONDS;
-		foreach ( Resource::live_ids( 'domain' ) as $id ) {
-			$r = Resource::find( $id );
-			if ( ! $r || ! $r->is_live() || 'domain' !== $r->get( 'driver' ) ) { continue; }
-			$sub = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $r->license()['subscription_id'] ?? 0 ) ) : false;
-			if ( ! $sub ) { continue; }
-			$done = array_map( 'strval', (array) $r->get( 'renewed_orders' ) );
-			foreach ( (array) $sub->get_related_orders( 'ids', 'renewal' ) as $order_id ) {
-				$order = wc_get_order( (int) $order_id );
-				$created = $order ? $order->get_date_created() : null;
-				if ( ! $order || ! $order->is_paid() || ! $created || $created->getTimestamp() < $since || in_array( (string) $order_id, $done, true ) ) { continue; }
-				if ( self::act_open( $r->id(), (string) $order_id ) ) { continue; }
-				Jobs::queue_act( $r->id(), 'renew', array( 'order' => (string) $order_id ) );
-				if ( ++$queued >= self::SWEEP_LIMIT ) { return $queued; }
-			}
-		}
-		return $queued;
+		return RenewalSweep::sweep( 'domain', 'domain', self::SWEEP_LIMIT );
 	}
 
-	/** Is a renew job for this order waiting or running? */
-	private static function act_open( int $resource_id, string $order_id ): bool {
-		foreach ( array( \ActionScheduler_Store::STATUS_PENDING, \ActionScheduler_Store::STATUS_RUNNING ) as $status ) {
-			$found = as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'args' => array( $resource_id, 'renew', array( 'order' => $order_id ) ), 'group' => Jobs::GROUP, 'status' => $status, 'per_page' => 1 ), 'ids' );
-			if ( $found ) { return true; }
-		}
-		return false;
+	/** Days before the registry expiry that the renewal is charged: the setting, 1 to 60, 30 when unset. */
+	private static function days_before(): int {
+		$days = Settings::get( 'domain_renew_days_before' );
+		return is_numeric( $days ) ? max( 1, min( 60, (int) $days ) ) : 30;
 	}
 
 	public static function next_payment_at( string $expiry, ?int $now = null ): int {
-		$now = $now ?? time();
-		$expires = strtotime( $expiry . ' UTC' );
-		if ( false === $expires ) { return 0; }
-		$days = Settings::get( 'domain_renew_days_before' );
-		$days = is_numeric( $days ) ? max( 1, min( 60, (int) $days ) ) : 30;
-		return max( $now + HOUR_IN_SECONDS, $expires - $days * DAY_IN_SECONDS );
+		return RenewalSweep::next_payment_at( $expiry, self::days_before(), $now );
 	}
 
 	public static function set_dates( Resource $r ): StepResult {
-		$license = $r->license();
-		$subscription_id = (int) ( $license['subscription_id'] ?? 0 );
-		if ( ! $subscription_id ) { return StepResult::done(); }
-		$sub = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $subscription_id ) : false;
-		if ( ! $sub ) { return StepResult::retry( 3600, 'The domain subscription is unavailable.' ); }
-		$next = self::next_payment_at( (string) ( $r->get( 'prepaid_expiry' ) ?: $r->get( 'expires_at' ) ) );
-		if ( ! $next ) { return StepResult::retry( 3600, 'The registrar expiry date is unavailable.' ); }
-		try { $saved = $sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', $next ) ), 'gmt' ); }
-		catch ( \Exception $e ) { return StepResult::retry( 3600, 'The subscription billing date could not be set.' ); }
-		return $saved ? StepResult::done( array( 'next_payment_at' => $next ) ) : StepResult::retry( 3600, 'The subscription billing date could not be set.' );
+		return RenewalSweep::set_dates( $r, (string) ( $r->get( 'prepaid_expiry' ) ?: $r->get( 'expires_at' ) ), 'The domain subscription is unavailable.', 'The registrar expiry date is unavailable.', self::days_before() );
 	}
 
 	public static function on_paid( $subscription, $order ): void {
-		if ( ! $subscription instanceof \WC_Subscription || ! $order instanceof \WC_Order || ! $order->is_paid() ) { return; }
-		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
-			$r = Resource::for_license( (int) $license['id'] );
-			if ( $r && 'domain' === $r->get( 'driver' ) ) { Jobs::queue_act( $r->id(), 'renew', array( 'order' => (string) $order->get_id() ) ); }
-		}
+		RenewalSweep::on_paid( $subscription, $order, 'domain' );
 	}
 
 	/** One scheduled event per prepaid transfer, queued when its registry renewal window opens. */

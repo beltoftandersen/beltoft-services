@@ -3,10 +3,12 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\Zone;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Domains\ZoneWriter;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -34,7 +36,7 @@ final class AppDomains {
 			return null;
 		}
 		foreach ( explode( '.', $sub ) as $label ) {
-			if ( 1 !== preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) {
+			if ( ! HostName::label( $label ) ) {
 				return null;
 			}
 		}
@@ -58,20 +60,12 @@ final class AppDomains {
 		}
 		$found = array();
 		foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
-			if ( ! in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) || self::row_name( $zone, (string) $row['name'] ) !== $fqdn ) {
+			if ( ! in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) || Records::fqdn_of_set( $zone, (string) $row['name'] ) !== $fqdn ) {
 				continue;
 			}
 			$found[ $row['type'] ][] = (string) $row['value'];
 		}
 		return $found;
-	}
-
-	private static function row_name( string $zone, string $name ): string {
-		$name = strtolower( rtrim( $name, '.' ) );
-		if ( '@' === $name || '' === $name || $name === $zone ) {
-			return $zone;
-		}
-		return str_ends_with( $name, '.' . $zone ) ? $name : $name . '.' . $zone;
 	}
 
 	/**
@@ -120,57 +114,52 @@ final class AppDomains {
 		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) || ( $fqdn !== $zone && ! str_ends_with( $fqdn, '.' . $zone ) ) ) {
 			return __( 'The domain is not one of your domains on our name servers.', 'beltoft-services' );
 		}
-		$set = Records::validate( $zone, array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => $ip ) ) );
-		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
-			return __( 'The domain name is not valid for a DNS record.', 'beltoft-services' );
-		}
-		// The zone lock covers the read and the write, so an editor save or a pause cannot slip in between.
-		$locked = Records::locked(
-			$zone,
-			static function () use ( $zone, $fqdn, $ip, $set, &$wrote, $strict ) {
-				// Read immediately before the write: what is at the name now decides.
-				$zone_data = DnsClients::dns()->zone( $zone );
-				if ( is_wp_error( $zone_data ) ) {
-					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
+		$rows   = array( array( 'name' => $fqdn, 'type' => 'A', 'ttl' => self::TTL, 'value' => $ip ) );
+		$policy = static function ( array $zone_data, array $sets ) use ( $zone, $fqdn, $ip, $strict ) {
+			$have = array();
+			foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
+				if ( in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) && Records::fqdn_of_set( $zone, (string) $row['name'] ) === $fqdn ) {
+					$have[ $row['type'] ][] = (string) $row['value'];
 				}
-				if ( ! is_array( $zone_data ) ) {
-					return __( 'The DNS zone does not exist.', 'beltoft-services' );
-				}
-				$have = array();
-				foreach ( Records::to_rows( $zone, (array) ( $zone_data['rrsets'] ?? array() ) ) as $row ) {
-					if ( in_array( $row['type'], array( 'A', 'AAAA', 'CNAME' ), true ) && self::row_name( $zone, (string) $row['name'] ) === $fqdn ) {
-						$have[ $row['type'] ][] = (string) $row['value'];
-					}
-				}
-				if ( Records::paused( $zone, $zone_data ) ) {
-					return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
-				}
-				$sets = self::types_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
-				if ( array( 'A' => array( $ip ) ) === $have && ( ! $strict || 1 === $sets ) ) {
-					return true;
-				}
-				if ( $strict && 0 !== $sets ) {
-					return __( 'The name already has a DNS record.', 'beltoft-services' );
-				}
-				if ( array() !== $have ) {
-					return __( 'The name already has a DNS record.', 'beltoft-services' );
-				}
-				$set[0]['changetype'] = 'REPLACE';
-				$done = DnsClients::dns()->replace_rrsets( $zone, $set );
-				if ( ! is_wp_error( $done ) ) {
-					$wrote = true;
-				}
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : true;
 			}
-		);
-		return is_wp_error( $locked ) ? new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) ) : $locked;
+			$at = self::types_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
+			if ( array( 'A' => array( $ip ) ) === $have && ( ! $strict || 1 === $at ) ) {
+				return true;
+			}
+			if ( ( $strict && 0 !== $at ) || array() !== $have ) {
+				return __( 'The name already has a DNS record.', 'beltoft-services' );
+			}
+			$sets[0]['changetype'] = 'REPLACE';
+			return $sets;
+		};
+		// The zone lock covers the read and the write, so an editor save or a pause cannot slip in between.
+		$result = ZoneWriter::write( $user_id, $zone, $rows, $policy, true );
+		if ( is_wp_error( $result ) ) {
+			return new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) );
+		}
+		if ( 'refused' === $result['status'] ) {
+			switch ( $result['reason'] ) {
+				case 'not_ours':
+					return __( 'The domain is not one of your domains on our name servers.', 'beltoft-services' );
+				case 'invalid':
+					return __( 'The domain name is not valid for a DNS record.', 'beltoft-services' );
+				case 'no_zone':
+					return __( 'The DNS zone does not exist.', 'beltoft-services' );
+				case 'paused':
+					return __( 'DNS hosting is paused for this domain.', 'beltoft-services' );
+				default:
+					return $result['reason'];
+			}
+		}
+		$wrote = $result['wrote'];
+		return true;
 	}
 
 	/** How many record sets of any type a name has in the raw rrsets of a zone. */
 	private static function types_at( string $zone, string $fqdn, array $rrsets ): int {
 		$n = 0;
 		foreach ( $rrsets as $set ) {
-			if ( is_array( $set ) && self::row_name( $zone, (string) ( $set['name'] ?? '' ) ) === $fqdn ) {
+			if ( is_array( $set ) && Records::fqdn_of_set( $zone, (string) ( $set['name'] ?? '' ) ) === $fqdn ) {
 				++$n;
 			}
 		}

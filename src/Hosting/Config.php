@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -73,7 +74,7 @@ final class Config {
 	public static function preview_zone(): string {
 		$zone = strtolower( self::get( 'preview_zone' ) );
 
-		return 1 === preg_match( '/^(?=.{1,200}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/D', $zone ) ? $zone : '';
+		return HostName::is_host( $zone, 200 ) ? $zone : '';
 	}
 
 	/**

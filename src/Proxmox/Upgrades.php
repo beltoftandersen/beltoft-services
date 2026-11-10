@@ -33,7 +33,7 @@ final class Upgrades {
 	 * @param string   $need disk, cpu or memory.
 	 */
 	public static function target( Resource $r, string $need ): ?\WC_Product_Variation {
-		if ( ! in_array( $need, self::NEEDS, true ) || 'proxmox' !== $r->get( 'driver' ) || true === $r->get( 'linked' ) || ! function_exists( 'wc_get_product' ) ) {
+		if ( ! in_array( $need, self::NEEDS, true ) || ProxmoxDriver::ID !== $r->get( 'driver' ) || true === $r->get( 'linked' ) || ! function_exists( 'wc_get_product' ) ) {
 			return null;
 		}
 

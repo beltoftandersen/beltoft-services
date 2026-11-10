@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Resource;
 use BeltoftLicenses\Account\View;
@@ -119,7 +120,7 @@ final class ServerName {
 		$name = strtolower( (string) preg_replace( '/[ _]/', '-', $name ) );
 
 		// A host name label: also refuses control characters, line breaks, tags, dots and non-ASCII letters.
-		return 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $name ) ? $name : null;
+		return HostName::label( $name ) ? $name : null;
 	}
 
 	/**
@@ -138,7 +139,7 @@ final class ServerName {
 	 * @param Resource $r Resource.
 	 */
 	public static function of( Resource $r ): string {
-		if ( SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+		if ( ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
 			return '';
 		}
 
@@ -165,7 +166,7 @@ final class ServerName {
 			return $name;
 		}
 
-		if ( $r && SshKeyField::DRIVER === $r->get( 'driver' ) && true !== $r->get( 'linked' ) && '' !== (string) $r->get( 'uuid' ) ) {
+		if ( $r && ProxmoxDriver::ID === $r->get( 'driver' ) && true !== $r->get( 'linked' ) && '' !== (string) $r->get( 'uuid' ) ) {
 			return Provision::vm_name( $r );
 		}
 
@@ -407,7 +408,7 @@ final class ServerName {
 	 * @return mixed
 	 */
 	public static function initial_meta( $meta, $license, $driver ) {
-		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || SshKeyField::DRIVER !== $driver->id() ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ProxmoxDriver::ID !== $driver->id() ) {
 			return $meta;
 		}
 
@@ -431,7 +432,7 @@ final class ServerName {
 		$servers = 0;
 
 		foreach ( $order->get_items() as $item ) {
-			if ( $item instanceof \WC_Order_Item_Product && \BeltoftServices\Product::driver_for( (int) $item->get_product_id() ) instanceof Driver && SshKeyField::DRIVER === \BeltoftServices\Product::driver_for( (int) $item->get_product_id() )->id() ) {
+			if ( $item instanceof \WC_Order_Item_Product && \BeltoftServices\Product::driver_for( (int) $item->get_product_id() ) instanceof Driver && ProxmoxDriver::ID === \BeltoftServices\Product::driver_for( (int) $item->get_product_id() )->id() ) {
 				++$servers;
 			}
 		}

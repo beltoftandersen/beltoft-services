@@ -8,7 +8,7 @@
 	var account = window.beltoftServicesAccount;
 	var mail = window.beltoftServicesMail;
 
-	if ( ! account || ! mail || ! window.fetch || ! window.beltoftStatus ) {
+	if ( ! account || ! mail || ! window.fetch || ! window.beltoftApi || ! window.beltoftStatus ) {
 		return;
 	}
 
@@ -22,24 +22,7 @@
 	}
 
 	function call( box, method, path, body ) {
-		return window.fetch( account.root + resourceOf( box ) + path, {
-			method: method,
-			credentials: 'same-origin',
-			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
-			body: body ? JSON.stringify( body ) : undefined
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
-			return response.json().then( function ( data ) {
-				return { ok: response.ok, status: response.status, data: data || {} };
-			}, function () {
-				return { ok: response.ok, status: response.status, data: {} };
-			} );
-		} );
+		return window.beltoftApi.call( account.root + resourceOf( box ) + path, { method: method, body: body || undefined, holder: account } );
 	}
 
 	function problem( result ) {

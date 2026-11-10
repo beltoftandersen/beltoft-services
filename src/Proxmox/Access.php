@@ -253,7 +253,7 @@ final class Access {
 	public static function on_state_changed( $r, $old, $new ): void {
 		unset( $old );
 
-		if ( 'deleted' === $new && $r instanceof Resource && SshKeyField::DRIVER === $r->get( 'driver' ) ) {
+		if ( 'deleted' === $new && $r instanceof Resource && ProxmoxDriver::ID === $r->get( 'driver' ) ) {
 			self::purge( $r );
 		}
 	}

@@ -282,7 +282,7 @@ final class Email extends ServiceArea {
 							MailPlan::cached( $root )['mailboxes'],
 							$limits['mailboxes']
 						),
-						\BeltoftServices\Hosting\HostingAccount::included_label( $resource ),
+						(string) apply_filters( 'beltoft_services_mail_included_label', '', $resource ),
 					)
 				)
 			),

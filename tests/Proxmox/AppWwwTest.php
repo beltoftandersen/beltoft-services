@@ -9,6 +9,8 @@ use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Domains\Records;
+use BeltoftServices\Domains\Records as DnsRecords;
+use BeltoftServices\Proxmox\AppDomains;
 use BeltoftServices\Proxmox\AppDomainRelease;
 use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppOwnDomain;
@@ -110,6 +112,41 @@ final class AppWwwTest extends MonitoringTestCase {
 		$this->assertNotNull( IpPool::hold( $r->id() ) );
 		$this->assertTrue( IpPool::assign( $r->id() ) );
 		return Resource::find( $r->id() );
+	}
+
+	public function test_the_app_record_policy_touches_only_the_a_set_at_the_name(): void {
+		$r    = $this->zone_server();
+		$user = (int) $r->license()['user_id'];
+		$this->assertTrue( DnsRecords::replace( self::ZONE, array(
+			array( 'name' => '@', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'keep me' ),
+			array( 'name' => '@', 'type' => 'MX', 'ttl' => 3600, 'priority' => 10, 'value' => 'mail.example.net.' ),
+			array( 'name' => 'other', 'type' => 'A', 'ttl' => 3600, 'value' => '203.0.113.5' ),
+		) ) );
+		$before = $this->rrsets();
+		$dns    = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$calls = count( $dns->calls() );
+
+		$wrote = null;
+		$this->assertTrue( AppDomains::publish( $user, self::ZONE, 'app.' . self::ZONE, self::IP, $wrote ) );
+		$this->assertTrue( $wrote );
+
+		$writes = array_values( array_filter( array_slice( $dns->calls(), $calls ), static fn( $c ) => 'replace_rrsets' === $c[0] ) );
+		$this->assertCount( 1, $writes );
+		$this->assertCount( 1, $writes[0][2] );
+		$this->assertSame( 'app.' . self::ZONE . '.', $writes[0][2][0]['name'] );
+		$this->assertSame( 'A', $writes[0][2][0]['type'] );
+
+		$keep = static fn( $set ) => 'app.' . self::ZONE . '.' !== $set['name'];
+		$this->assertEquals( array_values( $before ), array_values( array_filter( $this->rrsets(), $keep ) ), 'No other RRset changed.' );
+	}
+
+	public function test_a_zone_that_is_not_the_customers_is_refused_before_any_dns_call(): void {
+		$r     = $this->zone_server();
+		$dns   = new FakeDns( true );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
+		$this->assertStringContainsString( 'not one of your domains', (string) AppDomains::publish( (int) $r->license()['user_id'] + 1000, self::ZONE, 'app.' . self::ZONE, self::IP ) );
+		$this->assertSame( array(), $dns->calls() );
 	}
 
 	/** A server whose app domain is the bare zone of ours (or $want inside it). */

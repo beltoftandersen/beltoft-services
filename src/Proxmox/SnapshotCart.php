@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -67,7 +68,7 @@ final class SnapshotCart {
 	 * @return array{server: Resource, slots: int}|null
 	 */
 	private static function switching( array $data ): ?array {
-		$id = (int) ( $data['subscription_switch']['subscription_id'] ?? 0 );
+		$id = (int) ( $data[ CartFlow::SWITCH ]['subscription_id'] ?? 0 );
 		if ( $id < 1 && isset( $_GET['switch-subscription'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validated the switch.
 			$id = absint( wp_unslash( $_GET['switch-subscription'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		}
@@ -91,12 +92,12 @@ final class SnapshotCart {
 
 	/** A renewal is the same pack again; a resubscribe has no server on its line (packs are bought from the server card). */
 	private static function resubscribing( array $data ): bool {
-		return ! empty( $data['subscription_resubscribe'] );
+		return CartFlow::has_value( $data, array( CartFlow::RESUBSCRIBE ) );
 	}
 
 	/** May this server take a pack: a ready, owned-by-caller-checked server that gets snapshots (qcow2). */
 	private static function server_ok( ?Resource $server ): bool {
-		return $server && SshKeyField::DRIVER === $server->get( 'driver' ) && 'ready' === $server->get( 'state' ) && 'ready' === $server->get( 'desired' )
+		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) && 'ready' === $server->get( 'state' ) && 'ready' === $server->get( 'desired' )
 			&& Lifecycle::is_active( $server->license() ) && Snapshots::eligible( $server );
 	}
 
@@ -178,7 +179,7 @@ final class SnapshotCart {
 			wc_add_notice( __( 'Add snapshot slots again from your server in My account.', 'beltoft-services' ), 'error' );
 			return false;
 		}
-		if ( DiskCart::valid_switch( (int) $product_id ) || ! empty( $data['subscription_switch'] ) ) {
+		if ( DiskCart::valid_switch( (int) $product_id ) || CartFlow::has_value( $data, array( CartFlow::SWITCH ) ) ) {
 			if ( ! self::switch_fits( $data, $product ) ) {
 				wc_add_notice( __( 'This server cannot hold that many more snapshots.', 'beltoft-services' ), 'error' );
 				return false;
@@ -254,7 +255,7 @@ final class SnapshotCart {
 				$errors->add( 'snapshot_resubscribe', __( 'Add snapshot slots again from your server in My account.', 'beltoft-services' ) );
 				continue;
 			}
-			if ( ! empty( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has_value( $item, array( CartFlow::SWITCH ) ) ) {
 				$target = wc_get_product( (int) ( $item['variation_id'] ?: $item['product_id'] ) );
 				if ( ! $target || ! self::switch_fits( $item, $target ) ) {
 					$errors->add( 'snapshot_limit', __( 'This server cannot hold that many more snapshots.', 'beltoft-services' ) );

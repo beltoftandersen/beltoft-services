@@ -366,9 +366,9 @@ class AccountTest extends HostingCase {
 		$this->assertSame( 'invalid', ( new HostingActions( $this->account() ) )->enable_mail( 'not a domain' )->get_error_code() );
 
 		$child = Resource::find( $added['mail_resource'] );
-		$label = HostingAccount::included_label( $child );
+		$label = HostingAccount::included_label( '', $child );
 		$this->assertStringStartsWith( 'Included with Service ', $label );
-		$this->assertSame( '', HostingAccount::included_label( $r ) );
+		$this->assertSame( '', HostingAccount::included_label( '', $r ) );
 		$this->assertSame( $label, MailView::data( $child, array() )['included'] );
 	}
 

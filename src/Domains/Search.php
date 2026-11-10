@@ -144,7 +144,7 @@ final class Search {
 		} else {
 			$ascii = function_exists( 'idn_to_ascii' ) ? idn_to_ascii( $input, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46 ) : false;
 			$label = false === $ascii ? '' : strtolower( $ascii );
-			if ( ! preg_match( '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $label ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain label is required.', 'beltoft-services' ) ); }
+			if ( ! HostName::label( $label ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain label is required.', 'beltoft-services' ) ); }
 		}
 		$domains = array();
 		$check = array();

@@ -7,12 +7,11 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftLicenses\Licenses;
 use BeltoftServices\Children;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Jobs;
 use BeltoftServices\Mail\MailDomain;
 use BeltoftServices\Mail\MailDriver;
+use BeltoftServices\Mail\MailMeta;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -104,24 +103,9 @@ final class LiteMail {
 		$parent_license = $parent->license();
 		$slug           = sanitize_title( (string) ( $parent_license['product_slug'] ?? 'hosting' ) ) . '-mail';
 
-		// A license without a service product (its slug is not a registered service slug, on purpose): the lifecycle
-		// listeners leave it alone, the parent decides.
-		$license = Licenses::create(
-			array(
-				'product_slug'    => $slug,
-				'email'           => (string) ( $parent_license['email'] ?? '' ),
-				'user_id'         => (int) ( $parent_license['user_id'] ?? 0 ),
-				'max_activations' => 1,
-				'source'          => 'child',
-			)
-		);
-
-		if ( ! is_array( $license ) ) {
-			return new \WP_Error( 'license', __( 'The Email lite license could not be made.', 'beltoft-services' ) );
-		}
-
-		$child = Resource::create(
-			$license,
+		return Children::spawn(
+			$parent,
+			$slug,
 			Registry::get( MailDriver::ID ),
 			array(
 				'mailboxes' => (int) $plan['mail_mailboxes'],
@@ -131,27 +115,10 @@ final class LiteMail {
 			),
 			array(
 				MailDomain::META_DOMAIN => $name,
-				'mail_rl'               => array( 'minute' => (int) $plan['mail_per_minute'] ),
-			)
+				MailMeta::RATE_LIMIT    => array( 'minute' => (int) $plan['mail_per_minute'] ),
+			),
+			__( 'The Email lite license could not be made.', 'beltoft-services' ),
+			__( 'The Email lite service could not be linked to the account.', 'beltoft-services' )
 		);
-
-		if ( is_wp_error( $child ) ) {
-			// No active license without a service.
-			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
-
-			return $child;
-		}
-
-		if ( ! Children::attach( $parent, $child ) ) {
-			// No half-made child: the service never started, so it is closed and its license revoked, and a retry starts clean.
-			$child->set( array( 'state' => 'deleted', 'desired' => 'deleted' ) );
-			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
-
-			return new \WP_Error( 'link', __( 'The Email lite service could not be linked to the account.', 'beltoft-services' ) );
-		}
-
-		Jobs::enqueue( $child->id() );
-
-		return Resource::find( $child->id() ) ?? $child;
 	}
 }

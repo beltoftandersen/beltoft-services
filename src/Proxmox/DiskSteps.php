@@ -34,7 +34,7 @@ final class DiskSteps {
 		if ( $server_license && (int) ( $server_license['user_id'] ?? 0 ) !== (int) ( $license['user_id'] ?? 0 ) ) {
 			return StepResult::fail( 'The server belongs to another customer.' );
 		}
-		if ( $server && SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+		if ( $server && ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
 			return StepResult::fail( 'The linked service is not a server.' );
 		}
 		if ( $server && $server->get( 'linked' ) ) {
@@ -400,7 +400,7 @@ final class DiskSteps {
 		if ( $server && $server_license && (int) ( $server_license['user_id'] ?? 0 ) !== (int) ( $own_license['user_id'] ?? 0 ) ) {
 			return StepResult::fail( 'The server belongs to another customer, so the disk is not detached.' );
 		}
-		if ( ! $server || ! $server_license || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) || (int) ( $server_license['user_id'] ?? 0 ) < 1 ) {
+		if ( ! $server || ! $server_license || $server->get( 'linked' ) || ProxmoxDriver::ID !== $server->get( 'driver' ) || (int) ( $server_license['user_id'] ?? 0 ) < 1 ) {
 			return $never ? $never_done() : StepResult::fail( 'The server cannot be verified for detaching the disk.' );
 		}
 		$ctx = $this->context( $server );
@@ -666,7 +666,7 @@ final class DiskSteps {
 		}
 		$server_id = (int) $this->r->get( 'server_license' );
 		$server = $server_id > 0 ? Resource::for_license( $server_id ) : null;
-		if ( ! $server || $server->get( 'linked' ) || SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+		if ( ! $server || $server->get( 'linked' ) || ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
 			return StepResult::fail( 'The server cannot be verified for disk removal.' );
 		}
 		$server_license = Licenses::find( $server_id );

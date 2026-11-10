@@ -17,28 +17,12 @@
 	var account = window.beltoftServicesAccount;
 	var vm = window.beltoftServicesVm;
 
-	if ( ! account || ! vm || ! window.fetch ) {
+	if ( ! account || ! vm || ! window.fetch || ! window.beltoftApi ) {
 		return;
 	}
 
 	function post( panel, path, body ) {
-		return window.fetch( account.root + panel.getAttribute( 'data-resource' ) + '/' + path, {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: {
-				'X-WP-Nonce': account.nonce,
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify( body )
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
-			return response;
-		} );
+		return window.beltoftApi.call( account.root + panel.getAttribute( 'data-resource' ) + '/' + path, { method: 'POST', body: body, holder: account } );
 	}
 
 	var bs = window.beltoftStatus;
@@ -57,19 +41,15 @@
 
 	// The server's own refusal text is written for the customer; anything else gets a fixed line.
 	function reply( panel, response, fallback, handle, field ) {
-		return response.json().then( function ( body ) {
-			if ( 403 === response.status && body && 'rest_cookie_invalid_nonce' === body.code ) {
-				problem( panel, handle, vm.strings.expired );
-			} else if ( 429 === response.status ) {
-				problem( panel, handle, vm.strings.tooMany );
-			} else if ( 422 === response.status && body && 'string' === typeof body.message ) {
-				problem( panel, handle, body.message, field );
-			} else {
-				problem( panel, handle, fallback );
-			}
-		}, function () {
+		if ( response.expired ) {
+			problem( panel, handle, vm.strings.expired );
+		} else if ( 429 === response.status ) {
+			problem( panel, handle, vm.strings.tooMany );
+		} else if ( 422 === response.status && 'string' === typeof response.data.message ) {
+			problem( panel, handle, response.data.message, field );
+		} else {
 			problem( panel, handle, fallback );
-		} );
+		}
 	}
 
 	// A button of a closed question goes back to normal: the dialog is used again for the next action.
@@ -374,53 +354,48 @@
 		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
 			// An action that needs a purchase first (a reinstall to a paid app) answers with the checkout address.
 			if ( 200 === response.status ) {
-				return response.json().catch( function () {
-					return null;
-				} ).then( function ( body ) {
-					if ( body && body.redirect ) {
-						bs.info( body.message || '' );
-						window.location.href = body.redirect;
+				if ( response.data.redirect ) {
+					bs.info( response.data.message || '' );
+					window.location.href = response.data.redirect;
 
-						return;
-					}
+					return;
+				}
 
-					resetButton( button );
-					problem( panel, handle, vm.strings.failed );
-				} );
+				resetButton( button );
+				problem( panel, handle, vm.strings.failed );
+
+				return;
 			}
 
 			if ( 202 === response.status ) {
-				return response.json().catch( function () {
-					return null;
-				} ).then( function ( body ) {
-					panel.beltoftPending = false;
+				panel.beltoftPending = false;
 
-					if ( dialog ) {
-						resetButton( button );
-						closeDialog( dialog );
-					}
+				if ( dialog ) {
+					resetButton( button );
+					closeDialog( dialog );
+				}
 
-					// The bar keeps saying what is going on (and the buttons stay locked) until the work is over.
-					panel.beltoftWork = handle;
-					panel.beltoftWorkText = info ? info.start : '';
+				// The bar keeps saying what is going on (and the buttons stay locked) until the work is over.
+				panel.beltoftWork = handle;
+				panel.beltoftWorkText = info ? info.start : '';
 
-					if ( info ) {
-						panel.classList.add( 'has-working-flash' );
-						write( panel, ':asked', { info: info, queued: body && body.at ? body.at : 0, local: Date.now() } );
-					} else {
-						bs.release( handle );
-						panel.beltoftWork = bs.busy( vm.strings.queued, scopeOf( panel ), null );
-						panel.beltoftWorkText = vm.strings.queued;
-					}
+				if ( info ) {
+					panel.classList.add( 'has-working-flash' );
+					write( panel, ':asked', { info: info, queued: response.data.at ? response.data.at : 0, local: Date.now() } );
+				} else {
+					bs.release( handle );
+					panel.beltoftWork = bs.busy( vm.strings.queued, scopeOf( panel ), null );
+					panel.beltoftWorkText = vm.strings.queued;
+				}
 
-					// The panel's status poll (account.js) shows the progress and reloads when it is over; a power action also looks a few times, as the card's own buttons do.
-					panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued', { detail: { settle: !! ( info && info.power ) } } ) );
-				} );
+				// The panel's status poll (account.js) shows the progress and reloads when it is over; a power action also looks a few times, as the card's own buttons do.
+				panel.dispatchEvent( new window.CustomEvent( 'beltoft-services:queued', { detail: { settle: !! ( info && info.power ) } } ) );
+
+				return;
 			}
 
 			resetButton( button );
-
-			return reply( panel, response, vm.strings.failed, handle, field );
+			reply( panel, response, vm.strings.failed, handle, field );
 		} ).catch( function () {
 			resetButton( button );
 			problem( panel, handle, vm.strings.failed );
@@ -461,29 +436,17 @@
 		panel.beltoftPending = true;
 		handle = bs.busy( vm.strings.working, scopeOf( panel ), button || null );
 
-		window.fetch( account.root + id + '/' + path, {
-			method: 'POST',
-			credentials: 'same-origin',
-			headers: { 'X-WP-Nonce': account.nonce, 'Content-Type': 'application/json' },
-			body: JSON.stringify( body )
-		} ).then( function ( response ) {
-			var nonce = response.headers.get( 'X-WP-Nonce' );
-
-			if ( nonce ) {
-				account.nonce = nonce;
-			}
-
+		window.beltoftApi.call( account.root + id + '/' + path, { method: 'POST', body: body, holder: account } ).then( function ( response ) {
 			if ( 202 === response.status ) {
 				window.setTimeout( function () {
 					window.location.reload();
 				}, 1500 );
 
-				return null;
+				return;
 			}
 
 			resetButton( button );
-
-			return reply( panel, response, vm.strings.failed, handle );
+			reply( panel, response, vm.strings.failed, handle );
 		} ).catch( function () {
 			resetButton( button );
 			problem( panel, handle, vm.strings.failed );
@@ -546,29 +509,30 @@
 		handle = bs.busy( vm.strings.revealStart, scopeOf( panel ), button );
 
 		post( panel, 'reveal', {} ).then( function ( response ) {
+			var body = response.data;
+			var copy = panel.querySelector( '[data-vm-password-copy]' );
+
 			if ( ! response.ok ) {
-				return reply( panel, response, 409 === response.status ? vm.strings.gone : vm.strings.failed, handle );
+				reply( panel, response, 409 === response.status ? vm.strings.gone : vm.strings.failed, handle );
+
+				return;
 			}
 
-			return response.json().then( function ( body ) {
-				var copy = panel.querySelector( '[data-vm-password-copy]' );
+			if ( out && 'string' === typeof body.password ) {
+				out.textContent = body.password;
+				out.hidden = false;
+				button.hidden = true;
 
-				if ( out && body && 'string' === typeof body.password ) {
-					out.textContent = body.password;
-					out.hidden = false;
-					button.hidden = true;
-
-					// The password is only in the page now: a copy button next to it, through the same copy as the ssh command.
-					if ( copy ) {
-						copy.setAttribute( 'data-copy', body.password );
-						copy.hidden = false;
-					}
-
-					bs.done( handle, vm.strings.revealDone );
-				} else {
-					bs.fail( handle, vm.strings.failed );
+				// The password is only in the page now: a copy button next to it, through the same copy as the ssh command.
+				if ( copy ) {
+					copy.setAttribute( 'data-copy', body.password );
+					copy.hidden = false;
 				}
-			} );
+
+				bs.done( handle, vm.strings.revealDone );
+			} else {
+				bs.fail( handle, vm.strings.failed );
+			}
 		} ).catch( function () {
 			bs.fail( handle, vm.strings.failed );
 		} );
@@ -604,40 +568,10 @@
 		} );
 	}
 
-	function copyText( text ) {
-		var area;
-
-		if ( window.navigator.clipboard && window.navigator.clipboard.writeText ) {
-			return window.navigator.clipboard.writeText( text );
-		}
-
-		return new Promise( function ( resolve, reject ) {
-			area = document.createElement( 'textarea' );
-			area.value = text;
-			area.setAttribute( 'readonly', '' );
-			area.style.position = 'fixed';
-			area.style.opacity = '0';
-			document.body.appendChild( area );
-			area.select();
-
-			try {
-				if ( document.execCommand( 'copy' ) ) {
-					resolve();
-				} else {
-					reject( new Error( 'copy' ) );
-				}
-			} catch ( e ) {
-				reject( e );
-			}
-
-			document.body.removeChild( area );
-		} );
-	}
-
 	function copyCommand( panel, button ) {
 		var label = button.textContent;
 
-		copyText( button.getAttribute( 'data-copy' ) ).then( function () {
+		window.beltoftApi.copy( button.getAttribute( 'data-copy' ) ).then( function () {
 			button.textContent = button.getAttribute( 'data-copied' ) || label;
 			window.setTimeout( function () {
 				button.textContent = label;

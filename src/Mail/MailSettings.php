@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Crypto;
 use BeltoftServices\Settings;
 
@@ -211,7 +212,7 @@ final class MailSettings {
 	public static function host(): string {
 		$host = strtolower( rtrim( trim( (string) Settings::get( 'mail_host' ) ), '.' ) );
 
-		return 1 === preg_match( '/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/D', $host ) ? $host : '';
+		return HostName::is_host( $host, 0, true ) ? $host : '';
 	}
 
 	/**
@@ -272,7 +273,7 @@ final class MailSettings {
 	 * @param int                             $default The global value.
 	 */
 	public static function override( ?\BeltoftServices\Resource $r, string $key, int $default ): int {
-		$set = null === $r ? null : $r->get( 'mail_rl' );
+		$set = null === $r ? null : $r->get( MailMeta::RATE_LIMIT );
 
 		return is_array( $set ) && isset( $set[ $key ] ) && is_numeric( $set[ $key ] ) ? max( 0, (int) $set[ $key ] ) : $default;
 	}

@@ -34,13 +34,7 @@ final class AppStatus {
 	}
 
 	public static function schedule( int $id, int $delay ): void {
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$waiting = as_get_scheduled_actions( array( 'hook' => self::HOOK, 'args' => array( $id ), 'group' => \BeltoftServices\Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-			if ( $waiting ) {
-				return;
-			}
-			as_schedule_single_action( time() + $delay, self::HOOK, array( $id ), \BeltoftServices\Jobs::GROUP );
-		}
+		\BeltoftServices\Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
 	/** Recover a lost poll after an interrupted worker. */
@@ -55,13 +49,7 @@ final class AppStatus {
 
 	/** Narrow the sweep in SQL before loading resources. Verify each match after reading it. */
 	public static function candidates(): array {
-		global $wpdb;
-		$table = \BeltoftLicenses\Install::tables()['activations'];
-		$installing = '%' . $wpdb->esc_like( '"app_state":"installing"' ) . '%';
-		$unknown = '%' . $wpdb->esc_like( '"app_state":"unknown"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- bounded custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'vm' AND deactivated_at IS NULL AND (meta LIKE %s OR meta LIKE %s)", $table, $installing, $unknown ) );
-		return array_map( 'intval', (array) $ids );
+		return Resource::find_by_meta( 'vm', 'app_state', array( 'installing', 'unknown' ) );
 	}
 
 	public static function run( int $id ): void {

@@ -14,6 +14,7 @@ use BeltoftServices\Proxmox\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
 use BeltoftServices\Settings;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -123,9 +124,9 @@ abstract class ServiceEmail extends \WC_Email {
 				'monitor_disk_percent' => max( 0, min( 100, (int) ( $data['disk_percent'] ?? 0 ) ) ),
 				'monitor_cpu_percent' => max( 0, min( 100, (int) ( $data['cpu_percent'] ?? 0 ) ) ),
 				'monitor_cpu_hours' => max( 0, (int) ( $data['cpu_hours'] ?? 0 ) ),
-				'monitor_upgrade_url' => 'proxmox' === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
+				'monitor_upgrade_url' => ProxmoxDriver::ID === $r->get( 'driver' ) ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '',
 				'monitor_grow_url' => 'proxmox-db' === $r->get( 'driver' ) && 'db_disk' === ( $data['reason'] ?? '' ) ? \BeltoftServices\Proxmox\DbDisk::grow_url( $r ) : '',
-				'monitor_disks_url' => 'proxmox' === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::card_url( $r ) : '',
+				'monitor_disks_url' => ProxmoxDriver::ID === $r->get( 'driver' ) ? \BeltoftServices\Proxmox\DiskGuide::card_url( $r ) : '',
 				'monitor_cpu_since' => isset( $data['cpu_since'] ) ? wp_date( 'H:i', (int) $data['cpu_since'] ) : '',
 				'monitor_disk_used' => max( 0, (int) ( $data['disk_used'] ?? 0 ) ),
 				'monitor_disk_total' => max( 0, (int) ( $data['disk_total'] ?? 0 ) ),
@@ -217,7 +218,7 @@ abstract class ServiceEmail extends \WC_Email {
 		if ( \BeltoftServices\Proxmox\DiskDriver::ID === $driver || \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver || \BeltoftServices\Proxmox\AppLicenceDriver::ID === $driver ) {
 			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
 			$tab    = \BeltoftServices\Proxmox\DiskDriver::ID === $driver ? 'disks' : ( \BeltoftServices\Proxmox\SnapshotDriver::ID === $driver ? 'snapshots' : 'app' );
-		} elseif ( \BeltoftServices\Proxmox\SshKeyField::DRIVER === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
+		} elseif ( \BeltoftServices\Proxmox\ProxmoxDriver::ID === $driver && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
 			$server = $r;
 			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : ( isset( $data['app_domain'] ) ? 'app' : '' );
 		}
@@ -286,7 +287,7 @@ abstract class ServiceEmail extends \WC_Email {
 	 * @return int[]
 	 */
 	private static function extra_disks( Resource $r ): array {
-		if ( \BeltoftServices\Proxmox\SshKeyField::DRIVER !== $r->get( 'driver' ) ) {
+		if ( \BeltoftServices\Proxmox\ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
 			return array();
 		}
 

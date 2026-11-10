@@ -219,15 +219,7 @@ final class DnsClaimsCommand {
 		}
 
 		$stored = $r->locked(
-			static fn(): bool => $r->set(
-				array(
-					'zone_claimed'    => true,
-					'op'              => '',
-					'attempts'        => 0,
-					'next_attempt_at' => null,
-					'alerted'         => '',
-				)
-			)
+			static fn(): bool => $r->set( array_merge( array( 'zone_claimed' => true ), Resource::retry_reset() ) )
 		);
 
 		if ( ! $stored ) {

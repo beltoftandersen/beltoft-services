@@ -26,7 +26,7 @@ final class DbCard {
 		$parent = \BeltoftServices\Account\Panel::HANDLE;
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/db.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/db.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/db.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/db.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/db.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/db.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesDb', array(
 			'strings' => array(
 				'revealing' => __( 'Showing the password…', 'beltoft-services' ),

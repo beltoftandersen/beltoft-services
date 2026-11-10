@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
-use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -228,19 +228,7 @@ final class DbDisk {
 			return __( 'This amount of storage is not available.', 'beltoft-services' );
 		}
 
-		$item_product = is_object( $item ) && method_exists( $item, 'get_product_id' ) ? (int) $item->get_product_id() : 0;
-
-		foreach ( Licenses::where( 'subscription_id', $subscription_id ) as $license ) {
-			if ( ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) || (int) ( $license['product_id'] ?? 0 ) !== $product_id ) {
-				continue;
-			}
-
-			$resource = Resource::for_license( (int) $license['id'] );
-
-			if ( ! $resource || DbDriver::ID !== $resource->get( 'driver' ) ) {
-				continue;
-			}
-
+		foreach ( SwitchGuard::resources( $subscription_id, $item, DbDriver::ID, $product_id ) as $resource ) {
 			$have = self::promised_gb( $resource );
 			$want = self::total( $target );
 

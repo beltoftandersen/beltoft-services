@@ -22,7 +22,7 @@ final class AppProgress {
 	 * @return string '' (no app to speak of, or it is ready), installing (waiting or running), slow (no report for half an hour) or failed.
 	 */
 	public static function state( Resource $r ): string {
-		if ( 'ready' !== $r->get( 'state' ) || SshKeyField::DRIVER !== $r->get( 'driver' ) || '' === (string) $r->get( 'app_id' ) ) {
+		if ( 'ready' !== $r->get( 'state' ) || ProxmoxDriver::ID !== $r->get( 'driver' ) || '' === (string) $r->get( 'app_id' ) ) {
 			return '';
 		}
 
@@ -67,7 +67,7 @@ final class AppProgress {
 	 * @param Resource $r Resource.
 	 */
 	public static function planned( Resource $r ): bool {
-		return SshKeyField::DRIVER === $r->get( 'driver' ) && '' !== (string) $r->get( 'app_id' ) && ! in_array( $r->get( 'app_state' ), array( 'ready', 'failed' ), true ) && null !== Apps::definition( (string) $r->get( 'app_id' ) );
+		return ProxmoxDriver::ID === $r->get( 'driver' ) && '' !== (string) $r->get( 'app_id' ) && ! in_array( $r->get( 'app_state' ), array( 'ready', 'failed' ), true ) && null !== Apps::definition( (string) $r->get( 'app_id' ) );
 	}
 
 	/**

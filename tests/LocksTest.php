@@ -90,4 +90,30 @@ final class LocksTest extends TestCase {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test read.
 		$this->assertSame( '1', (string) $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK( %s )', $name ) ) );
 	}
+
+	public function test_acquire_takes_the_lock_and_release_frees_it(): void {
+		global $wpdb;
+
+		$name = Locks::name( 'resource', 987654 );
+
+		$this->assertTrue( Locks::acquire( $name, 0 ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test read.
+		$this->assertSame( '0', (string) $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK( %s )', $name ) ) );
+
+		Locks::release( $name );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test read.
+		$this->assertSame( '1', (string) $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK( %s )', $name ) ) );
+	}
+
+	public function test_acquire_is_refused_while_another_connection_holds_the_lock(): void {
+		global $wpdb;
+
+		$name  = Locks::name( 'slugs', 987655 );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', $name ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		$this->assertFalse( Locks::acquire( $name, 0 ) );
+		$other->close();
+	}
 }

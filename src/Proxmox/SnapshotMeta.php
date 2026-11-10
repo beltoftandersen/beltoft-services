@@ -73,7 +73,7 @@ final class SnapshotMeta {
 	private static function is_server( array $license ): bool {
 		$driver = Product::driver_for( (int) ( $license['product_id'] ?? 0 ) );
 
-		return $driver && SshKeyField::DRIVER === $driver->id();
+		return $driver && ProxmoxDriver::ID === $driver->id();
 	}
 
 	/** The server resource a pack belongs to, or null. */
@@ -84,21 +84,18 @@ final class SnapshotMeta {
 		}
 		$server = Resource::for_license( $id );
 
-		return $server && SshKeyField::DRIVER === $server->get( 'driver' ) ? $server : null;
+		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) ? $server : null;
 	}
 
 	/** Live pack resources linked to one server, whatever their state (the cascade and the card use this). */
 	public static function for_server( Resource $server ): array {
-		global $wpdb;
 		$license_id = (int) ( $server->license()['id'] ?? 0 );
 		$out        = array();
 		if ( $license_id < 1 ) {
 			return $out;
 		}
 		// One query for the candidates (the license id is in the meta text), then the exact check on each: no loading of every pack of every customer.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'snapshot' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id ASC", \BeltoftLicenses\Install::tables()['activations'], '%\"server_license\":%' . $wpdb->esc_like( (string) $license_id ) . '%' ) );
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'snapshot', 'server_license', array( $license_id, (string) $license_id ) ) as $id ) {
 			$pack = Resource::find( (int) $id );
 			if ( $pack && SnapshotDriver::ID === $pack->get( 'driver' ) && (int) $pack->get( 'server_license' ) === $license_id ) {
 				$out[] = $pack;
@@ -176,7 +173,7 @@ final class SnapshotMeta {
 	 * @return mixed
 	 */
 	public static function paid_slots( $slots, $server = null ) {
-		if ( ! $server instanceof Resource || SshKeyField::DRIVER !== $server->get( 'driver' ) ) {
+		if ( ! $server instanceof Resource || ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
 			return $slots;
 		}
 
@@ -194,10 +191,11 @@ final class SnapshotMeta {
 	/** A deleted server ends its packs. */
 	public static function state_changed( $resource, $old, $new ): void {
 		unset( $old );
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || SshKeyField::DRIVER !== $resource->get( 'driver' ) ) {
+		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
 			return;
 		}
 		foreach ( self::for_server( $resource ) as $pack ) {
+			// Silent on purpose: the parent's own email covers the customer (see Resource::transition()).
 			if ( 'deleted' !== $pack->get( 'state' ) && $pack->transition( 'deleted', 'Parent server deleted; snapshot slots no longer available' ) ) {
 				$pack->close();
 				\BeltoftServices\Alerts::admin( $pack, 'The parent server was deleted while the snapshot slots subscription may still bill. Check subscription #' . (int) ( $pack->license()['subscription_id'] ?? 0 ) . '.' );

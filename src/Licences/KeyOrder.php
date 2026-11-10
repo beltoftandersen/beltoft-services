@@ -18,7 +18,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\PleskLicence;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -209,7 +209,7 @@ final class KeyOrder {
 		$attach = (int) $r->get( 'lic_attach' );
 		$owner  = $attach > 0 ? Resource::for_license( $attach ) : null;
 
-		if ( $owner && SshKeyField::DRIVER === $owner->get( 'driver' ) && (int) ( $owner->license()['user_id'] ?? 0 ) === $user ) {
+		if ( $owner && ProxmoxDriver::ID === $owner->get( 'driver' ) && (int) ( $owner->license()['user_id'] ?? 0 ) === $user ) {
 			$licence = AppLicence::current( $owner );
 			$id      = $licence ? (int) $licence->get( 'plesk_key_id' ) : 0;
 
@@ -257,14 +257,10 @@ final class KeyOrder {
 	 * @return Resource[]
 	 */
 	public static function live( string $ip ): array {
-		global $wpdb;
 
 		$out = array();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE kind = 'lickey' AND deactivated_at IS NULL AND meta LIKE %s ORDER BY id DESC", \BeltoftLicenses\Install::tables()['activations'], '%\"lic_ip\":\"' . $wpdb->esc_like( $ip ) . '\"%' ) );
-
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( 'lickey', 'lic_ip', $ip, 'DESC' ) as $id ) {
 			$found = Resource::find( (int) $id );
 
 			if ( $found && KeyDriver::ID === $found->get( 'driver' ) && $ip === (string) $found->get( 'lic_ip' ) && ! in_array( (string) $found->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {
@@ -596,14 +592,6 @@ final class KeyOrder {
 	 * @param int    $delay Seconds.
 	 */
 	private static function schedule( string $hook, int $id, int $delay ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-
-		$waiting = as_get_scheduled_actions( array( 'hook' => $hook, 'args' => array( $id ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-
-		if ( ! $waiting ) {
-			as_schedule_single_action( time() + $delay, $hook, array( $id ), Jobs::GROUP );
-		}
+		Jobs::schedule_once( time() + $delay, $hook, array( $id ) );
 	}
 }

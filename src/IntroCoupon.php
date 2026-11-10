@@ -7,6 +7,8 @@
 
 namespace BeltoftServices;
 
+use BeltoftServices\Billing\CartFlow;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -231,13 +233,7 @@ final class IntroCoupon {
 	 * @param array<string, mixed> $item Cart item.
 	 */
 	private static function is_new( array $item ): bool {
-		foreach ( array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe', 'subscription_renewal_early' ) as $flag ) {
-			if ( isset( $item[ $flag ] ) ) {
-				return false;
-			}
-		}
-
-		return true;
+		return ! CartFlow::has( $item, CartFlow::ALL );
 	}
 
 	/**

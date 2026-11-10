@@ -58,7 +58,6 @@ final class Firewall {
 	public const QUARANTINE_TAG = 'bs-sys:quarantine';
 
 	public const TAG_CUSTOMER = 'bs-fw:';
-	public const TAG_SYSTEM   = 'bs-sys:';
 	public const TAG_DB       = 'bs-db:';
 	public const DB_WORLD     = 'bs-db:world';
 

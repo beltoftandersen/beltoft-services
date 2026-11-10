@@ -80,9 +80,7 @@ final class Jobs {
 	 * Schedules the sweep, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::SWEEP, array(), self::GROUP ) ) {
-			as_schedule_cron_action( time(), self::CRON, self::SWEEP, array(), self::GROUP );
-		}
+		self::ensure_cron( self::SWEEP, self::CRON );
 	}
 
 	/**
@@ -126,13 +124,61 @@ final class Jobs {
 
 	/**
 	 * Whether a plugin action with these arguments is waiting to run. A running action does not count, so an
-	 * action can schedule its own next attempt (as_has_scheduled_action also counts the running one).
+	 * action can schedule its own next attempt (as_has_scheduled_action also counts the running one). Queries the
+	 * pending status directly: as_next_scheduled_action answers true for a running copy without looking further.
 	 *
 	 * @param string            $hook Action hook.
 	 * @param array<int, mixed> $args Action arguments.
 	 */
 	public static function pending_action( string $hook, array $args ): bool {
-		return function_exists( 'as_next_scheduled_action' ) && is_int( as_next_scheduled_action( $hook, $args, self::GROUP ) );
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return false;
+		}
+
+		return (bool) as_get_scheduled_actions(
+			array(
+				'hook'     => $hook,
+				'args'     => $args,
+				'group'    => self::GROUP,
+				'status'   => \ActionScheduler_Store::STATUS_PENDING,
+				'per_page' => 1,
+			),
+			'ids'
+		);
+	}
+
+	/**
+	 * Schedules a one-off plugin action, unless one with the same arguments is waiting to run (a running one
+	 * does not count, see pending_action()).
+	 *
+	 * @param int               $timestamp When to run (unix time).
+	 * @param string            $hook      Action hook.
+	 * @param array<int, mixed> $args      Action arguments.
+	 * @return bool Whether it was scheduled.
+	 */
+	public static function schedule_once( int $timestamp, string $hook, array $args = array() ): bool {
+		if ( ! function_exists( 'as_schedule_single_action' ) || self::pending_action( $hook, $args ) ) {
+			return false;
+		}
+
+		as_schedule_single_action( $timestamp, $hook, $args, self::GROUP );
+
+		return true;
+	}
+
+	/**
+	 * Schedules a recurring plugin action, unless one is scheduled already (a running one counts, so a sweep that is
+	 * running now is not scheduled a second time).
+	 *
+	 * @param string            $hook  Action hook.
+	 * @param string            $cron  Cron expression.
+	 * @param array<int, mixed> $args  Action arguments.
+	 * @param int               $delay Seconds from now to the first run.
+	 */
+	public static function ensure_cron( string $hook, string $cron, array $args = array(), int $delay = 0 ): void {
+		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( $hook, $args, self::GROUP ) ) {
+			as_schedule_cron_action( time() + $delay, $cron, $hook, $args, self::GROUP );
+		}
 	}
 
 	/**
@@ -212,7 +258,7 @@ final class Jobs {
 
 		$lock = Locks::name( 'resource', $activation_id );
 
-		if ( ! self::acquire( $lock ) ) {
+		if ( ! Locks::acquire( $lock, 0 ) ) {
 			self::enqueue( $activation_id, self::LOCKED_DELAY );
 			return;
 		}
@@ -229,7 +275,7 @@ final class Jobs {
 			}
 		} finally {
 			self::$run_started = $outer;
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 	}
 
@@ -458,7 +504,7 @@ final class Jobs {
 
 		$lock = Locks::name( 'resource', $activation_id );
 
-		if ( ! self::acquire( $lock ) ) {
+		if ( ! Locks::acquire( $lock, 0 ) ) {
 			self::queue_act( $activation_id, $action, $args, self::LOCKED_DELAY );
 			return;
 		}
@@ -491,20 +537,12 @@ final class Jobs {
 				$resource->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null ) );
 			}
 
-			try {
-				$result = $driver->act( $resource, $action, $args );
-			} catch ( \Throwable $e ) {
-				$result = StepResult::retry( 0, $e->getMessage() );
-			}
-
-			if ( ! $result instanceof StepResult ) {
-				$result = StepResult::retry( 0, 'The driver returned no result' );
-			}
+			$result = Reconciler::call( static fn() => $driver->act( $resource, $action, $args ) );
 
 			self::acted( Resource::find( $activation_id ) ?? $resource, $action, $args, $result );
 		} finally {
 			self::$run_started = $outer;
-			self::release( $lock );
+			Locks::release( $lock );
 		}
 	}
 
@@ -591,7 +629,7 @@ final class Jobs {
 				return;
 			}
 
-			$delay = max( min( $result->delay(), $backoff[ count( $backoff ) - 1 ] ), $backoff[ $attempts - 1 ] );
+			$delay = Reconciler::clamp_delay( $result->delay(), $attempts );
 			self::queue_act( $r->id(), $action, $args, $delay );
 			return;
 		}
@@ -656,23 +694,14 @@ final class Jobs {
 	 * @return bool True when the poll was stored and queued.
 	 */
 	private static function polled( Resource $r, string $action, array $args, StepResult $result, array $meta ): bool {
-		$budget   = min( $result->poll_budget(), max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+		$budget   = Reconciler::poll_budget( $result->poll_budget() );
 		$episodes = (array) $r->get( 'act_wait_since' );
 		$episode  = is_array( $episodes[ $action ] ?? null ) ? $episodes[ $action ] : array( 'since' => 0, 'resets' => 0 );
-		$since    = (int) $episode['since'];
-		$resets   = (int) $episode['resets'];
-
-		// Progress starts the wait again, at most as often as the reconciler allows.
-		if ( $result->has_progress() && $resets < Reconciler::MAX_PROGRESS_RESETS ) {
-			++$resets;
-			$since = 0;
-		}
-
-		$since = $since > 0 ? $since : self::now();
+		$state    = Reconciler::poll_episode( (int) $episode['since'], (int) $episode['resets'], $result->has_progress(), $budget, self::now() );
 
 		// One episode per action name, kept when it has run out: every later run of it counts.
-		$episodes[ $action ] = array( 'since' => $since, 'resets' => $resets );
-		$expired             = self::now() - $since > $budget;
+		$episodes[ $action ] = array( 'since' => $state['since'], 'resets' => $state['resets'] );
+		$expired             = $state['expired'];
 
 		if ( $expired ) {
 			$r->set( array( 'act_wait_since' => $episodes ) );
@@ -907,29 +936,5 @@ final class Jobs {
 				self::enqueue( $id );
 			}
 		}
-	}
-
-	/**
-	 * Takes the resource lock without waiting.
-	 *
-	 * @param string $name Lock name.
-	 */
-	private static function acquire( string $name ): bool {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, 0 )', $name ) );
-	}
-
-	/**
-	 * Releases the resource lock.
-	 *
-	 * @param string $name Lock name.
-	 */
-	private static function release( string $name ): void {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock, nothing to cache.
-		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $name ) );
 	}
 }

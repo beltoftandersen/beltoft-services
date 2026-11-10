@@ -128,15 +128,7 @@ final class SslNames {
 	 * @param int    $user_id Customer.
 	 */
 	public static function zone_for( string $name, int $user_id ): ?string {
-		$best = null;
-
-		foreach ( ZoneAccess::zones( $user_id ) as $zone ) {
-			if ( ( $name === $zone || str_ends_with( $name, '.' . $zone ) ) && ( null === $best || strlen( $zone ) > strlen( $best ) ) ) {
-				$best = $zone;
-			}
-		}
-
-		return $best;
+		return ZoneAccess::zone_of( $user_id, $name );
 	}
 
 	/**

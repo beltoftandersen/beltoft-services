@@ -154,19 +154,6 @@ final class Account {
 	}
 
 	/**
-	 * Does the customer have an active usage account whose saved card can be charged (valid, not expired)? The saved
-	 * token is read from the customer's WooCommerce tokens, with no API call. False when the account is on hold or has
-	 * no card: an order that relies on the card then goes the normal way.
-	 *
-	 * @param int $user_id Customer.
-	 */
-	public static function has_valid_mandate( int $user_id ): bool {
-		$account = self::for_user( $user_id, array( 'active' ) );
-
-		return $account && self::has_card( $account ) && \BeltoftServices\Card\Card::usable( \BeltoftServices\Card\Card::details( $account ) );
-	}
-
-	/**
 	 * Can the account be charged without the customer present: it is active, its payment method is one WooCommerce Subscriptions
 	 * charges by itself, and a token gateway (Stripe) has its token and customer on the account with the token still saved
 	 * and not expired. The filter lets a site with another gateway say what "a saved card" is.

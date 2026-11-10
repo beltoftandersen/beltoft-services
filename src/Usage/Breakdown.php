@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\LineNames;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
@@ -16,7 +17,7 @@ use BeltoftServices\Proxmox\DbDiskField;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbIp;
 use BeltoftServices\Proxmox\DbIpField;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -74,7 +75,7 @@ final class Breakdown {
 		$driver = Product::driver_for( $product->get_parent_id() );
 		$id     = $driver ? $driver->id() : '';
 
-		return in_array( $id, array( DbDriver::ID, SshKeyField::DRIVER ), true ) ? $id : '';
+		return in_array( $id, array( DbDriver::ID, ProxmoxDriver::ID ), true ) ? $id : '';
 	}
 
 	/**
@@ -85,7 +86,7 @@ final class Breakdown {
 	 * @return array<string, mixed>|null
 	 */
 	private static function of_item( $item ): ?array {
-		if ( ! is_array( $item ) || isset( $item['subscription_renewal'] ) || '' === self::kind( $item['data'] ?? null ) ) {
+		if ( ! is_array( $item ) || CartFlow::is_renewal( $item ) || '' === self::kind( $item['data'] ?? null ) ) {
 			return null;
 		}
 

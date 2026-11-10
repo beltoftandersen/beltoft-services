@@ -7,12 +7,13 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,7 +33,7 @@ final class BillingField {
 	public const HANDLE = 'beltoft-services-billing-field';
 
 	/** Products of these drivers have the Billing choice (a pay as you go sibling variation, found from the Billing attribute). */
-	private const DRIVERS = array( SshKeyField::DRIVER, \BeltoftServices\Proxmox\DbDriver::ID );
+	private const DRIVERS = array( ProxmoxDriver::ID, \BeltoftServices\Proxmox\DbDriver::ID );
 
 	/**
 	 * Hooks.
@@ -72,7 +73,7 @@ final class BillingField {
 
 		$server = self::cart_server();
 
-		if ( null === $server || $server['usage'] || isset( $server['item']['subscription_resubscribe'] ) ) {
+		if ( null === $server || $server['usage'] || CartFlow::is_resubscribe( $server['item'] ) ) {
 			return;
 		}
 

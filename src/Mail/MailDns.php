@@ -8,11 +8,12 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\Clients as DnsClients;
+use BeltoftServices\Domains\PublicDns;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
-use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Domains\ZoneWriter;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -177,53 +178,43 @@ final class MailDns {
 	 * @return array{0:string,1:string}|\WP_Error [ status (ok or conflict), reason ], or a transient error.
 	 */
 	public static function publish( int $user_id, string $zone, array $row ) {
-		if ( ! in_array( $zone, ZoneAccess::zones( $user_id ), true ) ) {
-			return array( 'conflict', 'not_ours' );
-		}
-
 		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
-		$set  = Records::validate( $zone, array( array_intersect_key( $row + array( 'name' => '@' ), array_flip( array( 'name', 'type', 'ttl', 'value', 'priority' ) ) ) ) );
+		$rows = array( array_intersect_key( $row + array( 'name' => '@' ), array_flip( array( 'name', 'type', 'ttl', 'value', 'priority' ) ) ) );
 
-		if ( is_wp_error( $set ) || 1 !== count( $set ) ) {
-			return array( 'conflict', 'invalid' );
-		}
-
-		$locked = Records::locked(
+		$result = ZoneWriter::write(
+			$user_id,
 			$zone,
-			static function () use ( $zone, $fqdn, $row, $set ) {
-				// Read immediately before the write: what is at the name now decides.
-				$zone_data = DnsClients::dns()->zone( $zone );
-
-				if ( is_wp_error( $zone_data ) ) {
-					return new \WP_Error( 'transient', __( 'The DNS zone could not be read.', 'beltoft-services' ) );
-				}
-
-				if ( ! is_array( $zone_data ) ) {
-					return array( 'conflict', 'no_zone' );
-				}
-
-				if ( Records::paused( $zone, $zone_data ) ) {
-					return array( 'conflict', 'paused' );
-				}
-
-				$here = self::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
+			$rows,
+			static function ( array $zone_data, array $sets ) use ( $zone, $fqdn, $row ) {
+				$here = Records::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
 				$plan = self::plan( $row, $here, $zone );
 
 				if ( null === $plan['write'] ) {
-					return array( $plan['status'], $plan['reason'] );
+					return $plan['status'] . ':' . $plan['reason'];
 				}
 
-				$write                = $set[0];
-				$write['changetype']  = 'REPLACE';
-				$write['records']     = array_merge( $plan['keep'], $write['records'] );
-				$write['ttl']         = $plan['ttl'] ?? $write['ttl'];
-				$done                 = DnsClients::dns()->replace_rrsets( $zone, array( $write ) );
+				$write               = $sets[0];
+				$write['changetype'] = 'REPLACE';
+				$write['records']    = array_merge( $plan['keep'], $write['records'] );
+				$write['ttl']        = $plan['ttl'] ?? $write['ttl'];
 
-				return is_wp_error( $done ) ? new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) ) : array( 'ok', '' );
+				return array( $write );
 			}
 		);
 
-		return is_wp_error( $locked ) ? new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) ) : $locked;
+		if ( is_wp_error( $result ) ) {
+			return new \WP_Error( 'transient', __( 'The DNS zone is being changed.', 'beltoft-services' ) );
+		}
+
+		if ( 'ok' === $result['status'] ) {
+			return array( 'ok', '' );
+		}
+
+		if ( in_array( $result['reason'], array( 'not_ours', 'invalid', 'no_zone', 'paused' ), true ) ) {
+			return array( 'conflict', $result['reason'] );
+		}
+
+		return explode( ':', $result['reason'], 2 );
 	}
 
 	/**
@@ -276,15 +267,13 @@ final class MailDns {
 		$type = (string) $row['type'];
 
 		if ( 'CNAME' === $type ) {
-			if ( array() === $here ) {
+			$verdict = ZoneWriter::cname_verdict( (string) $row['value'], $here );
+
+			if ( 'write' === $verdict ) {
 				return array_merge( $none, array( 'write' => true ) );
 			}
 
-			$have = self::values( $zone, $here['CNAME'] ?? null );
-
-			return isset( $here['CNAME'] ) && 1 === count( $here ) && array( strtolower( (string) $row['value'] ) ) === $have
-				? $none
-				: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'name_taken' ) );
+			return 'present' === $verdict ? $none : array_merge( $none, array( 'status' => 'conflict', 'reason' => 'name_taken' ) );
 		}
 
 		if ( isset( $here['CNAME'] ) ) {
@@ -339,35 +328,6 @@ final class MailDns {
 		}
 
 		return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'unplaced' ) );
-	}
-
-	/**
-	 * The raw RRsets at a name, by type.
-	 *
-	 * @param string                             $zone   Zone.
-	 * @param string                             $fqdn   Name.
-	 * @param array<int, array<string, mixed>> $rrsets Raw RRsets.
-	 * @return array<string, array<string, mixed>>
-	 */
-	private static function sets_at( string $zone, string $fqdn, array $rrsets ): array {
-		$out = array();
-
-		foreach ( $rrsets as $set ) {
-			if ( ! is_array( $set ) ) {
-				continue;
-			}
-
-			$name = strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) );
-
-			if ( ( '' === $name || '@' === $name ? $zone : ( str_ends_with( $name, '.' . $zone ) || $name === $zone ? $name : $name . '.' . $zone ) ) === $fqdn ) {
-				$out[ strtoupper( (string) ( $set['type'] ?? '' ) ) ] = $set;
-			}
-		}
-
-		// SOA and NS are the zone's own and never ours to judge.
-		unset( $out['SOA'], $out['NS'] );
-
-		return $out;
 	}
 
 	/**
@@ -443,51 +403,14 @@ final class MailDns {
 	}
 
 	/**
-	 * What public DNS answers for a name, as any visitor sees it. Tests answer through the filter
-	 * beltoft_services_mail_dns_lookup; nothing in a test run reaches the network.
+	 * What public DNS answers for a name (see PublicDns::lookup).
 	 *
 	 * @param string $fqdn Name.
 	 * @param string $type MX, TXT or CNAME.
-	 * @return string[]|\WP_Error Values (MX as "priority host"), empty when none; an error when no resolver answered.
+	 * @return string[]|\WP_Error
 	 */
 	public static function lookup( string $fqdn, string $type ) {
-		/**
-		 * Replaces the public DNS read (tests only).
-		 *
-		 * @param array|\WP_Error|null $answer Null to read for real.
-		 * @param string               $fqdn   Name.
-		 * @param string               $type   MX, TXT or CNAME.
-		 */
-		$test = apply_filters( 'beltoft_services_mail_dns_lookup', null, $fqdn, $type );
-
-		if ( null !== $test ) {
-			return is_wp_error( $test ) ? $test : array_values( array_map( 'strval', (array) $test ) );
-		}
-
-		$flag    = array( 'MX' => DNS_MX, 'TXT' => DNS_TXT, 'CNAME' => DNS_CNAME )[ $type ] ?? DNS_TXT;
-		$records = @dns_get_record( rtrim( $fqdn, '.' ) . '.', $flag ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
-
-		if ( false === $records ) {
-			return new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
-		}
-
-		$out = array();
-
-		foreach ( $records as $record ) {
-			if ( $type !== ( $record['type'] ?? '' ) ) {
-				continue;
-			}
-
-			if ( 'MX' === $type ) {
-				$out[] = (int) ( $record['pri'] ?? 0 ) . ' ' . (string) ( $record['target'] ?? '' );
-			} elseif ( 'TXT' === $type ) {
-				$out[] = isset( $record['entries'] ) ? implode( '', (array) $record['entries'] ) : (string) ( $record['txt'] ?? '' );
-			} else {
-				$out[] = (string) ( $record['target'] ?? '' );
-			}
-		}
-
-		return $out;
+		return PublicDns::lookup( $fqdn, $type );
 	}
 
 	// -- The job ---------------------------------------------------------------------------------
@@ -523,15 +446,7 @@ final class MailDns {
 	 * @param int $delay Seconds from now.
 	 */
 	public static function schedule( int $id, int $delay ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-
-		$pending = as_get_scheduled_actions( array( 'hook' => self::HOOK, 'args' => array( $id ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ), 'ids' );
-
-		if ( ! $pending ) {
-			as_schedule_single_action( time() + $delay, self::HOOK, array( $id ), Jobs::GROUP );
-		}
+		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
 	/**
@@ -559,13 +474,7 @@ final class MailDns {
 	 * Recovers reads that were lost (a worker stopped, an action removed).
 	 */
 	public static function sweep(): void {
-		global $wpdb;
-
-		$like = '%' . $wpdb->esc_like( '"mail_dns":"waiting"' ) . '%';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom-table sweep, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL AND meta LIKE %s', \BeltoftLicenses\Install::tables()['activations'], MailDriver::KIND, $like ) );
-
-		foreach ( (array) $ids as $id ) {
+		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'waiting' ) as $id ) {
 			self::schedule( (int) $id, 0 );
 		}
 	}

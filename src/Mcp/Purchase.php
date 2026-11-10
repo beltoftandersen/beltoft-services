@@ -17,7 +17,7 @@ use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Account;
@@ -549,7 +549,7 @@ final class Purchase {
 			$resource = Resource::for_license( (int) $license['id'] );
 
 			// An extra disk ordered with the server is a service of its own: the answer is about the server.
-			if ( $resource && 'usage' === ( $license['source'] ?? '' ) && ( 'server' !== $kind || SshKeyField::DRIVER === $resource->get( 'driver' ) ) ) {
+			if ( $resource && 'usage' === ( $license['source'] ?? '' ) && ( 'server' !== $kind || ProxmoxDriver::ID === $resource->get( 'driver' ) ) ) {
 				$service = $resource;
 				Events::add( (int) $license['id'], 'api', 'Claude: ordered ' . $kind . ' ' . (string) $p['plan']['name'] . ' (order #' . $order->get_id() . ')' );
 				break;

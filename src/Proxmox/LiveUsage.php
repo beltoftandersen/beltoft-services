@@ -57,7 +57,7 @@ final class LiveUsage {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/usage-live.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/usage-live.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/usage-live.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/usage-live.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesUsage',
@@ -109,7 +109,7 @@ final class LiveUsage {
 
 			$resource = Resource::for_license( (int) $license['id'] );
 
-			if ( ! $resource || 'proxmox' !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
 				continue;
 			}
 

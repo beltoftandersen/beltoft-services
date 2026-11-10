@@ -6,7 +6,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\ZoneAccess;
-use BeltoftServices\Mail\MailDns;
+use BeltoftServices\Domains\ZoneWriter;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -232,7 +232,7 @@ final class Validation {
 			// A record that is already exactly this one was not written by us, and is never removed by us.
 			$was      = self::listed( $mine, $row );
 			$before   = ! $was && self::holds( $zone, $row['name'], $row['value'] );
-			$result   = MailDns::publish( $user, $zone, array( 'name' => $relative, 'type' => 'CNAME', 'ttl' => self::TTL, 'value' => $row['value'] ) );
+			$result   = ZoneWriter::write( $user, $zone, array( array( 'name' => $relative, 'type' => 'CNAME', 'ttl' => self::TTL, 'value' => $row['value'] ) ), ZoneWriter::cname_policy( (string) $row['value'] ) );
 
 			if ( is_wp_error( $result ) ) {
 				// The records written so far stay: the next run reads them as present and goes on, and they are still known as ours.
@@ -241,7 +241,7 @@ final class Validation {
 				return StepResult::retry( 300, 'The validation record could not be published yet.' );
 			}
 
-			if ( 'ok' !== $result[0] ) {
+			if ( 'ok' !== $result['status'] ) {
 				// The customer adds the records by hand, so none of ours is left half done in their zone.
 				self::clean_up( $r, $user, $rows );
 
@@ -297,30 +297,34 @@ final class Validation {
 			return false;
 		}
 
-		$done = Records::locked(
+		$ours = false;
+		$done = ZoneWriter::remove(
+			$user,
 			$zone,
-			static function () use ( $zone, $row ) {
-				$data = \BeltoftServices\Domains\Clients::dns()->zone( $zone );
-
-				foreach ( is_array( $data ) ? (array) ( $data['rrsets'] ?? array() ) : array() as $set ) {
+			static function ( array $data ) use ( $row, &$ours ) {
+				foreach ( (array) ( $data['rrsets'] ?? array() ) as $set ) {
 					if ( 'CNAME' !== ( $set['type'] ?? '' ) || strtolower( rtrim( (string) ( $set['name'] ?? '' ), '.' ) ) !== $row['name'] ) {
 						continue;
 					}
 
 					$records = (array) ( $set['records'] ?? array() );
 
+					// Exactly our one CNAME: anything else at the name is the customer's now.
 					if ( 1 !== count( $records ) || strtolower( rtrim( (string) ( $records[0]['content'] ?? '' ), '.' ) ) !== $row['value'] ) {
-						return false;
+						return array();
 					}
 
-					return ! is_wp_error( \BeltoftServices\Domains\Clients::dns()->replace_rrsets( $zone, array( array( 'name' => $set['name'], 'type' => 'CNAME', 'changetype' => 'DELETE' ) ) ) );
+					$ours = true;
+
+					return array( array( 'name' => $set['name'], 'type' => 'CNAME', 'changetype' => 'DELETE' ) );
 				}
 
-				return false;
+				return array();
 			}
 		);
 
-		return true === $done;
+		// Only a record that was ours and is gone counts: a name that no longer holds it is not "removed".
+		return true === $done && $ours;
 	}
 
 	/**
@@ -417,28 +421,5 @@ final class Validation {
 		}
 
 		return StepResult::done( $meta );
-	}
-
-	/**
-	 * Looks at public DNS for each CNAME row and records whether it is there. Read only; used to show the customer progress.
-	 *
-	 * @param Resource $r Resource.
-	 * @return array<int, array<string, string>> The rows with `seen` set to found or missing.
-	 */
-	public static function check_public( Resource $r ): array {
-		$rows = (array) $r->get( 'ssl_validation_rows' );
-
-		foreach ( $rows as $i => $row ) {
-			if ( ! is_array( $row ) || 'CNAME' !== ( $row['type'] ?? '' ) ) {
-				continue;
-			}
-
-			$found = MailDns::lookup( (string) $row['name'], 'CNAME' );
-			$seen  = ! is_wp_error( $found ) && in_array( strtolower( rtrim( (string) ( $found[0] ?? '' ), '.' ) ), array( (string) $row['value'] ), true );
-
-			$rows[ $i ]['seen'] = $seen ? 'found' : 'missing';
-		}
-
-		return $rows;
 	}
 }

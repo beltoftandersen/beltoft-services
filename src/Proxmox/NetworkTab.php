@@ -112,7 +112,7 @@ final class NetworkTab {
 		}
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/network-tab.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/network-tab.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/network-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/network-tab.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/network-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/network-tab.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesNetwork', array( 'strings' => self::strings() ) );
 	}
 

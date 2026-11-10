@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Usage\Account;
 use BeltoftServices\Usage\Rates;
 
@@ -62,7 +63,7 @@ final class CartRule {
 		$names   = array();
 
 		foreach ( $cart->get_cart() as $key => $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) || (int) ( $item['product_id'] ?? 0 ) === $account ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) || (int) ( $item['product_id'] ?? 0 ) === $account ) {
 				continue;
 			}
 

@@ -35,7 +35,7 @@ final class PowerWatch {
 	 * @param Resource $r Resource.
 	 */
 	private static function vm( Resource $r ): bool {
-		return in_array( (string) $r->get( 'driver' ), array( SshKeyField::DRIVER, DbDriver::ID ), true );
+		return in_array( (string) $r->get( 'driver' ), array( ProxmoxDriver::ID, DbDriver::ID ), true );
 	}
 
 	/**

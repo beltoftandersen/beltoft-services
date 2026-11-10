@@ -7,9 +7,8 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftLicenses\Licenses;
+use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
-use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -46,19 +45,8 @@ final class MailSwitch {
 
 		try {
 			$target = MailDriver::limits_from( Product::plan( (int) $product_id, (int) $variation_id > 0 ? (int) $variation_id : null ) );
-			$item_product = ( is_object( $item ) && method_exists( $item, 'get_product_id' ) ) ? (int) $item->get_product_id() : 0;
 
-			foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
-				if ( $item_product > 0 && (int) ( $license['product_id'] ?? 0 ) !== $item_product ) {
-					continue;
-				}
-
-				$resource = Resource::for_license( (int) $license['id'] );
-
-				if ( ! $resource || MailDriver::ID !== $resource->get( 'driver' ) ) {
-					continue;
-				}
-
+			foreach ( SwitchGuard::resources( (int) $subscription->get_id(), $item, MailDriver::ID ) as $resource ) {
 				$domains = MailPlan::used( MailPlan::root( $resource ) )['domains'];
 
 				if ( $domains > $target['domains'] ) {

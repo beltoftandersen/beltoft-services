@@ -8,7 +8,6 @@
 namespace BeltoftServices\Emails;
 
 use BeltoftLicenses\Import;
-use BeltoftLicenses\Install;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
@@ -299,9 +298,7 @@ final class Emails {
 	 * Schedules the daily usage check, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::USAGE_HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time(), self::USAGE_CRON, self::USAGE_HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::USAGE_HOOK, self::USAGE_CRON );
 	}
 
 	/**
@@ -409,11 +406,6 @@ final class Emails {
 	 * @return int[]
 	 */
 	private static function batch( string $kind, int $after ): array {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, always fresh.
-		$rows = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i WHERE kind = %s AND deactivated_at IS NULL AND id > %d ORDER BY id ASC LIMIT %d', Install::tables()['activations'], $kind, $after, self::BATCH ) );
-
-		return array_map( 'intval', (array) $rows );
+		return Resource::live_ids( $kind, $after, self::BATCH );
 	}
 }

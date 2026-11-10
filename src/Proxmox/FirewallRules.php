@@ -58,7 +58,7 @@ final class FirewallRules {
 	 * @param Resource $r Resource.
 	 */
 	public static function editable( Resource $r ): bool {
-		return 'proxmox' === $r->get( 'driver' )
+		return ProxmoxDriver::ID === $r->get( 'driver' )
 			&& true !== $r->get( 'linked' )
 			&& true !== $r->get( Firewall::LOCKED )
 			&& 'ready' === $r->get( 'state' )

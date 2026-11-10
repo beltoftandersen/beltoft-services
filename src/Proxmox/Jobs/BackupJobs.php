@@ -12,7 +12,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\ProxmoxJobs;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -55,7 +55,7 @@ final class BackupJobs {
 		$picked = null;
 
 		// Servers first, then managed databases (their backups do not depend on a plan variation).
-		foreach ( array( SshKeyField::DRIVER, DbDriver::ID ) as $driver_id ) {
+		foreach ( array( ProxmoxDriver::ID, DbDriver::ID ) as $driver_id ) {
 			$driver = Registry::get( $driver_id );
 
 			if ( ! $driver ) {

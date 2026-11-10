@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -149,7 +150,7 @@ final class DbNeedsServer {
 		$clusters = array();
 
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
-			if ( isset( $item['subscription_renewal'] ) || isset( $item['subscription_switch'] ) ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
 				continue;
 			}
 
@@ -177,7 +178,7 @@ final class DbNeedsServer {
 		foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user_id ) as $license ) {
 			$resource = Resource::for_license( (int) $license['id'] );
 
-			if ( ! $resource || 'proxmox' !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! in_array( $resource->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! in_array( $resource->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
 				continue;
 			}
 

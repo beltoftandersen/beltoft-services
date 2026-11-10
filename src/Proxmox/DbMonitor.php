@@ -381,14 +381,7 @@ final class DbMonitor {
 	 * @param string   $text What happened.
 	 */
 	private static function tell_admin( Resource $r, string $text ): void {
-		$to = (string) Settings::get( 'admin_email' );
-
-		if ( ! is_email( $to ) ) {
-			return;
-		}
-
 		$license = $r->license();
-		$site    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 		$key     = (string) ( $license['license_key'] ?? '' );
 		$lines   = array(
 			sprintf( 'License: %d (%s)', (int) ( $license['id'] ?? 0 ), $key ),
@@ -397,6 +390,6 @@ final class DbMonitor {
 			$text,
 		);
 
-		wp_mail( $to, sprintf( '[%s] Database alert: %s', $site, Alerts::mask( $key ) ), implode( "\n", $lines ) . "\n" );
+		Alerts::notify( sprintf( 'Database alert: %s', Alerts::mask( $key ) ), $lines, $r );
 	}
 }

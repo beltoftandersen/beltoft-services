@@ -67,7 +67,7 @@ final class CustomerDelete {
 			return;
 		}
 
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/delete.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/delete.js' ), true );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/delete.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/delete.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesDelete',

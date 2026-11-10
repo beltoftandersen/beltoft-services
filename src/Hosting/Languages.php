@@ -41,9 +41,7 @@ final class Languages {
 	 * Schedules the weekly refresh, once.
 	 */
 	public static function schedule(): void {
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( self::HOOK, array(), Jobs::GROUP ) ) {
-			as_schedule_cron_action( time() + 600, self::CRON, self::HOOK, array(), Jobs::GROUP );
-		}
+		Jobs::ensure_cron( self::HOOK, self::CRON, array(), 600 );
 	}
 
 	/**
