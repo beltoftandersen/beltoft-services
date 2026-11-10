@@ -492,6 +492,28 @@ final class AdminPanelTest extends TestCase {
 		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
 	}
 
+	public function test_act_only_dispatches(): void {
+		$method = new \ReflectionMethod( Panel::class, 'act' );
+		$lines  = $method->getEndLine() - $method->getStartLine() + 1;
+		$this->assertLessThan( 60, $lines, 'Panel::act dispatches; the work lives in Admin\\Actions, Reconciler and Breach.' );
+
+		$known = array_keys( Panel::errors() );
+		$code  = (string) file_get_contents( $method->getFileName() );
+		$body  = implode( "\n", array_slice( explode( "\n", $code ), $method->getStartLine() - 1, $lines ) );
+		preg_match_all( '/self::error\( \'([a-z_]+)\' \)/', $body, $found );
+
+		foreach ( $found[1] as $name ) {
+			$this->assertContains( $name, $known, 'Panel::act returns only known error codes.' );
+		}
+
+		$actions = file_get_contents( dirname( __DIR__ ) . '/src/Admin/Actions.php' );
+		preg_match_all( "/return '([a-z_]+)';/", (string) $actions, $returned );
+
+		foreach ( $returned[1] as $name ) {
+			$this->assertContains( $name, $known, 'Every code Actions returns is a known notice.' );
+		}
+	}
+
 	public function test_error_notices_show_only_known_messages(): void {
 		$this->admin();
 
