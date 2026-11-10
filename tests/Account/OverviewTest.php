@@ -3,6 +3,8 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Overview;
+use BeltoftServices\Account\OverviewActivity;
+use BeltoftServices\Account\OverviewData;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
@@ -891,5 +893,15 @@ class OverviewGatewayToken extends \WC_Payment_Token {
 
 	public function get_card_type() {
 		return 'Visa';
+	}
+
+	public function test_the_facade_keeps_data_and_describe(): void {
+		$this->assertTrue( is_callable( array( Overview::class, 'data' ) ) );
+		$this->assertSame( OverviewData::data(), Overview::data() );
+		$this->assertSame(
+			OverviewActivity::describe( 'Service provisioned', 'web-01', false ),
+			Overview::describe( 'Service provisioned', 'web-01', false )
+		);
+		$this->assertSame( 'web-01: ready', Overview::describe( 'Service provisioned', 'web-01', false ) );
 	}
 }
