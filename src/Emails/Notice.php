@@ -6,6 +6,8 @@ defined( 'ABSPATH' ) || exit;
 
 final class Notice extends ServiceEmail {
 
+	use SavedOrDefaultTexts;
+
 	protected const ID = 'beltoft_services_notice';
 
 	public const KINDS = array( 'db_access', 'db_world', 'restore_failed', 'rollback_failed', 'reveal_server', 'reveal_database', 'reveal_app', 'reveal_mailbox', 'app_action' );
@@ -45,21 +47,6 @@ final class Notice extends ServiceEmail {
 		return $titles[ $kind ] ?? $titles['db_access'];
 	}
 
-	/** The subject follows the kind unless the shop owner saved their own. */
-	public function get_subject() {
-		$saved = get_option( 'woocommerce_' . $this->id . '_settings', array() );
-		if ( is_array( $saved ) && '' !== trim( (string) ( $saved['subject'] ?? '' ) ) ) {
-			return parent::get_subject();
-		}
-		return apply_filters( 'woocommerce_email_subject_' . $this->id, $this->format_string( $this->get_default_subject() ), $this->object, $this ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce email hook.
-	}
-	public function get_heading() {
-		$saved = get_option( 'woocommerce_' . $this->id . '_settings', array() );
-		if ( is_array( $saved ) && '' !== trim( (string) ( $saved['heading'] ?? '' ) ) ) {
-			return parent::get_heading();
-		}
-		return apply_filters( 'woocommerce_email_heading_' . $this->id, $this->format_string( $this->get_default_heading() ), $this->object, $this ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce email hook.
-	}
 	public function get_default_subject() { return self::titles( (string) ( $this->values['notice_kind'] ?? '' ) )[0]; }
 	public function get_default_heading() { return self::titles( (string) ( $this->values['notice_kind'] ?? '' ) )[1]; }
 
