@@ -380,16 +380,15 @@ class CheckoutTest extends HostingCase {
 		}
 	}
 
-	public function test_an_upgrade_that_does_not_fit_the_accounts_node_is_refused_with_a_clear_message(): void {
+	public function test_an_upgrade_that_does_not_fit_the_accounts_node_is_not_refused(): void {
 		$r = $this->account( array( 'memory_mb' => 1024, 'disk_gb' => 10 ) );
 
 		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'memory_mb' => 2048 ) ) ), 'Room on the node.' );
 
 		$node = (array) \BeltoftServices\Hosting\Nodes::get( 'n1' );
 		$this->save_node( array( 'mem_gb' => (int) $node['mem_gb'] > 0 ? 1 : 1 ) ); // A node with no memory left after the reserve.
-		$refusal = HostingSwitch::refusal( $r, $this->target( $r, array( 'memory_mb' => 8192 ) ) );
-
-		$this->assertStringContainsString( 'cannot be added to your server', (string) $refusal );
+		// Changed on purpose (stock policy 2026-11-11): capacity never stops an upgrade, the node is simply over its budget.
+		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array( 'memory_mb' => 8192 ) ) ) );
 		$this->assertNull( HostingSwitch::refusal( $r, $this->target( $r, array() ) ), 'No growth, no refusal.' );
 	}
 

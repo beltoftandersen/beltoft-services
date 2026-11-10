@@ -268,6 +268,25 @@ class CapacityTest extends HostingCase {
 		WC()->cart->empty_cart();
 	}
 
+	public function test_a_plan_set_out_of_stock_while_in_the_cart_fails_the_cart_check_and_the_checkout(): void {
+		Stock::register();
+		$product = $this->service_product( 'hosting', array( 'node_group' => 'g1', 'memory_mb' => 2048, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ), array( 'max' => 3 ) );
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id() ) );
+		$this->assertTrue( WC()->cart->check_cart_item_stock(), 'In stock: the cart passes.' );
+
+		$closed = wc_get_product( $product->get_id() );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
+		wc_clear_notices();
+		foreach ( WC()->cart->get_cart() as $key => $item ) {
+			WC()->cart->cart_contents[ $key ]['data'] = wc_get_product( $item['product_id'] );
+		}
+		$this->assertNotTrue( WC()->cart->check_cart_item_stock(), 'Out of stock by hand: the cart check and so the checkout refuse it, as WooCommerce does.' );
+		wc_clear_notices();
+		WC()->cart->empty_cart();
+	}
+
 	public function test_the_admin_is_told_at_100_percent_and_at_each_further_10_percent_once_and_it_resets(): void {
 		$mails = array();
 		add_filter(

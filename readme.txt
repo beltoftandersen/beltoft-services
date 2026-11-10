@@ -131,7 +131,7 @@ Setting the pool in the cluster form is what puts the new VMs into it. Never use
 
 4. **The IP pool.** Settings → Services → IP pool, or `wp beltoft-services ip-pool-add 192.0.2.160/29`. Only IPv4 is supported in 0.2.0: a cluster that needs IPv6 cannot be used yet.
 
-5. **A product.** On a licensed product, the Service tab: driver "Proxmox virtual machine", the cluster, the template (the fallback when no choice was made), cores, memory and disk. A product is out of stock when the pool has no free address or no node has room; that is written as its WooCommerce stock status.
+5. **A product.** On a licensed product, the Service tab: driver "Proxmox virtual machine", the cluster, the template (the fallback when no choice was made), cores, memory and disk. A product is out of stock when you set its WooCommerce stock status to out of stock, and while the pool has no free address (the plugin writes that one). Room on a node never closes a product.
 
 = How does a cluster go live? =
 
@@ -165,7 +165,7 @@ The address is set with cloud-init as `ip=<address>/<prefix>,gw=<gateway>`, from
 
 = How is capacity decided? =
 
-A node counts as full when the memory of the VMs of this site on it (the configured memory of each, including a VM that was recorded but is not listed yet) plus the "memory kept free on each node" setting (default 4 GB) reaches the node's memory. Memory is counted as promised, not as used. VMs this site did not create are not counted, only the reserve covers them: raise the reserve if you run other machines on the same nodes. A product is out of stock when no node has room for its plan (its WooCommerce stock status is set after each run; one you mark out of stock yourself stays so). If the cache is lost, products stay as they are and a run is queued. The numbers are read hourly and when a cluster is saved, never during a page load. If an order slips through while the nodes are full, the service waits and is retried; if it still cannot be placed it fails, the admin gets an alert, and the customer gets a short "delay" email and a notice in My Account without details.
+Capacity never stops a sale. Memory is counted as promised, not as used: the memory of the VMs of this site on a node (the configured memory of each, including a VM that was recorded but is not listed yet) plus the "memory kept free on each node" setting (default 4 GB) is compared with the node's memory, and that decides where a new server goes: the online node with the most room, or, when none has room, the one with the most room left. VMs this site did not create are not counted, only the reserve covers them. A product is sold out only when you set its WooCommerce stock status to out of stock (or while no public address is free). The numbers are read hourly and when a cluster is saved, never during a page load. When a node passes its budget the admin is mailed at 100 percent and at each further 10 percent (once per step), and each night the real free memory and disk of a node are compared with what the plugin counts as committed, with a mail when the real free share is under the settings "Alert when real free memory is under" and "Alert when real free disk is under" (default 10 percent).
 
 = What about deletion, abuse, breach and disputes? =
 
@@ -231,6 +231,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= Unreleased =
+* Capacity never stops a sale, a placement or an upgrade. Hosting, servers, databases and apps are on sale whatever the room on the nodes; sold out is WooCommerce's own stock status, set by hand (a plan is also closed while no public address is free). New services go on the node with the most room, or the one least over its budget when none has room.
+* The admin is mailed when a node passes its committed budget (at 100 percent and at each further 10 percent), and each night when the real free memory or disk of a node is under a threshold (two new settings). The promised-storage setting is retired.
 
 = 0.7.0 =
 * DNS hosting for a domain registered elsewhere is verified with a TXT record before a zone is served. It is off by default; the setting is on the Domains tab.
