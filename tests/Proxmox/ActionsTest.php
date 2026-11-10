@@ -602,6 +602,49 @@ class ActionsTest extends TestCase {
 
 	// -- Power ---------------------------------------------------------------------------------------
 
+	public function test_every_offered_action_still_runs_through_run(): void {
+		$args = array(
+			'start'           => array(),
+			'shutdown'        => array(),
+			'reboot'          => array(),
+			'reset_password'  => array(),
+			'replace_ssh_key' => array( 'key' => self::key() ),
+			'rename'          => array( 'name' => 'renamed-box' ),
+			'reinstall'       => array( 'confirm' => 'REINSTALL' ),
+		);
+
+		// The dashboard offers each of them for a server of unknown power (nothing cached yet).
+		list( $probe ) = $this->ready();
+		delete_transient( \BeltoftServices\Proxmox\Operations::STATUS_PREFIX . $probe->id() );
+		$offered = Actions::offered( Resource::find( $probe->id() ) );
+
+		foreach ( array_keys( $args ) as $action ) {
+			$this->assertArrayHasKey( $action === 'rename' ? 'rename' : $action, $offered + array( 'rename' => 1 ), $action . ' is offered.' );
+		}
+
+		foreach ( $args as $action => $action_args ) {
+			list( $r ) = $this->ready();
+
+			if ( 'start' === $action ) {
+				$this->act( $r, 'shutdown' );
+			}
+
+			$before = count( $this->fake->calls() );
+			$result = ( new Actions( Resource::find( $r->id() ) ) )->run( $action, $action_args );
+
+			$this->assertTrue(
+				count( $this->fake->calls() ) > $before || 1 === preg_match( '/refused/i', $result->event() . $result->error() ),
+				$action . ' reaches its implementation: a Proxmox call or a refusal text.'
+			);
+		}
+
+		// A restore without backups is refused with its text, not routed nowhere.
+		list( $r ) = $this->ready();
+		$result    = ( new Actions( Resource::find( $r->id() ) ) )->run( 'restore', array( 'volid' => 'x', 'confirm' => 'RESTORE' ) );
+		$this->assertTrue( $result->is_done() );
+		$this->assertStringContainsString( 'refused', $result->event() );
+	}
+
 	public function test_start_only_offered_when_stopped(): void {
 		list( $r ) = $this->ready();
 

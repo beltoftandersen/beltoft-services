@@ -1093,7 +1093,7 @@ final class Resource {
 	 * Reconciler::notify() itself after the transition and the close), Proxmox\AppLicence (announces
 	 * "cancelled" itself), Proxmox\DiskMeta (releases the disk capacity itself), Proxmox\SnapshotMeta (the
 	 * parent's own email covers the customer), Proxmox\RestoreSteps (a failed disk keeps its volume, so no
-	 * capacity release) and Proxmox\Actions (a reinstall to provisioning, which no listener acts on).
+	 * capacity release) and Proxmox\Vm\Reinstall (a reinstall to provisioning, which no listener acts on).
 	 *
 	 * @param string $state ready, paused, etc. (see STATES).
 	 * @param string $event What happened, for the history.
