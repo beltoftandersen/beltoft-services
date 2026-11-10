@@ -5,7 +5,6 @@ namespace BeltoftServices\Ssl;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Domains\Records;
-use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\ZoneWriter;
 use BeltoftServices\Resource;
 
@@ -293,10 +292,6 @@ final class Validation {
 	 * @param array<string, mixed> $row  Row (name, value).
 	 */
 	public static function unpublish( int $user, string $zone, array $row ): bool {
-		if ( ! in_array( $zone, ZoneAccess::zones( $user ), true ) ) {
-			return false;
-		}
-
 		$ours = false;
 		$done = ZoneWriter::remove(
 			$user,

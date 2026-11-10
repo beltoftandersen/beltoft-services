@@ -7,9 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\DnsQuery;
-use BeltoftServices\Domains\Records;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\ZoneWriter;
 use BeltoftServices\Resource;

@@ -196,6 +196,18 @@ class ZoneWriterTest extends MailTestCase {
 		$this->assertCount( $base + 1, $this->writes() );
 	}
 
+	public function test_a_cname_policy_judges_a_set_stored_under_a_relative_or_apex_name(): void {
+		$sets   = array( array( 'name' => '_val.writer.example.', 'type' => 'CNAME', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => 'target.example.net.', 'disabled' => false ) ) ) );
+		$policy = ZoneWriter::cname_policy( 'target.example.net' );
+		$other  = array( array( 'name' => '_val', 'type' => 'TXT', 'ttl' => 300, 'records' => array( array( 'content' => '"x"', 'disabled' => false ) ) ) );
+		$this->assertSame( 'conflict:name_taken', $policy( array( 'rrsets' => $other ), $sets, 'writer.example' ) );
+		$same = array( array( 'name' => '_val', 'type' => 'CNAME', 'ttl' => 300, 'records' => array( array( 'content' => 'target.example.net.', 'disabled' => false ) ) ) );
+		$this->assertTrue( $policy( array( 'rrsets' => $same ), $sets, 'writer.example' ) );
+		$apex = array( array( 'name' => '@', 'type' => 'TXT', 'ttl' => 300, 'records' => array( array( 'content' => '"x"', 'disabled' => false ) ) ) );
+		$at   = array( array( 'name' => 'writer.example.', 'type' => 'CNAME', 'ttl' => 300, 'changetype' => 'REPLACE', 'records' => array( array( 'content' => 'target.example.net.', 'disabled' => false ) ) ) );
+		$this->assertSame( 'conflict:name_taken', $policy( array( 'rrsets' => $apex ), $at, 'writer.example' ) );
+	}
+
 	public function test_public_dns_answers_through_the_test_filter(): void {
 		add_filter( 'beltoft_services_mail_dns_lookup', static fn( $pre, $fqdn, $type ) => array( $fqdn . '|' . $type ), 10, 3 );
 		$this->assertSame( array( 'a.example|CNAME' ), \BeltoftServices\Domains\PublicDns::lookup( 'a.example', 'CNAME' ) );

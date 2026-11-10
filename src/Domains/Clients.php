@@ -36,11 +36,12 @@ final class Clients {
 
 	public static function dns(): Dns {
 		$account = Account::get();
-		$client = self::live_allowed() && 'fake' !== self::mode()
+		$live = self::live_allowed() && 'live' === self::mode();
+		$client = $live
 			? new LiveDns( (string) Settings::get( 'domain_dns_url', 'http://127.0.0.1:8081' ), $account['dns_key'], true )
 			: new FakeDns( true );
 		$filtered = apply_filters( 'beltoft_services_domains_dns', $client );
-		if ( $filtered instanceof FakeDns || ( self::live_allowed() && 'fake' !== self::mode() && $filtered instanceof LiveDns ) ) {
+		if ( $filtered instanceof FakeDns || ( $live && $filtered instanceof LiveDns ) ) {
 			return $filtered;
 		}
 		return $client;
