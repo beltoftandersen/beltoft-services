@@ -86,7 +86,7 @@ class DiskCartTest extends BackupTestCase {
 		foreach ( WC()->cart->get_cart() as $item ) {
 			$this->assertSame( 1, $item['quantity'] );
 			$this->assertSame( (int) $license['id'], $item['beltoft_services_disk_for'] );
-			$this->assertStringContainsString( '_disk_', DiskCart::recurring_key( 'base', $item ) );
+			$this->assertStringContainsString( '_disk_', apply_filters( 'woocommerce_subscriptions_recurring_cart_key', 'base', $item ) );
 		}
 		WC()->cart->calculate_totals();
 		$this->assertCount( 2, WC()->cart->recurring_carts, 'WooCommerce Subscriptions must create a separate renewal cart for each identical disk.' );
@@ -159,8 +159,8 @@ class DiskCartTest extends BackupTestCase {
 	}
 
 	public function test_a_disk_line_quantity_goes_back_to_one(): void {
-		WC()->cart->set_cart_contents( array( 'disk' => array( 'beltoft_services_disk_uid' => 'u1', 'quantity' => 5 ), 'other' => array( 'quantity' => 2 ) ) );
-		\BeltoftServices\Proxmox\DiskCart::one_each( WC()->cart );
+		WC()->cart->set_cart_contents( array( 'disk' => array( 'beltoft_services_disk_uid' => 'u1', 'quantity' => 5, 'data' => array() ), 'other' => array( 'quantity' => 2, 'data' => array() ) ) );
+		do_action( 'woocommerce_before_calculate_totals', WC()->cart );
 		$this->assertSame( 1, WC()->cart->cart_contents['disk']['quantity'] );
 		$this->assertSame( 2, WC()->cart->cart_contents['other']['quantity'] );
 		WC()->cart->empty_cart();

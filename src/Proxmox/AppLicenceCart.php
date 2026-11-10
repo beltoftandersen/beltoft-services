@@ -3,7 +3,10 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
+use BeltoftServices\Proxmox\Addon\AddonCart;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,10 +35,7 @@ final class AppLicenceCart {
 	public static function register(): void {
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'item_data' ), 20, 2 );
-		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
-		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
-		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
-		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'one_each' ), 5 );
+		AddonCart::register_line_hooks( Addon::for_driver( AppLicenceDriver::ID ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 	}
@@ -176,15 +176,6 @@ final class AppLicenceCart {
 	}
 
 	/**
-	 * A renewal, resubscribe or switch cart: the line was bought before.
-	 *
-	 * @param mixed $data Cart item data.
-	 */
-	private static function flow( $data ): bool {
-		return DiskCart::flow( is_array( $data ) ? $data : array() );
-	}
-
-	/**
 	 * Only a listed tier of a paid app, one of it, for the new server of the cart (or an existing line's own flow).
 	 *
 	 * @param mixed $valid        Validity so far.
@@ -199,7 +190,7 @@ final class AppLicenceCart {
 			return (bool) $valid;
 		}
 
-		if ( self::flow( $data ) || DiskCart::valid_switch( (int) $product_id ) ) {
+		if ( CartFlow::has_value( is_array( $data ) ? $data : array(), CartFlow::ALL ) || AddonCart::valid_switch( (int) $product_id ) ) {
 			return true;
 		}
 
@@ -232,7 +223,7 @@ final class AppLicenceCart {
 	public static function item_data( $data, $product_id = 0 ): array {
 		$data = is_array( $data ) ? $data : array();
 
-		if ( ! self::licence_product( (int) $product_id ) || self::flow( $data ) ) {
+		if ( ! self::licence_product( (int) $product_id ) || CartFlow::has_value( $data, CartFlow::ALL ) ) {
 			return $data;
 		}
 
@@ -246,57 +237,6 @@ final class AppLicenceCart {
 		$data[ AppLicence::CART_UID ] = wp_generate_uuid4();
 
 		return $data;
-	}
-
-	/**
-	 * The order line remembers which server it is for.
-	 *
-	 * @param \WC_Order_Item_Product $item   Line item.
-	 * @param string                 $key    Cart item key (unused).
-	 * @param array<string, mixed>   $values Cart item.
-	 * @param \WC_Order              $order  Order (unused).
-	 */
-	public static function order_item( $item, $key, $values, $order ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( $item instanceof \WC_Order_Item_Product && is_array( $values ) && isset( $values[ AppLicence::CART_UID ], $values[ AppLicence::CART_FOR ] ) ) {
-			$item->add_meta_data( AppLicence::ITEM_UID, (string) $values[ AppLicence::CART_UID ], true );
-			$item->add_meta_data( AppLicence::ITEM_SERVER, (string) $values[ AppLicence::CART_FOR ], true );
-		}
-	}
-
-	/**
-	 * Its own renewal cart.
-	 *
-	 * @param mixed $key       Recurring cart key.
-	 * @param mixed $cart_item Cart item.
-	 */
-	public static function recurring_key( $key, $cart_item = array() ): string {
-		$uid = is_array( $cart_item ) ? (string) ( $cart_item[ AppLicence::CART_UID ] ?? '' ) : '';
-
-		return '' === $uid ? (string) $key : $key . '_applic_' . md5( $uid );
-	}
-
-	/**
-	 * One licence is one line.
-	 *
-	 * @param mixed $html Quantity html.
-	 * @param mixed $key  Cart item key (unused).
-	 * @param mixed $item Cart item.
-	 */
-	public static function quantity( $html, $key = '', $item = array() ): string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
-		return is_array( $item ) && isset( $item[ AppLicence::CART_UID ] ) ? '1' : (string) $html;
-	}
-
-	/**
-	 * A quantity raised by a cart update goes back to 1.
-	 *
-	 * @param \WC_Cart $cart Cart.
-	 */
-	public static function one_each( $cart ): void {
-		foreach ( $cart instanceof \WC_Cart ? $cart->get_cart() : array() as $key => $item ) {
-			if ( isset( $item[ AppLicence::CART_UID ] ) && 1 !== (int) ( $item['quantity'] ?? 1 ) ) {
-				$cart->cart_contents[ $key ]['quantity'] = 1;
-			}
-		}
 	}
 
 	/**

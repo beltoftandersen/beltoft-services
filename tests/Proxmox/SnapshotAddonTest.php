@@ -226,10 +226,10 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 
 		foreach ( WC()->cart->get_cart() as $key => $item ) {
 			$this->assertSame( (int) $server->license()['id'], $item['beltoft_services_snapshot_for'] );
-			$this->assertStringContainsString( '_snapshots_', SnapshotCart::recurring_key( 'base', $item ) );
+			$this->assertStringContainsString( '_snapshots_', apply_filters( 'woocommerce_subscriptions_recurring_cart_key', 'base', $item ) );
 			WC()->cart->cart_contents[ $key ]['quantity'] = 4;
 		}
-		SnapshotCart::one_each( WC()->cart );
+		do_action( 'woocommerce_before_calculate_totals', WC()->cart );
 		foreach ( WC()->cart->get_cart() as $item ) {
 			$this->assertSame( 1, $item['quantity'], 'One line is one purchase.' );
 		}

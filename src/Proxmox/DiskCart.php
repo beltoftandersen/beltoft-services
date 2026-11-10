@@ -6,6 +6,8 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
+use BeltoftServices\Proxmox\Addon\AddonCart;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;
@@ -15,13 +17,14 @@ defined( 'ABSPATH' ) || exit;
 final class DiskCart {
 	private const NONCE = 'beltoft-services-disk';
 
+	private static function addon(): Addon {
+		return Addon::for_driver( DiskDriver::ID );
+	}
+
 	public static function register(): void {
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'item_data' ), 20, 2 );
-		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
-		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
-		add_filter( 'woocommerce_cart_item_quantity', array( __CLASS__, 'quantity' ), 10, 3 );
-		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'one_each' ), 5 );
+		AddonCart::register_line_hooks( self::addon() );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'checkout_validation' ), 10, 2 );
 	}
 
@@ -54,44 +57,13 @@ final class DiskCart {
 		return $driver && DiskDriver::ID === $driver->id();
 	}
 
-	/** A renewal, resubscribe or switch cart: the line was bought before. */
-	public static function flow( array $data ): bool {
-		return CartFlow::has_value( $data, CartFlow::ALL );
-	}
-
-	/** Confirm WCS is switching this customer's existing disk line. */
-	public static function valid_switch( int $product_id ): bool {
-		$subscription_id = isset( $_GET['switch-subscription'] ) ? absint( wp_unslash( $_GET['switch-subscription'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validates the switch before this hook.
-		$item_id = isset( $_GET['item'] ) ? absint( wp_unslash( $_GET['item'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- ownership and WCS ability checked below.
-		if ( ! $subscription_id || ! $item_id || ! function_exists( 'wcs_get_subscription' ) || ! class_exists( '\\WC_Subscriptions_Switcher' ) ) {
-			return false;
-		}
-		$subscription = wcs_get_subscription( $subscription_id );
-		$item = $subscription instanceof \WC_Subscription ? $subscription->get_item( $item_id ) : null;
-		return $item instanceof \WC_Order_Item_Product && (int) $item->get_product_id() === $product_id && \WC_Subscriptions_Switcher::can_item_be_switched_by_user( $item, $subscription, get_current_user_id() );
-	}
-
 	private static function link( array $data ) {
-		$requested_link = isset( $_REQUEST['beltoft_services_disk_for'] ) && is_scalar( $_REQUEST['beltoft_services_disk_for'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['beltoft_services_disk_for'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified below.
-		$link = $data['beltoft_services_disk_for'] ?? $requested_link;
-		if ( 'cart_server' === $link ) {
-			return DiskField::cart_server() ? 'cart_server' : null;
-		}
-		if ( ! is_scalar( $link ) || ! ctype_digit( (string) $link ) ) {
-			return null;
-		}
-		$id = (int) $link;
-		$requested_nonce = isset( $_REQUEST['beltoft_services_disk_nonce'] ) && is_scalar( $_REQUEST['beltoft_services_disk_nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['beltoft_services_disk_nonce'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- checked next.
-		$nonce = $data['beltoft_services_disk_nonce'] ?? $requested_nonce;
-		if ( ! is_scalar( $nonce ) || ! wp_verify_nonce( (string) $nonce, self::NONCE . ':' . $id ) ) {
-			return null;
-		}
-		$license = Licenses::find( $id );
-		$server = $license ? Resource::for_license( $id ) : null;
-		if ( ! $server || ! $license || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() || ProxmoxDriver::ID !== $server->get( 'driver' ) || 'ready' !== $server->get( 'state' ) || $server->get( 'linked' ) ) {
-			return null;
-		}
-		return $id;
+		return AddonCart::link( self::addon(), $data, static function ( int $id ): bool {
+			$license = Licenses::find( $id );
+			$server  = $license ? Resource::for_license( $id ) : null;
+
+			return $server && $license && (int) ( $license['user_id'] ?? 0 ) === get_current_user_id() && ProxmoxDriver::ID === $server->get( 'driver' ) && 'ready' === $server->get( 'state' ) && ! $server->get( 'linked' );
+		} );
 	}
 
 	public static function validate( $valid, $product_id, $quantity = 1, $variation_id = 0, $variation = array(), $data = array() ): bool {
@@ -105,7 +77,7 @@ final class DiskCart {
 			wc_add_notice( __( 'This extra disk must be sold as a subscription.', 'beltoft-services' ), 'error' );
 			return false;
 		}
-		if ( self::flow( $data ) || self::valid_switch( (int) $product_id ) ) {
+		if ( CartFlow::has_value( $data, CartFlow::ALL ) || AddonCart::valid_switch( (int) $product_id ) ) {
 			return true;
 		}
 		$link = self::link( $data );
@@ -136,7 +108,7 @@ final class DiskCart {
 	/** Add a unique key before WooCommerce computes the cart ID. */
 	public static function item_data( $data, $product_id ): array {
 		$data = is_array( $data ) ? $data : array();
-		if ( ! self::disk_product( (int) $product_id ) || self::flow( $data ) ) {
+		if ( ! self::disk_product( (int) $product_id ) || CartFlow::has_value( $data, CartFlow::ALL ) ) {
 			return $data;
 		}
 		$link = self::link( $data );
@@ -146,31 +118,6 @@ final class DiskCart {
 		$data['beltoft_services_disk_for'] = $link;
 		$data['beltoft_services_disk_uid'] = wp_generate_uuid4();
 		return $data;
-	}
-
-	public static function order_item( \WC_Order_Item_Product $item, string $cart_item_key, array $values, \WC_Order $order ): void {
-		if ( isset( $values['beltoft_services_disk_uid'], $values['beltoft_services_disk_for'] ) ) {
-			$item->add_meta_data( '_beltoft_services_disk_uid', (string) $values['beltoft_services_disk_uid'], true );
-			$item->add_meta_data( '_beltoft_services_disk_server', $values['beltoft_services_disk_for'], true );
-		}
-	}
-
-	public static function recurring_key( string $key, array $cart_item ): string {
-		$uid = (string) ( $cart_item['beltoft_services_disk_uid'] ?? '' );
-		return '' === $uid ? $key : $key . '_disk_' . md5( $uid );
-	}
-
-	/** One line is one disk: a quantity raised by a cart update or the Store API goes back to 1. */
-	public static function one_each( \WC_Cart $cart ): void {
-		foreach ( $cart->get_cart() as $key => $item ) {
-			if ( isset( $item['beltoft_services_disk_uid'] ) && 1 !== (int) ( $item['quantity'] ?? 1 ) ) {
-				$cart->cart_contents[ $key ]['quantity'] = 1;
-			}
-		}
-	}
-
-	public static function quantity( string $html, string $cart_item_key, array $cart_item ): string {
-		return isset( $cart_item['beltoft_services_disk_uid'] ) ? '1' : $html;
 	}
 
 	public static function checkout_validation( array $data, \WP_Error $errors ): void {

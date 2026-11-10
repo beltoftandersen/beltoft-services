@@ -157,7 +157,7 @@ final class AppLicenceCartTest extends PaidAppCase {
 		$this->assertSame( $v['basic']->get_id(), (int) $line['item']['variation_id'] );
 		$this->assertSame( 'cart_server', $line['item'][ AppLicence::CART_FOR ] );
 		$this->assertSame( 1, $line['item']['quantity'] );
-		$this->assertStringContainsString( '_applic_', AppLicenceCart::recurring_key( 'base', $line['item'] ) );
+		$this->assertStringContainsString( '_applic_', apply_filters( 'woocommerce_subscriptions_recurring_cart_key', 'base', $line['item'] ) );
 
 		$this->assertTrue( AppLicenceCart::choose( 'docker', 'basic' ), 'The same tier again changes nothing.' );
 		$this->assertCount( 2, WC()->cart->get_cart() );
@@ -210,7 +210,7 @@ final class AppLicenceCartTest extends PaidAppCase {
 		AppLicenceCart::choose( 'docker', 'pro' );
 		$item = new \WC_Order_Item_Product();
 		$line = AppLicenceCart::line();
-		AppLicenceCart::order_item( $item, $line['key'], $line['item'], new \WC_Order() );
+		do_action( 'woocommerce_checkout_create_order_line_item', $item, $line['key'], $line['item'], new \WC_Order() );
 		$this->assertSame( 'cart_server', $item->get_meta( AppLicence::ITEM_SERVER ) );
 		$this->assertNotSame( '', $item->get_meta( AppLicence::ITEM_UID ) );
 

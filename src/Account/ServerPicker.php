@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\BackupField;
-use BeltoftServices\Proxmox\DiskCart;
+use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
@@ -414,7 +414,7 @@ final class ServerPicker {
 		$old = array();
 
 		foreach ( $cart->get_cart() as $key => $item ) {
-			if ( DiskCart::flow( (array) $item ) ) {
+			if ( CartFlow::has_value( (array) $item, CartFlow::ALL ) ) {
 				return __( 'Finish or remove the subscription payment in your cart first.', 'beltoft-services' );
 			}
 
