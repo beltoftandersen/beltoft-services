@@ -481,6 +481,22 @@ class ClientTest extends TestCase {
 		$this->assertSame( 'pve1', $fake->request( 'GET', '/nodes' )[0]['node'] );
 	}
 
+	public function test_persisted_state_round_trips_under_the_same_option_name(): void {
+		delete_option( 'beltoft_services_fake_proxmox' );
+
+		$fake = new FakeClient( true );
+		$fake->add_node( 'pve9' );
+		$fake->add_pool( 'rt' );
+
+		$stored = get_option( 'beltoft_services_fake_proxmox' );
+		$this->assertIsArray( $stored );
+		$this->assertArrayHasKey( 'pve9', $stored['nodes'] );
+		$this->assertArrayHasKey( 'rt', $stored['pools'] );
+		$this->assertSame( $stored, ( new FakeClient( true ) )->state() );
+
+		delete_option( 'beltoft_services_fake_proxmox' );
+	}
+
 	public function test_fake_persists_without_secrets_when_asked(): void {
 		delete_option( 'beltoft_services_fake_proxmox' );
 

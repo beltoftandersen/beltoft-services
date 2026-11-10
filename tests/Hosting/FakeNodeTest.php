@@ -170,6 +170,22 @@ class FakeNodeTest extends TestCase {
 		$this->assertCount( 2, $n->calls_to( '#/status/current$#', 'GET' ) );
 	}
 
+	public function test_persisted_state_round_trips_under_the_same_option_name(): void {
+		delete_option( 'beltoft_services_fake_hosting_node' );
+
+		$n = new FakeNode( true );
+		$n->add_node( 'pve9' );
+		$n->add_pool( 'rt' );
+
+		$stored = get_option( 'beltoft_services_fake_hosting_node' );
+		$this->assertIsArray( $stored );
+		$this->assertArrayHasKey( 'pve9', $stored['nodes'] );
+		$this->assertArrayHasKey( 'rt', $stored['pools'] );
+		$this->assertSame( $stored, ( new FakeNode( true ) )->state() );
+
+		delete_option( 'beltoft_services_fake_hosting_node' );
+	}
+
 	public function test_persist_shares_the_state_between_instances(): void {
 		$a = new FakeNode( true );
 		$a->add_node( 'pve1' );
