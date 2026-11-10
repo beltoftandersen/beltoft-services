@@ -33,12 +33,12 @@ class ProductTest extends TestCase {
 		add_filter(
 			'beltoft_services_drivers',
 			static function ( $drivers ) {
-				$drivers['proxmox'] = new \BeltoftServices\Proxmox\ProxmoxDriver();
+				$drivers['proxmox'] = new \BeltoftServices\Proxmox\Vm\ProxmoxDriver();
 				return $drivers;
 			}
 		);
 
-		$field = ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->plan_fields()['backup_days'];
+		$field = ( new \BeltoftServices\Proxmox\Vm\ProxmoxDriver() )->plan_fields()['backup_days'];
 		$this->assertTrue( $field[4], 'It is set per variation.' );
 
 		$product = $this->service_product(

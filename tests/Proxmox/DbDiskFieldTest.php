@@ -120,7 +120,7 @@ class DbDiskFieldTest extends BackupTestCase {
 	private function room(): void {
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		// What the capacity job does next: the stored stock status follows the readings.
-		\BeltoftServices\Proxmox\Stock::sync( 'lab' );
+		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 	}
 
 	private function in_cart(): int {

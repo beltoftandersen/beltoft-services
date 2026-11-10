@@ -7,7 +7,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Cli\Commands;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\DiskMeta;
 use BeltoftServices\Proxmox\DiskPanels;
 use BeltoftServices\Product;
@@ -258,7 +258,7 @@ class DiskProvisionTest extends BackupTestCase {
 		Jobs::run( $disk->id() );
 		$this->settings( array( 'deletion_mode' => 'off' ) );
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( $server );
+		\BeltoftServices\Proxmox\Vm\Panels::account( $server );
 		$html = ob_get_clean();
 		$this->assertStringContainsString( 'Disks', $html );
 		$this->assertStringContainsString( 'Data disk 1: 50 GB', $html );
@@ -269,7 +269,7 @@ class DiskProvisionTest extends BackupTestCase {
 
 	public function test_disk_uses_server_retention_default(): void {
 		$product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
-		$this->assertSame( \BeltoftServices\Proxmox\ProxmoxDriver::DEFAULT_RETENTION_DAYS, Product::retention_days( $product->get_id() ) );
+		$this->assertSame( \BeltoftServices\Proxmox\Vm\ProxmoxDriver::DEFAULT_RETENTION_DAYS, Product::retention_days( $product->get_id() ) );
 	}
 
 	public function test_link_disk_dry_run_and_adoption_use_only_an_existing_named_volume(): void {

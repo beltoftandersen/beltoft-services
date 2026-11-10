@@ -15,11 +15,11 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Picked;
-use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Picked;
+use BeltoftServices\Proxmox\Vm\ServerName;
+use BeltoftServices\Proxmox\Vm\SshKeyField;
 use BeltoftServices\Tests\Proxmox\BackupTestCase;
 
 require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
@@ -85,7 +85,7 @@ class ServerPickerTest extends BackupTestCase {
 	public function tear_down(): void {
 		WC()->cart->empty_cart();
 		wc_clear_notices();
-		foreach ( array( ServerPicker::HANDLE, \BeltoftServices\Proxmox\Tiles::HANDLE, AppField::HANDLE ) as $handle ) {
+		foreach ( array( ServerPicker::HANDLE, \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, AppField::HANDLE ) as $handle ) {
 			wp_dequeue_style( $handle );
 			wp_dequeue_script( $handle );
 		}

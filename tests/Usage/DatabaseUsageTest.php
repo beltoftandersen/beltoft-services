@@ -199,7 +199,7 @@ class DatabaseUsageTest extends UsageTestCase {
 	public function test_the_bricks_tags_price_a_database_plan_and_its_add_on_variations(): void {
 		$v = $this->db_product();
 		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		\BeltoftServices\Proxmox\Stock::sync( 'lab' );
+		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 
 		$this->assertSame( Rates::money( 25 / 730, 4 ), Catalog::value( 'beltoft_usage_hourly', $v['m-0-0']->get_id() ) );
 		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['m-0-0']->get_id() ) );
@@ -233,7 +233,7 @@ class DatabaseUsageTest extends UsageTestCase {
 
 		// The public IP off and extra storage on keep the billing model (storage needs room on a node).
 		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		\BeltoftServices\Proxmox\Stock::sync( 'lab' );
+		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 		$this->assertTrue( DbIpField::swap( false )['ok'] );
 		$this->assertSame( $v['u-0-0']->get_id(), $this->in_cart() );
 		$this->assertTrue( DbDiskField::swap( 50 )['ok'] );

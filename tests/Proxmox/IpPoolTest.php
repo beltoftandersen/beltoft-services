@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Tests\TestCase;
 
 /**

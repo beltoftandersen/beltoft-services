@@ -14,7 +14,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

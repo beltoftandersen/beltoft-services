@@ -12,8 +12,8 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Jobs\BackupJobs;
 

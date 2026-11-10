@@ -10,10 +10,10 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\ConsoleTab;
 use BeltoftServices\Proxmox\Pve\FakeClient;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\PowerJobs;
-use BeltoftServices\Proxmox\Jobs\ServerSyncJobs;
+use BeltoftServices\Proxmox\Vm\PowerJobs;
+use BeltoftServices\Proxmox\Vm\ServerSyncJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 

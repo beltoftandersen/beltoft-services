@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
 

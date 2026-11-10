@@ -13,7 +13,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\DiskPanels;
-use BeltoftServices\Proxmox\Panels;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Resource;
 use BeltoftServices\ThankYou;
 

@@ -13,7 +13,7 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Mcp\Purchase;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 
 require_once dirname( __DIR__ ) . '/Usage/UsageTestCase.php';

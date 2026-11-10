@@ -9,14 +9,14 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Access;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Access;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Pve\Prepares;
-use BeltoftServices\Proxmox\Provision;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\Provision;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\Vm\SshKeyField;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 

@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

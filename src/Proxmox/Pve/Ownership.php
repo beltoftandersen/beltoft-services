@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

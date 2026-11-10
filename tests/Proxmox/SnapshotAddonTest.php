@@ -7,13 +7,13 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DiskCascade;
-use BeltoftServices\Proxmox\Panels;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\SnapshotCart;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Proxmox\SnapshotExpiry;
 use BeltoftServices\Proxmox\SnapshotMeta;
 use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\Stock;
+use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 

@@ -9,7 +9,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
 

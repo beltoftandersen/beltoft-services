@@ -9,10 +9,10 @@ namespace BeltoftServices\Proxmox\Jobs;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

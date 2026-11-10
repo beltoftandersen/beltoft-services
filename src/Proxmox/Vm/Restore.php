@@ -9,11 +9,11 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\Prepares;
-use BeltoftServices\Proxmox\RestoreSteps;
+use BeltoftServices\Proxmox\Vm\RestoreSteps;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;

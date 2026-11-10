@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
 
@@ -342,7 +342,7 @@ class DiskReinstallTest extends BackupTestCase {
 		list( $server ) = $this->server_with( 1 );
 		$this->assertTrue( $server->set( array( 'agent' => 'ok' ) ) );
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( Resource::find( $server->id() ) );
+		\BeltoftServices\Proxmox\Vm\Panels::account( Resource::find( $server->id() ) );
 		$html = ob_get_clean();
 		$this->assertStringContainsString( 'data-action="reinstall" data-disks="1"', $html );
 		$this->assertStringContainsString( 'Extra disks are kept with their data and stay attached.', $html );

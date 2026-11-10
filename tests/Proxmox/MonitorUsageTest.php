@@ -2,9 +2,9 @@
 /** Customer usage alerts: sustained CPU, the urgent disk level, the per-server switch. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Proxmox\GuestDisk;
+use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Monitor;
-use BeltoftServices\Proxmox\Usage;
+use BeltoftServices\Proxmox\Vm\Usage;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/MonitoringTestCase.php';

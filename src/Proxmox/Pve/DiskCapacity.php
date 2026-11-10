@@ -6,7 +6,7 @@ namespace BeltoftServices\Proxmox\Pve;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

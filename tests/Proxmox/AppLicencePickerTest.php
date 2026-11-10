@@ -7,9 +7,9 @@ use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Picked;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Picked;
 
 require_once __DIR__ . '/BackupTestCase.php';
 require_once __DIR__ . '/PaidAppFixtures.php';

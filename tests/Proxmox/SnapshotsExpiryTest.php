@@ -9,8 +9,8 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Panels;
-use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\Panels;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;

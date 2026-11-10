@@ -9,6 +9,8 @@ use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 

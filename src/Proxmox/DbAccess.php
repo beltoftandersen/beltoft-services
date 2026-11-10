@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

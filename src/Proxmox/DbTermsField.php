@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

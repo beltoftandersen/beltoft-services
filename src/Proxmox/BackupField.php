@@ -9,6 +9,8 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

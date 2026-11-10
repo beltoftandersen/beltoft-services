@@ -8,7 +8,7 @@
 namespace BeltoftServices\Proxmox\Pve;
 
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
-use BeltoftServices\Proxmox\Stock;
+use BeltoftServices\Proxmox\Vm\Stock;
 
 defined( 'ABSPATH' ) || exit;
 

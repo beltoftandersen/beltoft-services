@@ -11,8 +11,8 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\ProxmoxJobs;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

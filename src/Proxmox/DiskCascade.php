@@ -8,6 +8,8 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonLink;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -22,9 +22,9 @@ use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 use BeltoftServices\Domains\ZoneAccess;
@@ -82,9 +82,9 @@ class AppFieldTest extends TestCase {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
-		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Schema::tables()['vms'] );
+		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Vm\Schema::tables()['vms'] );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
-		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Schema::tables()['ips'] );
+		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Vm\Schema::tables()['ips'] );
 		delete_transient( IpPool::FREE_TRANSIENT );
 	}
 
@@ -717,23 +717,23 @@ class AppFieldTest extends TestCase {
 	// -- Review fixes ---------------------------------------------------------------------------
 
 	public function test_the_tiles_assets_load_on_checkout_only_and_only_with_a_server_in_the_cart(): void {
-		wp_dequeue_script( \BeltoftServices\Proxmox\Tiles::HANDLE );
-		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		wp_dequeue_script( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE );
+		wp_dequeue_style( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE );
 		WC()->cart->add_to_cart( $this->vm()->get_id() );
 
-		\BeltoftServices\Proxmox\Tiles::checkout_assets();
-		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not the checkout page.' );
+		\BeltoftServices\Proxmox\Vm\Tiles::checkout_assets();
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ), 'Not the checkout page.' );
 
 		add_filter( 'woocommerce_is_checkout', '__return_true' );
-		\BeltoftServices\Proxmox\Tiles::checkout_assets();
-		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
-		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
+		\BeltoftServices\Proxmox\Vm\Tiles::checkout_assets();
+		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ) );
+		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ) );
 
-		wp_dequeue_script( \BeltoftServices\Proxmox\Tiles::HANDLE );
-		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		wp_dequeue_script( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE );
+		wp_dequeue_style( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE );
 		WC()->cart->empty_cart();
-		\BeltoftServices\Proxmox\Tiles::checkout_assets();
-		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'No server in the cart, no tiles.' );
+		\BeltoftServices\Proxmox\Vm\Tiles::checkout_assets();
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ), 'No server in the cart, no tiles.' );
 		remove_filter( 'woocommerce_is_checkout', '__return_true' );
 	}
 

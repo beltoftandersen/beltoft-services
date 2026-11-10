@@ -12,7 +12,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
@@ -602,7 +602,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$server = $this->server();
 		$a      = $this->take( $server, 'A' );
 		$this->fake->task( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
-		\BeltoftServices\Proxmox\Operations::remember_power( $server->id(), 'stopped' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $server->id(), 'stopped' );
 
 		$this->rollback( $server, $a );
 

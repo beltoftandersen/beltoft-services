@@ -5,6 +5,8 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;

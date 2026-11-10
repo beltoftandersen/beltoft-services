@@ -4,9 +4,10 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Emails\Emails;
+use BeltoftServices\Proxmox\Vm\AbuseJobs;
+use BeltoftServices\Proxmox\Vm\Usage;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
-use BeltoftServices\Proxmox\Jobs\AbuseJobs;
 
 defined( 'ABSPATH' ) || exit;
 

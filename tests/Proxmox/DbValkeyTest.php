@@ -27,7 +27,7 @@ use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\PostgresEngine;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Proxmox\ValkeyEngine;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
@@ -391,7 +391,7 @@ class DbValkeyTest extends TestCase {
 
 	public function test_the_policy_waits_for_a_start_and_a_job_that_finds_the_database_stopped_ends_at_once(): void {
 		$r = $this->built();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'stopped' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'stopped' );
 
 		$refused = $this->policy_post( $r, array( 'policy' => 'allkeys-lru' ) );
 		$this->assertSame( 409, $refused->get_status() );
@@ -400,7 +400,7 @@ class DbValkeyTest extends TestCase {
 		$this->assertFalse( DbCard::view( Resource::find( $r->id() ) )['policy']['can_set'], 'The card offers no form for a stopped database.' );
 
 		// A job that was queued before the stop: the VM is stopped, so it ends without waiting for the guest.
-		delete_transient( \BeltoftServices\Proxmox\Operations::STATUS_PREFIX . $r->id() );
+		delete_transient( \BeltoftServices\Proxmox\Vm\Operations::STATUS_PREFIX . $r->id() );
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
 		$done = Registry::get( 'proxmox-db' )->act( Resource::find( $r->id() ), DbPolicy::ACTION, array( 'policy' => 'allkeys-lru' ) );
 		$this->assertTrue( $done->is_done() );

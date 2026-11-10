@@ -12,10 +12,10 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\NetConfig;
-use BeltoftServices\Proxmox\Panels;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\Panels;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\ServerSyncJobs;
+use BeltoftServices\Proxmox\Vm\ServerSyncJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -271,7 +271,7 @@ class BandwidthTest extends BackupTestCase {
 		$this->assertNull( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'delete' => 'net0' ) ) );
 		$seen = count( $this->puts_to_config() );
 
-		$this->assertTrue( ( new \BeltoftServices\Proxmox\Operations( Resource::find( $r->id() ) ) )->reconcile_rate() );
+		$this->assertTrue( ( new \BeltoftServices\Proxmox\Vm\Operations( Resource::find( $r->id() ) ) )->reconcile_rate() );
 
 		$this->assertCount( $seen, $this->puts_to_config() );
 		$this->assertArrayNotHasKey( 'net0', $this->fake->vm( 5000 )['config'] );

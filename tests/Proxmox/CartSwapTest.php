@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Proxmox\CartSwap;
 use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Tests\Mcp\ServerDiskFixture;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 

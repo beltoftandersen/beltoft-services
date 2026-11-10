@@ -60,7 +60,7 @@ class DiskCartTest extends BackupTestCase {
 		$add = \BeltoftServices\Proxmox\DiskPanels::server( $server )['add'];
 		$this->assertNotEmpty( $add, 'The 50 GB size fits and is offered.' );
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( \BeltoftServices\Resource::find( $server->id() ) );
+		\BeltoftServices\Proxmox\Vm\Panels::account( \BeltoftServices\Resource::find( $server->id() ) );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'data-disk-add', $html );
 		$this->assertSame( count( $add ), substr_count( $html, 'class="beltoft-services-add__tile"' ) );

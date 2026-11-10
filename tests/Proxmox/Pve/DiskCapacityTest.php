@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Proxmox\Pve;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Stock;
+use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\BackupTestCase;

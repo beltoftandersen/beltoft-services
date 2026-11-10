@@ -4,6 +4,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

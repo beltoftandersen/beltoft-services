@@ -19,23 +19,23 @@ use BeltoftServices\Proxmox\DbIp;
 use BeltoftServices\Proxmox\DbNeedsServer;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\Stock;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\Stock;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Proxmox\DbProfile;
-use BeltoftServices\Proxmox\Profiles;
+use BeltoftServices\Proxmox\Vm\Profiles;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Api\Routes;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbGrow;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Jobs\DiskJobs;
+use BeltoftServices\Proxmox\Vm\DiskJobs;
 
 /**
  * A database driver that does not sleep.

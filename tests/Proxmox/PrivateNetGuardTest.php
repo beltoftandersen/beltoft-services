@@ -13,7 +13,7 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbNetGuard;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 
 require_once __DIR__ . '/BackupTestCase.php';
 
@@ -131,9 +131,9 @@ class PrivateNetGuardTest extends BackupTestCase {
 		$user = self::factory()->user->create();
 		wp_set_current_user( $user );
 		$variation = wc_get_product( $db->get_id() );
-		$this->assertFalse( \BeltoftServices\Proxmox\Stock::available( $variation ), 'No network: not available.' );
+		$this->assertFalse( \BeltoftServices\Proxmox\Vm\Stock::available( $variation ), 'No network: not available.' );
 		$this->seed_private_nets( 1 );
-		$this->assertNotFalse( \BeltoftServices\Proxmox\Stock::filter( true, $variation ) );
+		$this->assertNotFalse( \BeltoftServices\Proxmox\Vm\Stock::filter( true, $variation ) );
 		$this->assertSame( 'instock', wc_get_product( $db->get_id() )->get_stock_status( 'edit' ), 'The stored status is not touched by the pool.' );
 	}
 

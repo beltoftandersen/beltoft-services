@@ -17,7 +17,7 @@ use BeltoftServices\Proxmox\DbDiskField;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbIp;
 use BeltoftServices\Proxmox\DbIpField;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

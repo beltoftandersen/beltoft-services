@@ -11,6 +11,8 @@ use BeltoftServices\Proxmox\Addon\AddonCart;
 use BeltoftServices\Proxmox\Pve\Capacity;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;

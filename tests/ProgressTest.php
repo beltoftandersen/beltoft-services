@@ -514,7 +514,7 @@ final class ProgressTest extends TestCase {
 	}
 
 	public function test_the_server_panel_passes_busy_from_the_progress(): void {
-		$this->assertStringContainsString( "Progress::build( \$r )['active']", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/Panels.php' ) );
+		$this->assertStringContainsString( "Progress::build( \$r )['active']", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Proxmox/Vm/Panels.php' ) );
 	}
 
 	public function test_a_driver_cannot_write_the_marker(): void {

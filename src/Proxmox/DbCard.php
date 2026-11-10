@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox;
 
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

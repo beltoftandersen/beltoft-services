@@ -13,12 +13,12 @@ use BeltoftServices\Admin\Panel as AdminPanel;
 use BeltoftServices\Crypto;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Access;
+use BeltoftServices\Proxmox\Vm\Access;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

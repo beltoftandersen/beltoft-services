@@ -4,9 +4,13 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Resource;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Panels;
+use BeltoftServices\Proxmox\Vm\Tiles;
+use BeltoftServices\Proxmox\Vm\VmRecords;
+use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 

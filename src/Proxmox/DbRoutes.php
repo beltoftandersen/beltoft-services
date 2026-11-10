@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Crypto;
+use BeltoftServices\Proxmox\Vm\RevealRoute;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 

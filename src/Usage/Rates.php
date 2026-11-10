@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Resource;
 

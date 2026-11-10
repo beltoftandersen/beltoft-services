@@ -11,7 +11,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/BackupTestCase.php';
@@ -92,7 +92,7 @@ class PowerLagTest extends BackupTestCase {
 
 	public function test_a_shutdown_whose_status_lags_is_found_off_by_the_look_after_and_the_page_power_is_right(): void {
 		$r = $this->ready_vm();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
 		$this->fake->lag_status( 5000, 3 );
 		$this->pauses = array();
 
@@ -100,13 +100,13 @@ class PowerLagTest extends BackupTestCase {
 
 		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
 		$this->assertNotEmpty( $this->pauses, 'Looked again with short waits.' );
-		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Operations::cached_status( $r->id() )['power'] );
-		$this->assertFalse( as_has_scheduled_action( \BeltoftServices\Proxmox\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ), 'Nothing left to follow up.' );
+		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Vm\Operations::cached_status( $r->id() )['power'] );
+		$this->assertFalse( as_has_scheduled_action( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ), 'Nothing left to follow up.' );
 	}
 
 	public function test_a_shutdown_that_still_shows_running_says_so_and_one_follow_up_keeps_the_power_right(): void {
 		$r = $this->ready_vm();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
 		$this->fake->lag_status_seconds( 5000, 60 ); // Longer than the look after the task.
 		$this->pauses = array();
 
@@ -116,32 +116,32 @@ class PowerLagTest extends BackupTestCase {
 		$this->assertSame( 'Shutdown requested; the server is still powering off', $result->event() );
 		$this->assertStringNotContainsString( 'left running', $result->event() );
 		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'stopped_by_customer' ), 'Not an outage.' );
-		$this->assertTrue( as_has_scheduled_action( \BeltoftServices\Proxmox\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ) );
+		$this->assertTrue( as_has_scheduled_action( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ) );
 
 		// A second shutdown does not queue a second follow-up.
-		\BeltoftServices\Proxmox\Jobs\PowerJobs::follow_up( $r->id() );
-		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Proxmox\ProxmoxJobs::POWER_AFTER, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
+		\BeltoftServices\Proxmox\Vm\PowerJobs::follow_up( $r->id() );
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Proxmox\Vm\ProxmoxJobs::POWER_AFTER, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
 
 		// The page still says running until the follow-up reads the VM, which by then is off.
-		$this->assertSame( 'running', \BeltoftServices\Proxmox\Operations::cached_status( $r->id() )['power'] );
+		$this->assertSame( 'running', \BeltoftServices\Proxmox\Vm\Operations::cached_status( $r->id() )['power'] );
 		$this->fake->elapse( 90 );
-		\BeltoftServices\Proxmox\Jobs\PowerJobs::after( $r->id() );
+		\BeltoftServices\Proxmox\Vm\PowerJobs::after( $r->id() );
 
-		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Operations::cached_status( $r->id() )['power'] );
+		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Vm\Operations::cached_status( $r->id() )['power'] );
 		$events = \BeltoftLicenses\Events::for_license( (int) $r->license()['id'] );
 		$this->assertStringContainsString( 'Server stopped', wp_json_encode( $events ) );
 	}
 
 	public function test_the_follow_up_leaves_a_vm_that_still_runs_alone(): void {
 		$r = $this->ready_vm();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'stopped' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'stopped' );
 		$seen = count( $this->fake->calls() );
 
-		\BeltoftServices\Proxmox\Jobs\PowerJobs::after( $r->id() );
+		\BeltoftServices\Proxmox\Vm\PowerJobs::after( $r->id() );
 
-		$this->assertSame( 'running', \BeltoftServices\Proxmox\Operations::cached_status( $r->id() )['power'], 'The reading wins.' );
+		$this->assertSame( 'running', \BeltoftServices\Proxmox\Vm\Operations::cached_status( $r->id() )['power'], 'The reading wins.' );
 		$this->assertEmpty( $this->power( $seen ), 'Nothing is sent to the VM.' );
-		\BeltoftServices\Proxmox\Jobs\PowerJobs::after( 999999 );
+		\BeltoftServices\Proxmox\Vm\PowerJobs::after( 999999 );
 	}
 
 	public function test_a_database_shutdown_shares_the_look_after(): void {
@@ -149,15 +149,15 @@ class PowerLagTest extends BackupTestCase {
 		$r->set( array( 'driver' => 'proxmox-db' ) );
 		$this->fake->lag_status_seconds( 5000, 60 );
 
-		$result = ( new \BeltoftServices\Proxmox\Actions( Resource::find( $r->id() ) ) )->run( 'shutdown', array() );
+		$result = ( new \BeltoftServices\Proxmox\Vm\Actions( Resource::find( $r->id() ) ) )->run( 'shutdown', array() );
 
 		$this->assertSame( 'Shutdown requested; the server is still powering off', $result->event() );
-		$this->assertTrue( as_has_scheduled_action( \BeltoftServices\Proxmox\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ) );
+		$this->assertTrue( as_has_scheduled_action( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::POWER_AFTER, array( $r->id() ), Jobs::GROUP ) );
 	}
 
 	public function test_the_status_says_pending_while_the_vm_has_not_followed_the_shutdown_then_the_real_power(): void {
 		$r = $this->ready_vm();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
 		$this->fake->lag_status_seconds( 5000, 60 );
 		( new ProxmoxDriver() )->act( Resource::find( $r->id() ), 'shutdown', array() );
 		Resource::find( $r->id() )->set( array( Jobs::RESULT => array( 'action' => 'shutdown', 'ok' => true, 'at' => time(), 'text' => '' ) ) );
@@ -181,12 +181,12 @@ class PowerLagTest extends BackupTestCase {
 		$this->assertFalse( $second['power_pending'] );
 		$this->assertFalse( $second['power_failed'] );
 		$this->assertSame( 'stopped', $second['power'] );
-		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Operations::cached_status( $r->id() )['power'] );
+		$this->assertSame( 'stopped', \BeltoftServices\Proxmox\Vm\Operations::cached_status( $r->id() )['power'] );
 	}
 
 	public function test_a_shutdown_the_vm_never_follows_is_failed_after_the_wait_and_a_start_is_the_same(): void {
 		$r = $this->ready_vm();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
 		$this->fake->lag_status_seconds( 5000, 100000 );
 		( new ProxmoxDriver() )->act( Resource::find( $r->id() ), 'shutdown', array() );
 		$set = static function ( int $id, string $action, int $age ): Resource {
@@ -386,7 +386,7 @@ class PowerLagTest extends BackupTestCase {
 			$seen = count( $this->fake->calls() );
 
 			$result = ( new ProxmoxDriver() )->$operation( Resource::find( $r->id() ) );
-			$vmid   = (int) Resource::find( $r->id() )->get( 'vmid' ) ?: (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'];
+			$vmid   = (int) Resource::find( $r->id() )->get( 'vmid' ) ?: (int) \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() )['vmid'];
 
 			$this->assertTrue( $result->is_done(), $operation . ': ' . $result->error() );
 			$power = $this->power( $seen );

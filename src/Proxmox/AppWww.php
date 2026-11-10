@@ -8,6 +8,7 @@ use BeltoftServices\Domains\PublicSuffix;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

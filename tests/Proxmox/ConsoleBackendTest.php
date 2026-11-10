@@ -9,8 +9,8 @@ use BeltoftServices\Proxmox\ConsoleRoute;
 use BeltoftServices\Proxmox\ConsoleSessions;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Crypto;
 use BeltoftServices\Resource;
 

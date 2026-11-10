@@ -16,10 +16,10 @@ use BeltoftServices\BillingRequirements;
 use BeltoftServices\Mcp\Access;
 use BeltoftServices\Mcp\Purchase;
 use BeltoftServices\Mcp\Sandbox;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\SshKeyField;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ServerName;
+use BeltoftServices\Proxmox\Vm\SshKeyField;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 

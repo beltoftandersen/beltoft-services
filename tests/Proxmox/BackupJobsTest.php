@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Jobs\BackupJobs;
 

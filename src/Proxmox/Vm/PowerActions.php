@@ -8,11 +8,11 @@
 namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Actions;
-use BeltoftServices\Proxmox\Jobs\PowerJobs;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Actions;
+use BeltoftServices\Proxmox\Vm\PowerJobs;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\Prepares;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

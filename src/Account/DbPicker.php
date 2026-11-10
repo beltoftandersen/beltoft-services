@@ -13,7 +13,7 @@ use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbNeedsServer;
 use BeltoftServices\Billing\CartFlow;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\PostgresEngine;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\RateLimit;
@@ -316,9 +316,9 @@ final class DbPicker {
 		}
 
 		// The engine tiles are the tiles of the server picker (tiles.css), so those load first.
-		\BeltoftServices\Proxmox\Tiles::enqueue();
-		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
-		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Tiles::HANDLE, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
+		\BeltoftServices\Proxmox\Vm\Tiles::enqueue();
+		wp_enqueue_style( ServerPicker::HANDLE, plugins_url( 'assets/picker.css', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE ), \BeltoftServices\Assets::version( 'assets/picker.css' ) );
+		wp_enqueue_script( ServerPicker::HANDLE, plugins_url( 'assets/picker.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/picker.js' ), true );
 	}
 
 	// -- The page ----------------------------------------------------------------------------------

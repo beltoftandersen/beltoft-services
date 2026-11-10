@@ -15,7 +15,7 @@ use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\ServiceEmail;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

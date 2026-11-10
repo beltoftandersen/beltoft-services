@@ -4,7 +4,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Proxmox\LiveUsage;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftLicenses\Account\View;
 
 require_once __DIR__ . '/MonitoringTestCase.php';

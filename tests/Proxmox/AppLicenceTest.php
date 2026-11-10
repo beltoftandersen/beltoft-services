@@ -10,7 +10,7 @@ use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/PaidAppCase.php';
@@ -298,7 +298,7 @@ final class AppLicenceTest extends PaidAppCase {
 		$driver = \BeltoftServices\Drivers\Registry::get( 'proxmox-app' );
 		$this->assertSame( 'applic', $driver->kind() );
 		$this->assertSame( array( 'app', 'tier', 'tier_label' ), array_keys( $driver->plan_fields() ) );
-		$this->assertContains( 'proxmox-app', \BeltoftServices\Proxmox\Stock::addon_drivers() );
+		$this->assertContains( 'proxmox-app', \BeltoftServices\Proxmox\Vm\Stock::addon_drivers() );
 		$this->tier_product();
 		$this->assertContains( self::$slug, \BeltoftServices\Product::service_slugs() );
 	}

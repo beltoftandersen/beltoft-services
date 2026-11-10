@@ -8,8 +8,8 @@
 namespace BeltoftServices\Tests\Proxmox\Pve;
 
 use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
-use BeltoftServices\Proxmox\Schema;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\Schema;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
 

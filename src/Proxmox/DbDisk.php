@@ -11,6 +11,7 @@ use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

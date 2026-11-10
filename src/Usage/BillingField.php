@@ -12,8 +12,8 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

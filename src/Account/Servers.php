@@ -12,13 +12,13 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\GuestDisk;
-use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\Vm\GuestDisk;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\SnapshotDriver;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

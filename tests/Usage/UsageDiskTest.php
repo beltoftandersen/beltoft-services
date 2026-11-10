@@ -16,7 +16,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DiskCart;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\DiskPanels;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Mcp\CallsTools;
 use BeltoftServices\Tests\Mcp\ServerDiskFixture;
@@ -157,7 +157,7 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertSame( '', DiskCart::grow_url( $disk ), 'The subscription switch is never built for it.' );
 
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( Resource::find( $server->id() ) );
+		\BeltoftServices\Proxmox\Vm\Panels::account( Resource::find( $server->id() ) );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'data-delete-disk="' . $disk->id() . '"', $html );
 		$this->assertStringContainsString( 'data-grow-disk="' . $disk->id() . '"', $html );

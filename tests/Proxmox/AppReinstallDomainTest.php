@@ -14,8 +14,8 @@ use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/MonitoringTestCase.php';

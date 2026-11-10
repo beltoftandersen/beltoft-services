@@ -6,6 +6,9 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

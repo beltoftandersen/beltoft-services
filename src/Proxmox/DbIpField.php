@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Vm\OsField;
 
 defined( 'ABSPATH' ) || exit;
 

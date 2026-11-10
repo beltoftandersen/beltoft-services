@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
@@ -273,7 +273,7 @@ class DiskRestoreTest extends BackupTestCase {
 		$this->disk_for( $server );
 		$this->assertTrue( $server->set( array( 'backup_list' => array( array( 'volid' => 'backup-store:backup/vm/5000/x', 'ctime' => time(), 'size' => 1048576 ) ) ) ) );
 		ob_start();
-		\BeltoftServices\Proxmox\Panels::account( Resource::find( $server->id() ) );
+		\BeltoftServices\Proxmox\Vm\Panels::account( Resource::find( $server->id() ) );
 		$html = ob_get_clean();
 		$this->assertStringContainsString( 'Extra disks are not part of the backup: they keep their current data and are attached again after the restore.', $html );
 		$this->assertStringNotContainsString( "\xE2\x80\x94", $html );

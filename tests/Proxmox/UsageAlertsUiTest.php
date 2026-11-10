@@ -14,8 +14,8 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\MetricsRoute;
 use BeltoftServices\Proxmox\Monitor;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\Upgrades;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\Upgrades;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/BackupTestCase.php';

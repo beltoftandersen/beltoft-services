@@ -27,9 +27,17 @@ define( 'BELTOFT_SERVICES_VERSION', '0.7.0' );
 /*
  * Old class names that outside code still calls (the site theme and the OdooWoo portal; see tests/fixtures/external-api.php)
  * and that moved to a new namespace: old name => new name. The autoloader loads the new class and aliases the old name to it.
- * Empty until a moved class is on that list.
+ * Only classes listed in tests/fixtures/external-api.php are here (ExternalApiTest reads that list through these aliases).
  */
-define( 'BELTOFT_SERVICES_CLASS_ALIASES', array() );
+define(
+	'BELTOFT_SERVICES_CLASS_ALIASES',
+	array(
+		'BeltoftServices\\Proxmox\\OsField'      => 'BeltoftServices\\Proxmox\\Vm\\OsField',
+		'BeltoftServices\\Proxmox\\Picked'       => 'BeltoftServices\\Proxmox\\Vm\\Picked',
+		'BeltoftServices\\Proxmox\\ServerName'   => 'BeltoftServices\\Proxmox\\Vm\\ServerName',
+		'BeltoftServices\\Proxmox\\SshKeyField'  => 'BeltoftServices\\Proxmox\\Vm\\SshKeyField',
+	)
+);
 
 spl_autoload_register(
 	static function ( $class_name ) {
@@ -66,7 +74,7 @@ add_action(
 );
 
 // Creates the IP pool and VM tables; an update runs Schema::maybe_upgrade() from Plugin::boot().
-register_activation_hook( __FILE__, array( \BeltoftServices\Proxmox\Schema::class, 'activate' ) );
+register_activation_hook( __FILE__, array( \BeltoftServices\Proxmox\Vm\Schema::class, 'activate' ) );
 // Clusters that are saved already get their capacity cached at once, so the stock is not closed for an hour.
 register_activation_hook( __FILE__, array( \BeltoftServices\Proxmox\Jobs\CapacityJobs::class, 'activate' ) );
 
@@ -75,7 +83,7 @@ register_deactivation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'unsc
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Hosting\Addons::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\Renewals::class, 'unschedule' ) );
-register_deactivation_hook( __FILE__, array( \BeltoftServices\Proxmox\ProxmoxJobs::class, 'unschedule' ) );
+register_deactivation_hook( __FILE__, array( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Ssl\SslJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Ssl\SslRenewals::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Emails\Emails::class, 'unschedule' ) );

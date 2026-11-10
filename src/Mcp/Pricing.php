@@ -14,7 +14,7 @@ use BeltoftServices\Credit\Config;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\DbDisk;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Usage\Account;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Estimate;

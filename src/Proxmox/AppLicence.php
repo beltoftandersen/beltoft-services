@@ -10,9 +10,10 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonLink;
-use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Rates;
 

@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Proxmox\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/BackupTestCase.php';

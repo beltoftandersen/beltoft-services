@@ -14,6 +14,24 @@ use PHPUnit\Framework\TestCase;
  */
 class ClassAliasTest extends TestCase {
 
+	/**
+	 * Every alias with one static method and one constant that the site theme reads through the old name (the
+	 * names come from tests/fixtures/external-api.php). Old names are built from parts so that
+	 * NamespaceMoveTest does not see them as left-over references.
+	 *
+	 * @return array<string, array{string, string}>
+	 */
+	private function expected(): array {
+		$old = 'BeltoftServices\\Proxmox\\';
+
+		return array(
+			$old . 'ServerName'  => array( 'BeltoftServices\\Proxmox\\Vm\\ServerName', 'display', 'ACTION' ),
+			$old . 'SshKeyField' => array( 'BeltoftServices\\Proxmox\\Vm\\SshKeyField', 'cart_needs_key', '' ),
+			$old . 'OsField'     => array( 'BeltoftServices\\Proxmox\\Vm\\OsField', 'cart_choice', '' ),
+			$old . 'Picked'      => array( 'BeltoftServices\\Proxmox\\Vm\\Picked', 'clean', 'KEY' ),
+		);
+	}
+
 	public function test_every_alias_target_exists_and_the_old_name_resolves_to_it(): void {
 		$this->assertIsArray( BELTOFT_SERVICES_CLASS_ALIASES );
 
@@ -21,6 +39,33 @@ class ClassAliasTest extends TestCase {
 			$this->assertTrue( class_exists( $new ) || interface_exists( $new ) || trait_exists( $new ), $new );
 			$this->assertTrue( class_exists( $old ) || interface_exists( $old ) || trait_exists( $old ), $old );
 			$this->assertSame( ( new \ReflectionClass( $new ) )->getName(), ( new \ReflectionClass( $old ) )->getName(), $old );
+		}
+	}
+
+	public function test_the_alias_map_is_exactly_the_classes_in_the_external_api_list(): void {
+		$external = array_keys( require dirname( __DIR__ ) . '/fixtures/external-api.php' );
+
+		foreach ( BELTOFT_SERVICES_CLASS_ALIASES as $old => $new ) {
+			$this->assertContains( substr( $old, strlen( 'BeltoftServices\\' ) ), $external, $old . ' is aliased but nothing outside the plugin calls it.' );
+		}
+	}
+
+	public function test_every_alias_is_exercised_through_the_old_name(): void {
+		$this->assertEqualsCanonicalizing( array_keys( $this->expected() ), array_keys( BELTOFT_SERVICES_CLASS_ALIASES ), 'The alias map and the checks here differ.' );
+
+		foreach ( BELTOFT_SERVICES_CLASS_ALIASES as $old => $new ) {
+			$this->assertArrayHasKey( $old, $this->expected(), $old . ' has no alias check here.' );
+			list( $target, $method, $const ) = $this->expected()[ $old ];
+
+			$this->assertSame( $target, $new );
+			$this->assertSame( $target, ( new \ReflectionClass( $old ) )->getName() );
+			$this->assertTrue( is_callable( array( $old, $method ) ), $old . '::' . $method );
+
+			if ( '' !== $const ) {
+				// The theme reads constants through the old name; defined() must trigger the autoloader.
+				$this->assertTrue( defined( $old . '::' . $const ), $old . '::' . $const );
+				$this->assertSame( constant( $target . '::' . $const ), constant( $old . '::' . $const ) );
+			}
 		}
 	}
 }

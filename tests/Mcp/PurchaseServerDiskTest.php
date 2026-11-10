@@ -14,7 +14,7 @@ use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Purchase;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\Offers;
+use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Rates;
@@ -309,7 +309,7 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 			if ( (int) $item->get_variation_id() === $this->disk['u-50']->get_id() ) {
 				$this->assertNotSame( '', (string) $item->get_meta( '_beltoft_services_disk_uid' ) );
 			} else {
-				$this->assertSame( '9001', (string) $item->get_meta( \BeltoftServices\Proxmox\OsField::ITEM_META ) );
+				$this->assertSame( '9001', (string) $item->get_meta( \BeltoftServices\Proxmox\Vm\OsField::ITEM_META ) );
 			}
 		}
 

@@ -6,6 +6,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

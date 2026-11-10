@@ -9,6 +9,9 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Account\ServerLinks;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

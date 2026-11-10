@@ -8,7 +8,7 @@ use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\ConsoleAuth;
 use BeltoftServices\Proxmox\ConsoleSessions;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 
 require_once __DIR__ . '/MonitoringTestCase.php';
 

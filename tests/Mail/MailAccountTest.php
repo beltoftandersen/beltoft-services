@@ -371,7 +371,7 @@ final class MailAccountTest extends MailTestCase {
 	public function test_the_mail_notice_points_to_the_email_page(): void {
 		$r = $this->ready_mail( 'notice.example', array(), $this->user );
 
-		$this->assertSame( 'notice.example', \BeltoftServices\Proxmox\ServerName::email_label( $r, $r->license() ) );
+		$this->assertSame( 'notice.example', \BeltoftServices\Proxmox\Vm\ServerName::email_label( $r, $r->license() ) );
 		$this->assertStringContainsString( 'reveal_mailbox', implode( ' ', \BeltoftServices\Emails\Notice::KINDS ) );
 		$this->assertSame( 'View your email in your account', \BeltoftServices\Emails\Notice::link_text( 'reveal_mailbox' ) );
 		$this->assertContains( 'reveal_mailbox', \BeltoftServices\Emails\Notice::ALWAYS );

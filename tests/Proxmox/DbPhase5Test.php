@@ -18,16 +18,16 @@ use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbMonitor;
 use BeltoftServices\Proxmox\DbPower;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\ProxmoxJobs;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 use BeltoftServices\Proxmox\Jobs\BackupJobs;
-use BeltoftServices\Proxmox\Jobs\PowerJobs;
+use BeltoftServices\Proxmox\Vm\PowerJobs;
 
 /**
  * A database driver that does not sleep.
@@ -330,7 +330,7 @@ class DbPhase5Test extends TestCase {
 		$this->backup_of( $r );
 		$this->assertCount( 1, $this->fake->state()['backups']['backup-store'] );
 
-		$op = new \BeltoftServices\Proxmox\Operations( Resource::find( $r->id() ) );
+		$op = new \BeltoftServices\Proxmox\Vm\Operations( Resource::find( $r->id() ) );
 		$r->set( array( 'desired' => 'deleted', 'state' => 'deleting' ) );
 		$result = $op->delete();
 

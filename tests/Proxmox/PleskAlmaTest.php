@@ -10,7 +10,7 @@ use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/PaidAppCase.php';

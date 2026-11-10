@@ -6,7 +6,7 @@ namespace BeltoftServices\Proxmox\Addon;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -16,7 +16,7 @@ use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

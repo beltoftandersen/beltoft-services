@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\Panels;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
 

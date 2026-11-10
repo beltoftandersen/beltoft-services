@@ -9,7 +9,7 @@ use BeltoftServices\Proxmox\AppLicenceCart;
 use BeltoftServices\Proxmox\AppLicenceDriver;
 use BeltoftServices\Proxmox\DiskDriver;
 use BeltoftServices\Proxmox\SnapshotDriver;
-use BeltoftServices\Proxmox\Stock;
+use BeltoftServices\Proxmox\Vm\Stock;
 
 class AddonTest extends \WP_UnitTestCase {
 	public function test_the_three_add_ons_keep_their_keys(): void {
