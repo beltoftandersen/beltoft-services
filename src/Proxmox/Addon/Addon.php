@@ -29,6 +29,7 @@ final class Addon {
 	 * @param string $list_order          Order of its resources on a server, ASC or DESC.
 	 * @param string $parent_deleted_event History text when its server is deleted.
 	 * @param \Closure $after_parent_deleted What it does once ended for a deleted server, given the resource.
+	 * @param bool   $skips_deleted       Whether the server's cascade leaves an add-on that is already deleted alone (true for packs and app licences; a disk is always ended, so its activation is closed and the admin told).
 	 */
 	public function __construct(
 		public readonly string $driver_id,
@@ -40,7 +41,8 @@ final class Addon {
 		public readonly bool $server_must_be_live,
 		public readonly string $list_order,
 		public readonly string $parent_deleted_event,
-		public readonly \Closure $after_parent_deleted
+		public readonly \Closure $after_parent_deleted,
+		public readonly bool $skips_deleted = true
 	) {}
 
 	/** Cart item key holding the server the add-on is for. */
@@ -70,7 +72,7 @@ final class Addon {
 	 */
 	public static function all(): array {
 		return array(
-			new self( DiskDriver::ID, 'disk', 'disk', '_disk_', 'beltoft-services-disk', true, false, 'ASC', 'Parent server deleted; extra disk no longer available', DiskMeta::after_parent_deleted( ... ) ),
+			new self( DiskDriver::ID, 'disk', 'disk', '_disk_', 'beltoft-services-disk', true, false, 'ASC', 'Parent server deleted; extra disk no longer available', DiskMeta::after_parent_deleted( ... ), false ),
 			new self( SnapshotDriver::ID, 'snapshot', 'snapshot', '_snapshots_', 'beltoft-services-snapshots', false, true, 'ASC', 'Parent server deleted; snapshot slots no longer available', SnapshotMeta::after_parent_deleted( ... ) ),
 			new self( AppLicenceDriver::ID, 'applic', 'applic', '_applic_', AppLicenceCart::NONCE, true, false, 'DESC', 'Parent server deleted; app licence no longer available', AppLicence::after_parent_deleted( ... ) ),
 		);

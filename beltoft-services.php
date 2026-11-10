@@ -25,7 +25,7 @@ define( 'BELTOFT_SERVICES_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BELTOFT_SERVICES_VERSION', '0.7.0' );
 
 /*
- * Old class names that outside code still calls (the site theme and the OdooWoo portal; see tests/fixtures/external-api.php)
+ * Old class names that outside code still calls (the site theme, the OdooWoo portal and system scripts; see tests/fixtures/external-api.php)
  * and that moved to a new namespace: old name => new name. The autoloader loads the new class and aliases the old name to it.
  * Only classes listed in tests/fixtures/external-api.php are here (ExternalApiTest reads that list through these aliases).
  */
@@ -35,6 +35,8 @@ define(
 		'BeltoftServices\\Proxmox\\AppField'    => 'BeltoftServices\\Apps\\AppField',
 		'BeltoftServices\\Proxmox\\AppLicence'  => 'BeltoftServices\\Apps\\AppLicence',
 		'BeltoftServices\\Proxmox\\Backups'      => 'BeltoftServices\\Proxmox\\Backup\\Backups',
+		'BeltoftServices\\Proxmox\\Clients'      => 'BeltoftServices\\Proxmox\\Pve\\Clients',
+		'BeltoftServices\\Proxmox\\Clusters'     => 'BeltoftServices\\Proxmox\\Pve\\Clusters',
 		'BeltoftServices\\Proxmox\\DbIpField'     => 'BeltoftServices\\Proxmox\\Db\\DbIpField',
 		'BeltoftServices\\Proxmox\\DiskField'    => 'BeltoftServices\\Proxmox\\Disk\\DiskField',
 		'BeltoftServices\\Proxmox\\OsField'      => 'BeltoftServices\\Proxmox\\Vm\\OsField',

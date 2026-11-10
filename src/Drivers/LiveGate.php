@@ -7,8 +7,6 @@
 
 namespace BeltoftServices\Drivers;
 
-use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -41,16 +39,25 @@ final class LiveGate {
 	private string $retry_text;
 
 	/**
+	 * Gives the explicit site tag the admin set, or '' (the gate names no feature, the factory passes it in).
+	 *
+	 * @var callable
+	 */
+	private $site_tag;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string $constant     Name of the wp-config.php constant that allows live calls.
 	 * @param string $alert_prefix Put before the id in the site tag alert.
 	 * @param string $retry_text   Admin text with one %s for the id, returned by gate().
+	 * @param callable $site_tag   Returns the explicit site tag, or '' when none is set.
 	 */
-	public function __construct( string $constant, string $alert_prefix, string $retry_text ) {
+	public function __construct( string $constant, string $alert_prefix, string $retry_text, callable $site_tag ) {
 		$this->constant     = $constant;
 		$this->alert_prefix = $alert_prefix;
 		$this->retry_text   = $retry_text;
+		$this->site_tag     = $site_tag;
 	}
 
 	/**
@@ -77,7 +84,7 @@ final class LiveGate {
 	 * @param bool                 $allowed  Whether wp-config.php allows live calls.
 	 */
 	public function untagged( array $settings, bool $allowed ): bool {
-		return $allowed && 'live' === ( $settings['client'] ?? 'fake' ) && '' === ProxmoxSettings::explicit_site_tag();
+		return $allowed && 'live' === ( $settings['client'] ?? 'fake' ) && '' === ( $this->site_tag )();
 	}
 
 	/**

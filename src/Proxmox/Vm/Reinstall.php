@@ -49,6 +49,7 @@ final class Reinstall {
 	 * Bookkeeping only: the provision's `wipe` step does the destroying, with retries and
 	 * ownership checks, on the same VMID and address, with a new password.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $args   Arguments.
 	 */

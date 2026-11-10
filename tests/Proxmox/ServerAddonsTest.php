@@ -94,6 +94,66 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		return (string) ob_get_clean();
 	}
 
+	public function test_a_disk_already_deleted_is_still_closed_and_alerted_when_its_server_is_deleted(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+
+		// The disk went to deleted on its own and its activation is still open (as at 6d95431).
+		$this->assertTrue( $disk->transition( 'deleted', 'Deleted before its server' ) );
+		$this->assertTrue( $this->fresh( $disk )->is_live() );
+
+		$this->assertTrue( $server->transition( 'deleted', 'Deleted for the test' ) );
+		Reconciler::notify( $server, 'ready', 'deleted' );
+
+		$fresh = $this->fresh( $disk );
+		$this->assertFalse( $fresh->is_live() );
+		$alerts = array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'Resource: ' . $fresh->id() . "\n" ) );
+		$this->assertCount( 1, $alerts );
+	}
+
+	public function test_the_add_on_cascade_runs_after_the_servers_own_clean_up(): void {
+		global $wp_filter;
+
+		$hook      = $wp_filter['beltoft_services_state_changed'];
+		$original  = $hook->callbacks[10];
+		$wanted    = array(
+			'access'      => array( \BeltoftServices\Proxmox\Vm\Access::class, 'on_state_changed' ),
+			'operations'  => array( \BeltoftServices\Proxmox\Vm\Operations::class, 'on_state_changed' ),
+			'credentials' => array( \BeltoftServices\Proxmox\Vm\Credentials::class, 'on_state_changed' ),
+			'cascade'     => array( \BeltoftServices\Proxmox\Addon\AddonCascade::class, 'state_changed' ),
+		);
+		$sequence  = array();
+		$recording = array();
+
+		foreach ( $original as $key => $entry ) {
+			$name = array_search( $entry['function'], $wanted, true );
+
+			if ( false === $name ) {
+				$recording[ $key ] = $entry;
+				continue;
+			}
+
+			$recording[ $key ] = array(
+				'function'      => static function () use ( &$sequence, $name ) {
+					$sequence[] = $name;
+				},
+				'accepted_args' => 3,
+			);
+		}
+
+		$hook->callbacks[10] = $recording;
+		$server              = $this->server();
+
+		try {
+			do_action( 'beltoft_services_state_changed', $server, 'ready', 'paused' );
+		} finally {
+			$hook->callbacks[10] = $original;
+		}
+
+		// The test suite boots the plugin more than once, so each listener may be registered several times: the order of first runs counts.
+		$this->assertSame( array( 'access', 'operations', 'credentials', 'cascade' ), array_values( array_unique( $sequence ) ) );
+	}
+
 	public function test_the_list_has_no_card_for_a_disk_or_a_pack_of_a_server_in_the_list(): void {
 		$server = $this->server();
 		$disk   = $this->disk_for( $server );

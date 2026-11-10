@@ -10,7 +10,7 @@ namespace BeltoftServices\Proxmox\Pve;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Talks to a real Proxmox VE API (PRODUCTION). Built only by Clients::for(), which passes the
+ * Talks to a real Proxmox VE API (PRODUCTION). Built only by Clients::for() (and by Hosting\Clients for a hosting node's API), which pass the
  * allowance read from the constant BELTOFT_SERVICES_PROXMOX_LIVE. Nothing in the plugin sets it.
  *
  * Cluster keys: api_url (https only), token_id (USER@REALM!TOKENID), token_secret (plain text

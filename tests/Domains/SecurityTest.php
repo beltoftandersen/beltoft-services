@@ -311,7 +311,7 @@ class SecurityTest extends TestCase {
 		$ask = static fn() => array( 'kind' => 'code', 'label' => 'Code from your app' );
 		add_filter( 'beltoft_services_step_up_ask', $ask );
 
-		$this->assertSame( 'one-time-code', \BeltoftServices\StepUp::ask( (int) $r->license()['user_id'] )['autocomplete'] );
+		$this->assertSame( 'one-time-code', \BeltoftServices\StepUp::ask( (int) $r->license()['user_id'], \BeltoftServices\Account\ApiTokens::PURPOSE )['autocomplete'] );
 		$this->assertSame( 403, $this->code_request( $r, '123456' )->get_status(), 'Without a check for it nothing is shown.' );
 
 		$check = static fn( $ok, $user, $secret ) => '123456' === $secret;

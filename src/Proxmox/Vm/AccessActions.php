@@ -52,6 +52,7 @@ final class AccessActions {
 	 * digest of the config just read, in one PUT. Proxmox cloud-init sets the hostname from the VM name when
 	 * it next boots, so the customer is told to reboot; the server is never rebooted here.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 * @param string               $name   The name as sent (checked again here).
@@ -120,6 +121,7 @@ final class AccessActions {
 	 * A new password: stored first, then sent as `cipassword` alone and, while the VM runs with
 	 * the guest agent, to the agent. Nothing else of the cloud-init config is written.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 */
@@ -180,6 +182,7 @@ final class AccessActions {
 	/**
 	 * Adds or replaces the SSH key. Stored first (a reinstall then uses it too), then written.
 	 *
+	 * @internal Public only so Actions can call it; not an API.
 	 * @param array<string, mixed> $record VM record.
 	 * @param array<string, mixed> $v      Verified VM.
 	 * @param string               $key    The key as sent (checked again here).

@@ -65,7 +65,6 @@ final class Plugin {
 		Hosting\Addons::register();
 		Hosting\HostingAccount::register();
 		Children::register();
-		Proxmox\Addon\AddonCascade::register();
 		Domains\DomainSettings::register();
 		Ssl\SslSettings::register();
 		Ssl\Keys::register();
@@ -202,6 +201,8 @@ final class Plugin {
 		Proxmox\Db\DbIpField::register();
 		Proxmox\Db\DbDiskField::register();
 		Proxmox\Disk\DiskMeta::register();
+		// The cascade runs after the server's own clean-up (CoreHooks, Credentials), as the three old cascades did.
+		Proxmox\Addon\AddonCascade::register();
 		Proxmox\Disk\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
 		Proxmox\Disk\DiskCart::register();

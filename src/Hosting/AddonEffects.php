@@ -103,6 +103,7 @@ final class AddonEffects {
 	/**
 	 * Adds the domain a paid add-on order was for to its website, or says that it could not be (the line is paid and stays).
 	 *
+	 * @internal Public only so AddonBilling can call it; not an API.
 	 * @param \WC_Order            $order Paid order.
 	 * @param Resource             $r     Hosting resource.
 	 * @param array<string, mixed> $meta  Order meta of the add-on.
@@ -126,6 +127,7 @@ final class AddonEffects {
 	/**
 	 * Removes the names of a registrable domain from the account (its line has just ended).
 	 *
+	 * @internal Public only so AddonBilling can call it; not an API.
 	 * @param Resource $r   Hosting resource.
 	 * @param string   $reg Registrable domain.
 	 * @return bool False when a name could not be removed.

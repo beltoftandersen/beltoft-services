@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Structure;
 use PHPUnit\Framework\TestCase;
 
 /**
- * A bare 'proxmox' next to a driver check is a second copy of the id. This scans src/ and fails on one outside ProxmoxDriver.
+ * A bare 'proxmox' or "proxmox" next to a driver check is a second copy of the id. This scans src/ and fails on one outside ProxmoxDriver.
  */
 class DriverIdLiteralTest extends TestCase {
 
@@ -37,7 +37,7 @@ class DriverIdLiteralTest extends TestCase {
 				continue;
 			}
 
-			if ( preg_match( "/'proxmox'/", (string) file_get_contents( $file->getPathname() ) ) ) {
+			if ( preg_match( '/[\'"]proxmox[\'"]/', (string) file_get_contents( $file->getPathname() ) ) ) {
 				$bad[] = $rel;
 			}
 		}

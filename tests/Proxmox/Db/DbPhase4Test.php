@@ -234,14 +234,6 @@ class DbPhase4Test extends TestCase {
 		return array_values( array_filter( $this->fake->calls(), static fn( $c ) => $c['method'] === $method && substr( $c['path'], -strlen( $suffix ) ) === $suffix ) );
 	}
 
-	private function backup_of( Resource $r ): string {
-		$this->assertIsString( $this->fake->task( 'POST', '/nodes/node-a/vzdump', array( 'vmid' => (int) $r->get( 'vmid' ), 'storage' => 'backup-store' ) ) );
-		$list = ( new Backups( Resource::find( $r->id() ) ) )->list();
-		$this->assertNotEmpty( $list );
-
-		return $list[0]['volid'];
-	}
-
 	private function follow_up(): void {
 		as_unschedule_all_actions( ProxmoxJobs::BACKUP_NEXT, array(), Jobs::GROUP );
 		BackupJobs::backup_next();

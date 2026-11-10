@@ -1,6 +1,6 @@
 <?php
 /**
- * Public classes, methods and constants that code outside this plugin calls (site themes and add-on plugins).
+ * Public classes, methods and constants that code outside this plugin calls (site themes, add-on plugins and system scripts, for example the ones in /usr/local/lib/beltoft/).
  * A name listed here may not be removed, renamed or made private: see tests/Structure/ExternalApiTest.php.
  * Methods end in (), everything else is a class constant. An empty list pins the class name alone.
  *
@@ -24,6 +24,8 @@ return array(
 	'Proxmox\\AppField' => array( 'POST_APP', 'POST_TIER', 'POST_VERSION', 'offer_for()' ),
 	'Proxmox\\AppLicence' => array( 'tier()' ),
 	'Proxmox\\Backups' => array( 'sibling()' ),
+	'Proxmox\\Clients' => array( 'for()' ),
+	'Proxmox\\Clusters' => array( 'OPTION', 'get()' ),
 	'Proxmox\\DbIpField' => array( 'cart_has_new_database()' ),
 	'Proxmox\\DiskField' => array( 'cart_server()', 'server_swap_in_progress()' ),
 	'Proxmox\\OsField' => array( 'cart_choice()', 'cart_needs_choice()' ),

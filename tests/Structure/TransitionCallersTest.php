@@ -17,6 +17,19 @@ use PHPUnit\Framework\TestCase;
 class TransitionCallersTest extends TestCase {
 
 	/**
+	 * How many ->transition( calls each listed file has today. A second call in a listed file is a new caller too.
+	 *
+	 * @var array<string, int>
+	 */
+	private const COUNTS = array(
+		'Reconciler.php'                 => 2,
+		'Apps/AppLicence.php'            => 1,
+		'Proxmox/Addon/AddonCascade.php' => 1,
+		'Proxmox/Vm/RestoreSteps.php'    => 2,
+		'Proxmox/Vm/Reinstall.php'       => 1,
+	);
+
+	/**
 	 * Files that call ->transition() and why none of them notifies.
 	 *
 	 * @var array<string, string>
@@ -39,15 +52,21 @@ class TransitionCallersTest extends TestCase {
 				continue;
 			}
 
-			if ( 1 === preg_match( '/->transition\(/', (string) file_get_contents( $file->getPathname() ) ) ) {
-				$found[] = substr( $file->getPathname(), strlen( $root ) );
+			$count = preg_match_all( '/->transition\(/', (string) file_get_contents( $file->getPathname() ) );
+
+			if ( $count > 0 ) {
+				$found[ substr( $file->getPathname(), strlen( $root ) ) ] = $count;
 			}
 		}
 
-		sort( $found );
+		ksort( $found );
 		$allowed = array_keys( self::ALLOWED );
 		sort( $allowed );
 
-		$this->assertSame( $allowed, $found, 'Resource::transition() fires nothing: new callers must use Reconciler::move() or list their reason here.' );
+		$this->assertSame( $allowed, array_keys( $found ), 'Resource::transition() fires nothing: new callers must use Reconciler::move() or list their reason here.' );
+
+		$counts = self::COUNTS;
+		ksort( $counts );
+		$this->assertSame( $counts, $found, 'The number of ->transition( calls in a listed file changed: a new call needs its reason checked, then the count here updated.' );
 	}
 }

@@ -152,4 +152,22 @@ final class SchedulingAndNotifyTest extends TestCase {
 		$this->assertTrue( Alerts::notify( 'Sent', array( 'a' ), $r ) );
 		$this->assertSame( array(), Alerts::problems() );
 	}
+
+	public function test_notify_leaves_the_row_of_an_unsent_failure_alert_alone(): void {
+		$product = $this->service_product( 'fake' );
+		$this->fake_driver();
+		$license = $this->service_license( $product );
+		$this->run_jobs();
+		$r = Resource::for_license( (int) $license['id'] );
+
+		// A failure alert could not be sent (Alerts::admin recorded it), the address is fixed, then another mail about the resource goes out.
+		delete_option( Alerts::PROBLEM_OPTION );
+		$this->settings( array( 'admin_email' => '' ) );
+		Alerts::admin( $r, 'It broke' );
+		$this->assertArrayHasKey( $r->id(), Alerts::problems() );
+
+		$this->settings( array( 'admin_email' => 'ops@example.com' ) );
+		$this->assertTrue( Alerts::notify( 'Something else', array( 'a' ), $r ) );
+		$this->assertArrayHasKey( $r->id(), Alerts::problems(), 'The failure alert was never sent, so its row stays.' );
+	}
 }
