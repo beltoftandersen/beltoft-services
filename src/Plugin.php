@@ -289,8 +289,8 @@ final class Plugin {
 			$missing[] = 'WooCommerce Subscriptions';
 		}
 
-		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.3', '<' ) ) {
-			$missing[] = 'Beltoft Licenses 0.8.3 or newer';
+		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.4', '<' ) ) {
+			$missing[] = 'Beltoft Licenses 0.8.4 or newer';
 		}
 
 		global $wpdb;
