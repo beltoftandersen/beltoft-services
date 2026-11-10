@@ -8,7 +8,7 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -78,25 +78,7 @@ final class MailField {
 	 * @return array<string, array<string, mixed>> Cart item key => cart item.
 	 */
 	public static function cart_lines(): array {
-		$cart = function_exists( 'WC' ) ? WC()->cart : null;
-		$out  = array();
-
-		if ( ! $cart ) {
-			return $out;
-		}
-
-		foreach ( $cart->get_cart() as $key => $item ) {
-			// A renewal or a switch pays for a service that exists.
-			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
-				continue;
-			}
-
-			if ( self::is_mail_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
-				$out[ (string) $key ] = $item;
-			}
-		}
-
-		return $out;
+		return LineField::cart_lines( array( __CLASS__, 'is_mail_product' ) );
 	}
 
 	/**
@@ -194,9 +176,7 @@ final class MailField {
 	 * @throws \Automattic\WooCommerce\StoreApi\Exceptions\RouteException When the cart has an email line.
 	 */
 	public static function block_store_api( \WC_Order $order, \WP_REST_Request $request ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( array() !== self::cart_lines() ) {
-			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'beltoft_services_mail_checkout_required', esc_html__( 'Email plans are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website.', 'beltoft-services' ), 400 );
-		}
+		LineField::refuse_store_api( array( __CLASS__, 'is_mail_product' ), 'beltoft_services_mail_checkout_required', __( 'Email plans are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website.', 'beltoft-services' ) );
 	}
 
 	// -- Classic checkout --------------------------------------------------------------------
