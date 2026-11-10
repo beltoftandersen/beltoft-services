@@ -5,9 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Backup;
 
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;

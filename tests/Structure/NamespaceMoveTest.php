@@ -83,6 +83,10 @@ class NamespaceMoveTest extends TestCase {
 		'SnapshotCart' => array( 'Proxmox', 'Proxmox\\Snapshot' ),
 		'SnapshotExpiry' => array( 'Proxmox', 'Proxmox\\Snapshot' ),
 		'SnapshotJobs' => array( 'Proxmox\\Jobs', 'Proxmox\\Snapshot' ),
+		'Backups' => array( 'Proxmox', 'Proxmox\\Backup' ),
+		'BackupField' => array( 'Proxmox', 'Proxmox\\Backup' ),
+		'CartSwap' => array( 'Proxmox', 'Proxmox\\Backup' ),
+		'BackupJobs' => array( 'Proxmox\\Jobs', 'Proxmox\\Backup' ),
 	);
 
 	/**

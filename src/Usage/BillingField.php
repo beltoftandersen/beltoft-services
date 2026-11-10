@@ -9,8 +9,8 @@ namespace BeltoftServices\Usage;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\BackupField;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\BackupField;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
@@ -252,7 +252,7 @@ final class BillingField {
 
 		$usage  = isset( $_POST['billing'] ) && 'usage' === sanitize_text_field( wp_unslash( $_POST['billing'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
 		// Alone on the session's latest cart, like the backups and disk swaps (CartSwap).
-		$result = \BeltoftServices\Proxmox\CartSwap::locked( static fn(): array => self::swap( $usage ) ) ?? array( 'ok' => false, 'usage' => $usage, 'variation_id' => 0 );
+		$result = \BeltoftServices\Proxmox\Backup\CartSwap::locked( static fn(): array => self::swap( $usage ) ) ?? array( 'ok' => false, 'usage' => $usage, 'variation_id' => 0 );
 
 		return array( $result, $result['ok'] ? 200 : 409 );
 	}

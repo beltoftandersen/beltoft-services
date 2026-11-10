@@ -8,7 +8,7 @@
 namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
 use BeltoftServices\Proxmox\PrivateNets;

@@ -10,7 +10,7 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Lifecycle;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\NetConfig;

@@ -31,7 +31,7 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
 
 /**
  * A database driver that does not sleep.

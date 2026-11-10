@@ -8,8 +8,9 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 class DiskPolicyTest extends BackupTestCase {
 	public function set_up(): void {

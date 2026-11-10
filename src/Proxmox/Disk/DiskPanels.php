@@ -4,7 +4,7 @@
 namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;

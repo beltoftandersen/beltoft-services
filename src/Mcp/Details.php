@@ -13,7 +13,7 @@ use BeltoftServices\Account\Panel;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;

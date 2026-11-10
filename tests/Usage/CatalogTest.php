@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Account\Servers;
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Usage\BillingField;
@@ -380,7 +380,7 @@ class CatalogTest extends UsageTestCase {
 	}
 
 	public function test_the_backups_price_in_pay_as_you_go_is_per_hour(): void {
-		$this->assertSame( "+\u{20AC}0.0045 / hour", \BeltoftServices\Proxmox\Backups::price_difference( $this->v['u-None'], $this->v['u-Daily'] ) );
+		$this->assertSame( "+\u{20AC}0.0045 / hour", \BeltoftServices\Proxmox\Backup\Backups::price_difference( $this->v['u-None'], $this->v['u-Daily'] ) );
 	}
 
 	public function test_the_choice_sits_at_the_top_of_your_server(): void {

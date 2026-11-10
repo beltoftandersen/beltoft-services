@@ -6,12 +6,13 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Vm\Actions;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 class DiskRestoreTest extends BackupTestCase {
 	private function disk_for( Resource $server ): Resource {

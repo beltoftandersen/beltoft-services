@@ -5,7 +5,7 @@ namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\CartSwap;
+use BeltoftServices\Proxmox\Backup\CartSwap;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Usage\Rates;

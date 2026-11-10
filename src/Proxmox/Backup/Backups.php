@@ -5,10 +5,11 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Backup;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Pve\Prepares;

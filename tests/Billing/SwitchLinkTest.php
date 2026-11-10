@@ -13,9 +13,9 @@ use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Disk\DiskCart;
 use BeltoftServices\Resource;
 use BeltoftServices\SwitchLink;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Backup/BackupTestCase.php';
 
 class SwitchLinkTest extends BackupTestCase {
 

@@ -9,7 +9,7 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Pve\Steps;

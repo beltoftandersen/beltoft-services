@@ -198,7 +198,7 @@ final class Plugin {
 		Proxmox\AppReinstallPaid::register();
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
-		Proxmox\BackupField::register();
+		Proxmox\Backup\BackupField::register();
 		Proxmox\DbIpField::register();
 		Proxmox\DbDiskField::register();
 		Proxmox\Disk\DiskMeta::register();

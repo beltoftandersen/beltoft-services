@@ -8,7 +8,7 @@ use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
 require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 

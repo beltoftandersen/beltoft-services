@@ -8,14 +8,15 @@
 
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Alerts;
 use BeltoftServices\Account\DbPicker;
-use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Alerts;
 use BeltoftServices\Proxmox\DbNetGuard;
 use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\Schema;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 class PrivateNetGuardTest extends BackupTestCase {
 

@@ -5,17 +5,17 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Backup;
 
-use BeltoftServices\Proxmox\BackupField;
-use BeltoftServices\Proxmox\CartSwap;
+use BeltoftServices\Proxmox\Backup\BackupField;
+use BeltoftServices\Proxmox\Backup\CartSwap;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Tests\Mcp\ServerDiskFixture;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 
-require_once dirname( __DIR__ ) . '/Usage/UsageTestCase.php';
-require_once dirname( __DIR__ ) . '/Mcp/ServerDiskFixture.php';
+require_once dirname( __DIR__, 2 ) . '/Usage/UsageTestCase.php';
+require_once dirname( __DIR__, 2 ) . '/Mcp/ServerDiskFixture.php';
 
 /**
  * CartSwap.

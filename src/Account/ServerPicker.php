@@ -11,7 +11,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;

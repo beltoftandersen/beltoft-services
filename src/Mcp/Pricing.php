@@ -12,7 +12,7 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Credit\Balance;
 use BeltoftServices\Credit\Config;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Usage\Account;

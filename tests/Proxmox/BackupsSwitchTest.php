@@ -11,13 +11,14 @@ use BeltoftServices\Account\Panel;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 /**
  * Panels and switch URLs.

@@ -5,9 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Backup;
 
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\BackupField;
 
 require_once __DIR__ . '/BackupTestCase.php';
 

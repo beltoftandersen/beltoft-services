@@ -1072,7 +1072,7 @@ class ActionsTest extends TestCase {
 		$upid = $this->fake->task( 'POST', '/nodes/node-a/vzdump', array( 'vmid' => (int) $r->get( 'vmid' ), 'storage' => 'backup-store' ) );
 		$this->assertIsString( $upid );
 
-		$list = ( new \BeltoftServices\Proxmox\Backups( Resource::find( $r->id() ) ) )->list();
+		$list = ( new \BeltoftServices\Proxmox\Backup\Backups( Resource::find( $r->id() ) ) )->list();
 		$this->assertNotEmpty( $list );
 
 		return $list[0]['volid'];

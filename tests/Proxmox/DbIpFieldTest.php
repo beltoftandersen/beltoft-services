@@ -11,8 +11,9 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbIpField;
 use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 /**
  * Rendering rules, the swap and the cart line.
@@ -315,7 +316,7 @@ class DbIpFieldTest extends BackupTestCase {
 
 		// A customer's address is kept across a plan change: a database plan change touches nothing but the address
 		// (DbDriver::update_plan), and the pair of a plan is found by its address field alone.
-		$this->assertSame( $v['Big-Yes']->get_id(), \BeltoftServices\Proxmox\Backups::sibling_by( $v['Big-No'], 'public_ip', true )->get_id() );
-		$this->assertNull( \BeltoftServices\Proxmox\Backups::sibling_by( $v['Big-Yes'], 'public_ip', true ) );
+		$this->assertSame( $v['Big-Yes']->get_id(), \BeltoftServices\Proxmox\Backup\Backups::sibling_by( $v['Big-No'], 'public_ip', true )->get_id() );
+		$this->assertNull( \BeltoftServices\Proxmox\Backup\Backups::sibling_by( $v['Big-Yes'], 'public_ip', true ) );
 	}
 }

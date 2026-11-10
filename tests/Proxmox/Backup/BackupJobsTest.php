@@ -5,13 +5,13 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Backup;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
 
 require_once __DIR__ . '/BackupTestCase.php';
 

@@ -12,7 +12,7 @@
 namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

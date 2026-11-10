@@ -8,14 +8,14 @@
 namespace BeltoftServices\Account;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Proxmox\DbNeedsServer;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\PostgresEngine;
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Usage\Rates;
 

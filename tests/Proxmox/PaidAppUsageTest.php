@@ -283,7 +283,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 
 	private function put_server_in_cart( \WC_Product_Variation $variation ): void {
 		wp_set_current_user( self::factory()->user->create() );
-		$this->assertNotFalse( WC()->cart->add_to_cart( $variation->get_parent_id(), 1, $variation->get_id(), \BeltoftServices\Proxmox\BackupField::attributes( $variation ) ) );
+		$this->assertNotFalse( WC()->cart->add_to_cart( $variation->get_parent_id(), 1, $variation->get_id(), \BeltoftServices\Proxmox\Backup\BackupField::attributes( $variation ) ) );
 	}
 
 	private function tier_line_variation(): int {

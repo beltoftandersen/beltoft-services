@@ -18,7 +18,7 @@ use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
 require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 

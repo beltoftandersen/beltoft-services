@@ -8,13 +8,14 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 /**
  * Delete purges first; a backup-only plan change is quiet; a backup does not break a plan change.
@@ -110,7 +111,7 @@ class BackupOperationsTest extends BackupTestCase {
 		$alerts = array_values( array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ) );
 		$this->assertCount( 1, $alerts, 'One admin alert (the customer mails are not under test).' );
 		$this->assertStringContainsString( 'Backups of VMID ' . $vmid . ' could not be deleted on storage "backup-store"', $alerts[0]['message'] );
-		$orphans = get_option( \BeltoftServices\Proxmox\Backups::ORPHANS );
+		$orphans = get_option( \BeltoftServices\Proxmox\Backup\Backups::ORPHANS );
 		$this->assertSame( $vmid, $orphans[0]['vmid'], 'The leftover is listed.' );
 	}
 

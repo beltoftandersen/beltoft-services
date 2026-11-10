@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbCard;
@@ -26,7 +26,7 @@ use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
-use BeltoftServices\Proxmox\Jobs\BackupJobs;
+use BeltoftServices\Proxmox\Backup\BackupJobs;
 use BeltoftServices\Proxmox\Vm\PowerJobs;
 
 /**

@@ -12,11 +12,11 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 use BeltoftServices\Usage\Account;
 use BeltoftServices\Usage\Rates;
 
-require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Backup/BackupTestCase.php';
 
 /**
  * A gateway that can be charged later, and one that cannot.

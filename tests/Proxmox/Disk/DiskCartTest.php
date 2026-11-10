@@ -4,11 +4,11 @@
 namespace BeltoftServices\Tests\Proxmox\Disk;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\Disk\DiskCart;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
 require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 

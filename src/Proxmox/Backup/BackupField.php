@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Backup;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Disk\DiskField;

@@ -17,7 +17,7 @@ use BeltoftServices\Domains\DnsClaimRoutes;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;

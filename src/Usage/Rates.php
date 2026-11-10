@@ -9,7 +9,7 @@ namespace BeltoftServices\Usage;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppLicenceDriver;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;

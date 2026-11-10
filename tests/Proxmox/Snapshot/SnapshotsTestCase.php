@@ -13,7 +13,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
 require_once dirname( __DIR__ ) . '/BackupTestCase.php';
 
@@ -112,7 +112,7 @@ abstract class SnapshotsTestCase extends BackupTestCase {
 
 	protected function backup_volid( Resource $r ): string {
 		$this->assertIsString( $this->fake->task( 'POST', '/nodes/node-a/vzdump', array( 'vmid' => (int) $r->get( 'vmid' ), 'storage' => 'backup-store' ) ) );
-		$list = ( new \BeltoftServices\Proxmox\Backups( $this->fresh( $r ) ) )->list();
+		$list = ( new \BeltoftServices\Proxmox\Backup\Backups( $this->fresh( $r ) ) )->list();
 
 		return $list[0]['volid'];
 	}

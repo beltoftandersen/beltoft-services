@@ -247,8 +247,8 @@ class DatabaseUsageTest extends UsageTestCase {
 	public function test_the_checkout_labels_of_the_add_ons_on_a_usage_line_are_hourly_differences(): void {
 		$v = $this->db_product();
 
-		$this->assertSame( '+' . Rates::money( 8 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backups::price_difference( $v['u-0-0'], $v['u-0-50'] ) );
-		$this->assertSame( '+' . Rates::money( 5 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backups::price_difference( $v['u-0-0'], $v['u-1-0'] ) );
+		$this->assertSame( '+' . Rates::money( 8 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backup\Backups::price_difference( $v['u-0-0'], $v['u-0-50'] ) );
+		$this->assertSame( '+' . Rates::money( 5 / 730, 4 ) . ' / hour', \BeltoftServices\Proxmox\Backup\Backups::price_difference( $v['u-0-0'], $v['u-1-0'] ) );
 	}
 
 	// -- The New database page ----------------------------------------------------------------------
