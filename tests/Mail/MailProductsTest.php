@@ -115,6 +115,11 @@ final class MailProductsTest extends MailTestCase {
 			$v->save();
 		}
 
+		$count = count( wc_get_product( $id )->get_children() );
+		$this->run_command( array( 'refresh-descriptions' => true, 'dry-run' => true ) );
+		$this->assertStringContainsString( '(es)', wc_get_product( wc_get_product( $id )->get_children()[0] )->get_description(), 'A dry run writes nothing.' );
+		$this->assertSame( $count, MailProductsCommand::refresh_descriptions( false ), 'A dry run counts the plans that would change.' );
+
 		$this->assertSame( '', $this->run_command( array( 'refresh-descriptions' => true ) ) );
 		$descriptions = array_map( static fn( $vid ) => wc_get_product( $vid )->get_description(), wc_get_product( $id )->get_children() );
 		$this->assertContains( '5 mailboxes of 10 GB, 50 aliases, 3 domains', $descriptions );

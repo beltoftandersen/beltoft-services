@@ -71,9 +71,10 @@ final class MailProductsCommand {
 
 	/**
 	 * Writes the plain-words description again on every plan of the mail product, from the plan limits stored on each
-	 * plan. For a product made before the descriptions were worded with plurals. Returns the number of plans changed.
+	 * plan. For a product made before the descriptions were worded with plurals. Returns the number of plans changed,
+	 * or with `$write` false the number that would change (nothing is written).
 	 */
-	public static function refresh_descriptions(): int {
+	public static function refresh_descriptions( bool $write = true ): int {
 		$id      = self::existing();
 		$product = $id > 0 ? wc_get_product( $id ) : null;
 		$changed = 0;
@@ -92,13 +93,18 @@ final class MailProductsCommand {
 			$text = self::plan_description( MailDriver::limits_from( Product::plan( $id, (int) $vid ) ) );
 
 			if ( $variation->get_description() !== $text ) {
-				$variation->set_description( $text );
-				$variation->save();
+				if ( $write ) {
+					$variation->set_description( $text );
+					$variation->save();
+				}
+
 				++$changed;
 			}
 		}
 
-		wc_delete_product_transients( $id );
+		if ( $write && $changed > 0 ) {
+			wc_delete_product_transients( $id );
+		}
 
 		return $changed;
 	}
@@ -208,7 +214,8 @@ final class MailProductsCommand {
 	 * : Create the product. Refused when a product with the mail driver exists.
 	 *
 	 * [--refresh-descriptions]
-	 * : Write the plan descriptions again on the existing product (singular and plural wording).
+	 * : Write the plan descriptions again on the existing product (singular and plural wording). With --dry-run it
+	 * only counts the plans that would change.
 	 *
 	 * @param array<int, string>   $args       Positional arguments (none).
 	 * @param array<string, mixed> $assoc_args Flags.
@@ -217,6 +224,11 @@ final class MailProductsCommand {
 		unset( $args );
 
 		if ( ! empty( $assoc_args['refresh-descriptions'] ) ) {
+			if ( ! empty( $assoc_args['dry-run'] ) ) {
+				\WP_CLI::log( 'Would change the description of ' . self::refresh_descriptions( false ) . ' plans. Nothing was written.' );
+				return;
+			}
+
 			\WP_CLI::success( 'Changed the description of ' . self::refresh_descriptions() . ' plans.' );
 			return;
 		}
