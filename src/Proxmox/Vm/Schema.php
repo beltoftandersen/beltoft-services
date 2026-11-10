@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
+use BeltoftServices\VersionedSchema;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -16,6 +18,8 @@ defined( 'ABSPATH' ) || exit;
  * BeltoftLicenses\Install.)
  */
 final class Schema {
+
+	use VersionedSchema;
 
 	public const DB_VERSION        = '5';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
@@ -80,52 +84,12 @@ final class Schema {
 	}
 
 	/**
-	 * Creates or updates the tables when the stored schema version is behind. An update never
-	 * runs the activation hook, so Plugin::boot() calls this.
-	 */
-	public static function maybe_upgrade(): void {
-		if ( self::DB_VERSION === get_option( self::OPTION_DB_VERSION ) || false !== get_transient( self::RETRY_TRANSIENT ) ) {
-			return;
-		}
-
-		self::create_tables();
-
-		// A persistent failure is tried again in an hour, not on every request.
-		if ( self::DB_VERSION !== get_option( self::OPTION_DB_VERSION ) ) {
-			set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
-		}
-	}
-
-	/**
 	 * Unique keys that are missing, as "table.key" names. Empty when all are in place.
 	 *
 	 * @return string[]
 	 */
 	public static function missing_keys(): array {
-		global $wpdb;
-
-		$tables  = self::tables();
-		$missing = array();
-
-		foreach ( self::UNIQUE_KEYS as $table => $keys ) {
-			$suppress = $wpdb->suppress_errors( true );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check on our own table.
-			$rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Non_unique = 0', $tables[ $table ] ), ARRAY_A );
-			$wpdb->suppress_errors( $suppress );
-
-			$found = array();
-			foreach ( is_array( $rows ) ? $rows : array() as $row ) {
-				$found[ $row['Key_name'] ][ (int) $row['Seq_in_index'] ] = $row['Column_name'];
-			}
-
-			foreach ( $keys as $name => $columns ) {
-				if ( ! isset( $found[ $name ] ) || array_values( $found[ $name ] ) !== $columns ) {
-					$missing[] = $table . '.' . $name;
-				}
-			}
-		}
-
-		return $missing;
+		return self::unique_keys_missing();
 	}
 
 	/**

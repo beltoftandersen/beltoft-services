@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\VersionedSchema;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -15,6 +17,8 @@ defined( 'ABSPATH' ) || exit;
  * feature stays off (see DnsClaimsFeature) until ready() is true.
  */
 final class DnsSchema {
+
+	use VersionedSchema;
 
 	public const DB_VERSION        = '1';
 	public const OPTION_DB_VERSION = 'beltoft_services_dns_db_version';
@@ -44,22 +48,6 @@ final class DnsSchema {
 	}
 
 	/**
-	 * Creates or updates the tables when the stored version is behind.
-	 */
-	public static function maybe_upgrade(): void {
-		if ( self::DB_VERSION === get_option( self::OPTION_DB_VERSION ) || false !== get_transient( self::RETRY_TRANSIENT ) ) {
-			return;
-		}
-
-		self::create_tables();
-
-		// A persistent failure is tried again in an hour, not on every request.
-		if ( self::DB_VERSION !== get_option( self::OPTION_DB_VERSION ) ) {
-			set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
-		}
-	}
-
-	/**
 	 * Is the schema in place: the stored version is current and the keys were verified.
 	 */
 	public static function ready(): bool {
@@ -72,28 +60,7 @@ final class DnsSchema {
 	 * @return string[]
 	 */
 	public static function missing_keys(): array {
-		global $wpdb;
-
-		$tables  = self::tables();
-		$missing = array();
-
-		foreach ( self::UNIQUE_KEYS as $table => $keys ) {
-			$suppress = $wpdb->suppress_errors( true );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check on our own table.
-			$rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Non_unique = 0', $tables[ $table ] ), ARRAY_A );
-			$wpdb->suppress_errors( $suppress );
-
-			$found = array();
-			foreach ( is_array( $rows ) ? $rows : array() as $row ) {
-				$found[ $row['Key_name'] ][ (int) $row['Seq_in_index'] ] = $row['Column_name'];
-			}
-
-			foreach ( $keys as $name => $columns ) {
-				if ( ! isset( $found[ $name ] ) || array_values( $found[ $name ] ) !== $columns ) {
-					$missing[] = $table . '.' . $name;
-				}
-			}
-		}
+		$missing = self::unique_keys_missing();
 
 		/**
 		 * Filters the keys reported missing (lets a test simulate a failed verification).
