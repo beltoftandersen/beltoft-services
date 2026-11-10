@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -16,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * with a total of 0 (the usage account is one), and the early renewal is a cart the customer pays. So the
  * renewal order is made by the same function a scheduled renewal uses (wcs_create_renewal_order(), which runs
  * our line builder and claims the rows) and charged through the gateway hook a scheduled payment uses
- * (WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook()). The subscription's dates and
+ * (Billing\Subscriptions::charge_now()). The subscription's dates and
  * status are not touched; a payment that fails puts it on hold like any failed renewal. Runs after the hourly meter.
  * The rows are claimed by the order, so the next run finds nothing until more usage has accrued.
  */
@@ -117,7 +118,7 @@ final class Threshold {
 		$order->add_order_note( __( 'Usage billed early: the unbilled usage reached the threshold.', 'beltoft-services' ) );
 
 		if ( $order->get_total() > 0 && $order->get_payment_method() ) {
-			\WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook( $order );
+			Subscriptions::charge_now( $order );
 		} elseif ( 0.0 === (float) $order->get_total() ) {
 			$order->payment_complete();
 		}

@@ -55,6 +55,51 @@ final class Connections {
 	public static function register(): void {
 		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 1 );
 		add_filter( 'beltoft_services_connection', array( __CLASS__, 'filter_connection' ), 10, 2 );
+		add_action( 'beltoft_services_product_panel_after_driver', array( __CLASS__, 'product_field' ), 20, 1 );
+		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_product_field' ) );
+	}
+
+	/**
+	 * The connection choice of the Service panel of a product.
+	 *
+	 * @param mixed $product The product being edited, null for a new one.
+	 */
+	public static function product_field( $product = null ): void {
+		$connection  = $product ? (string) $product->get_meta( Product::META_CONNECTION ) : '';
+		$connections = array( '' => __( '— None —', 'beltoft-services' ) );
+
+		foreach ( self::all() as $id => $saved_connection ) {
+			$connections[ $id ] = '' === (string) $saved_connection['label'] ? $id : sprintf( '%1$s (%2$s)', $saved_connection['label'], $id );
+		}
+
+		if ( '' !== $connection && ! isset( $connections[ $connection ] ) ) {
+			/* translators: %s: connection id. */
+			$connections[ $connection ] = sprintf( __( '%s (missing)', 'beltoft-services' ), $connection );
+		}
+
+		woocommerce_wp_select(
+			array(
+				'id'          => Product::META_CONNECTION,
+				'label'       => __( 'Connection', 'beltoft-services' ),
+				'description' => __( 'The connection to use (HTTP driver only). Add connections under Settings → Services → Connections.', 'beltoft-services' ),
+				'desc_tip'    => true,
+				'options'     => $connections,
+				'value'       => $connection,
+			)
+		);
+	}
+
+	/**
+	 * Saves the connection choice.
+	 *
+	 * @param mixed $product The product.
+	 */
+	public static function save_product_field( $product ): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified by WooCommerce (woocommerce_meta_nonce) before woocommerce_admin_process_product_object.
+		if ( $product instanceof \WC_Product ) {
+			$product->update_meta_data( Product::META_CONNECTION, isset( $_POST[ Product::META_CONNECTION ] ) ? sanitize_key( wp_unslash( $_POST[ Product::META_CONNECTION ] ) ) : '' );
+		}
+		// phpcs:enable
 	}
 
 	/**

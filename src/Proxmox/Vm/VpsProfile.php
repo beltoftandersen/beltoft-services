@@ -16,6 +16,8 @@ defined( 'ABSPATH' ) || exit;
  */
 final class VpsProfile implements BuildProfile {
 
+	use PostBuildMeta;
+
 	public function steps(): array {
 		return array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' );
 	}
@@ -39,20 +41,5 @@ final class VpsProfile implements BuildProfile {
 
 	public function cicustom( array $cluster ): ?string {
 		return '' !== (string) $cluster['vendor_snippet'] ? 'vendor=' . $cluster['vendor_snippet'] : null;
-	}
-
-	public function post_build_meta( array $record, ?array $ip ): array {
-		return array(
-			'disks_check' => null,
-			'ip'          => $ip['address'] ?? null,
-			'node'        => $record['node'],
-			'vmid'        => $record['vmid'],
-			'vm'          => array(
-				'cluster' => $record['cluster'],
-				'vmid'    => $record['vmid'],
-				'node'    => $record['node'],
-			),
-			'task'        => null,
-		);
 	}
 }

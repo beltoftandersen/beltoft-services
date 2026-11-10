@@ -235,6 +235,27 @@ final class Subscriptions {
 	}
 
 	/**
+	 * Charges a renewal order through the gateway of its payment method (the one place that names the
+	 * WooCommerce Subscriptions hook).
+	 *
+	 * @param \WC_Order $order Renewal order, payment method already set.
+	 */
+	public static function charge_now( \WC_Order $order ): void {
+		\WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook( $order );
+	}
+
+	/**
+	 * Changes the status of a subscription the way the customer's own button does (the one place that names the
+	 * WooCommerce Subscriptions status handler).
+	 *
+	 * @param \WC_Subscription $s      Subscription.
+	 * @param string           $status 'cancelled' or 'active'.
+	 */
+	public static function change_status( \WC_Subscription $s, string $status ): void {
+		\WCS_User_Change_Status_Handler::change_users_subscription( $s, $status );
+	}
+
+	/**
 	 * Cancels a subscription with WooCommerce Subscriptions' customer status change. The caller has checked
 	 * cancellable().
 	 *
@@ -245,7 +266,7 @@ final class Subscriptions {
 	public static function cancel( \WC_Subscription $s, ?callable $quiet = null ): array {
 		$id    = $s->get_id();
 		$said  = array( 'errors' => array(), 'messages' => array() );
-		$apply = static fn() => \WCS_User_Change_Status_Handler::change_users_subscription( $s, 'cancelled' );
+		$apply = static fn() => self::change_status( $s, 'cancelled' );
 
 		if ( null !== $quiet ) {
 			$said = $quiet( $apply );

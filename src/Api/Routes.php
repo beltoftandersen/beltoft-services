@@ -34,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Routes {
 
-	public const NAMESPACE = 'beltoft-services/v1';
+	public const NAMESPACE = \BeltoftServices\Plugin::REST_NAMESPACE;
 
 	/**
 	 * Requests per user, route and window for actions and Open, unless filtered.

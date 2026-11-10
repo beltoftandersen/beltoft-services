@@ -7,11 +7,6 @@
 
 namespace BeltoftServices;
 
-use BeltoftServices\Proxmox\Disk\DiskDriver;
-use BeltoftServices\Proxmox\Vm\ServerName;
-use BeltoftServices\Usage\Account;
-use BeltoftServices\Usage\Rates;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -46,7 +41,7 @@ final class LineNames {
 	 * @return mixed
 	 */
 	public static function usage_meta( $meta, $item = null ) {
-		if ( ! is_array( $meta ) || ! $item instanceof \WC_Order_Item_Product || ! Rates::is_usage( $item->get_product() ) ) {
+		if ( ! is_array( $meta ) || ! $item instanceof \WC_Order_Item_Product || ! self::is_usage( $item->get_product() ) ) {
 			return $meta;
 		}
 
@@ -66,8 +61,27 @@ final class LineNames {
 	 * The note under a pay-as-you-go line.
 	 */
 	public static function usage_note(): string {
-		/* translators: %s: how pay as you go is billed */
-		return sprintf( __( '%s, excl. VAT', 'beltoft-services' ), Rates::billed_note() );
+		/**
+		 * The note under a pay-as-you-go line, for the feature that bills it.
+		 *
+		 * @param string $note Empty until the feature says it.
+		 */
+		return (string) apply_filters( 'beltoft_services_line_usage_note', '' );
+	}
+
+	/**
+	 * Is this line billed by use (pay as you go)? The feature that bills it says so.
+	 *
+	 * @param mixed $product Product or variation of the line, or its id.
+	 */
+	private static function is_usage( $product ): bool {
+		/**
+		 * Is a product billed by use?
+		 *
+		 * @param bool  $usage   False until the feature says so.
+		 * @param mixed $product Product, variation or id.
+		 */
+		return (bool) apply_filters( 'beltoft_services_line_is_usage', false, $product );
 	}
 
 	/**
@@ -76,7 +90,12 @@ final class LineNames {
 	 * @param int $product_id Product id.
 	 */
 	private static function is_account_product( int $product_id ): bool {
-		$id = (int) get_option( Account::OPTION_PRODUCT );
+		/**
+		 * The id of the hidden pay-as-you-go account product.
+		 *
+		 * @param int $id 0 until the feature says it.
+		 */
+		$id = (int) apply_filters( 'beltoft_services_line_account_product_id', 0 );
 
 		return $id > 0 && $id === $product_id;
 	}
@@ -134,7 +153,7 @@ final class LineNames {
 				/* translators: %s: backup frequency, such as "daily". */
 				$extras[] = sprintf( __( '%s backups', 'beltoft-services' ), $low );
 			} elseif ( 'billing' === $slug ) {
-				$extras[] = Rates::is_usage( $product ) ? __( 'pay as you go', 'beltoft-services' ) : sprintf( /* translators: %s: billing period, such as "monthly". */ __( 'billed %s', 'beltoft-services' ), $low );
+				$extras[] = self::is_usage( $product ) ? __( 'pay as you go', 'beltoft-services' ) : sprintf( /* translators: %s: billing period, such as "monthly". */ __( 'billed %s', 'beltoft-services' ), $low );
 			} elseif ( 'extra-storage' === $slug ) {
 				if ( in_array( $low, array( 'none', 'no' ), true ) ) {
 					continue;
@@ -160,15 +179,15 @@ final class LineNames {
 
 		$label = trim( $name . ' ' . implode( ' ', $plain ) );
 
-		if ( DiskDriver::ID === $driver->id() && $disk_server_id ) {
-			$server = is_numeric( $disk_server_id ) ? Resource::for_license( (int) $disk_server_id ) : null;
-			$on     = $server ? ServerName::of( $server ) : '';
-
-			if ( '' !== $on ) {
-				/* translators: 1: "Extra disk 50 GB", 2: server name. */
-				$label = sprintf( __( '%1$s for %2$s', 'beltoft-services' ), $label, $on );
-			}
-		}
+		/**
+		 * The name of a line before its extras: a feature adds what belongs to its own product (the server an extra
+		 * disk is for).
+		 *
+		 * @param string $label          Name and plain attribute values.
+		 * @param string $driver_id      The driver of the product.
+		 * @param mixed  $disk_server_id The licence id of the server the line is for, when known.
+		 */
+		$label = (string) apply_filters( 'beltoft_services_line_label', $label, (string) $driver->id(), $disk_server_id );
 
 		return array() === $extras ? $label : $label . ', ' . implode( ', ', $extras );
 	}
@@ -308,13 +327,16 @@ final class LineNames {
 			$rows[ wp_strip_all_tags( (string) $meta->display_key ) ] = (string) $meta->display_value;
 		}
 
-		$server = trim( (string) $item->get_meta( ServerName::ITEM_META ) );
+		/**
+		 * The meta rows of an order line, before the billing note: a feature adds its own (the server name).
+		 *
+		 * @param array<string, string> $rows Label => html.
+		 * @param \WC_Order_Item_Product $item The line.
+		 */
+		$filtered = apply_filters( 'beltoft_services_line_rows', $rows, $item );
+		$rows     = is_array( $filtered ) ? $filtered : $rows;
 
-		if ( '' !== $server ) {
-			$rows[ __( 'Server name', 'beltoft-services' ) ] = esc_html( $server );
-		}
-
-		if ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) {
+		if ( self::is_account_product( $product->get_id() ) || self::is_usage( $product ) ) {
 			$rows[ __( 'Billing', 'beltoft-services' ) ] = esc_html( self::usage_note() );
 		}
 
@@ -364,7 +386,7 @@ final class LineNames {
 		}
 
 		// At checkout the note is said once under the items (Usage\Summary).
-		if ( ( self::is_account_product( $product->get_id() ) || Rates::is_usage( $product ) ) && ! self::at_checkout() ) {
+		if ( ( self::is_account_product( $product->get_id() ) || self::is_usage( $product ) ) && ! self::at_checkout() ) {
 			$data[] = array(
 				'key'   => __( 'Billing', 'beltoft-services' ),
 				'value' => self::usage_note(),

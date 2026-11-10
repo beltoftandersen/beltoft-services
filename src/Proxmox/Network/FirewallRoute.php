@@ -9,7 +9,6 @@ namespace BeltoftServices\Proxmox\Network;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;
-use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Progress;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -69,11 +68,19 @@ final class FirewallRoute {
 	}
 
 	/**
+	 * Is this call made for a connected app (an AI client) and not by the customer's own browser? The connected-app
+	 * feature says so.
+	 */
+	private static function app_call(): bool {
+		return (bool) apply_filters( 'beltoft_services_connected_app_call', false );
+	}
+
+	/**
 	 * The address the customer is using (IPv4 only), or ''. In a call from a connected app the visitor is the app's
 	 * server, and the model's word for the customer's address is not trusted, so there is none there (see put()).
 	 */
 	private static function my_ip(): string {
-		$ip = Endpoint::inside() ? '' : ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '' );
+		$ip = self::app_call() ? '' : ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '' );
 
 		return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '';
 	}
@@ -183,7 +190,7 @@ final class FirewallRoute {
 
 		// A connected app has no address to check against: SSH must stay open to anyone, or the rules that let SSH in must
 		// be the ones already applied to a firewall that is on.
-		$app_keeps_ssh = Endpoint::inside() && FirewallRules::managed( $resource ) && true === $resource->get( Firewall::ON ) && FirewallRules::ssh_rules( $rules ) === FirewallRules::ssh_rules( FirewallRules::rules_of( $resource ) );
+		$app_keeps_ssh = self::app_call() && FirewallRules::managed( $resource ) && true === $resource->get( Firewall::ON ) && FirewallRules::ssh_rules( $rules ) === FirewallRules::ssh_rules( FirewallRules::rules_of( $resource ) );
 
 		if ( $on && ! $ack && ! $app_keeps_ssh && FirewallRules::blocks_ssh( $rules, self::my_ip() ) ) {
 			return self::error( 'beltoft_services_ssh_closed', __( 'No rule lets you in over SSH from where you are now. Add an SSH rule, or tick the box to confirm that you do not need SSH.', 'beltoft-services' ), 409 );

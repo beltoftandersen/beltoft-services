@@ -23,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  *    until its end date.
  *  - Stop DNS hosting (free DNS-only service): after the customer types the domain name, the subscription is
  *    cancelled with WooCommerce Subscriptions' own customer status change
- *    (WCS_User_Change_Status_Handler::change_users_subscription(), what the Cancel button of the subscription
+ *    (Billing\Subscriptions::change_status(), what the Cancel button of the subscription
  *    page runs). DnsCancel ends a free DNS subscription at once and the records stop answering.
  *
  * The forms are plain posts to the page with a nonce: the notices WooCommerce shows need a session, and a form

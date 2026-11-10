@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
+use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
@@ -14,6 +15,7 @@ use BeltoftServices\Proxmox\Disk\DiskGuide;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
+use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -38,6 +40,102 @@ final class CoreHooks {
 		add_filter( 'beltoft_services_park_action', array( __CLASS__, 'park_action' ), 10, 3 );
 		add_filter( 'beltoft_services_failure_alert_lines', array( DiskDriver::class, 'failure_alert_lines' ), 10, 3 );
 		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'thankyou_row' ), 10, 3 );
+		add_filter( 'beltoft_services_thankyou_dashboard_url', array( __CLASS__, 'dashboard_url' ), 10, 2 );
+		add_action( 'beltoft_services_product_panel_after_driver', array( __CLASS__, 'picker_field' ), 10, 2 );
+		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_picker' ) );
+		add_filter( 'beltoft_services_line_label', array( __CLASS__, 'line_label' ), 10, 3 );
+		add_filter( 'beltoft_services_line_rows', array( __CLASS__, 'line_rows' ), 10, 2 );
+	}
+
+	/**
+	 * The name of an extra disk line says which server it is for.
+	 *
+	 * @param mixed $label          The name so far.
+	 * @param mixed $driver_id      The driver of the product.
+	 * @param mixed $disk_server_id The licence id of the server, when known.
+	 * @return mixed
+	 */
+	public static function line_label( $label, $driver_id = '', $disk_server_id = 0 ) {
+		if ( DiskDriver::ID !== $driver_id || ! $disk_server_id ) {
+			return $label;
+		}
+
+		$server = is_numeric( $disk_server_id ) ? Resource::for_license( (int) $disk_server_id ) : null;
+		$on     = $server ? ServerName::of( $server ) : '';
+
+		if ( '' === $on ) {
+			return $label;
+		}
+
+		/* translators: 1: "Extra disk 50 GB", 2: server name. */
+		return sprintf( __( '%1$s for %2$s', 'beltoft-services' ), $label, $on );
+	}
+
+	/**
+	 * The server name a customer chose is a row of the order line.
+	 *
+	 * @param mixed $rows Label => html.
+	 * @param mixed $item The order line.
+	 * @return mixed
+	 */
+	public static function line_rows( $rows, $item = null ) {
+		if ( ! is_array( $rows ) || ! $item instanceof \WC_Order_Item ) {
+			return $rows;
+		}
+
+		$server = trim( (string) $item->get_meta( ServerName::ITEM_META ) );
+
+		if ( '' !== $server ) {
+			$rows[ __( 'Server name', 'beltoft-services' ) ] = esc_html( $server );
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * The "Show in the server picker" box of a server product.
+	 *
+	 * @param mixed $product   The product being edited, null for a new one.
+	 * @param mixed $driver_id The saved driver id.
+	 */
+	public static function picker_field( $product = null, $driver_id = '' ): void {
+		if ( ProxmoxDriver::ID !== $driver_id ) {
+			return;
+		}
+
+		woocommerce_wp_checkbox(
+			array(
+				'id'          => Product::META_PICKER,
+				'label'       => __( 'Show in the server picker', 'beltoft-services' ),
+				'description' => __( 'Offer this product on the customer\'s New server page in My account. Its variations without backups are the plans.', 'beltoft-services' ),
+				'value'       => $product && 'no' === $product->get_meta( Product::META_PICKER ) ? 'no' : 'yes',
+			)
+		);
+		echo '<input type="hidden" name="' . esc_attr( Product::FIELD_PICKER ) . '" value="1">';
+	}
+
+	/**
+	 * Saves the picker box, only when the panel printed it (a product that just became a server shows it after this save).
+	 *
+	 * @param mixed $product The product.
+	 */
+	public static function save_picker( $product ): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified by WooCommerce (woocommerce_meta_nonce) before woocommerce_admin_process_product_object.
+		if ( $product instanceof \WC_Product && isset( $_POST[ Product::FIELD_PICKER ] ) ) {
+			$product->update_meta_data( Product::META_PICKER, isset( $_POST[ Product::META_PICKER ] ) ? 'yes' : 'no' );
+		}
+		// phpcs:enable
+	}
+
+	/**
+	 * Where "Go to your dashboard" leads for a server: the page of the new server.
+	 *
+	 * @param mixed $url     The address so far.
+	 * @param mixed $license The server's licence row.
+	 * @return mixed
+	 */
+	public static function dashboard_url( $url, $license = null ) {
+		return is_array( $license ) ? ServerLinks::url( $license ) : $url;
 	}
 
 	/**

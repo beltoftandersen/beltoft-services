@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\SwitchLink;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDisk;
@@ -569,7 +570,7 @@ final class Stock {
 	private static function existing_customer_flow( \WC_Product $product ): bool {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Only presence is read, to let an existing customer through; WooCommerce Subscriptions verifies its own nonces.
 		$named = array(
-			isset( $_REQUEST['switch-subscription'] ) ? absint( wp_unslash( $_REQUEST['switch-subscription'] ) ) : 0,
+			SwitchLink::requested( true )['subscription'],
 			isset( $_GET['resubscribe'] ) ? absint( wp_unslash( $_GET['resubscribe'] ) ) : 0,
 		);
 		// phpcs:enable

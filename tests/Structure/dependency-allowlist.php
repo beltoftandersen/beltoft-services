@@ -11,15 +11,4 @@ return array(
 	'Billing/Subscriptions.php -> Usage\Rates', // Known and deferred, 2026-11-10.
 	'Emails/ServiceEmail.php -> Account\Licences', // Known and deferred, 2026-11-10 (the literal 'licence-key').
 	'Emails/ServiceEmail.php -> Account\ServiceArea', // Known and deferred, 2026-11-10.
-	'LineNames.php -> Proxmox\Disk\DiskDriver',
-	'LineNames.php -> Proxmox\Vm\ServerName',
-	'LineNames.php -> Usage\Account',
-	'LineNames.php -> Usage\Rates',
-	'Product.php -> Http\Connections',
-	'Product.php -> Usage\Rates',
-	'Product.php -> Proxmox\Vm\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
-	'Proxmox/Network/FirewallRoute.php -> Mcp\Endpoint',
-	'ThankYou.php -> Account\Panel',
-	'ThankYou.php -> Account\ServerLinks',
-	'ThankYou.php -> Api\Routes',
 );

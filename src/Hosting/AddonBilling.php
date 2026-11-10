@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
@@ -432,7 +433,7 @@ final class AddonBilling {
 			self::$buying = true;
 
 			try {
-				\WC_Subscriptions_Payment_Gateways::trigger_gateway_renewal_payment_hook( $order );
+				Subscriptions::charge_now( $order );
 			} finally {
 				self::$buying = false;
 			}

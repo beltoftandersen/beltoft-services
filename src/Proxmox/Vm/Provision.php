@@ -1119,7 +1119,7 @@ final class Provision {
 		}
 
 		// A gateway the pool row brings must be on the address's own network; the cluster's is the routed default.
-		if ( null !== $ip && null !== $ip['gateway'] && '' !== $ip['gateway'] && ! self::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
+		if ( null !== $ip && null !== $ip['gateway'] && '' !== $ip['gateway'] && ! NetConfig::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
 			return StepResult::fail( sprintf( 'configure: the gateway %1$s of address %2$s is outside %2$s/%3$d; nothing was written to the VM', $ip['gateway'], $ip['address'], (int) $this->cluster['prefix'] ) );
 		}
 
@@ -1596,26 +1596,6 @@ final class Provision {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Is the address's gateway on the address's network (address/prefix)?
-	 *
-	 * @param string $address IPv4 address.
-	 * @param string $gateway IPv4 gateway.
-	 * @param int    $prefix  Prefix length.
-	 */
-	private static function gateway_on_network( string $address, string $gateway, int $prefix ): bool {
-		$a = ip2long( $address );
-		$g = ip2long( $gateway );
-
-		if ( false === $a || false === $g || $prefix < 1 || $prefix > 32 ) {
-			return false;
-		}
-
-		$mask = ( 0xFFFFFFFF << ( 32 - $prefix ) ) & 0xFFFFFFFF;
-
-		return ( $a & $mask ) === ( $g & $mask );
 	}
 
 	/**

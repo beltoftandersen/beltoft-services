@@ -36,6 +36,29 @@ final class Panel {
 	public static function register(): void {
 		add_action( 'beltoft_licenses_account_license', array( __CLASS__, 'render' ), 10, 2 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_filter( 'beltoft_services_thankyou_state', array( __CLASS__, 'thankyou_state' ), 10, 3 );
+	}
+
+	/**
+	 * The group, label and failure message of a service for the thank-you page and its progress route.
+	 *
+	 * @param mixed $view  The view so far.
+	 * @param mixed $state The stored state.
+	 * @param mixed $r     The service.
+	 * @return mixed
+	 */
+	public static function thankyou_state( $view, $state = '', $r = null ) {
+		if ( ! is_array( $view ) || ! is_string( $state ) || ! $r instanceof Resource ) {
+			return $view;
+		}
+
+		$group = self::group( $state, $r );
+
+		return array(
+			'group'   => $group,
+			'label'   => self::label( $state, $r ),
+			'message' => 'failed' === $group ? self::message( $state, $r ) : '',
+		);
 	}
 
 	/**

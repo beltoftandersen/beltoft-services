@@ -11,6 +11,7 @@ use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Vm\BuildProfile;
+use BeltoftServices\Proxmox\Vm\PostBuildMeta;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,6 +21,8 @@ defined( 'ABSPATH' ) || exit;
  * private address comes from PrivateNets, so the profile belongs to one resource.
  */
 final class DbProfile implements BuildProfile {
+
+	use PostBuildMeta;
 
 	/**
 	 * @var Resource
@@ -75,21 +78,6 @@ final class DbProfile implements BuildProfile {
 
 	public function cicustom( array $cluster ): ?string {
 		return '' !== (string) ( $cluster['db_vendor_snippet'] ?? '' ) ? 'vendor=' . $cluster['db_vendor_snippet'] : null;
-	}
-
-	public function post_build_meta( array $record, ?array $ip ): array {
-		return array(
-			'disks_check' => null,
-			'ip'          => $ip['address'] ?? null,
-			'node'        => $record['node'],
-			'vmid'        => $record['vmid'],
-			'vm'          => array(
-				'cluster' => $record['cluster'],
-				'vmid'    => $record['vmid'],
-				'node'    => $record['node'],
-			),
-			'task'        => null,
-		);
 	}
 
 	/**

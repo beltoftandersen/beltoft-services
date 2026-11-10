@@ -4,6 +4,7 @@
 namespace BeltoftServices\Proxmox\Addon;
 
 use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\SwitchLink;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -12,6 +13,19 @@ defined( 'ABSPATH' ) || exit;
  * server, each line gets its own renewal cart, and a line is always one piece. The kinds keep their own validation.
  */
 final class AddonCart {
+	/**
+	 * Hook the cart of one add-on kind: the class's validate(), item_data() and checkout_validation() and the per-line behaviour.
+	 *
+	 * @param class-string $class Class that has the three methods.
+	 * @param Addon        $a     Add-on kind.
+	 */
+	public static function register_cart_hooks( string $class, Addon $a ): void {
+		add_filter( 'woocommerce_add_to_cart_validation', array( $class, 'validate' ), 20, 6 );
+		add_filter( 'woocommerce_add_cart_item_data', array( $class, 'item_data' ), 20, 2 );
+		self::register_line_hooks( $a );
+		add_action( 'woocommerce_after_checkout_validation', array( $class, 'checkout_validation' ), 10, 2 );
+	}
+
 	/**
 	 * Hook the per-line cart behaviour of one add-on kind.
 	 *
@@ -69,8 +83,9 @@ final class AddonCart {
 	 * @param int $product_id Product id.
 	 */
 	public static function valid_switch( int $product_id ): bool {
-		$subscription_id = isset( $_GET['switch-subscription'] ) ? absint( wp_unslash( $_GET['switch-subscription'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WCS validates the switch before this hook.
-		$item_id         = isset( $_GET['item'] ) ? absint( wp_unslash( $_GET['item'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- ownership and WCS ability checked below.
+		$requested       = SwitchLink::requested();
+		$subscription_id = $requested['subscription'];
+		$item_id         = $requested['item'];
 		if ( ! $subscription_id || ! $item_id || ! function_exists( 'wcs_get_subscription' ) || ! class_exists( '\\WC_Subscriptions_Switcher' ) ) {
 			return false;
 		}

@@ -25,28 +25,7 @@ final class Restore {
 	use Steps;
 	use Prepares;
 	use RestoreSteps;
-
-	/**
-	 * Cluster settings (token secret decrypted), as Actions prepared them.
-	 *
-	 * @var array<string, mixed>
-	 */
-	private $cluster = array();
-
-	/**
-	 * @param Resource $r     Resource.
-	 * @param Actions  $owner The Actions run that prepared the client and polled the stored task.
-	 */
-	public function __construct( Resource $r, Actions $owner ) {
-		$this->r = $r;
-		$state = $owner->state();
-
-		$this->client    = $state['client'];
-		$this->cluster   = $state['cluster'];
-		$this->secrets   = $state['secrets'];
-		$this->wait      = $state['wait'];
-		$this->finished  = $state['finished'];
-	}
+	use ActionsRun;
 
 	/**
 	 * Restores the whole server to one backup: off, restored over the same VMID (`force`), the
