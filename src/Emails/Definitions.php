@@ -37,7 +37,7 @@ final class Definitions {
 		$row = self::table()[ $id ] ?? null;
 
 		if ( null === $row ) {
-			throw new \InvalidArgumentException( sprintf( 'No such service email: %s', $id ) );
+			throw new \InvalidArgumentException( esc_html( sprintf( 'No such service email: %s', $id ) ) );
 		}
 
 		$html = 'emails/beltoft-services-' . str_replace( '_', '-', substr( $id, strlen( 'beltoft_services_' ) ) ) . '.php';

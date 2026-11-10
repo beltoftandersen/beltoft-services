@@ -55,7 +55,7 @@ final class LineField {
 	 */
 	public static function refuse_store_api( callable $is_product, string $code, string $message ): void {
 		if ( array() !== self::cart_lines( $is_product ) ) {
-			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( $code, esc_html( $message ), 400 );
+			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( esc_html( $code ), esc_html( $message ), 400 );
 		}
 	}
 
