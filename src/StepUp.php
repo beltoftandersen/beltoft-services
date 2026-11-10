@@ -90,11 +90,11 @@ final class StepUp {
 	 * What the customer is asked for.
 	 *
 	 * @param int    $user_id Customer.
-	 * @param string $purpose One of purposes(). Without one, the API token step (the first feature that used it).
+	 * @param string $purpose One of purposes().
 	 * @return array{kind: string, label: string, autocomplete: string, email: string, purpose: string} kind emailed (the default) or code
 	 *         (a site's own factor, nothing is sent), the field label, the autocomplete hint, the masked account email.
 	 */
-	public static function ask( int $user_id, string $purpose = 'api_token' ): array {
+	public static function ask( int $user_id, string $purpose ): array {
 		$default = array(
 			'kind'         => 'emailed',
 			'label'        => __( 'Code from the email', 'beltoft-services' ),
@@ -185,7 +185,7 @@ final class StepUp {
 	 * @param string $secret  What was typed.
 	 * @param string $purpose One of purposes().
 	 */
-	public static function verify( int $user_id, string $secret, string $purpose = 'api_token' ): bool {
+	public static function verify( int $user_id, string $secret, string $purpose ): bool {
 		$secret = preg_replace( '/\s+/', '', $secret ) ?? '';
 
 		if ( ! get_userdata( $user_id ) || '' === $secret || strlen( $secret ) > 200 || ! in_array( $purpose, self::purposes(), true ) ) {
