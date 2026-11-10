@@ -37,6 +37,7 @@ final class HostingSettings {
 	 * Hooks the tabs, the fields and the bounds check.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( HostingDriver::class, 'add' ), 7 );
 		add_filter( 'beltoft_services_settings_tabs', array( __CLASS__, 'add_tab' ) );
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'add_section' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'add_fields' ) );

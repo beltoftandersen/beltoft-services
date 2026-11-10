@@ -53,7 +53,26 @@ final class Connections {
 	 * Hooks the filter other plugins read a connection through.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 1 );
 		add_filter( 'beltoft_services_connection', array( __CLASS__, 'filter_connection' ), 10, 2 );
+	}
+
+	/**
+	 * Adds the HTTP driver to the registry.
+	 *
+	 * @param mixed $drivers Drivers keyed by id.
+	 * @return mixed
+	 */
+	public static function add_drivers( $drivers ) {
+		if ( ! is_array( $drivers ) ) {
+			return $drivers;
+		}
+
+		if ( ! isset( $drivers['http'] ) ) {
+			$drivers['http'] = new HttpDriver();
+		}
+
+		return $drivers;
 	}
 
 	/**

@@ -89,7 +89,26 @@ final class KeyCatalog {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 6 );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
+	}
+
+	/**
+	 * Adds the licence key driver to the registry.
+	 *
+	 * @param mixed $drivers Drivers keyed by id.
+	 * @return mixed
+	 */
+	public static function add_drivers( $drivers ) {
+		if ( ! is_array( $drivers ) ) {
+			return $drivers;
+		}
+
+		if ( ! isset( $drivers[ 'licence-key' ] ) ) {
+			$drivers[ 'licence-key' ] = new KeyDriver();
+		}
+
+		return $drivers;
 	}
 
 	/**

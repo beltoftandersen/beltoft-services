@@ -29,6 +29,46 @@ class RegistryTest extends TestCase {
 		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'hosting', 'fake' ), Registry::kinds() );
 	}
 
+	/**
+	 * The shipped drivers, in the order the admin screen and the jobs iterate them, whatever the request type.
+	 * The ids and classes are pinned: a driver missing here strands a paying customer's service.
+	 */
+	public function test_the_shipped_drivers_are_registered_in_todays_order(): void {
+		$golden = array(
+			'http'              => \BeltoftServices\Http\HttpDriver::class,
+			'proxmox'           => \BeltoftServices\Proxmox\ProxmoxDriver::class,
+			'proxmox-db'        => \BeltoftServices\Proxmox\DbDriver::class,
+			'proxmox-disk'      => \BeltoftServices\Proxmox\DiskDriver::class,
+			'proxmox-snapshots' => \BeltoftServices\Proxmox\SnapshotDriver::class,
+			'proxmox-app'       => \BeltoftServices\Proxmox\AppLicenceDriver::class,
+			'domain'            => \BeltoftServices\Domains\DomainDriver::class,
+			'dns'               => \BeltoftServices\Domains\DnsDriver::class,
+			'mail'              => \BeltoftServices\Mail\MailDriver::class,
+			'ssl'               => \BeltoftServices\Ssl\SslDriver::class,
+			'licence-key'       => \BeltoftServices\Licences\KeyDriver::class,
+			'hosting'           => \BeltoftServices\Hosting\HostingDriver::class,
+		);
+
+		$actual = array();
+		foreach ( Registry::all() as $id => $driver ) {
+			$actual[ $id ] = get_class( $driver );
+		}
+		$this->assertSame( $golden, $actual );
+
+		// A plugin adding a driver late, at the default priority, still comes after the shipped ones.
+		$this->fake_driver();
+		$this->assertSame( 'fake', array_key_last( Registry::all() ) );
+	}
+
+	/**
+	 * Core names no driver: with every callback gone the registry is empty.
+	 */
+	public function test_the_registry_is_built_from_the_filter_alone(): void {
+		remove_all_filters( 'beltoft_services_drivers' );
+
+		$this->assertSame( array(), Registry::all() );
+	}
+
 	public function test_unknown_driver_is_null(): void {
 		$this->fake_driver();
 
