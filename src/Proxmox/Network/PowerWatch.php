@@ -8,7 +8,7 @@
 namespace BeltoftServices\Proxmox\Network;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;

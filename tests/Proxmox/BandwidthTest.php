@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Network\NetConfig;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;

@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Alerts;
-use BeltoftServices\Proxmox\DbNetGuard;
+use BeltoftServices\Proxmox\Db\DbNetGuard;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\Schema;

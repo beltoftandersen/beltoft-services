@@ -11,7 +11,7 @@ use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\DbJob;
+use BeltoftServices\Proxmox\Db\DbJob;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

@@ -10,7 +10,7 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DbActions;
+use BeltoftServices\Proxmox\Db\DbActions;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Disk\DiskSteps;
 use BeltoftServices\Proxmox\Network\Firewall;

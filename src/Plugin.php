@@ -189,7 +189,7 @@ final class Plugin {
 		Proxmox\Vm\ServerName::register();
 		Proxmox\Vm\SshKeyField::register();
 		Proxmox\Vm\OsField::register();
-		Proxmox\DbTermsField::register();
+		Proxmox\Db\DbTermsField::register();
 		Proxmox\Vm\Tiles::register();
 		Proxmox\AppField::register();
 		Proxmox\AppLicence::register();
@@ -199,8 +199,8 @@ final class Plugin {
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
 		Proxmox\Backup\BackupField::register();
-		Proxmox\DbIpField::register();
-		Proxmox\DbDiskField::register();
+		Proxmox\Db\DbIpField::register();
+		Proxmox\Db\DbDiskField::register();
 		Proxmox\Disk\DiskMeta::register();
 		Proxmox\Disk\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
@@ -209,11 +209,11 @@ final class Plugin {
 		Proxmox\Snapshot\SnapshotCart::register();
 		Proxmox\Disk\DiskField::register();
 		Proxmox\Vm\Actions::register();
-		Proxmox\DbActions::register();
-		Proxmox\DbRoutes::register();
-		Proxmox\DbAccessRoute::register();
-		Proxmox\DbNeedsServer::register();
-		Proxmox\DbNetGuard::register();
+		Proxmox\Db\DbActions::register();
+		Proxmox\Db\DbRoutes::register();
+		Proxmox\Db\DbAccessRoute::register();
+		Proxmox\Db\DbNeedsServer::register();
+		Proxmox\Db\DbNetGuard::register();
 		Proxmox\Vm\Panels::register();
 		Proxmox\Vm\EmailDetails::register();
 		Proxmox\Vm\ProxmoxJobs::register();

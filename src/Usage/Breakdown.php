@@ -12,11 +12,11 @@ use BeltoftServices\LineNames;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Backup\BackupField;
-use BeltoftServices\Proxmox\DbDisk;
-use BeltoftServices\Proxmox\DbDiskField;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DbIp;
-use BeltoftServices\Proxmox\DbIpField;
+use BeltoftServices\Proxmox\Db\DbDisk;
+use BeltoftServices\Proxmox\Db\DbDiskField;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Db\DbIp;
+use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;

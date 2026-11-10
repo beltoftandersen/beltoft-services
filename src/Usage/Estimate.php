@@ -111,7 +111,7 @@ final class Estimate {
 		$label    = Renewal::label( $resource_id );
 		$resource = Resource::find( $resource_id );
 
-		if ( $resource && \BeltoftServices\Proxmox\DbAccess::is_db( $resource ) && '' === (string) $resource->get( 'server_name' ) ) {
+		if ( $resource && \BeltoftServices\Proxmox\Db\DbAccess::is_db( $resource ) && '' === (string) $resource->get( 'server_name' ) ) {
 			$address = (string) $resource->get( 'db_address' );
 
 			if ( false !== filter_var( $address, FILTER_VALIDATE_IP ) ) {

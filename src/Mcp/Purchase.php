@@ -614,8 +614,8 @@ final class Purchase {
 		}
 
 		// A database engine with licence terms: the customer said yes to the summary, which showed the link.
-		if ( null !== \BeltoftServices\Proxmox\DbTermsField::cart_terms() ) {
-			$form[ \BeltoftServices\Proxmox\DbTermsField::POST_KEY ] = '1';
+		if ( null !== \BeltoftServices\Proxmox\Db\DbTermsField::cart_terms() ) {
+			$form[ \BeltoftServices\Proxmox\Db\DbTermsField::POST_KEY ] = '1';
 		}
 
 		$_POST    = $form;

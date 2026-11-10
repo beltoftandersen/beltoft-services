@@ -7,8 +7,8 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DbProfile;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Db\DbProfile;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

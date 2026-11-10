@@ -26,6 +26,7 @@ class ClassAliasTest extends TestCase {
 
 		return array(
 			$old . 'Backups'     => array( 'BeltoftServices\\Proxmox\\Backup\\Backups', 'sibling', '' ),
+			$old . 'DbIpField'   => array( 'BeltoftServices\\Proxmox\\Db\\DbIpField', 'cart_has_new_database', '' ),
 			$old . 'DiskField'   => array( 'BeltoftServices\\Proxmox\\Disk\\DiskField', 'cart_server', '' ),
 			$old . 'ServerName'  => array( 'BeltoftServices\\Proxmox\\Vm\\ServerName', 'display', 'ACTION' ),
 			$old . 'SshKeyField' => array( 'BeltoftServices\\Proxmox\\Vm\\SshKeyField', 'cart_needs_key', '' ),

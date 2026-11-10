@@ -8,7 +8,7 @@
 namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DbJob;
+use BeltoftServices\Proxmox\Db\DbJob;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

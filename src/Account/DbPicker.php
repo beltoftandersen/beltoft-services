@@ -9,12 +9,12 @@ namespace BeltoftServices\Account;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
-use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\DbEngines;
-use BeltoftServices\Proxmox\DbNeedsServer;
+use BeltoftServices\Proxmox\Db\DbDriver;
+use BeltoftServices\Proxmox\Db\DbEngines;
+use BeltoftServices\Proxmox\Db\DbNeedsServer;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Vm\Offers;
-use BeltoftServices\Proxmox\PostgresEngine;
+use BeltoftServices\Proxmox\Db\PostgresEngine;
 use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Usage\Rates;
@@ -112,7 +112,7 @@ final class DbPicker {
 				$numbers = Product::plan( $product->get_id(), $variation->get_id() );
 
 				// The public IP twin and the extra storage steps of a plan are chosen at checkout: each plan is listed once.
-				if ( \BeltoftServices\Proxmox\DbIp::plan_wants( $numbers ) || \BeltoftServices\Proxmox\DbDisk::extra( $numbers ) > 0 ) {
+				if ( \BeltoftServices\Proxmox\Db\DbIp::plan_wants( $numbers ) || \BeltoftServices\Proxmox\Db\DbDisk::extra( $numbers ) > 0 ) {
 					continue;
 				}
 

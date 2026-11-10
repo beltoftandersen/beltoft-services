@@ -9,8 +9,8 @@ namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\BackupField;
-use BeltoftServices\Proxmox\DbDiskField;
-use BeltoftServices\Proxmox\DbIpField;
+use BeltoftServices\Proxmox\Db\DbDiskField;
+use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Rates;
 

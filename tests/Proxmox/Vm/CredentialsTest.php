@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox\Vm;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Vm\Credentials;
-use BeltoftServices\Proxmox\DbJob;
+use BeltoftServices\Proxmox\Db\DbJob;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

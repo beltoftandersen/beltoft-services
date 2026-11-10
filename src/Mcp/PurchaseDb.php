@@ -10,10 +10,10 @@ namespace BeltoftServices\Mcp;
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Proxmox\Backup\Backups;
-use BeltoftServices\Proxmox\DbDisk;
-use BeltoftServices\Proxmox\DbDiskField;
-use BeltoftServices\Proxmox\DbIpField;
-use BeltoftServices\Proxmox\DbTermsField;
+use BeltoftServices\Proxmox\Db\DbDisk;
+use BeltoftServices\Proxmox\Db\DbDiskField;
+use BeltoftServices\Proxmox\Db\DbIpField;
+use BeltoftServices\Proxmox\Db\DbTermsField;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Usage\Rates;
 
@@ -248,9 +248,9 @@ final class PurchaseDb {
 	 * @param array<string, mixed> $plan Plan.
 	 */
 	private static function engine_terms( array $plan ): string {
-		$engine = \BeltoftServices\Proxmox\DbEngines::for_plan( \BeltoftServices\Product::plan( (int) $plan['product_id'], (int) $plan['variation_id'] ) );
+		$engine = \BeltoftServices\Proxmox\Db\DbEngines::for_plan( \BeltoftServices\Product::plan( (int) $plan['product_id'], (int) $plan['variation_id'] ) );
 
-		return $engine instanceof \BeltoftServices\Proxmox\DbEngineTerms ? $engine->terms_url() : '';
+		return $engine instanceof \BeltoftServices\Proxmox\Db\DbEngineTerms ? $engine->terms_url() : '';
 	}
 
 	/**

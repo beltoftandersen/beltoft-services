@@ -8,8 +8,8 @@
 namespace BeltoftServices\Proxmox\Network;
 
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\DbAccess;
-use BeltoftServices\Proxmox\DbEngines;
+use BeltoftServices\Proxmox\Db\DbAccess;
+use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

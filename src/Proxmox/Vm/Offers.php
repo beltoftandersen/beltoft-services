@@ -9,8 +9,8 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
-use BeltoftServices\Proxmox\DbDisk;
-use BeltoftServices\Proxmox\DbIpField;
+use BeltoftServices\Proxmox\Db\DbDisk;
+use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Usage\Rates;
 
