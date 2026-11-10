@@ -896,7 +896,7 @@ class ProvisionTest extends TestCase {
 		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
 	}
 
-	public function test_a_full_node_gets_no_clone_and_one_alert(): void {
+	public function test_a_full_node_is_still_placed_on_and_the_admin_is_told_once(): void {
 		$mails = array();
 		add_filter(
 			'pre_wp_mail',
@@ -907,31 +907,46 @@ class ProvisionTest extends TestCase {
 			10,
 			2
 		);
-		$this->settings( array( 'admin_email' => 'admin@example.com' ) );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$this->cache( array( 'node-a' => 68719476736 - 1048576 * 1024 ) ); // 1 GiB free, the plan needs 4.
 		$resource = $this->resource();
 
 		foreach ( array( 1, 2, 3 ) as $unused ) {
-			$result = $this->run_provision( $resource );
-			$this->assertTrue( $result->is_retry() );
-			$this->assertStringContainsString( 'No capacity on cluster lab', $result->error() );
+			$this->run_provision( $resource );
 		}
 
-		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
-		$this->assertCount( 1, $mails, 'Alerted once.' );
-		$this->assertStringContainsString( 'No capacity on cluster lab', $mails[0]['message'] );
+		$this->assertCount( 1, $this->calls( 'POST', '/clone' ), 'Capacity never stops a placement: the VM is cloned on the only node (changed on purpose: it used to wait with "No capacity").' );
+		$this->assertSame( 'node-a', VmRecords::for_resource( $resource->id() )['node'] );
+		$over = array_values( array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'over its committed memory budget' ) ) );
+		$this->assertCount( 1, $over, 'The admin is told once that the node is over its budget.' );
+		$this->assertStringContainsString( 'Memory kept free on each node', $over[0]['message'], 'The setting that defines the budget is named.' );
 	}
-
-	public function test_all_nodes_full_gets_no_clone(): void {
+	public function test_all_nodes_full_places_on_the_least_over_node(): void {
 		$this->fake->add_node( 'node-b' );
 		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
 		$this->cache( array( 'node-a' => 68719476736, 'node-b' => 68719476736 - 1048576 ) );
 		$resource = $this->resource();
 
-		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
-		$this->assertCount( 0, $this->calls( 'POST', '/clone' ) );
+		$this->run_provision( $resource );
+		$this->assertCount( 1, $this->calls( 'POST', '/clone' ), 'Changed on purpose: all nodes full no longer stops the clone.' );
+		$this->assertSame( 'node-b', VmRecords::for_resource( $resource->id() )['node'], 'node-b has the most room left.' );
 	}
 
+	public function test_an_offline_node_is_never_chosen_even_when_it_has_the_most_room(): void {
+		$gb = 1073741824;
+		$this->fake->add_node( 'node-b' );
+		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
+		set_transient(
+			\BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab',
+			array(
+				array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 20 * $gb ),
+				array( 'node' => 'node-b', 'status' => 'offline', 'maxmem' => 64 * $gb, 'mem' => 0 ),
+			),
+			HOUR_IN_SECONDS
+		);
+		$this->assertSame( 'node-a', \BeltoftServices\Proxmox\Pve\Placement::node( 'lab', array(), '', 4 * $gb ), 'The only online node, over its budget.' );
+		$this->assertNull( \BeltoftServices\Proxmox\Pve\Placement::node( 'nowhere', array(), '', 4 * $gb ), 'No cache for the cluster: null as before.' );
+	}
 	public function test_a_failed_record_move_reserves_nothing_and_the_retry_reserves_once(): void {
 		$resource = $this->resource();
 		$before   = \BeltoftServices\Proxmox\Pve\Capacity::free_by_node( 'lab' )['node-a'];
@@ -980,7 +995,12 @@ class ProvisionTest extends TestCase {
 		$free = \BeltoftServices\Proxmox\Pve\Capacity::free_by_node( 'lab' );
 		$this->assertSame( 4 * $gb, $free['node-a'] );
 		$this->assertSame( 2 * $gb, $free['node-b'] );
-		$this->assertFalse( \BeltoftServices\Proxmox\Pve\Capacity::fits( 'lab', 5 * $gb ), 'Stock closes for a plan that no longer fits anywhere.' );
+
+		// Nothing fits any more (4 and 2 GiB free, 4 needed again on the fourth): the next one is placed all the same, on the node with the most room.
+		$resource = $this->resource();
+		IpPool::add( '192.0.2.13' );
+		$this->assert_done( $this->run_provision( $resource ) );
+		$this->assertContains( VmRecords::for_resource( $resource->id() )['node'], array( 'node-a', 'node-b' ) );
 	}
 
 	public function test_template_must_be_a_template_and_in_the_list(): void {

@@ -974,9 +974,10 @@ final class Provision {
 				}
 
 				// Retried along the backoff; when it runs out the service fails and the admin is told.
-				Alerts::admin( $this->r, sprintf( 'No capacity on cluster %s', $this->cluster_id ) );
+				// Placement picks the node with the most room even when it is over budget, so this is only "no online node".
+				Alerts::admin( $this->r, sprintf( 'No usable node on cluster %s', $this->cluster_id ) );
 
-				return StepResult::retry( 0, sprintf( 'clone: No capacity on cluster %s', $this->cluster_id ) );
+				return StepResult::retry( 0, sprintf( 'clone: No usable node on cluster %s', $this->cluster_id ) );
 			}
 
 			// The record and the committed memory change together, under the capacity lock.

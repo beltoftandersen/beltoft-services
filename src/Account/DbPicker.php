@@ -26,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
  * New server page (ServerPicker, same markup and style): the plans of the published managed database products, found
  * by driver. A database has no operating system, app, name or key to choose, so a plan is all there is. A plain form
  * posted to the same address puts the plan in the cart and goes to checkout. A customer without a server with us gets
- * the notice of DbNeedsServer above the plans (it never refuses). Nothing here calls Proxmox: stock is the cached capacity.
+ * the notice of DbNeedsServer above the plans (it never refuses). Nothing here calls Proxmox: stock is WooCommerce's own stock status.
  */
 final class DbPicker {
 

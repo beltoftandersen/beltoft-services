@@ -255,7 +255,7 @@ class ProxmoxJobsTest extends TestCase {
 		return wc_get_product( $product_id )->get_stock_status( 'edit' );
 	}
 
-	public function test_the_hourly_capacity_run_writes_the_stock_status(): void {
+	public function test_the_hourly_capacity_run_does_not_write_the_stock_status(): void {
 		IpPool::add( '192.0.2.10' );
 		$small = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
 		$big   = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 100 * 1024, 'disk_gb' => 30 ) );
@@ -275,26 +275,18 @@ class ProxmoxJobsTest extends TestCase {
 
 		CapacityJobs::capacity();
 
+		$this->assertIsArray( get_transient( Placement::CAPACITY_PREFIX . 'lab' ), 'The cache is written.' );
 		$this->assertSame( 'instock', $this->stock_of( $small->get_id() ) );
-		$this->assertSame( 'outofstock', $this->stock_of( $big->get_id() ), 'No node can hold 100 GB.' );
+		$this->assertSame( 'instock', $this->stock_of( $big->get_id() ), 'No node can hold 100 GB, and the plan is on sale all the same (changed on purpose: capacity never closes a plan).' );
 		$this->assertSame( 'instock', $this->stock_of( $http->get_id() ), 'Another driver is not touched.' );
-		$this->assertSame( array( $big->get_id() => 'outofstock' ), $seen, 'One change, one hook.' );
-
-		$seen = array();
-		CapacityJobs::capacity();
-		$this->assertSame( array(), $seen, 'The next run changes nothing and fires nothing.' );
+		$this->assertSame( array(), $seen, 'The run fires no stock hook.' );
 	}
-
-	public function test_the_on_demand_capacity_run_writes_the_stock_status(): void {
+	public function test_the_on_demand_capacity_run_writes_the_cache_and_no_stock_status(): void {
 		IpPool::add( '192.0.2.10' );
 		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );
 		CapacityJobs::capacity();
 		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ) );
 
-		// The cache is flushed (an object cache flush) while the product is closed by this plugin.
-		set_transient( Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 8 * self::GB, 'mem' => 8 * self::GB ) ), HOUR_IN_SECONDS );
-		Stock::sync( 'lab' );
-		$this->assertSame( 'outofstock', $this->stock_of( $product->get_id() ), 'Closed by the plugin (marker set).' );
 		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
 
 		do_action( ProxmoxJobs::CAPACITY_NOW, 'lab' );
@@ -302,7 +294,6 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertIsArray( get_transient( Placement::CAPACITY_PREFIX . 'lab' ) );
 		$this->assertSame( 'instock', $this->stock_of( $product->get_id() ) );
 	}
-
 	public function test_a_capacity_run_that_cannot_read_the_cluster_leaves_the_status_alone(): void {
 		IpPool::add( '192.0.2.10' );
 		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) );

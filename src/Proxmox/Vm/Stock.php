@@ -12,39 +12,33 @@ use BeltoftServices\Product;
 use BeltoftServices\SwitchLink;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Apps\AppLicenceDriver;
-use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Network\IpPool;
-use BeltoftServices\Proxmox\Pve\CapacityJobs;
-use BeltoftServices\Proxmox\Network\PrivateNets;
-use BeltoftServices\Proxmox\Pve\Capacity;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Availability is the product's WooCommerce stock status: sync() writes it (`instock` or `outofstock`,
- * only when it differs) after every capacity cache write and every change of the IP pool, so
- * WooCommerce's own hooks fire (`woocommerce_product_set_stock_status`, which page caches purge on).
- * A product the owner set to out of stock by hand is never reopened: only a status this class closed
- * (marker META_CLOSED) is. Products that manage stock are left to WooCommerce.
+ * Sold out is WooCommerce's own stock status (`instock` or `outofstock`, the field in the product editor): the
+ * owner sets it by hand. Capacity never stops a sale (owner decision 2026-11-11): nothing here asks the node
+ * memory or the storage when a page is shown, a product is added to the cart or an order is checked out, and no
+ * filter closes `woocommerce_is_purchasable` or `woocommerce_product_is_in_stock` any more.
  *
- * Two WooCommerce filters (woocommerce/includes/abstracts/abstract-wc-product.php:1843 and :1785;
- * variations reach the second through parent::is_purchasable(), class-wc-product-variation.php:574)
- * stay as a guard for the time between two runs: a Proxmox product is unavailable when the IP pool has
- * no free address, or when no allowed node has the plan's memory free in the capacity cache. With NO
- * cache (an object cache flush) the filters do not close anything: the stored status stands, and a
- * capacity run is queued.
+ * One thing is still written automatically, because it cannot be oversold: a machine needs a public address, so
+ * sync() writes `outofstock` (only when it differs, WooCommerce's own hooks fire, page caches purge on
+ * `woocommerce_product_set_stock_status`) while the address pool is empty, and `instock` again when addresses
+ * are back. It runs when the pool changes or a product is saved, never when a page is shown. A product the owner
+ * set to out of stock by hand is never reopened: only a status this class closed (marker META_CLOSED) is. Products
+ * that manage stock are left to WooCommerce. Products closed by the old capacity rule carry the same marker and are
+ * reopened by the first sync (Plugin::maybe_upgrade()).
  *
- * A renewal, a switch and a resubscribe need no new address, so they are never blocked, also not by a
- * stored `outofstock`: WooCommerce reads the stored status in is_in_stock() (add_to_cart(),
- * check_cart_item_stock(), the order-pay check), so for those flows the in-stock filter answers true.
- * A cart item with WooCommerce Subscriptions' keys for this product, or the request arguments that start
- * those flows (`switch-subscription`, the switcher reads it before the item is in the cart;
- * `resubscribe`), lets the product through.
+ * The one filter left is `woocommerce_product_is_in_stock`, and it only opens: a renewal, a switch and a resubscribe
+ * of an existing customer need no new machine, so they are never blocked, also not by a stored `outofstock`:
+ * WooCommerce reads the stored status in is_in_stock() (add_to_cart(), check_cart_item_stock(), the order-pay check),
+ * so for those flows the filter answers true. A cart item with WooCommerce Subscriptions' keys for this product, or the
+ * request arguments that start those flows (`switch-subscription`, the switcher reads it before the item is in the
+ * cart; `resubscribe`), lets the product through.
  */
 final class Stock {
 
@@ -52,11 +46,6 @@ final class Stock {
 	 * Marker on a product whose `outofstock` this class wrote, so only that one is reopened.
 	 */
 	public const META_CLOSED = '_beltoft_services_stock_closed';
-
-	/**
-	 * Transient prefix: a capacity run was queued for the cluster lately (see queue()).
-	 */
-	private const QUEUED_PREFIX = 'beltoft_services_proxmox_stock_queued_';
 
 	/**
 	 * Product and variation id of the item being added now when it belongs to one of those flows.
@@ -77,11 +66,16 @@ final class Stock {
 	private static $writing = false;
 
 	/**
+	 * Option that says the products closed by the old capacity rule were reopened.
+	 */
+	public const MIGRATED = 'beltoft_services_stock_policy';
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_action( 'init', array( __CLASS__, 'migrate' ), 20 );
 		add_filter( 'woocommerce_product_is_in_stock', array( __CLASS__, 'in_stock' ), 20, 2 );
-		add_filter( 'woocommerce_is_purchasable', array( __CLASS__, 'filter' ), 20, 2 );
 		// The status follows a saved plan or driver, and an owner's own change to it is respected (see forget_marker()).
 		add_action( 'woocommerce_after_product_object_save', array( __CLASS__, 'product_saved' ) );
 		add_action( 'woocommerce_after_product_variation_object_save', array( __CLASS__, 'product_saved' ) );
@@ -94,10 +88,22 @@ final class Stock {
 		// end of the request closes the flag instead.
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validation' ), 1 );
 		add_action( 'shutdown', array( __CLASS__, 'clear_flow' ) );
-		// A cart loaded from the session checks is_purchasable() before the item data is applied (class-wc-cart-session.php:198).
-		add_filter( 'woocommerce_cart_item_is_purchasable', array( __CLASS__, 'session_item' ), 20, 4 );
 		// Paying an existing renewal, switch or resubscribe order (woocommerce/includes/shortcodes/class-wc-shortcode-checkout.php:154).
 		add_filter( 'woocommerce_pay_order_product_in_stock', array( __CLASS__, 'pay_order' ), 20, 3 );
+	}
+
+	/**
+	 * Once, after the stock policy change (2026-11-11): the products this class closed for lack of memory or storage carry
+	 * the marker and are reopened by one sync (a product the owner closed by hand has no marker and stays closed; one closed
+	 * for lack of addresses is closed again by the same sync).
+	 */
+	public static function migrate(): void {
+		if ( '' !== (string) get_option( self::MIGRATED, '' ) ) {
+			return;
+		}
+
+		self::sync();
+		update_option( self::MIGRATED, '1' );
 	}
 
 	/**
@@ -153,26 +159,6 @@ final class Stock {
 	}
 
 	/**
-	 * Filter woocommerce_cart_item_is_purchasable: an item restored from the session that carries a
-	 * flow key stays.
-	 *
-	 * @param mixed $purchasable Value so far.
-	 * @param mixed $key         Cart item key.
-	 * @param mixed $values      Session values of the item.
-	 * @param mixed $product     Product.
-	 * @return mixed
-	 */
-	public static function session_item( $purchasable, $key = '', $values = array(), $product = null ) {
-		if ( $purchasable || ! $product instanceof \WC_Product || ! is_array( $values ) || ! self::has_flow_key( $values ) ) {
-			return $purchasable;
-		}
-
-		$driver = Product::driver_for( $product->get_id() );
-
-		return $driver && in_array( $driver->id(), self::drivers(), true ) ? true : $purchasable;
-	}
-
-	/**
 	 * Filter woocommerce_pay_order_product_in_stock: renewal, switch and resubscribe orders can be paid.
 	 *
 	 * @param mixed $in_stock Value so far.
@@ -204,8 +190,8 @@ final class Stock {
 	}
 
 	/**
-	 * Filter woocommerce_product_is_in_stock: the guard of `filter()`, and an existing customer's
-	 * renewal, switch or resubscribe is in stock even when the stored status is `outofstock`.
+	 * Filter woocommerce_product_is_in_stock: an existing customer's renewal, switch or resubscribe is in stock even when
+	 * the stored status is `outofstock`. It never closes anything.
 	 *
 	 * @param mixed $value   Value so far.
 	 * @param mixed $product Product.
@@ -220,140 +206,27 @@ final class Stock {
 			}
 		}
 
-		return self::filter( $value, $product );
+		return $value;
 	}
 
 	/**
-	 * Both filters: ( $value, $product ). Only ever closes (a false value stays false).
+	 * Can a new machine be had for this product as far as addresses go? Memory and storage are not asked.
+	 * A machine needs a public address; a database only with the public IP add-on, and never the one kept for servers.
 	 *
-	 * @param mixed $value   Value so far.
-	 * @param mixed $product Product.
-	 * @return mixed
+	 * @param \WC_Product $product Product or variation.
 	 */
-	public static function filter( $value, $product ) {
-		if ( ! $value || ! $product instanceof \WC_Product ) {
-			return $value;
-		}
-
+	private static function availability( \WC_Product $product ): bool {
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( ! $driver || ! in_array( $driver->id(), self::drivers(), true ) || self::existing_customer_flow( $product ) ) {
-			return $value;
+		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID, DiskDriver::ID ), true ) ) {
+			return true; // Slots, app licences and extra disks need no address.
 		}
-
-		$available = self::availability( $product );
-
-		if ( null === $available ) {
-			// No capacity cache: not "no room". The stored status stands until the capacity run (queued) has written it.
-			self::queue( (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) );
-
-			return $value;
-		}
-
-		return $available ? $value : false;
-	}
-
-	/**
-	 * True when it cannot be told whether a machine can be built (no capacity cache). Checkout lets such a plan through on its stored
-	 * status, so a picker may offer it.
-	 *
-	 * @param \WC_Product $product Product or variation.
-	 */
-	public static function unknown( \WC_Product $product ): bool {
-		return null === self::availability( $product );
-	}
-
-	/**
-	 * Can a new machine be built for this product now? False with no capacity cache.
-	 *
-	 * @param \WC_Product $product Product or variation.
-	 */
-	public static function available( \WC_Product $product ): bool {
-		return true === self::availability( $product );
-	}
-
-	/**
-	 * Can a new machine be built now: true or false, or null when it cannot be told because the
-	 * cluster is known but its capacity cache is gone (and the pool has addresses).
-	 *
-	 * @param \WC_Product $product Product or variation.
-	 */
-	private static function availability( \WC_Product $product, bool $live = true ): ?bool {
-		$driver = Product::driver_for( $product->get_id() );
-		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID ), true ) ) {
-			return true; // Slots and app licences are an entitlement: nothing is built, so nothing runs out.
-		}
-		if ( $driver && DiskDriver::ID === $driver->id() ) {
-			$size = (int) ( Product::plan( $product->get_id() )['disk_gb'] ?? 0 );
-			if ( $size < 1 ) {
-				return false;
-			}
-			foreach ( Clusters::all() as $cluster_id => $cluster ) {
-				foreach ( (array) $cluster['nodes'] as $node ) {
-					if ( DiskCapacity::fits( (string) $cluster_id, (string) $node, (string) $cluster['storage'], $size ) ) {
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-
-		$plan = Product::plan( $product->get_id() );
 
 		if ( $driver && DbDriver::ID === $driver->id() ) {
-			// A database needs a private network of its own for this customer (a visitor: any free one), also for a customer without a server.
-			if ( $live && ! PrivateNets::available_for( get_current_user_id(), (string) ( $plan['cluster'] ?? '' ) ) ) {
-				return false;
-			}
-
-			// A database needs an address only with the public IP add-on, and never the one kept for servers.
-			if ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() ) {
-				return false;
-			}
-
-			// Extra storage is sold out when the data disk does not fit on a node (a plan without it is not asked).
-			if ( DbDisk::extra( $plan ) > 0 && ! DbDisk::fits_new( $plan ) ) {
-				return false;
-			}
-		} elseif ( 0 === IpPool::free_count() ) {
-			return false;
+			return ! ( (int) ( Product::plan( $product->get_id() )['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() );
 		}
 
-		$cluster = (string) ( $plan['cluster'] ?? '' );
-		$free    = Capacity::free_by_node( $cluster ); // One read of the cluster list and one of the cache; no secret is decrypted.
-
-		if ( null === $free ) {
-			return isset( Clusters::all()[ $cluster ] ) ? null : false; // A saved cluster without a cache waits; an unknown one is closed.
-		}
-
-		$bytes = max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576;
-
-		foreach ( $free as $bytes_free ) {
-			if ( $bytes_free >= $bytes ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Queues a capacity run for the cluster (CapacityJobs::queue_capacity(): async, one waiting run is
-	 * enough). At most once in five minutes, so a cluster that cannot be read is not asked on every page view.
-	 *
-	 * @param string $cluster_id Cluster id.
-	 */
-	private static function queue( string $cluster_id ): void {
-		if ( '' === $cluster_id || false !== get_transient( self::QUEUED_PREFIX . $cluster_id ) ) {
-			return;
-		}
-
-		if ( ! class_exists( 'ActionScheduler' ) || ! \ActionScheduler::is_initialized() ) {
-			return;
-		}
-
-		set_transient( self::QUEUED_PREFIX . $cluster_id, 1, 5 * MINUTE_IN_SECONDS );
-		CapacityJobs::queue_capacity( $cluster_id );
+		return 0 !== IpPool::free_count();
 	}
 
 	/**
@@ -364,10 +237,9 @@ final class Stock {
 	 * product's own status is synced by WooCommerce afterwards. Never throws: callers are the capacity job
 	 * and the pool, which must not fail on a product.
 	 *
-	 * @param string|null $cluster_id Only the plans of this cluster (a capacity write); null for all (the pool changed).
 	 */
-	public static function sync( ?string $cluster_id = null ): void {
-		self::sync_ids( self::product_ids(), $cluster_id );
+	public static function sync(): void {
+		self::sync_ids( self::product_ids() );
 	}
 
 	/**
@@ -387,7 +259,7 @@ final class Stock {
 		$driver = Product::driver_for( $id );
 
 		if ( $driver && in_array( $driver->id(), self::drivers(), true ) ) {
-			self::sync_ids( array( $id ), null );
+			self::sync_ids( array( $id ) );
 		}
 	}
 
@@ -414,9 +286,8 @@ final class Stock {
 	 * The sync of these parent products. A product that fails is logged and skipped: the others go on.
 	 *
 	 * @param int[]       $ids        Parent product ids.
-	 * @param string|null $cluster_id Only the plans of this cluster, or null.
 	 */
-	private static function sync_ids( array $ids, ?string $cluster_id ): void {
+	private static function sync_ids( array $ids ): void {
 		if ( self::$writing || ! function_exists( 'wc_get_product' ) ) {
 			return;
 		}
@@ -426,7 +297,7 @@ final class Stock {
 		try {
 			foreach ( $ids as $id ) {
 				try {
-					self::sync_product( (int) $id, $cluster_id );
+					self::sync_product( (int) $id );
 				} catch ( \Throwable $e ) {
 					// A failed write cannot be recorded anywhere else; the next sync tries again.
 					error_log( sprintf( 'Beltoft Services: the stock status of product %d could not be synced: %s', (int) $id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
@@ -441,9 +312,8 @@ final class Stock {
 	 * One product, or a variable product's variations, then the variable product itself.
 	 *
 	 * @param int         $id         Parent product id.
-	 * @param string|null $cluster_id Cluster filter.
 	 */
-	private static function sync_product( int $id, ?string $cluster_id ): void {
+	private static function sync_product( int $id ): void {
 		$product = wc_get_product( $id );
 
 		if ( ! $product ) {
@@ -451,7 +321,7 @@ final class Stock {
 		}
 
 		if ( ! $product instanceof \WC_Product_Variable ) {
-			self::apply( $product, $cluster_id );
+			self::apply( $product );
 			return;
 		}
 
@@ -460,7 +330,7 @@ final class Stock {
 		foreach ( $product->get_children() as $child_id ) {
 			try {
 				$variation = wc_get_product( $child_id );
-				$changed   = ( $variation && self::apply( $variation, $cluster_id ) ) || $changed;
+				$changed   = ( $variation && self::apply( $variation ) ) || $changed;
 			} catch ( \Throwable $e ) {
 				error_log( sprintf( 'Beltoft Services: the stock status of variation %d could not be synced: %s', (int) $child_id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- see sync_ids().
 			}
@@ -496,28 +366,14 @@ final class Stock {
 	 * Brings one product's stored status in line with its availability.
 	 *
 	 * @param \WC_Product $product    Simple product or variation.
-	 * @param string|null $cluster_id Skip plans of other clusters.
 	 * @return bool Whether the status was saved.
 	 */
-	private static function apply( \WC_Product $product, ?string $cluster_id ): bool {
+	private static function apply( \WC_Product $product ): bool {
 		if ( $product->managing_stock() ) {
 			return false; // Quantities decide; WooCommerce would reset the status anyway.
 		}
 
-		$driver = Product::driver_for( $product->get_id() );
-		if ( null !== $cluster_id && ( ! $driver || ! in_array( $driver->id(), self::addon_drivers(), true ) ) && (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) !== $cluster_id ) {
-			return false;
-		}
-
-		// The stored status is the shop-wide capacity: the private network rule depends on who asks.
-		$available = self::availability( $product, false );
-
-		if ( null === $available ) {
-			// No cache, so nothing can be said (a product closed for lack of an address cannot be reopened): ask for one.
-			self::queue( (string) ( Product::plan( $product->get_id() )['cluster'] ?? '' ) );
-
-			return false;
-		}
+		$available = self::availability( $product );
 
 		$stored = $product->get_stock_status( 'edit' );
 

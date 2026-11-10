@@ -32,7 +32,7 @@ defined( 'ABSPATH' ) || exit;
  * same address: it works without script, and an error comes back on the page with the choices kept. The handler checks
  * the choices with the code checkout runs (Offers for the plan and its stock, OsField::check, AppField::resolve,
  * ServerName::normalise, SshKeyField::normalise), puts the plan in the cart with the choices on the cart line (see
- * Picked) and sends the customer to checkout. Nothing here calls Proxmox: stock is the cached capacity.
+ * Picked) and sends the customer to checkout. Nothing here calls Proxmox: stock is WooCommerce's own stock status.
  *
  * A customer who is not logged in is sent to the login with the address to come back to.
  */
@@ -541,7 +541,6 @@ final class ServerPicker {
 		wp_nonce_field( self::NONCE, self::FIELD );
 
 		$available = array_filter( $plans, static fn( $plan ) => ! empty( $plan['in_stock'] ) );
-		$unknown   = array() !== array_filter( $available, static fn( $plan ) => ! empty( $plan['unknown'] ) );
 
 		self::billing( $plans, $selected, 'usage' === $values['billing'], '' !== $values['backups'], array() !== self::$state['values'] );
 		self::error( $errors, 'billing' );
@@ -564,10 +563,6 @@ final class ServerPicker {
 			}
 
 			echo '</div>';
-		}
-
-		if ( $unknown ) {
-			echo '<p class="beltoft-services-picker__soldout">' . esc_html__( 'Availability is checked again at checkout.', 'beltoft-services' ) . '</p>';
 		}
 
 		self::error( $errors, 'plan' );

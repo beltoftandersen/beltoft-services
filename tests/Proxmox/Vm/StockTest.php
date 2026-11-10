@@ -18,8 +18,10 @@ use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Tests\TestCase;
 
 /**
- * A VM product is sold out without a free address or without room on a node; renewals, switches
- * and resubscribes are never blocked.
+ * A VM product is closed (stored `outofstock`) only while no public address is free, or by the owner by hand;
+ * renewals, switches and resubscribes are never blocked. Capacity never closes it (owner decision 2026-11-11):
+ * the tests that proved a closing for lack of memory are changed on purpose to prove the opposite, and the ones
+ * that used a capacity write to close a plan use the address pool instead, the one automatic closing left.
  */
 class StockTest extends TestCase {
 
@@ -128,6 +130,17 @@ class StockTest extends TestCase {
 		return wc_get_product( is_object( $p ) ? $p->get_id() : $p )->get_stock_status( 'edit' );
 	}
 
+	/**
+	 * The address comes back without the pool telling anybody (another process wrote it): no sync runs.
+	 */
+	private function quiet_unblock(): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( Schema::tables()['ips'], array( 'state' => 'free' ), array( 'state' => 'blocked' ) );
+		delete_transient( IpPool::FREE_TRANSIENT );
+	}
+
 	private function in_stock( \WC_Product $p ): bool {
 		$p = wc_get_product( $p->get_id() );
 
@@ -140,48 +153,52 @@ class StockTest extends TestCase {
 
 		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertFalse( $this->in_stock( $product ) );
-		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock() );
-		$this->assertFalse( wc_get_product( $product->get_id() )->is_purchasable() );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'WooCommerce\'s own stored status says sold out.' );
+		$this->assertTrue( wc_get_product( $product->get_id() )->is_purchasable(), 'Purchasable is not touched: sold out is the stock status.' );
 
 		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
 		$this->assertTrue( $this->in_stock( $product ), 'The cached count is cleared by the change.' );
 	}
-
-	public function test_out_of_stock_without_capacity(): void {
+	public function test_capacity_never_closes_a_server_plan(): void {
 		$product = $this->product( 4096 );
 
-		$this->capacity( 3 );
-		$this->assertFalse( $this->in_stock( $product ), '3 GB free cannot hold a 4 GB plan.' );
-
-		$this->capacity( 4 );
-		$this->assertTrue( $this->in_stock( $product ), 'Exactly enough counts.' );
+		foreach ( array( 3, 0, 4 ) as $free ) {
+			$this->capacity( $free );
+			$this->assertTrue( $this->in_stock( $product ), $free . ' GB free: a 4 GB plan is still on sale.' );
+		}
 
 		$this->capacity( null );
-		$this->assertTrue( $this->in_stock( $product ), 'No cache is not "no room": the stored status stands; Proxmox is not asked.' );
+		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ); // Saving the cluster queued one.
+		$this->assertTrue( $this->in_stock( $product ), 'No cache: nothing is asked, nothing is queued.' );
 		$this->assertSame( array(), $this->http_calls() );
+		$this->assertFalse( as_has_scheduled_action( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ), 'A page view does not queue a capacity run.' );
 
-		// One node with room is enough; an offline node does not count.
-		$rows         = array(
-			array( 'node' => 'node-a', 'status' => 'offline', 'maxmem' => 64 * self::GB, 'mem' => 0 ),
-			array( 'node' => 'node-b', 'status' => 'online', 'maxmem' => 64 * self::GB, 'mem' => 62 * self::GB ),
-		);
-		set_transient( Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
-		$this->assertFalse( $this->in_stock( $product ) );
-
-		$rows[1]['mem'] = 10 * self::GB;
-		set_transient( Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
+		// Every node full or offline: still on sale.
+		set_transient( Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'offline', 'maxmem' => 64 * self::GB, 'mem' => 0 ), array( 'node' => 'node-b', 'status' => 'online', 'maxmem' => 64 * self::GB, 'mem' => 64 * self::GB ) ), HOUR_IN_SECONDS );
 		$this->assertTrue( $this->in_stock( $product ) );
-	}
 
-	public function test_variation_plan_memory_decides(): void {
+		// Set out of stock by hand: sold out, and a capacity write does not reopen it.
+		$fresh = wc_get_product( $product->get_id() );
+		$fresh->set_stock_status( 'outofstock' );
+		$fresh->save();
+		$this->capacity( 32 );
+		$this->assertFalse( $this->in_stock( $product ) );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock() );
+	}
+	public function test_variation_plan_memory_does_not_decide(): void {
 		$parent = $this->product( 1024, array( 'variations' => array( array( 'memory_mb' => 2048 ), array( 'memory_mb' => 16384 ) ) ) );
 		$this->capacity( 8 );
 		$ids = $parent->get_children();
 
 		$this->assertTrue( $this->in_stock( wc_get_product( $ids[0] ) ) );
-		$this->assertFalse( $this->in_stock( wc_get_product( $ids[1] ) ), 'The large variation does not fit.' );
-	}
+		$this->assertTrue( $this->in_stock( wc_get_product( $ids[1] ) ), 'The large variation does not fit 8 GB free and is on sale all the same.' );
 
+		$variation = wc_get_product( $ids[1] );
+		$variation->set_stock_status( 'outofstock' );
+		$variation->save();
+		$this->assertFalse( $this->in_stock( wc_get_product( $ids[1] ) ), 'Out of stock by hand: sold out.' );
+		$this->assertTrue( $this->in_stock( wc_get_product( $ids[0] ) ) );
+	}
 	public function test_other_products_are_left_alone(): void {
 		$other = $this->service_product( 'fake' );
 		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
@@ -195,10 +212,43 @@ class StockTest extends TestCase {
 		$this->assertTrue( $this->in_stock( $plain ) );
 	}
 
-	public function test_a_product_already_out_of_stock_stays_so(): void {
-		$this->assertFalse( \BeltoftServices\Proxmox\Vm\Stock::filter( false, $this->product() ) );
+	public function test_showing_stock_for_many_plans_makes_no_capacity_query(): void {
+		global $wpdb;
+		$parent   = $this->product( 1024, array( 'variations' => array( array( 'memory_mb' => 2048 ), array( 'memory_mb' => 16384 ), array( 'memory_mb' => 65536 ) ) ) );
+		$products = array_merge( array( $this->product( 4096 ), $this->product( 8192 ) ), array_map( 'wc_get_product', $parent->get_children() ) );
+		$this->capacity( 0 );
+		wp_cache_flush();
+
+		$seen = array();
+		$grab = static function ( $query ) use ( &$seen ) {
+			$seen[] = (string) $query;
+
+			return $query;
+		};
+		add_filter( 'query', $grab );
+
+		foreach ( $products as $product ) {
+			$fresh = wc_get_product( $product->get_id() );
+			$fresh->is_purchasable();
+			$fresh->is_in_stock();
+			apply_filters( 'woocommerce_add_to_cart_validation', true, $product->get_id(), 1 );
+		}
+		do_action( 'woocommerce_check_cart_items' );
+		do_action( 'woocommerce_checkout_process' );
+
+		remove_filter( 'query', $grab );
+
+		foreach ( $seen as $sql ) {
+			$this->assertStringNotContainsString( Schema::tables()['vms'], $sql, 'The display, cart and checkout path read the machine records: ' . $sql );
+			$this->assertStringNotContainsString( $wpdb->prefix . 'beltoft_licenses_activations', $sql, 'The display, cart and checkout path read the activations: ' . $sql );
+		}
+		$this->assertSame( array(), $this->http_calls() );
 	}
 
+	public function test_a_product_already_out_of_stock_stays_so(): void {
+		$this->assertFalse( \BeltoftServices\Proxmox\Vm\Stock::in_stock( false, $this->product() ), 'Only a flow of an existing customer opens it.' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\Stock::in_stock( true, $this->product() ), 'It never closes.' );
+	}
 	/**
 	 * A subscription of a user (WooCommerce Subscriptions' own factory).
 	 *
@@ -333,7 +383,8 @@ class StockTest extends TestCase {
 		WC()->cart->cart_contents = array();
 		WC()->session->set( 'cart', $session );
 		WC()->cart->get_cart_from_session();
-		$this->assertCount( 0, WC()->cart->get_cart(), 'A new server is dropped from the reloaded cart.' );
+		$this->assertCount( 1, WC()->cart->get_cart(), 'The reload no longer drops it (purchasable is not touched); WooCommerce\'s own stock check refuses it.' );
+		$this->assertNotTrue( WC()->cart->check_cart_item_stock(), 'A new server with no address is refused at the cart check, as WooCommerce does it.' );
 		wc_clear_notices();
 	}
 
@@ -475,10 +526,6 @@ class StockTest extends TestCase {
 		$ids    = $parent->get_children();
 		$seen   = array();
 
-		$this->capacity( 32 );
-		Stock::sync( 'lab' );
-		$this->assertSame( 'instock', $this->stored( $ids[1] ) );
-
 		add_action(
 			'woocommerce_product_set_stock_status',
 			static function ( $id, $status ) use ( &$seen ) {
@@ -496,71 +543,49 @@ class StockTest extends TestCase {
 			2
 		);
 
-		$this->capacity( 8 );
-		Stock::sync( 'lab' );
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 
-		$this->assertSame( array( 'v' . $ids[1] => 'outofstock' ), $seen, 'Only the variation that does not fit changes; the parent keeps "instock" (another variation is in stock).' );
-		$this->assertSame( 'instock', $this->stored( $simple ) );
-		$this->assertSame( 'instock', $this->stored( $ids[0] ) );
-		$this->assertSame( 'outofstock', $this->stored( $ids[1] ) );
-		$this->assertSame( 'instock', $this->stored( $parent ) );
+		$this->assertSame( 'outofstock', $seen[ 'p' . $simple->get_id() ] ?? '', 'The simple product: WooCommerce\'s hook fired (page caches purge on it).' );
+		$this->assertSame( 'outofstock', $seen[ 'v' . $ids[0] ] ?? '' );
+		$this->assertSame( 'outofstock', $seen[ 'v' . $ids[1] ] ?? '' );
+		$this->assertSame( 'outofstock', $this->stored( $parent ) );
 	}
-
 	public function test_a_variable_parent_follows_its_variations(): void {
 		$parent = $this->product( 1024, array( 'variations' => array( array( 'memory_mb' => 2048 ), array( 'memory_mb' => 16384 ) ) ) );
 		$ids    = $parent->get_children();
 
-		$this->capacity( 1 );
-		Stock::sync( 'lab' );
-
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertSame( 'outofstock', $this->stored( $ids[0] ) );
 		$this->assertSame( 'outofstock', $this->stored( $ids[1] ) );
 		$this->assertSame( 'outofstock', $this->stored( $parent ), 'WC_Product_Variable::sync() closed the parent: every variation is out.' );
 
-		$this->capacity( 8 );
-		Stock::sync( 'lab' );
-
+		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
 		$this->assertSame( 'instock', $this->stored( $ids[0] ) );
-		$this->assertSame( 'outofstock', $this->stored( $ids[1] ) );
-		$this->assertSame( 'instock', $this->stored( $parent ), 'And reopened when one variation is back.' );
-
-		$this->capacity( 32 );
-		Stock::sync( 'lab' );
 		$this->assertSame( 'instock', $this->stored( $ids[1] ) );
+		$this->assertSame( 'instock', $this->stored( $parent ) );
 	}
-
-	public function test_a_capacity_write_by_the_placement_syncs_the_status(): void {
+	public function test_a_capacity_write_by_the_placement_does_not_touch_the_status(): void {
 		$product = $this->product( 4096 );
 		$this->capacity( 4 );
-		Stock::sync( 'lab' );
 		$this->assertSame( 'instock', $this->stored( $product ) );
 
 		// A placement commits 2 GB on each node's cache row it names; here the two nodes are filled in two steps.
 		$this->assertTrue( Capacity::place( 'lab', 'node-a', 2 * self::GB, static fn() => true ) );
-		$this->assertSame( 'instock', $this->stored( $product ), 'node-b still has room.' );
 		$this->assertTrue( Capacity::place( 'lab', 'node-b', 2 * self::GB, static fn() => true ) );
-		$this->assertSame( 'outofstock', $this->stored( $product ), 'Nothing fits any more.' );
-
-		// A failed record commits nothing and syncs nothing.
-		$this->capacity( 8 );
-		Stock::sync( 'lab' );
-		$this->assertFalse( Capacity::place( 'lab', 'node-a', 8 * self::GB, static fn() => false ) );
-		$this->assertSame( 'instock', $this->stored( $product ) );
+		$this->assertSame( 'instock', $this->stored( $product ), 'Nothing fits any more, and the plan is still on sale.' );
+		$this->assertTrue( $this->in_stock( $product ) );
 	}
-
-	public function test_other_clusters_and_other_products_are_not_synced_by_a_cluster_write(): void {
+	public function test_a_sync_writes_no_product_of_another_driver_and_ignores_capacity(): void {
 		$product = $this->product();
 		$this->capacity( 1 );
-
-		Stock::sync( 'elsewhere' );
-		$this->assertSame( 'instock', $this->stored( $product ), 'A capacity write of another cluster does not touch this plan.' );
+		Stock::sync();
+		$this->assertSame( 'instock', $this->stored( $product ), 'Capacity is not a reason to close.' );
 
 		$other = $this->service_product( 'fake' );
-		Stock::sync();
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertSame( 'outofstock', $this->stored( $product ) );
 		$this->assertSame( 'instock', $this->stored( $other ), 'A product of another driver is never written.' );
 	}
-
 	public function test_a_status_the_owner_set_by_hand_is_not_reopened(): void {
 		$product = $this->product();
 		$product->set_stock_status( 'outofstock' );
@@ -572,8 +597,7 @@ class StockTest extends TestCase {
 
 		// A plugin-closed product that the owner reopens by hand is closed again when it is still unavailable.
 		$mine = $this->product();
-		$this->capacity( 1 );
-		Stock::sync();
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertSame( 'outofstock', $this->stored( $mine ) );
 		$mine = wc_get_product( $mine->get_id() );
 		$mine->set_stock_status( 'instock' );
@@ -595,65 +619,33 @@ class StockTest extends TestCase {
 		$this->assertSame( 5, $fresh->get_stock_quantity() );
 	}
 
-	public function test_no_capacity_cache_does_not_close_and_queues_a_run(): void {
+	public function test_no_capacity_cache_closes_nothing_and_queues_nothing(): void {
 		$product = $this->product();
 		$this->capacity( null );
 		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP );
 
 		$this->assertTrue( $this->in_stock( $product ), 'The stored status (instock) stands.' );
-		$this->assertTrue( as_has_scheduled_action( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ), 'A capacity run for that cluster is queued.' );
-
 		$this->in_stock( $product );
-		$this->in_stock( $product );
-		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => ProxmoxJobs::CAPACITY_NOW, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ), 'One waiting run, however many page views.' );
+		$this->assertFalse( as_has_scheduled_action( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ), 'No capacity run is queued by a page view.' );
 
-		// The sync writes nothing without a cache.
-		Stock::sync( 'lab' );
+		Stock::sync();
 		$this->assertSame( 'instock', $this->stored( $product ) );
-
-		// A stored outofstock stays too: the guard only ever closes.
-		$closed = $this->product();
-		$this->capacity( 1 );
-		Stock::sync( 'lab' );
-		$this->assertSame( 'outofstock', $this->stored( $closed ) );
-		$this->capacity( null );
-		$this->assertFalse( $this->in_stock( $closed ) );
-		$this->assertSame( 'outofstock', $this->stored( $closed ) );
+		$this->assertSame( array(), $this->http_calls() );
 	}
-
-	public function test_the_queued_run_is_throttled_and_a_cluster_that_is_not_saved_is_closed(): void {
-		$product = $this->product();
-		$this->capacity( null );
-		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP );
-
-		$this->in_stock( $product );
-		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP );
-		$this->in_stock( $product );
-		$this->assertFalse( as_has_scheduled_action( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ), 'A run was queued a moment ago: a cluster that cannot be read is not asked on every page view.' );
-
-		// A plan naming a cluster that does not exist has no cache to wait for: it stays closed.
+	public function test_a_plan_naming_a_cluster_that_is_not_saved_is_not_closed_by_capacity(): void {
 		$ghost = $this->service_product( 'proxmox', array( 'cluster' => 'ghost', 'template' => 9000, 'cores' => 1, 'memory_mb' => 1024, 'disk_gb' => 10 ) );
-		$this->assertFalse( $this->in_stock( $ghost ) );
+		$this->assertTrue( $this->in_stock( $ghost ), 'Capacity is not asked: only the owner or the address pool closes a plan.' );
 	}
-
-	public function test_a_product_closed_for_lack_of_addresses_waits_for_the_capacity_run_when_the_cache_is_gone(): void {
+	public function test_a_product_closed_for_lack_of_addresses_reopens_with_the_address_whatever_the_cache(): void {
 		$product = $this->product();
 		$this->capacity( null );
-		as_unschedule_all_actions( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP );
 
 		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertSame( 'outofstock', $this->stored( $product ), 'No address needs no cache to be known.' );
 
 		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
-		$this->assertSame( 'outofstock', $this->stored( $product ), 'An address is back, but without a cache the room cannot be told: nothing is written.' );
-		$this->assertTrue( as_has_scheduled_action( ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), Jobs::GROUP ), 'The capacity run that will tell is queued.' );
-
-		// The run writes the cache and, with it, the status.
-		$this->capacity( 8 );
-		Stock::sync( 'lab' );
-		$this->assertSame( 'instock', $this->stored( $product ) );
+		$this->assertSame( 'instock', $this->stored( $product ), 'An address is back: it reopens, with or without a capacity cache.' );
 	}
-
 	public function test_stored_outofstock_does_not_block_a_renewal_cart_check(): void {
 		$product = $this->sold_out_product();
 		$sub     = $this->subscription( self::factory()->user->create() );
@@ -678,13 +670,14 @@ class StockTest extends TestCase {
 	public function test_stored_outofstock_does_not_block_a_variation_in_a_flow(): void {
 		$parent = $this->product( 1024, array( 'variations' => array( array( 'memory_mb' => 2048 ), array( 'memory_mb' => 16384 ) ) ) );
 		$ids    = $parent->get_children();
-		$this->capacity( 8 );
-		Stock::sync( 'lab' );
+		$closed = wc_get_product( $ids[1] );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
 		$this->assertSame( 'outofstock', $this->stored( $ids[1] ) );
 
 		$sub = $this->subscription( self::factory()->user->create() );
 		WC()->cart->empty_cart();
-		$this->assertFalse( WC()->cart->add_to_cart( $parent->get_id(), 1, $ids[1], array( 'attribute_tier' => '1' ) ), 'A new server for the full variation is refused.' );
+		$this->assertFalse( WC()->cart->add_to_cart( $parent->get_id(), 1, $ids[1], array( 'attribute_tier' => '1' ) ), 'A new server for the variation set out of stock is refused.' );
 		wc_clear_notices();
 
 		$key = WC()->cart->add_to_cart( $parent->get_id(), 1, $ids[1], array( 'attribute_tier' => '1' ), array( 'subscription_switch' => array( 'subscription_id' => $sub->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
@@ -763,13 +756,12 @@ class StockTest extends TestCase {
 		$product = $this->product( 4096 );
 		$id      = $product->get_id();
 
-		$this->capacity( 1 );
-		Stock::sync( 'lab' );
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 		$this->assertSame( 'outofstock', $this->stored( $id ) );
 		$this->assertSame( 'yes', get_post_meta( $id, Stock::META_CLOSED, true ), 'Closed by the plugin.' );
 
-		// Room comes back (no sync yet), and the owner reopens by hand, then closes on purpose.
-		$this->capacity( 8 );
+		// The address comes back (no sync yet), and the owner reopens by hand, then closes on purpose.
+		$this->quiet_unblock();
 		$owner = wc_get_product( $id );
 		$owner->set_stock_status( 'instock' );
 		$owner->save();
@@ -779,7 +771,7 @@ class StockTest extends TestCase {
 		$owner->set_stock_status( 'outofstock' );
 		$owner->save();
 
-		Stock::sync( 'lab' );
+		Stock::sync();
 		$this->assertSame( 'outofstock', $this->stored( $id ), 'Closed on purpose: the next sync does not reopen it.' );
 		IpPool::add( '192.0.2.77' );
 		$this->assertSame( 'outofstock', $this->stored( $id ) );
@@ -789,9 +781,8 @@ class StockTest extends TestCase {
 		$product = $this->product( 4096 );
 		$id      = $product->get_id();
 
-		$this->capacity( 1 );
-		Stock::sync( 'lab' );
-		$this->capacity( 8 );
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
+		$this->quiet_unblock();
 
 		foreach ( array( 'instock', 'outofstock', 'instock', 'outofstock' ) as $status ) {
 			$owner = wc_get_product( $id );
@@ -800,52 +791,46 @@ class StockTest extends TestCase {
 		}
 
 		$this->assertSame( '', (string) get_post_meta( $id, Stock::META_CLOSED, true ) );
-		Stock::sync( 'lab' );
+		Stock::sync();
 		$this->assertSame( 'outofstock', $this->stored( $id ), 'The owner\'s last word stands.' );
 	}
 
 	public function test_the_plugins_own_writes_keep_their_claim(): void {
 		$product = $this->product( 4096 );
-		$this->capacity( 1 );
-		Stock::sync( 'lab' );
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
 
 		$this->assertSame( 'yes', get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
-		$this->capacity( 8 );
-		Stock::sync( 'lab' );
+		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
 		$this->assertSame( 'instock', $this->stored( $product ), 'Its own closing is undone by it.' );
 	}
+	public function test_a_new_product_with_no_address_is_stored_out_of_stock_when_saved(): void {
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
+		$product = $this->product( 4096 );
 
-	public function test_a_new_product_with_no_room_is_stored_out_of_stock_when_saved(): void {
+		$this->assertSame( 'outofstock', $this->stored( $product ), 'No sync: the save itself wrote it.' );
+		$this->assertSame( 'yes', get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
+	}
+
+	public function test_a_new_product_with_no_room_on_any_node_is_stored_in_stock(): void {
 		$this->capacity( 1 );
 		$product = $this->product( 4096 );
 
-		$this->assertSame( 'outofstock', $this->stored( $product ), 'No sync, no capacity run: the save itself wrote it.' );
-		$this->assertSame( 'yes', get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
+		$this->assertSame( 'instock', $this->stored( $product ), 'Capacity never closes a plan.' );
+		$this->assertSame( '', (string) get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
 	}
-
-	public function test_editing_the_plan_memory_refreshes_the_status(): void {
+	public function test_editing_the_plan_memory_does_not_change_the_status(): void {
 		$product = $this->product( 4096 );
 		$this->capacity( 3 );
 		$product = wc_get_product( $product->get_id() );
-		$product->save(); // Any save of the product.
-		$this->assertSame( 'outofstock', $this->stored( $product ), '4 GB does not fit in 3 GB.' );
-
-		$product = wc_get_product( $product->get_id() );
-		$product->update_meta_data( \BeltoftServices\Product::META_PLAN . 'memory_mb', '2048' );
-		$product->save();
-		$this->assertSame( 'instock', $this->stored( $product ), 'Now it fits, and the save says so.' );
-
-		$product = wc_get_product( $product->get_id() );
 		$product->update_meta_data( \BeltoftServices\Product::META_PLAN . 'memory_mb', '8192' );
 		$product->save();
-		$this->assertSame( 'outofstock', $this->stored( $product ) );
+		$this->assertSame( 'instock', $this->stored( $product ), 'A plan that does not fit is on sale.' );
 	}
-
-	public function test_editing_a_variation_refreshes_it_and_its_parent(): void {
+	public function test_editing_a_variation_does_not_close_it_or_its_parent_for_capacity(): void {
 		$parent = $this->product( 1024, array( 'variations' => array( array( 'memory_mb' => 16384 ) ) ) );
 		$ids    = $parent->get_children();
-		$this->assertSame( 'outofstock', $this->stored( $ids[0] ), 'Too big for 8 GB.' );
-		$this->assertSame( 'outofstock', $this->stored( $parent ), 'The parent follows its only variation.' );
+		$this->assertSame( 'instock', $this->stored( $ids[0] ), 'Too big for 8 GB, in stock.' );
+		$this->assertSame( 'instock', $this->stored( $parent ) );
 
 		$variation = wc_get_product( $ids[0] );
 		$variation->update_meta_data( \BeltoftServices\Product::META_PLAN . 'memory_mb', '2048' );
@@ -854,31 +839,31 @@ class StockTest extends TestCase {
 		$this->assertSame( 'instock', $this->stored( $ids[0] ) );
 		$this->assertSame( 'instock', $this->stored( $parent ) );
 	}
-
 	public function test_a_product_of_another_driver_is_not_synced_by_its_save(): void {
 		$this->capacity( 1 );
 		$other = $this->service_product( 'fake' );
 		$this->assertSame( 'instock', $this->stored( $other ) );
 	}
 
-	public function test_saving_or_deleting_a_cluster_refreshes_the_status(): void {
+	public function test_saving_or_deleting_a_cluster_does_not_change_the_status(): void {
 		$product = $this->product( 4096 );
 		$this->assertSame( 'instock', $this->stored( $product ) );
 
 		$this->assertTrue( $this->save_cluster( array( 'nodes' => 'node-c' ) ) );
-		$this->assertSame( 'outofstock', $this->stored( $product ), 'The cached nodes are no longer allowed ones.' );
-
-		$this->assertTrue( $this->save_cluster() );
 		$this->assertSame( 'instock', $this->stored( $product ) );
 
+		$this->assertTrue( $this->save_cluster() );
 		$this->assertTrue( Clusters::delete( 'lab' ) );
-		$this->assertSame( 'outofstock', $this->stored( $product ), 'A plan on a cluster that is gone cannot be built.' );
+		$this->assertSame( 'instock', $this->stored( $product ), 'Capacity and clusters are not a reason to close a plan.' );
 	}
 
 	public function test_one_failing_product_does_not_stop_the_others_and_is_logged(): void {
 		$a = $this->product( 4096 );
 		$b = $this->product( 4096 );
-		$this->capacity( 1 );
+		global $wpdb;
+		// The last address goes without the pool telling anybody (another process wrote it): no sync has run yet.
+		$wpdb->update( Schema::tables()['ips'], array( 'state' => 'blocked' ), array( 'state' => 'free' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		delete_transient( IpPool::FREE_TRANSIENT );
 
 		$fail = static function ( $object ) use ( $a ) {
 			if ( $object instanceof \WC_Product && $object->get_id() === $a->get_id() ) {
@@ -890,7 +875,7 @@ class StockTest extends TestCase {
 		$log = tempnam( sys_get_temp_dir(), 'bsl' );
 		$old = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- capture the log line.
 
-		Stock::sync( 'lab' );
+		Stock::sync();
 
 		ini_set( 'error_log', (string) $old ); // phpcs:ignore WordPress.PHP.IniSet.Risky
 		remove_action( 'woocommerce_before_product_object_save', $fail );
@@ -998,16 +983,41 @@ class StockTest extends TestCase {
 		WC()->cart->empty_cart();
 	}
 
-	public function test_medusa_availability_is_real(): void {
-		// Medusa answered availability from the pool and the node's real memory; here both are read
-		// from this site's own records: the pool count and the committed-memory cache. Both must move it.
+	public function test_medusa_availability_is_the_address_pool_only(): void {
+		// Medusa answered availability from the pool and the node's real memory. Only the pool still moves it: memory
+		// is oversold on purpose (owner decision 2026-11-11), so a full cluster is on sale.
 		$product = $this->product( 2048 );
 
 		$this->assertTrue( $this->in_stock( $product ) );
 		$this->capacity( 1 );
-		$this->assertFalse( $this->in_stock( $product ), 'Memory, not only addresses.' );
+		$this->assertTrue( $this->in_stock( $product ), 'Memory does not close a plan.' );
 		$this->capacity( 8 );
 		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
-		$this->assertFalse( $this->in_stock( $product ), 'Addresses, not only memory.' );
+		$this->assertFalse( $this->in_stock( $product ), 'Addresses do.' );
 	}
-}
+
+	public function test_the_first_run_after_the_policy_change_reopens_what_capacity_had_closed(): void {
+		$closed = $this->product( 4096 );
+		$hand   = $this->product( 4096 );
+		$p      = wc_get_product( $closed->get_id() );
+		$p->set_stock_status( 'outofstock' );
+		$p->save();
+		update_post_meta( $p->get_id(), Stock::META_CLOSED, 'yes' ); // What the old capacity rule wrote (a save of the status by anybody else would forget it).
+		$h = wc_get_product( $hand->get_id() );
+		$h->set_stock_status( 'outofstock' ); // The owner, by hand: no marker.
+		$h->save();
+		delete_option( Stock::MIGRATED );
+
+		Stock::migrate();
+
+		$this->assertSame( 'instock', $this->stored( $closed ), 'Closed by the old capacity rule: reopened.' );
+		$this->assertSame( 'outofstock', $this->stored( $hand ), 'Closed by the owner: stays closed.' );
+		$this->assertSame( '1', get_option( Stock::MIGRATED ) );
+
+		$p = wc_get_product( $closed->get_id() );
+		$p->set_stock_status( 'outofstock' );
+		$p->save();
+		update_post_meta( $p->get_id(), Stock::META_CLOSED, 'yes' );
+		Stock::migrate();
+		$this->assertSame( 'outofstock', $this->stored( $closed ), 'Once only.' );
+	}}

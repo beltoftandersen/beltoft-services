@@ -7,14 +7,16 @@
 
 namespace BeltoftServices\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\Vm\Stock;
+use BeltoftServices\Alerts;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * The one place that reads the capacity transient written by CapacityJobs::capacity() (rows with
  * node, status, maxmem and `mem`, the committed memory plus the host reserve). It never calls
- * Proxmox: with no cache there is no answer (Placement waits; Stock keeps the stored status and queues a run).
+ * Proxmox: with no cache there is no answer (Placement waits). Capacity never stops a sale: the numbers
+ * decide where a machine goes (Placement) and what the admin is told (overage_alerts()), nothing else.
  *
  * Self-healing: the job recounts committed memory from scratch every hour (listed VMs of this
  * site, plus recorded VMs that are placed but not listed yet and whose resource is still live).
@@ -64,22 +66,6 @@ final class Capacity {
 	}
 
 	/**
-	 * Does one allowed node have this much free memory? False with no cache.
-	 *
-	 * @param string $cluster_id Cluster id.
-	 * @param int    $bytes      Memory needed.
-	 */
-	public static function fits( string $cluster_id, int $bytes ): bool {
-		foreach ( (array) self::free_by_node( $cluster_id ) as $free ) {
-			if ( $free >= $bytes ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
 	 * Records a placement and commits its memory in the cache, in one go under the lock the
 	 * capacity job writes with: the memory is added only when `$record` succeeded, so a failed
 	 * record is not counted and its retry counts once. With no cache nothing is added (the job's
@@ -124,9 +110,63 @@ final class Capacity {
 		}
 
 		if ( $ok ) {
-			Stock::sync( $cluster_id ); // The committed memory moved: the plan that no longer fits closes.
+			self::overage_alerts( $cluster_id ); // The committed memory moved: tell the admin when a node is over its budget.
 		}
 
 		return (bool) $ok;
+	}
+
+	/**
+	 * Mails the admin when the memory committed on a node passes its budget (the node memory minus the host reserve, setting
+	 * `host_reserve_gb`), and again at each further 10 percent, once per step, forgotten when the share falls back under the
+	 * step (Alerts::overage()). Reads the cache only.
+	 *
+	 * @param string $cluster_id Cluster id.
+	 * @return string[] Nodes a mail was sent for.
+	 */
+	public static function overage_alerts( string $cluster_id ): array {
+		$cluster = Clusters::all()[ $cluster_id ] ?? null;
+		$rows    = self::rows( $cluster_id );
+		$sent    = array();
+
+		if ( null === $cluster || null === $rows ) {
+			return $sent;
+		}
+
+		$reserve = max( 0, (int) Settings::get( 'host_reserve_gb' ) ) * 1024;
+		$allowed = array_map( 'strval', (array) $cluster['nodes'] );
+
+		foreach ( $rows as $row ) {
+			$name = (string) ( $row['node'] ?? '' );
+			$max  = (int) ( $row['maxmem'] ?? 0 ) / 1048576;
+			$mem  = (int) ( $row['mem'] ?? 0 ) / 1048576;
+
+			if ( ! in_array( $name, $allowed, true ) || 'online' !== (string) ( $row['status'] ?? '' ) || $max - $reserve <= 0 ) {
+				continue;
+			}
+
+			$budget    = $max - $reserve;
+			$committed = max( 0.0, $mem - $reserve );
+
+			$ok = Alerts::overage(
+				'pve:' . $cluster_id . ':' . $name . ':memory',
+				$committed / $budget,
+				/* translators: 1: node name, 2: cluster id. */
+				sprintf( __( 'Node %1$s of cluster %2$s is over its committed memory budget', 'beltoft-services' ), $name, $cluster_id ),
+				array(
+					/* translators: 1: node name, 2: cluster id, 3: committed in GB, 4: budget in GB. */
+					sprintf( __( 'Node %1$s of cluster %2$s has %3$.1f GB of memory committed to servers of this site, a budget of %4$.1f GB.', 'beltoft-services' ), $name, $cluster_id, $committed / 1024, $budget / 1024 ),
+					/* translators: 1: node memory in GB, 2: reserve in GB. */
+					sprintf( __( 'The budget is the memory of the node (%1$.1f GB) minus the setting "Memory kept free on each node, in GB" (%2$.1f GB).', 'beltoft-services' ), $max / 1024, $reserve / 1024 ),
+					__( 'Nothing is stopped: new servers are placed on the node with the most room left. Add a node or raise the capacity.', 'beltoft-services' ),
+				)
+			);
+
+			if ( $ok ) {
+				$sent[] = $name;
+			}
+		}
+
+		return $sent;
 	}
 }

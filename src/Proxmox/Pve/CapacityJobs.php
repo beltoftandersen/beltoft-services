@@ -10,7 +10,6 @@ namespace BeltoftServices\Proxmox\Pve;
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
-use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -171,9 +170,9 @@ final class CapacityJobs {
 				}
 			}
 		}
-		// A product's stock follows both the memory and storage readings.
+		// Committed memory moved: tell the admin where a node is over its budget (Capacity::overage_alerts()).
 		if ( $locked ) {
-			Stock::sync( $id );
+			Capacity::overage_alerts( $id );
 		}
 	}
 }

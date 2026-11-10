@@ -442,14 +442,14 @@ class ProxmoxEmailsTest extends TestCase {
 		$this->assertSame( array(), $this->customer_mails( 'delay' ), 'One email per resource.' );
 	}
 
-	public function test_no_capacity_retried_by_the_reconciler_ends_in_a_failure_with_the_alert_and_the_delay_notice(): void {
-		// Every node is full: 1 GiB free, the plan needs 4.
+	public function test_no_usable_node_retried_by_the_reconciler_ends_in_a_failure_with_the_alert_and_the_delay_notice(): void {
+		// Changed on purpose (stock policy 2026-11-11): a full node no longer stops a placement, so the only node is offline instead.
 		set_transient(
 			\BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab',
 			array(
 				array(
 					'node'   => 'node-a',
-					'status' => 'online',
+					'status' => 'offline',
 					'maxmem' => 68719476736,
 					'mem'    => 68719476736 - 1073741824,
 				),
@@ -472,13 +472,13 @@ class ProxmoxEmailsTest extends TestCase {
 		$this->assertSame( 'failed', $r->get( 'state' ) );
 		$this->assertSame( 'provision', $r->get( 'failed_op' ) );
 		$this->assertSame( 6, $runs, 'Five retries, and the sixth ends it: no progress ever counted.' );
-		$this->assertStringContainsString( 'No capacity on cluster lab', (string) $r->get( 'last_error' ) );
+		$this->assertStringContainsString( 'No usable node on cluster lab', (string) $r->get( 'last_error' ) );
 		$this->assertSame( array(), array_filter( $this->fake->calls(), static fn( $c ) => 'POST' === $c['method'] && false !== strpos( $c['path'], '/clone' ) ), 'Nothing was cloned.' );
 
 		// The admin is alerted (once per error), the customer gets the delay notice once, no ready email.
 		$alerts = array_values( array_filter( $this->mails, static fn( $m ) => 'ops@example.com' === ( is_array( $m['to'] ) ? implode( ',', $m['to'] ) : $m['to'] ) ) );
 		$this->assertNotEmpty( $alerts );
-		$this->assertStringContainsString( 'No capacity on cluster lab', implode( ' ', wp_list_pluck( $alerts, 'message' ) ) );
+		$this->assertStringContainsString( 'No usable node on cluster lab', implode( ' ', wp_list_pluck( $alerts, 'message' ) ) );
 		$this->assertCount( 1, $this->customer_mails( 'delay' ) );
 		$this->assertSame( array(), $this->customer_mails( 'ready' ) );
 		$this->assertNotNull( IpPool::for_resource( $id ), 'The address stays held for the retry or the deletion.' );

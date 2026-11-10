@@ -20,8 +20,8 @@ defined( 'ABSPATH' ) || exit;
  * Everything comes from the product, its variations and the cluster settings, nothing is written in code: a product is
  * offered when it is a published variable VM product whose "Show in the server picker" setting is not off (and a filter
  * agrees); its plans are the variations without backups; the numbers are the plan fields; the price is the display
- * price excluding tax; stock is the one the shop uses (variation stock status and Stock::available, which read the
- * cached capacity and the IP pool, never Proxmox). Reading is cheap and cached for the request.
+ * price excluding tax; stock is WooCommerce's own stock status of the variation (set by hand, and closed while the
+ * address pool is empty, see Stock), never node capacity and never Proxmox. Reading is cheap and cached for the request.
  */
 final class Offers {
 
@@ -203,7 +203,6 @@ final class Offers {
 			'disk_gb'      => (int) ( $numbers['disk_gb'] ?? 0 ),
 			'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
 			'in_stock'     => self::in_stock( $variation ),
-			'unknown'      => Stock::unknown( $variation ),
 			'backups'      => $backups,
 			'note'         => self::note( $product, $variation ),
 		);
@@ -260,12 +259,12 @@ final class Offers {
 	}
 
 	/**
-	 * Can the plan be bought now? The shop's own stock status and purchasability, and room for a machine.
+	 * Can the plan be bought now? WooCommerce's own stock status and purchasability: room on a node is not asked.
 	 *
 	 * @param \WC_Product_Variation $variation Variation.
 	 */
 	public static function in_stock( \WC_Product_Variation $variation ): bool {
-		return $variation->is_purchasable() && $variation->is_in_stock() && ( Stock::available( $variation ) || Stock::unknown( $variation ) );
+		return $variation->is_purchasable() && $variation->is_in_stock();
 	}
 
 	/**
