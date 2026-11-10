@@ -159,6 +159,7 @@ final class Plugin {
 		Api\Reference::register();
 		Api\Tokens::register();
 		Oauth\Server::register();
+		Mcp\Access::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
 		// Feature hooks into the core's extension points (retention, state_changed, parking, failure mail).

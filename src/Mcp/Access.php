@@ -29,6 +29,43 @@ final class Access {
 	public const DEFAULT_REDIRECTS = "https://claude.ai/api/mcp/auth_callback\nhttps://claude.com/api/mcp/auth_callback";
 
 	/**
+	 * Hooks the connector's settings into the Settings screen.
+	 */
+	public static function register(): void {
+		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 5 );
+	}
+
+	/**
+	 * The connector switch and the redirect addresses, as settings on the General tab.
+	 *
+	 * @param array<string, array<string, mixed>> $fields Field definitions by key.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function settings_fields( array $fields ): array {
+		return array_merge(
+			$fields,
+			array(
+				'mcp_enabled' => array(
+					'tab'     => 'general',
+					'section' => 'api',
+					'type'    => 'checkbox',
+					'default' => 1,
+					'label'   => __( 'Let customers connect apps (Use with Claude)', 'beltoft-services' ),
+					'desc'    => __( 'Turns the OAuth server and the MCP endpoint on or off for the whole site. Off, connected apps stop working at once. Personal API tokens are not affected.', 'beltoft-services' ),
+				),
+				'mcp_redirect_uris' => array(
+					'tab'     => 'general',
+					'section' => 'api',
+					'type'    => 'textarea',
+					'default' => self::DEFAULT_REDIRECTS,
+					'label'   => __( 'Redirect addresses apps may use', 'beltoft-services' ),
+					'desc'    => __( 'One address per line, matched exactly. An app can only register and sign in with an address on this list. Empty means the Claude addresses.', 'beltoft-services' ),
+				),
+			)
+		);
+	}
+
+	/**
 	 * Is the connector on for this site?
 	 */
 	public static function enabled(): bool {

@@ -70,6 +70,7 @@ final class Overview {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 8 );
 		foreach ( self::SECTIONS as $section => $tag ) {
 			add_shortcode(
 				$tag,
@@ -84,6 +85,42 @@ final class Overview {
 		add_action( 'woocommerce_account_dashboard', array( __CLASS__, 'dashboard' ), 20 );
 		add_action( 'woocommerce_account_content', array( __CLASS__, 'dashboard' ), 20 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+	}
+
+	/**
+	 * The three welcome links, as settings on the General tab.
+	 *
+	 * @param array<string, array<string, mixed>> $fields Field definitions by key.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function settings_fields( array $fields ): array {
+		return array_merge(
+			$fields,
+			array(
+				'welcome_servers_url' => array(
+					'tab'     => 'general',
+					'section' => 'account',
+					'type'    => 'url',
+					'default' => '',
+					'label'   => __( 'Welcome block: servers link', 'beltoft-services' ),
+					'desc'    => __( 'Address of the page where customers buy a server. A customer with no services sees three starting points in My Account; one without an address is left out.', 'beltoft-services' ),
+				),
+				'welcome_domains_url' => array(
+					'tab'     => 'general',
+					'section' => 'account',
+					'type'    => 'url',
+					'default' => '',
+					'label'   => __( 'Welcome block: domains link', 'beltoft-services' ),
+				),
+				'welcome_plugins_url' => array(
+					'tab'     => 'general',
+					'section' => 'account',
+					'type'    => 'url',
+					'default' => '',
+					'label'   => __( 'Welcome block: plugins link', 'beltoft-services' ),
+				),
+			)
+		);
 	}
 
 	/**
