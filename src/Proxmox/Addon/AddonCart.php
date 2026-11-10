@@ -14,6 +14,19 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AddonCart {
 	/**
+	 * Hook the cart of one add-on kind: the class's validate(), item_data() and checkout_validation() and the per-line behaviour.
+	 *
+	 * @param class-string $class Class that has the three methods.
+	 * @param Addon        $a     Add-on kind.
+	 */
+	public static function register_cart_hooks( string $class, Addon $a ): void {
+		add_filter( 'woocommerce_add_to_cart_validation', array( $class, 'validate' ), 20, 6 );
+		add_filter( 'woocommerce_add_cart_item_data', array( $class, 'item_data' ), 20, 2 );
+		self::register_line_hooks( $a );
+		add_action( 'woocommerce_after_checkout_validation', array( $class, 'checkout_validation' ), 10, 2 );
+	}
+
+	/**
 	 * Hook the per-line cart behaviour of one add-on kind.
 	 *
 	 * @param Addon $a Add-on kind.

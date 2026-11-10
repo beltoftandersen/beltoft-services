@@ -24,10 +24,7 @@ final class SnapshotCart {
 	}
 
 	public static function register(): void {
-		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate' ), 20, 6 );
-		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'item_data' ), 20, 2 );
-		AddonCart::register_line_hooks( self::addon() );
-		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'checkout_validation' ), 10, 2 );
+		AddonCart::register_cart_hooks( __CLASS__, self::addon() );
 	}
 
 	/** Slots a variation of the pack product gives. */
