@@ -30,6 +30,42 @@ final class CoreHooks {
 		add_action( 'beltoft_services_state_changed', array( Operations::class, 'on_state_changed' ), 10, 3 );
 		add_filter( 'beltoft_services_park_action', array( __CLASS__, 'park_action' ), 10, 3 );
 		add_filter( 'beltoft_services_failure_alert_lines', array( DiskDriver::class, 'failure_alert_lines' ), 10, 3 );
+		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'thankyou_row' ), 10, 3 );
+	}
+
+	/**
+	 * The thank-you row: the server name and the card address of every service, and the keys of a snapshot pack and
+	 * an extra disk (where to find them).
+	 *
+	 * @param mixed $row     The row so far.
+	 * @param mixed $r       Resource.
+	 * @param mixed $license Licence row.
+	 * @return mixed
+	 */
+	public static function thankyou_row( $row, $r, $license ) {
+		if ( ! is_array( $row ) || ! $r instanceof Resource || ! is_array( $license ) ) {
+			return $row;
+		}
+
+		$row['name'] = ServerName::display( $r, $license );
+		$row['url']  = DiskGuide::card_url( $r );
+
+		if ( SnapshotDriver::ID === (string) $r->get( 'driver' ) ) {
+			$row['url']      = DiskGuide::server_url( $r );
+			$row['snapshot'] = array(
+				'slots'      => SnapshotMeta::slots_of( $r ),
+				'server_url' => $row['url'],
+			);
+		}
+
+		if ( DiskDriver::ID === (string) $r->get( 'driver' ) ) {
+			$row['disk'] = array(
+				'server_url' => DiskGuide::server_url( $r ),
+				'guide_url'  => DiskGuide::guide_url( $r ),
+			);
+		}
+
+		return $row;
 	}
 
 	/**

@@ -19,6 +19,7 @@ final class DomainSettings {
 		add_action( 'admin_post_beltoft_services_save_domains_account', array( __CLASS__, 'save_account' ) );
 		add_action( 'beltoft_services_domain_prices', array( __CLASS__, 'sync_prices' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'schedule_prices' ) );
+		ThankYou::register();
 	}
 
 	/**
