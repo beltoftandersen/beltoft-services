@@ -33,6 +33,7 @@ return array(
 	'Proxmox\\ServerName' => array( 'display()' ),
 	'Proxmox\\SshKeyField' => array( 'cart_needs_key()' ),
 	'RateLimit' => array( 'exceeded()' ),
+	'Settings' => array( 'get()' ),
 	'Resource' => array( 'for_license()' ),
 	'Usage\\Account' => array( 'ESTABLISHED', 'for_user()' ),
 	'Usage\\Breakdown' => array( 'parts()' ),
