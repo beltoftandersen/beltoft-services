@@ -95,7 +95,7 @@ final class DiskPanels {
 			$server_usage = DiskCart::usage_server( (array) $server->license() );
 			foreach ( DiskField::sizes_for( $server_usage ) as $variation ) {
 				$size = (int) ( Product::plan( $variation->get_parent_id(), $variation->get_id() )['disk_gb'] ?? 0 );
-				if ( ! $record || ! $cluster || ! DiskCapacity::fits( $record['cluster'], $record['node'], (string) $cluster['storage'], $size ) ) {
+				if ( ! $record || ! $cluster ) {
 					continue;
 				}
 				$url = DiskCart::add_url( $server, $variation );

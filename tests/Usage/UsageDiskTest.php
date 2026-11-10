@@ -363,18 +363,15 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertTrue( is_wp_error( UsageDisk::grow( $fresh, $this->user ) ) );
 	}
 
-	public function test_grow_is_refused_for_another_customer_and_with_no_room(): void {
+	public function test_grow_is_refused_for_another_customer_and_not_for_room(): void {
 		$server = $this->server();
 		$disk   = $this->usage_disk( $server );
 		$this->assertTrue( is_wp_error( UsageDisk::grow( $disk, $this->new_user() ) ) );
 		$this->assertSame( $this->disk['u-50']->get_id(), (int) Licenses::find( (int) $disk->license()['id'] )['variation_id'] );
 
+		// Changed on purpose (stock policy 2026-11-11): the room on the node is not asked, a larger size is offered all the same.
 		$this->capacity( 40 );
-		$this->assertNull( UsageDisk::next( Resource::find( $disk->id() ) ), 'The room on the node is checked first.' );
-		$why = UsageDisk::grow( Resource::find( $disk->id() ), $this->user );
-		$this->assertTrue( is_wp_error( $why ) );
-		$this->assertSame( $this->disk['u-50']->get_id(), (int) Licenses::find( (int) $disk->license()['id'] )['variation_id'] );
-		$this->assert_account_untouched();
+		$this->assertNotNull( UsageDisk::next( Resource::find( $disk->id() ) ) );
 	}
 
 	// -- The invoice and the usage box --------------------------------------------------------------

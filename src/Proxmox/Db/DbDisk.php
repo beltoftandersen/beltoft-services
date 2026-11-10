@@ -10,8 +10,6 @@ namespace BeltoftServices\Proxmox\Db;
 use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -155,31 +153,6 @@ final class DbDisk {
 		return Backups::price_difference( $from, $to );
 	}
 
-	// -- Capacity -------------------------------------------------------------------------------------
-
-	/**
-	 * Does a new database with this plan's data disk fit on a node of its cluster? Only a fresh reading of the storage
-	 * says yes (see DiskCapacity::fits()).
-	 *
-	 * @param array<string, mixed> $plan Plan.
-	 */
-	public static function fits_new( array $plan ): bool {
-		$cluster = Clusters::all()[ (string) ( $plan['cluster'] ?? '' ) ] ?? null;
-		$size    = self::total( $plan );
-
-		if ( ! is_array( $cluster ) || $size < 1 ) {
-			return false;
-		}
-
-		foreach ( (array) $cluster['nodes'] as $node ) {
-			if ( DiskCapacity::fits( (string) $plan['cluster'], (string) $node, (string) $cluster['storage'], $size ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
 	/**
 	 * Is any database variation sold with extra storage? Then the storage of the nodes is read.
 	 */
@@ -239,37 +212,9 @@ final class DbDisk {
 			if ( $want > 0 && $have > $want ) {
 				return __( "Storage can't be made smaller. Choose a size at least as large as your current storage.", 'beltoft-services' );
 			}
-
-			if ( $want > $have && ! self::room_to_grow( $resource, $want - $have ) ) {
-				return __( 'No more storage is available right now. Please try again later.', 'beltoft-services' );
-			}
 		}
 
 		return DbIp::switch_error( $subscription_id, $product_id, $target, $item );
-	}
-
-	/**
-	 * Is there room for the growth on the node of the database? Refused only when a fresh reading says no: with no reading
-	 * the switch goes on (DbGrow reads again and waits).
-	 *
-	 * @param Resource $r  Resource.
-	 * @param int      $gb Growth in GB.
-	 */
-	private static function room_to_grow( Resource $r, int $gb ): bool {
-		$record  = VmRecords::for_resource( $r->id() );
-		$cluster = $record ? Clusters::all()[ (string) $record['cluster'] ] ?? null : null;
-
-		if ( ! $record || ! is_array( $cluster ) ) {
-			return true;
-		}
-
-		$storage = (string) $cluster['storage'];
-
-		if ( null === DiskCapacity::available( (string) $record['cluster'], (string) $record['node'], $storage ) ) {
-			return true;
-		}
-
-		return DiskCapacity::fits( (string) $record['cluster'], (string) $record['node'], $storage, $gb, $r->id() );
 	}
 
 	/**
@@ -312,7 +257,7 @@ final class DbDisk {
 			$larger = true;
 			$more   = self::total( Product::plan( $step->get_parent_id(), $step->get_id() ) ) - $out['gb'];
 
-			if ( $more < 1 || ! self::room_to_grow( $r, $more ) ) {
+			if ( $more < 1 ) {
 				continue;
 			}
 

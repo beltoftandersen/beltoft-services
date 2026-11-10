@@ -127,17 +127,15 @@ class PrivateNetGuardTest extends BackupTestCase {
 		$this->assertSame( array( 'beltoft_services_db_no_network' ), $errors->get_error_codes() );
 	}
 
-	public function test_the_picker_refuses_a_post_and_the_stock_is_closed_for_the_customer_only(): void {
+	public function test_the_picker_refuses_a_post_and_the_stock_is_not_closed_by_the_private_network_pool(): void {
 		$db   = $this->db_product();
 		$user = self::factory()->user->create();
 		wp_set_current_user( $user );
 		$variation = wc_get_product( $db->get_id() );
-		$this->assertFalse( \BeltoftServices\Proxmox\Vm\Stock::available( $variation ), 'No network: not available.' );
+		$this->assertTrue( $variation->is_in_stock(), 'Changed on purpose (stock policy 2026-11-11): the display no longer asks the private network pool; the cart check and the picker refuse.' );
 		$this->seed_private_nets( 1 );
-		$this->assertNotFalse( \BeltoftServices\Proxmox\Vm\Stock::filter( true, $variation ) );
 		$this->assertSame( 'instock', wc_get_product( $db->get_id() )->get_stock_status( 'edit' ), 'The stored status is not touched by the pool.' );
 	}
-
 	public function test_the_build_keeps_its_own_failure_as_the_last_guard(): void {
 		$this->assertNull( PrivateNets::reserve( 11, 1 ) );
 	}

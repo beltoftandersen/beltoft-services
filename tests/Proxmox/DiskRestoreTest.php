@@ -253,20 +253,21 @@ class DiskRestoreTest extends BackupTestCase {
 		}
 	}
 
-	public function test_a_left_volume_is_counted_in_the_capacity_check_until_the_server_goes(): void {
+	public function test_a_left_volume_is_counted_as_committed_until_the_server_goes(): void {
 		$server = $this->ready_vm();
 		$disk   = $this->disk_for( $server );
-		$this->settings( array( 'deletion_mode' => 'on', 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'deletion_mode' => 'on', 'disk_reserve_gb' => 0 ) );
 		$name = 'vm-5000-bs4-' . str_replace( '-', '', (string) $disk->get( 'uuid' ) ) . '.raw';
 		$this->assertTrue( $disk->set( array( 'slot' => 'scsi4', 'volname' => $name, 'steps' => array(), 'size_gb' => null ) ) );
 		$this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		$this->assertTrue( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 10 ) );
+		$before = DiskCapacity::committed_gb( 'lab', 'node-a' );
 		$result = Registry::get( 'proxmox-disk' )->delete( Resource::find( $disk->id() ) );
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$left = (array) Resource::find( $server->id() )->get( 'left_volumes' );
 		$this->assertSame( array( 'disk-store:5000/' . $name => 50 ), $left );
-		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 10 ), 'The left volume still takes its space.' );
+		$this->assertSame( $before + 50, DiskCapacity::committed_gb( 'lab', 'node-a' ), 'The left volume still counts as committed on the node (the nightly cross-check and the alerts read it).' );
 	}
 
 	public function test_the_restore_text_tells_about_the_extra_disks(): void {

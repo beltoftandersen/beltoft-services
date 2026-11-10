@@ -8,9 +8,6 @@ use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonCart;
-use BeltoftServices\Proxmox\Pve\Capacity;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
@@ -123,8 +120,6 @@ final class DiskCart {
 	}
 
 	public static function checkout_validation( array $data, \WP_Error $errors ): void {
-		$requested = array();
-		$new_server_disk_gb = 0;
 		$new_server_disk_count = 0;
 		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $item ) {
 			if ( ! isset( $item['beltoft_services_disk_uid'] ) || ! self::disk_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
@@ -145,49 +140,14 @@ final class DiskCart {
 				if ( count( DiskMeta::for_server( $server ) ) + $in_cart > max( 1, (int) Settings::get( 'disk_max_extra' ) ) ) {
 					$errors->add( 'disk_limit', __( 'This server has reached its extra disk limit.', 'beltoft-services' ) );
 				}
-				$record = VmRecords::for_resource( $server->id() );
-				$cluster = $record ? Clusters::get( $record['cluster'] ) : null;
-				$size = (int) ( Product::plan( (int) $item['product_id'], (int) $item['variation_id'] )['disk_gb'] ?? 0 );
-				$key = $record && $cluster ? $record['cluster'] . '|' . $record['node'] . '|' . $cluster['storage'] : '';
-				$requested[ $key ] = (int) ( $requested[ $key ] ?? 0 ) + $size;
-				if ( ! $record || ! $cluster || ! DiskCapacity::fits( $record['cluster'], $record['node'], (string) $cluster['storage'], $requested[ $key ] ) ) {
-					$errors->add( 'disk_capacity', __( 'This disk size is no longer available for the server.', 'beltoft-services' ) );
-				}
+				// Room on the node is not checked: capacity never stops an order (the disk is made when the node has the space).
 			} elseif ( 'cart_server' === $link ) {
 				++$new_server_disk_count;
-				$new_server_disk_gb += (int) ( Product::plan( (int) $item['product_id'], (int) $item['variation_id'] )['disk_gb'] ?? 0 );
 			}
 		}
 		if ( $new_server_disk_count > 1 ) {
 			$errors->add( 'disk_limit', __( 'Choose only one extra disk with a new server.', 'beltoft-services' ) );
 		}
-		if ( $new_server_disk_gb > 0 ) {
-			$entry = DiskField::cart_server();
-			$server_item = $entry['item'] ?? null;
-			$plan = $server_item ? Product::plan( (int) $server_item['product_id'], (int) ( $server_item['variation_id'] ?? 0 ) ) : array();
-			if ( ! self::new_server_fits( $plan, $new_server_disk_gb ) ) {
-				$errors->add( 'disk_capacity', __( 'The server and extra disk cannot be delivered with the available capacity.', 'beltoft-services' ) );
-			}
-		}
-	}
-
-	/**
-	 * Can a new server of this plan and an extra disk of $gb be delivered: a node with the memory free and the room for both disks?
-	 *
-	 * @param array<string, mixed> $plan Plan numbers (cluster, memory_mb, disk_gb).
-	 * @param int                  $gb   Extra disk in GB.
-	 */
-	public static function new_server_fits( array $plan, int $gb ): bool {
-		$cluster_id = (string) ( $plan['cluster'] ?? '' );
-		$cluster = Clusters::get( $cluster_id );
-		$memory = max( 0, (int) ( $plan['memory_mb'] ?? 0 ) ) * 1048576;
-		$space = max( 0, (int) ( $plan['disk_gb'] ?? 0 ) ) + $gb;
-		foreach ( $cluster ? (array) Capacity::free_by_node( $cluster_id ) : array() as $node => $free ) {
-			if ( $free >= $memory && DiskCapacity::fits( $cluster_id, (string) $node, (string) $cluster['storage'], $space ) ) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/** WooCommerce Subscriptions' own switch link, limited to the next larger size. */

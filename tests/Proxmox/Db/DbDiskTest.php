@@ -549,7 +549,8 @@ class DbDiskTest extends TestCase {
 		$this->assertStringContainsString( "can't be made smaller", $ask( $v['e50-1'] ) );
 	}
 
-	public function test_a_switch_to_more_disk_is_refused_when_a_fresh_reading_says_it_does_not_fit(): void {
+	public function test_a_switch_to_more_disk_is_not_refused_for_room_on_the_node(): void {
+		// Changed on purpose (stock policy 2026-11-11): capacity never stops an upgrade; the grow waits for real space.
 		$v = $this->ladder_variations();
 		$r = $this->db_on_ladder( 'e0-0' );
 		$sub   = wcs_get_subscription( (int) $r->license()['subscription_id'] );
@@ -561,22 +562,25 @@ class DbDiskTest extends TestCase {
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		$this->assertSame( '', $ask( $v['e50-0'] ) );
 		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
-		$this->assertStringContainsString( 'No more storage is available right now', $ask( $v['e50-0'] ) );
+		$this->assertSame( '', $ask( $v['e50-0'] ), 'No room on the storage: the upgrade is still not refused.' );
 	}
-
-	public function test_extra_storage_is_sold_out_when_the_disk_does_not_fit_and_a_plan_without_is_not(): void {
+	public function test_extra_storage_is_never_sold_out_for_lack_of_room(): void {
+		// Changed on purpose (stock policy 2026-11-11): only WooCommerce's own stock status closes a step.
 		$v = $this->ladder_variations();
 
-		$this->assertTrue( Stock::available( $v['e0-0'] ), 'No extra storage: not asked.' );
-		$this->assertFalse( Stock::available( $v['e50-0'] ), 'No reading of the storage: not sold.' );
+		$this->assertTrue( wc_get_product( $v['e0-0']->get_id() )->is_in_stock(), 'No extra storage.' );
+		$this->assertTrue( wc_get_product( $v['e50-0']->get_id() )->is_in_stock(), 'No reading of the storage: on sale.' );
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		$this->assertTrue( Stock::available( $v['e50-0'] ) );
-		$this->assertTrue( Stock::available( $v['e250-0'] ) );
 		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
-		$this->assertFalse( Stock::available( $v['e50-0'] ) );
-		$this->assertTrue( Stock::available( $v['e0-0'] ), 'A plan without extra storage is not asked about the disk.' );
-	}
+		Stock::sync();
+		$this->assertTrue( wc_get_product( $v['e50-0']->get_id() )->is_in_stock(), 'No room on the storage: still on sale.' );
+		$this->assertTrue( wc_get_product( $v['e250-0']->get_id() )->is_in_stock() );
 
+		$closed = wc_get_product( $v['e250-0']->get_id() );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
+		$this->assertFalse( wc_get_product( $v['e250-0']->get_id() )->is_in_stock(), 'Set out of stock by hand: sold out.' );
+	}
 	public function test_the_storage_of_the_nodes_is_read_when_a_variation_has_extra_storage(): void {
 		delete_transient( 'beltoft_services_disk_products' );
 		$this->assertFalse( DiskCapacity::wanted(), 'Nothing sold with extra storage yet.' );
@@ -966,7 +970,7 @@ class DbDiskTest extends TestCase {
 		remove_all_filters( 'woocommerce_subscriptions_can_item_be_switched_by_user' );
 	}
 
-	public function test_an_option_that_does_not_fit_is_hidden_and_none_left_says_so(): void {
+	public function test_an_option_is_offered_whatever_the_room_on_the_node(): void {
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched_by_user', '__return_true' );
 		$r = $this->db_on_ladder( 'e50-0' );
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
@@ -974,14 +978,12 @@ class DbDiskTest extends TestCase {
 
 		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
 		$view = DbDisk::view( Resource::find( $r->id() ) );
-		$this->assertSame( array(), $view['options'] );
-		$this->assertTrue( $view['full'] );
-		$html = $this->card( $r );
-		$this->assertStringContainsString( 'No more storage available right now.', $html );
-		$this->assertStringNotContainsString( 'Make larger', $html );
+		$this->assertNotEmpty( $view['options'], 'Changed on purpose (stock policy 2026-11-11): capacity does not hide a larger size.' );
+		$this->assertFalse( $view['full'] );
+		$this->assertStringContainsString( 'Make larger', $this->card( $r ) );
+		$this->assertStringNotContainsString( 'No more storage available right now.', $this->card( $r ) );
 		remove_all_filters( 'woocommerce_subscriptions_can_item_be_switched_by_user' );
 	}
-
 	public function test_the_largest_step_has_nothing_to_offer_and_no_full_notice(): void {
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched_by_user', '__return_true' );
 		$r    = $this->db_on_ladder( 'e250-0', false );

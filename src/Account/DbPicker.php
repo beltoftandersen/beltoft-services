@@ -133,7 +133,8 @@ final class DbPicker {
 					'major'        => (int) ( $numbers['major'] ?? 0 ),
 					'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
 					'backup_days'  => 0 === $days ? Backups::DB_DEFAULT_DAYS : $days,
-					'in_stock'     => Offers::in_stock( $variation ),
+					// WooCommerce's own stock status, and a private network for the customer: a database cannot be built without one (a pool, not node capacity).
+					'in_stock'     => Offers::in_stock( $variation ) && \BeltoftServices\Proxmox\Network\PrivateNets::available_for( get_current_user_id(), (string) ( $numbers['cluster'] ?? '' ) ),
 					'usage'        => Rates::for_plan( $variation, false ), // A sold-out card keeps its price; process() refuses it.
 				);
 			}

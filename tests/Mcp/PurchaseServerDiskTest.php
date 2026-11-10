@@ -141,13 +141,12 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 		}
 	}
 
-	public function test_a_size_that_does_not_fit_is_not_listed(): void {
-		// 30 GB for the server and the disk, and the room is 120: both sizes are in stock alone, the server with 100 does not fit.
+	public function test_every_size_is_listed_whatever_the_room(): void {
+		// Changed on purpose (stock policy 2026-11-11): 30 GB for the server and the disk, and the room is 120: the server with 100 does not fit, and is listed all the same.
 		$this->capacity( 120 );
 		$plan = $this->first_plan( $this->json( $this->tool( 'catalog', array( 'kind' => 'server_plans' ), $this->oauth( $this->user, Tokens::READ ) ) ) );
-		$this->assertSame( array( 50 ), array_column( $plan['options']['extra_disk'], 'extra_gb' ) );
+		$this->assertSame( array( 50, 100 ), array_column( $plan['options']['extra_disk'], 'extra_gb' ) );
 	}
-
 	public function test_a_site_with_only_monthly_disks_lists_none(): void {
 		foreach ( array( 'u-50', 'u-100' ) as $key ) {
 			$this->disk[ $key ]->set_status( 'private' );
@@ -216,13 +215,12 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 		$this->assertStringContainsString( 'The sizes are, in GB: 50, 100.', wp_json_encode( $out ) );
 	}
 
-	public function test_a_quote_with_no_room_is_refused(): void {
+	public function test_a_quote_with_no_room_is_not_refused(): void {
+		// Changed on purpose (stock policy 2026-11-11): capacity never stops a quote.
 		$this->capacity( 70 );
 		$out = $this->tool( 'price_quote', array( 'plan' => $this->plan_id(), 'extra_disk_gb' => 50 ), $this->oauth( $this->user, Tokens::READ ) );
-		$this->assertTrue( $out['isError'] );
-		$this->assertStringContainsString( 'does not fit', wp_json_encode( $out ) );
+		$this->assertFalse( $out['isError'] ?? false, wp_json_encode( $out ) );
 	}
-
 	public function test_a_quote_without_a_disk_is_unchanged(): void {
 		$quote = $this->json( $this->tool( 'price_quote', array( 'plan' => $this->plan_id() ), $this->oauth( $this->user, Tokens::READ ) ) );
 		$this->assertCount( 1, $quote['lines'] );
@@ -254,14 +252,13 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 		$this->assertSame( array(), $this->orders( $this->user ) );
 	}
 
-	public function test_no_capacity_refuses_the_order(): void {
+	public function test_no_capacity_does_not_refuse_the_order(): void {
+		// Changed on purpose (stock policy 2026-11-11): capacity never stops an order.
 		$this->capacity( 70 );
 		$out = $this->tool( 'order_server', $this->args( array( 'extra_disk_gb' => 50 ) ), $this->oauth( $this->user, Tokens::FULL ) );
-		$this->assertTrue( $out['isError'] );
-		$this->assertStringContainsString( 'does not fit', wp_json_encode( $out ) );
-		$this->assertSame( array(), $this->orders( $this->user ) );
+		$this->assertFalse( $out['isError'] ?? false, wp_json_encode( $out ) );
+		$this->assertStringNotContainsString( 'does not fit', wp_json_encode( $out ) );
 	}
-
 	/**
 	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
 	 *

@@ -53,23 +53,26 @@ final class DiskCapacity {
 		return true;
 	}
 
-	/** True only with a fresh reading and enough free and promised capacity. */
-	public static function fits( string $cluster, string $node, string $storage, int $gb, int $exclude = 0 ): bool {
+	/** The last fresh storage reading (total and free bytes), or null when there is none. No remote call. */
+	public static function reading( string $cluster, string $node, string $storage ): ?array {
 		$row = get_transient( self::cache_key( $cluster, $node, $storage ) );
-		if ( ! is_array( $row ) || time() - (int) ( $row['read_at'] ?? 0 ) >= 2 * HOUR_IN_SECONDS || $gb < 1 ) {
-			return false;
-		}
-		$reservations = (array) get_option( self::RESERVATIONS, array() );
+
+		return is_array( $row ) && time() - (int) ( $row['read_at'] ?? 0 ) < 2 * HOUR_IN_SECONDS ? array( 'total' => (int) $row['total'], 'avail' => (int) $row['avail'] ) : null;
+	}
+
+	/** GB of the other disk reservations on a node's storage. */
+	private static function reserved_gb( string $cluster, string $node, string $storage, int $exclude ): int {
 		$reserved = 0;
-		foreach ( $reservations as $id => $entry ) {
+		foreach ( (array) get_option( self::RESERVATIONS, array() ) as $id => $entry ) {
 			if ( (int) $id !== $exclude && is_array( $entry ) && $entry['cluster'] === $cluster && $entry['node'] === $node && $entry['storage'] === $storage ) {
 				$reserved += (int) $entry['gb'];
 			}
 		}
-		$reserve = max( 0, (int) Settings::get( 'disk_reserve_gb' ) );
-		if ( (int) $row['avail'] < ( $gb + $reserved + $reserve ) * 1073741824 ) {
-			return false;
-		}
+		return $reserved;
+	}
+
+	/** GB the live servers and extra disks of a node count as theirs (what is promised, not what is used). */
+	public static function committed_gb( string $cluster, string $node ): int {
 		$promised = 0;
 		foreach ( VmRecords::rows_for_cluster( $cluster ) as $record ) {
 			if ( $record['node'] !== $node ) {
@@ -94,8 +97,21 @@ final class DiskCapacity {
 				$promised += max( 0, (int) $disk->get( 'size_gb' ) );
 			}
 		}
-		$percent = min( 100, max( 1, (int) Settings::get( 'disk_promise_percent' ) ) );
-		return ( $promised + $reserved + $gb ) * 1073741824 <= (int) $row['total'] * $percent / 100;
+		return $promised;
+	}
+
+	/**
+	 * True only with a fresh reading and the space really free on the storage (after the other reservations and the
+	 * kept-free reserve). The promised total is not a limit: capacity is oversold on purpose (owner decision 2026-11-11),
+	 * so this is asked only when a disk is made, never to stop a sale.
+	 */
+	public static function fits( string $cluster, string $node, string $storage, int $gb, int $exclude = 0 ): bool {
+		$row = self::reading( $cluster, $node, $storage );
+		if ( null === $row || $gb < 1 ) {
+			return false;
+		}
+		$reserve = max( 0, (int) Settings::get( 'disk_reserve_gb' ) );
+		return $row['avail'] >= ( $gb + self::reserved_gb( $cluster, $node, $storage, $exclude ) + $reserve ) * 1073741824;
 	}
 
 	/** Reserve one disk or grow delta atomically across all nodes and storages. */

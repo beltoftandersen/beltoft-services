@@ -98,7 +98,8 @@ class DiskCartTest extends BackupTestCase {
 		$this->assertFalse( WC()->cart->add_to_cart( $variation->get_parent_id(), 1, $variation->get_id(), array( 'attribute_size' => '50 GB' ) ) );
 	}
 
-	public function test_checkout_rechecks_a_new_servers_memory_and_disk_capacity(): void {
+	public function test_checkout_does_not_recheck_a_new_servers_memory_and_disk_capacity(): void {
+		// Changed on purpose (stock policy 2026-11-11): capacity never stops a checkout.
 		$server = $this->variable_product();
 		$variation = $this->variation();
 		$this->assertNotFalse( WC()->cart->add_to_cart( $server['a-None']->get_parent_id(), 1, $server['a-None']->get_id(), array( 'attribute_tier' => 'a', 'attribute_backups' => 'None' ) ) );
@@ -106,12 +107,11 @@ class DiskCartTest extends BackupTestCase {
 		$errors = new \WP_Error();
 		DiskCart::checkout_validation( array(), $errors );
 		$this->assertFalse( $errors->has_errors(), $errors->get_error_message() );
-		$this->settings( array( 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'disk_reserve_gb' => 100000 ) );
 		$errors = new \WP_Error();
 		DiskCart::checkout_validation( array(), $errors );
-		$this->assertSame( 'disk_capacity', $errors->get_error_code() );
+		$this->assertFalse( $errors->has_errors(), 'No room anywhere: the order goes through.' );
 	}
-
 	public function test_checkout_rejects_two_disks_with_one_new_server(): void {
 		$server = $this->variable_product();
 		$variation = $this->variation();

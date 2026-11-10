@@ -86,14 +86,14 @@ final class DbDiskField {
 	}
 
 	/**
-	 * Can a step be chosen now: it can be bought and its data disk fits on a node? Without extra storage always.
+	 * Can a step be chosen now: it can be bought (WooCommerce's own stock status; room on a node is not asked)? Without extra storage always.
 	 *
 	 * @param \WC_Product_Variation $step Step.
 	 */
 	private static function available( \WC_Product_Variation $step ): bool {
 		$plan = Product::plan( $step->get_parent_id(), $step->get_id() );
 
-		return 0 === DbDisk::extra( $plan ) || ( $step->is_purchasable() && $step->is_in_stock() && DbDisk::fits_new( $plan ) );
+		return 0 === DbDisk::extra( $plan ) || ( $step->is_purchasable() && $step->is_in_stock() );
 	}
 
 	// -- Rendering -------------------------------------------------------------------------------
@@ -249,8 +249,6 @@ final class DbDiskField {
 
 		if ( ! DbDisk::within_limits( $plan ) ) {
 			$errors->add( 'beltoft_services_db_disk', __( 'This amount of extra storage is not available. Please choose another size.', 'beltoft-services' ) );
-		} elseif ( ! DbDisk::fits_new( $plan ) ) {
-			$errors->add( 'beltoft_services_db_disk', __( 'This amount of extra storage is not available right now. Please choose a smaller size or try again later.', 'beltoft-services' ) );
 		}
 	}
 

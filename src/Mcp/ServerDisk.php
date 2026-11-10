@@ -8,7 +8,6 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Disk\DiskCart;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;
@@ -17,8 +16,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The sizes are those the checkout's extra disk box offers a pay as you go server (DiskField::sizes_for( true ): the pay as you
- * go twin of each monthly size, price 0 at checkout, billed by the hour), cut down to those that fit on a node together with
- * the server (DiskCart::new_server_fits(), the checkout's own check).
+ * go twin of each monthly size, price 0 at checkout, billed by the hour). Room on a node is not asked: capacity never
+ * stops an order.
  */
 final class ServerDisk {
 
@@ -26,20 +25,15 @@ final class ServerDisk {
 	 * The pay as you go disk sizes of a plan, by extra GB.
 	 *
 	 * @param array<string, mixed> $plan     Plan from Offers.
-	 * @param bool                 $capacity Only the sizes that fit on a node with the server now.
 	 * @return array<int, \WC_Product_Variation> Sorted by size.
 	 */
-	public static function steps( array $plan, bool $capacity = true ): array {
+	public static function steps( array $plan ): array {
 		$out = array();
 
 		foreach ( DiskField::sizes_for( true ) as $variation ) {
 			$gb = (int) ( Product::plan( $variation->get_parent_id(), $variation->get_id() )['disk_gb'] ?? 0 );
 
 			if ( $gb < 1 || isset( $out[ $gb ] ) || null === Rates::for_usage( $variation ) ) {
-				continue;
-			}
-
-			if ( $capacity && ! DiskCart::new_server_fits( $plan, $gb ) ) {
 				continue;
 			}
 
@@ -63,10 +57,6 @@ final class ServerDisk {
 
 		if ( isset( $steps[ $gb ] ) ) {
 			return $steps[ $gb ];
-		}
-
-		if ( isset( self::steps( $plan, false )[ $gb ] ) ) {
-			return __( 'This extra disk size does not fit on the servers right now. Choose a smaller size, order without it, or try again later.', 'beltoft-services' );
 		}
 
 		if ( array() === $steps ) {

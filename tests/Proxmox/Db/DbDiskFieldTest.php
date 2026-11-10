@@ -121,7 +121,7 @@ class DbDiskFieldTest extends BackupTestCase {
 	private function room(): void {
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		// What the capacity job does next: the stored stock status follows the readings.
-		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
+		\BeltoftServices\Proxmox\Vm\Stock::sync();
 	}
 
 	private function in_cart(): int {
@@ -170,29 +170,32 @@ class DbDiskFieldTest extends BackupTestCase {
 		$this->assertMatchesRegularExpression( '#<option value="50"[^>]*>\+50 GB \(\+[^)]*4\.00#', $html, 'The public IP twins differ by the same amount.' );
 	}
 
-	public function test_a_step_that_does_not_fit_is_disabled_and_the_chosen_one_never_is(): void {
+	public function test_a_step_set_out_of_stock_is_disabled_and_the_chosen_one_never_is(): void {
+		// Changed on purpose (stock policy 2026-11-11): room on the storage no longer disables a step, WooCommerce's stock status does.
 		$v = $this->db_variations();
 		$this->add( $v['e0-0'] );
 
+		$this->assertDoesNotMatchRegularExpression( '#<option value="\d+"[^>]*disabled#', $this->html(), 'No reading of the storage, no room: every step is on sale.' );
+		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
+		$this->assertDoesNotMatchRegularExpression( '#<option value="\d+"[^>]*disabled#', $this->html() );
+
+		$closed = wc_get_product( $v['e250-0']->get_id() );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
 		$html = $this->html();
-		$this->assertMatchesRegularExpression( '#<option value="50"[^>]*disabled#', $html, 'No reading of the storage: not sold.' );
+		$this->assertMatchesRegularExpression( '#<option value="250"[^>]*disabled#', $html );
 		$this->assertDoesNotMatchRegularExpression( '#<option value="0"[^>]*disabled#', $html );
 		$this->assertStringContainsString( 'Some sizes are not available right now.', $html );
 
-		$this->room();
-		$this->assertDoesNotMatchRegularExpression( '#<option value="\d+"[^>]*disabled#', $this->html() );
-
-		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
-		$this->assertMatchesRegularExpression( '#<option value="250"[^>]*disabled#', $this->html() );
-
 		WC()->cart->empty_cart();
-		$this->settings( array( 'disk_reserve_gb' => 0 ) );
-		$this->room();
-		$this->add( $v['e50-0'] );
-		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
-		$this->assertDoesNotMatchRegularExpression( '#<option value="50"[^>]*disabled#', $this->html(), 'The step already in the cart is not disabled.' );
+		$closed->set_stock_status( 'instock' );
+		$closed->save();
+		$this->add( $v['e250-0'] );
+		$closed = wc_get_product( $v['e250-0']->get_id() );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
+		$this->assertDoesNotMatchRegularExpression( '#<option value="250"[^>]*disabled#', $this->html(), 'The step already in the cart is not disabled.' );
 	}
-
 	public function test_no_select_for_the_wrong_carts(): void {
 		$this->assertNull( DbDiskField::cart_database() );
 		$this->assertSame( '', $this->html() );
@@ -264,12 +267,14 @@ class DbDiskFieldTest extends BackupTestCase {
 		$this->assertSame( $v['e250-0']->get_id(), $this->in_cart() );
 	}
 
-	public function test_the_swap_refuses_a_size_that_is_not_on_the_ladder_or_does_not_fit(): void {
+	public function test_the_swap_refuses_a_size_that_is_not_on_the_ladder_or_is_out_of_stock(): void {
 		$v = $this->db_variations();
 		$this->add( $v['e0-0'] );
 
-		$this->assertFalse( DbDiskField::swap( 50 )['ok'], 'No reading of the storage: not sold.' );
-		$this->assertSame( $v['e0-0']->get_id(), $this->in_cart(), 'Nothing changed.' );
+		$this->assertTrue( DbDiskField::swap( 50 )['ok'], 'No reading of the storage: on sale (changed on purpose, stock policy 2026-11-11).' );
+		$this->assertSame( $v['e50-0']->get_id(), $this->in_cart() );
+		WC()->cart->empty_cart();
+		$this->add( $v['e0-0'] );
 
 		$this->room();
 		$this->assertFalse( DbDiskField::swap( 75 )['ok'], 'Not a step of the ladder.' );
@@ -277,10 +282,12 @@ class DbDiskFieldTest extends BackupTestCase {
 		$this->assertSame( $v['e0-0']->get_id(), $this->in_cart() );
 
 		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
-		$this->assertFalse( DbDiskField::swap( 250 )['ok'] );
+		$closed = wc_get_product( $v['e250-0']->get_id() );
+		$closed->set_stock_status( 'outofstock' );
+		$closed->save();
+		$this->assertFalse( DbDiskField::swap( 250 )['ok'], 'Set out of stock by hand.' );
 		$this->assertSame( $v['e0-0']->get_id(), $this->in_cart() );
 	}
-
 	public function test_a_step_that_cannot_be_bought_puts_the_first_item_back(): void {
 		$v = $this->db_variations();
 		$this->room();
@@ -359,7 +366,7 @@ class DbDiskFieldTest extends BackupTestCase {
 		$this->assertSame( $v['e50-0']->get_id(), (int) reset( $cart )['variation_id'], 'The swap is saved before the lock is let go, so a second swap starts from it.' );
 	}
 
-	public function test_the_checkout_refuses_a_size_that_does_not_fit_and_one_the_settings_forbid(): void {
+	public function test_the_checkout_does_not_refuse_for_room_and_refuses_one_the_settings_forbid(): void {
 		$v = $this->db_variations();
 		$this->room();
 		$this->add( $v['e100-0'] );
@@ -371,14 +378,13 @@ class DbDiskFieldTest extends BackupTestCase {
 		$this->settings( array( 'disk_reserve_gb' => 10000 ) );
 		$errors = new \WP_Error();
 		DbDiskField::validate( array(), $errors );
-		$this->assertSame( array( 'beltoft_services_db_disk' ), $errors->get_error_codes(), 'It does not fit.' );
-		$this->assertStringContainsString( 'not available right now', $errors->get_error_message() );
+		$this->assertSame( array(), $errors->get_error_codes(), 'It does not fit, and the checkout goes on (changed on purpose, stock policy 2026-11-11).' );
 		$this->settings( array( 'disk_reserve_gb' => 0 ) );
 
 		delete_transient( 'beltoft_services_disk_capacity_' . md5( 'lab|node-a|disk-store' ) );
 		$errors = new \WP_Error();
 		DbDiskField::validate( array(), $errors );
-		$this->assertSame( array( 'beltoft_services_db_disk' ), $errors->get_error_codes(), 'No reading of the storage: it does not fit.' );
+		$this->assertSame( array(), $errors->get_error_codes(), 'No reading of the storage: the checkout goes on.' );
 		$this->room();
 
 		$this->settings( array( 'db_disk_max_gb' => 90 ) );

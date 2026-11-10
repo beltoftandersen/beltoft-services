@@ -12,6 +12,11 @@ use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
 require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
+/**
+ * Changed on purpose with the stock policy of 2026-11-11 (capacity never stops a sale): the promised-storage budget
+ * (`disk_promise_percent`) is retired, so fits() only asks whether the storage really has the space free, and a disk
+ * product is never closed for lack of storage.
+ */
 class DiskCapacityTest extends BackupTestCase {
 	public function tear_down(): void {
 		delete_option( DiskCapacity::RESERVATIONS );
@@ -23,9 +28,10 @@ class DiskCapacityTest extends BackupTestCase {
 		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 50 ) );
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		$this->assertTrue( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 50 ) );
-		$this->settings( array( 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
-		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 50 ), 'The 30 GB boot disk plus 50 GB exceeds 1% of 4 TB.' );
-		$this->settings( array( 'disk_promise_percent' => 100, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'disk_reserve_gb' => 100000 ) );
+		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 50 ), 'The kept-free reserve is more than the storage really has free.' );
+		$this->settings( array( 'disk_reserve_gb' => 0 ) );
+		$this->assertTrue( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 50 ), 'The promised total is not a limit any more.' );
 		$product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $server->license()['user_id'] ) );
 		$disk = Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $product->get_id() ), array( 'server_license' => $server->license()['id'] ) );
@@ -50,14 +56,14 @@ class DiskCapacityTest extends BackupTestCase {
 	public function test_reserve_replaces_an_existing_reservation_of_a_different_size(): void {
 		$server = $this->ready_vm();
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		$this->settings( array( 'disk_promise_percent' => 100, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'disk_reserve_gb' => 0 ) );
 		$disk = $this->disk_resource( $server );
 		$this->assertTrue( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 50 ) );
 		$this->assertTrue( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 70 ), 'A changed target replaces the reservation.' );
 		$this->assertCount( 1, get_option( DiskCapacity::RESERVATIONS ) );
 		$this->assertSame( 70, DiskCapacity::reservation( $disk )['gb'] );
-		$this->settings( array( 'disk_promise_percent' => 1 ) );
-		$this->assertFalse( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 90 ), 'The new size still has to fit.' );
+		$this->settings( array( 'disk_reserve_gb' => 100000 ) );
+		$this->assertFalse( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 90 ), 'The new size still has to be really free on the storage.' );
 		$this->assertSame( 70, DiskCapacity::reservation( $disk )['gb'], 'A refused replacement keeps the old reservation.' );
 	}
 
@@ -79,13 +85,16 @@ class DiskCapacityTest extends BackupTestCase {
 		$this->assertSame( $expected, $left, 'An old reservation of a missing disk goes; a live disk and a fresh one stay.' );
 	}
 
-	public function test_disk_product_stock_follows_verified_storage_capacity(): void {
+	public function test_disk_product_stock_ignores_storage_capacity(): void {
 		$product = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-' . wp_generate_password( 6, false ) ) );
-		$this->assertFalse( Stock::available( $product ) );
+		$this->assertTrue( wc_get_product( $product->get_id() )->is_in_stock(), 'No reading of the storage: on sale.' );
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
-		$this->assertTrue( Stock::available( $product ) );
-		$this->settings( array( 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
-		$this->assertFalse( Stock::available( $product ) );
+		$this->settings( array( 'disk_reserve_gb' => 100000 ) );
+		$fresh = wc_get_product( $product->get_id() );
+		$this->assertTrue( $fresh->is_in_stock() );
+		$this->assertTrue( $fresh->is_purchasable() );
+		Stock::sync();
+		$this->assertSame( 'instock', wc_get_product( $product->get_id() )->get_stock_status( 'edit' ), 'No storage reading closes a disk product.' );
 	}
 
 	public function test_storage_is_only_read_when_a_disk_product_exists(): void {

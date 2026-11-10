@@ -123,7 +123,7 @@ final class PurchaseDb {
 		if ( $gb > 0 && $with instanceof \WC_Product_Variation ) {
 			$step = DbDisk::ladder( $with )[ $gb ] ?? null;
 
-			if ( null === $step || ! $step->is_purchasable() || ! $step->is_in_stock() || ! DbDisk::fits_new( \BeltoftServices\Product::plan( $step->get_parent_id(), $step->get_id() ) ) ) {
+			if ( null === $step || ! $step->is_purchasable() || ! $step->is_in_stock() ) {
 				return $fail( __( 'This amount of extra storage is not available right now. Choose a smaller size or try again later.', 'beltoft-services' ) );
 			}
 		}

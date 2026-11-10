@@ -11,7 +11,6 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\VmRecords;
@@ -76,7 +75,7 @@ final class UsageDisk {
 				continue;
 			}
 
-			if ( ! $record || ! $cluster || ! DiskCapacity::fits( $record['cluster'], $record['node'], (string) $cluster['storage'], $gb - $have, $disk->id() ) ) {
+			if ( ! $record || ! $cluster ) {
 				continue;
 			}
 

@@ -406,22 +406,31 @@ class DbPhase4Test extends TestCase {
 	public function test_a_public_ip_plan_is_sold_out_at_the_reserve_and_a_plan_without_is_not(): void {
 		$with    = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => 1 ), array( 'slug' => 'dbip-' . wp_generate_password( 5, false ) ) );
 		$without = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'slug' => 'dbno-' . wp_generate_password( 5, false ) ) );
+		// The address pool is the one automatic closing left (an address cannot be oversold): it is written as the WooCommerce stock status.
+		$open = static function ( \WC_Product $p ): bool {
+			wp_cache_flush();
 
-		$this->assertFalse( Stock::available( $with ), 'No address at all.' );
-		$this->assertTrue( Stock::available( $without ), 'A database without the add-on needs no address.' );
+			return wc_get_product( $p->get_id() )->is_in_stock();
+		};
+
+		Stock::sync();
+		$this->assertFalse( $open( $with ), 'No address at all.' );
+		$this->assertTrue( $open( $without ), 'A database without the add-on needs no address.' );
 
 		$this->pool( 1 );
-		$this->assertFalse( Stock::available( $with ), 'The last address is kept for servers.' );
-		$this->assertTrue( Stock::available( $without ) );
+		Stock::sync();
+		$this->assertFalse( $open( $with ), 'The last address is kept for servers.' );
+		$this->assertTrue( $open( $without ) );
 
 		$this->pool( 1, 20 );
-		$this->assertTrue( Stock::available( $with ) );
+		Stock::sync();
+		$this->assertTrue( $open( $with ) );
 
 		$this->settings( array( 'ip_reserve_for_vps' => 2 ) );
 		delete_transient( IpPool::FREE_TRANSIENT );
-		$this->assertFalse( Stock::available( $with ) );
+		Stock::sync();
+		$this->assertFalse( $open( $with ) );
 	}
-
 	public function test_a_switch_to_the_add_on_is_refused_when_no_address_can_be_given(): void {
 		$this->pool( 1 );
 		$r   = $this->ready_db();

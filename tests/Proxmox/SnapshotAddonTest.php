@@ -780,10 +780,9 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 	}
 
 	public function test_a_pack_is_never_out_of_stock_for_lack_of_capacity(): void {
-		$this->settings( array( 'disk_promise_percent' => 1, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'disk_reserve_gb' => 0 ) );
 		$product = $this->product();
 		$two     = $this->variation( $product, 2 );
-		$this->assertTrue( Stock::available( $two ) );
-		$this->assertTrue( Stock::filter( true, $two ) );
-	}
-}
+		$this->assertTrue( wc_get_product( $two->get_id() )->is_in_stock() );
+		$this->assertTrue( Stock::in_stock( true, $two ) );
+	}}
