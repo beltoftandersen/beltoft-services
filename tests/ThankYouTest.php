@@ -169,6 +169,70 @@ final class ThankYouTest extends TestCase {
 		$this->assertArrayNotHasKey( 'disk', $rows[ $dns->id() ] );
 	}
 
+	/**
+	 * The row of every kind of service in every state, byte for byte (ids and the site address replaced by tokens).
+	 */
+	public function test_the_payload_is_unchanged_for_every_kind(): void {
+		$order  = $this->order();
+		$server = $this->service( $order, 'proxmox', array( 'state' => 'ready' ) );
+		$made   = array(
+			'vm-building'    => $this->service( $order, 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'ip' ) ) ),
+			'vm-ready'       => $server,
+			'vm-failed'      => $this->service( $order, 'proxmox', array( 'state' => 'failed', 'failed_op' => 'provision' ) ),
+			'db'             => $this->service( $order, 'proxmox-db', array( 'state' => 'ready' ) ),
+			'disk'           => $this->service( $order, 'proxmox-disk', array( 'state' => 'ready', 'server_license' => $server->license()['id'] ) ),
+			'disk-no-server' => $this->service( $order, 'proxmox-disk', array( 'state' => 'provisioning' ) ),
+			'snapshots'      => $this->service( $order, 'proxmox-snapshots', array( 'state' => 'ready', 'server_license' => $server->license()['id'] ) ),
+			'app'            => $this->service( $order, 'proxmox-app', array( 'state' => 'ready', 'server_license' => $server->license()['id'] ) ),
+			'domain'         => $this->service( $order, 'domain', array( 'state' => 'ready', 'domain' => 'example.com' ) ),
+			'domain-idn'     => $this->service( $order, 'domain', array( 'state' => 'provisioning', 'domain' => 'xn--bcher-kva.example' ) ),
+			'domain-empty'   => $this->service( $order, 'domain', array( 'state' => 'ready' ) ),
+			'dns'            => $this->service( $order, 'dns', array( 'state' => 'failed', 'domain' => 'example.org', 'failed_op' => 'provision' ) ),
+			'hosting-ready'  => $this->service( $order, 'hosting', array( 'state' => 'ready' ) ),
+			'hosting-wait'   => $this->service( $order, 'hosting', array( 'state' => 'provisioning' ) ),
+			'fake'           => $this->service( $order, 'fake', array( 'state' => 'ready' ) ),
+		);
+
+		$out = array();
+
+		foreach ( $made as $key => $r ) {
+			$json = (string) wp_json_encode( ThankYou::row( Resource::find( $r->id() ) ), JSON_UNESCAPED_SLASHES );
+			$json = preg_replace( '/"id":' . $r->id() . '\b/', '"id":"{id}"', $json );
+			$json = str_replace( array( '-' . $r->id() . '"', home_url() ), array( '-{id}"', '{home}' ), $json );
+			$json = str_replace( '-' . $server->id() . '"', '-{server}"', $json );
+			$json = (string) preg_replace( array( '/Service [A-Za-z0-9]{6}/', '/"started":\d+/', '/vps=\d+/' ), array( '{product}', '"started":"{time}"', 'vps={license}' ), $json );
+
+			$out[ $key ] = $json;
+		}
+
+		$this->assertSame( self::golden(), $out );
+	}
+
+	/**
+	 * The golden rows, captured from the code before the rows were built through a filter.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function golden(): array {
+		return array(
+			'vm-building' => '{"id":"{id}","kind":"vm","name":"{product}","group":"getting-ready","ready":false,"label":"Getting ready","message":"","progress":{"kind":"build","phase":"running","active":true,"title":"Setting up your server","steps":[{"key":"ip","label":"Reserve an IP address","status":"done","status_label":"Done"},{"key":"vmid","label":"Prepare the server","status":"current","status_label":"In progress"},{"key":"clone","label":"Create the server","status":"todo","status_label":"Waiting"},{"key":"configure","label":"Apply your settings","status":"todo","status_label":"Waiting"},{"key":"start","label":"Start the server","status":"todo","status_label":"Waiting"},{"key":"ready","label":"Final checks","status":"todo","status_label":"Waiting"}],"current":"vmid","minutes":3,"eta":"Usually about 3 minutes.","text":"Setting up your server. Usually about 3 minutes.","leave":"You can leave this site. The work goes on, and the same progress is in your account.","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?vps={license}/disks#beltoft-service-{id}"}',
+			'vm-ready' => '{"id":"{id}","kind":"vm","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?vps={license}/disks#beltoft-service-{id}"}',
+			'vm-failed' => '{"id":"{id}","kind":"vm","name":"{product}","group":"failed","ready":false,"label":"Delayed","message":"There\'s a delay setting up your service. We\'re on it.","progress":{"kind":"build","phase":"failed","active":false,"title":"Setting up your server","steps":[{"key":"ip","label":"Reserve an IP address","status":"failed","status_label":"Failed"},{"key":"vmid","label":"Prepare the server","status":"todo","status_label":"Waiting"},{"key":"clone","label":"Create the server","status":"todo","status_label":"Waiting"},{"key":"configure","label":"Apply your settings","status":"todo","status_label":"Waiting"},{"key":"start","label":"Start the server","status":"todo","status_label":"Waiting"},{"key":"ready","label":"Final checks","status":"todo","status_label":"Waiting"}],"current":"ip","minutes":3,"eta":"Usually about 3 minutes.","text":"This stopped before it was finished.","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?vps={license}/disks#beltoft-service-{id}"}',
+			'db' => '{"id":"{id}","kind":"db","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+			'disk' => '{"id":"{id}","kind":"disk","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?vps={license}/disks#beltoft-service-{server}","disk":{"server_url":"{home}?vps={license}/disks#beltoft-service-{server}","guide_url":"{home}?vps={license}/disks#beltoft-disk-guide-{id}"}}',
+			'disk-no-server' => '{"id":"{id}","kind":"disk","name":"{product}","group":"getting-ready","ready":false,"label":"Getting ready","message":"","progress":{"kind":"build","phase":"running","active":true,"title":"Adding your disk","steps":[{"key":"server","label":"Find the server","status":"current","status_label":"In progress"},{"key":"slot","label":"Choose a slot","status":"todo","status_label":"Waiting"},{"key":"allocate","label":"Create the disk","status":"todo","status_label":"Waiting"},{"key":"attach","label":"Attach it to the server","status":"todo","status_label":"Waiting"},{"key":"verify","label":"Final checks","status":"todo","status_label":"Waiting"}],"current":"server","minutes":3,"eta":"Usually about 3 minutes.","text":"Adding your disk. Usually about 3 minutes.","leave":"You can leave this site. The work goes on, and the same progress is in your account.","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}","disk":{"server_url":"","guide_url":"{home}?licenses#beltoft-disk-guide-{id}"}}',
+			'snapshots' => '{"id":"{id}","kind":"snapshot","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?vps={license}/disks#beltoft-service-{server}","snapshot":{"slots":0,"server_url":"{home}?vps={license}/disks#beltoft-service-{server}"}}',
+			'app' => '{"id":"{id}","kind":"applic","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?vps={license}/disks#beltoft-service-{server}"}',
+			'domain' => '{"id":"{id}","kind":"domain","name":"example.com","group":"ready","ready":true,"label":"Active","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+			'domain-idn' => '{"id":"{id}","kind":"domain","name":"b\\u00fccher.example","group":"getting-ready","ready":false,"label":"Being registered","message":"","progress":{"kind":"build","phase":"running","active":true,"title":"Setting up your service","steps":[{"key":"contact","label":"Save the owner details","status":"current","status_label":"In progress"},{"key":"zone_prepared","label":"Prepare the DNS","status":"todo","status_label":"Waiting"},{"key":"order","label":"Send the order to the registry","status":"todo","status_label":"Waiting"},{"key":"active","label":"Wait for the registry","status":"todo","status_label":"Waiting"},{"key":"zone","label":"Set up the DNS","status":"todo","status_label":"Waiting"},{"key":"dates","label":"Final checks","status":"todo","status_label":"Waiting"}],"current":"contact","minutes":5,"eta":"Usually about 5 minutes.","text":"Setting up your service. Usually about 5 minutes.","leave":"You can leave this site. The work goes on, and the same progress is in your account.","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+			'domain-empty' => '{"id":"{id}","kind":"domain","name":"{product}","group":"ready","ready":true,"label":"Active","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+			'dns' => '{"id":"{id}","kind":"dns","name":"example.org","group":"failed","ready":false,"label":"Delayed","message":"There\'s a delay setting up your service. We\'re on it.","progress":{"kind":"build","phase":"failed","active":false,"title":"Setting up your service","steps":[{"key":"claim","label":"Reserve the domain","status":"failed","status_label":"Failed"},{"key":"zone","label":"Create the DNS zone","status":"todo","status_label":"Waiting"},{"key":"delegation","label":"Check the name servers","status":"todo","status_label":"Waiting"}],"current":"claim","minutes":3,"eta":"Usually about 3 minutes.","text":"This stopped before it was finished.","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+			'hosting-ready' => '{"id":"{id}","kind":"hosting","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}","hosting":{"site_url":"","admin_url":""}}',
+			'hosting-wait' => '{"id":"{id}","kind":"hosting","name":"{product}","group":"getting-ready","ready":false,"label":"Getting ready","message":"","progress":{"kind":"build","phase":"running","active":true,"title":"Setting up your service","steps":[{"key":"place","label":"Reserve resources","status":"current","status_label":"In progress"},{"key":"ip","label":"Reserve an address","status":"todo","status_label":"Waiting"},{"key":"vmid","label":"Prepare your container","status":"todo","status_label":"Waiting"},{"key":"clone","label":"Create your container","status":"todo","status_label":"Waiting"},{"key":"configure","label":"Apply your plan","status":"todo","status_label":"Waiting"},{"key":"start","label":"Start your container","status":"todo","status_label":"Waiting"},{"key":"prepare","label":"Prepare the system","status":"todo","status_label":"Waiting"},{"key":"db","label":"Create the database","status":"todo","status_label":"Waiting"},{"key":"site","label":"Install WordPress","status":"todo","status_label":"Waiting"},{"key":"edge","label":"Connect the web server","status":"todo","status_label":"Waiting"},{"key":"dns","label":"Publish the address","status":"todo","status_label":"Waiting"},{"key":"verify","label":"Check your website","status":"todo","status_label":"Waiting"},{"key":"mail","label":"Set up website mail","status":"todo","status_label":"Waiting"},{"key":"ready","label":"Final checks","status":"todo","status_label":"Waiting"}],"current":"place","minutes":3,"eta":"Usually about 3 minutes.","text":"Setting up your service. Usually about 3 minutes.","leave":"You can leave this site. The work goes on, and the same progress is in your account.","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+			'fake' => '{"id":"{id}","kind":"fake","name":"{product}","group":"ready","ready":true,"label":"Ready","message":"","progress":{"kind":"","phase":"idle","active":false,"title":"","steps":[],"current":"","minutes":0,"eta":"","text":"","leave":"","started":"{time}","note":"","hosts":[],"link":[]},"url":"{home}?licenses#beltoft-service-{id}"}',
+		);
+	}
+
 	public function test_a_reply_never_holds_a_secret_an_address_or_the_last_error(): void {
 		$order = $this->order();
 		$this->service(

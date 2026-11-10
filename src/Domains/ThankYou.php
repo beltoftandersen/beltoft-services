@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Resource;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -24,6 +26,33 @@ final class ThankYou {
 	 * @var array<int, bool>
 	 */
 	private static array $printed = array();
+
+	/**
+	 * Hooks into the thank-you page of the core: the blocks print in its area, and a domain or DNS row is named by its domain.
+	 */
+	public static function register(): void {
+		add_action( 'beltoft_services_thankyou_render', array( __CLASS__, 'render' ) );
+		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'row' ), 20, 2 );
+	}
+
+	/**
+	 * A domain or DNS hosting row is named by the domain name, as the customer knows it (an international name in letters).
+	 *
+	 * @param mixed $row The row so far.
+	 * @param mixed $r   Resource.
+	 * @return mixed
+	 */
+	public static function row( $row, $r ) {
+		if ( ! is_array( $row ) || ! $r instanceof Resource ) {
+			return $row;
+		}
+
+		if ( in_array( $row['kind'] ?? '', array( 'domain', 'dns' ), true ) && '' !== (string) $r->get( 'domain' ) ) {
+			$row['name'] = HostName::display( (string) $r->get( 'domain' ) );
+		}
+
+		return $row;
+	}
 
 	/**
 	 * The DNS hosting domains of an order: domain => parent DS present (true, false or null when unknown).
