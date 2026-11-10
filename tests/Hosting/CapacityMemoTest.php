@@ -67,8 +67,8 @@ class CapacityMemoTest extends HostingCase {
 		} );
 
 		$this->assertSame( $one, $many, 'Forty plans on the node cost the same queries as one.' );
-		// One read of the records, and (until beltoft-licenses has a batch read) one activation read per account.
-		$this->assertLessThanOrEqual( 1 + 6 + 2, $one );
+		// One read of the records and one read of every account, however many accounts there are.
+		$this->assertLessThanOrEqual( 3, $one );
 	}
 
 	public function test_two_sequential_placements_see_each_others_commitment(): void {

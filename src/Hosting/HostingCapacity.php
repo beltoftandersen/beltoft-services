@@ -140,13 +140,10 @@ final class HostingCapacity {
 		$disk   = 0.0;
 		$count  = 0;
 
-		foreach ( Records::resource_ids( $node_id ) as $resource_id ) {
-			// One activation read per account: beltoft-licenses has no read of several activations by id yet. When it
-			// has one, this loop becomes a single query (the memo already means it runs once per node and request).
-			$r = Resource::find( $resource_id );
-
+		// Every account of the node in one read.
+		foreach ( Resource::find_many( Records::resource_ids( $node_id ) ) as $r ) {
 			// A deleted or gone resource commits nothing; its record is released by its delete.
-			if ( ! $r || 'deleted' === $r->get( 'state' ) ) {
+			if ( 'deleted' === $r->get( 'state' ) ) {
 				continue;
 			}
 

@@ -179,6 +179,25 @@ final class Resource {
 	}
 
 	/**
+	 * Several resources in one query, keyed by activation id. An id that is unknown or names a site
+	 * activation is left out.
+	 *
+	 * @param int[] $activation_ids Activation ids.
+	 * @return array<int, Resource>
+	 */
+	public static function find_many( array $activation_ids ): array {
+		$out = array();
+
+		foreach ( Licenses::activations( $activation_ids ) as $id => $row ) {
+			if ( 'site' !== $row['kind'] ) {
+				$out[ (int) $id ] = new self( $row );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * The license's live resource, or null.
 	 *
 	 * @param int $license_id License id.

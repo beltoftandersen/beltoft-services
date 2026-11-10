@@ -21,14 +21,14 @@ final class LicencesContractTest extends TestCase {
 
 	public function test_the_installed_version_is_at_least_the_one_the_plugin_requires(): void {
 		$this->assertTrue( defined( 'BELTOFT_LICENSES_VERSION' ) );
-		$this->assertGreaterThanOrEqual( 0, version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.4' ) );
+		$this->assertGreaterThanOrEqual( 0, version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.5' ) );
 	}
 
 	public function test_the_dependency_gate_names_the_same_version(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Plugin.php' );
 
-		$this->assertStringContainsString( "'0.8.4', '<'", $source );
-		$this->assertStringContainsString( 'Beltoft Licenses 0.8.4 or newer', $source );
+		$this->assertStringContainsString( "'0.8.5', '<'", $source );
+		$this->assertStringContainsString( 'Beltoft Licenses 0.8.5 or newer', $source );
 	}
 
 	public function test_install_tables_has_the_keys_the_plugin_reads(): void {
@@ -49,7 +49,7 @@ final class LicencesContractTest extends TestCase {
 	}
 
 	public function test_the_query_and_update_methods_exist(): void {
-		foreach ( array( 'live_resource_ids', 'resource_ids_by_meta', 'resource_ids_by_meta_any', 'product_holders', 'resource_ids_having_meta', 'resources_of_source', 'update', 'where', 'query', 'activation', 'add_resource', 'close_resource' ) as $method ) {
+		foreach ( array( 'live_resource_ids', 'resource_ids_by_meta', 'resource_ids_by_meta_any', 'activations', 'product_holders', 'resource_ids_having_meta', 'resources_of_source', 'update', 'where', 'query', 'activation', 'add_resource', 'close_resource' ) as $method ) {
 			$this->assertTrue( method_exists( Licenses::class, $method ), $method );
 		}
 	}
