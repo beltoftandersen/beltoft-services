@@ -17,7 +17,6 @@ return array(
 	'Progress.php -> Proxmox\DiskDriver',
 	'Progress.php -> Proxmox\ProxmoxDriver',
 	'Proxmox/FirewallRoute.php -> Mcp\Endpoint',
-	'Settings.php -> Mcp\Access',
 	'ThankYou.php -> Account\Panel',
 	'ThankYou.php -> Domains\HostName',
 	'ThankYou.php -> Account\ServerLinks',

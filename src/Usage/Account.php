@@ -48,10 +48,68 @@ final class Account {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 8 );
 		add_action( 'woocommerce_checkout_subscription_created', array( __CLASS__, 'flag' ), 10, 2 );
 		// Before Lifecycle (10), so the license is on the account when its service is made.
 		add_action( 'beltoft_licenses_license_created', array( __CLASS__, 'attach' ), 5 );
 		add_action( 'woocommerce_subscription_renewal_payment_complete', array( __CLASS__, 'paid' ), 10, 2 );
+	}
+
+	/**
+	 * The pay as you go settings on the General tab.
+	 *
+	 * @param array<string, array<string, mixed>> $fields Field definitions by key.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function settings_fields( array $fields ): array {
+		return array_merge(
+			$fields,
+			array(
+				'usage_threshold_new' => array(
+					'tab'     => 'general',
+					'section' => 'usage',
+					'type'    => 'number',
+					'default' => 50,
+					'min'     => 1,
+					'label'   => __( 'Bill pay as you go early at this amount: new accounts', 'beltoft-services' ),
+					'desc'    => __( 'In the store currency, for an account with no paid usage invoice yet. When the unbilled usage reaches it, the usage is charged at once, without waiting for the monthly renewal.', 'beltoft-services' ),
+				),
+				'usage_threshold' => array(
+					'tab'     => 'general',
+					'section' => 'usage',
+					'type'    => 'number',
+					'default' => 250,
+					'min'     => 1,
+					'label'   => __( 'Bill pay as you go early at this amount: other accounts', 'beltoft-services' ),
+				),
+				'usage_minimum' => array(
+					'tab'     => 'general',
+					'section' => 'usage',
+					'type'    => 'number',
+					'default' => 5,
+					'min'     => 0,
+					'label'   => __( 'Minimum amount to charge a card for pay as you go', 'beltoft-services' ),
+					'desc'    => __( 'In the store currency, including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month\'s invoice instead. 0 turns this off.', 'beltoft-services' ),
+				),
+				'offer_monthly' => array(
+					'tab'     => 'general',
+					'section' => 'usage',
+					'type'    => 'checkbox',
+					'default' => 0,
+					'label'   => __( 'Show the Monthly option for servers and databases', 'beltoft-services' ),
+					'desc'    => __( 'Off: customers only see pay as you go, and a new server or database added to the cart as a monthly plan is changed to its pay as you go plan when it has one. Email plans, plugin licences, renewals, plan changes of existing subscriptions and orders made in the admin are not touched.', 'beltoft-services' ),
+				),
+				'usage_new_limit' => array(
+					'tab'     => 'general',
+					'section' => 'usage',
+					'type'    => 'number',
+					'default' => 2,
+					'min'     => 0,
+					'label'   => __( 'Pay as you go services before the first paid usage invoice', 'beltoft-services' ),
+					'desc'    => __( 'The most services an account may run until a usage invoice has been paid. 0 means no limit.', 'beltoft-services' ),
+				),
+			)
+		);
 	}
 
 	/**

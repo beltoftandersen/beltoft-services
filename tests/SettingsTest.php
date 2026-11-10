@@ -50,6 +50,26 @@ class SettingsTest extends TestCase {
 		$this->assertSame( 0, Settings::get( 'delete_data' ) );
 	}
 
+	/**
+	 * Every field of every tab, with its definition, in the order the screen shows them. The
+	 * fixture was captured before the feature fields moved out of Settings, so it guards that
+	 * the move changed no key, default, tab, section, type, label or position.
+	 */
+	public function test_the_field_keys_and_defaults_are_unchanged_and_in_todays_order(): void {
+		$golden = json_decode( (string) file_get_contents( __DIR__ . '/fixtures/settings/fields.json' ), true );
+		$fields = Settings::fields();
+
+		$fields['admin_email']['default'] = '(site admin email)';
+
+		$this->assertSame( array_keys( $golden ), array_keys( $fields ) );
+
+		foreach ( $golden as $key => $definition ) {
+			$this->assertSame( $definition, $fields[ $key ], $key );
+		}
+
+		$this->assertSame( get_option( 'admin_email' ), Settings::get( 'admin_email' ) );
+	}
+
 	public function test_sanitize_rejects_unknown_deletion_mode(): void {
 		$this->assertSame( 'on', Settings::sanitize( array( 'deletion_mode' => 'on' ) )['deletion_mode'] );
 		$this->assertSame( 'off', Settings::sanitize( array( 'deletion_mode' => 'everything' ) )['deletion_mode'] );

@@ -56,6 +56,7 @@ final class Topup {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 9 );
 		add_action( 'template_redirect', array( __CLASS__, 'handle' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'no_product_page' ), 1 );
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate_add' ), 10, 2 );
@@ -71,6 +72,46 @@ final class Topup {
 		add_action( 'woocommerce_order_status_completed', array( __CLASS__, 'credit_order' ) );
 		add_action( 'woocommerce_order_refunded', array( __CLASS__, 'refunded' ), 10, 2 );
 		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'status_changed' ), 10, 3 );
+	}
+
+	/**
+	 * The account credit settings on the General tab.
+	 *
+	 * @param array<string, array<string, mixed>> $fields Field definitions by key.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function settings_fields( array $fields ): array {
+		return array_merge(
+			$fields,
+			array(
+				'credit_enabled' => array(
+					'tab'     => 'general',
+					'section' => 'credit',
+					'type'    => 'checkbox',
+					'default' => 0,
+					'label'   => __( 'Account credit for pay as you go', 'beltoft-services' ),
+					'desc'    => __( 'Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows.', 'beltoft-services' ),
+				),
+				'credit_min' => array(
+					'tab'     => 'general',
+					'section' => 'credit',
+					'type'    => 'number',
+					'default' => 10,
+					'min'     => 1,
+					'label'   => __( 'Smallest top-up', 'beltoft-services' ),
+					'desc'    => __( 'In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
+				),
+				'credit_max' => array(
+					'tab'     => 'general',
+					'section' => 'credit',
+					'type'    => 'number',
+					'default' => 1000,
+					'min'     => 1,
+					'label'   => __( 'Largest top-up', 'beltoft-services' ),
+					'desc'    => __( 'In the store currency.', 'beltoft-services' ),
+				),
+			)
+		);
 	}
 
 	/**
