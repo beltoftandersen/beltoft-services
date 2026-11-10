@@ -235,21 +235,12 @@ final class Resource {
 	 * @return int[]
 	 */
 	public static function find_by_meta( string $kind, string $key, $value, string $order = 'ASC' ): array {
-		$ids = array();
-
 		if ( '' === $kind ) {
-			return $ids;
+			return array();
 		}
 
-		foreach ( is_array( $value ) ? $value : array( $value ) as $one ) {
-			$ids = array_merge( $ids, Licenses::resource_ids_by_meta( $kind, $key, $one, $order ) );
-		}
-
-		$ids = array_values( array_unique( $ids ) );
-
-		'DESC' === strtoupper( $order ) ? rsort( $ids ) : sort( $ids );
-
-		return $ids;
+		// One query for the whole list; the ids come back in id order, each once.
+		return Licenses::resource_ids_by_meta_any( $kind, $key, is_array( $value ) ? $value : array( $value ), $order );
 	}
 
 	/**

@@ -45,7 +45,7 @@ Connection secrets are encrypted with a key from `wp-config.php`, and they are n
 
 == Installation ==
 
-1. Install and activate WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.3 or newer, then this plugin.
+1. Install and activate WooCommerce, WooCommerce Subscriptions and Beltoft Licenses 0.8.4 or newer, then this plugin.
 2. Add the secrets key to `wp-config.php` (see the FAQ).
 3. Go to Settings → Services, check the alert address, and add a connection under Connections.
 4. On a licensed product, open the Service tab, choose the driver and the connection, and fill in the plan.

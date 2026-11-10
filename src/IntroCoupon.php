@@ -209,30 +209,14 @@ final class IntroCoupon {
 
 		$want = self::normalise_email( sanitize_email( $email ) );
 
-		// The licences list for one product, a page at a time.
-		for ( $page = 1, $seen = 0; ; ++$page ) {
-			list( $rows, $total ) = \BeltoftLicenses\Licenses::query(
-				array(
-					'product_slug' => $slug,
-					'per_page'     => 200,
-					'page'         => $page,
-				)
-			);
-
-			foreach ( $rows as $row ) {
-				if ( $user_id > 0 && (int) $row['user_id'] === $user_id ) {
-					return true;
-				}
-
-				if ( '' !== $want && self::normalise_email( (string) $row['email'] ) === $want ) {
-					return true;
-				}
+		// Who holds a licence of the product, of any status: two columns in one query.
+		foreach ( \BeltoftLicenses\Licenses::product_holders( $slug ) as $row ) {
+			if ( $user_id > 0 && $row['user_id'] === $user_id ) {
+				return true;
 			}
 
-			$seen += count( $rows );
-
-			if ( ! $rows || $seen >= $total ) {
-				break;
+			if ( '' !== $want && self::normalise_email( $row['email'] ) === $want ) {
+				return true;
 			}
 		}
 
