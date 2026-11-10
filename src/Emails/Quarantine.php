@@ -5,16 +5,8 @@ namespace BeltoftServices\Emails;
 defined( 'ABSPATH' ) || exit;
 
 final class Quarantine extends ServiceEmail {
-	public function __construct() {
-		$this->id = 'beltoft_services_quarantine';
-		$this->title = __( 'Outgoing traffic blocked', 'beltoft-services' );
-		$this->description = __( 'Sent when the outgoing network traffic of a server is blocked because it scanned other servers or sent a flood of connections.', 'beltoft-services' );
-		$this->template_html = 'emails/beltoft-services-quarantine.php';
-		$this->template_plain = 'emails/plain/beltoft-services-quarantine.php';
-		parent::__construct();
-	}
-	public function get_default_subject() { return __( 'Outgoing traffic from your server is blocked', 'beltoft-services' ); }
-	public function get_default_heading() { return __( 'Outgoing traffic is blocked', 'beltoft-services' ); }
+
+	protected const ID = 'beltoft_services_quarantine';
 
 	/**
 	 * What was seen, as label => number lines in words for the customer.

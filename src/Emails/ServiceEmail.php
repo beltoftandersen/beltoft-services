@@ -45,9 +45,23 @@ abstract class ServiceEmail extends \WC_Email {
 	public const DATE_TIME = 'j F Y, H:i';
 
 	/**
+	 * The email's id, as in Definitions. A class that has one is described by its definition.
+	 */
+	protected const ID = '';
+
+	/**
 	 * Set up.
 	 */
 	public function __construct() {
+		if ( '' !== static::ID ) {
+			$definition           = Definitions::get( static::ID );
+			$this->id             = static::ID;
+			$this->title          = $definition['title'];
+			$this->description    = $definition['description'];
+			$this->template_html  = $definition['html'];
+			$this->template_plain = $definition['plain'];
+		}
+
 		$this->customer_email = true;
 		$this->template_base  = BELTOFT_SERVICES_PATH . 'templates/';
 		$this->placeholders   = array(
@@ -57,6 +71,20 @@ abstract class ServiceEmail extends \WC_Email {
 		);
 
 		parent::__construct();
+	}
+
+	/**
+	 * Default subject: the definition's, unless the class follows what it is about.
+	 */
+	public function get_default_subject() {
+		return '' === static::ID ? parent::get_default_subject() : Definitions::get( static::ID )['subject'];
+	}
+
+	/**
+	 * Default heading: the definition's, unless the class follows what it is about.
+	 */
+	public function get_default_heading() {
+		return '' === static::ID ? parent::get_default_heading() : Definitions::get( static::ID )['heading'];
 	}
 
 	/**

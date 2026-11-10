@@ -289,7 +289,7 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 		$this->assertSame( 'Your app is live on your domain', $this->mails[0]['subject'] );
 		$this->assertStringContainsString( 'https://' . self::NAME, wp_strip_all_tags( $this->mails[0]['message'] ) );
 		$this->assertStringNotContainsString( "\u{2014}", $this->mails[0]['message'] );
-		$this->assertContains( 'beltoft_services_app_domain_live', Emails::IDS );
+		$this->assertContains( 'beltoft_services_app_domain_live', Emails::ids() );
 	}
 
 	public function test_no_email_for_a_server_without_an_own_domain_or_one_that_never_went_live(): void {

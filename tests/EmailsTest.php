@@ -291,14 +291,14 @@ final class EmailsTest extends TestCase {
 		);
 
 		foreach ( array( 'html', 'plain' ) as $type ) {
-			foreach ( Emails::IDS as $id ) {
+			foreach ( Emails::ids() as $id ) {
 				$email             = Emails::get( $id );
 				$email->email_type = $type;
 				$email->trigger( $resource, $data );
 			}
 		}
 
-		$this->assertCount( 2 * count( Emails::IDS ), $this->customer_mails(), 'Every email was rendered and sent.' );
+		$this->assertCount( 2 * count( Emails::ids() ), $this->customer_mails(), 'Every email was rendered and sent.' );
 
 		foreach ( $this->customer_mails() as $mail ) {
 			$text = (string) $mail['subject'] . "\n" . (string) $mail['message'];
@@ -521,7 +521,7 @@ final class EmailsTest extends TestCase {
 	 * The snapshot notice in each reason, as html and plain text: its words, no em dash, no hosting provider, no ids.
 	 */
 	public function test_the_snapshot_notice_reads_right_for_each_reason_in_both_formats(): void {
-		$this->assertContains( 'beltoft_services_snapshot_notice', Emails::IDS );
+		$this->assertContains( 'beltoft_services_snapshot_notice', Emails::ids() );
 		$this->assertInstanceOf( \BeltoftServices\Emails\SnapshotNotice::class, Emails::get( 'beltoft_services_snapshot_notice' ) );
 
 		$this->fake_driver();
@@ -564,5 +564,40 @@ final class EmailsTest extends TestCase {
 		$this->mails = array();
 		Emails::get( 'beltoft_services_snapshot_notice' )->trigger( $resource, array( 'snapshot_reason' => '<script>' ) );
 		$this->assertStringContainsString( 'reached the end of its keeping time', (string) preg_replace( '/\s+/', ' ', (string) $this->customer_mails()[0]['message'] ) );
+	}
+
+	public function test_the_definitions_match_the_fixture_word_for_word(): void {
+		$fixture = require BELTOFT_SERVICES_PATH . 'tests/fixtures/email-definitions.php';
+
+		$this->assertSame( array_keys( $fixture ), \BeltoftServices\Emails\Definitions::ids() );
+
+		foreach ( $fixture as $id => $expected ) {
+			$this->assertSame( $expected, \BeltoftServices\Emails\Definitions::get( $id ), $id );
+		}
+	}
+
+	public function test_every_class_in_the_registry_has_a_definition_and_the_templates_follow_the_id(): void {
+		$classes = ( new \ReflectionClassConstant( Emails::class, 'CLASSES' ) )->getValue();
+		$seen    = array();
+
+		foreach ( $classes as $class ) {
+			if ( \BeltoftServices\Emails\StepUpCode::class === $class ) {
+				continue;
+			}
+
+			$email  = new $class();
+			$def    = \BeltoftServices\Emails\Definitions::get( $email->id );
+			$slug   = str_replace( '_', '-', substr( $email->id, strlen( 'beltoft_services_' ) ) );
+			$seen[] = $email->id;
+
+			$this->assertSame( $def['title'], $email->title, $email->id );
+			$this->assertSame( $def['description'], $email->description, $email->id );
+			$this->assertSame( 'emails/beltoft-services-' . $slug . '.php', $email->template_html );
+			$this->assertSame( 'emails/plain/beltoft-services-' . $slug . '.php', $email->template_plain );
+			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'templates/' . $email->template_html );
+			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'templates/' . $email->template_plain );
+		}
+
+		$this->assertEqualsCanonicalizing( \BeltoftServices\Emails\Definitions::ids(), $seen );
 	}
 }
