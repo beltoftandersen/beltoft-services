@@ -10,7 +10,7 @@ use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
 class DiskMetaTest extends BackupTestCase {
 	public function set_up(): void {

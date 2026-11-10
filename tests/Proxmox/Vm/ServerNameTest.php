@@ -20,7 +20,7 @@ use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
 class ServerNameTest extends BackupTestCase {
 

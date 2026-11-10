@@ -15,7 +15,7 @@ use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
 abstract class SnapshotsTestCase extends BackupTestCase {
 

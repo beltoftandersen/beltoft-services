@@ -10,7 +10,7 @@ use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
 class DiskCartTest extends BackupTestCase {
 	public function set_up(): void {
