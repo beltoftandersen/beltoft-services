@@ -76,7 +76,6 @@ final class AppLicence {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
-		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 10, 3 );
 		add_action( 'beltoft_services_reinstall_started', array( __CLASS__, 'reinstalled' ), 10, 2 );
 	}
 
@@ -527,39 +526,24 @@ final class AppLicence {
 	}
 
 	/**
-	 * A server that is deleted ends its app licences: the resource is closed and the subscription cancelled (when it
-	 * holds only add-ons; else the admin is told, as for the other add-ons).
+	 * An app licence whose server was deleted has been ended by AddonCascade: announce it, cancel the undelivered
+	 * order, close it and cancel the subscription (when it holds only add-ons; else the admin is told, as for the other
+	 * add-ons).
 	 *
-	 * @param mixed  $resource Resource.
-	 * @param string $old      Old state (unused).
-	 * @param string $new      New state.
+	 * @param Resource $licence App licence.
 	 */
-	public static function state_changed( $resource, $old, $new ): void {
-		unset( $old );
+	public static function after_parent_deleted( Resource $licence ): void {
+		$id = (int) ( $licence->license()['subscription_id'] ?? 0 );
 
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
-			return;
-		}
+		// Silent on purpose: announce() below is the customer notice (see Resource::transition()).
+		self::announce( $licence, 'cancelled' );
+		DiskCascade::cancel_undelivered( $licence, 'The server was deleted, so its app licence ends.' );
+		$licence->close();
 
-		foreach ( self::for_server( $resource ) as $licence ) {
-			if ( 'deleted' === $licence->get( 'state' ) ) {
-				continue;
-			}
+		$subscription = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : null;
 
-			$id = (int) ( $licence->license()['subscription_id'] ?? 0 );
-
-			// Silent on purpose: announce() below is the customer notice (see Resource::transition()).
-			if ( $licence->transition( 'deleted', 'Parent server deleted; app licence no longer available' ) ) {
-				self::announce( $licence, 'cancelled' );
-				DiskCascade::cancel_undelivered( $licence, 'The server was deleted, so its app licence ends.' );
-				$licence->close();
-
-				$subscription = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : null;
-
-				if ( $subscription instanceof \WC_Subscription && ! in_array( $subscription->get_status(), array( 'cancelled', 'expired', 'trash' ), true ) ) {
-					Alerts::admin( $licence, 'The parent server was deleted while the app licence subscription may still bill. Check subscription #' . $id . '.' );
-				}
-			}
+		if ( $subscription instanceof \WC_Subscription && ! in_array( $subscription->get_status(), array( 'cancelled', 'expired', 'trash' ), true ) ) {
+			Alerts::admin( $licence, 'The parent server was deleted while the app licence subscription may still bill. Check subscription #' . $id . '.' );
 		}
 	}
 

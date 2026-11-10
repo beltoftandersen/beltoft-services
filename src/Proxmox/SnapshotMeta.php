@@ -16,7 +16,6 @@ final class SnapshotMeta {
 	public static function register(): void {
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
 		add_filter( 'beltoft_services_snapshot_paid_slots', array( __CLASS__, 'paid_slots' ), 10, 2 );
-		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 10, 3 );
 	}
 
 	/** The server chosen at checkout, from the order line (the line says which server; the nonce was checked at add to cart). */
@@ -131,18 +130,14 @@ final class SnapshotMeta {
 		}
 	}
 
-	/** A deleted server ends its packs. */
-	public static function state_changed( $resource, $old, $new ): void {
-		unset( $old );
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
-			return;
-		}
-		foreach ( self::for_server( $resource ) as $pack ) {
-			// Silent on purpose: the parent's own email covers the customer (see Resource::transition()).
-			if ( 'deleted' !== $pack->get( 'state' ) && $pack->transition( 'deleted', 'Parent server deleted; snapshot slots no longer available' ) ) {
-				$pack->close();
-				\BeltoftServices\Alerts::admin( $pack, 'The parent server was deleted while the snapshot slots subscription may still bill. Check subscription #' . (int) ( $pack->license()['subscription_id'] ?? 0 ) . '.' );
-			}
-		}
+	/**
+	 * A pack whose server was deleted has been ended by AddonCascade: close it and tell the admin.
+	 *
+	 * @param Resource $pack Snapshot pack.
+	 */
+	public static function after_parent_deleted( Resource $pack ): void {
+		// Silent on purpose: the parent's own email covers the customer (see Resource::transition()).
+		$pack->close();
+		\BeltoftServices\Alerts::admin( $pack, 'The parent server was deleted while the snapshot slots subscription may still bill. Check subscription #' . (int) ( $pack->license()['subscription_id'] ?? 0 ) . '.' );
 	}
 }

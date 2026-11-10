@@ -68,6 +68,7 @@ final class Plugin {
 		Hosting\Addons::register();
 		Hosting\HostingAccount::register();
 		Children::register();
+		Proxmox\Addon\AddonCascade::register();
 		Domains\DomainSettings::register();
 		Ssl\SslSettings::register();
 		Ssl\Keys::register();

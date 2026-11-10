@@ -296,7 +296,7 @@ class DiskProvisionTest extends BackupTestCase {
 		$server = $this->ready_vm();
 		$disk = $this->disk_for( $server );
 		Jobs::run( $disk->id() );
-		DiskMeta::state_changed( $server, 'ready', 'deleted' );
+		\BeltoftServices\Proxmox\Addon\AddonCascade::state_changed( $server, 'ready', 'deleted' );
 		$this->assertSame( 'deleted', Resource::find( $disk->id() )->get( 'state' ) );
 		$this->assertFalse( Resource::find( $disk->id() )->is_live() );
 	}

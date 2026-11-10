@@ -10,6 +10,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
+use BeltoftServices\Reconciler;
 use BeltoftServices\Proxmox\DiskGuide;
 use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Resource;
@@ -32,6 +33,49 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		Jobs::run( $pack->id() );
 
 		return $this->fresh( $pack );
+	}
+
+	public function test_a_deleted_server_ends_every_add_on_kind_once_with_its_own_event(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+		$pack   = $this->pack( $server );
+
+		$subscription = wcs_create_subscription( array( 'customer_id' => (int) $server->license()['user_id'], 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$this->assertInstanceOf( \WC_Subscription::class, $subscription );
+		$product = $this->service_product( 'proxmox-app', array(), array( 'slug' => 'app-' . wp_generate_password( 6, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $server->license()['user_id'], 'email' => 'customer@example.com', 'subscription_id' => $subscription->get_id() ) );
+		$app     = Resource::create( $license, Registry::get( 'proxmox-app' ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $server->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $app );
+
+		$this->assertTrue( $server->transition( 'deleted', 'Deleted for the test' ) );
+		Reconciler::notify( $server, 'ready', 'deleted' );
+
+		$expected = array(
+			array( $disk, 'Parent server deleted; extra disk no longer available' ),
+			array( $pack, 'Parent server deleted; snapshot slots no longer available' ),
+			array( $app, 'Parent server deleted; app licence no longer available' ),
+		);
+
+		foreach ( $expected as list( $addon, $event ) ) {
+			$fresh = $this->fresh( $addon );
+			$this->assertSame( 'deleted', $fresh->get( 'state' ) );
+			$this->assertFalse( $fresh->is_live() );
+			$this->assertSame( 1, substr_count( $this->events_of( $fresh ), $event ), $event );
+			$alerts = count( array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'Resource: ' . $fresh->id() . "\n" ) ) );
+
+			if ( $addon === $app ) {
+				// The app licence's subscription holds only that add-on, so it is cancelled instead of alerting.
+				$this->assertSame( 0, $alerts );
+				$this->assertSame( 'cancelled', wcs_get_subscription( $subscription->get_id() )->get_status() );
+				continue;
+			}
+
+			$this->assertSame( 1, $alerts, 'One admin alert for ' . $event );
+		}
+
+		// A second notice changes nothing: the add-ons are already deleted.
+		Reconciler::notify( $server, 'ready', 'deleted' );
+		$this->assertSame( 1, substr_count( $this->events_of( $this->fresh( $disk ) ), $expected[0][1] ) );
 	}
 
 	/** The views of the customer's licenses, as the Servers tab gets them. */
