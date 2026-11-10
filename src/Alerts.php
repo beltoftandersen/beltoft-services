@@ -22,6 +22,13 @@ final class Alerts {
 	public const PROBLEM_OPTION = 'beltoft_services_alert_problem';
 
 	/**
+	 * Message of the problem row record_unsent() writes (notify() clears only a row with this text).
+	 *
+	 * @var string
+	 */
+	private const UNSENT_MESSAGE = 'An admin alert could not be sent: the alert address is not a valid email address.';
+
+	/**
 	 * The address admin alerts go to: the alert address setting, or (with $fallback) the WordPress admin address
 	 * when that setting is not a valid address. Empty when there is none.
 	 *
@@ -90,8 +97,13 @@ final class Alerts {
 
 		$sent = (bool) wp_mail( $to, $subject, implode( "\n", $lines ) . ( $options['newline'] ? "\n" : '' ) );
 
+		// Clear only the row record_unsent() wrote: another row (a failure alert that was never sent) stays until that alert goes out.
 		if ( $resource ) {
-			self::clear_problem( $resource->id() );
+			$problems = self::problems();
+
+			if ( self::UNSENT_MESSAGE === ( $problems[ $resource->id() ]['message'] ?? '' ) ) {
+				self::clear_problem( $resource->id() );
+			}
 		}
 
 		return $sent;
@@ -108,7 +120,7 @@ final class Alerts {
 		$problems[ $r->id() ] = array(
 			'time'     => time(),
 			'resource' => $r->id(),
-			'message'  => 'An admin alert could not be sent: the alert address is not a valid email address.',
+			'message'  => self::UNSENT_MESSAGE,
 		);
 
 		update_option( self::PROBLEM_OPTION, $problems, false );
