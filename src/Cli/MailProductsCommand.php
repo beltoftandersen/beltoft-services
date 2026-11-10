@@ -102,7 +102,7 @@ final class MailProductsCommand {
 			}
 		}
 
-		if ( $write && $changed > 0 ) {
+		if ( $write ) {
 			wc_delete_product_transients( $id );
 		}
 

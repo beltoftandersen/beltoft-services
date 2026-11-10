@@ -23,7 +23,7 @@ class WcsInternalsTest extends TestCase {
 		return array(
 			'gateway renewal hook' => array( 'trigger_gateway_renewal_payment_hook', 'Billing/Subscriptions.php' ),
 			'status handler'       => array( 'WCS_User_Change_Status_Handler::', 'Billing/Subscriptions.php' ),
-			'switch query'         => array( "['switch-subscription']", 'SwitchLink.php' ),
+			'switch query'         => array( 'switch-subscription', 'SwitchLink.php' ),
 		);
 	}
 
@@ -36,11 +36,28 @@ class WcsInternalsTest extends TestCase {
 		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) );
 
 		foreach ( $it as $file ) {
-			if ( 'php' === $file->getExtension() && str_contains( (string) file_get_contents( $file->getPathname() ), $needle ) ) {
+			if ( 'php' === $file->getExtension() && str_contains( $this->code_without_comments( (string) file_get_contents( $file->getPathname() ) ), $needle ) ) {
 				$found[] = substr( $file->getPathname(), strlen( $root ) );
 			}
 		}
 
 		$this->assertSame( array( $owner ), $found, $needle );
+	}
+
+	/**
+	 * The file's code with comments and docblocks left out: a name in a comment is not a use.
+	 */
+	private function code_without_comments( string $code ): string {
+		$out = '';
+
+		foreach ( token_get_all( $code ) as $token ) {
+			if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ) {
+				continue;
+			}
+
+			$out .= is_array( $token ) ? $token[1] : $token;
+		}
+
+		return $out;
 	}
 }

@@ -29,21 +29,37 @@ class BootRegistryTest extends TestCase {
 	 * @return array<string, string> class FQCN => file
 	 */
 	private function classes_with_register(): array {
-		$found = array();
-		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src', \FilesystemIterator::SKIP_DOTS ) );
+		$found  = array();
+		$files  = array();
+		$traits = array();
+		$it     = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src', \FilesystemIterator::SKIP_DOTS ) );
 
 		foreach ( $it as $file ) {
 			if ( 'php' !== $file->getExtension() ) {
 				continue;
 			}
 
-			$code = (string) file_get_contents( $file->getPathname() );
+			$code                          = (string) file_get_contents( $file->getPathname() );
+			$files[ $file->getPathname() ] = $code;
 
-			if ( ! preg_match( '/public static function register\(/', $code ) || ! preg_match( '/^namespace ([\w\\\\]+);/m', $code, $ns ) || ! preg_match( '/^(?:final |abstract )?class (\w+)/m', $code, $cl ) ) {
+			// A trait that brings register() along: a class using it has a register() too.
+			if ( preg_match( '/public static function register\(/', $code ) && preg_match( '/^trait (\w+)/m', $code, $tr ) ) {
+				$traits[] = $tr[1];
+			}
+		}
+
+		foreach ( $files as $path => $code ) {
+			$has = (bool) preg_match( '/public static function register\(/', $code );
+
+			foreach ( $traits as $trait ) {
+				$has = $has || (bool) preg_match( '/^\s+use [^;(]*\b' . $trait . '\b[^;(]*;/m', $code );
+			}
+
+			if ( ! $has || ! preg_match( '/^namespace ([\w\\\\]+);/m', $code, $ns ) || ! preg_match( '/^(?:final |abstract )?class (\w+)/m', $code, $cl ) ) {
 				continue;
 			}
 
-			$found[ $ns[1] . '\\' . $cl[1] ] = $file->getPathname();
+			$found[ $ns[1] . '\\' . $cl[1] ] = $path;
 		}
 
 		ksort( $found );
