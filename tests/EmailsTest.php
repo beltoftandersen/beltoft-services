@@ -653,7 +653,51 @@ final class EmailsTest extends TestCase {
 		}
 	}
 
-	public function test_the_values_array_is_unchanged_for_a_vm_a_domain_a_mail_a_hosting_and_an_ssl_resource(): void {
+	/**
+	 * The values array of a "ready" email for one resource of each of five drivers, with the ids that come from the
+	 * test database swapped for tokens. The fixture was made by running this same code on the plugin at 6d95431
+	 * (before the values moved into the feature filters), so it holds the old values, not today's.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function normalised_values(): array {
+		$out = array();
+
+		foreach ( array( 'proxmox', 'domain', 'mail', 'hosting', 'ssl' ) as $driver ) {
+			$this->fake_driver( $driver );
+			$product = $this->service_product( $driver, array(), array( 'slug' => 'values-' . $driver ) );
+			$product->set_name( 'Fixture product' );
+			$product->save();
+			$license = $this->service_license( $product, array( 'fire' => false ) );
+			wp_update_user( array( 'ID' => $license['user_id'], 'display_name' => 'Fixture Customer' ) );
+			$resource = Resource::find( Resource::create( $license, Registry::get( $driver ), array(), array( 'state' => 'ready' ) )->id() );
+			$email    = Emails::get( 'beltoft_services_ready' );
+
+			// The date comes from the data, so the run does not depend on the day it is made.
+			$email->trigger( $resource, array( 'deletes_at' => 1900000000 ) );
+
+			$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
+			$property->setAccessible( true );
+			$values = $property->getValue( $email );
+			ksort( $values );
+
+			$json = (string) wp_json_encode( $values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			$json = (string) preg_replace( '/(?<!\d)' . (int) $resource->id() . '(?!\d)/', '{resource}', $json );
+			$json = (string) preg_replace( '/(?<!\d)' . (int) $license['id'] . '(?!\d)/', '{license}', $json );
+
+			$out[ $driver ] = json_decode( $json, true );
+		}
+
+		return $out;
+	}
+
+	public function test_the_values_are_the_ones_the_old_code_gave(): void {
+		$expected = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'tests/fixtures/email-values.json' ), true );
+
+		$this->assertSame( $expected, $this->normalised_values() );
+	}
+
+	public function test_the_values_array_has_the_same_keys_for_a_vm_a_domain_a_mail_a_hosting_and_an_ssl_resource(): void {
 		$golden = array(
 			'account_url',
 			'app_domain',
