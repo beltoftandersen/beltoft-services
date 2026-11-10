@@ -30,7 +30,8 @@ final class AddonLink {
 		$order_id = (int) ( $license['order_id'] ?? 0 );
 		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
 
-		if ( ! $order || (int) ( $license['user_id'] ?? 0 ) < 1 ) {
+		// Only a snapshot pack refuses a licence without a user (as before); a disk and an app licence go on.
+		if ( ! $order || ( $a->server_must_be_live && (int) ( $license['user_id'] ?? 0 ) < 1 ) ) {
 			return $meta;
 		}
 
