@@ -51,7 +51,7 @@ final class PurchaseDbTest extends UsageTestCase {
 		$this->account = $this->usage_account( $this->user );
 		$this->save_cluster( array( 'templates' => '9000 = Debian 12', 'default_template' => '9000' ) );
 		// A fresh reading of the storage first, so the extra storage steps are in stock when they are saved.
-		$key = ( new \ReflectionMethod( \BeltoftServices\Proxmox\DiskCapacity::class, 'cache_key' ) );
+		$key = ( new \ReflectionMethod( \BeltoftServices\Proxmox\Pve\DiskCapacity::class, 'cache_key' ) );
 		$key->setAccessible( true );
 		set_transient( $key->invoke( null, 'lab', 'node-a', 'disk-store' ), array( 'total' => 5000 * 1073741824, 'avail' => 4000 * 1073741824, 'read_at' => time() ), HOUR_IN_SECONDS );
 		$this->db = $this->database_product();

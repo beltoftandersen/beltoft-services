@@ -10,6 +10,8 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Pve\Prepares;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

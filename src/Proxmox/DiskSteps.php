@@ -6,6 +6,11 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Locks;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

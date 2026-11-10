@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;

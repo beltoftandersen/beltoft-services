@@ -5,12 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox\Jobs;
+namespace BeltoftServices\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\Clients;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;

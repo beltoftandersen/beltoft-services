@@ -8,6 +8,7 @@ use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonLink;
 use BeltoftServices\Locks;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
 use BeltoftServices\Alerts;
 

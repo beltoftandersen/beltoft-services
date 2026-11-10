@@ -16,10 +16,10 @@ use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppReveal;
 use BeltoftServices\Proxmox\AppStatus;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\Schema;
@@ -51,7 +51,7 @@ class WireClient extends FakeClient {
 
 	public function request( string $method, string $path, array $params = array() ) {
 		if ( 'PUT' === $method && preg_match( '#/qemu/\d+/config$#', $path ) ) {
-			$live = new \BeltoftServices\Proxmox\LiveClient(
+			$live = new \BeltoftServices\Proxmox\Pve\LiveClient(
 				array(
 					'api_url'      => 'https://pve.example.test:8006',
 					'token_id'     => 'svc@pve!beltoft',
@@ -388,7 +388,7 @@ class ProvisionTest extends TestCase {
 		$this->assertEmpty( $fresh->get( 'app_error' ) );
 
 		// A NEW order or a reinstall is still refused for an app that is switched off.
-		$cluster = \BeltoftServices\Proxmox\Clusters::get( (string) ( (array) $fresh->get( 'plan' ) )['cluster'] );
+		$cluster = \BeltoftServices\Proxmox\Pve\Clusters::get( (string) ( (array) $fresh->get( 'plan' ) )['cluster'] );
 		$this->assertSame( 'The app is not enabled on this cluster', Apps::check( $cluster, array( 'template' => 9001, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 80 ), 'docker', '29' ) );
 		$this->assertNull( Apps::check( $cluster, array( 'template' => 9001, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 80 ), 'docker', '29', false ) );
 	}
@@ -716,7 +716,7 @@ class ProvisionTest extends TestCase {
 				'vmid'   => 5000,
 				'node'   => 'node-a',
 				'name'   => 'not-ours',
-				'config' => array( 'description' => 'beltoft-services:' . \BeltoftServices\Proxmox\ProxmoxSettings::site_tag() . ':another-uuid' ),
+				'config' => array( 'description' => 'beltoft-services:' . \BeltoftServices\Proxmox\Pve\ProxmoxSettings::site_tag() . ':another-uuid' ),
 			)
 		);
 
@@ -784,7 +784,7 @@ class ProvisionTest extends TestCase {
 				'full'        => 1,
 				'storage'     => 'disk-store',
 				'format'      => 'qcow2',
-				'description' => 'beltoft-services:' . \BeltoftServices\Proxmox\ProxmoxSettings::site_tag() . ':' . $fresh->get( 'uuid' ),
+				'description' => 'beltoft-services:' . \BeltoftServices\Proxmox\Pve\ProxmoxSettings::site_tag() . ':' . $fresh->get( 'uuid' ),
 				'pool'        => 'customers',
 			),
 			$clone[0]['params']
@@ -818,7 +818,7 @@ class ProvisionTest extends TestCase {
 		$this->assert_done( $this->run_provision( $resource ) );
 
 		$this->assertSame(
-			'/nodes/node-a/qemu/' . \BeltoftServices\Proxmox\Clusters::default_template( 'lab' ) . '/clone',
+			'/nodes/node-a/qemu/' . \BeltoftServices\Proxmox\Pve\Clusters::default_template( 'lab' ) . '/clone',
 			$this->calls( 'POST', '/clone' )[0]['path']
 		);
 	}
@@ -871,13 +871,13 @@ class ProvisionTest extends TestCase {
 			);
 		}
 
-		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
 	}
 
 	public function test_clone_waits_for_the_capacity_cache_and_never_asks_proxmox_for_nodes(): void {
 		$this->fake->add_node( 'node-b' );
 		$this->cluster( array( 'nodes' => 'node-a, node-b' ) );
-		delete_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab' );
+		delete_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab' );
 		$resource = $this->resource();
 
 		$result = $this->run_provision( $resource );
@@ -889,7 +889,7 @@ class ProvisionTest extends TestCase {
 	}
 
 	public function test_a_single_node_without_a_cache_waits_too(): void {
-		delete_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab' );
+		delete_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab' );
 		$resource = $this->resource();
 
 		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
@@ -934,7 +934,7 @@ class ProvisionTest extends TestCase {
 
 	public function test_a_failed_record_move_reserves_nothing_and_the_retry_reserves_once(): void {
 		$resource = $this->resource();
-		$before   = \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' )['node-a'];
+		$before   = \BeltoftServices\Proxmox\Pve\Capacity::free_by_node( 'lab' )['node-a'];
 
 		// A move that fails: the record row is made unwritable for one attempt.
 		$fail = function ( $query ) {
@@ -947,12 +947,12 @@ class ProvisionTest extends TestCase {
 		remove_filter( 'query', $fail );
 
 		$this->assertTrue( $first->is_retry() );
-		$this->assertSame( $before, \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' )['node-a'], 'Nothing reserved by the failed move.' );
+		$this->assertSame( $before, \BeltoftServices\Proxmox\Pve\Capacity::free_by_node( 'lab' )['node-a'], 'Nothing reserved by the failed move.' );
 
 		$this->run_provision( $resource );
 		$this->run_provision( $resource );
 
-		$this->assertSame( $before - 4096 * 1048576, \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' )['node-a'], 'Reserved once.' );
+		$this->assertSame( $before - 4096 * 1048576, \BeltoftServices\Proxmox\Pve\Capacity::free_by_node( 'lab' )['node-a'], 'Reserved once.' );
 	}
 
 	public function test_a_burst_of_provisions_commits_memory_and_does_not_overcommit(): void {
@@ -964,7 +964,7 @@ class ProvisionTest extends TestCase {
 			array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 4 * $gb ),
 			array( 'node' => 'node-b', 'status' => 'online', 'maxmem' => 16 * $gb, 'mem' => 10 * $gb ),
 		);
-		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab', $rows, HOUR_IN_SECONDS );
 
 		IpPool::add( '192.0.2.12' );
 		$nodes = array();
@@ -977,10 +977,10 @@ class ProvisionTest extends TestCase {
 
 		$this->assertSame( array( 'node-a', 'node-a', 'node-b' ), $nodes, 'Each placement counts: 12/6 free, then 8/6, then 4/6.' );
 
-		$free = \BeltoftServices\Proxmox\Capacity::free_by_node( 'lab' );
+		$free = \BeltoftServices\Proxmox\Pve\Capacity::free_by_node( 'lab' );
 		$this->assertSame( 4 * $gb, $free['node-a'] );
 		$this->assertSame( 2 * $gb, $free['node-b'] );
-		$this->assertFalse( \BeltoftServices\Proxmox\Capacity::fits( 'lab', 5 * $gb ), 'Stock closes for a plan that no longer fits anywhere.' );
+		$this->assertFalse( \BeltoftServices\Proxmox\Pve\Capacity::fits( 'lab', 5 * $gb ), 'Stock closes for a plan that no longer fits anywhere.' );
 	}
 
 	public function test_template_must_be_a_template_and_in_the_list(): void {

@@ -14,8 +14,8 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Access;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\Schema;
@@ -445,7 +445,7 @@ class ProxmoxEmailsTest extends TestCase {
 	public function test_no_capacity_retried_by_the_reconciler_ends_in_a_failure_with_the_alert_and_the_delay_notice(): void {
 		// Every node is full: 1 GiB free, the plan needs 4.
 		set_transient(
-			\BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab',
+			\BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab',
 			array(
 				array(
 					'node'   => 'node-a',

@@ -11,7 +11,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
@@ -19,7 +19,7 @@ use BeltoftServices\Proxmox\DbGuest;
 use BeltoftServices\Proxmox\DbMonitor;
 use BeltoftServices\Proxmox\DbPower;
 use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\ProxmoxJobs;
@@ -103,7 +103,7 @@ class DbPhase5Test extends TestCase {
 		);
 		$this->save_cluster();
 		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
-		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
 
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();

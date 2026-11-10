@@ -13,7 +13,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Actions;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -41,7 +41,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 	}
 
 	public function test_the_settings_are_clamped(): void {
-		$clean = \BeltoftServices\Proxmox\ProxmoxSettings::sanitize( array( 'snapshot_free_days' => 0, 'snapshot_max_slots' => 999, 'snapshot_free_slots' => -3, 'snapshot_reserve_gb' => -1 ) );
+		$clean = \BeltoftServices\Proxmox\Pve\ProxmoxSettings::sanitize( array( 'snapshot_free_days' => 0, 'snapshot_max_slots' => 999, 'snapshot_free_slots' => -3, 'snapshot_reserve_gb' => -1 ) );
 		$this->assertSame( 1, $clean['snapshot_free_days'] );
 		$this->assertSame( 50, $clean['snapshot_max_slots'] );
 		$this->assertSame( 0, $clean['snapshot_free_slots'] );

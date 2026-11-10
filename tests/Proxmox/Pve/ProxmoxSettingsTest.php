@@ -5,9 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Pve;
 
-use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Settings;

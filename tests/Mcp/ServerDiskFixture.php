@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Mcp;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Placement;
+use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Usage\Rates;
 
 /**
@@ -23,7 +23,7 @@ trait ServerDiskFixture {
 	 */
 	protected function capacity( int $free_gb ): void {
 		set_transient( Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 64 * 1073741824, 'mem' => 0 ) ), HOUR_IN_SECONDS );
-		$key = new \ReflectionMethod( \BeltoftServices\Proxmox\DiskCapacity::class, 'cache_key' );
+		$key = new \ReflectionMethod( \BeltoftServices\Proxmox\Pve\DiskCapacity::class, 'cache_key' );
 		$key->setAccessible( true );
 		set_transient( $key->invoke( null, 'lab', 'node-a', 'disk-store' ), array( 'total' => 5000 * 1073741824, 'avail' => $free_gb * 1073741824, 'read_at' => time() ), HOUR_IN_SECONDS );
 	}

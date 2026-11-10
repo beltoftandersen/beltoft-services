@@ -15,8 +15,8 @@ use BeltoftServices\Proxmox\Actions;
 use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\ClustersScreen;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\ClustersScreen;
 use BeltoftServices\Proxmox\Operations;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Resource;
@@ -778,7 +778,7 @@ class AppTabTest extends MonitoringTestCase {
 		add_filter( 'beltoft_services_key', fn() => $key );
 		foreach ( array( 'good' => bin2hex( random_bytes( 32 ) ), 'bad' => "abc\ndef" ) as $case => $enc ) {
 			$r = $this->with_app( array( 'app_id' => 'n8n', 'app_version' => '2', 'app_state' => 'installing', 'app_request' => 'req-' . $case, 'app_started_at' => time() - 60 ), 5004 + ( 'bad' === $case ? 1 : 0 ) );
-			$fake = new \BeltoftServices\Proxmox\FakeClient();
+			$fake = new \BeltoftServices\Proxmox\Pve\FakeClient();
 			$fake->add_node( 'node-a' );
 			$fake->add_vm( array( 'vmid' => (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'], 'node' => 'node-a', 'status' => 'running', 'config' => array( 'agent' => '1' ) ) );
 			$fake->simulate_app( (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'], 'req-' . $case, 'ready', 'complete', array( 'root_email' => 'a@example.invalid', 'root_password' => 'Pw-1', 'encryption_key' => $enc ) );

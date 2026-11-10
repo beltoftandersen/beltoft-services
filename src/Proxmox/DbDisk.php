@@ -9,6 +9,8 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

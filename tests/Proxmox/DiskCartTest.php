@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Proxmox\DiskCart;
 use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\BackupField;
 use BeltoftServices\Product;
 

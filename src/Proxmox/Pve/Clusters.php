@@ -5,11 +5,14 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Pve;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Http\Connections;
+use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
+use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Stock;
 
 defined( 'ABSPATH' ) || exit;
 

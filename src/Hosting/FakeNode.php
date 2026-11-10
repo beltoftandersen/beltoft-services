@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Proxmox\FakePve;
+use BeltoftServices\Proxmox\Pve\FakePve;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * https://pve.proxmox.com/pve-docs/api-viewer/index.html#/nodes/{node}/lxc), with the documented parameter
  * names. Unknown or missing parameters are refused with HTTP 400, as the API's JSON schema does. Behaviour
  * beyond what the docs state is a modelling convenience, marked "modelled", and is no proof of what a real node
- * answers. This is a new file: the virtual machine fake (Proxmox\FakeClient) is not touched and knows no
+ * answers. This is a new file: the virtual machine fake (Proxmox\Pve\FakeClient) is not touched and knows no
  * containers.
  *
  * Seeding: add_node(), add_pool(), add_template(), add_ct(). Scripting: fail_next(), next_task(). Inspection:

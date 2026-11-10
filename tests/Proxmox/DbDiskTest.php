@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbCard;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbGuest;
@@ -23,7 +23,7 @@ use BeltoftServices\Proxmox\Stock;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Proxmox\DbProfile;
 use BeltoftServices\Proxmox\Profiles;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\ProxmoxDriver;
 use BeltoftServices\Proxmox\ProxmoxJobs;
@@ -34,7 +34,7 @@ use BeltoftServices\Tests\TestCase;
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbGrow;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Jobs\DiskJobs;
 
 /**
@@ -114,7 +114,7 @@ class DbDiskTest extends TestCase {
 		);
 		$this->save_cluster();
 		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
-		set_transient( \BeltoftServices\Proxmox\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
+		set_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab', array( array( 'node' => 'node-a', 'status' => 'online', 'maxmem' => 68719476736, 'mem' => 0 ) ), HOUR_IN_SECONDS );
 
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();

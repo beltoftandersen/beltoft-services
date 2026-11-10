@@ -14,7 +14,7 @@ use BeltoftServices\Account\Servers;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Offers;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Proxmox\Picked;

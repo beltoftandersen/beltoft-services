@@ -14,6 +14,7 @@ use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

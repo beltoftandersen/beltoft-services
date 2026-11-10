@@ -4,6 +4,8 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\CustomerDelete;

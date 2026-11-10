@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox\Jobs;
 
 use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 

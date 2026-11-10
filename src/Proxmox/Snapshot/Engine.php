@@ -12,14 +12,14 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Actions;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\Prepares;
+use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Provision;
 use BeltoftServices\Proxmox\RestoreSteps;
 use BeltoftServices\Proxmox\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\Steps;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 

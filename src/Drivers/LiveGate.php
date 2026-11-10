@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Drivers;
 
-use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 
 defined( 'ABSPATH' ) || exit;
 

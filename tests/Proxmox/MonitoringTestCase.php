@@ -4,9 +4,9 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
-use BeltoftServices\Proxmox\Ownership;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;

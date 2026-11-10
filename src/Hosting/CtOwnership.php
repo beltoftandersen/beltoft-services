@@ -7,19 +7,19 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Proxmox\Client;
-use BeltoftServices\Proxmox\Ownership;
-use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The same tag format as the virtual machines (Proxmox\Ownership): a line in the container description,
+ * The same tag format as the virtual machines (Proxmox\Pve\Ownership): a line in the container description,
  * `beltoft-services:<site_tag>:<resource uuid>`. A container is ours only when its description carries that line
  * as a whole line, its id is inside the node's customer range, this plugin recorded the id for this resource and
  * it is not a template. Anything else is read-only. The listing, the free-id check and the line match are the
- * Proxmox\Ownership ones (they are path-agnostic); only the config path differs (lxc, not qemu).
+ * Proxmox\Pve\Ownership ones (they are path-agnostic); only the config path differs (lxc, not qemu).
  *
  * Absence is not deletion: a container that /cluster/resources does not list may be hidden from the token.
  */

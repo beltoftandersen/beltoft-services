@@ -11,7 +11,7 @@ use BeltoftServices\Admin\Panel;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Flows;
@@ -472,10 +472,10 @@ class FlowsTest extends FirewallTestCase {
 
 	public function test_the_settings_are_sanitised(): void {
 		$this->settings( array( 'traffic_quarantine' => 'nonsense' ) );
-		$clean = \BeltoftServices\Proxmox\ProxmoxSettings::sanitize( array( 'traffic_quarantine' => 'nonsense', 'flow_sources' => "bad, 10.0.0.5 10.0.0.5\n2001:db8::1", 'flow_minutes' => 0 ) );
+		$clean = \BeltoftServices\Proxmox\Pve\ProxmoxSettings::sanitize( array( 'traffic_quarantine' => 'nonsense', 'flow_sources' => "bad, 10.0.0.5 10.0.0.5\n2001:db8::1", 'flow_minutes' => 0 ) );
 		$this->assertSame( 'report', $clean['traffic_quarantine'] );
 		$this->assertSame( '10.0.0.5', $clean['flow_sources'] );
 		$this->assertSame( 1, $clean['flow_minutes'] );
-		$this->assertSame( '10.10.10.1', \BeltoftServices\Proxmox\ProxmoxSettings::clean_addresses( 'nothing valid' ) );
+		$this->assertSame( '10.10.10.1', \BeltoftServices\Proxmox\Pve\ProxmoxSettings::clean_addresses( 'nothing valid' ) );
 	}
 }

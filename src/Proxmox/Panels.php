@@ -9,6 +9,8 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

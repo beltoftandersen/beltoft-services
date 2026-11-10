@@ -9,7 +9,7 @@ use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\OsField;
 use BeltoftServices\Resource;
 

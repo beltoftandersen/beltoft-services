@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbDiskField;
 use BeltoftServices\Proxmox\DbIpField;
-use BeltoftServices\Proxmox\DiskCapacity;
+use BeltoftServices\Proxmox\Pve\DiskCapacity;
 
 require_once __DIR__ . '/BackupTestCase.php';
 

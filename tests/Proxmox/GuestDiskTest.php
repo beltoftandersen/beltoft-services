@@ -3,8 +3,8 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Clusters;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Proxmox\MetricsRoute;
 use BeltoftServices\Proxmox\Operations;

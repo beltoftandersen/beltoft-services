@@ -12,6 +12,7 @@ use BeltoftServices\Proxmox\DbGrow;
 use BeltoftServices\Proxmox\GuestDisk;
 use BeltoftServices\Proxmox\Monitor;
 use BeltoftServices\Proxmox\ProxmoxJobs;
+use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftServices\Proxmox\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

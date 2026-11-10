@@ -6,6 +6,8 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\PublicSuffix;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Pve\Clients;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

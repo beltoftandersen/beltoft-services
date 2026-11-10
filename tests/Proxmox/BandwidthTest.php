@@ -8,9 +8,9 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\FakeClient;
+use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\NetConfig;
 use BeltoftServices\Proxmox\Panels;
 use BeltoftServices\Proxmox\ProxmoxDriver;

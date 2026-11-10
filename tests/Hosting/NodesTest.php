@@ -15,7 +15,7 @@ use BeltoftServices\Hosting\FakeAgent;
 use BeltoftServices\Hosting\FakeNode;
 use BeltoftServices\Hosting\Nodes;
 use BeltoftServices\Hosting\Records;
-use BeltoftServices\Proxmox\Client;
+use BeltoftServices\Proxmox\Pve\Client;
 
 /**
  * Nodes (records, secrets, validation) and Clients (the live gate).
@@ -201,7 +201,7 @@ class NodesTest extends HostingCase {
 		// setting is refused by the live client itself, never answered by a fake.
 		$this->settings( array( 'site_tag' => 'tagone' ) );
 		$this->assertNull( Clients::gate( 'n1', $node, true ) );
-		$this->assertInstanceOf( \BeltoftServices\Proxmox\LiveClient::class, Clients::build_node( $node, true ) );
+		$this->assertInstanceOf( \BeltoftServices\Proxmox\Pve\LiveClient::class, Clients::build_node( $node, true ) );
 		$this->assertNotInstanceOf( FakeNode::class, Clients::build_node( $node, true ) );
 
 		try {

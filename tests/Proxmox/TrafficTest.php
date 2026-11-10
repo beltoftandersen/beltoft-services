@@ -2,7 +2,7 @@
 /** Outgoing traffic volume alerts: sustained and jump, admin only. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Proxmox\ProxmoxSettings;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 use BeltoftServices\Proxmox\Traffic;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

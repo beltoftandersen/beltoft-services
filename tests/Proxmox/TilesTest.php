@@ -126,7 +126,7 @@ class TilesTest extends TestCase {
 			'templates'         => array( 9000 => 'Ubuntu 24.04 LTS', 9002 => 'Debian 13' ),
 			'template_families' => array( 9000 => 'ubuntu-24.04', 9002 => 'debian-13' ),
 		);
-		update_option( \BeltoftServices\Proxmox\Clusters::OPTION, array( 'tiles' => $cluster ) );
+		update_option( \BeltoftServices\Proxmox\Pve\Clusters::OPTION, array( 'tiles' => $cluster ) );
 
 		$items = Tiles::os_items( 'tiles', array( 9000 => 'Ubuntu 24.04 LTS', 9002 => 'Debian 13' ), 9002 );
 		$this->assertSame( 'ubuntu-24.04', $items[0]['attrs']['data-family'] );

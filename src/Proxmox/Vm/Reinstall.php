@@ -12,9 +12,9 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Access;
 use BeltoftServices\Proxmox\Actions;
 use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Prepares;
+use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\Steps;
+use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

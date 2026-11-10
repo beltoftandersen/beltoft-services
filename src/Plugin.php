@@ -53,7 +53,7 @@ final class Plugin {
 		// Driver settings screens add their tabs to Settings::register()'s filters, so they come after it.
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
-		Proxmox\ProxmoxSettings::register();
+		Proxmox\Pve\ProxmoxSettings::register();
 		Hosting\HostingSettings::register();
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();
@@ -129,7 +129,7 @@ final class Plugin {
 		Domains\Sync::register();
 		Domains\Security::register();
 		Domains\EmailDetails::register();
-		Proxmox\ClustersScreen::register();
+		Proxmox\Pve\ClustersScreen::register();
 		Proxmox\ServerProgress::register();
 		Proxmox\AppProgress::register();
 		Status::register();
@@ -203,7 +203,7 @@ final class Plugin {
 		Proxmox\DbDiskField::register();
 		Proxmox\DiskMeta::register();
 		Proxmox\DiskCascade::register();
-		add_action( Jobs::SWEEP, array( Proxmox\DiskCapacity::class, 'sweep' ) );
+		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
 		Proxmox\DiskCart::register();
 		Proxmox\SnapshotMeta::register();
 		Proxmox\SnapshotCart::register();

@@ -67,7 +67,7 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 		);
 		$this->settings( array( 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
 		$this->clear_ips();
-		$this->assertTrue( \BeltoftServices\Proxmox\Clusters::save( 'lab', array(
+		$this->assertTrue( \BeltoftServices\Proxmox\Pve\Clusters::save( 'lab', array(
 			'label' => 'Lab', 'api_url' => 'https://pve.example.invalid:8006',
 			'token_id' => 'svc@pve!beltoft', 'token_secret' => 'secret-secret-secret-1',
 			'client' => 'fake', 'nodes' => 'node-a', 'storage' => 'disk-store',

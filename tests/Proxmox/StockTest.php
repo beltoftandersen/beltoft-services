@@ -8,10 +8,10 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Capacity;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Capacity;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\Placement;
+use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\ProxmoxJobs;
 use BeltoftServices\Proxmox\Schema;
 use BeltoftServices\Proxmox\Stock;

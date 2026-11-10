@@ -15,7 +15,7 @@ use BeltoftServices\Mcp\Purchase;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DiskField;
 use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\Placement;
+use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Rates;
 use BeltoftServices\Tests\Usage\UsageTestCase;

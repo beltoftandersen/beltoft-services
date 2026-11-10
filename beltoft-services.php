@@ -24,9 +24,23 @@ define( 'BELTOFT_SERVICES_FILE', __FILE__ );
 define( 'BELTOFT_SERVICES_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BELTOFT_SERVICES_VERSION', '0.7.0' );
 
+/*
+ * Old class names that outside code still calls (the site theme and the OdooWoo portal; see tests/fixtures/external-api.php)
+ * and that moved to a new namespace: old name => new name. The autoloader loads the new class and aliases the old name to it.
+ * Empty until a moved class is on that list.
+ */
+define( 'BELTOFT_SERVICES_CLASS_ALIASES', array() );
+
 spl_autoload_register(
 	static function ( $class_name ) {
 		$prefix = 'BeltoftServices\\';
+
+		if ( isset( BELTOFT_SERVICES_CLASS_ALIASES[ $class_name ] ) ) {
+			if ( class_exists( BELTOFT_SERVICES_CLASS_ALIASES[ $class_name ] ) ) {
+				class_alias( BELTOFT_SERVICES_CLASS_ALIASES[ $class_name ], $class_name );
+			}
+			return;
+		}
 
 		if ( 0 !== strpos( $class_name, $prefix ) ) {
 			return;

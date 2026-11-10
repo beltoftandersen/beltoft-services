@@ -15,7 +15,7 @@ use BeltoftServices\Mail\MailRoutes;
 use BeltoftServices\Proxmox\Actions;
 use BeltoftServices\Proxmox\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backups;
-use BeltoftServices\Proxmox\Clusters;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbActions;
 use BeltoftServices\Proxmox\DbPolicy;
