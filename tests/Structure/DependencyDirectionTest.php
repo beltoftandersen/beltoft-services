@@ -15,11 +15,17 @@ use PHPUnit\Framework\TestCase;
  * and stops new ones (Plugin.php, the composition root, is exempt); remove an entry when the leak is fixed (a stale entry fails the test).
  *
  * FEATURES lists every feature folder (widened 2026-11 to Hosting, Ssl, Licences, Credit, Card, Admin and Cli; the widening found no new leak).
- * Billing and Emails stay out on purpose: they are core-side infrastructure (core imports Billing\CartFlow and the email registry).
+ * Drivers, Billing, Checkout and Emails count as core when they are the importing side (CORE_FOLDERS, widened 2026-11-10);
+ * as imported classes they are not features, because core imports Billing\CartFlow and the email registry.
  */
 class DependencyDirectionTest extends TestCase {
 
 	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'Credit', 'Card', 'Admin', 'Cli', 'Apps' );
+
+	/**
+	 * Folders that belong to the core layer as sources (they may not import a feature). As targets they stay what they are.
+	 */
+	private const CORE_FOLDERS = array( 'Drivers', 'Billing', 'Checkout', 'Emails' );
 
 	/**
 	 * Layer => layers it must not use.
@@ -150,6 +156,11 @@ class DependencyDirectionTest extends TestCase {
 			}
 
 			$from = $this->layer( $ns . '\\X' );
+
+			// The target table puts these folders in the core layer (widened 2026-11-10): they follow the core rule.
+			if ( in_array( $from, self::CORE_FOLDERS, true ) ) {
+				$from = 'core';
+			}
 
 			if ( ! isset( self::FORBIDDEN[ $from ] ) && ! isset( self::FORBIDDEN_CLASSES[ $from ] ) ) {
 				continue;

@@ -21,7 +21,7 @@ final class Clients {
 	 * The shared live/fake gate.
 	 */
 	private static function gate_object(): LiveGate {
-		return new LiveGate( 'BELTOFT_SERVICES_PROXMOX_LIVE', '', 'Set the site tag for cluster %s' );
+		return new LiveGate( 'BELTOFT_SERVICES_PROXMOX_LIVE', '', 'Set the site tag for cluster %s', array( ProxmoxSettings::class, 'explicit_site_tag' ) );
 	}
 
 	/**

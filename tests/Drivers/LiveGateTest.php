@@ -9,6 +9,7 @@
 namespace BeltoftServices\Tests\Drivers;
 
 use BeltoftServices\Drivers\LiveGate;
+use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
 use BeltoftServices\Tests\TestCase;
 
 /**
@@ -16,8 +17,13 @@ use BeltoftServices\Tests\TestCase;
  */
 class LiveGateTest extends TestCase {
 
+	/** The site tag source the factories pass in. */
+	private function tag(): array {
+		return array( ProxmoxSettings::class, 'explicit_site_tag' );
+	}
+
 	public function test_an_undefined_constant_allows_nothing(): void {
-		$gate = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', '', 'Set %s' );
+		$gate = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', '', 'Set %s', $this->tag() );
 
 		$this->assertFalse( LiveGate::constant_true( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT' ) );
 		$this->assertFalse( $gate->live_allowed() );
@@ -28,7 +34,7 @@ class LiveGateTest extends TestCase {
 	}
 
 	public function test_untagged_needs_allowed_live_and_an_empty_site_tag(): void {
-		$gate = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', '', 'Set %s' );
+		$gate = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', '', 'Set %s', $this->tag() );
 		$live = array( 'client' => 'live' );
 		$fake = array( 'client' => 'fake' );
 
@@ -50,11 +56,11 @@ class LiveGateTest extends TestCase {
 		$this->settings( array( 'site_tag' => '', 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$live = array( 'client' => 'live' );
 
-		$plain = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', '', 'Set the site tag for cluster %s' );
+		$plain = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', '', 'Set the site tag for cluster %s', $this->tag() );
 		$this->assertSame( 'Set the site tag for cluster c1', $plain->gate( 'c1', $live, true ) );
 		$this->assertNotFalse( get_transient( 'beltoft_services_site_tag_alert_' . md5( 'c1' ) ), 'The alert id has no prefix.' );
 
-		$prefixed = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', 'hosting ', 'Set the site tag for hosting node %s' );
+		$prefixed = new LiveGate( 'BELTOFT_SERVICES_NO_SUCH_LIVE_CONSTANT', 'hosting ', 'Set the site tag for hosting node %s', $this->tag() );
 		$this->assertSame( 'Set the site tag for hosting node n1', $prefixed->gate( 'n1', $live, true ) );
 		$this->assertNotFalse( get_transient( 'beltoft_services_site_tag_alert_' . md5( 'hosting n1' ) ), 'The alert id carries the prefix.' );
 	}
