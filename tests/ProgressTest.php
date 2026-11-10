@@ -7,11 +7,21 @@
 
 namespace BeltoftServices\Tests;
 
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
 use BeltoftLicenses\Account\View;
+
+/**
+ * A fake driver that names its build steps.
+ */
+final class SteppedFakeDriver extends FakeDriver implements ProvisionSteps {
+	public function step_labels(): array {
+		return array( 'one' => 'First thing', 'two' => 'Second thing' );
+	}
+}
 
 /**
  * Progress tests. Nothing here calls a server: only resource meta and the fake driver.
@@ -77,6 +87,9 @@ final class ProgressTest extends TestCase {
 			'resume'          => array( 'state' => 'paused', 'desired' => 'ready' ),
 			'marker-label'    => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'fw_apply', 'at' => $now, 'label' => 'Apply firewall changes' ) ),
 			'marker-plain'    => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'x', 'at' => $now, 'label' => '' ) ),
+			'marker-restore'  => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'restore', 'at' => $now, 'label' => 'Restore' ) ),
+			'marker-rollback' => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'snapshot_rollback', 'at' => $now, 'label' => 'Go back' ) ),
+			'restore-failed'  => array( 'state' => 'failed', 'failed_op' => 'update_plan', 'restore' => array( 'volid' => 'v', 'phase' => 'restored' ) ),
 			'marker-reinstall' => array( 'state' => 'ready', Progress::MARKER => array( 'action' => 'reinstall', 'at' => $now, 'label' => 'Reinstall' ) ),
 			'idle'            => array( 'state' => 'ready' ),
 			'app-installing'  => array( 'state' => 'ready', 'app_id' => 'wordpress', 'app_state' => 'installing', 'app_step' => 'database' ),
@@ -118,6 +131,25 @@ final class ProgressTest extends TestCase {
 		foreach ( $want as $name => $payload ) {
 			$this->assertSame( $payload, $got[ $name ], $name );
 		}
+	}
+
+	public function test_a_driver_implementing_provision_steps_gets_its_steps_in_the_payload(): void {
+		$stepper = new SteppedFakeDriver( 'stepper' );
+		add_filter(
+			'beltoft_services_drivers',
+			static function ( $drivers ) use ( $stepper ) {
+				$drivers['stepper'] = $stepper;
+				return $drivers;
+			}
+		);
+
+		list( $r ) = $this->resource( 'stepper', array( 'state' => 'provisioning', 'steps' => array( 'one' ) ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertSame( array( 'one' => 'done', 'two' => 'current' ), $this->statuses( $p ) );
+		$this->assertSame( array( 'First thing', 'Second thing' ), array_column( $p['steps'], 'label' ) );
+		$this->assertSame( 'two', $p['current'] );
 	}
 
 	public function test_a_server_build_lists_its_steps_with_the_current_one(): void {

@@ -7,6 +7,7 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Emails\Emails;
@@ -14,8 +15,22 @@ use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DomainDriver implements Driver, StopsOnDelete, InternalActions, NeedsBilling {
+final class DomainDriver implements Driver, StopsOnDelete, InternalActions, NeedsBilling, ProvisionSteps {
 	public function id(): string { return 'domain'; }
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'contact'      => __( 'Save the owner details', 'beltoft-services' ),
+			'zone_prepared' => __( 'Prepare the DNS', 'beltoft-services' ),
+			'order'        => __( 'Send the order to the registry', 'beltoft-services' ),
+			'active'       => __( 'Wait for the registry', 'beltoft-services' ),
+			'zone'         => __( 'Set up the DNS', 'beltoft-services' ),
+			'dates'        => __( 'Final checks', 'beltoft-services' ),
+		);
+	}
 	public function label(): string { return __( 'Domain name', 'beltoft-services' ); }
 	public function kind(): string { return 'domain'; }
 	public function unit_label( int $used, int $max ): string {

@@ -4,13 +4,14 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
 /** One subscription and resource per extra disk. */
-final class DiskDriver implements Driver {
+final class DiskDriver implements Driver, ProvisionSteps {
 	public const ID = 'proxmox-disk';
 
 	/** Use the server retention default unless the disk product sets its own period. */
@@ -48,6 +49,19 @@ final class DiskDriver implements Driver {
 
 	public function id(): string {
 		return self::ID;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'server'       => __( 'Find the server', 'beltoft-services' ),
+			'slot'         => __( 'Choose a slot', 'beltoft-services' ),
+			'allocate'     => __( 'Create the disk', 'beltoft-services' ),
+			'attach'       => __( 'Attach it to the server', 'beltoft-services' ),
+			'verify'       => __( 'Final checks', 'beltoft-services' ),
+		);
 	}
 
 	public function label(): string {

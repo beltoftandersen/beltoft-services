@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Product;
@@ -22,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * provisioning; pause, resume, delete and the plan change arrive with the next task, and until
  * then they refuse without touching Proxmox. No sign-in link: a VM has none (no Drivers\Opens).
  */
-class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions {
+class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions, ProvisionSteps {
 
 	/**
 	 * Driver id of the Proxmox driver.
@@ -39,6 +40,20 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 */
 	public function id(): string {
 		return self::ID;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function step_labels(): array {
+		return array(
+			'ip'           => __( 'Reserve an IP address', 'beltoft-services' ),
+			'vmid'         => __( 'Prepare the server', 'beltoft-services' ),
+			'clone'        => __( 'Create the server', 'beltoft-services' ),
+			'configure'    => __( 'Apply your settings', 'beltoft-services' ),
+			'start'        => __( 'Start the server', 'beltoft-services' ),
+			'ready'        => __( 'Final checks', 'beltoft-services' ),
+		);
 	}
 
 	/**
