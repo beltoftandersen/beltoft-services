@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$beltoft_ask     = \BeltoftServices\StepUp::ask( get_current_user_id(), \BeltoftServices\StepUp::TRANSFER_CODE );
+$beltoft_ask     = \BeltoftServices\StepUp::ask( get_current_user_id(), \BeltoftServices\Domains\AuthCodeRoute::PURPOSE );
 $beltoft_id      = 'beltoft-domain-stepup-' . $r->id();
 $beltoft_emailed = 'emailed' === $beltoft_ask['kind'];
 ?>

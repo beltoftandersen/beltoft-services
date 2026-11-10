@@ -10,7 +10,36 @@ use BeltoftServices\StepUp;
 defined( 'ABSPATH' ) || exit;
 
 final class AuthCodeRoute {
-	public static function register(): void { add_action( 'rest_api_init', array( __CLASS__, 'routes' ) ); }
+	/**
+	 * The step-up purpose of showing a domain transfer code.
+	 */
+	public const PURPOSE = 'transfer_code';
+
+	public static function register(): void {
+		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+		add_filter( 'beltoft_services_stepup_purposes', array( __CLASS__, 'stepup_purposes' ) );
+		add_filter( 'beltoft_services_stepup_text', array( __CLASS__, 'stepup_text' ), 10, 2 );
+	}
+
+	/**
+	 * Registers the purpose of the code step before a transfer code is shown.
+	 *
+	 * @param array<int, string> $purposes Purposes so far.
+	 * @return array<int, string>
+	 */
+	public static function stepup_purposes( $purposes ): array {
+		return array_merge( (array) $purposes, array( self::PURPOSE ) );
+	}
+
+	/**
+	 * What the code email says this purpose is for.
+	 *
+	 * @param string $text    Text so far.
+	 * @param string $purpose The purpose.
+	 */
+	public static function stepup_text( $text, $purpose ): string {
+		return self::PURPOSE === $purpose ? __( 'showing a domain transfer code', 'beltoft-services' ) : (string) $text;
+	}
 	public static function routes(): void {
 		register_rest_route( Routes::NAMESPACE, '/resources/(?P<id>\d+)/domain-authcode', array(
 			// POST: the code travels in the body, never in a URL or a log line.
@@ -29,7 +58,7 @@ final class AuthCodeRoute {
 		} else {
 			$r = Routes::guard( $request, true, 5 );
 			if ( ! $r instanceof Resource ) { $response = $r; }
-			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ), StepUp::TRANSFER_CODE ) ) {
+			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ), self::PURPOSE ) ) {
 				$response = rest_convert_error_to_response( new \WP_Error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 			}
 			elseif ( 'domain' !== $r->get( 'driver' ) || ! ctype_digit( (string) $r->get( 'remote_id' ) ) ) {
