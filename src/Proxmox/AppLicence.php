@@ -10,6 +10,8 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Proxmox\Addon\Addon;
+use BeltoftServices\Proxmox\Addon\AddonLink;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Rates;
@@ -288,24 +290,7 @@ final class AppLicence {
 	 * @return Resource[]
 	 */
 	public static function for_server( Resource $server ): array {
-
-		$license_id = (int) ( $server->license()['id'] ?? 0 );
-		$out        = array();
-
-		if ( $license_id < 1 ) {
-			return $out;
-		}
-
-		// One query for the candidates (the license id is in the meta text), then the exact check on each.
-		foreach ( Resource::find_by_meta( 'applic', 'server_license', array( $license_id, (string) $license_id ), 'DESC' ) as $id ) {
-			$licence = Resource::find( (int) $id );
-
-			if ( $licence && AppLicenceDriver::ID === $licence->get( 'driver' ) && (int) $licence->get( 'server_license' ) === $license_id ) {
-				$out[] = $licence;
-			}
-		}
-
-		return $out;
+		return AddonLink::for_server( Addon::for_driver( AppLicenceDriver::ID ), $server );
 	}
 
 	/**
@@ -534,62 +519,11 @@ final class AppLicence {
 	 * @return mixed
 	 */
 	public static function initial_meta( $meta, $license, $driver ) {
-		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || AppLicenceDriver::ID !== $driver->id() ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver ) {
 			return $meta;
 		}
 
-		$order_id = (int) ( $license['order_id'] ?? 0 );
-		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
-
-		if ( ! $order ) {
-			return $meta;
-		}
-
-		$uid             = '';
-		$subscription_id = (int) ( $license['subscription_id'] ?? 0 );
-
-		if ( $subscription_id > 0 && function_exists( 'wcs_get_subscription' ) ) {
-			$subscription = wcs_get_subscription( $subscription_id );
-
-			foreach ( $subscription ? $subscription->get_items() : array() as $item ) {
-				if ( (int) $item->get_product_id() === (int) $license['product_id'] ) {
-					$uid = (string) $item->get_meta( self::ITEM_UID, true );
-					break;
-				}
-			}
-		}
-
-		$matches = array();
-
-		foreach ( $order->get_items() as $item ) {
-			if ( (int) $item->get_product_id() !== (int) $license['product_id'] || ( '' !== $uid && $uid !== (string) $item->get_meta( self::ITEM_UID, true ) ) ) {
-				continue;
-			}
-
-			$matches[] = $item;
-		}
-
-		if ( 1 !== count( $matches ) ) {
-			return $meta;
-		}
-
-		$link = $matches[0]->get_meta( self::ITEM_SERVER, true );
-
-		if ( 'cart_server' === $link ) {
-			$meta['server_order_id'] = $order_id;
-		} elseif ( is_numeric( $link ) && (int) $link > 0 ) {
-			// Bought for a server the customer already has (the reinstall form).
-			$server = Licenses::find( (int) $link );
-			$driver = $server ? Product::driver_for( (int) ( $server['product_id'] ?? 0 ) ) : null;
-
-			if ( $server && (int) ( $server['user_id'] ?? 0 ) === (int) ( $license['user_id'] ?? 0 ) && $driver && ProxmoxDriver::ID === $driver->id() ) {
-				$meta['server_license'] = (int) $link;
-			}
-		}
-
-		$meta['order_item_id'] = (int) $matches[0]->get_id();
-
-		return $meta;
+		return AddonLink::initial_meta( Addon::for_driver( AppLicenceDriver::ID ), $meta, $license, $driver );
 	}
 
 	/**

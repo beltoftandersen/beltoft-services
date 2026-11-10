@@ -5,7 +5,8 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
-use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
+use BeltoftServices\Proxmox\Addon\AddonLink;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 use BeltoftServices\Alerts;
@@ -19,55 +20,7 @@ final class DiskMeta {
 	}
 
 	public static function initial_meta( array $meta, array $license, Driver $driver ): array {
-		if ( DiskDriver::ID !== $driver->id() ) {
-			return $meta;
-		}
-		$order_id = (int) ( $license['order_id'] ?? 0 );
-		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
-		if ( ! $order ) {
-			return $meta;
-		}
-		$uid = '';
-		$subscription_id = (int) ( $license['subscription_id'] ?? 0 );
-		if ( $subscription_id > 0 && function_exists( 'wcs_get_subscription' ) ) {
-			$subscription = wcs_get_subscription( $subscription_id );
-			if ( $subscription ) {
-				foreach ( $subscription->get_items() as $item ) {
-					if ( (int) $item->get_product_id() === (int) $license['product_id'] ) {
-						$uid = (string) $item->get_meta( '_beltoft_services_disk_uid', true );
-						break;
-					}
-				}
-			}
-		}
-		$matches = array();
-		foreach ( $order->get_items() as $item ) {
-			if ( (int) $item->get_product_id() !== (int) $license['product_id'] ) {
-				continue;
-			}
-			$item_uid = (string) $item->get_meta( '_beltoft_services_disk_uid', true );
-			if ( '' !== $uid && $uid !== $item_uid ) {
-				continue;
-			}
-			$matches[] = $item;
-		}
-		if ( 1 !== count( $matches ) ) {
-			return $meta;
-		}
-		foreach ( $matches as $item ) {
-			$link = $item->get_meta( '_beltoft_services_disk_server', true );
-			if ( is_numeric( $link ) && (int) $link > 0 ) {
-				$server = Licenses::find( (int) $link );
-				if ( $server && (int) $server['user_id'] === (int) $license['user_id'] && self::is_server( $server ) ) {
-					$meta['server_license'] = (int) $link;
-				}
-			} elseif ( 'cart_server' === $link ) {
-				$meta['server_order_id'] = $order_id;
-			}
-			$meta['order_item_id'] = (int) $item->get_id();
-			break;
-		}
-		return $meta;
+		return AddonLink::initial_meta( self::addon(), $meta, $license, $driver );
 	}
 
 	/** One unique server license in the same paid order, possibly issued after the disk. */
@@ -82,21 +35,16 @@ final class DiskMeta {
 	}
 
 	private static function is_server( array $license ): bool {
-		$driver = Product::driver_for( (int) ( $license['product_id'] ?? 0 ) );
-		return $driver && ProxmoxDriver::ID === $driver->id();
+		return AddonLink::is_server( $license );
 	}
 
 	/** Live disk resources linked to one server license, including paused disks awaiting retention. */
 	public static function for_server( Resource $server ): array {
-		$license = $server->license();
-		$out = array();
-		foreach ( Resource::live_ids( 'disk' ) as $id ) {
-			$disk = Resource::find( $id );
-			if ( $disk && DiskDriver::ID === $disk->get( 'driver' ) && (int) $disk->get( 'server_license' ) === (int) ( $license['id'] ?? 0 ) ) {
-				$out[] = $disk;
-			}
-		}
-		return $out;
+		return AddonLink::for_server( self::addon(), $server );
+	}
+
+	private static function addon(): Addon {
+		return Addon::for_driver( DiskDriver::ID );
 	}
 
 	/**

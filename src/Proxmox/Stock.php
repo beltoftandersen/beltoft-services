@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 
 defined( 'ABSPATH' ) || exit;
@@ -128,7 +129,7 @@ final class Stock {
 	 * @return string[]
 	 */
 	public static function addon_drivers(): array {
-		return array( DiskDriver::ID, SnapshotDriver::ID, AppLicenceDriver::ID );
+		return Addon::driver_ids();
 	}
 
 	/**
