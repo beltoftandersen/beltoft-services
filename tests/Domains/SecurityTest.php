@@ -247,7 +247,7 @@ class SecurityTest extends TestCase {
 	/** Emails a transfer code check code to the domain's owner and returns it from the captured mail. */
 	private function emailed_code( Resource $r ): string {
 		$before = count( $this->mails );
-		$this->assertTrue( \BeltoftServices\StepUp::send( (int) $r->license()['user_id'], \BeltoftServices\StepUp::TRANSFER_CODE ) );
+		$this->assertTrue( \BeltoftServices\StepUp::send( (int) $r->license()['user_id'], \BeltoftServices\Domains\AuthCodeRoute::PURPOSE ) );
 		$this->assertCount( $before + 1, $this->mails );
 		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
 
@@ -282,7 +282,7 @@ class SecurityTest extends TestCase {
 		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
 		$user = (int) $r->license()['user_id'];
 		wp_set_current_user( $user );
-		\BeltoftServices\StepUp::send( $user, \BeltoftServices\StepUp::API_TOKEN );
+		\BeltoftServices\StepUp::send( $user, \BeltoftServices\Account\ApiTokens::PURPOSE );
 		preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m );
 
 		$this->assertSame( 403, $this->code_request( $r, $m[1] )->get_status() );

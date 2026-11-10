@@ -16,10 +16,6 @@ defined( 'ABSPATH' ) || exit;
 
 final class StepUp {
 
-	public const API_TOKEN     = 'api_token';
-	public const TRANSFER_CODE = 'transfer_code';
-	public const PURPOSES      = array( self::API_TOKEN, self::TRANSFER_CODE );
-
 	/**
 	 * Minutes a code works, wrong tries allowed per code, and the send limit (codes per window, window in seconds).
 	 */
@@ -32,6 +28,21 @@ final class StepUp {
 	 * User meta that holds the hash of the code of a purpose.
 	 */
 	private const META = 'beltoft_services_stepup_';
+
+	/**
+	 * The purposes a code can be sent and checked for. Each feature that needs the step registers its own on the filter
+	 * beltoft_services_stepup_purposes (the API tokens and the domain transfer code do); anything else is refused.
+	 *
+	 * @return string[]
+	 */
+	public static function purposes(): array {
+		/**
+		 * The purposes of the step-up check, one string each.
+		 *
+		 * @param string[] $purposes Purposes registered so far.
+		 */
+		return array_values( array_unique( array_map( 'strval', (array) apply_filters( 'beltoft_services_stepup_purposes', array() ) ) ) );
+	}
 
 	/**
 	 * Hooks.
@@ -52,7 +63,7 @@ final class StepUp {
 				'callback'            => array( __CLASS__, 'rest_send' ),
 				'permission_callback' => 'is_user_logged_in',
 				'args'                => array(
-					'purpose' => array( 'type' => 'string', 'required' => true, 'enum' => self::PURPOSES ),
+					'purpose' => array( 'type' => 'string', 'required' => true, 'enum' => self::purposes() ),
 				),
 			)
 		);
@@ -79,11 +90,11 @@ final class StepUp {
 	 * What the customer is asked for.
 	 *
 	 * @param int    $user_id Customer.
-	 * @param string $purpose One of PURPOSES.
+	 * @param string $purpose One of purposes(). Without one, the API token step (the first feature that used it).
 	 * @return array{kind: string, label: string, autocomplete: string, email: string, purpose: string} kind emailed (the default) or code
 	 *         (a site's own factor, nothing is sent), the field label, the autocomplete hint, the masked account email.
 	 */
-	public static function ask( int $user_id, string $purpose = self::API_TOKEN ): array {
+	public static function ask( int $user_id, string $purpose = 'api_token' ): array {
 		$default = array(
 			'kind'         => 'emailed',
 			'label'        => __( 'Code from the email', 'beltoft-services' ),
@@ -127,13 +138,13 @@ final class StepUp {
 	 * Emails a new code to the account address. A new code replaces the old one.
 	 *
 	 * @param int    $user_id Customer.
-	 * @param string $purpose One of PURPOSES.
+	 * @param string $purpose One of purposes().
 	 * @return true|\WP_Error
 	 */
 	public static function send( int $user_id, string $purpose ) {
 		$user = get_userdata( $user_id );
 
-		if ( ! $user || ! in_array( $purpose, self::PURPOSES, true ) || '' === (string) $user->user_email ) {
+		if ( ! $user || ! in_array( $purpose, self::purposes(), true ) || '' === (string) $user->user_email ) {
 			return new \WP_Error( 'step_up_send', __( 'We could not send the code. Try again in a few minutes.', 'beltoft-services' ), array( 'status' => 400 ) );
 		}
 
@@ -172,12 +183,12 @@ final class StepUp {
 	 *
 	 * @param int    $user_id Customer.
 	 * @param string $secret  What was typed.
-	 * @param string $purpose One of PURPOSES.
+	 * @param string $purpose One of purposes().
 	 */
-	public static function verify( int $user_id, string $secret, string $purpose = self::API_TOKEN ): bool {
+	public static function verify( int $user_id, string $secret, string $purpose = 'api_token' ): bool {
 		$secret = preg_replace( '/\s+/', '', $secret ) ?? '';
 
-		if ( ! get_userdata( $user_id ) || '' === $secret || strlen( $secret ) > 200 || ! in_array( $purpose, self::PURPOSES, true ) ) {
+		if ( ! get_userdata( $user_id ) || '' === $secret || strlen( $secret ) > 200 || ! in_array( $purpose, self::purposes(), true ) ) {
 			return false;
 		}
 

@@ -26,6 +26,11 @@ defined( 'ABSPATH' ) || exit;
 final class ApiTokens {
 
 	/**
+	 * The step-up purpose of making a Full access token.
+	 */
+	public const PURPOSE = 'api_token';
+
+	/**
 	 * Name of the posted field that says what to do (create or revoke).
 	 */
 	public const FIELD = 'beltoft_api_token';
@@ -63,6 +68,28 @@ final class ApiTokens {
 		add_action( 'woocommerce_after_edit_account_form', array( __CLASS__, 'render_under_form' ) );
 		add_action( 'beltoft_account_security_sections', array( __CLASS__, 'render' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_filter( 'beltoft_services_stepup_purposes', array( __CLASS__, 'stepup_purposes' ) );
+		add_filter( 'beltoft_services_stepup_text', array( __CLASS__, 'stepup_text' ), 10, 2 );
+	}
+
+	/**
+	 * Registers the purpose of the code step before a Full access token.
+	 *
+	 * @param array<int, string> $purposes Purposes so far.
+	 * @return array<int, string>
+	 */
+	public static function stepup_purposes( $purposes ): array {
+		return array_merge( (array) $purposes, array( self::PURPOSE ) );
+	}
+
+	/**
+	 * What the code email says this purpose is for.
+	 *
+	 * @param string $text    Text so far.
+	 * @param string $purpose The purpose.
+	 */
+	public static function stepup_text( $text, $purpose ): string {
+		return self::PURPOSE === $purpose ? __( 'making a Full access API token', 'beltoft-services' ) : (string) $text;
 	}
 
 	/**
@@ -169,7 +196,7 @@ final class ApiTokens {
 
 		if ( 'send_code' === ( $post['action'] ?? '' ) ) {
 			self::$prefill = array( 'name' => (string) ( $post['name'] ?? '' ), 'scope' => (string) ( $post['scope'] ?? '' ), 'sent' => false );
-			$sent          = StepUp::send( $user_id, StepUp::API_TOKEN );
+			$sent          = StepUp::send( $user_id, self::PURPOSE );
 
 			if ( is_wp_error( $sent ) ) {
 				return array( 'ok' => false, 'message' => $sent->get_error_message(), 'password' => '' );
@@ -194,7 +221,7 @@ final class ApiTokens {
 				return array( 'ok' => false, 'message' => __( 'Too many wrong attempts. Please wait a few minutes and try again.', 'beltoft-services' ), 'password' => '' );
 			}
 
-			if ( ! StepUp::verify( $user_id, (string) ( $post['secret'] ?? '' ), StepUp::API_TOKEN ) ) {
+			if ( ! StepUp::verify( $user_id, (string) ( $post['secret'] ?? '' ), self::PURPOSE ) ) {
 				set_transient( $key, (int) get_transient( $key ) + 1, self::FAIL_WINDOW );
 				self::$prefill = array( 'name' => (string) ( $post['name'] ?? '' ), 'scope' => (string) ( $post['scope'] ?? '' ), 'sent' => false );
 
@@ -277,7 +304,7 @@ final class ApiTokens {
 				'tokens'   => Tokens::all( $user->ID ),
 				'scopes'   => Tokens::scopes(),
 				'levels'   => Tokens::levels(),
-				'step_up'  => StepUp::ask( $user->ID, StepUp::API_TOKEN ),
+				'step_up'  => StepUp::ask( $user->ID, self::PURPOSE ),
 				'prefill'  => self::$prefill,
 				'audit'    => array_slice( array_reverse( Audit::lines( $user->ID ) ), 0, 20 ),
 				'result'   => self::$result,
