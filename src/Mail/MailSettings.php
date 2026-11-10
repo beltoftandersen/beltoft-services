@@ -26,10 +26,29 @@ final class MailSettings {
 	 * Hooks the tab and its fields.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 4 );
 		add_filter( 'beltoft_services_settings_tabs', array( __CLASS__, 'add_tab' ) );
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'add_section' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'add_fields' ) );
 		add_filter( 'beltoft_services_default_retention', array( MailDriver::class, 'default_retention' ), 10, 2 );
+	}
+
+	/**
+	 * Adds the mail driver to the registry.
+	 *
+	 * @param mixed $drivers Drivers keyed by id.
+	 * @return mixed
+	 */
+	public static function add_drivers( $drivers ) {
+		if ( ! is_array( $drivers ) ) {
+			return $drivers;
+		}
+
+		if ( ! isset( $drivers[ 'mail' ] ) ) {
+			$drivers[ 'mail' ] = new MailDriver();
+		}
+
+		return $drivers;
 	}
 
 	/**

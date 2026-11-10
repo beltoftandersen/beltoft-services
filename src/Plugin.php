@@ -43,9 +43,6 @@ final class Plugin {
 		Domains\DnsSchema::maybe_upgrade();
 		Oauth\Schema::maybe_upgrade();
 
-		// The WordPress hosting driver joins the registry through the same filter other plugins use.
-		add_filter( 'beltoft_services_drivers', array( Hosting\HostingDriver::class, 'add' ) );
-
 		Settings::register();
 
 		Product::register();

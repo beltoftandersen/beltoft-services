@@ -22,6 +22,7 @@ final class CoreHooks {
 	 * Registers the hooks.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 2 );
 		add_filter( 'beltoft_services_default_retention', array( ProxmoxDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( DiskDriver::class, 'default_retention' ), 10, 2 );
 		add_filter( 'beltoft_services_default_retention', array( AppLicenceDriver::class, 'default_retention' ), 10, 2 );
@@ -29,6 +30,36 @@ final class CoreHooks {
 		add_action( 'beltoft_services_state_changed', array( Operations::class, 'on_state_changed' ), 10, 3 );
 		add_filter( 'beltoft_services_park_action', array( __CLASS__, 'park_action' ), 10, 3 );
 		add_filter( 'beltoft_services_failure_alert_lines', array( DiskDriver::class, 'failure_alert_lines' ), 10, 3 );
+	}
+
+	/**
+	 * Adds the Proxmox drivers to the registry.
+	 *
+	 * @param mixed $drivers Drivers keyed by id.
+	 * @return mixed
+	 */
+	public static function add_drivers( $drivers ) {
+		if ( ! is_array( $drivers ) ) {
+			return $drivers;
+		}
+
+		if ( ! isset( $drivers[ ProxmoxDriver::ID ] ) ) {
+			$drivers[ ProxmoxDriver::ID ] = new ProxmoxDriver();
+		}
+		if ( ! isset( $drivers[ 'proxmox-db' ] ) ) {
+			$drivers[ 'proxmox-db' ] = new DbDriver();
+		}
+		if ( ! isset( $drivers[ 'proxmox-disk' ] ) ) {
+			$drivers[ 'proxmox-disk' ] = new DiskDriver();
+		}
+		if ( ! isset( $drivers[ 'proxmox-snapshots' ] ) ) {
+			$drivers[ 'proxmox-snapshots' ] = new SnapshotDriver();
+		}
+		if ( ! isset( $drivers[ 'proxmox-app' ] ) ) {
+			$drivers[ 'proxmox-app' ] = new AppLicenceDriver();
+		}
+
+		return $drivers;
 	}
 
 	/**
