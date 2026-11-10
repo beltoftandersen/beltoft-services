@@ -1,18 +1,18 @@
 <?php
 /** Customer console tab. @package BeltoftServices */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Console;
 
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
-use BeltoftServices\Proxmox\Console;
-use BeltoftServices\Proxmox\ConsoleTab;
+use BeltoftServices\Proxmox\Console\Console;
+use BeltoftServices\Proxmox\Console\ConsoleTab;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/Network/MonitoringTestCase.php';
+require_once dirname( __DIR__ ) . '/Network/MonitoringTestCase.php';
 
 class ConsoleTabTest extends MonitoringTestCase {
 	public function set_up(): void {

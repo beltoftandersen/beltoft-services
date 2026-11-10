@@ -1,7 +1,7 @@
 <?php
 /** Short-lived, one-use console tickets. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Console;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Jobs;

@@ -1,17 +1,17 @@
 <?php
 /** Live wiring is tested in a separate process with every HTTP call intercepted. @package BeltoftServices */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Console;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\ConsoleAuth;
-use BeltoftServices\Proxmox\ConsoleSessions;
+use BeltoftServices\Proxmox\Console\ConsoleAuth;
+use BeltoftServices\Proxmox\Console\ConsoleSessions;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/Network/MonitoringTestCase.php';
+require_once dirname( __DIR__ ) . '/Network/MonitoringTestCase.php';
 
 class ConsoleLiveWiringTest extends MonitoringTestCase {
 	public function set_up(): void {

@@ -1,7 +1,7 @@
 <?php
 /** Console tab for an eligible customer server. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Console;
 
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Api\Routes;

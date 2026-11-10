@@ -112,6 +112,12 @@ class NamespaceMoveTest extends TestCase {
 		'Metrics' => array( 'Proxmox', 'Proxmox\\Network' ),
 		'MetricsRoute' => array( 'Proxmox', 'Proxmox\\Network' ),
 		'LiveUsage' => array( 'Proxmox', 'Proxmox\\Network' ),
+		'Console' => array( 'Proxmox', 'Proxmox\\Console' ),
+		'ConsoleAuth' => array( 'Proxmox', 'Proxmox\\Console' ),
+		'ConsoleClient' => array( 'Proxmox', 'Proxmox\\Console' ),
+		'ConsoleRoute' => array( 'Proxmox', 'Proxmox\\Console' ),
+		'ConsoleSessions' => array( 'Proxmox', 'Proxmox\\Console' ),
+		'ConsoleTab' => array( 'Proxmox', 'Proxmox\\Console' ),
 	);
 
 	/**
@@ -138,7 +144,8 @@ class NamespaceMoveTest extends TestCase {
 		$left = array();
 
 		foreach ( $this->code_files() as $file ) {
-			$code = (string) file_get_contents( $file );
+			// The namespace line itself may equal an old class name (Proxmox\Console\Console moved out of the class named Proxmox\Console).
+			$code = (string) preg_replace( '/^namespace\s+[^;]+;/m', '', (string) file_get_contents( $file ) );
 
 			foreach ( self::MOVED as $class => $namespaces ) {
 				$old = 'BeltoftServices\\' . $namespaces[0] . '\\' . $class;

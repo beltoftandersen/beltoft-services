@@ -1,12 +1,12 @@
 <?php
 /** The console backend uses only FakeClient and an isolated WordPress test database. @package BeltoftServices */
 
-namespace BeltoftServices\Tests\Proxmox;
+namespace BeltoftServices\Tests\Proxmox\Console;
 
-use BeltoftServices\Proxmox\Console;
-use BeltoftServices\Proxmox\ConsoleAuth;
-use BeltoftServices\Proxmox\ConsoleRoute;
-use BeltoftServices\Proxmox\ConsoleSessions;
+use BeltoftServices\Proxmox\Console\Console;
+use BeltoftServices\Proxmox\Console\ConsoleAuth;
+use BeltoftServices\Proxmox\Console\ConsoleRoute;
+use BeltoftServices\Proxmox\Console\ConsoleSessions;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\Operations;
@@ -15,7 +15,7 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/Network/MonitoringTestCase.php';
+require_once dirname( __DIR__ ) . '/Network/MonitoringTestCase.php';
 
 class ConsoleBackendTest extends MonitoringTestCase {
 	public function set_up(): void {

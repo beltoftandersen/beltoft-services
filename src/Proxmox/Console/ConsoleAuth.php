@@ -1,7 +1,7 @@
 <?php
 /** Internal authorization for the console websocket proxy. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Console;
 
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;

@@ -168,9 +168,9 @@ final class Plugin {
 		// Feature hooks into the core's extension points (retention, state_changed, parking, failure mail).
 		Proxmox\Vm\CoreHooks::register();
 		Proxmox\Vm\RevealRoute::register();
-		Proxmox\ConsoleRoute::register();
-		Proxmox\ConsoleAuth::register();
-		Proxmox\ConsoleTab::register();
+		Proxmox\Console\ConsoleRoute::register();
+		Proxmox\Console\ConsoleAuth::register();
+		Proxmox\Console\ConsoleTab::register();
 		Proxmox\AppReveal::register();
 		Proxmox\AppInstall::register();
 		Proxmox\AppDomainRelease::register();

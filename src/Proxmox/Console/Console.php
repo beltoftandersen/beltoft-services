@@ -1,7 +1,7 @@
 <?php
 /** Console feature switch and eligibility. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Console;
 
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;

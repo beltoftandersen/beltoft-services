@@ -1,7 +1,7 @@
 <?php
 /** Customer REST request to open a server console. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Console;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Api\Routes;

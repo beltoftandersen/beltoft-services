@@ -1,7 +1,7 @@
 <?php
 /** Build a console client without exposing the cluster's main API credential. @package BeltoftServices */
 
-namespace BeltoftServices\Proxmox;
+namespace BeltoftServices\Proxmox\Console;
 
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\Pve\Clients;
