@@ -6,7 +6,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppLicenceCart;
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 
 require_once __DIR__ . '/PaidAppCase.php';
 
@@ -109,7 +109,7 @@ final class AppLicenceCartTest extends PaidAppCase {
 		$this->tier_product();
 		wp_set_current_user( self::factory()->user->create() );
 		$vm = $this->vm_product();
-		WC()->cart->add_to_cart( $vm->get_id(), 1, 0, array(), array( \BeltoftServices\Proxmox\Picked::KEY => array( 'app' => 'docker', 'tier' => 'pro' ) ) );
+		WC()->cart->add_to_cart( $vm->get_id(), 1, 0, array(), array( \BeltoftServices\Proxmox\Vm\Picked::KEY => array( 'app' => 'docker', 'tier' => 'pro' ) ) );
 		$html = $this->html();
 		$this->assertDoesNotMatchRegularExpression( '#<fieldset[^>]*data-app-tiers="docker"[^>]*hidden#', $html );
 		$this->assertMatchesRegularExpression( '#value="pro"[^>]*checked#', $html );

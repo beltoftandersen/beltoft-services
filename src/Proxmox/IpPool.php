@@ -8,6 +8,9 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Locks;
+use BeltoftServices\Proxmox\Vm\Schema;
+use BeltoftServices\Proxmox\Vm\Stock;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 
 defined( 'ABSPATH' ) || exit;
 

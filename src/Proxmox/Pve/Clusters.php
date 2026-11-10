@@ -12,7 +12,7 @@ use BeltoftServices\Http\Connections;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\Stock;
+use BeltoftServices\Proxmox\Vm\Stock;
 
 defined( 'ABSPATH' ) || exit;
 

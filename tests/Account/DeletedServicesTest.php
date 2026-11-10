@@ -191,7 +191,7 @@ final class DeletedServicesTest extends UsageTestCase {
 		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + 10 * DAY_IN_SECONDS ) ) );
 		$sub->save();
 		$live = Resource::find( $live->id() );
-		\BeltoftServices\Proxmox\Operations::remember_power( $live->id(), 'running' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $live->id(), 'running' );
 		$license = Licenses::find( (int) $live->license()['id'] );
 		$GLOBALS['wp']->query_vars['vps'] = (string) $license['id'];
 

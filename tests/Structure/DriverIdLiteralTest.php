@@ -20,7 +20,7 @@ class DriverIdLiteralTest extends TestCase {
 	 * @var array<string, string>
 	 */
 	private const ALLOWED = array(
-		'src/Proxmox/ProxmoxDriver.php'   => 'defines the id',
+		'src/Proxmox/Vm/ProxmoxDriver.php'   => 'defines the id',
 		'src/Proxmox/Pve/ProxmoxSettings.php' => 'the settings tab slug, not the driver id',
 		'src/Drivers/Driver.php'          => 'a docblock example',
 	);
@@ -43,6 +43,6 @@ class DriverIdLiteralTest extends TestCase {
 		}
 
 		$this->assertSame( array(), $bad, "Use ProxmoxDriver::ID instead of the literal 'proxmox'." );
-		$this->assertSame( 'proxmox', \BeltoftServices\Proxmox\ProxmoxDriver::ID );
+		$this->assertSame( 'proxmox', \BeltoftServices\Proxmox\Vm\ProxmoxDriver::ID );
 	}
 }

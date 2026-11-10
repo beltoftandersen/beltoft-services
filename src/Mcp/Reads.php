@@ -17,21 +17,21 @@ use BeltoftServices\Domains\DnsClaimRoutes;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDriver;
 use BeltoftServices\Proxmox\DbIp;
-use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\Offers;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Snapshots;
-use BeltoftServices\Proxmox\SnapshotCart;
+use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Vm\Offers;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Snapshot\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Estimate;
 use BeltoftServices\Usage\Rates;
 use BeltoftServices\Usage\Renewal;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

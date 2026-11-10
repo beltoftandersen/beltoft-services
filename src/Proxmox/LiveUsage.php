@@ -19,8 +19,11 @@ use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\LiveClient;
 use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Vm\GuestDisk;
+use BeltoftServices\Proxmox\Vm\PowerJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Jobs\PowerJobs;
 
 defined( 'ABSPATH' ) || exit;
 

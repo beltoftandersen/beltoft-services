@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Vm\Profiles;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

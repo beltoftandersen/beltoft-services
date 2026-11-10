@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Credit;
 
 use BeltoftServices\Credit\Balance;
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Tests\TestCase;
 
 /**

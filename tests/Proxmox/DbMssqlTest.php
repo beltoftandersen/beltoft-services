@@ -25,8 +25,8 @@ use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\MssqlEngine;
 use BeltoftServices\Proxmox\PostgresEngine;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\ProxmoxJobs;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
@@ -277,7 +277,7 @@ class DbMssqlTest extends TestCase {
 
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'with the family mssql-2025', $result->error() );
-		$this->assertNull( \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() ) );
+		$this->assertNull( \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() ) );
 	}
 
 	public function test_a_postgres_template_is_not_used_for_sql_server_and_the_other_way_round(): void {
@@ -294,7 +294,7 @@ class DbMssqlTest extends TestCase {
 
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'database engine of this plan (oracle) is not available', $result->error() );
-		$this->assertNull( \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() ) );
+		$this->assertNull( \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() ) );
 	}
 
 	public function test_a_plan_below_four_gb_or_of_another_version_fails_before_any_vm_is_built(): void {
@@ -303,7 +303,7 @@ class DbMssqlTest extends TestCase {
 			$result = Registry::get( 'proxmox-db' )->provision( Resource::find( $r->id() ) );
 
 			$this->assertTrue( $result->is_failed() );
-			$this->assertNull( \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() ) );
+			$this->assertNull( \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() ) );
 		}
 	}
 
@@ -313,7 +313,7 @@ class DbMssqlTest extends TestCase {
 
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'has not accepted the licence terms', $result->error() );
-		$this->assertNull( \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() ) );
+		$this->assertNull( \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() ) );
 		$this->assertNotNull( DbBuild::plan_error( Resource::find( $r->id() ) ) );
 
 		add_filter( 'beltoft_services_db_terms_accepted', '__return_true' );
@@ -431,7 +431,7 @@ class DbMssqlTest extends TestCase {
 		$meta = DbTermsField::initial_meta( array(), $license, Registry::get( 'proxmox-db' ) );
 		$this->assertSame( array( DbTermsField::META => 1761800000 ), $meta );
 
-		$this->assertSame( array( 'x' => 1 ), DbTermsField::initial_meta( array( 'x' => 1 ), $license, new \BeltoftServices\Proxmox\ProxmoxDriver() ), 'Another driver is left alone.' );
+		$this->assertSame( array( 'x' => 1 ), DbTermsField::initial_meta( array( 'x' => 1 ), $license, new \BeltoftServices\Proxmox\Vm\ProxmoxDriver() ), 'Another driver is left alone.' );
 	}
 
 	public function test_checkout_without_the_box_is_refused_and_with_it_the_line_carries_the_time(): void {

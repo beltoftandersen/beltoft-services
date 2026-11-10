@@ -1,0 +1,442 @@
+<?php
+/**
+ * The optional server name: a display label for a VM, chosen at checkout and renamed in My Account.
+ *
+ * @package BeltoftServices
+ */
+
+namespace BeltoftServices\Proxmox\Vm;
+
+use BeltoftLicenses\Account\View;
+use BeltoftServices\Checkout\BlockField;
+use BeltoftServices\Checkout\ClassicPost;
+use BeltoftServices\Checkout\OrderFieldMeta;
+use BeltoftServices\Domains\HostName;
+use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\DbEngines;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Resource;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * The optional server name, chosen at checkout and changed in My Account. It is the VM's name in
+ * Proxmox (the clone is created with it), which cloud-init uses as the guest's hostname, so ssh
+ * shows `root@web-01`. It is also stored as resource meta `server_name`, shown as the heading of the
+ * server card and where a customer email or the thank-you page names the server, and falls back to
+ * the product name (and, for the VM name, to `vm-<uuid>`) when empty.
+ *
+ * Accepted: a host name label, 1 to 63 characters, lowercase a-z, digits and hyphens, starting and
+ * ending with a letter or digit. The entry is lowercased and spaces and underscores become hyphens;
+ * everything else is refused with a message, never silently cut.
+ *
+ * The checkout field is built the way OsField and SshKeyField are: a classic field saved on the
+ * order line item and a block checkout additional field of location "order". It is asked only for
+ * a new server (DiskField::cart_server(): the one server of the cart, not a renewal, switch or
+ * resubscribe). The customer renames later through the action `rename` (Actions::run(): a job under
+ * the resource lock that changes the VM name; the hostname follows at the next reboot).
+ */
+final class ServerName {
+
+	/**
+	 * Classic checkout field name.
+	 */
+	public const POST_KEY = 'beltoft_services_server_name';
+
+	/**
+	 * Order line item meta.
+	 */
+	public const ITEM_META = '_beltoft_services_server_name';
+
+	/**
+	 * Block checkout field id.
+	 */
+	public const BLOCK_FIELD_ID = 'beltoft-services/server-name';
+
+	/**
+	 * Resource meta key.
+	 */
+	public const META = 'server_name';
+
+	/**
+	 * Resource meta key: the name the VM has been renamed to while the guest still has the old hostname.
+	 */
+	public const PENDING = 'server_name_pending';
+
+	/**
+	 * Resource meta key: when the rename was written (a boot after it ends the notice).
+	 */
+	public const PENDING_AT = 'server_name_pending_at';
+
+	/**
+	 * The customer action.
+	 */
+	public const ACTION = 'rename';
+
+	/**
+	 * Longest name (a host name label).
+	 */
+	public const MAX = 63;
+
+	/**
+	 * Hooks.
+	 */
+	public static function register(): void {
+		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render_classic' ) );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_classic' ), 10, 2 );
+		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 10, 4 );
+		add_action( 'woocommerce_init', array( __CLASS__, 'register_block_field' ) );
+		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
+		add_filter( 'beltoft_licenses_account_title', array( __CLASS__, 'title' ), 10, 2 );
+	}
+
+	/**
+	 * The meta that says the VM has the name but the guest may not.
+	 *
+	 * @param string $name Name.
+	 * @return array<string, mixed>
+	 */
+	public static function pending_meta( string $name ): array {
+		return array(
+			self::PENDING    => $name,
+			self::PENDING_AT => time(),
+		);
+	}
+
+	// -- Validation ---------------------------------------------------------------------------
+
+	/**
+	 * The canonical name, '' for an empty entry, or null when the entry is not acceptable.
+	 *
+	 * @param mixed $raw What the customer entered.
+	 * @return string|null
+	 */
+	public static function normalise( $raw ): ?string {
+		if ( ! is_string( $raw ) ) {
+			return null;
+		}
+
+		$name = trim( $raw );
+
+		if ( '' === $name ) {
+			return '';
+		}
+
+		$name = strtolower( (string) preg_replace( '/[ _]/', '-', $name ) );
+
+		// A host name label: also refuses control characters, line breaks, tags, dots and non-ASCII letters.
+		return HostName::label( $name ) ? $name : null;
+	}
+
+	/**
+	 * The message for a refused name (the entry itself is never repeated).
+	 */
+	public static function invalid_message(): string {
+		/* translators: %d: the longest name, in characters. */
+		return sprintf( _n( 'The server name is used as the hostname. Use up to %d letter (a to z), digits and hyphens, starting and ending with a letter or digit.', 'The server name is used as the hostname. Use up to %d letters (a to z), digits and hyphens, starting and ending with a letter or digit.', self::MAX, 'beltoft-services' ), self::MAX );
+	}
+
+	// -- Display ------------------------------------------------------------------------------
+
+	/**
+	 * The name of a server resource, or '' (not a VM, or none set).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function of( Resource $r ): string {
+		if ( ProxmoxDriver::ID !== $r->get( 'driver' ) ) {
+			return '';
+		}
+
+		$name = $r->get( self::META );
+
+		return is_string( $name ) && null !== self::normalise( $name ) ? (string) self::normalise( $name ) : '';
+	}
+
+	/**
+	 * Listener of beltoft_licenses_account_title: the server's name as the heading of its card. Without a
+	 * chosen name, a server this plugin created is headed by its VM name (vm-<uuid>), which is also its
+	 * hostname, so the card matches what ssh shows. A linked server (its hostname is not ours) keeps the
+	 * product name.
+	 *
+	 * @param mixed $title   Heading so far.
+	 * @param mixed $license License row.
+	 * @return mixed
+	 */
+	public static function title( $title, $license ) {
+		$r    = is_array( $license ) && ! empty( $license['id'] ) ? Resource::for_license( (int) $license['id'] ) : null;
+		$name = $r ? self::of( $r ) : '';
+
+		if ( '' !== $name ) {
+			return $name;
+		}
+
+		if ( $r && ProxmoxDriver::ID === $r->get( 'driver' ) && true !== $r->get( 'linked' ) && '' !== (string) $r->get( 'uuid' ) ) {
+			return Provision::vm_name( $r );
+		}
+
+		return $title;
+	}
+
+	/**
+	 * What a customer message calls this service: the server name, else the product name.
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $license License row.
+	 */
+	public static function display( Resource $r, array $license ): string {
+		$name = self::of( $r );
+
+		return '' !== $name ? $name : View::product_name( $license );
+	}
+
+	/**
+	 * What a customer email calls this service: the domain name for a domain, the zone for DNS hosting, "Extra disk
+	 * 50 GB on web1" for a disk, the engine for a database, else display().
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $license License row.
+	 */
+	public static function email_label( Resource $r, array $license ): string {
+		$driver = (string) $r->get( 'driver' );
+
+		// A domain is named by its domain name (the registration), and DNS hosting by the zone it serves.
+		if ( 'domain' === $driver && '' !== (string) $r->get( 'domain' ) ) {
+			return (string) $r->get( 'domain' );
+		}
+
+		if ( 'dns' === $driver && '' !== (string) $r->get( 'domain' ) ) {
+			/* translators: %s: domain name. */
+			return sprintf( __( 'DNS hosting for %s', 'beltoft-services' ), (string) $r->get( 'domain' ) );
+		}
+
+		// Business email: the email domain.
+		if ( 'mail' === $driver && '' !== (string) $r->get( 'mail_domain' ) ) {
+			return (string) $r->get( 'mail_domain' );
+		}
+
+		// An extra disk: its size and the server it belongs to.
+		if ( DiskDriver::ID === $driver && (int) $r->get( 'size_gb' ) > 0 ) {
+			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+			$on     = $server ? self::of( $server ) : '';
+
+			if ( '' !== $on ) {
+				/* translators: 1: size in GB, 2: server name. */
+				return sprintf( __( 'Extra disk %1$d GB on %2$s', 'beltoft-services' ), (int) $r->get( 'size_gb' ), $on );
+			}
+
+			/* translators: %d: size in GB. */
+			return sprintf( __( 'Extra disk %d GB', 'beltoft-services' ), (int) $r->get( 'size_gb' ) );
+		}
+
+		// A managed database: its engine and version.
+		if ( DbDriver::ID === $driver ) {
+			$label = DbEngines::for_resource( $r )->label( (array) $r->get( 'plan' ) );
+
+			if ( '' !== $label ) {
+				/* translators: %s: engine and version, such as "PostgreSQL 18". */
+				return sprintf( __( '%s database', 'beltoft-services' ), $label );
+			}
+		}
+
+		return self::display( $r, $license );
+	}
+
+	// -- Classic checkout ---------------------------------------------------------------------
+
+	/**
+	 * Shows the field for a new server.
+	 */
+	public static function render_classic(): void {
+		if ( null === DiskField::cart_server() ) {
+			return;
+		}
+
+		self::print_field( Picked::get( 'name' ) );
+	}
+
+	/**
+	 * The field (checkout and the picker print the same markup).
+	 *
+	 * @param string $value Value to start from.
+	 */
+	public static function print_field( string $value = '' ): void {
+		echo '<div class="beltoft-services-server-name">';
+
+		woocommerce_form_field(
+			self::POST_KEY,
+			array(
+				'type'              => 'text',
+				'label'             => __( 'Server name', 'beltoft-services' ),
+				'description'       => __( "Optional. Used as the server's hostname, for example web-01. You can change it later.", 'beltoft-services' ),
+				'required'          => false,
+				'custom_attributes' => array(
+					'maxlength'    => self::MAX,
+					'autocomplete' => 'off',
+					'spellcheck'   => 'false',
+				),
+			),
+			$value
+		);
+
+		echo '</div>';
+	}
+
+	/**
+	 * The submitted classic value, only inside WooCommerce's own checkout run.
+	 */
+	private static function posted(): string {
+		// A form that does not carry the field at all (the step was not shown) uses what the picker carried. A posted value, even an empty one, wins.
+		return ClassicPost::raw( self::POST_KEY, Picked::get( 'name' ) );
+	}
+
+	/**
+	 * Refuses a classic checkout with a name that is not acceptable. Empty is fine.
+	 *
+	 * @param mixed     $data   Posted data (unused).
+	 * @param \WP_Error $errors Errors.
+	 */
+	public static function validate_classic( $data, $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		if ( $errors instanceof \WP_Error && null !== DiskField::cart_server() && null === self::normalise( self::posted() ) ) {
+			$errors->add( 'beltoft_services_server_name', self::invalid_message() );
+		}
+	}
+
+	/**
+	 * Saves the name on the line item of the new server.
+	 *
+	 * @param \WC_Order_Item_Product $item   Line item.
+	 * @param string                 $key    Cart item key (unused).
+	 * @param array<string, mixed>   $values Cart item (unused).
+	 * @param \WC_Order              $order  Order (unused).
+	 */
+	public static function save_on_item( $item, $key = '', $values = array(), $order = null ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		if ( ! $item instanceof \WC_Order_Item_Product ) {
+			return;
+		}
+
+		$server = DiskField::cart_server();
+
+		if ( null === $server || (int) ( $server['item']['product_id'] ?? 0 ) !== (int) $item->get_product_id() ) {
+			return;
+		}
+
+		$name = self::normalise( self::posted() );
+
+		if ( null !== $name && '' !== $name ) {
+			$item->add_meta_data( self::ITEM_META, $name, true );
+		}
+	}
+
+	// -- Block checkout -----------------------------------------------------------------------
+
+	/**
+	 * Arguments for woocommerce_register_additional_checkout_field(): an optional text field of
+	 * location "order", hidden unless the cart holds a VM, or when it pays a renewal or switch (the
+	 * same rule as the SSH key).
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function block_field_args(): array {
+		$args = SshKeyField::block_field_args();
+
+		return array(
+			'id'                         => self::BLOCK_FIELD_ID,
+			'label'                      => __( 'Server name', 'beltoft-services' ),
+			'optionalLabel'              => __( 'Server name (optional)', 'beltoft-services' ),
+			'location'                   => 'order',
+			'type'                       => 'text',
+			'required'                   => false,
+			'show_in_order_confirmation' => true,
+			'hidden'                     => $args['hidden'],
+			'sanitize_callback'          => array( __CLASS__, 'block_sanitize' ),
+			'validate_callback'          => array( __CLASS__, 'block_validate' ),
+		);
+	}
+
+	/**
+	 * Registers the block field when this WooCommerce has the API.
+	 */
+	public static function register_block_field(): void {
+		BlockField::register( self::block_field_args() );
+	}
+
+	/**
+	 * The canonical name when acceptable, otherwise the trimmed entry (the validator then refuses it).
+	 *
+	 * @param mixed $value Entry.
+	 */
+	public static function block_sanitize( $value ): string {
+		$value = is_string( $value ) ? $value : '';
+
+		return self::normalise( $value ) ?? trim( $value );
+	}
+
+	/**
+	 * Optional; refused when not acceptable.
+	 *
+	 * @param mixed $value Entry.
+	 * @return true|\WP_Error
+	 */
+	public static function block_validate( $value ) {
+		if ( OsField::cart_is_existing_server() ) {
+			return true;
+		}
+
+		return null === self::normalise( $value ) ? new \WP_Error( 'beltoft_services_server_name', self::invalid_message() ) : true;
+	}
+
+	// -- Hand-over to the resource ---------------------------------------------------------------
+
+	/**
+	 * Adds the customer's name to the initial meta of a VM resource: the license's order line, or
+	 * the block checkout field on the order. It is checked again here.
+	 *
+	 * @param mixed                $meta    Meta so far.
+	 * @param array<string, mixed> $license License row.
+	 * @param Driver               $driver  Driver.
+	 * @return mixed
+	 */
+	public static function initial_meta( $meta, $license, $driver ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ProxmoxDriver::ID !== $driver->id() ) {
+			return $meta;
+		}
+
+		$order = ! empty( $license['order_id'] ) ? wc_get_order( (int) $license['order_id'] ) : false;
+
+		if ( ! $order instanceof \WC_Order ) {
+			return $meta;
+		}
+
+		$product_id = (int) ( $license['product_id'] ?? 0 );
+		$variation  = (int) ( $license['variation_id'] ?? 0 );
+
+		// The block checkout's field belongs to the order, not to a line: it names a server only when the order has exactly one.
+		$servers = 0;
+
+		foreach ( $order->get_items() as $item ) {
+			if ( $item instanceof \WC_Order_Item_Product && \BeltoftServices\Product::driver_for( (int) $item->get_product_id() ) instanceof Driver && ProxmoxDriver::ID === \BeltoftServices\Product::driver_for( (int) $item->get_product_id() )->id() ) {
+				++$servers;
+			}
+		}
+
+		$candidates = OrderFieldMeta::candidates( $order, $product_id, $variation, self::ITEM_META, self::BLOCK_FIELD_ID );
+
+		if ( 1 !== $servers ) {
+			array_pop( $candidates ); // The block field is the last candidate.
+		}
+
+		foreach ( $candidates as $candidate ) {
+			$name = self::normalise( $candidate );
+
+			if ( null !== $name && '' !== $name ) {
+				$meta[ self::META ] = $name;
+				break;
+			}
+		}
+
+		return $meta;
+	}
+}

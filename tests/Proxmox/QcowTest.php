@@ -8,10 +8,11 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Provision;
+use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
 
 class QcowTest extends BackupTestCase {

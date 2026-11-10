@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

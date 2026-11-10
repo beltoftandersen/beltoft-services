@@ -13,8 +13,8 @@ use BeltoftServices\Account\Panel;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Resource;
 use BeltoftServices\ThankYou;
 

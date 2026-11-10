@@ -8,6 +8,8 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Vm\Actions;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

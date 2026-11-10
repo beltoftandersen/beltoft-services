@@ -14,17 +14,17 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\LinkVm;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\Schema;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\LinkVm;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\Schema;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
-use BeltoftServices\Proxmox\Jobs\AbuseJobs;
+use BeltoftServices\Proxmox\Vm\AbuseJobs;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
-use BeltoftServices\Proxmox\Jobs\PasswordJobs;
-use BeltoftServices\Proxmox\Jobs\PowerJobs;
+use BeltoftServices\Proxmox\Vm\PasswordJobs;
+use BeltoftServices\Proxmox\Vm\PowerJobs;
 
 /**
  * A ProxmoxDriver that does not sleep.

@@ -8,7 +8,7 @@ use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Proxmox\Console;
 use BeltoftServices\Proxmox\ConsoleTab;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/MonitoringTestCase.php';

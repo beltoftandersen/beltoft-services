@@ -17,8 +17,8 @@ use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\IpPool;
-use BeltoftServices\Proxmox\OsField;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\HostName;
 
@@ -104,7 +104,7 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 	private function waiting( array $meta = array(), int $vmid = 5000 ): Resource {
 		$r  = $this->ready_vm( $vmid, 'christian.beltoft@gmail.com' );
 		$ip = '192.0.2.' . ( 10 + $vmid - 5000 );
-		$this->assertTrue( \BeltoftServices\Proxmox\VmRecords::move( $r->id(), 'node-a' ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\VmRecords::move( $r->id(), 'node-a' ) );
 		$this->assertTrue( $r->set( array_merge(
 			array(
 				'ip'          => $ip,
@@ -302,7 +302,7 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 	public function test_the_app_status_tells_the_customer_when_the_install_reports_ready(): void {
 		$r = $this->waiting( array( 'app_domain_dns' => 'live', 'app_domain' => self::NAME, 'app_domain_made' => false, 'app_state' => 'installing', 'app_request' => 'req-1', 'app_started_at' => time(), 'app_id' => 'docker', 'app_version' => '29' ) );
 		$this->fake->set_guest_file( 5000, Apps::STATUS, wp_json_encode( array( 'v' => 1, 'request' => 'req-1', 'state' => 'ready', 'step' => 'complete', 'updated' => gmdate( 'c' ) ) ) );
-		$record = \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() );
+		$record = \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() );
 		AppStatus::check( Resource::find( $r->id() ), $this->fake, $record['node'], (int) $record['vmid'] );
 
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'app_state' ) );

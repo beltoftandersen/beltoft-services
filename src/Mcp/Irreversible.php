@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 

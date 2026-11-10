@@ -17,7 +17,7 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Plan 10.1, in the pattern of Proxmox\Backups (its vzdump, prune and listing calls, with container paths and
+ * Plan 10.1, in the pattern of Proxmox\Backup\Backups (its vzdump, prune and listing calls, with container paths and
  * `type=lxc`; that class is not changed). One resumable round per backup, kept in the resource meta `backup`:
  *
  * 1. `backup.prepare`: the agent dumps the customer's databases from the shared server into the container's dump
@@ -488,7 +488,7 @@ final class HostingBackups {
 	}
 
 	/**
-	 * Is the volume id one of a container's own container backups, on a Backup Server or a directory storage? (Proxmox\Backups::volid_fits is the virtual
+	 * Is the volume id one of a container's own container backups, on a Backup Server or a directory storage? (Proxmox\Backup\Backups::volid_fits is the virtual
 	 * machine version and refuses these.)
 	 *
 	 * @param int    $vmid  Container id.

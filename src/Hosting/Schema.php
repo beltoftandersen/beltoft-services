@@ -10,7 +10,7 @@ namespace BeltoftServices\Hosting;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Creates and upgrades the WordPress hosting tables with dbDelta, the way Proxmox\Schema does, with its own
+ * Creates and upgrades the WordPress hosting tables with dbDelta, the way Proxmox\Vm\Schema does, with its own
  * version option so the two schemas never wait for each other. The version is stored only once the unique keys
  * are verified in place: they are the backstop under the allocation locks.
  */

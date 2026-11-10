@@ -13,8 +13,8 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbAccess;
 use BeltoftServices\Proxmox\DbDriver;
-use BeltoftServices\Proxmox\EmailDetails;
-use BeltoftServices\Proxmox\ServerName;
+use BeltoftServices\Proxmox\Vm\EmailDetails;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
 

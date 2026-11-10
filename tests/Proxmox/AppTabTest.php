@@ -11,14 +11,14 @@ use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Crypto;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\ClustersScreen;
-use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/MonitoringTestCase.php';
@@ -344,20 +344,20 @@ class AppTabTest extends MonitoringTestCase {
 	public function test_the_tiles_assets_load_on_a_server_page_only(): void {
 		$r = $this->with_app();
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		wp_dequeue_script( \BeltoftServices\Proxmox\Tiles::HANDLE );
-		wp_dequeue_style( \BeltoftServices\Proxmox\Tiles::HANDLE );
+		wp_dequeue_script( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE );
+		wp_dequeue_style( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE );
 
 		unset( $GLOBALS['wp']->query_vars['vps'] );
 		do_action( 'beltoft_services_account_assets', 'parent-handle', ServerLinks::slug() );
-		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not on the list.' );
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ), 'Not on the list.' );
 
 		$GLOBALS['wp']->query_vars['vps'] = (string) $r->license()['id'];
 		do_action( 'beltoft_services_account_assets', 'parent-handle', 'licenses' );
-		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ), 'Not on another endpoint.' );
+		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ), 'Not on another endpoint.' );
 
 		do_action( 'beltoft_services_account_assets', 'parent-handle', ServerLinks::slug() );
-		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
-		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Tiles::HANDLE, 'enqueued' ) );
+		$this->assertTrue( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ) );
+		$this->assertTrue( wp_style_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ) );
 	}
 
 	public function test_the_reinstall_tiles_keep_the_system_open_say_what_an_app_runs_on_and_offer_the_version_select(): void {
@@ -780,9 +780,9 @@ class AppTabTest extends MonitoringTestCase {
 			$r = $this->with_app( array( 'app_id' => 'n8n', 'app_version' => '2', 'app_state' => 'installing', 'app_request' => 'req-' . $case, 'app_started_at' => time() - 60 ), 5004 + ( 'bad' === $case ? 1 : 0 ) );
 			$fake = new \BeltoftServices\Proxmox\Pve\FakeClient();
 			$fake->add_node( 'node-a' );
-			$fake->add_vm( array( 'vmid' => (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'], 'node' => 'node-a', 'status' => 'running', 'config' => array( 'agent' => '1' ) ) );
-			$fake->simulate_app( (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'], 'req-' . $case, 'ready', 'complete', array( 'root_email' => 'a@example.invalid', 'root_password' => 'Pw-1', 'encryption_key' => $enc ) );
-			\BeltoftServices\Proxmox\AppStatus::check( $r, $fake, 'node-a', (int) \BeltoftServices\Proxmox\VmRecords::for_resource( $r->id() )['vmid'] );
+			$fake->add_vm( array( 'vmid' => (int) \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() )['vmid'], 'node' => 'node-a', 'status' => 'running', 'config' => array( 'agent' => '1' ) ) );
+			$fake->simulate_app( (int) \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() )['vmid'], 'req-' . $case, 'ready', 'complete', array( 'root_email' => 'a@example.invalid', 'root_password' => 'Pw-1', 'encryption_key' => $enc ) );
+			\BeltoftServices\Proxmox\AppStatus::check( $r, $fake, 'node-a', (int) \BeltoftServices\Proxmox\Vm\VmRecords::for_resource( $r->id() )['vmid'] );
 			$fresh = Resource::find( $r->id() );
 			if ( 'good' === $case ) {
 				$this->assertSame( 'ready', $fresh->get( 'app_state' ) );

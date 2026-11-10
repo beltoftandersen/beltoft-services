@@ -13,7 +13,7 @@ use BeltoftServices\Proxmox\IpHistory;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\IpWho;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
 use BeltoftServices\Tests\TestCase;

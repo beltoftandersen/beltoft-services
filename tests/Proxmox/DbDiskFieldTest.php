@@ -11,8 +11,9 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbDiskField;
 use BeltoftServices\Proxmox\DbIpField;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 /**
  * Rendering rules, the swap, the cart line and the checkout check.
@@ -120,7 +121,7 @@ class DbDiskFieldTest extends BackupTestCase {
 	private function room(): void {
 		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		// What the capacity job does next: the stored stock status follows the readings.
-		\BeltoftServices\Proxmox\Stock::sync( 'lab' );
+		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 	}
 
 	private function in_cart(): int {

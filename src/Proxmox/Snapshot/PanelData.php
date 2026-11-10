@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Proxmox\Snapshot;
 
-use BeltoftServices\Proxmox\Snapshots;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

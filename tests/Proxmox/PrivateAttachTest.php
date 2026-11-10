@@ -11,15 +11,15 @@ use BeltoftServices\Cli\PrivateNetCommand;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Actions;
+use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\NetworkTab;
 use BeltoftServices\Proxmox\PrivateAttach;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\ProxmoxDriver;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
@@ -272,9 +272,9 @@ class PrivateAttachTest extends TestCase {
 
 	public function test_check_refuses_attach_of_a_stopped_server_before_any_call(): void {
 		$r = $this->ready();
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'stopped' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'stopped' );
 		$this->assertNotNull( Actions::check( $r, 'private_attach', array() ) );
-		\BeltoftServices\Proxmox\Operations::remember_power( $r->id(), 'running' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
 		$this->assertNull( Actions::check( $r, 'private_attach', array() ) );
 	}
 

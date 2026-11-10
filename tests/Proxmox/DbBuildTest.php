@@ -22,10 +22,10 @@ use BeltoftServices\Proxmox\DbRoutes;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\Profiles;
-use BeltoftServices\Proxmox\Schema;
-use BeltoftServices\Proxmox\VmRecords;
-use BeltoftServices\Proxmox\VpsProfile;
+use BeltoftServices\Proxmox\Vm\Profiles;
+use BeltoftServices\Proxmox\Vm\Schema;
+use BeltoftServices\Proxmox\Vm\VmRecords;
+use BeltoftServices\Proxmox\Vm\VpsProfile;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

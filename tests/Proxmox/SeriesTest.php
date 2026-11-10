@@ -2,7 +2,7 @@
 /** VM metrics source tests. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 
 require_once __DIR__ . '/MonitoringTestCase.php';
 

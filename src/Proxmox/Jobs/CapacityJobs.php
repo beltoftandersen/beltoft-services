@@ -14,9 +14,9 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftServices\Proxmox\Pve\Placement;
-use BeltoftServices\Proxmox\ProxmoxJobs;
-use BeltoftServices\Proxmox\Stock;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
+use BeltoftServices\Proxmox\Vm\Stock;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

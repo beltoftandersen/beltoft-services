@@ -4,6 +4,10 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Proxmox\Vm\GuestDisk;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

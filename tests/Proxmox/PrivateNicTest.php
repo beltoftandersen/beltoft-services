@@ -11,8 +11,8 @@ use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\PrivateNets;
 use BeltoftServices\Proxmox\PrivateNic;
-use BeltoftServices\Proxmox\Schema;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\Schema;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 

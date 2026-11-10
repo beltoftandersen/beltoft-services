@@ -18,9 +18,9 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\DbEngines;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/Proxmox/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Backup/BackupTestCase.php';
 
 class DbPickerTest extends BackupTestCase {
 

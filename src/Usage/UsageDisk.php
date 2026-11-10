@@ -12,9 +12,9 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\DiskField;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

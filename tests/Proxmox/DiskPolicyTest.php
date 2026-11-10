@@ -8,8 +8,9 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once __DIR__ . '/BackupTestCase.php';
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 class DiskPolicyTest extends BackupTestCase {
 	public function set_up(): void {
@@ -118,13 +119,13 @@ class DiskPolicyTest extends BackupTestCase {
 	public function test_a_paused_disk_is_shown_as_detached_with_its_data_kept(): void {
 		$disk = $this->ready_disk();
 		$server = Resource::for_license( (int) $disk->get( 'server_license' ) );
-		$items = \BeltoftServices\Proxmox\DiskPanels::server( $server )['items'];
+		$items = \BeltoftServices\Proxmox\Disk\DiskPanels::server( $server )['items'];
 		$this->assertFalse( $items[0]['paused'] );
 		$this->assertTrue( $disk->transition( 'paused', 'test' ) );
-		$items = \BeltoftServices\Proxmox\DiskPanels::server( $server )['items'];
+		$items = \BeltoftServices\Proxmox\Disk\DiskPanels::server( $server )['items'];
 		$this->assertTrue( $items[0]['paused'] );
 		ob_start();
-		\BeltoftServices\Proxmox\DiskPanels::account( Resource::find( $disk->id() ) );
+		\BeltoftServices\Proxmox\Disk\DiskPanels::account( Resource::find( $disk->id() ) );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'This disk is detached from your server because its subscription is not active. Your data is kept until the disk is deleted.', $html );
 		$this->assertStringNotContainsString( 'sudo mkfs', $html, 'A detached disk shows no format instructions.' );
@@ -260,11 +261,11 @@ class DiskPolicyTest extends BackupTestCase {
 		$server_sub->update_status( 'pending-cancel' );
 		$fresh = wcs_get_subscription( $disk_sub->get_id() );
 		$this->assertSame( 'pending-cancel', $fresh->get_status() );
-		$this->assertSame( $server_sub->get_id(), (int) $fresh->get_meta( \BeltoftServices\Proxmox\DiskCascade::MARKER ) );
+		$this->assertSame( $server_sub->get_id(), (int) $fresh->get_meta( \BeltoftServices\Proxmox\Disk\DiskCascade::MARKER ) );
 		wcs_get_subscription( $server_sub->get_id() )->update_status( 'active' );
 		$back = wcs_get_subscription( $disk_sub->get_id() );
 		$this->assertSame( 'active', $back->get_status() );
-		$this->assertSame( '', (string) $back->get_meta( \BeltoftServices\Proxmox\DiskCascade::MARKER ) );
+		$this->assertSame( '', (string) $back->get_meta( \BeltoftServices\Proxmox\Disk\DiskCascade::MARKER ) );
 		$this->assertSame( 0, (int) $back->get_time( 'end' ) );
 		$this->assertStringContainsString( 'Active again with its server', $this->notes( $disk_sub ) );
 		$this->assertStringContainsString( 'is active again with this server', $this->notes( $server_sub ) );
@@ -274,7 +275,7 @@ class DiskPolicyTest extends BackupTestCase {
 		list( , $server_sub, , $own_sub ) = $this->server_and_disk();
 		$server_sub->update_status( 'pending-cancel' );
 		$own_sub = wcs_get_subscription( $own_sub->get_id() );
-		$own_sub->delete_meta_data( \BeltoftServices\Proxmox\DiskCascade::MARKER );
+		$own_sub->delete_meta_data( \BeltoftServices\Proxmox\Disk\DiskCascade::MARKER );
 		$own_sub->save();
 		wcs_get_subscription( $server_sub->get_id() )->update_status( 'active' );
 		$this->assertSame( 'pending-cancel', wcs_get_subscription( $own_sub->get_id() )->get_status(), 'No marker: the customer ended it themselves.' );

@@ -9,7 +9,7 @@ namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Account\ServerPicker;
-use BeltoftServices\Proxmox\Backups;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\DbDisk;
 use BeltoftServices\Proxmox\DbDiskField;
 use BeltoftServices\Proxmox\DbIpField;

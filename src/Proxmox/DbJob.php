@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Vm\Access;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

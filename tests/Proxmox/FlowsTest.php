@@ -16,7 +16,7 @@ use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
 use BeltoftServices\Proxmox\Flows;
 use BeltoftServices\Proxmox\Quarantine;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/FirewallTestCase.php';

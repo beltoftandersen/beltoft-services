@@ -38,7 +38,7 @@ final class Plugin {
 		// settings API the feature settings screens extend), then Product and Jobs (core), then the drivers'
 		// settings and connections, then the feature parts. Features add to core filters and actions; core
 		// never names a feature.
-		Proxmox\Schema::maybe_upgrade();
+		Proxmox\Vm\Schema::maybe_upgrade();
 		Hosting\Schema::maybe_upgrade();
 		Domains\DnsSchema::maybe_upgrade();
 		Oauth\Schema::maybe_upgrade();
@@ -166,8 +166,8 @@ final class Plugin {
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
 		// Feature hooks into the core's extension points (retention, state_changed, parking, failure mail).
-		Proxmox\CoreHooks::register();
-		Proxmox\RevealRoute::register();
+		Proxmox\Vm\CoreHooks::register();
+		Proxmox\Vm\RevealRoute::register();
 		Proxmox\ConsoleRoute::register();
 		Proxmox\ConsoleAuth::register();
 		Proxmox\ConsoleTab::register();
@@ -183,14 +183,14 @@ final class Plugin {
 		Proxmox\FirewallRoute::register();
 		Proxmox\FirewallTab::register();
 		Proxmox\NetworkTab::register();
-		Proxmox\Switches::register();
-		Proxmox\Upgrades::register();
-		Proxmox\Credentials::register();
-		Proxmox\ServerName::register();
-		Proxmox\SshKeyField::register();
-		Proxmox\OsField::register();
+		Proxmox\Vm\Switches::register();
+		Proxmox\Vm\Upgrades::register();
+		Proxmox\Vm\Credentials::register();
+		Proxmox\Vm\ServerName::register();
+		Proxmox\Vm\SshKeyField::register();
+		Proxmox\Vm\OsField::register();
 		Proxmox\DbTermsField::register();
-		Proxmox\Tiles::register();
+		Proxmox\Vm\Tiles::register();
 		Proxmox\AppField::register();
 		Proxmox\AppLicence::register();
 		Proxmox\AppLicenceCart::register();
@@ -198,26 +198,26 @@ final class Plugin {
 		Proxmox\AppReinstallPaid::register();
 		Proxmox\AppReinstall::register();
 		Proxmox\AppTab::register();
-		Proxmox\BackupField::register();
+		Proxmox\Backup\BackupField::register();
 		Proxmox\DbIpField::register();
 		Proxmox\DbDiskField::register();
-		Proxmox\DiskMeta::register();
-		Proxmox\DiskCascade::register();
+		Proxmox\Disk\DiskMeta::register();
+		Proxmox\Disk\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
-		Proxmox\DiskCart::register();
-		Proxmox\SnapshotMeta::register();
-		Proxmox\SnapshotCart::register();
-		Proxmox\DiskField::register();
-		Proxmox\Actions::register();
+		Proxmox\Disk\DiskCart::register();
+		Proxmox\Snapshot\SnapshotMeta::register();
+		Proxmox\Snapshot\SnapshotCart::register();
+		Proxmox\Disk\DiskField::register();
+		Proxmox\Vm\Actions::register();
 		Proxmox\DbActions::register();
 		Proxmox\DbRoutes::register();
 		Proxmox\DbAccessRoute::register();
 		Proxmox\DbNeedsServer::register();
 		Proxmox\DbNetGuard::register();
-		Proxmox\Panels::register();
-		Proxmox\EmailDetails::register();
-		Proxmox\ProxmoxJobs::register();
-		Proxmox\Stock::register();
+		Proxmox\Vm\Panels::register();
+		Proxmox\Vm\EmailDetails::register();
+		Proxmox\Vm\ProxmoxJobs::register();
+		Proxmox\Vm\Stock::register();
 		Proxmox\IpPoolScreen::register();
 		Admin\Panel::register();
 		Admin\Screen::register();

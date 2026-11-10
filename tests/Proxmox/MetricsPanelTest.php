@@ -2,7 +2,7 @@
 /** Customer usage panel tests. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Proxmox\Panels;
+use BeltoftServices\Proxmox\Vm\Panels;
 
 require_once __DIR__ . '/MonitoringTestCase.php';
 

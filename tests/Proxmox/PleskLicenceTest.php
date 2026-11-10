@@ -13,7 +13,7 @@ use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppLicence;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\OsField;
+use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\PleskLicence;
 use BeltoftServices\Resource;
 

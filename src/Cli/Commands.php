@@ -20,20 +20,20 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\IpfilterReport;
 use BeltoftServices\Proxmox\IpWho;
-use BeltoftServices\Proxmox\LinkVm;
+use BeltoftServices\Proxmox\Vm\LinkVm;
 use BeltoftServices\Proxmox\Metrics;
-use BeltoftServices\Proxmox\Operations;
-use BeltoftServices\Proxmox\GuestDisk;
-use BeltoftServices\Proxmox\DiskDriver;
-use BeltoftServices\Proxmox\DiskMeta;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\GuestDisk;
+use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Quarantine;
-use BeltoftServices\Proxmox\Provision;
-use BeltoftServices\Proxmox\VmRecords;
+use BeltoftServices\Proxmox\Vm\Provision;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 

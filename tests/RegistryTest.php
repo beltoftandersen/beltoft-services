@@ -36,10 +36,10 @@ class RegistryTest extends TestCase {
 	public function test_the_shipped_drivers_are_registered_in_todays_order(): void {
 		$golden = array(
 			'http'              => \BeltoftServices\Http\HttpDriver::class,
-			'proxmox'           => \BeltoftServices\Proxmox\ProxmoxDriver::class,
+			'proxmox'           => \BeltoftServices\Proxmox\Vm\ProxmoxDriver::class,
 			'proxmox-db'        => \BeltoftServices\Proxmox\DbDriver::class,
-			'proxmox-disk'      => \BeltoftServices\Proxmox\DiskDriver::class,
-			'proxmox-snapshots' => \BeltoftServices\Proxmox\SnapshotDriver::class,
+			'proxmox-disk'      => \BeltoftServices\Proxmox\Disk\DiskDriver::class,
+			'proxmox-snapshots' => \BeltoftServices\Proxmox\Snapshot\SnapshotDriver::class,
 			'proxmox-app'       => \BeltoftServices\Proxmox\AppLicenceDriver::class,
 			'domain'            => \BeltoftServices\Domains\DomainDriver::class,
 			'dns'               => \BeltoftServices\Domains\DnsDriver::class,

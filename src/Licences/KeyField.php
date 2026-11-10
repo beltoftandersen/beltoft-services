@@ -14,8 +14,8 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Apps;
 use BeltoftServices\Proxmox\IpPool;
 use BeltoftServices\Proxmox\PleskLicence;
-use BeltoftServices\Proxmox\ServerName;
-use BeltoftServices\Proxmox\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ServerName;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

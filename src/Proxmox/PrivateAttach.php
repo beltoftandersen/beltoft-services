@@ -15,6 +15,13 @@ use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\Vm\Actions;
+use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Proxmox\Vm\Profiles;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\ServerName;
+use BeltoftServices\Proxmox\Vm\VmRecords;
+use BeltoftServices\Proxmox\Vm\VpsProfile;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 

@@ -8,6 +8,8 @@
 namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Backup\BackupField;
+use BeltoftServices\Proxmox\Backup\CartSwap;
 
 defined( 'ABSPATH' ) || exit;
 

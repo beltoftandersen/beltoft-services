@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * A hosting plan is sold out when no node of its group has room (HostingCapacity). Unlike the virtual machine
  * stock there is nothing remote to cache: the room is counted from the records and the node sizes, so the filters
  * answer live and no stored status is written. Hosting needs no public address per customer, so the address pool
- * plays no part. Like Proxmox\Stock it only ever closes, and an existing customer's renewal, switch or
+ * plays no part. Like Proxmox\Vm\Stock it only ever closes, and an existing customer's renewal, switch or
  * resubscribe is never blocked.
  */
 final class Stock {

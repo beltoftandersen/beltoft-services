@@ -8,7 +8,7 @@
 namespace BeltoftServices\Credit;
 
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\Schema;
+use BeltoftServices\Proxmox\Vm\Schema;
 
 defined( 'ABSPATH' ) || exit;
 

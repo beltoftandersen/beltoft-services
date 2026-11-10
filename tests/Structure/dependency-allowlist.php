@@ -5,13 +5,13 @@
  * 2026-11-01: 11 entries (FirewallRoute, ThankYou) were already there but hidden by a namespace parsing bug, now fixed.
  */
 return array(
-	'LineNames.php -> Proxmox\DiskDriver',
-	'LineNames.php -> Proxmox\ServerName',
+	'LineNames.php -> Proxmox\Disk\DiskDriver',
+	'LineNames.php -> Proxmox\Vm\ServerName',
 	'LineNames.php -> Usage\Account',
 	'LineNames.php -> Usage\Rates',
 	'Product.php -> Http\Connections',
 	'Product.php -> Usage\Rates',
-	'Product.php -> Proxmox\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
+	'Product.php -> Proxmox\Vm\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
 	'Proxmox/FirewallRoute.php -> Mcp\Endpoint',
 	'ThankYou.php -> Account\Panel',
 	'ThankYou.php -> Account\ServerLinks',

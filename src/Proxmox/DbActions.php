@@ -9,8 +9,11 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\Vm\Actions;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 

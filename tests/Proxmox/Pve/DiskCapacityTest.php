@@ -5,12 +5,12 @@ namespace BeltoftServices\Tests\Proxmox\Pve;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Stock;
+use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\BackupTestCase;
+use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
-require_once dirname( __DIR__ ) . '/BackupTestCase.php';
+require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
 class DiskCapacityTest extends BackupTestCase {
 	public function tear_down(): void {

@@ -15,6 +15,7 @@ use BeltoftServices\Domains\DomainSettings;
 use BeltoftServices\Domains\LiveClient;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;

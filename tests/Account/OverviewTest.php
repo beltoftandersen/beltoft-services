@@ -10,7 +10,7 @@ use BeltoftServices\Account\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\Operations;
+use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\MonitoringTestCase;
 

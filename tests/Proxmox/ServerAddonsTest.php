@@ -10,12 +10,13 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Disk\DiskGuide;
+use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Reconciler;
-use BeltoftServices\Proxmox\DiskGuide;
-use BeltoftServices\Proxmox\SnapshotDriver;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Snapshot\SnapshotsTestCase;
 
-require_once __DIR__ . '/SnapshotsTestCase.php';
+require_once __DIR__ . '/Snapshot/SnapshotsTestCase.php';
 
 class ServerAddonsTest extends SnapshotsTestCase {
 

@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox;
 use BeltoftServices\Alerts;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\BackupField;
+use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\DbDiskField;
 use BeltoftServices\Proxmox\DbIpField;
 use BeltoftServices\Usage\Breakdown;

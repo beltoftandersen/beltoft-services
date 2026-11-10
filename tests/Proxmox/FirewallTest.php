@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Firewall;
 use BeltoftServices\Proxmox\FirewallRules;
-use BeltoftServices\Proxmox\Provision;
+use BeltoftServices\Proxmox\Vm\Provision;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/FirewallTestCase.php';
@@ -527,12 +527,12 @@ class FirewallTest extends FirewallTestCase {
 	public function test_the_actions_are_offered_only_when_editable_and_apply_needs_a_managed_server(): void {
 		list( $r ) = $this->ready();
 		$this->assertSame( array(), FirewallRules::offered( $r ) );
-		$this->assertArrayNotHasKey( 'fw_apply', ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->customer_actions( $r ) );
+		$this->assertArrayNotHasKey( 'fw_apply', ( new \BeltoftServices\Proxmox\Vm\ProxmoxDriver() )->customer_actions( $r ) );
 
 		$this->save_cluster( array( 'fw_enabled' => '1' ) );
 		$r = Resource::find( $r->id() );
 		$this->assertSame( array( 'fw_apply', 'fw_reset' ), array_keys( FirewallRules::offered( $r ) ) );
-		$this->assertArrayHasKey( 'fw_reset', ( new \BeltoftServices\Proxmox\ProxmoxDriver() )->customer_actions( $r ) );
+		$this->assertArrayHasKey( 'fw_reset', ( new \BeltoftServices\Proxmox\Vm\ProxmoxDriver() )->customer_actions( $r ) );
 		$this->assertNotNull( FirewallRules::check( $r, 'fw_apply', array() ), 'Nothing to apply before the customer set it up.' );
 		$this->assertNull( FirewallRules::check( $r, 'fw_reset', array() ) );
 	}
@@ -552,7 +552,7 @@ class FirewallTest extends FirewallTestCase {
 	public function test_the_admin_panel_shows_the_firewall_line_and_the_error(): void {
 		$show = static function ( Resource $r ): string {
 			ob_start();
-			\BeltoftServices\Proxmox\Panels::admin( $r );
+			\BeltoftServices\Proxmox\Vm\Panels::admin( $r );
 
 			return (string) ob_get_clean();
 		};

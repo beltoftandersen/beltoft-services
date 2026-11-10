@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Proxmox\Addon;
 
-use BeltoftServices\Proxmox\DiskField;
+use BeltoftServices\Proxmox\Disk\DiskField;
 
 defined( 'ABSPATH' ) || exit;
 

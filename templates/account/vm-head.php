@@ -2,7 +2,7 @@
 /**
  * The head of a server's page: the back link with the buttons for what the customer does most on one row, then the name, and the state line (the state, then the plan's name, or what the page is doing: see assets/status.js).
  *
- * Variables (set by BeltoftServices\Proxmox\Panels::page_head()): $title, $group (getting-ready, ready, paused, removed or failed),
+ * Variables (set by BeltoftServices\Proxmox\Vm\Panels::page_head()): $title, $group (getting-ready, ready, paused, removed or failed),
  * $badge (the state text), $message (a sentence about the state), $show_power (the power replaces the state text),
  * $busy, $show_message (print the message line: not ready, or the app is not done), $power (running, stopped or empty), $plan (the plan's name, or empty),
  * $resource_id, $can_rename (the name can be changed: the name is a button that opens the field), $server_name (the name now set, or empty), $ip, $ssh_user, $actions (start, reboot, shutdown => label, the ones offered now), $billing_note (a pay-as-you-go server: "A stopped server is still billed...", else empty).
