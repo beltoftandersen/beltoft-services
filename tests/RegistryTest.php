@@ -40,7 +40,7 @@ class RegistryTest extends TestCase {
 			'proxmox-db'        => \BeltoftServices\Proxmox\Db\DbDriver::class,
 			'proxmox-disk'      => \BeltoftServices\Proxmox\Disk\DiskDriver::class,
 			'proxmox-snapshots' => \BeltoftServices\Proxmox\Snapshot\SnapshotDriver::class,
-			'proxmox-app'       => \BeltoftServices\Proxmox\AppLicenceDriver::class,
+			'proxmox-app'       => \BeltoftServices\Apps\AppLicenceDriver::class,
 			'domain'            => \BeltoftServices\Domains\DomainDriver::class,
 			'dns'               => \BeltoftServices\Domains\DnsDriver::class,
 			'mail'              => \BeltoftServices\Mail\MailDriver::class,

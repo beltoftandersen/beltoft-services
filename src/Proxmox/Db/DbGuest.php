@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Db;
 
-use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Apps\Apps;
 use BeltoftServices\Proxmox\Pve\Client;
 
 defined( 'ABSPATH' ) || exit;

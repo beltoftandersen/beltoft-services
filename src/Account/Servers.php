@@ -261,13 +261,13 @@ final class Servers {
 
 		$driver = (string) $resource->get( 'driver' );
 
-		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Proxmox\AppLicenceDriver::ID !== $driver ) {
+		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Apps\AppLicenceDriver::ID !== $driver ) {
 			return null;
 		}
 
 		return array(
 			'license_id' => max( 0, (int) $resource->get( 'server_license' ) ),
-			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : \BeltoftServices\Proxmox\AppTab::SLUG ),
+			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : \BeltoftServices\Apps\AppTab::SLUG ),
 			'resource'   => $resource,
 		);
 	}
@@ -473,12 +473,12 @@ final class Servers {
 		$title  = (string) ( $view['product'] ?? '' );
 		$kind   = \BeltoftLicenses\Account\View::product_name( $license );
 
-		$app = $resource->on_hold() ? '' : \BeltoftServices\Proxmox\AppProgress::line( $resource );
+		$app = $resource->on_hold() ? '' : \BeltoftServices\Apps\AppProgress::line( $resource );
 
 		if ( '' !== $app ) {
 			// The server is up but its app is not done: the row says so, never "Running" or "Ready".
 			$text = $app;
-			$tone = 'failed' === \BeltoftServices\Proxmox\AppProgress::state( $resource ) ? 'bad' : 'busy';
+			$tone = 'failed' === \BeltoftServices\Apps\AppProgress::state( $resource ) ? 'bad' : 'busy';
 		} elseif ( $busy ) {
 			$text = __( 'Working', 'beltoft-services' );
 			$tone = 'busy';

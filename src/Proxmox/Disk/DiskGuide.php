@@ -9,7 +9,7 @@ namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;

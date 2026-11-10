@@ -315,7 +315,7 @@ final class OverviewData {
 				'sep'   => ':',
 				'state' => __( 'Working', 'beltoft-services' ),
 				'name'  => $names[ $id ] ?? View::product_name( $license ),
-				'text'  => 'app' === $progress['kind'] ? \BeltoftServices\Proxmox\AppProgress::line( $resource ) : (string) $progress['title'],
+				'text'  => 'app' === $progress['kind'] ? \BeltoftServices\Apps\AppProgress::line( $resource ) : (string) $progress['title'],
 				'link'  => self::follow_url( $license ),
 				'label' => __( 'Follow it', 'beltoft-services' ),
 			);

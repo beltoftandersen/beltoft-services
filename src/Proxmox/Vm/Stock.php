@@ -10,7 +10,7 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
-use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;

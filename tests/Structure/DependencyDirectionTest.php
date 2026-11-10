@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 class DependencyDirectionTest extends TestCase {
 
-	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'Credit', 'Card', 'Admin', 'Cli' );
+	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'Credit', 'Card', 'Admin', 'Cli', 'Apps' );
 
 	/**
 	 * Layer => layers it must not use.

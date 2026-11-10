@@ -8,7 +8,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonLink;
-use BeltoftServices\Proxmox\AppLicenceDriver;
+use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\Stock;

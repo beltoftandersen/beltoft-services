@@ -51,7 +51,7 @@ final class ToolsMapTest extends McpTestCase {
 	}
 
 	private function find_class( string $short ): ?string {
-		foreach ( array( 'Proxmox', 'Proxmox\\Vm', 'Proxmox\\Disk', 'Proxmox\\Snapshot', 'Proxmox\\Backup', 'Proxmox\\Network', 'Proxmox\\Console', 'Proxmox\\Db', 'Domains' ) as $ns ) {
+		foreach ( array( 'Proxmox', 'Proxmox\\Vm', 'Proxmox\\Disk', 'Proxmox\\Snapshot', 'Proxmox\\Backup', 'Proxmox\\Network', 'Proxmox\\Console', 'Proxmox\\Db', 'Apps', 'Domains' ) as $ns ) {
 			if ( class_exists( 'BeltoftServices\\' . $ns . '\\' . $short ) ) {
 				return 'BeltoftServices\\' . $ns . '\\' . $short;
 			}

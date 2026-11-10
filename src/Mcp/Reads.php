@@ -16,7 +16,7 @@ use BeltoftServices\Api\Services;
 use BeltoftServices\Domains\DnsClaimRoutes;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Proxmox\Apps;
+use BeltoftServices\Apps\Apps;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Db\DbDisk;

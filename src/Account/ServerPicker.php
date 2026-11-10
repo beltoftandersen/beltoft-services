@@ -8,9 +8,9 @@
 namespace BeltoftServices\Account;
 
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\AppField;
-use BeltoftServices\Proxmox\AppLicence;
-use BeltoftServices\Proxmox\AppLicenceCart;
+use BeltoftServices\Apps\AppField;
+use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\AppLicenceCart;
 use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Disk\DiskField;

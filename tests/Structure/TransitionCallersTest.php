@@ -23,7 +23,7 @@ class TransitionCallersTest extends TestCase {
 	 */
 	private const ALLOWED = array(
 		'Reconciler.php'            => 'move() is the path that notifies: it calls transition() and then notify(); mark_deleted() calls notify() itself right after the transition and the close.',
-		'Proxmox/AppLicence.php'    => 'Announces "cancelled" itself; a notify would add the generic deleted email on top.',
+		'Apps/AppLicence.php'       => 'Announces "cancelled" itself; a notify would add the generic deleted email on top.',
 		'Proxmox/Addon/AddonCascade.php' => 'Ends the add-ons of a deleted server; each kind\'s after_parent_deleted does its own notice (a notify would double it or release capacity twice).',
 		'Proxmox/Vm/RestoreSteps.php'  => 'A failed disk keeps its volume; a notify would release capacity for a volume left in place. It alerts the admin.',
 		'Proxmox/Vm/Reinstall.php'   => 'The reinstall moves to provisioning; no listener acts on it and the later ready does not mail twice.',

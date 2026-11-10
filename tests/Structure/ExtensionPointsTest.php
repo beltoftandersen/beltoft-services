@@ -7,8 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
-use BeltoftServices\Proxmox\AppInstall;
-use BeltoftServices\Proxmox\AppStatus;
+use BeltoftServices\Apps\AppInstall;
+use BeltoftServices\Apps\AppStatus;
 use BeltoftServices\Proxmox\Vm\CoreHooks;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
@@ -48,7 +48,7 @@ class ExtensionPointsTest extends TestCase {
 	public function test_core_hooks_register_proxmox_state_and_retention_handlers(): void {
 		$this->assertNotFalse( has_filter( 'beltoft_services_default_retention', array( \BeltoftServices\Proxmox\Vm\ProxmoxDriver::class, 'default_retention' ) ) );
 		$this->assertNotFalse( has_filter( 'beltoft_services_default_retention', array( DiskDriver::class, 'default_retention' ) ) );
-		$this->assertNotFalse( has_filter( 'beltoft_services_default_retention', array( \BeltoftServices\Proxmox\AppLicenceDriver::class, 'default_retention' ) ) );
+		$this->assertNotFalse( has_filter( 'beltoft_services_default_retention', array( \BeltoftServices\Apps\AppLicenceDriver::class, 'default_retention' ) ) );
 		$this->assertNotFalse( has_action( 'beltoft_services_state_changed', array( \BeltoftServices\Proxmox\Vm\Access::class, 'on_state_changed' ) ) );
 		$this->assertNotFalse( has_action( 'beltoft_services_state_changed', array( \BeltoftServices\Proxmox\Vm\Operations::class, 'on_state_changed' ) ) );
 		$this->assertNotFalse( has_action( 'beltoft_services_state_changed', array( \BeltoftServices\Mail\MailAccess::class, 'on_state_changed' ) ) );
