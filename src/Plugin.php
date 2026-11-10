@@ -228,6 +228,7 @@ final class Plugin {
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Emails\Emails::register();
+		Usage\CoreHooks::register();
 		Usage\Meter::register();
 		Usage\Threshold::register();
 		Usage\Account::register();

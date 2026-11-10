@@ -15,7 +15,4 @@ return array(
 	'LineNames.php -> Proxmox\Vm\ServerName',
 	'LineNames.php -> Usage\Account',
 	'LineNames.php -> Usage\Rates',
-	'Product.php -> Http\Connections',
-	'Product.php -> Usage\Rates',
-	'Product.php -> Proxmox\Vm\ProxmoxDriver', // The Proxmox-only fields of the product form: was the bare literal, now the constant.
 );

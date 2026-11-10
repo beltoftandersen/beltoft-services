@@ -15,6 +15,7 @@ use BeltoftServices\Proxmox\Disk\DiskGuide;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
+use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -40,6 +41,43 @@ final class CoreHooks {
 		add_filter( 'beltoft_services_failure_alert_lines', array( DiskDriver::class, 'failure_alert_lines' ), 10, 3 );
 		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'thankyou_row' ), 10, 3 );
 		add_filter( 'beltoft_services_thankyou_dashboard_url', array( __CLASS__, 'dashboard_url' ), 10, 2 );
+		add_action( 'beltoft_services_product_panel_after_driver', array( __CLASS__, 'picker_field' ), 10, 2 );
+		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_picker' ) );
+	}
+
+	/**
+	 * The "Show in the server picker" box of a server product.
+	 *
+	 * @param mixed $product   The product being edited, null for a new one.
+	 * @param mixed $driver_id The saved driver id.
+	 */
+	public static function picker_field( $product = null, $driver_id = '' ): void {
+		if ( ProxmoxDriver::ID !== $driver_id ) {
+			return;
+		}
+
+		woocommerce_wp_checkbox(
+			array(
+				'id'          => Product::META_PICKER,
+				'label'       => __( 'Show in the server picker', 'beltoft-services' ),
+				'description' => __( 'Offer this product on the customer\'s New server page in My account. Its variations without backups are the plans.', 'beltoft-services' ),
+				'value'       => $product && 'no' === $product->get_meta( Product::META_PICKER ) ? 'no' : 'yes',
+			)
+		);
+		echo '<input type="hidden" name="' . esc_attr( Product::FIELD_PICKER ) . '" value="1">';
+	}
+
+	/**
+	 * Saves the picker box, only when the panel printed it (a product that just became a server shows it after this save).
+	 *
+	 * @param mixed $product The product.
+	 */
+	public static function save_picker( $product ): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified by WooCommerce (woocommerce_meta_nonce) before woocommerce_admin_process_product_object.
+		if ( $product instanceof \WC_Product && isset( $_POST[ Product::FIELD_PICKER ] ) ) {
+			$product->update_meta_data( Product::META_PICKER, isset( $_POST[ Product::META_PICKER ] ) ? 'yes' : 'no' );
+		}
+		// phpcs:enable
 	}
 
 	/**

@@ -9,8 +9,6 @@ namespace BeltoftServices;
 
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Http\Connections;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -426,40 +424,15 @@ final class Product {
 				'value'       => $driver_id,
 			)
 		);
-		if ( ProxmoxDriver::ID === $driver_id ) {
-			woocommerce_wp_checkbox(
-				array(
-					'id'          => self::META_PICKER,
-					'label'       => __( 'Show in the server picker', 'beltoft-services' ),
-					'description' => __( 'Offer this product on the customer\'s New server page in My account. Its variations without backups are the plans.', 'beltoft-services' ),
-					'value'       => $product && 'no' === $product->get_meta( self::META_PICKER ) ? 'no' : 'yes',
-				)
-			);
-			echo '<input type="hidden" name="' . esc_attr( self::FIELD_PICKER ) . '" value="1">';
-		}
+		/**
+		 * Fields of a feature that sit right under the driver choice of the Service panel (the Proxmox server picker
+		 * box, then the HTTP connection).
+		 *
+		 * @param \WC_Product|null $product   The product being edited, null for a new one.
+		 * @param string           $driver_id The saved driver id, '' for none.
+		 */
+		do_action( 'beltoft_services_product_panel_after_driver', $product, $driver_id );
 
-		$connection  = $product ? (string) $product->get_meta( self::META_CONNECTION ) : '';
-		$connections = array( '' => __( '— None —', 'beltoft-services' ) );
-
-		foreach ( Connections::all() as $id => $saved_connection ) {
-			$connections[ $id ] = '' === (string) $saved_connection['label'] ? $id : sprintf( '%1$s (%2$s)', $saved_connection['label'], $id );
-		}
-
-		if ( '' !== $connection && ! isset( $connections[ $connection ] ) ) {
-			/* translators: %s: connection id. */
-			$connections[ $connection ] = sprintf( __( '%s (missing)', 'beltoft-services' ), $connection );
-		}
-
-		woocommerce_wp_select(
-			array(
-				'id'          => self::META_CONNECTION,
-				'label'       => __( 'Connection', 'beltoft-services' ),
-				'description' => __( 'The connection to use (HTTP driver only). Add connections under Settings → Services → Connections.', 'beltoft-services' ),
-				'desc_tip'    => true,
-				'options'     => $connections,
-				'value'       => $connection,
-			)
-		);
 		woocommerce_wp_text_input(
 			array(
 				'id'                => self::META_RETENTION,
@@ -506,19 +479,14 @@ final class Product {
 			)
 		);
 
-		if ( '' !== $driver_id ) {
-			woocommerce_wp_text_input(
-				array(
-					'id'                => \BeltoftServices\Usage\Rates::META_PREMIUM,
-					'label'             => __( 'Pay as you go premium (%)', 'beltoft-services' ),
-					'description'       => __( 'Added to the monthly price for the hourly rate and the monthly cap of pay as you go variations. Empty means 10.', 'beltoft-services' ),
-					'desc_tip'          => true,
-					'type'              => 'number',
-					'custom_attributes' => array( 'min' => '0', 'step' => '0.1' ),
-					'value'             => $product ? $product->get_meta( \BeltoftServices\Usage\Rates::META_PREMIUM ) : '',
-				)
-			);
-		}
+		/**
+		 * Fields of a feature after the renewal reminder of the Service panel (the pay as you go premium), before the
+		 * driver's plan fields.
+		 *
+		 * @param \WC_Product|null $product   The product being edited, null for a new one.
+		 * @param string           $driver_id The saved driver id, '' for none.
+		 */
+		do_action( 'beltoft_services_product_panel_after_reminder', $product, $driver_id );
 
 		$driver = '' === $driver_id ? null : Registry::get( $driver_id );
 		if ( $driver ) {
@@ -614,7 +582,6 @@ final class Product {
 		if ( '' !== $driver_id ) {
 			self::remember_slug( $slug );
 		}
-		$product->update_meta_data( self::META_CONNECTION, isset( $_POST[ self::META_CONNECTION ] ) ? sanitize_key( wp_unslash( $_POST[ self::META_CONNECTION ] ) ) : '' );
 
 		$retention = isset( $_POST[ self::META_RETENTION ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::META_RETENTION ] ) ) ) : '';
 		$product->update_meta_data( self::META_RETENTION, '' === $retention ? '' : (string) absint( $retention ) );
@@ -622,15 +589,14 @@ final class Product {
 		$product->update_meta_data( RenewalReminder::META, isset( $_POST[ RenewalReminder::META ] ) ? RenewalReminder::clean_days( sanitize_text_field( wp_unslash( $_POST[ RenewalReminder::META ] ) ) ) : '' );
 		$product->update_meta_data( IntroCoupon::META, isset( $_POST[ IntroCoupon::META ] ) ? IntroCoupon::clean_code( sanitize_text_field( wp_unslash( $_POST[ IntroCoupon::META ] ) ) ) : '' );
 
-		if ( '' !== $driver_id && isset( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) {
-			$premium = trim( sanitize_text_field( wp_unslash( $_POST[ \BeltoftServices\Usage\Rates::META_PREMIUM ] ) ) );
-			$product->update_meta_data( \BeltoftServices\Usage\Rates::META_PREMIUM, is_numeric( $premium ) ? (string) max( 0, (float) $premium ) : '' );
-		}
-
-		// Only when the panel printed the box (a product that just became a server shows it after this save).
-		if ( isset( $_POST[ self::FIELD_PICKER ] ) ) {
-			$product->update_meta_data( self::META_PICKER, isset( $_POST[ self::META_PICKER ] ) ? 'yes' : 'no' );
-		}
+		/**
+		 * A feature saves its own fields of the Service panel. WooCommerce has verified the form's nonce and the user's
+		 * capability. The driver id is the one just saved.
+		 *
+		 * @param \WC_Product $product   The product.
+		 * @param string      $driver_id The saved driver id, '' for none.
+		 */
+		do_action( 'beltoft_services_product_save', $product, $driver_id );
 
 		$rendered = isset( $_POST[ self::FIELD_MARKER ] ) ? sanitize_key( wp_unslash( $_POST[ self::FIELD_MARKER ] ) ) : '';
 		if ( $driver && $rendered === $driver_id ) {
