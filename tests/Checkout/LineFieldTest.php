@@ -25,9 +25,19 @@ class LineFieldTest extends TestCase {
 		parent::tear_down();
 	}
 
+	private function simple_product(): \WC_Product_Simple {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Line field test' );
+		$product->set_regular_price( '10' );
+		$product->set_status( 'publish' );
+		$product->save();
+
+		return $product;
+	}
+
 	public function test_cart_lines_skip_renewals_and_switches_and_keep_the_products_lines(): void {
-		$mine   = $this->service_product( 'hosting', array(), array( 'slug' => 'lf-a-' . wp_generate_password( 4, false ) ) );
-		$other  = $this->service_product( 'hosting', array(), array( 'slug' => 'lf-b-' . wp_generate_password( 4, false ) ) );
+		$mine   = $this->simple_product();
+		$other  = $this->simple_product();
 		$is_one = static fn( int $id ): bool => $id === $mine->get_id();
 
 		WC()->cart->empty_cart();
