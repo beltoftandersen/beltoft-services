@@ -153,25 +153,25 @@ final class DiskMeta {
 		return $labels[ $disk->id() ] ?? __( 'Data disk', 'beltoft-services' );
 	}
 
-	/** Reclaim reservations after failure; account for disks lost with a deleted parent VM. */
+	/** Reclaim reservations after failure. */
 	public static function state_changed( $resource, $old, $new ): void {
 		if ( ! $resource instanceof Resource ) {
 			return;
 		}
 		if ( DiskDriver::ID === $resource->get( 'driver' ) && in_array( $new, array( 'failed', 'deleted' ), true ) ) {
 			DiskCapacity::release( $resource );
-			return;
 		}
-		if ( 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
-			return;
-		}
-		foreach ( self::for_server( $resource ) as $disk ) {
-			// Silent on purpose: the capacity is released below (see Resource::transition()).
-			if ( $disk->transition( 'deleted', 'Parent server deleted; extra disk no longer available' ) ) {
-				$disk->close();
-				DiskCapacity::release( $disk );
-				Alerts::admin( $disk, 'The parent server was deleted while the extra disk subscription may still bill. Check subscription #' . (int) ( $disk->license()['subscription_id'] ?? 0 ) . '.' );
-			}
-		}
+	}
+
+	/**
+	 * A disk whose server was deleted has been ended by AddonCascade: close it, release its capacity and tell the admin.
+	 *
+	 * @param Resource $disk Disk.
+	 */
+	public static function after_parent_deleted( Resource $disk ): void {
+		// Silent on purpose: the capacity is released here (see Resource::transition()).
+		$disk->close();
+		DiskCapacity::release( $disk );
+		Alerts::admin( $disk, 'The parent server was deleted while the extra disk subscription may still bill. Check subscription #' . (int) ( $disk->license()['subscription_id'] ?? 0 ) . '.' );
 	}
 }
