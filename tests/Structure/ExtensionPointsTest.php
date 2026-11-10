@@ -11,7 +11,7 @@ use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\Vm\CoreHooks;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
-use BeltoftServices\Proxmox\PrivateAttach;
+use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Tests\TestCase;
 
 /**

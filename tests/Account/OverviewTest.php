@@ -12,9 +12,9 @@ use BeltoftServices\Product;
 use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\MonitoringTestCase;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once dirname( __DIR__ ) . '/Proxmox/MonitoringTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Network/MonitoringTestCase.php';
 
 class OverviewTest extends MonitoringTestCase {
 	public function set_up(): void {

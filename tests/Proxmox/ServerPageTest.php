@@ -7,8 +7,9 @@ use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\Servers;
 use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 class ServerPageTest extends MonitoringTestCase {
 	private function as_owner( $r ): array {

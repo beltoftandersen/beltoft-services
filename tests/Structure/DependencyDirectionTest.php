@@ -34,9 +34,21 @@ class DependencyDirectionTest extends TestCase {
 
 	/**
 	 * Layer => single classes it must not use (finer than FORBIDDEN): Proxmox shares ServerLinks with Account, never Servers.
+	 * An entry ending in a backslash is a namespace prefix: Hosting reaches into Proxmox only through Proxmox\Pve, so every
+	 * other Proxmox sub-namespace is out of bounds for it.
 	 */
 	private const FORBIDDEN_CLASSES = array(
 		'Proxmox' => array( 'Account\\Servers' ),
+		'Hosting' => array(
+			'Proxmox\\Vm\\',
+			'Proxmox\\Disk\\',
+			'Proxmox\\Snapshot\\',
+			'Proxmox\\Backup\\',
+			'Proxmox\\Network\\',
+			'Proxmox\\Console\\',
+			'Proxmox\\Db\\',
+			'Proxmox\\Addon\\',
+		),
 	);
 
 	/**
@@ -146,7 +158,7 @@ class DependencyDirectionTest extends TestCase {
 			foreach ( array_unique( $names ) as $name ) {
 				$to = $this->layer( $name );
 
-				if ( in_array( $to, self::FORBIDDEN[ $from ] ?? array(), true ) || in_array( $this->class_of( $name ), self::FORBIDDEN_CLASSES[ $from ] ?? array(), true ) ) {
+				if ( in_array( $to, self::FORBIDDEN[ $from ] ?? array(), true ) || $this->in_forbidden_classes( $this->class_of( $name ), self::FORBIDDEN_CLASSES[ $from ] ?? array() ) ) {
 					$out[ $rel . ' -> ' . $this->class_of( $name ) ] = true;
 				}
 			}
@@ -190,6 +202,21 @@ class DependencyDirectionTest extends TestCase {
 		}
 
 		return $parts[1];
+	}
+
+	/**
+	 * Whether a class is listed, exactly or by namespace prefix (an entry that ends in a backslash).
+	 *
+	 * @param string[] $list Entries.
+	 */
+	private function in_forbidden_classes( string $class_name, array $list ): bool {
+		foreach ( $list as $entry ) {
+			if ( $class_name === $entry || ( '\\' === substr( $entry, -1 ) && 0 === strpos( $class_name, $entry ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function class_of( string $name ): string {

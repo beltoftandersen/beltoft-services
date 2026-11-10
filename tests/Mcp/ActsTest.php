@@ -12,7 +12,7 @@ use BeltoftServices\Api\Tokens;
 use BeltoftServices\Jobs;
 use BeltoftServices\Mcp\Audit;
 use BeltoftServices\Mcp\Tools;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/McpTestCase.php';

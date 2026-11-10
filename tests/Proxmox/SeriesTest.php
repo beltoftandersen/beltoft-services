@@ -3,8 +3,9 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Proxmox\Vm\Operations;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 class SeriesTest extends MonitoringTestCase {
 	public function test_owned_vm_series_uses_expected_endpoint_and_range(): void {

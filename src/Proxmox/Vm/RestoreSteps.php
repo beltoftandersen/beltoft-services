@@ -10,13 +10,13 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DbActions;
+use BeltoftServices\Proxmox\Db\DbActions;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Disk\DiskSteps;
-use BeltoftServices\Proxmox\Firewall;
-use BeltoftServices\Proxmox\FirewallRules;
-use BeltoftServices\Proxmox\PrivateNets;
-use BeltoftServices\Proxmox\PrivateNic;
+use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\FirewallRules;
+use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 
 defined( 'ABSPATH' ) || exit;

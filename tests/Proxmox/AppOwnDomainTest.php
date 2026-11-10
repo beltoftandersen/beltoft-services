@@ -16,13 +16,14 @@ use BeltoftServices\Proxmox\AppReinstall;
 use BeltoftServices\Proxmox\AppStatus;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Proxmox\Apps;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\HostName;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 /**
  * Documentation values only. DNS answers come from a filter, Proxmox is FakeClient, no mail leaves the test.

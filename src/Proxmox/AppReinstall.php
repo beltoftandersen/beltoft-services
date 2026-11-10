@@ -5,6 +5,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Panels;

@@ -8,9 +8,9 @@
 namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Proxmox\Pve\Client;
-use BeltoftServices\Proxmox\DbActions;
-use BeltoftServices\Proxmox\DbMonitor;
-use BeltoftServices\Proxmox\Monitor;
+use BeltoftServices\Proxmox\Db\DbActions;
+use BeltoftServices\Proxmox\Db\DbMonitor;
+use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftLicenses\Events;
 use BeltoftServices\Jobs;

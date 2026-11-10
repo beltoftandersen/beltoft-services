@@ -9,7 +9,7 @@ namespace BeltoftServices\Proxmox\Backup;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DbDriver;
+use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;

@@ -11,7 +11,7 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\ProxmoxSettings;
-use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Settings;
 use BeltoftServices\Tests\TestCase;
 

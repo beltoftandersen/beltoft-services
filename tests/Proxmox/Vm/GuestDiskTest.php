@@ -3,16 +3,16 @@
 namespace BeltoftServices\Tests\Proxmox\Vm;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\MetricsRoute;
+use BeltoftServices\Proxmox\Network\MetricsRoute;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Vm\DiskJobs;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
-use BeltoftServices\Tests\Proxmox\MonitoringTestCase;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once dirname( __DIR__ ) . '/MonitoringTestCase.php';
+require_once dirname( __DIR__ ) . '/Network/MonitoringTestCase.php';
 
 class GuestDiskTest extends MonitoringTestCase {
 	private function fixture(): array {

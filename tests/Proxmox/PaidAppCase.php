@@ -13,14 +13,15 @@ use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\AppField;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 require_once __DIR__ . '/PaidAppFixtures.php';
 
 /**

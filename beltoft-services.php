@@ -33,6 +33,7 @@ define(
 	'BELTOFT_SERVICES_CLASS_ALIASES',
 	array(
 		'BeltoftServices\\Proxmox\\Backups'      => 'BeltoftServices\\Proxmox\\Backup\\Backups',
+		'BeltoftServices\\Proxmox\\DbIpField'     => 'BeltoftServices\\Proxmox\\Db\\DbIpField',
 		'BeltoftServices\\Proxmox\\DiskField'    => 'BeltoftServices\\Proxmox\\Disk\\DiskField',
 		'BeltoftServices\\Proxmox\\OsField'      => 'BeltoftServices\\Proxmox\\Vm\\OsField',
 		'BeltoftServices\\Proxmox\\Picked'       => 'BeltoftServices\\Proxmox\\Vm\\Picked',

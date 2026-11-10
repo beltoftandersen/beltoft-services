@@ -700,7 +700,7 @@ abstract class ServiceArea {
 
 		// A database's head has the state line, the power buttons and no renewal date on a pay as you go service.
 		if ( self::$page['area'] instanceof Databases ) {
-			$card = \BeltoftServices\Proxmox\DbCard::view( $resource );
+			$card = \BeltoftServices\Proxmox\Db\DbCard::view( $resource );
 			$file = 'db-head.php';
 
 			if ( 'usage' === (string) ( self::$page['license']['source'] ?? '' ) ) {

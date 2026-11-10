@@ -12,9 +12,9 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Proxmox\FirewallTestCase;
+use BeltoftServices\Tests\Proxmox\Network\FirewallTestCase;
 
-require_once dirname( __DIR__ ) . '/Proxmox/FirewallTestCase.php';
+require_once dirname( __DIR__ ) . '/Proxmox/Network/FirewallTestCase.php';
 require_once __DIR__ . '/CallsTools.php';
 
 /**

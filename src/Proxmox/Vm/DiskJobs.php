@@ -8,8 +8,8 @@
 namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\DbGrow;
-use BeltoftServices\Proxmox\Monitor;
+use BeltoftServices\Proxmox\Db\DbGrow;
+use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;

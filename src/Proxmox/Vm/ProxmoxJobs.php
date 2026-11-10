@@ -11,7 +11,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backup\BackupJobs;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
 use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
-use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 
 defined( 'ABSPATH' ) || exit;
 

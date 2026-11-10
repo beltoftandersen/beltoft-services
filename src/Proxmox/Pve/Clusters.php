@@ -9,9 +9,9 @@ namespace BeltoftServices\Proxmox\Pve;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Http\Connections;
-use BeltoftServices\Proxmox\Firewall;
+use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Jobs\CapacityJobs;
-use BeltoftServices\Proxmox\PrivateNets;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Vm\Stock;
 
 defined( 'ABSPATH' ) || exit;

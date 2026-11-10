@@ -1,6 +1,6 @@
 <?php
 /**
- * The card of a managed database. Printed by BeltoftServices\Proxmox\DbCard::render().
+ * The card of a managed database. Printed by BeltoftServices\Proxmox\Db\DbCard::render().
  *
  * Variables: $view (see DbCard::view()), $nav (the page's tabs, slug => title, or empty on a card), $active (the tab shown),
  * $link (a callable that gives a tab's address). The password is never part of this template: the button asks the
@@ -172,7 +172,7 @@ $beltoft_services_db_wait = array(
 					<?php endforeach; ?>
 				</ul>
 			<?php elseif ( $view['stopped'] ) : ?>
-				<p><?php echo esc_html( sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?> <?php echo esc_html( \BeltoftServices\Proxmox\DbPower::start_first() ); ?></p>
+				<p><?php echo esc_html( sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?> <?php echo esc_html( \BeltoftServices\Proxmox\Db\DbPower::start_first() ); ?></p>
 			<?php else : ?>
 				<p><?php echo esc_html( $beltoft_services_policy['working'] ? __( 'A change is being applied. This can take a minute.', 'beltoft-services' ) : sprintf( /* translators: %s: the current setting */ __( 'Current setting: %s', 'beltoft-services' ), (string) $beltoft_services_policy['current'] ) ); ?></p>
 			<?php endif; ?>
@@ -210,7 +210,7 @@ $beltoft_services_db_wait = array(
 			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
 				<h4><?php esc_html_e( 'Who may connect', 'beltoft-services' ); ?></h4>
 				<?php if ( $view['stopped'] ) : ?>
-					<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\DbPower::start_first() ); ?> <?php esc_html_e( 'The list can be changed while the database runs.', 'beltoft-services' ); ?></p>
+					<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\Db\DbPower::start_first() ); ?> <?php esc_html_e( 'The list can be changed while the database runs.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
 				<p class="description"><?php esc_html_e( 'Only these addresses can reach the database over its public IP address. Everything else is refused.', 'beltoft-services' ); ?></p>
 				<?php if ( $beltoft_services_access['world'] ) : ?>
@@ -360,7 +360,7 @@ $beltoft_services_db_wait = array(
 		<?php elseif ( $view['stopped'] ) : ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
-				<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\DbPower::start_first() ); ?></p>
+				<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\Db\DbPower::start_first() ); ?></p>
 			</div>
 		<?php elseif ( $view['resetting'] ) : ?>
 			<p><?php esc_html_e( 'A new password is being made. This can take a minute.', 'beltoft-services' ); ?></p>

@@ -13,12 +13,13 @@ use BeltoftServices\Proxmox\AppInstall;
 use BeltoftServices\Proxmox\AppTab;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\IpPool;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
+use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 
-require_once __DIR__ . '/MonitoringTestCase.php';
+require_once __DIR__ . '/Network/MonitoringTestCase.php';
 
 final class AppReinstallDomainTest extends MonitoringTestCase {
 	public function set_up(): void {

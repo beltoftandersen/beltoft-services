@@ -33,7 +33,7 @@ final class BillingField {
 	public const HANDLE = 'beltoft-services-billing-field';
 
 	/** Products of these drivers have the Billing choice (a pay as you go sibling variation, found from the Billing attribute). */
-	private const DRIVERS = array( ProxmoxDriver::ID, \BeltoftServices\Proxmox\DbDriver::ID );
+	private const DRIVERS = array( ProxmoxDriver::ID, \BeltoftServices\Proxmox\Db\DbDriver::ID );
 
 	/**
 	 * Hooks.

@@ -7,6 +7,7 @@ use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;

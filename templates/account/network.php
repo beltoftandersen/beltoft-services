@@ -1,6 +1,6 @@
 <?php
 /**
- * The Network tab of a server page. Printed by BeltoftServices\Proxmox\NetworkTab::pane().
+ * The Network tab of a server page. Printed by BeltoftServices\Proxmox\Network\NetworkTab::pane().
  *
  * Variables: $view (PrivateAttach::view()): resource_id, state (empty, attaching, attached, detaching, failed),
  * address, cidr, others (address and name of the customer's other servers on the network), notice, mac,

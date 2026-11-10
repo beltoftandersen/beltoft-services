@@ -210,6 +210,6 @@ final class Actions {
 	 * @return true|string
 	 */
 	public static function quarantine_lift( Resource $r, string $who ) {
-		return \BeltoftServices\Proxmox\Quarantine::request_lift( $r, $who ) ? true : 'no_quarantine';
+		return \BeltoftServices\Proxmox\Network\Quarantine::request_lift( $r, $who ) ? true : 'no_quarantine';
 	}
 }

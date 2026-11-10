@@ -196,17 +196,17 @@ class PowerLagTest extends BackupTestCase {
 			return Resource::find( $id );
 		};
 
-		$within = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'shutdown', 10 ) );
+		$within = \BeltoftServices\Proxmox\Network\PowerWatch::view( $set( $r->id(), 'shutdown', 10 ) );
 		$this->assertTrue( $within['power_pending'] );
 
-		$over = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'shutdown', \BeltoftServices\Proxmox\PowerWatch::WINDOW + 5 ) );
+		$over = \BeltoftServices\Proxmox\Network\PowerWatch::view( $set( $r->id(), 'shutdown', \BeltoftServices\Proxmox\Network\PowerWatch::WINDOW + 5 ) );
 		$this->assertFalse( $over['power_pending'] );
 		$this->assertTrue( $over['power_failed'], 'The page is told not to claim it.' );
 
 		// A failed result, an old one and an action without a wanted power say nothing.
-		$old = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'shutdown', 3600 ) );
+		$old = \BeltoftServices\Proxmox\Network\PowerWatch::view( $set( $r->id(), 'shutdown', 3600 ) );
 		$this->assertFalse( $old['power_pending'] || $old['power_failed'] );
-		$reboot = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'reboot', 5 ) );
+		$reboot = \BeltoftServices\Proxmox\Network\PowerWatch::view( $set( $r->id(), 'reboot', 5 ) );
 		$this->assertFalse( $reboot['power_pending'] || $reboot['power_failed'] );
 
 		// A start: the VM is off, the job said ok, the VM does not run yet (status lags), then it does.
@@ -214,10 +214,10 @@ class PowerLagTest extends BackupTestCase {
 		$fresh = Resource::find( $r->id() );
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
 		( new ProxmoxDriver() )->act( $fresh, 'start', array() );
-		$begin = \BeltoftServices\Proxmox\PowerWatch::view( $set( $r->id(), 'start', 5 ) );
+		$begin = \BeltoftServices\Proxmox\Network\PowerWatch::view( $set( $r->id(), 'start', 5 ) );
 		$this->assertTrue( $begin['power_pending'] || 'running' === $begin['power'] );
 		$this->fake->elapse( 61 );
-		$end = \BeltoftServices\Proxmox\PowerWatch::view( Resource::find( $r->id() ) );
+		$end = \BeltoftServices\Proxmox\Network\PowerWatch::view( Resource::find( $r->id() ) );
 		$this->assertFalse( $end['power_pending'] );
 		$this->assertSame( 'running', $end['power'] );
 	}

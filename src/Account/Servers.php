@@ -355,7 +355,7 @@ final class Servers {
 
 		if ( $rows ) {
 			ServiceArea::actions( $buttons, false );
-			\BeltoftServices\Proxmox\LiveUsage::enqueue();
+			\BeltoftServices\Proxmox\Network\LiveUsage::enqueue();
 			include self::file( 'servers-list.php' );
 		}
 
@@ -504,7 +504,7 @@ final class Servers {
 
 			$memory = (int) ( $plan['memory_mb'] ?? 0 ) * 1048576;
 			// The guest's own figure (MemAvailable) when a fresh reading is kept: PVE counts page cache as used.
-			$guest = \BeltoftServices\Proxmox\LiveUsage::cached_memory( $resource->id() );
+			$guest = \BeltoftServices\Proxmox\Network\LiveUsage::cached_memory( $resource->id() );
 
 			if ( null !== $guest ) {
 				$bars[] = array(
@@ -555,7 +555,7 @@ final class Servers {
 			'state'   => $text,
 			'tone'    => $tone,
 			'renews'  => ServerLinks::renewal( $license ),
-			'note'    => \BeltoftServices\Proxmox\Quarantine::active( $resource ) ? __( 'Outgoing internet traffic is blocked', 'beltoft-services' ) : '',
+			'note'    => \BeltoftServices\Proxmox\Network\Quarantine::active( $resource ) ? __( 'Outgoing internet traffic is blocked', 'beltoft-services' ) : '',
 			'bars'    => $bars,
 		);
 	}

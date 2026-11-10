@@ -5,6 +5,7 @@ namespace BeltoftServices\Proxmox;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;

@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Proxmox\ConsoleTab;
+use BeltoftServices\Proxmox\Console\ConsoleTab;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Vm\Operations;
