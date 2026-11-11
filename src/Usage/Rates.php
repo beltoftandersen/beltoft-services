@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Currency;
 use BeltoftServices\Product;
 use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Backup\Backups;
@@ -362,7 +363,8 @@ final class Rates {
 
 	/**
 	 * The monthly price (excluding tax) a pay-as-you-go variation is priced from: its monthly sibling's
-	 * price, or else the variation's own meta `_beltoft_services_usage_monthly`. Null when neither exists.
+	 * price, or else the variation's own meta `_beltoft_services_usage_monthly` (a number in the shop's currency, so only
+	 * while the current currency is the shop's). Null when neither exists.
 	 *
 	 * @param \WC_Product_Variation $v Pay-as-you-go variation.
 	 */
@@ -371,6 +373,11 @@ final class Rates {
 
 		if ( $sibling && '' !== (string) $sibling->get_price() ) {
 			return (float) wc_get_price_excluding_tax( $sibling );
+		}
+
+		// The meta is a figure in the shop's currency: in another currency a missing price is no price, never a relabelled figure.
+		if ( Currency::current() !== Currency::base() ) {
+			return null;
 		}
 
 		$meta = (string) $v->get_meta( self::META_MONTHLY );

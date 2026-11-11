@@ -9,7 +9,8 @@ namespace BeltoftServices\Usage;
 
 use BeltoftServices\Credit\Balance;
 use BeltoftServices\Credit\Config;
-use BeltoftServices\Settings;
+use BeltoftServices\Alerts;
+use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -43,15 +44,34 @@ final class Minimum {
 	}
 
 	/**
-	 * The minimum, incl. VAT, in the store currency (0: off).
+	 * The minimum, incl. VAT, in a currency (the store currency by default; 0: off). A currency with no amount for it has no
+	 * minimum (0), and the admin is told once.
+	 *
+	 * @param string $currency Currency code, '' for the current one.
 	 */
-	public static function amount(): float {
+	public static function amount( string $currency = '' ): float {
+		$currency = Currency::or_current( $currency );
+		$setting  = Currency::amount( 'usage_minimum', $currency );
+
 		/**
 		 * The least amount charged to a card for a usage invoice, incl. VAT. 0 turns it off.
 		 *
-		 * @param float $amount Setting usage_minimum.
+		 * @param float  $amount   Setting usage_minimum in that currency (0 when the currency has none).
+		 * @param string $currency Currency code.
 		 */
-		return max( 0.0, (float) apply_filters( 'beltoft_services_usage_minimum', (float) Settings::get( 'usage_minimum' ) ) );
+		$amount = max( 0.0, (float) apply_filters( 'beltoft_services_usage_minimum', (float) $setting, $currency ) );
+
+		if ( null === $setting && $amount <= 0 ) {
+			Alerts::notify(
+				/* translators: %s: currency code */
+				sprintf( __( 'No usage minimum for %s', 'beltoft-services' ), $currency ),
+				array( sprintf( 'The setting usage_minimum has no amount in %s, so no minimum applies to usage invoices in that currency.', $currency ) ),
+				null,
+				'beltoft_services_usage_minimum_' . strtolower( $currency )
+			);
+		}
+
+		return $amount;
 	}
 
 	/**
@@ -69,11 +89,12 @@ final class Minimum {
 	 * Whether an invoice of this total (cents, incl. VAT) is carried: what is left for the card after credit that covers
 	 * it is above 0 and under the minimum.
 	 *
-	 * @param int $total_cents Order total incl. VAT.
-	 * @param int $user_id     Customer.
+	 * @param int    $total_cents Order total incl. VAT.
+	 * @param int    $user_id     Customer.
+	 * @param string $currency    Currency of the invoice, '' for the current one.
 	 */
-	public static function carries( int $total_cents, int $user_id ): bool {
-		$minimum = (int) round( self::amount() * 100 );
+	public static function carries( int $total_cents, int $user_id, string $currency = '' ): bool {
+		$minimum = (int) round( self::amount( $currency ) * 100 );
 
 		if ( $minimum < 1 || $total_cents < 1 ) {
 			return false;
@@ -96,7 +117,7 @@ final class Minimum {
 	public static function carry( \WC_Order $order, \WC_Subscription $account, bool $early ): string {
 		$cents    = Balance::cents( $order->get_total() );
 		$amount   = Rates::money( $cents / 100, 2, $order->get_currency() );
-		$minimum  = Rates::money( self::amount(), 2, $order->get_currency() );
+		$minimum  = Rates::money( self::amount( $order->get_currency() ), 2, $order->get_currency() );
 
 		foreach ( $order->get_items( 'fee' ) as $id => $fee ) {
 			if ( '' !== (string) $fee->get_meta( '_beltoft_services_usage_item' ) ) {

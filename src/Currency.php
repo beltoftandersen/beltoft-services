@@ -106,11 +106,21 @@ final class Currency {
 	 * @return mixed The amount, or null for none.
 	 */
 	public static function amount( string $key, string $currency = '' ) {
-		$currency = self::clean( $currency );
-		$currency = '' !== $currency ? $currency : self::current();
+		$currency = self::or_current( $currency );
 		$value    = self::base() === $currency ? Settings::get( $key ) : null;
 
 		return apply_filters( 'beltoft_services_amount_setting', $value, $key, $currency );
+	}
+
+	/**
+	 * A currency code as a caller gave it, or the current currency when it is empty or not a code.
+	 *
+	 * @param string $code Currency code.
+	 */
+	public static function or_current( string $code ): string {
+		$code = self::clean( $code );
+
+		return '' !== $code ? $code : self::current();
 	}
 
 	/**

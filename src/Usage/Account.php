@@ -52,6 +52,26 @@ final class Account {
 		// Before Lifecycle (10), so the license is on the account when its service is made.
 		add_action( 'beltoft_licenses_license_created', array( __CLASS__, 'attach' ), 5 );
 		add_action( 'woocommerce_subscription_renewal_payment_complete', array( __CLASS__, 'paid' ), 10, 2 );
+		// The customer's currency, when nothing earlier answered (the core asks the filter and names no feature).
+		add_filter( 'beltoft_services_user_currency', array( __CLASS__, 'user_currency' ), 20, 2 );
+	}
+
+	/**
+	 * Answer for the filter beltoft_services_user_currency: the currency of the customer's usage account, when no earlier
+	 * listener gave one.
+	 *
+	 * @param mixed $code    Answer so far.
+	 * @param mixed $user_id Customer.
+	 * @return mixed
+	 */
+	public static function user_currency( $code, $user_id = 0 ) {
+		if ( is_string( $code ) && '' !== $code ) {
+			return $code;
+		}
+
+		$account = self::for_user( (int) $user_id );
+
+		return $account ? (string) $account->get_currency() : $code;
 	}
 
 	/**

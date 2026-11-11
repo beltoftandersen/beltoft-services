@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array{balance: int, history: array<int, array<string, mixed>>, amounts: int[], min: int, max: int, currency: string} $credit The page data (see BeltoftServices\Credit\Page::data()).
+ * @var array{balance: int, history: array<int, array<string, mixed>>, amounts: int[], min: int, max: int, available: bool, currency: string} $credit The page data (see BeltoftServices\Credit\Page::data()).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -46,6 +46,9 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
 	</div>
 
+	<?php if ( ! $credit['available'] ) : ?>
+		<p class="beltoft-services-credit__note"><?php esc_html_e( 'Top-ups are not available in your currency.', 'beltoft-services' ); ?></p>
+	<?php else : ?>
 	<form class="beltoft-services-credit__form" method="post" action="<?php echo esc_url( Page::url() ); ?>" data-bs-working="<?php esc_attr_e( 'Working…', 'beltoft-services' ); ?>">
 		<fieldset class="beltoft-services-credit__amounts">
 			<legend class="beltoft-services-credit__legend"><?php esc_html_e( 'Top up', 'beltoft-services' ); ?></legend>
@@ -82,6 +85,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<input type="hidden" name="<?php echo esc_attr( Topup::ACTION ); ?>" value="1">
 		<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Continue to checkout', 'beltoft-services' ); ?></button>
 	</form>
+	<?php endif; ?>
 
 	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( Page::url() ); ?>" novalidate data-bs-working="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>">
 		<div class="beltoft-services-ov__head">

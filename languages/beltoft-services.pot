@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T05:06:25+00:00\n"
+"POT-Creation-Date: 2026-11-11T05:45:01+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -78,7 +78,7 @@ msgstr ""
 #: src/Domains/DnsClaimPanel.php:147
 #: src/Proxmox/Vm/Panels.php:153
 #: src/Status.php:64
-#: templates/account/credit.php:49
+#: templates/account/credit.php:52
 #: assets/domain.js:296
 #: assets/domain.js:327
 #: assets/domain.js:352
@@ -330,7 +330,7 @@ msgstr ""
 #: src/Account/DbPicker.php:384
 #: src/Account/ServerPicker.php:583
 #: src/Domains/DnsClaimPanel.php:173
-#: templates/account/credit.php:83
+#: templates/account/credit.php:86
 msgid "Continue to checkout"
 msgstr ""
 
@@ -615,7 +615,7 @@ msgstr ""
 #: src/Account/Email.php:255
 #: src/Mail/MailDriver.php:43
 #: src/Mail/MailDriver.php:659
-#: src/Mail/MailField.php:350
+#: src/Mail/MailField.php:359
 msgid "Business email"
 msgstr ""
 
@@ -652,7 +652,7 @@ msgid "That licence was not found. Here are your licences."
 msgstr ""
 
 #: src/Account/Licences.php:147
-#: src/Licences/KeyField.php:257
+#: src/Licences/KeyField.php:265
 #: src/Licences/KeyPanel.php:69
 #: src/Licences/KeyPanel.php:129
 #: templates/account/app.php:41
@@ -1070,7 +1070,7 @@ msgstr ""
 #. translators: %s: price
 #: src/Account/ServerPicker.php:496
 #: src/Account/ServerPicker.php:727
-#: src/Usage/Rates.php:226
+#: src/Usage/Rates.php:227
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1264,7 +1264,7 @@ msgstr ""
 #: src/Account/Ssl.php:144
 #: src/Cli/SslCommand.php:112
 #: src/Ssl/SslDriver.php:50
-#: src/Ssl/SslField.php:377
+#: src/Ssl/SslField.php:385
 msgid "SSL certificate"
 msgstr ""
 
@@ -2081,8 +2081,8 @@ msgstr ""
 #: src/Domains/Cart.php:484
 #: src/Domains/EmailDetails.php:18
 #: src/Domains/Panels.php:142
-#: src/Hosting/SiteField.php:416
-#: src/Hosting/SiteField.php:430
+#: src/Hosting/SiteField.php:425
+#: src/Hosting/SiteField.php:439
 #: src/Mail/MailDriver.php:639
 msgid "Domain"
 msgstr ""
@@ -3290,8 +3290,8 @@ msgstr ""
 #: src/Domains/DkAgreement.php:78
 #: src/Domains/DomainDriver.php:34
 #: src/Hosting/HostingAccount.php:535
-#: src/Hosting/SiteField.php:443
-#: src/Ssl/SslField.php:425
+#: src/Hosting/SiteField.php:452
+#: src/Ssl/SslField.php:434
 #: templates/account/dns-claim.php:15
 msgid "Domain name"
 msgstr ""
@@ -3689,7 +3689,7 @@ msgid "%s credit added."
 msgstr ""
 
 #: src/Credit/Code.php:277
-#: src/Credit/Topup.php:276
+#: src/Credit/Topup.php:317
 msgid "The page expired. Please try again."
 msgstr ""
 
@@ -3723,8 +3723,8 @@ msgid "The balance is busy. Try again."
 msgstr ""
 
 #: src/Credit/Grant.php:123
-#: src/Credit/Topup.php:176
-#: src/Credit/Topup.php:233
+#: src/Credit/Topup.php:212
+#: src/Credit/Topup.php:274
 #: src/Settings.php:127
 msgid "Account credit"
 msgstr ""
@@ -3735,7 +3735,7 @@ msgstr ""
 
 #: src/Credit/Grant.php:131
 #: templates/account/credit.php:45
-#: templates/account/credit.php:112
+#: templates/account/credit.php:116
 msgid "Balance"
 msgstr ""
 
@@ -3810,44 +3810,44 @@ msgstr ""
 msgid "Credit"
 msgstr ""
 
-#: src/Credit/Page.php:170
+#: src/Credit/Page.php:171
 msgid "Enter your credit code."
 msgstr ""
 
 #. translators: %s: reason.
-#: src/Credit/Page.php:207
+#: src/Credit/Page.php:208
 #, php-format
 msgid "Credit added: %s"
 msgstr ""
 
 #. translators: %s: reason.
-#: src/Credit/Page.php:211
+#: src/Credit/Page.php:212
 #, php-format
 msgid "Credit correction: %s"
 msgstr ""
 
-#: src/Credit/Page.php:224
-#: src/Credit/Topup.php:530
+#: src/Credit/Page.php:225
+#: src/Credit/Topup.php:577
 msgid "Top-up"
 msgstr ""
 
-#: src/Credit/Page.php:225
+#: src/Credit/Page.php:226
 msgid "Used on invoice"
 msgstr ""
 
-#: src/Credit/Page.php:226
+#: src/Credit/Page.php:227
 msgid "Credit added"
 msgstr ""
 
-#: src/Credit/Page.php:227
+#: src/Credit/Page.php:228
 msgid "Refund"
 msgstr ""
 
-#: src/Credit/Page.php:228
+#: src/Credit/Page.php:229
 msgid "Chargeback"
 msgstr ""
 
-#: src/Credit/Page.php:229
+#: src/Credit/Page.php:230
 msgid "Adjustment"
 msgstr ""
 
@@ -3879,72 +3879,77 @@ msgstr ""
 msgid "In the store currency."
 msgstr ""
 
+#: src/Credit/Topup.php:325
+#: templates/account/credit.php:50
+msgid "Top-ups are not available in your currency."
+msgstr ""
+
 #. translators: 1: smallest amount, 2: largest amount (with currency).
-#: src/Credit/Topup.php:287
+#: src/Credit/Topup.php:334
 #, php-format
 msgid "Enter an amount from %1$s to %2$s."
 msgstr ""
 
-#: src/Credit/Topup.php:298
+#: src/Credit/Topup.php:345
 msgid "The top-up could not be added to the cart."
 msgstr ""
 
-#: src/Credit/Topup.php:416
-#: src/Credit/Topup.php:439
+#: src/Credit/Topup.php:463
+#: src/Credit/Topup.php:486
 msgid "Note"
 msgstr ""
 
-#: src/Credit/Topup.php:521
+#: src/Credit/Topup.php:568
 msgid "Account credit not added: the order has no customer account."
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:531
+#: src/Credit/Topup.php:578
 #, php-format
 msgid "Account credit of %s added to the balance."
 msgstr ""
 
-#: src/Credit/Topup.php:533
+#: src/Credit/Topup.php:580
 msgid "Account credit could not be added now (balance busy). It is added when the order status is saved again."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:566
+#: src/Credit/Topup.php:613
 #, php-format
 msgid "Chargeback undone, order #%s"
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:567
+#: src/Credit/Topup.php:614
 msgid "The order is paid again: the credit taken back for the chargeback was returned to the balance."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:635
+#: src/Credit/Topup.php:682
 #, php-format
 msgid "Refund, order #%s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:638
+#: src/Credit/Topup.php:685
 #, php-format
 msgid "Refund: %s taken back from the account credit."
 msgstr ""
 
 #. translators: 1: order number, 2: new status.
-#: src/Credit/Topup.php:680
+#: src/Credit/Topup.php:727
 #, php-format
 msgid "Chargeback, order #%1$s is now %2$s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:681
+#: src/Credit/Topup.php:728
 #, php-format
 msgid "The order is no longer paid: %s taken back from the account credit."
 msgstr ""
 
 #. translators: 1: customer id, 2: balance.
-#: src/Credit/Topup.php:697
+#: src/Credit/Topup.php:744
 #, php-format
 msgid "The account credit of customer #%1$d is now negative: %2$s. The customer has used credit that was paid back."
 msgstr ""
@@ -6581,7 +6586,7 @@ msgid "No backups yet. The first one is made tonight."
 msgstr ""
 
 #: src/Hosting/HostingAccount.php:459
-#: templates/account/credit.php:109
+#: templates/account/credit.php:113
 msgid "Date"
 msgstr ""
 
@@ -6640,7 +6645,7 @@ msgid "Undo the last restore"
 msgstr ""
 
 #: src/Hosting/HostingAccount.php:518
-#: src/Hosting/SiteField.php:405
+#: src/Hosting/SiteField.php:414
 msgid "Website name"
 msgstr ""
 
@@ -6900,7 +6905,7 @@ msgid "Too many changes. Please try again later."
 msgstr ""
 
 #: src/Hosting/HostingSettings.php:82
-#: src/Hosting/SiteField.php:541
+#: src/Hosting/SiteField.php:550
 msgid "Hosting"
 msgstr ""
 
@@ -7843,135 +7848,135 @@ msgstr ""
 msgid "Hosting is ordered at the website checkout, where you name your website. Please use the checkout page of the website."
 msgstr ""
 
-#: src/Hosting/SiteField.php:276
+#: src/Hosting/SiteField.php:284
 #: templates/emails/beltoft-services-hosting-ready.php:38
 msgid "Your website"
 msgstr ""
 
-#: src/Hosting/SiteField.php:402
+#: src/Hosting/SiteField.php:411
 msgid "Website address"
 msgstr ""
 
-#: src/Hosting/SiteField.php:403
+#: src/Hosting/SiteField.php:412
 msgid "Temporary address, connect a domain later"
 msgstr ""
 
-#: src/Hosting/SiteField.php:405
+#: src/Hosting/SiteField.php:414
 msgid "Lowercase letters, numbers and dashes. You connect your own domain later."
 msgstr ""
 
-#: src/Hosting/SiteField.php:405
+#: src/Hosting/SiteField.php:414
 msgid "Lowercase letters, numbers and dashes."
 msgstr ""
 
 #. translators: %s: address such as myshop.example.net, with the name part marked.
-#: src/Hosting/SiteField.php:409
+#: src/Hosting/SiteField.php:418
 #, php-format
 msgid "Your website opens at %s"
 msgstr ""
 
-#: src/Hosting/SiteField.php:414
+#: src/Hosting/SiteField.php:423
 msgid "A domain in my account"
 msgstr ""
 
-#: src/Hosting/SiteField.php:423
+#: src/Hosting/SiteField.php:432
 msgid "Or a name inside it"
 msgstr ""
 
-#: src/Hosting/SiteField.php:423
+#: src/Hosting/SiteField.php:432
 msgid "For example www.mine.example. Leave empty to use the domain itself. We set up its DNS for you."
 msgstr ""
 
-#: src/Hosting/SiteField.php:428
-#: src/Mail/MailField.php:274
+#: src/Hosting/SiteField.php:437
+#: src/Mail/MailField.php:283
 msgid "A new domain in this order"
 msgstr ""
 
-#: src/Hosting/SiteField.php:437
+#: src/Hosting/SiteField.php:446
 msgid "The website starts on a temporary address and moves to this domain when its registration is finished."
 msgstr ""
 
-#: src/Hosting/SiteField.php:441
+#: src/Hosting/SiteField.php:450
 msgid "A domain I have elsewhere"
 msgstr ""
 
-#: src/Hosting/SiteField.php:443
+#: src/Hosting/SiteField.php:452
 msgid "For example www.example.com"
 msgstr ""
 
-#: src/Hosting/SiteField.php:444
+#: src/Hosting/SiteField.php:453
 msgid "After you order, your account page shows the DNS records to add where your domain is managed: an A record that points the domain to our server, and a TXT record that proves the domain is yours. Until the domain points to us, the website works on a temporary address."
 msgstr ""
 
-#: src/Hosting/SiteField.php:450
+#: src/Hosting/SiteField.php:459
 msgid "Install"
 msgstr ""
 
-#: src/Hosting/SiteField.php:452
+#: src/Hosting/SiteField.php:461
 msgid "WordPress"
 msgstr ""
 
-#: src/Hosting/SiteField.php:452
+#: src/Hosting/SiteField.php:461
 msgid "WordPress with WooCommerce"
 msgstr ""
 
-#: src/Hosting/SiteField.php:458
+#: src/Hosting/SiteField.php:467
 msgid "Site language"
 msgstr ""
 
-#: src/Hosting/SiteField.php:460
+#: src/Hosting/SiteField.php:469
 msgid "Common languages"
 msgstr ""
 
-#: src/Hosting/SiteField.php:466
+#: src/Hosting/SiteField.php:475
 msgid "All languages"
 msgstr ""
 
-#: src/Hosting/SiteField.php:477
+#: src/Hosting/SiteField.php:486
 msgid "More options"
 msgstr ""
 
-#: src/Hosting/SiteField.php:478
+#: src/Hosting/SiteField.php:487
 msgid "Website title"
 msgstr ""
 
-#: src/Hosting/SiteField.php:478
+#: src/Hosting/SiteField.php:487
 msgid "Shown in the browser tab. Empty uses the domain or the website name. You can change it in WordPress."
 msgstr ""
 
-#: src/Hosting/SiteField.php:479
+#: src/Hosting/SiteField.php:488
 msgid "WordPress admin email"
 msgstr ""
 
-#: src/Hosting/SiteField.php:479
+#: src/Hosting/SiteField.php:488
 msgid "Empty uses your billing email."
 msgstr ""
 
-#: src/Hosting/SiteField.php:481
+#: src/Hosting/SiteField.php:490
 msgid "Temporary address name"
 msgstr ""
 
-#: src/Hosting/SiteField.php:481
+#: src/Hosting/SiteField.php:490
 msgid "Made from your domain, for example example-com. Your website is reachable at this address until your domain points to us."
 msgstr ""
 
-#: src/Hosting/SiteField.php:516
-#: src/Licences/KeyField.php:293
-#: src/Licences/KeyField.php:300
-#: src/Mail/MailField.php:301
+#: src/Hosting/SiteField.php:525
+#: src/Licences/KeyField.php:302
+#: src/Licences/KeyField.php:309
+#: src/Mail/MailField.php:310
 #: src/Proxmox/Db/DbTermsField.php:102
-#: src/Ssl/SslField.php:425
-#: src/Ssl/SslField.php:476
-#: src/Ssl/SslField.php:521
-#: src/Ssl/SslField.php:550
+#: src/Ssl/SslField.php:434
+#: src/Ssl/SslField.php:485
+#: src/Ssl/SslField.php:530
+#: src/Ssl/SslField.php:559
 msgid "required"
 msgstr ""
 
-#: src/Hosting/SiteField.php:545
+#: src/Hosting/SiteField.php:554
 msgid "Each hosting account is its own line. Set the quantity to 1 and add the product again for another account."
 msgstr ""
 
-#: src/Hosting/SiteField.php:557
+#: src/Hosting/SiteField.php:566
 msgid "You used the same website name or domain for two lines. Each one can be used once."
 msgstr ""
 
@@ -8439,7 +8444,7 @@ msgstr ""
 msgid "Licences are ordered at the website checkout, where you enter the server address. Please use the checkout page of the website."
 msgstr ""
 
-#: src/Licences/KeyField.php:281
+#: src/Licences/KeyField.php:290
 #: src/Proxmox/Vm/EmailDetails.php:181
 #: src/Proxmox/Vm/EmailDetails.php:190
 #: src/Proxmox/Vm/EmailDetails.php:200
@@ -8448,31 +8453,31 @@ msgstr ""
 msgid "Server"
 msgstr ""
 
-#: src/Licences/KeyField.php:289
+#: src/Licences/KeyField.php:298
 msgid "Another server (enter the address)"
 msgstr ""
 
-#: src/Licences/KeyField.php:293
+#: src/Licences/KeyField.php:302
 msgid "Server address (IPv4)"
 msgstr ""
 
-#: src/Licences/KeyField.php:295
+#: src/Licences/KeyField.php:304
 msgid "The licence is tied to this public address and works for it only."
 msgstr ""
 
-#: src/Licences/KeyField.php:298
+#: src/Licences/KeyField.php:307
 msgid "The server is a physical server."
 msgstr ""
 
-#: src/Licences/KeyField.php:298
+#: src/Licences/KeyField.php:307
 msgid "The server is a virtual server (VPS). This licence is not valid on a physical server."
 msgstr ""
 
-#: src/Licences/KeyField.php:302
+#: src/Licences/KeyField.php:311
 msgid "CloudLinux runs on AlmaLinux. On a server of ours it needs the Plesk version on AlmaLinux."
 msgstr ""
 
-#: src/Licences/KeyField.php:325
+#: src/Licences/KeyField.php:334
 msgid "Each licence is for one server address. Set the quantity to 1 and order again for another licence."
 msgstr ""
 
@@ -8916,68 +8921,68 @@ msgstr ""
 msgid "Email plans are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website."
 msgstr ""
 
-#: src/Mail/MailField.php:225
-#: src/Mail/MailField.php:449
+#: src/Mail/MailField.php:233
+#: src/Mail/MailField.php:458
 msgid "Email domain"
 msgstr ""
 
-#: src/Mail/MailField.php:275
+#: src/Mail/MailField.php:284
 msgid "New domain in this order"
 msgstr ""
 
-#: src/Mail/MailField.php:282
+#: src/Mail/MailField.php:291
 msgid "Email is set up when the domain is ready. We add the email records for you."
 msgstr ""
 
-#: src/Mail/MailField.php:286
+#: src/Mail/MailField.php:295
 #: templates/account/mail.php:117
 #: templates/account/mail.php:118
 msgid "One of your domains with us"
 msgstr ""
 
-#: src/Mail/MailField.php:287
+#: src/Mail/MailField.php:296
 msgid "Domain on our name servers"
 msgstr ""
 
-#: src/Mail/MailField.php:294
+#: src/Mail/MailField.php:303
 msgid "We add the email records to this domain for you. Your other records are not changed."
 msgstr ""
 
-#: src/Mail/MailField.php:298
+#: src/Mail/MailField.php:307
 #: templates/account/mail.php:126
 #: templates/account/mail.php:127
 msgid "A domain at another provider"
 msgstr ""
 
-#: src/Mail/MailField.php:301
+#: src/Mail/MailField.php:310
 msgid "Domain you want email for"
 msgstr ""
 
-#: src/Mail/MailField.php:305
+#: src/Mail/MailField.php:314
 msgid "You add the DNS records where the domain is hosted. We show you which ones after the order, and we first ask for a TXT record that proves the domain is yours."
 msgstr ""
 
-#: src/Mail/MailField.php:310
+#: src/Mail/MailField.php:319
 msgid "No domain yet?"
 msgstr ""
 
-#: src/Mail/MailField.php:310
+#: src/Mail/MailField.php:319
 msgid "Find one"
 msgstr ""
 
-#: src/Mail/MailField.php:354
+#: src/Mail/MailField.php:363
 msgid "Each email domain is its own line. Set the quantity to 1 and add the product again for another domain."
 msgstr ""
 
-#: src/Mail/MailField.php:366
+#: src/Mail/MailField.php:375
 msgid "You chose the same domain for two lines. Each domain can have email once."
 msgstr ""
 
-#: src/Mail/MailField.php:468
+#: src/Mail/MailField.php:477
 msgid "Waiting for the proof that the domain is yours. Add the record on the DNS tab."
 msgstr ""
 
-#: src/Mail/MailField.php:475
+#: src/Mail/MailField.php:484
 msgid "Waiting for your domain registration to finish."
 msgstr ""
 
@@ -14215,7 +14220,7 @@ msgid "Email to an approval address"
 msgstr ""
 
 #: src/Ssl/Panels.php:322
-#: src/Ssl/SslField.php:455
+#: src/Ssl/SslField.php:464
 msgid "Approval address"
 msgstr ""
 
@@ -14433,116 +14438,116 @@ msgstr[1] ""
 msgid "SSL certificates are ordered at the website checkout, where you enter the domain. Please use the checkout page of the website."
 msgstr ""
 
-#: src/Ssl/SslField.php:377
+#: src/Ssl/SslField.php:385
 msgid "Email certificate (S/MIME)"
 msgstr ""
 
-#: src/Ssl/SslField.php:425
+#: src/Ssl/SslField.php:434
 msgid "Domain for the wildcard certificate"
 msgstr ""
 
-#: src/Ssl/SslField.php:438
+#: src/Ssl/SslField.php:447
 msgid "The certificate covers every name under this domain, such as *.example.com."
 msgstr ""
 
-#: src/Ssl/SslField.php:438
+#: src/Ssl/SslField.php:447
 msgid "The one name the certificate is for, for example example.com or www.example.com."
 msgstr ""
 
-#: src/Ssl/SslField.php:441
+#: src/Ssl/SslField.php:450
 msgid "Add the validation record to my DNS for me (domains on our name servers)"
 msgstr ""
 
-#: src/Ssl/SslField.php:442
+#: src/Ssl/SslField.php:451
 msgid "I add a DNS record myself"
 msgstr ""
 
-#: src/Ssl/SslField.php:443
-#: src/Ssl/SslField.php:511
+#: src/Ssl/SslField.php:452
+#: src/Ssl/SslField.php:520
 msgid "I put a file on my website"
 msgstr ""
 
-#: src/Ssl/SslField.php:444
+#: src/Ssl/SslField.php:453
 msgid "Send an approval email to an address at the domain"
 msgstr ""
 
-#: src/Ssl/SslField.php:447
+#: src/Ssl/SslField.php:456
 msgid "How the domain is validated"
 msgstr ""
 
-#: src/Ssl/SslField.php:462
+#: src/Ssl/SslField.php:471
 msgid "The approval email goes to this address at your domain."
 msgstr ""
 
-#: src/Ssl/SslField.php:476
+#: src/Ssl/SslField.php:485
 msgid "Email address for the certificate"
 msgstr ""
 
-#: src/Ssl/SslField.php:478
+#: src/Ssl/SslField.php:487
 msgid "The certificate is for this one address, your account email or the billing email of this order. We send you a link to confirm that the mailbox is yours, and you click it."
 msgstr ""
 
-#: src/Ssl/SslField.php:479
+#: src/Ssl/SslField.php:488
 msgid "Name on the certificate (optional)"
 msgstr ""
 
-#: src/Ssl/SslField.php:481
+#: src/Ssl/SslField.php:490
 msgid "Left empty, the name in your billing details is used."
 msgstr ""
 
 #. translators: %d: number of names.
-#: src/Ssl/SslField.php:496
+#: src/Ssl/SslField.php:505
 #, php-format
 msgid "One certificate for up to %d name. The first name is the main name."
 msgid_plural "One certificate for up to %d names. The first name is the main name."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Ssl/SslField.php:509
+#: src/Ssl/SslField.php:518
 msgid "We add the DNS record"
 msgstr ""
 
-#: src/Ssl/SslField.php:510
+#: src/Ssl/SslField.php:519
 msgid "I add a DNS record"
 msgstr ""
 
 #. translators: %d: row number.
-#: src/Ssl/SslField.php:518
+#: src/Ssl/SslField.php:527
 #, php-format
 msgid "Name %d"
 msgstr ""
 
 #. translators: %d: row number.
-#: src/Ssl/SslField.php:523
+#: src/Ssl/SslField.php:532
 #, php-format
 msgid "How name %d is validated"
 msgstr ""
 
-#: src/Ssl/SslField.php:534
+#: src/Ssl/SslField.php:543
 msgid "Leave a row empty to use fewer names. Every name is validated on its own."
 msgstr ""
 
-#: src/Ssl/SslField.php:547
+#: src/Ssl/SslField.php:556
 msgid "Private key"
 msgstr ""
 
-#: src/Ssl/SslField.php:548
+#: src/Ssl/SslField.php:557
 msgid "Make the key for me. I download it once from my account."
 msgstr ""
 
-#: src/Ssl/SslField.php:549
+#: src/Ssl/SslField.php:558
 msgid "I have a certificate request (CSR). We never see my key."
 msgstr ""
 
-#: src/Ssl/SslField.php:550
+#: src/Ssl/SslField.php:559
 msgid "Certificate request (CSR)"
 msgstr ""
 
-#: src/Ssl/SslField.php:554
+#: src/Ssl/SslField.php:563
 msgid "This certificate is issued to the company in your billing details. The certificate authority checks the company and may phone or ask for documents, which can take a few days."
 msgstr ""
 
-#: src/Ssl/SslField.php:576
+#: src/Ssl/SslField.php:585
 msgid "Each certificate is its own order. Set the quantity to 1 and order again for another certificate."
 msgstr ""
 
@@ -14710,43 +14715,43 @@ msgstr ""
 msgid "Open in My Account"
 msgstr ""
 
-#: src/Usage/Account.php:73
+#: src/Usage/Account.php:93
 msgid "Bill pay as you go early at this amount: new accounts"
 msgstr ""
 
-#: src/Usage/Account.php:74
+#: src/Usage/Account.php:94
 msgid "In the store currency, for an account with no paid usage invoice yet. When the unbilled usage reaches it, the usage is charged at once, without waiting for the monthly renewal."
 msgstr ""
 
-#: src/Usage/Account.php:82
+#: src/Usage/Account.php:102
 msgid "Bill pay as you go early at this amount: other accounts"
 msgstr ""
 
-#: src/Usage/Account.php:90
+#: src/Usage/Account.php:110
 msgid "Minimum amount to charge a card for pay as you go"
 msgstr ""
 
-#: src/Usage/Account.php:91
+#: src/Usage/Account.php:111
 msgid "In the store currency, including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month's invoice instead. 0 turns this off."
 msgstr ""
 
-#: src/Usage/Account.php:98
+#: src/Usage/Account.php:118
 msgid "Show the Monthly option for servers and databases"
 msgstr ""
 
-#: src/Usage/Account.php:99
+#: src/Usage/Account.php:119
 msgid "Off: customers only see pay as you go, and a new server or database added to the cart as a monthly plan is changed to its pay as you go plan when it has one. Email plans, plugin licences, renewals, plan changes of existing subscriptions and orders made in the admin are not touched."
 msgstr ""
 
-#: src/Usage/Account.php:107
+#: src/Usage/Account.php:127
 msgid "Pay as you go services before the first paid usage invoice"
 msgstr ""
 
-#: src/Usage/Account.php:108
+#: src/Usage/Account.php:128
 msgid "The most services an account may run until a usage invoice has been paid. 0 means no limit."
 msgstr ""
 
-#: src/Usage/Account.php:129
+#: src/Usage/Account.php:149
 msgid "Usage account"
 msgstr ""
 
@@ -14944,7 +14949,7 @@ msgstr ""
 #. translators: 1: product name, 2: the database's address.
 #. translators: 1: "€0.0829 per hour", 2: "max €55.00 per month"
 #: src/Usage/Estimate.php:119
-#: src/Usage/Rates.php:294
+#: src/Usage/Rates.php:295
 #, php-format
 msgid "%1$s, %2$s"
 msgstr ""
@@ -15011,54 +15016,66 @@ msgstr ""
 msgid "Your usage invoice for %s could not be charged. Pay it here: %%2$s"
 msgstr ""
 
+#. translators: %s: currency code
+#: src/Usage/Meter.php:211
+#, php-format
+msgid "Usage not metered in %s"
+msgstr ""
+
+#. translators: %s: currency code
+#: src/Usage/Minimum.php:67
+#, php-format
+msgid "No usage minimum for %s"
+msgstr ""
+
 #. translators: 1: amount with currency, 2: minimum with currency.
-#: src/Usage/Minimum.php:111
+#: src/Usage/Minimum.php:132
 #, php-format
 msgid "Usage of %1$s carried to next month (under the %2$s minimum)."
 msgstr ""
 
 #. translators: %s: monthly amount such as €45
-#: src/Usage/Rates.php:121
+#: src/Usage/Rates.php:122
 #, php-format
 msgid "%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:131
+#: src/Usage/Rates.php:132
 #, php-format
 msgid "+%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:141
+#: src/Usage/Rates.php:142
 #, php-format
 msgid "+%s per month"
 msgstr ""
 
 #. translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50
-#: src/Usage/Rates.php:215
+#: src/Usage/Rates.php:216
 #, php-format
 msgid "Or %1$s/hour, max %2$s/month, pay as you go"
 msgstr ""
 
-#: src/Usage/Rates.php:256
+#: src/Usage/Rates.php:257
 msgid "Billed monthly for the hours used"
 msgstr ""
 
 #. translators: %s: price per hour such as €0.0829
-#: src/Usage/Rates.php:273
+#: src/Usage/Rates.php:274
 #, php-format
 msgid "%s per hour"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55.00
-#: src/Usage/Rates.php:283
+#: src/Usage/Rates.php:284
 #, php-format
 msgid "max %s per month"
 msgstr ""
 
 #. translators: %s: monthly price such as €55.00
-#: src/Usage/Rates.php:304
+#: src/Usage/Rates.php:305
 #, php-format
 msgid "%s per month, paid in advance"
 msgstr ""
@@ -15192,7 +15209,13 @@ msgstr ""
 msgid "Due today"
 msgstr ""
 
-#: src/Usage/Threshold.php:118
+#. translators: %s: currency code
+#: src/Usage/Threshold.php:98
+#, php-format
+msgid "No early bill threshold for %s"
+msgstr ""
+
+#: src/Usage/Threshold.php:142
 msgid "Usage billed early: the unbilled usage reached the threshold."
 msgstr ""
 
@@ -15719,60 +15742,60 @@ msgstr ""
 msgid "Keyboard input"
 msgstr ""
 
-#: templates/account/credit.php:51
+#: templates/account/credit.php:54
 msgid "Top up"
 msgstr ""
 
-#: templates/account/credit.php:61
+#: templates/account/credit.php:64
 msgid "Other"
 msgstr ""
 
-#: templates/account/credit.php:65
+#: templates/account/credit.php:68
 msgid "Other amount"
 msgstr ""
 
 #. translators: 1: smallest amount, 2: largest amount, with currency.
-#: templates/account/credit.php:73
+#: templates/account/credit.php:76
 #, php-format
 msgid "%1$s to %2$s, all of it goes to your balance. No VAT on top-ups; VAT is on your usage invoices."
 msgstr ""
 
-#: templates/account/credit.php:86
+#: templates/account/credit.php:90
 #: templates/account/domain-stepup.php:20
 #: assets/domain.js:235
 msgid "Checking the code…"
 msgstr ""
 
-#: templates/account/credit.php:88
+#: templates/account/credit.php:92
 msgid "Have a credit code?"
 msgstr ""
 
-#: templates/account/credit.php:91
+#: templates/account/credit.php:95
 msgid "Credit code"
 msgstr ""
 
-#: templates/account/credit.php:95
+#: templates/account/credit.php:99
 msgid "Redeem"
 msgstr ""
 
-#: templates/account/credit.php:97
+#: templates/account/credit.php:101
 msgid "You need a saved card to redeem a code. Each card can use a code once."
 msgstr ""
 
-#: templates/account/credit.php:101
+#: templates/account/credit.php:105
 msgid "History"
 msgstr ""
 
-#: templates/account/credit.php:104
+#: templates/account/credit.php:108
 msgid "Nothing yet. Top-ups and credit used on invoices show here."
 msgstr ""
 
-#: templates/account/credit.php:110
+#: templates/account/credit.php:114
 #: templates/account/firewall.php:44
 msgid "What"
 msgstr ""
 
-#: templates/account/credit.php:111
+#: templates/account/credit.php:115
 #: templates/account/usage.php:30
 msgid "Amount"
 msgstr ""

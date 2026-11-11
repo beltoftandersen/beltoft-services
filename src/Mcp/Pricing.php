@@ -466,7 +466,7 @@ final class Pricing {
 			'note'   => 'Excluding VAT, an estimate. Each service is capped at its max per month (usage_summary shows which lines reached it).',
 		) : null;
 
-		$minimum = \BeltoftServices\Usage\Minimum::amount();
+		$minimum = \BeltoftServices\Usage\Minimum::amount( (string) $currency );
 
 		$out['usage_minimum'] = array(
 			'minimum' => $minimum > 0 ? Rates::money( $minimum, 2, $currency ) : null,

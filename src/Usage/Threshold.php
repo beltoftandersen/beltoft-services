@@ -8,7 +8,8 @@
 namespace BeltoftServices\Usage;
 
 use BeltoftServices\Billing\Subscriptions;
-use BeltoftServices\Settings;
+use BeltoftServices\Alerts;
+use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,12 +34,14 @@ final class Threshold {
 	}
 
 	/**
-	 * The threshold for an account.
+	 * The threshold for an account, in the account's currency. Null when that currency has no amount for it: no early bill.
 	 *
 	 * @param \WC_Subscription $account Account.
 	 */
-	public static function for_account( \WC_Subscription $account ): float {
-		return (float) Settings::get( Account::charged( $account ) ? 'usage_threshold' : 'usage_threshold_new' );
+	public static function for_account( \WC_Subscription $account ): ?float {
+		$value = Currency::amount( Account::charged( $account ) ? 'usage_threshold' : 'usage_threshold_new', (string) $account->get_currency() );
+
+		return null === $value ? null : (float) $value;
 	}
 
 	/**
@@ -80,7 +83,28 @@ final class Threshold {
 
 		$accrued = Renewal::statement( Ledger::unbilled( (int) $account->get_customer_id(), Ledger::hour( time() ) ) )['total'];
 
-		if ( $accrued <= 0 || $accrued < self::for_account( $account ) ) {
+		if ( $accrued <= 0 ) {
+			return false;
+		}
+
+		$threshold = self::for_account( $account );
+
+		// A currency with no threshold amount gets no early bill; the monthly renewal still bills the usage.
+		if ( null === $threshold ) {
+			$currency = (string) $account->get_currency();
+
+			Alerts::notify(
+				/* translators: %s: currency code */
+				sprintf( __( 'No early bill threshold for %s', 'beltoft-services' ), $currency ),
+				array( sprintf( 'The settings usage_threshold and usage_threshold_new have no amount in %s, so usage in that currency is billed at the monthly renewal only.', $currency ) ),
+				null,
+				'beltoft_services_usage_threshold_' . strtolower( $currency )
+			);
+
+			return false;
+		}
+
+		if ( $accrued < $threshold ) {
 			return false;
 		}
 

@@ -8,6 +8,8 @@
 namespace BeltoftServices\Usage;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Alerts;
+use BeltoftServices\Currency;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
@@ -90,6 +92,8 @@ final class Meter {
 		$horizon = $last - ( self::BACKFILL_HOURS - 1 ) * HOUR_IN_SECONDS;
 		$written = 0;
 
+		self::$currencies = array();
+
 		$rows = Licenses::resources_of_source( 'usage', gmdate( 'Y-m-d H:i:s', $horizon ) );
 
 		foreach ( (array) $rows as $row ) {
@@ -133,9 +137,22 @@ final class Meter {
 			return 0;
 		}
 
-		$items = Rates::items( $resource );
+		// The rates are read in the currency of the customer's usage account, whatever the job runs in.
+		$currency = self::currency_of( $license, $user_id );
+		list( $ok, $items ) = Currency::with( $currency, static fn() => Rates::items( $resource ) );
+
+		if ( ! $ok ) {
+			// Fail closed: no rate is read under a currency we did not get, so nothing is written for this resource.
+			self::alert( $resource, $currency, 'The currency of the usage account could not be used for the rates.' );
+
+			return 0;
+		}
 
 		if ( ! $items ) {
+			if ( Currency::base() !== $currency ) {
+				self::alert( $resource, $currency, 'The product has no price in that currency, so nothing is metered.' );
+			}
+
 			return 0;
 		}
 
@@ -148,12 +165,53 @@ final class Meter {
 					continue;
 				}
 
-				if ( Ledger::record( $id, $user_id, $item['item'], $item['quantity'], $item['unit'], $item['rate'], $hour ) ) {
+				if ( Ledger::record( $id, $user_id, $item['item'], $item['quantity'], $item['unit'], $item['rate'], $hour, $currency ) ) {
 					++$written;
 				}
 			}
 		}
 
 		return $written;
+	}
+
+	/** @var array<int, string> Currency per usage account subscription id, for one run. */
+	private static array $currencies = array();
+
+	/**
+	 * The currency a resource is metered in: that of the usage account its licence is on, else the customer's usage account, else the shop's.
+	 *
+	 * @param array<string, mixed> $license License row.
+	 * @param int                  $user_id Customer.
+	 */
+	private static function currency_of( array $license, int $user_id ): string {
+		$sub_id = (int) ( $license['subscription_id'] ?? 0 );
+		$key    = $sub_id > 0 ? $sub_id : -$user_id;
+
+		if ( ! isset( self::$currencies[ $key ] ) ) {
+			$account = $sub_id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $sub_id ) : false;
+			$account = $account instanceof \WC_Subscription ? $account : Account::for_user( $user_id );
+			$code    = $account ? Currency::clean( $account->get_currency() ) : '';
+
+			self::$currencies[ $key ] = '' !== $code ? $code : Currency::base();
+		}
+
+		return self::$currencies[ $key ];
+	}
+
+	/**
+	 * Tells the admin once per resource and currency that a resource is not metered.
+	 *
+	 * @param Resource $resource Resource.
+	 * @param string   $currency Currency code.
+	 * @param string   $reason   Why.
+	 */
+	private static function alert( Resource $resource, string $currency, string $reason ): void {
+		Alerts::notify(
+			/* translators: %s: currency code */
+			sprintf( __( 'Usage not metered in %s', 'beltoft-services' ), $currency ),
+			array( sprintf( 'Resource %d is not metered in %s. %s', $resource->id(), $currency, $reason ) ),
+			$resource,
+			'beltoft_services_usage_currency_' . $resource->id() . '_' . strtolower( $currency )
+		);
 	}
 }

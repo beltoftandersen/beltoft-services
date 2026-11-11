@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Credit;
 
-use BeltoftServices\Settings;
+use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -115,37 +115,73 @@ final class Topup {
 	}
 
 	/**
-	 * The smallest top-up in the store currency.
-	 */
-	public static function min(): int {
-		return max( 1, (int) Settings::get( 'credit_min' ) );
-	}
-
-	/**
-	 * The largest top-up in the store currency.
-	 */
-	public static function max(): int {
-		return max( self::min(), (int) Settings::get( 'credit_max' ) );
-	}
-
-	/**
-	 * The fixed amounts offered, within min and max.
+	 * A limit of a currency (whole amounts), or null when the currency has none (see Currency::amount()).
 	 *
+	 * @param string $key      Setting key.
+	 * @param string $currency Currency code, '' for the current one.
+	 */
+	private static function limit( string $key, string $currency ): ?int {
+		$value = Currency::amount( $key, $currency );
+
+		return null === $value ? null : max( 1, (int) $value );
+	}
+
+	/**
+	 * Whether top-ups are sold in a currency: it has both limits. A currency with no amount for them has no top-ups.
+	 *
+	 * @param string $currency Currency code, '' for the current one.
+	 */
+	public static function available( string $currency = '' ): bool {
+		return null !== self::limit( 'credit_min', $currency ) && null !== self::limit( 'credit_max', $currency );
+	}
+
+	/**
+	 * The smallest top-up in a currency (the store currency by default). 0 when top-ups are not sold in it.
+	 *
+	 * @param string $currency Currency code, '' for the current one.
+	 */
+	public static function min( string $currency = '' ): int {
+		return self::limit( 'credit_min', $currency ) ?? 0;
+	}
+
+	/**
+	 * The largest top-up in a currency (the store currency by default). 0 when top-ups are not sold in it.
+	 *
+	 * @param string $currency Currency code, '' for the current one.
+	 */
+	public static function max( string $currency = '' ): int {
+		$max = self::limit( 'credit_max', $currency );
+
+		return null === $max ? 0 : max( self::min( $currency ), $max );
+	}
+
+	/**
+	 * The fixed amounts offered, within min and max of the currency. None when top-ups are not sold in it.
+	 *
+	 * @param string $currency Currency code, '' for the current one.
 	 * @return int[]
 	 */
-	public static function amounts(): array {
+	public static function amounts( string $currency = '' ): array {
+		$currency = Currency::or_current( $currency );
+
+		if ( ! self::available( $currency ) ) {
+			return array();
+		}
+
 		/**
-		 * Filters the fixed top-up amounts (whole amounts of the store currency).
+		 * Filters the fixed top-up amounts (whole amounts of the currency). The default list is for the store currency only:
+		 * another currency starts with none, because euro amounts are not scaled.
 		 *
-		 * @param int[] $amounts Default 10, 25, 50, 100 and 250.
+		 * @param int[]  $amounts  Default 10, 25, 50, 100 and 250 in the store currency, none in another.
+		 * @param string $currency Currency code.
 		 */
-		$amounts = (array) apply_filters( 'beltoft_services_credit_amounts', array( 10, 25, 50, 100, 250 ) );
+		$amounts = (array) apply_filters( 'beltoft_services_credit_amounts', Currency::base() === $currency ? array( 10, 25, 50, 100, 250 ) : array(), $currency );
 		$amounts = array_values( array_unique( array_map( 'intval', $amounts ) ) );
 		$amounts = array_values(
 			array_filter(
 				$amounts,
-				static function ( int $a ): bool {
-					return $a >= self::min() && $a <= self::max();
+				static function ( int $a ) use ( $currency ): bool {
+					return $a >= self::min( $currency ) && $a <= self::max( $currency );
 				}
 			)
 		);
@@ -202,9 +238,14 @@ final class Topup {
 	/**
 	 * Cents of a typed amount, or null when it is not a valid top-up: digits with at most two decimals, within min and max.
 	 *
-	 * @param mixed $raw Typed value.
+	 * @param mixed  $raw      Typed value.
+	 * @param string $currency Currency code, '' for the current one. Null when top-ups are not sold in it.
 	 */
-	public static function parse( $raw ): ?int {
+	public static function parse( $raw, string $currency = '' ): ?int {
+		if ( ! self::available( $currency ) ) {
+			return null;
+		}
+
 		$raw = trim( str_replace( ',', '.', (string) $raw ) );
 
 		if ( ! preg_match( '/^\d{1,7}(\.\d{1,2})?$/D', $raw ) ) {
@@ -213,7 +254,7 @@ final class Topup {
 
 		$cents = Balance::cents( $raw );
 
-		return $cents >= self::min() * 100 && $cents <= self::max() * 100 ? $cents : null;
+		return $cents >= self::min( $currency ) * 100 && $cents <= self::max( $currency ) * 100 ? $cents : null;
 	}
 
 	/**
@@ -279,6 +320,12 @@ final class Topup {
 		}
 
 		$cents = self::amount_from_post( $_POST ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified above.
+
+		if ( null === $cents && ! self::available() ) {
+			wc_add_notice( __( 'Top-ups are not available in your currency.', 'beltoft-services' ), 'error' );
+			wp_safe_redirect( $back );
+			exit;
+		}
 
 		if ( null === $cents ) {
 			wc_add_notice(
@@ -377,7 +424,7 @@ final class Topup {
 
 			$cents = (int) ( $item[ self::CART_KEY ] ?? 0 );
 
-			if ( ! Config::enabled() || $cents < self::min() * 100 || $cents > self::max() * 100 ) {
+			if ( ! Config::enabled() || ! self::available() || $cents < self::min() * 100 || $cents > self::max() * 100 ) {
 				$cart->remove_cart_item( $key );
 				continue;
 			}

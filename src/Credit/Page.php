@@ -153,6 +153,7 @@ final class Page {
 			'amounts'  => Topup::amounts(),
 			'min'      => Topup::min(),
 			'max'      => Topup::max(),
+			'available' => Topup::available(),
 			'currency' => get_woocommerce_currency(),
 		);
 	}
