@@ -19,15 +19,15 @@ use BeltoftServices\Usage\Estimate;
 		<h2><?php esc_html_e( 'Usage this month', 'beltoft-services' ); ?></h2>
 	</div>
 	<div class="beltoft-services-credit__balance">
-		<span class="beltoft-services-credit__label"><?php esc_html_e( 'Total so far, excl. VAT (estimate)', 'beltoft-services' ); ?></span>
-		<span class="beltoft-services-credit__amount"><?php echo esc_html( Estimate::money( $estimate['total'], $estimate['currency'] ) ); ?></span>
+		<span class="beltoft-services-credit__label"><?php echo esc_html( Estimate::incl() ? __( 'Total so far, incl. VAT (estimate)', 'beltoft-services' ) : __( 'Total so far, excl. VAT (estimate)', 'beltoft-services' ) ); ?></span>
+		<span class="beltoft-services-credit__amount"><?php echo esc_html( Estimate::money( Estimate::shown_total( $estimate ), $estimate['currency'] ) ); ?></span>
 	</div>
 	<table class="beltoft-services-usage__table">
 		<thead>
 			<tr>
 				<th scope="col"><?php esc_html_e( 'Service', 'beltoft-services' ); ?></th>
 				<th scope="col"><?php esc_html_e( 'Hours', 'beltoft-services' ); ?></th>
-				<th scope="col"><?php esc_html_e( 'Amount', 'beltoft-services' ); ?></th>
+				<th scope="col"><?php echo esc_html( Estimate::incl() ? __( 'Amount incl. VAT', 'beltoft-services' ) : __( 'Amount', 'beltoft-services' ) ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -41,7 +41,7 @@ use BeltoftServices\Usage\Estimate;
 							<?php endif; ?>
 						</td>
 						<td><?php echo esc_html( (string) $beltoft_services_usage_line['hours'] ); ?></td>
-						<td><?php echo esc_html( Estimate::money( $beltoft_services_usage_line['charge'], $estimate['currency'] ) ); ?></td>
+						<td><?php echo esc_html( Estimate::money( Estimate::shown_line( (float) $beltoft_services_usage_line['charge'] ), $estimate['currency'] ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			<?php endforeach; ?>

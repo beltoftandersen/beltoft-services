@@ -82,6 +82,7 @@ final class DbCard {
 			'resource_id' => $r->id(),
 			'kind'        => $kind,
 			'cost'        => \BeltoftServices\Usage\Estimate::cost_line( $r->id() ),
+			'cost_net'    => \BeltoftServices\Usage\Estimate::cost_line_net( $r->id() ),
 			'host'        => $ready ? $address : '',
 			'engine'      => $engine->label( $plan ),
 			'engine_id'   => $engine->id(),

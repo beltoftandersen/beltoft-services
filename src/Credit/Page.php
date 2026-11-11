@@ -161,7 +161,21 @@ final class Page {
 			'max'      => Topup::max( $currency ),
 			'available' => $here && Topup::available( $currency ),
 			'currency' => $currency,
+			'reserve'  => self::reserve( $user_id, $currency ),
 		);
+	}
+
+	/**
+	 * The reservation of this month's usage, when it is in the currency the page shows.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param string $currency Currency of the page.
+	 * @return array<string, mixed>|null
+	 */
+	private static function reserve( int $user_id, string $currency ): ?array {
+		$reserve = Reserve::for_user( $user_id );
+
+		return $reserve && $reserve['currency'] === $currency ? $reserve : null;
 	}
 
 	/**

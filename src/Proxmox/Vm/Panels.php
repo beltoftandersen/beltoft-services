@@ -301,6 +301,7 @@ final class Panels {
 			'snapshots'  => self::snapshots( $r, $r->accepts_actions() ),
 			'resource_id' => $r->id(),
 			'cost'        => \BeltoftServices\Usage\Estimate::cost_line( $r->id() ),
+			'cost_net'    => \BeltoftServices\Usage\Estimate::cost_line_net( $r->id() ),
 			'server_name' => ServerName::of( $r ),
 			'can_rename'  => $r->accepts_actions() && true !== $r->get( 'linked' ),
 			'hostname_pending' => is_string( $r->get( ServerName::PENDING ) ) ? (string) $r->get( ServerName::PENDING ) : '',

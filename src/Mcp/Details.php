@@ -176,7 +176,7 @@ final class Details {
 			'user'            => (string) $card['user'],
 			'tls_fingerprint' => (string) $card['fingerprint'],
 			'size'            => (string) $card['size'],
-			'cost_so_far'     => (string) $card['cost'],
+			'cost_so_far'     => (string) ( $card['cost_net'] ?? $card['cost'] ),
 			'backups'         => array(
 				'enabled'   => (bool) $card['backups']['enabled'],
 				'days'      => (int) $card['backups']['days'],

@@ -16,6 +16,8 @@ use BeltoftServices\Credit\Page;
 use BeltoftServices\Credit\Topup;
 use BeltoftServices\Usage\Rates;
 
+$beltoft_services_reserve = $credit['reserve'] ?? null;
+
 $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 ?>
 <section class="beltoft-services-credit">
@@ -45,6 +47,23 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<span class="beltoft-services-credit__label"><?php esc_html_e( 'Balance', 'beltoft-services' ); ?></span>
 		<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
 	</div>
+
+	<?php if ( $beltoft_services_reserve ) : ?>
+		<div class="beltoft-services-credit__balance">
+			<span class="beltoft-services-credit__label"><?php esc_html_e( 'Used so far this month (estimate)', 'beltoft-services' ); ?></span>
+			<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $beltoft_services_reserve['usage'], $credit['currency'] ) ); ?></span>
+		</div>
+		<div class="beltoft-services-credit__balance">
+			<span class="beltoft-services-credit__label"><?php esc_html_e( "Left after this month's usage", 'beltoft-services' ); ?></span>
+			<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $beltoft_services_reserve['left'], $credit['currency'] ) ); ?></span>
+		</div>
+		<p class="beltoft-services-credit__note"><?php esc_html_e( 'Usage is counted including VAT, as on the invoice. This is an estimate: nothing is taken from your balance until the invoice is made.', 'beltoft-services' ); ?></p>
+		<?php if ( $beltoft_services_reserve['carried'] ) : ?>
+			<p class="beltoft-services-credit__note"><?php esc_html_e( 'This usage is under the minimum and is carried to next month, so no credit is used on it yet.', 'beltoft-services' ); ?></p>
+		<?php elseif ( $beltoft_services_reserve['rest'] > 0 ) : ?>
+			<p class="beltoft-services-credit__note"><?php echo esc_html( sprintf( /* translators: %s: amount with currency. */ __( 'Your usage is more than your balance. The rest, %s, is charged to your card.', 'beltoft-services' ), Page::money( $beltoft_services_reserve['rest'], $credit['currency'] ) ) ); ?></p>
+		<?php endif; ?>
+	<?php endif; ?>
 
 	<?php if ( ! $credit['available'] ) : ?>
 		<p class="beltoft-services-credit__note"><?php esc_html_e( 'Top-ups are not available in your currency.', 'beltoft-services' ); ?></p>

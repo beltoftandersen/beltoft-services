@@ -170,6 +170,16 @@ final class TaxNote {
 	}
 
 	/**
+	 * What one usage invoice line of an amount excluding tax comes to on the invoice itself: line_incl() when the shop charges tax and the
+	 * customer is not VAT exempt, else the amount. Unlike figure() it does not depend on the display, because credit pays the invoice total.
+	 *
+	 * @param float $excl Amount of one invoice line, excluding tax.
+	 */
+	public static function invoice_line( float $excl ): float {
+		return wc_tax_enabled() && ! self::exempt() ? self::line_incl( $excl ) : $excl;
+	}
+
+	/**
 	 * Whether a catalogue figure of this product is shown including tax: the display in force is including and the amount belongs to a
 	 * product. Without a product the amount is shown as given (excluding tax) and the sentence around it says so.
 	 *

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -151,7 +152,13 @@ final class Estimate {
 	public static function so_far( int $user_id ): string {
 		$estimate = self::for_user( $user_id );
 
-		return $estimate ? sprintf( /* translators: %s: amount with currency. */ __( 'Usage so far: %s (estimate)', 'beltoft-services' ), self::money( $estimate['total'], $estimate['currency'] ) ) : '';
+		if ( ! $estimate ) {
+			return '';
+		}
+
+		$amount = self::money( self::shown_total( $estimate ), $estimate['currency'] );
+
+		return self::incl() ? sprintf( /* translators: %s: amount with currency. */ __( 'Usage so far, incl. VAT: %s (estimate)', 'beltoft-services' ), $amount ) : sprintf( /* translators: %s: amount with currency. */ __( 'Usage so far: %s (estimate)', 'beltoft-services' ), $amount );
 	}
 
 	/**
@@ -173,8 +180,97 @@ final class Estimate {
 			return '';
 		}
 
-		$cost = (float) ( $estimate['resources'][ $resource_id ]['total'] ?? 0.0 );
+		$cost = self::shown_resource( $estimate, $resource_id );
 
-		return sprintf( /* translators: %s: amount with currency. */ __( 'Cost so far this month: %s', 'beltoft-services' ), self::money( $cost, $estimate['currency'] ) );
+		return self::incl() ? sprintf( /* translators: %s: amount with currency. */ __( 'Cost so far this month, incl. VAT: %s', 'beltoft-services' ), self::money( $cost, $estimate['currency'] ) ) : sprintf( /* translators: %s: amount with currency. */ __( 'Cost so far this month: %s', 'beltoft-services' ), self::money( $cost, $estimate['currency'] ) );
+	}
+
+	/**
+	 * The same line with the net amount, for machine readable answers (MCP): never taxed.
+	 *
+	 * @param int $resource_id Activation id.
+	 */
+	public static function cost_line_net( int $resource_id ): string {
+		return TaxNote::in( 'excl', static fn() => self::cost_line( $resource_id ) );
+	}
+
+	/**
+	 * Whether the customer of this request is shown prices including VAT (the display TaxNote gives).
+	 */
+	public static function incl(): bool {
+		return 'incl' === TaxNote::display();
+	}
+
+	/**
+	 * One estimate line as shown: the net charge, or what the invoice line comes to including VAT.
+	 *
+	 * @param float $charge Net charge of a line.
+	 */
+	public static function shown_line( float $charge ): float {
+		return self::incl() && $charge > 0 ? round( TaxNote::invoice_line( $charge ), 2 ) : $charge;
+	}
+
+	/**
+	 * The total as shown (see shown_line()).
+	 *
+	 * @param array<string, mixed> $estimate for_user().
+	 */
+	public static function shown_total( array $estimate ): float {
+		return self::incl() ? self::gross( self::charges( $estimate, 0 ) ) : (float) $estimate['total'];
+	}
+
+	/**
+	 * The total of one service as shown.
+	 *
+	 * @param array<string, mixed> $estimate    for_user().
+	 * @param int                  $resource_id Activation id.
+	 */
+	public static function shown_resource( array $estimate, int $resource_id ): float {
+		return self::incl() ? self::gross( self::charges( $estimate, $resource_id ) ) : (float) ( $estimate['resources'][ $resource_id ]['total'] ?? 0.0 );
+	}
+
+	/**
+	 * What the invoice for this estimate comes to including VAT, in cents, whatever the display (credit pays the invoice total).
+	 *
+	 * @param array<string, mixed> $estimate for_user().
+	 */
+	public static function invoice_cents( array $estimate ): int {
+		return (int) round( self::gross( self::charges( $estimate, 0 ) ) * 100 );
+	}
+
+	/**
+	 * Net charges of the lines of the estimate (of one service, or all with 0).
+	 *
+	 * @param array<string, mixed> $estimate    for_user().
+	 * @param int                  $resource_id Activation id, 0 for all.
+	 * @return float[]
+	 */
+	private static function charges( array $estimate, int $resource_id ): array {
+		$out = array();
+
+		foreach ( (array) $estimate['resources'] as $id => $resource ) {
+			if ( 0 === $resource_id || (int) $id === $resource_id ) {
+				foreach ( (array) $resource['lines'] as $line ) {
+					$out[] = (float) $line['charge'];
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Invoice lines taxed one by one as WooCommerce taxes them; the sum rounded once.
+	 *
+	 * @param float[] $charges Net charges.
+	 */
+	private static function gross( array $charges ): float {
+		$sum = 0.0;
+
+		foreach ( $charges as $charge ) {
+			$sum += $charge > 0 ? TaxNote::invoice_line( $charge ) : 0.0;
+		}
+
+		return round( $sum, 2 );
 	}
 }
