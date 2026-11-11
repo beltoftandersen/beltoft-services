@@ -131,6 +131,16 @@ class ServiceAreasTest extends TestCase {
 		$this->assertContains( 'apps', Endpoint::slugs() );
 	}
 
+	public function test_an_app_row_keeps_its_columns_and_right_aligns_the_action(): void {
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+
+		// The empty extra cell still takes its column on a wide screen, so the Open button is not pulled left into it.
+		$this->assertStringContainsString( '.beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: block; }', $css );
+		$this->assertStringContainsString( '.beltoft-services-servers--area .beltoft-services-http-open { justify-self: end;', $css );
+		// A stacked row has no empty line of its own.
+		$this->assertStringContainsString( '.beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; }', $css );
+	}
+
 	public function test_the_slug_can_be_changed_with_a_filter(): void {
 		add_filter( 'beltoft_services_databases_slug', static fn() => 'dbs' );
 
