@@ -343,9 +343,10 @@ final class Card {
 		$token       = self::token_for( $account );
 		$fingerprint = '';
 
-		if ( $token && function_exists( 'stripe_wc' ) && str_starts_with( $token->get_gateway_id(), 'stripe_' ) ) {
+		if ( $token && class_exists( '\\WC_Stripe_Gateway' ) && str_starts_with( $token->get_gateway_id(), 'stripe_' ) ) {
 			try {
-				$pm = stripe_wc()->client->mode( $account )->paymentMethods->retrieve( $token->get_token() );
+				// The plugin's client comes from its gateway class (it has no `client` property on `stripe_wc()`).
+				$pm = \WC_Stripe_Gateway::load()->mode( $account )->paymentMethods->retrieve( $token->get_token() );
 
 				if ( ! is_wp_error( $pm ) && isset( $pm->card->fingerprint ) ) {
 					$fingerprint = (string) $pm->card->fingerprint;
