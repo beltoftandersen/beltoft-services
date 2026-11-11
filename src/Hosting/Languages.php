@@ -86,6 +86,23 @@ final class Languages {
 	}
 
 	/**
+	 * The language a new website is offered first: the language of the page the customer is ordering on when the list
+	 * has it (a Danish checkout offers Dansk), else the default.
+	 */
+	public static function preselected(): string {
+		$locale = (string) determine_locale();
+
+		/**
+		 * The website language preselected in the order form.
+		 *
+		 * @param string $locale The page's locale when it is on the list, else the default.
+		 */
+		$locale = (string) apply_filters( 'beltoft_services_hosting_default_language', self::offered( $locale ) ? $locale : self::DEFAULT );
+
+		return self::offered( $locale ) ? $locale : self::DEFAULT;
+	}
+
+	/**
 	 * The native name of a locale, or the locale itself when it is not on the list.
 	 *
 	 * @param string $locale Locale.

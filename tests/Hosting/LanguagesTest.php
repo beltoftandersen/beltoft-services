@@ -110,4 +110,23 @@ final class LanguagesTest extends TestCase {
 
 		delete_site_transient( 'available_translations' );
 	}
+
+	public function test_the_preselected_language_follows_the_page_language_when_the_list_has_it(): void {
+		$this->assertSame( Languages::DEFAULT, Languages::preselected(), 'An English page offers the default.' );
+
+		$danish = static fn() => 'da_DK';
+		add_filter( 'determine_locale', $danish );
+		$this->assertSame( 'da_DK', Languages::preselected(), 'A Danish page offers Dansk.' );
+		remove_filter( 'determine_locale', $danish );
+
+		$unknown = static fn() => 'xx_YY';
+		add_filter( 'determine_locale', $unknown );
+		$this->assertSame( Languages::DEFAULT, Languages::preselected(), 'A locale that is not on the list falls back.' );
+		remove_filter( 'determine_locale', $unknown );
+
+		$forced = static fn() => 'de_DE';
+		add_filter( 'beltoft_services_hosting_default_language', $forced );
+		$this->assertSame( 'de_DE', Languages::preselected(), 'A site can choose it.' );
+		remove_filter( 'beltoft_services_hosting_default_language', $forced );
+	}
 }

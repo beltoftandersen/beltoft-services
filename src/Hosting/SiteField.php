@@ -392,7 +392,7 @@ final class SiteField {
 		$mode = '' === $post['mode'] ? self::MODE_PREVIEW : $post['mode'];
 		$have = array() !== $zones;
 		$pick = in_array( $post['install'], self::OFFERED, true ) ? $post['install'] : $install;
-		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::DEFAULT;
+		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::preselected();
 		$zone = Config::preview_zone();
 
 		$new = MailField::cart_domains();
