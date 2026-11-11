@@ -350,10 +350,11 @@ final class Balance {
 		$target = '' !== $target ? $target : Currency::base();
 
 		$refused = null;
+		$first   = false;
 
 		list( $locked, $written ) = self::locked(
 			$user_id,
-			static function () use ( $wpdb, $user_id, $signed, $kind, $ref_type, $ref_id, $note, $target, &$refused ): bool {
+			static function () use ( $wpdb, $user_id, $signed, $kind, $ref_type, $ref_id, $note, $target, &$refused, &$first ): bool {
 				// One currency per customer, also at a zero balance: another currency is refused. With no rows yet, the currency someone
 				// else fixed for the customer (the usage account, a bridge) counts as theirs. The mail is sent after the lock is released.
 				$have  = self::row_currency( $user_id );
@@ -394,6 +395,7 @@ final class Balance {
 
 				if ( 1 === (int) $done ) {
 					update_user_meta( $user_id, self::META_CURRENCY, $target );
+					$first = null === $have;
 				}
 
 				return 1 === (int) $done;
@@ -408,6 +410,19 @@ final class Balance {
 				null,
 				'beltoft_services_credit_mixed_' . $user_id
 			);
+		}
+
+		if ( $locked && true === $written && $first ) {
+			/**
+			 * The customer's first credit row was written: from now on their credit, and so their money, is in this
+			 * currency. A shop side that lets the customer pick a currency (a currency plugin through a bridge) can fix
+			 * the customer to it. Fired once per customer, after the balance lock is released; not for later rows and not
+			 * when the write was refused.
+			 *
+			 * @param int    $user_id  Customer.
+			 * @param string $currency Currency code of the first row.
+			 */
+			do_action( 'beltoft_services_credit_currency_set', $user_id, $target );
 		}
 
 		return $locked && true === $written;

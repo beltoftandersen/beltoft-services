@@ -113,6 +113,27 @@ class CodeTest extends CreditTestCase {
 		return new \WC_Coupon( $c->get_id() );
 	}
 
+	public function test_the_first_redemption_fires_the_currency_action_and_the_second_does_not(): void {
+		$fired = array();
+		add_action(
+			'beltoft_services_credit_currency_set',
+			static function ( $user, $currency ) use ( &$fired ) {
+				$fired[] = array( (int) $user, (string) $currency );
+			},
+			10,
+			2
+		);
+		$user = $this->customer();
+		$this->code( array( 'amount' => '10', 'code' => 'SETONE' ) );
+		$this->code( array( 'amount' => '5', 'code' => 'SETTWO' ) );
+
+		$this->assertTrue( Code::redeem( $user, 'SETONE' )['ok'] );
+		$this->assertSame( array( array( $user, 'EUR' ) ), $fired );
+		$this->assertTrue( Code::redeem( $user, 'SETTWO' )['ok'] );
+		$this->assertCount( 1, $fired );
+		remove_all_actions( 'beltoft_services_credit_currency_set' );
+	}
+
 	public function test_type_is_registered(): void {
 		$this->assertArrayHasKey( Code::TYPE, wc_get_coupon_types() );
 	}

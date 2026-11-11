@@ -31,6 +31,12 @@ abstract class CreditTestCase extends UsageTestCase {
 	}
 
 	public function tear_down(): void {
+		// Rows written while a test ran can be committed by an implicit commit (table creation): clear them so later suites start clean.
+		global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
+		$wpdb->query( 'DELETE FROM ' . Balance::table() );
+		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Usage\Ledger::table() );
+		// phpcs:enable
 		$this->vat( false );
 		Estimate::reset();
 		parent::tear_down();

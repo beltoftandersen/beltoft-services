@@ -67,6 +67,7 @@ For a site builder. The plugin never converts a price. It reads prices from WooC
 * `beltoft_services_app_text( $text, $app_id, $field )`: the summary and getting-started text of a one-click app, after translation.
 * `beltoft_services_checkout_field_heading( $show, $kind )`: a checkout with its own step heading leaves the fields' heading out.
 * Action `beltoft_services_usage_account_created( $user_id, $account )`: a usage account was made with no order behind it; fix the customer's currency here.
+* Action `beltoft_services_credit_currency_set( $user_id, $currency )`: the customer's first credit row was written (a code, a top-up or an admin grant), so their credit is now in that currency for good. Fired once per customer, after the balance lock is released; not for later rows and not when a write is refused. Fix the customer's shop currency here, so they cannot place an order in another currency and strand the credit.
 * The cart item key `beltoft_services_price_currency` (`Currency::CART_KEY`) holds the currency a runtime price (a domain line, a top-up line) was worked out in. A site that approves runtime prices in another currency must approve a line only when this key equals the cart's currency.
 
 What the plugin never does: convert an amount for a customer, show a price in a currency other than the customer's, or put one customer's money in two currencies (a credit balance has one currency, and rows in another currency are never billed on an order of the first).
