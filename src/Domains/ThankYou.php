@@ -100,6 +100,26 @@ final class ThankYou {
 	}
 
 	/**
+	 * The transfer-in domains of an order that were free: nothing was paid and the first yearly payment is due at the renewal date.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @return array<string, bool> Domain => true.
+	 */
+	public static function free_transfers( \WC_Order $order ): array {
+		$domains = array();
+
+		foreach ( $order->get_items() as $item ) {
+			$data = $item->get_meta( '_beltoft_services_domain', true );
+
+			if ( is_array( $data ) && 'transfer' === ( $data['mode'] ?? '' ) && ! empty( $data['domain'] ) && ! empty( $data['free_transfer'] ) && 0.0 === round( (float) $item->get_total(), 2 ) ) {
+				$domains[ (string) $data['domain'] ] = true;
+			}
+		}
+
+		return $domains;
+	}
+
+	/**
 	 * What each transfer does with the DNS, as the customer chose it: domain => first, after or keep ('' for an older order).
 	 *
 	 * @param \WC_Order $order Order.
@@ -162,6 +182,7 @@ final class ThankYou {
 				array(
 					'domains'     => $transfers,
 					'choices'     => self::transfer_choices( $order ),
+					'free'        => self::free_transfers( $order ),
 					'days'        => self::transfer_days(),
 					'account_url' => $account_url,
 				),

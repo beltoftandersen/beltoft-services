@@ -195,7 +195,10 @@ final class Search {
 			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
 			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
-			$results[] = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
+			$row = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
+			// Only a free transfer carries the key, so the shape the API and MCP return is unchanged for every other result.
+			if ( 'taken' === $status && Prices::free_transfer( $entry['domain'] ) ) { $row['free_transfer'] = true; }
+			$results[] = $row;
 		}
 		return array( 'results' => $results );
 	}

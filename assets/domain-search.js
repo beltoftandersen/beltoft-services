@@ -274,7 +274,7 @@
       }
     }
 
-    function codeForm(domain, shown) {
+    function codeForm(domain, shown, free) {
       shown = shown || domain;
       const form = document.createElement('form');
       form.className = 'beltoft-domain-transfer';
@@ -291,7 +291,7 @@
       notice.setAttribute('aria-live', 'polite');
       const row = element('div', 'beltoft-domain-transfer__row', '');
       row.append(field, submit);
-      form.append(notice, row, element('p', 'beltoft-domain-transfer__help', __('The transfer takes up to 5 days and adds one year to the registration.', 'beltoft-services')));
+      form.append(notice, row, element('p', 'beltoft-domain-transfer__help', free ? __('The transfer takes up to 5 days and is free. The first yearly payment is due when the domain is up for renewal.', 'beltoft-services') : __('The transfer takes up to 5 days and adds one year to the registration.', 'beltoft-services')));
       recommendation(domain).then(function (advice) {
         if (!advice) return;
         const who = advice.registrar ? String(advice.registrar).replace(/\.+$/, '') : __('your current registrar', 'beltoft-services');
@@ -333,11 +333,21 @@
         information.appendChild(element('span', 'beltoft-domain-result__status', __('Registered, can be transferred', 'beltoft-services')));
         if (hasPrice) {
           const transferPrice = element('div', 'beltoft-domain-result__price', '');
-          transferPrice.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('%s / year', 'beltoft-services'), priceMarkup(item));
-          card.insertBefore(transferPrice, actions);
-          information.appendChild(element('span', 'beltoft-domain-result__note', taxMode === 'incl' ? __('The transfer is charged as one year and adds that year to the registration. Price including VAT.', 'beltoft-services') : __('The transfer is charged as one year and adds that year to the registration. Price excluding VAT.', 'beltoft-services')));
+          if (item.free_transfer) {
+            // The server decides: the extension moves without a year, so nothing is paid now and the yearly price comes at the renewal date.
+            transferPrice.textContent = __('Free transfer', 'beltoft-services');
+            card.insertBefore(transferPrice, actions);
+            const renews = element('span', 'beltoft-domain-result__note', '');
+            renews.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('Renews at %s / year', 'beltoft-services'), priceMarkup(item));
+            information.appendChild(renews);
+            information.appendChild(element('span', 'beltoft-domain-result__note', taxMode === 'incl' ? __('The transfer is free. The first yearly payment is due when the domain is up for renewal. Price including VAT.', 'beltoft-services') : __('The transfer is free. The first yearly payment is due when the domain is up for renewal. Price excluding VAT.', 'beltoft-services')));
+          } else {
+            transferPrice.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('%s / year', 'beltoft-services'), priceMarkup(item));
+            card.insertBefore(transferPrice, actions);
+            information.appendChild(element('span', 'beltoft-domain-result__note', taxMode === 'incl' ? __('The transfer is charged as one year and adds that year to the registration. Price including VAT.', 'beltoft-services') : __('The transfer is charged as one year and adds that year to the registration. Price excluding VAT.', 'beltoft-services')));
+          }
         }
-        const code = codeForm(item.domain, item.display);
+        const code = codeForm(item.domain, item.display, !!item.free_transfer);
         actions.appendChild(code.form);
         code.field.focus();
         return;

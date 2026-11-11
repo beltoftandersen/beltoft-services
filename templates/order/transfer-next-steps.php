@@ -7,6 +7,7 @@
  *
  * @var array<string, bool> $domains Domain => our DNS already serves it (the DNS stays as it is).
  * @var array<string, string> $choices Domain => where the DNS lives: first, after, keep, or '' for an older order.
+ * @var array<string, bool> $free Domain => the transfer was free (optional).
  * @var int      $days        The most days a transfer can take.
  * @var string   $account_url My Account Domains page.
  */
@@ -51,6 +52,9 @@ foreach ( $domains as $beltoft_domain => $beltoft_served ) :
 		</li>
 		<li><?php esc_html_e( 'We email you when the domain is with us.', 'beltoft-services' ); ?></li>
 	</ol>
+	<?php endif; ?>
+	<?php if ( ! empty( $free[ $beltoft_domain ] ) ) : ?>
+		<p><?php esc_html_e( 'The transfer is free. The first yearly payment is due when the domain is up for renewal.', 'beltoft-services' ); ?></p>
 	<?php endif; ?>
 	<?php if ( $beltoft_served ) : ?>
 		<p><?php esc_html_e( 'Your DNS stays as it is.', 'beltoft-services' ); ?></p>

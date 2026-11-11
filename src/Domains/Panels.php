@@ -127,6 +127,13 @@ final class Panels {
 				: $labels[ TransferDns::choice( $r ) ];
 		}
 
+		if ( $r->get( 'transfer_free' ) ) {
+			$due = (int) $r->get( 'next_payment_at' );
+			$rows[ __( 'Payment', 'beltoft-services' ) ] = $due > 0
+				/* translators: %s: date */
+				? sprintf( __( 'Free transfer. The first yearly payment is due on %s.', 'beltoft-services' ), wp_date( get_option( 'date_format' ), $due ) )
+				: __( 'Free transfer. The first yearly payment is due when the domain is up for renewal.', 'beltoft-services' );
+		}
 		$rows[ __( 'Waiting for', 'beltoft-services' ) ]          = TransferDns::waiting_reason( $r );
 		$rows[ __( 'DNS records checked', 'beltoft-services' ) ]  = (int) $r->get( 'dns_reviewed_at' ) > 0 ? ( 'imported' === (string) $r->get( 'dns_reviewed_path' ) ? __( 'Imported a zone file', 'beltoft-services' ) : __( 'Acknowledged that records we could not find are missing', 'beltoft-services' ) ) . ' (' . wp_date( 'Y-m-d H:i', (int) $r->get( 'dns_reviewed_at' ) ) . ')' : '';
 		$rows[ __( 'How the DNS was chosen', 'beltoft-services' ) ] = $r->get( 'transfer_dns_detected' ) ? __( 'Detected: the current name servers are a registrar\'s own', 'beltoft-services' ) : '';

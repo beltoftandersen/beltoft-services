@@ -93,8 +93,8 @@ final class PriceTags {
 		}
 
 		return preg_replace_callback(
-			'/\{beltoft_domain_(?:register|renew|transfer):([a-z0-9][a-z0-9.-]*)\}/iD',
-			static fn( $m ) => self::value( (string) $m[1], 'text' === $context ),
+			'/\{beltoft_domain_(register|renew|transfer):([a-z0-9][a-z0-9.-]*)\}/iD',
+			static fn( $m ) => 'transfer' === strtolower( (string) $m[1] ) && Prices::free_transfer( 'example.' . strtolower( (string) $m[2] ) ) ? esc_html_x( 'Free', 'the price of a transfer that costs nothing', 'beltoft-services' ) : self::value( (string) $m[2], 'text' === $context ),
 			$content
 		);
 	}

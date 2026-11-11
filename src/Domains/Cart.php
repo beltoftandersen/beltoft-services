@@ -62,6 +62,32 @@ final class Cart {
 		// After Subscriptions and the core trial rule: a free transfer is a $0 cart that still needs a payment method, and is not a trial.
 		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'needs_payment' ), 30, 2 );
 		add_filter( 'beltoft_services_trial_cart_item', array( __CLASS__, 'is_trial_item' ), 10, 2 );
+		// The line reads as a transfer, never as a free trial, and shows no first renewal date (the real one is known after the transfer).
+		add_filter( 'woocommerce_cart_item_price', array( __CLASS__, 'free_transfer_price' ), 98, 2 );
+		add_filter( 'woocommerce_cart_item_subtotal', array( __CLASS__, 'free_transfer_subtotal' ), 98, 2 );
+		add_filter( 'wcs_cart_totals_order_total_html', array( __CLASS__, 'free_transfer_totals' ), 20, 2 );
+	}
+
+	/** The price text of a free transfer line: "Free transfer, then 20 / year". */
+	public static function free_transfer_price( $price, $item = array() ) {
+		if ( ! is_array( $item ) || ! self::is_free_transfer_item( $item ) || ! isset( $item['data'] ) || ! class_exists( \WC_Subscriptions_Product::class ) ) { return $price; }
+		$string = \WC_Subscriptions_Product::get_price_string( $item['data'], array( 'price' => wc_price( wc_get_price_to_display( $item['data'] ) ), 'subscription_length' => false, 'sign_up_fee' => false, 'trial_length' => false ) );
+		/* translators: %s: the yearly price with its period, such as 20 / year */
+		return sprintf( __( 'Free transfer, then %s', 'beltoft-services' ), (string) $string );
+	}
+
+	/** What a free transfer line costs today. */
+	public static function free_transfer_subtotal( $subtotal, $item = array() ) {
+		return is_array( $item ) && self::is_free_transfer_item( $item ) ? wc_price( 0 ) : $subtotal;
+	}
+
+	/** The recurring totals of a free transfer: Subscriptions' "First renewal" date is the one year placeholder, so it is left out. */
+	public static function free_transfer_totals( $html, $cart = null ) {
+		if ( ! is_string( $html ) || ! $cart instanceof \WC_Cart ) { return $html; }
+		foreach ( $cart->get_cart() as $item ) {
+			if ( self::is_free_transfer_item( $item ) ) { return (string) preg_replace( '/<div class="first-payment-date">.*?<\/div>/s', '', $html ); }
+		}
+		return $html;
 	}
 
 	/** The meta keys Subscriptions reads a trial from, set on the cart's own copy of the product. */

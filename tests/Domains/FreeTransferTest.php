@@ -9,7 +9,10 @@ use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeClient;
 use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Domains\Meta;
+use BeltoftServices\Domains\PriceTags;
 use BeltoftServices\Domains\Prices;
+use BeltoftServices\Domains\Search;
+use BeltoftServices\Domains\ThankYou;
 use BeltoftServices\Domains\Renewals;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
@@ -444,5 +447,77 @@ class FreeTransferTest extends TestCase {
 		$this->assertTrue( RenewalSweep::set_dates( $this->dated( $sub, gmdate( 'Y-m-d H:i:s', time() + 400 * DAY_IN_SECONDS ) ), gmdate( 'Y-m-d H:i:s', time() + 400 * DAY_IN_SECONDS ), 'x', 'y', 30 )->is_done() );
 		$sub = wcs_get_subscription( $sub->get_id() );
 		$this->assertEqualsWithDelta( $trial, $sub->get_time( 'trial_end' ), 5, 'A real trial that ends before the payment is not touched.' );
+	}
+
+	// ---- what the customer reads ----
+
+	public function test_the_search_result_says_which_taken_domains_move_for_free(): void {
+		$this->table();
+		$this->settings( array( 'domain_featured_tlds' => 'se' ) );
+		$fake = new FakeClient();
+		foreach ( array( 'owned.se', 'owned.se', 'owned.com' ) as $name ) { $fake->reply( 'POST', '/domains/check', array( 'results' => array( array( 'domain' => $name, 'status' => 'taken' ) ) ) ); }
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$off = Search::find( 'owned.se' );
+		$this->assertArrayNotHasKey( 'free_transfer', $off['results'][0], 'Off: the result keeps the shape it had.' );
+		$this->on();
+		$on = Search::find( 'owned.se' );
+		$this->assertTrue( $on['results'][0]['free_transfer'] );
+		$this->assertSame( 20, $on['results'][0]['price'], 'The yearly price is still the figure.' );
+		$this->assertArrayNotHasKey( 'free_transfer', Search::find( 'owned.com' )['results'][0] );
+	}
+
+	public function test_the_transfer_price_tag_says_free_and_the_others_keep_their_figure(): void {
+		$this->table();
+		$text = static fn( string $tag ): string => (string) apply_filters( 'bricks/frontend/render_data', $tag, null );
+		$this->assertNotSame( 'Free', $text( '{beltoft_domain_transfer:se}' ), 'Off: a figure.' );
+		$this->on();
+		PriceTags::forget();
+		$this->assertSame( 'Free', $text( '{beltoft_domain_transfer:se}' ) );
+		$this->assertNotSame( 'Free', $text( '{beltoft_domain_renew:se}' ) );
+		$this->assertNotSame( 'Free', $text( '{beltoft_domain_register:se}' ) );
+		$this->assertNotSame( 'Free', $text( '{beltoft_domain_transfer:com}' ), 'A transfer with a cost keeps its figure.' );
+		$this->settings( array( 'domain_free_transfers' => 0 ) );
+		$this->assertNotSame( 'Free', $text( '{beltoft_domain_transfer:se}' ), 'Turned off again in the same request.' );
+	}
+
+	public function test_the_cart_line_reads_as_a_transfer_not_a_trial_and_prints_no_first_renewal_date(): void {
+		$this->table();
+		$this->on();
+		$key = $this->add( $this->domain_product(), 'moveme.se', 'transfer' );
+		$this->totals();
+		$item = WC()->cart->cart_contents[ $key ];
+		$price = wp_strip_all_tags( (string) apply_filters( 'woocommerce_cart_item_price', '', $item, $key ) );
+		$this->assertStringStartsWith( 'Free transfer, then', $price );
+		$this->assertStringContainsString( '20', $price );
+		$this->assertStringNotContainsStringIgnoringCase( 'trial', $price );
+		$this->assertStringContainsString( '0.00', wp_strip_all_tags( (string) apply_filters( 'woocommerce_cart_item_subtotal', '', $item, $key ) ) );
+		$recurring = array_values( (array) WC()->cart->recurring_carts )[0];
+		$html = apply_filters( 'wcs_cart_totals_order_total_html', '<strong>20</strong><div class="first-payment-date"><small>First renewal: November 11, 2027</small></div>', $recurring );
+		$this->assertStringNotContainsString( 'First renewal', $html );
+		$this->assertStringContainsString( '<strong>20</strong>', $html );
+		$paid = apply_filters( 'wcs_cart_totals_order_total_html', 'x<div class="first-payment-date">d</div>', new \WC_Cart() );
+		$this->assertStringContainsString( 'first-payment-date', $paid, 'Other carts keep it.' );
+	}
+
+	public function test_the_thank_you_page_and_the_panel_say_when_the_first_payment_is_due(): void {
+		$order = wc_create_order();
+		foreach ( array( array( 'a.se', 0.0, true ), array( 'b.se', 20.0, true ), array( 'c.com', 20.0, false ) ) as list( $name, $total, $stamp ) ) {
+			$item = new \WC_Order_Item_Product();
+			$item->set_product( $this->domain_product() );
+			$item->set_total( $total );
+			$item->add_meta_data( '_beltoft_services_domain', array( 'domain' => $name, 'mode' => 'transfer' ) + ( $stamp ? array( 'free_transfer' => true ) : array() ), true );
+			$order->add_item( $item );
+		}
+		$order->save();
+		$this->assertSame( array( 'a.se' => true ), ThankYou::free_transfers( $order ) );
+		$r = $this->transfer_resource( array( 'transfer_free' => true ) );
+		ob_start();
+		\BeltoftServices\Domains\Panels::admin( $r );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Free transfer. The first yearly payment is due when the domain is up for renewal.', $html );
+		$r->set( array( 'next_payment_at' => strtotime( '2027-09-26 00:00:00 UTC' ) ) );
+		ob_start();
+		\BeltoftServices\Domains\Panels::admin( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'is due on', (string) ob_get_clean() );
 	}
 }
