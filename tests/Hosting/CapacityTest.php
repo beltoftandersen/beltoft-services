@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests\Hosting;
 
 require_once __DIR__ . '/HostingCase.php';
 
+use BeltoftServices\Billing\ExistingFlow;
 use BeltoftServices\Hosting\HostingCapacity;
 use BeltoftServices\Hosting\Plan;
 use BeltoftServices\Hosting\Records;
@@ -206,10 +207,33 @@ class CapacityTest extends HostingCase {
 		$this->assertFalse( $sold->is_in_stock() );
 		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', $sold->is_in_stock(), $sold ) );
 
-		// A switch or resubscribe request of an existing customer passes.
-		$_REQUEST['switch-subscription'] = '5';
-		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ) );
+		// A bare request argument opens nothing: not for a guest, not for a made-up id, not for a subscription of another product.
+		foreach ( array( 'switch-subscription', 'resubscribe' ) as $arg ) {
+			$set = static function ( ?string $value ) use ( $arg ): void {
+				$bag = 'switch-subscription' === $arg ? '_REQUEST' : '_GET';
+
+				if ( null === $value ) {
+					unset( $GLOBALS[ $bag ][ $arg ] );
+					return;
+				}
+
+				$GLOBALS[ $bag ][ $arg ] = $value;
+			};
+			$set( '5' );
+			$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A guest with ' . $arg . '=5.' );
+			$set( null );
+		}
+
+		$user  = self::factory()->user->create();
+		$other = $this->service_product( 'fake' );
+		$mine  = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$mine->add_product( $other );
+		$mine->save();
+		wp_set_current_user( $user );
+		$_REQUEST['switch-subscription'] = (string) $mine->get_id();
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A logged-in customer with an unrelated own subscription.' );
 		unset( $_REQUEST['switch-subscription'] );
+		wp_set_current_user( 0 );
 
 		// Another product is left alone.
 		$other = $this->service_product( 'fake' );
@@ -238,10 +262,27 @@ class CapacityTest extends HostingCase {
 		$this->assertFalse( $fresh->is_in_stock(), 'Sold out for a new customer.' );
 
 		// WooCommerce Subscriptions adds a renewal with its key in the item data; the check runs before the item is in the cart.
-		apply_filters( 'woocommerce_add_cart_item_data', array( 'subscription_renewal' => array( 'renewal_order_id' => 1 ) ), $product->get_id(), 0 );
+		$data = array( 'subscription_renewal' => array( 'subscription_id' => $sub->get_id(), 'renewal_order_id' => $renewal->get_id() ) );
+		apply_filters( 'woocommerce_add_cart_item_data', $data, $product->get_id(), 0 );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'A guest forging the renewal key is refused.' );
+		wp_set_current_user( $user );
 		$this->assertTrue( wc_get_product( $product->get_id() )->is_in_stock(), 'The renewal being added passes.' );
-		Stock::clear_flow();
+		ExistingFlow::clear();
 		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'Only while it is being added.' );
+
+		// The key naming a subscription of somebody else, or one that holds another product, is refused.
+		$foreign = wcs_create_subscription( array( 'customer_id' => self::factory()->user->create(), 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$foreign->add_product( $product );
+		$foreign->save();
+		apply_filters( 'woocommerce_add_cart_item_data', array( 'subscription_renewal' => array( 'subscription_id' => $foreign->get_id() ) ), $product->get_id(), 0 );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'Somebody else\'s subscription.' );
+		$unrelated = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$unrelated->add_product( $this->service_product( 'fake' ) );
+		$unrelated->save();
+		apply_filters( 'woocommerce_add_cart_item_data', array( 'subscription_renewal' => array( 'subscription_id' => $unrelated->get_id() ) ), $product->get_id(), 0 );
+		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'An own subscription of another product.' );
+		ExistingFlow::clear();
+		wp_set_current_user( $user );
 
 		apply_filters( 'woocommerce_add_cart_item_data', array(), $product->get_id(), 0 );
 		$this->assertFalse( wc_get_product( $product->get_id() )->is_in_stock(), 'A new purchase is not let through.' );
@@ -249,6 +290,35 @@ class CapacityTest extends HostingCase {
 		// Paying the renewal order.
 		$this->assertTrue( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $fresh->is_in_stock(), $fresh, $renewal ) );
 		$this->assertFalse( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $fresh->is_in_stock(), $fresh, $plain ) );
+	}
+
+	public function test_a_real_switch_and_a_real_resubscribe_pass_on_a_hand_closed_plan(): void {
+		Stock::register();
+		$product = $this->service_product( 'hosting', array( 'node_group' => 'g1', 'memory_mb' => 2048, 'disk_gb' => 10, 'cores' => 1, 'sites' => 1 ), array( 'max' => 3 ) );
+		$product->set_stock_status( 'outofstock' );
+		$product->save();
+		$sold = wc_get_product( $product->get_id() );
+		$user = self::factory()->user->create();
+		$sub  = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$sub->add_product( $product );
+		$sub->save();
+		wp_set_current_user( $user );
+		// Subscriptions' own switch and resubscribe rules end in these filters (the test plan is not a subscription product, and no payment was made).
+		add_filter( 'woocommerce_subscriptions_can_item_be_switched', static fn( $can, $item, $s ) => $s instanceof \WC_Subscription && $s->has_status( 'active' ), 10, 3 );
+		add_filter( 'wcs_can_user_resubscribe_to_subscription', static fn( $can, $s ) => $s instanceof \WC_Subscription && $s->has_status( 'cancelled' ), 10, 2 );
+
+		$_REQUEST['switch-subscription'] = (string) $sub->get_id();
+		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A switch of an active subscription that holds the plan.' );
+		unset( $_REQUEST['switch-subscription'] );
+
+		$sub->update_status( 'cancelled' );
+		$_GET['resubscribe'] = (string) $sub->get_id();
+		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A resubscribe of a cancelled subscription that holds the plan.' );
+		$_REQUEST['switch-subscription'] = (string) $sub->get_id();
+		unset( $_GET['resubscribe'] );
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A cancelled subscription is not switched.' );
+		unset( $_REQUEST['switch-subscription'] );
+		wp_set_current_user( 0 );
 	}
 
 	public function test_a_product_out_of_stock_by_hand_cannot_be_added_to_the_cart_and_a_capacity_exhausted_one_can(): void {

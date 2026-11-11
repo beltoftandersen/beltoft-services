@@ -7,14 +7,16 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
-use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Billing\ExistingFlow;
+use BeltoftServices\Jobs;
+use BeltoftServices\Locks;
 use BeltoftServices\Product;
-use BeltoftServices\SwitchLink;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
 defined( 'ABSPATH' ) || exit;
@@ -25,20 +27,24 @@ defined( 'ABSPATH' ) || exit;
  * memory or the storage when a page is shown, a product is added to the cart or an order is checked out, and no
  * filter closes `woocommerce_is_purchasable` or `woocommerce_product_is_in_stock` any more.
  *
- * One thing is still written automatically, because it cannot be oversold: a machine needs a public address, so
+ * Two things are still written automatically, because they cannot be oversold or cannot work at all, each with the
+ * marker META_CLOSED so that only a status this class closed is reopened and a hand-set `outofstock` never is:
+ * - the address pool: a machine needs a public address, so the product is closed while the pool is empty;
+ * - a configuration fault: a plan naming a cluster that is not saved, and an extra disk product without a size, are
+ *   closed until they are fixed (a saved cluster, a size), also when a cluster is deleted or saved.
  * sync() writes `outofstock` (only when it differs, WooCommerce's own hooks fire, page caches purge on
- * `woocommerce_product_set_stock_status`) while the address pool is empty, and `instock` again when addresses
- * are back. It runs when the pool changes or a product is saved, never when a page is shown. A product the owner
- * set to out of stock by hand is never reopened: only a status this class closed (marker META_CLOSED) is. Products
- * that manage stock are left to WooCommerce. Products closed by the old capacity rule carry the same marker and are
- * reopened by the first sync (Plugin::maybe_upgrade()).
+ * `woocommerce_product_set_stock_status`) and `instock` again when the cause is gone. It runs when the pool or a
+ * cluster changes or a product is saved, never when a page is shown. Products that manage stock are left to
+ * WooCommerce. A product saved from the admin product form with out of stock selected is the owner's choice: the
+ * marker is dropped, so it is not reopened by the pool. Products closed by the old capacity rule carry the same
+ * marker and are reopened once by a job queued by migrate().
  *
  * The one filter left is `woocommerce_product_is_in_stock`, and it only opens: a renewal, a switch and a resubscribe
- * of an existing customer need no new machine, so they are never blocked, also not by a stored `outofstock`:
- * WooCommerce reads the stored status in is_in_stock() (add_to_cart(), check_cart_item_stock(), the order-pay check),
- * so for those flows the filter answers true. A cart item with WooCommerce Subscriptions' keys for this product, or the
- * request arguments that start those flows (`switch-subscription`, the switcher reads it before the item is in the
- * cart; `resubscribe`), lets the product through.
+ * of a subscription the logged-in customer owns and that holds this product (Billing\ExistingFlow decides) are never
+ * blocked by a stored `outofstock`, because WooCommerce reads the stored status in is_in_stock() (add_to_cart(),
+ * check_cart_item_stock(), the order-pay check). A renewal and a switch act on a machine that exists and has its
+ * address, so they open a product the address pool closed; a resubscribe builds a new machine, so it opens a
+ * hand-closed product but not one this class closed.
  */
 final class Stock {
 
@@ -46,17 +52,6 @@ final class Stock {
 	 * Marker on a product whose `outofstock` this class wrote, so only that one is reopened.
 	 */
 	public const META_CLOSED = '_beltoft_services_stock_closed';
-
-	/**
-	 * Product and variation id of the item being added now when it belongs to one of those flows.
-	 * WooCommerce checks is_purchasable() inside add_to_cart() BEFORE the item is in the cart
-	 * (class-wc-cart.php:1367), and WCS adds a renewal through WC()->cart->add_to_cart() with the
-	 * keys in the item data (class-wcs-cart-renewal.php:364-370). The flag is set by the item-data
-	 * filter, replaced by the next add, and cleared once the item is added.
-	 *
-	 * @var array{0: int, 1: int}|null
-	 */
-	private static $adding = null;
 
 	/**
 	 * True while sync() writes: its own saves must not run product_saved() or forget_marker().
@@ -71,73 +66,68 @@ final class Stock {
 	public const MIGRATED = 'beltoft_services_stock_policy';
 
 	/**
+	 * Action Scheduler hook of the one-off reopening job.
+	 */
+	public const MIGRATE_JOB = 'beltoft_services_stock_policy_migrate';
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_action( 'init', array( __CLASS__, 'migrate' ), 20 );
+		add_action( self::MIGRATE_JOB, array( __CLASS__, 'run_migration' ) );
 		add_filter( 'woocommerce_product_is_in_stock', array( __CLASS__, 'in_stock' ), 20, 2 );
 		// The status follows a saved plan or driver, and an owner's own change to it is respected (see forget_marker()).
 		add_action( 'woocommerce_after_product_object_save', array( __CLASS__, 'product_saved' ) );
 		add_action( 'woocommerce_after_product_variation_object_save', array( __CLASS__, 'product_saved' ) );
 		add_action( 'woocommerce_product_object_updated_props', array( __CLASS__, 'forget_marker' ), 10, 2 );
-		// After WCS's own item-data filters (priority 10, e.g. the switcher's), so the keys are in place.
-		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'note_flow' ), 999, 3 );
-		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'clear_flow' ) );
-		// An add can abort after the item-data filter (WooCommerce throws, class-wc-cart.php:1487) and no
-		// action follows it: the next add's validation (class-wc-form-handler.php, the Store API) or the
-		// end of the request closes the flag instead.
-		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validation' ), 1 );
-		add_action( 'shutdown', array( __CLASS__, 'clear_flow' ) );
+		// The admin product form: out of stock selected there is the owner's choice, also when it did not change.
+		add_action( 'woocommerce_admin_process_product_object', array( __CLASS__, 'form_saved' ) );
+		add_action( 'woocommerce_admin_process_variation_object', array( __CLASS__, 'form_saved' ) );
+		ExistingFlow::register();
 		// Paying an existing renewal, switch or resubscribe order (woocommerce/includes/shortcodes/class-wc-shortcode-checkout.php:154).
 		add_filter( 'woocommerce_pay_order_product_in_stock', array( __CLASS__, 'pay_order' ), 20, 3 );
 	}
 
 	/**
-	 * Once, after the stock policy change (2026-11-11): the products this class closed for lack of memory or storage carry
-	 * the marker and are reopened by one sync (a product the owner closed by hand has no marker and stays closed; one closed
-	 * for lack of addresses is closed again by the same sync).
+	 * Once, after the stock policy change (2026-11-11): queues the job that reopens the products the old capacity rule
+	 * closed. A request only reads one option and queues one action (the catalogue is not loaded on a visitor's
+	 * request); with no Action Scheduler the work runs here.
 	 */
 	public static function migrate(): void {
 		if ( '' !== (string) get_option( self::MIGRATED, '' ) ) {
 			return;
 		}
 
-		self::sync();
-		update_option( self::MIGRATED, '1' );
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			Jobs::schedule_once( time(), self::MIGRATE_JOB );
+			return;
+		}
+
+		self::run_migration();
 	}
 
 	/**
-	 * Filter woocommerce_add_cart_item_data: opens the flow flag when the data carries a WCS flow key.
-	 *
-	 * @param mixed $data         Cart item data.
-	 * @param mixed $product_id   Product id.
-	 * @param mixed $variation_id Variation id.
-	 * @return mixed
+	 * The job: under a lock, one sync of every Proxmox product, then the option that says it ran (the products closed by
+	 * the old rule carry the marker and are reopened; one the owner closed by hand has none and stays closed; one closed
+	 * for lack of addresses or a fault is closed again by the same sync). A second run, at once or later, does nothing.
 	 */
-	public static function note_flow( $data, $product_id = 0, $variation_id = 0 ) {
-		self::$adding = is_array( $data ) && self::has_flow_key( $data ) ? array( (int) $product_id, (int) $variation_id ) : null;
+	public static function run_migration(): void {
+		Locks::with(
+			Locks::name( 'stock_policy', 0 ),
+			0,
+			static function (): void {
+				wp_cache_delete( 'alloptions', 'options' ); // Another process may have finished while this one waited.
+				wp_cache_delete( self::MIGRATED, 'options' );
 
-		return $data;
-	}
+				if ( '' !== (string) get_option( self::MIGRATED, '' ) ) {
+					return;
+				}
 
-	/**
-	 * Filter woocommerce_add_to_cart_validation, first in line: a new add starts, so a flag left by
-	 * an add that aborted is closed. The value passes through untouched.
-	 *
-	 * @param mixed $valid Whether the add is valid so far.
-	 * @return mixed
-	 */
-	public static function validation( $valid ) {
-		self::$adding = null;
-
-		return $valid;
-	}
-
-	/**
-	 * Action woocommerce_add_to_cart: the item is in the cart, close the flag. Also at the end of the request.
-	 */
-	public static function clear_flow(): void {
-		self::$adding = null;
+				self::sync();
+				update_option( self::MIGRATED, '1' );
+			}
+		);
 	}
 
 	/**
@@ -181,17 +171,9 @@ final class Stock {
 	}
 
 	/**
-	 * Does this data carry one of the flow keys?
-	 *
-	 * @param array<string, mixed> $data Cart item data or session values.
-	 */
-	private static function has_flow_key( array $data ): bool {
-		return CartFlow::has( $data, CartFlow::ALL );
-	}
-
-	/**
-	 * Filter woocommerce_product_is_in_stock: an existing customer's renewal, switch or resubscribe is in stock even when
-	 * the stored status is `outofstock`. It never closes anything.
+	 * Filter woocommerce_product_is_in_stock: a renewal, switch or resubscribe of the logged-in customer's own
+	 * subscription that holds this product is in stock even when the stored status is `outofstock`. It never closes
+	 * anything. A product this class closed (marker) stays closed for a resubscribe, which builds a new machine.
 	 *
 	 * @param mixed $value   Value so far.
 	 * @param mixed $product Product.
@@ -201,8 +183,16 @@ final class Stock {
 		if ( ! $value && $product instanceof \WC_Product ) {
 			$driver = Product::driver_for( $product->get_id() );
 
-			if ( $driver && in_array( $driver->id(), self::drivers(), true ) && self::existing_customer_flow( $product ) ) {
-				return true;
+			if ( $driver && in_array( $driver->id(), self::drivers(), true ) ) {
+				$kinds = ExistingFlow::kinds( $product );
+
+				if ( array_intersect( $kinds, array( ExistingFlow::RENEWAL, ExistingFlow::SWITCH ) ) ) {
+					return true;
+				}
+
+				if ( in_array( ExistingFlow::RESUBSCRIBE, $kinds, true ) && 'yes' !== (string) $product->get_meta( self::META_CLOSED ) ) {
+					return true;
+				}
 			}
 		}
 
@@ -210,20 +200,31 @@ final class Stock {
 	}
 
 	/**
-	 * Can a new machine be had for this product as far as addresses go? Memory and storage are not asked.
-	 * A machine needs a public address; a database only with the public IP add-on, and never the one kept for servers.
+	 * Can this product be sold at all, as far as it cannot be oversold or works at all? Memory and storage are not asked.
+	 * A machine needs a plan naming a saved cluster and a public address; a database needs the cluster, and an address
+	 * only with the public IP add-on, and never the one kept for servers; an extra disk needs a size.
 	 *
 	 * @param \WC_Product $product Product or variation.
 	 */
 	private static function availability( \WC_Product $product ): bool {
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID, DiskDriver::ID ), true ) ) {
-			return true; // Slots, app licences and extra disks need no address.
+		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID ), true ) ) {
+			return true; // Slots and app licences need no address.
+		}
+
+		if ( $driver && DiskDriver::ID === $driver->id() ) {
+			return (int) ( Product::plan( $product->get_id() )['disk_gb'] ?? 0 ) >= 1; // No size, no disk to make.
+		}
+
+		$plan = Product::plan( $product->get_id() );
+
+		if ( $driver && in_array( $driver->id(), array( ProxmoxDriver::ID, DbDriver::ID ), true ) && ! isset( Clusters::all()[ (string) ( $plan['cluster'] ?? '' ) ] ) ) {
+			return false; // A plan naming no saved cluster cannot be built.
 		}
 
 		if ( $driver && DbDriver::ID === $driver->id() ) {
-			return ! ( (int) ( Product::plan( $product->get_id() )['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() );
+			return ! ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() );
 		}
 
 		return 0 !== IpPool::free_count();
@@ -233,10 +234,8 @@ final class Stock {
 	 * Writes availability to the stock status of every Proxmox product and variation.
 	 *
 	 * Only a changed status is saved (WooCommerce CRUD, so its hooks fire once, and not at all when
-	 * nothing changed). Where it cannot be told (no capacity cache) nothing is written. A variable
-	 * product's own status is synced by WooCommerce afterwards. Never throws: callers are the capacity job
-	 * and the pool, which must not fail on a product.
-	 *
+	 * nothing changed). A variable product's own status is synced by WooCommerce afterwards. Never throws:
+	 * callers are the address pool and the cluster list, which must not fail on a product.
 	 */
 	public static function sync(): void {
 		self::sync_ids( self::product_ids() );
@@ -244,8 +243,8 @@ final class Stock {
 
 	/**
 	 * Action woocommerce_after_product_object_save / _product_variation_object_save: a saved Proxmox
-	 * product (new, or a changed plan, memory or driver) is synced at once, so its stored status is
-	 * right without waiting for the next capacity run.
+	 * product (new, or a changed plan or driver) is synced at once, so its stored status is right
+	 * without waiting for the next pool or cluster change.
 	 *
 	 * @param mixed $product Saved product or variation.
 	 */
@@ -260,6 +259,23 @@ final class Stock {
 
 		if ( $driver && in_array( $driver->id(), self::drivers(), true ) ) {
 			self::sync_ids( array( $id ) );
+		}
+	}
+
+	/**
+	 * Action woocommerce_admin_process_product_object and _variation_object: the admin product form was posted. With out of
+	 * stock selected that is the owner's choice, also when the status did not change (so forget_marker() never saw it): the
+	 * marker goes, and the address pool or a fixed fault no longer reopens the product.
+	 *
+	 * @param mixed $product Product or variation, with the posted values set and not yet saved.
+	 */
+	public static function form_saved( $product ): void {
+		if ( ! $product instanceof \WC_Product || 'outofstock' !== $product->get_stock_status( 'edit' ) ) {
+			return;
+		}
+
+		if ( '' !== (string) $product->get_meta( self::META_CLOSED ) ) {
+			$product->delete_meta_data( self::META_CLOSED );
 		}
 	}
 
@@ -399,67 +415,5 @@ final class Stock {
 		$product->save();
 
 		return true;
-	}
-
-	/**
-	 * Does the current user own this subscription? A made-up id in the address proves nothing.
-	 *
-	 * @param int $subscription_id Subscription id.
-	 */
-	private static function owns( int $subscription_id ): bool {
-		$user = get_current_user_id();
-
-		if ( $user <= 0 || ! function_exists( 'wcs_get_subscription' ) ) {
-			return false;
-		}
-
-		$subscription = wcs_get_subscription( $subscription_id );
-
-		return $subscription && (int) $subscription->get_user_id() === $user;
-	}
-
-	/**
-	 * Is this a renewal, switch or resubscribe?
-	 *
-	 * @param \WC_Product $product Product.
-	 */
-	private static function existing_customer_flow( \WC_Product $product ): bool {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Only presence is read, to let an existing customer through; WooCommerce Subscriptions verifies its own nonces.
-		$named = array(
-			SwitchLink::requested( true )['subscription'],
-			isset( $_GET['resubscribe'] ) ? absint( wp_unslash( $_GET['resubscribe'] ) ) : 0,
-		);
-		// phpcs:enable
-
-		foreach ( $named as $subscription_id ) {
-			if ( $subscription_id > 0 && self::owns( $subscription_id ) ) {
-				return true;
-			}
-		}
-
-		if ( null !== self::$adding && in_array( $product->get_id(), self::$adding, true ) ) {
-			return true;
-		}
-
-		$cart = function_exists( 'WC' ) && isset( WC()->cart ) ? WC()->cart : null;
-
-		if ( ! $cart ) {
-			return false;
-		}
-
-		// cart_contents, not get_cart(): this runs while the cart is loading from the session.
-		foreach ( (array) $cart->cart_contents as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
-			}
-
-			$same = in_array( $product->get_id(), array( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) ), true );
-
-			if ( $same && CartFlow::has( $item, CartFlow::ALL ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 }

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Tests\Proxmox\Vm;
 
+use BeltoftServices\Billing\ExistingFlow;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Pve\Capacity;
 use BeltoftServices\Proxmox\Pve\Clusters;
@@ -267,6 +268,62 @@ class StockTest extends TestCase {
 		return $subscription;
 	}
 
+	/**
+	 * A customer, logged in, with a subscription that holds the product (a variation or a simple product).
+	 *
+	 * @param \WC_Product $product Product the subscription holds.
+	 * @param string      $status  Subscription status.
+	 */
+	private function holder( \WC_Product $product, string $status = 'active' ): \WC_Subscription {
+		$user = self::factory()->user->create();
+		$sub  = $this->subscription( $user );
+		$sub->add_product( $product );
+		$sub->save();
+
+		$sub->update_status( 'active' );
+
+		if ( 'active' !== $status ) {
+			$sub->update_status( $status );
+		}
+
+		wp_set_current_user( $user );
+
+		return $sub;
+	}
+
+	/**
+	 * The item data WooCommerce Subscriptions gives a cart line of a flow.
+	 *
+	 * @param string $key Flow key.
+	 * @param int    $id  Subscription id.
+	 * @return array<string, mixed>
+	 */
+	private function flow( string $key, int $id ): array {
+		return array( $key => array( 'subscription_id' => $id, 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) );
+	}
+
+	/**
+	 * WooCommerce Subscriptions allows the switch of an active subscription (these test products are not
+	 * subscription products, so its own type check would say no). The filter is the one its own rule runs through.
+	 */
+	private function allow_switching(): void {
+		add_filter( 'woocommerce_subscriptions_can_item_be_switched', static fn( $can, $item, $sub ) => $sub instanceof \WC_Subscription && $sub->has_status( 'active' ), 10, 3 );
+	}
+
+	/**
+	 * The product set out of stock by hand: no marker.
+	 */
+	private function hand_closed_product(): \WC_Product {
+		$product = $this->product();
+		$fresh   = wc_get_product( $product->get_id() );
+		$fresh->set_stock_status( 'outofstock' );
+		$fresh->save();
+		$this->assertFalse( $this->in_stock( $product ) );
+		$this->assertSame( '', (string) get_post_meta( $product->get_id(), Stock::META_CLOSED, true ), 'No marker: the owner closed it.' );
+
+		return $product;
+	}
+
 	private function sold_out_product(): \WC_Product {
 		$product = $this->product();
 		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
@@ -276,8 +333,9 @@ class StockTest extends TestCase {
 		return $product;
 	}
 
-	public function test_stock_does_not_block_renewal_switch_or_resubscribe(): void {
-		$product = $this->sold_out_product();
+	public function test_a_real_renewal_switch_and_resubscribe_pass_on_a_hand_closed_product(): void {
+		$product = $this->hand_closed_product();
+		$this->allow_switching();
 
 		// A new VM added while sold out is refused by WooCommerce itself.
 		WC()->cart->empty_cart();
@@ -287,11 +345,11 @@ class StockTest extends TestCase {
 
 		// WCS adds each of its flows through WC()->cart->add_to_cart() with its key in the item data
 		// (class-wcs-cart-renewal.php:364-370); is_purchasable() runs before the item is in the cart.
-		$subscription = $this->subscription( self::factory()->user->create() );
+		foreach ( array( 'subscription_renewal' => 'active', 'subscription_resubscribe' => 'cancelled', 'subscription_switch' => 'active' ) as $key => $status ) {
+			$subscription = $this->holder( $product, $status );
 
-		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
 			WC()->cart->empty_cart();
-			$added = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( $key => array( 'subscription_id' => $subscription->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
+			$added = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( $key, $subscription->get_id() ) );
 			$this->assertNotFalse( $added, $key . ' is added while sold out: ' . wp_json_encode( wc_get_notices() ) );
 			// WCS's own cart checks may drop an item whose data is not a full switch; the add itself is what matters here.
 			$this->assertArrayHasKey( $added, WC()->cart->cart_contents, $key . ' in cart' );
@@ -301,6 +359,86 @@ class StockTest extends TestCase {
 			$this->assertFalse( WC()->cart->add_to_cart( $product->get_id() ), 'A plain add after a ' . $key . ' add is refused.' );
 			wc_clear_notices();
 		}
+	}
+
+	public function test_a_product_the_address_pool_closed_opens_for_a_renewal_and_a_switch_but_not_a_resubscribe(): void {
+		$product = $this->sold_out_product();
+		$this->assertSame( 'yes', (string) get_post_meta( $product->get_id(), Stock::META_CLOSED, true ) );
+		$this->allow_switching();
+
+		foreach ( array( 'subscription_renewal' => 'active', 'subscription_switch' => 'active' ) as $key => $status ) {
+			$subscription = $this->holder( $product, $status );
+			WC()->cart->empty_cart();
+			$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( $key, $subscription->get_id() ) ), $key . ': the machine exists and has its address: ' . wp_json_encode( wc_get_notices() ) );
+		}
+
+		// A resubscribe builds a new machine, and there is no address for it.
+		$subscription = $this->holder( $product, 'cancelled' );
+		WC()->cart->empty_cart();
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_resubscribe', $subscription->get_id() ) ), 'A resubscribe that would build a new server stays closed while the pool is empty.' );
+		wc_clear_notices();
+		WC()->cart->empty_cart();
+	}
+
+	public function test_forged_flow_data_opens_nothing_for_a_guest_or_an_unrelated_or_foreign_subscription(): void {
+		$product = $this->hand_closed_product();
+		$other   = $this->product();
+		$this->allow_switching();
+
+		$mine    = $this->holder( $other ); // Own, active, but it holds another product.
+		$mine_id = get_current_user_id();
+		$foreign = $this->subscription( self::factory()->user->create() );
+		$foreign->add_product( $product );
+		$foreign->save();
+		$guest_sub = $this->subscription( self::factory()->user->create() ); // No customer at all: user 0 must not match a guest.
+		$guest_sub->add_product( $product );
+		$guest_sub->set_customer_id( 0 );
+		$guest_sub->save();
+		$empty = $this->subscription( $mine_id ); // Own, but it has no line item at all.
+		$empty->update_status( 'cancelled' );
+
+		foreach ( array( 'subscription_renewal', 'subscription_resubscribe', 'subscription_switch' ) as $key ) {
+			foreach ( array(
+				'own subscription of another product' => $mine->get_id(),
+				'own empty cancelled subscription'    => $empty->get_id(),
+				'somebody else\'s subscription'       => $foreign->get_id(),
+				'a subscription that does not exist'  => 999999,
+			) as $what => $id ) {
+				wp_set_current_user( $mine_id );
+				WC()->cart->empty_cart();
+				$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( $key, $id ) ), $key . ' with ' . $what );
+				wc_clear_notices();
+			}
+
+			wp_set_current_user( 0 );
+			WC()->cart->empty_cart();
+			$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( $key, $foreign->get_id() ) ), $key . ' of a guest' );
+			$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( $key, $guest_sub->get_id() ) ), $key . ' of a guest, naming a subscription with no customer' );
+			wc_clear_notices();
+		}
+
+		WC()->cart->empty_cart();
+	}
+
+	public function test_a_switch_only_counts_when_subscriptions_allows_switching_that_item(): void {
+		$product = $this->hand_closed_product();
+		$sub     = $this->holder( $product, 'on-hold' );
+		$seen    = array();
+		add_filter(
+			'woocommerce_subscriptions_can_item_be_switched',
+			static function ( $can, $item, $subscription ) use ( &$seen ) {
+				$seen[] = $subscription instanceof \WC_Subscription ? $subscription->get_id() : 0;
+
+				return $subscription instanceof \WC_Subscription && $subscription->has_status( 'active' );
+			},
+			10,
+			3
+		);
+
+		WC()->cart->empty_cart();
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_switch', $sub->get_id() ) ), 'An on-hold subscription cannot be switched.' );
+		$this->assertContains( $sub->get_id(), $seen, 'The decision is WooCommerce Subscriptions\' own.' );
+		wc_clear_notices();
 	}
 
 	public function test_a_failed_flow_add_does_not_leave_the_exemption_open(): void {
@@ -318,13 +456,13 @@ class StockTest extends TestCase {
 
 	public function test_an_add_that_aborts_after_the_item_data_filter_closes_the_flag(): void {
 		$product = $this->sold_out_product();
-		$sub     = $this->subscription( self::factory()->user->create() );
+		$sub     = $this->holder( $product );
 
 		// WooCommerce throws after the item-data filter (here: something else makes the item not purchasable).
 		$abort = static fn() => false;
 		add_filter( 'woocommerce_is_purchasable', $abort, 999 );
 		WC()->cart->empty_cart();
-		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $sub->get_id() ) ) ) );
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_renewal', $sub->get_id() ) ) );
 		remove_filter( 'woocommerce_is_purchasable', $abort, 999 );
 		wc_clear_notices();
 
@@ -335,11 +473,11 @@ class StockTest extends TestCase {
 
 		// And so does the end of the request, for an abort nothing else followed.
 		add_filter( 'woocommerce_is_purchasable', $abort, 999 );
-		WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $sub->get_id() ) ) );
+		WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_renewal', $sub->get_id() ) );
 		remove_filter( 'woocommerce_is_purchasable', $abort, 999 );
 		wc_clear_notices();
-		$this->assertTrue( has_action( 'shutdown', array( Stock::class, 'clear_flow' ) ) !== false );
-		Stock::clear_flow();
+		$this->assertTrue( has_action( 'shutdown', array( ExistingFlow::class, 'clear' ) ) !== false );
+		ExistingFlow::clear();
 		$this->assertFalse( $this->in_stock( $product ), 'Closed at the end of the request.' );
 	}
 
@@ -347,7 +485,7 @@ class StockTest extends TestCase {
 		$product = $this->sold_out_product();
 
 		WC()->cart->empty_cart();
-		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $this->subscription( self::factory()->user->create() )->get_id() ) ) ) );
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_renewal', $this->holder( $product )->get_id() ) ) );
 
 		// What the session holds for the cart (class-wc-cart-session.php:277 reads it back).
 		$session = array();
@@ -409,12 +547,29 @@ class StockTest extends TestCase {
 		$this->assertFalse( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $p->is_in_stock(), $p, $plain ), 'An ordinary order for a new server cannot.' );
 	}
 
-	public function test_request_args_only_count_for_a_subscription_the_user_owns(): void {
-		$product = $this->sold_out_product();
+	public function test_request_args_only_count_for_a_subscription_the_user_owns_that_holds_the_product(): void {
+		$product = $this->hand_closed_product();
+		$other   = $this->product();
+		$this->allow_switching();
 		$mine    = self::factory()->user->create();
 		$theirs  = self::factory()->user->create();
-		$own     = $this->subscription( $mine );
+
+		$own = $this->subscription( $mine );
+		$own->add_product( $product );
+		$own->save();
+		$own->update_status( 'active' );
+		$cancelled = $this->subscription( $mine );
+		$cancelled->add_product( $product );
+		$cancelled->save();
+		$cancelled->update_status( 'cancelled' );
+		$unrelated = $this->subscription( $mine );
+		$unrelated->add_product( $other );
+		$unrelated->save();
 		$foreign = $this->subscription( $theirs );
+		$foreign->add_product( $product );
+		$foreign->save();
+		// WooCommerce Subscriptions' own resubscribe rule needs a payment made; the filter is the one that rule ends in.
+		add_filter( 'wcs_can_user_resubscribe_to_subscription', static fn( $can, $sub ) => $sub instanceof \WC_Subscription && $sub->has_status( array( 'cancelled', 'expired', 'pending-cancel' ) ), 10, 2 );
 
 		$set = static function ( string $arg, ?string $value ): void {
 			if ( 'switch-subscription' === $arg ) {
@@ -435,10 +590,13 @@ class StockTest extends TestCase {
 			$_GET[ $arg ] = $value;
 		};
 
-		foreach ( array( 'switch-subscription', 'resubscribe' ) as $arg ) {
+		foreach ( array( 'switch-subscription' => $own, 'resubscribe' => $cancelled ) as $arg => $good ) {
 			wp_set_current_user( $mine );
-			$set( $arg, (string) $own->get_id() );
-			$this->assertTrue( $this->in_stock( $product ), $arg . ' with an own subscription.' );
+			$set( $arg, (string) $good->get_id() );
+			$this->assertTrue( $this->in_stock( $product ), $arg . ' with an own subscription that holds the product.' );
+
+			$set( $arg, (string) $unrelated->get_id() );
+			$this->assertFalse( $this->in_stock( $product ), $arg . ' with an own subscription of another product.' );
 
 			$set( $arg, (string) $foreign->get_id() );
 			$this->assertFalse( $this->in_stock( $product ), $arg . ' with somebody else\'s subscription.' );
@@ -450,11 +608,22 @@ class StockTest extends TestCase {
 			$this->assertFalse( $this->in_stock( $product ), $arg . ' naming nothing.' );
 
 			wp_set_current_user( 0 );
-			$set( $arg, (string) $own->get_id() );
+			$set( $arg, (string) $good->get_id() );
 			$this->assertFalse( $this->in_stock( $product ), $arg . ' without a login.' );
+			$set( $arg, '1' );
+			$this->assertFalse( $this->in_stock( $product ), 'A guest with a forged ' . $arg . '=1.' );
 
 			$set( $arg, null );
 		}
+
+		// A switch of a subscription that is not active, and a resubscribe of one that is.
+		wp_set_current_user( $mine );
+		$_REQUEST['switch-subscription'] = (string) $cancelled->get_id();
+		$this->assertFalse( $this->in_stock( $product ), 'A cancelled subscription cannot be switched.' );
+		unset( $_REQUEST['switch-subscription'] );
+		$_GET['resubscribe'] = (string) $own->get_id();
+		$this->assertFalse( $this->in_stock( $product ), 'An active subscription cannot be resubscribed.' );
+		unset( $_GET['resubscribe'] );
 	}
 
 	public function test_the_stored_status_follows_the_pool(): void {
@@ -632,9 +801,37 @@ class StockTest extends TestCase {
 		$this->assertSame( 'instock', $this->stored( $product ) );
 		$this->assertSame( array(), $this->http_calls() );
 	}
-	public function test_a_plan_naming_a_cluster_that_is_not_saved_is_not_closed_by_capacity(): void {
+	public function test_a_plan_naming_a_cluster_that_is_not_saved_is_closed_as_a_fault_and_opens_when_it_is_saved(): void {
 		$ghost = $this->service_product( 'proxmox', array( 'cluster' => 'ghost', 'template' => 9000, 'cores' => 1, 'memory_mb' => 1024, 'disk_gb' => 10 ) );
-		$this->assertTrue( $this->in_stock( $ghost ), 'Capacity is not asked: only the owner or the address pool closes a plan.' );
+		$this->assertFalse( $this->in_stock( $ghost ), 'A configuration fault, not capacity: an order for it could never be built.' );
+		$this->assertSame( 'yes', (string) get_post_meta( $ghost->get_id(), Stock::META_CLOSED, true ), 'With the marker, like the address pool.' );
+
+		$this->assertTrue( $this->save_cluster_as( 'ghost' ) );
+		$this->assertTrue( $this->in_stock( $ghost ), 'The cluster is saved: it opens.' );
+
+		$this->assertTrue( Clusters::delete( 'ghost' ) );
+		$this->assertFalse( $this->in_stock( $ghost ), 'Deleting the cluster closes its plans.' );
+
+		// A plan the owner closed by hand is never reopened by a fixed fault.
+		$this->assertTrue( $this->save_cluster_as( 'ghost2' ) );
+		$hand = $this->service_product( 'proxmox', array( 'cluster' => 'ghost2', 'template' => 9000, 'cores' => 1, 'memory_mb' => 1024, 'disk_gb' => 10 ) );
+		$h    = wc_get_product( $hand->get_id() );
+		$h->set_stock_status( 'outofstock' );
+		$h->save();
+		$this->assertTrue( Clusters::delete( 'ghost2' ) );
+		$this->assertTrue( $this->save_cluster_as( 'ghost2' ) );
+		$this->assertFalse( $this->in_stock( $hand ), 'Closed by hand: a fixed fault does not reopen it.' );
+	}
+
+	public function test_an_extra_disk_product_without_a_size_is_closed_until_it_has_one(): void {
+		$disk = $this->service_product( 'proxmox-disk', array( 'cluster' => 'lab', 'disk_gb' => 0 ) );
+		$this->assertFalse( $this->in_stock( $disk ), 'No size, no disk to make.' );
+		$this->assertSame( 'yes', (string) get_post_meta( $disk->get_id(), Stock::META_CLOSED, true ) );
+
+		$fresh = wc_get_product( $disk->get_id() );
+		$fresh->update_meta_data( \BeltoftServices\Product::META_PLAN . 'disk_gb', '20' );
+		$fresh->save();
+		$this->assertTrue( $this->in_stock( $disk ), 'A size is set: it opens.' );
 	}
 	public function test_a_product_closed_for_lack_of_addresses_reopens_with_the_address_whatever_the_cache(): void {
 		$product = $this->product();
@@ -648,10 +845,10 @@ class StockTest extends TestCase {
 	}
 	public function test_stored_outofstock_does_not_block_a_renewal_cart_check(): void {
 		$product = $this->sold_out_product();
-		$sub     = $this->subscription( self::factory()->user->create() );
+		$sub     = $this->holder( $product );
 
 		WC()->cart->empty_cart();
-		$key = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $sub->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
+		$key = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_renewal', $sub->get_id() ) );
 		$this->assertNotFalse( $key );
 
 		// WC_Cart::check_cart_item_stock() (class-wc-cart.php:897) reads is_in_stock() of the item's product.
@@ -675,12 +872,13 @@ class StockTest extends TestCase {
 		$closed->save();
 		$this->assertSame( 'outofstock', $this->stored( $ids[1] ) );
 
-		$sub = $this->subscription( self::factory()->user->create() );
+		$this->allow_switching();
+		$sub = $this->holder( wc_get_product( $ids[0] ) ); // The customer holds the other variation of the same product.
 		WC()->cart->empty_cart();
 		$this->assertFalse( WC()->cart->add_to_cart( $parent->get_id(), 1, $ids[1], array( 'attribute_tier' => '1' ) ), 'A new server for the variation set out of stock is refused.' );
 		wc_clear_notices();
 
-		$key = WC()->cart->add_to_cart( $parent->get_id(), 1, $ids[1], array( 'attribute_tier' => '1' ), array( 'subscription_switch' => array( 'subscription_id' => $sub->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
+		$key = WC()->cart->add_to_cart( $parent->get_id(), 1, $ids[1], array( 'attribute_tier' => '1' ), $this->flow( 'subscription_switch', $sub->get_id() ) );
 		$this->assertNotFalse( $key, 'A switch to it is not: ' . wp_json_encode( wc_get_notices() ) );
 		WC()->cart->empty_cart();
 		wc_clear_notices();
@@ -690,12 +888,11 @@ class StockTest extends TestCase {
 		$product = $this->product();
 		$product->set_stock_status( 'outofstock' );
 		$product->save();
-		$mine = self::factory()->user->create();
-		$own  = $this->subscription( $mine );
+		$own = $this->holder( $product, 'cancelled' );
+		add_filter( 'wcs_can_user_resubscribe_to_subscription', '__return_true' ); // WooCommerce Subscriptions' payment-made rule.
 
-		wp_set_current_user( $mine );
 		$_GET['resubscribe'] = (string) $own->get_id();
-		$this->assertTrue( $this->in_stock( $product ), 'Renewals, switches and resubscribes are never blocked by the stored status.' );
+		$this->assertTrue( $this->in_stock( $product ), 'Renewals, switches and resubscribes of a subscription that holds it are never blocked by the stored status.' );
 		unset( $_GET['resubscribe'] );
 		$this->assertFalse( $this->in_stock( $product ), 'A new customer sees out of stock.' );
 		wp_set_current_user( 0 );
@@ -726,8 +923,19 @@ class StockTest extends TestCase {
 	 * @return true|\WP_Error
 	 */
 	private function save_cluster( array $over = array() ) {
+		return $this->save_cluster_as( 'lab', $over );
+	}
+
+	/**
+	 * A cluster with this id, otherwise as in set_up().
+	 *
+	 * @param string                $id   Cluster id.
+	 * @param array<string, string> $over Overrides.
+	 * @return true|\WP_Error
+	 */
+	private function save_cluster_as( string $id, array $over = array() ) {
 		return Clusters::save(
-			'lab',
+			$id,
 			array_merge(
 				array(
 					'label'             => 'Lab',
@@ -845,16 +1053,18 @@ class StockTest extends TestCase {
 		$this->assertSame( 'instock', $this->stored( $other ) );
 	}
 
-	public function test_saving_or_deleting_a_cluster_does_not_change_the_status(): void {
+	public function test_saving_a_cluster_with_other_nodes_does_not_change_the_status_and_deleting_it_closes_its_plans(): void {
 		$product = $this->product( 4096 );
 		$this->assertSame( 'instock', $this->stored( $product ) );
 
 		$this->assertTrue( $this->save_cluster( array( 'nodes' => 'node-c' ) ) );
-		$this->assertSame( 'instock', $this->stored( $product ) );
+		$this->assertSame( 'instock', $this->stored( $product ), 'The nodes are not a reason to close a plan.' );
 
 		$this->assertTrue( $this->save_cluster() );
 		$this->assertTrue( Clusters::delete( 'lab' ) );
-		$this->assertSame( 'instock', $this->stored( $product ), 'Capacity and clusters are not a reason to close a plan.' );
+		$this->assertSame( 'outofstock', $this->stored( $product ), 'A plan without a saved cluster is a fault: it closes.' );
+		$this->assertTrue( $this->save_cluster() );
+		$this->assertSame( 'instock', $this->stored( $product ), 'The cluster is back: it opens.' );
 	}
 
 	public function test_one_failing_product_does_not_stop_the_others_and_is_logged(): void {
@@ -945,10 +1155,13 @@ class StockTest extends TestCase {
 
 	public function test_an_early_renewal_cart_and_its_session_reload_survive_a_stored_out_of_stock(): void {
 		$product = $this->sold_out_product();
-		$sub     = $this->subscription( self::factory()->user->create() );
+		$sub     = $this->holder( $product );
 
+		// WooCommerce Subscriptions' early renewal is a renewal line with its own flag inside (wcs-early-renewal-functions.php:25).
+		$data = $this->flow( 'subscription_renewal', $sub->get_id() );
+		$data['subscription_renewal']['subscription_renewal_early'] = true;
 		WC()->cart->empty_cart();
-		$key = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal_early' => array( 'subscription_id' => $sub->get_id(), 'item_id' => 0, 'next_payment_timestamp' => 0, 'upgraded_or_downgraded' => '' ) ) );
+		$key = WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
 		$this->assertNotFalse( $key, 'An early renewal is added: ' . wp_json_encode( wc_get_notices() ) );
 		$this->assertTrue( WC()->cart->check_cart_item_stock() );
 
@@ -970,7 +1183,7 @@ class StockTest extends TestCase {
 		$this->assertSame( 'outofstock', $this->stored( $product ) );
 
 		WC()->cart->empty_cart();
-		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), array( 'subscription_renewal' => array( 'subscription_id' => $this->subscription( self::factory()->user->create() )->get_id() ) ) ) );
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_renewal', $this->holder( $product )->get_id() ) ) );
 		$session = array();
 		foreach ( WC()->cart->get_cart() as $k => $item ) {
 			$session[ $k ] = array_diff_key( $item, array( 'data' => 1, 'data_hash' => 1 ) );
@@ -1008,7 +1221,11 @@ class StockTest extends TestCase {
 		$h->save();
 		delete_option( Stock::MIGRATED );
 
+		as_unschedule_all_actions( Stock::MIGRATE_JOB, array(), Jobs::GROUP );
 		Stock::migrate();
+		$this->assertTrue( as_has_scheduled_action( Stock::MIGRATE_JOB, array(), Jobs::GROUP ), 'A request only queues the job.' );
+		$this->assertSame( 'outofstock', $this->stored( $closed ), 'Nothing is loaded or written by the request.' );
+		Stock::run_migration();
 
 		$this->assertSame( 'instock', $this->stored( $closed ), 'Closed by the old capacity rule: reopened.' );
 		$this->assertSame( 'outofstock', $this->stored( $hand ), 'Closed by the owner: stays closed.' );
@@ -1019,5 +1236,6 @@ class StockTest extends TestCase {
 		$p->save();
 		update_post_meta( $p->get_id(), Stock::META_CLOSED, 'yes' );
 		Stock::migrate();
+		Stock::run_migration();
 		$this->assertSame( 'outofstock', $this->stored( $closed ), 'Once only.' );
 	}}

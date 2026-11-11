@@ -318,6 +318,7 @@ final class Clusters {
 
 		unset( $all[ $id ] );
 		update_option( self::OPTION, $all, false );
+		Stock::sync(); // Its plans have no saved cluster now: they close (a configuration fault, not capacity).
 
 		return true;
 	}
@@ -650,6 +651,7 @@ final class Clusters {
 		$all[ $id ] = $clean;
 		update_option( self::OPTION, $all, false );
 		CapacityJobs::queue_capacity( $id );
+		Stock::sync(); // A plan that named this cluster before it was saved opens now.
 
 		return true;
 	}
