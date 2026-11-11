@@ -16,7 +16,7 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The shared part of the Databases, Apps, Email, SSL and Licences areas. Like Servers and Domains, an area takes over the licenses
+ * The shared part of the Databases, Hosting, Apps, Email, SSL and Licences areas. Like Servers and Domains, an area takes over the licenses
  * template of Beltoft Licenses on its own endpoint (WooCommerce's wc_get_template filter) and prints:
  *
  *  - `/my-account/<slug>/`: one row per service (templates/account/area-list.php);
@@ -55,7 +55,7 @@ abstract class ServiceArea {
 	 * @return array<int, ServiceArea>
 	 */
 	public static function all(): array {
-		return array( self::get( Databases::class ), self::get( Apps::class ), self::get( Email::class ), self::get( Ssl::class ), self::get( Licences::class ) );
+		return array( self::get( Databases::class ), self::get( Hosting::class ), self::get( Apps::class ), self::get( Email::class ), self::get( Ssl::class ), self::get( Licences::class ) );
 	}
 
 	/**

@@ -227,6 +227,7 @@ final class Slugs {
 			'servers'   => 'server',
 			'domains'   => 'domain',
 			'databases' => 'database',
+			'hosting'   => 'hosting',
 			'apps'      => 'app',
 			'email'     => 'email',
 			'ssl'       => 'certificate',

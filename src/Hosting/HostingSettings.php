@@ -152,6 +152,14 @@ final class HostingSettings {
 				'desc'    => __( 'Once a week one random account backup is restored into a scratch container on the node and checked. Needs a scratch container id on the node.', 'beltoft-services' ),
 			)
 		);
+		$fields['hosting_order_url'] = array_merge(
+			$base,
+			array(
+				'default' => '',
+				'label'   => __( 'Hosting order page', 'beltoft-services' ),
+				'desc'    => __( 'Where the Order hosting button in the account goes, for example /wordpress-hosting/#plans. Empty uses the first hosting product page.', 'beltoft-services' ),
+			)
+		);
 		foreach ( $list as $key => $row ) {
 			$fields[ $key ] = $base + array(
 				'default' => Config::DEFAULTS[ $row[0] ],
