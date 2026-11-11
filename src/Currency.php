@@ -17,6 +17,12 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Currency {
 
+	/** The currency suppliers (the registrar, the licence vendor) are paid in: the currency a cost is stored in. */
+	public const COST = 'EUR';
+
+	/** Cart item key: the currency a runtime price (a domain line, a top-up line) was worked out in. A site's bridge reads it as a string. */
+	public const CART_KEY = 'beltoft_services_price_currency';
+
 	/**
 	 * The shop's own currency: the option, never the filtered getter, so a forced currency does not change it.
 	 */
@@ -133,6 +139,84 @@ final class Currency {
 		$value    = self::base() === $currency ? Settings::get( $key ) : null;
 
 		return apply_filters( 'beltoft_services_amount_setting', $value, $key, $currency );
+	}
+
+	/**
+	 * The guard rate of a currency: how many units of it are worth one unit of the cost currency, deliberately a little above the real
+	 * rate (O2, about 2 percent), so a price converted back is understated and a mispriced line is refused rather than paid for. From the
+	 * setting currency_guard_rates (lines such as DKK=7.60) and the filter beltoft_services_guard_rate. Null when there is none: never 1 to 1.
+	 *
+	 * @param string $code Currency code.
+	 */
+	public static function guard_rate( string $code ): ?float {
+		$code = self::clean( $code );
+		$rate = null;
+
+		if ( '' === $code ) {
+			return null;
+		}
+
+		$text = Settings::get( 'currency_guard_rates' );
+
+		foreach ( is_string( $text ) ? preg_split( '/\r?\n/', $text ) : array() as $line ) {
+			if ( 1 === preg_match( '/^\s*([A-Za-z]{3})\s*=\s*([0-9]+(?:[.,][0-9]+)?)\s*$/D', (string) $line, $m ) && strtoupper( $m[1] ) === $code ) {
+				$rate = (float) str_replace( ',', '.', $m[2] );
+			}
+		}
+
+		/**
+		 * The guard rate of a currency against the cost currency: units of the currency per unit of EUR, a little above the real rate.
+		 *
+		 * @param float|null $rate Rate from the setting, or null.
+		 * @param string     $code Currency code.
+		 */
+		$rate = apply_filters( 'beltoft_services_guard_rate', $rate, $code );
+
+		return is_numeric( $rate ) && (float) $rate > 0 ? (float) $rate : null;
+	}
+
+	/**
+	 * What an amount in a currency is worth in the cost currency, for comparing what a customer paid with what a supplier is paid. Nothing
+	 * here is ever shown to or charged to a customer. The cost currency itself is 1 to 1; any other needs a guard rate; without one
+	 * the answer is null (the caller refuses) and the admin is told once per currency.
+	 *
+	 * @param float  $amount Amount in $code.
+	 * @param string $code   Currency code.
+	 */
+	public static function to_cost( float $amount, string $code ): ?float {
+		$code = self::clean( $code );
+
+		if ( self::COST === $code ) {
+			return $amount;
+		}
+
+		$rate = self::guard_rate( $code );
+
+		if ( null === $rate ) {
+			Alerts::notify(
+				/* translators: %s: currency code */
+				sprintf( __( 'No guard rate for %s', 'beltoft-services' ), '' !== $code ? $code : '?' ),
+				array( sprintf( 'An order in %1$s could not be compared with a supplier cost in %2$s because the setting currency_guard_rates has no line for %1$s. The supplier order was not placed. Add a line such as %1$s=7.60 (units of %1$s per %2$s, a little above the real rate).', '' !== $code ? $code : '?', self::COST ) ),
+				null,
+				'beltoft_services_guard_rate_' . strtolower( $code )
+			);
+
+			return null;
+		}
+
+		return $amount / $rate;
+	}
+
+	/**
+	 * The same for a catalogue price (a variation's price, a pay as you go cap): the shop's own currency is the one its costs are set
+	 * against, so a price in it is compared as it is, as it always was; a price in any other currency is converted at its guard rate, and
+	 * refused without one.
+	 *
+	 * @param float  $amount Price in $code.
+	 * @param string $code   Currency code the price is in.
+	 */
+	public static function price_to_cost( float $amount, string $code ): ?float {
+		return self::clean( $code ) === self::base() ? $amount : self::to_cost( $amount, $code );
 	}
 
 	/**

@@ -117,6 +117,31 @@ final class Rates {
 	}
 
 	/**
+	 * A pay as you go figure of a cart line in the CART's tax display, for a theme that builds its own order summary: the hourly rate (four
+	 * decimals) or a monthly cap (whole amounts without decimals), at the standard tax class the usage invoice is taxed at. Plain text, or
+	 * with $html the same through beltoft_services_price_html (context 'cart-rate'), escaped. Pinned in tests/fixtures/external-api.php.
+	 *
+	 * @param float            $amount  Amount excluding tax (an hourly rate or a cap).
+	 * @param string           $kind    'hourly' or 'cap'.
+	 * @param \WC_Product|null $product A product or variation of the cart line, for the tax display; null: the amount as given.
+	 * @param bool             $html    Pass the filter and return markup.
+	 */
+	public static function in_cart( float $amount, string $kind, ?\WC_Product $product, bool $html = false ): string {
+		$render = static fn(): string => 'hourly' === $kind ? self::money( $amount, 4, '', $product ) : self::cap_money( $amount, $product );
+
+		if ( ! $html ) {
+			return (string) TaxNote::in_cart( $render );
+		}
+
+		return wp_kses_post(
+			TaxNote::html(
+				static fn( string $display = '' ): string => esc_html( (string) ( '' === $display ? TaxNote::in_cart( $render ) : TaxNote::in( $display, $render ) ) ),
+				'cart-rate'
+			)
+		);
+	}
+
+	/**
 	 * "€45 / month": a monthly amount in whole euros (see cap_money()) in the order summary.
 	 *
 	 * @param float            $amount Monthly amount.

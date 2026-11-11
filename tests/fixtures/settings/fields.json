@@ -52,6 +52,14 @@
         "label": "Delete the settings when the plugin is deleted",
         "desc": "This also deletes the plugin's clusters, nodes, connections and other options, and its usage, credit, OAuth and MCP tables. The IP pool, virtual machine records, private network records and hosting records are deleted only when no service that is not deleted still exists, and the DNS assignments only when no name may still point at our servers; otherwise those tables are kept. Machines whose records are deleted can no longer be matched to their services."
     },
+    "currency_guard_rates": {
+        "tab": "general",
+        "section": "currency",
+        "type": "textarea",
+        "default": "",
+        "label": "Guard rates",
+        "desc": "One line per extra currency you sell in, for example DKK=7.60: how many units of it are worth one euro, a little above the real rate (about 2 percent). Only used to check that an order covers what a supplier is paid in euro (domains, certificates, licence keys); it is never shown or charged to a customer. Without a line for a currency, such an order is refused and you get an alert."
+    },
     "mcp_enabled": {
         "tab": "general",
         "section": "api",

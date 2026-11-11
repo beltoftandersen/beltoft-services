@@ -152,11 +152,13 @@ final class KeyOrder {
 
 		$order = $item->get_order();
 
-		if ( ! $order || 'EUR' !== strtoupper( (string) $order->get_currency() ) ) {
+		$paid = $order ? \BeltoftServices\Currency::to_cost( (float) $item->get_total(), (string) $order->get_currency() ) : null;
+
+		if ( null === $paid ) {
 			return 'The order is not in EUR; the Openprovider cost cannot be compared.';
 		}
 
-		return (float) $item->get_total() + 0.01 < $cost ? 'The order was paid below the Openprovider cost.' : null;
+		return $paid + 0.01 < $cost ? 'The order was paid below the Openprovider cost.' : null;
 	}
 
 	/**
@@ -172,7 +174,10 @@ final class KeyOrder {
 			return 'fake' === RegistrarClients::mode() ? null : 'The Openprovider cost of this licence is not set.';
 		}
 
-		return $variation instanceof \WC_Product && (float) wc_get_price_excluding_tax( $variation ) + 0.01 >= $cost ? null : 'The price of this licence is below the Openprovider cost.';
+		// The variation's price is read in the request's currency; in another one it is compared at the guard rate, and refused without one.
+		$price = $variation instanceof \WC_Product ? \BeltoftServices\Currency::price_to_cost( (float) wc_get_price_excluding_tax( $variation ), \BeltoftServices\Currency::current() ) : null;
+
+		return null !== $price && $price + 0.01 >= $cost ? null : 'The price of this licence is below the Openprovider cost.';
 	}
 
 	/**

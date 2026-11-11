@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Currency;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
@@ -25,8 +26,11 @@ final class SpendGuard {
 		if ( null === $cost ) { return 'The registrar cost for this domain is unknown.'; }
 		if ( ! $item instanceof \WC_Order_Item_Product ) { return 'The paid order line for this domain is unavailable.'; }
 		$order = $item->get_order();
-		if ( ! $order || 'EUR' !== strtoupper( (string) $order->get_currency() ) ) { return 'The order is not in EUR; the registrar cost cannot be compared.'; }
-		if ( (float) $item->get_total() + 0.01 < $cost ) { return self::MESSAGE; }
+		// What was paid, in the cost currency: an order in another currency is converted at its guard rate (a little above the real one), and
+		// with no guard rate it is refused, never taken 1 to 1. This is only a comparison: nothing is converted for the customer.
+		$paid = $order ? Currency::to_cost( (float) $item->get_total(), (string) $order->get_currency() ) : null;
+		if ( null === $paid ) { return 'The order is not in EUR; the registrar cost cannot be compared.'; }
+		if ( $paid + 0.01 < $cost ) { return self::MESSAGE; }
 		return null;
 	}
 

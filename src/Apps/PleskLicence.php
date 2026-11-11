@@ -291,10 +291,13 @@ final class PleskLicence {
 		}
 
 		if ( AppLicence::usage_billed( $licence ) ) {
-			// Billed by the hour with the server: the most a month can bring in is the cap.
-			$items = Rates::items( $licence );
+			// Billed by the hour with the server: the most a month can bring in is the cap, read in the currency of the usage account
+			// and compared at the guard rate when that is not the cost currency.
+			$code = self::account_currency( $licence );
+			list( $ok, $items ) = \BeltoftServices\Currency::with( $code, static fn() => Rates::items( $licence ) );
+			$cap  = $ok && $items ? \BeltoftServices\Currency::price_to_cost( (float) $items[0]['rate'] * Rates::HOURS, $code ) : null;
 
-			return $items && (float) $items[0]['rate'] * Rates::HOURS + 0.01 >= $cost ? null : 'The pay as you go cap of this Plesk tier is below the Openprovider cost.';
+			return null !== $cap && $cap + 0.01 >= $cost ? null : 'The pay as you go cap of this Plesk tier is below the Openprovider cost.';
 		}
 
 		$item = \BeltoftServices\Domains\SpendGuard::item_of_resource( $licence );
@@ -305,11 +308,26 @@ final class PleskLicence {
 
 		$order = $item->get_order();
 
-		if ( ! $order || 'EUR' !== strtoupper( (string) $order->get_currency() ) ) {
+		$paid = $order ? \BeltoftServices\Currency::to_cost( (float) $item->get_total(), (string) $order->get_currency() ) : null;
+
+		if ( null === $paid ) {
 			return 'The order is not in EUR; the Openprovider cost cannot be compared.';
 		}
 
-		return (float) $item->get_total() + 0.01 < $cost ? 'The order was paid below the Openprovider cost.' : null;
+		return $paid + 0.01 < $cost ? 'The order was paid below the Openprovider cost.' : null;
+	}
+
+	/**
+	 * The currency a pay as you go licence is billed in: that of the usage account its licence is on, else the shop's.
+	 *
+	 * @param Resource $licence Licence resource.
+	 */
+	private static function account_currency( Resource $licence ): string {
+		$id  = (int) ( $licence->license()['subscription_id'] ?? 0 );
+		$sub = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : false;
+		$code = $sub instanceof \WC_Subscription ? \BeltoftServices\Currency::clean( $sub->get_currency() ) : '';
+
+		return '' !== $code ? $code : \BeltoftServices\Currency::base();
 	}
 
 	/**
@@ -331,7 +349,9 @@ final class PleskLicence {
 
 		$found = AppLicence::tier( self::APP, $tier, false );
 
-		return null !== $found && (float) wc_get_price_excluding_tax( $found['variation'] ) + 0.01 >= $cost ? null : 'The price of this Plesk tier is below the Openprovider cost.';
+		$price = null !== $found ? \BeltoftServices\Currency::price_to_cost( (float) wc_get_price_excluding_tax( $found['variation'] ), \BeltoftServices\Currency::current() ) : null;
+
+		return null !== $price && $price + 0.01 >= $cost ? null : 'The price of this Plesk tier is below the Openprovider cost.';
 	}
 
 	/**

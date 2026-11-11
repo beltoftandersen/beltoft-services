@@ -37,7 +37,7 @@ final class Topup {
 	public const META_AMOUNT  = '_beltoft_services_credit_amount';
 
 	/** Cart item key (and order line meta): the currency the amount was validated in. */
-	public const CURRENCY_KEY  = 'beltoft_services_price_currency';
+	public const CURRENCY_KEY  = Currency::CART_KEY;
 	public const META_CURRENCY = '_beltoft_services_credit_currency';
 
 	/** Order meta: a paid top-up that could not be credited in its currency was put on hold (once). */

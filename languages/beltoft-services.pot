@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T08:15:30+00:00\n"
+"POT-Creation-Date: 2026-11-11T09:08:36+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -492,7 +492,7 @@ msgid "Name servers"
 msgstr ""
 
 #: src/Account/DomainPage.php:181
-#: src/Domains/Cart.php:476
+#: src/Domains/Cart.php:495
 msgid "Transfer"
 msgstr ""
 
@@ -1091,7 +1091,7 @@ msgstr ""
 #. translators: %s: price
 #: src/Account/ServerPicker.php:497
 #: src/Account/ServerPicker.php:782
-#: src/Usage/Rates.php:243
+#: src/Usage/Rates.php:268
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1104,7 +1104,7 @@ msgstr ""
 #. translators: %s: price
 #: src/Account/ServerPicker.php:497
 #: src/Account/ServerPicker.php:782
-#: src/Usage/Rates.php:239
+#: src/Usage/Rates.php:264
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1242,7 +1242,7 @@ msgid "Monthly"
 msgstr ""
 
 #: src/Account/ServerPicker.php:901
-#: src/Settings.php:126
+#: src/Settings.php:134
 #: src/Usage/BillingField.php:196
 msgid "Pay as you go"
 msgstr ""
@@ -1810,9 +1810,9 @@ msgstr ""
 #: src/Admin/Screen.php:40
 #: src/Admin/Screen.php:170
 #: src/Api/Reference.php:197
-#: src/Settings.php:227
-#: src/Settings.php:228
-#: src/Settings.php:268
+#: src/Settings.php:236
+#: src/Settings.php:237
+#: src/Settings.php:277
 msgid "Services"
 msgstr ""
 
@@ -2147,9 +2147,9 @@ msgstr ""
 #: src/Apps/AppReinstall.php:472
 #: src/Apps/AppReinstall.php:483
 #: src/Bricks/DomainQuery.php:31
-#: src/Domains/Cart.php:462
-#: src/Domains/Cart.php:476
-#: src/Domains/Cart.php:484
+#: src/Domains/Cart.php:481
+#: src/Domains/Cart.php:495
+#: src/Domains/Cart.php:503
 #: src/Domains/EmailDetails.php:18
 #: src/Domains/Panels.php:142
 #: src/Hosting/SiteField.php:425
@@ -2773,39 +2773,39 @@ msgstr ""
 msgid "One tier key and what Openprovider charges per month in EUR excluding VAT, for example pro=12.50. A licence is only ordered when the paid line of the tier covers this. Empty means unknown, and the live client refuses to order."
 msgstr ""
 
-#: src/Apps/PleskLicence.php:846
+#: src/Apps/PleskLicence.php:866
 #: src/Licences/KeyPanel.php:132
 msgid "Openprovider licence id"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:846
+#: src/Apps/PleskLicence.php:866
 #: src/Licences/KeyPanel.php:132
 msgid "deleted"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:846
+#: src/Apps/PleskLicence.php:866
 #: src/Licences/KeyPanel.php:132
 msgid "not ordered"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:847
+#: src/Apps/PleskLicence.php:867
 #: src/Licences/KeyPanel.php:133
 msgid "Openprovider item"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:848
+#: src/Apps/PleskLicence.php:868
 msgid "Plesk key"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:848
+#: src/Apps/PleskLicence.php:868
 msgid "not fetched"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:848
+#: src/Apps/PleskLicence.php:868
 msgid "installed on the server"
 msgstr ""
 
-#: src/Apps/PleskLicence.php:848
+#: src/Apps/PleskLicence.php:868
 msgid "kept, not confirmed on the server"
 msgstr ""
 
@@ -2919,6 +2919,12 @@ msgstr ""
 
 #: src/Billing/Subscriptions.php:321
 msgid "This order started a subscription, so cancelling it would cancel the subscription. The customer does that in the dashboard."
+msgstr ""
+
+#. translators: %s: currency code such as DKK
+#: src/Billing/SwitchCurrency.php:53
+#, php-format
+msgid "This subscription is in %s. Switch it from a page in that currency."
 msgstr ""
 
 #: src/BillingRequirements.php:111
@@ -3208,7 +3214,7 @@ msgid "This link has expired. Go back, search again and try again."
 msgstr ""
 
 #: src/Bricks/DomainQuery.php:233
-#: src/Domains/Cart.php:77
+#: src/Domains/Cart.php:78
 #: src/Domains/TransferDns.php:482
 #: src/Mcp/Confirmations.php:86
 #: src/Mcp/Tools.php:266
@@ -3868,7 +3874,7 @@ msgstr ""
 #: src/Credit/Grant.php:126
 #: src/Credit/Topup.php:225
 #: src/Credit/Topup.php:287
-#: src/Settings.php:127
+#: src/Settings.php:135
 msgid "Account credit"
 msgstr ""
 
@@ -4119,8 +4125,14 @@ msgstr ""
 msgid "The account credit of customer #%1$d is now negative: %2$s. The customer has used credit that was paid back."
 msgstr ""
 
-#: src/Currency.php:112
+#: src/Currency.php:118
 msgid "A currency runner did not restore the currency"
+msgstr ""
+
+#. translators: %s: currency code
+#: src/Currency.php:198
+#, php-format
+msgid "No guard rate for %s"
 msgstr ""
 
 #: src/Domains/Actions.php:19
@@ -4197,129 +4209,133 @@ msgstr ""
 msgid "The transfer code is not available yet."
 msgstr ""
 
-#: src/Domains/Cart.php:74
+#: src/Domains/Cart.php:75
 #: src/Domains/TransferDns.php:478
 msgid "Refresh the page and try again."
 msgstr ""
 
-#: src/Domains/Cart.php:101
+#: src/Domains/Cart.php:102
 #: src/Domains/DnsClaimRoutes.php:348
 msgid "The cart is unavailable."
 msgstr ""
 
-#: src/Domains/Cart.php:113
+#: src/Domains/Cart.php:114
 msgid "This domain is already in your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:121
+#: src/Domains/Cart.php:122
 msgid "This domain is already registered here."
 msgstr ""
 
-#: src/Domains/Cart.php:121
+#: src/Domains/Cart.php:122
 msgid "This domain cannot be added right now."
 msgstr ""
 
-#: src/Domains/Cart.php:126
+#: src/Domains/Cart.php:127
 #: src/Domains/DnsClaimRoutes.php:310
 msgid "This service is not available yet."
 msgstr ""
 
-#: src/Domains/Cart.php:131
+#: src/Domains/Cart.php:132
 msgid "This domain cannot be added right now. Try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Cart.php:136
+#: src/Domains/Cart.php:137
 msgid "This domain cannot be transferred here. Check that it is registered and that its extension is offered here."
 msgstr ""
 
-#: src/Domains/Cart.php:137
+#: src/Domains/Cart.php:138
 msgid "This domain cannot be ordered in that way."
 msgstr ""
 
-#: src/Domains/Cart.php:142
+#: src/Domains/Cart.php:143
 #: src/Domains/DnsClaimRoutes.php:382
 msgid "The domain could not be added to your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:150
+#: src/Domains/Cart.php:151
 msgid "Choose registration, transfer or DNS hosting."
 msgstr ""
 
-#: src/Domains/Cart.php:151
+#: src/Domains/Cart.php:152
 msgid "DNS hosting for a domain registered elsewhere requires ownership verification. This option is temporarily unavailable."
 msgstr ""
 
-#: src/Domains/Cart.php:152
+#: src/Domains/Cart.php:153
 #: src/Domains/DkAgreement.php:95
 msgid ".dk orders are not available yet."
 msgstr ""
 
-#: src/Domains/Cart.php:157
+#: src/Domains/Cart.php:158
 msgid "Enter the main domain, without a subdomain."
 msgstr ""
 
-#: src/Domains/Cart.php:159
+#: src/Domains/Cart.php:160
 #: templates/account/domain-page.php:289
 #: templates/account/domain.php:70
 #: assets/domain.js:295
 msgid "Enter the transfer code."
 msgstr ""
 
-#: src/Domains/Cart.php:160
+#: src/Domains/Cart.php:161
 #: src/Domains/TransferFix.php:207
 msgid "The transfer code must be 6 to 64 characters, letters, digits and common symbols only."
 msgstr ""
 
-#: src/Domains/Cart.php:162
+#: src/Domains/Cart.php:163
 msgid "Choose where your DNS lives."
 msgstr ""
 
-#: src/Domains/Cart.php:167
+#: src/Domains/Cart.php:169
 msgid "Transfer cannot start until secure storage is configured."
 msgstr ""
 
-#: src/Domains/Cart.php:205
+#: src/Domains/Cart.php:207
 msgid "This DNS hosting check has expired. Start again from My Account, Domains."
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:282
+#: src/Domains/Cart.php:284
 #, php-format
 msgid "%s is in your cart twice. Remove one of them."
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:289
+#: src/Domains/Cart.php:291
 #, php-format
 msgid "%s is already registered here. Remove it from your cart."
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:292
+#: src/Domains/Cart.php:294
 #, php-format
 msgid "%s cannot be added right now. Remove it from your cart."
 msgstr ""
 
-#: src/Domains/Cart.php:334
-#: src/Domains/Cart.php:345
+#: src/Domains/Cart.php:336
+#: src/Domains/Cart.php:347
 msgid "This domain extension is not offered any more. Remove it from your cart and search again."
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:362
+#: src/Domains/Cart.php:364
 #, php-format
 msgid "DNS hosting for %s: the ownership check is no longer valid, so the domain was not reserved for this order."
 msgstr ""
 
 #. translators: %s: domain name
-#: src/Domains/Cart.php:370
+#: src/Domains/Cart.php:372
 #, php-format
 msgid "DNS hosting for %s: the domain could not be tied to this order."
 msgstr ""
 
-#: src/Domains/Cart.php:412
-#: src/Domains/Cart.php:422
+#: src/Domains/Cart.php:414
+#: src/Domains/Cart.php:424
 msgid "Choose a domain on the domain search page first."
+msgstr ""
+
+#: src/Domains/Cart.php:461
+msgid "A domain was removed from your cart because the currency changed. Search for it again in the new currency."
 msgstr ""
 
 #: src/Domains/Contacts.php:35
@@ -5035,7 +5051,7 @@ msgstr ""
 #: src/Http/ConnectionsScreen.php:305
 #: src/Proxmox/Pve/ClustersScreen.php:303
 #: src/Proxmox/Pve/ClustersScreen.php:310
-#: src/Settings.php:352
+#: src/Settings.php:361
 msgid "Saved"
 msgstr ""
 
@@ -6330,7 +6346,7 @@ msgid "That add-on does not exist."
 msgstr ""
 
 #: src/Hosting/Actions/AddonActions.php:81
-#: src/Hosting/AddonBilling.php:327
+#: src/Hosting/AddonBilling.php:353
 msgid "This add-on cannot be bought online right now. Contact support."
 msgstr ""
 
@@ -6497,54 +6513,54 @@ msgstr ""
 msgid "The temporary address cannot be removed."
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:59
+#: src/Hosting/AddonBilling.php:60
 msgid "Extra domains and mailbox storage are bought from your hosting account page."
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:177
+#: src/Hosting/AddonBilling.php:203
 msgid "An extra domain"
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:178
+#: src/Hosting/AddonBilling.php:204
 msgid "5 GB of extra storage for one mailbox"
 msgstr ""
 
 #. translators: 1: what is bought, 2: price per month, 3: amount charged now, 4: number of months until the next renewal, 5: price per billing period.
-#: src/Hosting/AddonBilling.php:182
+#: src/Hosting/AddonBilling.php:208
 #, php-format
 msgid "%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded."
 msgid_plural "%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Hosting/AddonBilling.php:305
+#: src/Hosting/AddonBilling.php:331
 msgid "Your payment is being processed."
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:331
+#: src/Hosting/AddonBilling.php:357
 msgid "This mailbox has the most extra storage it can have."
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:335
+#: src/Hosting/AddonBilling.php:361
 msgid "This domain is paid for already."
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:345
+#: src/Hosting/AddonBilling.php:371
 msgid "This add-on is being bought already. Try again in a moment."
 msgstr ""
 
-#: src/Hosting/AddonBilling.php:371
+#: src/Hosting/AddonBilling.php:397
 msgid "The order could not be made. Try again in a moment."
 msgstr ""
 
 #. translators: %d: subscription number.
-#: src/Hosting/AddonBilling.php:416
+#: src/Hosting/AddonBilling.php:442
 #, php-format
 msgid "Hosting add-on for subscription #%d."
 msgstr ""
 
 #. translators: %d: order number.
-#: src/Hosting/AddonBilling.php:423
+#: src/Hosting/AddonBilling.php:449
 #, php-format
 msgid "Add-on order #%d was made for this subscription."
 msgstr ""
@@ -8304,7 +8320,7 @@ msgstr ""
 
 #: src/Http/Connections.php:628
 #: src/Proxmox/Pve/Clusters.php:740
-#: src/Settings.php:433
+#: src/Settings.php:442
 msgid "Add BELTOFT_SERVICES_KEY to wp-config.php before saving secrets."
 msgstr ""
 
@@ -10602,7 +10618,7 @@ msgid "Connect an app"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:367
+#: src/Plugin.php:368
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -14133,16 +14149,28 @@ msgstr ""
 msgid "This also deletes the plugin's clusters, nodes, connections and other options, and its usage, credit, OAuth and MCP tables. The IP pool, virtual machine records, private network records and hosting records are deleted only when no service that is not deleted still exists, and the DNS assignments only when no name may still point at our servers; otherwise those tables are kept. Machines whose records are deleted can no longer be matched to their services."
 msgstr ""
 
-#: src/Settings.php:105
-#: src/Settings.php:124
+#: src/Settings.php:92
+msgid "Guard rates"
+msgstr ""
+
+#: src/Settings.php:93
+msgid "One line per extra currency you sell in, for example DKK=7.60: how many units of it are worth one euro, a little above the real rate (about 2 percent). Only used to check that an order covers what a supplier is paid in euro (domains, certificates, licence keys); it is never shown or charged to a customer. Without a line for a currency, such an order is refused and you get an alert."
+msgstr ""
+
+#: src/Settings.php:113
+#: src/Settings.php:132
 msgid "General"
 msgstr ""
 
-#: src/Settings.php:125
+#: src/Settings.php:133
 msgid "My Account"
 msgstr ""
 
-#: src/Settings.php:128
+#: src/Settings.php:136
+msgid "Currencies"
+msgstr ""
+
+#: src/Settings.php:137
 #: templates/account/api-tokens.php:158
 #: templates/api-reference-full.php:131
 #: templates/api-reference-full.php:360
@@ -14151,19 +14179,19 @@ msgstr ""
 msgid "Use with Claude (MCP)"
 msgstr ""
 
-#: src/Settings.php:244
+#: src/Settings.php:253
 msgid "Settings"
 msgstr ""
 
-#: src/Settings.php:273
+#: src/Settings.php:282
 msgid "Secrets cannot be saved until an encryption key is set. Add this line to wp-config.php:"
 msgstr ""
 
-#: src/Settings.php:281
+#: src/Settings.php:290
 msgid "Services stop up to a day late after a subscription ends. Turn on 'Check expiry every hour' under Settings → Licenses."
 msgstr ""
 
-#: src/Settings.php:283
+#: src/Settings.php:292
 msgid "Open Settings → Licenses"
 msgstr ""
 
@@ -15168,7 +15196,7 @@ msgstr ""
 #. translators: 1: product name, 2: the database's address.
 #. translators: 1: "€0.0829 per hour", 2: "max €55.00 per month"
 #: src/Usage/Estimate.php:119
-#: src/Usage/Rates.php:314
+#: src/Usage/Rates.php:339
 #, php-format
 msgid "%1$s, %2$s"
 msgstr ""
@@ -15260,47 +15288,47 @@ msgid "Usage of %1$s carried to next month (under the %2$s minimum)."
 msgstr ""
 
 #. translators: %s: monthly amount such as €45
-#: src/Usage/Rates.php:128
+#: src/Usage/Rates.php:153
 #, php-format
 msgid "%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:140
+#: src/Usage/Rates.php:165
 #, php-format
 msgid "+%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:151
+#: src/Usage/Rates.php:176
 #, php-format
 msgid "+%s per month"
 msgstr ""
 
 #. translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50
-#: src/Usage/Rates.php:225
+#: src/Usage/Rates.php:250
 #, php-format
 msgid "Or %1$s/hour, max %2$s/month, pay as you go"
 msgstr ""
 
-#: src/Usage/Rates.php:273
+#: src/Usage/Rates.php:298
 msgid "Billed monthly for the hours used"
 msgstr ""
 
 #. translators: %s: price per hour such as €0.0829
-#: src/Usage/Rates.php:291
+#: src/Usage/Rates.php:316
 #, php-format
 msgid "%s per hour"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55.00
-#: src/Usage/Rates.php:302
+#: src/Usage/Rates.php:327
 #, php-format
 msgid "max %s per month"
 msgstr ""
 
 #. translators: %s: monthly price such as €55.00
-#: src/Usage/Rates.php:325
+#: src/Usage/Rates.php:350
 #, php-format
 msgid "%s per month, paid in advance"
 msgstr ""

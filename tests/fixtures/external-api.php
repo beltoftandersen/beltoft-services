@@ -40,6 +40,6 @@ return array(
 	'Usage\\Account' => array( 'ESTABLISHED', 'for_user()' ),
 	'Usage\\Breakdown' => array( 'parts()' ),
 	'Usage\\Cart' => array( 'usage_units()' ),
-	'Usage\\Rates' => array( 'billed_note()', 'cap_money()', 'for_usage()', 'is_usage()', 'money()' ),
+	'Usage\\Rates' => array( 'billed_note()', 'cap_money()', 'for_usage()', 'in_cart()', 'is_usage()', 'money()' ),
 	'Usage\\Summary' => array(),
 );

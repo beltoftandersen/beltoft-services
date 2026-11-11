@@ -36,11 +36,14 @@ final class SslGuard {
 
 		$order = $item->get_order();
 
-		if ( ! $order || 'EUR' !== strtoupper( (string) $order->get_currency() ) ) {
+		// Converted at the guard rate when the order is in another currency; refused without one (see SpendGuard).
+		$paid = $order ? \BeltoftServices\Currency::to_cost( (float) $item->get_total(), (string) $order->get_currency() ) : null;
+
+		if ( null === $paid ) {
 			return 'The order is not in EUR; the certificate cost cannot be compared.';
 		}
 
-		if ( (float) $item->get_total() + 0.01 < $cost ) {
+		if ( $paid + 0.01 < $cost ) {
 			return self::MESSAGE;
 		}
 

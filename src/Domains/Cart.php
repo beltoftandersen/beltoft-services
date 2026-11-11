@@ -5,6 +5,7 @@ namespace BeltoftServices\Domains;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Crypto;
+use BeltoftServices\Currency;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 
@@ -160,7 +161,8 @@ final class Cart {
 		if ( 'transfer' === $mode && ! self::auth_code_valid( trim( $auth_code ) ) ) { return new \WP_Error( 'auth_invalid', __( 'The transfer code must be 6 to 64 characters, letters, digits and common symbols only.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		$dns = trim( $dns );
 		if ( 'transfer' === $mode && '' !== $dns && ! in_array( $dns, TransferDns::CHOICES, true ) ) { return new \WP_Error( 'bad_dns_choice', __( 'Choose where your DNS lives.', 'beltoft-services' ), array( 'status' => 400 ) ); }
-		$data = array( 'beltoft_services_domain' => array( 'domain' => $domain, 'mode' => $mode ) );
+		// The line carries the currency its price is worked out in, so a cart that is re-priced to another currency cannot keep it.
+		$data = array( 'beltoft_services_domain' => array( 'domain' => $domain, 'mode' => $mode ), Currency::CART_KEY => Currency::current() );
 		if ( 'transfer' === $mode && '' !== $dns ) { $data['beltoft_services_domain']['dns'] = $dns; }
 		if ( 'transfer' === $mode ) {
 			try { $data['beltoft_services_domain_auth'] = Crypto::encrypt( trim( $auth_code ) ); }
@@ -441,12 +443,29 @@ final class Cart {
 		return null;
 	}
 
+	private static bool $noticed = false;
+
 	public static function apply_prices( \WC_Cart $cart ): void {
 		foreach ( $cart->get_cart() as $key => $item ) {
 			// One line is one domain: a quantity raised by a cart update or the Store API goes back to 1.
 			if ( isset( $item['beltoft_services_domain'] ) && 1 !== (int) ( $item['quantity'] ?? 1 ) ) { $cart->cart_contents[ $key ]['quantity'] = 1; }
+			// A priced domain line was chosen in a currency (a line from before lines carried one is in the shop's): in another currency the
+			// line goes, with one notice, and the customer searches again.
+			$domain = $item['beltoft_services_domain'] ?? null;
+			if ( is_array( $domain ) && 'dns' !== ( $domain['mode'] ?? '' ) && ! self::is_continuation( $item ) ) {
+				$tag = '' !== (string) ( $item[ Currency::CART_KEY ] ?? '' ) ? (string) $item[ Currency::CART_KEY ] : Currency::base();
+				if ( Currency::current() !== $tag ) {
+					$cart->remove_cart_item( $key );
+					if ( ! self::$noticed && function_exists( 'wc_add_notice' ) ) {
+						self::$noticed = true;
+						wc_add_notice( __( 'A domain was removed from your cart because the currency changed. Search for it again in the new currency.', 'beltoft-services' ), 'notice' );
+					}
+					continue;
+				}
+			}
 			$price = self::price_for( $item );
 			if ( null !== $price && isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) {
+				$cart->cart_contents[ $key ][ Currency::CART_KEY ] = Currency::current();
 				// The regular price too: left at the product's own price, a cheaper extension showed as a sale ("Save").
 				$item['data']->set_regular_price( $price );
 				$item['data']->set_sale_price( '' );

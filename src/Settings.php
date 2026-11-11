@@ -84,6 +84,14 @@ final class Settings {
 				'label'   => __( 'Delete the settings when the plugin is deleted', 'beltoft-services' ),
 				'desc'    => __( 'This also deletes the plugin\'s clusters, nodes, connections and other options, and its usage, credit, OAuth and MCP tables. The IP pool, virtual machine records, private network records and hosting records are deleted only when no service that is not deleted still exists, and the DNS assignments only when no name may still point at our servers; otherwise those tables are kept. Machines whose records are deleted can no longer be matched to their services.', 'beltoft-services' ),
 			),
+			'currency_guard_rates' => array(
+				'tab'     => 'general',
+				'section' => 'currency',
+				'type'    => 'textarea',
+				'default' => '',
+				'label'   => __( 'Guard rates', 'beltoft-services' ),
+				'desc'    => __( 'One line per extra currency you sell in, for example DKK=7.60: how many units of it are worth one euro, a little above the real rate (about 2 percent). Only used to check that an order covers what a supplier is paid in euro (domains, certificates, licence keys); it is never shown or charged to a customer. Without a line for a currency, such an order is refused and you get an alert.', 'beltoft-services' ),
+			),
 		);
 
 		/**
@@ -125,6 +133,7 @@ final class Settings {
 			'account' => __( 'My Account', 'beltoft-services' ),
 			'usage'   => __( 'Pay as you go', 'beltoft-services' ),
 			'credit'  => __( 'Account credit', 'beltoft-services' ),
+			'currency' => __( 'Currencies', 'beltoft-services' ),
 			'api'     => __( 'Use with Claude (MCP)', 'beltoft-services' ),
 		);
 
