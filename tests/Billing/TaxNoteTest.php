@@ -200,4 +200,20 @@ final class TaxNoteTest extends TestCase {
 		$this->assertNull( $seen['amount'] );
 		$this->assertSame( 'shown:incl', $seen['html'] );
 	}
+
+	public function test_a_listener_builds_both_figures_for_every_kind_of_price(): void {
+		$this->taxes( 'yes', 'excl' );
+		$this->rate_25();
+		$product = $this->product( '10' );
+
+		$this->listen(
+			function ( $html, $amount, $currency, $context, $render ) {
+				return $render( 'excl' ) . ' / ' . $render( 'incl' );
+			}
+		);
+
+		$this->assertSame( wc_price( 10 ) . ' / ' . wc_price( 12.5 ), TaxNote::html( 10.0, 'test', array( 'product' => $product ) ) );
+		$this->assertSame( wc_price( 10 ) . ' / ' . wc_price( 12.5 ), TaxNote::html( 10.0, 'test', array( 'tax_class' => '' ) ) );
+		$this->assertSame( 'excl / incl', TaxNote::html( fn( string $display = '' ) => '' === $display ? 'none' : $display, 'test' ) );
+	}
 }
