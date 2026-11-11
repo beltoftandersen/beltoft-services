@@ -93,6 +93,9 @@ class CacheablePriceTest extends UsageTestCase {
 		$this->assertSame( 'EUR:€12 | DKK:-', PriceTags::value( 'com' ) );
 
 		$this->fake_amounts( array( 'DKK' => array( 'domain_price_overrides' => "com=95.20\n" ) ) );
+		// The second currency's line arrives through a filter added in the middle of the request, which no site does: the figures
+		// remembered for the request are dropped by hand (a saved option drops them by itself).
+		PriceTags::forget();
 		$out = PriceTags::value( 'com' );
 		$this->assertStringStartsWith( 'EUR:€12 | DKK:', $out );
 		$this->assertStringContainsString( '95', $out );
@@ -141,5 +144,28 @@ class CacheablePriceTest extends UsageTestCase {
 		$this->fake_set_currency( 'EUR' );
 		$ref->setValue( null, array() );
 		unset( $_GET['bds_term'] );
+	}
+
+	public function test_a_domain_figure_is_worked_out_once_in_a_request_and_again_after_the_table_changes(): void {
+		$calls = 0;
+		add_filter(
+			'beltoft_services_price_html',
+			static function ( $html ) use ( &$calls ) {
+				++$calls;
+				return $html;
+			}
+		);
+
+		$first = PriceTags::value( 'com' );
+		$this->assertSame( $first, PriceTags::value( 'com' ) );
+		$this->assertSame( $first, PriceTags::render( '{beltoft_domain_register:com}' ) );
+		$this->assertSame( 1, $calls, 'The same figure asked three times is worked out once.' );
+
+		$table                 = get_option( Prices::OPTION );
+		$table['com']['price'] = 15;
+		update_option( Prices::OPTION, $table );
+
+		$this->assertNotSame( $first, PriceTags::value( 'com' ), 'A changed price shows in the same request.' );
+		$this->assertSame( 2, $calls );
 	}
 }

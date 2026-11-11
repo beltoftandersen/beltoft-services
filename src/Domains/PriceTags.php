@@ -9,6 +9,7 @@ namespace BeltoftServices\Domains;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Brand;
+use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -42,6 +43,9 @@ final class PriceTags {
 		add_filter( 'bricks/dynamic_tags_list', array( __CLASS__, 'tags_list' ) );
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
 		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render_data' ), 20, 2 );
+		// A changed price table, override line or setting must show in the same request.
+		add_action( 'updated_option', array( __CLASS__, 'forget' ), 10, 0 );
+		add_action( 'added_option', array( __CLASS__, 'forget' ), 10, 0 );
 	}
 
 	/**
@@ -104,6 +108,40 @@ final class PriceTags {
 	 */
 	public static function value( string $tld, bool $markup = true ): string {
 		$price = Prices::price( $tld );
+
+		// A page repeats the same figure (a price table, the same extension in several sections) and may be rendered more than once in a
+		// request (an SEO plugin reading the content): each figure is worked out once. The key holds everything the answer depends on.
+		$key = strtolower( $tld ) . '|' . ( $markup ? 'm' : 'p' ) . '|' . ( null === $price ? '' : (string) $price ) . '|' . Currency::current() . '|' . TaxNote::display();
+
+		if ( ! isset( self::$figures[ $key ] ) ) {
+			self::$figures[ $key ] = self::figure( $tld, $markup, $price );
+		}
+
+		return self::$figures[ $key ];
+	}
+
+	/**
+	 * Figures worked out in this request, by extension, kind, price, currency and tax display.
+	 *
+	 * @var array<string, string>
+	 */
+	private static array $figures = array();
+
+	/**
+	 * Forgets the figures of this request (the price table or a setting changed).
+	 */
+	public static function forget(): void {
+		self::$figures = array();
+	}
+
+	/**
+	 * Works one figure out.
+	 *
+	 * @param string         $tld    Extension without the dot.
+	 * @param bool           $markup Whether the figure may pass beltoft_services_price_html.
+	 * @param int|float|null $price  Price in the current currency, null when there is none.
+	 */
+	private static function figure( string $tld, bool $markup, int|float|null $price ): string {
 
 		// Only text content takes the filtered markup; elsewhere (an attribute, a link) it is the plain figure in the shop's display. The
 		// markup is a renderer that reads the price table again for the currency in force when a listener calls it (see Search::price_html()).
