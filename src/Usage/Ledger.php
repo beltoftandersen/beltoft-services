@@ -52,7 +52,8 @@ final class Ledger {
 		global $wpdb;
 
 		// The currency column exists once the schema upgrade has finished; before that rows are written the old way and read as the shop's currency.
-		$has    = Schema::has_currency();
+		$currency = Currency::clean( $currency );
+		$has      = Schema::has_currency();
 		$column = $has ? ', currency' : '';
 		$value  = $has ? ', %s' : '';
 		$args   = $has ? array( '' !== $currency ? $currency : Currency::base() ) : array();

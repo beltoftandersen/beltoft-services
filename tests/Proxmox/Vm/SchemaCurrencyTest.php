@@ -42,7 +42,7 @@ final class SchemaCurrencyTest extends TestCase {
 	}
 
 	/** Version 5 copies of both tables, with rows, as old code left them. */
-	private function version_5_tables(): void {
+	private function version_5_tables( bool $rows = true ): void {
 		global $wpdb;
 
 		$t = Schema::tables();
@@ -84,12 +84,25 @@ final class SchemaCurrencyTest extends TestCase {
 				KEY user_id (user_id,id)
 			)"
 		);
-		$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (resource_id, user_id, item, rate, hour_bucket, created) VALUES (1, 7, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00'), (1, 7, 'server', 0.05, '2026-11-01 11:00:00', '2026-11-01 12:00:00')" );
-		$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (user_id, kind, amount_cents, balance_after_cents, ref_id, created) VALUES (7, 'topup', 500, 500, 'a', '2026-11-01 10:00:00')" );
+		if ( $rows ) {
+			$this->version_5_rows();
+		}
 		// phpcs:enable
 
 		update_option( Schema::OPTION_DB_VERSION, '5' );
 		delete_transient( Schema::RETRY_TRANSIENT );
+	}
+
+	/** Two usage rows and one credit row, as old code left them. */
+	private function version_5_rows(): void {
+		global $wpdb;
+
+		$t = Schema::tables();
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test schema.
+		$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (resource_id, user_id, item, rate, hour_bucket, created) VALUES (1, 7, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00'), (1, 7, 'server', 0.05, '2026-11-01 11:00:00', '2026-11-01 12:00:00')" );
+		$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (user_id, kind, amount_cents, balance_after_cents, ref_id, created) VALUES (7, 'topup', 500, 500, 'a', '2026-11-01 10:00:00')" );
+		// phpcs:enable
 	}
 
 	/** Currency values of a table, one per row in id order. */
@@ -97,7 +110,7 @@ final class SchemaCurrencyTest extends TestCase {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test read.
-		return $wpdb->get_col( 'SELECT currency FROM ' . $table . ' ORDER BY id' );
+		return array_map( 'strval', $wpdb->get_col( 'SELECT currency FROM ' . $table . ' ORDER BY id' ) );
 	}
 
 	public function test_a_fresh_install_has_the_columns(): void {
@@ -277,5 +290,160 @@ final class SchemaCurrencyTest extends TestCase {
 
 		$this->assertTrue( Ledger::record( 56, 12, 'server', 1.0, 'hour', 0.05, strtotime( '2026-11-01 10:00:00 UTC' ) ) );
 		$this->assertSame( '', Ledger::unbilled( 12, strtotime( '2026-11-02 00:00:00 UTC' ) )[0]['currency'] );
+	}
+
+	public function test_a_failed_alter_on_empty_tables_does_not_store_the_version(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		$this->version_5_tables( false );
+
+		$break = static function ( $query ) {
+			return false !== stripos( $query, 'ADD COLUMN currency' ) ? 'SELECT * FROM zz_no_such_table' : $query;
+		};
+		add_filter( 'query', $break );
+
+		ob_start();
+		Schema::maybe_upgrade();
+		ob_end_clean();
+
+		remove_filter( 'query', $break );
+
+		$this->assertSame( '5', get_option( Schema::OPTION_DB_VERSION ), 'an empty table has nothing to backfill, but the column is still missing' );
+		$this->assertSame( array( 'usage.currency', 'credit.currency' ), Schema::missing_columns() );
+	}
+
+	public function test_a_failed_alter_with_no_shop_currency_does_not_store_the_version(): void {
+		update_option( 'woocommerce_currency', '' );
+		$this->version_5_tables();
+
+		$break = static function ( $query ) {
+			return false !== stripos( $query, 'ADD COLUMN currency' ) ? 'SELECT * FROM zz_no_such_table' : $query;
+		};
+		add_filter( 'query', $break );
+
+		ob_start();
+		Schema::maybe_upgrade();
+		ob_end_clean();
+
+		remove_filter( 'query', $break );
+
+		$this->assertSame( '5', get_option( Schema::OPTION_DB_VERSION ), 'the backfill is skipped for an empty shop currency, the columns still gate the version' );
+	}
+
+	public function test_a_shop_currency_that_is_not_a_code_skips_the_backfill_and_the_version_is_stored(): void {
+		update_option( 'woocommerce_currency', 'EURO' );
+		$this->version_5_tables();
+		$t = Schema::tables();
+
+		Schema::maybe_upgrade();
+
+		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( array( '', '' ), $this->values( $t['usage'] ) );
+	}
+
+	public function test_balance_at_version_5_writes_the_old_columns(): void {
+		update_option( Schema::OPTION_DB_VERSION, '5' );
+
+		$this->assertTrue( Balance::credit( 13, 500, Balance::TOPUP, 'order_item', 'v5' ) );
+
+		$this->assertSame( '', Balance::history( 13, 1 )[0]['currency'] );
+		$this->assertSame( 500, Balance::get( 13 ) );
+	}
+
+	public function test_the_backfill_stops_at_its_time_cap_and_resumes(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		$this->version_5_tables();
+		$t = Schema::tables();
+
+		$cap = static function () {
+			return -1;
+		};
+		add_filter( 'beltoft_services_schema_backfill_seconds', $cap );
+
+		Schema::maybe_upgrade();
+
+		remove_filter( 'beltoft_services_schema_backfill_seconds', $cap );
+
+		$this->assertSame( '5', get_option( Schema::OPTION_DB_VERSION ), 'not complete, not stored' );
+		$this->assertSame( array( '', '' ), $this->values( $t['usage'] ), 'the cap was hit before any window' );
+
+		delete_transient( Schema::RETRY_TRANSIENT );
+		Schema::maybe_upgrade();
+
+		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( array( 'EUR', 'EUR' ), $this->values( $t['usage'] ) );
+	}
+
+	public function test_the_backfill_walks_a_sparse_id_table_in_windows(): void {
+		global $wpdb;
+
+		update_option( 'woocommerce_currency', 'EUR' );
+		$this->version_5_tables( false );
+		$t = Schema::tables();
+
+		foreach ( array( 1, 2, 500, 2000000000, 2000000001 ) as $id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
+			$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (id, user_id, kind, amount_cents, balance_after_cents, ref_id, created) VALUES ($id, 7, 'topup', 1, 1, 'r$id', '2026-11-01 10:00:00')" );
+		}
+
+		$batch = static function () {
+			return 2;
+		};
+		add_filter( 'beltoft_services_schema_backfill_batch', $batch );
+
+		$queries = 0;
+		$count   = static function ( $query ) use ( &$queries ) {
+			if ( 0 === stripos( ltrim( $query ), 'UPDATE' ) ) {
+				++$queries;
+			}
+			return $query;
+		};
+		add_filter( 'query', $count );
+
+		Schema::maybe_upgrade();
+
+		remove_filter( 'query', $count );
+		remove_filter( 'beltoft_services_schema_backfill_batch', $batch );
+
+		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( array_fill( 0, 5, 'EUR' ), $this->values( $t['credit'] ) );
+		$this->assertLessThanOrEqual( 6, $queries, 'one update per window of rows, not per id range' );
+	}
+
+	public function test_a_row_that_is_already_set_does_not_count_toward_a_window(): void {
+		global $wpdb;
+
+		update_option( 'woocommerce_currency', 'EUR' );
+		$this->version_5_tables( false );
+		Schema::create_tables();
+		$t = Schema::tables();
+
+		foreach ( array( 1, 2, 3, 4, 5 ) as $id ) {
+			$currency = $id < 5 ? 'DKK' : '';
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
+			$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (id, user_id, kind, amount_cents, balance_after_cents, ref_id, created, currency) VALUES ($id, 7, 'topup', 1, 1, 'r$id', '2026-11-01 10:00:00', '$currency')" );
+		}
+
+		$batch = static function () {
+			return 2;
+		};
+		add_filter( 'beltoft_services_schema_backfill_batch', $batch );
+		Schema::create_tables();
+		remove_filter( 'beltoft_services_schema_backfill_batch', $batch );
+
+		$this->assertSame( array( 'DKK', 'DKK', 'DKK', 'DKK', 'EUR' ), $this->values( $t['credit'] ) );
+	}
+
+	public function test_a_ledger_writer_cleans_the_currency_code(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		update_option( Schema::OPTION_DB_VERSION, '6' );
+		$hour = strtotime( '2026-11-01 10:00:00 UTC' );
+
+		Ledger::record( 70, 21, 'server', 1.0, 'hour', 0.05, $hour, 'dkk' );
+		Ledger::record( 71, 21, 'server', 1.0, 'hour', 0.05, $hour, 'dkkx' );
+		Ledger::record( 72, 21, 'server', 1.0, 'hour', 0.05, $hour, '12' );
+
+		$rows = Ledger::unbilled( 21, strtotime( '2026-11-02 00:00:00 UTC' ) );
+
+		$this->assertSame( array( 'DKK', 'EUR', 'EUR' ), array_column( $rows, 'currency' ) );
 	}
 }

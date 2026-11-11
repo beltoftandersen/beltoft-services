@@ -80,10 +80,11 @@ final class TaxNote {
 	 * @param array<string, mixed> $args    Arguments.
 	 */
 	public static function html( $price, string $context, array $args = array() ): string {
-		$amount   = is_callable( $price ) ? null : (float) $price;
-		$currency = isset( $args['currency'] ) && '' !== (string) $args['currency'] ? (string) $args['currency'] : (string) get_woocommerce_currency();
+		$is_render = $price instanceof \Closure || ( is_callable( $price ) && ! is_string( $price ) );
+		$amount    = $is_render ? null : (float) $price;
+		$currency  = isset( $args['currency'] ) && '' !== (string) $args['currency'] ? (string) $args['currency'] : (string) get_woocommerce_currency();
 
-		$render = is_callable( $price ) ? $price : function ( string $display = '' ) use ( $amount, $args ): string {
+		$render = $is_render ? $price : function ( string $display = '' ) use ( $amount, $args ): string {
 			$wc = array();
 
 			if ( isset( $args['decimals'] ) ) {
@@ -101,7 +102,9 @@ final class TaxNote {
 	}
 
 	/**
-	 * An amount excluding tax with its tax added, from the product or the tax class of the arguments.
+	 * An amount excluding tax with its tax added, from the product's tax class or the tax class of the arguments. The amount is always
+	 * excluding tax (whatever prices_include_tax says), so the rates are applied to it as they are and nothing is rounded to the shop's
+	 * price decimals: the figure is formatted by wc_price() with the decimals the caller asked for.
 	 *
 	 * @param float                $amount Amount excluding tax.
 	 * @param array<string, mixed> $args   Arguments of html().
@@ -111,18 +114,18 @@ final class TaxNote {
 			return $amount;
 		}
 
-		$decimals = isset( $args['decimals'] ) ? (int) $args['decimals'] : wc_get_price_decimals();
-
 		if ( isset( $args['product'] ) && $args['product'] instanceof \WC_Product ) {
-			return round( (float) wc_get_price_including_tax( $args['product'], array( 'price' => $amount ) ), $decimals );
+			if ( ! $args['product']->is_taxable() ) {
+				return $amount;
+			}
+
+			$class = $args['product']->get_tax_class();
+		} elseif ( isset( $args['tax_class'] ) ) {
+			$class = (string) $args['tax_class'];
+		} else {
+			return $amount;
 		}
 
-		if ( isset( $args['tax_class'] ) ) {
-			$tax = array_sum( \WC_Tax::calc_tax( $amount, \WC_Tax::get_rates( (string) $args['tax_class'] ), false ) );
-
-			return round( $amount + $tax, $decimals );
-		}
-
-		return $amount;
+		return round( $amount + array_sum( \WC_Tax::calc_tax( $amount, \WC_Tax::get_rates( $class ), false ) ), 8 );
 	}
 }

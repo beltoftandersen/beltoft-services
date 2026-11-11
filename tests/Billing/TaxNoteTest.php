@@ -216,4 +216,54 @@ final class TaxNoteTest extends TestCase {
 		$this->assertSame( wc_price( 10 ) . ' / ' . wc_price( 12.5 ), TaxNote::html( 10.0, 'test', array( 'tax_class' => '' ) ) );
 		$this->assertSame( 'excl / incl', TaxNote::html( fn( string $display = '' ) => '' === $display ? 'none' : $display, 'test' ) );
 	}
+
+	private function incl_only(): void {
+		$this->listen(
+			function ( $html, $amount, $currency, $context, $render ) {
+				return $render( 'incl' );
+			}
+		);
+	}
+
+	public function test_including_keeps_four_decimals_on_both_paths(): void {
+		$this->taxes( 'yes', 'excl' );
+		$this->rate_25();
+		$product = $this->product( '10' );
+		$this->incl_only();
+
+		$expected = wc_price( 0.015625, array( 'decimals' => 4 ) );
+
+		$this->assertSame( $expected, TaxNote::html( 0.0125, 'test', array( 'decimals' => 4, 'product' => $product ) ) );
+		$this->assertSame( $expected, TaxNote::html( 0.0125, 'test', array( 'decimals' => 4, 'tax_class' => '' ) ) );
+	}
+
+	public function test_including_adds_tax_to_an_excluding_amount_whatever_prices_include_tax_says(): void {
+		$this->taxes( 'yes', 'excl' );
+		$this->rate_25();
+		$product = $this->product( '10' );
+		$this->incl_only();
+
+		foreach ( array( 'no', 'yes' ) as $setting ) {
+			update_option( 'woocommerce_prices_include_tax', $setting );
+			$this->assertSame( wc_price( 12.5 ), TaxNote::html( 10.0, 'test', array( 'product' => $product ) ), $setting );
+		}
+
+		update_option( 'woocommerce_prices_include_tax', 'no' );
+	}
+
+	public function test_including_leaves_a_non_taxable_product_alone(): void {
+		$this->taxes( 'yes', 'excl' );
+		$this->rate_25();
+		$product = $this->product( '10' );
+		$product->set_tax_status( 'none' );
+		$product->save();
+		$this->incl_only();
+
+		$this->assertSame( wc_price( 10 ), TaxNote::html( 10.0, 'test', array( 'product' => $product ) ) );
+	}
+
+	public function test_a_string_is_an_amount_never_a_function_name(): void {
+		$this->assertSame( wc_price( 0 ), TaxNote::html( 'time', 'test' ) );
+		$this->assertSame( wc_price( 12.5 ), TaxNote::html( '12.5', 'test' ) );
+	}
 }

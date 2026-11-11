@@ -143,54 +143,70 @@ final class Schema {
 	}
 
 	/**
-	 * Sets the shop's currency on the ledger rows that have none, in id windows (a primary key range each, so a large
-	 * table is never scanned twice) and under a lock that is not waited for. Idempotent: only empty values are written,
-	 * and an empty value reads as the shop's currency anyway, so stopping at any point loses nothing.
+	 * Sets the shop's currency on the ledger rows that have none, in keyset windows (each step reads forward from the last id it
+	 * handled, so a table is walked once whatever its ids look like) and under a lock that is not waited for. Idempotent: only empty
+	 * values are written, and an empty value reads as the shop's currency anyway, so stopping at any point loses nothing.
+	 *
+	 * A shop currency that is not a three letter code is treated like an empty one: nothing to set, the backfill counts as done.
 	 *
 	 * @return bool True when every row was visited (or there is nothing to set); false when it stopped early, failed or another request holds the lock.
 	 */
 	private static function backfill_currency(): bool {
 		global $wpdb;
 
-		$base = Currency::base();
+		$base = Currency::clean( Currency::base() );
 
 		if ( '' === $base ) {
 			return true;
 		}
 
 		$tables   = self::tables();
-		$deadline = microtime( true ) + self::BACKFILL_SECONDS;
+		$batch    = max( 1, (int) apply_filters( 'beltoft_services_schema_backfill_batch', self::BACKFILL_BATCH ) );
+		$deadline = microtime( true ) + (float) apply_filters( 'beltoft_services_schema_backfill_seconds', self::BACKFILL_SECONDS );
 
 		list( $locked, $done ) = Locks::with(
 			Locks::name( 'schema_backfill', 0 ),
 			0,
-			static function () use ( $wpdb, $tables, $base, $deadline ): bool {
+			static function () use ( $wpdb, $tables, $base, $batch, $deadline ): bool {
 				foreach ( array( 'usage', 'credit' ) as $key ) {
-					$suppress = $wpdb->suppress_errors( true );
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
-					$max = $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(id) FROM %i', $tables[ $key ] ) );
-					$wpdb->suppress_errors( $suppress );
+					$last = 0;
 
-					if ( null === $max || false === $max ) {
-						if ( $wpdb->last_error ) {
-							return false;
-						}
-						continue;
-					}
-
-					for ( $from = 0; $from <= (int) $max; $from += self::BACKFILL_BATCH ) {
-						if ( microtime( true ) > $deadline ) {
+					while ( true ) {
+						if ( microtime( true ) >= $deadline ) {
 							return false;
 						}
 
 						$suppress = $wpdb->suppress_errors( true );
+						// The id that ends this window: the batch-th empty row after the last one handled. None left means the window is the rest of the table.
 						// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
-						$result = $wpdb->query( $wpdb->prepare( "UPDATE %i SET currency = %s WHERE id >= %d AND id < %d AND currency = ''", $tables[ $key ], $base, $from, $from + self::BACKFILL_BATCH ) );
+						$end = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM %i WHERE id > %d AND currency = '' ORDER BY id LIMIT 1 OFFSET %d", $tables[ $key ], $last, $batch - 1 ) );
+
+						if ( '' !== (string) $wpdb->last_error ) {
+							$wpdb->suppress_errors( $suppress );
+							return false;
+						}
+
+						if ( null === $end ) {
+							// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
+							$result = $wpdb->query( $wpdb->prepare( "UPDATE %i SET currency = %s WHERE id > %d AND currency = ''", $tables[ $key ], $base, $last ) );
+							$wpdb->suppress_errors( $suppress );
+
+							if ( false === $result ) {
+								return false;
+							}
+
+							break;
+						}
+
+						// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
+						$result = $wpdb->query( $wpdb->prepare( "UPDATE %i SET currency = %s WHERE id > %d AND id <= %d AND currency = ''", $tables[ $key ], $base, $last, (int) $end ) );
 						$wpdb->suppress_errors( $suppress );
 
 						if ( false === $result ) {
 							return false;
 						}
+
+						$last = (int) $end;
 					}
 				}
 

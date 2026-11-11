@@ -50,14 +50,23 @@ final class Currency {
 	 * beltoft_services_currency_runner must give a callable function ( string $code, callable $fn ); with none, or when the
 	 * runner forced nothing, the callback does not run.
 	 *
-	 * @param string   $code Currency code, '' for the current one.
+	 * @param string   $code Currency code; a literal '' means the current one, any other value that is not a three letter code fails closed.
 	 * @param callable $fn   Callback.
 	 * @return array{0: bool, 1: mixed} Whether it ran, and its result (null when it did not).
 	 */
 	public static function with( string $code, callable $fn ): array {
+		if ( '' === $code ) {
+			return array( true, $fn() );
+		}
+
+		// Only a literal empty code means the current currency; a code that is not a currency never runs the callback.
 		$code = self::clean( $code );
 
-		if ( '' === $code || self::current() === $code ) {
+		if ( '' === $code ) {
+			return array( false, null );
+		}
+
+		if ( self::current() === $code ) {
 			return array( true, $fn() );
 		}
 
@@ -120,7 +129,7 @@ final class Currency {
 	 *
 	 * @param mixed $code Value.
 	 */
-	private static function clean( $code ): string {
+	public static function clean( $code ): string {
 		$code = strtoupper( trim( (string) ( is_scalar( $code ) ? $code : '' ) ) );
 
 		return 1 === preg_match( '/^[A-Z]{3}$/D', $code ) ? $code : '';

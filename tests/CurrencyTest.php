@@ -166,4 +166,26 @@ final class CurrencyTest extends TestCase {
 
 		$this->assertSame( 200, Currency::amount( 'credit_min' ) );
 	}
+
+	public function test_with_an_invalid_non_empty_code_never_runs_the_callback(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		$ran = false;
+
+		foreach ( array( 'EURO', 'xx', '12', ' ', 'E1R' ) as $code ) {
+			$out = Currency::with(
+				$code,
+				function () use ( &$ran ) {
+					$ran = true;
+					return 1;
+				}
+			);
+
+			$this->assertSame( array( false, null ), $out, $code );
+		}
+
+		$this->assertFalse( $ran );
+		$this->assertSame( array( true, 1 ), Currency::with( '', fn() => 1 ), 'only a literal empty code means the current currency' );
+	}
 }
