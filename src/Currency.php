@@ -44,11 +44,24 @@ final class Currency {
 	}
 
 	/**
+	 * The currency a customer is in when someone has fixed it, else the current one (a new account made on a page in that page's currency).
+	 *
+	 * @param int $user_id User id.
+	 */
+	public static function of_user_or_current( int $user_id ): string {
+		$code = self::clean( apply_filters( 'beltoft_services_user_currency', '', $user_id ) );
+
+		return '' !== $code ? $code : self::current();
+	}
+
+	/**
 	 * Runs a callback with a currency in force. Fails closed: a price is never read under a currency we did not get.
 	 *
 	 * The current currency (or an empty code) runs the callback as it is. For another one the filter
 	 * beltoft_services_currency_runner must give a callable function ( string $code, callable $fn ); with none, or when the
-	 * runner forced nothing, the callback does not run.
+	 * runner forced nothing, the callback does not run. The runner MUST restore the currency it forced in a `finally`, also when the
+	 * callback throws: this class does not touch another plugin's state, but it checks after the runner returns and alerts the admin
+	 * once when the current currency is not what it was before the call.
 	 *
 	 * @param string   $code Currency code; a literal '' means the current one, any other value that is not a three letter code fails closed.
 	 * @param callable $fn   Callback.
@@ -78,6 +91,7 @@ final class Currency {
 
 		$ran    = false;
 		$result = null;
+		$before = self::current();
 
 		$runner(
 			$code,
@@ -92,6 +106,15 @@ final class Currency {
 				return $result;
 			}
 		);
+
+		if ( self::current() !== $before ) {
+			Alerts::notify(
+				__( 'A currency runner did not restore the currency', 'beltoft-services' ),
+				array( sprintf( 'After forcing %1$s the runner left the current currency at %2$s instead of %3$s. A runner must restore the currency in a finally block. Prices read after this call may be in the wrong currency.', $code, self::current(), $before ) ),
+				null,
+				'beltoft_services_currency_leak'
+			);
+		}
 
 		return $ran ? array( true, $result ) : array( false, null );
 	}

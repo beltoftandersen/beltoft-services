@@ -38,6 +38,18 @@ final class Meter {
 	public const BACKFILL_HOURS = 48;
 
 	/**
+	 * Resource meta: the first hour a resource could not be metered (no rate in its account's currency, or the currency could not be
+	 * put in force), as unix time. The next successful run starts there instead of BACKFILL_HOURS back, and clears it.
+	 */
+	public const UNMETERED_SINCE = 'usage_unmetered_since';
+
+	/**
+	 * The most hours a gap is caught up: 45 days, a month of billing and slack. A resource unmetered for longer than that has a
+	 * configuration fault, not a late price; the hours beyond it are not written and the admin is told once.
+	 */
+	public const MAX_CATCHUP_HOURS = 1080;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -141,19 +153,50 @@ final class Meter {
 		$currency = self::currency_of( $license, $user_id );
 		list( $ok, $items ) = Currency::with( $currency, static fn() => Rates::items( $resource ) );
 
+		// Fail closed: no rate is read under a currency we did not get, and a currency with no price meters nothing. Either way the first
+		// unmetered hour is kept, so the hours are written once metering works (a base currency with no items stays silent, as before).
+		$reason = '';
+
 		if ( ! $ok ) {
-			// Fail closed: no rate is read under a currency we did not get, so nothing is written for this resource.
-			self::alert( $resource, $currency, 'The currency of the usage account could not be used for the rates.' );
+			$reason = 'The currency of the usage account could not be used for the rates.';
+		} elseif ( ! $items && Currency::base() !== $currency ) {
+			$reason = 'The product has no price in that currency, so nothing is metered.';
+		}
+
+		if ( '' !== $reason ) {
+			if ( null === $resource->get( self::UNMETERED_SINCE ) ) {
+				$last_row = Ledger::last_hour( $id );
+				$first    = max( Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ) );
+
+				$resource->set( array( self::UNMETERED_SINCE => null !== $last_row ? max( $first, $last_row + HOUR_IN_SECONDS ) : $first ) );
+			}
+
+			self::alert( $resource, $currency, $reason );
 
 			return 0;
 		}
 
 		if ( ! $items ) {
-			if ( Currency::base() !== $currency ) {
-				self::alert( $resource, $currency, 'The product has no price in that currency, so nothing is metered.' );
+			return 0;
+		}
+
+		// A gap is caught up from its first hour, not only 48 hours back, within MAX_CATCHUP_HOURS.
+		$since = $resource->get( self::UNMETERED_SINCE );
+
+		if ( null !== $since ) {
+			$floor = $last - ( self::MAX_CATCHUP_HOURS - 1 ) * HOUR_IN_SECONDS;
+
+			if ( (int) $since < $floor ) {
+				Alerts::notify(
+					/* translators: %d: resource id */
+					sprintf( __( 'Usage hours not caught up for resource %d', 'beltoft-services' ), $id ),
+					array( sprintf( 'Resource %1$d was unmetered since %2$s, longer than %3$d hours. Only the last %3$d hours are written; the older ones are not billed.', $id, gmdate( 'Y-m-d H:i', (int) $since ), self::MAX_CATCHUP_HOURS ) ),
+					$resource,
+					'beltoft_services_usage_gap_' . $id
+				);
 			}
 
-			return 0;
+			$start = max( $floor, Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ), Ledger::hour( (int) $since ) );
 		}
 
 		$have    = Ledger::written( $id, $start );
@@ -169,6 +212,11 @@ final class Meter {
 					++$written;
 				}
 			}
+		}
+
+		// Every hour of the gap is written now: the gap is closed.
+		if ( null !== $since ) {
+			$resource->set( array( self::UNMETERED_SINCE => null ) );
 		}
 
 		return $written;

@@ -258,4 +258,50 @@ class CurrencyBillingTest extends UsageTestCase {
 		$this->assertSame( 0, $this->open( $user, 'EUR' ) );
 		$this->assertSame( array(), $this->mails( 'two currencies' ) );
 	}
+
+	public function test_an_invalid_currency_code_matches_no_row(): void {
+		$user = $this->new_user();
+		$this->hours( 501, $user, 3, 0.2, 'DKK' );
+
+		$this->assertSame( 0, $this->open( $user, 'EURO' ), 'Not a code: fail closed, not the shop currency.' );
+		$this->assertSame( array(), Ledger::claim( array_column( Ledger::unbilled( $user, time() + DAY_IN_SECONDS, 'DKK' ), 'id' ), 9300, 'x1' ) );
+		$this->assertSame( 3, Ledger::stray( $user, time() + DAY_IN_SECONDS, 'EURO' ), 'Every row is another currency than a non-code.' );
+		$this->assertSame( 3, $this->open( $user, 'DKK' ) );
+	}
+
+	/** Rows of a 31 day month, hour i from the start, for a resource, in DKK. */
+	private function month_rows( int $resource, int $user, int $from, int $to, float $rate ): int {
+		$base = (int) strtotime( gmdate( 'Y-m-01 00:00:00', time() ) . ' UTC' );
+		do {
+			$base = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $base - DAY_IN_SECONDS ) . ' UTC' );
+		} while ( 31 !== (int) gmdate( 't', $base ) || $base > time() - 62 * DAY_IN_SECONDS );
+		for ( $i = $from; $i < $to; $i++ ) {
+			Ledger::record( $resource, $user, 'server', 1.0, 'hour', $rate, $base + $i * HOUR_IN_SECONDS, 'DKK' );
+		}
+		return $base;
+	}
+
+	public function test_the_monthly_cap_holds_across_two_orders_of_the_same_non_base_currency(): void {
+		$user    = $this->new_user();
+		$account = $this->account( $user, 'DKK' );
+		$this->month_rows( 501, $user, 0, 600, 0.2 ); // 120 DKK; the monthly cap is the peak hour times 730: 146.
+		$first = wcs_create_renewal_order( $account );
+		$this->assertEquals( 120.0, (float) $first->get_meta( Renewal::META_BILLED ) );
+		$this->month_rows( 501, $user, 600, 744, 0.2 ); // 28.80 DKK more, to the end of the 31 day month: only what is left under the cap fits.
+
+		$second = wcs_create_renewal_order( $account );
+
+		$this->assertEquals( 26.0, (float) $second->get_meta( Renewal::META_BILLED ), 'What the first DKK order took counts toward the cap.' );
+	}
+
+	public function test_a_statement_never_groups_rows_of_two_currencies_of_one_resource_item_and_month(): void {
+		$base = $this->month_rows( 501, 77, 0, 1, 0.2 );
+		Ledger::record( 501, 77, 'server', 1.0, 'hour', 0.05, $base + HOUR_IN_SECONDS, 'EUR' );
+		$rows = array_merge( Ledger::unbilled( 77, time() + DAY_IN_SECONDS, 'DKK' ), Ledger::unbilled( 77, time() + DAY_IN_SECONDS, 'EUR' ) );
+
+		$lines = Renewal::statement( $rows )['lines'];
+
+		$this->assertCount( 2, $lines );
+		$this->assertSame( array( 'DKK', 'EUR' ), array_column( $lines, 'currency' ) );
+	}
 }

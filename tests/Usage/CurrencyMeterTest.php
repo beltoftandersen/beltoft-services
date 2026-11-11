@@ -26,6 +26,9 @@ class CurrencyMeterTest extends UsageTestCase {
 	/** @var string[] Subjects of the admin mails sent. */
 	private array $alerts = array();
 
+	/** @var string[] Bodies of the admin mails sent. */
+	private array $bodies = array();
+
 	public function set_up(): void {
 		parent::set_up();
 		update_option( 'woocommerce_currency', 'EUR' );
@@ -35,6 +38,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		}
 		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$this->alerts = array();
+		$this->bodies = array();
 		add_filter( 'pre_wp_mail', array( $this, 'catch_mail' ), 10, 2 );
 	}
 
@@ -52,6 +56,7 @@ class CurrencyMeterTest extends UsageTestCase {
 	 */
 	public function catch_mail( $pre, $atts ) {
 		$this->alerts[] = (string) $atts['subject'];
+		$this->bodies[] = (string) $atts['message'];
 
 		return true;
 	}
@@ -219,5 +224,97 @@ class CurrencyMeterTest extends UsageTestCase {
 
 		$this->fake_user_currencies( array( $user => 'SEK' ) );
 		$this->assertSame( 'SEK', \BeltoftServices\Currency::of_user( $user ), 'The bridge, at priority 10, comes first.' );
+	}
+
+	public function test_a_hundred_hour_old_server_with_no_price_is_metered_from_its_first_hour_once_the_price_exists(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		list( , $r ) = $this->dkk_server( $v, $user );
+		$this->activated_ago( $r->id(), 100 );
+
+		$this->assertSame( 0, Meter::run( time() ) );
+		$this->assertSame( array(), $this->rows( $r->id() ) );
+		$this->assertNotNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ), 'The first unmetered hour is kept.' );
+
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		Meter::run( time() );
+		$rows = $this->rows( $r->id() );
+
+		$this->assertGreaterThanOrEqual( 99, count( $rows ), 'All the hours since the first one, not only the last 48.' );
+		$this->assertNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ), 'The gap is closed.' );
+		$this->assertCount( 0, array_filter( $rows, static fn( $x ) => 'DKK' !== $x['currency'] ) );
+	}
+
+	public function test_a_runner_that_works_again_catches_the_gap_up_too(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner( false );
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		list( , $r ) = $this->dkk_server( $v, $user );
+		$this->activated_ago( $r->id(), 80 );
+
+		Meter::run( time() );
+		$this->assertSame( array(), $this->rows( $r->id() ) );
+
+		$this->fake_currency_down();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		Meter::run( time() );
+
+		$this->assertGreaterThanOrEqual( 79, count( $this->rows( $r->id() ) ) );
+	}
+
+	public function test_a_gap_longer_than_the_bound_is_caught_up_to_the_bound_and_the_admin_is_told(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		list( , $r ) = $this->dkk_server( $v, $user );
+		$this->activated_ago( $r->id(), 1300 );
+		\BeltoftServices\Resource::find( $r->id() )->set( array( Meter::UNMETERED_SINCE => time() - 1300 * HOUR_IN_SECONDS ) );
+
+		Meter::run( time() );
+
+		$this->assertLessThanOrEqual( Meter::MAX_CATCHUP_HOURS, count( $this->rows( $r->id() ) ) );
+		$this->assertGreaterThan( 1000, count( $this->rows( $r->id() ) ) );
+		$this->assertCount( 1, $this->sent( 'not caught up' ) );
+	}
+
+	public function test_a_base_currency_resource_keeps_the_48_hour_window_and_no_marker(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$r    = $this->usage_vm( $v['u-None'], $user, 100 );
+
+		Meter::run( time() );
+
+		$this->assertLessThanOrEqual( 49, count( $this->rows( $r->id() ) ) );
+		$this->assertNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ) );
+	}
+
+	public function test_the_two_refusals_say_different_things(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner( false );
+		$this->dkk_server( $v, $user );
+		Meter::run( time() );
+		$this->assertStringContainsString( 'could not be used', implode( ' ', $this->bodies ) );
+
+		$this->bodies = array();
+		$this->fake_currency_down();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		delete_transient( 'beltoft_services_usage_currency_' . \BeltoftServices\Resource::find( 1 )?->id() );
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_beltoft_services_usage_currency%'" );
+		wp_cache_flush();
+		Meter::run( time() );
+		$this->assertStringContainsString( 'no price in that currency', implode( ' ', $this->bodies ) );
 	}
 }

@@ -188,4 +188,34 @@ final class CurrencyTest extends TestCase {
 		$this->assertFalse( $ran );
 		$this->assertSame( array( true, 1 ), Currency::with( '', fn() => 1 ), 'only a literal empty code means the current currency' );
 	}
+
+	public function test_a_runner_that_leaks_the_currency_is_noticed_once_and_the_result_is_still_returned(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		update_option( \BeltoftServices\Settings::OPTION, array_merge( (array) get_option( \BeltoftServices\Settings::OPTION, array() ), array( 'admin_email' => 'christian.beltoft@gmail.com' ) ) );
+		delete_transient( 'beltoft_services_currency_leak' );
+		$this->fake_currency_up( 'EUR' );
+		$sent = array();
+		$mail = static function ( $pre, $atts ) use ( &$sent ) {
+			$sent[] = (string) $atts['subject'];
+			return true;
+		};
+		add_filter( 'pre_wp_mail', $mail, 10, 2 );
+		// A runner that forces the code and never puts it back.
+		$leak = function () {
+			return function ( string $code, callable $fn ) {
+				$this->fake_set_currency( $code );
+				return $fn();
+			};
+		};
+		add_filter( 'beltoft_services_currency_runner', $leak );
+
+		$out = Currency::with( 'DKK', fn() => 5 );
+		Currency::with( 'DKK', fn() => 5 );
+
+		remove_filter( 'beltoft_services_currency_runner', $leak );
+		remove_filter( 'pre_wp_mail', $mail, 10 );
+
+		$this->assertSame( array( true, 5 ), $out );
+		$this->assertCount( 1, array_filter( $sent, static fn( $s ) => false !== strpos( $s, 'did not restore' ) ), 'Once, not on every call.' );
+	}
 }

@@ -108,8 +108,15 @@ final class Ledger {
 	 * @return array{0: string, 1: array<int, string>} Condition (starting with AND) and its arguments.
 	 */
 	private static function in_currency( string $currency, bool $other = false ): array {
-		$base     = Currency::base();
+		$base  = Currency::base();
+		$given = $currency;
 		$currency = Currency::clean( $currency );
+
+		// A value that is not a currency code fails closed: it matches no row (every row is "other"). Only '' is the shop's.
+		if ( '' === $currency && '' !== $given ) {
+			return array( $other ? '' : ' AND 1 = 0', array() );
+		}
+
 		$currency = '' !== $currency ? $currency : $base;
 
 		if ( ! Schema::has_currency() ) {
@@ -117,6 +124,20 @@ final class Ledger {
 		}
 
 		return array( ' AND COALESCE( NULLIF( currency, \'\' ), %s ) ' . ( $other ? '<>' : '=' ) . ' %s', array( $base, $currency ) );
+	}
+
+	/**
+	 * The last hour a resource has a row for (unix time), or null.
+	 *
+	 * @param int $resource_id Resource.
+	 */
+	public static function last_hour( int $resource_id ): ?int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$max = $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(hour_bucket) FROM %i WHERE resource_id = %d', self::table(), $resource_id ) );
+
+		return $max ? (int) strtotime( $max . ' UTC' ) : null;
 	}
 
 	/**
@@ -146,6 +167,9 @@ final class Ledger {
 	 * @param int    $user_id  Customer.
 	 * @param int    $before   Unix time (the start of an hour).
 	 * @param string $currency Currency code, '' for the shop's.
+	 *
+	 * Not index-only: the key user_open (user_id, order_id, hour_bucket) narrows it to the customer's unbilled rows, and the currency of each is
+	 * read from the row. It runs once per renewal and sees one customer's unbilled rows (about a month of hours), so no new index is worth a schema change.
 	 */
 	public static function stray( int $user_id, int $before, string $currency = '' ): int {
 		global $wpdb;
