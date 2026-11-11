@@ -29,6 +29,10 @@ class CurrencyMeterTest extends UsageTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		update_option( 'woocommerce_currency', 'EUR' );
+		// The alerts hold themselves back with transients named per currency; an earlier test may have set one.
+		foreach ( array( 'usage_minimum', 'usage_threshold', 'usage_early_currency' ) as $key ) {
+			delete_transient( 'beltoft_services_' . $key . '_dkk' );
+		}
 		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$this->alerts = array();
 		add_filter( 'pre_wp_mail', array( $this, 'catch_mail' ), 10, 2 );

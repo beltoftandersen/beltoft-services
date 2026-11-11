@@ -100,19 +100,60 @@ final class Ledger {
 	}
 
 	/**
-	 * Rows of a customer that no order has billed yet, from hours that ended before $before.
+	 * SQL that keeps the rows of one currency (an empty column value is the shop's currency, see Currency::of_row()) or,
+	 * with $other, the rows of every other currency. Before the schema upgrade has finished every row is the shop's.
 	 *
-	 * @param int $user_id Customer.
-	 * @param int $before  Unix time (the start of an hour).
+	 * @param string $currency Currency code, '' for the shop's.
+	 * @param bool   $other    The rows that are NOT in that currency.
+	 * @return array{0: string, 1: array<int, string>} Condition (starting with AND) and its arguments.
+	 */
+	private static function in_currency( string $currency, bool $other = false ): array {
+		$base     = Currency::base();
+		$currency = Currency::clean( $currency );
+		$currency = '' !== $currency ? $currency : $base;
+
+		if ( ! Schema::has_currency() ) {
+			return array( $currency === $base ? ( $other ? ' AND 1 = 0' : '' ) : ( $other ? '' : ' AND 1 = 0' ), array() );
+		}
+
+		return array( ' AND COALESCE( NULLIF( currency, \'\' ), %s ) ' . ( $other ? '<>' : '=' ) . ' %s', array( $base, $currency ) );
+	}
+
+	/**
+	 * Rows of a customer that no order has billed yet, from hours that ended before $before, in one currency (the shop's by
+	 * default): an order is made in one currency and only bills rows of it.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param int    $before   Unix time (the start of an hour).
+	 * @param string $currency Currency code, '' for the shop's.
 	 * @return array<int, array<string, mixed>>
 	 */
-	public static function unbilled( int $user_id, int $before ): array {
+	public static function unbilled( int $user_id, int $before, string $currency = '' ): array {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d AND order_id IS NULL AND hour_bucket < %s ORDER BY resource_id, item, hour_bucket', self::table(), $user_id, gmdate( 'Y-m-d H:i:s', $before ) ), ARRAY_A );
+		list( $sql, $args ) = self::in_currency( $currency );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $sql is fixed text.
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE user_id = %d AND order_id IS NULL AND hour_bucket < %s$sql ORDER BY resource_id, item, hour_bucket", self::table(), $user_id, gmdate( 'Y-m-d H:i:s', $before ), ...$args ), ARRAY_A );
 
 		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * How many unbilled rows of a customer are in a currency other than the given one. Such rows are never put on an order of
+	 * that currency; a caller that finds some tells the admin.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param int    $before   Unix time (the start of an hour).
+	 * @param string $currency Currency code, '' for the shop's.
+	 */
+	public static function stray( int $user_id, int $before, string $currency = '' ): int {
+		global $wpdb;
+
+		list( $sql, $args ) = self::in_currency( $currency, true );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $sql is fixed text.
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE user_id = %d AND order_id IS NULL AND hour_bucket < %s$sql", self::table(), $user_id, gmdate( 'Y-m-d H:i:s', $before ), ...$args ) );
 	}
 
 	/**
@@ -130,11 +171,14 @@ final class Ledger {
 	/**
 	 * Claims rows for an order: only rows still unbilled are taken, so two runs never bill a row twice.
 	 *
-	 * @param int[] $ids      Row ids.
-	 * @param int   $order_id Order.
+	 * Only rows in the order's currency are taken (an empty value is the shop's), whatever ids are given.
+	 *
+	 * @param int[]  $ids      Row ids.
+	 * @param int    $order_id Order.
+	 * @param string $currency Currency of the order, '' for the shop's.
 	 * @return array<int, array<string, mixed>> The rows the order now holds (among $ids).
 	 */
-	public static function claim( array $ids, int $order_id ): array {
+	public static function claim( array $ids, int $order_id, string $currency = '' ): array {
 		global $wpdb;
 
 		$ids = array_values( array_filter( array_map( 'intval', $ids ) ) );
@@ -145,8 +189,10 @@ final class Ledger {
 
 		$in = implode( ',', $ids );
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $in holds integers only.
-		$wpdb->query( $wpdb->prepare( "UPDATE %i SET order_id = %d WHERE order_id IS NULL AND id IN ($in)", self::table(), $order_id ) );
+		list( $sql, $args ) = self::in_currency( $currency );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $in holds integers only, $sql is fixed text.
+		$wpdb->query( $wpdb->prepare( "UPDATE %i SET order_id = %d WHERE order_id IS NULL AND id IN ($in)$sql", self::table(), $order_id, ...$args ) );
 		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE order_id = %d AND id IN ($in) ORDER BY resource_id, item, hour_bucket", self::table(), $order_id ), ARRAY_A );
 		// phpcs:enable
 
@@ -173,12 +219,15 @@ final class Ledger {
 	 * @param int    $month_start Unix time of the first hour of the month.
 	 * @param int    $month_end   Unix time of the first hour of the next month.
 	 * @param int    $except      An order whose rows do not count.
+	 * @param string $currency    Only rows in this currency count (an amount of another currency is no part of this cap), '' for the shop's.
 	 */
-	public static function billed( int $resource_id, string $item, int $month_start, int $month_end, int $except = 0 ): float {
+	public static function billed( int $resource_id, string $item, int $month_start, int $month_end, int $except = 0, string $currency = '' ): float {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		$sum = $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(quantity * rate) FROM %i WHERE resource_id = %d AND item = %s AND order_id IS NOT NULL AND order_id <> %d AND hour_bucket >= %s AND hour_bucket < %s', self::table(), $resource_id, $item, $except, gmdate( 'Y-m-d H:i:s', $month_start ), gmdate( 'Y-m-d H:i:s', $month_end ) ) );
+		list( $sql, $args ) = self::in_currency( $currency );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $sql is fixed text.
+		$sum = $wpdb->get_var( $wpdb->prepare( "SELECT SUM(quantity * rate) FROM %i WHERE resource_id = %d AND item = %s AND order_id IS NOT NULL AND order_id <> %d AND hour_bucket >= %s AND hour_bucket < %s$sql", self::table(), $resource_id, $item, $except, gmdate( 'Y-m-d H:i:s', $month_start ), gmdate( 'Y-m-d H:i:s', $month_end ), ...$args ) );
 
 		return (float) $sum;
 	}

@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Alerts;
+use BeltoftServices\Currency;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -55,8 +57,11 @@ final class Renewal {
 
 		foreach ( $rows as $row ) {
 			$start = (int) strtotime( gmdate( 'Y-m-01 00:00:00', (int) strtotime( $row['hour_bucket'] . ' UTC' ) ) . ' UTC' );
-			$key   = $row['resource_id'] . '|' . $row['item'] . '|' . $start;
+			$cur   = Currency::of_row( $row );
+			// A group is one currency: rows of two currencies are never added into one line or one cap.
+			$key   = $row['resource_id'] . '|' . $row['item'] . '|' . $start . '|' . $cur;
 
+			$groups[ $key ]['currency']    = $cur;
 			$groups[ $key ]['resource_id'] = (int) $row['resource_id'];
 			$groups[ $key ]['item']        = (string) $row['item'];
 			$groups[ $key ]['unit']        = (string) $row['unit'];
@@ -74,7 +79,7 @@ final class Renewal {
 		foreach ( $groups as $group ) {
 			$end    = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $group['month'] + 32 * DAY_IN_SECONDS ) . ' UTC' );
 			$cap    = round( $group['peak'] * Rates::HOURS, 2 );
-			$prior  = min( $cap, Ledger::billed( $group['resource_id'], $group['item'], $group['month'], $end, $except ) );
+			$prior  = min( $cap, Ledger::billed( $group['resource_id'], $group['item'], $group['month'], $end, $except, $group['currency'] ) );
 			$room   = max( 0.0, $cap - $prior );
 			$raw    = round( $group['raw'], 4 );
 			$charge = round( min( $raw, $room ), 2 );
@@ -254,13 +259,29 @@ final class Renewal {
 			return $order;
 		}
 
-		$rows = Ledger::unbilled( (int) $subscription->get_customer_id(), Ledger::hour( time() ) );
+		// An order bills the rows of its own currency only. Rows of another currency stay unbilled (and are told to the admin once).
+		$currency = (string) $order->get_currency();
+		$user_id  = (int) $subscription->get_customer_id();
+		$before   = Ledger::hour( time() );
+		$stray    = Ledger::stray( $user_id, $before, $currency );
+
+		if ( $stray > 0 ) {
+			Alerts::notify(
+				/* translators: %d: customer id */
+				sprintf( __( 'Usage in two currencies for customer %d', 'beltoft-services' ), $user_id ),
+				array( sprintf( 'Customer %1$d has %2$d unbilled usage rows in a currency other than %3$s (order %4$d). They were left unbilled; the order bills %3$s rows only.', $user_id, $stray, $currency, (int) $order->get_id() ) ),
+				null,
+				'beltoft_services_usage_mixed_' . $user_id
+			);
+		}
+
+		$rows = Ledger::unbilled( $user_id, $before, $currency );
 
 		if ( ! $rows ) {
 			return $order;
 		}
 
-		$claimed = Ledger::claim( array_column( $rows, 'id' ), (int) $order->get_id() );
+		$claimed = Ledger::claim( array_column( $rows, 'id' ), (int) $order->get_id(), $currency );
 
 		if ( ! $claimed ) {
 			return $order;
@@ -270,7 +291,6 @@ final class Renewal {
 		// The account's 0 product line stays: WooCommerce Subscriptions builds the order-pay cart of a renewal from
 		// the order's product lines, so without it a failed usage invoice cannot be paid ("Your checkout is empty").
 		// The fee lines below travel into that cart with it (WCS_Cart_Renewal::maybe_add_fees()).
-		$currency = $order->get_currency();
 
 		foreach ( $statement['lines'] as $line ) {
 			$fee = new \WC_Order_Item_Fee();
@@ -321,7 +341,7 @@ final class Renewal {
 		$order->calculate_totals( true );
 
 		// A month whose card amount is under the minimum is carried: the lines go, the rows wait for the next renewal.
-		if ( Minimum::carries( \BeltoftServices\Credit\Balance::cents( $order->get_total() ), (int) $subscription->get_customer_id() ) ) {
+		if ( Minimum::carries( \BeltoftServices\Credit\Balance::cents( $order->get_total() ), (int) $subscription->get_customer_id(), $currency ) ) {
 			Minimum::carry( $order, $subscription, self::$early );
 			$order->save();
 

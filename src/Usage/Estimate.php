@@ -66,7 +66,7 @@ final class Estimate {
 			return null;
 		}
 
-		$statement = Renewal::statement( Ledger::unbilled( $user_id, Ledger::hour( time() ) ) );
+		$statement = Renewal::statement( Ledger::unbilled( $user_id, Ledger::hour( time() ), (string) $account->get_currency() ) );
 		$resources = array();
 
 		foreach ( $statement['lines'] as $line ) {

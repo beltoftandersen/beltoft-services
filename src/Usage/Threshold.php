@@ -81,7 +81,7 @@ final class Threshold {
 			return false;
 		}
 
-		$accrued = Renewal::statement( Ledger::unbilled( (int) $account->get_customer_id(), Ledger::hour( time() ) ) )['total'];
+		$accrued = Renewal::statement( Ledger::unbilled( (int) $account->get_customer_id(), Ledger::hour( time() ), (string) $account->get_currency() ) )['total'];
 
 		if ( $accrued <= 0 ) {
 			return false;
@@ -116,10 +116,25 @@ final class Threshold {
 		Renewal::$early = true;
 
 		try {
-			$order = wcs_create_renewal_order( $account );
+			// The order is made in the account's currency whatever the job runs in; with no such currency nothing is billed.
+			list( $ok, $order ) = Currency::with( (string) $account->get_currency(), static fn() => wcs_create_renewal_order( $account ) );
 		} finally {
 			// A throw must not leave the flag set for the rest of the request.
 			Renewal::$early = false;
+		}
+
+		if ( ! $ok ) {
+			$currency = (string) $account->get_currency();
+
+			Alerts::notify(
+				/* translators: %s: currency code */
+				sprintf( __( 'Early bill not made in %s', 'beltoft-services' ), $currency ),
+				array( sprintf( 'The early bill of account %1$d could not be made in %2$s: that currency could not be put in force. Nothing was billed.', $account->get_id(), $currency ) ),
+				null,
+				'beltoft_services_usage_early_currency_' . strtolower( $currency )
+			);
+
+			return false;
 		}
 
 		if ( is_wp_error( $order ) || ! $order instanceof \WC_Order ) {

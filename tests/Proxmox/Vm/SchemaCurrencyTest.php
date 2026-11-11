@@ -442,8 +442,10 @@ final class SchemaCurrencyTest extends TestCase {
 		Ledger::record( 71, 21, 'server', 1.0, 'hour', 0.05, $hour, 'dkkx' );
 		Ledger::record( 72, 21, 'server', 1.0, 'hour', 0.05, $hour, '12' );
 
-		$rows = Ledger::unbilled( 21, strtotime( '2026-11-02 00:00:00 UTC' ) );
+		// unbilled() is per currency since slice 4: the DKK row is in its own list, the two cleaned codes are in the shop's.
+		$before = strtotime( '2026-11-02 00:00:00 UTC' );
 
-		$this->assertSame( array( 'DKK', 'EUR', 'EUR' ), array_column( $rows, 'currency' ) );
+		$this->assertSame( array( 'DKK' ), array_column( Ledger::unbilled( 21, $before, 'DKK' ), 'currency' ) );
+		$this->assertSame( array( 'EUR', 'EUR' ), array_column( Ledger::unbilled( 21, $before, 'EUR' ), 'currency' ) );
 	}
 }
