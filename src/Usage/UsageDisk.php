@@ -9,6 +9,7 @@ namespace BeltoftServices\Usage;
 
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Alerts;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
@@ -26,10 +27,73 @@ defined( 'ABSPATH' ) || exit;
  *
  * Grow moves the licence to the next larger pay as you go size of the same product. beltoft-licenses reports the change,
  * Lifecycle::apply_plan() stores the new plan on the disk and queues the update, and the disk driver's own resize path
- * (DiskSteps::grow(): capacity reserved, resize, verified) does the work. The meter bills the new rate from the next hour
- * it runs, because the rate and the size both come from the licence and plan as they are then.
+ * (DiskSteps::grow(): capacity reserved, resize, verified) does the work. The meter bills the disk by the size it really
+ * has until the grow has finished (Rates::items(): the resource's `size_gb` is what the driver measured and is set only
+ * when the resize is verified), so the larger rate starts with the first hour the disk is larger. When the grow fails for
+ * good the licence goes back to the size the disk has and the admin is told (on_state_changed()).
  */
 final class UsageDisk {
+
+	/**
+	 * Hooks.
+	 */
+	public static function register(): void {
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
+	}
+
+	/**
+	 * Action beltoft_services_state_changed: a pay as you go disk whose grow finally failed goes back to the variation of
+	 * the size it really has (the meter bills the disk by its real size while a grow is pending, but the licence must not
+	 * stay on the larger size either), and the admin is told. Never throws: it runs inside the failure itself.
+	 *
+	 * @param mixed $r   Resource.
+	 * @param mixed $old Old state.
+	 * @param mixed $new New state.
+	 */
+	public static function on_state_changed( $r, $old = '', $new = '' ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		if ( 'failed' !== $new || ! $r instanceof Resource || ! self::is_usage( $r ) ) {
+			return;
+		}
+
+		try {
+			$real    = (int) $r->get( 'size_gb' );
+			$plan    = (array) $r->get( 'plan' );
+			$planned = (int) ( $plan['disk_gb'] ?? 0 );
+			$license = $r->license();
+
+			if ( $real < 1 || $planned <= $real || empty( $license['id'] ) ) {
+				return;
+			}
+
+			$back    = null;
+			$back_gb = 0;
+
+			foreach ( DiskField::sizes_for( true ) as $variation ) {
+				$gb = (int) ( Product::plan( $variation->get_parent_id(), $variation->get_id() )['disk_gb'] ?? 0 );
+
+				if ( $variation->get_parent_id() === (int) ( $license['product_id'] ?? 0 ) && $gb <= $real && $gb > $back_gb ) {
+					$back    = $variation;
+					$back_gb = $gb;
+				}
+			}
+
+			$lines = array( sprintf( 'The pay as you go disk of resource %d could not be made larger (%d GB asked, %d GB it has): %s', $r->id(), $planned, $real, (string) $r->get( 'last_error' ) ) );
+
+			if ( $back ) {
+				$plan['disk_gb'] = $real;
+				$r->set( array( 'plan' => $plan ) );
+				Licenses::update( (int) $license['id'], array( 'variation_id' => $back->get_id() ) );
+				Events::add( (int) $license['id'], 'service', 'The disk could not be made larger: the licence is back on the ' . $back_gb . ' GB pay as you go size' );
+				$lines[] = sprintf( 'The licence is back on the %d GB size and is billed as such.', $back_gb );
+			} else {
+				$lines[] = 'No pay as you go size matches what the disk has; check the licence by hand.';
+			}
+
+			Alerts::notify( sprintf( 'Pay as you go disk %d could not be made larger', $r->id() ), $lines );
+		} catch ( \Throwable $e ) {
+			error_log( 'Beltoft Services: the failed disk grow could not be undone: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- runs inside the failure.
+		}
+	}
 
 	/**
 	 * Is this a pay as you go extra disk?

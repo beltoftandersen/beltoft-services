@@ -59,7 +59,7 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 		$this->account = $this->usage_account( $this->user );
 		$this->save_cluster( array( 'templates' => "9000 = Debian 12\n9001 = Ubuntu 24.04", 'default_template' => '9000' ) );
 		$this->v    = $this->usage_product();
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0, 'disk_promise_percent' => 100 ) );
+		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0 ) );
 		// The reading of the node first: a disk size is in stock only when it fits (Stock).
 		$this->capacity( 4000 );
 		$this->disk = $this->disk_product();

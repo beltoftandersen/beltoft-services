@@ -37,7 +37,7 @@ final class CartSwapTest extends UsageTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		$this->settings( array( 'offer_monthly' => 1, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0, 'disk_promise_percent' => 100 ) );
+		$this->settings( array( 'offer_monthly' => 1, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0 ) );
 		$this->v = $this->usage_product();
 		$this->capacity( 4000 );
 		$this->disk = $this->disk_product();

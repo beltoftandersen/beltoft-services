@@ -12,6 +12,7 @@ use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
+use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Resource;
@@ -435,10 +436,10 @@ final class Rates {
 				$out[] = array( 'item' => 'backups', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $extra, $premium ) );
 			}
 		} elseif ( DiskDriver::ID === $driver ) {
-			$gb = (float) ( ( (array) $r->get( 'plan' ) )['disk_gb'] ?? 0 );
+			list( $gb, $basis ) = self::disk_basis( $r, $v, $monthly );
 
 			if ( $gb > 0 ) {
-				$out[] = array( 'item' => 'disk', 'quantity' => $gb, 'unit' => 'GB', 'rate' => self::hourly( $monthly / $gb, $premium ) );
+				$out[] = array( 'item' => 'disk', 'quantity' => $gb, 'unit' => 'GB', 'rate' => self::hourly( $basis / $gb, $premium ) );
 			}
 		} elseif ( SnapshotDriver::ID === $driver ) {
 			$out[] = array( 'item' => 'snapshots', 'quantity' => 1.0, 'unit' => 'pack', 'rate' => self::hourly( $monthly, $premium ) );
@@ -447,5 +448,39 @@ final class Rates {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The size and the monthly price an extra disk is metered by. Normally the licence's variation: its plan size and its
+	 * price. While a grow is pending (the plan asks for more than the disk really has, `size_gb` being what the driver
+	 * measured) the disk is metered by the size it really has, at the price of the variation of that size (or, when no such
+	 * variation exists, the same price per GB), so the customer pays for the larger size only from the hour the disk is larger.
+	 *
+	 * @param Resource              $r       Disk.
+	 * @param \WC_Product_Variation $v       The licence's variation.
+	 * @param float                 $monthly Its monthly price.
+	 * @return array{0: float, 1: float} GB and the monthly price for that many.
+	 */
+	private static function disk_basis( Resource $r, \WC_Product_Variation $v, float $monthly ): array {
+		$planned = (float) ( ( (array) $r->get( 'plan' ) )['disk_gb'] ?? 0 );
+		$real    = (float) $r->get( 'size_gb' );
+
+		if ( $planned <= 0 || $real <= 0 || $real >= $planned ) {
+			return array( $planned, $monthly );
+		}
+
+		foreach ( DiskField::sizes_for( true ) as $candidate ) {
+			$size = (float) ( Product::plan( $candidate->get_parent_id(), $candidate->get_id() )['disk_gb'] ?? 0 );
+
+			if ( $candidate->get_parent_id() === $v->get_parent_id() && $size === $real ) {
+				$price = self::monthly( $candidate );
+
+				if ( null !== $price ) {
+					return array( $real, $price );
+				}
+			}
+		}
+
+		return array( $real, $monthly * $real / $planned );
 	}
 }
