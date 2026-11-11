@@ -90,6 +90,30 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( array(), $this->errors() );
 	}
 
+	public function test_a_checkout_with_its_own_step_heading_can_leave_the_fields_heading_out(): void {
+		$this->in_cart( $this->product() );
+		$kinds = array();
+		$hide  = static function ( $show, $kind ) use ( &$kinds ) {
+			$kinds[] = $kind;
+
+			return false;
+		};
+		add_filter( 'beltoft_services_checkout_field_heading', $hide, 10, 2 );
+
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+		remove_filter( 'beltoft_services_checkout_field_heading', $hide, 10 );
+
+		$this->assertStringNotContainsString( '<h3', $html, 'The heading is left out.' );
+		$this->assertStringContainsString( 'Temporary address', $html, 'The fields are still printed.' );
+		$this->assertSame( array( 'hosting' ), $kinds, 'The filter is told which fields these are.' );
+
+		ob_start();
+		SiteField::render();
+		$this->assertStringContainsString( '<h3>Your website</h3>', (string) ob_get_clean(), 'Without the filter the heading is printed as before.' );
+	}
+
 	public function test_the_form_prints_the_fields_and_offers_our_domains_only_to_a_customer_who_has_some(): void {
 		$product = $this->product();
 		$this->in_cart( $product );

@@ -222,7 +222,16 @@ final class MailField {
 		$fresh = self::cart_domains();
 
 		echo '<div class="beltoft-services-mail-field" style="margin:40px 0 0">';
-		echo '<h3 style="margin:0 0 16px">' . esc_html__( 'Email domain', 'beltoft-services' ) . '</h3>';
+		/**
+		 * Filters whether the checkout fields print their own heading. A checkout that shows these fields in a step
+		 * with a heading of its own returns false.
+		 *
+		 * @param bool   $show Whether to print the heading.
+		 * @param string $kind Which fields: hosting, mail, ssl or licence.
+		 */
+		if ( apply_filters( 'beltoft_services_checkout_field_heading', true, 'mail' ) ) {
+			echo '<h3 style="margin:0 0 16px">' . esc_html__( 'Email domain', 'beltoft-services' ) . '</h3>';
+		}
 
 		foreach ( $lines as $key => $item ) {
 			$product = $item['data'] ?? null;

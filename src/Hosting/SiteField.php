@@ -273,7 +273,16 @@ final class SiteField {
 		$zones = self::zones( get_current_user_id() );
 
 		echo '<div class="beltoft-services-site-field">';
-		echo '<h3>' . esc_html__( 'Your website', 'beltoft-services' ) . '</h3>';
+		/**
+		 * Filters whether the checkout fields print their own heading. A checkout that shows these fields in a step
+		 * with a heading of its own returns false.
+		 *
+		 * @param bool   $show Whether to print the heading.
+		 * @param string $kind Which fields: hosting, mail, ssl or licence.
+		 */
+		if ( apply_filters( 'beltoft_services_checkout_field_heading', true, 'hosting' ) ) {
+			echo '<h3>' . esc_html__( 'Your website', 'beltoft-services' ) . '</h3>';
+		}
 
 		foreach ( $lines as $key => $item ) {
 			$product = $item['data'] ?? null;
