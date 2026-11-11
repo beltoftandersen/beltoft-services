@@ -61,6 +61,32 @@ final class Currency {
 	}
 
 	/**
+	 * The currencies this shop sells in: its own, those with a line in the guard rates, and any a site adds through the filter
+	 * beltoft_services_currencies. One entry on a shop with a single currency.
+	 *
+	 * @return string[]
+	 */
+	public static function known_codes(): array {
+		$codes = array( self::base() );
+		$text  = Settings::get( 'currency_guard_rates' );
+
+		foreach ( is_string( $text ) ? preg_split( '/\r?\n/', $text ) : array() as $line ) {
+			if ( 1 === preg_match( '/^\s*([A-Za-z]{3})\s*=/', (string) $line, $m ) ) {
+				$codes[] = strtoupper( $m[1] );
+			}
+		}
+
+		/**
+		 * The currencies of this shop, for the admin screens that offer a choice of currency.
+		 *
+		 * @param string[] $codes Shop currency and the currencies with a guard rate.
+		 */
+		$filtered = apply_filters( 'beltoft_services_currencies', $codes );
+
+		return array_values( array_unique( array_filter( array_map( array( __CLASS__, 'clean' ), (array) $filtered ) ) ) );
+	}
+
+	/**
 	 * The currency of an order or subscription: its own code, else the shop's.
 	 *
 	 * @param \WC_Abstract_Order $order Order or subscription.

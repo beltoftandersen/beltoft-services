@@ -208,7 +208,7 @@ final class Settings {
 			}
 
 			$added[ $tab . '_' . $id ] = true;
-			add_settings_section( 'beltoft_services_' . $tab . '_' . $id, $sections[ $id ] ?? '', '__return_false', self::PAGE . '-' . $tab );
+			add_settings_section( 'beltoft_services_' . $tab . '_' . $id, $sections[ $id ] ?? '', 'currency' === $id ? array( __CLASS__, 'currency_intro' ) : '__return_false', self::PAGE . '-' . $tab );
 		}
 
 		foreach ( $fields as $key => $field ) {
@@ -226,6 +226,13 @@ final class Settings {
 				)
 			);
 		}
+	}
+
+	/**
+	 * The text under the Currencies heading: what the fields mean, and that nothing is converted for a customer.
+	 */
+	public static function currency_intro(): void {
+		echo '<p>' . esc_html__( 'Nothing here converts a price for a customer: a customer sees the price you set in their currency, in your price list. A second currency needs its own prices on every product, its own pay as you go prices, and its own amounts for the minimum, the early billing thresholds, the top-up limits and the domain prices (a site\'s code gives them through the filter beltoft_services_amount_setting). A guard rate is only used to check that an order covers what a supplier is paid in euro.', 'beltoft-services' ) . '</p>';
 	}
 
 	/**

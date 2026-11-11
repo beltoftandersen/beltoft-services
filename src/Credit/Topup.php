@@ -112,7 +112,7 @@ final class Topup {
 					'default' => 10,
 					'min'     => 1,
 					'label'   => __( 'Smallest top-up', 'beltoft-services' ),
-					'desc'    => __( 'In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
+					'desc'    => __( 'In the shop\'s currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value. No VAT is charged on a top-up: the customer pays this amount and all of it is credited.', 'beltoft-services' ),
 				),
 				'credit_max' => array(
 					'tab'     => 'general',
@@ -121,7 +121,7 @@ final class Topup {
 					'default' => 1000,
 					'min'     => 1,
 					'label'   => __( 'Largest top-up', 'beltoft-services' ),
-					'desc'    => __( 'In the store currency.', 'beltoft-services' ),
+					'desc'    => __( 'In the shop\'s currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value.', 'beltoft-services' ),
 				),
 			)
 		);

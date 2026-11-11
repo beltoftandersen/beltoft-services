@@ -121,7 +121,7 @@
         "default": 50,
         "min": 1,
         "label": "Bill pay as you go early at this amount: new accounts",
-        "desc": "In the store currency, for an account with no paid usage invoice yet. When the unbilled usage reaches it, the usage is charged at once, without waiting for the monthly renewal."
+        "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value. For an account with no paid usage invoice yet. When the unbilled usage reaches it, the usage is charged at once, without waiting for the monthly renewal."
     },
     "usage_threshold": {
         "tab": "general",
@@ -138,7 +138,7 @@
         "default": 5,
         "min": 0,
         "label": "Minimum amount to charge a card for pay as you go",
-        "desc": "In the store currency, including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month's invoice instead. 0 turns this off."
+        "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value. Including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month's invoice instead. 0 turns this off."
     },
     "offer_monthly": {
         "tab": "general",
@@ -172,7 +172,7 @@
         "default": 10,
         "min": 1,
         "label": "Smallest top-up",
-        "desc": "In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited."
+        "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value. No VAT is charged on a top-up: the customer pays this amount and all of it is credited."
     },
     "credit_max": {
         "tab": "general",
@@ -181,7 +181,7 @@
         "default": 1000,
         "min": 1,
         "label": "Largest top-up",
-        "desc": "In the store currency."
+        "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value."
     },
     "site_tag": {
         "tab": "proxmox",

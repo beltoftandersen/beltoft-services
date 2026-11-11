@@ -47,6 +47,61 @@ final class Code {
 		add_filter( 'woocommerce_coupon_is_valid', array( __CLASS__, 'not_in_cart' ), 10, 2 );
 		add_filter( 'woocommerce_coupon_error', array( __CLASS__, 'cart_message' ), 10, 3 );
 		add_action( 'template_redirect', array( __CLASS__, 'handle' ) );
+		add_action( 'woocommerce_coupon_options', array( __CLASS__, 'currency_field' ) );
+		add_action( 'woocommerce_coupon_options_save', array( __CLASS__, 'save_currency' ), 10, 2 );
+	}
+
+	/** Coupon meta: the currency of a credit code ('' is the shop's). */
+	public const META_CURRENCY = '_beltoft_services_credit_currency';
+
+	/**
+	 * The currency field of the coupon screen: only on a shop with more than one currency, and only meaningful for a credit code.
+	 *
+	 * @param mixed $coupon_id Coupon id.
+	 */
+	public static function currency_field( $coupon_id ): void {
+		$codes = Currency::known_codes();
+
+		if ( count( $codes ) < 2 || ! function_exists( 'woocommerce_wp_select' ) ) {
+			return;
+		}
+
+		$options = array();
+
+		foreach ( $codes as $code ) {
+			$options[ $code ] = $code;
+		}
+
+		woocommerce_wp_select(
+			array(
+				'id'          => self::META_CURRENCY,
+				'label'       => __( 'Credit code currency', 'beltoft-services' ),
+				'description' => __( 'For an account credit code: the currency the amount is in. A customer whose credit is in another currency cannot redeem it.', 'beltoft-services' ),
+				'desc_tip'    => true,
+				'options'     => $options,
+				'value'       => '' !== (string) get_post_meta( (int) $coupon_id, self::META_CURRENCY, true ) ? (string) get_post_meta( (int) $coupon_id, self::META_CURRENCY, true ) : Currency::base(),
+			)
+		);
+	}
+
+	/**
+	 * Saves the currency of a credit code (only a currency this shop sells in).
+	 *
+	 * @param mixed $post_id Coupon id.
+	 * @param mixed $coupon  Coupon.
+	 */
+	public static function save_currency( $post_id, $coupon = null ): void {
+		unset( $coupon );
+
+		if ( ! isset( $_POST[ self::META_CURRENCY ] ) || ! current_user_can( 'edit_shop_coupon', (int) $post_id ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verified the coupon form.
+			return;
+		}
+
+		$code = Currency::clean( sanitize_text_field( wp_unslash( (string) $_POST[ self::META_CURRENCY ] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified by WooCommerce.
+
+		if ( '' !== $code && in_array( $code, Currency::known_codes(), true ) ) {
+			update_post_meta( (int) $post_id, self::META_CURRENCY, Currency::base() === $code ? '' : $code );
+		}
 	}
 
 	/**
@@ -57,7 +112,7 @@ final class Code {
 	 */
 	public static function types( $types ) {
 		if ( is_array( $types ) ) {
-			$types[ self::TYPE ] = __( 'Account credit (redeemed on the Billing page, amount in the store currency)', 'beltoft-services' );
+			$types[ self::TYPE ] = __( 'Account credit (redeemed on the Billing page, amount in the currency set on the code, the shop\'s by default)', 'beltoft-services' );
 		}
 
 		return $types;
@@ -184,7 +239,7 @@ final class Code {
 		}
 
 		// A code is in the shop's currency unless the coupon says otherwise (its meta); it is only credited to a balance in that currency.
-		$currency = (string) $coupon->get_meta( '_beltoft_services_credit_currency', true );
+		$currency = (string) $coupon->get_meta( self::META_CURRENCY, true );
 		$currency = '' !== Currency::clean( $currency ) ? Currency::clean( $currency ) : Currency::base();
 
 		if ( ! Balance::allows( $user_id, $currency ) ) {

@@ -132,7 +132,7 @@ final class Grant {
 		<table class="form-table" role="presentation">
 			<tr>
 				<th><?php esc_html_e( 'Balance', 'beltoft-services' ); ?></th>
-				<td><strong><?php echo esc_html( Page::money( Balance::get( (int) $user->ID ), $currency ) ); ?></strong></td>
+				<td><strong><?php echo esc_html( Page::money( Balance::get( (int) $user->ID ), $currency ) . ' (' . $currency . ')' ); ?></strong></td>
 			</tr>
 			<tr>
 				<th><label for="beltoft-credit-amount"><?php esc_html_e( 'Add account credit', 'beltoft-services' ); ?></label></th>
@@ -149,7 +149,7 @@ final class Grant {
 					<th><?php esc_html_e( 'Latest rows', 'beltoft-services' ); ?></th>
 					<td>
 						<?php foreach ( $rows as $row ) : ?>
-							<?php echo esc_html( wp_date( (string) get_option( 'date_format' ), (int) strtotime( $row['created'] . ' UTC' ) ) . ': ' . Page::row_label( $row ) . ', ' . Page::money( (int) $row['amount_cents'], $currency, true ) ); ?><br>
+							<?php echo esc_html( wp_date( (string) get_option( 'date_format' ), (int) strtotime( $row['created'] . ' UTC' ) ) . ': ' . Page::row_label( $row ) . ', ' . Page::money( (int) $row['amount_cents'], $currency, true ) . ' ' . $currency ); ?><br>
 						<?php endforeach; ?>
 					</td>
 				</tr>

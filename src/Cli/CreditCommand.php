@@ -27,7 +27,7 @@ final class CreditCommand {
 	 * : User id, login or email.
 	 *
 	 * <amount>
-	 * : Amount in the store currency, without VAT, such as 10 or -2.50.
+	 * : Amount in the customer's credit currency, without VAT, such as 10 or -2.50.
 	 *
 	 * --reason=<text>
 	 * : Why (required). The customer sees it.
