@@ -637,8 +637,8 @@ div.beltoft-services-vm__more > h4 { margin-top: 16px; }
 .beltoft-services-srv__extra:empty { display: none; }
 .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: block; }
 .beltoft-services-servers--area .beltoft-services-http-open { justify-self: end; margin: 0; }
-@container (max-width: 620px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; } }
-@media (max-width: 700px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; } }
+@container (max-width: 620px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; } .beltoft-services-servers--area .beltoft-services-http-open { grid-column: 1 / -1; justify-self: start; margin-top: 4px; } }
+@media (max-width: 700px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; } .beltoft-services-servers--area .beltoft-services-http-open { grid-column: 1 / -1; justify-self: start; margin-top: 4px; } }
 .beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 880px; margin: 0 0 12px; }
 .beltoft-services-domains.is-empty .beltoft-services-list-actions, .beltoft-services-list-actions.is-start { justify-content: flex-start; margin: 12px 0 0; }
 .beltoft-services-list-actions a.beltoft-services-list-btn { white-space: nowrap; }
